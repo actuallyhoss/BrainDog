@@ -39,7 +39,10 @@ const NONE: ReadonlySet<string> = new Set();
 const nothing = (): void => undefined;
 
 /** Whether this address is a shared page, inside a record or not. */
-export const shared = (pathname: string): boolean => here(pathname).startsWith('/s/');
+export const shared = (pathname: string): boolean => {
+  const at = here(pathname);
+  return at === '/s' || at.startsWith('/s/');
+};
 
 /** `titleOf`'s separator (`lib/title.ts`). */
 const PART = ' · ';

@@ -40,6 +40,8 @@ export type NamedPair = {
   evidence: string;
   score: number | null;
   can: boolean;
+  /** What Slash read of the pair when it judged them ("Slash reads these as one."), or empty when nothing judged it. */
+  reading: string;
 };
 
 /** One line of the tile: the pair's handle, the two names, the reason under them, and whether he can be asked. */
@@ -76,13 +78,13 @@ function sideOf(v: unknown): NamedSide | null {
 /** One pair the screen can say, or `null`: one with no handle, or a side it cannot name, is dropped. */
 function pairOf(v: unknown): NamedPair | null {
   if (typeof v !== 'object' || v === null) return null;
-  const p = v as { pair?: unknown; kind?: unknown; how?: unknown; a?: unknown; b?: unknown; evidence?: unknown; score?: unknown; can?: unknown };
+  const p = v as { pair?: unknown; kind?: unknown; how?: unknown; a?: unknown; b?: unknown; evidence?: unknown; score?: unknown; can?: unknown; reading?: unknown };
   const pair = typeof p.pair === 'string' ? p.pair.trim() : '';
   const a = sideOf(p.a);
   const b = sideOf(p.b);
   if (pair === '' || !a || !b) return null;
   const score = typeof p.score === 'number' && Number.isFinite(p.score) ? p.score : null;
-  return { pair, kind: plain(p.kind), how: plain(p.how), a, b, evidence: plain(p.evidence), score, can: p.can === true };
+  return { pair, kind: plain(p.kind), how: plain(p.how), a, b, evidence: plain(p.evidence), reading: plain(p.reading), score, can: p.can === true };
 }
 
 /** The record's answer as the pairs the screen holds, or `null`. A REFUSAL IS NOTHING, and so is no list of pairs. */
@@ -100,7 +102,7 @@ export function namedOf(answer: unknown): NamedPair[] | null {
  */
 export function namedTile(pairs: readonly NamedPair[] | null): NamedTile | null {
   if (!pairs || pairs.length === 0) return null;
-  const lines = pairs.slice(0, NAMED_SHOWN).map((p) => ({ pair: p.pair, text: `${p.a.name} and ${p.b.name}`, why: p.evidence, can: p.can }));
+  const lines = pairs.slice(0, NAMED_SHOWN).map((p) => ({ pair: p.pair, text: `${p.a.name} and ${p.b.name}`, why: p.reading === '' ? p.evidence : `${p.reading} ${p.evidence}`, can: p.can }));
   const rest = pairs.length - lines.length;
   return { heading: NAMED_HEADING, lines, more: rest > 0 ? `and ${String(rest)} more` : '' };
 }

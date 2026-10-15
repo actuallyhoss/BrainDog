@@ -178,3 +178,12 @@ test('A PHRASE FOLDED INTO A LINE AND SAID APART LIGHTS AS WHAT THE LINE BECAME,
   ]);
   assert.ok(litIn(`So, ${said}`, [line]).every((r) => r.became === null), 'a stale line lit its other span');
 });
+
+test('THE RULES SAY THEY READ IT FOR ANY CAUSE, and the month spent keeps its own line (USE-B05)', () => {
+  assert.equal(firstRun.readByRulesAny, 'Simple rules read this. Check what was heard, and tell it more.');
+  assert.match(firstRun.readByRules, /out of asks this month/u, 'the spent month still says why');
+  assert.notEqual(firstRun.readByRulesAny, firstRun.readByRules);
+  /* BEFORE THE PRESS: what Next does, plain, with no dash a person would read as an em dash. */
+  assert.equal(firstRun.readOnPress, 'Pressing Next lets a model read what you wrote, once, to set this up. Nothing is kept until you keep it.');
+  for (const w of [firstRun.readByRulesAny, firstRun.readOnPress]) assert.doesNotMatch(w, /—/u, w);
+});

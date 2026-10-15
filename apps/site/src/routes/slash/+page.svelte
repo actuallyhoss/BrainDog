@@ -60,8 +60,8 @@
   const merchants = inbox.rows.map((r) => r[0]);
 
   /* CREDITS: each plan's month and each pack, on one scale. FREE LEADS (DIRECTION §35): Free is first and the one bar
-     in ink, and the paid plans follow as more. `PACKS` is empty until one is sold, so no pack bar is drawn and the
-     meta line says they are coming later. */
+     in ink, and the paid plans follow as more. `PACKS` is empty until billing is on (`plans.ts` `packsOnSale`), so
+     until then no pack bar is drawn and the meta line says they are coming later. */
   const credits = [
     { label: free.name, n: free.allowance.credits, shown: String(free.allowance.credits), ink: true },
     { label: cloud.name, n: cloud.allowance.credits, shown: String(cloud.allowance.credits), ink: false },

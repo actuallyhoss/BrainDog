@@ -72,11 +72,18 @@ export function groupChips(paths: readonly string[]): ChipGroup[] {
  */
 export type Picker = 'list' | 'call' | 'field' | 'script' | 'member';
 
+/** What the record says an argument is picked from (`GrammarArg.from`), by the picker that offers it. */
+const FROM_PICKER: Readonly<Record<string, Picker>> = { list: 'list', call: 'call', field: 'field', script: 'script', person: 'member' };
+
 /*
  * A SCRIPT IS ONE THE RECORD HAS INSTALLED, and a person asked is one of its members by the id the record holds for
  * them: both were boxes wanting an internal name (`script.id`, `ask_person.to`) that nobody at the canvas could know.
+ *
+ * THE RECORD'S `from` FIRST. The guesses from the verb and the path stand only for an argument the grammar says
+ * nothing of; one it says is picked from something this sheet has no picker for yet (a job, a figure, a door) is a box.
  */
-export function pickerOf(verb: Verb | string, path: readonly string[]): Picker | null {
+export function pickerOf(verb: Verb | string, path: readonly string[], from?: string): Picker | null {
+  if (from !== undefined) return Object.hasOwn(FROM_PICKER, from) ? FROM_PICKER[from]! : null;
   const last = path[path.length - 1];
   if (last === 'register') return 'list';
   if ((verb === 'call' && last === 'ingest') || (verb === 'run' && path.length === 1)) return 'call';

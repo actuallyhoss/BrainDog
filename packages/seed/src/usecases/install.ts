@@ -19,8 +19,10 @@
  * it on Home in place of the house figures (`homePageOf`).
  */
 
+import { holdsIn } from '@braindog/declare';
+
 import { AGENTS_PACK, agentsPackDocument } from '../packs/agents.ts';
-import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
+import { crossPack, FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId } from '../packs/first-party.ts';
 import { CATEGORIES_REGISTER, STARTER_CATEGORIES } from '../modules/money/lists/categories.ts';
 import { dated, dayOf } from './dates.ts';
 import { BUSINESS_EXAMPLES, BUSINESS_NAMES } from './business.ts';
@@ -324,7 +326,19 @@ export const forms = (u: UseCase): boolean => Object.hasOwn(FORMS, u.usecase);
  * `personal.ts`). `examples: true` carries them for a preview or a test,
  * and a formed plan still wins over them, because it is what the person asked for.
  */
-export function carriedDocument(u: UseCase, today: string, said?: string | null, options: { examples?: boolean; starters?: boolean } = {}): Body | null {
+export function carriedDocument(
+  u: UseCase,
+  today: string,
+  said?: string | null,
+  options: { examples?: boolean; starters?: boolean; holds?: ReadonlySet<string> } = {},
+): Body | null {
+  const doc = carriedWhole(u, today, said, options);
+  /* CUT TO WHAT THE RECORD WILL HOLD WHEN IT IS SAID (`fitted`), so a use case that goes in with only what it stands on
+     opens on pages it can draw. Not said, the document is the whole one, as it always was. */
+  return doc === null || options.holds === undefined ? doc : fitted(doc, options.holds);
+}
+
+function carriedWhole(u: UseCase, today: string, said: string | null | undefined, options: { examples?: boolean; starters?: boolean }): Body | null {
   const formed = formedFor(u, said);
   if (!formed) {
     const doc = useCaseDocument(u.usecase, today);
@@ -339,16 +353,21 @@ export function carriedDocument(u: UseCase, today: string, said?: string | null,
 }
 
 /**
- * THE SAME PLAN, AS ROWS TO WRITE ONCE THE PACK IS IN: the rows formed from what the person said, tagged as the install
- * tags them, with the links to make once they are in. A sentence that forms nothing plants nothing, because the use
- * case's own examples are never written (`carriedDocument`).
+ * THE SAME PLAN, AS ROWS TO WRITE ONCE THE PACK IS IN: the rows formed from what the person said, with the links to make
+ * once they are in. A sentence that forms nothing plants nothing, because the use case's own examples are never written
+ * (`carriedDocument`).
+ *
+ * A FORMED ROW CARRIES `formed` AND NEVER `example` (USE-B07): what somebody's own words asked for is theirs, so "Clear
+ * the examples" can never take it, and no fresh record holds a row tagged `example`. A row that is not formed, which the
+ * plan carries none of today, is still tagged as the install tags it.
  */
 export function plantedRows(u: UseCase, today: string, said?: string | null): { rows: { register: string; fields: Body }[]; links: ExampleLink[] | undefined } {
   const doc = carriedDocument(u, today, said);
   const rows = ((doc?.seeds ?? []) as Body[]).map((s) => {
     const fields = (s.fields ?? {}) as Body;
     const tags = Array.isArray(fields.tags) ? fields.tags.map(String) : [];
-    return { register: String(s.register), fields: { ...fields, tags: tags.includes(EXAMPLE_TAG) ? tags : [...tags, EXAMPLE_TAG] } };
+    const mine = tags.includes(FORMED_TAG);
+    return { register: String(s.register), fields: { ...fields, tags: mine ? tags.filter((t) => t !== EXAMPLE_TAG) : tags.includes(EXAMPLE_TAG) ? tags : [...tags, EXAMPLE_TAG] } };
   });
   return { rows, links: formedFor(u, said)?.links };
 }
@@ -367,10 +386,242 @@ export function withoutRows(doc: Body, options: { starters?: boolean } = {}): Bo
   return kept.length > 0 ? { ...rest, seeds: kept } : rest;
 }
 
+/* ── a document cut to the lists a record holds ─────────────────────────── */
+
+/** The lists the kernel seats in every record, which no pack declares and so no `holds` names. */
+const KERNEL_LISTS = ['session'];
+
+/** What a figure reads: the lists it is counted over, and the lists of the document that declares it. */
+type Figure = { lists: readonly string[]; owners: readonly string[] };
+
+const listIn = (v: unknown): string | null => (typeof v === 'string' && v.startsWith('register.') ? v.slice('register.'.length) : null);
+
+/** Every list a `where:` written as a tree points through (`pointed: { register }`), at any depth. */
+function pointedIn(v: unknown, out: string[] = []): string[] {
+  if (Array.isArray(v)) for (const x of v) pointedIn(x, out);
+  else if (isBody(v)) for (const [k, x] of Object.entries(v)) k === 'pointed' && isBody(x) && typeof x.register === 'string' ? (out.push(x.register), pointedIn(x, out)) : pointedIn(x, out);
+  return out;
+}
+
+/** The lists a figure is counted over: its source and every list its `where:` points through. Its legs are cut apart. */
+const figureLists = (d: Body): string[] => [...(listIn(d.source) === null ? [] : [listIn(d.source)!]), ...pointedIn(d.where)];
+
+/** The lists a document declares that wait on nothing (`when: { holds }` is the plan's to settle). */
+const ownLists = (decls: readonly Body[]): string[] => decls.flatMap((d) => (typeof d.register === 'string' && holdsIn(d.when) === null ? [d.register] : []));
+
+/**
+ * THE FIGURES AND PAGES EVERY DOCUMENT THE SEED SHIPS DECLARES, read once from the documents themselves and never listed
+ * by name: a use case's block that tests another add-on's figure, or a block it adds to another add-on's page, is there
+ * only while the record holds what that add-on is. A figure or page nobody here declares is the kernel's own, always held.
+ */
+let shipped: { figures: Map<string, Figure>; pages: Map<string, readonly string[]> } | null = null;
+function catalogue(): NonNullable<typeof shipped> {
+  if (shipped) return shipped;
+  const figures = new Map<string, Figure>();
+  const pages = new Map<string, readonly string[]>();
+  const docs = [{ declarations: crossPack() }, ...FIRST_PARTY.map((id) => firstPartyDocument(id)), agentsPackDocument()];
+  for (const doc of docs) {
+    const decls = (Array.isArray(doc?.declarations) ? doc.declarations : []).filter(isBody);
+    const owners = ownLists(decls);
+    for (const d of decls) {
+      if (typeof d.metric === 'string') figures.set(d.metric, { lists: figureLists(d), owners });
+      if (typeof d.page === 'string' && owners.length > 0) pages.set(d.page, owners);
+    }
+  }
+  shipped = { figures, pages };
+  return shipped;
+}
+
+/** The figure ids a block's `when:` tests, at any depth (`{ all: [{ metric }] }`), each without its argument. */
+function figuresIn(v: unknown, out: string[] = []): string[] {
+  if (Array.isArray(v)) for (const x of v) figuresIn(x, out);
+  else if (isBody(v)) for (const [k, x] of Object.entries(v)) typeof x === 'string' && k === 'metric' ? out.push(x.split(':')[0]!) : figuresIn(x, out);
+  return out;
+}
+
+/** The ids a sentence fills in (`{{cash-now}}`, `{{orders-owed.first_who}}`), each as far as its first `.` or `:`. */
+const filledIn = (v: unknown): string[] => (typeof v === 'string' ? [...v.matchAll(/\{\{\s*([a-z0-9][a-z0-9_-]*)/gu)].map((m) => m[1]!) : []);
+
+/** Whether a `where:`, as words or as a tree, names one of these fields. */
+const whereNames = (where: unknown, fields: ReadonlySet<string>): boolean =>
+  fields.size > 0 &&
+  (typeof where === 'string'
+    ? [...fields].some((f) => new RegExp(`(?:^|,\\s*)${escapeWord(f)}\\s`, 'u').test(where))
+    : [...fields].some((f) => JSON.stringify(where ?? null).includes(`"field":${JSON.stringify(f)}`)));
+
+/** A block's kinds that only frame the others: a page left with these alone is a heading over a hole. */
+const FRAMES = new Set(['note', 'section']);
+
+/**
+ * A DOCUMENT CUT TO THE LISTS A RECORD HOLDS (USE-B08), for any pack, so a use case can go in with what it stands on and
+ * grow into the rest. `holds` is every list the record will hold once the document is in; the document's own lists and
+ * the kernel's are held whatever it says. Out go: a list's link field to a list not held (with the columns, filters,
+ * roles and seed values over it); a figure counted over a list not held, or asked of a field so taken out; a rule about,
+ * or writing to, a list not held; a feed writing to one; a block reading one, testing a figure that went, or saying one in
+ * its words; a page per row of a list not held, and a page left with nothing but a heading; a list not held from each
+ * page's `requires`, from what the document extends and from what it adds to other pages. A PART THAT SAYS
+ * `when: { holds }` IS LEFT TO THAT RULE (`@braindog/declare` `when.ts`), which the plan settles. Nothing is named here:
+ * what each figure and page reads is read off the documents themselves (`catalogue`).
+ */
+export function fitted(doc: Body, holds: ReadonlySet<string>): Body {
+  const decls = (Array.isArray(doc.declarations) ? (doc.declarations as unknown[]) : []).filter(isBody);
+  const held = new Set([...holds, ...ownLists(decls), ...KERNEL_LISTS]);
+  const has = (list: string | null): boolean => list === null || held.has(list);
+  const waits = (part: Body): boolean => holdsIn(part.when) !== null;
+  const isLink = (f: Body): boolean => (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) && typeof f.to === 'string';
+  /* A LINK FIELD TO A LIST NOT HELD, BY ITS OWN LIST, since two lists may share a field id and point it at different lists. */
+  const goneIn = new Map<string, Set<string>>();
+  for (const d of decls)
+    if (typeof d.register === 'string' && !waits(d))
+      for (const f of (Array.isArray(d.fields) ? (d.fields as unknown[]) : []).filter(isBody))
+        if (isLink(f) && !waits(f) && !has(String(f.to))) goneIn.set(d.register, (goneIn.get(d.register) ?? new Set<string>()).add(String(f.id)));
+  const goneOf = (list: string | null): ReadonlySet<string> => (list === null ? new Set<string>() : (goneIn.get(list) ?? new Set<string>()));
+  const gone = new Set([...goneIn.values()].flatMap((s) => [...s]));
+  const fieldGone = (list: string | null, field: unknown): boolean => goneOf(list).has(String(field));
+  /* THE DOCUMENT'S OWN FIGURES FIRST, each with its legs over lists not held taken off, since a block tests them by id. */
+  const legsKept = (legs: unknown): Body[] => (Array.isArray(legs) ? (legs as unknown[]).filter(isBody).filter((l) => typeof l.register !== 'string' || has(l.register)) : []);
+  const figures = new Map<string, Body | null>();
+  for (const d of decls) {
+    if (typeof d.metric !== 'string' || waits(d)) continue;
+    const legs = Array.isArray(d.legs) ? legsKept(d.legs) : null;
+    const reads = figureLists(d).every(has) && !whereNames(d.where, goneOf(listIn(d.source))) && (legs === null || legs.length > 0);
+    figures.set(d.metric, reads ? (legs === null ? d : { ...d, legs }) : null);
+  }
+  const figureHeld = (id: string): boolean => {
+    if (figures.has(id)) return figures.get(id) !== null;
+    const f = catalogue().figures.get(id);
+    return f === undefined || (f.lists.every(has) && (f.owners.length === 0 || f.owners.some(has)));
+  };
+  const knownFigure = (id: string): boolean => figures.has(id) || catalogue().figures.has(id);
+  const sourceHeld = (source: unknown): boolean =>
+    typeof source !== 'string' ? true : source.startsWith('metric.') ? figureHeld(source.slice('metric.'.length)) : has(listIn(source));
+  /** A block as it stands on this record, or `null` when it reads what the record will not hold. */
+  const block = (b: Body): Body | null => {
+    if (waits(b)) return b;
+    const list = listIn(b.source);
+    if (!sourceHeld(b.source) || (typeof b.register === 'string' && !has(b.register))) return null;
+    if (!figuresIn(b.when).every(figureHeld)) return null;
+    if ((['body', 'heading', 'empty'] as const).some((k) => filledIn(b[k]).some((id) => knownFigure(id) && !figureHeld(id)))) return null;
+    if (whereNames(b.where, goneOf(list))) return null;
+    if (GROUPED_BY_FIRST.has(String(b.kind)) && Array.isArray(b.columns) && fieldGone(list, (b.columns as Body[])[0]?.field)) return null;
+    const out: Body = { ...b };
+    if (Array.isArray(b.columns))
+      out.columns = (b.columns as unknown[]).filter((c) => !isBody(c) || (!fieldGone(list, c.field) && (typeof c.metric !== 'string' || figureHeld(c.metric.split(':')[0]!))));
+    for (const k of ['cells', 'series'] as const) {
+      if (!Array.isArray(b[k])) continue;
+      const kept = (b[k] as unknown[]).filter((c) => !isBody(c) || typeof c.metric !== 'string' || figureHeld(c.metric.split(':')[0]!));
+      if (kept.length === 0) return null;
+      out[k] = kept;
+    }
+    if (Array.isArray(b.from)) out.from = legsKept(b.from);
+    return JSON.stringify(out) === JSON.stringify(b) ? b : out;
+  };
+  const page = (d: Body): Body | null => {
+    if (waits(d)) return d;
+    if (isBody(d.for) && typeof d.for.register === 'string' && !has(d.for.register)) return null;
+    const out: Body = { ...d };
+    /* A PAGE THAT KEEPS NO LIST SAYS NONE, since the kernel reads `requires: []` as malformed and no key as nothing wanted. */
+    if (Array.isArray(d.requires)) {
+      const kept = (d.requires as unknown[]).filter((r) => has(listIn(r)));
+      if (kept.length > 0) out.requires = kept;
+      else delete out.requires;
+    }
+    if (Array.isArray(d.filters)) {
+      const kept = (d.filters as unknown[]).filter((f) => !isBody(f) || !gone.has(String(f.field)));
+      if (kept.length > 0) out.filters = kept;
+      else delete out.filters;
+    }
+    if (Array.isArray(d.blocks)) {
+      const blocks = (d.blocks as unknown[]).flatMap((b) => (isBody(b) ? (block(b) ?? []) : [b]));
+      if (blocks.length < d.blocks.length && blocks.every((b) => isBody(b) && FRAMES.has(String(b.kind)))) return null;
+      out.blocks = blocks;
+    }
+    return out;
+  };
+  const rule = (d: Body): boolean => {
+    const on = isBody(d.on) && isBody(d.on.written) ? d.on.written.register : undefined;
+    const creates = (['then', 'steps'] as const).flatMap((k) => (Array.isArray(d[k]) ? (d[k] as unknown[]) : []).flatMap((a) => (isBody(a) && isBody(a.create) ? [a.create.register] : [])));
+    return [d.register, on, ...creates].every((l) => typeof l !== 'string' || has(l));
+  };
+  const feed = (d: Body): boolean => {
+    const target = isBody(d.writes) ? d.writes.register : undefined;
+    const lists = isBody(target) ? (Array.isArray(target.to) ? (target.to as unknown[]) : []).map((r) => (isBody(r) ? r.register : undefined)) : [target];
+    return lists.every((l) => typeof l !== 'string' || has(l));
+  };
+  const list = (d: Body): Body => {
+    const cut = goneOf(d.register as string);
+    if (cut.size === 0) return d;
+    const out: Body = { ...d, fields: (d.fields as unknown[]).filter((f) => !isBody(f) || !cut.has(String(f.id))) };
+    if (Array.isArray(d.mobile)) out.mobile = (d.mobile as unknown[]).filter((f) => !cut.has(String(f)));
+    for (const key of ROLE_KEYS) {
+      const role = d[key];
+      if (!isBody(role) || waits(role)) continue;
+      const kept = Object.fromEntries(Object.entries(role).filter(([, field]) => !cut.has(String(field))));
+      if (Object.keys(kept).length > 0) out[key] = kept;
+      else delete out[key];
+    }
+    /* A LIST WHOSE ROWS ARE STEPS OF ANOTHER'S says which link names that row (`steps: { of }`); with the link gone its
+       rows are a list of their own, and the kernel refuses a `steps:` naming a field the list does not have. */
+    if (isBody(d.steps) && cut.has(String(d.steps.of))) delete out.steps;
+    if (Array.isArray(d.search)) out.search = (d.search as unknown[]).filter((f) => !cut.has(String(f)));
+    if (isBody(d.same)) {
+      const same: Body = { ...d.same };
+      if (Array.isArray(same.fields)) same.fields = (same.fields as unknown[]).filter((f) => !cut.has(String(f)));
+      if (cut.has(String(same.within))) delete same.within;
+      out.same = same;
+    }
+    return out;
+  };
+  const declarations = decls.flatMap((d): Body[] => {
+    if (waits(d)) return [d];
+    if (typeof d.register === 'string') return [list(d)];
+    if (typeof d.metric === 'string') return figures.get(d.metric) ? [figures.get(d.metric)!] : [];
+    if (typeof d.page === 'string') {
+      const p = page(d);
+      return p ? [p] : [];
+    }
+    if (typeof d.rule === 'string') return rule(d) ? [d] : [];
+    if (typeof d.ingest === 'string') return feed(d) ? [d] : [];
+    return [d];
+  });
+  const out: Body = { ...doc, ...(Array.isArray(doc.declarations) ? { declarations } : {}) };
+  if (Array.isArray(doc.seeds))
+    out.seeds = (doc.seeds as unknown[]).filter(isBody).flatMap((s) =>
+      typeof s.register === 'string' && !has(s.register)
+        ? []
+        : [goneOf(String(s.register)).size === 0 || !isBody(s.fields) ? s : { ...s, fields: Object.fromEntries(Object.entries(s.fields).filter(([k]) => !fieldGone(String(s.register), k))) }],
+    );
+  if (isBody(doc.extends)) {
+    const kept = Object.fromEntries(Object.entries(doc.extends).filter(([id]) => has(listIn(id))));
+    if (Object.keys(kept).length > 0) out.extends = kept;
+    else delete out.extends;
+  }
+  if (Array.isArray(doc.adds)) {
+    const onto = (p: unknown): boolean => {
+      const owners = typeof p === 'string' ? catalogue().pages.get(p.replace(/^page\./u, '')) : undefined;
+      return owners === undefined || owners.some(has);
+    };
+    const kept = (doc.adds as unknown[]).flatMap((a) => {
+      if (!isBody(a) || !isBody(a.block)) return [a];
+      const b = onto(a.page) ? block(a.block) : null;
+      return b === null ? [] : [b === a.block ? a : { ...a, block: b }];
+    });
+    if (kept.length > 0) out.adds = kept;
+    else delete out.adds;
+  }
+  return JSON.stringify(out) === JSON.stringify(doc) ? doc : out;
+}
+
+/** The block kinds whose first column is what they group by, so they say nothing once it is gone. */
+const GROUPED_BY_FIRST = new Set(['bar', 'split']);
+
+/** The keys a list declares a role with, each part naming the field that plays it (`packages/kernel/src/roles.ts`). */
+const ROLE_KEYS = ['meets', 'rates', 'hand', 'org'] as const;
+
 /** The tag the install path puts on every row a pack seeds. */
 const EXAMPLE_TAG = 'example';
 
-/** The tag a row formed around what the person said carries beside `example`, so Clear the examples never offers their plan. */
+/** The tag a row formed around what the person said carries, so Clear the examples never offers their plan. */
 export const FORMED_TAG = 'formed';
 
 /**

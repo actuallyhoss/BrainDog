@@ -2122,13 +2122,9 @@ test('AND EVERY OTHER PUBLISHED REGISTER KEY THIS BUILD READS NOWHERE IS NAMED, 
     assert.ok(said?.allowed?.includes('fields'), `${key}'s refusal does not say what a register body takes`);
   }
 
-  /* AND THE FIELD'S OWN THREE. `derive:` is the one `02 §5` calls the important option of the four,
-     and with nothing reading it a field declaring a derivation is an ordinary writable field
-     holding whatever a caller sent, so `unique: true` + `derive: { normalise }`, which `32 §4.4`
-     uses as the duplicate-detection fixture, dedupes on the raw text or on nothing. `min`, `max`
-     and `required_when` left this list when the write path began keeping them. */
+  /* AND THE FIELD'S OWN TWO. `derive:` left this list when the read path began working it out (`derive-read.test.ts`);
+     `min`, `max` and `required_when` left it when the write path began keeping them. */
   const onAField: [string, Record<string, unknown>][] = [
-    ['derive', { derive: { normalise: 'what' } }],
     ['note', { note: 'a comment for the next reader' }],
     ['register', { register: 'people' }],
   ];

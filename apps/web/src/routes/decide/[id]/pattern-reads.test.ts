@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import '../../../lib/record/fixtures/fill.ts';
 import { proposedOf } from './proposed.ts';
-import { patternReads, readsOf, totalOf, words } from './pattern-reads.ts';
+import { acceptSaid, closedSaid, patternReads, readsOf, totalOf, wholeOf, words } from './pattern-reads.ts';
 
 /* TWO OF `fixtures/names.ts`'s invented people and one of its projects, written here: a file under `src/` may not reach
    out of `apps/web` by a relative path (`graph`, 31 §3 layer 3), and the names file is no package to import. */
@@ -152,5 +152,70 @@ test('NO TOTAL ACROSS TWO CURRENCIES, and none when more wait than one rehearsal
   assert.equal(totalOf(tried, [0, 2]), 'EUR 5.00');
   const shown = [{ key: 'a1', channel: 'email', from: ' ', subject: '', body: '' }];
   const out = readsOf(shown, tried, (f) => f, { more: 40, tried: null });
-  assert.deepEqual(out, { rows: [{ from: null, fields: [{ field: 'amount', value: 'EUR 5.00' }] }], waiting: 40, total: null });
+  assert.deepEqual(out, { rows: [{ from: null, fields: [{ field: 'amount', value: 'EUR 5.00' }] }], waiting: 40, total: null, accept: null });
+});
+
+test('WHAT ACCEPT DOES IS SAID FROM THE SAME REHEARSAL: the whole ones filed with one Undo, the part one kept waiting', async () => {
+  const { io, asked } = standIn(ARRIVALS);
+  const out = await withRecord(io, () => patternReads('http://six.record.test', { ingest: INGEST, samples: ['a3', 'a2', 'a1'] }));
+  /* a5, a4 and a2 read every field; a3 has no day, so it waits in the same question. a1 was filed and is not counted. */
+  assert.equal(out?.accept, 'Accept files the 3 it reads, with one Undo. 1 keeps waiting: it reads only part of it.');
+  /* NEVER A SECOND REQUEST A SAMPLE: one rehearsal answers the reads and the counts alike. */
+  assert.equal(asked.filter((a) => a.method === 'tryPattern').length, 1);
+});
+
+test('MORE WAITING THAN ONE REHEARSAL READS: the rest are said as read when he accepts, never guessed from the ten', async () => {
+  const many: Arrival[] = Array.from({ length: 14 }, (_, i) => ({
+    id: `m${String(i).padStart(2, '0')}`,
+    from: SHOP,
+    state: 'untriaged' as const,
+    read: i % 5 === 0 ? { amount: eur(100), merchant: PROJECTS[1] } : { amount: eur(100), merchant: PROJECTS[1], day: '2026-10-03' },
+  }));
+  const { io } = standIn(many);
+  const out = await withRecord(io, () => patternReads('http://seven.record.test', { ingest: INGEST, samples: ['m00', 'm01', 'm02'] }));
+  /* TEN READ: m00 and m05 miss the day, eight read whole; four more wait past the rehearsal. */
+  assert.equal(out?.accept, 'Accept files the 8 it reads, with one Undo. 2 keep waiting: it reads only part of them. It reads the other 4 when you accept.');
+  assert.equal(out?.total, null);
+});
+
+test('one and many, none whole, and a count the walk could not reach', () => {
+  assert.equal(acceptSaid({ whole: 1, part: 0 }, 1), 'Accept files the one it reads, with Undo.');
+  assert.equal(acceptSaid({ whole: 28, part: 4 }, 32), 'Accept files the 28 it reads, with one Undo. 4 keep waiting: it reads only part of them.');
+  assert.equal(acceptSaid({ whole: 2, part: 1 }, 4), 'Accept files the 2 it reads, with one Undo. 1 keeps waiting: it reads only part of it. It reads the other one when you accept.');
+  assert.equal(acceptSaid({ whole: 1_200, part: 0 }, 1_200), 'Accept files the 1,200 it reads, with one Undo.');
+  /* NONE READ WHOLE: Accept still keeps the pattern, and says it files nothing yet. */
+  assert.equal(acceptSaid({ whole: 0, part: 0 }, 0), words.filesNone);
+  assert.equal(acceptSaid({ whole: 0, part: 3 }, 3), 'Accept keeps the pattern; nothing it reads yet would be filed. 3 keep waiting: it reads only part of them.');
+  assert.equal(acceptSaid({ whole: 0, part: 2 }, 12), 'Accept keeps the pattern; nothing it has read yet would be filed. 2 keep waiting: it reads only part of them. It reads the other 10 when you accept.');
+  /* MORE WAIT THAN THE WALK REACHED: how many is not said. */
+  assert.equal(acceptSaid({ whole: 7, part: 3 }, null), 'Accept files the 7 it reads, with one Undo. 3 keep waiting: it reads only part of them. It reads the rest that wait when you accept.');
+});
+
+test('A READ IS WHOLE WHEN IT FILLS EVERY FIELD THE PATTERN WRITES, and claimed; an empty value is a part read', () => {
+  const cell = (value: unknown, ok = true) => ({ ok, value: value as never, raw: null });
+  const tried = {
+    claims: [true, true, true, false],
+    fields: [
+      { field: 'amount', from: 'extract' as const, how: null, cells: [cell(eur(100)), cell(eur(200)), cell(eur(300)), cell(eur(400))] },
+      { field: 'merchant', from: 'extract' as const, how: null, cells: [cell(PROJECTS[0]), cell(''), cell(null, false), cell(PROJECTS[2])] },
+    ],
+    waited: null,
+  };
+  assert.deepEqual(wholeOf(tried, [0, 1, 2, 3]), { whole: 1, part: 3 });
+  assert.deepEqual(wholeOf(tried, []), { whole: 0, part: 0 });
+  /* AND readsOf SAYS IT ONLY WHEN THE WAITING ONES WERE READ. */
+  const shown = [{ key: 'a1', channel: 'email', from: SHOP, subject: '', body: '' }];
+  assert.equal(readsOf(shown, tried, (f) => f, { more: 3, tried: null, read: [0, 1, 2, 3], all: 4 }).accept, 'Accept files the one it reads, with Undo. 3 keep waiting: it reads only part of them.');
+  assert.equal(readsOf(shown, tried, (f) => f, { more: 3, tried: null }).accept, null);
+});
+
+test('A RESOLVED QUESTION SAYS THE RECORD\'S OWN CLOSING NOTE as it was written, and an open one says none', () => {
+  const note = 'Filed 4 with this pattern. 1 still waits: it reads only part of it.';
+  assert.equal(closedSaid(note, true), note);
+  assert.equal(closedSaid('Nothing waited.', true), 'Nothing waited.');
+  /* OPEN, or closed with nothing said, or a note that is not words: nothing stands in for the reads. */
+  assert.equal(closedSaid(note, false), null);
+  assert.equal(closedSaid(undefined, true), null);
+  assert.equal(closedSaid('  ', true), null);
+  assert.equal(closedSaid({ filed: 4 }, true), null);
 });

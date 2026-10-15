@@ -4,7 +4,8 @@
  * ONE PROMPT, NO MODEL. Onboarding already asks what this BrainDog is for. When the answer is a project, the words in it
  * pick a kind of project (a podcast, a shop, an app) and the guide opens on that kind's milestones, first steps, first
  * choices and what helps, instead of the six milestones any project passes. The same sentence always forms the same
- * plan, so a fresh self-host with nothing configured does it. Nothing heard, and the guide opens on the general plan.
+ * plan, so a fresh self-host with nothing configured does it. Nothing heard, and the guide opens on the general plan
+ * (`GENERAL_GUIDE`): the six milestones any project passes, formed the same way.
  *
  * THEY ARE YOUR PLAN, NOT EXAMPLE ROWS. They are planted the way examples are, so a person can edit, finish or delete them
  * like any row, but each carries the `formed` tag (`install.ts` `FORMED_TAG`), so a screen reading the tag (`web/lib/record/tags.ts`)
@@ -403,8 +404,39 @@ export function planFor(kind: GuideKind, heard: readonly string[] = []): FormedP
   return { kind: kind.kind, name: kind.name, heard, seeds, links };
 }
 
-/** The plan a sentence forms, or `null` when it names no kind of project and the guide keeps its general plan. */
+/**
+ * THE GENERAL PLAN, FOR A PROJECT OF NO KIND THE WORDS NAME: a boat to restore, a thesis, a wedding. Until USE-A09 these
+ * six milestones were the guide's example rows (`guide.ts` `seeds`), which a record is never given, so a guide for any
+ * other project opened on empty lists. Kept apart from `GUIDE_KINDS` because nothing in a sentence picks it: it has no
+ * signals, so it never wins `guideKindOf` and never claims a word from another use case (`install.ts` `FORM_WORDS`).
+ */
+export const GENERAL_GUIDE: GuideKind = {
+  kind: 'general',
+  name: 'a new project',
+  signals: [],
+  milestones: [
+    ['idea', 'Say what it is and who it is for'],
+    ['idea', 'Find the people who want it'],
+    ['plan', 'Plan the smallest first version'],
+    ['build', 'Make the first version'],
+    ['launch', 'Share it with the first people'],
+    ['grow', 'Keep it going and learn from it'],
+  ],
+  steps: [
+    { what: 'Write one sentence about what this is and who it is for', milestone: 0, by: '+2d' },
+    { what: 'Name three people who would use it', milestone: 1, by: '+5d' },
+    { what: 'Ask one of them what they would want first', milestone: 1, by: '+9d' },
+  ],
+  choices: [{ question: 'What will it be called?', milestone: 0 }],
+  resources: [{ name: 'Three projects like yours to learn from', kind: 'example', milestone: 2 }],
+};
+
+/**
+ * The plan a sentence forms: its kind's, or the general plan when it names no kind. Formed like any kind's, so its rows
+ * carry the `formed` tag and "Clear the examples" never takes them. `null` only for a sentence that says nothing at all.
+ */
 export function formGuide(said: string): FormedPlan | null {
+  if (said.trim() === '') return null;
   const found = guideKindOf(said);
-  return found ? planFor(found.kind, found.heard) : null;
+  return found ? planFor(found.kind, found.heard) : planFor(GENERAL_GUIDE);
 }

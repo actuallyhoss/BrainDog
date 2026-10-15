@@ -64,6 +64,7 @@
   import { listName } from '$lib/record/names.ts';
   import { byLine, foldOf, sentenceOf, suggestedOf, tallyOf, words as lineWords } from './lines.ts';
   import { cardInPlace, enterOn, leftUnanswered, words as inPlaceWords, type InPlace } from './in-place.ts';
+  import { outcomeLines, readOutcomes, type OutcomeLine } from '$lib/record/slash-outcomes.ts';
   import { beforeNavigate } from '$app/navigation';
   /* A TYPE ONLY: the card itself is fetched when an answer first needs it (`loadCard`), so no screen loads it for this one. */
   import type DecisionCardType from '$lib/decide/DecisionCard.svelte';
@@ -168,6 +169,27 @@
       engine = v !== null && typeof v === 'object' && 'health' in v ? v : null;
     } catch {
       /* Nothing to say. */
+    }
+  }
+
+  /**
+   * WHAT CAME OF ITS SUGGESTIONS (ENG-B01, ENG-A16 seen): read from `engineReadings`, the record asked whatever the shell says, and the tile
+   * (`SlashOutcomes.svelte`) fetched by `import()` only once the read has lines, so a record with nothing to say, an old
+   * host and a refusal load nothing more.
+   */
+  let Outcomes = $state<Component<{ lines: OutcomeLine[] }> | null>(null);
+  let outcomes = $state<OutcomeLine[]>([]);
+
+  async function loadOutcomes() {
+    if (!client) return;
+    const lines = outcomeLines(await readOutcomes(client));
+    if (lines.length === 0) return;
+    try {
+      const m = await import('./SlashOutcomes.svelte');
+      outcomes = lines;
+      Outcomes = m.default;
+    } catch {
+      /* A CHUNK THAT DID NOT ARRIVE leaves Slash as it is, without the tile. */
     }
   }
 
@@ -325,6 +347,7 @@
     void read(load);
     void loadAsks();
     void loadEngine();
+    void loadOutcomes();
     if (page.data.me?.owner === true)
       void import('./PageJobs.svelte').then(
         (m) => (PageJobs = m.default),
@@ -549,6 +572,9 @@
         </ul>
       {/if}
     </Tile>
+
+    <!-- HOW ITS SUGGESTIONS ENDED, under the ones still open: the third tile before the fold, drawn only with something to say. -->
+    {#if Outcomes}<Outcomes lines={outcomes} />{/if}
 
     {#if folded}
       <!--

@@ -13,7 +13,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 
 import { checkPerson } from '../check-files.mjs';
-import { endOf, expect, lineOf, notMine, redOf, refusedWhy, selfHost, STEPS, walk } from '../expect/first-run.mjs';
+import { endOf, expect, firstReadAt, lineOf, marked, notMine, redOf, refusedWhy, selfHost, STEPS, walk } from '../expect/first-run.mjs';
 import { words as signupWords } from '../../../apps/web/src/routes/signup/words.ts';
 import { propose } from '../../../apps/web/src/lib/start/propose.ts';
 import { answer, oneQuestion } from '../../../apps/web/src/lib/start/question.ts';
@@ -357,4 +357,21 @@ test('THE LAST LINE: a green hosted run says day 15 was not walked, so it cannot
   assert.equal(endOf([], hosted), 'red. 0 of 7 steps green');
   /* And the line never disagrees with what the command leaves with. */
   for (const r of [green, withStep('offer', null), withStep('keep', null), withStep('today', undefined), []]) for (const h of [hosted, moves]) assert.equal(endOf(r, h).startsWith('red. '), redOf(r, h));
+});
+
+test('THE CHECKS BESIDE THE STEPS: the hard sentence, one box and one email, four presses, a reading in thirty seconds; each red by itself', async () => {
+  const ctx = { zone: MARIAM.zone, locale: MARIAM.locale };
+  assert.equal(expect.hard({ proposal: { usecase: 'shop' }, by: 'glm-5.3-flash' }, MARIAM).pass, true);
+  assert.match(expect.hard({ proposal: { usecase: null }, by: 'glm-5.3-flash' }, MARIAM).saw, /read by the model as none, not shop/u);
+  assert.equal(expect.hard({ proposal: { usecase: null }, by: 'rules' }, MARIAM).pass, null);
+  assert.equal(expect.fields({ fields: [{ role: 'textbox' }, { role: 'textbox', type: 'email' }] }).pass, true);
+  assert.match(expect.fields({ fields: [{ role: 'textbox' }, { role: 'textbox' }, { role: 'textbox', type: 'email' }] }).saw, /2 boxes to type in, not 1/u);
+  assert.equal(expect.presses({ presses: ['a', 'b', 'c', 'd'] }).pass, true);
+  assert.match(expect.presses({ presses: ['a', 'b', 'c', 'd', 'e'] }).saw, /5 presses: .*, not 4 at most/u);
+  assert.equal(expect.quick(await firstReadAt(MARIAM.said, (s) => propose(s, ctx))).pass, true);
+  assert.equal(expect.quick(await firstReadAt(MARIAM.said, (s) => propose(s, ctx), null, 3_000)).pass, false);
+  /* A fail while marked waits on its unit; a pass while marked stays a pass, since one person's pass is not the unit landed. */
+  assert.equal(marked(expect.presses({ presses: ['a', 'b', 'c', 'd', 'e'] })).waits, 'USE-B07');
+  assert.equal(marked(expect.presses({ presses: ['a'] })).pass, true);
+  assert.equal(redOf([...STEPS.map((s) => ({ id: s.id, pass: true, saw: 'seen' })), { id: 'quick', pass: false, saw: 'slow' }], { advance() {} }), true);
 });

@@ -850,7 +850,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            ("3 projects in play, 2 at risk or off track"): which need a push and which are on track, from what each one's
            health says (`.names`), so the verb agrees with how many it names. A record with nothing on track says the
            first half alone. */
-        body: '{{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track',
+        /* AND FIRST, THE QUESTIONS ABOUT PROJECTS, SINCE portfolio 1.17.0 (PGS-C18): "2 questions for you, Kiln needs a
+           push". The line said all was well while Decide's badge counted calls about these same projects.
+           `questions-open-in:things` counts what Waiting on you below draws, and at nought the clause goes. */
+        body: '{{questions-open-in:things}} question(s) for you, {{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track',
       },
       {
         /* SAID OF THE PROJECTS IN PLAY, SINCE portfolio 1.13.0, so with none in play the clause has no figure left and the
@@ -859,7 +862,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'projects-need-you', is: 0 },
-        body: 'Nothing needs you across {{projects-live}} project(s) in play',
+        /* A PUSH AND NOT YOU, AND THE QUESTIONS SECOND, SINCE portfolio 1.17.0: "Nothing needs you" read false beside two
+           questions waiting, and first they would put "Nothing" mid-line, since the writer never mends a capital. */
+        body: 'Nothing needs a push across {{projects-live}} project(s) in play, {{questions-open-in:things}} question(s) for you',
       },
       /* NO RIGHT NOW TILE, SINCE portfolio 1.10.0. It held In play and what aims to land within thirty days in a third of
          the row, beside two splits a third its height, so the row ended at three heights. In play is the line's now;
@@ -930,6 +935,23 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         /* DRAWN ONLY WHILE ONE IS IN PLAY, SINCE portfolio 1.13.0: its empty line, the one thing to do on a page with no
            project, is the line's now. */
         when: { metric: 'projects-live', gt: 0 },
+      },
+      {
+        /* WHAT A RULE OR AN AGENT ASKED ABOUT A PROJECT, SINCE portfolio 1.17.0 (PGS-C18), answered here, three at a time,
+           one tile each, and the rest in Decide: the questions whose row is on Projects (`list is things`), counted by
+           `questions-open-in:things` and drawn only while that is above nought. A project's own page draws its own
+           (`about is {{spoken}}`); this is every project's at once. UNDER IN PLAY AND BEFORE THE OPEN TILE, which takes
+           every block after it up to the next heading: at 1440 How they are going, In play, this and that tile, four
+           before the fold. */
+        kind: 'queue',
+        heading: 'Waiting on you',
+        icon: 'ask',
+        span: 12,
+        source: 'governance.open',
+        where: 'list is things',
+        limit: 3,
+        tiles: true,
+        when: { metric: 'questions-open-in:things', gt: 0 },
       },
       /* WHAT EACH EARNS, WHAT AGENTS HOLD AND WHAT IS COMING UP, OPEN WHILE SHORT AND FOLDED WHEN LONG, SINCE portfolio
          1.15.0. Two headings on one figure, as the page's two lines are, and a heading whose `when:` says no hides the

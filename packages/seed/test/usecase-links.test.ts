@@ -13,6 +13,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { USE_CASES, modulesFor, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument, moduleExamples } from '../src/usecases/install.ts';
+import { GENERAL_GUIDE, planFor } from '../src/usecases/guide-kinds.ts';
 import { carryForward, exampleLinks, linkExamples, titleFieldOf, type CarryIo, type LinkIo, type LinkRow } from '../src/usecases/links.ts';
 
 const TODAY = dayOf(NOW);
@@ -56,6 +57,8 @@ test('EVERY LINK NAMES A REF FIELD AND TWO EXAMPLE ROWS THE USE CASE REALLY SEED
 });
 
 test('ONLY AN EXAMPLE WITH THE FIELD EMPTY IS LINKED, AND A REFUSED WRITE IS SKIPPED', async () => {
+  /* THE GUIDE'S LINKS ARE ITS FORMED PLAN'S since personal-and-guide-99, handed to linkExamples as a host does. */
+  const GENERAL = { links: planFor(GENERAL_GUIDE).links };
   const STEP = 'Write one sentence about what this is and who it is for';
   const rows: Record<string, LinkRow[]> = {
     milestones: [{ seq: 4, fields: { what: 'Say what it is and who it is for', tags: ['example'] } }],
@@ -69,21 +72,21 @@ test('ONLY AN EXAMPLE WITH THE FIELD EMPTY IS LINKED, AND A REFUSED WRITE IS SKI
       return true;
     },
   };
-  assert.equal(await linkExamples(io, 'guide'), 1);
+  assert.equal(await linkExamples(io, 'guide', GENERAL), 1);
   assert.deepEqual(writes, ['steps#1.milestone=milestones#4']);
 
   /* A ROW SOMEBODY WROTE, WITH THE SAME TITLE, IS NOT AN EXAMPLE AND IS LEFT ALONE; a refusal counts nothing. */
   writes.length = 0;
   rows.steps = [{ seq: 1, fields: { what: STEP, tags: [] } }];
-  assert.equal(await linkExamples(io, 'guide'), 0);
+  assert.equal(await linkExamples(io, 'guide', GENERAL), 0);
   assert.deepEqual(writes, []);
   rows.steps = [{ seq: 1, fields: { what: STEP, tags: ['example'] } }];
-  assert.equal(await linkExamples({ ...io, link: async () => false }, 'guide'), 0);
-  assert.equal(await linkExamples({ rows: async () => { throw new Error('down'); }, link: io.link }, 'guide'), 0);
+  assert.equal(await linkExamples({ ...io, link: async () => false }, 'guide', GENERAL), 0);
+  assert.equal(await linkExamples({ rows: async () => { throw new Error('down'); }, link: io.link }, 'guide', GENERAL), 0);
 });
 
-test('ON A REAL RECORD, A GUIDE AND A TEAM OPEN WITH THEIR EXAMPLES LINKED', async () => {
-  for (const id of ['guide', 'team']) {
+test('ON A REAL RECORD, A TEAM OPENS WITH ITS EXAMPLES LINKED (the guide\'s formed plan is linked in guide.test.ts)', async () => {
+  for (const id of ['team']) {
     const u = useCase(id)!;
     const sql = openSqlite();
     const k: Kernel = await openRecord(sql, fixedClock(NOW));

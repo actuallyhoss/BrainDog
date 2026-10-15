@@ -3,7 +3,7 @@
  * and those figures live in `plans.ts`, not here: this file holds only the sentences said about them.
  */
 
-import { plan, type Allowance, type Plan } from '../plans.ts';
+import { PACKS, plan, type Allowance, type Pack, type Plan } from '../plans.ts';
 import { home } from './home.ts';
 
 /** A figure a month, grouped the way every figure on the site is. */
@@ -11,6 +11,15 @@ const aMonth = (n: number): string => `${n.toLocaleString('en-US')} a month`;
 
 /* A card's agents line, from the plan's own figure (`agents` in `PLAN_TABLE`): what a record may hold live at once. */
 const agentsOn = (id: Plan['id']): string => `Connect up to ${plan(id).allowance.agents.toLocaleString('en-US')} agents`;
+
+/**
+ * The pricing page's line on what is not sold, for the packs on sale: while none is, it says packs and extra usage are
+ * coming later and names no pack; with billing on it says only extra usage is. Extra usage is sold by no checkout.
+ */
+const laterFor = (packs: readonly Pick<Pack, 'credits'>[]): string =>
+  packs.length === 0
+    ? 'Credit packs and extra usage are coming later. Until then, work over the allowance waits for the next month.'
+    : 'Extra usage is coming later. Until then, runs over the allowance wait for the next month, and credit packs give Slash credits that do not end with the month.';
 
 export const pricing = {
   /**
@@ -74,14 +83,14 @@ export const pricing = {
       lead: 'Each question or draft uses one credit, no matter how long the answer takes. Every plan comes with a monthly amount, Free included.',
       credits: 'credits a month',
       packs: 'Credit packs',
-      // `PACKS` in `plans.ts` is empty until a pack is sold, and then these say what it is.
+      // `PACKS` in `plans.ts` is `packsOnSale(LAUNCH.billing)`: empty until billing is on, and then these say what each is.
       packsN: (credits: number) => (credits > 0 ? `+${credits.toLocaleString('en-US')}` : ''),
-      packsUnit: (packs: readonly { credits: number; price: string }[]) =>
+      packsUnit: (packs: readonly Pick<Pack, 'credits' | 'price'>[] = PACKS) =>
         packs.length === 0
           ? 'Credit packs are coming later.'
           : `credits for ${packs[0]?.price}` +
             packs.slice(1).map((p) => `, or ${p.credits.toLocaleString('en-US')} for ${p.price}`).join('') +
-            ', and they never expire',
+            ', and they do not end with the month',
       more: 'See pricing',
     },
     /**
@@ -113,8 +122,8 @@ export const pricing = {
    * Plus follow as the plans for pros. The plans it sells are `HOSTED_PLANS` in `apps/worker/src/billing.ts`, Free is
    * `FREE_PLAN` there, their names and prices come from `PLAN_TABLE` in `packages/record/src/plans.ts`, and the
    * allowance a record is held to is `ALLOWANCE` in `packages/record/src/directory.ts`; `plans.test.ts` holds `plans.ts`
-   * to all of them. Credit packs and extra usage are not built, so the page says they
-   * are coming later in one line and sells neither.
+   * to all of them. Credit packs are shown only with billing on (`packsOnSale` in `plans.ts`), and extra usage is sold
+   * by no checkout, so while billing is off the page says both are coming later in one line and sells neither.
    */
   pricing: {
     // A headline with no price in it: `plans.test.ts` checks that "$12 a month" never leads.
@@ -156,8 +165,9 @@ export const pricing = {
     /* The line under the comparison, from Free's own runs: how many automations it can run once a day through a long month. */
     compareReading: (daily: string) => `On Free, ${daily} can run every day, all month.`,
     automations: (n: number, word: string) => (n === 1 ? 'one automation' : `${word} automations`),
-    // Neither is built: `billing.ts` sells the plans alone, and `mayRun` in `directory.ts` holds a record at its allowance.
-    later: 'Credit packs and extra usage are coming later. Until then, work over the allowance waits for the next month.',
+    // Packs from `PACKS`, so none is named while none is sold; extra usage is built nowhere, and `mayRun` in `directory.ts` holds a record at its allowance.
+    later: laterFor(PACKS),
+    laterFor,
     /**
      * The allowance table's rows, in the order they are drawn: what each meter is called, what it counts,
      * and how a plan's figure for it reads. Every key of `Allowance` has one, which `plans.test.ts` checks.

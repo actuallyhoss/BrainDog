@@ -127,8 +127,8 @@ const SHAPES: Readonly<Record<string, { rows: string[][] }>> = {
   embed: { rows: [['https://youtu.be/dQw4w9WgXcQ', HOSTILE, '16:9']] },
 };
 
-/** `table` is bound to a register rather than to authored rows, so it has no fence to be hostile in. */
-const NO_FENCE = new Set(['table']);
+/** `table` and `form` are bound to a register rather than to authored rows, so neither has a fence to be hostile in. */
+const NO_FENCE = new Set(['table', 'form']);
 
 /**
  * THE SWEEP IS THE POINT, not any one kind. A hole in this package is one drawer that forgot

@@ -35,7 +35,7 @@ const of = (over: Partial<ReadingsOf> = {}): ReadingsOf => ({ now: NOW, calls: [
 const ask = (r: ReturnType<typeof engineReadings>, purpose: string) => r.asks.find((a) => a.purpose === purpose);
 
 test('an empty ledger reads as nothing asked and nothing open', () => {
-  assert.deepEqual(engineReadings(of()), { asks: [], understanding: { unattached: 0, open_by_cause: {} }, braked: null });
+  assert.deepEqual(engineReadings(of()), { asks: [], understanding: { unattached: 0, open_by_cause: {} }, braked: null, slash: [], folds: { made: 0, undone: 0 }, outside: 0 });
 });
 
 test('asked is counted by purpose over the last day, week and month', () => {

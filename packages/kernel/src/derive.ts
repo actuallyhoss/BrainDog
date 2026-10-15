@@ -224,10 +224,32 @@ export function deriveFault(field: DeriveField, fields: readonly DeriveField[], 
     if (name === id) return fault(`${id} is worked out from itself; name the other fields it reads.`, at);
     const s = fields.find((g) => g.id === name && g.retired !== true);
     if (s === undefined) return fault(`${id} reads ${name}, and this list has no field called ${name}.`, at);
-    if (isDerived(s)) return fault(`${id} reads ${name}, which is itself worked out; read the fields ${name} is made from.`, at);
+    /* A FIELD WORKED OUT FROM ANOTHER WORKED OUT IS READ IN ORDER (`derive-rows.ts` `withDerived`), so `least = product
+       [cost, margin]` reads the cost the row's parts make. A ring is refused, since neither end can be worked out first.
+       A link a `via` reads through is a stored link, and a field the kernel works out itself has no `derive:` to order
+       by, so both are still refused. */
+    if (isDerived(s) && (shape === 'via' || s.derive === undefined || shapeOf(s.derive) === null))
+      return fault(`${id} reads ${name}, which is itself worked out; read the fields ${name} is made from.`, at);
+    if (isDerived(s) && readsBack(s, id, fields)) return fault(`${id} reads ${name}, which reads ${id} back, so neither can be worked out.`, at);
     src.push(s);
   }
   return typeFault(field, shape, body, src, theirs);
+}
+
+/** Whether `from`, worked out, reads `id` through any chain of fields worked out on the same list. */
+function readsBack(from: DeriveField, id: string, fields: readonly DeriveField[]): boolean {
+  const seen = new Set<string>();
+  const walk = (f: DeriveField): boolean => {
+    if (seen.has(f.id)) return false;
+    seen.add(f.id);
+    for (const name of sourcesOf(f.derive)) {
+      if (name === id) return true;
+      const next = fields.find((g) => g.id === name && g.retired !== true && g.derive !== undefined);
+      if (next !== undefined && walk(next)) return true;
+    }
+    return false;
+  };
+  return walk(from);
 }
 
 /* ── the value ─────────────────────────────────────────────────────────── */

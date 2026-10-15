@@ -17,6 +17,10 @@
 
   EVERY CONTROL IS INSIDE ITS LABEL, so its name is the words beside it with no id to keep unique across a page that
   may carry the same field twice, and the hit area is the whole line.
+
+  A FIELD THE RECORD WORKS OUT (`readonly`, a `derive:`) IS A FIGURE BESIDE ITS LABEL, never a box: the record refuses a
+  write to it, so a box would take what was typed and drop it. It reads the value the record handed back, so it moves
+  the moment a cost it comes from is written.
 -->
 <script lang="ts">
   import { MISSING, inline, type Block, type RenderOptions } from '../src/index.ts';
@@ -36,48 +40,55 @@
 {:else if oninput}
   <div class="inputs">
     {#each plan.fields as f}
-      <label class="inputs-field">
-        <span class="inputs-label">{f.label}</span>
-        {#if f.control.tag === 'select'}
-          <select class="inputs-box" name={f.field} onchange={(e) => oninput?.(f.row, e.currentTarget.value)}>
-            <!-- A VALUE THAT IS NOT ONE OF THE CHOICES IS SHOWN AS IT STANDS, first, selected and not pickable. With no
-                 option selected a browser shows the first choice, a value the record does not hold, and picking that
-                 choice then fires no change, so the one value on screen was the one the person could not write. -->
-            {#if !f.control.choices.includes(f.value.trim())}
-              <option value={f.value.trim()} selected disabled>{f.value.trim() || MISSING}</option>
-            {/if}
-            {#each f.control.choices as choice}
-              <option value={choice} selected={choice === f.value.trim()}>{choice}</option>
-            {/each}
-          </select>
-        {:else if f.control.type === 'checkbox'}
-          <!-- A yes or no is written as the record spells it, so the host has nothing to translate. -->
-          <input
-            class="inputs-check"
-            type="checkbox"
-            name={f.field}
-            checked={isTicked(f.value)}
-            onchange={(e) => oninput?.(f.row, e.currentTarget.checked ? 'true' : 'false')}
-          />
-        {:else}
-          <input
-            class="inputs-box"
-            type={f.control.type}
-            name={f.field}
-            inputmode={f.control.inputmode}
-            autocomplete="off"
-            value={shownIn(f.value, holds[f.field])}
-            oninput={(e) => {
-              holds[f.field] = typedHold(e.currentTarget.value, f.value);
-              oninput?.(f.row, e.currentTarget.value);
-            }}
-            onblur={() => {
-              const hold = holds[f.field];
-              if (hold) holds[f.field] = leftHold(hold, f.value);
-            }}
-          />
-        {/if}
-      </label>
+      {#if f.readonly}
+        <div class="inputs-field inputs-worked">
+          <span class="inputs-label">{f.label}</span>
+          <span class="inputs-figure num">{#if f.value}<Text nodes={inline(f.value, opts)} {opts} />{:else}{MISSING}{/if}</span>
+        </div>
+      {:else}
+        <label class="inputs-field">
+          <span class="inputs-label">{f.label}</span>
+          {#if f.control.tag === 'select'}
+            <select class="inputs-box" name={f.field} onchange={(e) => oninput?.(f.row, e.currentTarget.value)}>
+              <!-- A VALUE THAT IS NOT ONE OF THE CHOICES IS SHOWN AS IT STANDS, first, selected and not pickable. With no
+                   option selected a browser shows the first choice, a value the record does not hold, and picking that
+                   choice then fires no change, so the one value on screen was the one the person could not write. -->
+              {#if !f.control.choices.includes(f.value.trim())}
+                <option value={f.value.trim()} selected disabled>{f.value.trim() || MISSING}</option>
+              {/if}
+              {#each f.control.choices as choice}
+                <option value={choice} selected={choice === f.value.trim()}>{choice}</option>
+              {/each}
+            </select>
+          {:else if f.control.type === 'checkbox'}
+            <!-- A yes or no is written as the record spells it, so the host has nothing to translate. -->
+            <input
+              class="inputs-check"
+              type="checkbox"
+              name={f.field}
+              checked={isTicked(f.value)}
+              onchange={(e) => oninput?.(f.row, e.currentTarget.checked ? 'true' : 'false')}
+            />
+          {:else}
+            <input
+              class="inputs-box"
+              type={f.control.type}
+              name={f.field}
+              inputmode={f.control.inputmode}
+              autocomplete="off"
+              value={shownIn(f.value, holds[f.field])}
+              oninput={(e) => {
+                holds[f.field] = typedHold(e.currentTarget.value, f.value);
+                oninput?.(f.row, e.currentTarget.value);
+              }}
+              onblur={() => {
+                const hold = holds[f.field];
+                if (hold) holds[f.field] = leftHold(hold, f.value);
+              }}
+            />
+          {/if}
+        </label>
+      {/if}
     {/each}
   </div>
 {:else}
@@ -91,3 +102,17 @@
     {/each}
   </div>
 {/if}
+
+<style>
+  /* A WORKED-OUT FIGURE SITS WHERE A BOX'S TEXT WOULD, so the column of figures lines up with what was typed above it. */
+  .inputs-worked {
+    cursor: default;
+  }
+
+  .inputs-figure {
+    padding-inline: var(--sp-3);
+    color: var(--ink);
+    font-size: var(--t-ui);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

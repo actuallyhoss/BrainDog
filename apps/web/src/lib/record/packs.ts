@@ -121,11 +121,19 @@ export function live(client: Caller): Source {
 /** The two client methods an install calls, apart from `Caller` so the switch tests need not stub them. */
 export type Installer = {
   planPack(args: { doc: unknown; source?: { kind: string } }): Promise<Wire<unknown>>;
-  installPack(args: { doc: unknown; source?: { kind: string }; planHash: string; approve?: string[] }): Promise<Wire<unknown>>;
+  installPack(args: { doc: unknown; source?: { kind: string }; planHash: string; approve?: string[]; retireWithRows?: boolean }): Promise<Wire<unknown>>;
 };
 
 /** A plan somebody is reading: the record's diff in the screen's words, the calls it makes, and the lines Install approves. */
-export type Offer = { id: string; doc: Record<string, unknown>; plan: Plan; calls: CallOut[]; approve: string[] };
+export type Offer = {
+  id: string;
+  doc: Record<string, unknown>;
+  plan: Plan;
+  calls: CallOut[];
+  approve: string[];
+  /** The plan takes a list away that still holds items, keeping them (`Diff.removals`); Install on it says so. */
+  removes: boolean;
+};
 
 /**
  * The document behind a catalogue entry, or `null` for one nothing ships yet.
@@ -197,11 +205,12 @@ export async function relabelDocument(id: string, installed: readonly PackState[
 export async function planInstall(client: Installer, id: string, doc: Record<string, unknown>, nameOf: (kind: 'register' | 'page' | 'metric', id: string) => string): Promise<Answer<Offer>> {
   const planned = said(await client.planPack({ doc, source: { kind: 'local' } }));
   if (!planned.ok) return planned;
-  const diff = (planned.value as { diff?: { calls_out?: unknown; approve?: unknown } } | null)?.diff;
+  const diff = (planned.value as { diff?: { calls_out?: unknown; approve?: unknown; removals?: unknown } } | null)?.diff;
   const plan = planOf(diff, nameOf);
   if (!plan) return { ok: false, refusal: { code: 'VALUE_MALFORMED', fix: copy.writeRaced } };
   const approve = Array.isArray(diff?.approve) ? diff.approve.filter((l): l is string => typeof l === 'string') : [];
-  return { ok: true, value: { id, doc, plan, calls: callsOutOf(diff?.calls_out), approve } };
+  const removes = Array.isArray(diff?.removals) && diff.removals.length > 0;
+  return { ok: true, value: { id, doc, plan, calls: callsOutOf(diff?.calls_out), approve, removes } };
 }
 
 /**
@@ -214,7 +223,13 @@ export async function installPlanned(
   nameOf: (kind: 'register' | 'page' | 'metric', id: string) => string,
 ): Promise<{ ok: true } | { ok: false; fix: string; again: Offer | null }> {
   const out = said(
-    await client.installPack({ doc: offer.doc, source: { kind: 'local' }, planHash: offer.plan.planHash, ...(offer.approve.length > 0 ? { approve: offer.approve } : {}) }),
+    await client.installPack({
+      doc: offer.doc,
+      source: { kind: 'local' },
+      planHash: offer.plan.planHash,
+      ...(offer.approve.length > 0 ? { approve: offer.approve } : {}),
+      ...(offer.removes ? { retireWithRows: true } : {}),
+    }),
   );
   if (out.ok) return { ok: true };
   if (out.refusal.code !== 'PLAN_STALE') return { ok: false, fix: out.refusal.fix, again: null };

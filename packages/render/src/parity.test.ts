@@ -1119,3 +1119,30 @@ test('A BLOCK WITH ACTIONS AND NO HOST TO PRESS THEM draws one line of labels in
   assert.ok(html.includes('<p class="block-actions">Brew · Toss (hard to undo)</p>'), html);
   assert.doesNotMatch(html, /<button/u);
 });
+
+test("A TABLE WITH ROW ACTIONS AND NO HOST TO PRESS THEM says each row's actions once in the line of labels, never per row", () => {
+  const block: BlockSegment = {
+    ...page('```comparison\nTea | Leaf\nSencha | Green\nAssam | Black\n```'),
+    row_actions: [
+      { verb: 'row.tick', label: 'Steeped' },
+      { verb: 'row.delete', label: 'Toss', hard: true },
+    ],
+  };
+  /* The table's roving tab stop is Table.svelte's alone (`noRovingStop`, above); the rest is one tree. */
+  const svelte = noRovingStop(tree(render(Block, { props: { block } }).body));
+  const html = tree(toHTML([block]));
+  assert.equal(svelte, html);
+  assert.ok(html.endsWith('<p class="block-actions">Steeped · Toss (hard to undo)</p></figure>'), html);
+  assert.doesNotMatch(html, /<button/u);
+});
+
+/* ── a calendar's strip of weeks ───────────────────────────────────────────── */
+
+test('A CALENDAR STRIP OF TWO WEEKS, A THING TODAY AND ONE NEXT WEEK, draws one tree in both renderers', () => {
+  /* A fence cannot carry `weeks`: the page read sets it on the parsed block, as it sets `actions`. */
+  const block: BlockSegment = { ...page('```calendar\nPay the plumber | 2026-10-15\nBook the vet | 2026-10-20\n```'), weeks: 2 };
+  const [svelte, html] = both(block, { now: Date.UTC(2026, 9, 15, 12) });
+  assert.equal(svelte, html);
+  assert.match(html, /calendar-strip/u);
+  assert.match(html, /<span class="calendar-today">Today<\/span>/u);
+});

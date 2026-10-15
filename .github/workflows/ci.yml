@@ -324,6 +324,8 @@ jobs:
       - run: node --test tools/people/test/*.test.mjs
       # AND THE USE-CASE WALKS' KIT (`tools/usecase-walks`), no workspace either: its walk and its doors.
       - run: node --test tools/usecase-walks/*.test.mjs
+      # AND THE CATALOGUE WRITER'S AND THE FIRST-READ EVAL'S (`tools/catalogue`, `tools/first-read-eval`), no workspaces either.
+      - run: node --test tools/catalogue/*.test.mjs tools/first-read-eval/*.test.mjs
 
   windows:
     # THE KERNEL, THE SELF-HOST AND THE CLI ON WINDOWS, which is the owner's own machine and which

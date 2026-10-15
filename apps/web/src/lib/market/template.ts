@@ -14,6 +14,10 @@
  * `requires` NAMES THE LISTS IT READS, twice, as a pack says it: the page's own list of `register.<id>`, and on the
  * manifest each installed pack that holds one of those lists, at the version held here or later.
  *
+ * IT GOES OUT SIGNED, ON THE SAME PATH AS A USE CASE: the menu sends `text` through `submitToKennel` in `publish.ts`,
+ * which signs it with the publisher's key in this browser (`author-key.ts`) over kind `pack`, `id`, `version` and the
+ * text's checksum, so nothing here holds a key. `signedAs` names what that signature covers, as the Kennel reads it.
+ *
  * PURE, AND LOADED BY PLAIN NODE: no import at all, so the page's menu pays nothing for it until it is pressed.
  */
 
@@ -64,6 +68,9 @@ export const templateWords = {
   settingNote: 'Filled in from the page it was made from. Change it to one of yours.',
 } as const;
 
+/** Who a template says made it when nobody is named: the words the record writes on a pack it exports. */
+export const TEMPLATE_AUTHOR = 'a BrainDog owner';
+
 /** The most settings a manifest may declare (`CONFIG_CEILING` in `@braindog/kernel`). */
 export const SETTINGS_MOST = 64;
 
@@ -100,7 +107,7 @@ function namesOf(field: string, value: string): TemplateSetting['names'] | null 
  * Make the template. `version` is the one it goes out as; `format` and `primitives` are the record's own (`version()`),
  * so the pack asks for no newer renderer than the one that drew it here.
  */
-export function templateOf(input: { body: Body; states: readonly TemplateState[]; format: number; primitives: number; version?: string }): Template {
+export function templateOf(input: { body: Body; states: readonly TemplateState[]; format: number; primitives: number; version?: string; author?: string }): Template {
   const settings: TemplateSetting[] = [];
   const reads = new Set<string>();
   const hosts = new Set<string>();
@@ -189,6 +196,10 @@ export function templateOf(input: { body: Body; states: readonly TemplateState[]
     version,
     title,
     summary: templateWords.summary(title),
+    /* EVERY PACK SAYS ITS AUTHOR AND LICENSE, or every door refuses it (`readPackFile`): the Kennel and an install from
+       the file alike. The words are the record's own for a pack it exports (`export-pack.ts`). */
+    author: input.author?.trim() || TEMPLATE_AUTHOR,
+    license: 'MIT',
     requires: { format: input.format, primitives: input.primitives, packs },
     ...(settings.length > 0 ? { config } : {}),
     declarations: [page],
@@ -218,3 +229,6 @@ export function templateOf(input: { body: Body; states: readonly TemplateState[]
     headings,
   };
 }
+
+/** What a template's signature covers: the kind, id and version the Kennel reads from its file, beside its checksum. */
+export const signedAs = (t: Pick<Template, 'id' | 'version'>): { kind: 'pack'; id: string; version: string } => ({ kind: 'pack', id: t.id, version: t.version });

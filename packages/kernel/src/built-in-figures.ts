@@ -13,6 +13,14 @@
  * the way it reaches every figure (`fill` in `fill.ts`): the figure holds `about: '{{it}}'`, and the reader fills the
  * hole. Read with no parameter the hole is still there, and the count is the whole record's.
  *
+ * AND ONE LIST'S QUESTIONS, `questions-open-in:<list>` (PGS-C18): the open questions whose `body.about` names a row of
+ * that list by its spoken id (`tasks#4` is on `tasks`), the rule a queue's `where: list is <list>` keeps
+ * (`QueueQuestion.list`, `listOf` in `pages.ts`). So Work says "2 wait on you" of the questions about its own tasks, and
+ * gates its 'Waiting on you' on the same count, while a question about a person waits on People's page instead. Read
+ * with no parameter it counts the questions about a row of any list. NOT SAVED DAILY, as `questions-open` is not: no
+ * built-in figure is armed for the night (`snapshot:` is a declaration's), and a past day read from the queue would
+ * count today's open questions on it.
+ *
  * A DECLARED FIGURE OF THE SAME ID WINS. The record asks its declarations first and these second, so a pack that
  * declares its own `questions-open` is read as it declared it, and nothing here can take a name from a pack.
  *
@@ -100,7 +108,7 @@ const PARAM = '{{it}}';
  * declared figure over a list narrows with `where`); it is this figure's own, and it holds `{{it}}` until a parameter
  * fills it.
  */
-export type OpenQuestionsDecl = MetricDecl & { about?: string | undefined };
+export type OpenQuestionsDecl = MetricDecl & { about?: string | undefined; list?: string | undefined };
 
 const QUESTIONS_OPEN: OpenQuestionsDecl = {
   metric: 'questions-open',
@@ -112,6 +120,19 @@ const QUESTIONS_OPEN: OpenQuestionsDecl = {
   compare: 'none',
   format: 'int',
   about: PARAM,
+};
+
+/** The open questions about one list's rows: `list` holds `{{it}}` until a list's name fills it. */
+const QUESTIONS_OPEN_IN: OpenQuestionsDecl = {
+  metric: 'questions-open-in',
+  name: 'Questions about this list waiting on you',
+  source: GOVERNANCE_OPEN,
+  value: { count: 'id' },
+  target: { lte: 0 },
+  window: '7d',
+  compare: 'none',
+  format: 'int',
+  list: PARAM,
 };
 
 /** The source the working-runs figure reads, the same word the page source over the same runs is. */
@@ -869,6 +890,7 @@ const DOCUMENTS_DEAD_PATHS: MetricDecl = {
 /** The figures the record answers by id when no declaration holds that id. */
 export const BUILT_IN_FIGURES: Readonly<Record<string, MetricDecl>> = {
   'questions-open': QUESTIONS_OPEN,
+  'questions-open-in': QUESTIONS_OPEN_IN,
   'runs-working': RUNS_WORKING,
   'arrivals-waiting': sign('arrivals-waiting', 'Messages waiting on you', { lte: 0 }, 'int', { door: PARAM }),
   'arrivals-oldest-days': sign('arrivals-oldest-days', 'Days the oldest waiting message has waited', { lte: 1 }, 'days'),
@@ -910,15 +932,38 @@ export const builtInFigure = (id: string): MetricDecl | null =>
  */
 export function readOpenQuestions(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'>, decl?: MetricDecl): Result<Reading> {
   const at = new Date(ctx.asOfMs ?? ctx.nowMs).toISOString();
-  const said = (decl as OpenQuestionsDecl | undefined)?.about;
+  const d = decl as OpenQuestionsDecl | undefined;
+  const said = d?.about;
   const about = typeof said === 'string' && said !== PARAM ? said : null;
   const open = "SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)";
+  const counted = (n: number): Result<Reading> =>
+    ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: n <= 0, refusals: [] });
+  if (typeof d?.list === 'string') return counted(openOnList(sql, at, d.list === PARAM ? null : d.list));
   const row =
     about === null
       ? sql.one<{ n: number }>(open, at)
       : sql.one<{ n: number }>(`${open} AND (CASE WHEN json_valid(body) THEN json_extract(body, '$.about') END) = ?`, at, about);
-  const n = Number(row?.n ?? 0);
-  return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: n <= 0, refusals: [] });
+  return counted(Number(row?.n ?? 0));
+}
+
+/** A row's spoken id, `tasks#4`, as `listOf` in `pages.ts` reads one: the list is what comes before the `#`. */
+const SPOKEN_ROW = /^([a-z][a-z0-9_]*)#([1-9][0-9]*)$/;
+
+/**
+ * How many open questions at `at` are about a row of `list`, or of any list with `null`. THE QUEUE'S RULE, NOT A
+ * PATTERN OF ITS OWN: `about` is a spoken id and its list is the part before the `#` (`QueueQuestion.list`), so a word
+ * such as `Box`, a body this record cannot parse, and an `about` that is not text are on no list.
+ */
+function openOnList(sql: Sql, at: string, list: string | null): number {
+  const abouts = sql.all<{ about: string }>(
+    `SELECT about FROM (SELECT CASE WHEN json_valid(body) THEN CASE WHEN json_type(body, '$.about') = 'text' THEN json_extract(body, '$.about') END END AS about
+       FROM suggestion WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= ?)) WHERE about LIKE '%#%'`,
+    at,
+  );
+  return abouts.filter((r) => {
+    const m = SPOKEN_ROW.exec(r.about);
+    return m !== null && (list === null || m[1] === list);
+  }).length;
 }
 
 /**

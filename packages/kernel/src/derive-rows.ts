@@ -12,7 +12,7 @@
  */
 
 import type { Json } from './coerce.ts';
-import { derived, isDerived, shapeOf, type DeriveField } from './derive.ts';
+import { derived, isDerived, shapeOf, sourcesOf, type DeriveField } from './derive.ts';
 
 /**
  * The far side of a `via`: for the linked list, the row ids the page links to and the field to read there, each id
@@ -25,7 +25,30 @@ export type DerivableRow = { fields: Record<string, Json> };
 
 /** The fields of a list that are worked out at read, and the link each `via` reads through. */
 function derivedFields(fields: readonly DeriveField[]): DeriveField[] {
-  return fields.filter((f) => f.retired !== true && f.derive !== undefined && shapeOf(f.derive) !== null);
+  return inOrder(fields.filter((f) => f.retired !== true && f.derive !== undefined && shapeOf(f.derive) !== null));
+}
+
+/**
+ * THE DERIVED FIELDS IN THE ORDER THEY ARE WORKED OUT: each after every derived field it reads, so a chain such as
+ * `least = product [cost, margin]` reads the cost this read made and never a value stored under its name. The install
+ * refuses a ring (`deriveFault`); one that reached here anyway is left in declaration order rather than walked forever.
+ */
+function inOrder(mine: readonly DeriveField[]): DeriveField[] {
+  const by = new Map(mine.map((f) => [f.id, f]));
+  const out: DeriveField[] = [];
+  const state = new Map<string, 'open' | 'done'>();
+  const visit = (f: DeriveField): void => {
+    if (state.get(f.id) !== undefined) return;
+    state.set(f.id, 'open');
+    for (const name of sourcesOf(f.derive)) {
+      const g = by.get(name);
+      if (g !== undefined && state.get(name) === undefined) visit(g);
+    }
+    state.set(f.id, 'done');
+    out.push(f);
+  };
+  for (const f of mine) visit(f);
+  return out;
 }
 
 /**
@@ -49,7 +72,8 @@ export function withDerived<T extends DerivableRow>(rows: readonly T[], fields: 
   }
   return rows.map((r) => {
     const out: Record<string, Json> = { ...r.fields };
-    for (const f of mine) out[f.id] = derived(r.fields, f, resolved.get(f.id));
+    /* Each reads the row as worked out so far, so a field read by another is filled before it is read. */
+    for (const f of mine) out[f.id] = derived(out, f, resolved.get(f.id));
     return { ...r, fields: out };
   });
 }

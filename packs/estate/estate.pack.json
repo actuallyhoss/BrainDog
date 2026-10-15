@@ -58,7 +58,10 @@
             "server",
             "database",
             "storage",
-            "network"
+            "network",
+            "vm",
+            "edge",
+            "object"
           ],
           "labels": {
             "domain": "Domain",
@@ -72,7 +75,10 @@
             "server": "Server",
             "database": "Database",
             "storage": "Storage",
-            "network": "Network"
+            "network": "Network",
+            "vm": "Virtual machine",
+            "edge": "Edge network",
+            "object": "Object storage"
           },
           "index": true,
           "required": true
@@ -116,7 +122,7 @@
       "requires": [ "register.services" ],
       "pack": "estate",
       "blocks": [
-        { "kind": "note", "lead": true, "span": 12, "body": "{{estate-month}} a month to keep everything running." },
+        { "kind": "note", "lead": true, "span": 12, "body": "{{questions-open-in:services}} question(s) for you, {{estate-month}} a month to keep everything running." },
         {
           "kind": "note",
           "heading": "Nothing kept yet",
@@ -150,7 +156,7 @@
           "source": "governance.open",
           "where": "list is services",
           "limit": 3,
-          "when": { "metric": "questions-open", "gt": 0 }
+          "when": { "metric": "questions-open-in:services", "gt": 0 }
         },
         {
           "kind": "split",

@@ -56,12 +56,16 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
          that came in from a cloud account brought its own words for these, a value each and no label, so the month by
          type read a key where every other part read a name. Hosting stays what a plan with a provider is; these four are
          the things such a plan is made of, for somebody who keeps them one by one. They join after the eight, so no row
-         moves, and a value a record added itself stays where it is (`laidBack` in `packages/declare/src/index.ts`). */
+         moves, and a value a record added itself stays where it is (`laidBack` in `packages/declare/src/index.ts`).
+         AND THE THREE A CLOUD ACCOUNT CALLS ITS OWN, STILL IN estate 2.2.0 (PGS-C18): `vm`, `edge` and `object`, which an
+         import added to the list itself with no label, so Each month, by type read "vm" and "edge" where a person reads
+         words. Declared here with their labels, they are the same stored values: a record that added them keeps every
+         row as it is, and its own copy of the value takes this label as it is laid over the update (`rebased`). */
       {
         id: 'kind',
         label: 'Type',
         type: 'enum',
-        values: ['domain', 'hosting', 'saas', 'certificate', 'subscription', 'membership', 'insurance', 'utility', 'server', 'database', 'storage', 'network'],
+        values: ['domain', 'hosting', 'saas', 'certificate', 'subscription', 'membership', 'insurance', 'utility', 'server', 'database', 'storage', 'network', 'vm', 'edge', 'object'],
         labels: {
           domain: 'Domain',
           hosting: 'Hosting',
@@ -75,6 +79,9 @@ export const ESTATE_REGISTERS: Record<string, SeedRegister> = {
           database: 'Database',
           storage: 'Storage',
           network: 'Network',
+          vm: 'Virtual machine',
+          edge: 'Edge network',
+          object: 'Object storage',
         },
         index: true,
         required: true,
@@ -384,11 +391,15 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
       {
         /* THE ONE SENTENCE THE PAGE OPENS WITH: what it costs a month to keep everything running, every cycle at its
            share of a month (`estate-month`). A record with nothing to pay for has no sentence to say, and the note is
-           not drawn rather than drawn at nought. */
+           not drawn rather than drawn at nought.
+
+           AND IT OPENS ON WHAT WAITS ON YOU, SINCE estate 2.2.0 (PGS-C18): how many open questions are about a service
+           (`questions-open-in:services`), the clause the writer leaves out at nought, so the line and Waiting on you
+           under it count the same questions and the page never sounds quiet while one is asked. */
         kind: 'note',
         lead: true,
         span: 12,
-        body: '{{estate-month}} a month to keep everything running.',
+        body: '{{questions-open-in:services}} question(s) for you, {{estate-month}} a month to keep everything running.',
       },
       {
         /* WHAT A FRESH RECORD READS, SINCE estate 2.1.0, in place of every tile under it: each is drawn only while there is
@@ -430,7 +441,8 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
       {
         /* WHAT `renew-soon` HAS ASKED ABOUT SERVICES, answered where it is shown, three at a time, and the rest are in
            Decide. No `empty:` of its own: with nothing waiting the queue says its own line. Only while something is
-           asked. */
+           asked ABOUT A SERVICE, SINCE estate 2.2.0 (PGS-C18): it was gated on every open question on the record, so a
+           question about a task drew a band here that said nothing matched. */
         kind: 'queue',
         heading: 'Waiting on you',
         icon: 'ask',
@@ -438,7 +450,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         source: 'governance.open',
         where: 'list is services',
         limit: 3,
-        when: { metric: 'questions-open', gt: 0 },
+        when: { metric: 'questions-open-in:services', gt: 0 },
       },
       {
         /* THE MONTH IN PARTS, ONE A TYPE, the parts of the figure the page opens with, over the same rows at the same

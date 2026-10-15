@@ -11,11 +11,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { SLASH_BRIEF_INSTRUCTIONS, SLASH_HEADLINE_INSTRUCTIONS } from '@braindog/host/slash';
+import { SLASH_BRIEF_INSTRUCTIONS, SLASH_COMPOSE_INSTRUCTIONS } from '@braindog/host/slash';
 import type { HeadlineInput } from '@braindog/record';
 
 import { openSqlite } from '../../../packages/kernel/test/sqlite.ts';
-import { includedModel, workerSlashModel, type ModelFail } from '../src/slash.ts';
+import { LOOK, includedModel, workerSlashModel, type ModelFail } from '../src/slash.ts';
 
 const FAKE_KEK = '0'.repeat(64);
 const GRANT = 'g_his';
@@ -191,7 +191,7 @@ test('A PAGE MAY BE ANSWERED AS AN OBJECT: the headline schema lets `lead`, `ord
   const input: HeadlineInput = { today: '2026-10-14', pages: [{ page: 'money', title: 'Money', rules: 'Two bills are due this week.', figures: [] }] };
   assert.deepEqual(await includedModel(switchedOn(ai))!.headline!(input), composed);
   const messages = ai.runs[0]!.inputs['messages'] as { content: string }[];
-  assert.equal(messages[0]!.content, SLASH_HEADLINE_INSTRUCTIONS);
-  const format = ai.runs[0]!.inputs['response_format'] as { json_schema?: { schema?: { properties?: { lines?: Record<string, unknown> } } } } | undefined;
-  assert.deepEqual(format?.json_schema?.schema?.properties?.lines, { type: 'object' }, 'the schema names what a page line must be, so a provider may refuse an object');
+  assert.equal(messages[0]!.content, SLASH_COMPOSE_INSTRUCTIONS);
+  const format = ai.runs[0]!.inputs['response_format'] as { json_schema?: { schema?: unknown } } | undefined;
+  assert.deepEqual(format?.json_schema?.schema, LOOK, 'the page looks were not asked under the look schema');
 });

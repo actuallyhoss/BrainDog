@@ -18,13 +18,25 @@
  * AND UNDER THE GRIDS, AN AGENDA of the days that hold anything, every row of them in the order they came. It is the
  * dated list a calendar falls back to, the whole of what a narrow screen shows under a strip of the month's days, and
  * the one place every row is said, because a day's cell names its first three and counts the rest.
+ *
+ * OR A STRIP OF WEEKS, when the block says `weeks:` (`calendarStripPlan`): whole weeks from the Monday of this one, a
+ * week a row of seven days, which is what a person reads on Today and a project page, where three whole months would
+ * be two of them empty. The record reads the strip's days itself (`packages/kernel/src/kinds/calendar.ts`).
  */
 
-import { DOTS_MOST, isDay, monthGrid } from './days.ts';
+import { DOTS_MOST, isDay, monthGrid, weekStart } from './days.ts';
+import { addDays } from './forecast.ts';
 
 /** The words the drawers write that no author did, here because this package cannot import the app's copy. */
 export const CALENDAR_NONE = 'Nothing on the calendar.';
 export const calendarSkipped = (titles: readonly string[]): string => `Not on the calendar, because the day does not read: ${titles.join(', ')}.`;
+/** The word beside today's number on a strip, so today is never told by its colour alone. */
+export const CALENDAR_TODAY = 'Today';
+/** What a strip's week with nothing on it says, where a narrow screen lists only the days that hold something. */
+export const CALENDAR_WEEK_NONE = 'Nothing this week.';
+/** What a strip says of the rows whose day falls before or after its weeks, which it draws on no day. */
+export const calendarOutside = (n: number): string =>
+  `${n} ${n === 1 ? 'thing falls' : 'things fall'} outside these weeks and ${n === 1 ? 'is' : 'are'} not drawn.`;
 /** A day's count of the rows its cell has no room to name. */
 export const calendarMore = (n: number): string => `+${n}`;
 
@@ -102,16 +114,8 @@ export type CalendarPlan<R> = {
   empty: boolean;
 };
 
-/**
- * The months and the agenda for these rows, on `today` (`YYYY-MM-DD`, or empty for no clock).
- *
- * The order of the rows on a day is the order they came in, which is the reader's: the record sorts a block by its
- * `order:`, and a person typing a fence puts first what matters first.
- *
- * `mark` is the day a link opened the calendar on (`YYYY-MM-DD`): its cell reads `marked`, and a day outside the months
- * drawn marks nothing, so the grids are never stretched to reach it.
- */
-export function calendarPlan<R extends { cells: readonly string[] }>(rows: readonly R[], today: string, mark?: string | null): CalendarPlan<R> {
+/** The rows by the day each falls on, in the order they came, and those whose day does not read, by index. */
+function byDayOf<R extends { cells: readonly string[] }>(rows: readonly R[]): { byDay: Map<string, R[]>; skipped: number[] } {
   const byDay = new Map<string, R[]>();
   const skipped: number[] = [];
   rows.forEach((row, i) => {
@@ -124,7 +128,20 @@ export function calendarPlan<R extends { cells: readonly string[] }>(rows: reado
     held.push(row);
     byDay.set(day, held);
   });
+  return { byDay, skipped };
+}
 
+/**
+ * The months and the agenda for these rows, on `today` (`YYYY-MM-DD`, or empty for no clock).
+ *
+ * The order of the rows on a day is the order they came in, which is the reader's: the record sorts a block by its
+ * `order:`, and a person typing a fence puts first what matters first.
+ *
+ * `mark` is the day a link opened the calendar on (`YYYY-MM-DD`): its cell reads `marked`, and a day outside the months
+ * drawn marks nothing, so the grids are never stretched to reach it.
+ */
+export function calendarPlan<R extends { cells: readonly string[] }>(rows: readonly R[], today: string, mark?: string | null): CalendarPlan<R> {
+  const { byDay, skipped } = byDayOf(rows);
   const keys = [...byDay.keys()].sort();
   const first = keys[0];
   const last = keys[keys.length - 1];
@@ -146,6 +163,86 @@ export function calendarPlan<R extends { cells: readonly string[] }>(rows: reado
 
   const days = keys.map((day) => ({ day, said: calendarSaid(day, today), today: day === today, items: byDay.get(day) ?? [] }));
   return { months, days, skipped, empty: false };
+}
+
+/** The most weeks a strip draws, as many as the record reads (`weeks:` 1 to 8). */
+export const CALENDAR_WEEKS_MOST = 8;
+
+/**
+ * One day of a strip. `past` is a day of this week already gone, drawn quieter and still holding what fell on it, so
+ * the week reads whole. `marked` is the day a link opened the calendar on, as on a month's grid.
+ */
+export type CalendarStripDay<R> = { day: string; num: number; said: string; today: boolean; past: boolean; marked: boolean; items: R[]; more: number; count: number };
+/** One week of a strip, Monday first: `This week`, or the week of its Monday. `count` is every row on its days. */
+export type CalendarStripWeek<R> = { from: string; label: string; days: CalendarStripDay<R>[]; count: number };
+export type CalendarStripPlan<R> = {
+  weeks: CalendarStripWeek<R>[];
+  /** The rows whose day does not read, by index, named under the strip as under the months. */
+  skipped: number[];
+  /** The rows whose day falls before or after the weeks, by index, which the strip counts and draws on no day. */
+  outside: number[];
+  /** No row falls on a day of the weeks. */
+  empty: boolean;
+};
+
+/**
+ * `weeks` whole weeks from the Monday of the week `today` is in, a week a row of seven days, each day its first rows
+ * and a count of the rest as a month's cell has (`DOTS_MOST`, `calendarMore`).
+ *
+ * THE WEEKS ARE TODAY'S, NOT THE ROWS': the record read the strip from this Monday (`weeks:`), so a strip with nothing
+ * in its first week still starts on it. With no clock the strip starts on the week of the first row instead, and no
+ * day is today or past. `weeks` is held to 1 to `CALENDAR_WEEKS_MOST`.
+ */
+export function calendarStripPlan<R extends { cells: readonly string[] }>(rows: readonly R[], today: string, weeks: number, mark?: string | null): CalendarStripPlan<R> {
+  const { byDay, skipped } = byDayOf(rows);
+  const n = Math.min(CALENDAR_WEEKS_MOST, Math.max(1, Number.isFinite(weeks) ? Math.trunc(weeks) : 1));
+  const clock = isDay(today) ? today : null;
+  const start = clock ?? [...byDay.keys()].sort()[0];
+  if (start === undefined) return { weeks: [], skipped, outside: [], empty: true };
+  const from = weekStart(start);
+  const to = addDays(from, 7 * n - 1);
+  const outside: number[] = [];
+  rows.forEach((row, i) => {
+    const day = calendarDay(row.cells[1] ?? '');
+    if (day !== null && (day < from || day > to)) outside.push(i);
+  });
+  const marking = mark && isDay(mark) ? mark : null;
+  const out: CalendarStripWeek<R>[] = Array.from({ length: n }, (_, w) => {
+    const monday = addDays(from, 7 * w);
+    const days = Array.from({ length: 7 }, (_, d): CalendarStripDay<R> => {
+      const day = addDays(monday, d);
+      const items = byDay.get(day) ?? [];
+      const shown = items.slice(0, DOTS_MOST);
+      return {
+        day,
+        num: Number(day.slice(8, 10)),
+        said: calendarSaid(day, today),
+        today: day === clock,
+        past: clock !== null && day < clock,
+        marked: day === marking,
+        items: shown,
+        more: items.length - shown.length,
+        count: items.length,
+      };
+    });
+    const label = clock !== null && clock >= monday && clock <= addDays(monday, 6) ? 'This week' : `Week of ${calendarSaid(monday, today).slice(4)}`;
+    return { from: monday, label, days, count: days.reduce((sum, d) => sum + d.count, 0) };
+  });
+  return { weeks: out, skipped, outside, empty: out.every((w) => w.count === 0) };
+}
+
+/**
+ * A strip as lines, for a drawer that writes words and no grid: one line a day that holds anything, in its week, and
+ * one line saying `CALENDAR_WEEK_NONE` for a week that holds nothing, so a quiet week is said rather than skipped.
+ */
+export type CalendarStripLine<R> = { week: string; day: string | null; said: string; today: boolean; past: boolean; items: R[]; more: number };
+
+export function calendarStripLines<R>(plan: CalendarStripPlan<R>): CalendarStripLine<R>[] {
+  return plan.weeks.flatMap((w): CalendarStripLine<R>[] =>
+    w.count === 0
+      ? [{ week: w.label, day: null, said: CALENDAR_WEEK_NONE, today: false, past: false, items: [], more: 0 }]
+      : w.days.filter((d) => d.count > 0).map((d) => ({ week: w.label, day: d.day, said: d.said, today: d.today, past: d.past, items: d.items, more: d.more })),
+  );
 }
 
 /**

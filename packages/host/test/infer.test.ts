@@ -10,8 +10,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { no, ok, type Result } from '@braindog/ports';
-import { PURPOSES, infer, lastRows, routeFor, type Candidate, type InferCall, type InferDeps, type RouteFacts } from '../src/infer.ts';
+import * as hostPause from '../src/infer.ts';
+import { PURPOSES, infer, lastRows, routeFor, type Candidate, type InferCall, type InferDeps, type LastRow, type RouteFacts } from '../src/infer.ts';
 import { core, openStore } from '../../slash/src/call.ts';
+import * as slashPause from '../../slash/src/paused.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const T0 = Date.UTC(2026, 9, 6, 9);
@@ -272,4 +274,30 @@ test('A PROBE SPENDS NOTHING, and a host with no model for a purpose says so wit
   assert.ok(!out.out.ok && 'refusal' in out.out);
   assert.equal(out.out.refusal.code, 'NOT_IN_THIS_BUILD');
   assert.deepEqual(none.rows(), []);
+});
+
+test("THE PAUSE RESTATED HERE IS SLASH'S, case for case: the constants and every answer agree (paused.ts)", () => {
+  for (const name of ['NOT_SERVED', 'NOT_SERVED_PAUSE', 'FAILED_PAUSE', 'FAILS_TO_PAUSE', 'LAST_ROWS', 'RAW_MAX'] as const)
+    assert.equal(hostPause[name], slashPause[name], `${name} differs between the host and Slash`);
+  const at = (min: number) => new Date(T0 + min * MINUTE).toISOString();
+  const fail = (min: number, raw: string | null = null): LastRow => ({ ts: at(min), status: 'error', code: 'UNREACHABLE', raw });
+  const answered: LastRow = { ts: at(1), status: 'ok', code: null, raw: null };
+  const served = `${hostPause.NOT_SERVED}: gone`;
+  const cases: [readonly LastRow[], number][] = [
+    [[], 0],
+    [[fail(2), fail(1), fail(0)], 3],
+    [[fail(2), fail(1), fail(0)], 12],
+    [[fail(2), fail(1)], 3],
+    [[fail(2), answered, fail(0), fail(-1)], 3],
+    [[fail(20), fail(5), fail(0)], 21],
+    [[fail(0, served)], 60],
+    [[fail(0, served)], 24 * 60],
+    [[{ ts: at(0), status: 'refused', code: 'SLASH_BUDGET_SPENT', raw: null }, fail(-1), fail(-2), fail(-3)], 1],
+  ];
+  for (const [rows, min] of cases) {
+    const now = T0 + min * MINUTE;
+    assert.equal(hostPause.pausedFor(rows, now), slashPause.pausedFor(rows, now), `the two disagree at minute ${min}`);
+    assert.equal(hostPause.paused(rows, now), slashPause.paused(rows, now));
+  }
+  assert.equal(slashPause.pausedFor([fail(2), fail(1), fail(0)], T0 + 3 * MINUTE), 'failed', 'the table holds a pause, not only agreement');
 });

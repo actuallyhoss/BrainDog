@@ -3,19 +3,26 @@
  * the Kennel as the signed-in person (`POST /api/kennel/v1/submit`), and what a share changes
  * since the version it counts on from.
  *
- * THE SESSION IS WHO PUBLISHES. The body is `{ text }` and nothing else: no signature, because the app holds no author
- * key, and no publisher name, because the Kennel names the file by its `author` line and otherwise by the person the
- * session belongs to. The cookie goes because the request comes from a page on this host, which is the only way the
- * Kennel reads one.
+ * THE PUBLISHER'S KEY SIGNS IT. The body is `{ text, signature }`: the signature is made in this browser by the key
+ * `author-key.ts` keeps there (made once, its private half never leaves), over the kind, id, version and checksum the
+ * Kennel reads from the file, and it carries the key's public half and id, which the Kennel holds as the publisher and
+ * Browse draws the publisher's line from. No publisher name goes, because the Kennel names the file by its `author` line.
+ *
+ * A BROWSER THAT CANNOT KEEP A KEY (no WebCrypto, no Ed25519, no IndexedDB) PUBLISHES AS THE SESSION, `{ text }`, as
+ * before, and the sentence it ends in says it went unsigned. So does an id whose earlier versions went out unsigned under
+ * this person's session: the Kennel holds it as theirs and not their key's, so the signed send is refused as another
+ * publisher's and is sent once more unsigned, which the Kennel holds to the same person. The cookie goes because the
+ * request comes from a page on this host, which is the only way the Kennel reads one.
  *
  * A SELF-HOST TAKES NO SUBMISSIONS and answers with a sentence naming the Kennel it reads, which the screen says as it
  * is, as it says every other refusal: this file never guesses a host's reason.
  *
- * PLAIN NODE LOADS THIS FILE: its one value import is relative, and the catalogue's readers are imported only when a
- * diff is asked for, so a page's menu does not carry the declare package for a button nobody pressed.
+ * PLAIN NODE LOADS THIS FILE: its one value import is relative, and the catalogue's readers and the author key are
+ * imported only when a diff or a publish is asked for, so a page's menu does not carry the declare package for a button
+ * nobody pressed.
  */
 
-import type { Changes } from '@braindog/declare/catalogue';
+import type { Changes, Signature } from '@braindog/declare/catalogue';
 
 import { KENNEL_AT } from './counts.ts';
 
@@ -26,8 +33,23 @@ export const kennelFetch: Fetcher = (input, init) => globalThis.fetch(input, ini
 
 export type EntryKind = 'pack' | 'usecase';
 
-/** What the Kennel answers a submission with: listed at once for a trusted publisher, or waiting for the operator. */
-export type Submitted = { state: 'listed' | 'review'; kind: EntryKind; id: string; version: string };
+/**
+ * What the Kennel answers a submission with: listed at once for a trusted publisher, or waiting for the operator.
+ * `unsigned` says why it went out with no signature: this browser keeps no key, or the id's earlier versions went unsigned.
+ */
+export type Submitted = { state: 'listed' | 'review'; kind: EntryKind; id: string; version: string; unsigned?: 'browser' | 'earlier' };
+
+/** What signs a file before it goes: its signature, or `null` when this browser cannot sign. */
+export type Signer = (text: string) => Promise<Signature | null>;
+
+/** The publisher's key in this browser, loaded at the press. A load that fails signs nothing, and the file goes unsigned. */
+export const browserSigner: Signer = async (text) => {
+  try {
+    return await (await import('./author-key.ts')).signatureFor(text);
+  } catch {
+    return null;
+  }
+};
 
 export const publishWords = {
   publish: 'Publish to the Kennel',
@@ -38,6 +60,8 @@ export const publishWords = {
   seeBrowse: 'Browse shows it then.',
   unreached: 'BrainDog could not reach the Kennel. Try again in a moment.',
   unread: 'The Kennel answered in a way this version of BrainDog does not read.',
+  unsignedBrowser: 'It went out unsigned, because this browser cannot keep a signing key.',
+  unsignedEarlier: 'It went out unsigned, as its earlier versions did.',
   /* WHAT A SHARE CHANGES, read from `changesBetween` in `@braindog/declare/catalogue`. */
   kinds: { register: 'list', page: 'page', rule: 'automation', metric: 'figure', script: 'script', ingest: 'door', theme: 'theme', block: 'block' } as Record<string, string>,
   part: 'part',
@@ -67,30 +91,58 @@ export function answerOf(doc: unknown): { ok: true; value: Submitted } | { ok: f
   return { ok: true, value: { state: v.state, kind: v.kind, id: v.id, version: v.version } };
 }
 
-/** Send one file to the Kennel as the signed-in person. One call per press; the screen guards the press. */
-export async function submitToKennel(fetcher: Fetcher, text: string): Promise<{ ok: true; value: Submitted } | { ok: false; fix: string }> {
+/** One send of one body, and the refusal's code and place when it is refused, which only this file reads. */
+async function sendOnce(fetcher: Fetcher, body: { text: string; signature?: Signature }): Promise<{ answer: ReturnType<typeof answerOf>; code: string | null; at: string | null }> {
   let res: Response;
   try {
     res = await fetcher(`${KENNEL_AT}submit`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(body),
     });
   } catch {
-    return { ok: false, fix: publishWords.unreached };
+    return { answer: { ok: false, fix: publishWords.unreached }, code: null, at: null };
   }
   let doc: unknown;
   try {
     doc = await res.json();
   } catch {
-    return { ok: false, fix: res.ok ? publishWords.unread : publishWords.unreached };
+    return { answer: { ok: false, fix: res.ok ? publishWords.unread : publishWords.unreached }, code: null, at: null };
   }
-  return answerOf(doc);
+  const refusal = typeof doc === 'object' && doc !== null && (doc as { ok?: unknown }).ok === false ? ((doc as { refusal?: { code?: unknown; at?: unknown } }).refusal ?? null) : null;
+  return { answer: answerOf(doc), code: typeof refusal?.code === 'string' ? refusal.code : null, at: typeof refusal?.at === 'string' ? refusal.at : null };
 }
 
-/** The sentence a submission ends in, up to its link: listed, or waiting for review. */
-export const publishedSaid = (s: Submitted & { title: string }): string => (s.state === 'listed' ? publishWords.listed(s.title, s.version) : publishWords.review(s.title, s.version));
+/**
+ * Send one file to the Kennel, signed by the publisher's key in this browser (`signer`), or as the signed-in person when
+ * it cannot sign. One call per press; the screen guards the press. A signed send refused because the id is held by a
+ * person (the Kennel's "belongs to another publisher", at `id`) is sent once more unsigned: if the person is the one who
+ * published it, it is theirs, and if not, the Kennel says the same again.
+ */
+export async function submitToKennel(fetcher: Fetcher, text: string, signer: Signer = browserSigner): Promise<{ ok: true; value: Submitted } | { ok: false; fix: string }> {
+  const signature = await signer(text);
+  if (signature === null) {
+    const { answer } = await sendOnce(fetcher, { text });
+    return answer.ok ? { ok: true, value: { ...answer.value, unsigned: 'browser' } } : answer;
+  }
+  const signed = await sendOnce(fetcher, { text, signature });
+  if (signed.answer.ok || signed.code !== 'PROVIDES_CONFLICT' || signed.at !== 'id') return signed.answer;
+  const { answer } = await sendOnce(fetcher, { text });
+  return answer.ok ? { ok: true, value: { ...answer.value, unsigned: 'earlier' } } : answer;
+}
+
+/** The line a publish adds when it went out with no signature, or `null` when it was signed. */
+export const unsignedSaid = (s: Pick<Submitted, 'unsigned'>): string | null =>
+  s.unsigned === 'browser' ? publishWords.unsignedBrowser : s.unsigned === 'earlier' ? publishWords.unsignedEarlier : null;
+
+/** The sentence a submission ends in, up to its link: listed, or waiting for review, after the unsigned line when it went unsigned. */
+export const publishedSaid = (s: Submitted & { title: string }): string => {
+  const said = s.state === 'listed' ? publishWords.listed(s.title, s.version) : publishWords.review(s.title, s.version);
+  const unsigned = unsignedSaid(s);
+  /* THE UNSIGNED LINE GOES FIRST, so the sentence still ends where the screen puts its link. */
+  return unsigned === null ? said : `${unsigned} ${said}`;
+};
 
 /** The link's own words. A waiting file is not in the index yet, so its link is Browse itself. */
 export const publishedLink = (s: Submitted): string => (s.state === 'listed' ? publishWords.seeIt : publishWords.seeBrowse);

@@ -168,7 +168,7 @@ export {
   type RangeInput,
 } from './progress.ts';
 export { PATH_DONE, PATH_EVERYTHING, PATH_NEXT, PATH_STEP, PATH_VIEWS, pathFault, pathMore, pathPlan, pathRest, pathShort, unvalued, type PathMark } from './path.ts';
-export { CALENDAR_DAY, CALENDAR_MONTHS_MOST, CALENDAR_NONE, WEEKDAYS, dayParam, calendarDay, calendarMore, calendarPlan, calendarSaid, calendarSkipped, type CalendarCell, type CalendarDay, type CalendarMonth, type CalendarPlan } from './calendar.ts';
+export { CALENDAR_DAY, CALENDAR_MONTHS_MOST, CALENDAR_NONE, CALENDAR_TODAY, CALENDAR_WEEKS_MOST, CALENDAR_WEEK_NONE, WEEKDAYS, dayParam, calendarDay, calendarMore, calendarOutside, calendarPlan, calendarSaid, calendarSkipped, calendarStripLines, calendarStripPlan, type CalendarCell, type CalendarDay, type CalendarMonth, type CalendarPlan, type CalendarStripDay, type CalendarStripLine, type CalendarStripPlan, type CalendarStripWeek } from './calendar.ts';
 export { LANES_NONE, LANES_NOW, LANES_WINDOW, lanesFault, lanesInstant, lanesMore, lanesOutside, lanesPlan, lanesSentence, lanesSince, lanesSkipped, type Lane, type LanesPlan, type LanesTick } from './lanes.ts';
 export { LINK_ADDRESS, LINKS_NONE, linkFault, linkHost, linkHref, linkPlan, type LinkLine } from './links.ts';
 export { GALLERY_NONE, PICTURE_MIMES, fileRef, galleryPlan, isPictureMime, pictureSrc, type GalleryTile } from './gallery.ts';
@@ -270,5 +270,7 @@ export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, t
 export { FAILED_RUN, SHEET_DAY, SHEET_FORMS, SHEET_KINDS, SHEET_NOW, SHEET_POINTS, SHEET_STALE_STEPS, SHEET_STATES, SPECIMEN, chartSpecimen, chartSpecimens, partSpecimens, planSpecimen, planSpecimens, sheetKey, specimenFor, specimenSegments, specimenStale, type SheetAge, type SheetForm, type SheetKind, type SheetState, type Specimen } from './sheet.ts';
 /* A declared block's actions (PGS-A12): the plan Block.svelte draws them by, and the quiet line of labels without a host. */
 export * from './actions.ts';
+/* A form block (`form`): the plan Form.svelte draws by, what a press sends, and the lines without a host. */
+export * from './form.ts';
 /* The glyph groups (PGS-A08): which glyphs are the core, the set and the shell's, read by the grammar an agent is handed. */
 export { GLYPH_GROUPS, GROUP_SAYS, glyphGroups, groupOf, markGlyphs, markGroups, type GlyphGroup } from './glyphs/groups.ts';

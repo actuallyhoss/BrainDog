@@ -162,6 +162,8 @@ export type Boot = {
   whatsNew?: WhatsNew;
   /** The record's installed look, as the record's Boot.theme: each scheme's custom properties without the `--`; null for the house look; absent from an older host. */
   theme?: { light: Record<string, string>; dark: Record<string, string> } | null;
+  /** The looks the record holds, its own and those an add-on brought, which the theme chooser offers; absent from an older host. */
+  looks?: { id: string; name: string; from: 'own' | 'pack'; pack?: string }[];
   /*
    * THE SHELL'S ONE ROUND TRIP (EXP-D03), each absent from a host older than shape 2, which a reader then asks the way it
    * asked before: `waits` from `counts`, `working` from `sessions`, the voice from the add-ons, and Slash from `version`.
@@ -1163,10 +1165,15 @@ export type AskReading = {
   oldest_owed: string | null;
   last_error: { at: string; code: string } | null;
 };
+/** How Slash's questions of one kind ended over the last 30 days: `share` is accepted unchanged over answered, `null` with none answered. */
+export type SlashReading = { kind: string; offered: number; accepted: number; changed: number; declined: number; undone: number; lapsed: number; share: number | null };
 export type EngineReadings = {
   asks: AskReading[];
   understanding: { unattached: number; open_by_cause: Record<string, number> };
   braked: { on: boolean; share: number; of: number } | null;
+  slash: SlashReading[];
+  folds: { made: number; undone: number };
+  outside: number;
 };
 
 /**
@@ -1624,10 +1631,12 @@ export function createClient(options: ClientOptions) {
        `call` and had no name, which left the argument names unchecked on the screens that change who may
        see a record. */
     /** Apply the plan somebody read: `planHash` is the plan's, and `approve` the calls-out lines it printed. */
-    installPack: (args: { doc: unknown; source?: { kind: string; ref?: string }; planHash: string; approve?: string[] }) =>
+    installPack: (args: { doc: unknown; source?: { kind: string; ref?: string }; planHash: string; approve?: string[]; retireWithRows?: boolean }) =>
       call<unknown>('installPack', args as Record<string, unknown>),
     /** Take a pack back out. Its declarations go and its rows stay. */
     uninstallPack: (args: { id: string }) => call<unknown>('uninstallPack', args as Record<string, unknown>),
+    /** The add-ons taken out within the window a reinstall still puts back, newest first, with the lists that stayed. */
+    packsRemoved: () => call<Answer<'packsRemoved'>>('packsRemoved'),
     packConfig: (args: { id: string }) => call<unknown>('packConfig', args as Record<string, unknown>),
     /** Only the settings that changed; `null` puts one back to its default. */
     setPackConfig: (args: { id: string; values: Record<string, unknown>; batch?: string }) => call<unknown>('setPackConfig', args as Record<string, unknown>),
@@ -1942,6 +1951,8 @@ export function createClient(options: ClientOptions) {
        `@braindog/host`'s, because the host signs the link into `openShare`'s and the record never holds the key. */
     /** Open a read-only link to one page, for `days` from 1 to 90 (30 unless said). The link is in the answer once. */
     openShare: (args: { slug: string; days?: number }) => call<ShareLink>('openShare', args as Record<string, unknown>),
+    /** Whether this host can open a link at all, and the sentence why not when it cannot. */
+    shareable: () => call<{ can: boolean; why?: string }>('shareable'),
     /** Close one link for good. Sharing the page again makes a new link. */
     closeShare: (id: string) => call<ShareClosed>('closeShare', { id }),
     /** The links this record opened, newest first, open and closed. Never a link itself. */
@@ -1969,6 +1980,31 @@ export function createClient(options: ClientOptions) {
         return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
       }
       return answered<unknown>(res.status, body);
+    },
+    /**
+     * Keep one file's bytes at the address their hash makes (`PUT /api/files/<sha256>`), with this client's bearer.
+     * The host hashes them again and refuses bytes that are not at their own hash.
+     */
+    putFile: async (bytes: Uint8Array): Promise<Result<{ sha256: string; mime: string; bytes: number }>> => {
+      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', Uint8Array.from(bytes)));
+      const sha256 = Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
+      let res: Response;
+      try {
+        res = await doFetch(`${base}/api/files/${sha256}`, {
+          method: 'PUT',
+          headers: options.token ? { authorization: `Bearer ${options.token}` } : {},
+          body: Uint8Array.from(bytes),
+        });
+      } catch (e) {
+        return { ok: false, refusal: unreachable(e instanceof Error ? e.message : String(e)) };
+      }
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
+      }
+      return answered<{ sha256: string; mime: string; bytes: number }>(res.status, body);
     },
   };
 }

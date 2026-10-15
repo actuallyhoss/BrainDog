@@ -41,8 +41,9 @@ export type Action = {
   href?: string;
 };
 
-/** What the host is handed when an action is pressed: the action, the row it sits on, and a switch's or choice's new value. */
-export type OnAct = (action: Action, row?: unknown, value?: string) => void;
+/** What the host is handed when an action is pressed: the action, the row it sits on, and a switch's or choice's new
+ * value (a form's typed fields, an object). Its answer, where the host gives one, says whether a form's row landed. */
+export type OnAct = (action: Action, row?: unknown, value?: unknown) => unknown;
 
 /** One action as the drawer draws it. `primary` is the block's one filled control: at most one in a plan. */
 export type PlannedAction = { action: Action; label: string; kind: ActionAs; hard: boolean; primary: boolean };
@@ -103,4 +104,37 @@ export function actionsPlan(list: readonly unknown[] | null | undefined, { narro
 /** The labels the string drawer prints, in declared order, with a hard action's word beside it. Nothing pressable. */
 export function actionLabels(list: readonly unknown[] | null | undefined): string[] {
   return drawable(list).map((a) => (a.hard === true ? `${labelOf(a)} (${HARD_WORD})` : labelOf(a)));
+}
+
+/** How many of a row's actions are shown before the rest fold: one wide, none on a phone (the menu alone). */
+export const ROW_ACTIONS_SHOWN = 1;
+
+/** The hidden name of a table's last column, where each row's actions sit. */
+export const ROW_ACTIONS_HEAD = 'Actions';
+
+/**
+ * The plan for ONE ROW's actions (`row_actions`), drawn at the row's end in a list or in a table's last column.
+ *
+ * A ROW IS QUIETER THAN A BLOCK: its first action is shown and the rest wait in the row's one menu, and nothing takes
+ * the accent's fill, because a column of filled buttons down a list is the loudest thing on the page and none of them
+ * is the page's one primary. ON A PHONE NONE IS SHOWN and every one is in the menu, so a row keeps one button and its
+ * words keep the width. A hard action keeps its mark and its word wherever it lands.
+ */
+export function rowActionsPlan(list: readonly unknown[] | null | undefined, { narrow = false }: { narrow?: boolean } = {}): ActionsPlan {
+  const planned = actionsPlan(list, { narrow: false });
+  const all = [...planned.shown, ...planned.menu].map((p) => ({ ...p, primary: false }));
+  const cut = narrow ? 0 : ROW_ACTIONS_SHOWN;
+  if (all.length <= cut) return { shown: all, menu: [], fold: null };
+  return { shown: all.slice(0, cut), menu: all.slice(cut), fold: narrow ? 'sheet' : 'menu' };
+}
+
+/**
+ * THE BLOCK'S ROW A TABLE'S PRESS WAS ON. A table block draws its rows through `comparisonPlan`, whose `TableRow` key is
+ * its place under the head row, so the host is handed back the row the page declared and not the drawer's copy of it.
+ * A row this cannot place is handed on as it came.
+ */
+export function tableSourceRow<R>(rows: readonly R[], row: unknown): R | unknown {
+  const key = row && typeof row === 'object' ? (row as { key?: unknown }).key : undefined;
+  const at = typeof key === 'string' && /^\d+$/u.test(key) ? Number(key) + 1 : -1;
+  return at > 0 && at < rows.length ? rows[at] : row;
 }

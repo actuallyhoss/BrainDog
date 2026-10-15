@@ -12,6 +12,11 @@
  * the two back. The question carries the pair's own hash under `pair`, which is what the kernel reads a pair as settled
  * by (`settledIn`), so once asked, answered or undone, the pair is never offered again.
  *
+ * A MODEL WEEDS THE OFFERS, AND NEVER PRESSES (ENG-B04 job 3). Where a model may read, the nightly job hands it these
+ * pairs too, and its answer is kept in the done job: a pair it read as two is no longer offered, and one it read as one
+ * is offered first, with `judged` and the sentence `Slash reads these as one.` beside the record's own reason. Nothing
+ * is filed or folded on its word: the press is still his, and the question still his to answer.
+ *
  * ONE QUESTION A PAIR, AND ONE FOLD: the row named second is pointed at the first, which is the older and is kept. What
  * else points at the folded one follows the fold's chain as the kernel reads it (`foldEnd`); moving those is not this.
  *
@@ -35,7 +40,10 @@ export const NAMED_MOST = 20;
 /** One side of a pair as anybody may read it: what it is called, its list, and its number there (none for a name seen). */
 export type NamedSide = { name: string; register: string; seq: number | null };
 
-/** One pair as `namedTwice` answers it. `pair` is the handle a press names it by. */
+/**
+ * One pair as `namedTwice` answers it. `pair` is the handle a press names it by. `judged` and `reading` are there only
+ * when a model read the two as one: its score, and the sentence that says so.
+ */
 export type NamedPair = {
   pair: string;
   kind: Pair['kind'];
@@ -45,7 +53,12 @@ export type NamedPair = {
   evidence: string;
   score: number;
   can: boolean;
+  judged?: number;
+  reading?: string;
 };
+
+/** What an offer a model read as one says beside the record's reason. */
+export const READS_AS_ONE = 'Slash reads these as one.';
 
 /** What `namedTwice` answers. */
 export type NamedTwice = { pairs: NamedPair[] };
@@ -173,6 +186,7 @@ export function methods(deps: RecordDeps) {
             evidence: evidenceOf(h.pair),
             score: h.pair.score,
             can: h.why === undefined,
+            ...(h.pair.judged === undefined ? {} : { judged: h.pair.judged, reading: READS_AS_ONE }),
           }),
         );
       return { ok: true, value: { pairs } };

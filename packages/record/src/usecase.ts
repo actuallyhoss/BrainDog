@@ -330,7 +330,9 @@ export function useCases(d: UseCaseDeps) {
       };
     };
 
-    for (const m of u.modules) {
+    /* WHAT IT STANDS ON, AND NOT ALL IT NAMES (USE-B08): a file that says `needs` goes in with those and grows into the
+       rest of `modules` when its moment comes. A file that says none stands on every module it names, as it always did. */
+    for (const m of u.needs ?? u.modules) {
       const s = states.find((p) => p.id === m);
       if (s) {
         if (s.disabled_at !== null) enable.push(m);
@@ -353,7 +355,16 @@ export function useCases(d: UseCaseDeps) {
       if (pack.value.manifest.pack !== m) return refuse('VALUE_MALFORMED', `The document sent for ${m} is the pack ${pack.value.manifest.pack}.`, `modules.${m}`);
       await step(m, 'module', pack.value, offered);
     }
-    if (shared.value.pack && shared.value.doc) await step(shared.value.pack.manifest.pack, 'usecase', shared.value.pack, shared.value.doc);
+    /* THE FILE'S OWN PACK IS CUT TO WHAT THE RECORD WILL HOLD ONCE THE MODULES ABOVE ARE IN (`fitted`), so a page over a
+       list of a module it does not stand on goes in without that list rather than refusing the file REGISTER_UNRESOLVED.
+       A pack that reads only what will be held is the file's own document, planned as it always was. */
+    if (shared.value.pack && shared.value.doc) {
+      const { fitted } = await import('@braindog/seed/usecases/install');
+      const doc = fitted(shared.value.doc, new Set(holds(state)));
+      const pack = doc === shared.value.doc ? ok(shared.value.pack) : await normaliseChecked(doc, args.source ?? { kind: 'paste' });
+      if (!pack.ok) return pack as Result<Body>;
+      await step(pack.value.manifest.pack, 'usecase', pack.value, doc);
+    }
 
     return ok({
       usecase: {

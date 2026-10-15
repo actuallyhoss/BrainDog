@@ -233,9 +233,9 @@ export function kennelReader(folder: string | undefined, deps?: KennelDeps): Ken
 /* ── answers ────────────────────────────────────────────────────────────── */
 
 const BASE_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'x-content-type-options': 'nosniff' } as const;
-/* A READ IS OPEN TO EVERY ORIGIN, as on the Cloud, and only a published file may be kept by a cache: it never changes. */
-const READ = { ...BASE_HEADERS, 'cache-control': 'no-store', 'access-control-allow-origin': '*' };
-const KEPT = { ...BASE_HEADERS, 'cache-control': 'public, max-age=31536000, immutable', 'access-control-allow-origin': '*' };
+/* A READ CARRIES NO CORS HEADER, as on the Cloud, and only a published file may be kept by a cache: it never changes. */
+const READ = { ...BASE_HEADERS, 'cache-control': 'no-store' };
+const KEPT = { ...BASE_HEADERS, 'cache-control': 'public, max-age=31536000, immutable' };
 
 const refused = (status: number, code: string, fix: string, extra: Record<string, string> = {}): Answer => ({
   status,
@@ -252,7 +252,7 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
   if ('wrong' in asked)
     return asked.wrong === 'method'
       ? refused(405, 'ROUTE_UNKNOWN', `This Kennel address takes ${asked.allow}.`, { allow: asked.allow })
-      : refused(404, 'ROUTE_UNKNOWN', WHAT, { 'access-control-allow-origin': '*' });
+      : refused(404, 'ROUTE_UNKNOWN', WHAT);
   const base = kennelBase(deps.kennel);
   if (base === null && deps.kennel !== undefined && deps.kennel.trim().toLowerCase() !== 'off' && !unreadTold) {
     unreadTold = true;
@@ -273,9 +273,7 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
     case 'preview': {
       const text = await fileFrom(folder, base, deps, asked.path);
       if (text === null)
-        return refused(404, 'ROUTE_UNKNOWN', `This BrainDog holds no ${asked.path}, and ${base === null ? 'it reads no Kennel' : 'the Kennel did not answer for it'}.`, {
-          'access-control-allow-origin': '*',
-        });
+        return refused(404, 'ROUTE_UNKNOWN', `This BrainDog holds no ${asked.path}, and ${base === null ? 'it reads no Kennel' : 'the Kennel did not answer for it'}.`);
       return { status: 200, headers: asked.ask === 'file' ? KEPT : READ, body: text };
     }
     case 'submit':

@@ -121,6 +121,13 @@ test('EVERY KIND GETS THE SURFACE, which is the whole defect', () => {
       );
       continue;
     }
+    /* A FORM READS NO ROWS EITHER: it asks a few questions and adds one row, and its page kind draws its fields
+       (`$lib/page/kinds/form.ts`). A "Nothing matched." over its questions would be a claim about rows it never read. */
+    if (kind === 'form') {
+      const { refusal } = draw(bound({ kind, rows: [], entries: [], matched: [], refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']));
+      assert.equal(refusal, null, 'a form reported an empty answer about rows it never read');
+      continue;
+    }
     /* AN EMPTY ANSWER COUNTS NOTHING TOO: a section is drawn by its count, which the record sends without the rows. */
     const { refusal } = draw(
       bound({ kind, rows: [], entries: [], matched: [], shown: 0, total: 0, refusals: [], empty: 'Nothing matched.' }, ['authored', 'body', 'metrics']),

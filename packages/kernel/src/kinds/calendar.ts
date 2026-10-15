@@ -5,6 +5,10 @@
  * `instant` field. It may instead write its rows out, each `{ cells: [title, day] }`. `back:` and `ahead:` are how many
  * whole months it shows before and after this one, up to `MONTHS_MOST` each, `BACK` and `AHEAD` when it says neither.
  *
+ * OR A STRIP OF WEEKS: `weeks:` is how many whole weeks it shows from the Monday of this one, 1 to `WEEKS_MOST`, read
+ * in the record's own zone as `today` is. It stands in place of `back:` and `ahead:`, never beside them, and the answer
+ * says `weeks` so a host draws the strip and not the months (`packages/render/src/calendar.ts` `calendarStripPlan`).
+ *
  * THE DEFAULTS ARE THE CONTRACT'S, IN THE ORDER IT NAMES THE KEYS: "`ahead`, `back` ... defaults 0 and 2", so a
  * calendar that says neither shows this month and the two before it. A calendar meant to look forward says `ahead:`.
  *
@@ -60,6 +64,9 @@ export const CALENDAR_MOST = 500;
 /** How many whole months either way a calendar may show: a year each side. */
 const MONTHS_MOST = 12;
 
+/** How many whole weeks a strip may show: two months of them. */
+const WEEKS_MOST = 8;
+
 /** The months shown when the block does not say: this one, and the two before it. */
 const AHEAD = 0;
 const BACK = 2;
@@ -82,6 +89,22 @@ function monthEdge(day: string, n: number, edge: 'first' | 'last'): string {
      December into the next year, so no month is counted by hand here. */
   return new Date(edge === 'first' ? Date.UTC(year, month + n, 1) : Date.UTC(year, month + n + 1, 0)).toISOString().slice(0, 10);
 }
+
+/** The Monday on or before `day`, the first day of its week, as `buckets.ts` and `render/src/days.ts` start one. */
+function mondayOf(day: string): string {
+  const t = Date.parse(`${day}T00:00:00Z`);
+  const at = Number.isFinite(t) ? new Date(t) : new Date(0);
+  return new Date(at.getTime() - ((at.getUTCDay() + 6) % 7) * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** A day `n` days after `day`. */
+const daysAfter = (day: string, n: number): string => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+/** The block's `weeks:`, which `PageBlock` does not name yet, read as whatever was written. */
+const weeksOf = (block: PageBlock | Readonly<Record<string, unknown>>): unknown => (block as { weeks?: unknown }).weeks;
+
+/** How a calendar too full for its window is told to show less: by the form it was written in. */
+const fewer = (block: PageBlock | Readonly<Record<string, unknown>>): string => (weeksOf(block) === undefined ? 'show fewer months with back: and ahead:' : 'show fewer weeks with weeks:');
 
 /**
  * The months of a calendar over `deadlines`: every row of every list the reader may read whose deadline falls inside
@@ -128,7 +151,7 @@ function readAcross(deps: PageDeps, block: PageBlock, base: BlockResult, window:
       if (counted > CALENDAR_MOST)
         return stop(
           overDue(
-            `A calendar draws every row in its months, and more than ${CALENDAR_MOST} things fall due in these. Show fewer months with back: and ahead:.`,
+            `A calendar draws every row in its days, and more than ${CALENDAR_MOST} things fall due in these. Narrow it with where:, or ${fewer(block)}.`,
             'source',
           ),
         );
@@ -175,7 +198,7 @@ export const calendar: KindModule & { across: readonly string[] } = {
 
   /* SHARED: a `series` reads both and a `stat` or `lines` block reads `back`, each as buckets, where a calendar reads
      them as whole months (`block-keys.ts` `KEY_KINDS`). */
-  keys: ['back', 'ahead'],
+  keys: ['back', 'ahead', 'weeks'],
 
   validate(block, ctx) {
     for (const key of ['back', 'ahead'] as const) {
@@ -187,9 +210,25 @@ export const calendar: KindModule & { across: readonly string[] } = {
           at: key,
         };
     }
+    const weeks = weeksOf(block);
+    if (weeks !== undefined) {
+      if (!(typeof weeks === 'number' && Number.isInteger(weeks) && weeks >= 1 && weeks <= WEEKS_MOST))
+        return {
+          code: 'OUT_OF_BOUNDS',
+          fix: `weeks: on a calendar is how many whole weeks it shows from this one, from 1 to ${WEEKS_MOST}, and ${JSON.stringify(weeks)} is not.`,
+          at: 'weeks',
+        };
+      /* ONE FORM OR THE OTHER: a strip from this week and months either side of this one are two calendars, and a block
+         saying both would draw neither as its author meant. */
+      if (block.back !== undefined || block.ahead !== undefined)
+        return invalid(
+          'A calendar shows whole months with back: and ahead:, or whole weeks from this one with weeks:, and this one says both. Take one off.',
+          block.back !== undefined ? 'back' : 'ahead',
+        );
+    }
     if (block.limit !== undefined)
       return invalid(
-        `A calendar draws every row in its months, up to ${CALENDAR_MOST}, so it takes no limit:. Narrow it with where:, or show fewer months with back: and ahead:.`,
+        `A calendar draws every row in its days, up to ${CALENDAR_MOST}, so it takes no limit:. Narrow it with where:, or ${fewer(block)}.`,
         'limit',
       );
     /* OVER `deadlines` THE SHARED CHECK IS ASKED ABOUT THE KEYS ALONE, since it knows a source only as a list: it is
@@ -221,14 +260,19 @@ export const calendar: KindModule & { across: readonly string[] } = {
     const kit = deps.kit;
     if (!kit) return { ...base, refusals: [...base.refusals, { code: 'NOT_IN_THIS_BUILD', fix: 'This record does not read a calendar onto a page yet.', at: 'kind' }] };
     const today = kit.today();
-    const window = {
-      from: monthEdge(today, -(block.back ?? BACK), 'first'),
-      to: monthEdge(today, block.ahead ?? AHEAD, 'last'),
-      today,
-    };
-    /* ROWS WRITTEN OUT ARE THE AUTHOR'S, drawn as written: the window says which months the host draws them in. */
-    if (!block.source) return { ...base, window };
-    if (block.source === ACROSS) return readAcross(deps, block, base, window);
+    const weeks = weeksOf(block);
+    /* A STRIP IS WHOLE WEEKS FROM THIS MONDAY, the days of this week already gone among them, so the week reads whole
+       and today sits on its own weekday; months are whole months either side of this one. */
+    const strip = typeof weeks === 'number' ? weeks : null;
+    const window =
+      strip === null
+        ? { from: monthEdge(today, -(block.back ?? BACK), 'first'), to: monthEdge(today, block.ahead ?? AHEAD, 'last'), today }
+        : { from: mondayOf(today), to: daysAfter(mondayOf(today), 7 * strip - 1), today };
+    /* THE ANSWER SAYS `weeks`, so a host draws the strip from it and never works out the form from the window. */
+    const said = (out: BlockResult): BlockResult => (strip === null ? out : Object.assign(out, { weeks: strip }));
+    /* ROWS WRITTEN OUT ARE THE AUTHOR'S, drawn as written: the window says which days the host draws them in. */
+    if (!block.source) return said({ ...base, window });
+    if (block.source === ACROSS) return said(readAcross(deps, block, base, window));
 
     const day = block.columns?.[1]?.field ?? '';
     const from: Leaf = { field: day, gte: window.from };
@@ -241,20 +285,20 @@ export const calendar: KindModule & { across: readonly string[] } = {
       within: { all: [from, to] },
       order: [{ field: day, dir: 'asc' }],
     });
-    if ('refusals' in listed) return { ...base, window, refusals: [...base.refusals, ...listed.refusals] };
+    if ('refusals' in listed) return said({ ...base, window, refusals: [...base.refusals, ...listed.refusals] });
     if (listed.matched > CALENDAR_MOST)
-      return {
+      return said({
         ...base,
         window,
         refusals: [
           ...base.refusals,
           {
             code: 'OUT_OF_BOUNDS',
-            fix: `A calendar draws every row in its months, and ${listed.register} has ${listed.matched} in these where a calendar draws ${CALENDAR_MOST}. Narrow it with where:, or show fewer months with back: and ahead:.`,
+            fix: `A calendar draws every row in its days, and ${listed.register} has ${listed.matched} in these where a calendar draws ${CALENDAR_MOST}. Narrow it with where:, or ${fewer(block)}.`,
             at: 'where',
           },
         ],
-      };
-    return { ...base, window, rows: listed.rows, matched: listed.matched };
+      });
+    return said({ ...base, window, rows: listed.rows, matched: listed.matched });
   },
 };

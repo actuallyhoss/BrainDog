@@ -218,7 +218,10 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     else if (c.waits === 'first') stops.push(words.conflictFirst(what, name(text(c.pack))));
     else stops.push(words.conflict(what, name(text(c.pack))));
   }
-  if (count(d.orphans) > 0) stops.push(words.orphans(count(d.orphans)));
+  /* A LIST TAKEN AWAY WHILE IT HOLDS ROWS IS A STEP SHOWN, NOT A STOP (`Diff.removals`, "Your 41 items stay"): Install
+     on this plan presses `retireWithRows`, so the orphans it counts no longer stop it. */
+  const removals = list(d.removals);
+  if (count(d.orphans) > 0 && removals.length === 0) stops.push(words.orphans(count(d.orphans)));
   /* AN UNRESOLVED PAGE ADD IS THE PAGE THAT IS MISSING: `page_adds` carries `unresolved` only beside a
      `refusal`, whose sentence already names the page and the pack, so it is shown as a stop rather than dropped
      silently the way the resolved ones below are drawn. */
@@ -234,6 +237,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
     ...list(d.renames).map((r) => row(words.renamed(name(text(r.from)), name(text(r.to))))),
     ...list(d.misreads).map((r) => row(name(text(r.id)), words.misread(name(text(r.reader)), text(r.where)))),
     ...list(d.warnings).map((w) => row(text(w.say))),
+    ...removals.map((r) => row(name(`register.${text(r.retire)}`), text(r.line))),
   ];
 
   const part: Part = {

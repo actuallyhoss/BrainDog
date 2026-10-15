@@ -123,6 +123,7 @@ import { opsPlan, type OpsPlanDeps } from './ops-plan.ts';
 import { stripeOf } from './stripe.ts';
 /* TELEMETRY: one Analytics Engine point per request, when `TELEMETRY` is bound. */
 import { telemetry } from './telemetry.ts';
+import { readSetup } from '@braindog/slash/propose';
 
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
 const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'This record is going back to a copy and starts again in a moment. Ask again then.', at: 'record' };
@@ -569,7 +570,7 @@ export class Record$ extends DurableObject<Env> {
   #copies: (Snapshots & { readonly reopens: true }) | undefined;
 
   /** The record's own deletion, as `#open` hands it to the record, or `null` before the record is opened. */
-  #destroy: (() => Promise<void>) | null = null;
+  #destroy: (() => Promise<{ kept: string; removed: number } | void>) | null = null;
 
   /**
    * The `Scheduler` port over this object's own alarm. One per customer, and this is the one.
@@ -923,9 +924,12 @@ export class Record$ extends DurableObject<Env> {
             },
           };
           const swept = blobs && copies ? { blobs, final: async (record: string) => keyOf(blobs, record, (await copies.take('final')).id) } : undefined;
+          /* WHAT THE SWEEP KEPT AND REMOVED GOES BACK ON THE ANSWER, so `deleteRecord` can say where the final copy is. */
+          let answer: Awaited<ReturnType<typeof destroyRecord>> = undefined;
           await this.ctx.blockConcurrencyWhile(async () => {
-            await destroyRecord(wipe, (record) => directory.close(record), id, swept);
+            answer = await destroyRecord(wipe, (record) => directory.close(record), id, swept);
           });
+          return answer;
         }),
       });
 
@@ -1020,7 +1024,7 @@ export class Record$ extends DurableObject<Env> {
     const more = await this.#act(api);
     const asked = await this.#ask(api);
     const modelled = await this.#model(api);
-    await slashLook(api);
+    await slashLook(api, { sql: this.#jobsStore });
     /* AND THE RECORD LINTS ITS OWN PAGES (PRF-A04), at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
     await api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e)));
     /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
@@ -1977,7 +1981,7 @@ export class Record$ extends DurableObject<Env> {
        (`apps/web/src/lib/data/live.ts`), and the poll is the one call that must stay one `MAX(rowid)`: a daily look
        woken by it would put Slash's model calls behind a question that only asks whether anything changed. The alarm
        and every other read still start it. */
-    if (!pollAsked(request.method, new URL(request.url).pathname) && !(await this.lapsed())) this.ctx.waitUntil(slashLook(api));
+    if (!pollAsked(request.method, new URL(request.url).pathname) && !(await this.lapsed())) this.ctx.waitUntil(slashLook(api, { sql: this.#jobsStore }));
     /* THE METHOD ROUTER'S HANDLERS, WITH THE VAULT PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
        (`withVaultPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
        below serve the same table. */
@@ -4049,14 +4053,14 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
      host does not offer until a host serves them (`packages/host/src/auth.ts`). Only the Worker ever will: a self-host
      is made by its operator. */
   const signupPath = url.pathname.replace(/\/+$/, '');
-  /* A STRANGER'S FIRST SENTENCE READ BY THE INCLUDED MODEL (`first-read.ts`), off until `FIRST_READ_DAILY` is set. No
-     reader is built yet (`readSetup`), so the door answers that it is not in this build. */
+  /* A STRANGER'S FIRST SENTENCE READ BY THE INCLUDED MODEL (`first-read.ts`), off until `FIRST_READ_DAILY` is set, and
+     read by `readSetup`: the model call and the reading, with no record, owner or ledger. */
   if (signupPath === '/auth/signup/read')
     return serveFirstRead(
       request,
       firstReadDoorOf(env, {
         origin: `https://${env.PUBLIC_HOST ?? ''}`,
-        readSetup: null,
+        readSetup,
         store: { hit: (key, day, most) => directory.firstReadHit(key, day, most) as unknown as Promise<boolean> },
       }),
     );

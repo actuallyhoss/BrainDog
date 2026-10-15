@@ -17,6 +17,7 @@ import { formedFor } from '@braindog/seed/usecases/install';
 import { firstRun } from './first-run.ts';
 import { hear } from './who.ts';
 import { arrangeTurns } from './arrange.ts';
+import { propose } from './start/propose.ts';
 
 const founder = USE_CASES.find((u) => u.usecase === 'founder')!;
 
@@ -75,4 +76,58 @@ const CHIPS: Record<string, string> = {
 test('THE TABLE IS EVERY CHIP, and each is what that chip alone proposes', () => {
   assert.deepEqual(Object.keys(CHIPS), [...firstRun.whoChips]);
   for (const [chip, id] of Object.entries(CHIPS)) assert.equal(arrange(chip).pick?.usecase, id, chip);
+});
+
+/* A CATALOGUE USE CASE IS HEARD BY ITS OWN WORDS (USE-A16). No list compiled into the app holds "flats" or "tenants", so
+   the landlord's sentence was Personal on "rent" twice: measured before `heard`, Personal 2 and nothing else above 0. The
+   catalogue use case here is invented, and so are its words; it stands on Money, which this build ships. */
+const FLATS = 'I rent out six flats to tenants and need to keep track of the rent';
+const RENT_BOOK = { id: 'rent-book', title: 'Rent book', summary: 'Flats, the tenants in them and the rent each one owes.', signals: ['flats', 'tenants', 'rent'], modules: ['money-core'] };
+
+test('A CATALOGUE USE CASE IS PROPOSED BY ITS OWN SIGNALS, counted as a shipped one is counted', () => {
+  const heard = arrangeTurns(null, FLATS, [RENT_BOOK]);
+  assert.equal(heard.pick?.usecase, 'rent-book');
+  assert.equal(heard.pick?.title, 'Rent book');
+  assert.deepEqual(heard.pick?.modules, ['money-core']);
+  assert.deepEqual(heard.ranked[0]?.why.map((w) => w.text), ['rent', 'flats', 'tenants', 'rent']);
+  for (const r of heard.ranked) for (const w of r.why) assert.equal(heard.from.slice(w.at, w.at + w.text.length), w.text);
+  /* TWO TURNS READ IT THE SAME WAY, the catalogue's words counted in both. */
+  assert.equal(arrangeTurns('I have a few flats', 'tenants and the rent', [RENT_BOOK]).pick?.usecase, 'rent-book');
+  /* AN OFFER WITH NO TITLE (`heardOf`) IS SAID IN WORDS, never by its id. */
+  const bare = arrangeTurns(null, FLATS, [{ id: RENT_BOOK.id, signals: RENT_BOOK.signals, modules: RENT_BOOK.modules }]);
+  assert.equal(bare.pick?.title, 'Rent book');
+});
+
+test('WITH NO CATALOGUE THE SAME SENTENCE IS WHAT IT WAS, byte for byte', () => {
+  assert.deepEqual(arrangeTurns(null, FLATS), { ...arrange(FLATS), from: FLATS });
+  assert.equal(arrangeTurns(null, FLATS).pick?.usecase, 'personal');
+  assert.deepEqual(arrangeTurns(null, FLATS, []), arrangeTurns(null, FLATS));
+  assert.deepEqual(arrangeTurns(hear(WHO).bio, ABOUT, []), arrangeTurns(hear(WHO).bio, ABOUT));
+});
+
+test('A CATALOGUE ENTRY UNDER A SHIPPED ID IS PASSED OVER, as a use case or a module, and so is one with no words', () => {
+  const shadow = [
+    { ...RENT_BOOK, id: 'personal', title: 'Not personal' },
+    { ...RENT_BOOK, id: 'money-core', title: 'Not money' },
+    { ...RENT_BOOK, id: 'quiet-book', signals: [] },
+  ];
+  assert.deepEqual(arrangeTurns(null, FLATS, shadow), arrangeTurns(null, FLATS));
+  assert.equal(arrangeTurns(null, FLATS, shadow).pick?.title, useCaseTitle('personal'));
+  /* A TIE STILL GOES AS IT DID: equal words and equal length leave the shipped use case first, by catalogue order. */
+  const twin = { ...RENT_BOOK, id: 'pocket-book', signals: [...(USE_CASES.find((u) => u.usecase === 'personal')?.signals ?? [])] };
+  assert.equal(arrangeTurns(null, FLATS, [twin]).pick?.usecase, 'personal');
+});
+
+const useCaseTitle = (id: string): string | undefined => USE_CASES.find((u) => u.usecase === id)?.title;
+
+/* AND THE FIRST RUN PROPOSES IT: `propose` hands the catalogue it is given to the rules, which before heard only the
+   compiled words and proposed Personal for the same sentence with the same catalogue in hand. */
+test('THE FIRST RUN PROPOSES THE CATALOGUE USE CASE IT IS HANDED, and the modules it stands on', () => {
+  const offer = [{ id: RENT_BOOK.id, signals: RENT_BOOK.signals, modules: RENT_BOOK.modules }];
+  const with_ = propose(FLATS, { zone: 'UTC', locale: 'en', catalogue: offer });
+  assert.equal(with_.usecase, 'rent-book');
+  assert.ok(with_.modules.includes('money-core'), with_.modules.join(', '));
+  assert.ok(!with_.modules.includes('rent-book'), 'the use case is not its own module');
+  for (const h of with_.heard) assert.doesNotMatch(h.became, /rent-book/u, 'said by its name, never its id');
+  assert.equal(propose(FLATS, { zone: 'UTC', locale: 'en' }).usecase, 'personal');
 });

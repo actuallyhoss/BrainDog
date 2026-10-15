@@ -110,7 +110,7 @@ test('the index is the bundled catalogue and what R2 lists; a signed file waits,
 
   const first = await serveKennel(get('index.json'), deps);
   assert.equal(first.status, 200);
-  assert.equal(first.headers.get('access-control-allow-origin'), '*');
+  assert.equal(first.headers.get('access-control-allow-origin'), null);
   assert.equal(first.headers.get('cache-control'), 'no-store');
   assert.deepEqual(((await first.json()) as CatalogueIndex).entries.map((e) => e.id), ['pad']);
 
@@ -231,7 +231,7 @@ test('counts, a missing file, a wrong method, a host with no bucket or no operat
 
   const missing = await serveKennel(get('packs/nothing/1.0.0.pack.json'), deps);
   assert.equal(missing.status, 404);
-  assert.equal(missing.headers.get('access-control-allow-origin'), '*');
+  assert.equal(missing.headers.get('access-control-allow-origin'), null);
   assert.equal(missing.headers.get('cache-control'), 'no-store');
   assert.equal((await serveKennel(post('index.json', {}), deps)).status, 405);
   assert.equal((await serveKennel(get('../../boot'), deps)).status, 404);

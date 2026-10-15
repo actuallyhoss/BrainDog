@@ -17,15 +17,38 @@ import type { Refusal } from '@braindog/ports';
 export type Raw = Readonly<Record<string, unknown>>;
 
 /**
- * The host panels a `section` may name with `panel:`, drawn by the host for the page's row under the section's
- * heading: what the row's work runs on and is scheduled to do, where its numbers are sent, and, on a run's own page,
- * what that run did (`run`, drawn only when the page is for a run), and where the row was seen (`seen`, the notes, runs
- * and rows that name it, newest first, from the record's `about` read).
+ * The host panels a `section` may name with `panel:`, drawn by the host under the section's heading. Four are about the
+ * page's row: what the row's work runs on and is scheduled to do (`actions`), where its numbers are sent
+ * (`reporting`), on a run's own page what that run did (`run`, drawn only when the page is for a run), and where the
+ * row was seen (`seen`, the notes, runs and rows that name it, newest first, from the record's `about` read). Two are
+ * about the record and need no row, so they stand on any page: the look editor (`look-editor`) and the form that says
+ * which model Slash uses (`slash-model`).
  *
  * A KEY AND NOT TWO KINDS, because the renderer cannot draw either: each is the host's own screen, placed by the page.
  * The web still reads the two English headings a page carried before this key, and nothing new relies on them.
+ *
+ * ONE TABLE, READ ON BOTH SIDES (PGS-A17). `needs` is what the panel is about: `row` refuses it on a page about no row,
+ * and `none` lets it stand on any page. `level` is who the host draws it for: `read` for anyone who reads the page,
+ * `write` where the page writes, `owner` for the record's owner only. `says` is the line a person or a gate is told
+ * the panel is. The web holds one loader for each key (`apps/web/src/lib/page/panels/index.ts`), and a test holds the
+ * two lists equal.
  */
-export const PANELS = ['actions', 'reporting', 'run', 'seen'] as const;
+export type Panel = 'actions' | 'reporting' | 'run' | 'seen' | 'look-editor' | 'slash-model';
+
+/** What a host panel is about, who it is drawn for and what it is, in one line. */
+export type PanelEntry = Readonly<{ needs: 'row' | 'none'; level: 'read' | 'write' | 'owner'; says: string }>;
+
+export const PANEL_TABLE: Readonly<Record<Panel, PanelEntry>> = {
+  actions: { needs: 'row', level: 'write', says: 'What this runs on and is scheduled to do' },
+  reporting: { needs: 'row', level: 'write', says: 'Where its numbers are sent' },
+  run: { needs: 'row', level: 'read', says: 'What this run did, and its way back' },
+  seen: { needs: 'row', level: 'read', says: 'Where the record saw it' },
+  'look-editor': { needs: 'none', level: 'owner', says: 'Change how this record looks' },
+  'slash-model': { needs: 'none', level: 'owner', says: 'The model Slash uses' },
+};
+
+/* THE KEYS IN THE TABLE'S ORDER, the four of before first, as the refusal lists them and the web's list equals. */
+export const PANELS = Object.keys(PANEL_TABLE) as readonly Panel[];
 
 /** The most bytes a path's short view is named in, which is the width of the switch it is drawn on. */
 export const SHORT_LABEL_BYTES = 24;
@@ -42,15 +65,15 @@ const invalid = (fix: string, at: string, allowed?: readonly string[]): Refusal 
 /**
  * Why a section's `panel:` cannot be drawn, or `null`.
  *
- * `onTemplate` IS WHETHER THE PAGE IS A PAGE PER ROW (`for:`). A panel is about one row, whose actions or reports it
- * draws, so on a page about no row it would be drawn about nothing. `null` when the caller cannot say, as a block
- * read on its own cannot.
+ * `onTemplate` IS WHETHER THE PAGE IS A PAGE PER ROW (`for:`). A panel that `needs` a row draws that row's actions or
+ * reports, so on a page about no row it would be drawn about nothing; one that needs none stands on any page. `null`
+ * when the caller cannot say, as a block read on its own cannot.
  */
 export function panelFault(panel: unknown, onTemplate: boolean | null): Refusal | null {
   if (panel === undefined) return null;
   if (typeof panel !== 'string' || !(PANELS as readonly string[]).includes(panel))
-    return invalid(`panel: is one of ${PANELS.join(', ')}, the part of the row's page the host draws under this section's heading, and ${JSON.stringify(panel)} is none of them.`, 'panel', PANELS);
-  if (onTemplate === false)
+    return invalid(`panel: is one of ${PANELS.join(', ')}, the part of the page the host draws under this section's heading, and ${JSON.stringify(panel)} is none of them.`, 'panel', PANELS);
+  if (onTemplate === false && PANEL_TABLE[panel as Panel].needs === 'row')
     return invalid(`panel: ${panel} draws a part of one row's page, and this page is about no row. Make it a page per row with for: { register }, or take panel: off.`, 'panel');
   return null;
 }

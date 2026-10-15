@@ -15,7 +15,8 @@
  * WHO IS ASKING IS A KEY OR A PERSON, NEVER A NAME. An author's signature names its key, and the key id is the
  * publisher; with no signature, the host says which signed-in person sent it. The name a submission gives is only what
  * readers see. An id belongs to whoever published it first, so a later version comes from the same person, or is signed
- * by a key that signed it before or one that key rotated to.
+ * by a key that signed it before or one that key rotated to. An author's name is held the same way once they sign: every
+ * later version under it, of any id, is signed by that key or its rotation (`claimOn`).
  *
  * THE STATE IS THREE FILES AND THE PUBLISHED FILES BESIDE THEM: the Kennel's own index (never the bundled one, whose ids
  * it keeps for BrainDog), the review file (what waits, what was refused, and who submitted in the last day), and the
@@ -234,8 +235,13 @@ function listIn(index: CatalogueIndex, entry: Omit<CatalogueEntry, 'latest' | 'v
 
 /* ── submitting ─────────────────────────────────────────────────────────── */
 
-/** Who is submitting: an author's key, whose signature the file carries, or a person the host signed in. */
-export type Identity = { kind: 'key'; signature: Signature; name?: string | undefined } | { kind: 'person'; id: string; name?: string | undefined };
+/**
+ * Who is submitting: an author's key, whose signature the file carries, or a person the host signed in. A key sent from
+ * a signed-in session also carries that `person`, so the key may claim an id the same person published unsigned.
+ */
+export type Identity =
+  | { kind: 'key'; signature: Signature; name?: string | undefined; person?: string | undefined }
+  | { kind: 'person'; id: string; name?: string | undefined };
 
 export type Submitted = Change & { answer: { state: 'listed' | 'review'; kind: EntryKind; id: string; version: string } };
 
@@ -282,7 +288,57 @@ function mayTake(listed: CatalogueEntry | null, owner: Publisher | null, identit
   }
   const key = identity.signature.key_id;
   if (signers.includes(key) || rotatedFrom(statements, signers, key) !== null) return ok(true);
+  /* AN ID A PERSON PUBLISHED UNSIGNED MAY BE CLAIMED BY THAT PERSON'S KEY (SHL-B07): the host signed them in beside the
+     signature, so the key is theirs. Once signed, the id is pinned to the key by the signature on that version. */
+  if (owner?.kind === 'person' && identity.person !== undefined && identity.person === owner.id) return ok(true);
   return pinned === undefined ? theirs : no<true>('SIGNATURE_INVALID', `Earlier versions of ${id} are signed by key ${pinned}, and this one by key ${key}. Sign it with that key.`, { at: 'signature' });
+}
+
+/**
+ * AN AUTHOR WHO HAS SIGNED SIGNS EVERY VERSION AFTER, of any id. The first signed version the Kennel lists under an
+ * author's name claims that name for its key, kept where the pin on an id is kept: in the signatures on the listed
+ * versions, so no file beside the index holds it and a host writes nothing new. A later version under that name is
+ * signed by a key that signed under it before, or by one such a key rotated to (the index's verified statements, read
+ * as Browse reads them). An author who never signed publishes unsigned as before.
+ *
+ * NAMES MATCH ONCE FOLDED (width, case and spacing), both the file's author and the name readers see, so a version is
+ * not slipped in under a name by spelling it in capitals. The refusal says the name as the Kennel lists it, never as
+ * this file spells it, since this public door echoes nothing it was sent.
+ */
+type Claim = { name: string; keys: string[] };
+
+/* THE RECORD'S STAND-IN AUTHOR IS NOBODY'S NAME. A use case shared or a template written with no author named goes out
+   as 'a BrainDog owner' (`packages/record/src/usecase.ts`, `apps/web/src/lib/market/template.ts`), so the first key to
+   sign under it would otherwise claim it and refuse every other person's publish. It is never claimed. */
+const STAND_IN_AUTHOR = 'a BrainDog owner';
+
+const folded = (name: string): string => name.normalize('NFKC').replace(CONTROL, ' ').replace(/\s+/gu, ' ').trim().toLowerCase();
+
+/** The claim on any of these names: the name as listed, and every key that signed under it, the first one first. */
+function claimOn(index: CatalogueIndex, names: readonly string[]): Claim | null {
+  const wanted = new Set(names.map(folded).filter((n) => n !== '' && n !== folded(STAND_IN_AUTHOR)));
+  const signed: { name: string; key: string; at: string }[] = [];
+  for (const e of index.entries) {
+    const said = [e.author, e.publisher?.name ?? ''].find((n) => wanted.has(folded(n)));
+    if (said === undefined) continue;
+    for (const v of e.versions) if (v.signature) signed.push({ name: said, key: v.signature.key_id, at: v.published_at });
+  }
+  signed.sort((a, b) => a.at.localeCompare(b.at));
+  const first = signed[0];
+  return first === undefined ? null : { name: first.name, keys: [...new Set(signed.map((s) => s.key))] };
+}
+
+/* SIGNATURE_REQUIRED is the code this refusal is for, and waits on the registry (`packages/ports`); until it is there
+   the Kennel says SIGNATURE_INVALID, which a host and Browse already read as "signed wrong or not at all". */
+function mayAuthor(claim: Claim | null, identity: Identity, statements: KeyStatements): Result<true> {
+  if (claim === null) return ok(true);
+  if (identity.kind === 'person')
+    return no('SIGNATURE_INVALID', `${claim.name} signs every version, and this one is not signed. Publish it from the app you signed with before.`, { at: 'signature' });
+  const key = identity.signature.key_id;
+  if (claim.keys.includes(key) || rotatedFrom(statements, claim.keys, key) !== null) return ok(true);
+  return no('SIGNATURE_INVALID', `${claim.name} signs every version with one key, and this one is signed with another. Sign it with that key, or publish its rotation to the new key first.`, {
+    at: 'signature',
+  });
 }
 
 const unsigned = ({ signature: _signature, ...v }: CatalogueVersion): CatalogueVersion => v;
@@ -356,6 +412,13 @@ export async function acceptSubmission(state: KennelState, text: string, identit
   /* A WAITING ENTRY ALREADY LISTED IS ONE WHOSE REVIEW FILE WAS NOT WRITTEN AFTER ITS INDEX WAS, and counts for nothing. */
   const waiting = state.review.pending.filter((p) => p.entry.kind === file.kind && p.entry.id === id && !listedAt(state.index, file.kind, id, p.version.version));
   const owner = listed?.publisher ?? waiting[0]?.entry.publisher ?? null;
+  /* THE AUTHOR'S CLAIM COMES BEFORE THE ID'S, so a version under a signed author's name, of an id they hold or a new
+     one, is told the one sentence Browse says to its publisher. A signed-in person adding to an entry they published
+     unsigned is the one exception: the host vouches it is them, and a name is not unique, so a key that signs under the
+     same name never locks them out of their own add-on. */
+  const ownEntry = identity.kind === 'person' && owner?.kind === 'person' && owner.id === identity.id;
+  const authored = ownEntry ? ok(true) : mayAuthor(claimOn(state.index, [author, publisher.name]), identity, statements);
+  if (!authored.ok) return authored as Result<Submitted>;
   const may = mayTake(listed, owner, identity, statements, id);
   if (!may.ok) return may as Result<Submitted>;
   /* ONE VERSION OF AN ENTRY WAITS AT A TIME. Its bump was computed against what is listed, and a second one computed

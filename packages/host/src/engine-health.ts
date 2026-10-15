@@ -30,6 +30,7 @@ export type EngineHealth = {
   doubleShare?: number | undefined;
   doubleOf?: { twice: number; asks: number } | undefined;
   spent?: { person: number; background: number } | undefined;
+  passedOver?: number | undefined;
 };
 
 /** `@braindog/slash`'s `EngineSaid`: one sentence, and whose it is to fix. */

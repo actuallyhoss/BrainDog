@@ -12,6 +12,8 @@
  * first run reading by its own rules instead, so the caller only ever reads a result.
  */
 
+import type { ModelAsk } from '../signup.ts';
+
 export type Refused = { ok: false; refusal: { code: string; fix: string } };
 export type Asked<T> = { ok: true; value: T } | Refused;
 
@@ -28,6 +30,8 @@ export type SetupReply = {
   rows: { list: string; fields: Record<string, unknown> }[];
   draft: string | null;
   by: string;
+  /** The one question the reading could not answer, where the read asks one (first-read-setup's answer). */
+  ask?: ModelAsk | null;
 };
 
 /** What `proposeMapping` answers (`MappingAnswer` in `@braindog/slash`). */

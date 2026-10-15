@@ -3,14 +3,19 @@
  * hand: its pages, its Home, what each module keeps, whether it has due dates to remind about, and where Money keeps its
  * currency.
  *
- * NOTHING HERE WRITES. A preview may draw examples; nothing writes them. What is asked of the record from here is
- * its `previewChange`, which runs inside a rehearsal and keeps nothing, and every page
- * the proposal makes is drawn by it, not Home alone.
+ * NOTHING HERE WRITES. What is asked of the record from here is its `previewChange`, which runs inside a rehearsal and
+ * keeps nothing, and every page the proposal makes is drawn by it, not Home alone.
+ *
+ * NOTHING IS DRAWN THAT NOBODY TYPED (USE-B07). A page is drawn over the person's own name, the entries their sentence
+ * filled and the first entries of the files they brought (`ownRows`), and a page none of those reach is its name and one
+ * line of what it will hold (`pageShown`). No example, and no sample row Slash drafted, is ever drawn as theirs.
  */
 
 import { useCase, type UseCase } from '@braindog/seed/usecases';
 import { carriedDocument, homePageOf, moduleDocument } from '@braindog/seed/usecases/install';
 import { previewOf } from '@braindog/seed/usecases/share';
+
+import { PEOPLE } from '../../lib/who.ts';
 
 type Body = Record<string, unknown>;
 
@@ -122,15 +127,16 @@ const voiced = (u: UseCase, text: unknown): unknown =>
     : text;
 
 
-/** One call to `previewChange`: the declarations it rehearses and the example rows it draws them over, by list. */
+/** One call to `previewChange`: the declarations it rehearses and the person's own rows it draws them over, by list. */
 export type Asked = { to: { declarations: Decl[] }; rows: Record<string, Body[]> };
 
 /** A page the proposal makes, with the lists it reads by declaration id. */
 type Made = { decl: Decl; needs: string[] };
 
 /**
- * WHAT TO ASK THE RECORD TO DRAW EVERY PAGE THE PROPOSAL MAKES, with the use cases' and the modules' examples, in as
- * few calls as the method's ceilings allow.
+ * WHAT TO ASK THE RECORD TO DRAW EVERY PAGE THE PROPOSAL MAKES, in as few calls as the method's ceilings allow, and
+ * over no rows: the use cases' and the modules' examples are never asked for, so a call carries only the lists and pages,
+ * and the person's own rows are laid over it where it is drawn (`withOwn`).
  *
  * ONLY LISTS AND PAGES ARE ASKED FOR. A rule or an automation draws nothing, and every declaration it would take is one
  * a page cannot. A page goes into a call with the lists it reads, and a new call is opened when the next page and its
@@ -143,7 +149,6 @@ type Made = { decl: Decl; needs: string[] };
 export function changesAsked(cases: readonly UseCase[], modules: readonly string[], today: string): Asked[] {
   const lists = new Map<string, Decl>();
   const made: Made[] = [];
-  const examples = new Map<string, Body[]>();
   const speaks = cases[0] ?? null;
 
   const take = (doc: Body | null, home: string | null) => {
@@ -163,15 +168,11 @@ export function changesAsked(cases: readonly UseCase[], modules: readonly string
         : d;
       made.push({ decl: { ...one, body }, needs });
     }
-    for (const seed of bodies(doc?.seeds)) {
-      const list = typeof seed.register === 'string' ? seed.register : '';
-      if (list !== '' && isMap(seed.fields)) (examples.get(list) ?? examples.set(list, []).get(list))?.push(seed.fields);
-    }
   };
 
   /* THE USE CASES' OWN PAGES FIRST, then each module's, so a page both declare is drawn as the use case words it. */
-  for (const u of cases) take(carriedDocument(u, today, null, { examples: true }), homePageOf(u.usecase));
-  for (const id of modules) take(moduleDocument(cases.find((u) => u.modules.includes(id)) ?? null, id, { today, examples: true }), null);
+  for (const u of cases) take(carriedDocument(u, today, null), homePageOf(u.usecase));
+  for (const id of modules) take(moduleDocument(cases.find((u) => u.modules.includes(id)) ?? null, id, { today }), null);
 
   const calls: { ids: Set<string>; decls: Decl[] }[] = [];
   for (const m of made) {
@@ -193,24 +194,97 @@ export function changesAsked(cases: readonly UseCase[], modules: readonly string
     call.decls.push(m.decl);
   }
 
-  return calls.map((call) => {
+  return calls.map((call) => ({ to: { declarations: call.decls }, rows: {} }));
+}
+
+/**
+ * What Slash drafted for a business outside the catalogue, as one call to `previewChange`: its lists and pages, and never
+ * its sample rows, which nobody typed.
+ */
+export const draftAsked = (draft: { change: { to: unknown } }): Body => ({ to: draft.change.to });
+
+/** An entry as the person gave it: the list it goes into and what fills it. */
+export type Own = { register: string; fields: Body };
+
+
+/**
+ * THE ROWS A PREVIEW PAGE DRAWS, AND NO OTHERS: the person's name as their own entry in People, the entries their
+ * sentence filled, then the first entries of each file they brought as it maps them, by list, within the ceilings
+ * `previewChange` holds a call to. An entry with nothing in it is no entry. Nothing answered here is a row nobody typed.
+ */
+export function ownRows(typed: readonly Own[], mapped: Readonly<Record<string, readonly Body[]>>, name: string | null): Record<string, Body[]> {
+  const out: Record<string, Body[]> = {};
+  let total = 0;
+  const put = (list: string, fields: Body) => {
+    if (list === '' || Object.keys(fields).length === 0 || total >= ROWS_MOST) return;
+    const at = (out[list] ??= []);
+    if (at.length >= ROWS_A_LIST) return;
+    at.push(fields);
+    total += 1;
+  };
+  const me = name?.trim() ?? '';
+  if (me !== '' && !typed.some((t) => t.register === PEOPLE && t.fields.name === me)) put(PEOPLE, { name: me });
+  for (const t of typed) put(t.register, t.fields);
+  for (const [list, rows] of Object.entries(mapped)) for (const r of rows) put(list, r);
+  return out;
+}
+
+/** The lists a call declares, by id, as `register.<id>` names them. */
+const listsIn = (call: Body): Map<string, Body> => {
+  const to = isMap(call.to) ? call.to : {};
+  const out = new Map<string, Body>();
+  for (const d of bodies(to.declarations)) {
+    const body = isMap(d.body) ? d.body : d;
+    if (typeof body.register === 'string') out.set(body.register, body);
+  }
+  return out;
+};
+
+/** The rows the calls already carry, by list: once examples are never asked, only a file's own mapped entries. */
+export function mappedOf(asked: readonly Body[]): Record<string, Body[]> {
+  const out: Record<string, Body[]> = {};
+  for (const a of asked) for (const [list, rows] of Object.entries(isMap(a.rows) ? a.rows : {})) (out[list] ??= []).push(...bodies(rows));
+  return out;
+}
+
+/** Each call with its rows replaced by the person's own, for the lists it declares, and only those. */
+export function withOwn(asked: readonly Body[], own: Readonly<Record<string, readonly Body[]>>): Body[] {
+  return asked.map((a) => {
     const rows: Record<string, Body[]> = {};
-    let total = 0;
-    for (const d of call.decls) {
-      if (d.kind !== 'register') continue;
-      const list = d.id.slice('register.'.length);
-      const some = (examples.get(list) ?? []).slice(0, Math.min(ROWS_A_LIST, ROWS_MOST - total));
-      if (some.length === 0) continue;
-      rows[list] = some;
-      total += some.length;
-    }
-    return { to: { declarations: call.decls }, rows };
+    for (const list of listsIn(a).keys()) if ((own[list]?.length ?? 0) > 0) rows[list] = [...(own[list] ?? [])];
+    return { ...a, rows };
   });
 }
 
-/** What Slash drafted for a business outside the catalogue, as one call to `previewChange`, its sample rows included. */
-export const draftAsked = (draft: { change: { to: unknown }; rows: Record<string, Record<string, unknown>[]> }): Body =>
-  Object.keys(draft.rows).length > 0 ? { to: draft.change.to, rows: draft.rows } : { to: draft.change.to };
+/** The lists one page of a call reads, in the order its `requires` names them. */
+export function readsOf(call: Body, slug: string): Body[] {
+  const to = isMap(call.to) ? call.to : {};
+  const page = bodies(to.declarations).map((d) => (isMap(d.body) ? d.body : d)).find((d) => d.page === slug);
+  const lists = listsIn(call);
+  const needs: unknown[] = Array.isArray(page?.requires) ? page.requires : [];
+  return needs.flatMap((n): Body[] => {
+    const list = typeof n === 'string' && n.startsWith('register.') ? lists.get(n.slice('register.'.length)) : undefined;
+    return list ? [list] : [];
+  });
+}
+
+/** How a page is shown: drawn over the person's own rows, or its name and one line of what it will hold. */
+export type Shown = { drawn: true; title: string; rows: Record<string, Body[]> } | { drawn: false; title: string; line: string };
+
+/**
+ * A PAGE IS DRAWN ONLY OVER WHAT THE PERSON GAVE IT. Where none of their rows reaches a list it reads, it is its name and
+ * one line of what it will hold, in the list's own words for that (`holds`), and never a page of invented entries.
+ */
+export function pageShown(title: string, reads: readonly Body[], own: Readonly<Record<string, readonly Body[]>>): Shown {
+  const rows: Record<string, Body[]> = {};
+  for (const l of reads) {
+    const list = typeof l.register === 'string' ? l.register : '';
+    if ((own[list]?.length ?? 0) > 0) rows[list] = [...(own[list] ?? [])];
+  }
+  if (Object.keys(rows).length > 0) return { drawn: true, title, rows };
+  const holds = reads.map((l) => l.holds).find((h): h is string => typeof h === 'string' && h.trim() !== '');
+  return { drawn: false, title, line: holds ? words.holds(holds.trim()) : words.holdsNothingYet };
+}
 
 /** The words this preview adds to the first run's own (`lib/first-run.ts`). */
 export const words = {
@@ -228,6 +302,12 @@ export const words = {
   closePage: 'Close this page',
   /** Under a page's title on its card, where it has no section of its own. */
   home: 'Home',
+  /** Under a page none of the person's entries reaches: what it will hold, in its list's own words. */
+  holds: (what: string) => `It will hold ${what}.`,
+  /** The same, for a page that reads no list. */
+  holdsNothingYet: 'Empty until you add to it.',
+  /** Over a page opened from its card: what it is drawn with. */
+  yours: 'Drawn with only what you gave it. Nothing is kept until you keep it.',
   /** Where the record cannot draw the pages: the rail above still says what is made. */
   undrawn: 'These pages could not be drawn here. They are made as shown above.',
 } as const;

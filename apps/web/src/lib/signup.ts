@@ -28,6 +28,8 @@
 
 import { playedBy } from './start/parts.ts';
 import type { Reply } from './first-run.ts';
+import type { Asked as Answered, FirstAsked, SetupAsked, SetupReply } from './start/ask.ts';
+import type { HeardLine, Place, Proposal } from './start/propose.ts';
 
 /** The world the calls reach, so a test needs no socket. */
 export type Io = { fetch: (url: string, init: RequestInit) => Promise<Response> };
@@ -301,8 +303,12 @@ export const SAID_MOST = 2000;
  * only: it is never packed for the link, and one kept before there were keys reads back without it.
  *
  * AND WITH WHAT AN ANSWERED PRESS LEFT (`left`), which a reload sends in place of the whole build.
+ *
+ * AND WITH THE WHOLE READING THE PERSON KEPT (`reading`, USE-B05): the model's, read once on their press of Next, or the
+ * rules'. The tab the link opens builds from it and never reads again (`readingKept`), so what is made is what was
+ * shown. One kept before there were readings has none, and is read again by the rules as it always was.
  */
-export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean; key?: string; left?: Left };
+export type Draft = { said: string; currency: string | null; usecase: string | null; reply?: Reply | null; cut?: boolean; key?: string; left?: Left; reading?: Proposal };
 
 /**
  * WHAT AN ANSWERED PRESS LEFT TO MAKE, kept beside the sentence with the new key its Try again goes out under (audit 59,
@@ -347,7 +353,14 @@ export function keepSaid(storage: Pick<Storage, 'setItem' | 'removeItem'> | null
   if (draft === null) fromLink = null;
   try {
     if (draft === null || draft.said.trim() === '') storage?.removeItem(SAID_KEY);
-    else storage?.setItem(SAID_KEY, JSON.stringify({ said: draft.said.slice(0, SAID_MOST), currency: draft.currency, usecase: draft.usecase, ...(draft.reply ? { reply: draft.reply } : {}), ...(keyOf(draft.key) ? { key: draft.key } : {}), at: now }));
+    else {
+      /* THE READING ONLY WITH THE WHOLE SENTENCE IT WAS READ FROM: a cut sentence would be built from words it no longer has. */
+      const reading = draft.said.length <= SAID_MOST ? readingOf(draft.reading) : null;
+      storage?.setItem(
+        SAID_KEY,
+        JSON.stringify({ said: draft.said.slice(0, SAID_MOST), currency: draft.currency, usecase: draft.usecase, ...(draft.reply ? { reply: draft.reply } : {}), ...(keyOf(draft.key) ? { key: draft.key } : {}), ...(reading ? { reading } : {}), at: now }),
+      );
+    }
   } catch {
     /* Storage off: the new record's /start asks "Who are you?" again, which is the whole of the cost. */
   }
@@ -390,7 +403,8 @@ function keptHere(storage: Pick<Storage, 'getItem' | 'removeItem'> | null | unde
   }
   const key = keyOf(v.key);
   const left = leftOf(v.left);
-  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase), ...(key ? { key } : {}), ...(left ? { left } : {}) }, v.reply);
+  const reading = v.said.length <= SAID_MOST ? readingOf(v.reading) : null;
+  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase), ...(key ? { key } : {}), ...(left ? { left } : {}), ...(reading ? { reading } : {}) }, v.reply);
 }
 
 /**
@@ -463,6 +477,170 @@ function withReply(draft: Draft, kept: unknown): Draft {
   return reply ? { ...draft, reply } : draft;
 }
 
+/* ── the reading: asked on a press, kept beside the sentence ─────────────── */
+
+const SPAN = (v: unknown): v is [number, number] => Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0) && v[0] <= v[1];
+const strs = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+const textOr = (v: unknown): v is string | null => v === null || typeof v === 'string';
+
+function lineOf(v: unknown): HeardLine | null {
+  if (!isObj(v) || typeof v.phrase !== 'string' || typeof v.became !== 'string') return null;
+  if ((v.at !== undefined && !SPAN(v.at)) || (v.more !== undefined && !(Array.isArray(v.more) && v.more.every(SPAN)))) return null;
+  return {
+    phrase: v.phrase,
+    became: v.became,
+    ...(SPAN(v.at) ? { at: v.at } : {}),
+    ...(v.you === true ? { you: true as const } : {}),
+    ...(v.loose === true ? { loose: true as const } : {}),
+    ...(Array.isArray(v.more) && v.more.length > 0 ? { more: v.more as [number, number][] } : {}),
+  };
+}
+
+function placeOf(v: unknown): Place | null {
+  if (!isObj(v) || (v.kind !== 'today' && v.kind !== 'module' && v.kind !== 'list') || typeof v.id !== 'string' || typeof v.name !== 'string') return null;
+  if (!textOr(v.phrase) || !(v.at === null || SPAN(v.at))) return null;
+  return { kind: v.kind, id: v.id, name: v.name, phrase: v.phrase, at: v.at };
+}
+
+function entryOf(v: unknown): Proposal['rows'][number] | null {
+  if (!isObj(v) || typeof v.register !== 'string' || !isObj(v.fields)) return null;
+  return { register: v.register, fields: v.fields, ...(Number.isInteger(v.party) ? { party: v.party as number } : {}) };
+}
+
+/**
+ * A READING, READ BACK OFF SOMETHING KEPT, or `null` when it is not one: storage and a link are text anybody's page could
+ * have written, so every part is held to its shape before a build is made from it. The answer to the one question is
+ * not taken from it (`reply` carries that), so it is laid over once and never twice.
+ */
+export function readingOf(v: unknown): Proposal | null {
+  if (!isObj(v)) return null;
+  const { name, usecase, also, modules, currency, title } = v;
+  if (!textOr(name) || !textOr(usecase) || !strs(also) || !strs(modules) || !textOr(currency) || !textOr(title)) return null;
+  if (!Array.isArray(v.rows) || !Array.isArray(v.heard) || !Array.isArray(v.places)) return null;
+  const rows = v.rows.map(entryOf);
+  const heard = v.heard.map(lineOf);
+  const places = v.places.map(placeOf);
+  if (rows.includes(null) || heard.includes(null) || places.includes(null)) return null;
+  const names = isObj(v.names) && Object.values(v.names).every((n) => typeof n === 'string') ? (v.names as Record<string, string>) : null;
+  return {
+    name,
+    usecase,
+    also,
+    modules,
+    currency,
+    rows: rows as Proposal['rows'],
+    heard: heard as HeardLine[],
+    title,
+    places: places as Place[],
+    ...(v.currencyBy === 'device' ? { currencyBy: 'device' as const } : {}),
+    ...(typeof v.by === 'string' && v.by !== '' ? { by: v.by } : {}),
+    ...(typeof v.fell === 'string' && v.fell !== '' ? { fell: v.fell } : {}),
+    ...(textOr(v.summary) ? { summary: v.summary } : {}),
+    ...(textOr(v.draft) ? { draft: v.draft } : {}),
+    ...(names ? { names } : {}),
+  };
+}
+
+/**
+ * THE READER A BUILD IS MADE WITH: the reading kept beside this very sentence, and no read at all; else `read`, the rules
+ * reading the words as they always did (a draft kept before there were readings, or a link that could not carry one).
+ */
+export const readingKept =
+  (draft: Pick<Draft, 'said' | 'reading'> | null, read: (said: string) => Promise<Proposal>) =>
+  (said: string): Promise<Proposal> =>
+    draft?.reading !== undefined && said === draft.said ? Promise.resolve(draft.reading) : read(said);
+
+/** What woke a reading of the words: a key, a pause after the last one, or the person's own press of Next. */
+export type ReadCause = 'key' | 'pause' | 'press';
+
+/** The reading door before there is an account (`readAsks(origin).setup`, `lib/start/ask.ts`), or a test's. */
+export type ReadDoor = (ask: FirstAsked) => Promise<Answered<SetupReply>>;
+
+/**
+ * Where the words were typed, and a fresh bot-check answer for one read: `human` answers `''` where the host asks for
+ * none and `null` where none could be had. `heard` is told every answer the read came back with, the door's own.
+ */
+export type ReadEnv = { zone: string | null; locale: string; human: () => Promise<string | null>; heard?: (out: Answered<SetupReply>) => void };
+
+/** The code a host with no reading door answers (501, or a bare 404): the page's own rules read, and say nothing of a model. */
+export const READS_OFF = 'NOT_IN_THIS_BUILD';
+
+/**
+ * THE MODEL'S READER FOR ONE CAUSE, or `null`, and then the rules read (`proposeFirst`). ONLY A PRESS IS READ: a key or a
+ * pause lights the build by the rules on this device and sends nothing, so nothing typed leaves it until the person asks.
+ *
+ * A FRESH BOT-CHECK ANSWER BEFORE EACH READ, since one is good once. With none to be had, the door is not asked at all:
+ * the refusal is the page's own, and the rules' reading stands, as it does for any refusal or a host that answered 501.
+ */
+export function readerFor(cause: ReadCause, door: ReadDoor | null, env: ReadEnv): ((ask: SetupAsked) => Promise<Answered<SetupReply>>) | null {
+  if (cause !== 'press' || door === null) return null;
+  return async (ask) => {
+    let out: Answered<SetupReply>;
+    try {
+      const turnstile = await env.human();
+      out =
+        turnstile === null
+          ? { ok: false, refusal: { code: 'FORBIDDEN', fix: 'The check that you are a person did not answer, so simple rules read this.' } }
+          : await door({ said: ask.said, offer: ask.offer, today: ask.today, zone: env.zone ?? 'UTC', locale: env.locale, turnstile });
+    } catch (e) {
+      out = { ok: false, refusal: { code: 'UNREACHABLE', fix: e instanceof Error ? e.message : String(e) } };
+    }
+    env.heard?.(out);
+    return out;
+  };
+}
+
+/** What a question back may be about, as the reading door says it (`SetupAbout` in `@braindog/slash`). */
+export type AskAbout = 'name' | 'kind' | 'things' | 'who_for' | 'currency';
+const ABOUTS: ReadonlySet<string> = new Set<AskAbout>(['name', 'kind', 'things', 'who_for', 'currency']);
+
+/** The one question the model would ask back: one line, and up to four short choices to tap. */
+export type ModelAsk = { about: AskAbout; question: string; choices: string[] };
+
+/**
+ * THE ONE QUESTION A READING CARRIES (`ask` on the door's answer), held to what the screen can say: one line of 120
+ * characters at most, and up to four choices of 24. One that does not fit is no question, never a cut one.
+ */
+export function askOf(reply: unknown): ModelAsk | null {
+  if (!isObj(reply) || !isObj(reply.ask)) return null;
+  const { about, question, choices } = reply.ask;
+  if (typeof about !== 'string' || !ABOUTS.has(about) || typeof question !== 'string') return null;
+  const line = question.trim();
+  if (line === '' || /[\r\n]/u.test(line) || [...line].length > 120) return null;
+  const taps = Array.isArray(choices) ? choices.map((c) => (typeof c === 'string' ? c.trim() : '')) : [];
+  if (taps.length > 4 || taps.some((c) => c === '' || /[\r\n]/u.test(c) || [...c].length > 24)) return null;
+  return { about: about as AskAbout, question: line, choices: [...new Set(taps)] };
+}
+
+/**
+ * HOW THE ANSWER TO THE MODEL'S QUESTION IS LAID OVER THE READING: as the rules' own answer (`Reply`) where it asks what
+ * the rules would ask (the name, the currency), so it is kept, mailed and built as theirs; `null` for anything else,
+ * which the page says back to it as words told more.
+ */
+export const answeredAs = (ask: ModelAsk, rules: string | null): 'name' | 'currency' | null =>
+  (ask.about === 'name' || ask.about === 'currency') && ask.about === rules ? ask.about : null;
+
+/** The key, in this tab's storage, that says the host answered 501 to a read this session. */
+export const READS_KEY = 'braindog.signup.reads';
+
+/** Whether this tab already heard the host say it has no reading door. Storage may be off, and then it was not heard. */
+export function readsOffKept(storage: Pick<Storage, 'getItem'> | null | undefined): boolean {
+  try {
+    return storage?.getItem(READS_KEY) === 'off';
+  } catch {
+    return false;
+  }
+}
+
+/** Keep, for this tab, that the host has no reading door, so the line about a model reading is not said again. */
+export function keepReadsOff(storage: Pick<Storage, 'setItem'> | null | undefined): void {
+  try {
+    storage?.setItem(READS_KEY, 'off');
+  } catch {
+    /* Storage off: the page holds it in memory for as long as it is open. */
+  }
+}
+
 /** The most of what was said that rides in the mailed link, packed: the host's own limit (`SAID_IN_LINK`). */
 export const SAID_LINK_MOST = 1000;
 
@@ -494,17 +672,27 @@ let fromLink: Draft | null = null;
  *
  * SHORTENED AT A WORD to fit `SAID_LINK_MOST` and `SAID_LINK_BYTES`, so a long sentence still carries its start and
  * the pack says `cut: true`; the whole of it waits on this device as before (`keepSaid`).
+ *
+ * THE READING RIDES ONLY WHOLE, beside the whole sentence it was read from, and only where all of it fits: a link opened
+ * on a phone then builds what the desk showed. Where it does not fit, the link is packed as it always was and the phone's
+ * rules read the words; the reading still waits on the device that typed them.
  */
 export function saidForLink(draft: Draft | null | undefined): string | null {
   if (!draft) return null;
-  const pack = (said: string, cut = false): string =>
+  const pack = (said: string, cut = false, reading: Proposal | null = null): string =>
     JSON.stringify({
       said,
       ...(draft.currency ? { currency: draft.currency } : {}),
       ...(draft.usecase ? { usecase: draft.usecase } : {}),
       ...(draft.reply ? { reply: draft.reply } : {}),
+      ...(reading ? { reading } : {}),
       ...(cut ? { cut: true } : {}),
     });
+  const reading = draft.said === draft.said.trim() ? readingOf(draft.reading) : null;
+  if (reading !== null && draft.said !== '') {
+    const whole = pack(draft.said, false, reading);
+    if (whole.length <= SAID_LINK_MOST && encodeURIComponent(whole).length <= SAID_LINK_BYTES && !CARRIES_NOT.some((r) => r.test(whole))) return whole;
+  }
   /* BOTH OF THE HOST'S MEASURES: the characters packed, and the bytes the link writes them as. Measured with `cut`
      said, since a shortened pack says so and those words are part of what must fit. */
   const fitsLink = (said: string): boolean => {
@@ -543,8 +731,10 @@ export function saidFromLink(packed: string | null): Draft | null {
     return null;
   }
   if (!isObj(v) || typeof v.said !== 'string' || v.said.trim() === '') return null;
-  /* `cut` IS READ WHOEVER SHORTENED IT: this page before sending, or the host fitting the link (`saidFitted`). */
-  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase), ...(v.cut === true ? { cut: true } : {}) }, v.reply);
+  /* `cut` IS READ WHOEVER SHORTENED IT: this page before sending, or the host fitting the link (`saidFitted`). A cut
+     sentence never keeps a reading of the words it lost. */
+  const reading = v.cut === true ? null : readingOf(v.reading);
+  return withReply({ said: v.said.slice(0, SAID_MOST), currency: str(v.currency), usecase: str(v.usecase), ...(v.cut === true ? { cut: true } : {}), ...(reading ? { reading } : {}) }, v.reply);
 }
 
 /**

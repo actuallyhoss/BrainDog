@@ -1,7 +1,7 @@
 /**
- * A record's files on the Cloud: `PUT /api/files` keeps the bytes and answers their name, `GET /api/files/<sha256>`
- * gives them back (`51 §5.5`, `12 §8` "The asset store"). Both also under
- * `/app/<slug>/api/files`, which is the address the app calls from.
+ * A record's files on the Cloud: `PUT /api/files/<sha256>` keeps the bytes at the address their hash makes, `PUT
+ * /api/files` keeps them and answers the name, and `GET /api/files/<sha256>` gives them back (`51 §5.5`, `12 §8` "The
+ * asset store", R.260). All three also under `/app/<slug>/api/files`, which is the address the app calls from.
  *
  * THE BYTES NEVER CROSS INTO THE RECORD'S OBJECT. A row holds `{ sha256, mime, bytes, name }` (`kernel/src/coerce.ts`
  * `file`) and the bytes sit in `BLOBS` at `rec_<id>/a/<sha256>`, so a photo of a receipt costs the record's single
@@ -11,6 +11,11 @@
  * THE KEY IS THE HASH, NEVER THE CALLER'S. A name the caller chose would let one upload overwrite another's, and a path
  * in it would walk out of the prefix; the digest of what arrived is the one name nobody can choose. Two uploads of the
  * same bytes are one object, which is what content addressing is for.
+ *
+ * A PUT AT AN ADDRESS IS HELD TO IT. The client hashed the bytes it meant to send and named the hash in the path; this
+ * door hashes what arrived, and a difference is `CHECKSUM_MISMATCH` with nothing kept, so a file cut short on the way
+ * is never filed under a name it does not have. A second put of the same bytes finds them there and answers as the
+ * first did, and nothing is written twice.
  *
  * TYPED BY ITS FIRST BYTES AND NOT BY ITS HEADER. `Content-Type` is what the caller says; the magic bytes are what the
  * file is. Six types are taken, and SVG is never one of them: an SVG is a document that can carry script, and served
@@ -44,11 +49,13 @@ export const SHA256 = /^[0-9a-f]{64}$/;
  * `default-src 'none'; sandbox` MAKES THE ANSWER INERT even when a browser opens it as a page: no script, no form, no
  * plugin, no same-origin. `nosniff` stops a browser guessing a type the check did not give it. `private` because a file
  * is one record's and a shared cache must never hand it to somebody else; `immutable` because the name is the hash, so
- * the bytes behind one name can never change.
+ * the bytes behind one name can never change. `noindex` because the address is the capability (P.166): a search engine
+ * that found one must never list it.
  */
 export const FILE_HEADERS: Readonly<Record<string, string>> = {
   'content-security-policy': "default-src 'none'; sandbox",
   'x-content-type-options': 'nosniff',
+  'x-robots-tag': 'noindex',
   'cache-control': 'private, max-age=31536000, immutable',
 };
 
@@ -188,10 +195,11 @@ const refuse = (status: number, refusal: Refusal, extra: Record<string, string> 
 /* THE SENTENCES, each saying what to do next. The code is from the registry (`30 §6`); none is new. */
 const NO_STORE: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog keeps no files: it has no BLOBS bucket bound.' };
 const NO_FILE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'This record holds no file by that name.' };
-const NOT_HERE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'A file is put with PUT /api/files and read with GET /api/files/<sha256>.' };
+const NOT_HERE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'A file is put with PUT /api/files/<sha256> and read with GET /api/files/<sha256>.' };
 const TOO_BIG: Refusal = { code: 'OUT_OF_BOUNDS', fix: 'A file here is at most 2 MB. Send a smaller one.' };
 const NOT_TAKEN: Refusal = { code: 'BODY_MALFORMED', fix: 'A file here is a PNG, JPEG, GIF, WebP or AVIF picture, or a PDF.' };
 const MISLABELLED = (said: string, found: string): Refusal => ({ code: 'BODY_MALFORMED', fix: `This file was sent as ${said} and is ${found}. Send it with its own type.` });
+const MISMATCH: Refusal = { code: 'CHECKSUM_MISMATCH', fix: 'These bytes do not hash to the address they were put at, so nothing was kept; put them at their own hash.' };
 const EMPTY: Refusal = { code: 'BODY_MALFORMED', fix: 'The file arrived empty. Send its bytes as the body.' };
 const CANNOT_READ: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Reading a file here takes somebody who can read this record, or a token.' };
 const CANNOT_WRITE: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Adding a file takes somebody who can write here, or a token with write scope.' };
@@ -211,7 +219,7 @@ export async function serveFiles(request: Request, deps: FileDeps): Promise<Resp
   const method = request.method;
   const reading = method === 'GET' || method === 'HEAD';
   if (asked.sha256 === null && method !== 'PUT') return refuse(405, NOT_HERE, { allow: 'PUT' });
-  if (asked.sha256 !== null && !reading) return refuse(405, NOT_HERE, { allow: 'GET, HEAD' });
+  if (asked.sha256 !== null && !reading && method !== 'PUT') return refuse(405, NOT_HERE, { allow: 'GET, HEAD, PUT' });
 
   const door = await doorOf(request, deps.session, asked.slug);
   if (door.door === 'share') return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } });
@@ -236,26 +244,36 @@ export async function serveFiles(request: Request, deps: FileDeps): Promise<Resp
   const over = await deps.limit({ door: door.door, ctx }, reading ? 'read' : 'write');
   if (over !== null) return withCookie(over, cookie);
 
-  const out = reading ? await give(request, deps.blobs, record, ctx, asked.sha256!) : await keep(request, deps.blobs, record, ctx);
+  const out = reading ? await give(request, deps.blobs, record, ctx, asked.sha256!) : await keep(request, deps.blobs, record, ctx, asked.sha256);
   return withCookie(out, cookie);
 }
 
-/** `PUT /api/files`: the body, checked, hashed and kept, and its name answered. */
-async function keep(request: Request, blobs: FileBucket | undefined, record: string, ctx: CallContext): Promise<Response> {
+/**
+ * `PUT /api/files` and `PUT /api/files/<sha256>`: the body, checked, hashed and kept, and its name answered.
+ *
+ * `at` IS THE HASH THE PATH NAMED, or `null` for the collection. It is compared before the type is read: bytes that are
+ * not the ones the client hashed are not the file it meant, so what they look like says nothing. A name that is not a
+ * hash at all is the same refusal, because no bytes could hash to it.
+ */
+async function keep(request: Request, blobs: FileBucket | undefined, record: string, ctx: CallContext, at: string | null): Promise<Response> {
   if (!writesFiles(ctx)) return refuse(403, CANNOT_WRITE);
   if (blobs === undefined) return refuse(501, NO_STORE);
+  if (at !== null && !SHA256.test(at)) return refuse(422, MISMATCH);
   /* AN HONEST HEADER THAT SAYS TOO MUCH IS REFUSED BEFORE A BYTE IS READ; a dishonest one is caught by the count. */
   const length = Number(request.headers.get('content-length') ?? '0');
   if (Number.isFinite(length) && length > FILE_MOST) return refuse(413, TOO_BIG);
   const bytes = await bodyUpTo(request.body, FILE_MOST);
   if (bytes === null) return refuse(413, TOO_BIG);
   if (bytes.byteLength === 0) return refuse(400, EMPTY);
+  const sha256 = await sha256Of(bytes);
+  if (at !== null && at !== sha256) return refuse(422, MISMATCH);
   const mime = sniff(bytes);
   if (mime === null) return refuse(415, NOT_TAKEN);
   const said = typeSaid(request.headers.get('content-type'));
   if (!agrees(said, mime)) return refuse(415, MISLABELLED(said, mime));
-  const sha256 = await sha256Of(bytes);
-  await blobs.put(fileKey(record, sha256), bytes, { httpMetadata: { contentType: mime } });
+  /* THE SAME BYTES ARE ALREADY THE SAME FILE, so a second put finds them and writes nothing; the answer is the first's. */
+  const key = fileKey(record, sha256);
+  if ((await blobs.head(key)) === null) await blobs.put(key, bytes, { httpMetadata: { contentType: mime } });
   return answer(200, { sha256, mime, bytes: bytes.byteLength });
 }
 

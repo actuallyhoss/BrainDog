@@ -13,7 +13,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW } from '../src/index.ts';
 import { GUIDE, GUIDE_GROWS } from '../src/usecases/guide.ts';
-import { GUIDE_KINDS, formGuide, guideKindOf, planFor } from '../src/usecases/guide-kinds.ts';
+import { GENERAL_GUIDE, GUIDE_KINDS, formGuide, guideKindOf, planFor } from '../src/usecases/guide-kinds.ts';
 import { useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, formedFor } from '../src/usecases/install.ts';
 import { linkExamples, type LinkIo } from '../src/usecases/links.ts';
@@ -33,7 +33,8 @@ const hostFor = (k: Kernel): Host => ({
   transaction: (fn) => k.transaction(fn),
   reload: () => k.reload(),
   retire: (ids) => k.retire(ids),
-  seed: (register, fields) => k.create(register, { ...fields, tags: ['example'] }, { actor: 'p_seed', cascade: false }) as never,
+  /* THE TAGS A ROW CARRIES ARE KEPT, as the record's own host keeps them (`packHost`), so a formed row is still `formed`. */
+  seed: (register, fields) => k.create(register, { ...fields, tags: [...new Set([...(Array.isArray(fields.tags) ? fields.tags.map(String) : []), 'example'])] }, { actor: 'p_seed', cascade: false }) as never,
   remember: (row) => k.rememberPack(row),
   forget: (id) => k.forgetPack(id),
   claimed: (pack) => k.packClaims(pack),
@@ -90,7 +91,7 @@ const figure = (k: Kernel, metric: string): number | null => {
   return value<{ value: number | null }>(k.metric(decl)).value;
 };
 
-test('WHAT THE PROJECT IS PICKS ITS PLAN, the same way every time, and a sentence naming no kind forms nothing', () => {
+test('WHAT THE PROJECT IS PICKS ITS PLAN, the same way every time, and a sentence naming no kind forms the general plan', () => {
   const cases: [string, string | null][] = [
     ["I want to start a podcast and don't know where to begin", 'podcast'],
     ['I have an idea for a YouTube channel', 'video'],
@@ -105,11 +106,16 @@ test('WHAT THE PROJECT IS PICKS ITS PLAN, the same way every time, and a sentenc
     ['starting a charity fundraiser for the local shelter', 'cause'],
     ["I'm starting something new", null],
     ['A new project', null],
+    ['I want to restore an old wooden boat and sail it next summer', null],
   ];
   for (const [said, kind] of cases) {
     assert.equal(guideKindOf(said)?.kind.kind ?? null, kind, said);
+    assert.equal(formGuide(said)?.kind, kind ?? 'general', `${said} forms ${kind ?? 'the general'} plan`);
     assert.deepEqual(formGuide(said), formGuide(said), 'the same sentence forms the same plan');
   }
+  /* A SENTENCE THAT SAYS NOTHING FORMS NOTHING: there is no project to plan. */
+  assert.equal(formGuide('   '), null);
+  assert.equal(formedFor(guide, ''), null);
   assert.deepEqual(guideKindOf('Starting a PODCAST')?.heard, ['PODCAST'], 'the phrase is said back as it was written');
   assert.equal(formedFor(useCase('student')!, 'a podcast about my coursework'), null, 'only a use case that forms a plan forms one');
 });
@@ -117,7 +123,7 @@ test('WHAT THE PROJECT IS PICKS ITS PLAN, the same way every time, and a sentenc
 test('EVERY KIND OPENS ON SIX MILESTONES FROM THE IDEA ON, first steps, choices and what helps, each pointing at a milestone it has', () => {
   const stages = ['idea', 'plan', 'build', 'launch', 'grow'];
   const kinds = new Set<string>();
-  for (const kind of GUIDE_KINDS) {
+  for (const kind of [...GUIDE_KINDS, GENERAL_GUIDE]) {
     assert.ok(!kinds.has(kind.kind), `${kind.kind} twice`);
     kinds.add(kind.kind);
     assert.equal(kind.milestones.length, 6, kind.kind);
@@ -145,15 +151,51 @@ test('A PODCAST OPENS ON A PODCAST PLAN, linked: its milestone underway, its fir
   const steps = rows(k, 'steps');
   assert.equal(steps.length, 5);
   for (const s of [...steps, ...rows(k, 'choices'), ...rows(k, 'resources')]) assert.ok(s.fields.milestone, `${JSON.stringify(s.fields)} has no milestone`);
-  assert.ok(steps.every((s) => Array.isArray(s.fields.tags) && (s.fields.tags as string[]).includes('example')), 'a formed plan is marked as examples');
+  assert.ok(steps.every((s) => Array.isArray(s.fields.tags) && (s.fields.tags as string[]).includes('formed')), 'a formed plan is marked as formed');
   assert.ok(steps.every((s) => typeof s.fields.by === 'string' && s.fields.by > TODAY), 'each first step is due after today');
 
-  /* A SENTENCE THAT NAMES NO KIND FORMS NOTHING, so nothing is planted; asked for its examples, the guide carries the
-     general plan exactly as the pack ships it. */
-  const bare = await guideFor("I'm starting something new");
-  assert.deepEqual(rows(bare, 'milestones'), [], 'a sentence that forms no plan plants no example milestones');
-  const plain = await guideFor("I'm starting something new", true);
-  assert.deepEqual(rows(plain, 'milestones').map((m) => m.fields.what).sort(), GUIDE.pack.seeds.filter((s) => s.register === 'milestones').map((s) => s.fields.what as string).sort());
+});
+
+/* A PROJECT OF NO KNOWN KIND IS PLANNED TOO (USE-A09). Until the general plan was a kind, a boat, a thesis or a wedding
+   formed nothing and the guide opened on empty lists, since its own example rows are never written. */
+const BOAT = 'I want to restore an old wooden boat and sail it next summer';
+
+test('A BOAT FORMS THE GENERAL PLAN: six milestones, the first underway, three first steps, each under its milestone', async () => {
+  const formed = formedFor(guide, BOAT);
+  assert.equal(formed?.kind, 'general');
+  /* FORMED LIKE ANY KIND'S, in the document the first run installs, so the preview shows them before the person accepts. */
+  const seeds = (carriedDocument(guide, TODAY, BOAT)?.seeds ?? []) as { register: string; fields: { tags?: string[] } }[];
+  assert.equal(seeds.length, 11);
+  assert.ok(seeds.every((s) => s.fields.tags?.includes('formed')), 'every row of the general plan is formed');
+
+  const k = await guideFor(BOAT);
+  const milestones = rows(k, 'milestones');
+  assert.deepEqual(milestones.map((m) => m.fields.what).sort(), GENERAL_GUIDE.milestones.map(([, what]) => what).sort());
+  assert.deepEqual(milestones.filter((m) => m.fields.state === 'underway').map((m) => m.fields.what), ['Say what it is and who it is for']);
+  const steps = rows(k, 'steps');
+  assert.equal(steps.length, 3);
+  for (const s of [...steps, ...rows(k, 'choices'), ...rows(k, 'resources')]) {
+    assert.ok(s.fields.milestone, `${JSON.stringify(s.fields)} has no milestone`);
+    assert.ok((s.fields.tags as string[]).includes('formed'), `${JSON.stringify(s.fields)} is not formed`);
+  }
+  assert.ok(steps.every((s) => typeof s.fields.by === 'string' && s.fields.by > TODAY), 'each first step is due after today');
+
+  /* AND THE GUIDE'S HOME DRAWS THE PATH, the next steps and what helps, as it does for a known kind. */
+  const home = pageOf(k, 'home-guide');
+  for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  assert.deepEqual(home.filter((b) => b.drawn !== false).map((b) => b.heading), [undefined, 'Where you are', 'Next three steps', 'Waiting on you', 'Resources']);
+  assert.equal(home[1]!.rows?.length, 6, 'the path draws the six milestones');
+
+  /* A KNOWN KIND STILL FORMS ITS OWN, never the general plan. */
+  const shop = await guideFor('opening an Etsy shop for handmade candles');
+  assert.equal(formedFor(guide, 'opening an Etsy shop for handmade candles')?.kind, 'shop');
+  assert.ok(!rows(shop, 'milestones').some((m) => m.fields.what === 'Say what it is and who it is for'), 'a shop opens on a shop plan');
+});
+
+test('THE GUIDE CARRIES NO EXAMPLE ROWS: asked for its examples with no sentence, it plants nothing', async () => {
+  assert.equal((GUIDE.pack as { seeds?: unknown[] }).seeds, undefined);
+  const plain = await guideFor('', true);
+  assert.deepEqual(rows(plain, 'milestones'), []);
 });
 
 test('THE GUIDE SAYS WHERE YOU ARE AND WHAT IS NEXT, and says nothing about what has not happened yet', async () => {

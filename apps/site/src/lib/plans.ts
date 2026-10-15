@@ -21,15 +21,18 @@
  * SLASH IS COUNTED IN CREDITS. The owner, 26 September: "$0.1 per slash ask sounds so bad. maybe use slash credits?"
  * One question or draft is one credit, however much work it takes, and each plan includes a month of them.
  *
- * NO PACKS AND NO EXTRA USAGE ON SALE, YET. Their figures are in the table, and no checkout sells either
- * (`apps/worker/src/billing.ts` sells the two plans and nothing else; LCH-A10 builds the packs). So the site says only
- * that they are coming later, and `PACKS` is empty until the checkout sells one. Billing stays off or in test mode
- * (DIRECTION §42): nothing here charges a card.
+ * PACKS ARE SHOWN WITH BILLING ON, AND ONLY THEN (LCH-A10). The checkout sells the table's two packs beside the plans
+ * (`apps/worker/src/billing.ts`, in Stripe's test mode while billing is not live), so `PACKS` is `packsOnSale` of
+ * `LAUNCH.billing`: the table's packs, each with its price, when the site says a card is charged, and none before. Billing
+ * stays off or in test mode until the owner's word to charge (DIRECTION §42), so today the site names no pack and says
+ * they are coming later, and that word flips one line in `launch.ts`. Extra usage is still sold by no checkout: the site
+ * says it is coming later either way. Nothing here charges a card.
  *
  * FIGURES ONLY. The sentences the pricing page says about them are in `copy/pricing.ts`; `unit` and `for` stay here
  * because the home page's teaser reads them beside the price.
  */
 
+import { LAUNCH } from './launch.ts';
 import { SIGNUP } from './links.ts';
 
 const HOUR_MS = 3_600_000;
@@ -171,13 +174,27 @@ export const PLANS: readonly Plan[] = [
 /** The plans a person pays for, in the order they are offered after Free. */
 export const PAID: readonly Plan[] = PLANS.filter((p) => p.id !== 'free');
 
+/** Cents of `CURRENCY` as a person reads them, the table's `priceOf`: whole dollars bare ("$5"), else to the cent. */
+export const priceOf = (cents: number): string =>
+  cents % 100 === 0 ? `$${cents / 100}` : `$${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
+
 /** A pack of Slash credits as the site draws it: the table's `Pack`, with its price as a person reads it. */
-export type Pack = { credits: number; cents: number; price: string };
+export type Pack = { id: string; credits: number; cents: number; price: string };
+
+/** The table's `PACKS`, every field: 100 credits for $5, 500 for $20, his of 26 September. `plans.test.ts` holds each. */
+export const TABLE_PACKS: readonly Omit<Pack, 'price'>[] = [
+  { id: 'credits-100', credits: 100, cents: 500 },
+  { id: 'credits-500', credits: 500, cents: 2_000 },
+];
 
 /**
- * SLASH CREDIT PACKS ON SALE. Empty: none is sold yet (the header says why), and every page that draws packs draws
- * nothing from an empty list. When the checkout sells one, it is the table's `PACKS` with `priceOf` beside each.
+ * The packs the site shows for a word on billing: the table's, each with `priceOf` beside it, when billing is on, and
+ * none when it is off, so no page names a pack a card cannot buy.
  */
-export const PACKS: readonly Pack[] = [];
+export const packsOnSale = (billing: boolean): readonly Pack[] =>
+  billing ? TABLE_PACKS.map((p) => ({ ...p, price: priceOf(p.cents) })) : [];
+
+/** SLASH CREDIT PACKS ON SALE, by `LAUNCH.billing`: empty until billing is on. Every page that draws packs reads this. */
+export const PACKS: readonly Pack[] = packsOnSale(LAUNCH.billing);
 
 export const plan = (id: Plan['id']): Plan => PLANS.find((p) => p.id === id)!;

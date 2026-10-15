@@ -1058,6 +1058,14 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       return ok<Arrived>({ raw, ingest: matched.ingest, state: 'review', wrote: [], reason });
     }
 
+    /* HIS ACCEPTANCE IS THE APPROVAL THE CEILING WAITS FOR (ENG-B07). The header's rule is that a pattern nobody has
+       approved yet writing rows into somebody's ledger is the one failure this design exists to prevent, and every
+       pattern a model drafts is installed at `needs-review` for that reason. A person who said yes to the shape's one
+       question has approved it: from then on what it reads exactly files as `exact`, and what it reads in part still
+       waits. The approval is the decision on that question and nothing else (`approvedPattern`), so an Undo that puts
+       the question back takes the approval with it. */
+    const lid: Confidence = ceiling !== 'exact' && approvedPattern(deps.sql, matched.ingest) !== null ? 'exact' : (ceiling as Confidence);
+
     /* `43 §5.1` STEP 6, WHICH IS AFTER THE FIELDS AND BEFORE THE CONFIDENCE, because a route reads
        the values step 5 produced and a miss is one of the things step 7 files as `needs-review`. */
     const routed = routeTo(matched.writes.register, extracted);
@@ -1153,7 +1161,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
 
     const confidence = worse(
       missed.length ? 'needs-review' : soft.length || pending.length ? 'proposed' : 'exact',
-      ceiling,
+      lid,
     );
 
     /* A FAILURE DOWNGRADES RATHER THAN DISCARDS. The bytes stay, the reason is on them, and the
@@ -1220,7 +1228,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
             : `${by} chose or defaulted ${words.fields(soft)} rather than reading ${guessed}, so what it read is proposed rather than written.`
           : held
             ? `${by} ${held}`
-            : ceiling === 'exact'
+            : lid === 'exact'
               ? ''
               : `${by} will ask before it writes anything, so what it read is proposed rather than written.`;
       /* A TAIL IS SAID WHATEVER ELSE HELD THE ARRIVAL, because accepting the rowset confirms it, and a person should not
@@ -1235,6 +1243,14 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
 
       /* THE QUESTION IS SAID IN A PERSON'S WORDS, and since REC-A03 the reason is too. The reason is the inbox's; the
          question is what Decide draws, and it named the pattern and the list by their ids (`heldAsked`). */
+      /* A PATTERN DRAWN FOR A SHAPE ASKS ONE QUESTION FOR IT, NEVER ONE PER TEXT (ENG-B07). A text it reads only in part,
+         or that its ceiling holds, joins the shape's one open question, whose count and samples grow; with none open and
+         the pattern accepted it waits, and nothing new is asked by itself. A tail to confirm keeps its own question,
+         because accepting that one is what confirms the account. */
+      if (pending.length === 0) {
+        const one = patternWaits(deps, matched.ingest, shapeOf(arrival.channel, headers), raw);
+        if (one !== undefined) return ok<Arrived>({ raw, ingest: matched.ingest, state, wrote: [], reason, confidence, ...(one === null ? {} : { suggestion: one }) });
+      }
       /* A LOOKUP THE MESSAGE GAVE NO DIGITS FOR IS ONE QUESTION PER DOOR AND WHAT WAS MISSED, not one per payee: the
          person's answer is the same for every charge it holds (which account), so splitting it by shop asked it again for
          each shop. A miss that is not a lookup's joins by payee as it did. */
@@ -1250,7 +1266,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
           invalid,
           soft,
           tails: pending,
-          waits: ceiling !== 'exact',
+          waits: lid !== 'exact',
         }),
         ...(pending.length ? { tails: pending } : {}),
       });
@@ -2282,13 +2298,19 @@ export type Answered = { id: string; option: string | null; actor: string; batch
  * in the decision's batch, so one Undo puts all of it back.
  *
  * "NONE OF THESE" keeps them waiting and stops the asking (`declinedTail`). A move question answered "Move them" moves
- * the rows a wrong answer filed. Anything else is not the inbox's, and is left alone.
+ * the rows a wrong answer filed. A shape's pattern question answered yes files what waits through the pattern
+ * (`answerPattern`). Anything else is not the inbox's, and is left alone.
  *
  * ONCE. The answer is marked on the question (`applied`), so the door's sweep, which carries out an answer the record did
  * not hand here, never does it twice.
  */
 export function answerAsked(deps: IngestDeps, a: Answered): Result<string | null> {
   const q = deps.sql.one<{ body_kind: string; body: string; status: string }>('SELECT body_kind, body, status FROM suggestion WHERE id = ?', a.id);
+  /* A SHAPE'S ONE PATTERN QUESTION, whatever its cause, since the accept path hands every body here (ENG-B07). */
+  if (q?.body_kind === 'pattern') {
+    const asked = q.status === 'resolved' ? parsed(q.body) : null;
+    return asked === null ? ok(null) : answerPattern(deps, a, asked);
+  }
   const body = q?.body_kind === 'options' && q.status === 'resolved' ? parsed(q.body) : null;
   if (body === null || a.option === null || typeof body.cause !== 'string') return ok(null);
   if (body.cause.startsWith('tail:')) return answerTail(deps, a, body);
@@ -2414,8 +2436,10 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
  * too, for a record whose Undo does not. Answers how many texts wait again.
  */
 export function reopenedTail(sql: Sql, suggestion: string): number {
-  const q = sql.one<{ body: string; status: string }>('SELECT body, status FROM suggestion WHERE id = ?', suggestion);
+  const q = sql.one<{ body_kind: string; body: string; status: string }>('SELECT body_kind, body, status FROM suggestion WHERE id = ?', suggestion);
   const body = q?.status === 'open' ? parsed(q.body) : null;
+  /* AND A SHAPE'S PATTERN QUESTION, whose texts wait again as nothing read them (ENG-B07). */
+  if (body !== null && q?.body_kind === 'pattern') return reopenedPattern(sql, suggestion, body);
   const tail = body === null ? null : tailAsked(body);
   if (body === null || tail === null) return 0;
   const { one, label } = tailWords(sql, tail);
@@ -2479,7 +2503,7 @@ type Again = { raw: string; from?: { suggestion: string; row: Record<string, unk
  * THE QUESTION IT WAS ASKED IN LOSES ITS ROW FIRST, so a run again that holds it once more asks once more rather than
  * twice; a question left with nothing in it closes as filed, or as asked again as one question. Never as declined.
  */
-function replayHeld(deps: IngestDeps, items: readonly Again[], undone = false): Replayed {
+function replayHeld(deps: IngestDeps, items: readonly Again[], undone = false, through: string | null = null): Replayed {
   const out: Replayed = { filed: 0, already: 0, waiting: 0, wrote: [] };
   const from = new Map(items.map((item) => [item.raw, item.from]));
   const ids = [...from.keys()];
@@ -2489,10 +2513,12 @@ function replayHeld(deps: IngestDeps, items: readonly Again[], undone = false): 
     const rows = deps.sql.all<{ id: string; ts: string; channel: string; headers: string | null; body: string | null; sha256: string; state: string; reason: string | null }>(
       `SELECT id, ts, channel, headers, body, sha256, state, reason FROM inbox_raw
         WHERE id IN (SELECT value FROM json_each(?))
-          AND (state IN ('review', 'proposed') OR (? = 1 AND state = 'matched' AND ${UNDONE_SQL}))
+          AND (state IN ('review', 'proposed') OR (? = 1 AND state = 'matched' AND ${UNDONE_SQL}) OR (? = 1 AND state = 'untriaged'))
         ORDER BY ts, rowid`,
       JSON.stringify(ids.slice(i, i + REPLAY_BATCH)),
       undone ? 1 : 0,
+      /* `through` ALSO TAKES A TEXT NOTHING READ YET, and offers it that one pattern alone (`answerPattern`). */
+      through === null ? 0 : 1,
     );
     for (const row of rows) {
       const pattern = matchedBy(deps, row.id);
@@ -2506,7 +2532,7 @@ function replayHeld(deps: IngestDeps, items: readonly Again[], undone = false): 
           body: row.body ?? '',
           sha256: row.sha256,
           verified: true,
-          ...(row.channel === 'webhook' && pattern !== null ? { ingest: pattern.door ?? pattern.ingest } : {}),
+          ...(through !== null ? { ingest: through } : row.channel === 'webhook' && pattern !== null ? { ingest: pattern.door ?? pattern.ingest } : {}),
         },
         { id: row.id, state: row.state, reason: row.reason, ts: row.ts },
         {},
@@ -3001,13 +3027,23 @@ function answerMove(deps: IngestDeps, a: Answered, body: Record<string, unknown>
  * pattern was fixed, so a fix reached only the texts that came after it.
  */
 export function rerunHeld(deps: IngestDeps, ingests: readonly string[]): Result<Replayed> {
+  /* AN ACCEPTED PATTERN IS CARRIED OUT HERE, the first time it can be: `decide` hands its answer to `answerAsked`
+     before the record's `land` installs it, so on a first accept there is no pattern yet to run what waits through.
+     FIRST, so what the yes files is in the decision's batch and one Undo takes it back; the run again below would file
+     what the pattern held in a batch of its own. */
+  for (const ingest of ingests) acceptedPatterns(deps, ingest);
   return ok(rerun(deps, ingests, null));
 }
 
 /** `rerunHeld`'s work: the arrivals held under `ingests`, or only those of them in `only`, run again oldest first. */
 function rerun(deps: IngestDeps, ingests: readonly string[], only: ReadonlySet<string> | null): Replayed {
+  return replayHeld(deps, heldItems(deps, ingests, only));
+}
+
+/** The arrivals held under `ingests` (or only those in `only`), oldest first, each with the rowset it is asked in. */
+function heldItems(deps: IngestDeps, ingests: readonly string[], only: ReadonlySet<string> | null): Again[] {
   const named = new Set(ingests.map((i) => `ingest:${i}`));
-  if (named.size === 0) return { filed: 0, already: 0, waiting: 0, wrote: [] };
+  if (named.size === 0) return [];
   const asking = deps.sql.all<{ id: string; body: string; opened_by: string }>(
     "SELECT id, body, opened_by FROM suggestion WHERE body_kind = 'rowset' AND status = 'open' AND opened_by IN (SELECT value FROM json_each(?))",
     JSON.stringify([...named]),
@@ -3031,7 +3067,232 @@ function rerun(deps: IngestDeps, ingests: readonly string[], only: ReadonlySet<s
     }
     items.push({ raw: raw.id, ...(from === undefined ? {} : { from }) });
   }
-  return replayHeld(deps, items);
+  return items;
+}
+
+/* ── a shape's one pattern question, answered ───────────────────────────── */
+
+/** The most samples a pattern question carries: the most the record's builder tries one pattern on at once. */
+const PATTERN_SAMPLES_MOST = 10;
+/** The most waiting texts one accepted pattern runs again in one answer. Past it the rest wait for the next answer. */
+const PATTERN_FILES_MOST = 10_000;
+
+/** A pattern question as it is read here. */
+type PatternAsked = { id: string; status: string; resolved_as: string | null; cause: string | null; body: Record<string, unknown> };
+
+const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
+
+/** The name of the ingest a pattern question installs, from either spelling its body is filed in, or `null`. */
+function patternIngest(body: Record<string, unknown>): string | null {
+  const inner = patternBody(body);
+  return inner !== null && typeof inner.ingest === 'string' && inner.ingest !== '' ? inner.ingest : null;
+}
+
+/** The ingest's body a pattern question installs, from either spelling its body is filed in, or `null`. */
+function patternBody(body: Record<string, unknown>): Record<string, unknown> | null {
+  const ingest = body.ingest as Record<string, unknown> | null | undefined;
+  if (ingest === null || typeof ingest !== 'object') return null;
+  return (ingest.body !== null && typeof ingest.body === 'object' ? ingest.body : ingest) as Record<string, unknown>;
+}
+
+/** The pattern questions that install `ingest`, newest first. */
+function patternAsked(sql: Sql, ingest: string): PatternAsked[] {
+  return sql
+    .all<{ id: string; status: string; resolved_as: string | null; cause: string | null; body: string }>(
+      `SELECT id, status, resolved_as, cause, body FROM suggestion
+        WHERE body_kind = 'pattern' AND json_valid(body)
+          AND coalesce(json_extract(body, '$.ingest.body.ingest'), json_extract(body, '$.ingest.ingest')) = ?
+        ORDER BY rowid DESC LIMIT ?`,
+      ingest,
+      ASKED_SCAN,
+    )
+    .flatMap((q) => {
+      const body = parsed(q.body);
+      return body === null ? [] : [{ ...q, body }];
+    });
+}
+
+/** Whether a pattern question holds a yes now: answered, as accepted, and not taken back. */
+const accepted = (sql: Sql, q: PatternAsked): boolean => q.status === 'resolved' && q.resolved_as === 'addressed' && settledAnswer(sql, q.id) === 'accept';
+
+/**
+ * The pattern question whose yes approved `ingest`, or `null` when nobody said yes to it.
+ *
+ * THE DECISION IS THE APPROVAL AND THE ONLY ONE. There is no teaching table and none is added: a pattern drawn for a
+ * shape is approved while a person's yes to its one question stands, so an Undo that puts the question back in Decide
+ * puts the ceiling back as well. A pattern no question was asked about is never approved here, so a pack's pattern set
+ * to ask before it writes still asks.
+ */
+export function approvedPattern(sql: Sql, ingest: string): string | null {
+  return patternAsked(sql, ingest).find((q) => accepted(sql, q))?.id ?? null;
+}
+
+/**
+ * Where a text a drawn pattern did not file waits (ENG-B07): in the shape's one open pattern question, joined, which
+ * answers its id; quietly, which answers `null`, when the pattern was accepted and no question is open; and `undefined`
+ * for a pattern nobody was asked about, which asks as it always did.
+ */
+function patternWaits(deps: IngestDeps, ingest: string, shape: string, raw: string): string | null | undefined {
+  const asked = patternAsked(deps.sql, ingest);
+  if (asked.length === 0) return undefined;
+  const byCause = deps.sql.one<{ id: string; body: string }>(
+    "SELECT id, body FROM suggestion WHERE body_kind = 'pattern' AND status = 'open' AND cause = ? ORDER BY rowid LIMIT 1",
+    patternCause(shape),
+  );
+  const open = byCause === undefined ? asked.find((q) => q.status === 'open') : { id: byCause.id, body: parsed(byCause.body) ?? {} };
+  if (open !== undefined) {
+    joinPattern(deps.sql, open.id, open.body, raw);
+    return open.id;
+  }
+  return asked.some((q) => accepted(deps.sql, q)) ? null : undefined;
+}
+
+/**
+ * One more text in a shape's open pattern question: its count grows by one, and its samples by the text while they are
+ * fewer than the builder reads at once. Every text it holds is kept in `joined`, so the answer files each of them.
+ */
+function joinPattern(sql: Sql, suggestion: string, body: Record<string, unknown>, raw: string): void {
+  const samples = stringsOf(body.samples);
+  const joined = stringsOf(body.joined);
+  if (samples.includes(raw) || joined.includes(raw)) return;
+  const count = (typeof body.count === 'number' && body.count >= samples.length ? body.count : samples.length) + 1;
+  sql.exec(
+    'UPDATE suggestion SET body = ? WHERE id = ?',
+    JSON.stringify({ ...body, samples: samples.length < PATTERN_SAMPLES_MOST ? [...samples, raw] : samples, joined: [...joined, raw], count }),
+    suggestion,
+  );
+}
+
+/**
+ * The texts an accepted pattern runs again, oldest first: every one of the question's shape that nothing read yet, and
+ * every one the pattern itself holds, each with the per-text question it is asked in. The shape is read from the texts
+ * the question was drawn from and those that joined it, as `owedShapes` reads a question's shape.
+ */
+function patternWaiting(deps: IngestDeps, body: Record<string, unknown>, pattern: IngestDecl): Again[] {
+  const drawn = [...stringsOf(body.samples), ...stringsOf(body.joined)];
+  const shapes = new Set(
+    deps.sql
+      .all<{ channel: Channel; headers: string | null }>('SELECT channel, headers FROM inbox_raw WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(drawn))
+      .map((r) => shapeOf(r.channel, (parsed(r.headers) ?? {}) as Record<string, string>)),
+  );
+  const untriaged = deps.sql
+    .all<{ id: string; headers: string | null }>(
+      `SELECT id, headers FROM inbox_raw WHERE state = 'untriaged' AND channel = ? AND (reason IS NULL OR reason <> ?) ORDER BY ts, rowid`,
+      pattern.channel,
+      UNVERIFIED,
+    )
+    /* THE SHAPE IS READ HERE AND NOT IN SQL, so the cap is on what is this shape's, never on every untriaged text. */
+    .filter((r) => shapes.has(shapeOf(pattern.channel, (parsed(r.headers) ?? {}) as Record<string, string>)))
+    .map((r): Again => ({ raw: r.id }));
+  const items = [...untriaged, ...heldItems(deps, [pattern.ingest], null)];
+  /* ONE ORDER FOR BOTH, the order they came in, so the oldest files first whichever way it waited. */
+  const order = deps.sql
+    .all<{ id: string }>('SELECT id FROM inbox_raw WHERE id IN (SELECT value FROM json_each(?)) ORDER BY ts, rowid', JSON.stringify(items.map((i) => i.raw)))
+    .map((r) => r.id);
+  const byRaw = new Map(items.map((i) => [i.raw, i]));
+  return order.slice(0, PATTERN_FILES_MOST).map((raw) => byRaw.get(raw)!);
+}
+
+/** "Filed 4 with this pattern. 1 still waits: it reads only part of it." */
+function patternFiledSaid(filed: number, already: number, part: number, unread: number): string {
+  if (filed + already + part + unread === 0) return 'Nothing waited.';
+  return [
+    `Filed ${filed} with this pattern.`,
+    already ? `${already} ${already === 1 ? 'was' : 'were'} already there.` : '',
+    part ? `${part} still ${part === 1 ? 'waits' : 'wait'}: it reads only part of ${part === 1 ? 'it' : 'them'}.` : '',
+    unread ? `${unread} more ${unread === 1 ? 'waits' : 'wait'} that it does not read.` : '',
+  ]
+    .filter((said) => said !== '')
+    .join(' ');
+}
+
+/**
+ * A shape's one pattern question, answered, carried out (ENG-B07): "The ingest proposal loop" (R.107).
+ *
+ * A YES FILES EVERYTHING THE PATTERN READS, WITH ONE UNDO. Every text of the shape that waits runs again through the
+ * pattern the yes installed, from its stored bytes, oldest first, 200 at a time (`replayHeld`). The yes is the approval
+ * the header's ceiling waits for (`approvedPattern`), so what the pattern reads exactly files as `exact`, and what it
+ * reads in part keeps waiting, quietly, with no question of its own. Everything written goes in the decision's batch, so
+ * one Undo puts every row back and the texts back to waiting (`reopenedPattern`). The question closes saying what
+ * happened: "Filed 4 with this pattern. 1 still waits: it reads only part of it."
+ *
+ * A NO FILES NOTHING, and the shape is not owed again: the decision is the memory (`owedShapes`).
+ *
+ * NOT INSTALLED YET IS NOT DONE. `decide` hands the answer here before the record's `land` installs the pattern, so a
+ * first yes finds nothing to run the texts through and leaves them; the install calls `rerunHeld`, which carries the
+ * answer out then (`acceptedPatterns`). ONCE: the answer is marked on the question (`applied`), as a tail's is.
+ */
+function answerPattern(deps: IngestDeps, a: Answered, asked: Record<string, unknown>, landed = false): Result<string | null> {
+  const body = parsed(deps.sql.one<{ body: string }>('SELECT body FROM suggestion WHERE id = ?', a.id)?.body) ?? asked;
+  if (carriedOut(deps.sql, a.id, body)) return ok(null);
+  const at = instant(deps.nowMs);
+  const resolve = answeredAt(deps.sql, a.id);
+  const keep = (more: Record<string, unknown>): void => deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify({ ...body, ...more }), a.id);
+  if (a.option !== 'accept') {
+    keep({ applied: { none: true, at, resolve } });
+    return ok(null);
+  }
+  const name = patternIngest(body);
+  const pattern = name === null ? undefined : deps.ingests().find((i) => i.ingest === name);
+  if (pattern === undefined) return ok(null);
+  /* THE VERSION HE SAID YES TO, never an older one under the same name. At the press (`landed` false) a pattern of that
+     name already in, from an Undo or a draft that reused a name, may not be the one the question carries; the install
+     that follows hands the answer back through `rerunHeld`, which runs what waits through what just landed. */
+  if (!landed && canonical(pattern) !== canonical(patternBody(body))) return ok(null);
+
+  const mark = lastEvent(deps.sql);
+  const items = patternWaiting(deps, body, pattern);
+  const ran = replayHeld(deps, items, true, pattern.ingest);
+  const states = deps.sql.all<{ id: string; state: string }>('SELECT id, state FROM inbox_raw WHERE id IN (SELECT value FROM json_each(?))', JSON.stringify(items.map((i) => i.raw)));
+  const filed = states.filter((s) => s.state === 'matched').map((s) => s.id);
+  const part = states.filter((s) => s.state === 'review' || s.state === 'proposed').length;
+  const unread = states.filter((s) => s.state === 'untriaged').length;
+  const line = patternFiledSaid(ran.filed, ran.already, part, unread);
+  keep({ applied: { at, resolve, filed, wrote: ran.wrote }, said: line });
+  deps.sql.exec(
+    "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, ?, 'note', ?, 'suggestion', ?)",
+    deps.mint(),
+    at,
+    `ingest:${pattern.ingest}`,
+    `suggestion:${a.id}`,
+    line.slice(0, 280),
+  );
+  inBatch(deps.sql, mark, a.batch, []);
+  return ok(line);
+}
+
+/**
+ * Every yes to a pattern question about `ingest` not carried out yet, carried out now in the batch its decision was
+ * made in. `rerunHeld` calls this once an install lands. One that cannot be carried out runs in a savepoint of its own,
+ * is written in the log on its question, and stops nothing else.
+ */
+function acceptedPatterns(deps: IngestDeps, ingest: string): void {
+  for (const q of patternAsked(deps.sql, ingest)) {
+    if (!accepted(deps.sql, q) || carriedOut(deps.sql, q.id, q.body)) continue;
+    const made = deps.sql.one<{ actor: string; batch: string | null }>(
+      "SELECT e.actor AS actor, e.batch AS batch FROM event r JOIN event e ON e.rowid = r.rowid - 1 AND e.kind = 'decide' WHERE r.kind = 'resolve' AND r.target = ? ORDER BY r.rowid DESC LIMIT 1",
+      `suggestion:${q.id}`,
+    );
+    const done = attempt(deps.sql, (fn) => fn(), () => answerPattern(deps, { id: q.id, option: 'accept', actor: made?.actor ?? 'system', batch: made?.batch ?? null }, q.body, true));
+    if (!done.ok) failedAnswer(deps, q.id, ingest, done);
+  }
+}
+
+/**
+ * A pattern question an Undo put back in Decide, made to wait again: the texts its yes filed, whose rows the Undo took
+ * back, wait again as nothing read them, and what the yes did is taken off it, so a second yes files them again.
+ * `reopenedTail` hands a pattern question here. Answers how many texts wait again.
+ */
+function reopenedPattern(sql: Sql, suggestion: string, body: Record<string, unknown>): number {
+  const applied = body.applied as { filed?: unknown } | undefined;
+  const again = sql.all<{ id: string }>(
+    `UPDATE inbox_raw SET state = 'untriaged', reason = NULL
+      WHERE id IN (SELECT value FROM json_each(?)) AND state = 'matched' AND ${UNDONE_SQL} RETURNING id`,
+    JSON.stringify(stringsOf(applied?.filed)),
+  );
+  const { applied: _applied, said: _said, ...rest } = body;
+  if (body.applied !== undefined || body.said !== undefined) sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(rest), suggestion);
+  return again.length;
 }
 
 /**

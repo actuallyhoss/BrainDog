@@ -226,6 +226,9 @@ function shapeFor(nav: NonNullable<DesignSignals['nav']>): { shape: NavShape; wh
 
 const SHAPE_TITLE: Record<NavShape, string> = { rail: 'A rail for your pages', bar: 'A top bar for your pages', menu: 'A menu for your pages' };
 
+/** The last day an offer made at `nowMs` waits, `LAPSE_DAYS` on (HD.579, "every proposal states a deadline"). */
+export const lapsesFrom = (nowMs: number): string => dayOf(nowMs + LAPSE_DAYS * DAY_MS);
+
 /* ── the offers ─────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 /**
@@ -234,7 +237,7 @@ const SHAPE_TITLE: Record<NavShape, string> = { rail: 'A rail for your pages', b
  */
 export function recommend(signals: DesignSignals): Offer[] {
   const { pages } = signals;
-  const lapses = dayOf(signals.nowMs + LAPSE_DAYS * DAY_MS);
+  const lapses = lapsesFrom(signals.nowMs);
   const out: Offer[] = [];
   const offer = (o: Omit<Offer, 'class' | 'lapses'>): void => void out.push({ ...o, class: 'arrange', lapses });
   const drafted = (draft: Draft | undefined): { draft?: Draft } => (draft === undefined ? {} : { draft });
@@ -417,4 +420,38 @@ export function answeredAlready(open: readonly Pick<Held, 'key'>[], signals: Pic
     if (has) out.push({ key, reason: 'already has a page' });
   }
   return out;
+}
+
+/* ── filing through the queue ───────────────────────────────────────────────────────────────────────────────────── */
+
+/** The most rank a filed arrangement may say: the kernel's scale (`kernel/src/govern.ts` `RANK_MOST`), not the tiers'. */
+export const FILED_RANK_MOST = 1000;
+/** The kernel's scale cut into one band a tier, the lowest band for a rank under every tier (an ask no rule weighed). */
+const BAND = Math.floor(FILED_RANK_MOST / (Object.keys(TIER).length + 1));
+
+/**
+ * A rank as a filed arrangement says it, on the kernel's scale, in the same order, so the kernel's "outranks"
+ * (`makeRoom`) reads what the queue meant. EACH TIER HAS A BAND OF ITS OWN, so a tier is never level with the one below
+ * it; within a band two a few points apart may come out level, and a tie keeps the older.
+ */
+export const filedRank = (rank: number): number => {
+  /* A TIER IS ITS BASE AND UP TO `WITHIN_MOST` ABOVE IT, so the tiers sit `WITHIN_MOST + 1` apart. */
+  const step = WITHIN_MOST + 1;
+  const r = Math.max(0, Math.min(TIER.shape + WITHIN_MOST, Math.floor(rank)));
+  return Math.floor(r / step) * BAND + Math.floor(((r % step) * (BAND - 1)) / WITHIN_MOST);
+};
+
+/**
+ * Which of a filer's asks it files now and which wait their turn: the strongest first, while what already waits leaves
+ * room under `WAITING_MOST`.
+ *
+ * `waiting` IS THE ONE COUNT: every arrangement offer that waits on the person, wherever, the pen's and every filer's
+ * open on Decide, so Slash's and the pen's never sum past three. NOTHING OPEN GIVES WAY HERE: an ask stronger than one
+ * waiting waits too, and a lapse stays a computed state (`queueOf`), never a take-back by itself.
+ */
+export function roomFor<T extends { rank: number }>(asks: readonly T[], waiting: number): { file: T[]; wait: T[] } {
+  const room = Math.max(0, WAITING_MOST - Math.max(0, waiting));
+  /* A STABLE SORT, so two of one strength keep the order they were drafted in. */
+  const ranked = [...asks].sort((a, b) => b.rank - a.rank);
+  return { file: ranked.slice(0, room), wait: ranked.slice(room) };
 }

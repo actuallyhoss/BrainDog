@@ -304,6 +304,8 @@ export type LiveBlock = BlockResult & {
    * which a bare figure typed into an empty money box is written in (`inputs-write.ts` `home`).
    */
   home?: string | null;
+  /** An `inputs` block's: the fields its list works out (`derive:`), as the record answers them, drawn as figures and never typed into. */
+  derived?: readonly string[];
   /** A block with a column `as: scope`: what each of those cells draws its chip from (`scopeCellsOf`). */
   scopeCells?: ScopeCells;
   /**
@@ -1452,7 +1454,8 @@ export function blockOf(
     if (!register || !REGISTERS[register] || !types) return cannot;
     const entries = got.slice(0, 1).map((r) => entryOf(register, r, refs));
     const home = typeof homeSaid === 'string' && /^[A-Z]{3}$/u.test(homeSaid) ? homeSaid : null;
-    return { ...shell, register, entries, matched: entries, rows: toRows(register, entries, shell.columns, now, namesOf(refs)), shown: entries.length, total: entries.length, names: namesOf(refs), types, home } as LiveBlock;
+    const derived = Array.isArray(b.derived) ? b.derived.filter((f): f is string => typeof f === 'string') : [];
+    return { ...shell, register, entries, matched: entries, rows: toRows(register, entries, shell.columns, now, namesOf(refs)), shown: entries.length, total: entries.length, names: namesOf(refs), types, home, derived } as LiveBlock;
   }
   /* A CAPTURE READS NO ROWS, and it has no `source:` either, so it is answered before the check that sends a block
      with none back as written text. Its list is kept on `register`, which every other block here takes from its

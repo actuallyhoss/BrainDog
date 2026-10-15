@@ -64,6 +64,10 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { refused, type Result } from '@braindog/ports';
+
+import { refuse, type Saying } from './json.ts';
+
 type Env = Record<string, string | undefined>;
 type Hook = { type: 'command'; command: string; timeout: number; statusMessage?: string };
 type Entry = { hooks: Hook[] };
@@ -971,4 +975,97 @@ function planAgentSkill(file: string, options: Options): Plan {
     `${PLACES_SKILL}${had ? ', in place of an older copy' : ''}: what BrainDog is to an agent, how it connects, and to call context first.`,
   ];
   return { lines, write: { file, had, value: text } };
+}
+
+/* ── `pack install --force` and `pack uninstall --force` (SHL-A12 job 6) ───────────────────────────────────────── */
+
+/**
+ * The usage line for `--force`, for the `pack` usage text to carry beside install and uninstall.
+ *
+ * WHAT IT LIFTS IS ONE REFUSAL. An update that takes a list away while the list still holds items is `WOULD_ORPHAN`
+ * until somebody says to take it, and `--force` is saying so at the terminal, as the plan's press is on the screens: the
+ * record retires the list and keeps every item in it, and a version that declares the list again puts it back. Every
+ * other refusal (a stale plan, a rename, a type change, a call out nobody approved) stands and prints as it always has.
+ */
+export const FORCE_USAGE = '--force on pack install or pack uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.';
+
+/**
+ * The three record calls the forced commands make, as `@braindog/client` names them. A stand-in in the tests.
+ *
+ * `retireWithRows` IS THE RECORD'S WORD FOR THE PRESS (`@braindog/declare` `InstallOptions`), sent only under `--force`.
+ */
+export type PackClient = {
+  planPack: (args: { doc: unknown }) => Promise<Result<unknown>>;
+  installPack: (args: { doc: unknown; planHash: string; retireWithRows?: boolean }) => Promise<Result<unknown>>;
+  uninstallPack: (args: { id: string }) => Promise<Result<unknown>>;
+};
+
+/** One list a plan takes away while it holds items (`Diff.removals`), as much of it as the line needs. */
+type Removal = { retire: string; name: string; rows: number };
+
+const itemsOf = (n: number): string => (n === 1 ? '1 item' : `${n.toLocaleString('en-GB')} items`);
+const joined = (parts: readonly string[]): string => (parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)!}`);
+
+/** The one line a forced install says: "Forced: Services keeps its 41 items, retired." */
+export const forcedLine = (removals: readonly Removal[]): string => `Forced: ${joined(removals.map((r) => `${r.name} keeps its ${itemsOf(r.rows)}`))}, retired.`;
+
+/** `--force` taken out of the arguments, before a `--` and never after it. */
+export function takeForce(args: readonly string[]): { force: boolean; rest: string[] } {
+  const end = args.indexOf('--');
+  const head = end < 0 ? [...args] : args.slice(0, end);
+  const tail = end < 0 ? [] : args.slice(end);
+  return { force: head.includes('--force'), rest: [...head.filter((a) => a !== '--force'), ...tail] };
+}
+
+/* A refusal prints as the other pack commands print one: its sentence, then its code. */
+const saidOf = (r: Result<unknown>): string => (refused(r) ? `${r.refusal.fix} (${r.refusal.code})`.replace(/\s+/gu, ' ').trim() : 'That was not read.');
+
+const removalsOf = (diff: unknown): Removal[] => {
+  const list = (diff as { removals?: unknown } | null)?.removals;
+  if (!Array.isArray(list)) return [];
+  return list.filter((r): r is Removal => typeof r?.retire === 'string' && typeof r?.name === 'string' && Number.isInteger(r?.rows));
+};
+
+/**
+ * `braindog pack install <file> [--force]` once the file is read, and `braindog pack uninstall <id> [--force]`, against
+ * the record. Answers the exit code.
+ *
+ * WITHOUT `--force` NOTHING CHANGES: a plan taking a list away from its items is refused `WOULD_ORPHAN` by the record and
+ * printed as today. With it, the install says it was pressed (`retireWithRows`) and nothing else is lifted: a refusal
+ * that comes back, `WOULD_ORPHAN` included (a record that has not been taught the word, or a field left out under
+ * items, which the kernel refuses on its own), prints exactly as it would have.
+ *
+ * AN UNINSTALL ALREADY KEEPS EVERY ITEM (`@braindog/declare` `uninstall`), and is never `WOULD_ORPHAN`, so `--force` there
+ * has nothing to lift; it is taken so the two commands read alike, and the line says what stays where.
+ */
+export async function forcedPack(
+  verb: 'install' | 'uninstall',
+  given: { doc: unknown } | { id: string },
+  client: PackClient,
+  io: Saying & { out: (line: string) => void },
+  force = false,
+): Promise<number> {
+  if (verb === 'uninstall') {
+    if (!('id' in given)) return refuse(io, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Which add-on? Name it by its id.', at: 'id' } }, 'Which add-on? Name it by its id. (REQUIRED_MISSING)');
+    const gone = await client.uninstallPack({ id: given.id });
+    if (!gone.ok) return refuse(io, gone, saidOf(gone));
+    /* The answer keys what stays by the list's id, which is no name to print, so the line says the whole count. */
+    const kept = Object.values((gone.value as { rows_kept?: Record<string, number> } | null)?.rows_kept ?? {}).reduce((a, n) => a + (Number.isInteger(n) && n > 0 ? n : 0), 0);
+    io.out(`Removed ${given.id}.${kept === 0 ? '' : ` ${kept === 1 ? 'Its 1 item stays' : `Its ${itemsOf(kept)} stay`}, and installing it again puts its lists back.`}`);
+    return 0;
+  }
+  if (!('doc' in given)) return refuse(io, { ok: false, refusal: { code: 'REQUIRED_MISSING', fix: 'Which add-on file?', at: 'doc' } }, 'Which add-on file? (REQUIRED_MISSING)');
+  const planned = await client.planPack({ doc: given.doc });
+  if (!planned.ok) return refuse(io, planned, saidOf(planned));
+  const diff = (planned.value as { diff?: { planHash?: unknown; pack?: { id?: unknown; version?: unknown } } } | null)?.diff;
+  if (typeof diff?.planHash !== 'string') {
+    io.say('The record answered no plan for this add-on. Read it again with braindog pack install --dry-run.');
+    return 1;
+  }
+  const put = await client.installPack({ doc: given.doc, planHash: diff.planHash, ...(force ? { retireWithRows: true } : {}) });
+  if (!put.ok) return refuse(io, put, saidOf(put));
+  const removals = removalsOf(diff);
+  const what = [diff.pack?.id, diff.pack?.version].filter((p) => typeof p === 'string').join(' ');
+  io.out(force && removals.length > 0 ? forcedLine(removals) : `Installed ${what === '' ? 'the add-on' : what}.`);
+  return 0;
 }

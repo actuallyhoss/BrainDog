@@ -75,7 +75,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
-    { version: '3.4.0', notes: 'People says when somebody may be on your record twice, with a link that opens the list at those people. Calendar is a new page: this month and the next two, with everything that has a day it is due, from every list. Activity is a page of its own: everything that changed, a day at a time, with one line for each run, and who worked, what changed, the busy hours and what an agent asked beside it.' },
+    { version: '3.4.0', notes: 'People says when somebody may be on your record twice, with a link that opens the list at those people. Calendar is a new page: this month and the next two, with everything that has a day it is due, from every list. Activity is a page of its own: everything that changed, a day at a time, with one line for each run, and who worked, what changed, the busy hours and what an agent asked beside it. What is asked about somebody here waits on the People page to be answered, and its first line says how many.' },
     { version: '3.3.0', notes: 'Health is a page of its own: each check this record runs on itself, by name, with what it last found. Anything that needs a look comes first, said in words and marked, and a check with nothing to go on yet says Not read yet. Under the first line it says how many checks have not been read yet.' },
     {
       version: '3.2.0',
@@ -188,7 +188,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
-    { version: '2.2.0', notes: 'A service can be a Server, a Database, Storage or a Network, each with its name. Types you added yourself stay as they are. A project page no longer says Costs a year 0 when nothing it runs on has a cost recorded; the figure is left out until one is.' },
+    { version: '2.2.0', notes: 'A service can be a Server, a Database, Storage or a Network, each with its name. Types you added yourself stay as they are. A project page no longer says Costs a year 0 when nothing it runs on has a cost recorded; the figure is left out until one is. Services shows what is asked about a service and says how many in its first line, and Virtual machine, Edge network and Object storage are types with names.' },
     {
       version: '2.1.0',
       notes:

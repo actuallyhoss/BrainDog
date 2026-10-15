@@ -8,8 +8,10 @@
   lives in this sheet's memory until the sheet closes, and closing forgets it. A person who lost it closes it in Settings
   under Links and makes another; there is no way to see a link again, which is what makes one safe to hand out.
 
-  ONLY AN OWNER CAN MAKE ONE (`openShare` is ADMIN). The button is drawn for everybody the head is drawn for, and anybody
-  else is told the record's own sentence when they press it, rather than this guessing at a level it does not read.
+  NO PRESS THAT FAILS. On opening, the sheet asks `shareable` (`readShareable`), and "Share a read-only link" is drawn
+  only on yes. An owner on a host that makes no links reads the host's own sentence instead; anybody who is not an owner
+  reads the record's own sentence for that (`shareable` is ADMIN, as `openShare` is), rather than this guessing at a
+  level it does not read. "Share as a template" is offered either way.
 
   "SHARE AS A TEMPLATE" LIVES IN THE SAME SHEET, so the page head keeps its one line. It reads the page as the
   record stores it, makes a pack of that page alone (`lib/market/template.ts`), and says what the pack adds, what it
@@ -27,7 +29,7 @@
   import { kennelFetch, nextVersion, publishedHref, publishedLink, publishedSaid, publishWords, submitToKennel, type Submitted } from '../market/publish.ts';
   import { templateOf, templateWords, wordsOf, type Template, type TemplateSetting } from '../market/template.ts';
   import { words as market } from '../market/words.ts';
-  import { linkOf, openLink, daysSaid, SHARE_DAYS, SHARE_DAYS_DEFAULT, words } from '../record/share-write.ts';
+  import { linkOf, openLink, daysSaid, readShareable, SHARE_DAYS, SHARE_DAYS_DEFAULT, words } from '../record/share-write.ts';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import Segmented from './Segmented.svelte';
@@ -41,6 +43,9 @@
   let busy = $state(false);
   let made = $state<{ link: string; until: string } | null>(null);
   let refused = $state<string | null>(null);
+  /** Whether this BrainDog makes links, asked each time the sheet opens. */
+  let can = $state.raw<{ state: 'asking' } | { state: 'yes' } | { state: 'no'; why: string }>({ state: 'asking' });
+  let asks = 0;
 
   /** Which of the sheet's two jobs it is doing: the read-only link, or the page as a template. */
   let mode = $state<'link' | 'template'>('link');
@@ -58,6 +63,16 @@
     days = SHARE_DAYS_DEFAULT;
     mode = 'link';
     open = true;
+    void ask();
+  }
+
+  /** Ask `shareable`. An answer for a sheet opened again since is dropped, so the newest ask is the one drawn. */
+  async function ask() {
+    const n = (asks += 1);
+    can = { state: 'asking' };
+    const said = await readShareable(createClient({ base: apiBase() }));
+    if (n !== asks) return;
+    can = said.can ? { state: 'yes' } : { state: 'no', why: said.why ?? words.shareOff };
   }
 
   /* CLOSING FORGETS THE LINK, which is the whole of "shown once". */
@@ -144,7 +159,7 @@
   {words.shareOpen}
 </Button>
 
-<Sheet bind:open title={mode === 'template' ? templateWords.title : words.shareTitle} onclose={forget}>
+<Sheet bind:open title={mode === 'template' ? templateWords.title : can.state === 'yes' ? words.shareTitle : words.shareOpen} onclose={forget}>
   <div class="share">
     {#if mode === 'template'}
       {#if template.state === 'reading'}
@@ -206,6 +221,13 @@
       </div>
       <p class="share-hint">{words.shareUntil(made.until)}</p>
       <Button weight="bare" onclick={() => (made = null)}>{words.shareAnother}</Button>
+    {:else if can.state === 'asking'}
+      <p class="share-hint" role="status">{words.shareAsking}</p>
+      <Button weight="bare" onclick={() => void asTemplate()}>{templateWords.open}</Button>
+    {:else if can.state === 'no'}
+      <!-- THE HOST'S OWN SENTENCE, and no press for a link it would refuse. -->
+      <p class="share-line" role="status">{can.why}</p>
+      <Button weight="bare" onclick={() => void asTemplate()}>{templateWords.open}</Button>
     {:else}
       <p class="share-hint">{words.shareLead}</p>
       <Segmented role="group" aria-label={words.shareDays}>

@@ -175,9 +175,9 @@ test('A PAGE KEY NOBODY READS IS REFUSED BY NAME, and tabs are said in nav', () 
   assert.equal(lint(pageOf({ nav: { section: 'Launch', order: 10, tabs: true }, blocks: [{ kind: 'note', body: 'x' }] })), null);
   assert.equal(lint(pageOf({ nav: { section: 'Launch', order: 10, tabs: 'yes' }, blocks: [{ kind: 'note', body: 'x' }] }))?.code, 'DECLARATION_INVALID');
   assert.equal(lint(pageOf({ nav: { section: 'Launch', order: 10, tab: true }, blocks: [{ kind: 'note', body: 'x' }] }))?.code, 'DECLARATION_INVALID');
-  /* PUBLISHED AND DRAWN BY NOTHING: the repair is a build that draws it, so the code says wait rather than you made it up.
-     `filters` is drawn now (`page-reads.test.ts`); `header` still waits. */
-  assert.equal(lint(pageOf({ header: {}, blocks: [{ kind: 'note', body: 'x' }] }))?.code, 'NOT_IN_THIS_BUILD');
+  /* `filters` AND `header` ARE DRAWN NOW (`page-reads.test.ts`, `page-head.test.ts`): a head is checked by what it says. */
+  assert.equal(lint(pageOf({ header: { kicker: 'Launch' }, blocks: [{ kind: 'note', body: 'x' }] })), null);
+  assert.equal(lint(pageOf({ header: { banner: 'x' }, blocks: [{ kind: 'note', body: 'x' }] }))?.code, 'DECLARATION_INVALID');
   assert.equal(lint(pageOf({ filters: [], blocks: [{ kind: 'note', body: 'x' }] })), null);
 });
 

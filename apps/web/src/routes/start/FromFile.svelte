@@ -6,6 +6,10 @@
   with the field's own name. Its entries are drawn on the pages below, in the page they will live on, so this tile does
   not draw them twice.
 
+  ONE OF MANY: a zip brings one of these for each table inside, drawn under the page's own key for each, so its
+  heading is the table's own file name and its "Leave it out" names that file too, or a screen reader would hear the
+  same button twice.
+
   NOTHING HERE IS SAVED. "Leave it out" takes the file off the build; the one press is what writes it.
 -->
 <script lang="ts">
@@ -46,7 +50,7 @@
 
 <Tile icon="upload" title={file.file} count={mapping ? going : undefined} aria-busy={reading}>
   {#snippet actions()}
-    <Button weight="quiet" size="sm" disabled={busy} onclick={onremove}>{firstRun.exportLeave}</Button>
+    <Button weight="quiet" size="sm" disabled={busy} aria-label={`${firstRun.exportLeave}: ${file.file}`} onclick={onremove}>{firstRun.exportLeave}</Button>
   {/snippet}
   <p class="file-line" role={reading ? 'status' : undefined}>{line}</p>
   {#if mapping && shown.length > 0}

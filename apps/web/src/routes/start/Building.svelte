@@ -12,12 +12,17 @@
   the person goes looking.
 
   WHAT JUST CAME ON takes the arrival tint for a second and a half, as on /start.
+
+  WHO READ IT IS SAID UNDER THE PLACES (`readBy`, USE-B05): where the reading is the rules', for any cause (no model on
+  this host, no press yet, a refusal, a silence), one quiet line says so, and where the month's asks are spent it says
+  that instead (`firstRun.readByRules`). A model's reading says nothing more, and neither does a screen with no reading.
 -->
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
   import Money from '$lib/ui/Money.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import type { Place } from '$lib/start/propose.ts';
+  import { firstRun } from '$lib/first-run.ts';
+  import type { Place, Proposal } from '$lib/start/propose.ts';
   import { placeIcon, placesFrom, words, type Part as PartOf } from './building.ts';
 
   let {
@@ -25,6 +30,7 @@
     title = null,
     places,
     locale,
+    readBy = null,
   }: {
     /** The parts as read (`partsOf`): only the entries the sentence filled are read off them, under their place. */
     parts: readonly PartOf[];
@@ -33,7 +39,18 @@
     /** Where things will be kept, Today first (`Proposal.places`). Absent, Today and each part that is on. */
     places?: readonly Place[] | undefined;
     locale: string;
+    /** Who read the words (`Proposal.by`, and `fell` where a model was asked and the rules answered), or `null` before a reading. */
+    readBy?: Pick<Proposal, 'by' | 'fell'> | null | undefined;
   } = $props();
+
+  /** The line about the rules, where they read it: the month spent has its own, and any other cause the plain one. */
+  const rulesLine = $derived(
+    readBy === null || readBy === undefined || (readBy.by !== undefined && readBy.by !== 'rules')
+      ? null
+      : readBy.fell === 'SLASH_BUDGET_SPENT'
+        ? firstRun.readByRules
+        : firstRun.readByRulesAny,
+  );
 
   const shown = $derived(placesFrom(places, parts));
   const entriesOf = (place: Place) => (place.kind === 'module' ? (parts.find((p) => p.on && p.id === place.id)?.entries ?? []) : []);
@@ -85,6 +102,7 @@
       {/each}
     </ol>
     <p class="reading">{words.startsEmpty}</p>
+    {#if rulesLine}<p class="reading" data-read-by="rules">{rulesLine}</p>{/if}
   </Tile>
 </div>
 

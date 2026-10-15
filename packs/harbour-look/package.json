@@ -1,0 +1,11 @@
+{
+  "name": "@braindog/pack-harbour-look",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test harbour-look.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

@@ -29,9 +29,14 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import { untrack } from 'svelte';
-  import { redraw } from '$lib/theme/draw.ts';
+  import { onMount, untrack } from 'svelte';
+  import { drawn, drawSaved, lookOf, redraw } from '$lib/theme/draw.ts';
   import { follow } from '$lib/theme/follow.ts';
+  import { CONTRAST, choicesOf, lookWords, otherScheme, previewOf, styleOf, type Look } from '$lib/theme/theme-choice.ts';
+  /* THE HOUSE'S OWN SEED AND THE EDITOR'S SOLVER, both already in this screen's chunk (`LookEditor`), so the house's
+     other scheme is solved here without a new export from the module every screen loads. */
+  import { HOUSE_SEED } from '@braindog/theme';
+  import { baseOf } from '$lib/theme/look.ts';
   import LookEditor from '$lib/theme/LookEditor.svelte';
   import { takeFix } from '$lib/theme/staged.ts';
   import type { AreaProps } from '../settings-state.svelte.ts';
@@ -121,6 +126,81 @@
     settle();
   }
 
+  /* ── the look: every one the record holds, one press each (PGS-A21) ── */
+
+  /* WHAT `boot` SAID OF THE LOOKS, asked again here because the shell keeps neither `looks` nor the person's pick. Until
+     it answers, the page's own drawn look stands in, so the preview is true from the first frame. */
+  let booted = $state.raw<unknown>({ theme: drawn() });
+  let picking = $state(false);
+  /* THE CHOICE IS LISTED ONCE THE RECORD HAS SAID WHAT IT HOLDS, so it never marks House on a record drawn in its own. */
+  let answered = $state(false);
+  const choices = $derived(choicesOf(booted, moreContrast));
+
+  const recordBoot = async (): Promise<unknown> => {
+    const [{ createClient }, { apiBase }] = await Promise.all([import('@braindog/client'), import('$lib/at.ts')]);
+    const out = await createClient({ base: apiBase() })
+      .boot()
+      .catch(() => null);
+    return out?.ok ? out.value : null;
+  };
+
+  onMount(() => {
+    void recordBoot().then((b) => {
+      if (b !== null) booted = b;
+      answered = b !== null;
+    });
+  });
+
+  /* ONE PRESS PICKS. High contrast is its switch, as it always was; any other look turns it off, since it wins over every
+     look and a press that changed nothing on screen would read as broken. The pick goes through the same `keep` the
+     accent's does, as `look.theme`, and the record then draws it: `boot` is asked again and its look put on the page. */
+  async function pickLook(id: string) {
+    if (picking) return;
+    if (id === CONTRAST) return pickContrast(!moreContrast);
+    if (moreContrast) pickContrast(false);
+    picking = true;
+    /* `look.theme` IS NOT ONE OF THE COOKIE'S FIRST-PAINT KEYS (`pref.LOOK_KEYS`): the look is the record's to draw, so the
+       key is cast here rather than adding a word to the module every screen loads. */
+    const kept = await pref.keep('look.theme' as pref.LookKey, id);
+    settle();
+    if (kept.from === 'refused') toasts.push(kept.fix);
+    const fresh = await recordBoot();
+    picking = false;
+    if (fresh === null) return;
+    booted = fresh;
+    drawSaved(lookOf(fresh));
+  }
+
+  /* THE SCHEME THE PAGE IS IN, so the preview can draw the one it is not: the device's when the person said system. */
+  let deviceDark = $state(typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches);
+  onMount(() => {
+    if (typeof matchMedia !== 'function') return;
+    const q = matchMedia('(prefers-color-scheme: dark)');
+    const on = () => (deviceDark = q.matches);
+    q.addEventListener('change', on);
+    return () => q.removeEventListener('change', on);
+  });
+  const inUse = $derived<'light' | 'dark'>(scheme === 'system' ? (deviceDark ? 'dark' : 'light') : scheme);
+
+  /* THE HOUSE'S PALETTES, OR A PERSON'S OWN COLOUR'S, solved once each: a solve is the generator's whole search. */
+  const solved = new Map<string, { house: Look; contrast: Look } | null>();
+  const solvedFor = (hex: string | null) => {
+    const key = hex ?? HOUSE_SEED.accent;
+    if (!solved.has(key)) {
+      const base = baseOf(key, HOUSE_SEED.neutralHue);
+      solved.set(key, base && { house: base.house.schemes, contrast: base.contrast.schemes });
+    }
+    return solved.get(key) ?? null;
+  };
+
+  /* WHAT THE OTHER SCHEME WOULD DRAW, in the order the page stacks its sheets: a person's own colour over everything
+     (`accent.ts`), High contrast over the record's look (`draw.ts`), then the record's look, then the house. */
+  const preview = $derived.by(() => {
+    const own = solvedFor(accent);
+    const fallback = own && (moreContrast ? own.contrast : own.house);
+    return previewOf(accent !== null || moreContrast ? null : booted, inUse, fallback);
+  });
+
   /* SCREENSHOT MODE, AS THIS SCREEN SHOWS IT NOW: the mark the mode puts on the page, so the switch never claims a mode the
      screen is not in. The press is the palette's and the key's (`customise-apply.ts`), kept as the person's `look.shot`. */
   let shotOn = $state(shotNow());
@@ -192,6 +272,27 @@
   <p class="hint">{kept === 'record' ? words.hint(props.shell.index.name) : kept === 'pending' ? words.hintPending : words.hintDevice}</p>
   <div class="looks">
     <div class="choices">
+      <!-- EVERY LOOK THE RECORD HOLDS, ONE PRESS EACH: House, High contrast, the record's own, one for each add-on. The
+           one drawn now carries a tick as well as its fill, so the state is never colour alone. -->
+      {#if answered}
+        <div class="choice">
+          <span class="choice-name" id="choice-look">{lookWords.title}</span>
+          <span class="choice-line">{accent === null ? lookWords.line : lookWords.ownOnTop}</span>
+          <div class="look-picks" role="group" aria-labelledby="choice-look">
+            {#each choices as c (c.id)}
+              <button
+                type="button"
+                class="look-pick"
+                aria-pressed={c.on}
+                data-on={c.on ? '' : undefined}
+                disabled={picking && c.id !== CONTRAST}
+                onclick={() => void pickLook(c.id)}>{#if c.on}<Icon name="check" size="s" />{/if}{c.name}</button
+              >
+            {/each}
+          </div>
+        </div>
+      {/if}
+
       <div class="choice">
         <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
         <Segmented role="group" aria-labelledby="choice-scheme">
@@ -280,8 +381,10 @@
       control, so it is hidden from a screen reader: the choices beside it say what they are.
     -->
     <div class="preview" aria-hidden="true">
-      <p class="preview-name">{copy.densityPreview}</p>
-      <div class="pv">
+      <p class="preview-name">{preview ? lookWords.preview(otherScheme(inUse)) : copy.densityPreview}</p>
+      <!-- THE OTHER SCHEME, FROM ITS OWN SOLVED COLOURS: the page is already the scheme in use, so the preview is the one a
+           person cannot see without switching, drawn from the tokens the record would draw it in. -->
+      <div class="pv" style={styleOf(preview)}>
         <div class="pv-bar">
           <span class="pv-mark"></span>
           <span class="pv-place" data-on></span>
@@ -529,6 +632,47 @@
     }
   }
 
+  /* ── the looks ── */
+
+  /* A LOOK IS A WORD ON A RECTANGLE (radius 8), wrapping onto a second line on a phone rather than scrolling. The one
+     drawn now takes the working accent's tint AND a tick, so the state is never colour alone. */
+  .look-picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .look-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-4);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--field);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .look-pick[data-on] {
+    background: var(--action-tint-1);
+    color: var(--action-text);
+  }
+
+  .look-pick:disabled {
+    cursor: progress;
+  }
+
+  @media (pointer: coarse) {
+    .look-pick {
+      min-block-size: var(--tap);
+    }
+  }
+
   /* A refusal a person cannot act on teaches them the control is broken, so the floor it missed is
      printed rather than a shrug. */
   .wrong {
@@ -548,15 +692,16 @@
     font-weight: 500;
   }
 
-  /* THE GROUND AND ITS LIGHT, as the app's own ground, with the glass bar and one tile on it. */
+  /* THE BOARD WITH ONE TILE ON IT (DIRECTION §39): flat, opaque, no border and no shadow. Every colour here is a role the
+     look solves, so the scheme's tokens set on this element (`styleOf`) repaint all of it, words included. */
   .pv {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-3);
-    border-radius: var(--r-lg);
-    background: radial-gradient(120% 60% at 50% -20%, var(--ground-glow), transparent), var(--sunk);
-    box-shadow: inset 0 0 0 1px var(--line-soft);
+    border-radius: var(--r-tile);
+    background: var(--board);
+    color: var(--ink);
   }
 
   .pv-bar {
@@ -564,9 +709,8 @@
     align-items: center;
     gap: var(--sp-3);
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
-    background: var(--glass);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 7%, transparent);
+    border-radius: var(--r-ctl);
+    background: var(--field);
   }
 
   /* THE MARK WEARS THE RECORD'S COLOUR, which is where a person sees the colour they chose. */
@@ -586,7 +730,7 @@
   }
 
   .pv-place[data-on] {
-    background: var(--ink);
+    background: var(--action);
   }
 
   .pv-tile {
@@ -594,9 +738,8 @@
     flex-direction: column;
     gap: var(--sp-2);
     padding: var(--sp-4);
-    border-radius: var(--r-lg);
-    background: var(--bg);
-    box-shadow: var(--e1);
+    border-radius: var(--r-tile);
+    background: var(--tile);
   }
 
   .pv-head {

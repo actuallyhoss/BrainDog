@@ -148,7 +148,7 @@ import type { Json as JsonValue } from '@braindog/kernel';
 import { arranger, carryUpdate, forgetHeld, installHeld, planAgain, speakingNow, writeVoice, type CatalogueEntry, type CatalogueShelf, type SetupAnswer } from './arrange.ts';
 import { LATE_DAYS, isWorking, presenceOf, waiting as waitingOf, type Presence, type WaitingNow } from './waiting.ts';
 import { useCases, type ExportArgs } from './usecase.ts';
-import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, noticeUsage, pageShowsAgents, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
+import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, formedRows, fromModel, growsDrafts, lapsing, noticeUsage, pageShowsAgents, queueFiling, readUsage, SLASH_ASKED_MOST, SLASH_OPEN_CAP, stableKey, waitingCount, type CatalogueOffer, type Offered, type SlashDraft, type SlashModel } from './slash.ts';
 import { grammarOf } from './grammar.ts';
 import { askedFault, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
@@ -218,7 +218,7 @@ import { briefTick } from './brief-write.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
 import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
-import { PEN_DISMISSED_MOST, penFor, penRanked, signatureOf, type PenItem } from './emergent.ts';
+import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
@@ -230,6 +230,9 @@ import { choiceOf } from './decided.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 import { byWhoOf, passesOf, passFolder, passKept, type ByWho, type UpdatePass } from './update-pass.ts';
 import { docValues } from './row-values.ts';
+/* THE VERBS THAT RUN, which the page read cuts a block's actions to (`kernel.page`'s `runs`). */
+import { RUNS } from './verbs.ts';
+import { lookThemeFault, looksOf, themeFor, type LookOffer } from './theme-pick.ts';
 
 export type { CatalogueEntry, FigureTest, Grows, RowIo } from './arrange.ts';
 /* WHAT `setup` ANSWERS (USE-B04), for the host's table of calls, the client and the first run's screen. */
@@ -949,6 +952,7 @@ export const PREF_KEYS = [
   'look.density',
   'look.contrast',
   'look.accent',
+  'look.theme',
   'look.shot',
   'packs.known_keys',
 ] as const;
@@ -965,6 +969,9 @@ export type PrefKey = (typeof PREF_KEYS)[number];
  * accent"): `look.scheme` light, dark or the device's own (absent is the device's own), `look.size` and `look.density` the
  * cookie's own words (`apps/web/src/lib/pref.ts`), `look.contrast` the high-contrast palette, and `look.accent` one of the
  * suggested accents by name, or `House`. The browser keeps a first-paint copy of each, written from these.
+ *
+ * `look.theme` IS WHICH INSTALLED LOOK THIS PERSON IS DRAWN IN (PGS-A21): `house`, or an installed `theme` declaration's
+ * id; absent, or a theme since uninstalled, is the record's own, else the first by id (`theme-pick.ts`).
  *
  * `look.shot` IS SCREENSHOT MODE, ON OR OFF (batch 62): the person's own words are plated while the screen is shown to
  * someone else. Kept and sent with boot like the five; no screen reads it yet, and the browser keeps no copy of it.
@@ -986,6 +993,7 @@ export type Prefs = {
   'look.density'?: LookDensity;
   'look.contrast'?: boolean;
   'look.accent'?: string;
+  'look.theme'?: string;
   'look.shot'?: boolean;
   'packs.known_keys'?: Record<string, string[]>;
 };
@@ -1165,6 +1173,8 @@ export type Boot = {
    * from one place.
    */
   theme: { light: Record<string, string>; dark: Record<string, string> } | null;
+  /** The looks this record holds, the record's own first and then each add-on's (`looksOf`), for Appearance's chooser. */
+  looks: LookOffer[];
   /**
    * WHICH SHAPE THIS ANSWER IS, a whole number (`BOOT_SHAPE`) that grows whenever a field joins or one is taken away, so
    * a client tells a host that sends `waits` from one older than it by asking once rather than by guessing from keys.
@@ -1204,8 +1214,8 @@ export type Boot = {
   copies?: CopyFacts;
 };
 
-/** The shape `boot` answers in: 2 since `waits`, `lateDays`, `working`, `voice` and `slash` joined it; 3 since `copies`. */
-export const BOOT_SHAPE = 3;
+/** The shape `boot` answers in: 2 since `waits`, `lateDays`, `working`, `voice` and `slash` joined it; 3 since `copies`; 4 since `looks`. */
+export const BOOT_SHAPE = 4;
 
 /** The most working runs `boot` sends. The rail says how many, so past this it says the ceiling. */
 export const WORKING_MOST = 50;
@@ -1727,9 +1737,10 @@ export type RecordDeps = {
   snapshots?: Snapshots | ReopeningSnapshots | undefined;
   /**
    * Remove this record from the host: its storage, its copies and its name (`53 §5.9`). It runs last, after every
-   * check, and the record answers nothing afterwards. Absent, `deleteRecord` refuses `NOT_IN_THIS_BUILD`.
+   * check, and the record answers nothing afterwards. Absent, `deleteRecord` refuses `NOT_IN_THIS_BUILD`. A host that
+   * keeps a last copy says where (`kept`) and how many files it removed (`removed`), and `deleteRecord` passes both on.
    */
-  destroy?: (() => Promise<void>) | undefined;
+  destroy?: (() => Promise<{ kept: string; removed: number } | void>) | undefined;
   /**
    * Why this host cannot take an invitation, or `null` when it can.
    *
@@ -2683,11 +2694,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const gone = Array.isArray(goneRaw) ? goneRaw.filter((x): x is string => typeof x === 'string') : [];
     /* A PEN THE OWNER TURNED OFF HOLDS NOTHING (`pen.suggest`, as `boot` reads it), so Slash asks on Decide instead. */
     const penOn = ownerId !== null && ownerPrefs['pen.suggest'] !== false;
+    const queued = penOn ? penQueued({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(gone), use: { sql, nowMs: clock.now() } }) : null;
     usage.pen = {
       /* ONLY FOR SOMEONE WHO IS SHOWN A PEN: `boot` shows it to a reader of every list and nobody else, so for a member
          held to some lists Slash yields nothing, or it kept back offers that were shown nowhere (pen-window-53-54). */
-      held: penOn && !partial ? penRanked({ kernel, reads: () => true, pages: kernel.pages(), dismissed: new Set(gone), use: { sql, nowMs: clock.now() } }).map((i) => i.id) : [],
+      held: queued !== null && !partial ? queued.ranked.map((i) => i.id) : [],
       dismissed: gone,
+      /* THE PEN'S PART OF THE ONE COUNT (ENG-B14), whole whoever asks, as the slots on Decide are. */
+      waiting: queued?.waiting.length ?? 0,
     };
     const busy = usage.agents.length > 0;
     const offered: Offered[] = catalogue.map((e) => {
@@ -2842,7 +2856,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         continue;
       }
       /* WHO DRAFTED IT IS KEPT WITH IT, so a reload still says whether it came from how he uses BrainDog or a model. */
-      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: prepared.value }, SLASH, d.by);
+      const put = kernel.propose({ question: d.question, body_kind: d.body_kind, body: { ...prepared.value, ...lapsing(d) } }, SLASH, d.by);
       if (!put.ok) {
         skipped.push({ question: d.question, why: 'refusal' in put ? put.refusal.fix : 'It would not file.' });
         continue;
@@ -2907,6 +2921,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         dropped.push(large ? `This BrainDog is too large for the included model to read, so ${fell}` : `The model did not answer, so ${fell}`);
       }
     }
+    /* THE ONE QUEUE (ENG-B14): every arrangement drafted, the rules' or the model's, carries its rank and its day, and only
+       as many file as the one count leaves room for, the pen's and Decide's; the rest are held, each saying why. */
+    const queue = queueFiling(r.usage, drafts, (d) => r.asked.has(d.key));
+    drafts = queue.file;
     if (deps.catalogueOffers) {
       try {
         const on = new Map(r.usage.packs.map((p) => [p.id, p.on]));
@@ -2929,7 +2947,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }),
       ];
     const { filed, skipped } = await slashFiling(drafts, r);
-    return { by, filed, skipped, dropped, large };
+    return { by, filed, skipped: [...queue.held, ...skipped], dropped, large };
   };
 
   /**
@@ -4495,6 +4513,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const { next: said, ...rest } = look;
     const as = (k: unknown): unknown => (typeof k === 'string' ? (rekeyed.get(k) ?? k) : k);
     for (const part of ['order', 'hide', 'pinned'] as const) if (Array.isArray(rest[part])) rest[part] = (rest[part] as unknown[]).map(as);
+    /* AND A HELD BLOCK'S WIDTH, COLUMN AND GROUP go out under the key it was sent with, as its place in the order does. */
+    for (const part of ['span', 'area', 'group'] as const)
+      if (rest[part] !== null && typeof rest[part] === 'object' && !Array.isArray(rest[part]))
+        rest[part] = Object.fromEntries(Object.entries(rest[part] as Record<string, unknown>).map(([k, v]) => [as(k) as string, v]));
     if (rest.lead !== undefined) rest.lead = as(rest.lead);
     const asked = said !== null && typeof said === 'object' ? (said as Partial<LookNext>) : null;
     const next = look.by === 'slash' ? held : typeof asked?.row === 'string' && typeof asked.text === 'string' && drawnFor(blocks, asked.row) ? (asked as LookNext) : null;
@@ -4603,7 +4625,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const slashFileDescribed = async (asked: string, page: string | undefined, ctx: CallContext, preview: SlashPreviewer | null): Promise<Result<SlashFiled>> => {
     const r = slashReading(ctx);
-    const waits = deps.slashModel ? presses.held(asked, r.waiting.length, (k) => r.asked.get(k)?.status === 'open') : null;
+    const waits = deps.slashModel ? presses.held(asked, Math.max(r.waiting.length, waitingCount(r.usage)), (k) => r.asked.get(k)?.status === 'open') : null;
     if (waits !== null) return ok({ by: 'rules', filed: [], skipped: [], dropped: [waits], large: false });
     const described = await slashDescribed(asked, page, ctx, preview, r);
     if (!described.ok) return described;
@@ -4667,11 +4689,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   });
 
   /**
+   * WHAT THE PAGE READ CUTS A BLOCK'S ACTIONS TO (PGS-A17): the caller's level on the record as a write checks it, who
+   * they are to it (its owner, a member signed in, an agent on a token, a link), and the verbs that run here. A caller
+   * with no level on the record reads as `read`; the system reads as `read` and is named nobody.
+   */
+  const pageCut = (ctx: CallContext): { level: string; readerIs?: 'owner' | 'member' | 'agent' | 'link'; runs: ReadonlySet<string> } => {
+    const p = ctx.principal;
+    if (p.kind === 'person') return { level: p.level ?? 'read', readerIs: p.level === 'owner' ? 'owner' : 'member', runs: RUNS };
+    if (p.kind === 'token') return { level: p.level ?? 'read', readerIs: 'agent', runs: RUNS };
+    if (p.kind === 'share') return { level: 'read', readerIs: 'link', runs: RUNS };
+    return { level: 'read', runs: RUNS };
+  };
+
+  /**
    * Whether every block of a page, drawn for this caller, is held from her (kernel `whollyWithheld`, the rule the agent
    * door's resources ask), so `pages` does not list a page that would open onto nothing but held blocks.
    */
   const drawnWithheld = (ctx: CallContext, slug: string): boolean => {
-    const read = kernel.page(slug, undefined, { reader: pageReader(ctx) });
+    const read = kernel.page(slug, undefined, { reader: pageReader(ctx), ...pageCut(ctx) });
     return read.ok && whollyWithheld(read.value.blocks as never);
   };
 
@@ -5179,7 +5214,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const exampleTag = (fields: Record<string, unknown>): string[] => {
     const already = Array.isArray(fields.tags) ? (fields.tags as unknown[]).map(String) : [];
-    return already.includes('example') ? already : [...already, 'example'];
+    /* AND A FORMED ROW IS NOT AN EXAMPLE EITHER (USE-B07: no fresh record holds a row tagged example). */
+    return already.includes('example') || already.includes('formed') ? already : [...already, 'example'];
   };
 
   /**
@@ -7186,10 +7222,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * theme a pack brought. With none of those, the first installed theme by id is drawn, which is deterministic rather
    * than whichever row the database happened to return first. Retiring the owner's own look, or uninstalling the pack,
    * drops the row, and the next `boot` answers `null`: the house theme is back.
+   *
+   * AND THE PERSON'S OWN `look.theme` PICKS FIRST (PGS-A21, `theme-pick.ts` `themeFor`): `house` is the house look on
+   * purpose, an installed theme's id is that theme, and anything else falls back to the rule above.
    */
-  const themeInstalled = (): { id: string; body: string; checksum: string } | null => {
-    const themes = kernel.declarations().filter((d) => d.kind === 'theme');
-    return themes.find((d) => d.pack_id === null) ?? themes[0] ?? null;
+  const themeInstalled = (ctx: CallContext): { id: string; body: string; checksum: string } | null => {
+    const p = ctx.principal;
+    const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
+    const pick = person === null ? undefined : (kernel.prefsOf(person) as Prefs)['look.theme'];
+    return themeFor(
+      kernel.declarations().filter((d) => d.kind === 'theme'),
+      typeof pick === 'string' ? pick : undefined,
+    );
   };
 
   /**
@@ -7878,7 +7922,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -8358,7 +8402,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE LOOK IS READ IN THE SAME MOMENT AND DRAWN AFTER IT. The row is read inside the transaction with
          everything else, and solved outside it, because the solve loads `@braindog/theme` on demand and a read
          transaction held open across an `await` is a snapshot another connection's writes wait behind. */
-      const [answer, look] = kernel.transaction(() => {
+      const [answer, look, looks] = kernel.transaction(() => {
         const out: Boot['registers'] = [];
         for (const [id, decl] of kernel.registers()) {
           /* THE FILTER WAS THE CEILING'S, WHICH IS THE WRONG ONE. A register somebody holds `append`
@@ -8371,7 +8415,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
         const shell = shellFor(ctx);
         const waits = waitsFor(ctx);
-        const answered: Omit<Boot, 'theme'> = {
+        const answered: Omit<Boot, 'theme' | 'looks'> = {
           registers: out,
           now: new Date(clock.now()).toISOString(),
           /* THE FIRST SCREEN IN ONE ROUND TRIP (`32 §3`): who is working, and what waits on a person, each
@@ -8393,9 +8437,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ...(build?.host === undefined ? {} : { host: build.host }),
           ...(admin(ctx) === null ? { copies: kernel.copyFacts() } : {}),
         };
-        return [answered, themeInstalled()] as const;
+        return [answered, themeInstalled(ctx), looksOf(kernel.declarations().filter((d) => d.kind === 'theme'))] as const;
       });
-      return ok({ ...answer, theme: look === null ? null : await themeDrawn(look) });
+      return ok({ ...answer, theme: look === null ? null : await themeDrawn(look), looks });
     },
 
     /**
@@ -9199,7 +9243,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE READER GOES DOWN WITH THE ASK, so the kernel lays the look over the blocks as this caller is shown them: held
          as `heldBlock` holds them, with her own read mark on a feed. */
       const reader = pageReader(ctx);
-      let out = kernel.page(args.slug, filter, { ...reach, reader });
+      let out = kernel.page(args.slug, filter, { ...reach, reader, ...pageCut(ctx) });
       /* A FILTER IS HELD BY THE LISTS IT WAS COUNTED FROM, as a block is by the list it reads. The kernel counts every
          list the page's blocks read and names each link by its row's title, so a member invited to Tasks alone was handed
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
@@ -9209,7 +9253,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
         const kept = { ...filter };
         for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];
-        out = kernel.page(args.slug, kept, { ...reach, reader });
+        out = kernel.page(args.slug, kept, { ...reach, reader, ...pageCut(ctx) });
       }
       /* AND THE OBSERVATION IS AFTER THE ANSWER, not before it. It ran first, on the caller's raw
          slug, so `GET /api/page?slug=<anything>` inserted a row keyed by whatever a reader typed and
@@ -9929,6 +9973,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (typeof value !== 'string' || !allowed.includes(value))
           return no('VALUE_MALFORMED', `${key} is ${allowed.join(', ')}, or null to take it away.`, { at: 'value', allowed: [...allowed] });
         kept = value;
+      } else if (value !== null && key === 'look.theme') {
+        const fault = lookThemeFault(
+          value,
+          kernel
+            .declarations()
+            .filter((d) => d.kind === 'theme')
+            .map((d) => d.id),
+        );
+        if (fault) return no(fault.code, fault.fix, { ...(fault.at === undefined ? {} : { at: fault.at }), ...(fault.allowed ? { allowed: [...fault.allowed] } : {}) });
+        kept = value as string;
       } else if (value !== null && key === 'packs.known_keys') {
         const entries = typeof value === 'object' && !Array.isArray(value) ? Object.entries(value as Record<string, unknown>) : null;
         if (!entries || entries.length > 200 || !entries.every(([k, v]) => k.length > 0 && k.length <= 300 && texts(v, 8, (s) => /^[0-9a-f]{16}$/u.test(s))))
@@ -10685,13 +10739,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * reaches here and the install is already one transaction: filing a proposal would half-install a pack whose rules
      * run actions it does not have yet. An agent's way to an action is `propose`, whose acceptance is this same approval.
      */
-    async installPack(args: { doc: unknown; source?: PackSource; planHash: string; approve?: readonly string[] }, ctx: CallContext) {
+    async installPack(args: { doc: unknown; source?: PackSource; planHash: string; approve?: readonly string[]; retireWithRows?: boolean }, ctx: CallContext) {
       const stop = admin(ctx, undefined, 'installPack');
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.planHash) return no('REQUIRED_MISSING', 'Read the plan first; installing is approving one.', { at: 'planHash' });
       const approve: unknown = args.approve;
       if (approve !== undefined && (!Array.isArray(approve) || approve.some((l) => typeof l !== 'string')))
         return no('VALUE_MALFORMED', 'approve is the list of lines the plan calls out, as it printed them.', { at: 'approve' });
+      if (args.retireWithRows !== undefined && typeof args.retireWithRows !== 'boolean')
+        return no('VALUE_MALFORMED', 'retireWithRows is true when the plan that takes a list away, keeping its items, was pressed.', { at: 'retireWithRows' });
 
       const pack = await normaliseChecked(args.doc, args.source ?? { kind: 'local' });
       if (!pack.ok) return pack;
@@ -10701,7 +10757,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          caller that updates a use case does it (`arrange.ts` `carryUpdate`). */
       const from = state.packs.find((p) => p.id === pack.value.manifest.pack)?.version ?? null;
       const spoke = speakingNow(kernel);
-      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), args.planHash, (approve ?? []) as string[]);
+      const put = await installHeld(kernel, pack.value, diff, packHost(ctx), args.planHash, (approve ?? []) as string[], undefined, args.retireWithRows === true ? { retireWithRows: true } : {});
       if (put.ok) await carryUpdate(deps.catalogue ?? [], kernel, pack.value.manifest.pack, from, actorOf(ctx));
       /* AND WHAT A PAGE THIS UPDATE KEPT GOES WITHOUT IS ASKED ABOUT (`keptAsk`), as the night's update asks it. */
       if (put.ok)
@@ -11783,7 +11839,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      *
      * NOTHING RUNS AFTER THE HOST'S PART, not even the alarm's tail, because there is no record left to arm it on.
      */
-    async deleteRecord(args: { slug: string }, ctx: CallContext): Promise<Result<{ slug: string; deleted: true }>> {
+    async deleteRecord(args: { slug: string }, ctx: CallContext): Promise<Result<{ slug: string; deleted: true; kept?: string; removed?: number }>> {
       const stop = admin(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!destroy) return { ok: false as const, refusal: NO_DELETE };
@@ -11796,8 +11852,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const slug = kernel.identity()?.slug ?? '';
       if (!slug || args.slug.trim() !== slug)
         return no('VALUE_MALFORMED', `Type ${slug || 'the name of this record'} exactly to delete it. Nothing was deleted.`, { at: 'slug' });
-      await destroy();
-      return ok({ slug, deleted: true as const });
+      const answer = await destroy();
+      return ok({ slug, deleted: true as const, ...(answer ?? {}) });
     },
     /* ── VAULT ────────────────────────────────────────────────── */
 

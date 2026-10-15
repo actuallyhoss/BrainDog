@@ -506,7 +506,8 @@ test('from-packs --check writes nothing, exits 1 naming an unpublished change, a
 
   const unpublished = run(packs, to, '--check');
   assert.equal(unpublished.code, 1, unpublished.said);
-  assert.match(unpublished.said, /a run would write packs\/shelf\/1\.0\.0\.pack\.json, index\.json/u);
+  /* THE BUILT-IN USE CASES ARE PUBLISHED BESIDE EVERY PACK (`from-packs.mjs`), so a fresh catalogue gets them too. */
+  assert.match(unpublished.said, /a run would write packs\/shelf\/1\.0\.0\.pack\.json, (?:usecases\/[a-z-]+\/[\d.]+\.usecase\.json, )*index\.json/u);
   assert.equal(existsSync(to), false, '--check wrote into the catalogue');
 
   assert.equal(run(packs, to).code, 0);

@@ -77,12 +77,12 @@ test('index, unique, required, required_when, default and immutable beside deriv
   assert.equal(fix(f('total', 'int', { sum: ['quantity', 'spare'] }, { index: false })), null, 'index: false asks nothing');
 });
 
-test('a source that does not exist, is retired, is derived, or is the field itself', () => {
+test('a source that does not exist, is retired, or is the field itself; one that is derived is read in order', () => {
   assert.match(fix(f('total', 'int', { sum: ['quantity', 'ghost'] }))!.fix, /total reads ghost, and this list has no field called ghost\./);
   assert.match(fix(f('total', 'int', { sum: ['quantity', 'gone'] }))!.fix, /no field called gone/);
-  assert.match(fix(f('total', 'int', { sum: ['quantity', 'worked'] }))!.fix, /total reads worked, which is itself worked out/);
+  assert.equal(fix(f('total', 'int', { sum: ['quantity', 'worked'] })), null);
   assert.match(fix(f('total', 'int', { sum: ['quantity', 'total'] }))!.fix, /worked out from itself/);
-  assert.match(fix(f('size', 'text', { band: { of: 'worked', steps: [{ upto: 1, is: 'a' }] } }))!.fix, /itself worked out/);
+  assert.equal(fix(f('size', 'text', { band: { of: 'worked', steps: [{ upto: 1, is: 'a' }] } })), null);
 });
 
 test('the shape body: arity, band steps, via and normalise', () => {

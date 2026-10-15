@@ -143,8 +143,9 @@ test('A PAGE DECLARES READER FILTERS AS { field, control }, and a filter nothing
   assert.equal(rank?.code, 'DECLARATION_INVALID');
   assert.match(rank?.fix ?? '', /rank, which is int/);
 
-  /* `header` IS STILL PUBLISHED AND DRAWN BY NOTHING, so it waits for a build rather than being refused as made up. */
-  assert.equal(validateDeclaration({ ...WORK, body: { ...(WORK.body as object), header: {} } as never })?.code, 'NOT_IN_THIS_BUILD');
+  /* `header` IS DRAWN NOW, so a head is checked by what it says and not refused as unbuilt. */
+  assert.equal(validateDeclaration({ ...WORK, body: { ...(WORK.body as object), header: { kicker: 'Work' } } as never }), null);
+  assert.equal(validateDeclaration({ ...WORK, body: { ...(WORK.body as object), header: { banner: 'x' } } as never })?.code, 'DECLARATION_INVALID');
 });
 
 test('THE ANSWER SAYS WHAT EACH FILTER CAN TAKE, counting open rows only, named in the person’s own words', async () => {

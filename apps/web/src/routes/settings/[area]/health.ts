@@ -37,6 +37,8 @@ export type Engine = {
     lastWords?: string | null | undefined;
     doubleShare?: number | undefined;
     doubleOf?: { twice: number; asks: number } | undefined;
+    /** How many times the walk passed over a model that kept failing and asked the next one. */
+    passedOver?: number | undefined;
   };
   said: { text: string; whose: 'ours' | 'yours' | null };
 };
@@ -268,5 +270,6 @@ export function engineLines(engine: Engine | null | undefined, now: number): str
   const twice = h.doubleOf;
   if ((h.doubleShare ?? 0) > 0 && twice && twice.twice > 0 && twice.asks > 0)
     lines.push(`Needed a second model for ${twice.twice} of ${twice.asks} ${twice.asks === 1 ? 'ask' : 'asks'}.`);
+  if ((h.passedOver ?? 0) > 0) lines.push(`Skipped a failing model ${h.passedOver} ${h.passedOver === 1 ? 'time' : 'times'} and asked the next one.`);
   return lines;
 }

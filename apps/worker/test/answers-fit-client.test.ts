@@ -219,6 +219,7 @@ const BOOT = {
   pen: optional(list('any')),
   whatsNew: optional(keys({ events: list(keys({ id: 'string' })), upTo: or(map('any'), 'string', 'number', 'null'), sinceCapped: 'boolean' })),
   theme: optional(or(keys({ light: map('string'), dark: map('string') }), 'null')),
+  looks: optional(list(keys({ id: 'string', name: 'string', from: is('own', 'pack'), pack: optional('string') }))),
   shape: optional('number'),
   waits: optional(keys({ questions: 'number', late: 'number', hard: 'number', inbox: or('number', 'null'), working: 'number' })),
   lateDays: optional('number'),

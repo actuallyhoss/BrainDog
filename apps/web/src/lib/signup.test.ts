@@ -9,7 +9,35 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrivalOf, keepKey, keepLeft, keepSaid, pressKept, SAID_KEY, SAID_LINK_BYTES, SAID_LINK_MOST, saidForLink, saidFromLink, saidKept, startSignup, type Draft, type Io } from './signup.ts';
+import {
+  answeredAs,
+  arrivalOf,
+  askOf,
+  keepKey,
+  keepLeft,
+  keepReadsOff,
+  keepSaid,
+  pressKept,
+  readerFor,
+  readingKept,
+  readingOf,
+  READS_OFF,
+  readsOffKept,
+  SAID_KEY,
+  SAID_LINK_BYTES,
+  SAID_LINK_MOST,
+  saidForLink,
+  saidFromLink,
+  saidKept,
+  startSignup,
+  type Draft,
+  type Io,
+  type ReadDoor,
+} from './signup.ts';
+import type { FirstAsked, SetupReply } from './start/ask.ts';
+import { proposeFirst, type Proposal } from './start/propose.ts';
+import { accepting } from '../routes/signup/build.ts';
+import { browserCurrencyEnv } from '../routes/start/building.ts';
 
 const MARIAM = "I'm Mariam. I run a small candle shop in Alexandria and freelance as a designer.";
 const TOKEN = 'v'.repeat(20) + '_-' + 'K'.repeat(21);
@@ -287,4 +315,155 @@ test('THE KEY NEVER RIDES IN THE LINK: it is this device\'s handle on its own pr
   assert.deepEqual(JSON.parse(packed ?? '{}'), { said: MARIAM, currency: 'EGP' });
   const back = saidFromLink(JSON.stringify({ said: MARIAM, key: 'first-run-other' }));
   assert.equal(back !== null && 'key' in back, false, 'and one a link carries is not taken');
+});
+
+/* ── USE-B05: the reading, asked on a press and kept beside the sentence ─────────────────────────────────────── */
+
+const NOOR = "I'm Noor. I run a small pottery shop and sell mugs.";
+const WHERE = { zone: 'Africa/Cairo', locale: 'en-GB' };
+
+/** What a reading door answers for Noor's words, as a model would: the shop, her name, and one question back. */
+const NOOR_READ = {
+  name: 'Noor',
+  summary: 'A small pottery shop.',
+  usecase: 'shop',
+  also: [],
+  modules: [],
+  currency: null,
+  heard: [{ phrase: 'pottery shop', became: 'Shop' }],
+  names: [],
+  rows: [],
+  draft: null,
+  by: 'included',
+  ask: { about: 'things', question: 'What do you sell most?', choices: ['Mugs', 'Bowls'] },
+} satisfies SetupReply & { ask: unknown };
+
+/** A door that counts what it was sent, answering 501 (off) or Noor's reading (on). */
+function readDoor(on: boolean): { door: ReadDoor; sent: FirstAsked[] } {
+  const sent: FirstAsked[] = [];
+  const door: ReadDoor = async (ask) => {
+    sent.push(ask);
+    return on ? { ok: true, value: NOOR_READ } : { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'This host has no reading door.' } };
+  };
+  return { door, sent };
+}
+
+/** A widget that hands a new answer each time it is asked, and counts how often. */
+function widget() {
+  let n = 0;
+  return { human: async () => `answer-${++n}`, asked: () => n };
+}
+
+test('A READING IS ASKED ONLY FOR A PRESS: a key or a pause sends nothing, and the rules read', async () => {
+  const on = readDoor(true);
+  const w = widget();
+  for (const cause of ['key', 'pause'] as const) {
+    const reader = readerFor(cause, on.door, { ...WHERE, human: w.human });
+    assert.equal(reader, null, `${cause} has a reader`);
+    const p = await proposeFirst(NOOR, WHERE, reader);
+    assert.ok(p.by === undefined || p.by === 'rules', `${cause} was read by ${p.by}`);
+  }
+  assert.equal(on.sent.length, 0, 'the door was asked without a press');
+  assert.equal(w.asked(), 0, 'a bot-check answer was spent without a press');
+  assert.equal(readerFor('press', null, { ...WHERE, human: w.human }), null, 'no door, no reader');
+});
+
+test('A PRESS WITH THE DOOR OFF: the host answers 501 once, the rules reading stands, and the tab remembers', async () => {
+  const off = readDoor(false);
+  const w = widget();
+  const codes: string[] = [];
+  const reader = readerFor('press', off.door, { ...WHERE, human: w.human, heard: (out) => void (!out.ok && codes.push(out.refusal.code)) });
+  const p = await proposeFirst(NOOR, WHERE, reader);
+  assert.equal(off.sent.length, 1);
+  assert.equal(off.sent[0]?.said, NOOR);
+  assert.equal(off.sent[0]?.turnstile, 'answer-1', 'a fresh bot-check answer goes with the read');
+  assert.ok(p.by === undefined || p.by === 'rules');
+  assert.equal(p.fell, READS_OFF, 'the rules read it, and the build says why');
+  assert.deepEqual(codes, [READS_OFF]);
+  const tab = storage();
+  assert.equal(readsOffKept(tab), false);
+  keepReadsOff(tab);
+  assert.equal(readsOffKept(tab), true, 'the line about a model is not said again this session');
+  const blocked = { getItem: () => { throw new Error('off'); }, setItem: () => { throw new Error('off'); } };
+  assert.doesNotThrow(() => keepReadsOff(blocked));
+  assert.equal(readsOffKept(blocked), false);
+});
+
+test('NO BOT-CHECK ANSWER, NO READ: the door is never asked, and the rules read', async () => {
+  const on = readDoor(true);
+  const p = await proposeFirst(NOOR, WHERE, readerFor('press', on.door, { ...WHERE, human: async () => null }));
+  assert.equal(on.sent.length, 0);
+  assert.equal(p.fell, 'FORBIDDEN');
+});
+
+test('A PRESS WITH THE DOOR ON CARRIES THE READING THROUGH THE KEPT SENTENCE, and the build never reads again', async () => {
+  const on = readDoor(true);
+  const w = widget();
+  let ask: unknown = null;
+  const reader = readerFor('press', on.door, { ...WHERE, human: w.human, heard: (out) => void (ask = out.ok ? askOf(out.value) : null) });
+  const p = await proposeFirst(NOOR, WHERE, reader);
+  assert.equal(p.by, 'included');
+  assert.equal(p.usecase, 'shop');
+  assert.equal(p.name, 'Noor');
+  assert.deepEqual(ask, { about: 'things', question: 'What do you sell most?', choices: ['Mugs', 'Bowls'] });
+  /* A SECOND PRESS IS A SECOND ANSWER: one is good once. */
+  await proposeFirst(NOOR, WHERE, reader);
+  assert.deepEqual(on.sent.map((s) => s.turnstile), ['answer-1', 'answer-2']);
+
+  const desk = storage();
+  keepSaid(desk, { said: NOOR, currency: null, usecase: null, reading: p }, 1000);
+  const kept = saidKept(desk, 2000, null);
+  assert.deepEqual(kept?.reading, JSON.parse(JSON.stringify(p)), 'the whole reading is kept beside the sentence');
+  const never = async (): Promise<Proposal> => assert.fail('the build read the words again');
+  const env = { device: browserCurrencyEnv('en-GB', ['en-GB'], 'Africa/Cairo'), today: '2026-10-15', email: null, nav: [], locale: 'en-GB' };
+  const built = await accepting(kept!, null, readingKept(kept, never), env);
+  assert.equal(built?.usecase, 'shop', 'the build is the reading the person kept');
+  assert.equal(built?.proposal.by, 'included');
+  /* OTHER WORDS ARE READ AGAIN: a reading stands only for the sentence it read. */
+  let read = 0;
+  await readingKept(kept, async (s) => (read++, proposeFirst(s, WHERE, null)))('I am somebody else');
+  assert.equal(read, 1);
+});
+
+test('AN OLD KEPT SENTENCE WITH NO READING STILL READS, and a broken reading is dropped and not the sentence', async () => {
+  const desk = storage();
+  desk.setItem(SAID_KEY, JSON.stringify({ said: NOOR, currency: 'EGP', usecase: null, at: 1000 }));
+  const old = saidKept(desk, 2000, null);
+  assert.equal(old?.said, NOOR);
+  assert.equal(old !== null && 'reading' in old, false);
+  let read = 0;
+  await readingKept(old, async (s) => (read++, proposeFirst(s, WHERE, null)))(NOOR);
+  assert.equal(read, 1, 'the rules read it, as they always did');
+  desk.setItem(SAID_KEY, JSON.stringify({ said: NOOR, currency: null, usecase: null, reading: { name: 5, heard: 'no' }, at: 1000 }));
+  const broken = saidKept(desk, 2000, null);
+  assert.equal(broken?.said, NOOR);
+  assert.equal(broken !== null && 'reading' in broken, false);
+  assert.equal(readingOf({ name: null, usecase: null, also: [], modules: [], currency: null, title: null, rows: [], heard: [{ phrase: 'x', became: 'y', at: [3, 1] }], places: [] }), null, 'a span that runs backwards');
+});
+
+test('THE READING RIDES IN THE LINK ONLY WHOLE, and the tab the link opens is handed it back', async () => {
+  const p = await proposeFirst(NOOR, WHERE, readerFor('press', readDoor(true).door, { ...WHERE, human: widget().human }));
+  const packed = saidForLink({ said: NOOR, currency: null, usecase: null, reading: p });
+  assert.ok(packed !== null && packed.length <= SAID_LINK_MOST);
+  const arrived = arrivalOf(mailed(packed), () => {});
+  assert.equal(arrived?.kind, 'verify');
+  assert.deepEqual(arrived?.kind === 'verify' ? arrived.said?.reading : null, JSON.parse(JSON.stringify(p)));
+  /* A LONG SENTENCE IS CUT, AND A CUT ONE CARRIES NO READING of the words it lost. */
+  const long = `${NOOR} ${Array.from({ length: 300 }, (_, i) => `mug${i}`).join(' ')}`;
+  const cut = saidFromLink(saidForLink({ said: long, currency: null, usecase: null, reading: p }));
+  assert.equal(cut?.cut, true);
+  assert.equal(cut !== null && 'reading' in cut, false);
+  assert.equal(saidFromLink(JSON.stringify({ said: NOOR, cut: true, reading: p }))?.reading, undefined);
+});
+
+test('THE ONE QUESTION BACK IS HELD TO ONE LINE AND FOUR CHOICES, and answered as the rules would where it asks what they do', () => {
+  assert.equal(askOf({ ask: null }), null);
+  assert.equal(askOf({}), null);
+  assert.equal(askOf({ ask: { about: 'age', question: 'How old are you?', choices: [] } }), null, 'not one of the five');
+  assert.equal(askOf({ ask: { about: 'kind', question: 'x'.repeat(121), choices: [] } }), null, 'never a cut question');
+  assert.equal(askOf({ ask: { about: 'kind', question: 'What kind?', choices: ['a', 'b', 'c', 'd', 'e'] } }), null);
+  assert.deepEqual(askOf({ ask: { about: 'name', question: ' What should I call you? ', choices: [] } }), { about: 'name', question: 'What should I call you?', choices: [] });
+  assert.equal(answeredAs({ about: 'currency', question: 'Which currency?', choices: [] }, 'currency'), 'currency');
+  assert.equal(answeredAs({ about: 'name', question: 'Your name?', choices: [] }, 'currency'), null, 'the rules ask another, so it is told more');
+  assert.equal(answeredAs({ about: 'things', question: 'What do you sell?', choices: [] }, null), null);
 });

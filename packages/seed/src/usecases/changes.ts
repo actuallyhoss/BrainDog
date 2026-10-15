@@ -20,6 +20,7 @@ const NAMED = (list: string): string =>
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.5.0', notes: 'A new Home has something to press. Until an account counts as cash, Bring your money in links to adding one, forwarding a bank message and add-ons for your bank. Until you keep a savings goal or have a project on the go, a line names the first one. Each goes once you have it.' },
     { version: '2.4.0', notes: 'The count of the budgets you have set is kept by Money now, so Home and Money read the same one. Nothing you see on Home changes.' },
     { version: '2.3.1', notes: NAMED('Ledger') },
   ],

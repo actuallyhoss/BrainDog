@@ -118,7 +118,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   assert.deepEqual(
     headings,
     [
-      undefined, undefined, undefined, 'What needs doing?', 'Late', 'At a glance', 'This week', 'With an agent', 'Waiting on you',
+      undefined, undefined, undefined, 'What needs doing?', 'Late', 'Questions for you', 'At a glance', 'This week', 'With an agent', 'Waiting on you',
       'Not this week', 'After this week', 'No due day', 'Later',
       'Done lately', 'Done recently',
     ],
@@ -416,11 +416,11 @@ test('NO BAND OF WORK IS DRAWN EMPTY, and the line’s late is the Late band’s
        empty. */
     const late = block(page, 'Late');
     /* FOUND BY WHAT IT SAYS, since work 1.14.0 put the line for nothing open first. */
-    const lead = page.blocks.find((b) => b.kind === 'note' && /^\{\{tasks-late-yours\}\} late/u.test(String((b as { body?: string }).body))) as
+    const lead = page.blocks.find((b) => b.kind === 'note' && /\{\{tasks-late-yours\}\} late/u.test(String((b as { body?: string }).body))) as
       | { body?: string; drawn?: boolean; values?: Record<string, unknown> }
       | undefined;
     assert.ok(lead, 'Work has no line counting what is late');
-    assert.equal(lead.body, '{{tasks-late-yours}} late, {{tasks-waiting}} waiting on you');
+    assert.equal(lead.body, '{{questions-open-in:tasks}} question(s) for you, {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you');
     const count = late.matched ?? late.rows.length;
     assert.equal(lead.drawn !== false, count > 0);
     if (count > 0) assert.equal(lead.values?.['tasks-late-yours'], count);

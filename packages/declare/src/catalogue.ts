@@ -181,6 +181,13 @@ export type CatalogueEntry = {
   publisher?: Publisher;
   /** Its latest file says `unlisted: true`: installable by id and updated as any other, and left out of every listing. */
   unlisted?: true;
+  /**
+   * A use case's: the words its latest file says it is heard in, as the first run listens for them, and the modules it
+   * stands on (USE-A16). Left out by an add-on, by a use case whose file says none, and by an index written before
+   * either key existed, which reads as it always did.
+   */
+  signals?: string[];
+  modules?: string[];
 };
 
 /**
@@ -550,9 +557,16 @@ const versionRead = (v: Record<string, unknown>): CatalogueVersion => {
   };
 };
 
-/** An entry's marketplace fields kept only in their shapes: categories this version names, a publisher with its three parts, `unlisted` only as `true`. */
+/** A list of words kept only as one: every item a string, or the key left out. */
+const wordsRead = (x: unknown): string[] | null => (Array.isArray(x) && x.every((w) => typeof w === 'string') ? [...x] : null);
+
+/**
+ * An entry's marketplace fields kept only in their shapes: categories this version names, a publisher with its three
+ * parts, `unlisted` only as `true`, and a use case's `signals` and `modules` only as lists of words, so a number there
+ * from a hand-edited index is dropped rather than heard.
+ */
 const entryRead = (e: Record<string, unknown>, versions: CatalogueVersion[]): CatalogueEntry => {
-  const { categories, publisher, unlisted, ...rest } = e;
+  const { categories, publisher, unlisted, signals, modules, ...rest } = e;
   const named = Array.isArray(categories) ? CATEGORIES.filter((c) => categories.includes(c)) : null;
   const who: Publisher | null =
     isMap(publisher) && (publisher.kind === 'braindog' || publisher.kind === 'key' || publisher.kind === 'person') && typeof publisher.id === 'string' && typeof publisher.name === 'string'
@@ -565,6 +579,8 @@ const entryRead = (e: Record<string, unknown>, versions: CatalogueVersion[]): Ca
     ...(named ? { categories: named } : {}),
     ...(who ? { publisher: who } : {}),
     ...(unlisted === true ? { unlisted: true as const } : {}),
+    ...(e.kind === 'usecase' && wordsRead(signals) ? { signals: wordsRead(signals) as string[] } : {}),
+    ...(e.kind === 'usecase' && wordsRead(modules) ? { modules: wordsRead(modules) as string[] } : {}),
   };
 };
 
@@ -819,6 +835,10 @@ export async function publishTo(
     categories: categoriesOf(file, by?.kind === 'braindog' ? BRAINDOG_PUBLISHER.name : ''),
     ...(by ? { publisher: by } : {}),
     ...(flag === true ? { unlisted: true as const } : {}),
+    /* WHAT THE FIRST RUN HEARS A USE CASE IN, from its own file: the words and the modules it stands on, so a stranger's
+       sentence can point at it without a list in code naming it. Said only when the file says some. */
+    ...(file.kind === 'usecase' && file.shared.usecase.signals.length > 0 ? { signals: [...file.shared.usecase.signals] } : {}),
+    ...(file.kind === 'usecase' && file.shared.usecase.modules.length > 0 ? { modules: [...file.shared.usecase.modules] } : {}),
   };
   const entries = [...index.entries.filter((e) => !(e.id === s.id && e.kind === kind)), entry].sort((a, b) => a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
   return ok({ index: { ...index, entries }, path: catalogueFile(s.id, s.version, kind), entry, version, changes });

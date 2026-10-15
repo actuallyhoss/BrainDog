@@ -13,6 +13,14 @@ import assert from 'node:assert/strict';
 import { validateDeclaration } from '@braindog/kernel';
 
 import { ARGS, blankStep, draftOf, faultsOf, learnScripts, sayStep, type Arg } from './flow.ts';
+import { holdGrammar } from './grammar.ts';
+
+/* THE RECORD'S GRAMMAR, HELD AS THE EDITOR HOLDS IT once `flowGrammar` answers: a script step and its two arguments. */
+holdGrammar({
+  triggers: [{ id: 'manual', args: [] }],
+  steps: [{ verb: 'script', group: 'flow', row: false, once: false, args: [{ name: 'id', type: 'text', required: true, from: 'script' }, { name: 'as', type: 'name', required: false }] }],
+  ceilings: { steps: 50, depth: 3, runsPerDay: 1000, vars: 64 },
+});
 
 const scriptAs = (): Arg | undefined => ARGS.script.find((a) => a.path.join('.') === 'script.as');
 

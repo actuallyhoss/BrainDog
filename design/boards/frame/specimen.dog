@@ -22,12 +22,12 @@ blocks:
     heading: Working now
     span: 3
     cells: [runs-working]
-    icon: agent
+    icon: bot
   - kind: stat
     heading: Vital signs
     span: 3
     cells: [signs-red]
-    icon: pulse
+    icon: heart-pulse
   - kind: stat
     heading: What you have
     span: 8

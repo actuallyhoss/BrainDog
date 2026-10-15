@@ -117,6 +117,7 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | --- | --- | --- |
 | `hello` | A list of things to do and a page of what is still open. | The smallest add-on, exactly as `braindog pack new` starts one, with its `.test.json`. |
 | `reading-list` | Books, articles and papers to read, what is being read now, and a line on each one finished. | A list with a state, and a page with one table for each state. |
+| `harbour-look` | A sea blue-green in place of the house red, on a cooler grey, in light and in dark. | A pack that is only a theme: one `theme` declaration and nothing else. |
 | `roadmap` | Your dated tasks on one time axis, each dragged to a new date. | A page over another add-on's list, named in `requires`. |
 | `project-brief` | On each project, one line on what it is, the plan, and what is in the way. | `extends`: optional fields laid on another add-on's list, and a block added to its page. |
 | `pad` | Notes beside the work, with a second opinion from Slash under each one. | An automation that asks Slash and writes the answer back, with no code. |

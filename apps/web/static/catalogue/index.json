@@ -609,6 +609,44 @@
     },
     {
       "kind": "pack",
+      "id": "harbour-look",
+      "title": "Harbour look",
+      "summary": "A sea blue-green in place of the house red, on a cooler grey, in light and in dark.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "f8d80cbfcd6ec05b2eca12d1c7710b407656ad8be4818af3ece87fba61359fb1",
+          "bytes": 525,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version: one look, built from a sea blue-green and a cool grey."
+        }
+      ],
+      "categories": [
+        "themes",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "hello",
       "title": "Hello",
       "summary": "A list of things to do and a page showing what is still open: the smallest useful add-on, in the shape braindog pack new starts every one.",
@@ -867,8 +905,38 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "2.2.0",
+      "latest": "3.0.0",
       "versions": [
+        {
+          "version": "3.0.0",
+          "checksum": "59b6ae4f1fb74b27ada577162eb2148979392c07924e92afbc32e42c7eae916b",
+          "bytes": 22144,
+          "published_at": "2026-10-15T11:59:23.539Z",
+          "bump": "minor",
+          "reach": {
+            "modules": [
+              "pad"
+            ],
+            "lists": [
+              "Parts",
+              "Steps",
+              "Helpers",
+              "Budget lines",
+              "Price check",
+              "Lessons"
+            ],
+            "pages": [
+              "Desk",
+              "{{name}}",
+              "Numbers"
+            ],
+            "rules": [],
+            "examples": 1,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The price check works its sums out itself: costs together, the least price that holds (that times Times cost, 2.5 at first and yours to change) and the room, the price less that least price, all drawn beside what you type. The rule and script that added them up are gone, so the add-on carries no code. The line saying whether the price passes and the tiles of costs and share are gone too: a room below nought is too thin."
+        },
         {
           "version": "2.2.0",
           "checksum": "9d54a6e6e753f10794d26b8caa582a67e9b6385c325491c8cd9efb3ad45ccac0",
@@ -1060,7 +1128,6 @@
       ],
       "categories": [
         "modules",
-        "automations",
         "made-by-braindog"
       ],
       "publisher": {
@@ -2593,6 +2660,804 @@
         "id": "braindog",
         "name": "BrainDog"
       }
+    },
+    {
+      "kind": "usecase",
+      "id": "business",
+      "title": "Small business",
+      "summary": "Money in and out, the hosting and subscriptions you run on, the people involved and the work.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "individual",
+      "latest": "1.7.1",
+      "versions": [
+        {
+          "version": "1.7.1",
+          "checksum": "44ccbd018fd4fa58e537cf05c47514f39f21427cf6dd7f62dc3fbafd98b845e9",
+          "bytes": 4542,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "business",
+        "small business",
+        "my business",
+        "studio",
+        "agency",
+        "freelance",
+        "freelancer",
+        "freelancing",
+        "consultancy",
+        "consulting",
+        "clients",
+        "client",
+        "customers",
+        "invoice",
+        "invoices",
+        "invoicing",
+        "domains",
+        "hosting",
+        "subscriptions",
+        "contractors",
+        "accountant",
+        "vat",
+        "bookkeeping",
+        "retainer",
+        "foundry"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "founder",
+      "title": "Solo founder",
+      "summary": "The organisations you run, the money across them, and the numbers your projects report.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "founder",
+      "latest": "2.6.0",
+      "versions": [
+        {
+          "version": "2.6.0",
+          "checksum": "33596a76ce724d22e0224a0abc6cd0b768a11938b2a611a4e2b93737f837b2d1",
+          "bytes": 42466,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [
+              "Numbers"
+            ],
+            "pages": [
+              "Today",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "founder",
+        "founders",
+        "co-founder",
+        "cofounder",
+        "startup",
+        "startups",
+        "saas",
+        "indie hacker",
+        "bootstrapped",
+        "my companies",
+        "companies",
+        "organisations",
+        "organizations",
+        "several businesses",
+        "side projects",
+        "dashboard",
+        "dashboards",
+        "analytics",
+        "metrics",
+        "kpis",
+        "datapoints",
+        "mrr",
+        "arr",
+        "revenue",
+        "users",
+        "signups",
+        "churn",
+        "runway",
+        "balances",
+        "my apps",
+        "my products",
+        "launch",
+        "launched",
+        "shipping"
+      ],
+      "modules": [
+        "portfolio",
+        "people",
+        "money-core",
+        "estate",
+        "work"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "guide",
+      "title": "New project guide",
+      "summary": "The milestones of your project, the next step to take, the choices to make and what helps along the way.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "starter",
+      "latest": "1.6.1",
+      "versions": [
+        {
+          "version": "1.6.1",
+          "checksum": "3fddd83a8d940877f5e716edd0d323218b8fd46c2e0456dd5b68b8890549e9f1",
+          "bytes": 37797,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Milestones",
+              "Choices",
+              "Resources",
+              "Steps"
+            ],
+            "pages": [
+              "Your project",
+              "Guide",
+              "{{what}}"
+            ],
+            "rules": [
+              "Mark a milestone passed on the path once it is reached",
+              "Take a milestone off the path as passed when it is moved back"
+            ],
+            "examples": 0,
+            "skills": [
+              "project-coach",
+              "step-taker",
+              "choice-recorder"
+            ],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "new project",
+        "a new project",
+        "start a",
+        "starting a",
+        "start something",
+        "starting something",
+        "something new",
+        "get started",
+        "getting started",
+        "where to begin",
+        "where to start",
+        "don't know where",
+        "from scratch",
+        "first time",
+        "beginner",
+        "guide",
+        "step by step",
+        "checklist",
+        "milestones",
+        "an idea",
+        "my idea",
+        "podcast",
+        "youtube channel",
+        "newsletter",
+        "blog",
+        "book",
+        "novel",
+        "album",
+        "band",
+        "charity",
+        "event",
+        "community",
+        "course of my own",
+        "passion project"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "landlord",
+      "title": "Landlord",
+      "summary": "The flats and houses you rent out, who rents each one, the rent that came in and the repairs waiting.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "individual",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "491cba2cf8d72d1cf56dd34cb53c5e2757d25098f3ff5ffb08b83d92f6eace84",
+          "bytes": 3241,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people",
+              "landlord"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "landlord",
+        "flats",
+        "flat",
+        "tenants",
+        "tenant",
+        "rent",
+        "rent out",
+        "renting",
+        "rental",
+        "rentals",
+        "lettings",
+        "letting",
+        "property",
+        "properties",
+        "repairs",
+        "repair",
+        "deposit",
+        "tenancy",
+        "tenancies",
+        "lease"
+      ],
+      "modules": [
+        "people",
+        "landlord"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "personal",
+      "title": "Personal",
+      "summary": "Your money and bills, what you are saving for, and the projects and goals you care about.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "individual",
+      "latest": "2.5.0",
+      "versions": [
+        {
+          "version": "2.5.0",
+          "checksum": "3b2264260e09a04b2a248cef7b28eef37583dffa9ba2772b0ba4319fb1d03034",
+          "bytes": 32033,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Log",
+              "Put by",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "personal",
+        "my life",
+        "life admin",
+        "my money",
+        "money",
+        "personal finance",
+        "finances",
+        "budget",
+        "budgets",
+        "budgeting",
+        "spending",
+        "savings",
+        "saving up",
+        "save up",
+        "savings goal",
+        "bills",
+        "rent",
+        "payday",
+        "pay day",
+        "debt",
+        "household",
+        "groceries",
+        "under control",
+        "side project",
+        "side projects",
+        "passion project",
+        "passion projects",
+        "hobby",
+        "hobbies",
+        "habit",
+        "habits",
+        "goals",
+        "my goals",
+        "running",
+        "gym",
+        "fitness",
+        "marathon",
+        "training for",
+        "diet",
+        "reading more",
+        "family"
+      ],
+      "modules": [
+        "portfolio",
+        "people",
+        "money-core"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "photographer",
+      "title": "Photographer",
+      "summary": "Your shoots from the first enquiry to the fee paid, the galleries each client is still owed, and your gear.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "individual",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "d546ec962efee041d13ed679cb0e83c15f58c8dcec90112dd08e32a051d0925e",
+          "bytes": 3304,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people",
+              "photographer"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "photographer",
+        "photography",
+        "shoots",
+        "shoot",
+        "photo shoot",
+        "clients",
+        "galleries",
+        "gallery",
+        "bookings",
+        "booking",
+        "weddings",
+        "wedding photographer",
+        "portraits",
+        "headshots",
+        "editing",
+        "deliverables",
+        "camera",
+        "gear",
+        "lenses",
+        "enquiries"
+      ],
+      "modules": [
+        "people",
+        "photographer"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "retainer-hours",
+      "title": "Agency",
+      "summary": "Each client's retainer, the hours worked against it this month, and what to invoice.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "individual",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "2848e9bf9b5bfc5e68eefae426ae2ad7a25d2925fc5b9035b6ca743543037449",
+          "bytes": 3216,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people",
+              "retainer-hours"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "retainer",
+        "retainers",
+        "hours",
+        "billable hours",
+        "timesheets",
+        "timesheet",
+        "clients",
+        "client work",
+        "invoices",
+        "invoice",
+        "hours used",
+        "monthly retainer",
+        "time tracking",
+        "log my time",
+        "billing"
+      ],
+      "modules": [
+        "people",
+        "retainer-hours"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "shop",
+      "title": "Shop",
+      "summary": "The orders you take, who they are for and when they are due, what has been paid, and the things you sell.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "individual",
+      "latest": "1.2.0",
+      "versions": [
+        {
+          "version": "1.2.0",
+          "checksum": "27203ec8b9ebf78f9f0e3f807186180ed60cce4c602d0b5fe3059a4d6f241721",
+          "bytes": 11839,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "people"
+            ],
+            "lists": [
+              "Orders",
+              "Products"
+            ],
+            "pages": [
+              "Orders"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "shop",
+        "store",
+        "sell",
+        "selling",
+        "orders",
+        "products",
+        "stock",
+        "handmade",
+        "market stall",
+        "stall",
+        "my shop",
+        "online shop"
+      ],
+      "modules": [
+        "people"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "student",
+      "title": "Student",
+      "summary": "Your courses, what is due and when, and how each piece of work went.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "individual",
+      "latest": "1.5.1",
+      "versions": [
+        {
+          "version": "1.5.1",
+          "checksum": "da3ad080a69933d7879ea02ed8bcb6b93579ef5ed10e18b7e8e9f600427d49be",
+          "bytes": 15020,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Study sessions"
+            ],
+            "pages": [
+              "Today",
+              "Studies"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "study-planner"
+            ],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "student",
+        "students",
+        "study",
+        "studies",
+        "studying",
+        "homework",
+        "exam",
+        "exams",
+        "revision",
+        "revising",
+        "course",
+        "courses",
+        "coursework",
+        "class",
+        "classes",
+        "lecture",
+        "lectures",
+        "assignment",
+        "assignments",
+        "essay",
+        "essays",
+        "thesis",
+        "dissertation",
+        "degree",
+        "university",
+        "uni",
+        "college",
+        "school",
+        "semester",
+        "grades",
+        "phd",
+        "masters",
+        "undergraduate",
+        "a levels",
+        "gcse",
+        "gcses",
+        "teacher",
+        "teachers",
+        "tutor"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "team",
+      "title": "Team board",
+      "summary": "Tickets with an owner and a status, the cycle each is in, and the work your agents took on.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "team",
+      "latest": "2.21.0",
+      "versions": [
+        {
+          "version": "2.21.0",
+          "checksum": "687a0437dfbb7753e062fe814b9ab0f5d30cc890de847a0b834d029a0836cf31",
+          "bytes": 33065,
+          "published_at": "2026-10-15T11:41:29.382Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "work"
+            ],
+            "lists": [
+              "Cycles",
+              "Cycle plan",
+              "Cycle days"
+            ],
+            "pages": [
+              "Team",
+              "Cycles",
+              "{{name}}",
+              "Agent work"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "task-triage",
+              "standup-digest"
+            ],
+            "calls_out": []
+          }
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "team",
+        "teams",
+        "my team",
+        "our team",
+        "product team",
+        "engineering team",
+        "product manager",
+        "product managers",
+        "project manager",
+        "pm",
+        "squad",
+        "squads",
+        "enterprise",
+        "department",
+        "colleagues",
+        "teammates",
+        "staff",
+        "sprint",
+        "sprints",
+        "cycle",
+        "cycles",
+        "backlog",
+        "ticket",
+        "tickets",
+        "issues",
+        "jira",
+        "linear",
+        "kanban",
+        "scrum",
+        "standup",
+        "standups",
+        "roadmap",
+        "task list",
+        "assignees",
+        "agents",
+        "our agents",
+        "agentic"
+      ],
+      "modules": [
+        "portfolio",
+        "people",
+        "work"
+      ]
     }
   ]
 }

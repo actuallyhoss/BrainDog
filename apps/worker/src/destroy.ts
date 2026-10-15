@@ -132,30 +132,41 @@ export async function expireFinal(blobs: Pick<Blobs, 'list' | 'delete'>, record:
 }
 
 /**
- * Deletes a record: final copy, sweep, alarm, bytes, names.
+ * What a delete kept and what it took (LCH-A03 job 3): the final copy's key, which starts `final-` inside the record's
+ * prefix, and how many other copies and files the sweep deleted. THE KEY IS A NAME AND NOT A SECRET: the bytes behind
+ * it are sealed, and the owner is owed knowing which copy is kept for `FINAL_KEPT_DAYS` and nothing else.
+ */
+export type Deleted = { kept: string; removed: number };
+
+/**
+ * Deletes a record: final copy, sweep, alarm, bytes, names. Answers what it kept, or `undefined` where no bucket was
+ * handed, since nothing was kept then and a delete must never say it kept a copy it did not.
  *
  * `copies` ABSENT IS THE WORKER AS IT IS WIRED TODAY, which hands this no bucket, and it keeps the order it had: the
  * copies stay in R2, as was measured. Passing the Worker's bucket and its copies port is still to be wired; nothing here
  * should be read as the Cloud already sweeping until that lands.
  */
-export async function destroyRecord(storage: Wipe, close: Close, record: string | null, copies?: Swept): Promise<void> {
+export async function destroyRecord(storage: Wipe, close: Close, record: string | null, copies?: Swept): Promise<Deleted | undefined> {
   /* A RECORD WITH NO IDENTITY HAS NO PREFIX, because the prefix is its id. Such an object never finished `createRecord`,
      the walk lists records by the Directory's ids, and so nothing was ever copied under a name it does not have. */
+  let answer: Deleted | undefined;
   if (copies && record !== null) {
     const kept = await copies.final(record);
     const prefix = prefixOf(record);
     if (!kept.startsWith(`${prefix}${FINAL}`))
       throw new Error(`The final copy was written to ${kept}, outside ${prefix}${FINAL}, where no night would ever expire it. Nothing was deleted.`);
-    await sweep(copies.blobs, prefix, kept);
+    let removed = await sweep(copies.blobs, prefix, kept);
     /* THE RECORD'S FILES GO WITH ITS COPIES, before the bytes and for the same reason: a file whose row is gone
        is a photo of somebody's receipt that nothing names and nobody can delete, and a failed sweep throws while the
        record is still whole. None is kept: the final copy holds each file's name and not its bytes, so a record put
        back from it within the thirty days comes back with its facts and without its files. */
-    await sweep(copies.blobs, filesPrefix(record), null);
+    removed += await sweep(copies.blobs, filesPrefix(record), null);
+    answer = { kept, removed };
   }
   await storage.deleteAlarm();
   await storage.deleteAll();
-  if (record === null) return;
+  if (record === null) return answer;
   const refused = await close(record);
   if (refused) throw new Error(`The record's data was deleted, and its name was not released: ${refused.fix}`);
+  return answer;
 }

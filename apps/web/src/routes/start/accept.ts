@@ -66,8 +66,11 @@ export type Accepting = {
    * lists, figures and pages, filed and accepted in this same press. Its sample rows are never written.
    */
   drafted?: Drafted | null;
-  /** A file the person pointed at and how it maps, when they kept it, and the language its days are read in. */
-  imported?: { file: Export; mapping: Mapping } | null;
+  /**
+   * The files the person pointed at and how each maps, when they kept them (one, or one for each table a zip held, in
+   * the order their tiles stand), and the language their days are read in.
+   */
+  imported?: Imported | readonly Imported[] | null;
   locale?: string;
   /** A press after one that came back with something not made: the record writes only what is missing. */
   again?: boolean;
@@ -91,6 +94,9 @@ export const pressKey = (): string => `first-run-${crypto.randomUUID()}`;
 
 /** A file the person pointed at, and how it maps. */
 export type Imported = { file: Export; mapping: Mapping };
+
+/** The files a press carries, in order: none, the one, or each of many. */
+const importsOf = (imported: Accepting['imported']): readonly Imported[] => (!imported ? [] : 'file' in imported ? [imported] : imported);
 
 /** One thing that was not made: the person's sentence and the record's. */
 export type NotMade = { said: string; why: string };
@@ -160,12 +166,17 @@ export const withNeeds = (u: UseCase | null, kept: readonly string[]): string[] 
  * the use case go in through the same plan.
  */
 export async function fileFor(u: UseCase, modules: readonly string[], today: string, said: string): Promise<Body | null> {
-  const [{ builtInFile }, { carriedDocument, formedFor }] = await Promise.all([import('@braindog/seed/usecases/share'), import('@braindog/seed/usecases/install')]);
+  const [{ builtInFile }, { carriedDocument, formedFor, moduleManifest }] = await Promise.all([import('@braindog/seed/usecases/share'), import('@braindog/seed/usecases/install')]);
   const file = builtInFile(u.usecase, today);
   if (!file) return null;
-  const { links: _links, pack: shipped, ...rest } = file;
+  /* EVERY MODULE THE BUILD KEEPS IS INSTALLED, not only the use case's `needs`: the file's own list would cut them. */
+  const { links: _links, pack: shipped, needs: _needs, ...rest } = file;
   const formed = formedFor(u, said);
-  const formedRows = carriedDocument(u, today, said)?.seeds;
+  /* THE FORMED SEEDS GO ONLY INTO LISTS THE BUILD HOLDS, so an entry is never planted in a list nothing installs. */
+  const holds = new Set(
+    withNeeds(u, modules).flatMap((m) => (moduleManifest(m)?.provides ?? []).flatMap((p) => (p.startsWith('register.') ? [p.slice('register.'.length)] : []))),
+  );
+  const formedRows = carriedDocument(u, today, said, { holds })?.seeds;
   const seeds = Array.isArray(formedRows) ? (formedRows as unknown[]) : [];
   let pack: unknown = shipped;
   if (shipped !== null && typeof shipped === 'object') {
@@ -418,9 +429,9 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
 
   /* THE FILE THEY POINTED AT, LAST, once the list it maps into is there. In the currency the preview drew it in: the one
      chosen for Money, or the one typed where Money is not kept. */
-  if (asked.imported) {
+  if (importsOf(asked.imported).length > 0) {
     const read = (await client.packs().catch(() => null)) as Wire<PackState[]> | null;
-    failed.push(...(await importFile(client, asked.imported, asked.currency ?? asked.proposal.currency, asked.locale ?? 'en', read?.ok ? read.value : [])));
+    failed.push(...(await importFiles(client, importsOf(asked.imported), asked.currency ?? asked.proposal.currency, asked.locale ?? 'en', read?.ok ? read.value : [])));
   }
 
   return { failed, left, nav, filed, refused, ...(formed.length === 0 ? {} : { plan }) };
@@ -430,18 +441,41 @@ export async function accept(client: Client, asked: Accepting): Promise<Accepted
 const FILE_AT_ONCE = 200;
 
 /**
+ * EVERY FILE'S ENTRIES, EACH INTO ITS OWN LIST, in the order the files were brought: a zip of two tables is two lists.
+ * Each is written as `importFile` writes one, and one the record refused, or whose call threw, is answered in its own
+ * line while the next still goes in. A list of a file's own takes a name no file before it took in this press, so two
+ * tables both called Tasks are two lists.
+ */
+export async function importFiles(client: Client, imported: readonly Imported[], currency: string | null, locale: string, states: readonly PackState[]): Promise<NotMade[]> {
+  const old = typeof (client as { setup?: unknown }).setup !== 'function' ? oldScript(client) : null;
+  const taken: string[] = [];
+  const failed: NotMade[] = [];
+  for (const one of imported) {
+    const done = await (old ? old.importFile(one, currency, locale, states, taken) : importOne(client, one, currency, locale, states, taken)).catch(() => [
+      { said: firstRun.importNotMade(one.mapping.name), why: '' },
+    ]);
+    failed.push(...done);
+  }
+  return failed;
+}
+
+/** One file's entries into the list it maps to: `importFiles` with that file alone. */
+export const importFile = (client: Client, imported: Imported, currency: string | null, locale: string, states: readonly PackState[]): Promise<NotMade[]> =>
+  importFiles(client, [imported], currency, locale, states);
+
+/**
  * THE FILE'S ENTRIES, WRITTEN INTO THE LIST IT MAPS TO: a list of its own filed and accepted first, as a drafted change
  * is, then its entries through `setup` with `again`, two hundred to a call. A call's entries go in all or none, so one
  * the record refuses is halved and sent again until the entry it would not take stands alone: every other one goes in.
- * What could not be written is one line, with how many and the record's first sentence for why.
+ * What could not be written is one line, with how many and the record's first sentence for why. A list of its own is
+ * added to `taken`, so the next file's own list is not given the same name.
  */
-export async function importFile(client: Client, imported: Imported, currency: string | null, locale: string, states: readonly PackState[]): Promise<NotMade[]> {
-  if (typeof (client as { setup?: unknown }).setup !== 'function') return oldScript(client).importFile(imported, currency, locale, states);
+async function importOne(client: Client, imported: Imported, currency: string | null, locale: string, states: readonly PackState[], taken: string[]): Promise<NotMade[]> {
   const { file, mapping } = imported;
   let own = undefined;
   if (mapping.list === null) {
-    const taken = [...new Set([...states.flatMap((p) => p.registers), ...allLists().map((l) => l.id)])];
-    own = ownList(file, mapping.name, currency, locale, taken);
+    own = ownList(file, mapping.name, currency, locale, [...new Set([...states.flatMap((p) => p.registers), ...allLists().map((l) => l.id), ...taken])]);
+    taken.push(own.id);
     const change: Drafted = { question: firstRun.importAsk(mapping.name), change: { to: { declarations: newListDeclarations(own, mapping.summary) } }, rows: {}, preview: { pages: [] } };
     const kept = await fileDrafted(client as unknown as SlashClient, change, true);
     if (kept.kind !== 'kept') return [{ said: firstRun.importNotMade(mapping.name), why: kept.kind === 'refused' ? kept.fix : (kept.fix ?? '') }];
@@ -481,7 +515,10 @@ export async function importFile(client: Client, imported: Imported, currency: s
  *
  * A closed tab leaves the record part made here, which is what `setup` ends: the record does the whole of it in one call.
  */
-function oldScript(client: Client): { accept(asked: Accepting): Promise<Accepted>; importFile(imported: Imported, currency: string | null, locale: string, states: readonly PackState[]): Promise<NotMade[]> } {
+function oldScript(client: Client): {
+  accept(asked: Accepting): Promise<Accepted>;
+  importFile(imported: Imported, currency: string | null, locale: string, states: readonly PackState[], taken: string[]): Promise<NotMade[]>;
+} {
   /** The packs the record holds now, or the refusal that said it could not tell. */
   async function packsOf(client: Client): Promise<{ ok: true; value: PackState[] } | { ok: false; why: string }> {
     const read = (await client.packs()) as Wire<PackState[]>;
@@ -776,12 +813,15 @@ function oldScript(client: Client): { accept(asked: Accepting): Promise<Accepted
     if (arrivesBy !== undefined) writePref({ arrivesBy });
 
     /* ── the file they pointed at ─────────────────────────────────────────── */
-    if (asked.imported) {
+    if (importsOf(asked.imported).length > 0) {
       const now = await packsOf(client);
       if (now.ok) states = now.value;
       /* THE CURRENCY THE PREVIEW DREW THE FILE IN: the one chosen for Money, or the one typed where Money is not kept. */
-      const done = await importFile(client, asked.imported, asked.currency ?? asked.proposal.currency, asked.locale ?? 'en', states);
-      failed.push(...done);
+      const taken: string[] = [];
+      for (const one of importsOf(asked.imported)) {
+        const done = await importFile(client, one, asked.currency ?? asked.proposal.currency, asked.locale ?? 'en', states, taken).catch(() => [{ said: firstRun.importNotMade(one.mapping.name), why: '' }]);
+        failed.push(...done);
+      }
     }
 
     return { failed, left, nav, filed };
@@ -801,12 +841,13 @@ function oldScript(client: Client): { accept(asked: Accepting): Promise<Accepted
     currency: string | null,
     locale: string,
     states: readonly PackState[],
+    taken: string[],
   ): Promise<NotMade[]> {
     const { file, mapping } = imported;
     let own = undefined;
     if (mapping.list === null) {
-      const taken = [...new Set([...states.flatMap((p) => p.registers), ...allLists().map((l) => l.id)])];
-      own = ownList(file, mapping.name, currency, locale, taken);
+      own = ownList(file, mapping.name, currency, locale, [...new Set([...states.flatMap((p) => p.registers), ...allLists().map((l) => l.id), ...taken])]);
+      taken.push(own.id);
       const change: Drafted = { question: firstRun.importAsk(mapping.name), change: { to: { declarations: newListDeclarations(own, mapping.summary) } }, rows: {}, preview: { pages: [] } };
       const kept = await fileDrafted(client as unknown as SlashClient, change, true);
       if (kept.kind !== 'kept') return [{ said: firstRun.importNotMade(mapping.name), why: kept.kind === 'refused' ? kept.fix : (kept.fix ?? '') }];
@@ -830,5 +871,5 @@ function oldScript(client: Client): { accept(asked: Accepting): Promise<Accepted
     return missed === 0 ? [] : [{ said: firstRun.importMissed(missed, file.entries.length, mapping.name), why }];
   }
 
-  return { accept: (asked) => accept(client, asked), importFile: (imported, currency, locale, states) => importFile(client, imported, currency, locale, states) };
+  return { accept: (asked) => accept(client, asked), importFile: (imported, currency, locale, states, taken) => importFile(client, imported, currency, locale, states, taken) };
 }

@@ -40,7 +40,7 @@ import type { Undone } from '../record/undo-write.ts';
 import type { UndoStack } from './undo.ts';
 
 /** What a write answered: the value it landed with, or the record's one sentence about why not. */
-export type Sent<T> = { ok: true; value: T } | { ok: false; fix: string };
+export type Sent<T> = { ok: true; value: T } | { ok: false; fix: string; at?: string | undefined };
 
 /** One write the screen draws before it is sent. */
 export type Change<T> = {

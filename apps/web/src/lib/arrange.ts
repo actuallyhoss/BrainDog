@@ -19,16 +19,74 @@
  * A plain `.ts` so `node --test` can hold it; the screen only calls it.
  */
 
-import { arrange, type Arrangement } from '@braindog/seed/usecases';
+import { arrange, MODULE_ORDER, USE_CASES, type Arrangement, type UseCase } from '@braindog/seed/usecases';
+
+import type { Offer } from './shape.ts';
+import type { CatalogueUsecase } from './start/offer.ts';
 
 /** The proposal, and the sentence its reasons are phrases of. */
 export type Arranged = Arrangement & { from: string };
 
-export function arrangeTurns(bio: string | null | undefined, about: string): Arranged {
+/**
+ * A CATALOGUE USE CASE IS HEARD AS A SHIPPED ONE IS (USE-A16): its own signals, counted by the same `arrange`, and the
+ * modules it stands on carried on what it proposes. `heard` is what the first run read from the host's catalogue
+ * (`start/offer.ts`, `heardOf` or the whole entry); its title and summary are said where it gives them, its id as words
+ * where not.
+ *
+ * IT COMES AFTER EVERY SHIPPED ONE, so a tie the length of what was heard leaves standing still goes to the compiled use
+ * case, by the catalogue order `arrange` keeps. AN ID THIS BUILD SHIPS IS PASSED OVER, as a use case or as a module, so
+ * an entry reusing one never shadows the words compiled for it; so is a second entry under one id, and one with no words.
+ */
+type Heard = CatalogueUsecase | Offer;
+
+const SHIPPED: ReadonlySet<string> = new Set([...USE_CASES.map((u) => u.usecase), ...MODULE_ORDER]);
+
+/** An id said as words, for an offer that came with no title: `rent-book` is "Rent book", never the id itself. */
+const said = (id: string): string => {
+  const words = id.replace(/-+/gu, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/** The front of a catalogue use case, as the arranger reads one: words and modules, and no pack of its own here. */
+const frontOf = (h: Heard): UseCase => ({
+  usecase: h.id,
+  version: '0.0.0',
+  title: 'title' in h && h.title.trim() !== '' ? h.title : said(h.id),
+  summary: 'summary' in h ? h.summary : '',
+  author: '',
+  license: '',
+  audience: 'other',
+  tone: '',
+  signals: [...h.signals],
+  modules: [...h.modules],
+  voice: {},
+  labels: {},
+  pack: null,
+  skills: [],
+  nav: [],
+  links: [],
+  over: {},
+});
+
+/** The use cases listened for: the shipped ones, then each catalogue one this build does not already ship. */
+function casesOf(heard: readonly Heard[] | undefined): readonly UseCase[] {
+  if (!heard || heard.length === 0) return USE_CASES;
+  const seen = new Set<string>();
+  const added: UseCase[] = [];
+  for (const h of heard) {
+    if (SHIPPED.has(h.id) || seen.has(h.id) || h.signals.length === 0) continue;
+    seen.add(h.id);
+    added.push(frontOf(h));
+  }
+  return added.length === 0 ? USE_CASES : [...USE_CASES, ...added];
+}
+
+export function arrangeTurns(bio: string | null | undefined, about: string, heard?: readonly Heard[]): Arranged {
+  const cases = casesOf(heard);
   const first = bio?.trim() ?? '';
-  if (!first) return { ...arrange(about), from: about };
+  if (!first) return { ...arrange(about, cases), from: about };
   const lead = `${first}. `;
-  const whole = arrange(`${lead}${about}`);
+  const whole = arrange(`${lead}${about}`, cases);
   /* TURN ONE ADDS WEIGHT, AND A TIE GOES TO TURN TWO.
      Every chip is one signal of one use case, so a turn-one chip beside a turn-two chip that names another
      is a one-to-one tie, and read as one sentence it went to the longer phrase and then to catalogue

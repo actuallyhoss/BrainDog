@@ -19,7 +19,7 @@
 
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type Pack, type VoiceKey } from '@braindog/declare';
+import { conflictFault, installFault, installOrder, keptQuestion, labelsOf, laterVersion, packIdOf, plan, plannedState, readShared, install, labelSetting, stagedBatch, uninstall, unresolvedFault, SPEAKS, VOICE_KEYS, speakingPack, voiceOf as voiceIn, voiceSetting, voiceWrites, type Diff, type Host, type Installed, type InstallOptions, type Pack, type VoiceKey } from '@braindog/declare';
 import { KEYS_REACH_ALL, approvalLines, configReads, configValue, egressChanged, egressOf, personNameOf, ulids, type ConfigDecl, type Declaration, type Json, type Kernel, type PlannedRecord } from '@braindog/kernel';
 import type { FormSpec, NextSpec } from './slash.ts';
 import { normaliseChecked } from './theme-check.ts';
@@ -155,11 +155,11 @@ const WAITING_HOLDER = 'braindog:waiting';
  * the part was. The file as it was read is kept until nothing of it waits, and the first install that leaves nothing
  * waiting takes it away again. Without its example entries: a part that lands by itself writes nothing nobody typed.
  */
-export async function installHeld(kernel: Kernel, pack: Pack, diff: Diff, host: Host, planHash: string, approve: readonly string[] = [], because?: string): ReturnType<typeof install> {
+export async function installHeld(kernel: Kernel, pack: Pack, diff: Diff, host: Host, planHash: string, approve: readonly string[] = [], because?: string, options: InstallOptions = {}): ReturnType<typeof install> {
   const waiting = diff.waiting ?? [];
   /* `because` IS WHY AN INSTALL NOBODY PRESSED HAPPENED, for the line history keeps of it (`planAgain`). */
   const more = { waiting, ...(because === undefined ? {} : { because }) };
-  const put = await install(pack, diff, { ...host, remember: (row) => host.remember({ ...row, ...more } as Parameters<Host['remember']>[0]) }, planHash, approve);
+  const put = await install(pack, diff, { ...host, remember: (row) => host.remember({ ...row, ...more } as Parameters<Host['remember']>[0]) }, planHash, approve, options);
   if (put.ok) kernel.setPref(WAITING_HOLDER, pack.manifest.pack, waiting.length > 0 ? { ...pack, seeds: [] } : null);
   return put;
 }
@@ -1321,7 +1321,8 @@ export function arranger(d: ArrangeDeps) {
         if (shared.value.doc === null)
           return refuse('PACK_MALFORMED', `${u.title} carries no lists or pages of its own, only the modules it names: ${listed(u.modules)}. Propose installing those instead.`, 'body.file');
         body = { install: packIdOf(u.usecase), doc: shared.value.doc };
-        fromFile = { title: u.title, summary: u.summary, modules: u.modules };
+        /* THE MODULES IT CANNOT STAND WITHOUT, when it names them (`needs`, USE-B08), else every module it names. */
+        fromFile = { title: u.title, summary: u.summary, modules: [...(u.needs ?? u.modules)] };
       }
       if (typeof body.install !== 'string') return ok(body);
       const asked = body.install;

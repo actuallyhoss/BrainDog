@@ -59,7 +59,7 @@ export async function load({ url, fetch }: Pick<LoadEvent, 'url' | 'fetch'>): Pr
   const inner = here(url.pathname);
   /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway. */
   const spared =
-    inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner.startsWith('/s/');
+    inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner === '/s' || inner.startsWith('/s/');
   const booted = await live.readBoot(api);
 
   /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as

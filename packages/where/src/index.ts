@@ -87,7 +87,28 @@ export type FieldSpec = {
    * happened yet.
    */
   deadline?: boolean;
+  /**
+   * WORKED OUT AT READ AND NEVER STORED (`02 §5`, the kernel's `derive.ts`): a total that is price times quantity,
+   * filled where a row leaves the record. There is no value under it in the store to compare, so a filter or a sort
+   * that names it would match nothing or sort by nothing; `derivedFault` refuses both in one sentence.
+   */
+  derived?: boolean;
 };
+
+/** The one sentence a filter or a sort over a field worked out at read is refused with. */
+export const derivedRefusal = (field: string): string => `${field} is worked out at read and never stored, so it cannot be filtered or sorted on.`;
+
+/**
+ * Why `field` of `schema` cannot be filtered or sorted on because it is worked out at read, or null.
+ *
+ * `MATCH_OP_UNSUPPORTED`, THE CODE THIS FILE GIVES A FIELD THAT CANNOT BE ASKED A TEST, because that is what it is: the
+ * field exists and is named right, and no comparison reaches it. Exported so the kernel's `ORDER BY` refuses a sort in
+ * the same words the compiler refuses a filter.
+ */
+export function derivedFault(schema: Pick<Schema, 'fields'>, field: string): Refusal | null {
+  if (!Object.hasOwn(schema.fields, field) || schema.fields[field]?.derived !== true) return null;
+  return { code: 'MATCH_OP_UNSUPPORTED', fix: derivedRefusal(field), at: field };
+}
 
 export type Schema = {
   register: string;
@@ -1023,6 +1044,13 @@ function compileAt(where: Predicate | undefined, schema: Schema, start: number):
       return '';
     }
 
+    /* A FIELD WORKED OUT AT READ HOLDS NOTHING IN THE STORE, so a clause over it is a filter that matches no row. */
+    const worked = schema.subject === 'inbox_raw' ? null : derivedFault(schema, field);
+    if (worked) {
+      bad.push(worked);
+      return '';
+    }
+
     const op = OPERATORS.find((o) => o in leaf);
     if (!op) {
       bad.push(
@@ -1661,7 +1689,9 @@ export function evaluate(
     };
 
     const op = OPERATORS.find((o) => o in leaf);
-    if (!op || !operatorAllowed(op, type)) return false;
+    /* A FIELD WORKED OUT AT READ IS NOT HELD BY THE ROW THE STORE HANDS HERE, and `compile` refuses it; in memory it
+       matches nothing, as a test the grammar cannot answer does. */
+    if (!op || !operatorAllowed(op, type) || decl.derived === true) return false;
     const value = leaf[op];
     /* THE THREE WAYS A VALUE IS ABSENT, and the compiler says the same three. A write stores none
        of them, but an import carries whatever the other record held. */

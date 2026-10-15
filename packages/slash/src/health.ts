@@ -24,6 +24,7 @@
  */
 
 import type { Clock, Sql } from '@braindog/ports';
+import { LEDGER_PASSED } from './paused.ts';
 
 /** The engine's state, its last answer and since when it has been failing, all ISO instants. */
 export type EngineHealth = {
@@ -47,6 +48,8 @@ export type EngineHealth = {
   doubleOf?: { twice: number; asks: number } | undefined;
   /** This month's asks by whose allowance they spent, as the meter counts them; present once one was spent. */
   spent?: { person: number; background: number } | undefined;
+  /** Attempts in the window the walk passed over because their model was paused (`LEDGER_PASSED`, `paused.ts`); present once one was. */
+  passedOver?: number | undefined;
 };
 
 /** The one sentence a person reads, and whose it is to fix: ours (the operator's), yours (the owner's), or nobody's. */
@@ -166,7 +169,7 @@ const monthStart = (ms: number): string => {
   return new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1)).toISOString();
 };
 
-type Beside = Pick<EngineHealth, 'answeredBy' | 'lastWords' | 'doubleShare' | 'doubleOf' | 'spent'>;
+type Beside = Pick<EngineHealth, 'answeredBy' | 'lastWords' | 'doubleShare' | 'doubleOf' | 'spent' | 'passedOver'>;
 
 /**
  * What the ledger says beside the state, each field only where it says something.
@@ -194,6 +197,9 @@ const beside = (sql: Sql, from: string, nowMs: number): Beside => {
     out.doubleShare = doubled.twice / doubled.asks;
     out.doubleOf = { twice: doubled.twice, asks: doubled.asks };
   }
+
+  const passed = sql.one<{ n: number }>(`SELECT COUNT(*) AS n FROM slash_call WHERE ts >= ? AND ${LEDGER_PASSED}`, from);
+  if (passed !== undefined && passed.n > 0) out.passedOver = passed.n;
 
   const spent = sql.one<{ person: number; background: number }>(SPENT, monthStart(nowMs));
   if (spent !== undefined && spent.person + spent.background > 0) out.spent = { person: spent.person, background: spent.background };

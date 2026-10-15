@@ -6,7 +6,8 @@
   "license": "Apache-2.0",
   "exports": {
     ".": "./src/index.ts",
-    "./prompts": "./src/prompts.ts"
+    "./prompts": "./src/prompts.ts",
+    "./propose": "./src/propose.ts"
   },
   "dependencies": {
     "@braindog/ports": "workspace:*",

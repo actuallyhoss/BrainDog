@@ -46,8 +46,11 @@ test('A USE CASE CARRIES ONLY THE PLAN FORMED FROM WHAT THE PERSON SAID', () => 
   const formed = seedsOf(carriedDocument(guide, TODAY, 'I want to start a podcast'));
   assert.ok(formed.length > 0, 'the podcast plan is not carried');
   for (const s of formed as { fields?: { tags?: unknown[] } }[]) assert.ok(s.fields?.tags?.includes('formed') === true, 'a formed row is not tagged formed');
-  /* A SENTENCE THAT FORMS NOTHING PLANTS NOTHING. */
-  assert.deepEqual(plantedRows(guide, TODAY, 'I send invoices').rows, []);
+  /* A SENTENCE THAT NAMES NO KIND OF PROJECT PLANTS THE GENERAL PLAN (`guide-kinds.ts` GENERAL_GUIDE), the six milestones
+     the guide once carried as examples, formed and the person's: never an example row. */
+  const general = plantedRows(guide, TODAY, 'I send invoices').rows;
+  assert.equal(general.filter((r) => r.register === 'milestones').length, 6);
+  for (const r of general as { fields: { tags?: unknown[] } }[]) assert.ok(r.fields.tags?.includes('formed') === true && !r.fields.tags.includes('example'), 'a general plan row is an example');
 });
 
 test('THE FILE MAKE IT MINE HANDS THE RECORD HOLDS NO EXAMPLE, and the modules the person kept', async () => {

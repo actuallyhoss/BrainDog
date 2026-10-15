@@ -39,7 +39,7 @@
 import {
   SLASH_ABOUT_ASK,
   SLASH_BRIEF_INSTRUCTIONS,
-  SLASH_HEADLINE_INSTRUCTIONS,
+  SLASH_COMPOSE_INSTRUCTIONS,
   SLASH_INSTRUCTIONS,
   SLASH_KEY_GONE,
   SLASH_PLAN_INSTRUCTIONS,
@@ -156,8 +156,28 @@ const RECORD_TOKENS = 2_048;
    here: no test spends a neuron, so the first alpha answer after the switch is the measurement. */
 const DRAFTS: JsonSchema = { type: 'object', properties: { drafts: { type: 'array', items: { type: 'object' } } }, required: ['drafts'] };
 const PLAN: JsonSchema = { type: 'object', properties: { plan: { type: 'object' } }, required: ['plan'] };
-/* The page headlines: one line a page, keyed by the page's id. Each line is checked by the record (`headlineFault`). */
-const LINES: JsonSchema = { type: 'object', properties: { lines: { type: 'object' } }, required: ['lines'] };
+/* A PAGE'S WHOLE LOOK (ENG-B09), keyed by the page's id: the bare line, or every part `lookAnswerOf` in
+   `packages/record/src/compose-look.ts` reads, `{ headline, lead, order, hide, next, group }`, and nothing it does not.
+   `LINES` once declared `lines` alone, so a model holding to the schema had nowhere to put a lead, a hide or a next, and
+   Today on the Cloud was never arranged as a self-host's is. Each part is still checked by the record (`headlineFault`,
+   `leadFault`, `hideFault`, `nextFault`, `orderFault`, `groupFault`): this says what may come back, never that it holds. */
+const LOOK_PAGE: JsonSchema = {
+  type: 'object',
+  properties: {
+    headline: { type: 'string' },
+    lead: { type: 'string' },
+    order: { type: 'array', items: { type: 'string' } },
+    hide: { type: 'array', items: { type: 'string' } },
+    next: { type: 'object', properties: { row: { type: 'string' }, text: { type: 'string' } }, required: ['row', 'text'] },
+    group: { type: 'object', additionalProperties: { type: 'string' } },
+  },
+  additionalProperties: false,
+};
+export const LOOK: JsonSchema = {
+  type: 'object',
+  properties: { lines: { type: 'object', additionalProperties: { anyOf: [{ type: 'string' }, LOOK_PAGE] } } },
+  required: ['lines'],
+};
 /* The briefing: the cards Today opens on, each a handle it was handed and one line. Each card is checked by the record
    (`briefFault`), which keeps only the handles it handed out. */
 const CARDS: JsonSchema = { type: 'object', properties: { cards: { type: 'array', items: { type: 'object' } } }, required: ['cards'] };
@@ -388,7 +408,8 @@ export function includedModel(env: SlashEnv, onFail?: OnModelFail): WorkerSlashM
     name: 'included',
     draft: (input) => ask(SLASH_INSTRUCTIONS, input, DRAFTS),
     form: (input) => ask(SLASH_PLAN_INSTRUCTIONS, input, PLAN),
-    headline: (input) => ask(SLASH_HEADLINE_INSTRUCTIONS, input, LINES),
+    /* THE PAGES' LOOKS, under the instructions' own name: the line and how each page is arranged, in one ask. */
+    headline: (input) => ask(SLASH_COMPOSE_INSTRUCTIONS, input, LOOK),
     /* THE BRIEFING, held to the same worst ask as the rest: a background ask, and never one of his. */
     brief: (input) => ask(SLASH_BRIEF_INSTRUCTIONS, input, CARDS),
     resolve: (input) => ask(SLASH_RESOLVE_INSTRUCTIONS, input, VERDICTS),
@@ -494,7 +515,8 @@ const NO_MODEL_HERE = 'Slash answers on your own key on this host, and none is c
 export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kernel'>, options: SlashWire = {}): WorkerSlashModel | undefined {
   const included = includedModel(env, options.onFail);
   const store = options.store;
-  if (store === undefined || !isBound(env.KEK)) return included;
+  /* EVERY LOOK ASK IS HEARD (`heardBy`), on either path, so a look that fails says why in Health (`slashLook`). */
+  if (store === undefined || !isBound(env.KEK)) return included === undefined ? undefined : heardBy(included, api, store);
   const own = () => slashOwnKeyOf(store());
   const chosen = (): WorkerSlashModel => {
     const key = own();
@@ -506,7 +528,7 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
     if (model === undefined) throw new NotSent(SLASH_KEY_GONE.fix);
     return ownTold(model, key, options.onFail);
   };
-  return {
+  return heardBy({
     /* READ ON EACH ASK AS THE REST IS, because the record names who drafted by it and treats `included` as the one model
        whose refusal before sending means the record was too large to ask about. */
     get name() {
@@ -550,7 +572,7 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
       if (model.about === undefined) throw new NotSent('The model Slash answers with here reads nothing for who it is about.');
       return model.about(input);
     },
-  };
+  }, api, store);
 }
 
 export type SlashEngineDeps = SlashWire & {
@@ -1249,12 +1271,193 @@ export function workerSlashDoor(
   return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { vault, samples });
 }
 
-/** Slash's daily look, asked on an alarm and after a request: the record decides whether it is due. It never throws. */
-export async function slashLook(api: Pick<RecordApi, 'slashTick'>): Promise<void> {
+/* ── the daily look, and what it heard go wrong ───────────────────────────────────────────────────────────────────── */
+
+/**
+ * What the look's asks heard, kept by the record they were asked for: the store the model reads its choice from, and the
+ * provider's words of the newest ask that failed, with when.
+ *
+ * KEYED BY THE RECORD, BECAUSE THE RECORD SWALLOWS THE THROW. `slashTick` reads a model that failed as "the rules speak",
+ * which is right for the page and left Health with nothing: the meter settles the hold as `UNREACHABLE` and no words, and
+ * `slashLook` saw nothing at all. The model (`heardBy`) and the look are both built over the one record `index.ts` opens,
+ * so the record is the one key both hold, and nothing is wired between them for it. A WeakMap, so a record let go takes
+ * its words with it.
+ */
+type LookEar = { store?: (() => Sql) | undefined; words: string | null; at: number };
+const lookEars = new WeakMap<object, LookEar>();
+
+const earOf = (record: unknown): LookEar | null => {
+  if (record === null || typeof record !== 'object') return null;
+  let ear = lookEars.get(record);
+  if (ear === undefined) lookEars.set(record, (ear = { words: null, at: 0 }));
+  return ear;
+};
+
+/** The asks the daily look makes of the record's model: its drafts, a skill's next version, the pages' looks and Today's cards. */
+const LOOK_ASKS = ['draft', 'skill', 'headline', 'brief'] as const;
+
+/**
+ * The record's model with each of the look's asks heard: the store noted, and a failure's words kept beside the record,
+ * then the throw passed on as it was. MUTATED IN PLACE, because `workerSlashModel`'s `name` is a getter read on each ask,
+ * and a spread would freeze it at the name of the moment it was built.
+ *
+ * A CALL NEVER SENT IS NOT HEARD (`sent: false`): no model was asked and the record writes no row for it, and the ceiling
+ * saying no (`SLASH_BUDGET_SPENT`) is the ceiling working, never a look that failed.
+ */
+function heardBy(model: WorkerSlashModel, api: () => unknown, store: (() => Sql) | undefined): WorkerSlashModel {
+  const ears = model as unknown as Record<(typeof LOOK_ASKS)[number], ((input: unknown) => Promise<unknown>) | undefined>;
+  for (const name of LOOK_ASKS) {
+    const ask = ears[name];
+    if (ask === undefined) continue;
+    ears[name] = async (input) => {
+      const ear = (() => {
+        try {
+          return earOf(api());
+        } catch {
+          return null;
+        }
+      })();
+      if (ear !== null && store !== undefined) ear.store = store;
+      try {
+        return await ask.call(model, input);
+      } catch (e) {
+        const mark = (typeof e === 'object' && e !== null ? e : {}) as { sent?: unknown; code?: unknown; raw?: unknown };
+        if (ear !== null && mark.sent !== false && mark.code !== 'SLASH_BUDGET_SPENT') {
+          const raw = typeof mark.raw === 'string' && mark.raw.trim() !== '' ? mark.raw : e instanceof Error ? e.message : String(e);
+          ear.words = lookWords(raw);
+          ear.at = Date.now();
+        }
+        throw e;
+      }
+    };
+  }
+  return model;
+}
+
+/** Anything that names where a call went: a URL, an IP address, a host name. Health says what failed, never where. */
+/* THE TRAILING STOP STAYS: an address ends before a comma, a colon or a full stop that follows it, so the sentence reads on. */
+const ADDRESS = /\b[a-z][a-z0-9+.-]*:\/\/\S*[^\s.,;:)!?]|\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b|\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d+)?(?:\/\S*[^\s.,;:)!?])?/giu;
+
+/**
+ * The provider's words fit for Health: every address cut, then everything shaped like a key (`scrubRaw`), and no dash
+ * used as punctuation, since a person reads them. `''` for a failure that said nothing.
+ */
+export const lookWords = (said: string): string =>
+  scrubRaw(said.replace(ADDRESS, '[cut]'))
+    .replace(/\s*[–—]\s*/gu, ', ')
+    .trim();
+
+/** The sentence a failed look is kept under, which Health reads as the provider's last words (`engineHealth`'s `lastWords`). */
+export const lookFailed = (words: string | null): string => `Today's look failed: ${words !== null && words !== '' ? words : 'the model did not answer.'}`;
+
+/** The asks of the look, by the purpose their rows carry (`slashRecordMeter`'s `BACKGROUND_PURPOSE`). */
+const LOOK_PURPOSES = "purpose IN ('look', 'headline', 'skill')";
+
+/** `LEDGER_FAILED` of `packages/slash/src/health.ts`, restated: this file never imports the package before a model is asked. */
+const FAILED = "status = 'error' AND code IN ('UNREACHABLE', 'PULL_REQUEST_REFUSED', 'ANSWER_UNREADABLE')";
+
+/** Where the look writes what failed: Slash's own store, and the time its rows are written at. Both default to what the model noted. */
+export type LookLedger = { sql?: Sql | undefined; clock?: Clock | undefined };
+
+/**
+ * A look that failed, written into Slash's ledger where the engine's readings and Health count a failed background ask.
+ *
+ * THE ROWS THE LOOK'S OWN ASKS LEFT ARE GIVEN THE WORDS. The meter settled each failed ask as `UNREACHABLE` with no words;
+ * each such row since the tick began is given the sentence, so Health says why and the readings count it once, as the
+ * meter wrote it. A TICK THAT THREW WITH NO SUCH ROW gets one, since nothing else says the look never ran. ONE A UTC DAY,
+ * moved to the newest failure's time and words, so a look that throws on every request is one failed look and one call
+ * of the background's month, never a row a request.
+ *
+ * WORDS HEARD WITH NO FAILED ROW WRITE NOTHING. That is an ask the meter already counted another way (an answer the
+ * schema refused is `PROPOSAL_SCHEMA`, answered and counted once), or his own press failing beside the tick, which is
+ * not the look; a row for either would count one ask twice or call a press a look.
+ *
+ * `since` IS THE LEDGER'S LAST ROW BEFORE THE TICK, or `null` where the store was not known until the tick's first ask
+ * (a Durable Object just woken). Then the tick's rows are the ones written from `from` on, never every failed row the
+ * ledger ever held.
+ *
+ * NOTHING HERE MAKES THE TABLE: a store no engine was ever built in has no ledger, and the failure is the log line alone.
+ */
+function lookCounted(sql: Sql, since: number | null, from: string, words: string | null, now: number, threw: boolean): void {
+  if (sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'") === undefined) return;
+  const raw = lookFailed(words);
+  const failed = sql.all<{ id: string }>(
+    `SELECT id FROM slash_call WHERE ${since === null ? 'ts >= ?' : 'rowid > ?'} AND ${LOOK_PURPOSES} AND ${FAILED} AND raw IS NULL`,
+    since ?? from,
+  );
+  for (const row of failed) sql.exec('UPDATE slash_call SET raw = ? WHERE id = ?', raw, row.id);
+  if (failed.length > 0 || !threw) return;
+  const at = new Date(now).toISOString();
+  const today = sql.one<{ id: string }>(
+    `SELECT id FROM slash_call WHERE id LIKE 'look-failed-%' AND substr(ts, 1, 10) = ? ORDER BY ts DESC LIMIT 1`,
+    at.slice(0, 10),
+  );
+  if (today !== undefined) {
+    sql.exec('UPDATE slash_call SET ts = ?, raw = ? WHERE id = ?', at, raw, today.id);
+    return;
+  }
+  /* UNDER THE MODEL THE LOOK WOULD HAVE ASKED: his key's where he chose it, the included one otherwise. A row under `-`
+     is one the readings pass over as a call that reached nothing, and this one is the look that failed. */
+  const settings = sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_settings'") === undefined
+    ? undefined
+    : sql.one<{ tier: string | null; model: string | null }>('SELECT tier, model FROM slash_settings WHERE singleton = 1');
+  const tier = settings?.tier === 'b' || settings?.tier === 'byo' ? settings.tier : 'a';
+  const model = tier !== 'a' && settings?.model ? settings.model : INCLUDED_MODEL;
+  sql.exec(
+    `INSERT INTO slash_call (id, ts, kind, tier, model, tokens_in, tokens_out, neurons, ms, status, code, question, purpose, spends, raw)
+     VALUES (?, ?, 'read', ?, ?, 0, 0, 0, 0, 'error', 'UNREACHABLE', ?, 'look', 'none', ?)`,
+    `look-failed-${at}`,
+    at,
+    tier,
+    model,
+    "Slash's daily look",
+    raw,
+  );
+}
+
+/** The newest row of Slash's ledger, so a tick's own rows are the ones after it; 0 where there is no ledger yet. */
+const ledgerMark = (sql: Sql): number =>
+  sql.one("SELECT 1 AS n FROM sqlite_master WHERE type = 'table' AND name = 'slash_call'") === undefined
+    ? 0
+    : (sql.one<{ n: number | null }>('SELECT MAX(rowid) AS n FROM slash_call')?.n ?? 0);
+
+/**
+ * Slash's daily look, asked on an alarm and after a request: the record decides whether it is due. It never throws.
+ *
+ * A LOOK THAT FAILS IS SEEN IN HEALTH (ENG-B09). It once wrote one console line and went on, so a dead look was invisible
+ * in the engine's readings. Now the asks that failed during the tick, and a tick that threw, are counted where the
+ * readings count a failed background ask (`lookCounted`), with the provider's words, so Settings says "Today's look
+ * failed: ..." and never a key or an address. `ledger` names Slash's store; absent, the store the record's model noted
+ * on its last ask is used, and with neither the failure is the log line alone, as it was.
+ */
+export async function slashLook(api: Pick<RecordApi, 'slashTick'>, ledger: LookLedger = {}): Promise<void> {
+  const ear = earOf(api);
+  const store = (): Sql | undefined => ledger.sql ?? ear?.store?.();
+  const clock = ledger.clock ?? { now: () => Date.now() };
+  const began = Date.now();
+  const from = new Date(clock.now()).toISOString();
+  let since: number | null = null;
+  try {
+    const sql = store();
+    since = sql === undefined ? null : ledgerMark(sql);
+  } catch {
+    since = null;
+  }
+  let threw: string | null = null;
   try {
     await api.slashTick();
   } catch (e) {
-    console.error('slash:', e instanceof Error ? e.message : String(e));
+    const said = e instanceof Error ? e.message : String(e);
+    console.error('slash:', said);
+    threw = lookWords(said);
+  }
+  const heard = ear !== null && ear.words !== null && ear.at >= began ? ear.words : null;
+  if (threw === null && heard === null) return;
+  try {
+    const sql = store();
+    if (sql !== undefined) lookCounted(sql, since, from, heard ?? threw, clock.now(), threw !== null);
+  } catch (e) {
+    console.error('slash: the failed look could not be counted:', e instanceof Error ? e.message : String(e));
   }
 }
 

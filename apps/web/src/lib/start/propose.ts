@@ -818,7 +818,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   const offers = [...BUNDLED, ...(ctx.catalogue ?? []).filter((o) => !BUNDLED.some((b) => b.id === o.id))];
   /* WHAT THE PERSON SAID THEY DO NOT HAVE IS NOT HEARD, by the modules or by the use cases: "no orders" is no Orders. */
   const all = shape(said, today ?? undefined, offers);
-  const turns = arrangeTurns(null, said);
+  const turns = arrangeTurns(null, said, ctx.catalogue);
   const no = refusedIn(said, [...all.heard, ...all.packs.flatMap((p) => p.why), ...turns.ranked.flatMap((r) => r.why)]);
   const read = unrefused(all, no);
   const arranged = unrefusedCases(turns, no);
@@ -940,8 +940,13 @@ export function fromModel(reply: SetupReply, sentence: string, ctx: ProposeConte
   const known = new Set(offers.map((o) => o.id));
   const u = reply.usecase === null ? null : (useCase(reply.usecase) ?? null);
   const beside = u ? reply.also.flatMap((id) => (id === u.usecase ? [] : (useCase(id) ?? []))).slice(0, 2) : [];
-  const name = reply.name !== null && reply.name.length <= 60 && at(sentence, reply.name) >= 0 && !OPENS_REFUSING.test(reply.name.trim()) ? reply.name : rules.name;
-  const asked = reply.modules.filter((id) => known.has(id));
+  /* THE NAME AS IT WAS TYPED, not as the model spelt it: a model that capitalised "hana" kept a name nobody wrote. */
+  const typedAt = reply.name === null ? -1 : at(sentence, reply.name);
+  const name =
+    reply.name !== null && reply.name.length <= 60 && typedAt >= 0 && !OPENS_REFUSING.test(reply.name.trim()) ? sentence.slice(typedAt, typedAt + reply.name.length) : rules.name;
+  /* A MODULE IS KEPT ONLY WHERE THE WORDS OR THE USE CASE ASKED FOR IT, so an answer that obeyed "install every add-on"
+     inside the sentence installs what the sentence was about and no more. */
+  const asked = reply.modules.filter((id) => known.has(id) && (rules.modules.length === 0 || rules.modules.includes(id) || (u !== null && modulesFor(u, []).includes(id))));
   /* AN ANSWER THAT CHOSE NOTHING AND DRAFTED NOTHING IS NO READING: the rules' stands, and where they read nothing either
      the words are the brief Slash drafts from (`outsideCatalogue`), as before there was a model. */
   if (u === null && asked.length === 0 && (reply.draft ?? '').trim() === '') return { ...rules, fell: 'PROPOSAL_EMPTY' };

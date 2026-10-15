@@ -164,7 +164,7 @@ export function inboxMail({ origin, slug, key, send = fetch, every = 3_000 }) {
     next: async (mark, { ms = MAIL_MOST_MS } = {}) => {
       const until = Date.now() + ms;
       for (;;) {
-        const found = (await read()).filter((a) => !mark?.has(a.id)).map(shape).find((l) => /\/app\/sign(up|in)#(verify|magic)=/u.test(`${l.text} ${l.html}`));
+        const found = (await read()).filter((a) => !mark?.has(a.id)).map(shape).find((l) => /\/app\/sign(up|in)#(verify|magic)=|\/app\/invite#[^&\s]+&proof=/u.test(`${l.text} ${l.html}`));
         if (found) return found;
         if (Date.now() >= until) return null;
         await pause(every);

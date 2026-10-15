@@ -20,7 +20,12 @@
   ASK SLASH IS OFFERED WHERE A MODEL IS, read from the layout's `slash` here rather than passed down through `FlowList`,
   because every menu on the canvas asks the same question of the same tab and none of the lists between has a use for it.
 
-  ON A PHONE IT IS A SEARCHABLE SHEET, WITH A LINE SAYING WHAT EACH STEP DOES. Nineteen verbs in an action sheet
+  EVERY STEP THE RECORD'S GRAMMAR HOLDS, on its shelf (`flow.ts` `stepGroups`), and none it does not. The grammar is
+  read once for the tab (`grammar.ts`); over a record older than the app there is none, the menu offers nothing, and
+  the labelled one says the record's one line in its place. A compact one on the wire draws nothing, so the line is
+  said where an empty list is and not at every gap.
+
+  ON A PHONE IT IS A SEARCHABLE SHEET, WITH A LINE SAYING WHAT EACH STEP DOES. Twenty verbs in an action sheet
   are a long scroll of labels ("Come back later", "Run a call on this row") that a stranger has to guess at; the sheet
   puts a search box at the top, which reads the label and the line (`flow.ts` `STEP_HELP`), and a line under each. The
   width is the app's one answer to "cards or a table" (`body.svelte.ts` `rowsAsCards`), so a menu never asks
@@ -32,7 +37,9 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { page } from '$app/state';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
-  import { STEP_HELP, stepGroups, VERB_LABELS, words, type Verb } from './flow.ts';
+  import { onMount } from 'svelte';
+  import { helpOf, labelOf, stepGroups, words, type Verb } from './flow.ts';
+  import { grammarNow, grammarState, loadGrammar } from './grammar.ts';
 
   let {
     label = words.addStep,
@@ -44,7 +51,12 @@
   let open = $state(false);
   let sheet = $state(false);
   let query = $state('');
-  const groups = $derived(stepGroups(page.data.slash === true));
+  /* THE TAB'S GRAMMAR, FOLLOWED BY ITS OWN SUBSCRIPTION and not `$grammarState`: Svelte's store helpers would go into
+     the runtime every screen loads (the entry budget). */
+  let read = $state.raw(grammarNow());
+  $effect(() => grammarState.subscribe((s) => (read = s)));
+  const groups = $derived(stepGroups(page.data.slash === true, read.state === 'ready' ? read.grammar : null));
+  onMount(() => void loadGrammar());
   const phone = $derived(rowsAsCards());
 
   /* EVERY WORD TYPED HAS TO BE IN THE LABEL OR THE LINE, in any order and any case, so "row tag" finds "Add a tag". */
@@ -52,7 +64,7 @@
     const said = query.trim().toLowerCase().split(/\s+/u).filter(Boolean);
     if (said.length === 0) return groups;
     return groups
-      .map((g) => ({ ...g, verbs: g.verbs.filter((v) => said.every((w) => `${VERB_LABELS[v]} ${STEP_HELP[v]}`.toLowerCase().includes(w))) }))
+      .map((g) => ({ ...g, verbs: g.verbs.filter((v) => said.every((w) => `${labelOf(v)} ${helpOf(v)}`.toLowerCase().includes(w))) }))
       .filter((g) => g.verbs.length > 0);
   });
 
@@ -64,7 +76,9 @@
 </script>
 
 <div class="step-menu" data-compact={compact ? '' : undefined} data-landing={landing ? '' : undefined}>
-  {#if phone}
+  {#if read.state === 'older' || read.state === 'unread'}
+    {#if !compact}<p class="older">{read.say}</p>{/if}
+  {:else if phone}
     <button type="button" class="open" aria-haspopup="dialog" aria-expanded={sheet} onclick={() => (sheet = true)}>
       <span class="add">
         <Icon name="plus" size="s" />
@@ -82,14 +96,14 @@
       {#each groups as group (group.label)}
         <p class="group" role="none">{group.label}</p>
         {#each group.verbs as verb (verb)}
-          <button type="button" class="mi" role="menuitem" title={STEP_HELP[verb]} onclick={() => onpick(verb)}>{VERB_LABELS[verb]}</button>
+          <button type="button" class="mi" role="menuitem" title={helpOf(verb)} onclick={() => onpick(verb)}>{labelOf(verb)}</button>
         {/each}
       {/each}
     </Menu>
   {/if}
 </div>
 
-{#if phone}
+{#if phone && read.state !== 'older' && read.state !== 'unread'}
   <Sheet
     open={sheet}
     title={words.addStep}
@@ -110,8 +124,8 @@
         {#each group.verbs as verb (verb)}
           <li>
             <button type="button" class="pick" onclick={() => choose(verb)}>
-              <span class="pick-label">{VERB_LABELS[verb]}</span>
-              <span class="pick-help">{STEP_HELP[verb]}</span>
+              <span class="pick-label">{labelOf(verb)}</span>
+              {#if helpOf(verb) !== ''}<span class="pick-help">{helpOf(verb)}</span>{/if}
             </button>
           </li>
         {/each}
@@ -127,8 +141,9 @@
     justify-content: center;
   }
 
-  /* THE PLUS ON THE WIRE, AND THE PILL IN AN EMPTY ARM: small nodes of the canvas, so the tile's white and its first
-     depth, on the `--rule` line they sit on. The words are the second ink, and ink under the pointer. */
+  /* THE PLUS ON THE WIRE, AND THE BUTTON IN AN EMPTY ARM: small nodes of the canvas, flat on the board as every tile
+     is, a rectangle at the control's radius on the `--rule` line they sit on. The words are the second ink, and ink
+     under the pointer. */
   .add {
     display: inline-flex;
     align-items: center;
@@ -140,13 +155,12 @@
     background: var(--bg);
     border: 0;
     border-radius: var(--r-pill);
-    box-shadow: var(--e1);
     color: var(--ink2);
     font-size: var(--t-sm);
     font-weight: 500;
     transition:
       color var(--d-state) var(--ease-out),
-      box-shadow var(--d-state) var(--ease-out);
+      background var(--d-state) var(--ease-out);
   }
 
   .step-menu[data-compact] .add {
@@ -156,17 +170,24 @@
 
   @media (hover: hover) and (pointer: fine) {
     .add:hover {
-      box-shadow: var(--e2);
+      background: var(--s1);
       color: var(--ink);
     }
   }
 
-  /* THE PILL SAYS A DRAG WILL LAND ON IT with the landing line's own ink, drawn round it rather than as a border. */
+  /* THE BUTTON SAYS A DRAG WILL LAND ON IT with the landing line's own ink, an outline drawn round it, not a border. */
   .step-menu[data-landing] .add {
-    box-shadow:
-      0 0 0 2px var(--ink),
-      var(--e1);
+    outline: 2px solid var(--ink);
+    outline-offset: 0;
     color: var(--ink);
+  }
+
+  /* THE RECORD'S ONE LINE, where the button would be: words at the body's size, nothing to press. */
+  .older {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-md);
+    text-align: center;
   }
 
   /* THE FOCUS RING FOLLOWS THE ROUND SHAPE, since the button round it is the thing focused. */

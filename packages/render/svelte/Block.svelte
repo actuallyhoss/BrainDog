@@ -24,13 +24,14 @@
   import Media from './p/Media.svelte';
   import Inputs from './Inputs.svelte';
   import Calendar from './Calendar.svelte';
+  import Form from './Form.svelte';
   import Lanes from './Lanes.svelte';
   import Links from './Links.svelte';
   import Gallery from './Gallery.svelte';
   import Embed from './Embed.svelte';
   import Path from './Path.svelte';
   import Actions from './Actions.svelte';
-  import { actionLabels, type OnAct } from '../src/actions.ts';
+  import { actionLabels, tableSourceRow, type OnAct } from '../src/actions.ts';
   import type { OnCapture } from './types.ts';
   import type { OnInput } from '../src/inputs.ts';
 
@@ -116,9 +117,10 @@
     onselect?: ((row: Row, on: boolean) => void) | undefined;
     selected?: readonly string[] | undefined;
     /**
-     * A DECLARED ACTION PRESSED (PGS-A12): the action, and a switch's or a choice's new value. Handed to `Actions` alone,
-     * which draws the block's `actions` under it only when this is passed; a preview or the mirror passes nothing and
-     * gets the block as it always was. Row actions inside the row drawers are a later job.
+     * A DECLARED ACTION PRESSED (PGS-A12): the action, the row it sat on, and a switch's or a choice's new value. Handed
+     * to `Actions`, which draws the block's `actions` under it only when this is passed, and with the block's
+     * `row_actions` to `List` (each row's end) and to a table's `Table` (a last column); a preview or the mirror passes
+     * nothing and gets the block as it always was. The grid's cards and board are a later job.
      */
     act?: OnAct | undefined;
   } = $props();
@@ -126,6 +128,13 @@
   /* THE BLOCK'S DECLARED ACTIONS, as the page read handed them, cut to what this reader may press. Read loosely until
      the parsed `Block` type carries the key: a fence an author typed never has one. */
   const actions = $derived(block.actions);
+  /* EACH ROW'S, the same way: handed to the list and the table only when `act` is, so a preview draws its rows as ever. */
+  const rowActions = $derived(act ? block.row_actions : undefined);
+  /* A TABLE'S PRESS IS HANDED ITS `TableRow`, whose key is its place under the head row (`comparisonPlan`), so the host
+     gets back the row of the block it declared and not the drawer's copy of it. */
+  /* THE QUIET LINE WITH NO HOST: the block's labels, then its rows', once each, the line `toHTML` prints. */
+  const quiet = $derived(actionLabels([...(actions ?? []), ...(block.row_actions ?? [])]));
+  const tableAct: OnAct = (action, row, value) => act?.(action, tableSourceRow(block.rows, row), value);
 
   /** The list this block draws through, so `choose` can reach its queue. */
   let list = $state<{ choose(i: number, key?: string | null): boolean } | undefined>(undefined);
@@ -180,7 +189,7 @@
            `aria-rowcount` now; this was the one caller of six that added the header itself, and
            the other five did not, so five surfaces announced one row too few and this one was
            right by hand. -->
-      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} home={opts.home} />
+      <Table columns={comparison.columns} rows={comparison.rows} total={comparison.rows.length} label={block.heading} href={opts.href} home={opts.home} {rowActions} act={act ? tableAct : undefined} />
     {/if}
   {:else if block.kind === 'inputs'}
     <!-- BY KIND, because the callback belongs to one kind on a primitive two others share: handed to `Rows`, a `spec`
@@ -188,6 +197,7 @@
     <!-- AND NOT THROUGH `Rows` EVEN READ-ONLY: an inputs row is `field | label | type | value`, so `Rows` would print the
          field's id as its label and its label as its value. `Inputs` draws the spec itself, in `Rows`' classes. -->
     <Inputs {block} {opts} {oninput} />
+  {:else if block.kind === 'form'}<Form {block} {opts} {act} />
   {:else if block.kind === 'calendar'}
     <!-- CALENDAR, LANES, LINK, GALLERY AND EMBED, EACH WITH A DRAWER OF ITS OWN, and the path, BY KIND AND BEFORE THE
          PRIMITIVES, for `inputs`' reason: each sits on a primitive other kinds share, and asking here keeps a
@@ -210,7 +220,7 @@
          to the union the other six are in, it is a prop none of them declares. -->
     <Grid {block} {opts} {onmove} {onopen} {onmenu} />
   {:else if spec.primitive === 'list'}
-    <List bind:this={list} {block} {opts} {ontick} {onact} {onreschedule} {cursor} {onrowfocus} {onopen} {onmenu} {onselect} {selected} />
+    <List bind:this={list} {block} {opts} {ontick} {onact} {onreschedule} {cursor} {onrowfocus} {onopen} {onmenu} {onselect} {selected} {rowActions} {act} />
   {:else if spec.primitive === 'panel'}
     <Panel {block} {opts} {oncapture} />
   {:else if Draw}
@@ -222,11 +232,11 @@
   {/if}
   <!-- UNDER THE BLOCK AND INSIDE ITS FIGURE, the controls only when the host can press them. With no `act` (a preview,
        the mirror) the labels are one quiet line and nothing pressable, the line `toHTML` prints, so the two trees stay
-       equal; a block with no actions draws neither. -->
+       equal; a block with no actions draws neither. A row's actions join that line once, never one a row. -->
   {#if act && actions?.length}
     <Actions {actions} onact={act} />
-  {:else if actionLabels(actions).length > 0}
-    <p class="block-actions">{actionLabels(actions).join(' · ')}</p>
+  {:else if !act && quiet.length > 0}
+    <p class="block-actions">{quiet.join(' · ')}</p>
   {/if}
 </figure>
 {/if}

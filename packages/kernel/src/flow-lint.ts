@@ -56,17 +56,17 @@ export const RUNS_PER_DAY_CEILING = 1000;
 /** A run's `vars` are bounded at sixty-four names (§3's `RunContext`), so a body naming more could never hold them. */
 export const VARS_CEILING = 64;
 
-const TRIGGERS = ['written', 'arrival', 'every', 'metric', 'decided', 'manual'] as const;
-const OPS = ['create', 'update', 'delete'] as const;
+export const TRIGGERS = ['written', 'arrival', 'every', 'metric', 'decided', 'manual'] as const;
+export const OPS = ['create', 'update', 'delete'] as const;
 /** The words a rule's `on:` was written with before it was an object. `create` is the only one any rule ever carried. */
 const LEGACY_WORDS = ['create'] as const;
-const CHANNELS = ['webhook', 'email', 'paste', 'api', 'pull'] as const;
-const SHAPES = ['text', 'number', 'choice'] as const;
+export const CHANNELS = ['webhook', 'email', 'paste', 'api', 'pull'] as const;
+export const SHAPES = ['text', 'number', 'choice'] as const;
 
 /** Every action a rule had before steps, closed. The inline pass's dispatch has one arm for each. */
 export const ACTIONS = ['tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop'] as const;
 /** The verbs only a step has. */
-const FLOW = ['if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait', 'meet', 'run_job'] as const;
+export const FLOW = ['if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait', 'meet', 'run_job'] as const;
 /**
  * Every verb a rule or a step may name. Exported so that `flow-secret-verbs.test.ts` asks each one what it does with a
  * secret, and a verb added here without an answer there fails that test.
@@ -79,7 +79,7 @@ export const VERBS: readonly string[] = [...ACTIONS, ...FLOW];
  * sends no fields needs no row; the walk in `flowFault` holds a call that does send them to the same rule as `run`. Installing one would be a step that reaches
  * for a row that is not there, on every fire, for ever.
  */
-const ROW_VERBS: readonly string[] = ['tag', 'untag', 'set', 'move', 'link', 'note', 'schedule', 'run'];
+export const ROW_VERBS: readonly string[] = ['tag', 'untag', 'set', 'move', 'link', 'note', 'schedule', 'run'];
 /** Triggers with no subject row. `arrival` is left out: a matched arrival writes rows, and §4.1 has its run read them. */
 const ROWLESS: readonly string[] = ['every', 'metric', 'manual'];
 
@@ -87,7 +87,7 @@ const ROWLESS: readonly string[] = ['every', 'metric', 'manual'];
  * The verbs §3 says need `once_per` on a trigger about a row: notifies, creates, calls or asks, and a job started, which
  * runs Claude Code on the owner's machine and would otherwise start again each time somebody fixes a typo in the row.
  */
-const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person', 'run_job'];
+export const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person', 'run_job'];
 
 /**
  * Field types whose value never leaves the record with a question: `ask_slash`'s `about:` is refused them here, and
@@ -115,9 +115,9 @@ const NAME = /^[a-z][a-z0-9_]{0,31}$/;
  * The keys of a `meet` step: `people.ts`'s `MeetArgs`, always `where`, and something saying who: a name, an email, a
  * handle or `keys`, or for an organisation its domain. Every one is text but `keys`, a template or a list of them.
  */
-const MEET_KEYS: readonly string[] = ['name', 'email', 'handle', 'where', 'kind', 'keys', 'org', 'domain', 'role', 'source', 'only'];
+export const MEET_KEYS: readonly string[] = ['name', 'email', 'handle', 'where', 'kind', 'keys', 'org', 'domain', 'role', 'source', 'only'];
 /** The keys of a `run_job` step. */
-const RUN_JOB_KEYS: readonly string[] = ['kind', 'args', 'as'];
+export const RUN_JOB_KEYS: readonly string[] = ['kind', 'args', 'as'];
 /** A kind of job by its declaration id, as `jobs.ts`'s `KIND_ID` reads one, so the lint refuses no id the queue takes. */
 const JOB_KIND = /^job\.[a-z][a-z0-9_-]{0,31}$/u;
 /** `trigger` and `vars` are the run context's own two keys, so a var called either would shadow the path to itself. */

@@ -15,11 +15,27 @@
   says it, a ring in the working accent shows it, and it is scrolled into view once for each day asked, at once under
   reduced motion. The day comes from `opts.day`, or from the host's context (`CALENDAR_DAY`) where the host cannot
   reach a block's options; with neither, nothing is marked and the tree is the twin's.
+
+  A STRIP WHEN THE BLOCK SAYS `weeks` (the record's answer handed through by the app, `calendarStripPlan`): a week a
+  row of seven days from the Monday of this one, each day saying its date and its first rows, today with the word
+  `Today` beside its date and never its colour alone, the days of this week already gone drawn quieter. Below 640px a
+  week reads as a list of its days with something on them, and a week with nothing says so. Months draw as they did.
 -->
 <script lang="ts">
   import { MISSING, TONES, WORKING_GLYPH, WORKING_LABEL, inline, takeWorking, text, type Block, type RenderOptions, type Row } from '../src/index.ts';
   import { getContext } from 'svelte';
-  import { CALENDAR_DAY, CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from '../src/calendar.ts';
+  import {
+    CALENDAR_DAY,
+    CALENDAR_NONE,
+    CALENDAR_TODAY,
+    CALENDAR_WEEK_NONE,
+    WEEKDAYS,
+    calendarMore,
+    calendarOutside,
+    calendarPlan,
+    calendarSkipped,
+    calendarStripPlan,
+  } from '../src/calendar.ts';
   import { roadmapToday } from '../src/roadmap.ts';
   import Text from './Text.svelte';
 
@@ -29,8 +45,12 @@
   /* `day` is not yet a key of RenderOptions (`src/html.ts`), so it is read as one more the host may give. */
   const asked = getContext<(() => string | null) | undefined>(CALENDAR_DAY);
   const mark = $derived((opts as RenderOptions & { day?: string | null }).day ?? asked?.() ?? null);
+  /* `weeks` is set by the app on the block it hands over, as it sets `actions` (`src/parse.ts`). */
+  const weeks = $derived(block.weeks);
+  const strip = $derived(typeof weeks === 'number' ? calendarStripPlan(block.rows, roadmapToday(opts.now), weeks, mark) : null);
   const plan = $derived(calendarPlan(block.rows, roadmapToday(opts.now), mark));
-  const skipped = $derived(plan.skipped.length ? calendarSkipped(plan.skipped.map((i) => said(block.rows[i]!, 0) || MISSING)) : '');
+  const skippedOf = (at: readonly number[]): string => (at.length ? calendarSkipped(at.map((i) => said(block.rows[i]!, 0) || MISSING)) : '');
+  const skipped = $derived(skippedOf(strip ? strip.skipped : plan.skipped));
 
   /* THE MARKED DAY IN VIEW, once for each day asked: a re-read of the page draws the same day again and does not move
      the reader, and a second link on the same page moves them to its day. */
@@ -38,7 +58,7 @@
   let shown: string | null = null;
   $effect(() => {
     const day = mark;
-    const cell = root?.querySelector('.calendar-cell[aria-current="date"]');
+    const cell = root?.querySelector('[aria-current="date"]');
     if (!day || !cell || shown === day) return;
     shown = day;
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -60,7 +80,28 @@
 
 {#snippet items(rows: Row[])}{#if rows.length}<ul class="calendar-items">{#each rows as r}{@render item(r)}{/each}</ul>{/if}{/snippet}
 
-{#if plan.empty}
+{#if strip}
+  <div class="calendar calendar-strip" bind:this={root}>
+    {#if strip.empty}<p class="calendar-empty">{CALENDAR_NONE}</p>{/if}
+    {#each strip.empty ? [] : strip.weeks as w}
+      <div class="calendar-week" data-count={w.count > 0 ? w.count : undefined}>
+        <p class="calendar-week-label">{w.label}</p>
+        <ol class="calendar-week-days" aria-label={w.label}>
+          {#each w.days as d}
+            <li class="calendar-strip-day" data-today={d.today ? '' : undefined} data-past={d.past ? '' : undefined} data-count={d.count > 0 ? d.count : undefined} aria-current={d.marked ? 'date' : undefined}
+              ><span class="calendar-strip-date num">{d.said}{#if d.today}{' '}<span class="calendar-today">{CALENDAR_TODAY}</span>{/if}</span>{@render items(d.items)}{#if d.more > 0}<span
+                  class="calendar-more">{calendarMore(d.more)}</span
+                >{/if}</li
+            >
+          {/each}
+        </ol>
+        {#if w.count === 0}<p class="calendar-week-none">{CALENDAR_WEEK_NONE}</p>{/if}
+      </div>
+    {/each}
+    {#if strip.outside.length}<p class="calendar-skipped">{calendarOutside(strip.outside.length)}</p>{/if}
+    {#if skipped}<p class="calendar-skipped">{skipped}</p>{/if}
+  </div>
+{:else if plan.empty}
   <div class="calendar">
     <p class="calendar-empty">{CALENDAR_NONE}</p>
     {#if skipped}<p class="calendar-skipped">{skipped}</p>{/if}
@@ -116,5 +157,122 @@
 
   :global(.calendar-cell[aria-current='date'] .calendar-num) {
     font-weight: 600;
+  }
+
+  /* ── the strip ──────────────────────────────────────────────────────────
+     GLOBAL FOR THE SAME REASON, and every rule under `.calendar-strip`, so nothing here reaches a month's grid. A week is
+     seven fixed columns, so a day with a long title is as wide as a free one; a day is a hairline and air, as a
+     month's day is, and today's hairline is the working accent beside the word, never the colour alone. */
+  :global(.calendar-strip .calendar-week) {
+    display: grid;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  :global(.calendar-strip .calendar-week-label) {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-md);
+    font-weight: 600;
+    line-height: var(--lh-tight);
+  }
+
+  :global(.calendar-strip .calendar-week-days) {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--sp-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  :global(.calendar-strip .calendar-strip-day) {
+    display: grid;
+    align-content: start;
+    gap: var(--sp-1);
+    min-block-size: 5.5rem;
+    min-inline-size: 0;
+    padding-block-start: var(--sp-1);
+    border-block-start: 2px solid var(--line);
+  }
+
+  :global(.calendar-strip .calendar-strip-date) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  :global(.calendar-strip .calendar-strip-day[data-today]) {
+    border-block-start-color: var(--accent);
+  }
+
+  :global(.calendar-strip .calendar-strip-day[data-today] .calendar-strip-date) {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  :global(.calendar-strip .calendar-today) {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  :global(.calendar-strip .calendar-strip-day[data-past]) {
+    opacity: 0.6;
+  }
+
+  :global(.calendar-strip .calendar-item) {
+    font-size: var(--t-base);
+  }
+
+  :global(.calendar-strip .calendar-title) {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.calendar-strip .calendar-week-none) {
+    display: none;
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-base);
+  }
+
+  /* NARROW, A WEEK IS A LIST OF ITS DAYS WITH SOMETHING ON THEM, the date in its own column and the titles whole beside
+     it, and a week with nothing says so in a line. Today stays, with its word, even on a free day. */
+  @container (inline-size < 40rem) {
+    :global(.calendar-strip .calendar-week-days) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    :global(.calendar-strip .calendar-strip-day) {
+      grid-template-columns: minmax(9ch, auto) minmax(0, 1fr);
+      align-items: baseline;
+      gap: var(--sp-3);
+      min-block-size: 0;
+      padding-block: var(--sp-2);
+      border-block-start-width: 1px;
+    }
+
+    :global(.calendar-strip .calendar-strip-day:not([data-count]):not([data-today])) {
+      display: none;
+    }
+
+    :global(.calendar-strip .calendar-strip-day .calendar-more) {
+      grid-column: 2;
+    }
+
+    :global(.calendar-strip .calendar-title) {
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    :global(.calendar-strip .calendar-week:not([data-count]) .calendar-week-none) {
+      display: block;
+    }
   }
 </style>

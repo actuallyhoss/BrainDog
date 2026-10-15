@@ -39,6 +39,7 @@ import { readFileSync } from 'node:fs';
 import { settleWhen } from '../../packages/declare/src/catalogue.ts';
 import { normalise, type Pack } from '../../packages/declare/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
+import { rulesLine } from '../../packages/record/src/headlines.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import type { CtxHost, Json, ScriptAnswer, ScriptDecl, ScriptWrite } from '../../packages/script/src/index.ts';
 import { runInQuickJs } from '../../packages/script/src/quickjs.ts';
@@ -571,4 +572,76 @@ test('A FINISHED TASK CLOSES ITS OPEN FOLLOW-UPS, and leaves one in review or dr
   const steps = [row(2, { what: 'Plates', state: 'open', parent: parent.id }), row(3, { what: 'Index', state: 'review', parent: parent.id }), row(4, { what: 'Cover', state: 'dropped', parent: parent.id })];
   const a = await runInQuickJs(scriptOf('close_follow_ups'), hostOf([parent, ...steps], { id: parent.id }));
   assert.deepEqual(writesOf(a), [{ op: 'update', spoken: 'tasks#2', patch: { state: 'done', note: 'Closed with Proof the spring catalogue (tasks#1).' }, version: 1 }]);
+});
+
+/* ── The questions about tasks, on Work (PGS-C18) ──────────────────────────────────────────────── */
+
+type Laid = { kind: string; heading?: string; lead?: boolean; fold?: boolean; box?: boolean; area?: string; body?: string; where?: string; when?: unknown; limit?: number; tiles?: boolean };
+type Drawn = { kind: string; heading?: string; lead?: boolean; body?: string; drawn?: boolean; values?: Record<string, Json>; queue?: { id: string }[]; matched?: number };
+
+const workPage = (): Laid[] => (file().declarations.find((d) => d.page === 'work')!.blocks as Laid[]);
+
+/**
+ * The tiles a page shows before its first fold at 1440: the line is the page's sentence, the capture line is the header's,
+ * and a boxed heading with what follows it is one tile, as `calm-pages.test.ts` counts them and the app draws them.
+ */
+function beforeTheFold(blocks: readonly Laid[]): string[] {
+  const main = blocks.filter((b) => b.area !== 'rail');
+  const fold = main.findIndex((b) => b.kind === 'section' && b.fold === true);
+  let boxed = false;
+  return (fold < 0 ? main : main.slice(0, fold))
+    .filter((b) => {
+      if (b.kind === 'section') return (boxed = b.box === true);
+      return !boxed && !b.lead && b.kind !== 'capture';
+    })
+    .map((b) => b.heading ?? b.kind);
+}
+
+test('WORK ASKS ITS OWN QUESTIONS: a queue of the questions about tasks, three drawn as tiles, only while one waits', () => {
+  const queue = workPage().find((b) => b.kind === 'queue');
+  assert.ok(queue, 'Work declares no queue');
+  assert.deepEqual(
+    { heading: queue.heading, where: queue.where, when: queue.when, limit: queue.limit, tiles: queue.tiles },
+    { heading: 'Questions for you', where: 'list is tasks', when: { metric: 'questions-open-in:tasks', gt: 0 }, limit: 3, tiles: true },
+  );
+  /* EVERY LINE OF THE PAGE BUT THE EMPTY ONE SAYS THE COUNT. */
+  const lines = workPage().filter((b) => b.lead && typeof b.body === 'string' && b.body.includes('{{'));
+  assert.equal(lines.length, 2);
+  for (const l of lines) assert.match(l.body!, /\{\{questions-open-in:tasks\}\} question\(s\) for you/u);
+});
+
+test('SIX TILES BEFORE THE FOLD AT 1440, the questions under Late', () => {
+  assert.deepEqual(beforeTheFold(workPage()), ['Late', 'Questions for you', 'At a glance', 'This week', 'With an agent', 'Waiting on you']);
+});
+
+test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT TASKS: nothing at nought, two at two, and not the one about a person', async () => {
+  const { api, close } = await record([PROJECTS, PEOPLE]);
+  said(await put(api, file()));
+  const late = add(api, 'tasks', { what: 'Glaze the test tiles', state: 'open', by: '2026-03-02' });
+  const later = add(api, 'tasks', { what: 'Book the kiln', state: 'open', by: '2026-03-12' });
+  const ada = person(api, 'Ada Byrne');
+  const spoken = (id: string): string => {
+    const e = api.kernel.get(id) as unknown as { register: string; seq: number };
+    return `${e.register}#${e.seq}`;
+  };
+  const OPTIONS = [{ id: 'yes', label: 'Yes', because: 'It is due' }, { id: 'no', label: 'No', because: 'Not yet' }];
+  const ask = (question: string, about: string) => said(api.kernel.propose({ question, body_kind: 'options', body: { options: OPTIONS, about } } as never, 'slash'));
+  const page = (): Drawn[] => said<{ blocks: Drawn[] }>(api.kernel.page('work')).blocks;
+  const line = (): string => {
+    const lead = page().find((b) => b.kind === 'note' && b.lead && b.drawn !== false && typeof b.body === 'string' && b.body.includes('questions-open-in'))!;
+    return rulesLine(lead.body!, lead.values ?? {});
+  };
+  const questions = (): Drawn => page().find((b) => b.heading === 'Questions for you')!;
+
+  assert.equal(questions().drawn, false, 'the queue drew with nothing asked');
+  assert.doesNotMatch(line(), /question/u, 'the line said nought');
+  assert.match(line(), /^1 late/u);
+
+  ask('Move the glazing to Friday?', spoken(late));
+  ask('Book the small kiln?', spoken(later));
+  ask('Is this the same potter?', spoken(ada));
+  assert.notEqual(questions().drawn, false);
+  assert.equal(questions().matched, 2, 'the queue kept a question about a person');
+  assert.match(line(), /^2 questions for you, 1 late/u);
+  close();
 });

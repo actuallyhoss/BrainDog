@@ -4,9 +4,10 @@
  * IT NEEDS NO FIRST-PARTY MODULE. Work's tasks point at Projects and carry no order or milestone, and a
  * person starting a podcast has no portfolio yet, so the guide carries its own four lists: the milestones
  * a project passes, the steps that reach each one, the choices still to make, and what helps along the way.
- * The example rows are the six milestones a project passes, from an idea to keeping it going, the first three steps,
- * a first choice and a first resource, so the guide opens already guiding. When onboarding heard what the project is,
- * the rows are that kind of project's plan instead, and they are the person's plan rather than examples (`guide-kinds.ts`).
+ * IT CARRIES NO EXAMPLE ROWS, SINCE USE-A09. What onboarding heard forms the first plan (`guide-kinds.ts`): that kind of
+ * project's, or for a project of no known kind the general plan, the six milestones a project passes from an idea to
+ * keeping it going, the first three steps, a first choice and a first resource. They were this pack's example rows,
+ * which a record is never given, so a boat or a thesis opened on empty lists. Now they are formed and the person's plan.
  *
  * WHERE YOU ARE, WHAT IS NEXT, WHAT IS STUCK AND WHAT WAITS ON YOU (1.1.0). A step can be blocked and say what it waits
  * on, and taken by an agent; a step, a milestone and a choice each keep the day they were finished, which the record
@@ -632,19 +633,6 @@ export const GUIDE = {
           },
         ],
       },
-    ],
-    seeds: [
-      { register: 'milestones', fields: { what: 'Say what it is and who it is for', stage: 'idea', state: 'underway', order: 1 } },
-      { register: 'milestones', fields: { what: 'Find the people who want it', stage: 'idea', state: 'not_started', order: 2 } },
-      { register: 'milestones', fields: { what: 'Plan the smallest first version', stage: 'plan', state: 'not_started', order: 3 } },
-      { register: 'milestones', fields: { what: 'Make the first version', stage: 'build', state: 'not_started', order: 4 } },
-      { register: 'milestones', fields: { what: 'Share it with the first people', stage: 'launch', state: 'not_started', order: 5 } },
-      { register: 'milestones', fields: { what: 'Keep it going and learn from it', stage: 'grow', state: 'not_started', order: 6 } },
-      { register: 'steps', fields: { what: 'Write one sentence about what this is and who it is for', state: 'to_do', order: 1, by: '+2d' } },
-      { register: 'steps', fields: { what: 'Name three people who would use it', state: 'to_do', order: 2, by: '+5d' } },
-      { register: 'steps', fields: { what: 'Ask one of them what they would want first', state: 'to_do', order: 3, by: '+9d' } },
-      { register: 'choices', fields: { question: 'What will it be called?', state: 'open' } },
-      { register: 'resources', fields: { name: 'Three projects like yours to learn from', kind: 'example' } },
     ],
   },
 };

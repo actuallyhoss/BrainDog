@@ -239,6 +239,8 @@ const usage = () =>
     '  Start a scratch BrainDog on this machine with the add-on in its catalogue, and print its page. Removed when it stops.',
     'braindog pack diff|search|install|yank <...>',
     '  The same as for a use case: diff <a> <b>, search [words] [--from <catalogue> | --kennel [host]], install <id|file> [--from <catalogue>], yank <id> <version> --reason <why>.',
+    'braindog pack install <file> --force | braindog pack uninstall <id> [--force]',
+    '  --force on pack install or pack uninstall takes away a list that still holds items, keeping every one of them. It lifts that refusal only.',
     'braindog pack publish <file> --to <folder> | --kennel [host] [--sign <key file>]',
     '  Add an add-on version to a catalogue folder, or submit it to the Kennel and say whether it is listed or waits for review, signed with an author key or as the person signed in.',
     'braindog kennel review [show|list|refuse <kind> <id> <version>] [--reason <why>] [--kennel <host>] | trust <publisher>',

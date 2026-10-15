@@ -110,7 +110,7 @@ export type {
   Where,
 } from './types.ts';
 export { ASK_CAP_DEFAULT, ASK_CAP_FREE, BACKGROUND_ASKS_MONTH, PROVIDERS, VERBS } from './types.ts';
-export { mappingAskOf, mappingOf, setupAskOf, setupOf, type MappingAnswer, type MappingAsk, type MappingList, type SetupAnswer, type SetupAsk, type SetupOffer } from './propose.ts';
+export { mappingAskOf, mappingOf, readSetup, setupAskOf, setupOf, type MappingAnswer, type MappingAsk, type MappingList, type SetupAbout, type SetupAnswer, type SetupAsk, type SetupOffer, type SetupQuestion } from './propose.ts';
 export type { IngestDeclaration, PatternDraft } from './jobs.ts';
 export { SKILL_BODY_MOST, SKILL_DRAFT_INSTRUCTIONS, SKILL_LEARNINGS_MOST, skillDraftShaped, type SkillDraftInput, type SkillDrafted } from './skill-draft.ts';
 

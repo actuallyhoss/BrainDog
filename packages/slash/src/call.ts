@@ -20,6 +20,8 @@
 import { no, ok, type Clock, type Result, type Sql } from '@braindog/ports';
 
 import { PROMPTS, MODELS, fill, type ModelId, type PromptId } from './prompts.ts';
+import { scrubWords } from './health.ts';
+import { LAST_ROWS_SQL, NOT_SERVED, PASSED_WORDS, RAW_MAX, pausedFor, type LastRow } from './paused.ts';
 import { checkSchema, isRecord, tokens } from './project.ts';
 import type { Inference, Purpose, ReadTrace, Settings, SlashRoute, Spends, Tier } from './types.ts';
 
@@ -73,6 +75,12 @@ export type Ran = {
   served: boolean;
   /** The host's handle for the candidate that ended a route's walk (ENG-A06), for the caller's row. Absent with no route. */
   candidate?: string | undefined;
+  /**
+   * The provider's words on a throw from a route's candidate, scrubbed and cut (`thrownRaw`), for the
+   * caller's row: a model its provider does not serve starts with that phrase, which is what pauses it for a day.
+   * Absent with no route, and on every attempt that did not throw.
+   */
+  raw?: string | undefined;
 };
 
 export type RunArgs = {
@@ -487,6 +495,21 @@ const KINDS: Readonly<Record<PromptId, CallKind>> = {
 /** A throw the host marked as a ceiling saying no before anything was sent: true of every candidate after it too. */
 const budgetIn = (e: unknown): boolean => typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'SLASH_BUDGET_SPENT';
 
+/**
+ * The provider's words a throw carried, for its row: `why` and `raw` as the hosts mark a throw (`apps/worker/src/slash.ts`
+ * `Reached`), scrubbed (`scrubWords`) and cut. A model its provider does not serve is written with `NOT_SERVED` first,
+ * which is what `pausedFor` reads back (`paused.ts`); a throw that carries no `why` is read from its sentence, as the
+ * host router reads a refusal's.
+ */
+const thrownRaw = (thrown: unknown): string | undefined => {
+  if (typeof thrown !== 'object' || thrown === null) return undefined;
+  const { why, raw, message } = thrown as { why?: unknown; raw?: unknown; message?: unknown };
+  const said = typeof raw === 'string' ? scrubWords(raw) : '';
+  const notServed = typeof why === 'string' ? why === NOT_SERVED : typeof message === 'string' && message.includes(NOT_SERVED);
+  if (notServed) return (said === '' ? NOT_SERVED : `${NOT_SERVED}: ${said}`).slice(0, RAW_MAX);
+  return said === '' ? undefined : said.slice(0, RAW_MAX);
+};
+
 /** A throw the host marked as nothing sent at all (`sent: false`, as `answer.ts` reads it). */
 const sentNothing = (e: unknown): boolean => typeof e === 'object' && e !== null && (e as { sent?: unknown }).sent === false;
 
@@ -694,9 +717,35 @@ export const core = (
 
     let start = t0;
     for (const [i, candidate] of walk.entries()) {
+      const final = i === walk.length - 1;
+      /* A CANDIDATE THAT KEEPS FAILING IS SKIPPED AT ONCE, read from its own last rows (`paused.ts`), and the skip is one
+         row under `-` that spends nothing and says why. THE LAST CANDIDATE IS NEVER SKIPPED, so an ask always reaches a
+         model, and a candidate with no handle has no rows of its own to read and is asked. */
+      if (!final && candidate.id !== undefined) {
+        const why = pausedFor(sql.all<LastRow>(LAST_ROWS_SQL, candidate.id, candidate.model), clock.now());
+        if (why !== null) {
+          account({
+            id: ulid(clock.now()),
+            kind: KINDS[args.id],
+            tier: settings().tier,
+            model: '-',
+            usage: { in: 0, out: 0 },
+            ms: 0,
+            status: 'nothing',
+            code: 'UNREACHABLE',
+            purpose: template.purpose,
+            spends: 'none',
+            served: false,
+            candidate: candidate.id,
+            raw: PASSED_WORDS[why],
+          });
+          continue;
+        }
+      }
       const { ran, thrown } = await ask(candidate.model, candidate.inference === undefined ? (args.inference ?? fallback) : (args.watch?.(candidate.inference) ?? candidate.inference), start);
-      const tried: Ran = candidate.id === undefined ? ran : { ...ran, candidate: candidate.id };
-      if (i === walk.length - 1 || !passedOver(ran, thrown)) return tried;
+      const raw = thrown === undefined ? undefined : thrownRaw(thrown);
+      const tried: Ran = candidate.id === undefined ? ran : { ...ran, candidate: candidate.id, ...(raw === undefined ? {} : { raw }) };
+      if (final || !passedOver(ran, thrown)) return tried;
       /* THE ATTEMPT PASSED OVER IS ITS OWN ROW, under its own model and a fresh id, so the ledger holds one row an attempt
          and the caller's row is the attempt that ended the walk. It spends nothing (`unspent`), and its neurons are its
          model's, as a caller's `UNREACHABLE` row's are. A throw the host marked as nothing sent is under `-`. */
@@ -713,6 +762,8 @@ export const core = (
         spends: 'none',
         served: false,
         candidate: candidate.id,
+        /* THE PROVIDER'S WORDS, so a model it does not serve reads back as that and is passed over for a day. */
+        raw,
       });
       start = clock.now();
     }

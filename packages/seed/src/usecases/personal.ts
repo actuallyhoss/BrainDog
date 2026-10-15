@@ -108,6 +108,15 @@ const budgetProgress = (heading: string) => ({
   empty: 'No budget yet. Give a category the most you mean to spend on it in a month, and what is left shows here.',
 });
 
+/**
+ * WHERE HOME'S FIRST ACTS LEAD, SINCE 2.5.0: the Accounts list with its add form open, the page where a forwarded bank
+ * message is set up (the first run's own "Your bank's texts" goes there), and Browse searched for "money", because every
+ * add-on that brings money in says so in its summary and this file names no provider (`tools/gates/shell-words.mjs`).
+ */
+const ADD_ACCOUNT = '/r/accounts?new=1';
+const FORWARD_BANK = '/settings/ingest';
+const BROWSE_MONEY = '/packs/browse?q=money';
+
 export const PERSONAL = {
   usecase: 'personal',
   /* 1.3.0: the Projects page went, so the rail has one Projects Overview, and its next steps are on Home.
@@ -132,8 +141,13 @@ export const PERSONAL = {
      2.4.0: the count of budgets set goes to Money (`hands`), which declares `budgets-set` itself since money-core
      3.17.0 so that its own Budgets tile has the count on a record with no use case. Two packs cannot own one
      figure, so this version stops declaring it and Home's budget tile reads Money's. A minor step: the figure is
-     handed with its id, where and value as they were, and nothing a record holds goes. */
-  version: '2.4.0',
+     handed with its id, where and value as they were, and nothing a record holds goes.
+     2.5.0: a new Home offers something to press (USE-A08). While no account counts as cash, Bring your money in links
+     to adding an account, forwarding a bank message and the add-ons that bring money in; while no savings goal is
+     kept, a line names one; while no project is live, a line names one in the Building lane. Each is drawn on its own
+     count, so Home drops it once the thing exists. Three blocks and one count are added and nothing goes, so a minor
+     step beside 2.4.0, which is live. */
+  version: '2.5.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -420,6 +434,9 @@ export const PERSONAL = {
       counted('savings-active', 'Savings goals on the go', 'register.savings_goals', 'state is not paused'),
       counted('goals-active', 'Goals on the go', 'register.goals', 'state is active, kind is goal'),
       counted('habits-active', 'Habits on the go', 'register.goals', 'state is active, kind is habit'),
+      /* EVERY SAVINGS GOAL KEPT, PAUSED OR NOT, SINCE 2.5.0: Home's line that names the first one waits on it, so a
+         person whose one goal is paused is not asked to name a goal again. */
+      counted('savings-held', 'Savings goals kept', 'register.savings_goals'),
       counted('goals-held', 'Goals and habits', 'register.goals'),
       counted('goal-log-held', 'Logged', 'register.goal_log'),
       counted('put-by-held', 'Put by', 'register.put_by'),
@@ -434,7 +451,7 @@ export const PERSONAL = {
         page: 'home-personal',
         title: 'Day to day',
         icon: 'home',
-        requires: ['register.accounts', 'register.categories', 'register.things', 'register.project_steps', 'register.goals', 'register.goal_log'],
+        requires: ['register.accounts', 'register.categories', 'register.things', 'register.project_steps', 'register.goals', 'register.goal_log', 'register.savings_goals'],
         blocks: [
           {
             /* THE PAGE'S ONE LINE, SINCE 2.2.0, said from Money's own figures in a person's words: what is in the
@@ -457,6 +474,43 @@ export const PERSONAL = {
             limit: 5,
             when: { metric: 'questions-open', gt: 0 },
             empty: '{{config:voice_nothing_needs_you}}',
+          },
+          {
+            /* THE FIRST ACTS, SINCE 2.5.0 (USE-A08): a new record opened on a line of zeros and nothing to press. Each is
+               drawn on its own count and goes once the thing it starts exists, so a record with an account, a goal and a
+               project never sees them. Nothing is written until the person presses. The way in for money comes first,
+               as it does on a founder's Home, while no account counts as cash (money-core `cash-accounts`). */
+            kind: 'link',
+            heading: 'Bring your money in',
+            icon: 'plug',
+            span: 12,
+            when: { metric: 'cash-accounts', lt: 1 },
+            authored: [
+              { cells: ['Add an account', ADD_ACCOUNT, 'What is in it today, and every figure on Home starts from it'] },
+              { cells: ['Forward a bank message', FORWARD_BANK, 'What you spent files itself from the texts your bank sends'] },
+              { cells: ['Find an add-on for your bank', BROWSE_MONEY, 'Balances and payments arrive on their own'] },
+            ],
+          },
+          {
+            /* THE HEADING IS THE PROMPT (`render/src/capture.ts`). A line typed here is a savings goal by that name, and
+               the host asks for the target the list requires before it writes. */
+            kind: 'capture',
+            heading: 'Name something you are saving for',
+            icon: 'piggy-bank',
+            span: 12,
+            register: 'savings_goals',
+            when: { metric: 'savings-held', lt: 1 },
+          },
+          {
+            /* A PROJECT NAMED HERE IS ON THE GO AT ONCE: the `where:` pins its lane to building (`captureFills`), so it
+               is a card under My projects as soon as it is written. */
+            kind: 'capture',
+            heading: 'Name something you are making',
+            icon: 'rocket',
+            span: 12,
+            register: 'things',
+            where: 'lane is building',
+            when: { metric: 'projects-live', lt: 1 },
           },
           {
             /* EVERY DAY SOMETHING FALLS DUE IN THE NEXT TWO WEEKS, bills, pay days and parts of a plan among them, as the

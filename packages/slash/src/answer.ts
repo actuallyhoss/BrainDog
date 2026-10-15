@@ -283,6 +283,7 @@ export const answering = (core: Core, fallback: Inference): { answer(ask: Ask, i
           code,
           question: `rule.${ask.rule} step ${step}`,
           candidate: ran.candidate,
+          raw: ran.raw,
           ...CHARGE,
         });
 

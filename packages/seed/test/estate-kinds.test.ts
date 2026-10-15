@@ -37,6 +37,8 @@ type Diff = { planHash: string; approve?: unknown; stays: { id: string; values: 
 
 const NAMED = { server: 'Server', database: 'Database', storage: 'Storage', network: 'Network' } as const;
 const EIGHT = ['domain', 'hosting', 'saas', 'certificate', 'subscription', 'membership', 'insurance', 'utility'];
+/** The three cloud types with names, since estate 2.2.0 (waiting-people-services-99). */
+const CLOUD = { vm: 'Virtual machine', edge: 'Edge network', object: 'Object storage' } as const;
 
 /** Estate with no example rows, so the only services on the record are the ones a test makes. */
 const estate = (): Doc => structuredClone(firstPartyDocument('estate', { seeds: [] })) as unknown as Doc;
@@ -126,8 +128,9 @@ const service = (name: string, kind: string, minor: number): Record<string, unkn
 
 test('SERVICES DECLARES SERVER, DATABASE, STORAGE AND NETWORK, each with its name, after the eight it had', () => {
   const kind = kindIn(estate());
-  assert.deepEqual(kind.values, [...EIGHT, ...Object.keys(NAMED)], 'the eight keep their places and the four come after');
+  assert.deepEqual(kind.values, [...EIGHT, ...Object.keys(NAMED), ...Object.keys(CLOUD)], 'the eight keep their places and the four come after');
   for (const [value, name] of Object.entries(NAMED)) assert.equal(kind.labels?.[value], name);
+  for (const [value, name] of Object.entries(CLOUD)) assert.equal(kind.labels?.[value], name);
   assert.deepEqual(
     (kind.values ?? []).filter((v) => typeof kind.labels?.[v] !== 'string' || kind.labels[v] === ''),
     [],
@@ -159,9 +162,10 @@ test("AN UPDATE TO THE FOUR KEEPS A TYPE THE RECORD ADDED ITSELF, and the row th
   said(api.kernel.create('services', service('Front of the site', 'edge_cache', 1_200), OWNER));
   const diff = await put(api, now());
   const kind = liveKind(api);
-  assert.deepEqual(kind.values, [...EIGHT, ...Object.keys(NAMED), 'vm', 'edge_cache'], "the record's own two come after the pack's twelve");
-  assert.deepEqual(diff.stays.map((s) => [s.id, s.values]), [['register.services', ['kind.vm', 'kind.edge_cache']]], 'the plan says which types it keeps');
+  assert.deepEqual(kind.values, [...EIGHT, ...Object.keys(NAMED), ...Object.keys(CLOUD), 'edge_cache'], "the record's own two come after the pack's twelve");
+  assert.deepEqual(diff.stays.map((s) => [s.id, s.values]), [['register.services', ['kind.edge_cache']]], 'the plan says which types it keeps');
   for (const [value, name] of Object.entries(NAMED)) assert.equal(kind.labels?.[value], name);
+  assert.equal(kind.labels?.vm, 'Virtual machine');
   said(api.kernel.update('services', vm.id, { note: 'Rebuilt in March' }, OWNER));
   assert.equal(api.kernel.get(vm.id)!.fields.kind, 'vm');
   said(api.kernel.create('services', service('The database', 'database', 2_000), OWNER));
@@ -181,7 +185,7 @@ test('A TYPE WITH NO NAME IS DRAWN IN SENTENCE CASE, never as its key, beside th
   said(api.kernel.create('services', service('The server', 'server', 3_000), OWNER));
   const { block, words } = monthByType(api);
   const labels = labelsOf(block);
-  for (const name of ['Vm', 'Edge cache', 'Server']) assert.ok(labels.includes(name), `${name} is not among ${labels.join(', ')}`);
+  for (const name of ['Virtual machine', 'Edge cache', 'Server']) assert.ok(labels.includes(name), `${name} is not among ${labels.join(', ')}`);
   for (const key of ['vm', 'edge_cache', 'server']) assert.ok(!labels.includes(key), `${key} is drawn as its key`);
   assert.doesNotMatch(words, /"label":"[a-z][a-z0-9]*_[a-z0-9_]*"/u, 'a label on the block still carries an underscore');
   close();

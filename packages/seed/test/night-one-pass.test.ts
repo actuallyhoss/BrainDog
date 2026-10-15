@@ -91,14 +91,22 @@ const fingerprint = (d: Body): string =>
 const RELEASED_2_3_1 = '268bbef9b5df127a';
 
 /**
- * Personal 2.3.1, from this build's document with 2.4.0's one change undone: no `hands`, and the count back where it
+ * Personal 2.3.1, from this build's document with 2.5.0's first things to press and 2.4.0's one change undone: no `hands`, and the count back where it
  * stood, first of the nine counts, straight before `savings-active`.
  */
 function personal231(): Body {
   const now = useCaseDocument('personal', TODAY) as Body;
   const { hands: _hands, ...rest } = now;
+  /* AND 2.5.0'S FIRST THINGS TO PRESS ON HOME, with the figure and the list they read (personal-and-guide-99). */
+  const firstActs = ['Bring your money in', 'Name something you are saving for', 'Name something you are making'];
   const declarations = (now.declarations as Body[]).flatMap((d) =>
-    d.metric === 'savings-active' ? [counted('budgets-set', 'Budgets set', 'register.categories', 'state is live, direction is out, budget is set'), d] : [d],
+    d.metric === 'savings-held'
+      ? []
+      : d.page === 'home-personal'
+        ? [{ ...d, requires: (d.requires as string[]).filter((r) => r !== 'register.savings_goals'), blocks: (d.blocks as Body[]).filter((b) => !firstActs.includes(String(b.heading))) }]
+        : d.metric === 'savings-active'
+          ? [counted('budgets-set', 'Budgets set', 'register.categories', 'state is live, direction is out, budget is set'), d]
+          : [d],
   );
   return { ...rest, version: '2.3.1', declarations, seeds: [] };
 }

@@ -831,7 +831,11 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'tasks-late-yours', gt: 0 },
-        body: '{{tasks-late-yours}} late, {{tasks-waiting}} waiting on you',
+        /* AND FIRST, THE QUESTIONS ABOUT TASKS, SINCE work 1.19.0 (PGS-C18): "2 questions for you, 1 late". Decide's
+           badge counted them while this line said only the tasks, so the page read quiet with calls waiting on its own
+           work. `questions-open-in:tasks` counts what Questions for you below draws, and at nought the clause goes. Not
+           "wait on you", which would read beside the tasks waiting on you as the same thing said twice. */
+        body: '{{questions-open-in:tasks}} question(s) for you, {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you',
       },
       {
         /* NOTHING LATE AND NOT HOW MANY ARE OPEN, SINCE work 1.15.0: Open is the first figure of the strip under the
@@ -840,7 +844,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'tasks-late-yours', is: 0 },
-        body: 'Nothing is late, {{tasks-waiting}} waiting on you',
+        /* THE QUESTIONS SECOND HERE, SINCE work 1.19.0: first they would put "Nothing" in the middle of the line, and
+           the writer leaves a clause at nought out and never mends a capital. */
+        body: 'Nothing is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you',
       },
       {
         /* CAPTURE FIRST, before any figure, because a task that is not written down the moment it comes to mind is the
@@ -875,6 +881,24 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         order: TIER_THEN_DUE,
         limit: 12,
         when: { metric: 'tasks-late-yours', gt: 0 },
+      },
+      {
+        /* WHAT A RULE OR AN AGENT ASKED ABOUT A TASK, SINCE work 1.19.0 (PGS-C18), answered here, three at a time, one
+           tile each, and the rest in Decide: the questions whose row is on tasks (`list is tasks`), counted by
+           `questions-open-in:tasks`, and drawn only while that is above nought, so a quiet day has no band for it.
+           QUESTIONS FOR YOU AND NOT WAITING ON YOU, which is the band of tasks handed back to a person further down.
+
+           THE WHOLE WIDTH UNDER LATE, the sixth tile before the fold at 1440: Late, this, At a glance, then This week,
+           With an agent and Waiting on you a third each. The capture line is the header's and no tile. */
+        kind: 'queue',
+        heading: 'Questions for you',
+        icon: 'ask',
+        span: 12,
+        source: 'governance.open',
+        where: 'list is tasks',
+        limit: 3,
+        tiles: true,
+        when: { metric: 'questions-open-in:tasks', gt: 0 },
       },
       {
         /* THE FIGURES, AS ONE STRIP, SINCE work 1.15.0, under what is late, which the page leads with when anything is

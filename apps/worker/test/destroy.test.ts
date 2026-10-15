@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { FINAL_KEPT_DAYS, destroyRecord, type Swept } from '../src/destroy.ts';
+import { fileKey } from '../src/files.ts';
 import { prefixOf } from '../src/snapshots.ts';
 
 const REC = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
@@ -101,6 +102,30 @@ test('A DELETED RECORD LEAVES ITS FINAL COPY AND NOTHING ELSE, and the copy is t
   assert.deepEqual([...blobs.held].filter((k) => k.startsWith(prefixOf(REC))), [FINAL]);
   assert.deepEqual([...blobs.held].filter((k) => k.startsWith(prefixOf(OTHER))).sort(), nightly(OTHER).sort(), 'another record lost a copy');
   assert.deepEqual(calls, [`final:${REC}`, 'deleteAlarm', 'deleteAll', `close:${REC}`]);
+});
+
+test('THE DELETE ANSWERS WHAT IT KEPT AND WHAT IT TOOK: the final copy by its key, and every other copy and file counted', async () => {
+  // LCH-A03 step 9 reads this answer: one key kept, named `final-`, and none other under the prefix. Two nights, one
+  // file and another record's copies beside them, so a count that took the other record's, or forgot the files, is off.
+  const { calls, storage, close } = fakes();
+  const file = fileKey(REC, 'a'.repeat(64));
+  const blobs = bucket([...nightly(REC), file, ...nightly(OTHER)]);
+
+  const said = await destroyRecord(storage, close, REC, { blobs, final: finalInto(blobs, calls) });
+
+  assert.deepEqual(said, { kept: FINAL, removed: 3 });
+  assert.match(said?.kept ?? '', /(^|\/)final-/u);
+  assert.ok(!blobs.held.has(file), 'the file outlived its record');
+  assert.equal([...blobs.held].filter((k) => k.startsWith(prefixOf(REC))).length, 1);
+});
+
+test('WITHOUT A BUCKET THE DELETE KEEPS NOTHING AND SAYS NOTHING KEPT, and a record with nothing else answers 0 removed', async () => {
+  const bare = fakes();
+  assert.equal(await destroyRecord(bare.storage, bare.close, REC), undefined, 'a delete with no bucket said it kept a copy');
+
+  const lone = fakes();
+  const blobs = bucket([]);
+  assert.deepEqual(await destroyRecord(lone.storage, lone.close, REC, { blobs, final: finalInto(blobs, lone.calls) }), { kept: FINAL, removed: 0 });
 });
 
 test('A SWEEP THAT FAILS LEAVES THE RECORD WHOLE: deleteAll is never called over copies that are still there', async () => {

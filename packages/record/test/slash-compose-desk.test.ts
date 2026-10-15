@@ -13,8 +13,8 @@
  * where the parts carry `hue`), and a path filtered by a field no step has (`stage`). Both are refused on the blocks
  * that name them when the draft is drawn, so both go back in one repair, and the second answer mends both.
  *
- * THE COST IS DESCRIBED TOO, AS A SCRIPT ON A CLOCK. The pack adds a price check's costs with a script a rule starts on
- * each write (`packs/launch-desk/cost.js`), and a description may not build that: from a description Slash builds a
+ * THE COST IS DESCRIBED TOO, AS A SCRIPT ON A CLOCK. Launch desk up to 2.2.0 added a price check's costs with a script a
+ * rule started on each write (3.0.0 works them out with derive:), and a description may not build that: from a description Slash builds a
  * script that runs only on its clock (`describedScript` in `packages/record/src/slash.ts`), since a rule handing rows
  * to code is the shape an abused model's answer once filed. So the described desk carries the same source under
  * `runs.every`, and its costs are added on that clock rather than the moment one is typed. The last case holds the
@@ -50,7 +50,11 @@ type Drafted = {
 type Filed = { by: string; filed: { id: string; question: string; by: string }[]; skipped: { question: string; why: string }[]; dropped: string[] };
 
 /** The pack's own cost script, which adds every check's costs when it is handed no row, as a run on a clock is. */
-const COST = readFileSync(new URL('../../../packs/launch-desk/cost.js', import.meta.url), 'utf8');
+const COST = (
+  JSON.parse(readFileSync(new URL('../../../apps/web/static/catalogue/packs/launch-desk/2.2.0.pack.json', import.meta.url), 'utf8')) as {
+    declarations: { script?: string; source?: string }[];
+  }
+).declarations.find((d) => d.script === 'launch_desk_cost')!.source!;
 
 /* ── the desk a model describes ─────────────────────────────────────────────────────────────────── */
 

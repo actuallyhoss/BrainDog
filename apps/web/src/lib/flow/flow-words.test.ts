@@ -25,6 +25,14 @@ import { fileURLToPath } from 'node:url';
 import { openRecord, type Declaration, type Kernel } from '@braindog/kernel';
 
 import { ARGS, COMPARE, CONDITION_HINT, leafOf, leafTo, sayCondition } from './flow.ts';
+import { holdGrammar } from './grammar.ts';
+
+/* THE RECORD'S GRAMMAR, HELD AS THE EDITOR HOLDS IT once `flowGrammar` answers: an `if` step and its condition. */
+holdGrammar({
+  triggers: [],
+  steps: [{ verb: 'if', group: 'flow', row: false, once: false, args: [{ name: 'if', type: 'condition', required: true }] }],
+  ceilings: { steps: 50, depth: 3, runsPerDay: 1000, vars: 64 },
+});
 
 const NOW = Date.UTC(2026, 8, 24, 12);
 const HERE = fileURLToPath(new URL('.', import.meta.url));

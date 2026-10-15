@@ -27,6 +27,10 @@
   its row, which docks it in a panel; with `onmenu` a quiet trailing control (`data-calm`, shown on hover or focus)
   hands it the row and itself to anchor a menu to. With neither the row is exactly `toHTML`'s, the same branch the box
   makes: a control that cannot act is absent.
+
+  A ROW'S OWN ACTIONS (PGS-A12) sit at its end, through `Actions` at the row's size, only where the host hands both the
+  block's `row_actions` and `act`. On `todo`, `timeline` and a plain list; the kinds with drawers of their own above
+  (feed, queue, agents, roadmap, path) do not draw them yet.
 -->
 <script lang="ts">
   import { inline, takeWorking, text, TONES, WORKING_GLYPH, WORKING_LABEL, type Block, type RenderOptions, type Row } from '../../src/index.ts';
@@ -42,6 +46,8 @@
   import Roadmap from './Roadmap.svelte';
   import type { RoadmapDrop } from './roadmap-drag.ts';
   import Text from '../Text.svelte';
+  import Actions from '../Actions.svelte';
+  import type { OnAct } from '../../src/actions.ts';
 
   let {
     block,
@@ -55,6 +61,8 @@
     onmenu,
     onselect,
     selected,
+    rowActions,
+    act,
   }: {
     block: Block;
     opts?: RenderOptions;
@@ -75,7 +83,15 @@
     cursor?: string | null | undefined;
     /** Where the host hears that focus moved into a row, with its key and the row. */
     onrowfocus?: ((key: string, row: Row) => void) | undefined;
+    /**
+     * EACH ROW'S DECLARED ACTIONS (PGS-A12, the block's `row_actions`) and where a press goes, with the row it was on.
+     * Drawn at the row's end only when both are handed; with either absent the row is exactly `toHTML`'s.
+     */
+    rowActions?: readonly unknown[] | null | undefined;
+    act?: OnAct | undefined;
   } = $props();
+
+  const acts = $derived(act !== undefined && Array.isArray(rowActions) && rowActions.length > 0);
 
   /** The queue this list hands its question to, so `choose` can reach it. */
   let queue = $state<{ choose(i: number, key?: string | null): boolean } | undefined>(undefined);
@@ -155,6 +171,9 @@
     boxes[to]?.focus();
   }
 </script>
+
+<!-- A ROW'S OWN ACTIONS, AT ITS END: the first shown and the rest in its one menu, each press handed its row. -->
+{#snippet rowActs(row: Row)}{#if acts}<div class="item-acts"><Actions actions={rowActions} {row} onact={act} size="row" /></div>{/if}{/snippet}
 
 <!-- `feed` is on this primitive and groups its rows, so it has a drawer of its own, as `cards` does on `grid`, and so
      does `roadmap`, which draws its rows on a time axis rather than as a list of them, and `steps path`. -->
@@ -264,6 +283,7 @@
             {UNSAVED}
           </span>
         {/if}
+        {@render rowActs(row)}
         {#if onmenu}
           <!-- LAST, AND QUIET: three dots that wait for the pointer or the keyboard to reach the row (`data-calm`), named
                for the task, with the 44px hit box the tick has. -->
@@ -304,6 +324,7 @@
         >
         <!-- Each cell as it is said (`timelineCell`): a day this year without its year, an amount of nothing not at all. -->
         <span class="item-detail"><Text nodes={inline(timelineCell(row.cells[2], opts.now), opts)} {opts} /></span>
+        {@render rowActs(row)}
       </li>
     {:else}
       {@const title = takeWorking(row.cells[0] ?? '')}
@@ -313,8 +334,43 @@
         >
         <span class="item-detail"><Text nodes={inline(row.cells[1] ?? '', opts)} {opts} /></span>
         <span class="item-state"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
+        {@render rowActs(row)}
       </li>
     {/if}
   {/each}
 </svelte:element>
 {/if}
+
+<style>
+  /* A ROW WITH ITS OWN ACTIONS TAKES A TRACK at the end of its first line for them, after the state and before a task's
+     menu, so nothing else on the row moves. Here and not in the skin, because only this component draws the slot. Global, so
+     no scoping class lands on a row `toHTML` draws too and the two trees stay equal. */
+  :global(.list > .item:has(> .item-acts)) {
+    grid-template-areas:
+      'marker title state acts'
+      '. detail detail detail'
+      '. meta meta meta';
+    grid-template-columns: auto minmax(min(16ch, 100%), 1fr) auto auto;
+  }
+
+  :global(.list > .item:has(> .item-acts):not(:has(> .item-marker))) {
+    grid-template-areas:
+      'title state acts'
+      'detail detail detail'
+      'meta meta meta';
+    grid-template-columns: minmax(min(16ch, 100%), 1fr) auto auto;
+  }
+
+  :global(.list > .item:has(> .item-acts):has(> .item-more)) {
+    grid-template-areas:
+      'marker title state acts more'
+      '. detail detail detail detail'
+      '. meta meta meta meta';
+    grid-template-columns: auto minmax(min(16ch, 100%), 1fr) auto auto auto;
+  }
+
+  :global(.list > .item > .item-acts) {
+    grid-area: acts;
+    align-self: center;
+  }
+</style>

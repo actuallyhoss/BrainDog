@@ -50,7 +50,7 @@
   import ActionRows from './panels/ActionRows.svelte';
   import Reporting from './panels/Reporting.svelte';
   import RunPanel from './panels/RunPanel.svelte';
-  import { panelOf } from './panels/panel-of.ts';
+  import { PANEL_WHO, panelOf } from './panels/panel-of.ts';
   import { openInPlace, type Opening } from './group-open.ts';
   import type { Writes } from './page-writes.ts';
   import type { Picked } from './picked.svelte.ts';
@@ -369,6 +369,19 @@
 
   /* The panel the host draws under this block, by the name the section gives it (`panel-of.ts`). */
   const panel = $derived(panelOf(block));
+  /* WHETHER THE READER OWNS THE RECORD, as the shell says it (`me.owner`), the flag the block's own menu reads too. */
+  const owns = $derived((route.data as { me?: { owner?: unknown } }).me?.owner === true);
+  /* A PANEL ABOUT THE RECORD AND NO ROW (`needs: none`, the look editor, the model Slash uses) stands under its section
+     on any page, for the people its level names: anyone for `read`, a page that writes for `write`, the owner alone for
+     `owner`. Never while arranging, since a panel is not a block to move. */
+  const hosted = $derived(
+    panel !== null &&
+      PANEL_WHO[panel].needs === 'none' &&
+      !arranging &&
+      (PANEL_WHO[panel].level === 'read' || (PANEL_WHO[panel].level === 'write' ? writes !== null : owns))
+      ? panel
+      : null,
+  );
   /* WHERE IT WAS SEEN SAYS WHETHER IT DREW (`Seen.svelte` `ondrew`): false on a refusal or an answer that is not one thing. Its section is a heading over the panel, so it is then left out rather than a heading over nothing. */
   let seenDrew = $state<boolean | null>(null);
 
@@ -588,7 +601,7 @@
         onpath={w ? (row, done) => w.onpath(block, row, done, i, shown.rows) : undefined}
         onopen={w ? verbs?.onopen : undefined}
         onmenu={w ? verbs?.onmenu : undefined}
-        act={w ? (action, row, value) => void w.act(action, row, value, { block, at: i, before: shown.rows }) : undefined}
+        act={w ? (action, row, value) => w.act(action, row, value, { block, at: i, before: shown.rows }) : undefined}
       />
       {#if more}<button type="button" class="block-more tap" onclick={(e) => void unfold(e, more.shown)}>{words.more(more.more)}</button>{/if}
       {#if w && segment.kind === 'steps' && w.stepable(block)}<AddStep {block} writes={w} />{/if}
@@ -616,13 +629,18 @@
      as well, and never while arranging. IT IS LOADED BY `import()`, so neither it nor its styles reach the entry chunk. -->
 {#if panel === 'seen' && param && !arranging}
   {#await import('./panels/Seen.svelte') then { default: Seen }}<Seen register={param.register} seq={param.seq} {now} ondrew={(d) => (seenDrew = d)} />{/await}{#if seenDrew === false}<span data-seen-none hidden></span>{/if}
-{:else if panel && panel !== 'seen' && param && writes && !arranging}
+{:else if (panel === 'actions' || panel === 'reporting' || panel === 'run') && param && writes && !arranging}
   <!-- BY THE ROW, `things#1`, and not by its title: the record resolves each action's project to its row. -->
   {#if panel === 'actions'}<Actions project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />
   {:else if panel === 'run'}
     <!-- A RUN'S PAGE, drawn for one row of the list of runs: what it did and its way back, by its handle (`S42`). -->
     {#if param.register === 'session'}<RunPanel run={`S${param.seq}`} title={param.title} onchanged={writes.reread} />{/if}
   {:else}<Reporting register={param.register} seq={param.seq} title={param.title} />{/if}
+{:else if hosted}
+  <!-- A PANEL ABOUT THE RECORD (`panels/index.ts`), on any page: the screen part as its own screen mounts it, handed
+       whether the reader owns the record. The registry and the panel are both reached by `import()`, so neither is in
+       the entry chunk. -->
+  {#await import('./panels/index.ts').then((m) => m.PANEL_LOADERS[hosted]()) then { default: Hosted }}<Hosted owner={owns} />{/await}
 {/if}
 
 <!--

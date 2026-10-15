@@ -40,7 +40,7 @@ const DECLS = [
     blocks: [
       { kind: 'note', heading: 'Lead', body: 'We hold {{projects.count}} projects and {{nothing.here}} and {{payroll.count}} people paid.' },
       { kind: 'stat', heading: 'Figures', cells: [{ metric: 'no-such-figure' }] },
-      { kind: 'note', heading: 'Marked', icon: 'not-a-glyph-at-all', body: 'Plain words.' },
+      { kind: 'note', heading: 'Marked', icon: 'board', body: 'Plain words.' },
       { kind: 'table', heading: 'Pay', source: 'register.payroll' },
     ],
   }),
@@ -49,9 +49,13 @@ const DECLS = [
 
 async function census() {
   const sql = openSqlite();
-  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
-  const put = await api.kernel.install(DECLS);
+  const first = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  const put = await first.kernel.install(DECLS);
   assert.ok(put.ok, JSON.stringify(put));
+  /* A GLYPH NO HOST DRAWS, ON A PAGE STORED BEFORE THE INSTALL REFUSED ONE (`declare.ts` `glyphFault`): written into the
+     stored body, and the record opened again over it, as a record carried from an older build is. */
+  sql.exec("UPDATE declaration SET body = json_set(body, '$.blocks[2].icon', 'not-a-glyph-at-all') WHERE id = 'page.overview' AND superseded_at IS NULL");
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   const made = (await api.create({ register: 'projects', fields: { name: 'Kiln', note: 'See {{kiln.budget}} for {{projects.count}} projects.' } }, owner)) as { ok: boolean };
   assert.ok(made.ok, JSON.stringify(made));
   const refuse = (fix: string): Refusal => ({ code: 'FORBIDDEN', fix, at: 'principal' });

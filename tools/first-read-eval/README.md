@@ -1,0 +1,3 @@
+`MODEL_CHECK_TOKEN=… MODEL_CHECK_ACCOUNT=… node tools/first-read-eval/run.mjs --spend` asks the real model the read set's 42 sentences through `readSetup`; the bar is 36 of 40 readings right and none of the six traps wrong. `--fake <file>` answers from a canned file and spends nothing.
+It costs money: 42 asks of the included model on Workers AI, about 72 neurons each at worst, so about 3,000 neurons (under 4 cents); an ask with no answer is tried twice more, so never more than about 9,000 (10 cents).
+Without the key and `--spend` together it asks nothing and exits 2; the key goes to the model's address alone and is never printed.

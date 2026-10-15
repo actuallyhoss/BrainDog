@@ -23,6 +23,12 @@
  * undone, and when a nightly job that was answered spoke about it. The hash of two rows is the one a nightly job
  * already names a pair by, so a pair shown under either reader is the same pair.
  *
+ * A MODEL WEEDS, AND NEVER DECIDES (ENG-B04 job 3). A nightly job that was answered keeps each verdict in its band
+ * (`people.ts` `answeredOnly`): a pair read as two things, or under the low band, is settled and left out; one in the
+ * top band is kept with `judged`, its score, and ranks first; one between is offered as if no model had spoken. A job
+ * answered before verdicts were kept says no band, and every pair it spoke about is settled, as before. Nothing is
+ * folded or asked on a verdict here either: the offer still waits on his press.
+ *
  * PURE OVER THE TABLES AS THEY ARE. No column, no table and no write: the lists are read from the live declarations, as
  * a figure reads them, and every read is bounded, so the nightly slice costs the same on a record of any size.
  */
@@ -65,7 +71,15 @@ export type Pair = {
   seen: number;
   shared?: 'repository' | 'site' | 'folder' | 'key';
   tie?: string;
+  /** A model's score for the two being one, when an answered nightly job read them in the top band. */
+  judged?: number;
 };
+
+/** The band a model's verdict on a pair fell in: read as two, in doubt, or as one (`people.ts` `bandOf`). */
+export type JudgedBand = 'two' | 'doubt' | 'one';
+
+/** What an answered nightly job keeps of its verdict on one pair: the band, and the score it was said with. */
+export type Judged = { band: JudgedBand; score: number };
 
 /** What a handle stands for, kept by the caller and never shown: a row, or the spellings of a name that was seen. */
 export type PairRow = { register: string; id?: string; names?: string[] };
@@ -177,17 +191,38 @@ function compare(sql: Pick<Sql, 'all'>, list: EntityList, a: Row, b: Row): { con
   return first === undefined ? { conflict: false } : { conflict: false, shared: SHARED_WORD[kindOfKey(first)] ?? 'key' };
 }
 
-/** What was already settled, read once: the pairs a nightly job was answered about, and what each question names. */
-type Settled = { hashes: Set<string>; asked: Map<string, Set<unknown>[]> };
+/**
+ * What was already settled, read once: the pairs a nightly job was answered about or a question names, and of the pairs
+ * a job read in the top band, the score it said.
+ */
+type Settled = { hashes: Set<string>; asked: Map<string, Set<unknown>[]>; judged: Map<string, number> };
+
+/** A kept verdict as it may be read, or `null` for none: an older job's, or one nobody can read. */
+function judgedOf(v: unknown): Judged | null {
+  if (typeof v !== 'object' || v === null) return null;
+  const { band, score } = v as { band?: unknown; score?: unknown };
+  if ((band !== 'two' && band !== 'doubt' && band !== 'one') || typeof score !== 'number' || !Number.isFinite(score)) return null;
+  return { band, score };
+}
 
 function settledIn(sql: Pick<Sql, 'all'>): Settled {
   const hashes = new Set<string>();
-  /* ONLY A JOB THAT WAS ANSWERED COUNTS, as `resolveJob` reads them: its payload is cut to the pairs its answer spoke about. */
+  const judged = new Map<string, number>();
+  /* ONLY A JOB THAT WAS ANSWERED COUNTS, as `resolveJob` reads them: its payload is cut to the pairs its answer spoke
+     about. A pair read as one or in doubt is not settled by it; anything else it spoke about is. */
   for (const { payload } of sql.all<{ payload: string }>("SELECT payload FROM outbox WHERE kind = 'infer.resolve' AND state = 'done'"))
   {
-    const rows = parsed(payload).rows;
-    if (typeof rows === 'object' && rows !== null) for (const hash of Object.keys(rows)) hashes.add(hash);
+    const job = parsed(payload);
+    const kept = typeof job.judged === 'object' && job.judged !== null ? (job.judged as Record<string, unknown>) : {};
+    if (typeof job.rows !== 'object' || job.rows === null) continue;
+    for (const hash of Object.keys(job.rows)) {
+      const said = judgedOf(kept[hash]);
+      if (said?.band === 'one') judged.set(hash, Math.max(said.score, judged.get(hash) ?? 0));
+      else if (said?.band !== 'doubt') hashes.add(hash);
+    }
   }
+  /* TWO JOBS THAT DISAGREE ARE SETTLED BY THE ONE THAT SAID TWO: nothing a model said twice over is offered on its word. */
+  for (const hash of hashes) judged.delete(hash);
   const asked = new Map<string, Set<unknown>[]>();
   for (const { body } of sql.all<{ body: string }>("SELECT body FROM suggestion WHERE body_kind = 'rowset'")) {
     const b = parsed(body) as { register?: unknown; pair?: unknown; rows?: unknown };
@@ -200,7 +235,7 @@ function settledIn(sql: Pick<Sql, 'all'>): Settled {
     }
     asked.set(b.register, [...(asked.get(b.register) ?? []), named]);
   }
-  return { hashes, asked };
+  return { hashes, asked, judged };
 }
 
 /** A row as a question's body names it: its list's prefix and its number. */
@@ -229,7 +264,7 @@ function undone(sql: Pick<Sql, 'one'>, read: Read, a: Row, b: Row): boolean {
 }
 
 /** A pair before it is checked: who it is between, how they agree, and what it is ranked by. */
-type Found = { read: Read; a: Row; b: Row | { name: string; names: string[]; seen: number }; how: PairHow; hash: string; score: number };
+type Found = { read: Read; a: Row; b: Row | { name: string; names: string[]; seen: number }; how: PairHow; hash: string; score: number; judged?: number };
 
 const isRow = (b: Found['b']): b is Row => 'id' in b;
 
@@ -298,14 +333,17 @@ function tieOf(reads: readonly Read[], read: Read, a: Row, b: Row): string | und
   return both === undefined ? undefined : projects.rows.find((r) => r.id === both)?.name;
 }
 
+/* A PAIR A MODEL READ AS ONE RANKS FIRST, the surer before the less sure, and then every pair by its own score. */
 const order = (x: Found, y: Found): number =>
+  (y.judged ?? -1) - (x.judged ?? -1) ||
   y.score - x.score || (x.a.seq ?? Infinity) - (y.a.seq ?? Infinity) || (x.hash < y.hash ? -1 : x.hash > y.hash ? 1 : 0);
 
 /**
  * Tonight's pairs, best first: at most `limit` of them and never more than `PAIRS_MOST`. Two organisations or two
  * projects of one name, and each name seen beside the one row it reads as. A pair whose strong keys disagree, a deleted
  * or folded row, and a pair already settled are not among them. `nowMs` is the instant it is read at: a name seen in
- * the last thirty days ranks above one seen before.
+ * the last thirty days ranks above one seen before, and a pair a nightly model read as one is first of all, with
+ * `judged`.
  *
  * READS ONLY. Nothing is asked, folded or kept: what is done with a pair is its caller's.
  */
@@ -330,7 +368,8 @@ export function pairsFor(sql: Pick<Sql, 'all' | 'one'>, nowMs: number, limit: nu
   const settled = settledIn(sql);
   const found = reads
     .flatMap((read) => [...(read.list.role === 'meets' ? [] : rowPairs(read)), ...seenPairs(sql, read, nowMs)])
-    .filter((f) => !settled.hashes.has(f.hash) && !(isRow(f.b) && asked(settled, f.read, f.a, f.b)));
+    .filter((f) => !settled.hashes.has(f.hash) && !(isRow(f.b) && asked(settled, f.read, f.a, f.b)))
+    .map((f) => (settled.judged.has(f.hash) ? { ...f, judged: settled.judged.get(f.hash)! } : f));
   const ranked: (Found & { shared?: NonNullable<Pair['shared']>; tie?: string })[] = [];
   for (const f of found.sort(order).slice(0, CHECKED_MOST)) {
     if (!isRow(f.b)) {
@@ -358,6 +397,7 @@ export function pairsFor(sql: Pick<Sql, 'all' | 'one'>, nowMs: number, limit: nu
       seen: isRow(f.b) ? 0 : f.b.seen,
       ...(f.shared === undefined ? {} : { shared: f.shared }),
       ...(f.tie === undefined ? {} : { tie: f.tie }),
+      ...(f.judged === undefined ? {} : { judged: f.judged }),
     });
     out.rows[a] = { register: f.read.list.register, id: f.a.id };
     out.rows[b] = isRow(f.b) ? { register: f.read.list.register, id: f.b.id } : { register: f.read.list.register, names: f.b.names };

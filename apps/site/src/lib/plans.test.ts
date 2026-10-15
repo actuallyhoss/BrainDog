@@ -20,7 +20,8 @@ import assert from 'node:assert/strict';
 
 import { site } from './copy.ts';
 import { home } from './copy/home.ts';
-import { PACKS, PAID, PLANS, TABLE, type Allowance } from './plans.ts';
+import { LAUNCH } from './launch.ts';
+import { PACKS, PAID, PLANS, TABLE, TABLE_PACKS, packsOnSale, priceOf, type Allowance } from './plans.ts';
 
 const REPO = new URL('../../../../', import.meta.url);
 
@@ -29,8 +30,9 @@ type Meters = { runs: number; requests: number; bytes: number; ms: number };
 const { ALLOWANCE } = (await import(new URL('packages/record/src/directory.ts', REPO).href)) as {
   ALLOWANCE: { [plan: string]: Meters | null };
 };
-const { HOSTED_PLANS, FREE_PLAN, planName, planPrice } = (await import(new URL('apps/worker/src/billing.ts', REPO).href)) as {
+const { HOSTED_PLANS, FREE_PLAN, PACK_SETTINGS, planName, planPrice } = (await import(new URL('apps/worker/src/billing.ts', REPO).href)) as {
   HOSTED_PLANS: { [plan: string]: { id: string; directory: string } };
+  PACK_SETTINGS: { [pack: string]: string };
   FREE_PLAN: { id: string; directory: string };
   planName: (plan: string) => string;
   planPrice: (plan: string) => string;
@@ -40,8 +42,10 @@ const { ASK_CAP_DEFAULT, ASK_CAP_FREE } = (await import(new URL('packages/slash/
   ASK_CAP_FREE: number;
 };
 
-const { PLAN_TABLE, tableDiffers } = (await import(new URL('packages/record/src/plans.ts', REPO).href)) as {
+const { PLAN_TABLE, PACKS: TABLE_PACKS_HELD, priceOf: tablePriceOf, tableDiffers } = (await import(new URL('packages/record/src/plans.ts', REPO).href)) as {
   PLAN_TABLE: { [plan: string]: { agents: number | null; credits: number | null } };
+  PACKS: readonly { id: string; credits: number; cents: number }[];
+  priceOf: (cents: number) => string;
   tableDiffers: (copy: Readonly<Record<string, unknown>>, table?: Readonly<Record<string, unknown>>) => string[];
 };
 
@@ -142,15 +146,46 @@ test('the allowance table has a row for every meter', () => {
     assert.deepEqual([...rows].sort(), Object.keys(plan.allowance).sort(), `copy/pricing.ts usage leaves out a meter of ${plan.name}, or names one plans.ts has not`);
 });
 
-test('nothing promises what the checkout does not sell: no packs, no billed extra usage, and no $12 headline', () => {
-  /* PACKS AND EXTRA USAGE ARE NOT BUILT (`billing.ts` sells two plans; `mayRun` holds a record at its allowance). */
-  assert.equal(PACKS.length, 0, 'plans.ts puts a credit pack on sale, and billing.ts sells none');
+test("with billing on, every pack the site shows is the table's, at its price, and one the checkout sells", () => {
+  /* EVERY FIELD OF THE SITE'S COPY OF THE TABLE'S PACKS, as `TABLE` is held above: an id, credits or cents moved names itself. */
+  assert.deepEqual(TABLE_PACKS, TABLE_PACKS_HELD, 'apps/site/src/lib/plans.ts holds packs packages/record/src/plans.ts does not');
+  const shown = packsOnSale(true);
+  assert.deepEqual(
+    shown,
+    TABLE_PACKS_HELD.map((p) => ({ ...p, price: tablePriceOf(p.cents) })),
+    'with billing on the site shows a pack, or a price, the table does not hold',
+  );
+  for (const pack of shown) {
+    assert.equal(priceOf(pack.cents), tablePriceOf(pack.cents), `the site reads ${pack.cents} cents as ${priceOf(pack.cents)}, the table as ${tablePriceOf(pack.cents)}`);
+    assert.ok(pack.id in PACK_SETTINGS, `the site shows ${pack.id}, and apps/worker/src/billing.ts sells no such pack`);
+  }
+  /* THE PLANTED FAULT: a pack at a price of its own is seen to differ. */
+  const moved = shown.map((p, i) => (i === 0 ? { ...p, cents: 400, price: '$4' } : p));
+  assert.notDeepEqual(moved, TABLE_PACKS_HELD.map((p) => ({ ...p, price: tablePriceOf(p.cents) })));
+  /* The packs' sentences name each pack at its price. */
+  assert.equal(site.slash.allowance.packsUnit(shown), 'credits for $5, or 500 for $20, and they do not end with the month');
+  assert.doesNotMatch(site.pricing.laterFor(shown), /credit packs .*coming later/i, 'with packs on sale the pricing page says they are coming later');
+});
+
+test('with billing off, no pack is shown and no sentence names one', () => {
+  assert.deepEqual(packsOnSale(false), [], 'with billing off the site shows a credit pack no card can buy');
+  assert.deepEqual(PACKS, packsOnSale(LAUNCH.billing), 'PACKS is not the packs on sale for LAUNCH.billing');
+  if (!LAUNCH.billing) assert.equal(PACKS.length, 0, 'billing is off and plans.ts puts a credit pack on sale');
+  const off = [site.slash.allowance.packsUnit(packsOnSale(false)), site.pricing.laterFor(packsOnSale(false))];
+  for (const line of off) assert.doesNotMatch(line, /\$\d|\bcredits for\b|never expire|do not end with the month/i, `"${line}" names a pack while none is sold`);
+  assert.match(off[1]!, /Credit packs and extra usage are coming later/, 'with billing off the pricing page does not say packs are coming later');
+  /* What the pages draw today is the off state while billing is off. */
+  if (!LAUNCH.billing) assert.deepEqual([site.slash.allowance.packsUnit(), site.pricing.later], off);
+});
+
+test('nothing promises what the checkout does not sell: no billed extra usage, and no $12 headline', () => {
+  /* EXTRA USAGE IS NOT BUILT (`mayRun` holds a record at its allowance); packs are held by the two tests above. */
   const said = JSON.stringify({
     pricing: site.pricing,
     home: home.home.plans,
     slash: [site.slash.allowance.lead, site.slash.allowance.packsUnit(PACKS), site.slash.drawn.creditsReading('five')],
   });
-  assert.doesNotMatch(said, /never charged past|charge for usage past|pack adds|top up with a pack/i, 'the pricing copy still sells packs or extra usage');
+  assert.doesNotMatch(said, /never charged past|charge for usage past|top up with a pack/i, 'the pricing copy still sells extra usage');
   for (const head of [site.pricing.title, site.pricing.sub, home.home.plans.title])
     assert.doesNotMatch(head, /\$\d/, `"${head}" is a headline with a price in it, and Free leads`);
 });

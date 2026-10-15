@@ -112,6 +112,7 @@ import { crashed } from '@braindog/host';
 import { fileModelSign } from '@braindog/host/sign-model';
 import { classOf, limitKey, refusedFor, windowLimiter, type LimitClass, type LimitDoor, type Limiter } from '@braindog/host/limits';
 import { guarded } from '@braindog/ports';
+import { readSetup } from '@braindog/slash/propose';
 
 /** A statement that opens, ends or names a transaction, as `guard` in `@braindog/ports` reads one. */
 const TRANSACTION = /^\s*(?:BEGIN|COMMIT|END|ROLLBACK|SAVEPOINT|RELEASE)\b/i;
@@ -2044,7 +2045,7 @@ export async function start(options: {
       resolve: options.shared?.resolve,
     }),
     /* THE FIRST READ OF A STRANGER'S SENTENCE, built once here where the origin is known, so its count lasts the process. */
-    firstRead: selfhostFirstReadDoor(env, { origin, slash: slashConfig, readSetup: null }),
+    firstRead: selfhostFirstReadDoor(env, { origin, slash: slashConfig, readSetup }),
     snapshots: kept,
     blobs: blobsFolder(options.file),
     /* THE TWO EMAIL ROUTES, GIVEN ONLY WHERE THIS HOST CAN MAIL THE LETTERS, as the magic-link door beside it is
@@ -2379,7 +2380,7 @@ async function answer(
     const ip = ipOf(req, trustProxy);
     const over = await overLimit(site, null, ip, SAFE_METHODS.has(method) ? 'read' : 'write');
     /* A STRANGER'S FIRST SENTENCE, READ BY THIS HOST'S MODEL (`./first-read.ts`): off until `FIRST_READ_DAILY` is set,
-       and no reader is built yet (`readSetup`), so it answers that it is not in this build. */
+       and read by `readSetup`, with no record, owner or ledger. */
     if (over === null && /^\/+auth\/signup\/read\/*$/.test(path)) return write(res, await serveFirstRead(request, site.firstRead));
     return write(res, over ?? (await serveAuth(request, { ...site.door, ip, reached: req.headers.host ?? '' })));
   }

@@ -2,7 +2,7 @@
  * One line a kind, said to an agent: what the kind is for, its cells, its forms and what it reads.
  *
  * THE TABLE SAID ALL OF IT AND REACHED NO AGENT. What a kind is for, its cells and its forms were comments beside its
- * entry in `kinds.ts`, and the grammar an agent is handed listed the thirty-nine by name and nothing more, so `spec`,
+ * entry in `kinds.ts`, and the grammar an agent is handed listed the forty by name and nothing more, so `spec`,
  * the block a page reaches for most, was called the workhorse in a code comment only (PGS-A08). These lines are what
  * the record's `grammar/kinds` says (`packages/record/src/grammar.ts`), one each, short enough to read in a turn.
  *
@@ -58,6 +58,7 @@ export const KIND_LINES: Readonly<Record<Kind, KindLine>> = {
   link: { for: 'addresses to open, each with its host', cells: 'title | url | note | icon' },
   gallery: { for: 'pictures as tiles with captions', cells: 'caption | file' },
   embed: { for: 'one video, map or design from a known provider', cells: 'url | title | aspect, one entry written by hand' },
+  form: { for: 'a few questions a person answers, then one button that adds the answers to a list', cells: 'its fields, each a question and its box, said in the page', reads: 'a list' },
 };
 
 /** The ten lines of what to reach for, in the order a page is usually built. */

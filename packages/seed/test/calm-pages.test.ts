@@ -75,7 +75,9 @@ test(`NO PAGE SHOWS MORE THAN ${ABOVE_THE_FOLD} TILES BEFORE THE REST IS FOLDED 
     const standsIn = (b: Block): boolean =>
       b.when !== undefined &&
       (b.when.lt !== undefined || twinOf(b) || leads.some((w) => w.metric === b.when!.metric && w.lt !== undefined && b.when!.gte === w.lt));
-    const main = page.blocks.filter((b) => b.area !== 'rail');
+    /* THE CAPTURE LINE RIGHT AFTER THE SENTENCE IS IN THE HEADER, NOT A TILE (`captured` in apps/web/src/lib/page/PageBody.svelte). */
+    const opening = page.blocks.find((b) => !b.lead);
+    const main = page.blocks.filter((b) => b.area !== 'rail' && !(b === opening && b.kind === 'capture'));
     const fold = main.findIndex((b) => b.kind === 'section' && b.fold === true);
     /* A BOXED SECTION AND THE BLOCKS AFTER IT, UP TO THE NEXT SECTION, ARE ONE TILE, as the app draws them (`boxesOf` in
        `apps/web/src/lib/page/layout.ts`): Money's Heads up is one tile of three lines, not three tiles. */
@@ -109,7 +111,10 @@ test('A QUEUE OF QUESTIONS IS DRAWN ONLY WHILE ONE IS ASKED, so no page carries 
         /* A QUEUE NARROWED TO ONE THING IS GATED ON THAT THING'S COUNT, `questions-open:<it>`, so a project page with nothing
            asked about it draws no band while the record has questions elsewhere. */
         const about = /^about is (.+)$/u.exec((b as { where?: string }).where ?? '')?.[1];
-        const metric = about === undefined ? 'questions-open' : `questions-open:${about}`;
-        assert.deepEqual(b.when, { metric, gt: 0 }, `${slug}: ${b.heading ?? b.kind} draws while nothing is asked`);
+        /* AND A QUEUE NARROWED TO ONE LIST (`list is tasks`) IS GATED ON THAT LIST'S COUNT, `questions-open-in:<list>`, or on
+           the record's (team/home-team gates its list-narrowed queue on questions-open). */
+        const list = /^list is (.+)$/u.exec((b as { where?: string }).where ?? '')?.[1];
+        const metrics = about !== undefined ? [`questions-open:${about}`] : list !== undefined ? [`questions-open-in:${list}`, 'questions-open'] : ['questions-open'];
+        assert.ok(metrics.some((metric) => JSON.stringify(b.when) === JSON.stringify({ metric, gt: 0 })), `${slug}: ${b.heading ?? b.kind} draws while nothing is asked`);
       }
 });

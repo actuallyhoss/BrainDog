@@ -46,7 +46,7 @@ import FEED from '@braindog/pack-live-feed/live-feed.pack.json' with { type: 'js
 
 import { TOOLS, type AdapterFetch, folderCatalogue, gatherAsks, holdsKey, isRef, loadAdapter, loadMap, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
 import { askToRun, fetchAdapter, type Asker } from './adapter-fetch.ts';
-import { hostCatalogueFor, knownKeys } from './catalogue.ts';
+import { hostCatalogueFor, hostKeys } from './catalogue.ts';
 import { keysOfRow, meeter, metOf, sameName, type Meeting } from './people.ts';
 import type { AgentIo } from './skills.ts';
 import { readSource } from './usecase.ts';
@@ -2345,7 +2345,7 @@ const fromCatalogue =
         : /^[a-z][a-z0-9+.-]*:\/\//iu.test(named)
           ? addressCatalogue(named, io, ms)
           : folderCatalogue(resolve(io.cwd, named));
-    const got = await fetchAdapter(id, { home: io.home, catalogue, known: knownKeys(io) });
+    const got = await fetchAdapter(id, { home: io.home, catalogue, known: (await hostKeys(undefined, io)).known });
     if (!got.ok) return got;
     const may = await askToRun(got.value, got.value.hash, { home: io.home, ask: io.ask, yes: values.yes });
     return may.ok ? { ok: true, file: got.value.file } : may;
@@ -2619,7 +2619,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
       : /^[a-z][a-z0-9+.-]*:\/\//iu.test(named)
         ? addressCatalogue(named, io, ms)
         : folderCatalogue(resolve(io.cwd, named));
-  const offered = await resolveOffers(offering.value, catalogue, knownKeys(io));
+  const offered = await resolveOffers(offering.value, catalogue, (await hostKeys(undefined, io)).known);
   /**
    * WHAT THE NIGHTS BEFORE LEFT IN THIS RECORD, AS THIS MACHINE REMEMBERS THEM: the rows their retire passes put in the
    * bin (`Binned`), and the newest export they carried, which an older one tonight is measured against (`newest` in

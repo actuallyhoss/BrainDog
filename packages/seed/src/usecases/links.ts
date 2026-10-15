@@ -40,15 +40,9 @@ export type LinkIo = {
 };
 
 /* NO PERSONAL OR STUDENT ENTRY SINCE PERSONAL 2.0.0 AND STUDENT 1.3.0: neither carries an example row any more,
-   so there is nothing of theirs to link. */
+   so there is nothing of theirs to link. AND NO GUIDE ENTRY SINCE personal-and-guide-99: the guide carries no example
+   rows either, and its formed plan brings the same links (`planFor(GENERAL_GUIDE).links`, passed to linkExamples). */
 const LINKS: Readonly<Record<string, readonly ExampleLink[]>> = {
-  guide: [
-    { register: 'steps', title: 'Write one sentence about what this is and who it is for', field: 'milestone', to: 'milestones', target: 'Say what it is and who it is for' },
-    { register: 'steps', title: 'Name three people who would use it', field: 'milestone', to: 'milestones', target: 'Find the people who want it' },
-    { register: 'steps', title: 'Ask one of them what they would want first', field: 'milestone', to: 'milestones', target: 'Find the people who want it' },
-    { register: 'choices', title: 'What will it be called?', field: 'milestone', to: 'milestones', target: 'Say what it is and who it is for' },
-    { register: 'resources', title: 'Three projects like yours to learn from', field: 'milestone', to: 'milestones', target: 'Plan the smallest first version' },
-  ],
   /* A TEAM'S PLANNED TICKETS POINT AT THE TICKET, one of Work's tasks, and at the example cycle. */
   team: TEAM_PLAN_LINKS,
   /* A FOUNDER'S ORGANISATION RUNS THE EXAMPLE PROJECT, and the example number is that project's, so an organisation's own

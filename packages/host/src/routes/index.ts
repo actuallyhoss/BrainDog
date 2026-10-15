@@ -52,6 +52,8 @@ import { ROUTES as NAMED_TWICE } from './named-twice.ts';
 import { ROUTES as exportPack } from './export-pack.ts';
 import { ROUTES as SHARES } from './shares.ts';
 import { ROUTES as deviceRename } from './device-rename.ts';
+import { ROUTES as flowGrammar } from './flow-grammar.ts';
+import { ROUTES as PACKS_REMOVED } from './packs-removed.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -95,5 +97,7 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...exportPack,
   ...SHARES,
   ...deviceRename,
+  ...flowGrammar,
+  ...PACKS_REMOVED,
   /* END ROUTES */
 ];

@@ -50,11 +50,12 @@ import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_SHARE_HEAD, HEAT_SHARE_LINE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
-import { CALENDAR_NONE, WEEKDAYS, calendarMore, calendarPlan, calendarSkipped } from './calendar.ts';
+import { CALENDAR_NONE, CALENDAR_TODAY, CALENDAR_WEEK_NONE, WEEKDAYS, calendarMore, calendarOutside, calendarPlan, calendarSkipped, calendarStripPlan } from './calendar.ts';
 import { LANES_NONE, LANES_NOW, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from './lanes.ts';
 import { LINKS_NONE, linkPlan } from './links.ts';
 import { GALLERY_NONE, galleryPlan, pictureSrc } from './gallery.ts';
 import { EMBED_NONE, embedOpen, embedPlan } from './embed.ts';
+import { formLines, formOf } from './form.ts';
 import { hueOf } from './cards.ts';
 import { pathRest, pathShort } from './path.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
@@ -638,6 +639,7 @@ function list(b: Block, o: RenderOptions): string {
   if (b.kind === 'queue') return queue(b, o);
   if (b.kind === 'roadmap') return roadmap(b, o);
   if (b.kind === 'steps' && b.form === 'path') return path(b, o);
+  if (b.kind === 'form') return formText(b);
   if (b.kind === 'calendar') return calendar(b, o);
   if (b.kind === 'lanes') return lanes(b, o);
   if (b.kind === 'link') return links(b, o);
@@ -1873,6 +1875,15 @@ function lanes(b: Block, o: RenderOptions): string {
 }
 
 /**
+ * `form`: a form is filled in on a screen, so the string drawer says what it asks and never draws a box: one line a
+ * field and the button's line (`src/form.ts` `formLines`). `svelte/Form.svelte` draws the boxes.
+ */
+function formText(b: Block): string {
+  const form = formOf(b);
+  return form ? `<ul class="form-lines">${formLines(form).map((l) => `<li>${escape(l)}</li>`).join('')}</ul>` : '<p class="form-empty">Nothing to fill in here.</p>';
+}
+
+/**
  * `calendar`: every month from the first row's to the last row's as a grid of weeks, Monday first, each day naming its
  * first rows and counting the rest, then an agenda of the days that hold anything (`src/calendar.ts` over
  * `src/days.ts`). `svelte/Calendar.svelte` is this function's twin.
@@ -1883,6 +1894,7 @@ function lanes(b: Block, o: RenderOptions): string {
  * the month as a strip of days on a phone puts a dot on, and the agenda under it says every row of every day.
  */
 function calendar(b: Block, o: RenderOptions): string {
+  if (typeof b.weeks === 'number') return calendarStrip(b, o, b.weeks);
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
   const plan = calendarPlan(b.rows, roadmapToday(o.now), o.day);
   const skipped = plan.skipped.length ? `<p class="calendar-skipped">${escape(calendarSkipped(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
@@ -1913,6 +1925,25 @@ function calendar(b: Block, o: RenderOptions): string {
     .map((d) => `<li class="calendar-day"${d.today ? ' data-today=""' : ''}><span class="calendar-date num">${escape(d.said)}</span>${items(d.items)}</li>`)
     .join('')}</ol>`;
   return `<div class="calendar">${months}${agenda}${skipped}</div>`;
+}
+
+/**
+ * `calendar` with `weeks`: a strip of whole weeks from the Monday of this one, seven days a week, each day naming its
+ * first rows and counting the rest. The twin of `svelte/Calendar.svelte`'s strip, drawn from `calendarStripPlan`.
+ */
+function calendarStrip(b: Block, o: RenderOptions, weeks: number): string {
+  const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
+  const plan = calendarStripPlan(b.rows, roadmapToday(o.now), weeks, o.day);
+  const item = (r: Row): string => `<li class="calendar-item"${toneAttrs(r.tone)}>${cell('calendar-title', r.cells[0] || MISSING, o)}${toneGlyph(r.tone)}</li>`;
+  const items = (rows: readonly Row[]): string => (rows.length ? `<ul class="calendar-items">${rows.map(item).join('')}</ul>` : '');
+  const skipped = plan.skipped.length ? `<p class="calendar-skipped">${escape(calendarSkipped(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
+  const outside = plan.outside.length ? `<p class="calendar-skipped">${escape(calendarOutside(plan.outside.length))}</p>` : '';
+  const day = (d: (typeof plan.weeks)[number]['days'][number]): string =>
+    `<li class="calendar-strip-day"${d.today ? ' data-today=""' : ''}${d.past ? ' data-past=""' : ''}${d.count ? ` data-count="${d.count}"` : ''}${d.marked ? ' aria-current="date"' : ''}><span class="calendar-strip-date num">${escape(d.said)}${d.today ? ` <span class="calendar-today">${escape(CALENDAR_TODAY)}</span>` : ''}</span>${items(d.items)}${d.more ? `<span class="calendar-more">${escape(calendarMore(d.more))}</span>` : ''}</li>`;
+  const body = plan.empty
+    ? `<p class="calendar-empty">${escape(CALENDAR_NONE)}</p>`
+    : plan.weeks.map((w) => `<div class="calendar-week"${w.count ? ` data-count="${w.count}"` : ''}><p class="calendar-week-label">${escape(w.label)}</p><ol class="calendar-week-days" aria-label="${escape(w.label)}">${w.days.map(day).join('')}</ol>${w.count === 0 ? `<p class="calendar-week-none">${escape(CALENDAR_WEEK_NONE)}</p>` : ''}</div>`).join('');
+  return `<div class="calendar calendar-strip">${body}${outside}${skipped}</div>`;
 }
 
 /**
@@ -2012,8 +2043,8 @@ function block(b: Block, o: RenderOptions): string {
   const left = emptied(b, o);
   if (left === null) return '';
   /* A BLOCK'S ACTIONS WITH NO HOST TO PRESS THEM are one quiet line of their labels, the line Block.svelte draws when no
-     `act` is handed, so the two renderers stay one tree. */
-  const acts = actionLabels(b.actions);
+     `act` is handed, so the two renderers stay one tree. Each row's actions are said once in that line, never per row. */
+  const acts = actionLabels([...(b.actions ?? []), ...(b.row_actions ?? [])]);
   const actsLine = acts.length ? `<p class="block-actions">${escape(acts.join(' · '))}</p>` : '';
   return `<figure class="block block-${spec.primitive}" data-kind="${b.kind}"${form} data-primitive="${spec.primitive}"${toneAttrs(b.tone)}>${cap}${
     left === undefined ? draw(b as never, o) : emptyLine(left)

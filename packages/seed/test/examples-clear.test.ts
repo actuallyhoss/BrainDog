@@ -12,8 +12,8 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
-import { modulesFor, useCase } from '../src/usecases/index.ts';
-import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
+import { modulesFor, useCase, useCaseDocument } from '../src/usecases/index.ts';
+import { carriedDocument, dayOf, moduleDocument, plantedRows } from '../src/usecases/install.ts';
 
 const TODAY = dayOf(NOW);
 
@@ -134,7 +134,8 @@ test("A GUIDE'S PLAN FORMED FROM WHAT THE PERSON SAID IS NEVER OFFERED FOR CLEAR
   const formed = await guideRecord('a podcast about local history');
   const milestones = value<{ rows: { fields: Record<string, unknown> }[] }>(formed.list({ register: 'milestones', limit: 50 })).rows;
   assert.ok(milestones.length > 0, 'the plan was formed');
-  assert.ok(milestones.every((r) => (r.fields.tags as string[]).includes('formed') && (r.fields.tags as string[]).includes('example')));
+  /* WHETHER THE SEED PATH ALSO MARKS IT `example` IS THE RECORD'S (`exampleTag`), and either way it is never cleared. */
+  assert.ok(milestones.every((r) => (r.fields.tags as string[]).includes('formed')));
   assert.deepEqual(formed.examples(), { untouched: 0, touched: 0, registers: {}, others: 0 });
   assert.deepEqual(value(formed.clearExamples({ actor: 'p_1' })), { cleared: 0, kept: 0 });
   assert.equal(value<{ rows: unknown[] }>(formed.list({ register: 'milestones', limit: 50 })).rows.length, milestones.length, 'the plan is all still there');
@@ -142,9 +143,12 @@ test("A GUIDE'S PLAN FORMED FROM WHAT THE PERSON SAID IS NEVER OFFERED FOR CLEAR
   const bare = await guideRecord(null);
   assert.deepEqual(bare.examples(), { untouched: 0, touched: 0, registers: {}, others: 0 }, 'a guide set up without a sentence plants no examples unless asked');
 
+  /* ASKED FOR ITS EXAMPLES, it plants what its pack carries, every one of them clearable: none since USE-A09, which made
+     the general plan a formed one (`guide-kinds.ts`), so this follows the pack rather than a count. */
   const plain = await guideRecord(null, true);
   const demo = plain.examples();
-  assert.ok(demo.untouched > 0, "a guide set up without a sentence asked for its examples has the use case's own to clear");
+  const carried = (useCaseDocument('guide', TODAY)?.seeds as unknown[] | undefined)?.length ?? 0;
+  assert.equal(demo.untouched, carried, "a guide set up without a sentence asked for its examples has the use case's own to clear");
   assert.equal(value<{ cleared: number }>(plain.clearExamples({ actor: 'p_1' })).cleared, demo.untouched);
 });
 
@@ -172,4 +176,24 @@ test("A FOUNDER'S EXAMPLES ARE LINKED INTO ONE PICTURE, and still clear together
   assert.deepEqual(k.examples(), before, 'linking one example to another leaves every one untouched');
   assert.equal(value<{ cleared: number; kept: number }>(k.clearExamples({ actor: 'p_1' })).cleared, before.untouched);
   assert.deepEqual(k.examples(), { untouched: 0, touched: 0, registers: {}, others: 0 });
+});
+
+test('A ROW FORMED FROM WHAT THE PERSON SAID CARRIES formed AND NEVER example, and Clear the examples leaves it (USE-B07)', async () => {
+  const guide = useCase('guide')!;
+  const plan = plantedRows(guide, TODAY, 'a podcast about local history');
+  assert.ok(plan.rows.length > 0, 'the plan was formed');
+  for (const row of plan.rows) {
+    const tags = row.fields.tags as string[];
+    assert.ok(tags.includes('formed'), `${row.register} carries formed`);
+    assert.ok(!tags.includes('example'), `${row.register} is not an example`);
+  }
+  /* WRITTEN AS THE FIRST RUN WRITES THEM, after the pack with no rows of its own: as the person's own entries. */
+  const k = await guideRecord(null);
+  for (const row of plan.rows) value(k.create(row.register, row.fields as never, { actor: 'p_1' }));
+  const planted = plan.rows.length;
+  const count = () => ['milestones', 'steps', 'choices', 'resources'].reduce((n, r) => n + value<{ rows: unknown[] }>(k.list({ register: r, limit: 100 })).rows.length, 0);
+  assert.equal(count(), planted);
+  assert.equal(k.examples().untouched, 0, 'nothing formed is offered for clearing');
+  assert.equal(value<{ cleared: number }>(k.clearExamples({ actor: 'p_1' })).cleared, 0);
+  assert.equal(count(), planted, 'the plan is all still there');
 });

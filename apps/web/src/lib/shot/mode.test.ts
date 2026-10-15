@@ -140,7 +140,7 @@ test('an off that arrives while the words are still loading starts nothing', asy
 });
 
 test('a shared page for a stranger never takes it, inside a record or not, and loads nothing', async () => {
-  for (const path of ['/app/s/k7Qm2', '/app/fernhill/s/k7Qm2']) {
+  for (const path of ['/app/s', '/app/fernhill/s']) {
     const s = drawn();
     const p = parts(path);
     const stop = await applyShot(true, s.root, { ...p, page: s.at });

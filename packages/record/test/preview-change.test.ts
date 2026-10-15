@@ -71,7 +71,7 @@ const DESK = [
 /** Numbers, with its two lists, the parts a budget line points at, and its figures. */
 const NUMBERS = [
   ...named('register', 'parts', 'checks', 'lines'),
-  ...named('metric', 'price', 'costs', 'priced', 'cost-share', 'least-price', 'price-room', 'price-free', 'price-unjudged'),
+  ...named('metric', 'price', 'priced', 'price-free', 'price-unjudged'),
   ...named('page', 'numbers'),
 ].map(declarationOf);
 
@@ -203,32 +203,36 @@ test('A PAGE PER ROW WITH NO ROW YET IS DRAWN WITH ITS PLACEHOLDERS, under one s
   sql.close();
 });
 
-test('NUMBERS, WITH ITS LISTS AND EVERY FIGURE IT READS, IS TWELVE DECLARATIONS AND DRAWS; A THIRTEENTH IS OUT OF BOUNDS', async () => {
+/* SINCE launch-desk 3.0.0 Numbers is eight declarations (its figures read only what is stored), so the Desk's other
+   lists stand beside it to make twelve. */
+const TWELVE = [...NUMBERS, ...named('register', 'steps', 'contacts', 'lessons', 'notes').map(declarationOf)];
+
+test('NUMBERS, WITH ITS LISTS, EVERY FIGURE IT READS AND THE OTHER LISTS OF THE DESK, IS TWELVE DECLARATIONS AND DRAWS; A THIRTEENTH IS OUT OF BOUNDS', async () => {
   const { sql, api } = await blank();
   const before = await held(sql, api);
-  assert.equal(NUMBERS.length, PREVIEW_DECLARATIONS_MOST);
-  const drawn = value<ChangePreviewed>(await api.previewChange({ to: { declarations: NUMBERS }, rows: { checks: [{ what: 'First price', price: 1000, making: 200, packing: 50, sending: 50, cost: 300 }] } }, owner));
+  assert.equal(TWELVE.length, PREVIEW_DECLARATIONS_MOST);
+  const drawn = value<ChangePreviewed>(await api.previewChange({ to: { declarations: TWELVE }, rows: { checks: [{ what: 'First price', price: 1000, making: 200, packing: 50, sending: 50 }] } }, owner));
   const numbers = pageOf(drawn, 'page.numbers');
   assert.equal(numbers.slug, 'numbers');
   assert.ok(numbers.blocks.length > 0);
   assert.deepEqual(await held(sql, api), before);
 
-  const over = refusalOf(await api.previewChange({ to: { declarations: [...NUMBERS, declarationOf(NOTES)] } }, owner));
+  const over = refusalOf(await api.previewChange({ to: { declarations: [...TWELVE, ...named('metric', 'essentials').map(declarationOf)] } }, owner));
   assert.equal(over.code, 'OUT_OF_BOUNDS');
   assert.equal(over.at, 'to.declarations');
   sql.close();
 });
 
-test("THE DESK'S RULE AND THE SCRIPT IT STARTS ARE TRIED BESIDE THE PRICE CHECK THEY WATCH, and neither stays", async () => {
+test('THE PRICE CHECK IS TRIED WITH A COST WRITTEN, and nothing of it stays', async () => {
   const { sql, api } = await blank();
   const before = await held(sql, api);
-  /* A SAMPLE THAT WRITES A COST, so the rule's trigger is met inside the rehearsal and its run is thrown away with it. */
+  /* A SAMPLE THAT WRITES A COST, so the price check is tried with one, and it is thrown away with the rehearsal. */
   const costed = { checks: [{ what: 'First price', price: 1000, making: 200, packing: 50, sending: 50 }] };
-  const change = [...named('register', 'checks'), ...named('rule', 'launch_desk_cost'), ...named('script', 'launch_desk_cost')].map(declarationOf);
+  const change = [...named('register', 'checks')].map(declarationOf);
   const drawn = value<ChangePreviewed>(await api.previewChange({ to: { declarations: change }, rows: costed }, owner));
   assert.deepEqual(drawn.pages, [], 'a change with no page draws none');
   assert.deepEqual(await held(sql, api), before);
-  for (const id of ['register.checks', 'rule.launch_desk_cost', 'script.launch_desk_cost'])
+  for (const id of ['register.checks'])
     assert.equal(api.kernel.declarations().some((d) => d.id === id), false, `the rehearsal kept ${id}`);
   sql.close();
 });

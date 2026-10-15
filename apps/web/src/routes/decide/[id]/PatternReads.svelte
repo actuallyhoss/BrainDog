@@ -9,13 +9,20 @@
   A FIELD THE RULE MISSES IS SAID, NOT DROPPED: a rule that finds the amount in two of three is the one a yes should
   stop at. A question whose messages cannot be read draws nothing here, and the rule and the builder's link above
   are what it was before.
+
+  WHAT ACCEPT DOES, SAID UNDER THE MESSAGES, muted and in the same block: how many it files with one Undo and how many
+  keep waiting, from the rehearsal the messages were read with. ONCE THE QUESTION IS RESOLVED (`resolved`), the record's
+  own closing note (`said`, "Filed 4 with this pattern. ...") stands in place of the messages, as the record wrote it,
+  and nothing is read again.
 -->
 <script lang="ts">
   import { apiBase } from '$lib/at.ts';
   import type { PatternAsked } from './proposed.ts';
-  import { patternReads, words, type PatternReads } from './pattern-reads.ts';
+  import { closedSaid, patternReads, words, type PatternReads } from './pattern-reads.ts';
 
-  let { pattern }: { pattern: PatternAsked } = $props();
+  let { pattern, resolved = false, said }: { pattern: PatternAsked; resolved?: boolean; said?: unknown } = $props();
+
+  const closed = $derived(closedSaid(said, resolved));
 
   /* ONE ANSWER PER QUESTION: a question changed under the screen drops the reads it was waiting on. */
   let reads = $state<PatternReads | null | undefined>(undefined);
@@ -24,6 +31,7 @@
     const asked = pattern;
     let current = true;
     reads = undefined;
+    if (resolved) return;
     void patternReads(apiBase(), asked)
       .then((r) => {
         if (current) reads = r;
@@ -37,7 +45,9 @@
   });
 </script>
 
-{#if reads === undefined}
+{#if resolved}
+  {#if closed !== null}<p class="reads-note reads-closed" role="status">{closed}</p>{/if}
+{:else if reads === undefined}
   <p class="reads-note reads-wait" role="status">{words.reading}</p>
 {:else if reads !== null && reads.rows.length}
   <section class="reads" aria-label={words.group}>
@@ -62,6 +72,7 @@
     </ul>
     {#if reads.waiting > 0}<p class="reads-note">{words.more(reads.waiting)}</p>{/if}
     {#if reads.total !== null}<p class="reads-note num">{words.total(reads.total)}</p>{/if}
+    {#if reads.accept !== null}<p class="reads-note reads-accept">{reads.accept}</p>{/if}
   </section>
 {/if}
 
@@ -127,8 +138,19 @@
     font-style: italic;
   }
 
-  .reads-note.reads-wait {
+  .reads-note.reads-wait,
+  .reads-note.reads-closed {
     margin-block-start: var(--sp-3);
+  }
+
+  /* The record's closing note is the news on a resolved question, so it reads a shade stronger than the counts. */
+  .reads-note.reads-closed {
+    color: var(--ink2);
+  }
+
+  /* What Accept does sits a step below the counts, as the last thing read before the press. */
+  .reads-note.reads-accept {
+    margin-block-start: var(--sp-1);
   }
 
   .reads-note {

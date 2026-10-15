@@ -73,12 +73,13 @@ test('PEOPLE OPENS ON ONE LINE SAID FROM ITS OWN FIGURES, and the figures count 
   /* HOW MANY IS A CLAUSE OF ITS OWN, and each other clause holds one figure, so a record with no Last in touch days
      (whoever `meet` added) reads "12 contacts" and never "0 of your 12 contacts were in touch". */
   const clauses = body.split(/,\s+/u);
-  assert.match(clauses[0]!, /^\{\{people-count\}\} contact\(s\)$/u);
+  assert.match(clauses[0]!, /^\{\{questions-open-in:people\}\} question\(s\) for you$/u);
+  assert.match(clauses[1]!, /^\{\{people-count\}\} contact\(s\)$/u);
   for (const clause of clauses.slice(1)) assert.equal(clause.match(/\{\{/gu)?.length, 1, clause);
   /* THE SAMPLE HAS SOMEBODY QUIET, so the named line is the one drawn, and it names the one quiet longest, from the rows. */
   assert.equal(counts!.drawn, false);
   assert.notEqual(quiet!.drawn, false);
-  assert.match(String(quiet!.body), /^\{\{people-quiet\.first\}\} has been quiet since \{\{people-quiet\.since\}\}/u);
+  assert.match(String(quiet!.body), /^\{\{questions-open-in:people\}\} question\(s\) for you, \{\{people-quiet\.first\}\} has been quiet since \{\{people-quiet\.since\}\}/u);
   const longest = [...PEOPLE].filter((p) => typeof p.in_touch === 'string' && p.in_touch < on(-90)).sort((a, b) => String(a.in_touch).localeCompare(String(b.in_touch)));
   const values = (quiet as { values?: Record<string, unknown> }).values ?? {};
   assert.equal(values['people-quiet.first'], longest[0]!.name);
@@ -358,8 +359,8 @@ test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never 
   assert.equal((note as { values?: Record<string, unknown> }).values?.['held-twice-shown'], 2);
   /* AFTER THE PAGE'S LINE AND BEFORE THE CARDS, and not a second headline: a page opens on one sentence. */
   const at = page.blocks.indexOf(note);
-  assert.equal(at, 2);
-  assert.ok((page.blocks.slice(0, at) as Drawn[]).every((b) => b.kind === 'note' && b.lead === true));
+  assert.equal(at, 3);
+  assert.ok((page.blocks.slice(0, at) as Drawn[]).every((b) => (b.kind === 'note' && b.lead === true) || b.heading === 'Waiting on you'));
   assert.equal(page.blocks[at + 1]?.heading, 'Everyone');
   assert.notEqual(note.lead, true);
   /* NO ID, NO LIST'S NUMBER: the count and plain words. */

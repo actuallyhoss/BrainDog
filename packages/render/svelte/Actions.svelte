@@ -3,6 +3,10 @@
   a few, a copy and a link, at most three of them shown in the order the page declared and the rest in one menu; on a
   phone, one shown and the rest in a sheet.
 
+  A ROW'S ACTIONS (`size="row"`, with its `row`) are drawn from `rowActionsPlan` instead: quiet, the first shown and the
+  rest in the row's one menu, on a phone the menu alone, and every control `data-row-action` so a host's Enter on the
+  row presses the first.
+
   WITH NO `onact` IT DRAWS NOTHING, the rule every drawer in this package keeps (`19 §6`): a preview or the mirror has no
   hand to press with, so a control there is absent rather than greyed out. The string drawer prints the labels alone.
 
@@ -12,7 +16,7 @@
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { ACTIONS_MORE, HARD_MARK, HARD_WORD, actionsPlan, type OnAct, type PlannedAction } from '../src/actions.ts';
+  import { ACTIONS_MORE, HARD_MARK, HARD_WORD, actionsPlan, rowActionsPlan, type OnAct, type PlannedAction } from '../src/actions.ts';
   import { rowsAsCards } from './rows-as-cards.svelte.ts';
 
   let {
@@ -20,6 +24,8 @@
     row,
     onact,
     narrow,
+    size = 'block',
+    tabindex,
   }: {
     actions: readonly unknown[] | null | undefined;
     /** The row these actions sit on, handed back with the press. A block's own actions have none. */
@@ -27,9 +33,18 @@
     onact?: OnAct | undefined;
     /** A phone's plan where the host knows better than the window; by default the 640px line every list reads. */
     narrow?: boolean | undefined;
+    /**
+     * `row` IS ONE ROW'S END (`rowActionsPlan`): quiet and compact, no accent fill, the first shown and the rest in the
+     * row's one menu. `block` is the line under a block, as it always was.
+     */
+    size?: 'block' | 'row' | undefined;
+    /** A host's roving tab stop (a table's caret): every shown control takes it. Absent, each is in the tab order. */
+    tabindex?: number | undefined;
   } = $props();
 
-  const plan = $derived(actionsPlan(actions, { narrow: narrow ?? rowsAsCards() }));
+  const plan = $derived((size === 'row' ? rowActionsPlan : actionsPlan)(actions, { narrow: narrow ?? rowsAsCards() }));
+  /* EVERY PRESSABLE CONTROL ON A ROW SAYS SO, so a host's Enter on the row presses its first (`PageBody`). */
+  const rowTag = $derived(row !== undefined ? '' : undefined);
 
   let open = $state(false);
   let more = $state<HTMLButtonElement | undefined>(undefined);
@@ -97,9 +112,9 @@
 {/snippet}
 
 <!-- ONE CONTROL, shown on the tile or stacked in the sheet. -->
-{#snippet control(p: PlannedAction)}
+{#snippet control(p: PlannedAction, ti: number | undefined)}
   {#if p.kind === 'switch'}
-    <button type="button" class="switch actions-switch" role="switch" aria-checked={p.action.on === true} onclick={() => press(p, p.action.on === true ? 'false' : 'true')}
+    <button type="button" class="switch actions-switch" role="switch" aria-checked={p.action.on === true} data-row-action={rowTag} tabindex={ti} onclick={() => press(p, p.action.on === true ? 'false' : 'true')}
       ><span class="switch-track" aria-hidden="true"></span><span>{p.label}</span>{@render hard(p)}</button
     >
   {:else if p.kind === 'choice'}
@@ -107,43 +122,44 @@
       <span class="actions-choice-label">{p.label}</span>
       <span class="segmented" role="group" aria-label={p.label}>
         {#each p.action.choices ?? [] as c}
-          <button type="button" class="segment" data-on={c === p.action.value ? '' : undefined} aria-pressed={c === p.action.value} onclick={() => press(p, c)}>{c}</button>
+          <button type="button" class="segment" data-on={c === p.action.value ? '' : undefined} aria-pressed={c === p.action.value} data-row-action={rowTag} tabindex={ti} onclick={() => press(p, c)}>{c}</button>
         {/each}
       </span>
     </span>
   {:else if p.kind === 'link'}
-    <a class="actions-btn" href={p.action.href} onclick={() => press(p)}>{p.label}{@render hard(p)}</a>
+    <a class="actions-btn" href={p.action.href} data-row-action={rowTag} tabindex={ti} onclick={() => press(p)}>{p.label}{@render hard(p)}</a>
   {:else}
-    <button type="button" class="actions-btn" data-primary={p.primary ? '' : undefined} onclick={() => press(p)}>{p.label}{@render hard(p)}</button>
+    <button type="button" class="actions-btn" data-primary={p.primary ? '' : undefined} data-row-action={rowTag} tabindex={ti} onclick={() => press(p)}>{p.label}{@render hard(p)}</button>
   {/if}
 {/snippet}
 
 <!-- ONE ITEM OF THE MENU: the same press, in a menu's roles. A choice is its own few, each a radio of the menu. -->
 {#snippet item(p: PlannedAction)}
   {#if p.kind === 'switch'}
-    <button type="button" class="switch actions-item" role="menuitemcheckbox" aria-checked={p.action.on === true} tabindex="-1" onclick={() => press(p, p.action.on === true ? 'false' : 'true')}
+    <button type="button" class="switch actions-item" role="menuitemcheckbox" aria-checked={p.action.on === true} tabindex="-1" data-row-action={rowTag} onclick={() => press(p, p.action.on === true ? 'false' : 'true')}
       ><span class="switch-track" aria-hidden="true"></span>{p.label}{@render hard(p)}</button
     >
   {:else if p.kind === 'choice'}
     <div class="actions-item-group" role="group" aria-label={p.label}>
       <span class="actions-choice-label" aria-hidden="true">{p.label}</span>
       {#each p.action.choices ?? [] as c}
-        <button type="button" class="actions-item" role="menuitemradio" aria-checked={c === p.action.value} tabindex="-1" onclick={() => press(p, c)}>{c}</button>
+        <button type="button" class="actions-item" role="menuitemradio" aria-checked={c === p.action.value} tabindex="-1" data-row-action={rowTag} onclick={() => press(p, c)}>{c}</button>
       {/each}
     </div>
   {:else if p.kind === 'link'}
-    <a class="actions-item" role="menuitem" tabindex="-1" href={p.action.href} onclick={() => press(p)}>{p.label}{@render hard(p)}</a>
+    <a class="actions-item" role="menuitem" tabindex="-1" href={p.action.href} data-row-action={rowTag} onclick={() => press(p)}>{p.label}{@render hard(p)}</a>
   {:else}
-    <button type="button" class="actions-item" role="menuitem" tabindex="-1" onclick={() => press(p)}>{p.label}{@render hard(p)}</button>
+    <button type="button" class="actions-item" role="menuitem" tabindex="-1" data-row-action={rowTag} onclick={() => press(p)}>{p.label}{@render hard(p)}</button>
   {/if}
 {/snippet}
 
-{#if onact && plan.shown.length > 0}
-  <div class="actions" data-fold={plan.fold}>
-    {#each plan.shown as p}{@render control(p)}{/each}
+<!-- A ROW ON A PHONE SHOWS NONE and keeps the menu alone, so what is drawn is the shown and the folded together. -->
+{#if onact && plan.shown.length + plan.menu.length > 0}
+  <div class="actions" data-fold={plan.fold} data-size={size}>
+    {#each plan.shown as p}{@render control(p, tabindex)}{/each}
     {#if plan.fold}
       <span class="actions-fold">
-        <button type="button" class="actions-btn" bind:this={more} aria-haspopup={plan.fold === 'sheet' ? 'dialog' : 'menu'} aria-expanded={plan.fold === 'menu' ? open : undefined} onclick={toggle}
+        <button type="button" class="actions-btn" bind:this={more} data-row-action={rowTag} {tabindex} aria-haspopup={plan.fold === 'sheet' ? 'dialog' : 'menu'} aria-expanded={plan.fold === 'menu' ? open : undefined} onclick={toggle}
           >{ACTIONS_MORE}<span class="actions-count">{plan.menu.length}</span></button
         >
         {#if plan.fold === 'menu' && open}
@@ -155,7 +171,7 @@
       {#if plan.fold === 'sheet'}
         <dialog class="actions-sheet" bind:this={sheet} aria-label={ACTIONS_MORE} onclick={backdrop}>
           <div class="actions-sheet-body">
-            {#each plan.menu as p}{@render control(p)}{/each}
+            {#each plan.menu as p}{@render control(p, undefined)}{/each}
             <button type="button" class="actions-btn actions-close" onclick={() => close(false)}>Close</button>
           </div>
         </dialog>
@@ -180,6 +196,27 @@
     align-items: center;
     gap: var(--sp-2);
     margin-block-start: var(--sp-3);
+  }
+
+  /* A ROW'S END: one line that never wraps, at the row's end and on no margin of its own, so the row keeps its height. */
+  .actions[data-size='row'] {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: var(--sp-1);
+    margin-block-start: 0;
+  }
+
+  /* QUIET AND COMPACT: no fill until the pointer or the keyboard reaches it, and never the accent's. */
+  .actions[data-size='row'] .actions-btn {
+    padding: 0 var(--sp-2);
+    background: none;
+    color: var(--ink2);
+  }
+
+  .actions[data-size='row'] .actions-btn:hover,
+  .actions[data-size='row'] .actions-btn:focus-visible {
+    background: var(--field);
+    color: var(--ink);
   }
 
   /* A RECTANGLE TOLD BY ITS FILL, `Button`'s: no border, radius 8, the label at the control size. */

@@ -53,7 +53,7 @@
   import { readNames } from '$lib/record/history-live.ts';
   import { callerAt, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
   import {
-    ARGS,
+    argsFor,
     CHANNELS,
     CONDITION_HINT,
     DAYS,
@@ -95,6 +95,7 @@
   import { openActions, whatOf, type ActionRow } from '$lib/record/actions.ts';
   import { CLOCKS, MONTHS, MONTH_DAYS, MONTH_WORDS, andWords, clockTo, clockWords, dayWords, fallsIn, monthsOf, type ClockWas } from './calendar.ts';
   import { CHANNEL_WORDS, DAY_WORDS, doorsPickable, groupChips, idWords, pickerOf, withCurrent, type Picker } from './chips.ts';
+  import { grammarNow, grammarState } from './grammar.ts';
   import Condition from './Condition.svelte';
   import Tokens from './Tokens.svelte';
   import type { FlowDraft } from './flow.svelte.ts';
@@ -335,7 +336,13 @@
 
   /* THE ARGUMENTS THAT MEAN SOMETHING NOW. `choices` is drawn only while the answer is a choice (`Arg.when`), so a
      person switching to "A number" is not left holding a list the lint would refuse. */
-  const args = $derived(found && verb ? ARGS[verb].filter((a) => !a.when || a.when(found.node.step)) : []);
+  /* The form is drawn again when the record's answer arrives. */
+  /* THE TAB'S GRAMMAR, FOLLOWED BY ITS OWN SUBSCRIPTION and not `$grammarState`: Svelte's store helpers would go into
+     the runtime every screen loads (the entry budget). */
+  let read = $state.raw(grammarNow());
+  $effect(() => grammarState.subscribe((s) => (read = s)));
+  const grammar = $derived(read.state === 'ready' ? read.grammar : null);
+  const args = $derived(found && verb ? argsFor(verb, grammar).filter((a) => !a.when || a.when(found.node.step)) : []);
 
   const shape = $derived<SlashShape>(found ? slashShape(found.node.step) : 'text');
   function setShape(s: SlashShape) {
@@ -673,7 +680,7 @@
               onchange={setIf}
             />
           {:else}
-            {@const picks = pickerOf(verb, a.path)}
+            {@const picks = pickerOf(verb, a.path, a.from)}
             {@const options = picks ? optionsFor(picks) : []}
             {#if a.template && (a.kind === 'text' || a.kind === 'long' || a.kind === 'pairs')}
               <p class="label" id="{idOf(a)}-label">{a.label}</p>
@@ -764,7 +771,7 @@
             {/if}
           {/if}
         {/each}
-        {#if ARGS[verb].length === 0}<p class="help">Nothing to fill in. The run ends here.</p>{/if}
+        {#if argsFor(verb, grammar).length === 0}<p class="help">Nothing to fill in. The run ends here.</p>{/if}
       </div>
     {/if}
   </div>

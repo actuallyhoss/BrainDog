@@ -13,16 +13,30 @@ import assert from 'node:assert/strict';
 import { OPERATOR, startCloud } from '../../apps/worker/test/cloud-serve.ts';
 import { HOST } from '../../apps/worker/test/cloud-harness.ts';
 import { planFor, stranger } from '../canary/lane.d/60-stranger.mjs';
-import { sweep } from './ends.mjs';
+import { close, erase, fileDelete, soleOwnerFix, sweep } from './ends.mjs';
 import { argsOf, ORDER, runDrill } from './run.mjs';
 import { capturedMail, drill, NOTE } from './steps.mjs';
 
 const SUPPORT = `help@${HOST}`;
 const ADDRESS = 'drill-ceramics@example.test';
 
-/** A Cloud by invitation, with a support address in its footer, and a drill code minted by its operator door. */
+const SECOND = 'drill-second@example.test';
+
+/**
+ * A Cloud by invitation, with a support address in its footer, and a drill code minted by its operator door.
+ *
+ * ITS QUEUE IS RUN, as the platform runs it: a record's doorbell (`INGRESS.send`) hands the Worker's own `queue` the
+ * message a moment later, so an erasure's `erase.r2` reaches the bucket here as it does on a host, and `erase` sees the
+ * file's address go quiet by the same path.
+ */
 async function cloudWithCode(env = {}) {
-  const c = await startCloud({ env: { SIGNUP: 'invite', SUPPORT_ADDRESS: SUPPORT, ...env } });
+  let ref = null;
+  const rung = (body) => ({ body, ack() {}, retry() {} });
+  /* THE HARNESS NAMES ITS RECORDS BY THE ID ITSELF, so the id a doorbell carries is read back as the same string. */
+  const queued = () => ({ ...ref.cloud.env, RECORD: { ...ref.cloud.env.RECORD, idFromString: (id) => id } });
+  const INGRESS = { send: async (body) => void setTimeout(() => void ref?.cloud.bundle.default.queue({ messages: [rung(body)] }, queued()).catch(() => {}), 0) };
+  const c = await startCloud({ env: { SIGNUP: 'invite', SUPPORT_ADDRESS: SUPPORT, INGRESS, ...env } });
+  ref = c;
   const res = await c.ask('/account/ops/invite', { method: 'POST', bearer: OPERATOR, body: JSON.stringify({ note: NOTE }) });
   const link = ((await res.json()).value?.links ?? [])[0] ?? '';
   return { c, code: link.slice(link.indexOf('#code=') + '#code='.length) };
@@ -35,7 +49,7 @@ const drillOn = (c, code, more = {}) =>
 test('THE WHOLE DRILL IS GREEN ON THE HARNESS, every step run, and no line holds a value', async () => {
   const { c, code } = await cloudWithCode();
   try {
-    const d = drillOn(c, code);
+    const d = Object.assign(drillOn(c, code), { second: { address: SECOND, mail: capturedMail(c.letters) }, operatorKey: OPERATOR });
     const lines = [];
     const results = await runDrill(d, { say: (l) => lines.push(l), sweepWith: { operatorKey: OPERATOR } });
     assert.deepEqual(results.map((r) => r.name), ORDER);
@@ -44,12 +58,19 @@ test('THE WHOLE DRILL IS GREEN ON THE HARNESS, every step run, and no line holds
       assert.ok(!r.skipped, `${r.name} skipped: ${r.said}`);
     }
     const said = lines.join('\n');
-    for (const v of [ADDRESS, code, d.cookie, d.bearer, d.link?.token, OPERATOR]) assert.ok(typeof v === 'string' && !said.includes(v), 'a line holds a value');
+    for (const v of [ADDRESS, SECOND, code, d.cookie, d.bearer, d.link?.token, OPERATOR]) assert.ok(typeof v === 'string' && !said.includes(v), 'a line holds a value');
     assert.doesNotMatch(said, /@/u, 'a line holds an address');
     assert.match(said, /the letter “Finish making your BrainDog record” came in [\d.]+ seconds/u);
-    assert.match(said, /the delete does not yet say what it kept/u, 'until destroy.ts answers what it kept, the step says so');
+    /* UNTIL THE RECORD'S DELETE PASSES `destroyRecord`'s ANSWER ON, the step says it cannot read it; then it says it. */
+    assert.match(said, /the delete does not yet say what it kept|it kept one final copy, named final-, and removed \d+ other/u);
+    assert.match(said, /erase: a second person was let in by invitation and attached a file; once the owner erased them/u);
+    assert.match(said, /close: while it alone owned its record, a close was refused \(“Delete drill-[a-z0-9-]+, or make somebody else its owner, first\.”\)/u);
     /* THE LETTERS A STRANGER GETS: the link, the welcome, the notice of the close; and no sign-in link after it. */
-    assert.deepEqual(c.letters.map((l) => l.subject), ['Finish making your BrainDog record', 'Your BrainDog record is ready', 'You are signed out of BrainDog']);
+    const theirs = c.letters.filter((l) => String(l.to).toLowerCase() === ADDRESS);
+    assert.deepEqual(theirs.map((l) => l.subject), ['Finish making your BrainDog record', 'Your BrainDog record is ready', 'You are signed out of BrainDog']);
+    /* THE SECOND ADDRESS IS CLOSED BY `erase`, or the next run's invitation would ask it to sign in first. */
+    const second = c.letters.filter((l) => String(l.to).toLowerCase() === SECOND);
+    assert.equal(second.at(-1)?.subject, 'You are signed out of BrainDog', 'the second address was left open for the next run');
     assert.ok(!c.letters.some((l) => String(l.text).includes('#magic=')), 'a sign-in link went to the closed address');
   } finally {
     await c.close();
@@ -73,7 +94,7 @@ test('WITH A BROKEN MAIL SENDER, MAIL GOES RED BY ITSELF, and the steps after it
     const by = Object.fromEntries(results.map((r) => [r.name, r]));
     assert.equal(by.shut.skipped, undefined);
     assert.equal(by.signup.skipped, undefined);
-    for (const n of ['verify-build', 'link-once', 'lockout', 'file-delete', 'close']) assert.equal(by[n].skipped, true, `${n}: ${by[n].said}`);
+    for (const n of ['verify-build', 'link-once', 'erase', 'lockout', 'file-delete', 'close']) assert.equal(by[n].skipped, true, `${n}: ${by[n].said}`);
   } finally {
     await c.close();
   }
@@ -140,4 +161,99 @@ test('THE LANE RUNS THE DRILL ONLY WHEN ITS NAMES ARE SET, and says skipped othe
   assert.equal(seen.opts.sweepWith.operatorKey, 'o');
   const redOut = await stranger(env, { run: async () => [{ name: 'mail', pass: false, said: 'no letter' }] });
   assert.equal(redOut.code, 1);
+});
+
+/* ---- The ends against a fake door: the host's answers written out, so each line is read with and without them. ---- */
+
+const SLUG = 'drill-kiln-1';
+
+/** A host that answers by method and path from `routes`, `{ status, body }` each, and keeps every ask. */
+function door(routes) {
+  const asked = [];
+  const send = async (url, init = {}) => {
+    const path = new URL(url).pathname;
+    const key = `${init.method ?? 'GET'} ${path}`;
+    asked.push({ key, body: init.body });
+    const r = typeof routes[key] === 'function' ? routes[key](init) : (routes[key] ?? { status: 404, body: { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No such door.' } } });
+    return new Response(JSON.stringify(r.body), { status: r.status ?? 200, headers: { 'content-type': 'application/json' } });
+  };
+  return { send, asked };
+}
+
+/** A drill signed in to its own record on the fake door. */
+const fakeDrill = (send) => Object.assign(drill({ host: 'https://alpha.example.test', address: ADDRESS, send }), { cookie: 'bd_s=drill-session', made: { slug: SLUG } });
+
+const ALONE = { status: 403, body: { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: soleOwnerFix(SLUG), at: 'records' } } };
+
+/** The doors `file-delete` asks, with the delete answering `value`. */
+const deleting = (value) => ({
+  [`PUT /app/${SLUG}/api/files`]: { body: { sha256: 'a'.repeat(64) } },
+  'POST /account/close': ALONE,
+  [`POST /app/${SLUG}/api/deleteRecord`]: { body: { ok: true, value } },
+  [`POST /app/${SLUG}/api/boot`]: { status: 404, body: { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'This record was deleted.' } } },
+  'GET /account/records': { body: { ok: true, value: [] } },
+});
+
+test('FILE-DELETE SAYS WHAT THE DELETE KEPT when the host answers it, and says it cannot read it when it does not', async () => {
+  const kept = await fileDelete(fakeDrill(door(deleting({ slug: SLUG, deleted: true, kept: 'rec_x/snapshots/final-2026-10-15.brainl.age', removed: 3 })).send));
+  assert.equal(kept.pass, true, kept.said);
+  assert.match(kept.said, /deleted by its name and no longer opens; it kept one final copy, named final-, and removed 3 other copies and files\.$/u);
+  assert.doesNotMatch(kept.said, /rec_x/u, 'the line printed the copy’s key, which holds the record’s id');
+
+  const one = await fileDelete(fakeDrill(door(deleting({ slug: SLUG, deleted: true, kept: 'rec_x/snapshots/final-2026-10-15.brainl.age', removed: 1 })).send));
+  assert.match(one.said, /removed 1 other copy or file\.$/u);
+
+  const before = await fileDelete(fakeDrill(door(deleting({ slug: SLUG, deleted: true })).send));
+  assert.equal(before.pass, true, before.said);
+  assert.match(before.said, /the delete does not yet say what it kept, so what was kept cannot be read\.$/u);
+
+  const astray = await fileDelete(fakeDrill(door(deleting({ slug: SLUG, deleted: true, kept: 'rec_x/snapshots/latest.brainl.age', removed: 2 })).send));
+  assert.equal(astray.pass, false);
+  assert.match(astray.said, /not a final copy/u);
+  const uncounted = await fileDelete(fakeDrill(door(deleting({ slug: SLUG, deleted: true, kept: 'rec_x/snapshots/final-2026-10-15.brainl.age' })).send));
+  assert.equal(uncounted.pass, false);
+  assert.match(uncounted.said, /not how many/u);
+});
+
+test('ERASE SKIPS AND SAYS WHY without a second address and its key, and prints neither when they are half there', async () => {
+  const d = fakeDrill(door({}).send);
+  const none = await erase(d, {});
+  assert.equal(none.skipped, true);
+  assert.equal(none.said, 'skipped: DRILL_SECOND_ADDRESS and DRILL_SECOND_KEY are not set, so there is no second person to erase.');
+  const half = await erase(d, { DRILL_SECOND_ADDRESS: 'drill-second@example.test' });
+  assert.equal(half.said, 'skipped: DRILL_SECOND_KEY is not set, so there is no second person to erase.');
+  const unnamed = await erase(d, { DRILL_SECOND_ADDRESS: 'drill-second@example.test', DRILL_SECOND_KEY: 'k-second-key' });
+  assert.equal(unnamed.said, 'skipped: no canary is named (SMOKE_SLUG), so the second address’s letters cannot be read.');
+  for (const r of [none, half, unnamed]) assert.doesNotMatch(r.said, /@|k-second-key/u);
+  const keyless = await erase(Object.assign(fakeDrill(door({}).send), { second: { address: 'drill-second@example.test', mail: capturedMail([]) } }), {});
+  assert.equal(keyless.said, 'skipped: no operator key, so the drill’s record cannot leave Free, where nobody else can join.');
+  const recordless = await erase(drill({ host: 'https://alpha.example.test', send: door({}).send }), {});
+  assert.equal(recordless.said, 'skipped: there is no record of the drill’s to share.');
+});
+
+test('CLOSE HOLDS THE SOLE-OWNER RULE: refused with the door’s sentence while the drill alone owns its record', async () => {
+  /* THE RECORD STILL STANDS: the close is asked, refused, and the account left open. */
+  const standing = door({ 'POST /account/close': ALONE });
+  const r = await close(fakeDrill(standing.send));
+  assert.equal(r.pass, true, r.said);
+  assert.equal(r.said, `while it alone owned its record, the close was refused: “Delete ${SLUG}, or make somebody else its owner, first.” The record still stands, so the account was left open.`);
+  assert.deepEqual(standing.asked.map((a) => a.key), ['POST /account/close']);
+
+  /* A DOOR THAT REFUSES IN OTHER WORDS, or closes an owner's account, is red. */
+  const other = await close(fakeDrill(door({ 'POST /account/close': { status: 403, body: { ok: false, refusal: { code: 'FORBIDDEN', fix: 'Not now.' } } } }).send));
+  assert.equal(other.pass, false);
+  assert.match(other.said, /not the door’s sentence: “Not now\.”/u);
+  const orphaned = await close(fakeDrill(door({ 'POST /account/close': { body: { ok: true, value: {} } } }).send));
+  assert.equal(orphaned.pass, false);
+  assert.match(orphaned.said, /left with no owner/u);
+
+  /* AFTER FILE-DELETE: the refusal it saw before the delete is said, then the account closes. */
+  const nobody = { status: 202, body: { ok: true, value: { sent: true } } };
+  const after = door({ 'POST /account/close': { body: { ok: true, value: { closed: true } } }, 'POST /auth/magic/start': nobody });
+  const d = Object.assign(fakeDrill(after.send), { deleted: true, soleOwner: { status: 403, fix: soleOwnerFix(SLUG), refused: true, closed: false } });
+  const closed = await close(d);
+  assert.equal(closed.pass, true, closed.said);
+  assert.match(closed.said, new RegExp(`^while it alone owned its record, a close was refused \\(“Delete ${SLUG}, or make somebody else its owner, first\\.”\\); then the account closed`, 'u'));
+  const wrong = await close(Object.assign(fakeDrill(after.send), { deleted: true, soleOwner: { status: 200, fix: null, refused: false, closed: false } }));
+  assert.equal(wrong.pass, false);
 });

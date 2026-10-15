@@ -3,7 +3,7 @@
   "version": "1.17.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "The line under What each one earns is drawn only once a project in play says what it earned in a year. A project's one line is typed on its card in In play. Each project in play on Projects says how long since anybody worked on it. That line and the line of the work finished on it each week wait until Work is there.",
+  "changes": "The line under What each one earns is drawn only once a project in play says what it earned in a year. A project's one line is typed on its card in In play. Each project in play on Projects says how long since anybody worked on it. That line and the line of the work finished on it each week wait until Work is there. Projects counts and answers the questions about your projects.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -78,14 +78,14 @@
           "lead": true,
           "span": 12,
           "when": { "metric": "projects-need-you", "gt": 0 },
-          "body": "{{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track"
+          "body": "{{questions-open-in:things}} question(s) for you, {{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track"
         },
         {
           "kind": "note",
           "lead": true,
           "span": 12,
           "when": { "metric": "projects-need-you", "is": 0 },
-          "body": "Nothing needs you across {{projects-live}} project(s) in play"
+          "body": "Nothing needs a push across {{projects-live}} project(s) in play, {{questions-open-in:things}} question(s) for you"
         },
         {
           "kind": "split",
@@ -120,6 +120,17 @@
           "order": [ { "field": "name", "dir": "asc" } ],
           "limit": 12,
           "when": { "metric": "projects-live", "gt": 0 }
+        },
+        {
+          "kind": "queue",
+          "heading": "Waiting on you",
+          "icon": "ask",
+          "span": 12,
+          "source": "governance.open",
+          "where": "list is things",
+          "limit": 3,
+          "tiles": true,
+          "when": { "metric": "questions-open-in:things", "gt": 0 }
         },
         {
           "kind": "section",

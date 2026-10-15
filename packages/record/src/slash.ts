@@ -22,7 +22,7 @@
  */
 
 import { PEN_USE_DAYS, PEN_YOUNG_DAYS, pageSpokenFor, signatureOf, usedOf, youngOf, type Used } from './emergent.ts';
-import { GROWS, NAMED_PAGE, recommend, type DrawnPage } from './design-agent.ts';
+import { GROWS, NAMED_PAGE, WAITING_MOST, filedRank, lapsesFrom, recommend, roomFor, type DrawnPage } from './design-agent.ts';
 import type { FigureTest, Grows } from './arrange.ts';
 import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
@@ -124,8 +124,11 @@ const wordIn = (word: string): RegExp => new RegExp(`\\b${word.replace(/[.*+?^${
 /** How Home heads its recent changes when agents do most of the work, and when no agent has worked in a quarter. */
 export const AGENTS_LINE = 'What you and your agents did since you last looked';
 export const QUIET_LINE = 'Since you last looked';
-/** At most this many arrangement questions open at once (ADR-051). */
-export const SLASH_OPEN_CAP = 3;
+/**
+ * At most this many of Slash's questions open at once (ADR-051), AND IT IS THE QUEUE'S OWN THREE (ENG-B14,
+ * `design-agent.ts` `WAITING_MOST`): one number, never a second cap beside the pen's.
+ */
+export const SLASH_OPEN_CAP = WAITING_MOST;
 
 /** The kinds of write that are somebody using a list. */
 const WRITES = "('create','edit','state','link','tag','untag','delete','restore')";
@@ -200,7 +203,17 @@ export type EntityUse = {
 export type Usage = {
   at: string;
   /** What the pen holds now and what the person dismissed (`emergent.ts` signatures). Absent, nothing is held. */
-  pen?: { held: readonly string[]; dismissed: readonly string[] };
+  pen?: {
+    held: readonly string[];
+    dismissed: readonly string[];
+    /** How many of its offers wait now (`emergent.ts` `penQueued`'s `waiting`), the pen's part of the one count. Absent, none. */
+    waiting?: number;
+  };
+  /**
+   * The arrangements open on Decide now, whoever filed them, the other part of the one count (`waitingCount`). Read whole,
+   * as the slots on Decide are, whatever the asker reads. Absent on a reading made by hand, and then none.
+   */
+  arranging?: number;
   /** The oldest event or row this record holds, and how many days ago that was. */
   firstWrite: string | null;
   ageDays: number;
@@ -271,6 +284,13 @@ export type SlashDraft = {
   body: Record<string, unknown>;
   /** Who drafted it: the rules, or the model named. */
   by: string;
+  /**
+   * How strong an arrangement is, on the recommender's tiers (`design-agent.ts` `recommend`), and the last day it waits,
+   * as `YYYY-MM-DD`. Set by the rule that drafted it from an offer; `queueFiling` gives any other arrangement the
+   * weakest rank and the day from now. Filed on the body by `lapsing`, never part of what it is about (`stableKey`).
+   */
+  rank?: number;
+  lapses?: string;
 };
 
 export type Offered = {
@@ -560,6 +580,7 @@ export function readUsage(
 
   const usage: Usage = {
     at: instantOf(nowMs),
+    arranging: Number(sql.one<{ n: number }>("SELECT count(*) AS n FROM suggestion WHERE body_kind = 'arrange' AND status = 'open'")?.n ?? 0),
     firstWrite,
     ageDays,
     loggedDays,
@@ -827,7 +848,7 @@ const drawnOf = (usage: Usage): DrawnPage[] =>
   [...usage.pages, ...(usage.made ?? [])].map((p) => ({ slug: p.slug, title: p.title, lists: p.registers, ...(p.row === undefined ? {} : { row: p.row }) }));
 
 /** The reading's own moment, for the recommender, which is told the time and never asks it. */
-const readAt = (usage: Usage): number => {
+const readAt = (usage: Pick<Usage, 'at'>): number => {
   const ms = Date.parse(usage.at);
   return Number.isFinite(ms) ? ms : 0;
 };
@@ -888,15 +909,17 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
   const packTitle = (id: string): string => offered.find((o) => o.id === id)?.title ?? usage.packs.find((p) => p.id === id)?.title ?? id;
 
   /* WHAT GROWS, most first. WHICH OF THEM IS OFFERED A PAGE IS THE RECOMMENDER'S ANSWER (`recommend`): it holds the
-     counts and reads "no page draws it whole" off the pages as drawn, so this rule and the pen cannot disagree. */
-  const pageOffered = new Set(
-    recommend({ nowMs: readAt(usage), pages: drawnOf(usage), lists: usage.lists.map((l) => ({ id: l.id, name: l.name, rows: l.rows, added30: l.added30, addedDays30: l.addedDays30 })) }).map((o) => o.key),
+     counts and reads "no page draws it whole" off the pages as drawn, so this rule and the pen cannot disagree, and the
+     draft carries the offer's rank and the day it lapses, so it waits in the one queue (`queueFiling`). */
+  const pageOffered = new Map(
+    recommend({ nowMs: readAt(usage), pages: drawnOf(usage), lists: usage.lists.map((l) => ({ id: l.id, name: l.name, rows: l.rows, added30: l.added30, addedDays30: l.addedDays30 })) }).map((o) => [o.key, o]),
   );
   const growing = usage.lists.filter((l) => l.added30 >= GROWS.rows && l.addedDays30 >= GROWS.days).sort((a, b) => b.added30 - a.added30);
   for (const l of growing) {
     noticed.push({ kind: 'grows', subject: l.id, text: `${l.name} grew by ${l.added30} in the last thirty days, on ${l.addedDays30} separate days.` });
     /* A LIST THAT GROWS AND NO PAGE SHOWS gets a page of its own, filed beside its pack's pages in the rail. */
-    if (pageOffered.has(`page:${l.id}`) && !pageSpokenFor(l.id, penHeld, penGone)) {
+    const offer = pageOffered.get(`page:${l.id}`);
+    if (offer !== undefined && !pageSpokenFor(l.id, penHeld, penGone)) {
       const slug = freeSlug(l.id, usage.pages);
       const section = usage.pages.find((p) => p.pack !== null && p.pack === l.pack)?.title ?? l.name;
       drafts.push({
@@ -919,6 +942,8 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
           ],
         },
         by: 'rules',
+        rank: offer.rank,
+        lapses: offer.lapses,
       });
     }
   }
@@ -1254,19 +1279,27 @@ const THEM: Readonly<Record<EntityUse['kind'], { them: string; own: string; has:
  * `namedHasPage`): a page a template made for its row, a page somebody wrote with that title, or one at that address. This
  * rule read titles and addresses for itself and so missed the first, and two projects with a page were each offered one.
  * What it keeps of its own is whether the address a draft would take is free, which is another question.
+ *
+ * AND IN THE RECOMMENDER'S ORDER, ONCE A THING (ENG-B14): the drafts follow `recommend`'s offers, strongest first, one
+ * for each key however often the reading carries the thing, and each carries its offer's rank and the day it lapses.
  */
 export function entityDrafts(usage: Usage): SlashDraft[] {
   const out: SlashDraft[] = [];
   const entities = usage.entities ?? [];
   const drawn = drawnOf(usage);
-  const offered = new Set(
-    recommend({ nowMs: readAt(usage), pages: drawn, named: entities.map((e) => ({ list: e.list, listName: e.listName, seq: e.seq, name: e.name, met: e.met, linked: e.linked })) }).map((o) => o.key),
-  );
+  const byKey = new Map<string, EntityUse>();
+  for (const e of entities) if (!byKey.has(`page:${e.list}#${e.seq}`)) byKey.set(`page:${e.list}#${e.seq}`, e);
+  const offers = recommend({
+    nowMs: readAt(usage),
+    pages: drawn,
+    named: [...byKey.values()].map((e) => ({ list: e.list, listName: e.listName, seq: e.seq, name: e.name, met: e.met, linked: e.linked })),
+  });
   /* THE ADDRESSES SPOKEN FOR: every page drawn, and each page drafted in this look. */
   const taken = new Set(drawn.map((p) => p.slug));
-  for (const e of entities) {
+  for (const offer of offers) {
     if (out.length >= ENTITY_DRAFTS_MOST) break;
-    if (!sayable(e.name) || !offered.has(`page:${e.list}#${e.seq}`) || e.lead === null || !/^[a-z][a-z0-9_]*$/u.test(e.list)) continue;
+    const e = byKey.get(offer.key);
+    if (e === undefined || !sayable(e.name) || e.lead === null || !/^[a-z][a-z0-9_]*$/u.test(e.list)) continue;
     const base = slugify(e.name);
     if (base === '' || taken.has(base)) continue;
     const { them, own, has } = THEM[e.kind];
@@ -1323,9 +1356,50 @@ export function entityDrafts(usage: Usage): SlashDraft[] {
         ],
       },
       by: 'rules',
+      rank: offer.rank,
+      lapses: offer.lapses,
     });
   }
   return out;
+}
+
+/* ── the one queue (ENG-B14) ───────────────────────────────────────────── */
+
+/**
+ * THE ONE COUNT: every arrangement offer that waits on the person now, the pen's and every open one on Decide whoever
+ * filed it. The cap reads this and nothing else, so Slash's questions and the pen's never sum past `WAITING_MOST`.
+ */
+export const waitingCount = (usage: Pick<Usage, 'pen' | 'arranging'>): number => Math.max(0, usage.pen?.waiting ?? 0) + Math.max(0, usage.arranging ?? 0);
+
+/** Why an arrangement Slash drafted is not filed yet: the queue is full. It is held, never dropped, and asked again on a later look. */
+export const QUEUE_FULL = `${WAITING_MOST} suggestions to arrange BrainDog already wait for you, so this one waits until one of them is answered.`;
+
+/**
+ * What a filed arrangement carries of the queue on its body: its rank on the kernel's scale (`filedRank`) and the last
+ * day it waits. Nothing for a draft that is not an arrangement or carries no day.
+ */
+export const lapsing = (d: Pick<SlashDraft, 'body_kind' | 'rank' | 'lapses'>): { rank?: number; lapses?: string } =>
+  d.body_kind !== 'arrange' || d.lapses === undefined ? {} : { rank: filedRank(d.rank ?? 0), lapses: d.lapses };
+
+/**
+ * Slash's drafts as they go to Decide through the one queue: every arrangement carries a rank and the day it lapses,
+ * and only as many are filed as the one count leaves room for (`roomFor`), the strongest first; the rest are held, each
+ * saying why. Anything that is not an arrangement passes as it came, in its place.
+ *
+ * `asked` IS WHAT DECIDE ALREADY HOLDS: a draft asked before takes no room here, since filing skips it, and so cannot
+ * keep a new one out. NOTHING IS TAKEN BACK OR DISPLACED: a lapse stays a computed state (the batch 93 ruling).
+ */
+export function queueFiling(
+  usage: Pick<Usage, 'at' | 'pen' | 'arranging'>,
+  drafts: readonly SlashDraft[],
+  asked: (d: SlashDraft) => boolean = () => false,
+): { file: SlashDraft[]; held: { question: string; why: string }[] } {
+  const lapses = lapsesFrom(readAt(usage));
+  const dated = drafts.map((d) => (d.body_kind === 'arrange' ? { ...d, rank: d.rank ?? 0, lapses: d.lapses ?? lapses } : d));
+  const asks = dated.filter((d) => d.body_kind === 'arrange' && !asked(d)) as (SlashDraft & { rank: number })[];
+  const { wait } = roomFor(asks, waitingCount(usage));
+  const waits = new Set<SlashDraft>(wait);
+  return { file: dated.filter((d) => !waits.has(d)), held: wait.map((d) => ({ question: d.question, why: QUEUE_FULL })) };
 }
 
 /** A skill's moment without what it then does: "when a ticket is opened, to set its priority" is "when a ticket is opened". */
@@ -1453,7 +1527,8 @@ const DESCRIBED_KEPT = 50;
  * which are shared with a person's reads at the palette and an automation's questions.
  *
  * `held` answers why this description is not sent now, or `null`: Decide full, or the same words already filed and still
- * waiting there. The words are compared as typed, less case and spacing. `once` makes presses of one description sent
+ * waiting there. `waiting` IS THE ONE COUNT (`waitingCount`, ENG-B14), or Slash's own open questions where those are
+ * more, so the pen's three and Slash's are one three here too, and the sentence keeps its words. The words are compared as typed, less case and spacing. `once` makes presses of one description sent
  * together one ask whose answer they share, since each of them would otherwise pass `held` before the first had filed;
  * `who` keeps two callers held to different reads from sharing an answer drawn from the other's reading.
  *
@@ -1466,6 +1541,7 @@ export function describedPresses<T>() {
   const filedFrom = new Map<string, readonly string[]>();
   return {
     held(asked: string, waiting: number, stillWaiting: (key: string) => boolean): string | null {
+      /* THE CAP IS THE QUEUE'S (`SLASH_OPEN_CAP` is `WAITING_MOST`), read over the count the caller hands. */
       if (waiting >= SLASH_OPEN_CAP)
         return `${SLASH_OPEN_CAP} of Slash's questions are already waiting on Decide, so nothing was drafted from what you described. Answer one of them, then ask again.`;
       const keys = filedFrom.get(said(asked));

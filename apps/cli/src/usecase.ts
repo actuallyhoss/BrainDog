@@ -246,10 +246,10 @@ export async function readSource(given: string, io: AgentIo, timeoutMs = USECASE
 }
 
 async function installFile(args: string[], io: AgentIo): Promise<number> {
-  let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined };
+  let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined; 'trust-key'?: boolean | undefined };
   let positionals: string[];
   try {
-    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' }, from: { type: 'string' }, version: { type: 'string' } } }));
+    ({ values, positionals } = parseArgs({ args, allowPositionals: true, strict: true, options: { host: { type: 'string' }, from: { type: 'string' }, version: { type: 'string' }, 'trust-key': { type: 'boolean' } } }));
   } catch {
     io.say(USAGE);
     return 1;
@@ -260,7 +260,7 @@ async function installFile(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   /* FROM A CATALOGUE BY ID, held to the checksum the index gives, then asked for as a file. */
-  if (values.from !== undefined) return ID.test(given) ? installFromCatalogue(given, values.from, values.version, values.host, io) : (io.say('--from names a catalogue to install a use case from by its id, as in braindog usecase install study --from ./catalogue.'), 1);
+  if (values.from !== undefined) return ID.test(given) ? installFromCatalogue(given, values.from, values.version, values.host, io, 'usecase', false, false, values['trust-key'] === true) : (io.say('--from names a catalogue to install a use case from by its id, as in braindog usecase install study --from ./catalogue.'), 1);
   if (values.version !== undefined) {
     io.say('--version picks a version from a catalogue, so it goes with --from.');
     return 1;

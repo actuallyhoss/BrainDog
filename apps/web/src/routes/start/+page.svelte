@@ -9,15 +9,17 @@
 
   OR POINT AT AN EXPORT. A CSV or JSON file from another app, dropped on the screen or picked, is read on this device
   (`lib/start/export.ts`); the model reads its first entries and says which list it goes into and which column fills
-  what, and the pages below are drawn over the file's own entries. A file no list holds becomes a list of its own.
+  what, and the pages below are drawn over the file's own entries. A file no list holds becomes a list of its own. A
+  zip, as Notion exports a workspace, is one tile for each table inside, each mapped and left out on its own, and the
+  pages of notes it held are counted and said once under them, never written.
 
   THEN A CONVERSATION, AND NOTHING WRITTEN. The words come back marked with what each phrase became, then BrainDog's
   reply: what it heard, what it is for, the one question the words cannot answer (the currency, with the ones worth
   offering numbered and one suggested with its reason), and a field to tell it more. Each later turn is read with the
   first, and BrainDog says what it added. Beside it, the BrainDog builds: its parts, each lighting up as a phrase asks
   for it, and the reading itself, phrase by phrase as it is typed and "Reading" while the model reads; then a tile for
-  each part with why it is on and the entries the words filled, and every page it makes, drawn by the record with
-  examples that are marked and never saved (`PagesPreview.svelte`).
+  each part with why it is on and the entries the words filled, and every page it makes, drawn by the record over the
+  person's own entries and file rows, never saved (`PagesPreview.svelte`).
 
   ONE BUTTON FAMILY, `Button`, in three weights by what each does: the one ink primary, quiet pills for the choices,
   and bare words for the other way in (a file). The primary sits at the end of the row under the field, where the eye
@@ -61,8 +63,8 @@
   import { draftBrief, outsideCatalogue, propose, proposeFirst, type Proposal } from '$lib/start/propose.ts';
   import { slashAsks } from '$lib/start/ask.ts';
   import { heardOf, offerOf, readCatalogueOffer, type CatalogueOffer } from '$lib/start/offer.ts';
-  import { BYTES_MOST, drawnWith, entriesOf, mapExport, newListDeclarations, ownList, readExport, type Export, type Mapping } from '$lib/start/export.ts';
-  import { listById } from '$lib/start/lists.ts';
+  import { BYTES_MOST, drawnWith, entriesOf, EXPORTS_MOST, leftSaid, mapExport, newListDeclarations, ownList, readExports, type Export, type Mapping } from '$lib/start/export.ts';
+  import { allLists, listById } from '$lib/start/lists.ts';
   import { titleOf } from '$lib/title.ts';
   import { drew } from '$lib/ui/screen.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -266,7 +268,7 @@
   async function read() {
     if (thinking) return;
     /* NOTHING SAID YET: the press puts the caret where the answer goes, rather than the button sitting greyed out. */
-    if (sentence.trim() === '' && file === null) {
+    if (sentence.trim() === '' && brought.length === 0) {
       field?.focus();
       return;
     }
@@ -277,7 +279,7 @@
     if (mine !== readings) return;
     thinking = false;
     /* A FILE ALONE IS AN ANSWER TOO, and its name stands where the words would. */
-    turns = [{ said: said === '' ? (file?.file ?? '') : said, at: Date.now(), adds: null }];
+    turns = [{ said: said === '' ? source : said, at: Date.now(), adds: null }];
     take(p);
     void tick().then(() => heardHeading?.focus());
   }
@@ -383,7 +385,7 @@
    * it (`LEANS_ON`: Money points at the person an invoice is to), so the record would refuse the one without the other.
    */
   function heldBy(id: string): string | null {
-    if (file !== null && mapping?.module === id) return file.file;
+    for (const b of brought) if (b.mapping?.module === id) return b.file.file;
     for (const c of cases) if (c.modules.includes(id)) return c.title;
     for (const m of kept) if (m !== id && (LEANS_ON[m] ?? []).includes(id)) return moduleName(m);
     return null;
@@ -417,52 +419,73 @@
   const ring = $derived(proposal !== null && reminds(cases, modules));
   const pages = $derived(pagesOf(cases, modules));
 
-  /* ── a file they pointed at ─────────────────────────────────────────────── */
+  /* ── the files they pointed at ─────────────────────────────────────────── */
 
-  /** The file read, `null` until one is brought in; how it maps, `null` while it is being read. */
-  let file = $state.raw<Export | null>(null);
-  let mapping = $state.raw<Mapping | null>(null);
+  /**
+   * ONE TILE FOR EACH FILE BROUGHT: one plain file is one, and a zip is one for each table inside it, eight at most
+   * (`readExports`). Each holds the export read, how it maps (`null` while it is being read), and its own handle, so a
+   * tile left out does not move the others' state.
+   */
+  type Brought = { key: number; file: Export; mapping: Mapping | null };
+  let brought = $state.raw<Brought[]>([]);
+  /** What the file held and left out, said once under the tiles ("14 pages of notes were left out"), or `null`. */
+  let leftLine = $state<string | null>(null);
   /** Why a file could not be read, said under the field. */
   let fileWhy = $state<string | null>(null);
   let picker = $state<HTMLInputElement | undefined>(undefined);
   let dragging = $state(false);
   /* EACH FILE IS NUMBERED, so a mapping that lands after another file was brought in is not drawn over it. */
   let files = 0;
+  /** The handle each tile is keyed by, never given twice on this page. */
+  let tileKeys = 0;
+  /** The name of the file as it was picked, which stands where the words would when nothing was said. */
+  let source = '';
 
   /**
-   * READ ON THIS DEVICE, THEN MAPPED: the model sees its first entries, the rules map it where there is no model. The
-   * module that keeps the list it goes into is turned on, and stays on while the file is in (`heldBy`).
+   * READ ON THIS DEVICE, THEN MAPPED: the model sees each table's first entries, one ask for each in the order the tiles
+   * stand, and the rules map them where there is no model. The module that keeps the list a table goes into is turned on,
+   * and stays on while that tile is in (`heldBy`).
    */
   async function bring(f: File | undefined) {
     if (!f || busy) return;
     fileWhy = null;
-    if (f.size > BYTES_MOST) {
+    if (!/\.zip$/iu.test(f.name) && f.size > BYTES_MOST) {
       fileWhy = firstRun.exportTooBig;
       return;
     }
-    const got = readExport(f.name, await f.text().catch(() => ''));
+    const bytes = new Uint8Array(await f.arrayBuffer().catch(() => new ArrayBuffer(0)));
+    const got = await readExports(f.name, bytes);
     if ('why' in got) {
-      fileWhy = got.why === 'notJson' ? firstRun.exportNotJson : firstRun.exportNoEntries;
+      /* THE PLAIN FILE'S TWO WHYS ARE SAID AS THEY ALWAYS WERE; a zip's is a sentence of its own, drawn as it is. */
+      fileWhy = got.why === 'notJson' ? firstRun.exportNotJson : got.why === 'noEntries' ? firstRun.exportNoEntries : got.why;
       return;
     }
     const mine = ++files;
-    file = got;
-    mapping = null;
-    const m = await mapExport(got, door?.mapping ?? null, locale);
-    if (mine !== files) return;
-    mapping = m;
-    if (m.module !== null) {
-      onByHand = new Set([...onByHand, m.module]);
-      offByHand = new Set([...offByHand].filter((x) => x !== m.module));
-      if (proposal !== null && !kept.includes(m.module)) kept = [...kept, m.module];
+    source = f.name;
+    const read = got.exports.slice(0, EXPORTS_MOST).map((file): Brought => ({ key: ++tileKeys, file, mapping: null }));
+    brought = read;
+    leftLine = leftSaid(got.left);
+    for (const b of read) {
+      /* A TILE LEFT OUT BEFORE ITS TURN IS NOT ASKED ABOUT. */
+      if (!brought.some((x) => x.key === b.key)) continue;
+      const m = await mapExport(b.file, door?.mapping ?? null, locale);
+      if (mine !== files) return;
+      if (!brought.some((x) => x.key === b.key)) continue;
+      brought = brought.map((x) => (x.key === b.key ? { ...x, mapping: m } : x));
+      if (m.module !== null) {
+        onByHand = new Set([...onByHand, m.module]);
+        offByHand = new Set([...offByHand].filter((x) => x !== m.module));
+        if (proposal !== null && !kept.includes(m.module)) kept = [...kept, m.module];
+      }
     }
   }
 
-  /** Take the file off the build. Its module stays as the person left it. */
-  function leaveFile() {
+  /** Take one file off the build. Its module stays as the person left it; the last one out takes the left-out line too. */
+  function leaveFile(key: number) {
+    brought = brought.filter((b) => b.key !== key);
+    if (brought.length > 0) return;
     files += 1;
-    file = null;
-    mapping = null;
+    leftLine = null;
     fileWhy = null;
   }
 
@@ -487,40 +510,50 @@
     if (!busy) void bring(e.dataTransfer?.files[0]);
   }
 
-  /** A list of the file's own, while it maps to none this build ships. */
-  const own = $derived(file && mapping && mapping.list === null ? ownList(file, mapping.name, currency, locale) : null);
-  /** The file's entries as their list stores them, in the currency as it stands. */
-  const entries = $derived(file && mapping ? entriesOf(file, mapping, currency, locale, own ?? undefined) : null);
-  /** Each column that fills a field of a list this build ships, with that field's name. */
-  const pairs = $derived(
-    file && mapping && mapping.list !== null
-      ? mapping.fields.map((m) => ({ column: m.column, label: listById(mapping?.list ?? '')?.fields.find((f) => f.id === m.field)?.label ?? m.field }))
-      : [],
-  );
-  /** What the file becomes, in the one line the conversation says it in. */
-  const fileSaid = $derived(
-    mapping === null
-      ? firstRun.exportReading
-      : (mapping.summary ?? (mapping.list === null ? firstRun.exportOwn(mapping.name) : firstRun.exportInto(entries?.fields.length ?? 0, mapping.name))),
-  );
-  /** The rail with the file's own page on it. */
-  const rail = $derived(own ? [...pages, { section: own.name, pages: [own.name] }] : pages);
+  /**
+   * EACH TILE AS IT IS DRAWN: a list of the file's own while it maps to none this build ships, named so no tile before
+   * it took the name; its entries as their list stores them, in the currency as it stands; each column that fills a
+   * field of a list this build ships, with that field's name; and what it becomes, in the one line the conversation
+   * says it in.
+   */
+  const tiled = $derived.by(() => {
+    const taken = allLists().map((l) => l.id);
+    return brought.map((b) => {
+      const { file, mapping } = b;
+      const own = mapping && mapping.list === null ? ownList(file, mapping.name, currency, locale, taken) : null;
+      if (own) taken.push(own.id);
+      const entries = mapping ? entriesOf(file, mapping, currency, locale, own ?? undefined) : null;
+      const pairs =
+        mapping && mapping.list !== null
+          ? mapping.fields.map((m) => ({ column: m.column, label: listById(mapping.list ?? '')?.fields.find((f) => f.id === m.field)?.label ?? m.field }))
+          : [];
+      const said =
+        mapping === null
+          ? firstRun.exportReading
+          : (mapping.summary ?? (mapping.list === null ? firstRun.exportOwn(mapping.name) : firstRun.exportInto(entries?.fields.length ?? 0, mapping.name)));
+      return { ...b, own, entries, pairs, said };
+    });
+  });
+  /** The rail with each file's own page on it. */
+  const rail = $derived([...pages, ...tiled.flatMap((t) => (t.own ? [{ section: t.own.name, pages: [t.own.name] }] : []))]);
 
   /* THE DRAFT STANDS ONLY WHILE NO USE CASE IS CHOSEN: choosing one from the chips is choosing its pages instead. */
   const using = $derived(chosen === null ? draft : null);
   const today = dayOf(Date.now());
   /**
    * WHAT THE RECORD IS ASKED TO DRAW: the draft as Slash drew it, over its sample rows, beside the modules kept; or every
-   * page of the use cases and modules, over their examples. Every one is a rehearsal that keeps nothing.
+   * page of the use cases and modules, over the person's own entries and file rows. Every one is a rehearsal that keeps
+   * nothing.
    *
    * ASKED AGAIN ONLY WHEN IT CHANGES: a turn that adds a client to People asks for the same pages, and the record is not
    * asked to draw them twice.
    */
   const plain = $derived(using ? [draftAsked(using), ...changesAsked([], modules, today)] : changesAsked(cases, modules, today));
   const asks = $derived(
-    file && mapping && entries
-      ? drawnWith(plain as Record<string, unknown>[], entries.register, entries.fields, own ? { declarations: newListDeclarations(own, mapping.summary) } : null)
-      : plain,
+    tiled.reduce(
+      (drawn, t) => (t.mapping && t.entries ? drawnWith(drawn, t.entries.register, t.entries.fields, t.own ? { declarations: newListDeclarations(t.own, t.mapping.summary) } : null) : drawn),
+      plain as Record<string, unknown>[],
+    ),
   );
   let drawAsked = $state.raw<Record<string, unknown>[]>([]);
   let drawKey = '';
@@ -619,8 +652,9 @@
   let owed: readonly SetupRow[] | undefined;
   /** What could not be made, `null` until a press has come back with something refused. */
   let failed = $state<NotMade[] | null>(null);
-  const nothing = $derived(u === null && modules.length === 0 && using === null && !(file !== null && mapping !== null));
-  const ready = $derived(proposal !== null && !busy && !nothing && !(asksCurrency && currency === null));
+  const nothing = $derived(u === null && modules.length === 0 && using === null && !brought.some((b) => b.mapping !== null));
+  /* A FILE STILL BEING READ HOLDS THE PRESS, so no tile on screen is left out of what it writes. */
+  const ready = $derived(proposal !== null && !busy && !nothing && !(asksCurrency && currency === null) && !brought.some((b) => b.mapping === null));
 
   async function make() {
     if (!proposal || !ready) return;
@@ -635,7 +669,7 @@
       today: dayOf(Date.now()),
       nav: pref.read().nav ?? [],
       drafted: using,
-      imported: file && mapping ? { file, mapping } : null,
+      imported: brought.flatMap((b) => (b.mapping ? [{ file: b.file, mapping: b.mapping }] : [])),
       locale,
     };
     busy = true;
@@ -748,9 +782,9 @@
 {#snippet bringer()}
   <!-- ONE QUIET CONTROL, AND ITS HINT ONLY ON HOVER OR FOCUS: the screen asks one question, and a file is the other way
        to answer it. The input is the browser's own picker; a drop anywhere on the screen does the same. -->
-  {#if file === null}
+  {#if brought.length === 0}
     <span class="bring">
-      <input class="bring-input" type="file" accept=".csv,.tsv,.json,.txt,text/csv,application/json" tabindex="-1" aria-hidden="true" bind:this={picker} onchange={pick} />
+      <input class="bring-input" type="file" accept=".csv,.tsv,.json,.txt,.zip,text/csv,text/tab-separated-values,application/json,text/plain,application/zip" tabindex="-1" aria-hidden="true" bind:this={picker} onchange={pick} />
       <Button weight="bare" size="sm" disabled={busy} aria-describedby="bring-hint" onclick={() => picker?.click()}>{firstRun.exportPoint}</Button>
       <span class="bring-hint" id="bring-hint">{firstRun.exportHint}</span>
     </span>
@@ -899,14 +933,14 @@
                               </li>
                             {/each}
                           </ul>
-                        {:else if file !== null}
-                          <p class="quiet">{fileSaid}</p>
+                        {:else if tiled.length > 0}
+                          {#each tiled as t (t.key)}<p class="quiet">{t.said}</p>{/each}
                         {:else}
                           <p class="quiet">{firstRun.heardNone}</p>
                           {#if proposal.name && modules.includes(PEOPLE)}<p class="quiet">{firstRun.heardNote}</p>{/if}
                         {/if}
                         {#if proposal.name && !modules.includes(PEOPLE)}<p class="quiet">{firstRun.nameNotKept}</p>{/if}
-                        {#if proposal.fell === 'SLASH_BUDGET_SPENT'}<p class="quiet">{firstRun.readByRules}</p>{/if}
+                        {#if proposal.fell === 'SLASH_BUDGET_SPENT'}<p class="quiet">{firstRun.readByRules}</p>{:else if proposal.by === undefined || proposal.by === 'rules'}<p class="quiet">{firstRun.readByRulesAny}</p>{/if}
                         {#each missing as m (m.title)}
                           <p class="nudge">{words.missing(m.title, m.missing)}</p>
                         {/each}
@@ -1063,19 +1097,21 @@
             {/if}
           </Tile>
 
-          {#if file}
+          {#each tiled as t (t.key)}
             <FromFile
-              {file}
-              {mapping}
-              line={fileSaid}
-              {pairs}
-              going={entries?.fields.length ?? 0}
-              held={entries?.skipped ?? 0}
-              reading={mapping === null}
+              file={t.file}
+              mapping={t.mapping}
+              line={t.said}
+              pairs={t.pairs}
+              going={t.entries?.fields.length ?? 0}
+              held={t.entries?.skipped ?? 0}
+              reading={t.mapping === null}
               {busy}
-              onremove={leaveFile}
+              onremove={() => leaveFile(t.key)}
             />
-          {/if}
+          {/each}
+          <!-- WHAT THE FILE HELD AND NOTHING WRITES, said once under its tiles, never as a tile of its own. -->
+          {#if tiled.length > 0 && leftLine}<p class="quiet">{leftLine}</p>{/if}
 
           {#if onParts.length > 0}
             <div class="parts" role="group" aria-label={firstRun.mineKeeps} data-live={proposal === null ? '' : undefined}>
@@ -1097,7 +1133,7 @@
 
           {#if proposal}
             <!-- EVERY PAGE IT MAKES, one row a page, each opening as the record would draw it. -->
-            <PagesPreview asked={drawAsked} {rail} />
+            <PagesPreview asked={drawAsked} {rail} typed={proposal.rows} name={proposal.name} />
           {/if}
         </div>
       </div>

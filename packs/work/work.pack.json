@@ -3,7 +3,7 @@
   "version": "1.19.0",
   "title": "Work",
   "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
-  "changes": "A thread has six states and the moves between them, and a day it aims for. A follow-up takes its parent's project, thread and owner, each one it left empty, and its agent when that agent made it. The Board opens with the line to add work. Which project a task or a thread is for waits until Projects is there, and who owns a task until People is. A project that has had nothing written on its tasks for more than thirty days is marked quiet.",
+  "changes": "A thread has six states and the moves between them, and a day it aims for. A follow-up takes its parent's project, thread and owner, each one it left empty, and its agent when that agent made it. The Board opens with the line to add work. Which project a task or a thread is for waits until Projects is there, and who owns a task until People is. A project that has had nothing written on its tasks for more than thirty days is marked quiet. Work counts and answers the questions about your tasks.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -172,14 +172,14 @@
           "lead": true,
           "span": 12,
           "when": { "metric": "tasks-late-yours", "gt": 0 },
-          "body": "{{tasks-late-yours}} late, {{tasks-waiting}} waiting on you"
+          "body": "{{questions-open-in:tasks}} question(s) for you, {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you"
         },
         {
           "kind": "note",
           "lead": true,
           "span": 12,
           "when": { "metric": "tasks-late-yours", "is": 0 },
-          "body": "Nothing is late, {{tasks-waiting}} waiting on you"
+          "body": "Nothing is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you"
         },
         { "kind": "capture", "heading": "What needs doing?", "icon": "plus", "span": 12, "register": "tasks" },
         {
@@ -193,6 +193,17 @@
           "order": [ { "field": "priority", "dir": "asc" }, { "field": "by", "dir": "asc" } ],
           "limit": 12,
           "when": { "metric": "tasks-late-yours", "gt": 0 }
+        },
+        {
+          "kind": "queue",
+          "heading": "Questions for you",
+          "icon": "ask",
+          "span": 12,
+          "source": "governance.open",
+          "where": "list is tasks",
+          "limit": 3,
+          "tiles": true,
+          "when": { "metric": "questions-open-in:tasks", "gt": 0 }
         },
         {
           "kind": "stat",

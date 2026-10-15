@@ -65,6 +65,7 @@
   import { askOnDecide, diffOf, install, installInTurn, notOwner, planFor, turnWords, type Offered, type OfferClient, type Planned } from './browse/[id]/offer.ts';
   import { words } from './words.ts';
   import { glyphOf } from './glyph.ts';
+  import { readRemoved, wayBack, type Removed } from './removed.ts';
   /* WHAT BRAINDOG ITSELF HAS IMPROVED, read from the one place Decide reads it too, so the Updates tab and the card on
      Decide never disagree about what waits. */
   import { declarationName, firstPartyUpdates } from '../decide/improved.ts';
@@ -110,6 +111,24 @@
   async function reread() {
     const again = await source?.packs();
     if (again?.ok) states = again.value;
+    void readGone();
+  }
+
+  /* ── removed ───────────────────────────────────────────────────────────── */
+
+  /* WHAT WAS UNINSTALLED INSIDE THE RECORD'S THIRTY DAYS (`packsRemoved`), read with the installed list and again after
+     every uninstall, put back and install, because each moves what is listed. Its part is fetched only once there is
+     something in it, so a record with nothing removed loads nothing more. A refusal is nothing removed. */
+  let removed = $state.raw<Removed[]>([]);
+  let RemovedPart = $state.raw<typeof import('./Removed.svelte').default | null>(null);
+  const gone = $derived(removed.filter((r) => !installed.some((s) => s.id === r.id)));
+  /* THE VERSION OF EACH MODULE THIS BUILD SHIPS, which is the one a module is put back at. */
+  const shipped = new Map([...byId].map(([id, p]) => [id, p.version]));
+
+  async function readGone() {
+    const rows = await readRemoved(client);
+    removed = rows;
+    if (rows.length > 0 && !RemovedPart) RemovedPart = (await import('./Removed.svelte')).default;
   }
 
   /* ── the tabs ──────────────────────────────────────────────────────────── */
@@ -215,22 +234,39 @@
    * is approved by a press, never by an undo.
    */
   async function reinstall(id: string, name: string) {
-    if (!client || busy !== null) return;
+    const out = await bringBack(id, name);
+    if (out.said) toasts.push(out.said, { intent: out.back ? 'good' : 'warn' });
+  }
+
+  /**
+   * Put back, from the Removed part: the same plan and install as Undo. Once it is back the toast says so and the part
+   * reads again; anything else, a refusal in the record's words or the plan to approve, is said on its row.
+   */
+  async function putBack(r: Removed, name: string): Promise<string | null> {
+    const out = await bringBack(r.id, name);
+    if (!out.back) return out.said || null;
+    toasts.push(out.said, { intent: 'good' });
+    return null;
+  }
+
+  /** The one way back for a module: `back` once it is in, and `said`, the line that says how it went. */
+  async function bringBack(id: string, name: string): Promise<{ back: boolean; said: string }> {
+    if (!client || busy !== null) return { back: false, said: '' };
     const c = client;
     busy = id;
     try {
       await reread();
       const planned = await planFor(c, { kind: 'module', id, source: 'bundled' }, { doc: null, text: null }, installed, copy.packNotInstallable(name));
-      if (!planned.ok) return void toasts.push(planned.fix, { intent: 'warn' });
+      if (!planned.ok) return { back: false, said: planned.fix };
       if (planned.planned.kind === 'pack' && planned.planned.approve.length > 0) {
         const p = planned.planned;
         sheet = { diff: diffOf(p), then: () => installOne(p, name, null).then(reread) };
-        return void toasts.push(copy.reinstallApprove(name), { intent: 'warn' });
+        return { back: false, said: copy.reinstallApprove(name) };
       }
       const out = await install(c, planned.planned, installed, pref.read().nav ?? [], copy.writeRaced);
-      if (!out.ok) return void toasts.push(out.fix, { intent: 'warn' });
-      toasts.push(copy.reinstalled(name), { intent: 'good' });
+      if (!out.ok) return { back: false, said: out.fix };
       await reread();
+      return { back: true, said: copy.reinstalled(name) };
     } finally {
       busy = null;
     }
@@ -612,6 +648,7 @@
         return false;
       }
       states = chosen.first.value;
+      void readGone();
       return true;
     });
   });
@@ -741,6 +778,11 @@
         {/each}
       </ul>
     </Section>
+  {/if}
+
+  <!-- REMOVED, UNDER WHAT IS INSTALLED: each one uninstalled inside thirty days, what of it stays, and Put back. -->
+  {#if RemovedPart && gone.length > 0}
+    <RemovedPart rows={gone} now={Date.now()} wayOf={(r) => wayBack(r, shipped, kennel)} nameOf={nameOf} held={busy !== null} onputback={putBack} />
   {/if}
 
   <!-- WHAT ONE ADD-ON BRINGS, each list and page a row that opens it. Settings says the same on the add-on's own page. -->

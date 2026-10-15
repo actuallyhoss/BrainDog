@@ -65,6 +65,7 @@
   import { copy } from '$lib/copy.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import FlowList from '$lib/flow/FlowList.svelte';
+  import { grammarNow, grammarState, loadGrammar } from '$lib/flow/grammar.ts';
   import Inspector from '$lib/flow/Inspector.svelte';
   import RunView from '$lib/flow/RunView.svelte';
   import Tried from '$lib/flow/Tried.svelte';
@@ -114,6 +115,14 @@
   let fix = $state('');
   let tab = $state<'steps' | 'runs' | 'versions' | 'written'>('steps');
   let busy = $state(false);
+  /* THE RECORD'S GRAMMAR, read when the editor opens. Over a record older than the app, or one whose grammar could not be
+     read, the automation opens read only: one line says why, and nothing is sent or tried. */
+  /* THE TAB'S GRAMMAR, FOLLOWED BY ITS OWN SUBSCRIPTION and not `$grammarState`: Svelte's store helpers would go into
+     the runtime every screen loads (the entry budget). */
+  let grammarRead = $state.raw(grammarNow());
+  $effect(() => grammarState.subscribe((s) => (grammarRead = s)));
+  const lockedSay = $derived(grammarRead.state === 'older' || grammarRead.state === 'unread' ? grammarRead.say : null);
+  $effect(() => void loadGrammar());
   let filed = $state<{ id: string | null } | null>(null);
   let refusal = $state('');
   /** The last dry run of an inline body, and the body it was asked about, so an edit after it hides a stale answer. */
@@ -352,7 +361,7 @@
    * without a trip to Decide. A new one lands on its own page, where Run now and Rename are offered from then on.
    */
   async function save() {
-    if (!source || busy || blocked || !flow.dirty) return;
+    if (!source || busy || blocked || !flow.dirty || lockedSay !== null) return;
     const isNew = row === null;
     if (isNew) flow.draft = { ...flow.draft, id: freshId(flow.draft.name, taken) };
     busy = true;
@@ -392,7 +401,7 @@
    * an inline rule is walked by the dry run. Neither writes anything, so neither needs a fault-free body.
    */
   async function tryIt() {
-    if (!source || trying) return;
+    if (!source || trying || lockedSay !== null) return;
     const body = flow.body;
     const asked = JSON.stringify(body);
     trying = true;
@@ -654,6 +663,7 @@
         {/if}
       {/snippet}
     </PageHead>
+    {#if lockedSay}<p class="locked" role="status">{lockedSay}</p>{/if}
     <div class="page">
       <Segmented class="tabs" role="group" aria-label={title}>
         <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
@@ -745,9 +755,9 @@
           <!-- TRY AND SAVE, AND NOTHING ELSE, IN THE STICKY GLASS BAR, so on a phone it is one row of two 44px buttons, no
                taller than `--sticky`, floating above the tab bar. -->
           <div class="bar">
-            <Button disabled={trying || flow.draft.steps.length === 0} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
+            <Button disabled={trying || flow.draft.steps.length === 0 || lockedSay !== null} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
             <!-- A GREYED SAVE SAYS WHY, read from the footer's sentence, so its reason is not only somewhere above it. -->
-            <Button weight="primary" disabled={busy || blocked || !flow.dirty} aria-describedby={blocked && !untouched && !refusal ? 'flow-held' : undefined} onclick={() => void save()}>{saveWord}</Button>
+            <Button weight="primary" disabled={busy || blocked || !flow.dirty || lockedSay !== null} aria-describedby={blocked && !untouched && !refusal ? 'flow-held' : undefined} onclick={() => void save()}>{saveWord}</Button>
           </div>
         </div>
       {:else if tab === 'runs' && row}
@@ -982,6 +992,13 @@
     color: var(--dim);
     font-size: var(--t-sm);
     line-height: 18px;
+  }
+
+  /* THE ONE LINE SAYING WHY THIS OPENS READ ONLY, under the head, in the head's own muted words. */
+  .locked {
+    margin: 0 0 var(--sp-3);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   /* WHAT IS WRONG WITH THE WHOLE OF IT, UNDER THE TRIGGER: red words after the glyph, on the

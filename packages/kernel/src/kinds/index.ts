@@ -32,6 +32,7 @@ import type { Refusal } from '@braindog/ports';
 import type { BlockResult, PageBlock, PageDeps } from '../pages.ts';
 import { calendar } from './calendar.ts';
 import { embed } from './embed.ts';
+import { form } from './form.ts';
 import { gallery } from './gallery.ts';
 import { lanes } from './lanes.ts';
 import { link } from './link.ts';
@@ -89,6 +90,7 @@ export const BLOCK_KIND_MODULES: Record<string, KindModule> = {
   gallery,
   embed,
   lanes,
+  form,
 };
 
 /** The module that reads `kind`, or `undefined` for a kind `pages.ts` reads itself. */

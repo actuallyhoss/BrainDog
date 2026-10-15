@@ -28,6 +28,16 @@
  * THE CATALOGUE ID IS THE ONE THE FILE GIVES ITSELF, not the folder's: `packs/mercury` publishes `mercury-company` and
  * `packs/rates-poll` publishes `rates-open-er-api-com`, and those are the ids a record holds them under.
  *
+ * USE CASES GO THROUGH THE SAME DOOR, AS KIND `usecase` (USE-A16). A folder under `packs/` may also hold
+ * `<id>.usecase.json`, a use case file named after the id inside it, such as the front an add-on is offered under to a
+ * stranger at the first run; and the use cases this build ships are written in beside them, each as the file
+ * `builtInFile` in `packages/seed/src/usecases/share.ts` already hands Browse. Each entry carries the `signals` and
+ * `modules` its file says, which is what the first run listens for (`apps/web/src/lib/start/offer.ts`), so a use case
+ * is heard because the catalogue lists it and not because a list in code names it. The same rules hold as for a pack:
+ * a published version never changes, a refused file stops the build with the door's sentence, and the same file again
+ * is passed over. A use case file needs no test of its own, since it carries no list a person keeps rows in that the
+ * door does not read, and a file in `packs/` that takes a built-in's id, or another file's, is refused.
+ *
  * NOTHING IS WRITTEN UNLESS EVERY PACK PASSES, so a refused pack leaves the catalogue as it was rather than half moved.
  *
  * A YANK COMES FROM A PACK'S OWN `yanked.json`, NEVER FROM A HAND EDIT OF THE CATALOGUE (`apps/web/static/catalogue`
@@ -70,7 +80,10 @@ import {
   readCatalogue,
   readCatalogueFile,
 } from '../../packages/declare/src/catalogue.ts';
+import { SHARED_SUFFIX } from '../../packages/declare/src/shared.ts';
 import { MODULES } from '../../packages/declare/src/usecase.ts';
+import { USE_CASES } from '../../packages/seed/src/usecases/index.ts';
+import { builtInFile } from '../../packages/seed/src/usecases/share.ts';
 import { makePreview } from './previews.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -141,6 +154,40 @@ for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) =
   said.push(`${where} published as ${out.value.path}`);
 }
 
+/* USE CASES, by the same door: each `<id>.usecase.json` beside an add-on, then every one this build ships as the file
+   Browse is handed. Their ids are held apart first, so one id never has two sources taking turns at its versions. */
+const usecases = [];
+const shipped = new Set(USE_CASES.map((u) => u.usecase));
+for (const folder of readdirSync(packsDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort()) {
+  for (const name of readdirSync(join(packsDir, folder)).filter((f) => f.endsWith(SHARED_SUFFIX)).sort()) {
+    const where = `packs/${folder}/${name}`;
+    const text = readFileSync(join(packsDir, folder, name), 'utf8');
+    let id;
+    try {
+      id = JSON.parse(text)?.usecase;
+    } catch {
+      fail(`${where} is not JSON.`);
+    }
+    if (typeof id !== 'string' || `${id}${SHARED_SUFFIX}` !== name)
+      fail(`${where} is named for a use case it does not hold. A use case file is named after the usecase inside it, as in ${typeof id === 'string' ? id : '<id>'}${SHARED_SUFFIX}.`);
+    if (shipped.has(id)) fail(`${where} takes the id ${id}, which a use case this build ships already has. Give it its own id.`);
+    const twin = usecases.find((u) => u.id === id);
+    if (twin) fail(`${where} and ${twin.where} both hold the use case ${id}. A use case is published from one file.`);
+    usecases.push({ id, where, text });
+  }
+}
+for (const u of USE_CASES) usecases.push({ id: u.usecase, where: `the built-in ${u.usecase}`, text: `${JSON.stringify(builtInFile(u.usecase), null, 2)}\n` });
+for (const { id, where, text } of usecases) {
+  const version = JSON.parse(text).version;
+  const listed = index.entries.find((e) => e.kind === 'usecase' && e.id === id)?.versions.find((v) => v.version === version);
+  if (listed && listed.checksum === (await fileChecksum(text))) continue;
+  const out = await publishTo(index, text, read, now, undefined, BRAINDOG_PUBLISHER);
+  if (!out.ok) fail(`${where}: ${out.refusal.fix} (${out.refusal.code})`);
+  index = out.value.index;
+  files.set(out.value.path, text);
+  said.push(`${where} published as ${out.value.path}`);
+}
+
 /* YANKS, READ THE SAME WAY: a `yanked.json` beside a pack, never a hand edit of the index. Each maps a catalogue id
    that pack publishes to why it is withdrawn, and every one of its versions is stamped, not only the latest, since
    an old version stays installable by id until it too is marked. A reused reason and date (a version already
@@ -177,9 +224,12 @@ for (const entry of index.entries) {
     described.push(entry);
     continue;
   }
-  const { categories: _c, publisher: _p, unlisted: _u, ...rest } = entry;
+  const { categories: _c, publisher: _p, unlisted: _u, signals: _s, modules: _m, ...rest } = entry;
   const unlisted = entry.kind === 'pack' && JSON.parse(text).unlisted === true;
-  described.push({ ...rest, categories: categoriesOf(file.value, BRAINDOG_PUBLISHER.name), publisher: BRAINDOG_PUBLISHER, ...(unlisted ? { unlisted: true } : {}) });
+  /* A USE CASE PUBLISHED BEFORE ITS ENTRY SAID ITS WORDS is given them here, from the same latest file, as categories were. */
+  const u = file.value.kind === 'usecase' ? file.value.shared.usecase : null;
+  const heard = { ...(u && u.signals.length > 0 ? { signals: [...u.signals] } : {}), ...(u && u.modules.length > 0 ? { modules: [...u.modules] } : {}) };
+  described.push({ ...rest, categories: categoriesOf(file.value, BRAINDOG_PUBLISHER.name), publisher: BRAINDOG_PUBLISHER, ...(unlisted ? { unlisted: true } : {}), ...heard });
 }
 index = { ...index, entries: described };
 

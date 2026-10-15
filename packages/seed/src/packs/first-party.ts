@@ -523,6 +523,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   keyed copies of a block that is there, nothing added or taken away, so a minor step. And Projects' In play cards
  *   say `edit: true` on `about` (card-edit-wire-93, PGS-C15, inside the unreleased step), so a project's one line is
  *   typed on its card where the reader may write the list: one key on a column that is there, so no version of its own.
+ *   And Projects draws the questions about its own list (`list is things`) as a queue gated on
+ *   `questions-open-in:things`, with a clause in the line (waiting-work-projects-99, PGS-C18, batch 99, inside the
+ *   unreleased step): one block added to a page that is there, nothing taken away.
  * - work 1.19.0 (W061, REC-C10): a thread has six states and declared moves, a day it aims for, and a follow-up takes
  *   its parent's project, thread and owner one by one (and the agent, when the agent holding the parent made the
  *   follow-up), and a thread that is holding may be marked
@@ -530,7 +533,9 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   version of its own. Two values, their labels and the moves on one field, one field added and one script's title
  *   and source changed, nothing taken away, so a minor step. And the Board page takes Work's capture line, first after
  *   its sentence (board-capture-line-83, batch 83, inside the unreleased step): one block added to a page that is
- *   there, nothing taken away.
+ *   there, nothing taken away. And Work draws the questions about its own list (`list is tasks`) as a queue gated on
+ *   `questions-open-in:tasks`, with a clause in the line (waiting-work-projects-99, PGS-C18, batch 99, inside the
+ *   unreleased step): one block added to a page that is there, nothing taken away.
  * - money-core 3.17.0, still unreleased, takes three more things of batch 61 with no version of its own: the Ledger
  *   pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`,
  *   pairs-fx-61); two figures over who made each Ledger entry, `filed-for-you-30d` and `filed-today`, read from

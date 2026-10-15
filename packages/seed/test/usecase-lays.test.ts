@@ -102,6 +102,12 @@ const LAID: Record<string, Laid> = {
     declares: '5719e519311f68f0',
     history: ['2.4.0 hands the count of budgets set, `metric.budgets-set`, to money-core, which declares it itself (budgets-set-73) -> 5719e519311f68f0'],
   },
+  /* 2.5.0, UNRELEASED (personal-and-guide-99): its changes are on its own Home, the first things to press. */
+  'personal@2.5.0': {
+    lays: ['hands metric.budgets-set to money-core'],
+    declares: '5719e519311f68f0',
+    history: ['2.5.0 lays what 2.4.0 laid, word for word -> 5719e519311f68f0'],
+  },
 };
 
 /** What is wrong with one use case's document against `LAID`, as sentences. Empty when nothing is. */

@@ -98,6 +98,7 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   const named = (ok: (t: (typeof THINGS)[number]) => boolean) => THINGS.filter((t) => inPlay(t) && ok(t)).map((t) => String(t.name)).reverse();
   const and = (list: string[]) => (list.length < 2 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
   assert.deepEqual(line.values, {
+    'questions-open-in:things': 0,
     'projects-need-you.names': and(named((t) => t.health === 'at_risk' || t.health === 'off_track')),
     'projects-on-track.names': and(named((t) => t.health === 'on_track')),
   });
@@ -195,7 +196,7 @@ test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and Parked and fin
      none. The record still draws it, so it comes after the line with no figure: the nightly line is written for the
      first line a page draws (`leadBlockOf` in `packages/record/src/headlines.ts`), and asked of "across 0 projects" the
      model's line would be drawn over this one saying the same. */
-  assert.match(String(leads[2]!.body), /^[^,]*\{\{projects-live\}\}[^,]*$/u, 'the line over the projects in play says something with nothing in play');
+  assert.match(String(leads[2]!.body), /^[^,]*\{\{projects-live\}\}[^,]*, \{\{questions-open-in:things\}\} question\(s\) for you$/u, 'the line over the projects in play says something with nothing in play');
   const first = leads.find((b) => b.drawn !== false);
   assert.doesNotMatch(String(first?.body), /\{\{/u, `the nightly line is asked of a line of noughts: ${first?.body}`);
   assert.equal(block(overview, 'In play').drawn, false, 'In play is drawn over nothing');
@@ -359,7 +360,7 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS HOW THE PROJECTS IN PLAY AR
   const leads = overview.blocks.filter((b) => b.kind === 'note' && (b as { lead?: boolean }).lead === true);
   assert.equal(leads.length, 3, 'the Overview declares its three opening sentences');
   assert.deepEqual(leads.map((b) => b.drawn !== false), [false, true, false], 'one sentence and not two, or none');
-  assert.match(String((leads[1] as { body?: string }).body), /^\{\{projects-need-you\.names\}\} need\(s\) a push, \{\{projects-on-track\.names\}\} is on track$/u);
+  assert.match(String((leads[1] as { body?: string }).body), /^\{\{questions-open-in:things\}\} question\(s\) for you, \{\{projects-need-you\.names\}\} need\(s\) a push, \{\{projects-on-track\.names\}\} is on track$/u);
 
   /* EVERY PROJECT IN PLAY IS A PART OF HOW THEY ARE GOING, and Where they are, which said the line again, is gone
      (portfolio 1.11.0). */

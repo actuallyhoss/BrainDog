@@ -11,8 +11,9 @@
  * so the Kennel needed no route and no `wrangler.jsonc` change. It is answered in `route()` before any record door,
  * because it is nobody's record.
  *
- * READS ARE PUBLIC AND OPEN TO EVERY ORIGIN: the index, a published file, its preview and the install counts are what a
- * self-host, the command line and anybody's browser fetch. A PUBLISHED FILE IS THE ONE ANSWER A CACHE MAY KEEP. A version
+ * READS ARE PUBLIC AND CARRY NO CORS HEADER: the index, a published file, its preview and the install counts are what a
+ * self-host and the command line fetch, and the site reads them on its own origin, so no answer here opens itself to a
+ * page on another one (his rule, no CORS anywhere). A PUBLISHED FILE IS THE ONE ANSWER A CACHE MAY KEEP. A version
  * is published once and never changes, so it is served `immutable`; everything else this file answers, the index and
  * every refusal included, is `no-store`, as every other answer from this Worker is.
  *
@@ -124,9 +125,9 @@ export const servesKennel = (pathname: string): boolean => pathname === KENNEL_B
 
 /* ── answers ─────────────────────────────────────────────────────────────── */
 
-type How = { open?: boolean; kept?: boolean; head?: boolean; extra?: readonly [string, string][] };
+type How = { kept?: boolean; head?: boolean; extra?: readonly [string, string][] };
 
-/** Every answer the Kennel gives: `no-store` unless it is a published file, and open to every origin when it is a read. */
+/** Every answer the Kennel gives: `no-store` unless it is a published file, and no `access-control-allow-*` on any. */
 function answer(status: number, body: string, how: How = {}): Response {
   return new Response(how.head === true ? null : body, {
     status,
@@ -134,7 +135,6 @@ function answer(status: number, body: string, how: How = {}): Response {
       ['content-type', 'application/json; charset=utf-8'],
       ['cache-control', how.kept === true ? IMMUTABLE : 'no-store'],
       ['x-content-type-options', 'nosniff'],
-      ...(how.open === true ? ([['access-control-allow-origin', '*']] as [string, string][]) : []),
       ...(how.extra ?? []),
     ],
   });
@@ -173,7 +173,7 @@ export async function serveKennel(request: Request, deps: KennelDeps): Promise<R
   if ('wrong' in asked)
     return asked.wrong === 'method'
       ? refusedWith(405, { code: 'ROUTE_UNKNOWN', fix: `This Kennel address takes ${asked.allow}.` }, { extra: [['allow', asked.allow]] })
-      : refusedWith(404, WHAT, { open: true });
+      : refusedWith(404, WHAT);
   const now = deps.now ?? (() => new Date());
   const head = request.method === 'HEAD';
   try {
@@ -189,16 +189,16 @@ export async function serveKennel(request: Request, deps: KennelDeps): Promise<R
         /* THE PUBLIC INDEX LEAVES OUT AN `unlisted` ENTRY, while its files still download by exact path, and
            install by id keeps resolving against the bundled catalogue, which keeps it. */
         const merged = mergeIndexes(await bundledIndex(deps.assets, false), await readingIndex(deps.blobs));
-        return answer(200, JSON.stringify({ ...merged, entries: listedEntries(merged) }), { open: true, head });
+        return answer(200, JSON.stringify({ ...merged, entries: listedEntries(merged) }), { head });
       }
       case 'counts':
-        return answer(200, await countsOf(deps.blobs, now()), { open: true, head });
+        return answer(200, await countsOf(deps.blobs, now()), { head });
       case 'file':
       case 'preview': {
         const text = await fileOf(deps, asked.path);
         return text === null
-          ? refusedWith(404, { code: 'ROUTE_UNKNOWN', fix: `The Kennel holds no ${asked.path}.` }, { open: true, head })
-          : answer(200, text, { open: true, kept: asked.ask === 'file', head });
+          ? refusedWith(404, { code: 'ROUTE_UNKNOWN', fix: `The Kennel holds no ${asked.path}.` }, { head })
+          : answer(200, text, { kept: asked.ask === 'file', head });
       }
       case 'submit':
         return await submit(request, deps, now);
@@ -721,8 +721,13 @@ async function submit(request: Request, deps: KennelDeps, now: () => Date): Prom
   const { text, signature, name } = asked.value;
   let identity: Identity;
   let cookie: string | undefined;
-  if (signature !== null) identity = { kind: 'key', signature, name };
-  else {
+  if (signature !== null) {
+    /* THE SESSION IS READ BESIDE A SIGNATURE, never in its place, so a person's key may claim an id that person
+       published unsigned (`packages/declare/src/kennel.ts` `mayTake`). Nobody signed in is a key alone, as before. */
+    const who = await personOf(request, deps);
+    identity = { kind: 'key', signature, name, ...('refused' in who ? {} : { person: who.person }) };
+    if (!('refused' in who)) cookie = who.cookie;
+  } else {
     const who = await personOf(request, deps);
     if ('refused' in who) return who.refused;
     identity = { kind: 'person', id: who.person, name };

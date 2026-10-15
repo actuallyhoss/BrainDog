@@ -112,6 +112,9 @@ export type WritesDeps = {
 /** Where a declared action was pressed: the block, its place on the page, and the rows it drew then. */
 export type Pressed = { block: LiveBlock; at: number; before: readonly Row[] };
 
+/** What a press came to: whether it landed and, when the record refused it, its sentence and the field it named. */
+export type Acted = { ok: boolean; fix?: string; at?: string };
+
 /**
  * THE ONE TABLE OF VERBS A PRESS SENDS TO THE RECORD BY THEIR OWN CLIENT METHOD (PGS-A12). The row verbs are the six
  * writes above said as verbs (`row.tick` is the tick write, `row.move` a card moved, `row.create` a captured line or a
@@ -728,12 +731,12 @@ export function pageWrites(deps: WritesDeps) {
    * A VERB THIS HOST CANNOT CARRY OUT SAYS WHAT IT WOULD DO AND RUNS NOTHING, before any sheet asks a question it has no
    * answer to. `value` is a switch's or a choice's new value; `on` is the block the press came from.
    */
-  async function act(action: ActAction, row?: unknown, value?: unknown, on?: Pressed): Promise<void> {
-    if (deps.now() === null || !action || typeof action.verb !== 'string') return;
+  async function act(action: ActAction, row?: unknown, value?: unknown, on?: Pressed): Promise<Acted> {
+    if (deps.now() === null || !action || typeof action.verb !== 'string') return { ok: false };
     const sheets = (sheetMod ??= await import('./act-sheet.ts'));
     const at = onOf(row, on);
     const args = sheets.argsOf(action, at, value);
-    if (!actable(action.verb)) return void toasts.push(sheets.actWords.cannot(action.label.trim(), sheets.lookOf(action, at.title, args).join(' ')), { intent: 'warn' });
+    if (!actable(action.verb)) return (toasts.push(sheets.actWords.cannot(action.label.trim(), sheets.lookOf(action, at.title, args).join(' ')), { intent: 'warn' }), { ok: false });
     const open = deps.sheet ?? sheets.openSheet;
     let a = action;
     for (;;) {
@@ -747,18 +750,19 @@ export function pageWrites(deps: WritesDeps) {
               ? ({ kind: 'confirm', label: a.label, said: said ?? sheets.HARD_PLAIN } as const)
               : null;
       if (!ask) break;
-      if (!(await open(ask))) return;
+      if (!(await open(ask))) return { ok: false };
       a = sheets.pastStep(a, step);
     }
     const out = await pressed(a, at, args, value, on);
     if (a.once === true && out.ok) await open({ kind: 'once', label: a.label, value: sheets.answeredValue(out.value) });
+    return { ok: out.ok, ...(out.fix === undefined ? {} : { fix: out.fix }), ...(out.at === undefined ? {} : { at: out.at }) };
   }
 
   /**
    * The verb run once, through the write its kind already has. Answers whether it was sent and what it answered, for a
    * value shown once; a refusal has been said by then, in the record's own words, and nothing is left changed.
    */
-  async function pressed(a: ActAction, at: On, args: Record<string, unknown>, value: unknown, on?: Pressed): Promise<{ ok: boolean; value?: unknown }> {
+  async function pressed(a: ActAction, at: On, args: Record<string, unknown>, value: unknown, on?: Pressed): Promise<{ ok: boolean; value?: unknown; fix?: string; at?: string }> {
     const w = sheetMod!.actWords;
     const label = a.label.trim();
     const what = at.title ? `${label}, “${at.title}”` : label;
@@ -782,7 +786,9 @@ export function pageWrites(deps: WritesDeps) {
     }
     if (!ROW_VERBS.has(a.verb)) return generic(a, at, args, what, keepsUndo);
     if (a.verb === 'row.create') {
-      const register = at.block?.register ?? at.ref?.register;
+      /* A FORM NAMES ITS LIST ON THE ACTION, not by a source: it reads no rows, so the page gives it no register. */
+      const bound = a.args && !Array.isArray(a.args) ? (a.args as Readonly<Record<string, unknown>>).register : undefined;
+      const register = at.block?.register ?? at.ref?.register ?? (typeof bound === 'string' && bound !== '' ? bound : undefined);
       if (!register) return (toasts.push(w.noRow, { intent: 'warn' }), { ok: false });
       /* A LINE TYPED IS A CAPTURE, the same write a capture field makes, with its receipt and its Undo. */
       if (typeof args.fields === 'string' && at.block && capturable(at.block)) return (await captureLine(register, args.fields, {}), { ok: true });
@@ -797,13 +803,13 @@ export function pageWrites(deps: WritesDeps) {
       const out = await optimist(toasts).run<{ seq: number; version: number }>({
         apply: () => {},
         revert: () => {},
-        send: () => writer.create(register, fields as never).then((x) => (x.ok ? { ok: true as const, value: x.entry } : { ok: false as const, fix: x.fix })),
+        send: () => writer.create(register, fields as never).then((x) => (x.ok ? { ok: true as const, value: x.entry } : { ok: false as const, fix: x.fix, ...('at' in x && x.at ? { at: x.at } : {}) })),
         said: w.done(label, null),
         undo: (made) =>
           keepsUndo ? () => void undoBack(label, () => writer.archive(register, made.seq, made.version).then((x) => (x.ok ? { from: 'undone' } : { from: 'refused', fix: x.fix }))) : null,
       });
       await deps.reread();
-      return out.ok ? { ok: true, value: out.value } : { ok: false };
+      return out.ok ? { ok: true, value: out.value } : { ok: false, fix: out.fix, ...(out.at ? { at: out.at } : {}) };
     }
     if (!at.ref) return (toasts.push(w.noRow, { intent: 'warn' }), { ok: false });
     /* A TICK IS THE TICK WRITE, and a move on a board's own column is the card moved: held, refused and undone as they are. */

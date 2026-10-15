@@ -100,7 +100,13 @@ export type LookBody = {
   pinned?: string[];
   /** Which parts are drawn in groups, and by which field of their list (the kernel's `LookBody.group`). */
   group?: Record<string, string>;
+  /** How wide each part is drawn, in twelfths, and which column it sits in (the kernel's `LookBody.span`, `.area`). The person's own look only. */
+  span?: Record<string, number>;
+  area?: Record<string, 'main' | 'rail'>;
 };
+
+/** The widths a look may give a part: the kernel's `LOOK_SPANS`, the board's five. */
+const SPANS: ReadonlySet<number> = new Set([12, 8, 6, 4, 3]);
 
 /** The live look over a page as the record holds it: its version, the pack that shipped it, and its body. */
 export type LiveLook = { version: number; pack: string | null; body: LookBody };
@@ -603,7 +609,22 @@ export function lookBodyOf(raw: unknown, page: string): LookBody | null {
   const group = b.group !== null && typeof b.group === 'object' && !Array.isArray(b.group) ? Object.entries(b.group as Record<string, unknown>) : [];
   if (group.length > 0 && group.every(([, f]) => typeof f === 'string'))
     out.group = Object.fromEntries((group as [string, string][]).sort(([a], [z]) => (a < z ? -1 : a > z ? 1 : 0)));
+  /* HIS WIDTHS AND COLUMNS, WHOLE, and only on his own look: Slash and the rules arrange a page, and never say how wide
+     a part is or where it sits. Sorted as the grouping is, so two looks that place alike read alike. */
+  if (by === 'owner') {
+    const span = placed(b.span, (w): w is number => typeof w === 'number' && SPANS.has(w));
+    if (span) out.span = span;
+    const area = placed(b.area, (a): a is 'main' | 'rail' => a === 'main' || a === 'rail');
+    if (area) out.area = area;
+  }
   return out;
+}
+
+/** A map of part keys to a width or a column, sorted by key, keeping the entries that are one; `undefined` for none. */
+function placed<T>(raw: unknown, fits: (v: unknown) => v is T): Record<string, T> | undefined {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const kept = Object.entries(raw as Record<string, unknown>).filter((e): e is [string, T] => BLOCK_KEY.test(e[0]) && fits(e[1]));
+  return kept.length === 0 ? undefined : Object.fromEntries(kept.sort(([a], [z]) => (a < z ? -1 : a > z ? 1 : 0)));
 }
 
 /** The live look over a page, or `null` when none is stored. */
@@ -655,8 +676,10 @@ const no = (code: Refusal['code'], fix: string): Result<never> => ({ ok: false, 
  * written again. `title` is the page's, for the sentence.
  */
 export async function writeLook(kernel: Kept, page: string, title: string, given: LookBody): Promise<Result<{ written: boolean }>> {
-  /* THE PAGE IT IS LAID OVER IS THE ONE IT IS WRITTEN TO, since the kernel reads the declaration's id from it. */
-  const body: LookBody = { ...given, look: page };
+  /* THE PAGE IT IS LAID OVER IS THE ONE IT IS WRITTEN TO, since the kernel reads the declaration's id from it. A width
+     and a column are the person's alone, so Slash's look carries neither. */
+  const { span: _span, area: _area, ...said } = given;
+  const body: LookBody = { ...said, look: page };
   const live = liveLook(kernel, page);
   if (!slashMay(live))
     return no('FORBIDDEN', live?.pack === null ? `${title} is arranged the way you set it, so Slash left it as it is.` : `${title} keeps the arrangement it came with, so Slash left it as it is.`);

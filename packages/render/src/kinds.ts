@@ -1,5 +1,5 @@
 /**
- * The eight primitives, the thirty-nine kinds, and the four intent words.
+ * The eight primitives, the forty kinds, and the four intent words.
  *
  * A block set is a SYSTEM, not a catalogue. Every kind draws from the same eight primitives and the
  * same tokens, and no kind introduces a colour, a font or a spacing value (05 §1).
@@ -339,6 +339,10 @@ const TABLE = {
   /* `url | title | aspect`, one authored row from `EMBED_PROVIDERS`, a facade until a reader presses Load
      (`src/embed.ts`). On the panel for `capture`'s reason: one bounded thing, not rows of anything. */
   embed: { primitive: 'panel', cells: 3, optional: 2, tone: false, rows: 1, pageOnly: true, minSpan: 6, purpose: 'media' },
+  /* A form a page declares that writes a new row of a list (PGS-A15, the kernel's `kinds/form.ts`): a field a row, each
+     its question and its box, then the button. On `rows`, for `inputs`'s reason: where the host cannot write, it is a
+     spec of what the form asks. Page-only, because what it writes into is the record's. */
+  form: { primitive: 'rows', cells: 0, tone: false, pageOnly: true, minSpan: 4, purpose: 'list' },
 } as const satisfies Record<string, KindSpec>;
 
 export type Kind = keyof typeof TABLE;

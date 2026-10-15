@@ -470,6 +470,10 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
    * record of six people every one was on the page twice. The cards stay, since they carry the day with who somebody is,
    * who they are with and where they were met; the lists go. Who has gone quiet is still said first and by name, in the
    * page's line, and `people-in-touch-90d` stays declared and draws nothing, as `people-in-touch-12w` does.
+   *
+   * WHAT WAITS ON YOU ABOUT THEM, SINCE People 3.4.0 (PGS-C18). The line opens on how many questions about somebody here
+   * are open, and Waiting on you under it answers three. Before the fold at most four tiles: Waiting on you, the note on
+   * somebody held twice, Everyone and Organisations, each drawn only while it has something.
    */
   people: {
     page: 'people',
@@ -491,7 +495,7 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'people-quiet', is: 0 },
-        body: '{{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days',
+        body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days',
       },
       {
         /* WHO HAS GONE QUIET, BY NAME, SINCE People 2.7.0 (the visual review of October 2nd), where the line said "1 quiet
@@ -501,7 +505,22 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'people-quiet', gt: 0 },
-        body: '{{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too',
+        body: '{{questions-open-in:people}} question(s) for you, {{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too',
+      },
+      {
+        /* WHAT IS ASKED ABOUT SOMEBODY ON THIS RECORD, SINCE People 3.4.0 (PGS-C18), answered where they are shown, three
+           at a time, and the rest are in Decide. Each line above opens on how many (`questions-open-in:people`, the open
+           questions whose row is on People), a clause the writer leaves out at nought, so the line and the queue count
+           the same questions. Under the line, since it is the one tile here that needs the person, and only while
+           something about People is asked: a question about a task or a bill is Work's or Money's to draw. */
+        kind: 'queue',
+        heading: 'Waiting on you',
+        icon: 'ask',
+        span: 12,
+        source: 'governance.open',
+        where: 'list is people',
+        limit: 3,
+        when: { metric: 'questions-open-in:people', gt: 0 },
       },
       {
         /* SOMEBODY HELD TWICE (AGT-D05): the record's own figure of the people it holds more than once, as far as the

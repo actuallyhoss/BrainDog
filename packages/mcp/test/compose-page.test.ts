@@ -126,10 +126,10 @@ const DESK_WHOLE = (): Decl[] => [
   ...named('page', 'desk', 'part'),
 ];
 
-/** Numbers, with its two lists, the parts a budget line points at, and every figure its verdict and tiles read. */
+/** Numbers, with its two lists, the parts a budget line points at, and every figure its notes read. */
 const NUMBERS_WHOLE = (): Decl[] => [
   ...named('register', 'parts', 'checks', 'lines'),
-  ...named('metric', 'price', 'costs', 'priced', 'cost-share', 'least-price', 'price-room', 'price-free', 'price-unjudged'),
+  ...named('metric', 'price', 'priced', 'price-free', 'price-unjudged'),
   ...named('page', 'numbers'),
 ];
 
@@ -205,7 +205,7 @@ async function rows(api: Awaited<ReturnType<typeof createRecordApi>>) {
   await make('steps', { what: 'Box quote', part: box.id, done: false, priority: 'should', rank: 3, due: '2026-10-12' });
   await make('lessons', { lesson: 'Ask for a sample first', body: 'The first run was the wrong weight.', part: product.id });
   await make('contacts', { name: 'A printer', part: box.id, status: 'asked' });
-  await make('checks', { what: 'First price', price: 1000, making: 200, packing: 50, sending: 50, cost: 300 });
+  await make('checks', { what: 'First price', price: 1000, making: 200, packing: 50, sending: 50 });
   await make('lines', { item: 'Fabric', part: product.id, low: 100, high: 300, spent: 120 });
   await make('notes', { text: 'Maybe fewer parts to start with.' });
 }
@@ -301,7 +301,7 @@ test('AN AGENT TRIES THE DESK WHOLE IN ONE CALL, OVER SAMPLE ROWS AND ONE PART, 
       triedBundle('Add the numbers of the launch desk?', NUMBERS_WHOLE(), 'metric.price', {
         rows: {
           parts: [{ name: 'Product', what: 'The first piece' }],
-          checks: [{ what: 'First price', price: 1000, making: 200, packing: 50, sending: 50, cost: 300 }],
+          checks: [{ what: 'First price', price: 1000, making: 200, packing: 50, sending: 50 }],
           lines: [{ item: 'Fabric', part: 'parts#1', low: 100, high: 300, spent: 120 }],
         },
       }),
@@ -310,7 +310,7 @@ test('AN AGENT TRIES THE DESK WHOLE IN ONE CALL, OVER SAMPLE ROWS AND ONE PART, 
   ).change_preview.pages;
   assert.deepEqual(counted.map((p) => p.id), ['page.numbers']);
   counted[0]!.blocks.forEach((b, i) => assert.deepEqual(b.refusals, [], `page.numbers.blocks[${i}] (${b.kind}) was refused`));
-  assert.deepEqual(counted[0]!.blocks.find((b) => b.kind === 'inputs')!.types, { price: 'decimal', making: 'decimal', packing: 'decimal', sending: 'decimal' });
+  assert.deepEqual(counted[0]!.blocks.find((b) => b.kind === 'inputs')!.types, { price: 'decimal', making: 'decimal', packing: 'decimal', sending: 'decimal', times_cost: 'decimal', cost: 'decimal', least: 'decimal', room: 'decimal' });
   assert.equal(counted[0]!.blocks.find((b) => b.kind === 'progress')!.matched, 1);
 
   /* AND NOTHING OF EITHER TRY STAYED: no list, no page, no question in Decide. */
@@ -327,7 +327,7 @@ test('AN AGENT TRIES THE DESK WHOLE IN ONE CALL, OVER SAMPLE ROWS AND ONE PART, 
   const lists = said<{ id: string }>(await mcp.call('propose', bundle('Add the lists a launch desk keeps?', LISTS, 'metric.essentials'), agent));
   assert.equal(api.kernel.declarations().some((d) => d.id === 'register.parts'), false, 'a proposal installed a list');
   await accept(lists.id);
-  for (const id of ['register.parts', 'register.steps', 'register.contacts', 'register.checks', 'register.notes', 'metric.cost-share', 'rule.launch_desk_cost', 'script.launch_desk_cost'])
+  for (const id of ['register.parts', 'register.steps', 'register.contacts', 'register.checks', 'register.notes', 'metric.price-unjudged'])
     assert.ok(api.kernel.declarations().some((d) => d.id === id), `${id} was not installed by the accept`);
 
   /* THE AGENT CAN NOW READ WHAT IT BUILT, as a model would before it writes a where. */

@@ -3,7 +3,7 @@
   "version": "3.4.0",
   "title": "People",
   "summary": "Clients, contractors and accountants, the organisations they are with, and where each one was seen.",
-  "changes": "The People page says how many people may be on this record twice and opens the list at them. Calendar shows this month and the next two with everything that has a day it is due, and Activity shows what changed a day at a time. Which projects a person or an organisation was met in, and an organisation's projects and money, wait until Projects and Money are there.",
+  "changes": "The People page says how many people may be on this record twice and opens the list at them, and what is asked about somebody here waits on the page to be answered. Calendar shows this month and the next two with everything that has a day it is due, and Activity shows what changed a day at a time. Which projects a person or an organisation was met in, and an organisation's projects and money, wait until Projects and Money are there.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -129,14 +129,24 @@
           "lead": true,
           "span": 12,
           "when": { "metric": "people-quiet", "is": 0 },
-          "body": "{{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days"
+          "body": "{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days"
         },
         {
           "kind": "note",
           "lead": true,
           "span": 12,
           "when": { "metric": "people-quiet", "gt": 0 },
-          "body": "{{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too"
+          "body": "{{questions-open-in:people}} question(s) for you, {{people-quiet.first}} has been quiet since {{people-quiet.since}}, and {{people-quiet.more}} other(s) have too"
+        },
+        {
+          "kind": "queue",
+          "heading": "Waiting on you",
+          "icon": "ask",
+          "span": 12,
+          "source": "governance.open",
+          "where": "list is people",
+          "limit": 3,
+          "when": { "metric": "questions-open-in:people", "gt": 0 }
         },
         {
           "kind": "note",

@@ -35,6 +35,8 @@
   import { rowGroup, tableLines } from '../../src/html.ts';
   import { AMOUNT_SPACE } from '../../src/money.ts';
   import { WORKING_GLYPH, WORKING_LABEL } from '../../src/working.ts';
+  import { ROW_ACTIONS_HEAD, type OnAct } from '../../src/actions.ts';
+  import Actions from '../Actions.svelte';
 
   /**
    * What a scope cell draws its chip from. The host's type of the same shape is `ScopeCells` in
@@ -61,6 +63,8 @@
     scope,
     icon,
     home,
+    rowActions,
+    act,
   }: {
     columns: readonly Column[];
     rows: readonly TableRow[];
@@ -98,7 +102,18 @@
     icon?: RenderOptions['icon'];
     /** The record's home currency (`RenderOptions.home`): a money cell is read once and written once against it. */
     home?: RenderOptions['home'];
+    /**
+     * EACH ROW'S DECLARED ACTIONS (PGS-A12) and where a press goes, handed the `TableRow` it was on. Drawn in a last
+     * column, and at a card's end on a phone, only when both are handed; with either absent the table is as it was.
+     */
+    rowActions?: readonly unknown[] | null | undefined;
+    act?: OnAct | undefined;
   } = $props();
+
+  const acts = $derived(act !== undefined && Array.isArray(rowActions) && rowActions.length > 0);
+  /* The actions' column is one past the declared ones, and in the caret's walk like any other. */
+  const actsAt = $derived(columns.length);
+  const cols = $derived(columns.length + (acts ? 1 : 0));
 
   /** A mark's picture as the host draws it, or `null`, and the chip's slot stays empty, as `Cards.svelte` leaves it. */
   const markArt = (glyph: string): string | null => glyphPath(glyph, icon ? { icon } : {});
@@ -107,7 +122,7 @@
      where the column sits. */
   const scoped = $derived(new Set((scope?.columns ?? []).map((i) => columns[i]?.field).filter((f): f is string => f !== undefined)));
 
-  const tracks = $derived(columns.map((c) => c.width).join(' '));
+  const tracks = $derived(columns.map((c) => c.width).join(' ') + (acts ? ' auto' : ''));
   /* One function for the groups AND the step they are counted in, because `aria-rowindex` is
      `group * step + i` and the two disagreeing is a table that announces a different row than the
      one on screen. It is also where `chunk={0}` stops being an endless loop during render. */
@@ -190,8 +205,9 @@
    * list's ends and belong to whoever owns the list.
    */
   function onkeydown(e: KeyboardEvent) {
-    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-    const to = moveCell(at, e.key, rows.length, columns.length);
+    /* A KEY A ROW'S MENU TOOK (its arrows, its Escape) is the menu's, never a move of the caret. */
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    const to = moveCell(at, e.key, rows.length, cols);
     if (!to) return;
     e.preventDefault();
     e.stopPropagation();
@@ -363,6 +379,9 @@
           {@render card(row)}
         </div>
       {/if}
+      <!-- BESIDE THE CARD AND NOT INSIDE IT, because a card can be a link or a button and a control inside one is a press
+           that lands on both. On a phone the row's actions are its one menu button. -->
+      {#if acts}<div class="table-card-acts"><Actions actions={rowActions} {row} onact={act} size="row" narrow /></div>{/if}
     </li>
     {/if}
   {/each}
@@ -389,7 +408,7 @@
     bind:this={grid}
     data-toned={toned ? '' : undefined}
     aria-rowcount={total === undefined || total < 0 ? -1 : total + 1 + heads}
-    aria-colcount={columns.length}
+    aria-colcount={cols}
     style="--cols:{tracks}"
     tabindex="-1"
     {onkeydown}
@@ -410,6 +429,7 @@
           {:else}{column.label}{/if}
         </span>
       {/each}
+      {#if acts}<span class="th" role="columnheader" data-align="end"><span class="th-name">{ROW_ACTIONS_HEAD}</span></span>{/if}
     </div>
 
     {#each grouped.groups as group, g}
@@ -424,7 +444,7 @@
           {#if line.kind === 'group'}
             <!-- A GROUP'S HEADING, ONE CELL ACROSS THE COLUMNS: its name and, where the table holds all its rows, its
                  count. Not in the caret's walk, which is the rows'; `groupHead` in `../../src/html.ts` is its mirror. -->
-            <div class="tr tr-group" role="row" aria-rowindex={g * grouped.step + i + 2}><span class="td" role="gridcell" aria-colspan={columns.length} style="grid-column:1/-1"><span class="group-name">{line.name}</span>{#if counted}{' '}<span class="group-count">{line.count}</span>{/if}</span></div>
+            <div class="tr tr-group" role="row" aria-rowindex={g * grouped.step + i + 2}><span class="td" role="gridcell" aria-colspan={cols} style="grid-column:1/-1"><span class="group-name">{line.name}</span>{#if counted}{' '}<span class="group-count">{line.count}</span>{/if}</span></div>
           {:else}
           {@const row = line.row}
           {@const index = line.at}
@@ -432,7 +452,11 @@
                that binds `focus` is drawing a caret line down its list and this marks it; a caller
                that binds nothing never drew one, and marking row 0 of every `comparison` block on
                every page would be a highlight nobody asked for on a row nobody chose. The roving
-               tab stop moves either way; only the paint belongs to the host. -->
+               tab stop moves either way; only the paint belongs to the host.
+
+               THE ROW'S OWN ACTIONS ARE ITS LAST CELL, after the declared ones and touching them. The cell is in the
+               caret's walk, Enter on it presses the first, and its controls take the tab stop only on the caret's row,
+               so the grid is still one stop and not two a row. -->
           <div
             class="tr"
             role="row"
@@ -505,7 +529,14 @@
                      static mirror, which emits no such space, drew a different tree. Found by
                      giving `parity.test.ts` its first `comparison` shape. -->
                 {#if c === glyphAt && row.tone}<span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}{@render cellBody(row, column, value)}</span>
-            {/each}
+            {/each}{#if acts}<span
+                class="td td-acts"
+                role="gridcell"
+                tabindex={tabIndex(index, actsAt)}
+                data-align="end"
+                onkeydown={(e) => e.key === 'Enter' && e.target === e.currentTarget && e.currentTarget.querySelector<HTMLElement>('[data-row-action]')?.click()}
+                ><Actions actions={rowActions} {row} onact={act} size="row" narrow={false} tabindex={at.row === index && at.col === actsAt ? 0 : -1} /></span
+              >{/if}
           </div>
           {/if}
         {/each}
@@ -530,3 +561,22 @@
      written for. A cap line is about the LIST; the host has the answer's real size and draws one for
      whichever body it rendered. `cap` stays here, because its other job is deciding whether there is
      a sentinel to observe. -->
+
+<style>
+  /* A CARD WITH ITS ROW'S ACTIONS keeps the card's width and puts the one menu button at its end, centred on it. Global, so no scoping
+     class lands on a card `toHTML` draws too. */
+  :global(.table-cards > li:has(> .table-card-acts)) {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  :global(.table-cards > li:has(> .table-card-acts) > .table-card) {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  :global(.table-cards > li > .table-card-acts) {
+    flex: none;
+  }
+</style>

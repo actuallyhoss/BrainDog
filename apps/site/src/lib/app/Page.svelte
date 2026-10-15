@@ -10,8 +10,9 @@
   heading, and under a chart the one written line that says what it means (`reads`, by segment). The page's
   opening sentence (`note lead`) is left out, because the title row above the page says it; `leadOf` finds it.
 
-  MONEY IS SAID AS THE APP SAYS IT, `£1,312.40 is left` and never `GBP 1,312.40`: in that line, in the opening
-  sentence, in a note, on a progress row (`inSymbols`) and in what an answer says. The source keeps its codes.
+  MONEY IS SAID AS THE APP SAYS IT, `$1,312.40 is left` and never `USD 1,312.40`: in that line, in the opening
+  sentence, in a note, on a progress row (`inSymbols`) and in what an answer says. The source keeps its codes. Every
+  drawer is told the plans' currency as the home (`HOME`), so a dollar is `$` there as in the copy, never `US$`.
 
   TWELVE COLUMNS AT 900PX AND WIDER, ONE BELOW. `layout` places a segment by its index; one it does not
   place takes its kind's `minSpan` (`page.ts`).
@@ -41,7 +42,7 @@
   import type { IconName } from '../icons.ts';
   import Flow from './Flow.svelte';
   import { cases } from '../copy/cases.ts';
-  import { GO, answerOf, goTarget, inSymbols, isLead, said as inWords, spanOf, withoutAnswered } from './page.ts';
+  import { GO, HOME, answerOf, goTarget, inSymbols, isLead, said as inWords, spanOf, withoutAnswered } from './page.ts';
   import type { Span } from '../examples/types.ts';
 
   let {
@@ -112,6 +113,8 @@
   const optsFor = (at: number): RenderOptions => {
     const map = live && go ? links : undefined;
     return {
+      /* The plans' currency, as `page.ts` tells its sentences: `$4,800` on a tile, never `US$4,800` beside the copy's `$`. */
+      home: HOME,
       ...(now === undefined ? {} : { now }),
       ...(map
         ? {

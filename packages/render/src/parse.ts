@@ -58,7 +58,7 @@ export type Row = { cells: string[]; tone?: Tone; hole?: boolean; done?: boolean
 
 export type Block = {
   type: 'block';
-  /** One of the thirty-nine, or `block.<id>` for a kind a pack declared; `kindSpec` reads either. */
+  /** One of the forty, or `block.<id>` for a kind a pack declared; `kindSpec` reads either. */
   kind: BlockKind;
   /** The word after the kind in the fence, one of `KINDS[kind].forms`: ` ```stat lead ` is `lead`. */
   form?: string;
@@ -67,6 +67,10 @@ export type Block = {
   rows: Row[];
   /** A declared block's actions, cut by the page read to what this reader may press (PGS-A12). Never parsed: a fence an author typed has none. */
   actions?: readonly Action[];
+  /** Each row's declared actions, cut by the page read to what this reader may press (PGS-A12). Never parsed. */
+  row_actions?: readonly Action[];
+  /** A calendar's strip of whole weeks from this one (`weeks:`), set by the page read like `actions`. Never parsed. */
+  weeks?: number;
   /** The raw fence, kept so a degraded sibling can show exactly what the author typed. */
   raw: string;
   start: number;
@@ -302,7 +306,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
         fix: isPackKind(kind)
           ? `"${written}" is a block kind no installed pack declares. Install the pack that declares it. The block is shown as you wrote it.`
           : written
-          ? `"${written}" is not one of the thirty-nine kinds. The block is shown as you wrote it.`
+          ? `"${written}" is not one of the forty kinds. The block is shown as you wrote it.`
           : 'A fence with no kind is shown as you wrote it.',
         raw,
         info,
@@ -487,7 +491,7 @@ export function parse(src: string, opts: ParseOptions = {}): Segment[] {
 
     out.push({
       type: 'block',
-      /* `kindSpec` answered, so the name is one of the thirty-nine or an installed `block.<id>`. */
+      /* `kindSpec` answered, so the name is one of the forty or an installed `block.<id>`. */
       kind: kind as BlockKind,
       ...(form ? { form } : {}),
       ...(heading ? { heading } : {}),

@@ -1,9 +1,9 @@
 {
   "pack": "launch-desk",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "title": "Launch desk",
   "summary": "A desk for launching a thing in parts: where it stands in one sentence, each part in its own colour and picture with its next step, the steps on a calendar by the day they are due, the calls waiting on you, a pad beside it, and a price check.",
-  "changes": "Tiles sit in even rows: on the desk the next move and what is already done stack in one box, the calls waiting on you come straight under the line and are shown once, and a part's own card sits at the top of the column beside its path.",
+  "changes": "The price check works its sums out itself: costs together, the least price that holds (that times Times cost, 2.5 at first and yours to change) and the room, the price less that least price, all drawn beside what you type. The rule and script that added them up are gone, so the add-on carries no code. The line saying whether the price passes and the tiles of costs and share are gone too: a room below nought is too thin.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -211,7 +211,7 @@
       "register": "checks",
       "name": "Price check",
       "one": "check",
-      "holds": "one price and what making, packing and sending one costs, to see whether the costs are at most two fifths of the price",
+      "holds": "one price, what making, packing and sending one costs, and how many times those costs the price should be at least",
       "title": "what",
       "fields": [
         {
@@ -245,14 +245,45 @@
           "min": 0
         },
         {
+          "id": "times_cost",
+          "label": "Times cost",
+          "type": "decimal",
+          "min": 0,
+          "default": 2.5
+        },
+        {
           "id": "cost",
           "label": "Costs together",
-          "type": "decimal"
+          "type": "decimal",
+          "derive": {
+            "sum": [
+              "making",
+              "packing",
+              "sending"
+            ]
+          }
         },
         {
           "id": "least",
           "label": "Least price that holds",
-          "type": "decimal"
+          "type": "decimal",
+          "derive": {
+            "product": [
+              "cost",
+              "times_cost"
+            ]
+          }
+        },
+        {
+          "id": "room",
+          "label": "Room over the least price",
+          "type": "decimal",
+          "derive": {
+            "diff": [
+              "price",
+              "least"
+            ]
+          }
         },
         {
           "id": "tags",
@@ -289,48 +320,6 @@
           "index": true
         }
       ]
-    },
-    {
-      "rule": "launch_desk_cost",
-      "name": "Add the three costs of the price check together, and the least price they allow",
-      "on": {
-        "written": {
-          "register": "checks",
-          "op": [
-            "create",
-            "update"
-          ],
-          "fields": [
-            "making",
-            "packing",
-            "sending"
-          ]
-        }
-      },
-      "steps": [
-        {
-          "script": {
-            "id": "launch_desk_cost",
-            "as": "costing"
-          }
-        }
-      ]
-    },
-    {
-      "script": "launch_desk_cost",
-      "title": "Add what making, packing and sending one costs, and the least price at which that is two fifths of it, whenever a cost is written",
-      "runs": {
-        "rule": true
-      },
-      "egress": [],
-      "keys": [],
-      "reads": [
-        "checks"
-      ],
-      "writes": [
-        "checks"
-      ],
-      "source": "/* A typed decimal as a whole number of units and how many places those units are, read off its shortest spelling. A\n   decimal field holds at most fifteen significant digits, so that spelling is the one that was typed: 4.004 is 4004 in\n   thousandths, never 4.00399999999999955946. */\nfunction exact(n) {\n  const [mantissa, power = '0'] = String(n).split('e');\n  const [whole, fraction = ''] = mantissa.split('.');\n  return { units: BigInt(whole + fraction), places: fraction.length - Number(power) };\n}\n\n/* Several decimals brought to the finest places any of them has, so they add as whole numbers. */\nfunction inCommon(list) {\n  const read = list.map(exact);\n  const places = Math.max(0, ...read.map((r) => r.places));\n  return { places, units: read.map((r) => r.units * 10n ** BigInt(places - r.places)) };\n}\n\n/* Whole units back to a number, through its decimal spelling, which Number reads to the nearest double; or null when the\n   spelling has more than the fifteen significant digits a decimal field holds, which the record would refuse. */\nfunction decimal(units, places) {\n  const digits = units.toString().padStart(places + 1, '0');\n  if (digits.replace(/^0+/, '').replace(/0+$/, '').length > 15) return null;\n  return Number(places === 0 ? digits : digits.slice(0, -places) + '.' + digits.slice(-places));\n}\n\n/* WHAT MAKING, PACKING AND SENDING ONE COST, ADDED EXACTLY, AND THE LEAST PRICE THEY ALLOW. The least price is five\n   halves of the costs, the price at which they are exactly two fifths of it, worked out in whole numbers here. The page\n   judges the price live against it, as the figure price less least price, so a price typed a moment ago is judged at\n   once and never against a verdict stored before it. */\nexport default async function run(ctx) {\n  const id = ctx.input && ctx.input.id;\n  const rows = id ? [await ctx.record.get(id)] : await ctx.record.list('checks', {});\n  for (const row of rows) {\n    if (!row) continue;\n    const costs = [row.fields.making, row.fields.packing, row.fields.sending];\n    let cost = null;\n    let least = null;\n    /* ALL THREE OR NOTHING: a sum of some of the costs was read as the cost, and passed. */\n    if (costs.every((n) => typeof n === 'number')) {\n      const common = inCommon(costs);\n      const sum = common.units.reduce((total, n) => total + n, 0n);\n      cost = decimal(sum, common.places);\n      least = cost === null ? null : decimal(sum * 25n, common.places + 1);\n      if (least === null) cost = null;\n    }\n    if ((row.fields.cost ?? null) === cost && (row.fields.least ?? null) === least) continue;\n    ctx.update('checks#' + row.seq, { cost, least }, row.version);\n  }\n}\n"
     },
     {
       "metric": "essentials",
@@ -393,21 +382,6 @@
       "compare": "none"
     },
     {
-      "metric": "costs",
-      "name": "Costs",
-      "source": "register.checks",
-      "where": "seq is 1, making is set, packing is set, sending is set",
-      "value": {
-        "max": "cost"
-      },
-      "format": "decimal",
-      "target": {
-        "gte": 0
-      },
-      "window": "30d",
-      "compare": "none"
-    },
-    {
       "metric": "priced",
       "name": "Price check filled in",
       "source": "register.checks",
@@ -421,65 +395,6 @@
       },
       "window": "30d",
       "compare": "none"
-    },
-    {
-      "metric": "cost-share",
-      "name": "Cost share",
-      "source": "register.checks",
-      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set",
-      "value": {
-        "ratio": {
-          "of": {
-            "max": "cost"
-          },
-          "per": {
-            "max": "price"
-          }
-        }
-      },
-      "format": "pct",
-      "target": {
-        "gte": 0
-      },
-      "window": "30d",
-      "compare": "none"
-    },
-    {
-      "metric": "least-price",
-      "name": "Least price that holds",
-      "source": "register.checks",
-      "target": {
-        "gte": 0
-      },
-      "window": "30d",
-      "compare": "none",
-      "where": "seq is 1, making is set, packing is set, sending is set",
-      "value": {
-        "max": "least"
-      },
-      "format": "decimal"
-    },
-    {
-      "metric": "price-room",
-      "name": "Price over the least that holds",
-      "source": "register.checks",
-      "target": {
-        "gte": 0
-      },
-      "window": "30d",
-      "compare": "none",
-      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set, least is set",
-      "value": {
-        "diff": {
-          "of": {
-            "max": "price"
-          },
-          "per": {
-            "max": "least"
-          }
-        }
-      },
-      "format": "decimal"
     },
     {
       "metric": "price-free",
@@ -498,9 +413,9 @@
     },
     {
       "metric": "price-unjudged",
-      "name": "Price check costs not added yet",
+      "name": "Price check with no least price yet",
       "source": "register.checks",
-      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set, least is not set",
+      "where": "seq is 1, price more than 0, making is set, packing is set, sending is set, times_cost is not set",
       "value": {
         "count": "id"
       },
@@ -930,6 +845,18 @@
             },
             {
               "field": "sending"
+            },
+            {
+              "field": "times_cost"
+            },
+            {
+              "field": "cost"
+            },
+            {
+              "field": "least"
+            },
+            {
+              "field": "room"
             }
           ],
           "row": "checks#1"
@@ -940,7 +867,7 @@
             "metric": "priced",
             "is": 0
           },
-          "body": "Type a price and the three costs above, and the verdict is said here."
+          "body": "Type a price and the three costs above, and what they add up to, the least price that holds and the room over it are worked out here."
         },
         {
           "kind": "note",
@@ -956,45 +883,7 @@
             "metric": "price-unjudged",
             "is": 1
           },
-          "body": "The costs are not added up yet. They are added whenever a cost is typed, so type one of them again to see the verdict."
-        },
-        {
-          "kind": "note",
-          "when": {
-            "metric": "price-room",
-            "gte": 0
-          },
-          "body": "It passes: the costs are {{cost-share}} of the price."
-        },
-        {
-          "kind": "note",
-          "when": {
-            "metric": "price-room",
-            "lt": 0
-          },
-          "body": "Too thin: the costs are {{cost-share}} of the price. Raise the price or bring a cost down until they are at most two fifths of it."
-        },
-        {
-          "kind": "stat",
-          "span": 12,
-          "cells": [
-            {
-              "metric": "price",
-              "label": "Price"
-            },
-            {
-              "metric": "costs",
-              "label": "Costs together"
-            },
-            {
-              "metric": "cost-share",
-              "label": "Cost share"
-            },
-            {
-              "metric": "least-price",
-              "label": "Least price that holds"
-            }
-          ]
+          "body": "The least price is not worked out yet, because Times cost is empty. Type how many times the costs the price should be at least."
         },
         {
           "kind": "section",

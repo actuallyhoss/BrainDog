@@ -207,6 +207,7 @@ export const patterns = (
         ...charge,
         served: ran.served,
         candidate: ran.candidate,
+        raw: ran.raw,
       });
 
     /* SETTLED THE MOMENT THE MODEL ANSWERED, as `propose.ts` settles its three sites since `538bc705`. A filing that threw

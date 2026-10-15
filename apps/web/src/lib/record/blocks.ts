@@ -1438,7 +1438,15 @@ function drawSegments(block: BlockResult, kinds?: Readonly<Record<string, KindSp
   const segments = parse(['```' + head, ...rows, '```'].join('\n'), { page: true, ...(kinds ? { kinds } : {}) });
   /* EVERY FIELD OF AN `inputs` BLOCK IS THE ONE ROW IT EDITS, so each drawn row names that row: the write a change makes
      is an update of it at the version it was read at (`inputs-write.ts`). */
-  if (block.kind === 'inputs' && block.register) return withRefs(segments, block.register, rows.map(() => block.entries[0]!).filter(Boolean));
+  if (block.kind === 'inputs' && block.register) {
+    const refd = withRefs(segments, block.register, rows.map(() => block.entries[0]!).filter(Boolean));
+    /* A FIELD THE LIST WORKS OUT (`derive:`) IS A FIGURE, NOT A BOX: `inputsPlan` plans a row marked `derived` read-only. */
+    const worked = keyOf(block, 'derived');
+    const derived = new Set(Array.isArray(worked) ? worked.filter((f): f is string => typeof f === 'string') : []);
+    if (derived.size > 0)
+      for (const s of refd) if (s.type === 'block') for (const row of s.rows) if (derived.has(row.cells[0] ?? '')) (row as { derived?: boolean }).derived = true;
+    return refd;
+  }
   const projected =
     !conflicted &&
     !block.authored?.length &&

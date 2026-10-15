@@ -10,7 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { panelOf } from './panel-of.ts';
+import { PANELS, PANEL_WHO, panelOf } from './panel-of.ts';
+import { PANEL_LOADERS, panelNeeds } from './index.ts';
 
 /* THE TWO HEADINGS THE READER ONCE MATCHED, written out here so a case holds them to drawing nothing. */
 const RUNS_ON = 'Runs on';
@@ -40,4 +41,33 @@ test('A SECTION THAT NAMES NO PANEL DRAWS NONE, even under a heading the reader 
 test('ONLY A SECTION CARRIES A PANEL, so a table headed like one is still a table', () => {
   assert.equal(panelOf({ kind: 'table', heading: RUNS_ON, panel: 'actions' } as never), null);
   assert.equal(panelOf({ kind: 'note', panel: 'actions' } as never), null);
+});
+
+/* THE KERNEL'S TABLE (`kinds/words.ts`), read through the kernel's own door. */
+const kernel = () => import('@braindog/kernel');
+
+test("THE WEB'S LIST IS THE KERNEL'S, in its order, and says what each panel is about and who it is for", async () => {
+  const { PANEL_TABLE, PANELS: KERNEL } = await kernel();
+  assert.deepEqual([...PANELS], [...KERNEL]);
+  for (const name of PANELS) {
+    assert.equal(PANEL_WHO[name].needs, PANEL_TABLE[name].needs, `${name} is about the same thing on both sides`);
+    assert.equal(PANEL_WHO[name].level, PANEL_TABLE[name].level, `${name} is drawn for the same people on both sides`);
+  }
+});
+
+test('EVERY PANEL THE KERNEL LISTS HAS A LOADER AND A LINE THAT SAYS WHAT IT IS', async () => {
+  const { PANEL_TABLE, PANELS: KERNEL } = await kernel();
+  for (const name of KERNEL) {
+    assert.equal(typeof PANEL_LOADERS[name], 'function', `${name} has a loader`);
+    assert.ok(PANEL_TABLE[name].says.trim().length > 0, `${name} says what it is`);
+    assert.equal(panelNeeds(name), PANEL_TABLE[name].needs);
+  }
+  assert.deepEqual(Object.keys(PANEL_LOADERS), [...KERNEL], 'and no loader for a panel the kernel does not list');
+});
+
+test('THE LOOK EDITOR IS NAMED BY A SECTION ON ANY PAGE, and needs no row', () => {
+  assert.equal(panelOf({ kind: 'section', heading: 'How the studio looks', panel: 'look-editor' } as never), 'look-editor');
+  assert.equal(panelOf({ kind: 'section', heading: 'The model', panel: 'slash-model' } as never), 'slash-model');
+  assert.equal(panelNeeds('look-editor'), 'none');
+  assert.equal(panelNeeds('actions'), 'row');
 });

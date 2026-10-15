@@ -25,7 +25,7 @@ import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { renameDeclarations } from './migrations/0016_slash.ts';
-import { jsonPath, compile, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
   enablePack as enableDeclaredPack,
@@ -54,6 +54,7 @@ import {
   type PlannedRecord,
 } from './declare.ts';
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
+import { withDerived, type DeriveResolve } from './derive-rows.ts';
 import { runsDataSteps } from './migrations/0028_runs.ts';
 import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, type SignReading, type VitalSign } from './signs.ts';
 import { scanKeys } from './key-scan.ts';
@@ -399,7 +400,7 @@ export type { Tried, TriedStep, TrySample } from './flow-try.ts';
    and the runner read (`capabilities.ts`). */
 export { CAPABILITIES, capability, notInThisBuild, serves, type Capability, type Hosts } from './capabilities.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
-export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS } from './declare.ts';
+export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS, REMOVED_WINDOW_DAYS } from './declare.ts';
 export { ftsQuery, projectedText } from './fts.ts';
 export { TRAVELS, decode, encode, projection, tables } from './brainl.ts';
 export { atMs, expandRepeat, offsetMs, remindersFor, shiftFrom } from './schedule.ts';
@@ -455,9 +456,11 @@ export { censusOf, type Census, type CensusAlso, type Held } from './census.ts';
 /* WHAT EVERY READER DRAWS (`drawn.ts`), one rule for the record, the web and an agent's read of a page. */
 export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, leadOf, markDrawn, says, unsaid, type Drawable, type Why } from './drawn.ts';
 /* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
+export { flowGrammar, type FlowGrammar, type GrammarStep, type Arg as FlowGrammarArg } from './flow-grammar.ts';
 export { ANSWER_KEYS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
+export { WHEN_READERS, actionsFault, declaredActions, type WhenReader } from './block-keys.ts';
 /* THE LOOK OVERLAY (DIRECTION §38, `compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
-export { applyLook, composeLook, drewNothing, lookOf, mergeLook, questionsLead, queuesKept, LOOK_BY, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
+export { applyLook, composeLook, drewNothing, lookOf, lookPlacesFault, mergeLook, questionsLead, queuesKept, LOOK_AREAS, LOOK_BY, LOOK_SPANS, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
 /* A LOOK'S GROUPING (ENG-B10, `compose.ts`): which kinds a look may group, how many, and over how many values. */
 export { GROUPED_BY_FIELD, GROUP_ROWS_OVER, GROUP_VALUES_LEAST, GROUP_VALUES_MOST, LOOK_GROUPS_MOST, groupsWell, valuesShown } from './compose.ts';
 /* THE HOLES IN A LOOK'S HEADLINE (ENG-B09, `compose.ts`): a number a line says is a hole the record fills from the page's own figures. */
@@ -541,6 +544,8 @@ export type { Claimed as KeyClaimed, EntityList, KeyList, ProjectList, SameList,
 export { clashes, foldPlan as sameFoldPlan, sameListOf, sameRuleOf } from './same.ts';
 export type { FoldGroup, FoldWrite, SameDecl, SameGroup } from './same.ts';
 export { isMarkGlyph, isUnknownMark } from './marks.ts';
+export { GLYPH_LIST, glyphFault } from './glyph-names.ts';
+export { PANEL_TABLE, PANELS } from './kinds/words.ts';
 export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { cutOffReadable, endedByCutOff, isBuild } from './token.ts';
 export { AGENTS_KEY, agentCap, agentsFull, liveAgents, type AgentCap } from './token.ts';
@@ -576,7 +581,7 @@ export { SIGNALS, WINDOWS, analyse, brakeOf, findingsFrom, mayPropose, observe, 
 /* WHAT A CARD SAYS OF AN AMOUNT AND OF WHERE A RUN STANDS (ENG-B12): the kernel's own two readings, so the briefing writes neither again. */
 export { moneyText } from './ingest.ts';
 /* THE SHAPES OWED A PATTERN (ENG-B07): which arrivals wait on a draft, and the cause their one question is filed under. */
-export { owedShapes, patternCause, type Owed } from './ingest.ts';
+export { owedShapes, patternCause, UNVERIFIED, type Owed } from './ingest.ts';
 export { runPlace } from './handoff.ts';
 export { FLOOR_MS, applyPull, checkInterval, firePull, intervalMs, jitterMs } from './pull.ts';
 export { applyPage, writePoints } from './fetched.ts';
@@ -798,6 +803,8 @@ export type RegisterDecl = {
     unique?: boolean;
     immutable?: boolean;
     derived?: boolean;
+    /** Worked out at read from the row's other fields, never stored (`derive.ts`). `listsOf` sets `derived` beside it. */
+    derive?: Json;
     retired?: boolean;
     default?: Json;
     /**
@@ -1478,6 +1485,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const named = Array.isArray(said) ? (said as string[]) : null;
       if (named)
         decl.fields = decl.fields.map((f) => (named.includes(f.id) ? { ...f, search: true } : f)) as typeof decl.fields;
+      /* A FIELD DECLARING `derive` IS WORKED OUT AT READ, so it carries the kernel's own flag from here: the write path
+         refuses a write to it (IMMUTABLE_FIELD) and the validation sweep skips it, the two things `derived` already
+         does, and nothing downstream needs to know the second spelling. */
+      if (decl.fields.some((f) => f.derive !== undefined))
+        decl.fields = decl.fields.map((f) => (f.derive !== undefined ? { ...f, derived: true } : f)) as typeof decl.fields;
       registers.set(decl.id, decl);
       if (decl.seq_prefix !== undefined && decl.seq_prefix !== '#') prefixes.set(decl.seq_prefix, decl.id);
     }
@@ -1849,6 +1861,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
                2 days before and 3 and 12 after the as-of day, `due after -7d` backfilled 50,000
                where the live read on that day was 350,000 (`test/metrics-asof-forward.test.ts`). */
             ...(f.deadline === true ? { deadline: true } : {}),
+            /* AND WHETHER IT IS WORKED OUT AT READ, which `where` refuses a filter or a sort over: nothing is stored
+               under it to compare (`derivedFault`). */
+            ...(f.derived === true ? { derived: true } : {}),
           },
         ]),
     ),
@@ -1868,6 +1883,39 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     (reads?: (register: string) => boolean) =>
     (register: string): Schema | null =>
       registers.has(register) ? { ...schemaOf(register), schemaOf: (r: string) => hopSchemaOf(r, reads) } : null;
+
+  /**
+   * THE FAR SIDE OF A `via` (SHL-B18), held to what the reader may open: the linked rows of one list by id, and the one
+   * field read on each. ONE QUERY A CALL, and `withDerived` calls it once per `via` field per page, so fifty rows
+   * through one link are one lookup. `reads` is the read path's own sight, the lists the caller reads whole (`hops`,
+   * or `reads` without it): a list outside it, or one she sees narrowed, answers nothing, so every link into it derives
+   * null rather than a value from a row she cannot open. A deleted row is gone, and derives null too. Absent is the
+   * record's own sight, every live row.
+   */
+  const sightOf =
+    (reads?: (register: string) => boolean): DeriveResolve =>
+    (register, ids, field) => {
+      if (ids.length === 0 || (reads !== undefined && !reads(register))) return new Map();
+      /* THE IDS AS ONE JSON ARRAY, read with `json_each`, because a Durable Object refuses a statement past a hundred
+         bound values and a page is up to five hundred rows (`param-sweep.test.ts`). */
+      const found = sql.all<{ id: string; fields: string }>(
+        'SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND id IN (SELECT value FROM json_each(?))',
+        register,
+        JSON.stringify(ids),
+      );
+      return new Map(found.map((r) => [r.id, ((JSON.parse(r.fields) as Record<string, Json>)[field] ?? null) as Json]));
+    };
+
+  /**
+   * One row as it leaves the kernel, with the fields its list works out at read filled (`derive-rows.ts`). Only at the
+   * doors out (`get` as the record hands it, a page of `list`), never inside the write path, which reads a row to
+   * change it and must see what is stored. A list with no derived field hands the row back as it is.
+   */
+  const readOut = (entry: Entry | null, reads?: (register: string) => boolean): Entry | null => {
+    const decl = entry === null ? undefined : registers.get(entry.register);
+    if (entry === null || decl === undefined || !decl.fields.some((f) => f.derived === true && f.derive !== undefined)) return entry;
+    return withDerived([entry], decl.fields, sightOf(reads))[0]!;
+  };
 
   /**
    * A rule or a metric whose predicate cannot be read, refused at INSTALL.
@@ -3302,6 +3350,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             at: 'order',
             allowed: addressable(schema),
           });
+        /* A FIELD WORKED OUT AT READ HAS NOTHING STORED TO SORT BY, so `where` refuses it in the filter's words. */
+        const worked = derivedFault(schema, o.field);
+        if (worked) return { ok: false, refusal: worked };
         const dir = o.dir === 'asc' ? 'ASC' : 'DESC';
         /**
          * AN ENUM SORTS BY ITS POSITION IN `values`, THE ORDER IT WAS DECLARED IN, and it sorted A to Z. By the label
@@ -3421,6 +3472,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const rows = page.slice(0, limit).map(hydrate);
     const more = page.length > limit;
     const last = rows.at(-1);
+    /* THE PAGE LEAVES WITH ITS WORKED-OUT FIELDS FILLED (SHL-B18), after the cursor's row is chosen, and a `via` read
+       through the reader's own sight: the lists she reads whole, as a hop from her filter is held. */
+    const decl = registers.get(q.register)!;
+    const out = decl.fields.some((f) => f.derived === true && f.derive !== undefined) ? withDerived(rows, decl.fields, sightOf(q.hops ?? q.reads)) : rows;
     /* AND A SORTED ANSWER HANDS BACK ITS OWN KIND OF CURSOR: the last row's value under each sort key, read by the
        same expressions the ORDER BY used, so the next page compares like with like. */
     const paging = !(more && last)
@@ -3433,7 +3488,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             ),
           )
         : `${last.created_at}|${last.id}`;
-    return ok({ rows, matched, cursor: paging });
+    return ok({ rows: out, matched, cursor: paging });
   }
 
   /**
@@ -6331,6 +6386,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     },
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
     titleOf: (register) => registers.get(register)?.title ?? null,
+    listName: (register) => registers.get(register)?.name ?? null,
     /* WITHOUT THIS LINE `readPage` NEVER LAYS ANOTHER PACK'S BLOCKS ON A PAGE, because `deps.adds` is
        optional and this is the one host that hands it: `additionsOf` reads every installed pack's manifest for
        what it adds to this page's declaration id. */
@@ -7538,8 +7594,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const job = embedJob(sql, clock.now());
       if (job) enqueue(sql, mint, clock.now(), 'infer.embed', job);
     });
-    /* AND ONCE A NIGHT, THE PEOPLE WHO MAY BE ONE, twenty pairs at most in one `infer.resolve` job, by name and where
-       they were seen and never an address (`people.ts`'s `resolveJob`). The answer comes back through `ackOutbox`. */
+    /* AND ONCE A NIGHT, THE PEOPLE, ORGANISATIONS AND PROJECTS THAT MAY BE ONE, twenty pairs at most in one
+       `infer.resolve` job, by name and where they were seen and never an address (`people.ts`'s `resolveJob`). The answer comes back through `ackOutbox`. */
     transaction(() => {
       const people = meetsRole(registers.values());
       const job = resolveJob({
@@ -8227,13 +8283,26 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     /* `walk` IS A LENGTH A READER PICKED on a forecast's horizon knob, which a forecast offering it walks in full (`walkReach`
        in `pages.ts`); without it a walk reaches past what it opens on to `WALK_UNASKED` at most. `reader` IS WHO IS READING
-       (`PageDeps.reader`), so the look is laid over the blocks as this caller is shown them. */
+       (`PageDeps.reader`), so the look is laid over the blocks as this caller is shown them. `level`, `readerIs` and
+       `runs` ARE WHAT THE CUT READS (`PageDeps`): the caller's level, who they are to the record, and the verbs that
+       run; without them a page reads as level read with no reader. */
     page: (
       slug: string,
       filter?: Readonly<Record<string, string>>,
-      opts: { walk?: number | 'last'; reader?: PageDeps['reader'] } = {},
+      opts: { walk?: number | 'last'; reader?: PageDeps['reader']; level?: string; readerIs?: PageDeps['readerIs']; runs?: ReadonlySet<string> } = {},
     ): Result<PageResult> =>
-      readPage({ ...pageDeps(), ...(opts.walk === undefined ? {} : { walk: opts.walk }), ...(opts.reader ? { reader: opts.reader } : {}) }, slug, filter),
+      readPage(
+        {
+          ...pageDeps(),
+          ...(opts.walk === undefined ? {} : { walk: opts.walk }),
+          ...(opts.reader ? { reader: opts.reader } : {}),
+          ...(opts.level === undefined ? {} : { level: opts.level }),
+          ...(opts.readerIs === undefined ? {} : { readerIs: opts.readerIs }),
+          ...(opts.runs ? { runs: opts.runs } : {}),
+        },
+        slug,
+        filter,
+      ),
 
     /**
      * A reader of many pages in one walk, each answered as `page` answers it, the figures they share read once.
@@ -8686,13 +8755,19 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** One block, without a page around it — what a `draw` tool hands an agent. `inbox` is the reader's reach, so a
         one-block preview tells a `signs` block in the kernel's quiet words to a key the inbox does not reach. */
-    block: (decl: PageBlock, opts: { walk?: number | 'last'; inbox?: boolean; here?: Entry } = {}): BlockResult =>
+    block: (
+      decl: PageBlock,
+      opts: { walk?: number | 'last'; inbox?: boolean; here?: Entry; level?: string; readerIs?: PageDeps['readerIs']; runs?: ReadonlySet<string> } = {},
+    ): BlockResult =>
       readBlock(
         {
           ...pageDeps(),
           ...(opts.walk === undefined ? {} : { walk: opts.walk }),
           ...(opts.inbox === undefined ? {} : { reader: { hold: (b: BlockResult) => b, inbox: opts.inbox } }),
           ...(opts.here === undefined ? {} : { here: opts.here }),
+          ...(opts.level === undefined ? {} : { level: opts.level }),
+          ...(opts.readerIs === undefined ? {} : { readerIs: opts.readerIs }),
+          ...(opts.runs ? { runs: opts.runs } : {}),
         },
         decl,
       ),
@@ -9630,7 +9705,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             ? sql.one<{ payload: string }>("SELECT payload FROM outbox WHERE id = ? AND kind = 'notify.push' AND state = 'leased'", args.id)
             : undefined;
         /* AND A MODEL'S ANSWER ABOUT WHO MAY BE ONE PERSON, filed as questions once the ack has passed the fence, so a
-           stale lease files nothing (`fileVerdicts`). A model only ever proposes: nothing is merged on its word. */
+           stale lease files nothing (`fileVerdicts`). A model only ever proposes: nothing is merged on its word. A pair
+           of organisations or projects files nothing here: its verdict stays in the done job, where `pairsFor` reads
+           it. */
         const resolving =
           args.state === 'done'
             ? sql.one<{ payload: string }>("SELECT payload FROM outbox WHERE id = ? AND kind = 'infer.resolve' AND state = 'leased'", args.id)
@@ -10656,7 +10733,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         )
         .map((r) => r.id),
     refused: () => state.refusal,
-    get,
+    /**
+     * A row as the record hands it out, with the fields its list works out at read filled (`readOut`). `reads` is the
+     * caller's sight for a `via`, the lists she reads whole; absent is the record's own. The closure's `get`, which the
+     * write path reads a row through, stays the stored row.
+     */
+    get: (ref: string | { register: string; seq: number }, opts: { includeDeleted?: boolean; reads?: (register: string) => boolean } = {}): Entry | null =>
+      readOut(get(ref, opts), opts.reads),
     list,
     /** What points at one row, from the `to:` every `ref` field already declares. */
     backlinks,

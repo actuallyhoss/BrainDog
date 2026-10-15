@@ -957,6 +957,7 @@
           {/if}
           {#if applied.length}<div class="settled-applied"><Applied lines={applied} /></div>
           {:else if kept.length}<div class="settled-applied"><Applied lines={kept} /></div>{/if}
+          {#if preview?.pattern}{#await import('./PatternReads.svelte') then loaded}<loaded.default pattern={preview.pattern} resolved said={live?.about?.body.said} />{/await}{/if}
           <!-- WHERE IT WENT, and what still waits. A receipt here is always a written decision. -->
           <p class="settled-where">{onwardWords.where} {onwardWords.left(waiting)}</p>
           <div class="settled-next">{@render onward()}</div>

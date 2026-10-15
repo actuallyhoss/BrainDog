@@ -36,15 +36,15 @@ const { FlowDraft } = await import('./flow.svelte.ts');
 
 const ASKS = { rule: 'asks', on: { manual: true }, steps: [{ ask_slash: { question: 'Go?', as: 'go' } }] };
 
-test('THE DRAFT READS WHETHER THE HOST ANSWERS SLASH WHEN IT IS ASKED, not when the page was built', () => {
-  /* MEASURED RED FIRST, with the boolean field: the function was kept as the flag, a function is truthy, and the card
-     had no fault on a host with no model. Before that, with a boolean, a later `true` never reached the draft. */
+test('THE DRAFT READS WHETHER THE HOST ANSWERS SLASH WHEN IT IS ASKED, and leaves the refusal to the record', () => {
+  /* MEASURED RED FIRST, with the boolean field: the function was kept as the flag, a function is truthy. Before that,
+     with a boolean, a later `true` never reached the draft. A host with no model is the record's to refuse now
+     (`checkAutomation`), so the draft says no fault of its own either way. */
   let slash = false;
   const flow = new FlowDraft({ slash: () => slash });
   flow.open('asks', ASKS as never, 1);
   assert.equal(flow.slash, false);
-  assert.equal(flow.faults.length, 1, JSON.stringify(flow.faults));
-  assert.match(flow.faults[0]!.say, /no model for Slash/u);
+  assert.deepEqual(flow.faults, []);
 
   /* THE SECOND `/api/version` ANSWERS, and the same draft now agrees with the menu that offered the step. */
   slash = true;

@@ -76,6 +76,9 @@
   import ChangesPanel from './ChangesPanel.svelte';
   import RowVerbMenu from './RowVerbMenu.svelte';
   import { blockKeys } from './recompose.ts';
+  import { HEAD_WORDS, headOf, searchQuery } from './declared-head.ts';
+  import Icon from '$lib/ui/Icon.svelte';
+  import { at } from '../at.ts';
   import { arrivedNow, keepLook, keptHere, lookOrder, lookPage, offerKey, offered, offerUndo, placedOf, undoLook } from './look.ts';
 
   let {
@@ -123,6 +126,44 @@
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
   const live = $derived(got?.from === 'live' ? got : null);
+
+  /* ── the page's declared head (PGS-A14) ────────────────────────────────────
+     A PAGE THAT SAYS `header:` IS ANSWERED A HEAD, drawn round its title and sentence as they are: the kicker over the
+     name, the count beside it, the state with its mark and words, the one primary button, a search the address holds
+     and a way back. A page with none, or one this build cannot read (`headOf`), draws exactly as it did. */
+  const declared = $derived(mode === 'page' && live ? headOf(live.page.page) : null);
+  /* THE WAY BACK RIDES IN THE KICKER'S PLACE, as on every hand-written screen (`PageHead`'s `back`), unless the page
+     says a kicker of its own; then it is a plain link under the name. */
+  const backInKicker = $derived(!!declared?.back && !declared.kicker);
+  const headKicker = $derived(declared?.kicker ?? declared?.back?.label ?? live?.page.page.nav?.section);
+  const headBelow = $derived(!!declared && (!!declared.state || !!declared.search || (!!declared.back && !backInKicker)));
+  function pressHead() {
+    if (declared?.action) void writes.act(declared.action);
+  }
+  /* WHAT IS TYPED IN THE SEARCH IS THE ADDRESS'S, so a narrowed page is a link and Back undoes it. The field keeps what
+     is being typed while the address catches up, and takes the address's word when Back or a link changes it. */
+  let searched = $state('');
+  let sent: string | null = null;
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect.pre(() => {
+    const param = declared?.search?.param;
+    const there = param ? (route.url.searchParams.get(param) ?? '') : '';
+    untrack(() => {
+      if (there !== sent) {
+        searched = there;
+        sent = null;
+      }
+    });
+  });
+  function onsearch(param: string, typed: string) {
+    searched = typed;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      sent = typed.trim();
+      void goto(`?${searchQuery(route.url.searchParams, param, typed)}`, { keepFocus: true, noScroll: true, replaceState: true });
+    }, 250);
+  }
+  $effect(() => () => clearTimeout(searchTimer));
 
   /* ── what the actions panel holds ──────────────────────────────────────────
      A PART WITH SOMETHING IN IT MUST NOT VANISH (DIRECTION §35, §37). A boxed section whose panel is the project's
@@ -550,12 +591,18 @@
   <PageHead
     icon={iconFor(live.page.page.icon, 'doc')}
     hue={hueOf(live.page.page.identity)}
-    kicker={live.page.page.nav?.section}
+    kicker={headKicker}
+    back={backInKicker ? declared?.back?.href : undefined}
+    count={declared?.count?.value}
     title={live.page.page.title}
     define={headlined ? undefined : 'page'}
+    below={headBelow ? declaredBelow : undefined}
   >
     {#snippet actions()}
       {#if headLine && wide.current}{@render lineInHead()}{/if}
+      {#if declared?.action && !arranging && !showSource}
+        <Button weight="primary" onclick={pressHead}>{declared.action.label}</Button>
+      {/if}
       {#if !arranging}
         <!-- SHARE, AND ONE "⋯" FOR THE REST (DIRECTION §35): How this is built, Change this page and Edit layout were
              four controls in a row over every page, and a reader uses Share far more often than the other three. The
@@ -570,6 +617,36 @@
   <!-- THE LINE THE PAGE OPENS ON, drawn once: in the header's row, or handed to the body to sit under its sentence. -->
   {#snippet lineInHead()}
     {#if headLine}<HeadCapture block={headLine.block} oncapture={(register, text, inherited) => void writes.captureLine(register, text, inherited)} />{/if}
+  {/snippet}
+
+  <!-- THE DECLARED HEAD'S LINE UNDER THE NAME: the state with its mark and its words (never colour alone), a way back
+       where the kicker is the page's own, and the search the address holds. -->
+  {#snippet declaredBelow()}
+    <div class="declared-head">
+      {#if declared?.state}
+        {@const tone = declared.state.tone}
+        <p class="head-state" data-tone={tone}>
+          <span class="head-mark"><Icon name={tone === 'good' ? 'check' : 'alert'} title={HEAD_WORDS.tone[tone]} /></span>
+          <span>{declared.state.words}</span>
+        </p>
+      {/if}
+      {#if declared?.back && !backInKicker}
+        <a class="head-back" href={at(declared.back.href)}>{declared.back.label}</a>
+      {/if}
+      {#if declared?.search}
+        {@const param = declared.search.param}
+        <input
+          class="field-input head-search"
+          type="search"
+          aria-label={HEAD_WORDS.search}
+          placeholder={HEAD_WORDS.search}
+          autocomplete="off"
+          spellcheck="false"
+          value={searched}
+          oninput={(e) => onsearch(param, e.currentTarget.value)}
+        />
+      {/if}
+    </div>
   {/snippet}
 
   <!-- THE RENDERER'S STRIP, one group a field, "All" first, the rest behind one select (`braindog-render` `Filters`).
@@ -803,6 +880,46 @@
   /* THE STRIP SITS IN THE PAGE'S OWN GUTTER, over the first tile, with the gap a row of tiles keeps. */
   .page-filters {
     padding: var(--sp-3) var(--gutter) 0;
+  }
+
+  /* A DECLARED HEAD'S LINE (PGS-A14): one row under the sentence that wraps on a phone. Flat, on the board: no tile,
+     no edge. A state is its mark and its words; late and needs-you take the deeper red, and the mark says it too. */
+  .declared-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-4);
+    font-size: var(--fs-body);
+  }
+  .head-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink);
+  }
+  .head-state[data-tone='warn'] .head-mark {
+    color: var(--warn);
+  }
+  .head-state[data-tone='bad'] {
+    color: var(--danger-text);
+  }
+  .head-mark {
+    display: inline-flex;
+  }
+  .head-back {
+    color: var(--accent-text);
+    text-decoration: none;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .head-back:hover {
+      text-decoration: underline;
+    }
+  }
+  .head-search {
+    flex: 1 1 14rem;
+    max-inline-size: 24rem;
+    min-inline-size: 0;
   }
 
   /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID, inside the page's own gutter, so it sits where the page

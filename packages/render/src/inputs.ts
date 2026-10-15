@@ -46,7 +46,11 @@ export type InputControl = {
   choices: string[];
 };
 
-export type InputField<R> = { row: R; field: string; label: string; type: InputType; value: string; control: InputControl };
+/**
+ * One field as drawn. `readonly` is a field the record works out from others on the row (`derive:`), drawn as a figure
+ * with its label and never a box: a write to it is refused, so a box over it would take what was typed and lose it.
+ */
+export type InputField<R> = { row: R; field: string; label: string; type: InputType; value: string; control: InputControl; readonly: boolean };
 
 /**
  * The host's place to put a changed field: the row the field was drawn from, and the text as it stands.
@@ -126,14 +130,17 @@ export function inputsFault(rows: readonly (readonly string[])[]): string | null
 /**
  * The fields, each with its control. Lenient where `inputsFault` is strict, for the reason `queuePlan` is: a row a host
  * built by hand whose field or type does not read is left out rather than drawn as a box that writes nowhere.
+ *
+ * A ROW MARKED `derived` IS READ-ONLY, as the kernel's inputs read marks a field that declares `derive:`. Only `true`
+ * counts, so a host that marks nothing draws every field as it did.
  */
-export function inputsPlan<R extends { cells: readonly string[] }>(rows: readonly R[]): { fields: InputField<R>[]; empty: string } {
+export function inputsPlan<R extends { cells: readonly string[]; derived?: boolean }>(rows: readonly R[]): { fields: InputField<R>[]; empty: string } {
   const fields: InputField<R>[] = [];
   for (const row of rows) {
     const field = cell(row.cells, 0);
     const { type, choices } = typeOf(cell(row.cells, 2));
     if (!FIELD.test(field) || !isType(type) || fields.some((f) => f.field === field)) continue;
-    fields.push({ row, field, label: cell(row.cells, 1) || field, type, value: row.cells[3] ?? '', control: controlOf(type, choices) });
+    fields.push({ row, field, label: cell(row.cells, 1) || field, type, value: row.cells[3] ?? '', control: controlOf(type, choices), readonly: row.derived === true });
   }
   return { fields, empty: INPUTS_NONE };
 }

@@ -748,6 +748,8 @@ const withoutBatch95 = (doc: Body): Body =>
   );
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
+/** Projects' quiet line with the clause for its list's questions, added inside the unreleased portfolio 1.17.0 (waiting-work-projects-99, PGS-C18). */
+const QUIET_PROJECTS = 'Nothing needs a push across {{projects-live}} project(s) in play, {{questions-open-in:things}} question(s) for you';
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
   'money-core': {
@@ -791,7 +793,10 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
            project, added inside the same unreleased 1.17.0 (projects-last-worked-96, REC-C16). */
         (now) =>
           now
-            .filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said')
+            .filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said' && !(b.kind === 'queue' && b.where === 'list is things'))
+            /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the same unreleased 1.17.0
+               (waiting-work-projects-99, PGS-C18). */
+            .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body === QUIET_PROJECTS ? 'Nothing needs you across {{projects-live}} project(s) in play' : b.body.replace('{{questions-open-in:things}} question(s) for you, ', '') } : b))
             .map((b) =>
               b.kind === 'cards' && Array.isArray(b.columns)
                 ? { ...b, columns: (b.columns as Body[]).filter((c) => c.as !== 'when').map(({ edit: _edit, ...c }) => c) }
@@ -825,7 +830,12 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       const doc = { ...raw, declarations: threads.filter((d) => d.metric !== 'project-moved-7d' && d.metric !== 'project-last-worked') };
       const linked = (doc.declarations as Body[]).some((d) => d.register === 'tasks' && (d.fields as Body[]).some((f) => f.id === 'thing'));
       /* AND THE BOARD'S CAPTURE LINE comes off too, added inside the unreleased 1.19.0 (board-capture-line-83). */
-      return withPage(doc, 'work-board', (now) =>
+      /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the unreleased 1.19.0
+         (waiting-work-projects-99, PGS-C18). */
+      const asked = withPage(doc, 'work', (now) =>
+        now.filter((b) => !(b.kind === 'queue' && b.where === 'list is tasks')).map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:tasks}} question(s) for you, ', '') } : b)),
+      );
+      return withPage(asked, 'work-board', (now) =>
         now.filter((b) => b.kind !== 'capture').map((b) => (b.kind === 'board' ? { ...b, columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
       );
     },
@@ -840,40 +850,44 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     released: '36328d2fcaeb58f3',
     undo: (raw) =>
       withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity') }, 'people', (now) =>
-        now.flatMap((b) =>
-          (b.when as Body | undefined)?.metric === 'held-twice'
-            ? []
-            : b.heading !== 'Everyone'
-            ? [b]
-            : [
-                {
-                  kind: 'table',
-                  heading: 'Gone quiet',
-                  icon: 'hourglass',
-                  tone: 'bad',
-                  span: 6,
-                  source: 'register.people',
-                  where: 'merged_into is empty, in_touch before -90d',
-                  columns: LAST_IN_TOUCH,
-                  order: QUIETEST_FIRST,
-                  limit: 6,
-                  when: { metric: 'people-quiet', gt: 0 },
-                },
-                {
-                  kind: 'table',
-                  heading: 'Last in touch',
-                  icon: 'handshake',
-                  span: 6,
-                  source: 'register.people',
-                  where: 'merged_into is empty, in_touch after -91d',
-                  columns: LAST_IN_TOUCH,
-                  order: QUIETEST_FIRST,
-                  limit: 6,
-                  when: { metric: 'people-in-touch-90d', gt: 0 },
-                },
-                b,
-              ],
-        ),
+        /* AND PEOPLE 3.4.0'S QUESTIONS ABOUT SOMEBODY, a queue and a clause in each line (waiting-people-services-99, PGS-C18). */
+        now
+          .filter((b) => !(b.kind === 'queue' && b.where === 'list is people'))
+          .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:people}} question(s) for you, ', '') } : b))
+          .flatMap((b) =>
+            (b.when as Body | undefined)?.metric === 'held-twice'
+              ? []
+              : b.heading !== 'Everyone'
+              ? [b]
+              : [
+                  {
+                    kind: 'table',
+                    heading: 'Gone quiet',
+                    icon: 'hourglass',
+                    tone: 'bad',
+                    span: 6,
+                    source: 'register.people',
+                    where: 'merged_into is empty, in_touch before -90d',
+                    columns: LAST_IN_TOUCH,
+                    order: QUIETEST_FIRST,
+                    limit: 6,
+                    when: { metric: 'people-quiet', gt: 0 },
+                  },
+                  {
+                    kind: 'table',
+                    heading: 'Last in touch',
+                    icon: 'handshake',
+                    span: 6,
+                    source: 'register.people',
+                    where: 'merged_into is empty, in_touch after -91d',
+                    columns: LAST_IN_TOUCH,
+                    order: QUIETEST_FIRST,
+                    limit: 6,
+                    when: { metric: 'people-in-touch-90d', gt: 0 },
+                  },
+                  b,
+                ],
+          ),
       ),
   },
 };

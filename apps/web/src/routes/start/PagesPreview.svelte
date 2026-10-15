@@ -1,9 +1,13 @@
 <!--
   Every page the first run would make, drawn before it is made: one row a page in a tile, each opening the page as the
-  record would draw it, with its layout, its rail and its tabs, over examples that are marked and never saved.
+  record would draw it, with its layout, its rail and its tabs, over what the person gave it and nothing else.
 
-  THE RECORD DRAWS THEM, IN A REHEARSAL. Each call in `asked` is `previewChange`, which installs its lists and pages with
-  the examples inside a transaction it throws away, and each page it answers
+  NOTHING IS DRAWN THAT NOBODY TYPED (USE-B07). The rows laid over each call are the person's name, the entries their
+  sentence filled and the first entries of their file, which `asked` already carries (`ownRows`, `withOwn`). A page none
+  of those reaches is its name and one line of what it will hold (`pageShown`), and opens nothing.
+
+  THE RECORD DRAWS THEM, IN A REHEARSAL. Each call is `previewChange`, which installs its lists and pages with those
+  rows inside a transaction it throws away, and each page it answers
   goes through Decide's own conversion (`previewOf`) into the one page reader, in its inert `preview` mode. Nothing is
   kept, and nothing is written before the press beside the preview.
 
@@ -29,34 +33,53 @@
   import { Stacked } from '$lib/viz';
   import type { Tried } from '../decide/[id]/proposed.ts';
   import { words as said } from './building.ts';
-  import { words } from './preview.ts';
+  import { mappedOf, ownRows, pageShown, readsOf, withOwn, words, type Own } from './preview.ts';
 
   let {
     asked,
     rail = [],
+    typed = [],
+    name = null,
   }: {
     asked: readonly Record<string, unknown>[];
     /** The sections of the side of the screen and the pages under each, as the declarations say them. */
     rail?: readonly { section: string; pages: readonly string[] }[];
+    /** The entries the person's sentence filled (`Proposal.rows`). */
+    typed?: readonly Own[];
+    /** The person's name, where they gave one: drawn as their own entry in People. */
+    name?: string | null;
   } = $props();
+
+  /** The person's own rows, by list, and each call carrying those and no others. */
+  const own = $derived(ownRows(typed, mappedOf(asked), name));
+  const sent = $derived(withOwn(asked, own));
 
   /** The pages drawn, in the order the calls answered them; `null` while they are asked for, `[]` when none could be. */
   let drawn = $state.raw<Tried[] | null>(null);
   /** Whether any call came back with nothing drawn, which is when the quiet line says so. */
   let short = $state(false);
+  /** The line under each page none of the person's rows reaches, by page; a page not here is drawn over theirs. */
+  let lines = $state.raw(new Map<string, string>());
   let shown = $state<number | null>(null);
   let el = $state<HTMLDialogElement>();
   let held = false;
 
-  /* EACH ASK IS NUMBERED, so pages that arrive after the proposal changed are not drawn under it. */
+  /* EACH ASK IS NUMBERED, so pages that arrive after the proposal changed are not drawn under it, and ASKED AGAIN ONLY
+     WHEN IT CHANGES: a turn that hears the same entries asks for the same pages. */
   let turn = 0;
+  let sentKey: string | null = null;
 
   $effect(() => {
-    const all = asked;
+    const all = sent;
+    const theirs = own;
+    const key = JSON.stringify(all);
+    if (key === sentKey) return;
+    sentKey = key;
     const mine = ++turn;
     drawn = null;
     short = false;
     shown = null;
+    lines = new Map();
     if (all.length === 0) {
       drawn = [];
       return;
@@ -67,13 +90,20 @@
       const got = await Promise.all(all.map((a) => previewOf(a, apiBase()).catch(() => ({ from: 'none' as const }))));
       if (mine !== turn) return;
       const pages: Tried[] = [];
-      for (const r of got) {
-        if (r.from !== 'live') continue;
-        for (const p of r.pages) if (!pages.some((q) => q.slug === p.slug)) pages.push(p);
-      }
+      const empty = new Map<string, string>();
+      got.forEach((r, i) => {
+        if (r.from !== 'live') return;
+        for (const p of r.pages) {
+          if (pages.some((q) => q.slug === p.slug)) continue;
+          pages.push(p);
+          const one = pageShown(p.got.page.page.title, readsOf(all[i] ?? {}, p.slug), theirs);
+          if (!one.drawn) empty.set(p.slug, one.line);
+        }
+      });
       /* THE PAGE IT OPENS ON FIRST: the one with no place of its own on the side of the screen. */
       pages.sort((a, b) => Number(Boolean(a.got.page.page.nav?.section)) - Number(Boolean(b.got.page.page.nav?.section)));
       short = got.some((r) => r.from !== 'live');
+      lines = empty;
       drawn = pages;
     })();
   });
@@ -130,19 +160,31 @@
       <ul class="pages">
         {#each drawn as p, i (p.slug)}
           {@const where = sectionOf(p)}
+          {@const line = lines.get(p.slug)}
           <li>
-            <button type="button" class="card" aria-label={words.openPage(p.got.page.page.title)} onclick={() => (shown = i)}>
-              <IconWell name={where ? 'doc' : 'home'} size="l" />
-              <span class="card-main">
-                <span class="card-title">{p.got.page.page.title}</span>
-                <span class="card-where">{where ?? `${firstRun.mineHome}, ${said.opensFirst}`}</span>
-              </span>
-              <Icon name="arrow" size="m" />
-            </button>
+            {#if line === undefined}
+              <button type="button" class="card" aria-label={words.openPage(p.got.page.page.title)} onclick={() => (shown = i)}>
+                <IconWell name={where ? 'doc' : 'home'} size="l" />
+                <span class="card-main">
+                  <span class="card-title">{p.got.page.page.title}</span>
+                  <span class="card-where">{where ?? `${firstRun.mineHome}, ${said.opensFirst}`}</span>
+                </span>
+                <Icon name="arrow" size="m" />
+              </button>
+            {:else}
+              <!-- NOTHING OF THEIRS REACHES IT: its name and what it will hold, and nothing to open. -->
+              <div class="rail-row">
+                <IconWell name={where ? 'doc' : 'home'} size="l" />
+                <span class="card-main">
+                  <span class="card-title">{p.got.page.page.title}</span>
+                  <span class="card-holds">{line}</span>
+                </span>
+              </div>
+            {/if}
           </li>
         {/each}
       </ul>
-      <p class="reading">{said.pagesIn(drawn.length, places.length)} {firstRun.mineExamples}</p>
+      <p class="reading">{said.pagesIn(drawn.length, places.length)}</p>
     {:else}
       <ul class="pages">
         {#each rail as r (r.section)}
@@ -166,7 +208,7 @@
       <span class="opened-title">{open.got.page.page.title}</span>
       <button type="button" class="opened-close tap" aria-label={words.closePage} title={words.closePage} onclick={() => el?.close()}><Icon name="close" size="m" /></button>
     </div>
-    <p class="reading">{firstRun.mineExamples}</p>
+    <p class="reading">{words.yours}</p>
     <div class="opened-body">
       <PageView slug={open.slug} got={open.got} mode="preview" was={open.was} />
     </div>
@@ -238,6 +280,13 @@
     line-height: 18px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* WHAT A PAGE WILL HOLD, under one nothing of theirs reaches: a whole sentence, so it wraps rather than cuts. */
+  .card-holds {
+    color: var(--dim);
+    font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   /* THE ONE WRITTEN LINE under the chart and its rows. */

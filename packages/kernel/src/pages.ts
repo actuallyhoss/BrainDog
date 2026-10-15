@@ -23,8 +23,11 @@ import type { Leaf, Predicate, Schema } from '@braindog/where';
 
 import type { ActionRow } from './actions.ts';
 import type { Exception } from './exceptions.ts';
-import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, feedSaysFault, forecastAxisFault, keyedBlocks, kindsReading, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey } from './block-keys.ts';
-import { GROUPED_BY_FIELD, applyLook, composeLook, lookOf, mergeLook, type LookBody } from './compose.ts';
+import { ANSWER_KEYS, BLOCK_READS, FILTER_TYPES, WHEN_DEPTH, blockKeyOf, declaredActions, feedSaysFault, forecastAxisFault, isReaderLeaf, keyedBlocks, kindsReading, noteSaysFault, whenJoin, whenTreeFault, wrongKindKey, type WhenReader } from './block-keys.ts';
+import { cutActions, type OfferedAction } from './row-actions.ts';
+import { GROUPED_BY_FIELD, applyLook, composeLook, figureSaid, lookOf, mergeLook, type LookBody } from './compose.ts';
+/* A PAGE'S HEAD OVER ITS TITLE (PGS-A16), read and resolved by the file that checks it at install. */
+import { headerBody, resolveHead, type HeadFigure, type ResolvedHead } from './page-head.ts';
 import { HANDOFFS_OPEN, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
@@ -64,7 +67,10 @@ export type WhenLeaf = { metric: string; empty?: boolean; beyond?: boolean; gt?:
  * A block's `when:`: one leaf, or `all:` (every one holds) or `any:` (one does) of two or more, each a leaf or one join of
  * leaves. Two levels deep at most (`block-keys.ts` `WHEN_DEPTH`).
  */
-export type WhenTree = WhenLeaf | { all: WhenTree[] } | { any: WhenTree[] };
+export type WhenTree = WhenLeaf | WhenReaderLeaf | { all: WhenTree[] } | { any: WhenTree[] };
+
+/** One test of who reads the page (PGS-A17): the reader is one of these words (`block-keys.ts` `WHEN_READERS`). */
+export type WhenReaderLeaf = { reader: WhenReader | readonly WhenReader[] };
 
 /**
  * The leaves of a `when:`, however it is joined, each once in the order written. Anything that is not a leaf is left
@@ -205,6 +211,8 @@ export type PageBlock = {
   series?: SeriesLine[];
   back?: number;
   ahead?: number;
+  /** A `calendar`'s: how many whole weeks it shows from the Monday of this one, 1 to 8, in place of back and ahead. */
+  weeks?: number;
   /** A `stat` or `lines` over readings: whether a point is a day or a week. A day when absent. */
   bucket?: string;
   /** A `series`'s: whether it draws what was left, in minus out, as a line. */
@@ -298,6 +306,10 @@ export type PageBlock = {
   drawn?: boolean;
   /** Why a block is not drawn, beside `drawn: false`: `empty`, `unsaid`, `when` or `cannot` (`drawn.ts` `Why`). */
   why?: Why;
+  /*
+   * NOT TYPED HERE: `actions` and `row_actions` (PGS-A12). As declared they are JSON nobody has checked, read through
+   * `declaredActions` as any page key is; as answered they are `BlockResult`'s, cut to the reader.
+   */
 };
 
 export type PageDecl = {
@@ -315,6 +327,13 @@ export type PageDecl = {
 };
 
 export type BlockResult = PageBlock & {
+  /**
+   * What may be pressed on the block itself, and on each of its rows (PGS-A12, `row-actions.ts`): declared, checked
+   * against the fields of the block's list, and cut to what this reader may press (`PageDeps.level`), each marked `hard`
+   * and `undo`. Absent where nothing is left to press.
+   */
+  actions?: readonly OfferedAction[];
+  row_actions?: readonly OfferedAction[];
   /**
    * A note with `says:`: which of its sentences was said, counted from 0. Its words are the answer's `body` and its tone
    * the answer's `tone`, so a host draws the note as it draws any other (`saidLine`).
@@ -413,6 +432,8 @@ export type BlockResult = PageBlock & {
    * source's, by field (`typesOf`), which a host draws each cell by, where no list declares the field: `instant`, `run`.
    */
   types?: Record<string, string>;
+  /** An inputs block's: the fields it draws that the record works out (derive:), drawn as figures and never boxes. */
+  derived?: string[];
   /**
    * And the record's home currency, or `null` when it has none, which a bare figure typed into an empty money box is
    * written in. The browser's own guess was the sample's rows, which a shipped build never fills, so it wrote GBP on a
@@ -778,6 +799,8 @@ export type PageDeps = {
   schemaOf: (register: string) => Schema | null;
   /** The field that titles a row of this register — what a template's slug is made from. */
   titleOf: (register: string) => string | null;
+  /** A list's name as its declaration says it, or `null`, which a page's head names a list it goes back to by. */
+  listName?: (register: string) => string | null;
   /** The cash walk, when a block names it. */
   /** `only` walks one currency's movements, unconverted, for a walk drawn once per currency. */
   /**
@@ -959,6 +982,23 @@ export type PageDeps = {
      */
     inbox?: boolean;
   };
+  /**
+   * THE READER'S LEVEL, in the record's words (`row-actions.ts` `ACTION_LEVELS`: read, write, decide or owner), as the
+   * record checks it for a write. Each block's `actions` and `row_actions` are cut to it, so a reader is sent only what
+   * the record would let them press. Absent is `read`, and nothing beyond reading is sent.
+   */
+  level?: string;
+  /**
+   * WHO READS, for a `when: { reader }` (PGS-A17): the record's owner, a member signed in, an agent on a token, or
+   * somebody holding a link. Named apart from `reader` above, which is how a reader is held. Absent, no block whose
+   * `when` asks who reads is sent, so a host that has not said who reads is never shown what was held for the owner.
+   */
+  readerIs?: WhenReader;
+  /**
+   * The verbs this host carries out (`RUNS` in `packages/record/src/verbs.ts`). A verb the table names and the host does
+   * not run yet is cut, rather than sent to be refused on every press. Absent, the table is the whole answer.
+   */
+  runs?: ReadonlySet<string>;
 };
 
 /**
@@ -1491,7 +1531,7 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
     const area = b !== null && typeof b === 'object' && b.area === 'rail' ? 'rail' : 'main';
     if (b !== null && typeof b === 'object' && b.kind === 'section') hiding.delete(area);
     else if (hiding.has(area) && b !== null && typeof b === 'object') {
-      const folded: BlockResult = { ...shorn(b), rows: [], matched: 0, refusals: [], drawn: false, why: 'when' };
+      const folded: BlockResult = { ...unacted(shorn(b)), rows: [], matched: 0, refusals: [], drawn: false, why: 'when' };
       return added === undefined ? folded : { ...folded, added };
     }
     /* THE PAGE'S ROW IS THE ENTRY ITS TEXT SITS ON, so `{{money:price}}` and `{{blockers.count}}` read the row (PGS-B03). */
@@ -1504,7 +1544,8 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
   });
   /* HELD BEFORE THE LOOK IS COMPOSED, so the look is the one this reader's page answers and not the record's (`heldFor`). */
   const shown = deps.reader ? heldFor(blocks, deps.reader.hold) : null;
-  const looked = lookedAt(deps, found.decl.page, shown?.blocks ?? blocks, shown);
+  const looked = lookedAt(deps, found.decl.page, shown?.blocks ?? blocks, shown, found.decl.layout !== undefined);
+  const head = pageHead(deps, found.decl, every, read_at, zone);
   return ok({
     ...found.decl,
     page: found.slug,
@@ -1523,7 +1564,41 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
     blocks: headlineHeld(drawnUnder(looked?.blocks ?? shown?.blocks ?? blocks, looked?.look.pinned)),
     ...(filters ? { filters: filters.answer } : {}),
     ...(looked ? { look: looked.look } : {}),
+    ...(head ? { head } : {}),
   });
+}
+
+/**
+ * THE HEAD OVER A PAGE'S TITLE (PGS-A16), its parts resolved for this read, or `null` when it declares none or none has
+ * anything to say. A count and a state read their figure as a stat cell does; the action is cut to the reader's level as
+ * a block's actions are, and left off when it does not reach.
+ */
+function pageHead(deps: PageDeps, decl: PageDecl, every: ReturnType<typeof resolvePages>, now: string, zone: string): ResolvedHead | null {
+  const declared = (decl as { header?: unknown }).header;
+  if (declared === undefined) return null;
+  const h = headerBody(declared, { figures: null, fields: null });
+  if (!h.ok) return null;
+  const figure = (id: string): HeadFigure | null => {
+    const metric = deps.metric(id);
+    const read = metric ? deps.read(metric) : null;
+    if (!read?.ok) return null;
+    const { value, unit, met } = read.value;
+    const said = value === null ? '' : ((unit ? figureSaid({ amount: value, currency: unit }) : figureSaid(value)) ?? String(value));
+    return { value, said, tone: met === true ? 'good' : met === false ? 'bad' : null };
+  };
+  const head = resolveHead(h.value, {
+    figure,
+    now,
+    zone,
+    pageTitle: (id) => every.find((p) => p.slug === id && !p.row)?.decl.title ?? null,
+    listName: (id) => deps.listName?.(id) ?? null,
+  });
+  if (head.action) {
+    const [cut] = cutActions([head.action], deps.level ?? 'read', deps.runs);
+    if (cut) head.action = cut;
+    else delete head.action;
+  }
+  return Object.keys(head).length > 0 ? head : null;
 }
 
 /**
@@ -1540,13 +1615,14 @@ function lookedAt(
   page: string,
   blocks: readonly BlockResult[],
   shown: { rekeyed: ReadonlyMap<string, string>; held: boolean } | null,
+  layout = false,
 ): { blocks: BlockResult[]; look: LookBody } | null {
   if (!deps.look) return null;
   const stored = rekeyedLook(lookOf(deps.look(page)), shown?.rekeyed);
   /* A LOOK SLASH WROTE WAS WRITTEN FROM THE WHOLE PAGE, so it is laid only for a reader shown the whole page. Laid for a
      member held from a block, its order, its lead and its basis said whether that block held something late: the rules
      answer her instead, from what she is shown. An owner's look is his arrangement and not a reading, so it stands. */
-  if (stored !== null && stored.by !== 'owner' && !shown?.held) return laidGroups(deps, applyLook(blocks, stored));
+  if (stored !== null && stored.by !== 'owner' && !shown?.held) return laidGroups(deps, applyLook(blocks, stored, { layout }));
   const composed = composeLook({
     page,
     blocks,
@@ -1557,7 +1633,7 @@ function lookedAt(
     stateOf: (list) => deps.schemaOf(list)?.state ?? null,
     ...(stored?.by === 'owner' && stored.pinned ? { pinned: stored.pinned } : {}),
   });
-  return laidGroups(deps, applyLook(blocks, stored?.by === 'owner' ? mergeLook(stored, composed) : composed));
+  return laidGroups(deps, applyLook(blocks, stored?.by === 'owner' ? mergeLook(stored, composed) : composed, { layout }));
 }
 
 /**
@@ -1915,7 +1991,7 @@ export function whenHolds(deps: PageDeps, when: unknown): boolean {
 /** Whether a `when:` of a shape already checked holds: a leaf of its figure, `all:` of every part, `any:` of one. */
 function treeHolds(deps: PageDeps, when: unknown): boolean {
   const join = whenJoin(when);
-  if (join === null) return leafHolds(deps, when as WhenLeaf);
+  if (join === null) return isReaderLeaf(when) ? readerHolds(deps, when) : leafHolds(deps, when as WhenLeaf);
   const parts = (when as Record<string, unknown[]>)[join]!;
   return join === 'all' ? parts.every((part) => treeHolds(deps, part)) : parts.some((part) => treeHolds(deps, part));
 }
@@ -1927,6 +2003,16 @@ function treeHolds(deps: PageDeps, when: unknown): boolean {
 function saidLine(deps: PageDeps, says: readonly SaysLine[]): { at: number; line: SaysLine } {
   const at = says.findIndex((line, i) => i === says.length - 1 || (line.when !== undefined && whenHolds(deps, line.when)));
   return { at, line: says[at]! };
+}
+
+/**
+ * Whether a leaf about who reads holds: only while the host said who reads and it is one of the words. NO READER SAID IS
+ * NOBODY THE LEAF NAMES, so a block held for the owner is not sent to a host that has not said who is reading.
+ */
+function readerHolds(deps: PageDeps, when: WhenReaderLeaf): boolean {
+  if (deps.readerIs === undefined) return false;
+  const words: readonly unknown[] = Array.isArray(when.reader) ? when.reader : [when.reader];
+  return words.includes(deps.readerIs);
 }
 
 /** Whether one leaf of a `when:` holds of the figure it names. */
@@ -2003,7 +2089,7 @@ export function readBlock(deps: PageDeps, block: PageBlock): BlockResult {
     return { ...leanRows(deps, readBlockAsWritten(deps, renamed(block))), key };
   } catch (e) {
     return {
-      ...(block !== null && typeof block === 'object' ? shorn(block) : block),
+      ...(block !== null && typeof block === 'object' ? unacted(shorn(block)) : block),
       key,
       rows: [],
       matched: 0,
@@ -2157,6 +2243,23 @@ function leanRows(deps: PageDeps, read: BlockResult): BlockResult {
   return cut ? { ...read, rows } : read;
 }
 
+/**
+ * The fields of the list a block reads, which its actions' args may name, or `null` where it reads no list this read
+ * knows the shape of: then an action is checked for its shape alone.
+ */
+function fieldsOfBlock(deps: PageDeps, block: PageBlock): ReadonlySet<string> | null {
+  const register = typeof block.source === 'string' && block.source.startsWith('register.') ? block.source.slice('register.'.length) : block.register;
+  const schema = typeof register === 'string' && register ? deps.schemaOf(register) : null;
+  return schema ? new Set(Object.keys(schema.fields)) : null;
+}
+
+/** A block without what may be pressed on it, for an answer that never reached the cut (`readBlockAsWritten`). */
+function unacted<T extends object>(block: T): T {
+  if (!Object.hasOwn(block, 'actions') && !Object.hasOwn(block, 'row_actions')) return block;
+  const { actions: _block, row_actions: _rows, ...kept } = block as T & { actions?: unknown; row_actions?: unknown };
+  return kept as T;
+}
+
 function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   /* A KEY THIS BUILD DOES NOT READ IS SAID, and it is said whatever else the block turns out to be:
      a `cells` block with a misspelt key and a `table` block with one are the same mistake, and the
@@ -2201,6 +2304,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
     });
 
   const base: BlockResult = { ...block, rows: [], matched: 0, refusals: unread };
+  /* WHAT MAY BE PRESSED IS NEVER SENT AS IT WAS DECLARED (PGS-A12): it is cut to this reader below, once the block is
+     drawn, and a block not drawn, or refused, carries none. */
+  delete base.actions;
+  delete base.row_actions;
 
   /**
    * AND `unread` HAS TO SURVIVE THE RETURN THAT SPREADS `base`, WHICH IT DID NOT.
@@ -2227,6 +2334,19 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
      matched nothing" are different facts and a renderer that cannot tell them apart draws the empty
      state of a block that was never meant to be on the page. */
   if (!drawnWhen(deps, block)) return { ...base, drawn: false, why: 'when' };
+
+  /* A BLOCK'S ACTIONS ARE CHECKED AS THE INSTALL CHECKS THEM, against the fields of its list (`block-keys.ts`
+     `actionsFault`), and a good list is cut to what this reader may press: with no level said, that is reading, and
+     nothing is sent. A press the record would refuse is never drawn. */
+  const pressed = block as PageBlock & { actions?: unknown; row_actions?: unknown };
+  if (pressed.actions !== undefined || pressed.row_actions !== undefined) {
+    const acted = declaredActions(block as unknown as Readonly<Record<string, unknown>>, 'This block', fieldsOfBlock(deps, block));
+    if (!acted.ok) return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: acted.fault.fix, at: acted.fault.at, ...(acted.fault.allowed ? { allowed: acted.fault.allowed } : {}) }) };
+    for (const key of ['actions', 'row_actions'] as const) {
+      const cut = acted.value[key] ? cutActions(acted.value[key], deps.level ?? 'read', deps.runs) : [];
+      if (cut.length > 0) base[key] = cut;
+    }
+  }
 
   /* A NOTE THAT SAYS SEVERAL SENTENCES SAYS ONE (PGS-A13), the first whose `when:` holds, read here and not by each host,
      so every reader of the page is said the same sentence: "3 questions wait for you" while they wait, and the calm line
@@ -4137,6 +4257,7 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
       })
       .map((f) => f.id),
   );
+  const worked = new Set((deps.lists?.().find((l) => l.id === register)?.fields ?? []).filter((f) => (f as { derived?: unknown }).derived === true).map((f) => f.id));
   const named = fields.length ? fields : Object.keys(schema.fields).filter((f) => TYPABLE.has(schema.fields[f]!.type) && !shut.has(f));
   const unknown = named.filter((f) => !Object.hasOwn(schema.fields, f));
   if (unknown.length)
@@ -4166,6 +4287,7 @@ function inputsBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     rows: got.value.rows,
     matched: got.value.rows.length,
     types: Object.fromEntries(named.map((f) => [f, schema.fields[f]!.type])),
+    ...(named.some((f) => worked.has(f)) ? { derived: named.filter((f) => worked.has(f)) } : {}),
     home: deps.home?.() ?? null,
   };
 }

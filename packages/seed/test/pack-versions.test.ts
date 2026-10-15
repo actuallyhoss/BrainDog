@@ -887,10 +887,11 @@ const DECLARED: Record<string, Version> = {
       rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
       setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
     `,
-    declares: 'a593ca243fd01b37',
+    declares: 'ec4895c39c078fc5',
     history: [
       "`register.services`'s `kind` gains `server`, `database`, `storage` and `network` with their labels -> 7cccb015ec1bb242",
       "Folded into the unreleased 2.2.0 (sketchpad-60; integrate 60): `project-cost` reads only services whose cost is set, so a project whose services say no cost draws no Costs a year where it drew 0; no id added or taken away -> a593ca243fd01b37",
+      "Folded into the unreleased 2.2.0 (waiting-people-services-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 2.1.0): `page.estate`'s Waiting on you is gated on `questions-open-in:services`, the questions about a service, where it was gated on every open question, and its line opens on a clause saying how many; and `register.services`'s `kind` names `vm`, `edge` and `object` Virtual machine, Edge network and Object storage; a block added, nothing taken away, no id added or taken away -> ec4895c39c078fc5",
     ],
   },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
@@ -1560,7 +1561,7 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: '4d18d12f51e37829',
+    declares: '72cb3cab41d4f86a',
     history: [
       "`page.people` says how many people may be on the record twice, in one note under its two lead notes, from the built-in figure held-twice and drawn only above nought; a note added, nothing taken away -> 3c1698b71103bfe4",
       "Folded into the unreleased 3.4.0 (people-twice-link-74; integrate 74; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list of everyone in order of name (`/r/people?sort=name`) and says what to look for; no id added or taken away -> 900ff4486ed1626e",
@@ -1568,6 +1569,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.4.0 (people-note-count-79-80; integrate 80; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice says the number is how many too many ('Too many: N'), where it read as the number of people the link shows; the link is unchanged; no id added or taken away -> d7d82263a138b702",
       "Folded into the unreleased 3.4.0 (batch 82, integrate 82; commit 63423720, the deployed build, holds 3.3.0), one fingerprint for two changes, a page added and nothing taken away: `page.people`'s note of people who may be held twice says the people the link shows and then how many too many ('N people may be on this record twice, M too many'), from the built-in figures held-twice-shown and held-twice, the link and the when unchanged (people-twice-note-82); and `page.calendar`, its line and one calendar over the computed deadlines, this month and the two after it, off the rail (calendar-page-82) -> 69d90b1f513c065d",
       "Folded into the unreleased 3.4.0 (activity-page-88; batch 88; commit 63423720, the deployed build, holds 3.3.0), a page added and nothing taken away: `page.activity`, off the rail, its one line, a feed over the record's log with a heading a day and one line a run, and beside it Who worked, What changed and Busy hours from the built-in figures activity-by-who, activity-by-kind and activity-by-hour, and a queue of what an agent asked -> 4d18d12f51e37829",
+      "Folded into the unreleased 3.4.0 (waiting-people-services-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 3.3.0): `page.people` draws the questions about somebody as a queue, Waiting on you, gated on `questions-open-in:people`, with a clause in its line saying how many; a block added, nothing taken away, no id added or taken away -> 72cb3cab41d4f86a",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
@@ -1599,11 +1601,12 @@ const DECLARED: Record<string, Version> = {
       register.things
       rule.project-past-aim
     `,
-    declares: '9ace1e3844609180',
+    declares: '9609a0f244086314',
     history: [
       "`page.portfolio` draws the note beside What each one earns, open and folded, only while `projects-earning-said` is above nought, where it was drawn while `projects-live` was and read 0 of 11 on a record where nobody had said; the words are the same -> bc4e48dea660614a",
       "`page.portfolio`'s In play cards say `edit: true` on `about`, so a project's one line is typed on its card (PGS-C15) -> 88eb91d28c23081b",
       "`page.portfolio`'s In play cards draw `project-last-worked` for each card as its when, Worked on 2 days ago or Quiet for 40 days, and nothing for a project with no task (projects-last-worked-96, REC-C16) -> 9ace1e3844609180",
+      "Inside the unreleased 1.17.0 (waiting-work-projects-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 1.16.0): `page.portfolio` draws the questions about its own list (`list is things`) as a queue, Waiting on you, gated on `questions-open-in:things`, with a clause in the line saying how many, and the quiet line says Nothing needs a push where it said Nothing needs you; a block added, nothing taken away, no id added or taken away -> 9609a0f244086314",
     ],
   },
   /* WHAT WAS WORKED ON A PROJECT THIS WEEK, a figure over tasks and so Work's (batch 46, REC-C16). 1.17.0 IS RELEASED. */
@@ -1637,13 +1640,14 @@ const DECLARED: Record<string, Version> = {
       metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
       register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
     `,
-    declares: 'e20a7069ac0b3816',
+    declares: 'a5e781318a2c7ef7',
     history: [
       "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
       "Inside the unreleased 1.19.0 (work-moves-62-63, audit 61 claim 6; integrate 63; commit 63423720, the deployed build, holds 1.18.0): on `register.tracks` holding leads to done, and `script.start_with_parent` no longer copies the agent; no id added or taken away -> 424cfe3512924e3b",
       "Inside the unreleased 1.19.0 (work-agent-follow-up-65, audit 63 claim 8; integrate 65; commit 63423720, the deployed build, holds 1.18.0): `script.start_with_parent` copies the parent's agent when the agent holding the parent made the follow-up, read from input.made_by; no id added or taken away -> 061458f472bc1a99",
       "Inside the unreleased 1.19.0 (board-capture-line-83, PGS-C08 job 3; commit 63423720, the deployed build, holds 1.18.0): `page.work-board` gains Work's capture line, What needs doing?, first after its sentence and before the board, adding to `register.tasks`; no id added or taken away -> 6de550d0463bb74b",
       "Inside the unreleased 1.19.0 (projects-last-worked-96, REC-C16; commit 63423720, the deployed build, holds 1.18.0): `project-last-worked` has a target of at most 30 days where it had none, so a project with nothing written on its tasks for longer misses it and is drawn as quiet; no id added or taken away -> e20a7069ac0b3816",
+      "Inside the unreleased 1.19.0 (waiting-work-projects-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 1.18.0): `page.work` draws the questions about its own list (`list is tasks`) as a queue, Questions for you, gated on `questions-open-in:tasks`, with a clause in the line; a block added, nothing taken away, no id added or taken away -> a5e781318a2c7ef7",
     ],
   },
 };

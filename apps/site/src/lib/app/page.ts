@@ -7,6 +7,16 @@
  */
 import { kindSpec, parse, symbolText, type Block, type Segment } from 'braindog-render';
 import type { Span } from '../examples/types.ts';
+import { CURRENCY } from '../plans.ts';
+
+/**
+ * THE HOME CURRENCY THE DRAWN APP IS TOLD, the plans' own. Not told one, the renderer spells a dollar `US$` so no reader
+ * can take it for another's, and the copy beside it says `$`: two spellings of one currency on one page. Told it, every
+ * figure is the one writer's (`writeAmount`): `$4,800` for the home's dollars, and a pound or a pound of Egypt in an
+ * example keeps its own mark with its code after, as on a record whose home is dollars. `Page.svelte` hands the same
+ * to the renderer, so a tile and a sentence beside it spell a figure alike.
+ */
+export const HOME = CURRENCY;
 
 /**
  * THE PREFIX OF A LINK THAT STAYS INSIDE THE WINDOW. A figure's `cellHref` answers `#go:<page-id>`,
@@ -88,26 +98,26 @@ export const isLead = (segment: Segment): boolean => segment.type === 'block' &&
  */
 export function leadOf(src: string): string {
   for (const s of parse(src, { page: true })) {
-    if (s.type === 'block' && isLead(s)) return symbolText(s.rows.map((r) => r.cells.join(' ')).join(' ').trim(), true);
+    if (s.type === 'block' && isLead(s)) return symbolText(s.rows.map((r) => r.cells.join(' ')).join(' ').trim(), true, HOME);
   }
   return '';
 }
 
 /**
- * A SENTENCE AS THE APP SAYS IT: every figure in it with its symbol and no `.00`, `£1,312.40 is left`, never
- * `GBP 1,312.40`. The text keeps the code, because money is never a bare number; this is only how it is drawn.
+ * A SENTENCE AS THE APP SAYS IT: every figure in it with its symbol and no `.00`, `$1,312.40 is left`, never
+ * `USD 1,312.40`. The text keeps the code, because money is never a bare number; this is only how it is drawn.
  */
-export const said = (text: string): string => symbolText(text, true);
+export const said = (text: string): string => symbolText(text, true, HOME);
 
 /**
  * A BLOCK WITH ITS MONEY DRAWN AS THE APP DRAWS IT, for the drawers that print a cell as written. A stat already
  * says its figure and its note with a symbol, and a table keeps its codes, as a ledger does. A note says its
- * sentence the way a headline does. A progress row keeps its pence in every cell, `£245.10 of £300.00`, because
- * what is left is worked out from them (a goal of `£300` would say `£55 left` where `£54.90` is left), and a range's
- * high is its fourth cell, so `£50.00 to £120` would sit where `£50.00 to £120.00` belongs.
+ * sentence the way a headline does. A progress row keeps its pence in every cell, `$245.10 of $300.00`, because
+ * what is left is worked out from them (a goal of `$300` would say `$55 left` where `$54.90` is left), and a range's
+ * high is its fourth cell, so `$50.00 to $120` would sit where `$50.00 to $120.00` belongs.
  */
 export function inSymbols(block: Block): Block {
   const each = (say: (c: string) => string): Block => ({ ...block, rows: block.rows.map((r) => ({ ...r, cells: r.cells.map(say) })) });
   if (block.kind === 'note') return each(said);
-  return block.kind === 'progress' ? each((c) => symbolText(c)) : block;
+  return block.kind === 'progress' ? each((c) => symbolText(c, false, HOME)) : block;
 }

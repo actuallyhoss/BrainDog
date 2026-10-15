@@ -545,8 +545,21 @@ export type Diff = {
   interrupts: string[];
   /** By construction: a pack declares shape and seeds examples, and has no verb that reads a row. */
   touches: { rows_read: 0; rows_written: 0 };
-  /** Rows that would be left under a retired register. Above zero is a refusal at install. */
+  /** Rows that would be left under a retired register. Above zero is a refusal at install, unless he pressed it (`InstallOptions`). */
   orphans: number;
+  /**
+   * Each list this version retires while it still holds rows, as the step Decide and Add-ons show (SHL-A12): `retire` is
+   * the list, `rows` how many it holds, `stays` that every one of them stays, and `line` the sentence, "Retires Services.
+   * Your 41 items stay, and the list can be put back."
+   *
+   * A REMOVAL, NOT A LOSS. Retiring a list never deletes what is in it, as an uninstall does not: the declaration goes and
+   * the rows stay where they are, so installing a version that declares the list again puts it back over them. So the
+   * plan says it as a step he can take, and `install` takes it only on his press (`retireWithRows`). Without the press
+   * it is `WOULD_ORPHAN` exactly as before, so an update nobody pressed never takes it (`@braindog/seed` `losses`).
+   *
+   * ABSENT WHEN NOTHING RETIRES OVER ROWS, so every other plan reads as it did. `orphans` is the sum of `rows` here.
+   */
+  removals?: { retire: string; name: string; rows: number; stays: true; line: string }[];
   /**
    * Field changes this upgrade cannot make, because the register already holds rows.
    *
@@ -602,7 +615,11 @@ export type Diff = {
 
 /** `handed` is how many declarations this install gave to another pack, and is absent when it gave none. */
 /** `refreshed` is how many rows it planted before this update went over, when it went over any. */
-export type Applied = { pack: string; version: string; declarations: number; seeds: number; retired: number; handed?: number; refreshed?: number };
+/**
+ * What an install did. `rows_kept` is each list it retired over rows on his press (`InstallOptions.retireWithRows`) and
+ * how many rows stay in it, as `Retired` says it for an uninstall; absent when it retired none.
+ */
+export type Applied = { pack: string; version: string; declarations: number; seeds: number; retired: number; handed?: number; refreshed?: number; rows_kept?: Record<string, number> };
 /** One kept page and what this version adds that it lacks (`Diff.brings`): a block by its kind and its heading. */
 export type Brought = { id: string; title?: string; blocks: { kind: string; heading?: string }[] };
 
@@ -1827,6 +1844,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
 
   const keeping = new Set(pack.declarations.map((d) => d.id));
   const retires: Diff['retires'] = [];
+  const removals: NonNullable<Diff['removals']> = [];
   let orphans = 0;
   const hands = pack.manifest.hands ?? {};
   for (const decl of installed.declarations) {
@@ -1872,6 +1890,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     }
     retires.push({ id: decl.id, rows });
     orphans += rows;
+    if (register !== null && rows > 0) removals.push(removalOf(register, decl.body, rows));
   }
   /* A DOOR GOES WHERE THE PATTERNS NAMING IT GO. money-core's plan handed `ingest.bank-ipn-in-sms`, which names `door:
      bank-from-out-sms`, and retired the door, since it held no token and filed nothing: every text reached it through
@@ -2072,6 +2091,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     interrupts: interruptsOf(pack),
     touches: { rows_read: 0, rows_written: 0 },
     orphans,
+    ...(removals.length === 0 ? {} : { removals }),
     retypes,
     newly_required: newlyRequired,
     misreads,
@@ -2745,6 +2765,23 @@ function laidBack(
   return body === null ? null : { body, values, ...(counted === null ? {} : { holding, binned }) };
 }
 
+/**
+ * The step a plan shows for a list it retires while the list holds rows (`Diff.removals`), named as the record names
+ * it: the live body's `name`, or the list's own word when the body has none.
+ */
+function removalOf(register: string, live: string, rows: number): NonNullable<Diff['removals']>[number] {
+  let name = register;
+  try {
+    const body = JSON.parse(live) as unknown;
+    if (isObject(body as Json) && typeof (body as Record<string, Json>).name === 'string' && (body as Record<string, string>).name!.trim() !== '')
+      name = (body as Record<string, string>).name!;
+  } catch {
+    /* A body that does not read keeps the list's own word. */
+  }
+  const kept = rows === 1 ? 'Your 1 item stays' : `Your ${rows.toLocaleString('en-GB')} items stay`;
+  return { retire: register, name, rows, stays: true, line: `Retires ${name}. ${kept}, and the list can be put back.` };
+}
+
 /** A live body as JCS text with `pack` set to `to`, which is what a handover stages; `null` for one that will not parse. */
 function handedBody(live: string, to: string): string | null {
   try {
@@ -3272,10 +3309,21 @@ function warningsOf(pack: Pack): { at: string; say: string }[] {
  * the accept refused `PACK_REQUIRED`, and one laying `domain` twice that it refused `PROVIDES_CONFLICT` half-way through
  * (`plan-all-refusals.test.ts`). Kept in one function, what the arranger asks and what the install refuses cannot drift.
  */
-export function installFault(pack: Pack, diff: Diff): Refusal | null {
-  const r = faultOf(pack, diff);
+export function installFault(pack: Pack, diff: Diff, options: InstallOptions = {}): Refusal | null {
+  const r = faultOf(pack, diff, options);
   return r !== null && refused(r) ? r.refusal : null;
 }
+
+/**
+ * What the caller of `install` says it was handed by a person, beside the plan and its approvals.
+ *
+ * `retireWithRows` IS HIS PRESS ON A PLAN THAT RETIRES A LIST HOLDING ROWS, the step it showed him (`Diff.removals`):
+ * the Add-ons and Decide screens pass it when he pressed the plan he was shown, and `braindog pack install --force`
+ * passes it when he typed it. It lifts `WOULD_ORPHAN` and nothing else: every other refusal stands, in its order. No
+ * caller that updates by itself passes it (`installHeld`, the quiet updates, `firstPartyTick`), so an update nobody
+ * pressed is refused as before and counted lost.
+ */
+export type InstallOptions = { retireWithRows?: boolean };
 
 /**
  * A pattern this version hands on whose door it also stops declaring, and whose `hands` does not send that door to the
@@ -3309,7 +3357,7 @@ function handsDoorFault(pack: Pack, diff: Diff): Refusal | null {
   return null;
 }
 
-function faultOf(pack: Pack, diff: Diff): Result<never> | null {
+function faultOf(pack: Pack, diff: Diff, options: InstallOptions = {}): Result<never> | null {
   /**
    * EACH HAS ITS OWN CODE, and both said `OUT_OF_BOUNDS`.
    *
@@ -3418,9 +3466,12 @@ function faultOf(pack: Pack, diff: Diff): Result<never> | null {
     );
 
   /* ROWS ARE NEVER THE PRICE OF AN UPGRADE. A pack that dropped a register somebody has been
-     writing into for a year would take the year with it, and there is no `--force` in v1 because
-     there is no sentence that makes that a good idea. */
-  if (diff.orphans > 0) {
+     writing into for a year would take the year with it, so nothing that updates by itself takes it.
+     BUT RETIRING TAKES NOTHING: the declaration goes and the rows stay, as an uninstall keeps them, and a
+     version that declares the list again puts it back over them. So the plan shows the step
+     (`removals`, "Your 41 items stay"), and his press on it (`retireWithRows`, which `--force` is) lifts
+     this one refusal and no other (SHL-A12). */
+  if (diff.orphans > 0 && options.retireWithRows !== true) {
     const at = diff.retires.find((r) => r.rows > 0)!;
     return no<never>(
       'WOULD_ORPHAN',
@@ -3659,7 +3710,7 @@ export function installOrder(coming: readonly { id: string; version: string; req
  * it does not have, and the way to not have half a pack is to check everything before writing
  * anything and to write it all in one go.
  */
-export async function install(pack: Pack, diff: Diff, host: Host, planHash: string, approve: readonly string[] = []): Promise<Result<Applied>> {
+export async function install(pack: Pack, diff: Diff, host: Host, planHash: string, approve: readonly string[] = [], options: InstallOptions = {}): Promise<Result<Applied>> {
   if (planHash !== diff.planHash)
     return no<Applied>(
       'PLAN_STALE',
@@ -3710,7 +3761,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
   }
 
   /* EVERY REFUSAL THE DIFF ALONE DECIDES, in `installFault`, so the arranger can ask the same of each pack it files. */
-  const fault = installFault(pack, diff);
+  const fault = installFault(pack, diff, options);
   if (fault) return { ok: false, refusal: fault };
 
   /* WHAT IT CALLS OUT IS APPROVED IN THE SAME PRESS, OR NOTHING IS ARMED.
@@ -3858,6 +3909,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         retired: retiring.length,
         ...(handing > 0 ? { handed: handing } : {}),
         ...(refreshed > 0 ? { refreshed } : {}),
+        ...(diff.removals !== undefined && diff.removals.length > 0 ? { rows_kept: Object.fromEntries(diff.removals.map((r) => [r.retire, r.rows])) } : {}),
       });
     });
   } catch (e) {

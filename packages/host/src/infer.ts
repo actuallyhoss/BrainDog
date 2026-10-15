@@ -246,44 +246,62 @@ export type InferLedger = {
   last(candidate: string): readonly LastRow[];
 };
 
+/* ── The pause, restated ──────────────────────────────────────────────────────────────────────── */
+
+/*
+ * THE PAUSE IS `@braindog/slash`'S NOW (`packages/slash/src/paused.ts`), where the walk every ask takes reads it. This
+ * package may not import that one (`docs/31-STACK.md` row 16, `46 §5.1`: only an app imports Slash), so the rule is
+ * restated here line for line, as `sign-model.ts` restates `health.ts`'s clauses, and `test/infer.test.ts` holds the two
+ * equal over every case. A change to one is a change to both.
+ */
+
+/** `@braindog/ports`'s `Missing` for a model the provider does not have, which is what marks a candidate down. */
+export const NOT_SERVED = 'the provider does not serve it';
+/** How long a model its provider does not serve is passed over: a day. */
+export const NOT_SERVED_PAUSE = 86_400_000;
+/** How long a model that failed `FAILS_TO_PAUSE` times inside this window is passed over. */
+export const FAILED_PAUSE = 600_000;
+/** Failures in a row, inside `FAILED_PAUSE`, that pause a candidate. */
+export const FAILS_TO_PAUSE = 3;
 /** How many of a candidate's rows a pause is read from: three failures make one, so a few more than three is enough. */
-const LAST = 6;
+export const LAST_ROWS = 6;
+/** The longest a provider's own words are kept on a row. */
+export const RAW_MAX = 300;
 
 /** A candidate's last rows from Slash's ledger, newest first, for a host whose ledger is the package's own store. */
 export const lastRows = (sql: Sql, candidate: string): LastRow[] =>
-  sql.all<LastRow>(`SELECT ts, status, code, raw FROM slash_call WHERE candidate = ? ORDER BY rowid DESC LIMIT ${LAST}`, candidate);
-
-/* ── Falling through ──────────────────────────────────────────────────────────────────────────── */
-
-/** `@braindog/ports`'s `Missing` for a model the provider does not have, which is what marks a candidate down. */
-const NOT_SERVED = 'the provider does not serve it';
-const DAY = 86_400_000;
-const TEN_MINUTES = 600_000;
-/** The longest a provider's own words are kept on a row. */
-const RAW_MAX = 300;
+  sql.all<LastRow>(`SELECT ts, status, code, raw FROM slash_call WHERE candidate = ? ORDER BY rowid DESC LIMIT ${LAST_ROWS}`, candidate);
 
 const failed = (row: LastRow): boolean => row.status === 'error' && row.code === 'UNREACHABLE';
 
+/** Why a candidate is passed over at `now`, or `null` when it is asked. */
+export type PausedFor = 'failed' | 'not_served';
+
 /**
- * Whether a candidate is passed over at `now`, read from its own last rows and from nothing kept in memory: both hosts
+ * Why a candidate is passed over at `now`, read from its own last rows and from nothing kept in memory: both hosts
  * build the engine per request, so a mark in memory would be one per request.
  *
  * NOT SERVED IS A DAY, because a model a provider has stopped serving does not come back in minutes. THREE FAILURES IN
  * TEN MINUTES ARE TEN MINUTES, counted from the newest and only while nothing since has answered.
  */
-export const paused = (rows: readonly LastRow[], now: number): boolean => {
+export const pausedFor = (rows: readonly LastRow[], now: number): PausedFor | null => {
   const fails: LastRow[] = [];
   for (const row of rows) {
     if (!failed(row)) break;
     fails.push(row);
   }
   const newest = fails[0];
-  if (newest === undefined) return false;
+  if (newest === undefined) return null;
   const at = Date.parse(newest.ts);
-  if (newest.raw?.startsWith(NOT_SERVED) === true) return now < at + DAY;
-  const third = fails[2];
-  return third !== undefined && at - Date.parse(third.ts) <= TEN_MINUTES && now < at + TEN_MINUTES;
+  if (newest.raw?.startsWith(NOT_SERVED) === true) return now < at + NOT_SERVED_PAUSE ? 'not_served' : null;
+  const third = fails[FAILS_TO_PAUSE - 1];
+  return third !== undefined && at - Date.parse(third.ts) <= FAILED_PAUSE && now < at + FAILED_PAUSE ? 'failed' : null;
 };
+
+/** Whether a candidate is passed over at `now`: `pausedFor`, as a yes or no. */
+export const paused = (rows: readonly LastRow[], now: number): boolean => pausedFor(rows, now) !== null;
+
+/* ── Falling through ──────────────────────────────────────────────────────────────────────────── */
 
 /** How one attempt ended, as the walk reads it. */
 type Ended = 'answered' | 'not_served' | 'no_answer' | 'late' | 'schema' | 'budget' | 'refused';
@@ -375,6 +393,11 @@ const USED_UP = {
  *
  * A KEY THAT WILL NOT OPEN IS THROWN ON AS THE HOST THREW IT, with the hold given back and no row: nothing was sent, and
  * the callers that already say so in their own words keep doing it (`engine-health.ts` reads that from the vault).
+ *
+ * KEPT, THOUGH ONLY ITS TESTS CALL IT TODAY. The asks that go through `@braindog/slash` walk their route inside the engine
+ * (`core.run`), and that walk now reads the same pause. This walk is for the asks that do not: the record's port and an
+ * automation's answers (`slash.ts`, `slash-answers.ts`, ENG-A06 job 7's wiring), and `test/infer.test.ts`,
+ * `may-think.test.ts` and `slash-own-key-route.test.ts` guard it as the scope's guard names it.
  */
 export const infer = async <T extends Reply>(purpose: InferPurpose, call: InferCall<T>, deps: InferDeps): Promise<Inferred<T>> => {
   const { ledger, clock } = deps;

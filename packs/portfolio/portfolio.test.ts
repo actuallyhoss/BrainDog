@@ -27,6 +27,7 @@ import { readFileSync } from 'node:fs';
 import { settleWhen } from '../../packages/declare/src/catalogue.ts';
 import { MODULE_WORDS, normalise, type Pack } from '../../packages/declare/src/index.ts';
 import { createRecordApi, type CallContext } from '../../packages/record/src/index.ts';
+import { rulesLine } from '../../packages/record/src/headlines.ts';
 import { fixedClock, openSqlite } from '../../packages/kernel/test/sqlite.ts';
 import { FIRST_PARTY, FIRST_PARTY_VERSIONS, firstPartyDocument, firstPartyManifest } from '../../packages/seed/src/index.ts';
 
@@ -402,4 +403,86 @@ test('THE PROJECT PAGE STAYS IN THE SEED: the file draws no page per project, an
   assert.deepEqual(pages.map((d) => d.page), ['portfolio']);
   for (const d of pages) assert.ok(typeof d.title !== 'string' || !d.title.includes('{{'), 'a page drawn per project is in the file; move the README line and this test with it');
   assert.match(readFileSync(new URL('./README.md', import.meta.url), 'utf8'), /project page/u, 'the README does not say where the project page lives');
+});
+
+/* ── The questions about projects, on Projects (PGS-C18) ───────────────────────────────────────── */
+
+type Laid = { kind: string; heading?: string; lead?: boolean; fold?: boolean; box?: boolean; area?: string; body?: string; where?: string; when?: unknown; limit?: number; tiles?: boolean };
+type Drawn = { kind: string; heading?: string; lead?: boolean; body?: string; drawn?: boolean; values?: Record<string, never>; matched?: number };
+
+const projectsPage = (): Laid[] => (file().declarations.find((d) => d.page === 'portfolio')!.blocks as Laid[]);
+
+/**
+ * The tiles a page shows before its first fold at 1440: the line is the page's sentence, the capture line is the header's,
+ * and a boxed heading with what follows it is one tile, as `calm-pages.test.ts` counts them and the app draws them.
+ */
+function beforeTheFold(blocks: readonly Laid[]): string[] {
+  const main = blocks.filter((b) => b.area !== 'rail');
+  const fold = main.findIndex((b) => b.kind === 'section' && b.fold === true);
+  let boxed = false;
+  return (fold < 0 ? main : main.slice(0, fold))
+    .filter((b) => {
+      if (b.kind === 'section') return (boxed = b.box === true);
+      return !boxed && !b.lead && b.kind !== 'capture';
+    })
+    .map((b) => b.heading ?? b.kind);
+}
+
+test('PROJECTS ASKS ITS OWN QUESTIONS: a queue of the questions about projects, three drawn as tiles, only while one waits', () => {
+  const queue = projectsPage().find((b) => b.kind === 'queue');
+  assert.ok(queue, 'Projects declares no queue');
+  assert.deepEqual(
+    { heading: queue.heading, where: queue.where, when: queue.when, limit: queue.limit, tiles: queue.tiles },
+    { heading: 'Waiting on you', where: 'list is things', when: { metric: 'questions-open-in:things', gt: 0 }, limit: 3, tiles: true },
+  );
+  const lines = projectsPage().filter((b) => b.lead && typeof b.body === 'string' && b.body.includes('{{'));
+  assert.equal(lines.length, 2);
+  for (const l of lines) assert.match(l.body!, /\{\{questions-open-in:things\}\} question\(s\) for you/u);
+});
+
+test('FOUR TILES BEFORE THE FOLD AT 1440, the questions under In play and before the open tile', () => {
+  assert.deepEqual(beforeTheFold(projectsPage()), ['How they are going', 'In play', 'Waiting on you', 'Earnings, agents and dates']);
+});
+
+test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT PROJECTS: nothing at nought, two at two, and not the one about a task', async () => {
+  const { api, close } = await record([WORK]);
+  said(await put(api, file()));
+  const stored = new Map((api.kernel.declarations() as unknown as { id: string; body: string }[]).map((d) => [d.id, d.body]));
+  const list = JSON.parse(stored.get('register.things')!) as { title: string; fields: { id: string; type: string; required?: boolean; values?: string[] }[] };
+  const make = (name: string): string => {
+    const fields: Body = { [list.title]: name };
+    for (const f of list.fields) if (f.required === true && f.id !== list.title && f.type === 'enum') fields[f.id] = f.values![0];
+    return said<{ id: string }>(api.kernel.create('things', fields as never, { actor: 'p_1' })).id;
+  };
+  const spoken = (id: string): string => {
+    const e = api.kernel.get(id) as unknown as { register: string; seq: number };
+    return `${e.register}#${e.seq}`;
+  };
+  const kiln = make('Kiln');
+  const atlas = make('Atlas');
+  const task = said<{ id: string }>(api.kernel.create('tasks', { what: 'Glaze the test tiles', state: 'open' } as never, { actor: 'p_1' })).id;
+  const OPTIONS = [{ id: 'yes', label: 'Yes', because: 'It is due' }, { id: 'no', label: 'No', because: 'Not yet' }];
+  const ask = (question: string, about: string) => said(api.kernel.propose({ question, body_kind: 'options', body: { options: OPTIONS, about } } as never, 'slash'));
+  const page = (): Drawn[] => said<{ blocks: Drawn[] }>(api.kernel.page('portfolio')).blocks;
+  const line = (): string | null => {
+    const lead = page().find((b) => b.kind === 'note' && b.lead && b.drawn !== false && typeof b.body === 'string' && b.body.includes('questions-open-in'));
+    return lead ? rulesLine(lead.body!, lead.values ?? {}) : null;
+  };
+  const waiting = (): Drawn => page().find((b) => b.kind === 'queue' && b.heading === 'Waiting on you')!;
+
+  assert.equal(waiting().drawn, false, 'the queue drew with nothing asked');
+  /* BOTH IN PLAY (`building`, the first a project can say), so a line is drawn, and it says no question at nought. */
+  const quiet = line();
+  assert.ok(quiet !== null && quiet !== '', 'Projects drew no line');
+  assert.doesNotMatch(quiet, /question/u, 'the line said nought');
+
+  ask('Ship the Kiln beta?', spoken(kiln));
+  ask('Park Atlas for a month?', spoken(atlas));
+  ask('Move the glazing to Friday?', spoken(task));
+  assert.notEqual(waiting().drawn, false);
+  assert.equal(waiting().matched, 2, 'the queue kept a question about a task');
+  /* THE CLAUSE LEADS THE LINE THAT NAMES WHAT NEEDS A PUSH, and follows the one that says nothing does. */
+  const two = line()!;
+  assert.ok(two === `2 questions for you, ${quiet}` || two === `${quiet}, 2 questions for you`, two);
+  close();
 });

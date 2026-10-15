@@ -28,6 +28,8 @@ import { checkInterval, intervalMs, type PullDecl } from './pull.ts';
 /* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against. */
 import { ACTION_AUTH_KINDS, reservedKeyHeader } from './actions.ts';
 import { timeOf } from './clock.ts';
+/* A FIELD WORKED OUT AT READ: its rule, asked in `fieldRules`, and the test every other key here puts to a field it names. */
+import { deriveFault, isDerived, shapeOf, sourcesOf, type DeriveField } from './derive.ts';
 import { isZone } from './slot.ts';
 import { scriptBody } from './script.ts';
 /* A JOB KIND'S LINT, in the file that keeps the queue which reads it, so the kind the owner approves is the kind a
@@ -53,8 +55,12 @@ import { pairsFault } from './pairs.ts';
 import { DELETE_RULES } from './referenced.ts';
 import { spanMs } from './vault.ts';
 import { actionsOf, callFault, flowFault, sealedAs, subjectOf } from './flow-lint.ts';
-import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
-import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, withoutHoles } from './compose.ts';
+import { BLOCK_INSTALLS, BLOCK_KEY, FILTER_CONTROLS, FILTER_TYPES, FILTERS_MOST, NAV_KEYS, PAGE_KEYS, PAGE_UNBUILT, actionsFault, feedSaysFault, forecastAxisFault, keyedBlocks, keysFor, kindsReading, noteSaysFault, unreadBlockKey, unreadPageKey, whenTreeFault, wrongKindKey } from './block-keys.ts';
+import { LOOK_BASIS_BYTES, LOOK_BY, LOOK_GROUPS_MOST, LOOK_HEADLINE_BYTES, LOOK_KEYS, LOOK_KEYS_MOST, LOOK_NEXT_BYTES, lookPlacesFault, withoutHoles } from './compose.ts';
+/* A GLYPH NAMED THAT THE RENDERER HAS NOT, refused with the nearest names it has (`glyph-names.ts`). */
+import { glyphFault } from './glyph-names.ts';
+/* A PAGE'S HEAD, checked by the file that reads it (`page-head.ts`). */
+import { headerFault } from './page-head.ts';
 /* THE KINDS THAT READ THEMSELVES, admitted into `BLOCK_KINDS` and asked to check their own blocks at install. */
 import { BLOCK_KIND_MODULES, kindModule } from './kinds/index.ts';
 /* THE PAGE WORDS THE INSTALL AND THE READ REFUSE IN ONE SENTENCE: a section's host panel, a path's short view and a roadmap's columns. */
@@ -777,7 +783,27 @@ function metricFieldFault(id: string, source: unknown, value: unknown, groupBy: 
       return bad('FIELD_UNKNOWN', `${id} reads ${field}, and ${register} has no field called ${field}.`, 'value', ['id', ...declared]);
   if (typeof groupBy === 'string' && !declared.includes(groupBy) && groupBy !== 'created_at' && groupBy !== 'updated_at')
     return bad('FIELD_UNKNOWN', `${id} groups by ${groupBy}, and ${register} has no field called ${groupBy}.`, 'group_by', declared);
+  /* A FIELD WORKED OUT AT READ IS NOT IN THE STORE A FIGURE ADDS UP, so a figure over it would read nothing on every
+     row. A figure reads the fields it is made from instead. */
+  const worked = derivedOf(installed, register);
+  for (const field of [...(rolled ? [rolled.balance, rolled.as_of] : valueFields(value)), ...(typeof groupBy === 'string' ? [groupBy] : [])])
+    if (worked.includes(field))
+      return bad(
+        'DECLARATION_INVALID',
+        `${id} reads ${field}, which is worked out at read and never stored, so a figure cannot add it up; read the fields ${field} is made from.`,
+        field === groupBy ? 'group_by' : 'value',
+        declared.filter((d) => !worked.includes(d)),
+      );
   return null;
+}
+
+/** The fields of a known register that are worked out at read: declaring `derive`, or carrying the kernel's flag. */
+function derivedOf(installed: Known, register: string): string[] {
+  const shape = installed.get(`register.${register}`);
+  if (shape === undefined || !Array.isArray(shape.fields)) return [];
+  return (shape.fields as { id?: unknown; derive?: unknown; derived?: unknown }[])
+    .filter((f) => f !== null && typeof f === 'object' && isDerived(f) && typeof f.id === 'string')
+    .map((f) => f.id as string);
 }
 
 /**
@@ -1240,7 +1266,7 @@ function lookBody(decl: Declaration, installed?: Known): Refusal | null {
   const id = decl.id;
   for (const key of Object.keys(body))
     if (!LOOK_KEYS.has(key))
-      return bad('DECLARATION_INVALID', `${id}: ${key}: is not a key a look has. A look is { look, basis, by, lead, order, hide, headline, next, pinned, group }.`, key, [...LOOK_KEYS]);
+      return bad('DECLARATION_INVALID', `${id}: ${key}: is not a key a look has. A look is { look, basis, by, lead, order, hide, headline, next, pinned, group, span, area }.`, key, [...LOOK_KEYS]);
   if (typeof body.look !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/u.test(body.look))
     return bad('DECLARATION_INVALID', `${id} names ${JSON.stringify(body.look ?? null)} as its page; a look names the page it is laid over by its id.`, 'look');
   if (!(LOOK_BY as readonly unknown[]).includes(body.by))
@@ -1264,6 +1290,8 @@ function lookBody(decl: Declaration, installed?: Known): Refusal | null {
     }
     lists[name] = list as string[];
   }
+  const placed = lookPlacesFault(body, id);
+  if (placed) return placed;
   const pinned = new Set(lists.pinned ?? []);
   for (const [i, key] of (lists.hide ?? []).entries()) {
     if (pinned.has(key)) return bad('DECLARATION_INVALID', `${id} pins ${key} and hides it. A pinned block stays drawn; take it out of hide.`, `hide[${i}]`);
@@ -1427,6 +1455,15 @@ export const CARD_FOLD_MOST = 50;
  * says it again (`pages.ts` `rowGrouping`). The list is checked when the record knows it, as a filter's field is
  * (`filtersFault`). `fold` is a count of cards from 1 to `CARD_FOLD_MOST`, and only folds a group of cards.
  */
+/** The fields of the list a block reads (`source: register.<id>`) or writes (`register:`), when that list is installed; else `null`. */
+function blockListFields(block: Readonly<Record<string, unknown>>, installed?: Known): ReadonlySet<string> | null {
+  const { source, register } = block;
+  const list = typeof source === 'string' && source.startsWith('register.') ? source.slice('register.'.length) : typeof register === 'string' ? register : null;
+  const shape = list === null ? undefined : installed?.get(`register.${list}`);
+  if (shape === undefined || !Array.isArray(shape.fields)) return null;
+  return new Set((shape.fields as { id?: unknown }[]).map((f) => f?.id).filter((f): f is string => typeof f === 'string'));
+}
+
 function cardGroupFault(id: string, at: string, block: Readonly<Record<string, unknown>>, installed?: Known): Refusal | null {
   const { group, fold, source } = block;
   const cards = block.kind !== 'table';
@@ -1503,6 +1540,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     blocks?: unknown;
     tone?: unknown;
     layout?: unknown;
+    header?: unknown;
   };
   const id = decl.id;
 
@@ -1519,6 +1557,12 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       );
     if (!PAGE_KEYS.has(key)) return bad('DECLARATION_INVALID', `${id}: ${unreadPageKey(key)}`, key, [...PAGE_KEYS]);
   }
+  /* A HEAD OVER THE TITLE (PGS-A16), checked by `page-head.ts`, the figures it counts against those installed. */
+  if (body.header !== undefined) {
+    const figures = installed ? new Set([...installed.keys()].filter((k) => k.startsWith('metric.')).map((k) => k.slice('metric.'.length))) : null;
+    const fault = headerFault(body.header, { figures, fields: null });
+    if (fault) return fault;
+  }
 
   if (typeof body.title !== 'string' || body.title.trim() === '')
     return bad('DECLARATION_INVALID', `${id} has no title, and a page is named on the screen before it is drawn.`, 'title');
@@ -1533,7 +1577,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
      an item in no menu, and one with no order sorts against whatever the reader last wrote. Both
      install cleanly and both produce a page you can only reach by typing its slug. */
   if (body.nav !== undefined) {
-    const nav = body.nav as { section?: unknown; order?: unknown; tabs?: unknown };
+    const nav = body.nav as { section?: unknown; order?: unknown; tabs?: unknown; icon?: unknown };
     if (nav === null || typeof nav !== 'object')
       return bad('DECLARATION_INVALID', `${id}'s nav is a section and an order.`, 'nav');
     if (typeof nav.section !== 'string' || nav.section.trim() === '' || byteLength(nav.section) > 40)
@@ -1547,6 +1591,10 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       return bad('DECLARATION_INVALID', `${id}'s nav has ${stray}:, and nav is { section, order, icon, tabs }. Tabs are tabs: true.`, 'nav', [...NAV_KEYS]);
     if (nav.tabs !== undefined && typeof nav.tabs !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}'s nav tabs is ${JSON.stringify(nav.tabs)}; it is true, to draw the pages of ${String(nav.section)} as tabs, or false.`, 'nav');
+    if (nav.icon !== undefined && (typeof nav.icon !== 'string' || !GLYPH.test(nav.icon)))
+      return bad('DECLARATION_INVALID', `${id}'s nav icon is a glyph name: lower-case letters, digits and dashes.`, 'nav');
+    const navUnknown = typeof nav.icon === 'string' ? glyphFault(nav.icon) : null;
+    if (navUnknown) return bad(navUnknown.code, `${id}'s nav: ${navUnknown.fix}`, 'nav.icon', navUnknown.allowed);
   }
 
   /* A MAIN COLUMN AND A SIDE RAIL, THE RAIL'S WIDTH IN TWELFTHS. Three to five, because a rail narrower than a quarter
@@ -1845,6 +1893,10 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        link field and a count, and from a section's, which is shut or not (`feedSaysFault`). */
     const fed = kind === 'feed' ? feedSaysFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
     if (fed) return bad('DECLARATION_INVALID', fed.fix, `${at}.${fed.at}`, fed.allowed);
+    /* WHAT MAY BE PRESSED ON A BLOCK (`actions`, `row_actions`), checked as the read checks it (`block-keys.ts`
+       `actionsFault`), against the fields of the list the block reads or writes when that list is installed. */
+    const acted = actionsFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`, blockListFields(raw as Readonly<Record<string, unknown>>, installed));
+    if (acted) return bad('DECLARATION_INVALID', acted.fix, `${at}.${acted.at}`, acted.allowed);
     /* A FORECAST'S `axis` IS ONE OF TWO WORDS (`forecastAxisFault`): a stray one would draw as fitted and say nothing. */
     const axised = kind === 'forecast' ? forecastAxisFault(raw as Readonly<Record<string, unknown>>, `${id}.${at}`) : null;
     if (axised) return bad('DECLARATION_INVALID', axised.fix, `${at}.${axised.at}`, axised.allowed);
@@ -1857,6 +1909,8 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     if (grouped) return grouped;
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))
       return bad('DECLARATION_INVALID', `${id}.${at}'s icon is a glyph name: lower-case letters, digits and dashes.`, at);
+    const unknown = typeof block.icon === 'string' ? glyphFault(block.icon) : null;
+    if (unknown) return bad(unknown.code, `${id}.${at}: ${unknown.fix}`, `${at}.icon`, unknown.allowed);
 
     /**
      * A `capture` IS BOUND BY `register:`, WHICH IS WHERE A NEW ROW GOES, and it reads nothing.
@@ -1883,7 +1937,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        the sentence the read refuses a hand-made block in. */
     if (kind === 'inputs' && block.where !== undefined)
       return bad('DECLARATION_INVALID', `${id}.${at} is inputs, which edit the one row that row: names and read no where:. Name the row with row:, such as row: ${typeof block.register === 'string' ? block.register : 'checks'}#2.`, at);
-    if ((kind === 'capture' || kind === 'inputs') && block.register !== undefined) {
+    if ((kind === 'capture' || kind === 'inputs' || kind === 'form') && block.register !== undefined) {
       if (typeof block.register !== 'string' || !REGISTER_ID.test(block.register))
         return bad('DECLARATION_INVALID', `${id}.${at}'s register is ${JSON.stringify(block.register)}; it is a register's id, such as tasks.`, at);
       if (declared.size > 0 && !declared.has(`register.${block.register}`))
@@ -4390,7 +4444,7 @@ function sameFault(id: string, body: Readonly<Record<string, unknown>>, fields: 
   if (role !== undefined)
     return bad('DECLARATION_INVALID', `${id} declares ${role}:, which already says when two of its rows are one, so same: would be read by nothing. Take it out.`, 'same');
   const live = fields.filter((f) => f.retired !== true);
-  const texts = live.filter((f) => f.type === 'text').map((f) => f.id);
+  const texts = live.filter((f) => f.type === 'text' && !isDerived(f as { derive?: unknown; derived?: unknown })).map((f) => f.id);
   const named = same.fields;
   if (!Array.isArray(named) || named.length === 0 || named.some((n) => typeof n !== 'string'))
     return bad('DECLARATION_INVALID', `${id}'s same names the fields two rows share as a list of its text fields, such as [name].`, 'same.fields', texts);
@@ -4401,6 +4455,9 @@ function sameFault(id: string, body: Readonly<Record<string, unknown>>, fields: 
       return bad('DECLARATION_INVALID', `${id}'s same names ${name}, which is retired, so no row writes it. Name a live text field.`, `same.fields[${i}]`, texts);
     if (field.type !== 'text')
       return bad('DECLARATION_INVALID', `${id}'s same names ${name}, which is a ${field.type}, and two rows are the same by their text fields.`, `same.fields[${i}]`, texts);
+    /* A FIELD WORKED OUT AT READ HAS NO STORED VALUE, and the key two rows are compared by is built from what is stored. */
+    if (isDerived(field as { derive?: unknown; derived?: unknown }))
+      return bad('DECLARATION_INVALID', `${id}'s same names ${name}, which is worked out at read and never stored, so two rows cannot be compared by it.`, `same.fields[${i}]`, texts);
     if ((named as string[]).indexOf(name) !== i)
       return bad('DECLARATION_INVALID', `${id}'s same names ${name} twice. Name each field once.`, `same.fields[${i}]`, texts);
   }
@@ -4427,8 +4484,8 @@ function sameFault(id: string, body: Readonly<Record<string, unknown>>, fields: 
 }
 
 /** Why a list's `once:` names what an add-on cannot plant, or `null` when it is a list of this list's own written fields. */
-function onceFault(id: string, fields: readonly (FieldLike & { derived?: boolean })[], once: unknown): Refusal | null {
-  const mine = fields.filter((f) => f.derived !== true).map((f) => f.id);
+function onceFault(id: string, fields: readonly (FieldLike & { derived?: boolean; derive?: unknown })[], once: unknown): Refusal | null {
+  const mine = fields.filter((f) => !isDerived(f)).map((f) => f.id);
   if (!Array.isArray(once) || once.some((o) => typeof o !== 'string'))
     return bad('DECLARATION_INVALID', `${id}'s once is a list of its own field ids, such as [name]: the fields an add-on plants and never changes after.`, 'once', mine);
   const at = (once as string[]).findIndex((o) => !mine.includes(o));
@@ -4535,10 +4592,16 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
  *               one's to fix.
  *   `deadline` · `qualifies` · `unit`  which day a row is about, which field makes an amount
  *               readable, and how a `duration` is said. All three are drawn.
- *   `derived`   the kernel's own flag, set by nothing today, which refuses a write and skips
- *               validation when it is set. It rules out three keys that would ask a caller for
- *               the value: `default`, `required` and `required_when`, each refused by name in
- *               `fieldRules`, because the write path the three of them speak to never runs.
+ *   `derived`   the kernel's own flag, which refuses a write and skips validation when it is set,
+ *               and which `index.ts` sets on every field declaring `derive`. It rules out three
+ *               keys that would ask a caller for the value: `default`, `required` and
+ *               `required_when`, each refused by name in `fieldRules`, because the write path the
+ *               three of them speak to never runs.
+ *   `derive`    `02 §5`'s seven shapes, worked out at read and never stored (`derive.ts`). Its rule is
+ *               `deriveFault`, asked in `fieldRules` with the linked list's fields for a `via`; the
+ *               read path fills it through `derive-rows.ts`, and `where` refuses to filter or sort
+ *               on it. The `unique: true` + `derive: { normalise }` fingerprint is not built: it
+ *               needs a stored value, and `deriveFault` refuses `unique` beside `derive`.
  *   `scope`     where a row applies; the write path holds a token to it, and `inScope` reads by it.
  *   `min` · `max`  bounds, in UTF-8 bytes on text and documents and by value on numbers.
  *   `required_when`  `{ field, is }`: required while another field of the row holds that value.
@@ -4551,21 +4614,16 @@ function prefixHolder(self: string, prefix: string, installed?: Known): { who: s
 const FIELD_KEYS = [
   'id', 'type', 'of', 'values', 'required', 'index', 'unique', 'immutable', 'default', 'retired',
   'redact', 'transitions', 'remind', 'repeat', 'scope', 'min', 'max', 'required_when', 'by',
-  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'labels', 'currency_from', 'currency_fixed', 'when',
+  'to', 'label', 'search', 'deadline', 'qualifies', 'unit', 'derived', 'derive', 'labels', 'currency_from', 'currency_fixed', 'when',
 ] as const;
 
 /**
  * Published on a field, read by nothing.
  *
- *   `derive`         `02 §5`'s seven shapes, and `34 §1.11` says `where` exports the machinery.
- *                    `where` exports none of it and no file parses a shape, so a field declaring a
- *                    derivation is an ordinary writable field holding whatever a caller sent, and
- *                    the `unique: true` + `derive: { normalise }` fingerprint dedupes on the raw
- *                    text or on nothing.
  *   `register`       the documented spelling of `to:`, above.
  *   `note`           a field's own comment, carried nowhere.
  */
-const FIELD_UNBUILT = ['register', 'derive', 'note'] as const;
+const FIELD_UNBUILT = ['register', 'note'] as const;
 
 /** How long a value's label may be, in UTF-8 bytes: a word or two in a column, never a sentence. */
 const VALUE_LABEL_BYTES = 64;
@@ -4683,6 +4741,32 @@ function currencyKeysFault(id: string, fields: readonly Record<string, unknown>[
 }
 
 /**
+ * A band into an enum gives each of the enum's values once: one edge fewer than its values, and the last value its
+ * `else`. `deriveFault` already refuses a band word the enum has not got; this is the other half, a value no band
+ * gives, which would install and never be read, or an edge past the last value that sorts into nothing new.
+ */
+function bandEdgesFault(f: Record<string, unknown>): Refusal | null {
+  const got = shapeOf(f.derive);
+  if (got?.shape !== 'band' || f.type !== 'enum' || !Array.isArray(f.values)) return null;
+  const body = got.body as { steps: readonly { is?: unknown }[]; else?: unknown };
+  const id = String(f.id);
+  const n = f.values.length;
+  if (body.steps.length !== n - 1 || body.else === undefined) {
+    const has = `${body.steps.length} ${body.steps.length === 1 ? 'edge' : 'edges'}${body.else === undefined ? ' and no else' : ''}`;
+    return bad(
+      'DECLARATION_INVALID',
+      `${id} sorts into its ${n} values, so its band has ${n - 1} ${n - 1 === 1 ? 'edge' : 'edges'}, one fewer than its values, and an else for the last; it has ${has}.`,
+      `${id}.derive.band.steps`,
+    );
+  }
+  /* THE RIGHT COUNT CAN STILL GIVE ONE VALUE TWICE AND ANOTHER NEVER, and the one never given installs and is never read. */
+  const given = [...body.steps.map((s) => s.is), body.else];
+  const missed = (f.values as unknown[]).find((v) => !given.includes(v));
+  if (missed === undefined) return null;
+  return bad('DECLARATION_INVALID', `${id}'s band never gives ${String(missed)}; give each of its values once, the last as its else.`, `${id}.derive.band.steps`);
+}
+
+/**
  * The rules on each field that the write path keeps, checked once every field is known, because a
  * condition and a move's `requires` name other fields of the register.
  *
@@ -4691,12 +4775,25 @@ function currencyKeysFault(id: string, fields: readonly Record<string, unknown>[
  * create could meet, and a `default`, which is a value no door wrote. It is never searched and never
  * a row's title, because it holds where a key is sealed and says nothing about the row.
  */
-function fieldRules(id: string, fields: readonly Record<string, unknown>[], title: unknown): Refusal | null {
+function fieldRules(id: string, fields: readonly Record<string, unknown>[], title: unknown, installed?: Known): Refusal | null {
   const byId = new Map(fields.map((f) => [String(f.id), f]));
   for (const f of fields) {
     const at = String(f.id);
     const said = `${id}.${at}`;
     const type = String(f.type);
+
+    /* A FIELD DECLARING `derive` IS WORKED OUT AT READ, and `deriveFault` is its whole rule: the shape, the keys that
+       cannot sit beside it, its sources and its type. A `via` is checked against the fields of the list its link
+       points at, this list's own when it links to itself, and the batch's or the record's when they hold it; a list
+       neither holds leaves the far field to the read, which derives null for a field that is not there. */
+    if (f.derive !== undefined) {
+      const link = shapeOf(f.derive)?.shape === 'via' ? fields.find((g) => g.id === sourcesOf(f.derive)[0]) : undefined;
+      const theirs = link !== undefined && typeof link.to === 'string' ? (link.to === id ? fields : (listFields(installed, link.to) ?? undefined)) : undefined;
+      const d = deriveFault(f as DeriveField, fields as DeriveField[], theirs as DeriveField[] | undefined);
+      if (d) return d;
+      const edges = bandEdgesFault(f);
+      if (edges) return edges;
+    }
 
     /* A DERIVED FIELD CANNOT ALSO BE ASKED FOR, and this is the same shape as `derived` beside a
        `default`, which this file already refuses: two instructions, one of which does nothing.
@@ -5791,7 +5888,7 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       return bad('STATE_NOT_ENUM', `${id}.${state}: state is a reserved id and is always an enum.`, state, ['enum']);
   }
 
-  const ruled = fieldRules(id, fields as unknown as Record<string, unknown>[], title);
+  const ruled = fieldRules(id, fields as unknown as Record<string, unknown>[], title, installed);
   if (ruled) return ruled;
   const coded = currencyKeysFault(id, fields as unknown as Record<string, unknown>[], installed);
   if (coded) return coded;

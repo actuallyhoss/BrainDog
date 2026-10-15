@@ -35,6 +35,8 @@
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import Links from '../Links.svelte';
+  import { createClient } from '@braindog/client';
+  import { readShareable } from '$lib/record/share-write.ts';
   import Understand from '../Understand.svelte';
 
   let { shell }: AreaProps = $props();
@@ -45,6 +47,16 @@
   const s = settingsState(() => shell);
   const me = $derived(shell.me);
   const anOwner = $derived(s.anOwner);
+  /* THE LINKS ARE DRAWN ONLY WHERE THIS HOST CAN MAKE ONE (`shareable`): with links off, the part would list nothing and
+     offer a press the host refuses. */
+  let linksOn = $state(false);
+  $effect(() => {
+    if (!anOwner) {
+      linksOn = false;
+      return;
+    }
+    void readShareable(createClient({ base: apiBase() })).then((v) => (linksOn = v.can));
+  });
   const people = $derived(s.people);
   const peopleFrom = $derived(s.peopleFrom);
   const peopleRefusal = $derived(s.peopleRefusal);
@@ -857,7 +869,7 @@
 {/if}
 
 <!-- The read-only links to single pages, beside who can see the record. -->
-{#if anOwner}<Links />{/if}
+{#if anOwner && linksOn}<Links />{/if}
 
 <!-- READ WHAT YOU ALREADY HAVE: the record's walk linking old payments, runs and services to who and what they are
      about, a dry look first and then Do it. The owner's, as the record's `understand` is. -->

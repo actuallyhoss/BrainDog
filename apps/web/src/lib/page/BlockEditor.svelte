@@ -10,6 +10,10 @@
   which draws the filter as rows and as a sentence and asks the record for its count through `previewPage`. There is no
   second editor of a `where` here, because two editors of one tree are two readings of it.
 
+  AN ICON ON ANY BLOCK (PGS-A19). The field shows the glyph the block wears and its name; Choose opens the picker
+  (`GlyphPicker.svelte`, by a dynamic import) in place, by group, and the pick goes out in the same patch as every other
+  edit. "No icon" takes the key off.
+
   A DESKTOP SURFACE, as arranging is (13 §10): the sheet opens only from the arranging bar, which is not drawn below
   900px. A phone changes a page by describing it.
 -->
@@ -43,6 +47,7 @@
   import { seedBlock } from '$lib/record/seed.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import type { IconName } from '$lib/ui/icons.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { apiBase } from '../at.ts';
@@ -113,6 +118,8 @@
     unread = null;
     touched = false;
     whereNow = undefined;
+    iconNow = undefined;
+    picking = false;
     const given = added ?? held;
     if (given) {
       stored = given;
@@ -268,6 +275,24 @@
     return out;
   };
 
+  /* ── the icon ───────────────────────────────────────────────────────────── */
+
+  /* THE FIELD'S OWN WORDS, here rather than in `glyph-pick.ts`, so the sheet does not load the set's names until the
+     picker is opened. */
+  const ICON_WORDS = { icon: 'Icon', none: 'No icon', choose: 'Choose', done: 'Done', loading: 'Getting the icons' } as const;
+
+  /** What the sheet will write: `undefined` while untouched, `null` for "No icon", else the glyph picked. */
+  let iconNow = $state<string | null | undefined>(undefined);
+  let picking = $state(false);
+  const iconStored = $derived(typeof stored?.icon === 'string' && stored.icon !== '' ? stored.icon : null);
+  const icon = $derived(iconNow === undefined ? iconStored : iconNow);
+  /* LOADED WHEN THE PICKER OPENS, a chunk of its own the browser keeps once fetched: the set's names and groups are not
+     in the sheet's chunk. */
+  const picker = $derived(picking ? import('./GlyphPicker.svelte') : null);
+
+  /** The icon's part of the patch: nothing when it is what the record holds, `null` to take it off. */
+  const iconPatch = (): Patch => (iconNow === undefined || iconNow === iconStored ? {} : { icon: iconNow });
+
   /* ── width ──────────────────────────────────────────────────────────────── */
 
   const steps = $derived(stepsFor(kind, draft?.columns.length ?? block.columns.length));
@@ -282,7 +307,7 @@
   async function save() {
     if (!stored || !draft || saving || !firstOk || !whenOk || !shortOk) return;
     saving = true;
-    const patch = patchOf(stored, draft, touched ? { value: whereNow } : undefined);
+    const patch = { ...patchOf(stored, draft, touched ? { value: whereNow } : undefined), ...iconPatch() };
     const landed = await onsave(patch, width, area === null ? null : column);
     saving = false;
     if (landed) open = false;
@@ -301,6 +326,37 @@
       <label class="label" for="{uid}-heading">{blockWords.heading}</label>
       <div class="field"><input id="{uid}-heading" class="field-input" type="text" bind:value={draft.heading} autocomplete="off" /></div>
       <p class="help">{blockWords.headingHelp}</p>
+    </div>
+
+    <div class="part">
+      <span class="label" id="{uid}-icon">{ICON_WORDS.icon}</span>
+      <div class="icon-now" role="group" aria-labelledby="{uid}-icon">
+        {#if icon}
+          <span class="icon-well"><Icon name={icon as IconName} size="m" /></span>
+          <span class="icon-name">{icon}</span>
+        {:else}
+          <span class="icon-name none">{ICON_WORDS.none}</span>
+        {/if}
+        <span class="icon-acts">
+          <Button weight="quiet" aria-expanded={picking ? 'true' : 'false'} aria-controls="{uid}-picker" onclick={() => (picking = !picking)}>
+            {picking ? ICON_WORDS.done : ICON_WORDS.choose}
+          </Button>
+          {#if icon}
+            <Button weight="bare" onclick={() => { iconNow = null; picking = false; }}>{ICON_WORDS.none}</Button>
+          {/if}
+        </span>
+      </div>
+      {#if picker}
+        <div id="{uid}-picker">
+          {#await picker}
+            <p class="help">{ICON_WORDS.loading}</p>
+          {:then m}
+            <m.default value={icon} onpick={(name: string) => (iconNow = name)} />
+          {:catch}
+            <p class="help" role="alert">{copy.recordNotReached}</p>
+          {/await}
+        </div>
+      {/if}
     </div>
 
     {#if draft.source !== null}
@@ -589,6 +645,39 @@
   .icon-btn:hover {
     background: var(--hover-wash);
     color: var(--ink);
+  }
+
+  /* THE ICON THE BLOCK WEARS, its name beside it, and the two ways to change it at the end of the line. */
+  .icon-now {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+  }
+
+  .icon-well {
+    display: grid;
+    place-items: center;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    background: var(--s1);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+  }
+
+  .icon-name {
+    color: var(--ink);
+    font-size: var(--t-base);
+  }
+
+  .icon-name.none {
+    color: var(--dim);
+  }
+
+  .icon-acts {
+    display: flex;
+    gap: var(--sp-2);
+    margin-inline-start: auto;
   }
 
   .foot {

@@ -15,6 +15,7 @@
  */
 
 import { BLOCK_KIND_MODULES } from './kinds/index.ts';
+import { ACTION_VERBS, BLOCK_VERBS, actionsBody, type ActionKey, type DeclaredAction } from './row-actions.ts';
 
 /**
  * A table's own entry for `key`, never one `Object.prototype` lends it. Looked up by bracket, a key named `constructor`
@@ -36,7 +37,7 @@ const own = <T>(table: Readonly<Record<string, T>>, key: string): T | undefined 
  */
 const GENERAL = [
   'kind', 'heading', 'span', 'source', 'where', 'columns', 'cells', 'order', 'limit', 'target', 'authored', 'empty',
-  'tone', 'body', 'when', 'opening', 'from', 'horizon', 'inherit', 'working', 'area', 'icon', 'key',
+  'tone', 'body', 'when', 'opening', 'from', 'horizon', 'inherit', 'working', 'area', 'icon', 'key', 'actions',
 ] as const;
 
 /**
@@ -60,6 +61,13 @@ const GENERAL = [
  * `READ_BY` below is this table with those added, so a registered kind's key is never written in two places. Ask
  * `kindsReading`, which reads both, rather than this table.
  */
+/*
+ * `actions` IS GENERAL AND `row_actions` IS NOT (PGS-A12): any block may offer a press of its own, such as Add one, and
+ * only a block that draws rows has a row to press one on. A registered kind that draws rows names `row_actions` in its
+ * own module's keys, as it names any key of its own, and joins these.
+ */
+const ROW_KINDS = ['table', 'cards', 'todo', 'board', 'steps', 'queue', 'roadmap', 'progress', 'timeline', 'feed'] as const;
+
 export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   lead: ['stat', 'cards', 'note', 'queue'],
   first: ['feed', 'agents', 'steps'],
@@ -98,6 +106,7 @@ export const KEY_KINDS: Readonly<Record<string, readonly string[]>> = {
   row: ['diff', 'inputs'],
   about: ['table', 'cards'],
   of: ['ring', 'heat'],
+  row_actions: ROW_KINDS,
 };
 
 /**
@@ -244,6 +253,64 @@ export function forecastAxisFault(block: Readonly<Record<string, unknown>>, who:
   };
 }
 
+/* ── a block's `actions` and `row_actions` (PGS-A12) ───────────────────────────────────────────────────── */
+
+/**
+ * WHERE THE FIELDS ARE NOT KNOWN, EVERY NAME IS ONE: an arg is then checked for its shape and the verb it belongs to,
+ * and its field is checked where the list is in hand. `actionsBody` asks only `has`.
+ */
+const ANY_FIELD: ReadonlySet<string> = new (class extends Set<string> {
+  override has(): boolean {
+    return true;
+  }
+})();
+
+/** The verbs a row's actions may name: every verb but a block's own (`BLOCK_VERBS`). */
+const ROW_ONLY: string[] = Object.keys(ACTION_VERBS).filter((verb) => !BLOCK_VERBS.has(verb));
+
+/** A block's two lists of actions, each checked, or the first refusal of either. */
+export type BlockActions = { actions?: DeclaredAction[]; row_actions?: DeclaredAction[] };
+
+/**
+ * A block's `actions` and `row_actions` checked and cleaned, or why not, in the shape `feedSaysFault` answers. `who` is
+ * what the sentence calls the block, and `fields` the fields of its source or list, `null` where they are not known
+ * here, so only the shape is checked. `actions` names block verbs only (`BLOCK_VERBS`), `row_actions` row verbs only.
+ */
+export function declaredActions(
+  block: Readonly<Record<string, unknown>>,
+  who: string,
+  fields: ReadonlySet<string> | null,
+): { ok: true; value: BlockActions } | { ok: false; fault: { fix: string; at: string; allowed?: string[] } } {
+  const value: BlockActions = {};
+  for (const key of ['actions', 'row_actions'] as const satisfies readonly ActionKey[]) {
+    if (block[key] === undefined) continue;
+    const read = actionsBody(block[key], { fields: fields ?? ANY_FIELD, key });
+    if (!read.ok) {
+      const r = 'refusal' in read ? read.refusal : null;
+      const allowed = r?.allowed ? [...r.allowed] : undefined;
+      return { ok: false, fault: { fix: `${who}'s ${r?.fix ?? `${key} cannot be read.`}`, at: r?.at ?? key, ...(allowed ? { allowed } : {}) } };
+    }
+    if (key === 'row_actions') {
+      const blockVerb = read.value.findIndex((a) => BLOCK_VERBS.has(a.verb));
+      if (blockVerb >= 0) {
+        const a = read.value[blockVerb]!;
+        return {
+          ok: false,
+          fault: { fix: `${who}'s row_actions[${blockVerb}] (${a.label})'s verb ${a.verb} acts on no row, so it goes under actions, not row_actions.`, at: `row_actions[${blockVerb}].verb`, allowed: ROW_ONLY },
+        };
+      }
+    }
+    value[key] = read.value;
+  }
+  return { ok: true, value };
+}
+
+/** Why a block's `actions` or `row_actions` cannot be offered, or `null` (`declaredActions`). The install and the read both ask. */
+export function actionsFault(block: Readonly<Record<string, unknown>>, who: string, fields: ReadonlySet<string> | null): { fix: string; at: string; allowed?: string[] } | null {
+  const read = declaredActions(block, who, fields);
+  return read.ok ? null : read.fault;
+}
+
 /* ── a `when:` tree, and a note's `says:` (PGS-A13) ──────────────────────────────────────────────────────── */
 
 /** The two ways a `when:` joins its tests: `all`, every one holds, and `any`, at least one does. */
@@ -255,9 +322,42 @@ export const WHEN_DEPTH = 2;
 /** What is wrong with one leaf of a `when:`, as a sentence, or `null`. `said` names the leaf. */
 export type WhenLeafFault = (leaf: unknown, said: string) => string | null;
 
+/**
+ * WHO READS THE PAGE (PGS-A17): its owner, a member signed in, an agent on a token, or somebody holding a link. A leaf
+ * `{ reader: owner }` or `{ reader: [owner, member] }` holds while the reader is one of them, so a block can be shown to
+ * its owner alone. A host that does not say who reads is shown no block that asks (`pages.ts` `leafHolds`).
+ */
+export const WHEN_READERS = ['owner', 'member', 'agent', 'link'] as const;
+export type WhenReader = (typeof WHEN_READERS)[number];
+
+/** Whether a leaf of a `when:` is one about who reads rather than a figure: it says `reader`. */
+export const isReaderLeaf = (leaf: unknown): leaf is { reader: WhenReader | WhenReader[] } =>
+  leaf !== null && typeof leaf === 'object' && !Array.isArray(leaf) && Object.hasOwn(leaf, 'reader');
+
+/**
+ * What is wrong with a leaf about who reads, or `null`: one of the four words, or a list of them, and nothing beside.
+ * ASKED BY `whenTreeFault` BEFORE THE CALLER'S OWN LEAF CHECK, so the install's fuller check (`declare.ts`) and the
+ * read's both admit it without each knowing the words.
+ */
+export function readerLeafFault(leaf: { reader: unknown }, said: string): string | null {
+  const words = Array.isArray(leaf.reader) ? leaf.reader : [leaf.reader];
+  const four = 'owner, member, agent or link';
+  if (words.length === 0) return `${said} names no reader. A reader is ${four}: { reader: owner }.`;
+  const odd = words.find((w) => !(WHEN_READERS as readonly unknown[]).includes(w));
+  if (odd !== undefined) return `${said} says reader: ${JSON.stringify(odd)}, and a reader is ${four}.`;
+  const beside = Object.keys(leaf).filter((k) => k !== 'reader');
+  if (beside.length > 0)
+    return `${said} says reader and ${beside.join(' and ')}. Who reads is the whole leaf, so a figure is a leaf of its own: { all: [{ reader: owner }, { metric, ... }] }.`;
+  return null;
+}
+
 /** The leaf check when the caller has no fuller one: a leaf names its figure. The install hands `declare.ts`'s own. */
 const leafNamed: WhenLeafFault = (leaf, said) =>
-  leaf !== null && typeof leaf === 'object' && typeof (leaf as { metric?: unknown }).metric === 'string' ? null : `${said} is one leaf naming a metric.`;
+  isReaderLeaf(leaf)
+    ? readerLeafFault(leaf, said)
+    : leaf !== null && typeof leaf === 'object' && typeof (leaf as { metric?: unknown }).metric === 'string'
+      ? null
+      : `${said} is one leaf naming a metric, or one saying who reads: { reader: owner }.`;
 
 /** The join a `when:` part says, `all` or `any`, or `null` for a leaf. Both is `both`, which is refused. */
 export function whenJoin(when: unknown): 'all' | 'any' | 'both' | null {
@@ -278,7 +378,7 @@ export function whenJoin(when: unknown): 'all' | 'any' | 'both' | null {
  */
 export function whenTreeFault(when: unknown, said: string, leafFault: WhenLeafFault = leafNamed, depth = 1): string | null {
   const join = whenJoin(when);
-  if (join === null) return leafFault(when, said);
+  if (join === null) return isReaderLeaf(when) ? readerLeafFault(when, said) : leafFault(when, said);
   if (join === 'both') return `${said} says all and any. A when is one of them, and the other goes inside it: { any: [{ all: [leaf, leaf] }, leaf] }.`;
   const list = (when as Record<string, unknown>)[join];
   const beside = Object.keys(when as object).filter((k) => k !== join);
@@ -364,16 +464,16 @@ export function wrongKindKey(key: string, kind: string): string {
  * holding pen's among them) uses `page`, `title`, `nav`, `icon`, `requires`, `blocks`, `for`, `pack`, `origin` and
  * `placed`, and nothing else. `icon`, `for` and `pack` were missing from the table while thirty-three pages, seven
  * templates and eight pages carried them, so the table was the thing that was wrong and it gains them. `layout` is
- * new. `filters` is read now: the reader's own choices over every block (`pages.ts` `readPage`). `header` is in the
- * table and refused apart, below, because nothing draws it.
+ * new. `filters` is read now: the reader's own choices over every block (`pages.ts` `readPage`). `header` is the head
+ * over the title, checked by `page-head.ts` at install and resolved by the read.
  */
 export const PAGE_KEYS: ReadonlySet<string> = new Set([
   'page', 'title', 'nav', 'icon', 'requires', 'blocks', 'for', 'pack', 'origin', 'derived_from', 'placed', 'tone', 'layout',
-  'filters',
+  'filters', 'header',
 ]);
 
-/** Published in `06 §1.1` and read by nothing in this build, so the repair is a deploy rather than an edit. */
-export const PAGE_UNBUILT: ReadonlySet<string> = new Set(['header']);
+/** Published in `06 §1.1` and read by nothing in this build, so the repair is a deploy rather than an edit. None now. */
+export const PAGE_UNBUILT: ReadonlySet<string> = new Set<string>([]);
 
 /** How a reader filter is drawn: a row of chips, or one segmented control for a field of a few values. */
 export const FILTER_CONTROLS = ['chips', 'segmented'] as const;

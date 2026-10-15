@@ -38,6 +38,10 @@ export function bucket(fail?: (call: 'put' | 'delete', key: string) => boolean) 
       const object = held.get(key);
       return object ? { size: object.bytes.length, text: async () => new TextDecoder().decode(object.bytes) } : null;
     },
+    async head(key: string) {
+      const object = held.get(key);
+      return object ? { size: object.bytes.length, httpMetadata: {} } : null;
+    },
     async list(options?: { prefix?: string; cursor?: string; include?: string[] }) {
       const meta = options?.include?.includes('customMetadata') ?? false;
       const objects = [...held.entries()]

@@ -29,6 +29,10 @@
  * plan says what it adds, changes and takes away. Which key signed it is said, and whether this machine has seen that key
  * for its author before (trust on first use, kept beside the hosts file), or that its old key named it in a rotation.
  *
+ * TRUST IS THE RECORD'S WHEN THE RECORD GIVES IT (`keySource`): the keys the app's Browse keeps in `packs.known_keys` are
+ * read here too, and a key first met here is kept there, so a publisher trusted in either place is known in both. A key
+ * other than the one seen before is held back, as Browse holds it, until `--trust-key`.
+ *
  * AN ADD-ON IS INSTALLED BY ID OR BY FILE. `pack install <id>` with no
  * `--from` finds the id in the catalogue the host serves, which `tools/catalogue/from-packs.mjs` fills from `packs/`, and
  * `pack install <file>` reads a `.pack.json` through the add-on door. Before this, `install` took only `<id> --from`, and
@@ -95,7 +99,7 @@ import { parseYaml } from '@braindog/declare/yaml';
 import { refused, type Result } from '@braindog/ports';
 
 import { oneLine, printable } from './clip.ts';
-import { hostsPath, target } from './http.ts';
+import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse } from './json.ts';
 import { kennelBase, submitToKennel, takeKennel, yankFromKennel } from './kennel.ts';
 import { untilAccepted } from './links.ts';
@@ -452,23 +456,27 @@ export function changeLines(given: Changes): string[] {
   return lines;
 }
 
-/** How a signature is said, with what this machine knows of the key. A revocation's reason is its author's words, so it is scrubbed too. */
-export function trustLine(given: Trust, named: string): string {
+/**
+ * How a signature is said, with what this machine, or the record when the keys were read from it, knows of the key. A
+ * revocation's reason is its author's words, so it is scrubbed too.
+ */
+export function trustLine(given: Trust, named: string, on: 'record' | 'machine' = 'machine'): string {
   const trust = printable(given);
   const author = oneLine(named);
+  const [Seer, seer] = on === 'record' ? ['Your record', 'your record'] : ['This machine', 'this machine'];
   switch (trust.kind) {
     case 'unsigned':
       return 'Unsigned: nothing says who published it beyond the catalogue it came from.';
     case 'stripped':
       return `Unsigned, and earlier versions were signed by key ${trust.before.join(', ')}. A catalogue does not publish an unsigned version after a signed one, so this may not be from ${author}. It is not asked for.`;
     case 'first':
-      return `Signed by key ${trust.key_id}. This machine has not seen a key for ${author} before, so it now remembers this one.`;
+      return `Signed by key ${trust.key_id}. ${Seer} has not seen a key for ${author} before, so it now remembers this one.`;
     case 'known':
-      return `Signed by key ${trust.key_id}, the key this machine has seen for ${author} before.`;
+      return `Signed by key ${trust.key_id}, the key ${seer} has seen for ${author} before.`;
     case 'changed':
-      return `Signed by key ${trust.key_id}, which is not the key this machine has seen for ${author} before (${trust.before.join(', ')}). Somebody else may have published it.`;
+      return `Signed by key ${trust.key_id}, which is not the key ${seer} has seen for ${author} before (${trust.before.join(', ')}). Somebody else may have published it.`;
     case 'rotated':
-      return `Signed by key ${trust.key_id}, which key ${trust.from}, the one this machine has seen for ${author}, named as its successor. This machine now remembers it too.`;
+      return `Signed by key ${trust.key_id}, which key ${trust.from}, the one ${seer} has seen for ${author}, named as its successor. ${Seer} now remembers it too.`;
     case 'revoked':
       return `Signed by key ${trust.key_id}, which its author revoked, so it is not trusted. Their reason: ${trust.reason}`;
   }
@@ -492,6 +500,121 @@ function remember(io: AgentIo, subject: string, keyId: string): void {
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, `${JSON.stringify(rememberKey(knownKeys(io), subject, keyId), null, 2)}\n`);
 }
+
+/** The record's pref the publisher keys are kept under (`PREF_KEYS` in `@braindog/record`), the one the app's Browse reads. */
+export const KNOWN_PREF = 'packs.known_keys';
+
+/** What the record takes (`setPref`): at most this many add-ons, each with at most this many key ids, newest kept. */
+const KNOWN_MOST = 200;
+const KEYS_MOST = 8;
+
+/** The one call the key source makes of a record: `client.call`, or a stand-in in a test. */
+export type PrefCall = (name: string, args: Record<string, unknown>) => Promise<Result<unknown>>;
+
+/**
+ * Where the publisher keys a person has seen are read and kept for one command.
+ *
+ * `on` says which list was read: the record's, with this machine's file folded in, or this machine's alone.
+ */
+export type KeySource = { on: 'record' | 'machine'; known: KnownKeys; keep(subject: string, keyId: string): Promise<void> };
+
+/**
+ * The newest `KNOWN_MOST` add-ons, each with its newest `KEYS_MOST` keys, so a full map is never refused whole: the same
+ * hold as `capKnown` in the app's `known-keys.ts`, written again here because the command line never imports the app.
+ */
+function capKnown(known: KnownKeys): KnownKeys {
+  return Object.fromEntries(
+    Object.entries(known)
+      .filter(([subject]) => subject.length > 0 && subject.length <= 300)
+      .slice(-KNOWN_MOST)
+      .map(([subject, ids]) => [subject, ids.slice(-KEYS_MOST)]),
+  );
+}
+
+/** Two maps as one, each add-on's keys first seen first and each once. */
+function mergeKnown(a: KnownKeys, b: KnownKeys): KnownKeys {
+  const out: KnownKeys = {};
+  for (const map of [a, b]) for (const [subject, ids] of Object.entries(map)) out[subject] = [...new Set([...(out[subject] ?? []), ...ids])];
+  return out;
+}
+
+const MACHINE = "Using this machine's list of publishers:";
+
+/**
+ * The keys this person has seen, read from their record when the command line reaches one that gives them, and this
+ * machine's `known-keys.json` otherwise, said once in one line.
+ *
+ * THE RECORD'S LIST IS THE APP'S: `packs.known_keys` as `boot` answers it on `me.prefs`, parsed by the same
+ * `readKnownKeys` Browse parses it with. This machine's file is folded in, so a key first met here before the record
+ * held it is not met again as a stranger. A record that answers no `me.prefs` (one that gives its prefs to a person and
+ * not to a token) is said as not giving the list, and the file is read alone.
+ *
+ * A KEPT KEY GOES TO THE FILE ALWAYS, AND TO THE RECORD ONLY WHEN IT WAS READ: `setPref` replaces the whole map, so a map
+ * the record never gave would write over every publisher it holds. Public key ids only; nothing here holds a signing key.
+ */
+export async function keySource(io: AgentIo, call: PrefCall | null, why = 'not signed in.'): Promise<KeySource> {
+  const machine = knownKeys(io);
+  const alone = (said: string): KeySource => {
+    io.say(`${MACHINE} ${said}`);
+    return { on: 'machine', known: machine, keep: async (subject, keyId) => remember(io, subject, keyId) };
+  };
+  if (call === null) return alone(why);
+  let answer: Result<unknown>;
+  try {
+    answer = await call('boot', {});
+  } catch {
+    return alone('the record did not answer.');
+  }
+  if (!answer.ok) {
+    const code = refused(answer) ? answer.refusal.code : undefined;
+    /* A HOST SET WITH NO LOGIN, OR ONE THE RECORD NO LONGER TAKES, IS NOT SIGNED IN, and is said as that. */
+    const out = code === 'UNAUTHORIZED' || code === 'GRANT_REVOKED' || code === 'WRONG_KEY';
+    return alone(out ? 'not signed in.' : code === 'UNREACHABLE' ? 'the record did not answer.' : 'the record did not give its list.');
+  }
+  const prefs = (answer.value as { me?: { prefs?: unknown } } | null)?.me?.prefs;
+  if (typeof prefs !== 'object' || prefs === null) return alone('the record does not give its list to the command line.');
+  let known = mergeKnown(readKnownKeys((prefs as Record<string, unknown>)[KNOWN_PREF]), machine);
+  let told = false;
+  return {
+    on: 'record',
+    get known() {
+      return known;
+    },
+    keep: async (subject, keyId) => {
+      remember(io, subject, keyId);
+      known = rememberKey(known, subject, keyId);
+      let kept = false;
+      try {
+        kept = (await call('setPref', { key: KNOWN_PREF, value: capKnown(known) })).ok;
+      } catch {
+        kept = false;
+      }
+      if (!kept && !told) {
+        told = true;
+        io.say('The record did not keep this publisher key, so only this machine remembers it.');
+      }
+    },
+  };
+}
+
+/**
+ * `keySource` over the host the command line talks to: no host set is not signed in, and the record is asked with the
+ * session it already holds, under the same time limit `connect` gives a call.
+ */
+export async function hostKeys(host: string | undefined, io: AgentIo): Promise<KeySource> {
+  let to: Target;
+  try {
+    to = target(host, io.env, hostsPath(io.env));
+  } catch {
+    return keySource(io, null);
+  }
+  const headers = await io.headers(to.key);
+  /* A CLIENT A CALL, so the keep after an install's checks has its own time limit and not what the read left of one. */
+  return keySource(io, (name, args) => clientFor(to, async () => headers, AbortSignal.timeout(budgetOf(io.env))).call<unknown>(name, args));
+}
+
+/** Whether any version of an entry is signed, the only case where whose key it is can change what is said. */
+const signedAnywhere = (entry: CatalogueEntry): boolean => entry.versions.some((v) => Boolean(v.signature));
 
 /** The git working tree a path is inside, or `null`. */
 function gitTreeOf(path: string): string | null {
@@ -754,7 +877,9 @@ async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<num
     io.out(positionals.length === 0 ? `This catalogue has no ${NOUN[kind].the} published yet.` : `No ${NOUN[kind].the} in this catalogue matches ${positionals.join(' ')}.`);
     return 0;
   }
-  const known = knownKeys(io);
+  /* THE RECORD IS ASKED ONLY WHEN A SIGNATURE IS THERE TO JUDGE, so a search of unsigned add-ons still sends nothing. */
+  const source = found.some(signedAnywhere) ? await hostKeys(undefined, io) : null;
+  const known = source?.known ?? knownKeys(io);
   const statements = await verifiedStatements(at.index.keys);
   for (const e of found) {
     const v = e.versions[0];
@@ -762,7 +887,7 @@ async function search(args: string[], io: AgentIo, kind: EntryKind): Promise<num
     const shown = printable(e);
     io.out(`${shown.id}  ${shown.title} ${shown.latest} by ${shown.author}. ${shown.summary}`);
     if (v) for (const line of reachLines(v.reach)) io.out(line);
-    io.out(`  ${trustLine(trustOf(known, trustSubject(e), v?.signature, statements, v ? await keysSignedBefore(e, v.version) : []), e.author)}`);
+    io.out(`  ${trustLine(trustOf(known, trustSubject(e), v?.signature, statements, v ? await keysSignedBefore(e, v.version) : []), e.author, source?.on)}`);
   }
   io.out(`Not from the add-on index. A signature is checked when it is installed, with braindog ${kind} install <id> --from ${from}.`);
   return 0;
@@ -931,6 +1056,7 @@ export async function installFromCatalogue(
   kind: EntryKind = 'usecase',
   dryRun = false,
   hostsOwn = false,
+  trustKey = false,
 ): Promise<number> {
   const at = await catalogueAt(from, io);
   if (typeof at === 'string') {
@@ -978,14 +1104,22 @@ export async function installFromCatalogue(
     refuse(io, matches, saidWithCode(matches));
     return 1;
   }
-  const trusted = await trustVersion(entry, chosen.version, held.value, at.index.keys, knownKeys(io));
+  /* THE RECORD IS ASKED ONLY WHEN A SIGNATURE IS THERE TO JUDGE, as `search` asks it. */
+  const source = signedAnywhere(entry) ? await hostKeys(host, io) : null;
+  const trusted = await trustVersion(entry, chosen.version, held.value, at.index.keys, source?.known ?? knownKeys(io));
   if (!trusted.ok) {
     io.say(`${trusted.fix} Nothing was sent.`);
     return 1;
   }
   const { trust } = trusted;
   const title = oneLine(entry.title);
-  const said = trustLine(trust, entry.author);
+  const said = trustLine(trust, entry.author, source?.on);
+  /* A DIFFERENT KEY IS HELD BACK, as the app's Browse holds it until Trust this key is pressed: here, until --trust-key. */
+  if (trust.kind === 'changed' && !trustKey) {
+    const press = `If ${oneLine(entry.author)} told you their key changed, run this again with --trust-key.`;
+    io.say(`${title} ${chosen.version}: ${said} It is not asked for. ${press} Nothing was sent.`);
+    return 1;
+  }
   io.out(said);
   const question = `Install ${title} ${chosen.version} from a catalogue? ${said}`;
   /* A DRY RUN REMEMBERS NO KEY: nothing was asked for, so nothing was trusted. */
@@ -994,9 +1128,10 @@ export async function installFromCatalogue(
     io.out(`Would ask the owner: ${question} Nothing was sent.`);
     return 0;
   }
-  /* THE KEY IS REMEMBERED ON FIRST USE, OR WHEN A KEY ALREADY TRUSTED NAMED IT. A different key is said on Decide and never replaces the one seen before. */
-  const keep = keyToKeep(trust);
-  if (keep !== null) remember(io, trustSubject(entry), keep);
+  /* THE KEY IS REMEMBERED ON FIRST USE, OR WHEN A KEY ALREADY TRUSTED NAMED IT, OR A DIFFERENT KEY THE PERSON TRUSTED
+     WITH --trust-key, kept beside the ones seen before and never in place of them. */
+  const keep = trust.kind === 'changed' ? trust.key_id : keyToKeep(trust);
+  if (keep !== null) await (source ? source.keep(trustSubject(entry), keep) : Promise.resolve(remember(io, trustSubject(entry), keep)));
   if (read.value.kind === 'usecase') return proposeFile(text, read.value.shared.usecase, host, io, question);
   return proposePack(read.value.file.pack.manifest.pack, read.value.file.doc, question, host, io, hostsOwn);
 }
@@ -1150,7 +1285,7 @@ export function sdkVerb(verb: string | undefined, kind: EntryKind = 'usecase'): 
 }
 
 const PACK_USAGE =
-  'braindog pack takes new <id> [--yaml], check <file|dir>, test <dir>, preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run].';
+  'braindog pack takes new <id> [--yaml], check <file|dir>, test <dir>, preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run] [--trust-key]. install <file> --force or uninstall <id> [--force] takes away a list that still holds items, keeping every one of them.';
 
 /**
  * `pack install <file>`: a `.pack.json` from a path or an address, read through the add-on door here first, then asked for
@@ -1158,10 +1293,17 @@ const PACK_USAGE =
  *
  * NO CATALOGUE STANDS BEHIND A FILE, so nothing is said about who signed it: the person named the file themselves.
  */
-async function installPackFile(given: string, host: string | undefined, io: AgentIo, dryRun: boolean): Promise<number> {
+async function installPackFile(given: string, host: string | undefined, io: AgentIo, dryRun: boolean, force = false): Promise<number> {
   const read = await readFileAs(given, io, 'pack');
   if (typeof read === 'number') return read;
   if (read.file.kind !== 'pack') return 1;
+  /* --force SENDS THE PLAN STRAIGHT TO THE RECORD with his press (`install.ts` `forcedPack`), never by way of Decide. */
+  if (force && !dryRun) {
+    const { connect } = await import('./skills.ts');
+    const at = await connect(host, io);
+    if (typeof at === 'number') return at;
+    return (await import('./install.ts')).forcedPack('install', { doc: read.file.file.doc }, at.client as never, io, true);
+  }
   const { title, version } = printable({ title: read.file.file.title, version: read.file.file.pack.manifest.version });
   const question = `Install ${title} ${version}?`;
   if (dryRun) {
@@ -1178,14 +1320,14 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
   if (verb === 'check') return checkPack(rest, io);
   if (verb === 'test') return testPack(rest, io);
   if (verb === 'install') {
-    let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined; 'dry-run'?: boolean | undefined };
+    let values: { host?: string | undefined; from?: string | undefined; version?: string | undefined; 'dry-run'?: boolean | undefined; 'trust-key'?: boolean | undefined; force?: boolean | undefined };
     let positionals: string[];
     try {
       ({ values, positionals } = parseArgs({
         args: rest,
         allowPositionals: true,
         strict: true,
-        options: { host: { type: 'string' }, from: { type: 'string' }, version: { type: 'string' }, 'dry-run': { type: 'boolean' } },
+        options: { host: { type: 'string' }, from: { type: 'string' }, version: { type: 'string' }, 'dry-run': { type: 'boolean' }, 'trust-key': { type: 'boolean' }, force: { type: 'boolean' } },
       }));
     } catch {
       io.say(PACK_USAGE);
@@ -1202,7 +1344,7 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
         io.say('--from and --version pick an add-on from a catalogue by its id, so they do not go with a file.');
         return 1;
       }
-      return installPackFile(given, values.host, io, dryRun);
+      return installPackFile(given, values.host, io, dryRun, values.force === true);
     }
     /* NO --from IS THE HOST'S OWN KENNEL, which lists every pack in `packs/` and every add-on published to it. */
     let from = values.from;
@@ -1214,7 +1356,19 @@ export async function pack(args: string[], io: AgentIo): Promise<number> {
         return 1;
       }
     }
-    return installFromCatalogue(given, from, values.version, values.host, io, 'pack', dryRun, values.from === undefined && values.version === undefined);
+    return installFromCatalogue(given, from, values.version, values.host, io, 'pack', dryRun, values.from === undefined && values.version === undefined, values['trust-key'] === true);
+  }
+  if (verb === 'uninstall') {
+    const { force, rest: left } = (await import('./install.ts')).takeForce(rest);
+    const [id, ...more] = left;
+    if (!id || more.length > 0 || !ID.test(id)) {
+      io.say('braindog pack uninstall takes one add-on id, as in braindog pack uninstall project-brief.');
+      return 1;
+    }
+    const { connect } = await import('./skills.ts');
+    const at = await connect(undefined, io);
+    if (typeof at === 'number') return at;
+    return (await import('./install.ts')).forcedPack('uninstall', { id }, at.client as never, io, force);
   }
   const sdk = sdkVerb(verb, 'pack');
   if (sdk) return sdk(rest, io);

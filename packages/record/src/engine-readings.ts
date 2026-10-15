@@ -24,6 +24,17 @@
  * THE DAY IS THE LAST 24 HOURS, the week the last 7 days and the month the last 30, each ending now, so a reading does
  * not empty at midnight or on the 1st. `answered`, `kept` and `refused` are the last day's, the window of `asked.day`:
  * the vital sign is red when a purpose has `asked.day` above 0 and `answered` 0.
+ *
+ * AND WHAT CAME OF SLASH'S SUGGESTIONS (ENG-B01 with ENG-A16, "answers that teach", D37.183): for each kind of question
+ * Slash filed in the month, how many it offered and how each ended. Accepted is taken as it was filed; changed is taken
+ * with only some of it (some rows of it, or some parts of an arrangement), since the person changed what was asked;
+ * declined is a no; undone is one whose answer an undo put back; lapsed is one still open past the last day it waits,
+ * or taken back on that day, worked out here as the kernel's sweep works it out and never written. Each question ends
+ * one way, in that order of weight: an undone one is not also accepted. `share` is accepted over every one answered
+ * (accepted, changed, declined, undone), the one number the agent side is judged by, and `null` with none answered.
+ * Then the folds the record made by itself in the last seven days and how many were put back, and `outside`: the
+ * events signed by Slash in the month that `slashMayWrite` would refuse, where 0 is the healthy answer. The caller
+ * works those three counts out; here they are held to whole numbers. A kind is echoed only as a plain word.
  */
 
 /** One `slash_call` row, as much of it as is counted. `raw` may be handed in and is never read. */
@@ -58,10 +69,53 @@ export type ReadingsOf = {
    * `null` then, never a brake that is off: an unread brake and a free one are not the same answer.
    */
   braked?: Braked | null | undefined;
+  /** The questions Slash filed in the month, newest first. Absent reads as none filed. */
+  slash?: readonly SlashFiled[] | undefined;
+  /** The record's own day at `now`, `YYYY-MM-DD` in its zone, which a lapse day is compared with. Absent, the UTC day. */
+  today?: string | undefined;
+  /** The folds the record made by itself in the last seven days, and how many of them were put back. Absent reads 0. */
+  folds?: Folds | undefined;
+  /** Events signed by Slash in the month that Slash may not sign. Absent reads 0. */
+  outside?: number | undefined;
 };
 
 /** Whether Slash's questions are braked, with the share and the count it was worked out from. */
 export type Braked = { on: boolean; share: number; of: number };
+
+/** One question Slash filed, as much of it as is counted: never its words, its body or who answered it. */
+export type SlashFiled = {
+  /** The kind of question, its body's kind. */
+  kind: string;
+  status: string;
+  resolved_as: string | null | undefined;
+  /** The option the decision that settled it chose, or `null` where no decision did. */
+  answer: string | null | undefined;
+  /** Accepted with only some of it taken. */
+  in_part: boolean;
+  /** An undo put back what its answer did. */
+  undone: boolean;
+  /** The last day it waits, as its body says it, or `null` where it says none. */
+  lapses: string | null | undefined;
+  /** Put off until this instant, or `null`. */
+  defer_until: string | null | undefined;
+  /** When it was last closed, or `null` for one never closed. */
+  closed_at: string | null | undefined;
+};
+
+/** How Slash's questions of one kind ended over the month. */
+export type SlashReading = {
+  kind: string;
+  offered: number;
+  accepted: number;
+  changed: number;
+  declined: number;
+  undone: number;
+  lapsed: number;
+  /** Accepted over answered, or `null` with none answered. */
+  share: number | null;
+};
+
+export type Folds = { made: number; undone: number };
 
 export type AskReading = {
   purpose: string;
@@ -85,6 +139,12 @@ export type EngineReadings = {
   understanding: { unattached: number; open_by_cause: Record<string, number> };
   /** The brake on Slash's questions, or `null` where it was not read. */
   braked: Braked | null;
+  /** What came of Slash's questions in the month, by kind, sorted by kind. Empty where it filed none. */
+  slash: SlashReading[];
+  /** The record's own folds over the last seven days. */
+  folds: Folds;
+  /** Events signed by Slash in the month outside what it may sign. 0, or a fault. */
+  outside: number;
 };
 
 /** Where a purpose or a cause that is not a plain word is counted. */
@@ -130,6 +190,59 @@ const brakedOf = (b: Braked | null | undefined): Braked | null => {
   if (!Number.isFinite(b.share) || b.share < 0 || b.share > 1 || !Number.isInteger(b.of) || b.of < 0) return null;
   return { on: b.on, share: b.share, of: b.of };
 };
+
+/** A day as a lapse is spelled, `YYYY-MM-DD`, and a real one: the 31st of September is not one. */
+const DAY_SPELT = /^\d{4}-\d{2}-\d{2}$/;
+const isDay = (s: unknown): s is string => typeof s === 'string' && DAY_SPELT.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+
+/** The words a question is closed with as a no, beside a decision whose answer is `reject`. */
+const NO: ReadonlySet<string> = new Set(['wont-fix', 'incorrect']);
+
+type Ending = 'accepted' | 'changed' | 'declined' | 'undone' | 'lapsed' | null;
+
+/**
+ * How one question ended, or `null` for one still waiting, merged into another or taken back before its day.
+ *
+ * LAPSED AS THE KERNEL'S SWEEP READS IT (`sweepLapsed`): open, not put off past now, and its last day before today. A
+ * question the sweep did take back is lapsed too, when it closed after its last day; one its filer took back sooner is
+ * neither, since nobody was asked long enough to answer it.
+ */
+function endingOf(s: SlashFiled, today: string, now: string): Ending {
+  if (s.undone) return 'undone';
+  if (s.in_part) return 'changed';
+  if (s.status === 'resolved') {
+    if (s.resolved_as === 'addressed') return s.answer === 'reject' ? 'declined' : 'accepted';
+    if (typeof s.resolved_as === 'string' && NO.has(s.resolved_as)) return 'declined';
+    const closed = typeof s.closed_at === 'string' ? s.closed_at.slice(0, 10) : '';
+    return s.resolved_as === 'withdrawn' && isDay(s.lapses) && closed > s.lapses ? 'lapsed' : null;
+  }
+  if (s.status !== 'open' || !isDay(s.lapses) || s.lapses >= today) return null;
+  return typeof s.defer_until === 'string' && s.defer_until > now ? null : 'lapsed';
+}
+
+/** What came of the questions handed in, by kind, sorted by kind. */
+function slashOf(filed: readonly SlashFiled[], today: string, now: string): SlashReading[] {
+  const kinds = new Map<string, SlashReading>();
+  for (const s of filed) {
+    const kind = plain(s.kind);
+    let k = kinds.get(kind);
+    if (!k) {
+      k = { kind, offered: 0, accepted: 0, changed: 0, declined: 0, undone: 0, lapsed: 0, share: null };
+      kinds.set(kind, k);
+    }
+    k.offered += 1;
+    const ended = endingOf(s, today, now);
+    if (ended !== null) k[ended] += 1;
+  }
+  for (const k of kinds.values()) {
+    const answered = k.accepted + k.changed + k.declined + k.undone;
+    k.share = answered === 0 ? null : k.accepted / answered;
+  }
+  return [...kinds.values()].sort((a, b) => byName(a.kind, b.kind));
+}
+
+/** A count as handed in, held to a whole number from 0. */
+const whole = (n: unknown): number => (typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : 0);
 
 /** Count the ledger, the queue, the mentions and the open questions handed in, as they stand at `of.now`. */
 export function engineReadings(of: ReadingsOf): EngineReadings {
@@ -197,5 +310,8 @@ export function engineReadings(of: ReadingsOf): EngineReadings {
       open_by_cause: Object.fromEntries([...causes.entries()].sort((a, b) => byName(a[0], b[0]))),
     },
     braked: brakedOf(of.braked),
+    slash: slashOf(of.slash ?? [], isDay(of.today) ? of.today : new Date(of.now).toISOString().slice(0, 10), new Date(of.now).toISOString()),
+    folds: { made: whole(of.folds?.made), undone: Math.min(whole(of.folds?.undone), whole(of.folds?.made)) },
+    outside: whole(of.outside),
   };
 }

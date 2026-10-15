@@ -17,6 +17,9 @@
  * broke) or the lead, and never names a row the page did not hand it. New blocks come only through a page's own
  * declaration, which the model writes as a proposal and the person accepts.
  *
+ * AND THE PERSON'S OWN LOOK SAYS HOW WIDE A BLOCK IS AND WHICH COLUMN IT SITS IN (`span`, `area`), so a page he resized
+ * stays the page an add-on wrote and keeps taking its updates. Only his: a rule's or Slash's look places nothing.
+ *
  * PURE. Nothing here reads the record: `readPage` hands in the page as read, today, the reader's mark and the lists'
  * declarations, so the same page reads the same look on every host.
  *
@@ -27,6 +30,8 @@
  */
 
 import { BLOCK_KEY, blockKeyOf, shortHash } from './block-keys.ts';
+import type { Refusal } from '@braindog/ports';
+
 import type { Json } from './coerce.ts';
 import { exponentOf } from './ingest.ts';
 import type { BlockResult, ListShape, PageRow } from './pages.ts';
@@ -55,11 +60,26 @@ export type LookBody = {
    * groups are the values of. Laid only on a block whose kind draws groups and that names none itself (`applyLook`).
    */
   group?: Record<string, string>;
+  /** How wide each block is drawn, by its key, in twelfths: one of `LOOK_SPANS`. Only on a look by `owner`. */
+  span?: Record<string, number>;
+  /** Which of the page's two columns each block sits in, by its key. Only on a look by `owner`. */
+  area?: Record<string, 'main' | 'rail'>;
   by: LookBy;
 };
 
 /** The keys a look may carry. */
-export const LOOK_KEYS: ReadonlySet<string> = new Set(['look', 'basis', 'lead', 'order', 'hide', 'headline', 'next', 'pinned', 'group', 'by']);
+export const LOOK_KEYS: ReadonlySet<string> = new Set(['look', 'basis', 'lead', 'order', 'hide', 'headline', 'next', 'pinned', 'group', 'span', 'area', 'by']);
+
+/**
+ * The widths a look may give a block, in twelfths: the board's five (`apps/web` `arrange.ts` `STEPS`), so a width a
+ * person picked is one the board draws and never one it snaps to a neighbour.
+ */
+export const LOOK_SPANS: readonly number[] = [12, 8, 6, 4, 3];
+const SPANS: ReadonlySet<number> = new Set(LOOK_SPANS);
+
+/** The columns a look may put a block in. */
+export const LOOK_AREAS: readonly ('main' | 'rail')[] = ['main', 'rail'];
+const isArea = (v: unknown): v is 'main' | 'rail' => v === 'main' || v === 'rail';
 
 /**
  * The kinds whose `group` is a field of the list they are over, so a look may name one for them. A kind is added here
@@ -204,6 +224,48 @@ function groupMap(v: unknown): Record<string, string> | undefined {
   return Object.fromEntries(entries) as Record<string, string>;
 }
 
+/** Whether a value is a width, or a column, a look may give a block. */
+const placeFits = { span: (v: unknown): v is number => typeof v === 'number' && SPANS.has(v), area: isArea } as const;
+
+/**
+ * A look's `span` or `area` as a read takes it: the entries that name a block's key and a width or column a look may
+ * give, the first `LOOK_KEYS_MOST` of them, or `undefined` when none do. FORGIVING ENTRY BY ENTRY, as a read is: one
+ * width a later board no longer draws leaves the others standing, since each says one block's place and no other's.
+ */
+function placeMap<K extends keyof typeof placeFits>(v: unknown, name: K): Record<string, K extends 'span' ? number : 'main' | 'rail'> | undefined {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const fits = placeFits[name] as (x: unknown) => boolean;
+  const kept = Object.entries(v as Record<string, unknown>).filter(([k, x]) => BLOCK_KEY.test(k) && fits(x)).slice(0, LOOK_KEYS_MOST);
+  return kept.length === 0 ? undefined : (Object.fromEntries(kept) as Record<string, K extends 'span' ? number : 'main' | 'rail'>);
+}
+
+/**
+ * WHY A LOOK MAY NOT PLACE ITS BLOCKS AS WRITTEN, or `null` when it may (the install's check, `declare.ts` `lookBody`).
+ * `span` and `area` are each a map of at most `LOOK_KEYS_MOST` block keys: a span to one of the board's five widths, an
+ * area to `main` or `rail`. Only the person's own look places anything: the rules and Slash arrange a page, and how wide
+ * a block is and where it sits are the page's author's or his. Whether the page has the key, or a rail to put a block
+ * in, is the read's to say (`applyLook`), since a look outlives the page it was written over.
+ */
+export function lookPlacesFault(body: Readonly<Record<string, unknown>>, id: string): Refusal | null {
+  const no = (fix: string, at: string, allowed?: readonly string[]): Refusal => ({ code: 'DECLARATION_INVALID', fix, at, ...(allowed ? { allowed } : {}) });
+  for (const name of ['span', 'area'] as const) {
+    const v = body[name];
+    if (v === undefined) continue;
+    const what = name === 'span' ? 'how wide a block is' : 'which column a block sits in';
+    if (body.by !== 'owner') return no(`${id} is arranged by ${String(body.by)} and says ${what}. Only your own look says that; take ${name} out.`, name);
+    if (v === null || typeof v !== 'object' || Array.isArray(v) || Object.keys(v).length > LOOK_KEYS_MOST)
+      return no(`${id}'s ${name} is a map of at most ${LOOK_KEYS_MOST} block keys, each to ${name === 'span' ? 'a width' : 'a column'}.`, name);
+    for (const [key, x] of Object.entries(v as Record<string, unknown>)) {
+      if (!BLOCK_KEY.test(key)) return no(`${id}'s ${name} names ${JSON.stringify(key)}, which is not a block's key.`, name);
+      if (name === 'span' && !placeFits.span(x))
+        return no(`${id} gives ${key} a width of ${JSON.stringify(x)}. A block is ${LOOK_SPANS.join(', ')} twelfths wide.`, `span.${key}`, LOOK_SPANS.map(String));
+      if (name === 'area' && !isArea(x))
+        return no(`${id} puts ${key} in ${JSON.stringify(x)}. A block sits in the main column or the rail.`, `area.${key}`, [...LOOK_AREAS]);
+    }
+  }
+  return null;
+}
+
 /** The list a block is over, by its id, or `null` for a block over anything else. */
 const listOf = (b: BlockResult): string | null => (typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null);
 
@@ -251,6 +313,9 @@ export function lookOf(raw: unknown): LookBody | null {
   const hide = keyList(r.hide);
   const pinned = keyList(r.pinned);
   const group = groupMap(r.group);
+  /* A WIDTH AND A COLUMN ARE READ ONLY OFF THE PERSON'S OWN LOOK, whatever the install let through. */
+  const span = r.by === 'owner' ? placeMap(r.span, 'span') : undefined;
+  const area = r.by === 'owner' ? placeMap(r.area, 'area') : undefined;
   return {
     look: r.look,
     basis: typeof r.basis === 'string' ? r.basis : '',
@@ -264,6 +329,8 @@ export function lookOf(raw: unknown): LookBody | null {
       : {}),
     ...(pinned ? { pinned } : {}),
     ...(group ? { group } : {}),
+    ...(span ? { span } : {}),
+    ...(area ? { area } : {}),
   };
 }
 
@@ -567,7 +634,8 @@ export function composeLook(input: ComposeInput): LookBody {
  * AN OWNER'S LOOK WITH THE ENGINE'S FILLING WHAT HE LEFT. What the owner set wins field by field: his lead, his order,
  * his headline, his next action. What he left unset is the engine's, and what he pinned is never hidden or moved by it
  * (the engine's look was composed knowing his pins, and they are taken out again here in case it was not). A list he
- * grouped his way is grouped his way, and the engine groups the ones he said nothing of, while a look has room.
+ * grouped his way is grouped his way, and the engine groups the ones he said nothing of, while a look has room. His
+ * widths and columns are his whole, and the engine's look never carries any.
  */
 export function mergeLook(owner: LookBody, engine: LookBody): LookBody {
   const pinned = new Set(owner.pinned ?? []);
@@ -589,6 +657,8 @@ export function mergeLook(owner: LookBody, engine: LookBody): LookBody {
     ...(next !== undefined ? { next } : {}),
     ...(owner.pinned?.length ? { pinned: owner.pinned } : {}),
     ...(Object.keys(group).length ? { group } : {}),
+    ...(owner.span && Object.keys(owner.span).length ? { span: owner.span } : {}),
+    ...(owner.area && Object.keys(owner.area).length ? { area: owner.area } : {}),
   };
 }
 
@@ -624,23 +694,49 @@ function handlesOf(blocks: readonly BlockResult[]): Set<string> {
  * - GROUP says `group` on a block whose kind draws groups, over a list, that names none of its own, while the rows it
  *   shows hold two to eight values of the field. Anything else is left as the page declared it, whoever's look it is:
  *   a stored look is laid over the page as it reads later, when all but one of the values may have gone.
+ * - SPAN AND AREA, on the person's own look only, say a block's width and column over the page's. A key the page lacks,
+ *   a heading, a value `lookPlacesFault` would refuse, and a rail on a page with no layout are passed over: the install
+ *   is not the only door a look comes in by, so the read holds by itself. `page.layout` says whether the page has a
+ *   rail; a host that does not say is read as having one only when one of its blocks already sits there.
  *
  * Nothing is added and nothing is taken out of the list, so a host keyed by `key` sees the same blocks, moved.
  */
-export function applyLook(read: readonly BlockResult[], look: LookBody): { blocks: BlockResult[]; look: LookBody } {
+export function applyLook(read: readonly BlockResult[], look: LookBody, page: { layout?: boolean } = {}): { blocks: BlockResult[]; look: LookBody } {
   const keys = read.map(keyOf);
   const at = new Map<string, number>();
   keys.forEach((k, i) => {
     if (!at.has(k)) at.set(k, i);
   });
-  /* GROUP FIRST, on the block each key names (the first of two alike): it moves and hides nothing, so the rest reads the
-     page with its groups said, and the blocks handed in are not written on. */
+  /* PLACES FIRST, on the block each key names (the first of two alike), so the order and the hide read the page in the
+     columns he put it in. A block he moved to the rail takes its place among the rail's. */
+  const owns = look.by === 'owner';
+  const railed = page.layout ?? read.some((b) => b.area === 'rail');
+  const placeable = (key: string): boolean => at.has(key) && read[at.get(key)!]!.kind !== 'section';
+  const span: Record<string, number> = {};
+  const area: Record<string, 'main' | 'rail'> = {};
+  if (owns) {
+    for (const [key, w] of Object.entries(look.span ?? {}).slice(0, LOOK_KEYS_MOST)) if (placeable(key) && placeFits.span(w)) span[key] = w;
+    for (const [key, a] of Object.entries(look.area ?? {}).slice(0, LOOK_KEYS_MOST)) if (placeable(key) && isArea(a) && (a === 'main' || railed)) area[key] = a;
+  }
+  const placed = (b: BlockResult, i: number): BlockResult => {
+    const key = keys[i]!;
+    if (at.get(key) !== i || (!Object.hasOwn(span, key) && !Object.hasOwn(area, key))) return b;
+    const out: BlockResult = { ...b };
+    if (Object.hasOwn(span, key)) out.span = span[key]!;
+    /* `main` IS SAID AS NO AREA, the way a page that names none says it. */
+    if (area[key] === 'rail') out.area = 'rail';
+    else if (area[key] === 'main') delete out.area;
+    return out;
+  };
+  const sited: readonly BlockResult[] = Object.keys(span).length + Object.keys(area).length === 0 ? read : read.map(placed);
+  /* GROUP NEXT: it moves and hides nothing, so the rest reads the page with its groups said, and the blocks handed in
+     are not written on. */
   const group: Record<string, string> = {};
   for (const [key, field] of Object.entries(look.group ?? {}).slice(0, LOOK_GROUPS_MOST)) {
-    const block = at.has(key) ? read[at.get(key)!]! : undefined;
+    const block = at.has(key) ? sited[at.get(key)!]! : undefined;
     if (block && FIELD_ID.test(field) && groupable(block) && groupsWell(block, field)) group[key] = field;
   }
-  const blocks: readonly BlockResult[] = Object.keys(group).length === 0 ? read : read.map((b, i) => (at.get(keys[i]!) === i && Object.hasOwn(group, keys[i]!) ? { ...b, group: group[keys[i]!]! } : b));
+  const blocks: readonly BlockResult[] = Object.keys(group).length === 0 ? sited : sited.map((b, i) => (at.get(keys[i]!) === i && Object.hasOwn(group, keys[i]!) ? { ...b, group: group[keys[i]!]! } : b));
   const pinned = (look.pinned ?? []).filter((k) => at.has(k));
   const pins = new Set(pinned);
   /* THE ENGINE'S LOOK NEVER LEADS WITH A QUEUE, NOR MOVES ONE, on a page that is about something else (`questionsLead`):
@@ -745,6 +841,8 @@ export function applyLook(read: readonly BlockResult[], look: LookBody): { block
       ...(next !== undefined ? { next } : {}),
       ...(pinned.length ? { pinned } : {}),
       ...(Object.keys(group).length ? { group } : {}),
+      ...(Object.keys(span).length ? { span } : {}),
+      ...(Object.keys(area).length ? { area } : {}),
     },
   };
 }

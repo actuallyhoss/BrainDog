@@ -1,6 +1,6 @@
 /**
- * A record's files on the self-host: `PUT /api/files` and `GET /api/files/<sha256>`, the same two doors the Worker
- * answers (`apps/worker/src/files.ts`, `51 §5.5`, `12 §8` "The asset store"), kept on disk at `<data>/<slug>/blobs/`
+ * A record's files on the self-host: `PUT /api/files/<sha256>`, `PUT /api/files` and `GET /api/files/<sha256>`, the
+ * same doors the Worker answers (`apps/worker/src/files.ts`, `51 §5.5`, `12 §8` "The asset store"), kept on disk at `<data>/<slug>/blobs/`
  * beside the record file and its `snapshots/`.
  *
  * `server.ts` ANSWERS WHO IS ASKING AND THIS FILE DOES THE REST. The dispatch line there runs after `contextFor`, so
@@ -14,11 +14,12 @@
  *
  * A FILE IS WRITTEN UNDER A TEMPORARY NAME AND MOVED INTO PLACE, so a crash mid-write leaves a stray temporary file
  * and never a truncated file under a hash it does not have. The name is the hash, so a second upload of the same bytes
- * is the same file, and the move replaces it with itself.
+ * is the same file. A put at an address is held to it as on the Worker: bytes that hash to anything else are
+ * `CHECKSUM_MISMATCH` and nothing is written, and bytes already there are not written again.
  */
 
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import type { CallContext } from '@braindog/record';
@@ -37,6 +38,7 @@ export const blobsFolder = (recordFile: string): string | null => (recordFile ==
 const FILE_HEADERS: Readonly<Record<string, string>> = {
   'content-security-policy': "default-src 'none'; sandbox",
   'x-content-type-options': 'nosniff',
+  'x-robots-tag': 'noindex',
   'cache-control': 'private, max-age=31536000, immutable',
 };
 
@@ -92,10 +94,11 @@ const refuse = (status: number, refusal: Refusal, extra: Record<string, string> 
 /* THE WORKER'S SENTENCES, but for the store that is missing: here it is a record held in memory. */
 const NO_STORE: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'A record held in memory keeps no files. Serve it from a file to keep them.' };
 const NO_FILE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'This record holds no file by that name.' };
-const NOT_HERE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'A file is put with PUT /api/files and read with GET /api/files/<sha256>.' };
+const NOT_HERE: Refusal = { code: 'ROUTE_UNKNOWN', fix: 'A file is put with PUT /api/files/<sha256> and read with GET /api/files/<sha256>.' };
 const TOO_BIG: Refusal = { code: 'OUT_OF_BOUNDS', fix: 'A file here is at most 2 MB. Send a smaller one.' };
 const NOT_TAKEN: Refusal = { code: 'BODY_MALFORMED', fix: 'A file here is a PNG, JPEG, GIF, WebP or AVIF picture, or a PDF.' };
 const MISLABELLED = (said: string, found: string): Refusal => ({ code: 'BODY_MALFORMED', fix: `This file was sent as ${said} and is ${found}. Send it with its own type.` });
+const MISMATCH: Refusal = { code: 'CHECKSUM_MISMATCH', fix: 'These bytes do not hash to the address they were put at, so nothing was kept; put them at their own hash.' };
 const EMPTY: Refusal = { code: 'BODY_MALFORMED', fix: 'The file arrived empty. Send its bytes as the body.' };
 const CANNOT_READ: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Reading a file here takes somebody who can read this record, or a token.' };
 const CANNOT_WRITE: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Adding a file takes somebody who can write here, or a token with write scope.' };
@@ -112,8 +115,9 @@ export async function serveFiles(request: Request, ctx: CallContext, folder: str
   if (!one && !collection) return refuse(404, NOT_HERE);
   const method = request.method;
   if (collection && method !== 'PUT') return refuse(405, NOT_HERE, { allow: 'PUT' });
-  if (one && method !== 'GET' && method !== 'HEAD') return refuse(405, NOT_HERE, { allow: 'GET, HEAD' });
-  return one ? give(ctx, folder, one[1]!, method === 'HEAD') : keep(request, ctx, folder);
+  if (one && method !== 'GET' && method !== 'HEAD' && method !== 'PUT') return refuse(405, NOT_HERE, { allow: 'GET, HEAD, PUT' });
+  if (one && method !== 'PUT') return give(ctx, folder, one[1]!, method === 'HEAD');
+  return keep(request, ctx, folder, one ? one[1]! : null);
 }
 
 /**
@@ -129,21 +133,28 @@ export function keepAttachment(folder: string, bytes: Uint8Array): { sha256: str
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   mkdirSync(folder, { recursive: true });
   const target = join(folder, sha256);
+  /* THE SAME BYTES ARE ALREADY THE SAME FILE, so nothing is written twice. */
+  if (existsSync(target)) return { sha256, mime };
   const passing = `${target}.${randomBytes(6).toString('hex')}.part`;
   writeFileSync(passing, bytes, { mode: 0o600 });
   renameSync(passing, target);
   return { sha256, mime };
 }
 
-/** `PUT /api/files`: the body, checked, hashed and kept, and its name answered. */
-async function keep(request: Request, ctx: CallContext, folder: string | null): Promise<Response> {
+/**
+ * `PUT /api/files` and `PUT /api/files/<sha256>`, in the Worker's order: `at` is the hash the path named, compared
+ * before the type is read, and a name that is not a hash is the same refusal, because no bytes could hash to it.
+ */
+async function keep(request: Request, ctx: CallContext, folder: string | null, at: string | null): Promise<Response> {
   if (!writesFiles(ctx)) return refuse(403, CANNOT_WRITE);
   if (folder === null) return refuse(501, NO_STORE);
+  if (at !== null && !SHA256.test(at)) return refuse(422, MISMATCH);
   /* THE BODY IS ALREADY IN MEMORY, weighed against the host's own ceiling as it arrived (`server.ts` `answer`); this is
      the file's smaller one. */
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.byteLength > FILE_MOST) return refuse(413, TOO_BIG);
   if (bytes.byteLength === 0) return refuse(400, EMPTY);
+  if (at !== null && createHash('sha256').update(bytes).digest('hex') !== at) return refuse(422, MISMATCH);
   const mime = sniff(bytes);
   if (mime === null) return refuse(415, NOT_TAKEN);
   const said = (request.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();

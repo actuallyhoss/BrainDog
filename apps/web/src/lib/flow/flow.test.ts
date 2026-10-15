@@ -14,10 +14,15 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord } from '@braindog/kernel';
 
 import {
-  ARGS,
+  argsFor,
+  actionsOf,
+  depthCeilingOf,
+  flowVerbsOf,
+  onceOf,
   stepGroups,
   notYet,
-  VERBS,
+  verbOf,
+  verbsOf,
   VERB_LABELS,
   blankDraft,
   blankStep,
@@ -58,6 +63,49 @@ import {
   words,
   type Node,
 } from './flow.ts';
+import { forgetGrammar, holdGrammar, type FlowGrammar } from './grammar.ts';
+
+/*
+ * THE GRAMMAR, WRITTEN HERE AND NOT READ FROM THE KERNEL, in the shape the record's `flowGrammar` answers: the canvas
+ * keeps no list of steps, so every test reads the one it is handed. `meet` and `run_job` are in it, as on the record.
+ */
+const a = (name: string, type = 'text', required = false, from?: string) => ({ name, type, required, ...(from ? { from } : {}) });
+const step = (verb: string, group: 'action' | 'flow', args: ReturnType<typeof a>[], { row = false, once = false } = {}) => ({ verb, group, row, once, args });
+const GRAMMAR: FlowGrammar = {
+  triggers: [
+    { id: 'written', args: [a('register', 'text', true, 'list'), a('op', 'list'), a('fields', 'list')] },
+    { id: 'arrival', args: [a('ingest', 'text', false, 'door')] },
+    { id: 'every', args: [a('every', 'span', true), a('at')] },
+    { id: 'metric', args: [a('id', 'text', true, 'figure')] },
+    { id: 'decided', args: [a('about')] },
+    { id: 'manual', args: [] },
+  ],
+  steps: [
+    step('tag', 'action', [a('tag', 'text', true)], { row: true }),
+    step('untag', 'action', [a('untag', 'text', true)], { row: true }),
+    step('set', 'action', [a('field', 'text', true, 'field'), a('to')], { row: true }),
+    step('move', 'action', [a('move', 'text', true)], { row: true }),
+    step('link', 'action', [a('field', 'text', true, 'field'), a('to.register', 'text', true, 'list'), a('to.by', 'text', true, 'field'), a('to.value', 'text', true)], { row: true }),
+    step('note', 'action', [a('note', 'text', true)], { row: true }),
+    step('notify', 'action', [a('say', 'text', true)], { once: true }),
+    step('schedule', 'action', [a('in', 'span', true), a('note', 'text', true)], { row: true }),
+    step('create', 'action', [a('register', 'text', true, 'list'), a('bound', 'number', true), a('fields', 'map')], { once: true }),
+    step('suggest', 'action', [a('question', 'text', true), a('options', 'list', true)], { once: true }),
+    step('run', 'action', [a('run', 'text', true, 'call')], { row: true, once: true }),
+    step('stop', 'action', []),
+    step('if', 'flow', [a('if', 'condition', true)]),
+    step('set_var', 'flow', [a('name', 'name', true), a('to')]),
+    step('script', 'flow', [a('id', 'text', true, 'script'), a('as', 'name')]),
+    step('call', 'flow', [a('ingest', 'text', true, 'call'), a('as', 'name')], { once: true }),
+    step('ask_slash', 'flow', [a('question', 'text', true), a('shape'), a('choices', 'list'), a('about', 'list', false, 'field'), a('as', 'name', true)], { once: true }),
+    step('ask_person', 'flow', [a('question', 'text', true), a('options', 'list', true), a('to', 'text', false, 'person'), a('as', 'name', true), a('wait', 'span')], { once: true }),
+    step('wait', 'flow', [a('wait', 'span', true)]),
+    step('meet', 'flow', [a('name'), a('email'), a('handle'), a('keys', 'list'), a('kind'), a('where', 'text', true)]),
+    step('run_job', 'flow', [a('kind', 'text', true, 'job'), a('args', 'map'), a('as', 'name')], { once: true }),
+  ],
+  ceilings: { steps: 50, depth: 3, runsPerDay: 1000, vars: 64 },
+};
+holdGrammar(GRAMMAR);
 
 /** A body with a branch: two steps before it, one after, and one step in each arm. */
 const branched = () =>
@@ -74,7 +122,7 @@ const branched = () =>
   });
 
 /** The verbs of a list, in order, so an assertion reads as the column reads. */
-const verbs = (nodes: readonly Node[]): string[] => nodes.map((n) => VERBS.find((v) => v in n.step) ?? '?');
+const verbs = (nodes: readonly Node[]): string[] => nodes.map((n) => verbOf(n.step, GRAMMAR) ?? '?');
 
 /* ── moving between branches: the red test this module was written against ── */
 
@@ -316,7 +364,7 @@ test('every trigger and every verb is said in a sentence, with no braces and no 
     assert.ok(said.length > 0);
     assert.doesNotMatch(said, /—|\{\{/);
   }
-  for (const v of VERBS) {
+  for (const v of verbsOf(GRAMMAR)) {
     const said = sayStep(blankStep(v));
     assert.ok(said.length > 0, v);
     assert.doesNotMatch(said, /—/, v);
@@ -344,7 +392,7 @@ test('A NUMBER IS COMPARED AS A LEAF, because the sentence grammar has no word f
 test('THE MENU OFFERS EVERY VERB THE RECORD READS AND INSTALLS, ONCE, in the five groups', () => {
   for (const slash of [false, true]) {
     const offered = stepGroups(slash).flatMap((g) => g.verbs);
-    assert.deepEqual([...offered, ...notYet(slash)].sort(), [...VERBS].sort(), `slash: ${slash}`);
+    assert.deepEqual([...offered, ...notYet(slash)].sort(), verbsOf(GRAMMAR).sort(), `slash: ${slash}`);
     assert.ok(!offered.some((v) => notYet(slash).includes(v)), 'a verb the record refuses at install is not offered');
     assert.equal(new Set(offered).size, offered.length);
     assert.deepEqual(stepGroups(slash).map((g) => g.label), ['Check', 'Change', 'Ask', 'Call out', 'Wait']);
@@ -368,37 +416,111 @@ test('A STEP READS THE ANSWERS OF THE STEPS BEFORE IT, and not of the ones after
   assert.deepEqual(varsBefore(asked, d.steps[3]!.key), ['vars.rate', 'vars.shown'], 'an answer inside one arm is not certain after it');
 });
 
-/* R2: ONLY WHAT IS PLAINLY MISSING IS SAID HERE. A tag on a clock and a clock under fifteen minutes were this list's
-   copy of the lint, and are the record's to say now, through `checkAutomation` on the card its `at` names. */
-test('what is plainly missing is said before saving, and nothing the record alone decides', () => {
-  const empty = draftOf('x', { rule: 'x', on: { every: '1h' }, steps: [] });
-  assert.ok(faultsOf(empty).some((f) => /at least one step/.test(f.say)));
-  const blank = draftOf('w', { rule: 'w', on: { manual: true }, steps: [{ ask_slash: { question: '', as: '' } }] });
-  assert.ok(faultsOf(blank).length >= 1);
-  const slash = draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_slash: { question: 'Why?', as: 'why' } }] });
+/* ONLY WHAT IS NOT PICKED YET IS SAID HERE, worked out from the grammar's `required` (HD.438). An empty automation, a
+   branch with nothing under it and a step this host cannot run are the record's to say, through `checkAutomation` on
+   the card its `at` names. */
+test('A MISSING REQUIRED ARGUMENT IS THE ONE HINT, and nothing the record alone decides', () => {
+  const blank = draftOf('w', { rule: 'w', on: { manual: true }, steps: [{ ask_slash: { question: '', as: 'why' } }] });
+  assert.deepEqual(faultsOf(blank, { grammar: GRAMMAR }), [{ key: blank.steps[0]!.key, say: 'Write the question for Slash.' }]);
   assert.deepEqual(faultsOf(branched()), []);
+
+  const empty = draftOf('x', { rule: 'x', on: { every: '1h' }, steps: [] });
+  assert.deepEqual(faultsOf(empty), [], 'an automation with no steps is the record to say');
+  const bare = draftOf('y', { rule: 'y', on: { manual: true }, steps: [{ if: 'a is 1', then: [] }] });
+  assert.deepEqual(faultsOf(bare), [], 'a branch with nothing under it is the record to say');
+  const asks = draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_slash: { question: 'Why?', as: 'why' } }] });
+  assert.deepEqual(faultsOf(asks, { slash: false }), [], 'whether this host answers Slash is the record to say');
 });
 
-/*
- * THE SAME STEP IS RIGHT ON ONE HOST AND REFUSED ON ANOTHER. The record's `unserved` refuses `ask_slash` at install only
- * where the host has not said it answers one, so the canvas asks the same question of the same flag. Before, every
- * `ask_slash` read "not in this build", which was false on a self-host with a model since `eb1a131b`.
- */
-const asksSlash = () => draftOf('s', { rule: 's', on: { manual: true }, steps: [{ ask_slash: { question: 'Why?', as: 'why' } }] });
-
-test('WHERE A MODEL IS, NOTHING IS SAID ABOUT AN ASK_SLASH STEP, because the record installs it', () => {
-  assert.deepEqual(faultsOf(asksSlash(), { slash: true }), []);
+test("A TRIGGER'S REQUIRED ARGUMENT NOT PICKED IS SAID ON THE TRIGGER, from the grammar's triggers", () => {
+  const d = { ...blankDraft('x'), trigger: { written: { register: '' } }, steps: nodesOf([{ notify: { say: 'hi' } }]) };
+  assert.deepEqual(faultsOf(d), [{ key: null, say: 'Say which list it watches.' }]);
+  const figure = { ...d, trigger: { metric: { id: ' ', crosses: 'target' as const } } };
+  assert.deepEqual(faultsOf(figure), [{ key: null, say: 'Say which figure it watches.' }]);
 });
 
-test('WHERE THERE IS NO MODEL, AN ASK_SLASH STEP SAYS SO, and not that the build lacks it', () => {
-  const slash = asksSlash();
-  const key = slash.steps[0]!.key;
-  const none = 'This BrainDog has no model for Slash to answer with. Ask a person instead.';
-  assert.deepEqual(faultsOf(slash, { slash: false }), [{ key, say: none }], 'an ask_slash an agent wrote is named before Send');
-  assert.deepEqual(faultsOf(slash), faultsOf(slash, { slash: false }), 'the default is the host with no model');
+test('A REQUIRED ARGUMENT THIS BUILD HAS NO WORDS FOR IS STILL SAID, by its name in words', () => {
+  const grown: FlowGrammar = { ...GRAMMAR, steps: [...GRAMMAR.steps, step('hand_over', 'flow', [a('desk_name', 'text', true)])] };
+  const d = draftOf('h', { rule: 'h', on: { manual: true }, steps: [{ hand_over: { desk_name: '' } }] });
+  assert.deepEqual(faultsOf(d, { grammar: grown }), [{ key: d.steps[0]!.key, say: 'Desk name is not picked yet.' }]);
+  holdGrammar(grown);
+  try {
+    assert.equal(sayStep({ hand_over: { desk_name: 'Front' } }), 'Hand over: Front', 'a verb with no words is its id in words and what it holds');
+  } finally {
+    holdGrammar(GRAMMAR);
+  }
 });
 
-/* ── the inspector's text boxes ───────────────────────────────────────────── */
+/* ── the grammar is the record's, and nothing here lists it again ─────────── */
+
+test('THE VERBS, ONCE AND THE DEPTH CEILING ARE THE GRAMMAR HANDED IN, and over none there are none', () => {
+  assert.deepEqual(verbsOf(GRAMMAR), GRAMMAR.steps.map((s) => s.verb));
+  assert.ok(flowVerbsOf(GRAMMAR).includes('meet') && flowVerbsOf(GRAMMAR).includes('run_job'));
+  assert.ok(!actionsOf(GRAMMAR).includes('if') && actionsOf(GRAMMAR).includes('tag'));
+  assert.deepEqual(onceOf(GRAMMAR), ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person', 'run_job']);
+  assert.equal(depthCeilingOf(GRAMMAR), 3);
+  const shallow: FlowGrammar = { ...GRAMMAR, ceilings: { ...GRAMMAR.ceilings, depth: 1 } };
+  assert.equal(depthCeilingOf(shallow), 1);
+  assert.deepEqual(verbsOf(null), []);
+  assert.deepEqual(stepGroups(true, null), [], 'an older record is offered nothing');
+  assert.equal(depthCeilingOf(null), 0);
+});
+
+test('A JOB STARTED ABOUT A ROW GETS ONCE FOR EACH ROW, because the grammar says run_job is once', () => {
+  const d = draftOf('j', { rule: 'j', on: { written: { register: 'tasks', op: ['create'] } }, steps: [{ run_job: { kind: 'job.weekly-notes' } }] });
+  assert.deepEqual(bodyOf(d).once_per, ['entry']);
+  const quiet: FlowGrammar = { ...GRAMMAR, steps: GRAMMAR.steps.map((s) => (s.verb === 'run_job' ? { ...s, once: false } : s)) };
+  assert.equal(bodyOf(d, quiet).once_per, undefined, 'read from the grammar, not a list here');
+});
+
+test('MEET AND RUN_JOB ARE OFFERED, START BLANK AND HAVE FORMS, like any other step', () => {
+  const offered = stepGroups(true).flatMap((g) => g.verbs);
+  assert.ok(offered.includes('meet') && offered.includes('run_job'));
+  assert.ok(stepGroups(true).find((g) => g.label === 'Change')!.verbs.includes('meet'));
+  assert.ok(stepGroups(true).find((g) => g.label === 'Call out')!.verbs.includes('run_job'));
+  assert.deepEqual(blankStep('run_job'), { run_job: { kind: '', args: {} } });
+  assert.deepEqual(blankStep('meet'), { meet: { where: '' } });
+  const kind = argsFor('run_job').find((x) => x.name === 'kind')!;
+  assert.equal(kind.from, 'job', 'the job is picked from the jobs the owner approved, never typed as an id');
+  assert.deepEqual(kind.path, ['run_job', 'kind']);
+  assert.ok(kind.required && kind.missing === 'Say which job to start.');
+  assert.deepEqual(argsFor('meet').map((x) => x.label), ['Their name', 'Their email', 'Their handle', 'Known by', 'A person or an organisation', 'Where you met them']);
+});
+
+test('THEIR CARDS SAY NAMES AND WORDS, never a stored id', () => {
+  assert.equal(sayStep({ run_job: { kind: 'job.weekly-notes', as: 'notes' } }), 'Start the job Weekly notes, keeping the id of its run as notes');
+  assert.equal(sayStep(blankStep('run_job')), 'Start a job');
+  assert.equal(sayStep({ meet: { name: 'Ines Okafor', where: 'the harbour market' } }), 'Meet Ines Okafor: the harbour market');
+  assert.equal(sayStep({ meet: { keys: ['bank:{{trigger.row.counterparty}}'], where: 'a bank text' } }), 'Meet the person it names: a bank text');
+  assert.doesNotMatch(sayStep({ meet: { keys: ['bank:{{trigger.row.counterparty}}'], where: 'x' } }), /bank:|counterparty/u);
+});
+
+test('A DRAFT WITH RUN_JOB READS BACK AS THE BODY IT WAS, and keeps its run for later steps', () => {
+  const body = {
+    rule: 'notes',
+    name: 'Weekly notes',
+    on: { every: '1w', at: '09:00', day: 'mon' },
+    steps: [{ run_job: { kind: 'job.weekly-notes', args: { week: '{{trigger.at}}' }, as: 'notes' } }, { notify: { say: 'Notes started as {{vars.notes}}' } }],
+  };
+  const d = draftOf('notes', body);
+  assert.deepEqual(bodyOf(d), body);
+  assert.deepEqual(varsBefore(d.steps, d.steps[1]!.key), ['vars.notes']);
+  assert.deepEqual(faultsOf(d), []);
+});
+
+test('OVER NO GRAMMAR A STEP IS STILL NAMED BY ITS SHAPE, and an inline rule keeps its form', () => {
+  forgetGrammar();
+  try {
+    assert.equal(verbOf({ meet: { where: 'x' } }), 'meet');
+    assert.equal(verbOf({ if: 'a', then: [] }), 'if');
+    assert.equal(verbOf({ tag: 'x', note: 'y' }), null);
+    const d = draftOf('x', { rule: 'x', register: 'tasks', then: [{ tag: 'seen' }] });
+    assert.deepEqual(bodyOf(d), { rule: 'x', register: 'tasks', then: [{ tag: 'seen' }] });
+    assert.deepEqual(faultsOf(d), []);
+  } finally {
+    holdGrammar(GRAMMAR);
+  }
+});
 
 test('A CHIP GOES IN AT THE CARET WITH ITS BRACES, replacing what was selected, and the caret lands after it', () => {
   assert.deepEqual(withChip('Gold is  a gram', 8, 8, 'vars.rate'), { value: 'Gold is {{vars.rate}} a gram', caret: 21 });
@@ -461,8 +583,8 @@ test('the calls a flow makes are found in both arms, once each, by call step or 
  * label, the word "needs", and a field label lower-cased. Each required argument now carries its own sentence.
  */
 test('EVERY REQUIRED ARGUMENT LEFT BLANK FAULTS WITH A WHOLE SENTENCE OF ITS OWN, never "<label> needs <label>."', () => {
-  for (const verb of VERBS) {
-    for (const arg of ARGS[verb].filter((a) => a.required)) {
+  for (const verb of verbsOf(GRAMMAR)) {
+    for (const arg of argsFor(verb, GRAMMAR).filter((x) => x.required)) {
       const empty = arg.kind === 'list' ? [] : arg.kind === 'number' ? 0 : '';
       const step = setAt(blankStep(verb), [...arg.path], empty);
       const d = { ...blankDraft('x'), trigger: { written: { register: 'tasks' } }, steps: [{ key: 'k', step, then: [], else: [] }] };
@@ -530,7 +652,7 @@ test('A CARD SAYS A REFERENCE AS A PART OF ITS OWN, so it is drawn as a chip, an
     { text: 'what', ref: 'trigger.row.what' },
   ]);
   assert.deepEqual(sayParts({ if: 'what is {{vars.name}}' }), [{ text: 'If what is ' }, { text: 'name', ref: 'vars.name' }]);
-  for (const v of VERBS) assert.equal(sayParts(blankStep(v)).map((p) => p.text).join(''), sayStep(blankStep(v)), v);
+  for (const v of verbsOf(GRAMMAR)) assert.equal(sayParts(blankStep(v)).map((p) => p.text).join(''), sayStep(blankStep(v)), v);
   assert.equal(sayParts(step).map((p) => p.text).join(''), sayStep(step));
 });
 

@@ -42,6 +42,13 @@ test('A PAIR IS SAID BY ITS TWO NAMES WITH THE RECORD\'S REASON UNDER THEM, and 
   assert.equal(tile?.heading, NAMED_HEADING);
 });
 
+test('WHAT SLASH READ OF A PAIR IS SAID FIRST, then the record\'s reason; a pair nothing judged keeps its reason alone', () => {
+  const judged = { ...MARROW, reading: 'Slash reads these as one.', judged: 0.96 };
+  const tile = namedTile(namedOf(answer([judged, JUNIPER])));
+  assert.equal(tile?.lines[0]?.why, 'Slash reads these as one. Both are called Marrow Press.');
+  assert.equal(tile?.lines[1]?.why, 'Both are called Juniper Hall.');
+});
+
 test('AT MOST THREE LINES, then "and 2 more" for the rest', () => {
   assert.equal(NAMED_SHOWN, 3);
   const tile = namedTile(namedOf(answer([MARROW, JUNIPER, LANTERN, QUILL, OTTER])));

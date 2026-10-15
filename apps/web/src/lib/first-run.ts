@@ -30,10 +30,15 @@ export const firstRun = {
   whoReading: 'Reading',
   /* WHERE SIMPLE RULES READ IT BECAUSE THE MONTH'S ASKS ARE SPENT, said once, quietly, so a thin reading is explained. */
   readByRules: "Slash is out of asks this month, so simple rules read this. Check what was heard, and tell it more.",
+  /* WHERE SIMPLE RULES READ IT FOR ANY OTHER CAUSE: no model on this host, no press yet, a refusal or a silence. Said on
+     the build beside the words, so a thin reading is never taken for the most this can do. */
+  readByRulesAny: 'Simple rules read this. Check what was heard, and tell it more.',
+  /* BEFORE THE PRESS, UNDER THE FIELD: what Next does with the words, said while the host may have a model to read them. */
+  readOnPress: 'Pressing Next lets a model read what you wrote, once, to set this up. Nothing is kept until you keep it.',
 
   /* POINT AT AN EXPORT: a file from another app, read on this device and shown before anything is saved. */
   exportPoint: 'Or bring in a file',
-  exportHint: 'A CSV or JSON export from your bank, Notion, Trello, Todoist or a spreadsheet.',
+  exportHint: 'A CSV, JSON or zip export from your bank, Notion, Trello, Todoist or a spreadsheet.',
   exportDrop: 'Drop it here',
   exportReading: 'Reading your file',
   exportInto: (n: number, name: string) => `${n === 1 ? 'One goes' : `${n} go`} into ${name}.`,
@@ -81,8 +86,6 @@ export const firstRun = {
   mineFor: 'Make it for',
   minePages: 'Its pages',
   mineHome: 'Its Home',
-  /* THE HOME IS DRAWN WITH EXAMPLES AND SAYS SO, because none of them is written. */
-  mineExamples: 'Drawn with examples to show its shape. None of them is saved.',
   mineEntries: 'From what you said',
   mineIn: (title: string, list: string) => `${title}, in ${list}`,
   mineKeeps: 'What it keeps',

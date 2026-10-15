@@ -9,9 +9,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import type { AskSetup, SetupAsked, SetupReply } from './ask.ts';
 import { useCase } from '@braindog/seed/usecases';
+import { offerOf } from './offer.ts';
+import { answer, oneQuestion } from './question.ts';
 
 import { caseBecame, currencyFor, draftBrief, fold, fromModel, heardWords, outsideCatalogue, partName, propose, proposeFirst, setupOffer } from './propose.ts';
 
@@ -1268,3 +1271,69 @@ test('WHAT WAS LEFT OPEN SINCE BATCH 69, each sentence word for word: "I never u
   /* WHAT NEVER RAN OUT STAYS AS RULED: it asks for no Products. */
   for (const typed of both('I never ran out of products')) assert.ok(!propose(typed, CAIRO).places.some((x) => x.name === 'Products'), typed);
 });
+
+/* ── the six traps of the read set, with a model that falls into each ─────────────────────────────────── */
+
+type SetEntry = {
+  trap?: string;
+  said: string;
+  answer?: { about: 'name' | 'currency' | 'arrivesBy'; value: string };
+  reads: { usecase: string; modules?: string[]; name: string | null; currency: string | null; question: string | null };
+  why?: string;
+};
+const READ_SET = JSON.parse(readFileSync(new URL('../../../../../tools/people/sets/read-set.json', import.meta.url), 'utf8')) as { ctx: { zone: string; locale: string }; sentences: SetEntry[] };
+
+/**
+ * WHAT A MODEL THAT FELL INTO EACH TRAP ANSWERS: a currency guessed from a country, pounds taken for sterling, a dollar
+ * sign read as Canada's, an instruction in the answer obeyed, a name it tidied into a capital, a name it transliterated.
+ * Each is what a real model has been seen to do or plainly could; the first run must still read what the set says.
+ */
+const TRAPPED: Record<string, Partial<SetupReply>> = {
+  'a country and no currency': { name: 'Dina', usecase: 'personal', currency: 'EGP', modules: ['money-core'] },
+  '"pounds" alone': { name: 'Tom', usecase: 'shop', currency: 'GBP', modules: ['money-core'] },
+  '"$40"': { name: 'Ana', usecase: 'student', currency: 'CAD' },
+  'an instruction inside the answer': { name: 'Rana', usecase: 'shop', modules: offerOf().modules.map((m) => m.id) },
+  'a name in lower case': { name: 'Hana', usecase: 'shop' },
+  'an answer in Arabic': { name: 'Nour', usecase: 'student' },
+};
+
+/**
+ * A TRAP THE SCREEN DOES NOT HOLD YET, and what holds it. It reads wrong until then, and its line says what it read;
+ * once it reads right while still here this goes red, so the mark is lifted the day the change lands (the read set's
+ * own `until`, kept here because the set's marks speak of the rules' reading and these of the model's).
+ */
+const UNHELD: Record<string, string> = {};
+
+/** What the first run makes of the model's answer: the use case, the modules, the name, the currency and the one question. */
+const trapRead = (s: SetEntry) => {
+  const ctx = READ_SET.ctx;
+  let p = fromModel(reply(TRAPPED[s.trap!]!), s.said, ctx, propose(s.said, ctx));
+  const asked = oneQuestion(p, s.said);
+  if (s.answer) p = answer(p, s.answer.about, s.answer.value, s.said);
+  return { usecase: p.usecase ?? 'none', modules: [...p.modules].sort(), name: p.name, currency: p.currency, question: asked?.about ?? null };
+};
+
+const trapWrong = (want: SetEntry['reads'], got: ReturnType<typeof trapRead>): string[] => {
+  const out: string[] = [];
+  for (const key of ['usecase', 'name', 'currency', 'question'] as const) if (want[key] !== got[key]) out.push(`${key} ${JSON.stringify(got[key])}, not ${JSON.stringify(want[key])}`);
+  if (want.modules !== undefined && JSON.stringify([...want.modules].sort()) !== JSON.stringify(got.modules)) out.push(`modules ${got.modules.join(', ') || 'none'}, not ${want.modules.join(', ')}`);
+  return out;
+};
+
+test('EVERY TRAP IN THE READ SET HAS A MODEL THAT FALLS INTO IT here, and no other', () => {
+  assert.deepEqual(READ_SET.sentences.flatMap((s) => s.trap ?? []).sort(), Object.keys(TRAPPED).sort());
+  for (const trap of Object.keys(UNHELD)) assert.ok(trap in TRAPPED, `${trap} is marked but is no trap`);
+});
+
+for (const s of READ_SET.sentences.filter((x) => x.trap !== undefined)) {
+  const waits = UNHELD[s.trap!];
+  test(`A MODEL IN THE TRAP OF ${s.trap!.toUpperCase()} ${waits === undefined ? 'IS HELD' : 'WAITS TO BE HELD'}: ${s.why ?? s.said}`, (t) => {
+    const wrong = trapWrong(s.reads, trapRead(s));
+    if (waits === undefined) {
+      assert.deepEqual(wrong, [], `"${s.said}" read ${wrong.join('; ')}`);
+      return;
+    }
+    assert.ok(wrong.length > 0, `the trap of ${s.trap} is held while marked: lift its mark in UNHELD`);
+    t.diagnostic(`not held yet (${waits}): ${wrong.join('; ')}`);
+  });
+}

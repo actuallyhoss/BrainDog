@@ -20,6 +20,7 @@ import { dropIndex, moveAt } from '../record/arrange.ts';
 import { often } from '../record/actions.ts';
 import { DAYS, EVERY, calendarWords, clockWords, inMonths } from './calendar.ts';
 import { idWords } from './chips.ts';
+import { OLDER, held, type ArgFrom, type FlowGrammar, type GrammarArg, type GrammarStep } from './grammar.ts';
 
 /* ── the definition, as §3 sketches it and `rules.ts` declares it ──────────── */
 
@@ -51,28 +52,46 @@ export type Step = Record<string, unknown>;
 /** A rule body. Only the keys this file reads are named; anything else is carried through untouched. */
 export type Body = Record<string, unknown>;
 
-/** The twelve actions a rule had before steps. The inline pass has one arm for each. */
-export const ACTIONS = ['tag', 'untag', 'set', 'move', 'link', 'note', 'notify', 'schedule', 'create', 'suggest', 'run', 'stop'] as const;
-/** The seven verbs only a step has. */
-export const FLOW_VERBS = ['if', 'set_var', 'script', 'call', 'ask_slash', 'ask_person', 'wait'] as const;
-export const VERBS = [...FLOW_VERBS, ...ACTIONS] as const;
-export type Verb = (typeof VERBS)[number];
+/* ── the grammar, as the record answers it ────────────────────────────────── */
 
 /**
- * The kernel's depth ceiling (`flow-lint.ts`): three levels of branch. A move that would pass it is refused here, as the
- * record would refuse the body; every other limit the record holds is said by `checkAutomation`.
+ * A VERB IS ONE THIS BUILD HAS WORDS FOR (`VERB_LABELS`), as a type. Which verbs there are is the record's grammar
+ * (`grammar.ts`), never a list here: a verb the grammar holds and these words do not is drawn by its arguments and its
+ * id in words, and is typed as a `Verb` all the same, since every table keyed by one answers a missing key.
  */
-export const DEPTH_CEILING = 3;
+export type Verb = keyof typeof VERB_LABELS;
 
-/** Verbs that need `once_per` on a trigger about a row. `flow-lint.ts` `ONCE`. */
-const ONCE: readonly string[] = ['notify', 'create', 'suggest', 'run', 'call', 'ask_slash', 'ask_person'];
+/**
+ * THE GRAMMAR'S TABLES, AS FUNCTIONS OVER A GRAMMAR. They were constants copied from `flow-lint.ts` by hand, and the
+ * copy lost `meet` and `run_job`. Each takes the grammar it reads, the tab's own by default (`held`), and over no
+ * grammar answers nothing: no verbs, no once, a ceiling of none, so an editor over an older record offers nothing.
+ */
+export const verbsOf = (g: FlowGrammar | null = held()): Verb[] => (g?.steps ?? []).map((s) => s.verb as Verb);
+/** The actions a rule had before steps, which the inline pass runs. The grammar's `group`. */
+export const actionsOf = (g: FlowGrammar | null = held()): Verb[] => (g?.steps ?? []).filter((s) => s.group === 'action').map((s) => s.verb as Verb);
+/** The verbs only a step has. */
+export const flowVerbsOf = (g: FlowGrammar | null = held()): Verb[] => (g?.steps ?? []).filter((s) => s.group !== 'action').map((s) => s.verb as Verb);
+/** Verbs that need `once_per` on a trigger about a row. */
+export const onceOf = (g: FlowGrammar | null = held()): Verb[] => (g?.steps ?? []).filter((s) => s.once).map((s) => s.verb as Verb);
+/**
+ * How many branches deep a step may sit. A move that would pass it is refused here, as the record would refuse the
+ * body; every other limit the record holds is said by `checkAutomation`.
+ */
+export const depthCeilingOf = (g: FlowGrammar | null = held()): number => g?.ceilings.depth ?? 0;
+/** One step of the grammar, by its verb. */
+export const grammarStep = (verb: string, g: FlowGrammar | null = held()): GrammarStep | undefined => g?.steps.find((s) => s.verb === verb);
 
 const isObject = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
 
-/** The one verb a step names, or `null` for a step that names none or two. */
-export function verbOf(step: Step): Verb | null {
-  const named = VERBS.filter((v) => v in step);
-  return named.length === 1 ? named[0]! : null;
+/**
+ * The one verb a step names, or `null` for a step that names none or two.
+ *
+ * OVER NO GRAMMAR, BY THE STEP'S SHAPE: its one key that is not a branch's arm. Decide and the hub say steps with no
+ * grammar read, and a step is exactly one verb key, so the shape alone names it.
+ */
+export function verbOf(step: Step, g: FlowGrammar | null = held()): Verb | null {
+  const keys = g ? Object.keys(step).filter((k) => g.steps.some((s) => s.verb === k)) : Object.keys(step).filter((k) => k !== 'then' && k !== 'else');
+  return keys.length === 1 ? (keys[0] as Verb) : null;
 }
 
 /* ── the tree ─────────────────────────────────────────────────────────────── */
@@ -225,7 +244,7 @@ function depthOfList(nodes: readonly Node[], list: ListId): number | null {
  *
  * TWO MOVES ARE REFUSED, AND THE TREE IS HANDED BACK AS IT WAS. A branch dropped into one of its own arms would be
  * removed from the tree and then inserted into a list that went with it, so the whole branch would vanish with no
- * error. And a branch dropped deeper than the record's three levels would be refused on Decide, after the person had
+ * error. And a branch dropped deeper than the grammar's ceiling would be refused on Decide, after the person had
  * forgotten which drag did it; the lint's sentence is said here, at the drop.
  */
 export function moveBetween(nodes: readonly Node[], key: string, to: { list: ListId; at: number }): Moved {
@@ -237,7 +256,8 @@ export function moveBetween(nodes: readonly Node[], key: string, to: { list: Lis
   const [owner] = splitList(to.list);
   if (owner !== null && holds(from.node, owner)) return { ...same, why: words.insideItself };
   const depth = depthOfList(nodes, to.list) ?? 0;
-  if (depth + heightOf(from.node) > DEPTH_CEILING) return { ...same, why: words.tooDeep };
+  const most = depthCeilingOf();
+  if (depth + heightOf(from.node) > most) return { ...same, why: held() ? words.tooDeep(most) : OLDER };
 
   if (from.list === to.list) {
     const order = moveAt(target.map((_, i) => ({ i, span: 12 })), from.at, to.at);
@@ -423,7 +443,9 @@ export function withCondition(d: Draft, cond: unknown): Draft {
   return { ...d, when: null, whenTree: cond === undefined ? null : cond };
 }
 
-const onlyActions = (nodes: readonly Node[]): boolean => nodes.every((n) => !isBranch(n) && (ACTIONS as readonly string[]).includes(verbOf(n.step) ?? ''));
+/* OVER NO GRAMMAR A BODY KEEPS THE FORM IT WAS READ WITH: nothing can be added to it, so nothing moves it onto a run. */
+const onlyActions = (nodes: readonly Node[], g: FlowGrammar | null): boolean =>
+  nodes.every((n) => !isBranch(n) && (g === null || actionsOf(g).includes(verbOf(n.step, g) ?? ('' as Verb))));
 
 /**
  * The body a draft saves as, which is exactly what an agent would write for the same flow.
@@ -439,14 +461,14 @@ const onlyActions = (nodes: readonly Node[]): boolean => nodes.every((n) => !isB
  * written trigger without one, because it would fire on every edit of the row. Once for each row is the reading a
  * person means, it is what the seed's own rules say, and it is written into the body so Decide shows it.
  */
-export function bodyOf(d: Draft): Body {
+export function bodyOf(d: Draft, g: FlowGrammar | null = held()): Body {
   const rest: Body = { ...d.rest };
   const t = d.trigger;
   const written = 'written' in t ? t.written : null;
   const plainWrite = written !== null && written.op === undefined && written.fields === undefined && written.from_rules === undefined;
   const inline =
-    plainWrite && d.form === 'then' && onlyActions(d.steps) && rest.project === undefined && rest.limits === undefined && rest.enabled !== false;
-  if (written !== null && hasVerb(d.steps, ONCE) && !(Array.isArray(rest.once_per) && rest.once_per.length > 0)) rest.once_per = ['entry'];
+    plainWrite && d.form === 'then' && onlyActions(d.steps, g) && rest.project === undefined && rest.limits === undefined && rest.enabled !== false;
+  if (written !== null && hasVerb(d.steps, onceOf(g)) && !(Array.isArray(rest.once_per) && rest.once_per.length > 0)) rest.once_per = ['entry'];
   const filed = conditionOf(d);
   const when = filed === null ? {} : { when: filed };
   const name = d.name.trim() === '' ? {} : { name: d.name.trim() };
@@ -627,14 +649,15 @@ export function clockOf(every: string, at?: string, day?: string): Clock {
 /* ── the step kinds, as the menu offers and the inspector edits them ──────── */
 
 /**
- * What each verb is called where a person picks it.
+ * What each verb is called where a person picks it. COPY, NOT THE GRAMMAR: which verbs are offered is the record's
+ * answer, and a verb it holds that this table has no words for is offered by its id in words (`labelOf`).
  *
  * `if` IS "IF" AND NOT "ONLY IF". "Only if" is Zapier's word for a Filter, which stops the Zap, and the runner does not
  * stop: `plan` in `packages/kernel/src/flow.ts` walks the arm it took and then carries on down the parent list either
  * way. A person who picked "Only if" and added the next step under it in the main column believed that step was
  * guarded, and it ran every time.
  */
-export const VERB_LABELS: Record<Verb, string> = {
+export const VERB_LABELS = {
   if: 'If',
   set_var: 'Remember a value',
   stop: 'Stop here',
@@ -645,6 +668,7 @@ export const VERB_LABELS: Record<Verb, string> = {
   link: 'Link to another item',
   note: 'Add a note',
   create: 'Add items',
+  meet: 'Meet a person',
   notify: 'Tell you',
   suggest: 'Suggest on Decide',
   ask_person: 'Ask a person',
@@ -652,9 +676,13 @@ export const VERB_LABELS: Record<Verb, string> = {
   call: 'Call a service',
   run: 'Run a call on this item',
   script: 'Run a script',
+  run_job: 'Start a job',
   wait: 'Wait',
   schedule: 'Come back later',
-};
+} as const satisfies Record<string, string>;
+
+/** What a person calls a verb: its words here, or its id in words for one the record holds and this build does not word. */
+export const labelOf = (verb: string): string => (Object.hasOwn(VERB_LABELS, verb) ? VERB_LABELS[verb as Verb] : idWords(verb));
 
 /**
  * Verbs the record reads but refuses at install on this host, so the menu does not offer them.
@@ -662,32 +690,69 @@ export const VERB_LABELS: Record<Verb, string> = {
  * A FACT ABOUT THE HOST, NOT THE BUILD. `ask_slash` was a constant here, "not in this build", and since `eb1a131b` a
  * self-host with a model installs it: the record's `unserved` refuses the step only where the host has not said it
  * answers `infer.ask` (`slashAskAt` in `packages/kernel/src/flow-lint.ts`). So the canvas asks the flag the record
- * asks, `/api/version`'s `slash`, which the layout reads once for the tab. A body an agent wrote with one on a host
- * with no model still says so before Send.
+ * asks, `/api/version`'s `slash`, which the layout reads once for the tab.
  *
  * READ FROM THE KERNEL'S TABLE (`capabilities.ts`), which the lint, the runner and the agents' grammar read too, so a
  * row flipped there is offered here in the same change. Only whole verbs are menu entries; a row for one key of a step
  * (`ask_person.to`) is not.
  */
-export const notYet = (slash: boolean): readonly Verb[] =>
-  notInThisBuild(slash).steps.filter((s): s is Verb => (VERBS as readonly string[]).includes(s));
+export const notYet = (slash: boolean, g: FlowGrammar | null = held()): readonly Verb[] => {
+  const verbs = verbsOf(g);
+  return notInThisBuild(slash).steps.filter((s): s is Verb => (verbs as readonly string[]).includes(s));
+};
+
+/** §6's five shelves, in the order the menu draws them. */
+export const SHELVES = ['Check', 'Change', 'Ask', 'Call out', 'Wait'] as const;
+export type Shelf = (typeof SHELVES)[number];
 
 /**
- * §6's five groups, in the order the menu draws them. Every verb the menu offers is in exactly one.
+ * Which shelf a verb sits on in the menu. COPY: where a person looks for it, not what the record holds. A verb with no
+ * shelf here goes by the grammar's group, an action to Change and a step's own verb to Call out.
  *
  * SLASH AFTER A PERSON in the Ask group, where a model is: a person is the answer that works on every host, and the
- * fault on a host with none sends somebody there.
+ * fault on a host with none sends somebody there. The order of this table is the order within a shelf.
  */
-export function stepGroups(slash: boolean): readonly { label: string; verbs: readonly Verb[] }[] {
-  const held = notYet(slash);
-  const offer = (verbs: readonly Verb[]): Verb[] => verbs.filter((v) => !held.includes(v));
-  return [
-    { label: 'Check', verbs: offer(['if', 'set_var', 'stop']) },
-    { label: 'Change', verbs: offer(['tag', 'untag', 'set', 'move', 'link', 'note', 'create']) },
-    { label: 'Ask', verbs: offer(['notify', 'suggest', 'ask_person', 'ask_slash']) },
-    { label: 'Call out', verbs: offer(['call', 'run', 'script']) },
-    { label: 'Wait', verbs: offer(['wait', 'schedule']) },
-  ];
+const SHELF: Partial<Record<Verb, Shelf>> = {
+  if: 'Check',
+  set_var: 'Check',
+  stop: 'Check',
+  tag: 'Change',
+  untag: 'Change',
+  set: 'Change',
+  move: 'Change',
+  link: 'Change',
+  note: 'Change',
+  create: 'Change',
+  meet: 'Change',
+  notify: 'Ask',
+  suggest: 'Ask',
+  ask_person: 'Ask',
+  ask_slash: 'Ask',
+  call: 'Call out',
+  run: 'Call out',
+  script: 'Call out',
+  run_job: 'Call out',
+  wait: 'Wait',
+  schedule: 'Wait',
+};
+
+/**
+ * EVERY STEP THE GRAMMAR HOLDS, on its shelf, less what this host refuses at install. A shelf with nothing on it is
+ * left out, so over an older record there is nothing to draw at all.
+ */
+export function stepGroups(slash: boolean, g: FlowGrammar | null = held()): readonly { label: Shelf; verbs: readonly Verb[] }[] {
+  const refused = notYet(slash, g);
+  const order = Object.keys(SHELF);
+  const rank = (v: string) => (order.includes(v) ? order.indexOf(v) : order.length);
+  const shelfOf = (s: GrammarStep): Shelf => SHELF[s.verb as Verb] ?? (s.group === 'action' ? 'Change' : 'Call out');
+  const offered = (g?.steps ?? []).filter((s) => !refused.includes(s.verb as Verb));
+  return SHELVES.map((label) => ({
+    label,
+    verbs: offered
+      .filter((s) => shelfOf(s) === label)
+      .map((s) => s.verb as Verb)
+      .sort((a, b) => rank(a) - rank(b)),
+  })).filter((shelf) => shelf.verbs.length > 0);
 }
 
 /**
@@ -695,7 +760,7 @@ export function stepGroups(slash: boolean): readonly { label: string; verbs: rea
  * "Run a call on this item") leaves a stranger guessing. Said as the runner does it (`packages/kernel/src/flow.ts`), and
  * the search in the sheet reads these words as well as the label.
  */
-export const STEP_HELP: Record<Verb, string> = {
+export const STEP_HELP: Partial<Record<Verb, string>> = {
   if: 'Take one of two ways, depending on a condition.',
   set_var: 'Keep a value under a name, for later steps to use.',
   stop: 'End the run here, and do nothing after.',
@@ -706,6 +771,7 @@ export const STEP_HELP: Record<Verb, string> = {
   link: 'Point one of its fields at an item in another list.',
   note: 'Write a note on it.',
   create: 'Add new items to a list.',
+  meet: 'Add someone to People, or say where you met someone already there.',
   notify: 'Send you a message.',
   suggest: 'Put a question on Decide for you to answer.',
   ask_person: 'Ask someone on this record and wait for the answer.',
@@ -713,54 +779,16 @@ export const STEP_HELP: Record<Verb, string> = {
   call: 'Fetch from a service you declared, and keep what it answers.',
   run: 'Send it to a service you declared.',
   script: 'Start one of your scripts.',
+  run_job: 'Start a job you approved, on your own machine.',
   wait: 'Pause, then carry on with the next step.',
   schedule: 'Put a reminder on it for a later day.',
 };
 
-/** A new step of one kind, with the arguments it needs present and empty, so the inspector has something to fill. */
-export function blankStep(verb: Verb): Step {
-  switch (verb) {
-    case 'if':
-      return { if: '' };
-    case 'set_var':
-      return { set_var: { name: '', to: '' } };
-    case 'stop':
-      return { stop: true };
-    case 'tag':
-    case 'untag':
-    case 'move':
-    case 'note':
-    case 'run':
-      return { [verb]: '' };
-    case 'set':
-      return { set: { field: '', to: '' } };
-    case 'link':
-      return { link: { field: '', to: { register: '', by: '', value: '' } } };
-    case 'create':
-      return { create: { register: '', bound: 1, fields: {} } };
-    case 'notify':
-      return { notify: { say: '' } };
-    case 'suggest':
-      return { suggest: { question: '', options: ['Yes', 'No'] } };
-    case 'ask_person':
-      return { ask_person: { question: '', options: ['Yes', 'No'], as: '' } };
-    case 'ask_slash':
-      return { ask_slash: { question: '', as: '' } };
-    case 'call':
-      return { call: { ingest: '' } };
-    case 'script':
-      /* NO `as: ''`. The inspector leaves an emptied optional box out, but a step nobody opened keeps what it was born
-         with, and the lint refuses '' as a name where it takes no `as` at all. */
-      return { script: { id: '' } };
-    case 'wait':
-      return { wait: '1h' };
-    case 'schedule':
-      return { schedule: { in: '1d', note: '' } };
-  }
-}
+/** The line under a verb in the menu, or none for a verb this build has no words for. */
+export const helpOf = (verb: string): string => STEP_HELP[verb as Verb] ?? '';
 
 /**
- * One argument as the inspector draws it.
+ * One argument as the inspector draws it: the grammar's argument (`name`, `required`, `from`) with this build's words.
  *
  * `text` is one line, `long` is a paragraph, `name` is an answer's name, `span` is a wait in the clock grammar,
  * `later` is a `schedule` span in the vault's grammar (where `m` is a month), `list` is one item a line, `pairs` is
@@ -769,17 +797,28 @@ export function blankStep(verb: Verb): Step {
  *
  * `shape` is what Slash's answer has to be, picked from `SLASH_SHAPES`, and `fields` is some of the run's row's
  * fields, picked from the list's own. `when` says the argument means something only while the step holds something
- * else: `choices` is refused by the lint on an answer that is not a choice, so it is drawn only for one.
+ * else: `choices` is refused by the lint on an answer that is not a choice, so it is drawn only for one. `from` is
+ * what the record says the value is picked from, so a picker offers names and never asks for an id.
  */
 export type ArgKind = 'text' | 'long' | 'name' | 'number' | 'span' | 'later' | 'list' | 'pairs' | 'condition' | 'shape' | 'fields';
-type ArgBase = { path: readonly string[]; label: string; kind: ArgKind; template?: boolean; hint?: string; when?: (step: Step) => boolean };
+type ArgBase = {
+  name: string;
+  path: readonly string[];
+  label: string;
+  kind: ArgKind;
+  template?: boolean;
+  hint?: string;
+  from?: ArgFrom | string;
+  when?: (step: Step) => boolean;
+};
 /**
- * A REQUIRED ARGUMENT CARRIES THE SENTENCE ITS ABSENCE SAYS, and the type will not take one without it. The fault was
- * assembled, `${verb} needs ${label}.`, and worked through `ARGS` it said "Tell you needs say.", "Add a note needs
- * note." and "Ask Slash needs keep the answer as.". A label names a field; it does
- * not also make a sentence with a verb's name in front of it.
+ * A REQUIRED ARGUMENT CARRIES THE SENTENCE ITS ABSENCE SAYS. The fault was assembled, `${verb} needs ${label}.`, and
+ * said "Tell you needs say."; a label names a field, and does not also make a sentence with a verb's name in front.
  */
 export type Arg = (ArgBase & { required?: false }) | (ArgBase & { required: true; missing: string });
+
+/** The words for one argument: everything the grammar does not say. `start` is what a new step begins with. */
+type ArgWords = { label: string; kind?: ArgKind; template?: true; hint?: string; missing?: string; when?: (step: Step) => boolean; start?: unknown };
 
 /** One sentence, for every step that keeps an answer, because the reason to name it is the same each time. */
 const NAME_IT = 'Name the answer, so later steps can use it.';
@@ -787,87 +826,169 @@ const NAME_IT = 'Name the answer, so later steps can use it.';
 /**
  * The example shown wherever a condition is written in words: a branch's "Only when" and the trigger's.
  *
- * IT SHOWS A NUMBER COMPARED, because that is the test a person reaches for first and the one the example used to
- * leave out. It read "state is open, due before today", typed twice (here and as a literal on the trigger's field in
- * `Inspector.svelte`), from when the sentence had no ordered words; since `3187be5a` it reads more than, at least,
- * less than, at most and between, and an example that never showed one taught that the "A number" builder was the only
- * way to ask. One constant, so the two fields cannot drift apart again.
+ * IT SHOWS A NUMBER COMPARED, because that is the test a person reaches for first. One constant, so the two fields
+ * cannot drift apart again.
  */
 export const CONDITION_HINT = 'amount is more than USD 500, due before today';
 
-export const ARGS: Record<Verb, readonly Arg[]> = {
-  if: [{ path: ['if'], label: 'Only when', kind: 'condition', required: true, missing: 'Write what has to be true for this branch.', hint: CONDITION_HINT }],
-  set_var: [
-    { path: ['set_var', 'name'], label: 'Call it', kind: 'name', required: true, missing: 'Name the value, so later steps can use it.' },
-    { path: ['set_var', 'to'], label: 'Value', kind: 'text', template: true },
-  ],
-  stop: [],
-  tag: [{ path: ['tag'], label: 'Tag', kind: 'text', required: true, missing: 'Say which tag to add.' }],
-  untag: [{ path: ['untag'], label: 'Tag', kind: 'text', required: true, missing: 'Say which tag to take off.' }],
-  set: [
-    { path: ['set', 'field'], label: 'Field', kind: 'text', required: true, missing: 'Say which field to set.' },
-    { path: ['set', 'to'], label: 'To', kind: 'text', template: true },
-  ],
-  move: [{ path: ['move'], label: 'To the state', kind: 'text', required: true, missing: 'Say which state to move it to.' }],
-  link: [
-    { path: ['link', 'field'], label: 'Field', kind: 'text', required: true, missing: 'Say which field holds the link.' },
-    { path: ['link', 'to', 'register'], label: 'In the list', kind: 'text', required: true, missing: 'Say which list the other item is in.' },
-    { path: ['link', 'to', 'by'], label: 'Matched by the field', kind: 'text', required: true, missing: 'Say which field finds the other item.' },
-    { path: ['link', 'to', 'value'], label: 'Equal to', kind: 'text', required: true, missing: 'Say what that field has to be.', template: true },
-  ],
-  note: [{ path: ['note'], label: 'Note', kind: 'long', required: true, missing: 'Write the note.', template: true }],
-  create: [
-    { path: ['create', 'register'], label: 'In the list', kind: 'text', required: true, missing: 'Say which list the new items go in.' },
-    { path: ['create', 'bound'], label: 'At most this many', kind: 'number', required: true, missing: 'Say how many it may add at most.' },
-    { path: ['create', 'fields'], label: 'Fields', kind: 'pairs', template: true, hint: 'title: Chase the invoice' },
-  ],
-  notify: [{ path: ['notify', 'say'], label: 'Say', kind: 'long', required: true, missing: 'Say what to tell you.', template: true }],
-  suggest: [
-    { path: ['suggest', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question to put on Decide.', template: true },
-    { path: ['suggest', 'options'], label: 'Answers', kind: 'list', required: true, missing: 'Give at least one answer to choose from.' },
-  ],
-  ask_person: [
-    { path: ['ask_person', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question to ask.', template: true },
-    { path: ['ask_person', 'options'], label: 'Answers', kind: 'list', required: true, missing: 'Give at least one answer to choose from.' },
-    /* OPTIONAL: left out, the question is the owner's to answer, as it always was. Picked from the record's members
-       (`chips.ts` `pickerOf`), since `to:` holds a member's id, which nobody should have to type. */
-    { path: ['ask_person', 'to'], label: 'Put it to', kind: 'text' },
-    { path: ['ask_person', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
-    { path: ['ask_person', 'wait'], label: 'Wait at most', kind: 'span', hint: '7d' },
-  ],
-  /* THE SHAPE, THE CHOICES AND `about` WERE WRITTEN ONLY THROUGH MCP OR A `.dog` FILE: the runner held an
-     answer to its shape and sent the named fields with the question, and the canvas drew the question and the name and
-     nothing else, so a choice could not be asked from here at all. The two optional ones are left out when unset, as
-     the runner reads no `shape` as text and no `about` as no fields. What a choice with nothing to choose from lacks is
-     the lint's to say (`flow-lint.ts`, the `ask_slash` case), on the card its `at` names. */
-  ask_slash: [
-    { path: ['ask_slash', 'question'], label: 'Question', kind: 'long', required: true, missing: 'Write the question for Slash.', template: true },
-    { path: ['ask_slash', 'shape'], label: 'The answer is', kind: 'shape' },
-    { path: ['ask_slash', 'choices'], label: 'Slash picks one of', kind: 'list', hint: 'One a line', when: (s) => slashShape(s) === 'choice' },
-    { path: ['ask_slash', 'about'], label: 'Send these fields with it', kind: 'fields' },
-    { path: ['ask_slash', 'as'], label: 'Keep the answer as', kind: 'name', required: true, missing: NAME_IT },
-  ],
-  call: [
-    { path: ['call', 'ingest'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to make.', hint: 'exchange_rate' },
-    { path: ['call', 'as'], label: 'Keep the answer as', kind: 'name' },
-  ],
-  run: [{ path: ['run'], label: 'The declared call', kind: 'text', required: true, missing: 'Say which call to run on this item.' }],
-  /* A SCRIPT STEP KEEPS NO ANSWER. `startScript` in `packages/kernel/src/flow.ts` queues a `script.run` job and goes on,
-     and `as:` holds that job's id; what the script returns never comes back into the run. The field said "Keep the
-     answer as" and its absence said `NAME_IT`, so a person named a value no step would ever see.
-     OPTIONAL, AS `call.as` IS. It was required here only because the lint (`flow-lint.ts`, the `script` case) refused a
-     step with none, though the runner never needed it; the lint and this dropped it together, and
-     `flow-script-as.test.ts` holds the two in step. */
-  script: [
-    { path: ['script', 'id'], label: 'The script', kind: 'text', required: true, missing: 'Say which script to run.' },
-    { path: ['script', 'as'], label: 'Call its run', kind: 'name' },
-  ],
-  wait: [{ path: ['wait'], label: 'For', kind: 'span', required: true, missing: 'Say how long to wait.', hint: '2h' }],
-  schedule: [
-    { path: ['schedule', 'in'], label: 'In', kind: 'later', required: true, missing: 'Say when to come back.', hint: '14d' },
-    { path: ['schedule', 'note'], label: 'Note', kind: 'text', required: true, missing: 'Write what to come back to.', template: true },
-  ],
+/**
+ * THE WORDS FOR EACH ARGUMENT, by verb and by the grammar's argument name. COPY: which arguments a step has, and which
+ * are required, is the grammar's. A name the record holds and this table does not word is drawn from its type and its
+ * name in words (`argOf`), so `meet` and `run_job` would have had forms before a word was written for them.
+ */
+const ARG_WORDS: Partial<Record<Verb, Record<string, ArgWords>>> = {
+  if: { if: { label: 'Only when', kind: 'condition', missing: 'Write what has to be true for this branch.', hint: CONDITION_HINT, start: '' } },
+  set_var: { name: { label: 'Call it', kind: 'name', missing: 'Name the value, so later steps can use it.' }, to: { label: 'Value', template: true, start: '' } },
+  tag: { tag: { label: 'Tag', missing: 'Say which tag to add.' } },
+  untag: { untag: { label: 'Tag', missing: 'Say which tag to take off.' } },
+  set: { field: { label: 'Field', missing: 'Say which field to set.' }, to: { label: 'To', template: true, start: '' } },
+  move: { move: { label: 'To the state', missing: 'Say which state to move it to.' } },
+  link: {
+    field: { label: 'Field', missing: 'Say which field holds the link.' },
+    'to.register': { label: 'In the list', missing: 'Say which list the other item is in.' },
+    'to.by': { label: 'Matched by the field', missing: 'Say which field finds the other item.' },
+    'to.value': { label: 'Equal to', missing: 'Say what that field has to be.', template: true },
+  },
+  note: { note: { label: 'Note', kind: 'long', missing: 'Write the note.', template: true } },
+  create: {
+    register: { label: 'In the list', missing: 'Say which list the new items go in.' },
+    bound: { label: 'At most this many', kind: 'number', missing: 'Say how many it may add at most.', start: 1 },
+    fields: { label: 'Fields', kind: 'pairs', template: true, hint: 'title: Chase the invoice', start: {} },
+  },
+  meet: {
+    name: { label: 'Their name', template: true },
+    email: { label: 'Their email', template: true },
+    handle: { label: 'Their handle', template: true },
+    keys: { label: 'Known by', kind: 'list', template: true, hint: 'One a line, such as bank: and the words on the statement' },
+    kind: { label: 'A person or an organisation', hint: 'person' },
+    org: { label: 'Their organisation', template: true },
+    domain: { label: 'Their web address', template: true },
+    role: { label: 'Their role', template: true },
+    where: { label: 'Where you met them', kind: 'long', template: true, missing: 'Say where they were met.' },
+    source: { label: 'Where this came from', template: true },
+    only: { label: 'Only someone already known', hint: 'known' },
+  },
+  notify: { say: { label: 'Say', kind: 'long', missing: 'Say what to tell you.', template: true } },
+  suggest: {
+    question: { label: 'Question', kind: 'long', missing: 'Write the question to put on Decide.', template: true },
+    options: { label: 'Answers', kind: 'list', missing: 'Give at least one answer to choose from.', start: ['Yes', 'No'] },
+  },
+  ask_person: {
+    question: { label: 'Question', kind: 'long', missing: 'Write the question to ask.', template: true },
+    options: { label: 'Answers', kind: 'list', missing: 'Give at least one answer to choose from.', start: ['Yes', 'No'] },
+    /* LEFT OUT, the question is the owner's to answer, as it always was. Picked from the record's members. */
+    to: { label: 'Put it to' },
+    as: { label: 'Keep the answer as', kind: 'name', missing: NAME_IT },
+    wait: { label: 'Wait at most', kind: 'span', hint: '7d' },
+  },
+  ask_slash: {
+    question: { label: 'Question', kind: 'long', missing: 'Write the question for Slash.', template: true },
+    shape: { label: 'The answer is', kind: 'shape' },
+    choices: { label: 'Slash picks one of', kind: 'list', hint: 'One a line', when: (s) => slashShape(s) === 'choice' },
+    about: { label: 'Send these fields with it', kind: 'fields' },
+    as: { label: 'Keep the answer as', kind: 'name', missing: NAME_IT },
+  },
+  call: { ingest: { label: 'The declared call', missing: 'Say which call to make.', hint: 'exchange_rate' }, as: { label: 'Keep the answer as', kind: 'name' } },
+  run: { run: { label: 'The declared call', missing: 'Say which call to run on this item.' } },
+  /* A SCRIPT STEP KEEPS NO ANSWER: `as:` holds the id of the job it queued (`startScript`), so it is not "the answer". */
+  script: { id: { label: 'The script', missing: 'Say which script to run.' }, as: { label: 'Call its run', kind: 'name' } },
+  run_job: {
+    kind: { label: 'The job', missing: 'Say which job to start.' },
+    args: { label: 'What it hands the job', kind: 'pairs', template: true, hint: 'week: this one', start: {} },
+    as: { label: 'Call its run', kind: 'name' },
+  },
+  wait: { wait: { label: 'For', kind: 'span', missing: 'Say how long to wait.', hint: '2h', start: '1h' } },
+  schedule: {
+    in: { label: 'In', kind: 'later', missing: 'Say when to come back.', hint: '14d', start: '1d' },
+    note: { label: 'Note', missing: 'Write what to come back to.', template: true },
+  },
 };
+
+/** The kind an argument is drawn as when its words do not say: by the grammar's type. */
+function kindOfType(type: string): ArgKind {
+  if (type === 'number' || type === 'integer' || type === 'count') return 'number';
+  if (type === 'list' || type.startsWith('list')) return 'list';
+  if (type === 'map' || type === 'pairs' || type === 'object' || type === 'record') return 'pairs';
+  if (type === 'span' || type === 'name' || type === 'condition' || type === 'long' || type === 'later' || type === 'shape' || type === 'fields') return type;
+  return 'text';
+}
+
+/** Where an argument sits in a step: under the verb's key, at its dotted name, or the verb's value itself. */
+export function argPath(verb: string, name: string): string[] {
+  const parts = name.split('.').filter((p) => p !== '');
+  /* A BRANCH'S `then` AND `else` SIT BESIDE `if` AT THE STEP'S ROOT (the kernel's names are paths from the root), so they
+     are never put under the verb's key. */
+  if (verb === 'if' && (parts[0] === 'then' || parts[0] === 'else')) return parts;
+  if (parts[0] === verb) parts.shift();
+  return [verb, ...parts];
+}
+
+/** One grammar argument, worded. */
+function argOf(verb: Verb, a: GrammarArg): Arg {
+  const w = ARG_WORDS[verb]?.[a.name];
+  const label = w?.label ?? idWords(a.name.split('.').pop() ?? a.name);
+  const base: ArgBase = {
+    name: a.name,
+    path: argPath(verb, a.name),
+    label,
+    kind: w?.kind ?? kindOfType(a.type),
+    ...(w?.template ? { template: true } : {}),
+    ...(w?.hint !== undefined ? { hint: w.hint } : {}),
+    ...(a.from !== undefined ? { from: a.from } : {}),
+    ...(w?.when ? { when: w.when } : {}),
+  };
+  return a.required ? { ...base, required: true, missing: w?.missing ?? notPicked(label) } : base;
+}
+
+/** The hint for a required argument this build has no sentence for. */
+const notPicked = (label: string): string => `${label} is not picked yet.`;
+
+/** A step's arguments as the inspector draws them, in the grammar's order. None for a verb the grammar does not hold. */
+export const argsFor = (verb: Verb, g: FlowGrammar | null = held()): Arg[] => (grammarStep(verb, g)?.args ?? []).map((a) => argOf(verb, a));
+
+/**
+ * `ARGS[verb]`, READ FROM THE TAB'S GRAMMAR AT EACH LOOK, for the inspector, which indexes it. It holds nothing of its
+ * own: every read is `argsFor(verb)`.
+ */
+export const ARGS: Readonly<Record<Verb, readonly Arg[]>> = new Proxy({} as Record<Verb, readonly Arg[]>, {
+  get: (_, verb) => (typeof verb === 'string' ? argsFor(verb as Verb) : undefined),
+  has: (_, verb) => typeof verb === 'string' && grammarStep(verb) !== undefined,
+  ownKeys: () => verbsOf(),
+  getOwnPropertyDescriptor: (_, verb) =>
+    typeof verb === 'string' && grammarStep(verb) !== undefined ? { enumerable: true, configurable: true, value: argsFor(verb as Verb) } : undefined,
+});
+
+/** What an argument starts as in a new step, when it has to be there: its words' start, or empty by its type. */
+function startOf(verb: Verb, a: GrammarArg): unknown {
+  const w = ARG_WORDS[verb]?.[a.name];
+  if (w && 'start' in w) return w.start;
+  const kind = w?.kind ?? kindOfType(a.type);
+  if (kind === 'list') return [];
+  if (kind === 'pairs') return {};
+  if (kind === 'number') return 0;
+  if (a.type === 'boolean' || a.type === 'true') return true;
+  return '';
+}
+
+/**
+ * A new step of one kind, with the arguments it needs present and empty, so the inspector has something to fill:
+ * every required one, and an optional one only where its words give it a start. A step that takes nothing is `true`.
+ *
+ * NO EMPTY OPTIONAL NAME. A step nobody opened keeps what it was born with, and the lint refuses '' as a name where it
+ * takes no `as` at all, so `{ script: { id: '' } }` is born with no `as`.
+ */
+export function blankStep(verb: Verb, g: FlowGrammar | null = held()): Step {
+  const args = grammarStep(verb, g)?.args ?? [];
+  if (args.length === 0) return { [verb]: true };
+  const own = args.find((a) => argPath(verb, a.name).length === 1);
+  if (own) return { [verb]: startOf(verb, own) };
+  let step: Step = { [verb]: {} };
+  for (const a of args) {
+    const w = ARG_WORDS[verb]?.[a.name];
+    if (a.required || (w && 'start' in w)) step = setAt(step, argPath(verb, a.name), startOf(verb, a));
+  }
+  return step;
+}
 
 /* ── what Slash answers, and what goes with the question ──────────────────── */
 
@@ -930,6 +1051,10 @@ export function slashSendable(fields: readonly { id: string; type: string; of?: 
 
 /* ── what a card says ─────────────────────────────────────────────────────── */
 
+const COUNT_WORDS = ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+/** A small count as a word, as a sentence says one; a larger one as its figure. */
+const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
+
 export const words = {
   heading: 'Automations',
   newOne: 'New automation',
@@ -983,7 +1108,8 @@ export const words = {
   nothingChanged: 'Nothing has changed since it was opened.',
   faults: 'Before it can be sent',
   insideItself: 'A branch cannot go inside itself.',
-  tooDeep: 'Branches go three deep at most, and this would make four.',
+  /* THE CEILING IS THE GRAMMAR'S, said as a word: the copy said "three" while the number was kept beside it by hand. */
+  tooDeep: (most: number) => `Branches go ${countWord(most)} deep at most, and this would make ${countWord(most + 1)}.`,
   alreadyFirst: 'It is already first here.',
   alreadyLast: 'It is already last here.',
   noBranchBeside: 'There is no branch next to it to move into.',
@@ -1308,19 +1434,36 @@ function saying(step: Step): string {
       return aloud(a) === '' ? 'Wait' : `Wait ${spanWords(aloud(a))}`;
     case 'schedule':
       return at('in') === '' ? 'Come back later' : withText(`Come back in ${laterWords(at('in'))}`, at('note'));
+    /* WHO, BY WHAT THE STEP CALLS THEM, and never by `keys`, which are a bank's or a door's own handles on somebody. */
+    case 'meet': {
+      const who = at('name') || at('org') || at('email') || at('handle') || at('domain');
+      const lead = who !== '' ? `Meet ${who}` : isObject(a) && a.keys !== undefined ? 'Meet the person it names' : 'Meet a person';
+      return withText(lead, at('where'));
+    }
+    /* THE JOB BY ITS NAME IN WORDS, not its declared id (`job.weekly-notes`), and the run's handle as the person named it. */
+    case 'run_job':
+      return at('kind') === '' ? 'Start a job' : `Start the job ${jobName(at('kind'))}${at('as') ? `, keeping the id of its run as ${at('as')}` : ''}`;
     case null:
       return 'A step this build cannot draw';
+    /* A VERB THE RECORD HOLDS AND THIS BUILD HAS NO WORDS FOR: its id in words and what its arguments hold. */
+    default:
+      return withText(labelOf(verb), argsFor(verb).map((arg) => aloud(getAt(step, arg.path))).filter((v) => v !== '').join(', '));
   }
 }
+
+/** A kind of job as a person says it: its declared id without `job.`, in words. A reference is left as it is. */
+export const jobName = (kind: string): string => (kind.includes('\u0002') ? kind : idWords(kind.replace(/^job\./u, '')));
 
 /* ── what a step may read ─────────────────────────────────────────────────── */
 
 /** The answer a step keeps, as its name, or `null` when it keeps none. */
 function keeps(step: Step): string | null {
   const verb = verbOf(step);
+  if (verb === null) return null;
   if (verb === 'set_var') return str(getAt(step, ['set_var', 'name'])) || null;
-  if (verb === 'call' || verb === 'script' || verb === 'ask_slash' || verb === 'ask_person') return str(getAt(step, [verb, 'as'])) || null;
-  return null;
+  /* EVERY STEP THAT KEEPS ONE KEEPS IT UNDER `as`, a call, an ask, a script's or a job's run, so a verb the grammar adds
+     with an `as` is read without a line here. */
+  return str(getAt(step, [verb, 'as'])) || null;
 }
 
 /**
@@ -1427,37 +1570,41 @@ export type Fault = { key: string | null; say: string };
 const blank = (v: unknown): boolean =>
   v === undefined || v === null || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0) || (typeof v === 'number' && !(v > 0));
 
+/** The hint for a trigger's required argument, by trigger and argument name. COPY, as `ARG_WORDS` is. */
+const TRIGGER_MISSING: Record<string, Record<string, string>> = {
+  written: { register: 'Say which list it watches.' },
+  metric: { id: 'Say which figure it watches.' },
+};
+
 /**
- * What is plainly missing from this draft, one sentence each, with the card each is about: a list not picked, a figure
- * not picked, no step at all, a required field left empty, a branch with nothing under If so.
+ * What is not picked yet in this draft, one sentence each, with the card each is about (`null` for the trigger): every
+ * argument the grammar says is required and the draft leaves empty, and nothing else.
  *
- * ONLY WHAT NEEDS NO SECOND READING. This was a second copy of the record's lint, a
- * hundred and forty lines of it, and it drifted: it refused a condition on an arrival after the runner learned to read
- * one, and said a figure trigger would never start after the sweep started it. Every other fault now comes from the
- * record's own lint through `checkAutomation`, placed on the card its `at` names (`FlowDraft.served`), so there is one
- * reading of a body and it is the one that installs it.
+ * ALL OTHER FAULTS ARE THE RECORD'S (HD.438). This was a second copy of the record's lint, and it drifted: it refused a
+ * condition on an arrival after the runner learned to read one, and said a figure trigger would never start after the
+ * sweep started it. An empty automation, a branch with nothing under it and a step this host cannot run are said by
+ * `checkAutomation`, placed on the card its `at` names (`FlowDraft.served`), so there is one reading of a body and it is
+ * the one that installs it. Over no grammar nothing is required, so nothing is said here.
  *
- * `slash` STAYS, because it is a fact this tab already holds and the menu already acts on: a step the menu would not
- * offer here, written by an agent, is said on its card before anybody asks the record.
+ * `slash` IS TAKEN AND NOT READ, for the callers that still hand it in: whether this host answers Slash is the record's
+ * to say of a step now, as it says it of every other.
  */
-export function faultsOf(d: Draft, { slash }: { slash: boolean } = { slash: false }): Fault[] {
+export function faultsOf(d: Draft, opts: { slash?: boolean; grammar?: FlowGrammar | null } = {}): Fault[] {
+  const g = opts.grammar === undefined ? held() : opts.grammar;
   const out: Fault[] = [];
-  const t = d.trigger;
-  if ('written' in t && t.written.register.trim() === '') out.push({ key: null, say: 'Say which list it watches.' });
-  if ('metric' in t && t.metric.id.trim() === '') out.push({ key: null, say: 'Say which figure it watches.' });
-  if (d.steps.length === 0) out.push({ key: null, say: 'An automation does at least one step.' });
+  const kind = triggerKind(d.trigger);
+  for (const a of g?.triggers.find((t) => t.id === kind)?.args ?? []) {
+    if (!a.required || !blank(getAt(d.trigger, argPath(kind, a.name)))) continue;
+    out.push({ key: null, say: TRIGGER_MISSING[kind]?.[a.name] ?? notPicked(idWords(a.name.split('.').pop() ?? a.name)) });
+  }
 
   const walk = (list: readonly Node[]) => {
     for (const n of list) {
-      const verb = verbOf(n.step);
-      if (verb === null) continue;
-      if (notYet(slash).includes(verb)) out.push({ key: n.key, say: 'This BrainDog has no model for Slash to answer with. Ask a person instead.' });
-      for (const arg of ARGS[verb]) if (arg.required && (arg.when?.(n.step) ?? true) && blank(getAt(n.step, arg.path))) out.push({ key: n.key, say: arg.missing });
-      if (verb === 'if') {
-        if ((n.then ?? []).length === 0) out.push({ key: n.key, say: 'Add a step under If so, or this branch does nothing.' });
-        walk(n.then ?? []);
-        walk(n.else ?? []);
-      }
+      const verb = verbOf(n.step, g);
+      if (verb !== null)
+        for (const arg of argsFor(verb, g)) if (arg.required && (arg.when?.(n.step) ?? true) && blank(getAt(n.step, arg.path))) out.push({ key: n.key, say: arg.missing });
+      walk(n.then ?? []);
+      walk(n.else ?? []);
     }
   };
   walk(d.steps);

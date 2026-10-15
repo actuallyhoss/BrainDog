@@ -198,7 +198,8 @@ test('A FILE WITH A BLOCK THIS BUILD DOES NOT DRAW IS SAID PLAINLY, WITH ITS COD
 });
 
 test('AFTER AN INSTALL THE EXAMPLES ARE LINKED AND THE FILE ORDER LEADS THE READER ARRANGEMENT', async () => {
-  /* THE GUIDE'S, since Student 1.3.0 carries no example to link. */
+  /* THE GUIDE'S PLAN, HANDED IN AS THE FILE CARRIES IT (`UseCase.links`): since the guide lost its example rows its own
+     table names none (`links.ts`), and a shared file's links are what the install links. */
   const rows: Record<string, { seq: number; fields: Record<string, unknown> }[]> = {
     steps: [{ seq: 1, fields: { what: 'Write one sentence about what this is and who it is for', tags: ['example'] } }],
     milestones: [{ seq: 4, fields: { what: 'Say what it is and who it is for', tags: ['example'] } }],
@@ -208,7 +209,8 @@ test('AFTER AN INSTALL THE EXAMPLES ARE LINKED AND THE FILE ORDER LEADS THE READ
     list: async ({ register }: { register: string }) => ok({ rows: rows[register] ?? [] }),
     update: async (args: { register: string; seq: number; patch: Record<string, unknown> }) => (updates.push(args), ok({})),
   };
-  const plan = { ...sharedPlanOf(ANSWER)!, usecase: { ...sharedPlanOf(ANSWER)!.usecase, id: 'guide' }, nav: ['/r/milestones', '/r/steps'] };
+  const links = [{ register: 'steps', title: 'Write one sentence about what this is and who it is for', field: 'milestone', to: 'milestones', target: 'Say what it is and who it is for' }];
+  const plan = { ...sharedPlanOf(ANSWER, [], links)!, usecase: { ...sharedPlanOf(ANSWER)!.usecase, id: 'guide' }, nav: ['/r/milestones', '/r/steps'] };
   const out = await afterInstall(client, plan, ['/p/money', '/r/steps']);
   assert.deepEqual(out.nav, ['/r/milestones', '/r/steps', '/p/money']);
   assert.ok(out.links >= 1, 'no example was linked');

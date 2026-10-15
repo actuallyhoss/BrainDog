@@ -4,27 +4,36 @@
   USE CASE 6, STEPS 1 TO 4 (his word of 9 October, `loop/progress/planner-45.md`, "The onboarding target").
 
   1. DESCRIBE. "Who are you?", one field, the first run's five chips and three promises under them. As it is typed, the
-     rules read it on this device (`proposeFirst` with no model, `lib/start/propose.ts`): Turnstile is not keyed, so no
-     model reads a stranger's words yet (USE-B05), and nothing typed leaves the device until the person keeps it.
+     rules read it on this device, a beat after each key (`proposeFirst` with no model, `lib/start/propose.ts`), and
+     nothing typed leaves the device. ON THE PERSON'S PRESS OF NEXT, AND ONLY THEN (USE-B05, `readerFor` in
+     `lib/signup.ts`), a model reads it once at the host's reading door (`readAsks(origin).setup`, `/auth/signup/read`),
+     with a fresh bot-check answer taken from the read's own widget first. One line under the field says so before the
+     press, until the host answers 501 (no door, no model or no bot check), which this tab then remembers. A 501, any
+     refusal or a silence leaves the rules' reading on screen, and the build says "Simple rules read this" whenever the
+     reading is the rules', for any cause (`firstRun.readByRulesAny`, `../start/Building.svelte`). The model's reading
+     stands for the words it read, so a press with nothing changed is not read twice; a key changes them back to the rules'.
   2. HER WORDS LIGHT UP. The words heard are marked in the field itself, where each line says it sits (`heard[].at`,
      `litIn`), under "What I heard": her name as "you", then each phrase and what it became. A line is pressed to change
      what it became or take it out (`amend`), and the BrainDog builds beside it (`../start/Building.svelte`). "That's me".
-  3. ONE QUESTION, at most: the one `oneQuestion` picks, its answers each with what it means, and "That is the only
-     question". With none to ask it goes straight on; with nothing placed at all, it asks what it is closest to.
+  3. ONE QUESTION, at most: the model's where its reading carried one (`askOf`), else the one `oneQuestion` picks, its
+     answers each with what it means, and "That is the only question". Never two. The model's asking what the rules would
+     (the name, the currency) is answered as theirs is (`answeredAs`); one about anything else is the person telling it
+     more, and that press reads the words once again. With none to ask it goes straight on; with nothing placed at all,
+     it asks what it is closest to.
   4. KEEP IT. The title with Change (`NameField`), the places, one email, "Email me a link", and where to open it.
 
   THEN ONE EMAIL. The record's name is chosen from what was heard, the business first, then the person, then the
   address (`lib/signup.ts` `recordNames`, `chooseName`, trying `-2` to `-9`), and said as one quiet line with Change.
   Turnstile stands under the field when the host asks for it. A person already signed in is asked for nothing more.
 
-  THEN THE LINK, AND THE BUILD IS MADE IN THE PAGE. The sentence waits for the link in `localStorage` (`keepSaid`),
-  because the link opens a new tab. Spending it makes the free record (`checkout` with `plan: 'free'`), opens it, and
-  writes the build into it with `/start`'s own `accept()`, here, with no jump to a second screen to answer again; then
-  the record's `/start#made` offers one agent and one source before Home. A link opened on another device has no
-  sentence but the one the link carries (`said`, read back by `arrivalOf`). BEFORE THE BUILD, the passkey is offered
-  (`../start/PasskeyFirst.svelte`), and a passkey made or "Not now" goes on to the build. What was changed by hand and the
-  answer wait beside the sentence on this device (`keepAmend`), laid over the second reading so the build is what the
-  screen showed.
+  THEN THE LINK, AND THE BUILD IS MADE IN THE PAGE. The sentence and the whole reading the person kept wait for the link
+  in `localStorage` (`keepSaid`), because the link opens a new tab. Spending it makes the free record (`checkout` with
+  `plan: 'free'`), opens it, and writes the kept reading into it with `/start`'s own `accept()`, here, never reading
+  again (`readingKept`); then the record's `/start#made` offers one agent and one source before Home. A link opened on
+  another device has only what the link carries (`said`, read back by `arrivalOf`): the reading too where all of it fits,
+  else the sentence, which its rules read. BEFORE THE BUILD, the passkey is offered (`../start/PasskeyFirst.svelte`),
+  and a passkey made or "Not now" goes on to the build. What was changed by hand and the answer wait beside the sentence
+  on this device (`keepAmend`), laid over the kept reading so the build is what the screen showed.
 
   ON `?plan=cloud` OR `?plan=plus` the link leads to Stripe's page on that plan instead (`NoRecord`), and the build is
   written once the payment has made the record (`#paid`). `#cancelled` is the payment step again. Free leads (§35).
@@ -82,13 +91,23 @@
     startSignup,
     verifySignup,
     zone,
+    answeredAs,
+    askOf,
+    keepReadsOff,
+    readerFor,
+    readingKept,
+    READS_OFF,
+    readsOffKept,
     type Draft,
     type Held,
+    type ModelAsk,
     type Plan,
+    type ReadCause,
   } from '$lib/signup.ts';
   import { heardOf, offerOf, readCatalogueOffer, type CatalogueOffer } from '$lib/start/offer.ts';
   import { placesOf, proposeFirst, type HeardLine, type Proposal } from '$lib/start/propose.ts';
-  import { answer, oneQuestion } from '$lib/start/question.ts';
+  import { readAsks } from '$lib/start/ask.ts';
+  import { answer, oneQuestion, words as asked, type Question } from '$lib/start/question.ts';
   import { titleOf } from '$lib/title.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -140,6 +159,9 @@
     | 'pay'
     | 'waiting'
     | 'slow';
+
+  /** The one question as the screen asks it: the rules' (`Question`) or the model's, with the answer it fills. */
+  type Shown = Omit<Question, 'about'> & { about: string; reply: Reply['about'] | null };
 
   let step = $state<Step>('loading');
   /* THE PLAN THE SITE'S BUTTON ASKED FOR, Free when it asked for none. */
@@ -198,6 +220,7 @@
     render: (el: HTMLElement, options: Record<string, unknown>) => string;
     reset: (id: string) => void;
     remove: (id: string) => void;
+    execute: (el: HTMLElement | string) => void;
   };
   const turnstileOf = (): Turnstile | null => (globalThis as { turnstile?: Turnstile }).turnstile ?? null;
 
@@ -208,9 +231,8 @@
    * that pushes the page sideways at 320. The answer is single use, so every failed send resets it.
    */
   function loadTurnstile(key: string, el: HTMLElement): void {
-    const draw = () => {
-      const t = turnstileOf();
-      if (!t || widgetId !== null) return;
+    withTurnstile((t) => {
+      if (widgetId !== null) return;
       widgetId = t.render(el, {
         sitekey: key,
         size: 'flexible',
@@ -218,14 +240,85 @@
         'expired-callback': () => (human = null),
         'error-callback': () => (human = null),
       });
-    };
-    if (turnstileOf()) return draw();
-    const script = document.createElement('script');
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-    script.async = true;
-    script.onload = draw;
-    document.head.append(script);
+    });
   }
+
+  /** Cloudflare's script, added to the page once, and `then` once it is there. */
+  function withTurnstile(then: (t: Turnstile) => void): void {
+    const now = turnstileOf();
+    if (now) return then(now);
+    let script = document.querySelector<HTMLScriptElement>('script[data-turnstile]');
+    if (script === null) {
+      script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.dataset.turnstile = '';
+      document.head.append(script);
+    }
+    script.addEventListener('load', () => {
+      const t = turnstileOf();
+      if (t) then(t);
+    });
+  }
+
+  /*
+   * THE READ'S OWN ANSWER, TAKEN FRESH BEFORE EACH READ. The describe step has its own slot, drawn only when Cloudflare
+   * needs the person to do something (`interaction-only`) and run only when asked (`execute`), so the field stays the
+   * screen. An answer is good once, so each read resets the widget and asks it again; one that does not come within
+   * `HUMAN_MS` is none, and the rules read instead.
+   */
+  const HUMAN_MS = 15_000;
+  let readSlot = $state<HTMLElement | null>(null);
+  let readWidget: string | null = null;
+  let readHuman: ((answer: string | null) => void) | null = null;
+
+  function freshHuman(): Promise<string | null> {
+    const key = siteKey;
+    const el = readSlot;
+    if (key === null) return Promise.resolve('');
+    if (el === null) return Promise.resolve(null);
+    return new Promise((done) => {
+      let over = false;
+      const end = (answer: string | null) => {
+        if (over) return;
+        over = true;
+        clearTimeout(timer);
+        readHuman = null;
+        done(answer);
+      };
+      const timer = setTimeout(() => end(null), HUMAN_MS);
+      readHuman = end;
+      withTurnstile((t) => {
+        try {
+          if (readWidget === null || !el.isConnected) {
+            readWidget = t.render(el, {
+              sitekey: key,
+              size: 'flexible',
+              appearance: 'interaction-only',
+              execution: 'execute',
+              callback: (answer: string) => readHuman?.(answer),
+              'expired-callback': () => readHuman?.(null),
+              'error-callback': () => readHuman?.(null),
+            });
+          } else t.reset(readWidget);
+          t.execute(el);
+        } catch {
+          end(null);
+        }
+      });
+    });
+  }
+
+  /* THE READ'S SLOT LEAVES WITH THE DESCRIBE AND QUESTION STEPS, and its widget with it. */
+  $effect(() => {
+    if (step === 'describe' || step === 'question' || readWidget === null) return;
+    try {
+      turnstileOf()?.remove(readWidget);
+    } catch {
+      /* Already dropped by Cloudflare. */
+    }
+    readWidget = null;
+  });
 
   $effect(() => {
     if (step === 'keep' && signedIn === null && siteKey !== null && widget !== null) loadTurnstile(siteKey, widget);
@@ -271,25 +364,89 @@
   let pick = $state<string | null>(null);
 
   /* THE DEVICE'S CURRENCY GOES IN WITH THE WORDS, so a shop in Cairo keeps EGP without being asked (`zoneCurrency`). */
-  /* THE CATALOGUE'S USE CASES ARE LISTENED FOR TOO (`heardOf`), once the host's catalogue answers; the model's offer
-     (`offerOf`) goes with them for the day a model reads here. */
+  /* THE CATALOGUE'S USE CASES ARE LISTENED FOR TOO (`heardOf`), once the host's catalogue answers. The host builds the
+     model's offer from its own catalogue, so the page's (`offerOf`) is never sent (`readAsks`). */
   let cat = $state.raw<CatalogueOffer | null>(null);
-  const reading = (s: string): Promise<Proposal> =>
-    proposeFirst(s, { zone: here, locale, currency: zoneCurrency(here), catalogue: heardOf(cat), offer: offerOf(cat) }, null);
+
+  /* ── the reading: the rules on each key, the model on a press ─────────── */
+
+  /** The host answered 501 to a read this session: it has no reading door, so the line about one is not said. */
+  let readsOff = $state(readsOffKept(tabStore()));
+  /** A read is out, on the press of Next: the button says so and nothing else moves. */
+  let readingNow = $state(false);
+  /**
+   * THE MODEL'S READING OF ONE SENTENCE, and its one question: it stands while the words are the ones it read, so a
+   * press with nothing changed is not read twice, and is gone the moment a key changes them.
+   */
+  let pressed = $state.raw<{ said: string; proposal: Proposal; ask: ModelAsk | null } | null>(null);
+  /** The sentence `live` was read from, so what is kept with the words is the reading of these very words. */
+  let liveFor = $state<string | null>(null);
+
+  /** The door before there is an account, on this page's own origin (sign-up names no record, so `apiBase()` is the
+      bare origin); `null` once the host said it has none. */
+  const door = $derived(readsOff || typeof location === 'undefined' ? null : readAsks(apiBase()).setup);
+
+  /**
+   * THE WORDS, READ FOR ONE CAUSE: by the rules on this device for a key or a pause, and by the model only for the
+   * person's press (`readerFor`). `ask` is told the model's one question, where its answer carried one.
+   */
+  function reading(s: string, cause: ReadCause = 'key', ask?: (q: ModelAsk | null) => void): Promise<Proposal> {
+    const reader = readerFor(cause, door, {
+      zone: here,
+      locale,
+      human: freshHuman,
+      heard: (out) => {
+        if (!out.ok && out.refusal.code === READS_OFF) {
+          readsOff = true;
+          keepReadsOff(tabStore());
+        }
+        ask?.(out.ok ? askOf(out.value) : null);
+      },
+    });
+    return proposeFirst(s, { zone: here, locale, currency: zoneCurrency(here), catalogue: heardOf(cat), offer: offerOf(cat) }, reader);
+  }
 
   $effect(() => {
     const s = sentence;
     if (s.trim() === '') {
       live = null;
+      liveFor = null;
+      return;
+    }
+    /* THE MODEL'S READING STANDS for the words it read; any other words are the rules', a beat after the last key. */
+    const kept = pressed;
+    if (kept !== null && kept.said === s) {
+      live = kept.proposal;
+      liveFor = s;
       return;
     }
     const wait = setTimeout(() => {
       void reading(s).then((p) => {
-        if (sentence === s) live = p;
+        /* NEVER OVER THE MODEL'S: a press that read these words while the rules were on their way keeps its reading. */
+        if (sentence === s && pressed?.said !== s) {
+          live = p;
+          liveFor = s;
+        }
       });
     }, 140);
     return () => clearTimeout(wait);
   });
+
+  /** THE PRESS'S READ: the model once for these words (or the reading it already gave them), else the rules'. */
+  async function readPressed(s: string): Promise<Proposal> {
+    if (pressed !== null && pressed.said === s) return pressed.proposal;
+    let ask: ModelAsk | null = null;
+    readingNow = true;
+    let p: Proposal;
+    try {
+      p = await reading(s, 'press', (q) => (ask = q));
+    } finally {
+      /* NEVER STUCK ON "Reading": a read that threw leaves Next pressable again. */
+      readingNow = false;
+    }
+    if (p.by !== undefined && p.by !== 'rules') pressed = { said: s, proposal: p, ask };
+    return p;
+  }
 
   /* THE CURRENCIES THIS DEVICE POINTS AT, for the one question when it is the currency. */
   let device: CurrencyEnv | null = null;
@@ -297,7 +454,31 @@
   const base = $derived(live === null ? null : settle(live, amends, null, sentence));
   const read = $derived(base === null ? null : reply === null ? base : answer(base, reply.about, reply.value, sentence));
   /** The one question it could not guess (`oneQuestion`), or none. */
-  const q = $derived(base === null ? null : oneQuestion(base, sentence, deviceOf()));
+  /** The rules' one question (`oneQuestion`), or none. */
+  const ruled = $derived(base === null ? null : oneQuestion(base, sentence, deviceOf()));
+  /** The model's question, where its reading of these very words carried one. */
+  const modelAsk = $derived(pressed !== null && pressed.said === sentence && live === pressed.proposal ? pressed.ask : null);
+  /** The words as they stood once the model's question was answered by telling it more, or skipped: nothing more is asked of them. */
+  let toldOnce = $state<string | null>(null);
+  /**
+   * THE ONE QUESTION ON SCREEN (`reply` is the answer it fills, or `null` for words told more): the model's in place of
+   * the rules', never beside it, and the rules' where the model asked nothing or did not read.
+   */
+  const q = $derived.by((): Shown | null => {
+    if (toldOnce === sentence) return null;
+    if (modelAsk === null) return ruled === null ? null : { ...ruled, reply: ruled.about };
+    const as = answeredAs(modelAsk, ruled?.about ?? null);
+    if (as !== null && ruled !== null) return { ...ruled, question: modelAsk.question, reply: as };
+    return {
+      about: modelAsk.about,
+      reply: null,
+      question: modelAsk.question,
+      choices: modelAsk.choices.map((c) => ({ value: c, label: c, means: null })),
+      suggested: null,
+      find: null,
+      only: asked.only,
+    };
+  });
   /** The sentence cut at the very words heard, for the marks under the field. */
   const lit = $derived(litIn(sentence, read?.heard ?? []));
 
@@ -354,7 +535,7 @@
   /** What is asked before keeping: the one question, or what it is closest to where nothing was placed. */
   const asks = $derived(sentence.trim() === '' ? null : q !== null ? 'one' : !placed ? 'closest' : null);
   /** Whether that is already answered: the reply is to this very question, or a use case was picked. */
-  const answered = $derived(asks === 'one' ? reply !== null && reply.about === q?.about : asks === 'closest' ? chosen !== null : true);
+  const answered = $derived(asks === 'one' ? reply !== null && q !== null && reply.about === q.reply : asks === 'closest' ? chosen !== null : true);
 
   /* "THAT'S ME": read again now, so a press straight after the last key acts on every word; then the one question, or
      straight on to keep. */
@@ -363,7 +544,16 @@
       field?.focus();
       return;
     }
-    live = await reading(sentence);
+    /* ONE READ AT A TIME: a second press while the first is out does nothing. */
+    if (readingNow) return;
+    /* THE WORDS AS THEY ARE KEPT, trimmed now, so the reading's marks sit on the very words that are kept and mailed. */
+    if (sentence !== sentence.trim()) sentence = sentence.trim();
+    const s = sentence;
+    const p = await readPressed(s);
+    /* TYPED ON WHILE IT READ: the new words are the rules' to light, and the press is pressed again. */
+    if (sentence !== s) return;
+    live = p;
+    liveFor = s;
     opened = null;
     await tick();
     if (!answered) {
@@ -383,10 +573,27 @@
     (signedIn ? document.getElementById('keep-h') : document.getElementById('up-email'))?.focus();
   }
 
-  /* THE ANSWER, OR SKIPPED (`null`): a value on the reading, written nowhere until the build. */
-  function answerIt(value: string | null): void {
-    if (asks === 'one' && q !== null) reply = { about: q.about, value: value === null || value.trim() === '' ? null : value.trim() };
-    void keep();
+  /*
+   * THE ANSWER, OR SKIPPED (`null`): a value on the reading, written nowhere until the build. AN ANSWER TO THE MODEL'S
+   * QUESTION THAT THE RULES WOULD NOT ASK (what kind, what things, who for) is the person telling it more: the words gain
+   * it, and this press reads them once again. Either way it was the one question, and nothing more is asked of them.
+   */
+  async function answerIt(value: string | null): Promise<void> {
+    const v = value === null || value.trim() === '' ? null : value.trim();
+    if (asks === 'one' && q !== null && q.reply !== null) reply = { about: q.reply, value: v };
+    else if (asks === 'one' && q !== null) {
+      if (v !== null) {
+        if (readingNow) return;
+        const s = withChip(sentence, v);
+        sentence = s;
+        const p = await readPressed(s);
+        if (sentence !== s) return;
+        live = p;
+        liveFor = s;
+      }
+      toldOnce = sentence;
+    }
+    await keep();
   }
 
   function pickCase(id: string) {
@@ -502,6 +709,8 @@
       /* ONLY THE LINK'S COPY SAYS `cut`: this device's own is the whole of it. */
       linkCut = arrived?.kind === 'verify' && draft.cut === true;
       chosen = draft.usecase;
+      /* AND THE MODEL'S READING, where one was kept: it is what the screen shows of these words, and is not read again. */
+      if (draft.reading !== undefined && draft.reading.by !== undefined && draft.reading.by !== 'rules') pressed = { said: draft.said, proposal: draft.reading, ask: null };
       /* AND WHAT WAS CHANGED AND ANSWERED, where this device kept it; a currency answered also rides in the link. */
       const kept = amendKept(localStore(), draft.said);
       amends = kept.amend;
@@ -558,8 +767,17 @@
 
   const ready = $derived(slug !== '' && free && !busy && !naming && (signedIn !== null || (email.trim() !== '' && (siteKey === null || human !== null))));
 
-  /** The sentence as it is kept across the mail. */
-  const draftNow = (): Draft => ({ said: sentence.trim(), currency: money === null ? null : (read?.currency ?? null), usecase: chosen, reply });
+  /**
+   * The sentence as it is kept across the mail, and the whole reading on screen where it is the reading of these very
+   * words, so the tab the link opens builds what was shown and reads nothing again.
+   */
+  const draftNow = (): Draft => ({
+    said: sentence.trim(),
+    currency: money === null ? null : (read?.currency ?? null),
+    usecase: chosen,
+    reply,
+    ...(live !== null && liveFor === sentence && sentence === sentence.trim() ? { reading: live } : {}),
+  });
 
   /** The sentence kept across the mail, and beside it what was changed by hand and answered. */
   function keepAll(): void {
@@ -628,7 +846,7 @@
     }
     /* THE RECORD IS MADE UNDER THE NAME SHE WAS SHOWN, read again from the sentence the link carried while the page's own
        reading of it may not be back yet. */
-    const shown = read ?? (sentence.trim() === '' ? null : settle(await reading(sentence), amends, null, sentence));
+    const shown = read ?? (sentence.trim() === '' ? null : settle(await readingKept(saidKept(localStore()), reading)(sentence), amends, null, sentence));
     held = { slug: out.value.slug, name: titleSent(shown, out.value.name), tz: out.value.tz, plan };
     hold(globalThis.sessionStorage, held);
     if (plan !== 'free') {
@@ -746,16 +964,18 @@
   }
 
   /**
-   * THE BUILD, WRITTEN INTO THE RECORD JUST MADE, IN THIS PAGE: the sentence read again by the same rules, then `/start`'s
-   * own `accept()` against the new record by its name, then its `/start#made`. With no sentence to build from (a link
-   * opened on another device), its `/start` asks the question there. `fallback` is where the host said the record opens.
+   * THE BUILD, WRITTEN INTO THE RECORD JUST MADE, IN THIS PAGE: the reading the person kept, never read again
+   * (`readingKept`), then `/start`'s own `accept()` against the new record by its name, then its `/start#made`. Only a
+   * sentence kept with no reading (kept before there were readings, or a link too long to carry one) is read again, by the
+   * rules. With no sentence to build from, its `/start` asks the question there. `fallback` is where the host said the
+   * record opens.
    */
   async function build(name: string, fallback: string): Promise<void> {
     const draft = saidKept(localStore()) ?? (sentence.trim() === '' ? null : draftNow());
     const signed = draft ? await methods() : null;
-    /* READ AGAIN, WITH WHAT WAS CHANGED AND ANSWERED LAID OVER IT, so the build is the one the screen showed (`accepting`). */
+    /* THE READING KEPT, WITH WHAT WAS CHANGED AND ANSWERED LAID OVER IT, so the build is the one the screen showed (`accepting`). */
     const asked = draft
-      ? await accepting(draft, amendKept(localStore(), draft.said), reading, {
+      ? await accepting(draft, amendKept(localStore(), draft.said), readingKept(draft, reading), {
           device: deviceOf(),
           today: dayOf(Date.now()),
           email: signed?.ok ? (signed.value.me?.email ?? null) : null,
@@ -984,6 +1204,8 @@
               onscroll={scrolled}
             ></textarea>
           </div>
+          <!-- WHAT NEXT DOES WITH THE WORDS, said before the press, until the host says it has no model to read them. -->
+          {#if !readsOff}<p class="quiet" data-reads-on-press>{firstRun.readOnPress}</p>{/if}
 
           {#if sentence.trim() === ''}
             <p class="quiet" id="chips-h">{words.startFrom}</p>
@@ -1035,7 +1257,7 @@
           {/if}
 
           <div class="go sticky">
-            <Button weight="primary" type="submit" kbd={sentence.trim() === '' ? undefined : '↵'}>{words.next}</Button>
+            <Button weight="primary" type="submit" disabled={readingNow} kbd={sentence.trim() === '' || readingNow ? undefined : '↵'}>{readingNow ? firstRun.whoReading : words.next}</Button>
           </div>
         </form>
 
@@ -1049,10 +1271,10 @@
         <h1 class="title" id="first-q" tabindex="-1">{words.questionTitle}</h1>
         {#if asks === 'one' && q !== null}
           <p class="lede" id="first-q-ask">{q.question}</p>
-          {#if q.about === 'currency'}
+          {#if q.reply === 'currency'}
             <Currency bind:value={pick} {locale} choices={q.choices.map((c) => ({ code: c.value, name: c.label, why: c.means ?? '' }))} suggested={q.suggested} find={q.find} />
-          {:else if q.about === 'name'}
-            <span class="field field-lg"><input class="field-input" type="text" autocomplete="name" maxlength="60" aria-labelledby="first-q-ask" bind:value={pick} /></span>
+          {:else if q.choices.length === 0}
+            <span class="field field-lg"><input class="field-input" type="text" autocomplete={q.about === 'name' ? 'name' : 'off'} maxlength="60" aria-labelledby="first-q-ask" bind:value={pick} /></span>
           {:else}
             <div class="opts" role="radiogroup" aria-labelledby="first-q-ask">
               {#each q.choices as c (c.value)}
@@ -1065,8 +1287,8 @@
           {/if}
           <p class="quiet">{q.only}</p>
           <div class="go sticky">
-            <Button weight="primary" disabled={pick === null || pick.trim() === ''} onclick={() => answerIt(pick)}>{words.questionNext}</Button>
-            <Button weight="bare" onclick={() => answerIt(null)}>{words.questionSkip}</Button>
+            <Button weight="primary" disabled={pick === null || pick.trim() === '' || readingNow} onclick={() => void answerIt(pick)}>{readingNow ? firstRun.whoReading : words.questionNext}</Button>
+            <Button weight="bare" disabled={readingNow} onclick={() => void answerIt(null)}>{words.questionSkip}</Button>
           </div>
         {:else}
           <p class="lede">{words.closest}</p>
@@ -1197,11 +1419,15 @@
           <div class="go"><Button weight="primary" onclick={() => void waitForRecord(held)}>{copy.signupCheckAgain}</Button></div>
         {/if}
       {/if}
+      {#if (step === 'describe' || step === 'question') && siteKey !== null}
+        <!-- THE READ'S OWN BOT CHECK, drawn only when Cloudflare needs the person to do something (`freshHuman`). -->
+        <div class="read-human" role="group" aria-label={copy.signupHuman} bind:this={readSlot}></div>
+      {/if}
     </div>
 
     {#if showBuild}
       <aside class="build" aria-label={firstRun.mineTitle}>
-        <Building {parts} title={read?.title ?? null} {places} {locale} />
+        <Building {parts} title={read?.title ?? null} {places} {locale} readBy={read} />
       </aside>
     {/if}
     {/if}
@@ -1553,6 +1779,11 @@
 
   .human {
     min-block-size: 65px;
+    inline-size: 100%;
+  }
+
+  /* THE READ'S BOT CHECK TAKES NO ROOM until Cloudflare draws something the person must do. */
+  .read-human {
     inline-size: 100%;
   }
 

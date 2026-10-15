@@ -1,0 +1,185 @@
+/**
+ * `from-packs` publishes use case files beside add-ons (USE-A16): a `<id>.usecase.json` under a folder in `packs/`, and
+ * every use case this build ships, each an entry of kind `usecase` carrying the `signals` and `modules` its file says.
+ * A second run writes nothing, a refused file stops the build before anything is written, and the three fronts in
+ * `packs/` read through the use case door as they ship.
+ *
+ * EVERY RUN HERE IS `--packs` AND `--to` A SCRATCH FOLDER. The catalogue the web app ships is the integrator's to rebuild.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { readCatalogue } from '../../packages/declare/src/catalogue.ts';
+import { readShared } from '../../packages/declare/src/shared.ts';
+import { normaliseUseCase } from '../../packages/declare/src/usecase.ts';
+import { USE_CASES } from '../../packages/seed/src/usecases/index.ts';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SCRIPT = join(ROOT, 'tools', 'catalogue', 'from-packs.mjs');
+
+const scratch = () => mkdtempSync(join(tmpdir(), 'from-packs-'));
+const run = (packs, to) => spawnSync(process.execPath, [SCRIPT, '--packs', packs, '--to', to], { encoding: 'utf8' });
+const indexOf = (to) => {
+  const read = readCatalogue(JSON.parse(readFileSync(join(to, 'index.json'), 'utf8')));
+  assert.ok(read.ok, 'the index written reads back');
+  return read.value;
+};
+const write = (path, value) => {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, typeof value === 'string' ? value : `${JSON.stringify(value, null, 2)}\n`);
+};
+
+/* AN INVENTED ADD-ON WITH NO PAGE, so no preview record is made, and a test that names its file. */
+const SHELF = {
+  pack: 'shelf',
+  version: '1.0.0',
+  title: 'Shelf',
+  summary: 'The things on a shelf.',
+  author: 'Nobody in particular',
+  license: 'MIT',
+  requires: { format: 1, primitives: 1 },
+  declarations: [{ register: 'shelf_items', name: 'Shelf', title: 'name', fields: [{ id: 'name', type: 'text', required: true }] }],
+};
+/* AN INVENTED USE CASE, heard in its own words, standing on one first-party module and carrying no pack. */
+const RENT_BOOK = {
+  usecase: 'rent-book',
+  version: '1.0.0',
+  title: 'Rent book',
+  summary: 'The rent each lodger owes and what they paid.',
+  author: 'Nobody in particular',
+  license: 'MIT',
+  audience: 'individual',
+  tone: 'plain',
+  signals: ['rent book', 'lodgers', 'lodger'],
+  modules: ['people'],
+};
+
+function packsFolder(rentBook = RENT_BOOK) {
+  const packs = scratch();
+  write(join(packs, 'shelf', 'shelf.pack.json'), SHELF);
+  write(join(packs, 'shelf', 'shelf.test.ts'), "test('installs', () => read('shelf.pack.json'));\n");
+  write(join(packs, 'rent-book', 'rent-book.usecase.json'), rentBook);
+  return packs;
+}
+
+const filesUnder = (dir) =>
+  readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((d) => d.isFile())
+    .map((d) => join(d.parentPath, d.name))
+    .sort();
+
+test('a use case file beside the add-ons is published as a usecase entry with its signals and modules, and so is every built-in', () => {
+  const to = scratch();
+  const out = run(packsFolder(), to);
+  assert.equal(out.status, 0, out.stderr);
+  const index = indexOf(to);
+  const rent = index.entries.find((e) => e.kind === 'usecase' && e.id === 'rent-book');
+  assert.ok(rent, 'rent-book is listed');
+  assert.deepEqual(rent.signals, ['rent book', 'lodgers', 'lodger']);
+  assert.deepEqual(rent.modules, ['people']);
+  assert.equal(rent.title, 'Rent book');
+  assert.ok(existsSync(join(to, 'usecases', 'rent-book', '1.0.0.usecase.json')));
+  assert.ok(index.entries.some((e) => e.kind === 'pack' && e.id === 'shelf'), 'the add-on is still published');
+  for (const u of USE_CASES) {
+    const entry = index.entries.find((e) => e.kind === 'usecase' && e.id === u.usecase);
+    assert.ok(entry, `${u.usecase} is listed`);
+    assert.equal(entry.latest, u.version);
+    assert.deepEqual(entry.signals, u.signals);
+    if (u.modules.length > 0) assert.deepEqual(entry.modules, u.modules);
+    else assert.equal(entry.modules, undefined);
+  }
+});
+
+test('a second run writes nothing', () => {
+  const packs = packsFolder();
+  const to = scratch();
+  assert.equal(run(packs, to).status, 0);
+  const before = new Map(filesUnder(to).map((f) => [f, { text: readFileSync(f, 'utf8'), at: statSync(f).mtimeMs }]));
+  const again = run(packs, to);
+  assert.equal(again.status, 0, again.stderr);
+  assert.match(again.stdout, /already in/u);
+  const after = filesUnder(to);
+  assert.deepEqual(after, [...before.keys()]);
+  for (const f of after) {
+    assert.equal(readFileSync(f, 'utf8'), before.get(f).text, `${f} is unchanged`);
+    assert.equal(statSync(f).mtimeMs, before.get(f).at, `${f} was not written again`);
+  }
+});
+
+test('a use case file the door refuses stops the build with its sentence, and nothing is written', () => {
+  const to = scratch();
+  const out = run(packsFolder({ ...RENT_BOOK, signals: ['Rent Book'] }), to);
+  assert.equal(out.status, 1);
+  assert.match(out.stderr, /packs\/rent-book\/rent-book\.usecase\.json: Signals are up to 64 lower-case words/u);
+  assert.deepEqual(readdirSync(to), []);
+});
+
+test('a published use case version never changes: the same version with other words is refused', () => {
+  const to = scratch();
+  assert.equal(run(packsFolder(), to).status, 0);
+  const out = run(packsFolder({ ...RENT_BOOK, signals: ['rent book', 'lodgers'] }), to);
+  assert.equal(out.status, 1);
+  assert.match(out.stderr, /a published version never changes/u);
+});
+
+test('a use case file named for another id, or taking a built-in id, is refused', () => {
+  const misnamed = packsFolder();
+  write(join(misnamed, 'rent-book', 'rent-book.usecase.json'), { ...RENT_BOOK, usecase: 'lodgings' });
+  assert.match(run(misnamed, scratch()).stderr, /is named for a use case it does not hold/u);
+  const taken = packsFolder();
+  const built = USE_CASES[0].usecase;
+  write(join(taken, 'rent-book', `${built}.usecase.json`), { ...RENT_BOOK, usecase: built });
+  assert.match(run(taken, scratch()).stderr, /which a use case this build ships already has/u);
+});
+
+/* THE THREE FRONTS AS THEY SHIP: each over its add-on, read through the use case door. */
+const FRONTS = [
+  { folder: 'landlord', id: 'landlord', words: ['flats', 'tenants', 'rent', 'repairs'] },
+  { folder: 'photographer', id: 'photographer', words: ['shoots', 'clients', 'galleries', 'bookings'] },
+  { folder: 'retainer-hours', id: 'retainer-hours', words: ['retainer', 'hours', 'clients', 'invoices'] },
+];
+
+for (const { folder, id, words } of FRONTS) {
+  test(`the ${id} front reads as a use case over its add-on`, async () => {
+    const text = readFileSync(join(ROOT, 'packs', folder, `${id}.usecase.json`), 'utf8');
+    const u = normaliseUseCase(JSON.parse(text));
+    assert.ok(u.ok, u.ok ? '' : u.refusal.fix);
+    const pack = JSON.parse(readFileSync(join(ROOT, 'packs', folder, `${folder}.pack.json`), 'utf8'));
+    assert.equal(u.value.usecase, id);
+    assert.equal(u.value.version, '1.0.0');
+    assert.equal(u.value.title, pack.title);
+    assert.ok(u.value.summary.length > 0 && !/[\r\n]/u.test(u.value.summary), 'one line of summary');
+    assert.equal(u.value.modules.at(-1), pack.pack, 'it stands on its add-on last');
+    for (const needed of Object.keys(pack.requires.packs ?? {})) assert.ok(u.value.modules.includes(needed), `and on ${needed}, which the add-on asks for`);
+    assert.deepEqual(u.value.needs, [pack.pack]);
+    for (const w of words) assert.ok(u.value.signals.includes(w), `heard in ${w}`);
+    assert.equal(Object.keys(u.value.voice).length, 3, 'three lines of voice');
+    assert.ok(!/—/u.test(text), 'no em dash in its words');
+    const shared = await readShared(text, { kind: 'local' });
+    assert.ok(shared.ok, shared.ok ? '' : shared.refusal.fix);
+  });
+}
+
+test('the three fronts publish as usecase entries with their signals', () => {
+  const packs = scratch();
+  for (const { folder, id } of FRONTS) {
+    mkdirSync(join(packs, folder), { recursive: true });
+    copyFileSync(join(ROOT, 'packs', folder, `${id}.usecase.json`), join(packs, folder, `${id}.usecase.json`));
+  }
+  const to = scratch();
+  const out = run(packs, to);
+  assert.equal(out.status, 0, out.stderr);
+  const index = indexOf(to);
+  for (const { id, words } of FRONTS) {
+    const entry = index.entries.find((e) => e.kind === 'usecase' && e.id === id);
+    assert.ok(entry, `${id} is listed`);
+    for (const w of words) assert.ok(entry.signals.includes(w));
+    assert.ok(entry.modules.includes(id));
+  }
+});

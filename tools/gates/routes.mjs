@@ -34,8 +34,8 @@ const fill = (seg, value) => ({ [seg]: String(value) });
  * An entry is one of two kinds:
  * - `{ fixed }`: fills that are not the record's to give. The sixteen Settings areas are read from the place that
  *   declares them (`settings/[area]/place.ts` `AREAS`), so an area added there is swept without a line here; it was a
- *   hand-typed fourteen, and Pages and Words and money were never opened. The site keeps its own samples, and
- *   `/s/[token]` opens a link that names no page, which is the whole of what that route draws while sharing is off.
+ *   hand-typed fourteen, and Pages and Words and money were never opened. The site keeps its own samples. The shared
+ *   page is `/s`, a static route with its link in the fragment, so it needs no sample: opened bare it draws the dead link.
  * - `{ asks, was }`: fills read from what the record answered (`readRecord`). An address the record has nothing for is
  *   opened once at `was`, the sample it had before, drawn as not found, and named in `unseen`.
  * `missing: true` marks a fixed sample that names nothing on purpose, so it is drawn as not found too (`missing` below).
@@ -56,7 +56,6 @@ export const SAMPLE_OF = {
     was: [{ ...fill('[register]', 'obligations'), ...fill('[seq]', '1') }],
   },
   'web:/t/[track]': { asks: (s) => s.tracks.map((seq) => fill('[track]', seq)), was: [fill('[track]', '2')] },
-  'web:/s/[token]': { fixed: [fill('[token]', 'no-page-yet')], missing: true },
   'web:/settings/[area]': { fixed: [...AREAS.keys()].map((area) => fill('[area]', area)) },
   'site:/packs/[id]': { fixed: [fill('[id]', 'bank-hsbc-eg')] },
   'site:/legal/[name]': { fixed: [fill('[name]', 'terms')] },

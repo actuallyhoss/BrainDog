@@ -33,7 +33,7 @@ test('AT IS SAFE TO CALL TWICE, because `Button` calls it on whatever it is hand
 test('SIGN-IN, AN INVITATION AND A SHARED PAGE NAME NO RECORD, so a slug is never added to them', () => {
   assert.equal(at('/signin', '/app/acme/r/tasks'), '/app/signin');
   assert.equal(at('/invite', '/app/acme/'), '/app/invite');
-  assert.equal(at('/s/tok_1', '/app/acme/'), '/app/s/tok_1');
+  assert.equal(at('/s', '/app/acme/'), '/app/s');
   /* `/start` keeps it: an empty record is sent there to be set up, and it is that record that is set up. */
   assert.equal(at('/start?add=clients', '/app/acme/'), '/app/acme/start?add=clients');
 });
@@ -139,6 +139,6 @@ test('A 401 IS SENT TO SIGN-IN, UNDER A SLUG OR NOT, and only the three addresse
   assert.equal(signInFirst('FORBIDDEN', { pathname: '/app/acme/', search: '' }), null);
   assert.equal(signInFirst('UNREACHABLE', { pathname: '/app/', search: '' }), null);
   /* And sign-in itself is never sent to sign-in, nor an invitation, nor a shared page, with a slug or without. */
-  for (const pathname of ['/app/signin', '/app/acme/signin', '/app/invite', '/app/s/tok_1'])
+  for (const pathname of ['/app/signin', '/app/acme/signin', '/app/invite', '/app/s'])
     assert.equal(signInFirst('UNAUTHORIZED', { pathname, search: '' }), null, pathname);
 });

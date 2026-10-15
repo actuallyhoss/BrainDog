@@ -21,7 +21,7 @@
 
 import { firstRun, NO_AMEND } from '../../../apps/web/src/lib/first-run.ts';
 import { words as signupWords } from '../../../apps/web/src/routes/signup/words.ts';
-import { propose } from '../../../apps/web/src/lib/start/propose.ts';
+import { propose, proposeFirst } from '../../../apps/web/src/lib/start/propose.ts';
 import { answer, oneQuestion } from '../../../apps/web/src/lib/start/question.ts';
 import { browserCurrencyEnv, zoneCurrency } from '../../../apps/web/src/routes/start/building.ts';
 import { accept } from '../../../apps/web/src/routes/start/accept.ts';
@@ -255,7 +255,112 @@ export const expect = {
       ? pass('offer', `nothing on day ${seen.earlyDay}; on day ${seen.lateDay}, "${late.title}": ${late.why}${lead}`)
       : fail('offer', missing.join('; '));
   },
+
+  /* ── the checks beside the steps (CHECKS): the hard sentence, and the friction as numbers ───────────── */
+
+  /**
+   * Her hard sentence, the one with no word the rules listen for, names her use case (USE-B05 job 10). It is the model's
+   * to read: read by the rules alone (`seen.by`), nothing is measured, and the line says what they read.
+   */
+  hard(seen, person) {
+    const said = person.says?.hard;
+    if (typeof said !== 'string' || said.trim() === '') return fail('hard', 'her file has no hard sentence');
+    const got = seen.proposal?.usecase ?? 'none';
+    if (seen.by === 'rules') return { id: 'hard', pass: null, saw: `the rules read it as ${got}, and no model read it on this host` };
+    return got === person.expects ? pass('hard', `read by the model as ${got}`) : fail('hard', `read by the model as ${got}, not ${person.expects}`);
+  },
+
+  /**
+   * At most one box to type in and one email field on the first screen (USE-B07). `seen.fields` is each field the
+   * screen draws, `{ role, type }`, as the rig read it; a field for an email is `type: 'email'`.
+   */
+  fields(seen) {
+    if (!Array.isArray(seen.fields)) return { id: 'fields', pass: null, saw: 'no first screen was handed in, so its fields were not counted' };
+    const emails = seen.fields.filter((f) => f.type === 'email').length;
+    const boxes = seen.fields.filter((f) => f.type !== 'email' && TYPED.has(f.role)).length;
+    const missing = [];
+    if (boxes > FRICTION.boxes) missing.push(`${boxes} boxes to type in, not ${FRICTION.boxes}`);
+    if (emails > FRICTION.emails) missing.push(`${emails} email fields, not ${FRICTION.emails}`);
+    return missing.length === 0 ? pass('fields', `${boxes} box and ${emails} email field on the first screen`) : fail('fields', missing.join('; '));
+  },
+
+  /** At most four presses from the first screen to Today (USE-B07). `seen.presses` names each, in order; `null` where Today was never reached. */
+  presses(seen) {
+    if (!Array.isArray(seen.presses)) return { id: 'presses', pass: null, saw: `not reached: ${seen.why ?? 'Today never opened'}` };
+    const n = seen.presses.length;
+    const said = `${n} ${n === 1 ? 'press' : 'presses'}: ${seen.presses.join(', ')}`;
+    return n <= FRICTION.presses ? pass('presses', said) : fail('presses', `${said}, not ${FRICTION.presses} at most`);
+  },
+
+  /**
+   * The first reading on screen within thirty seconds of the first key, for a script typing forty words a minute
+   * (USE-B07). `seen.at` is when, in milliseconds from the first key, a reading first named something she typed beyond her
+   * name (`firstReadAt`); `null` where nothing she typed was ever read. With no model on the host (`seen.model` false)
+   * that is not measured, as her hard sentence is: the rules read only some languages, and the page asks a model.
+   */
+  quick(seen) {
+    const limit = `${FRICTION.firstReadMs / 1000} seconds`;
+    if (typeof seen.at !== 'number' && seen.model === false) return { id: 'quick', pass: null, saw: 'the rules read none of what she typed, and no model read it on this host' };
+    if (typeof seen.at !== 'number') return fail('quick', `nothing she typed was read, in ${limit} or at all`);
+    const secs = (seen.at / 1000).toFixed(1);
+    const what = `${secs} seconds after the first key, read by ${seen.by ?? 'the rules'} on "${seen.upTo}"`;
+    return seen.at <= FRICTION.firstReadMs ? pass('quick', what) : fail('quick', `${what}, not within ${limit}`);
+  },
 };
+
+/**
+ * The checks said beside the seven steps, each red by itself, lettered in the order the walk says them. One marked
+ * `until` names the unit that makes it true: while it fails it waits and the walk is not red for it. A pass while
+ * marked stays a pass, because the walk differs by person: a person asked no question already takes four presses
+ * while Mariam takes six, so one person's pass is not the unit landed.
+ */
+export const CHECKS = [
+  { n: 'a', id: 'hard', name: 'Her hard sentence' },
+  { n: 'b', id: 'fields', name: 'One box and one email field' },
+  { n: 'c', id: 'quick', name: 'Read within thirty seconds' },
+  { n: 'd', id: 'presses', name: 'Four presses to Today', until: 'USE-B07' },
+];
+
+/** The friction as numbers (USE-B07). */
+export const FRICTION = { boxes: 1, emails: 1, presses: 4, firstReadMs: 30_000, wpm: 40 };
+
+/** The roles a person types into. */
+const TYPED = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton']);
+
+/** A key every 300 milliseconds: forty words a minute, at the five keys a word typing speed is counted in. */
+export const KEY_MS = 60_000 / (FRICTION.wpm * 5);
+
+/** The beat after a key before the page reads (`+page.svelte`, the rules' reading on each key). */
+const BEAT_MS = 140;
+
+/** Whether a reading names something typed beyond the person's name: a use case, or a phrase lit as a part. */
+const names = (p) => p !== null && (p.usecase != null || p.heard.some((h) => h.you !== true));
+
+/**
+ * WHEN THE FIRST READING IS ON SCREEN, for a script typing `said` a key every `keyMs`: the page reads on each key with
+ * the rules, so each word typed is read as it ends, and the time is that word's last key (the first key is at 0), the
+ * page's beat and the reading's own time.
+ * Where no word named anything, `last` is the reading after the last key (the model's, where there is one), and its
+ * time is added to the whole sentence's. `{ at, upTo, by }`, or `{ at: null }` where nothing was read.
+ */
+export async function firstReadAt(said, read, last = null, keyMs = KEY_MS) {
+  for (let i = 0; i < said.length; i++) {
+    if (!(i === said.length - 1 || /\s/u.test(said[i + 1])) || /\s/u.test(said[i])) continue;
+    const from = performance.now();
+    const p = read(said.slice(0, i + 1));
+    if (names(p)) return { at: i * keyMs + BEAT_MS + (performance.now() - from), upTo: said.slice(0, i + 1).split(/\s+/u).at(-1), by: 'the rules' };
+  }
+  if (last === null) return { at: null };
+  const from = performance.now();
+  const p = await last();
+  return names(p) ? { at: said.length * keyMs + (performance.now() - from), upTo: said.split(/\s+/u).at(-1), by: p.by === 'rules' ? 'the rules' : 'the model' } : { at: null };
+}
+
+/** A check's result with its mark read: a fail while marked waits on its unit, and anything else stands. */
+export function marked(r) {
+  const c = CHECKS.find((x) => x.id === r.id);
+  return c?.until && r.pass === false ? { ...r, pass: null, waits: c.until } : r;
+}
 
 /* ── the browser's doors ──────────────────────────────────────────────────────────────────────────────── */
 
@@ -465,6 +570,33 @@ export async function walk(person, host, say = () => {}, shot = null) {
   const after = asked === null ? proposal : answer(proposal, asked.about, person.answer, person.said);
   step(expect.question({ asked, after, again: asked === null ? null : oneQuestion(after, person.said, env) }, person));
 
+  /* THE CHECKS BESIDE THE STEPS (`CHECKS`), said as each is known and kept on `out.checks`, never among the seven. Her
+     hard sentence and her first reading are the model's where the host hands the walk one (`host.ask`, an `AskSetup`),
+     and the rules' where it does not, as the page reads them. */
+  out.checks = [];
+  const check = (r) => {
+    const m = marked(r);
+    out.checks.push(m);
+    say(m);
+    return m;
+  };
+  const ctx = { zone: person.zone, locale: person.locale, currency: zoneCurrency(person.zone) };
+  const readFirst = (said) => (host.ask ? proposeFirst(said, ctx, host.ask) : reading(said));
+  const hard = await readFirst(person.says?.hard ?? '');
+  check(expect.hard({ proposal: hard, by: hard.by ?? 'rules' }, person));
+  check(expect.fields({ fields: host.firstScreen?.fields ?? null }, person));
+  check(expect.quick({ ...(await firstReadAt(person.said, (s) => propose(s, ctx), () => readFirst(person.said))), model: Boolean(host.ask) }, person));
+  /* THE SIGN-UP PAGE'S PRESSES, as its steps take them (`routes/signup/+page.svelte`): Next under her sentence; on the
+     one question a choice (none for a name, which is typed, or where one is suggested) and Next; the one field's Send;
+     the link in her mail; the passkey step's one press. The build and Today open by themselves after it. */
+  const presses = [
+    'Next under her sentence',
+    ...(asked === null ? [] : [...(asked.choices.length > 0 && asked.suggested === null ? ['a choice'] : []), 'Next on the question']),
+    'Send the link',
+    'the link in her mail',
+    'the passkey step',
+  ];
+
   /* 4. Keep it, and the build she saw kept. */
   /* THE NAMES THE PAGE SENDS, from its own helpers (`nameSent`, `titleSent` in signup/build.ts), never a copy. */
   let opened = await keepIt(host, person, nameSent(proposal), titleSent(after, person.name));
@@ -498,6 +630,7 @@ export async function walk(person, host, say = () => {}, shot = null) {
   step(keptHere.pass === null ? joined(keptHere, await keepOnHosted(person, { title: after.title ?? person.name })) : keptHere);
   if (!boot) {
     for (const s of STEPS.slice(4)) step(fail(s.id, `not reached: ${opened.door === 'refused' ? opened.why : 'boot was refused'}`));
+    check(expect.presses({ presses: null, why: opened.door === 'refused' ? opened.why : 'boot was refused' }));
     return out;
   }
 
@@ -542,6 +675,8 @@ export async function walk(person, host, say = () => {}, shot = null) {
       person,
     ),
   );
+
+  check(expect.presses({ presses: bootOk ? presses : null, why: 'boot was refused' }));
 
   /* 7. Later. Orders read once a week, the orders she tells on the way, the pen read on day 13 and on day 15. */
   if (!host.advance) {
@@ -639,8 +774,9 @@ export async function selfHost(person) {
 
 /** One step as one line: its number and name, green, red or not walked, and what it saw. Coloured on a terminal. */
 export function lineOf(r, colour = false) {
-  const s = STEPS.find((x) => x.id === r.id);
-  const [word, code] = r.pass === true ? ['green', 32] : r.pass === false ? ['red', 31] : ['not walked', 33];
+  const s = STEPS.find((x) => x.id === r.id) ?? CHECKS.find((x) => x.id === r.id);
+  const step = STEPS.includes(s);
+  const [word, code] = r.pass === true ? ['green', 32] : r.pass === false ? ['red', 31] : r.waits ? [`waits on ${r.waits}`, 33] : [step ? 'not walked' : 'not measured', 33];
   const mark = colour ? `\u001b[${code}m${word}\u001b[0m` : word;
   return `${s.n}. ${s.name}: ${mark}. ${r.saw}`;
 }
@@ -676,6 +812,8 @@ export function deployed(origin, linkFile) {
  */
 export function redOf(results, host) {
   const said = new Map(results.map((r) => [r.id, r.pass]));
+  /* A CHECK IS RED BY ITSELF, and one not measured or waiting on its unit is not. */
+  if (CHECKS.some((c) => said.get(c.id) === false)) return true;
   return STEPS.some((s) => said.get(s.id) !== true && !(s.id === 'offer' && said.get(s.id) === null && !host.advance));
 }
 
@@ -685,8 +823,9 @@ export function redOf(results, host) {
  * and only a walk with every step green says it walked them all.
  */
 export function endOf(results, host) {
-  const green = results.filter((r) => r.pass === true).length;
-  if (redOf(results, host)) return `red. ${green} of ${STEPS.length} steps green`;
+  const green = results.filter((r) => r.pass === true && STEPS.some((s) => s.id === r.id)).length;
+  const checks = CHECKS.filter((c) => results.some((r) => r.id === c.id && r.pass === false)).map((c) => c.name);
+  if (redOf(results, host)) return `red. ${green} of ${STEPS.length} steps green${checks.length > 0 ? `, and red beside them: ${checks.join(', ')}` : ''}`;
   if (green === STEPS.length) return `green. all ${STEPS.length} steps walked`;
   return `green as far as it went, with day 15 not walked: this host keeps the real clock. ${green} of ${STEPS.length} steps walked, so this is not the whole first run`;
 }

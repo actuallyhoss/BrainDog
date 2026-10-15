@@ -69,6 +69,7 @@ import { instant } from './coerce.ts';
 import { FOLD_HOPS, holderOf, holders, nameKey, noteMention, sourceKeys } from './entities.ts';
 import type { Proposal } from './govern.ts';
 import { UNVERIFIED } from './ingest.ts';
+import { pairsFor, type Judged, type JudgedBand, type Pair } from './resolve.ts';
 import { githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
 import { LEGACY, PARTS, meetsRole, plays, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
 
@@ -480,6 +481,16 @@ const hydrate = (r: { id: string; seq: number | null; version: number; fields: s
   version: Number(r.version),
   fields: JSON.parse(r.fields) as Record<string, unknown>,
 });
+
+/** A row by id, only when it is one of `register`'s and not deleted. */
+const inList = (sql: Sql, register: string, id: string): Row | null => {
+  const r = sql.one<{ id: string; seq: number | null; version: number; fields: string }>(
+    'SELECT id, seq, version, fields FROM entry WHERE id = ? AND register = ? AND deleted_at IS NULL',
+    id,
+    register,
+  );
+  return r ? hydrate(r) : null;
+};
 
 const rowById = (sql: Sql, id: string): Row | null => {
   const r = sql.one<{ id: string; seq: number | null; version: number; fields: string }>('SELECT id, seq, version, fields FROM entry WHERE id = ? AND deleted_at IS NULL', id);
@@ -2429,14 +2440,26 @@ countHeldTwiceBy(peopleTwiceIn, (sql) => {
 
 /* ── the nightly question to a model ─────────────────────────────────── */
 
+/** What a pair is of, as a model reads it: two people, two organisations or two projects. */
+export type ResolveKind = 'person' | 'organisation' | 'project';
+
 /** One side of a pair as a model sees it: a name, where they were seen, and no address. */
-export type ResolveSide = { name: string; kind: 'person' | 'organisation'; domain?: string; masked?: string; seen: string[] };
+export type ResolveSide = { name: string; kind: ResolveKind; domain?: string; masked?: string; seen: string[] };
 
 /**
- * An `infer.resolve` job: the pairs, and which two rows each hash is about. `rows` is the record's, read back by the
- * ack; a host builds the model's prompt from `pairs` alone.
+ * An `infer.resolve` job: the pairs, each with its kind, and which two rows each hash is about. `rows` is the record's,
+ * read back by the ack; a host builds the model's prompt from `pairs` alone. A name seen beside a row has that row and
+ * nothing beside it (`''`). Once answered, `judged` keeps what the answer said of each pair (`answeredOnly`), which is
+ * where the other pairs' verdicts live: `pairsFor` reads them, and nothing else is written for them.
  */
-export type ResolveJob = { pairs: { hash: string; a: ResolveSide; b: ResolveSide }[]; rows: Record<string, [string, string]> };
+export type ResolveJob = {
+  pairs: { hash: string; kind?: ResolveKind; a: ResolveSide; b: ResolveSide }[];
+  rows: Record<string, [string, string]>;
+  judged?: Record<string, Judged>;
+};
+
+/** What a pair of the other kinds is called by a model: an organisation, never `org`. */
+const RESOLVE_KIND: Readonly<Record<Pair['kind'], ResolveKind | null>> = { person: null, org: 'organisation', project: 'project', thing: null };
 
 /** A stable name for a pair, the same whichever way round: FNV-1a over the two ids, sorted. */
 export function pairHash(a: string, b: string): string {
@@ -2450,13 +2473,12 @@ export function pairHash(a: string, b: string): string {
 const masked = (local: string): string => (local.length <= 2 ? '*'.repeat(local.length) : `${local[0]}${'*'.repeat(local.length - 2)}${local.at(-1)}`);
 
 /**
- * Tonight's doubtful pairs, at most `RESOLVE_PAIRS_NIGHT`, or `null` when there are none or a job is already out, or
- * one went out in the last twenty hours. A pair already asked, refused, undone, or handed to a model before is not
- * handed again.
+ * Tonight's doubtful pairs, at most `RESOLVE_PAIRS_NIGHT` in all, or `null` when there are none or a job is already
+ * out, or one went out in the last twenty hours. People first, then the organisations and projects `pairsFor` offers.
+ * A pair already asked, refused, undone, or handed to a model before is not handed again.
  */
 export function resolveJob(deps: Pick<PeopleDeps, 'sql' | 'nowMs' | 'list' | 'nameOf' | 'titleOf'>, max = RESOLVE_PAIRS_NIGHT): ResolveJob | null {
   const list = deps.list;
-  if (!list) return null;
   const since = instant(deps.nowMs - 20 * 3_600_000);
   if (deps.sql.one("SELECT 1 AS n FROM outbox WHERE kind = 'infer.resolve' AND (state IN ('pending', 'leased', 'failed') OR created > ?) LIMIT 1", since)) return null;
   const sent = new Set<string>();
@@ -2469,6 +2491,17 @@ export function resolveJob(deps: Pick<PeopleDeps, 'sql' | 'nowMs' | 'list' | 'na
       /* a payload nobody can read names no pair */
     }
   }
+  const job: ResolveJob = { pairs: [], rows: {} };
+  if (list) peoplePairs(deps, list, sent, job, max);
+  /* AND THEN THE OTHER PAIRS, IN WHAT ROOM IS LEFT: two organisations or two projects of one name, and a name seen beside
+     the one row it reads as (`resolve.ts`), each with its kind, by name and never an address. Their verdicts file
+     nothing: they are kept in the done job, and `pairsFor` reads them to weed and rank the offers. */
+  if (job.pairs.length < max) otherPairs(deps, sent, job, max);
+  return job.pairs.length === 0 ? null : job;
+}
+
+/** The doubtful pairs of people, into `job`, until it holds `max`. */
+function peoplePairs(deps: Pick<PeopleDeps, 'sql' | 'nameOf' | 'titleOf'>, list: DeclaredList<MeetsFields>, sent: ReadonlySet<string>, job: ResolveJob, max: number): void {
   const people = deps.sql
     .all<{ id: string; seq: number | null; version: number; fields: string }>(
       `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} ORDER BY seq DESC LIMIT 2000`,
@@ -2500,7 +2533,6 @@ export function resolveJob(deps: Pick<PeopleDeps, 'sql' | 'nowMs' | 'list' | 'na
     }
     for (const s of stemsOf(list, row)) file(`run:${s}`, row);
   }
-  const job: ResolveJob = { pairs: [], rows: {} };
   const seen = new Set<string>();
   for (const held of buckets.values())
     for (let i = 0; i < held.length && job.pairs.length < max; i++)
@@ -2510,10 +2542,36 @@ export function resolveJob(deps: Pick<PeopleDeps, 'sql' | 'nowMs' | 'list' | 'na
         if (seen.has(hash)) continue;
         seen.add(hash);
         if (sent.has(hash) || !similar(list, a, b) || strong(list, a, b) || refused(deps, list, a, b)) continue;
-        job.pairs.push({ hash, a: sideOf(deps, list, a), b: sideOf(deps, list, b) });
+        job.pairs.push({ hash, kind: 'person', a: sideOf(deps, list, a), b: sideOf(deps, list, b) });
         job.rows[hash] = [a.id, b.id];
       }
-  return job.pairs.length === 0 ? null : job;
+}
+
+/**
+ * `pairsFor`'s organisation and project pairs not handed before, best first, into `job` until it holds `max`. A side is
+ * its name and where it was seen as plain words: the project both are tied to, what both list, how often a name was
+ * seen. Never the place a name was seen in, which may be an address or a file.
+ */
+function otherPairs(deps: Pick<PeopleDeps, 'sql' | 'nowMs'>, sent: ReadonlySet<string>, job: ResolveJob, max: number): void {
+  const found = pairsFor(deps.sql, deps.nowMs);
+  for (const pair of found.pairs) {
+    if (job.pairs.length >= max) break;
+    const kind = RESOLVE_KIND[pair.kind];
+    const [a, b] = [found.rows[pair.a.h], found.rows[pair.b.h]];
+    if (kind === null || sent.has(pair.hash) || job.rows[pair.hash] !== undefined || a?.id === undefined || b === undefined) continue;
+    const both = [
+      ...(pair.tie === undefined ? [] : [`tied to ${pair.tie}`]),
+      ...(pair.shared === undefined ? [] : [`lists the same ${pair.shared} as the other`]),
+    ];
+    const times = pair.seen === 1 ? 'once' : `${pair.seen} times`;
+    job.pairs.push({
+      hash: pair.hash,
+      kind,
+      a: { name: pair.a.name, kind, seen: both },
+      b: { name: pair.b.name, kind, seen: b.id === undefined ? [`named ${times} in the work, with nothing else said of it`] : both },
+    });
+    job.rows[pair.hash] = [a.id, b.id ?? ''];
+  }
 }
 
 function sideOf(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFields>, row: Row): ResolveSide {
@@ -2555,13 +2613,27 @@ export function answeredOnly(payload: string, result: unknown): string {
     return payload;
   }
   const said = (result as { verdicts?: unknown } | null | undefined)?.verdicts;
-  const answered = new Set(
-    (Array.isArray(said) ? (said as { hash?: unknown }[]) : []).map((v) => v?.hash).filter((h): h is string => typeof h === 'string'),
-  );
+  const judged: Record<string, Judged> = {};
+  for (const v of Array.isArray(said) ? (said as { hash?: unknown; same?: unknown; confidence?: unknown }[]) : []) {
+    if (typeof v?.hash !== 'string' || job.rows?.[v.hash] === undefined) continue;
+    const confidence = typeof v.confidence === 'number' && Number.isFinite(v.confidence) ? v.confidence : 0;
+    judged[v.hash] = { band: bandOf(v.same === true, confidence), score: Math.round(confidence * 100) / 100 };
+  }
+  const answered = new Set(Object.keys(judged));
   return JSON.stringify({
     pairs: (job.pairs ?? []).filter((p) => answered.has(p.hash)),
     rows: Object.fromEntries(Object.entries(job.rows ?? {}).filter(([hash]) => answered.has(hash))),
+    judged,
   });
+}
+
+/**
+ * Which band a verdict falls in, as `settleVerdicts` reads one: `two` for a pair read as two things or under 0.6, `one`
+ * from 0.9 to 1, and `doubt` between, or for a score past 1 (85, said as a percentage), which is likely and never sure.
+ */
+function bandOf(same: boolean, confidence: number): JudgedBand {
+  if (!same || confidence < BAND_ASK) return 'two';
+  return confidence >= BAND_SURE && confidence <= 1 ? 'one' : 'doubt';
 }
 
 
@@ -2700,12 +2772,17 @@ export function settleVerdicts(deps: PeopleDeps, payload: string, result: unknow
   }
   const said = (result as { verdicts?: unknown } | null | undefined)?.verdicts;
   if (!Array.isArray(said)) return no('VALUE_MALFORMED', 'An answer about pairs carries verdicts: [{ hash, same, confidence }].', { at: 'result.verdicts' });
+  /* A PAIR THAT IS NOT TWO PEOPLE FILES NOTHING HERE: no question and no fold. Its verdict is kept in the done job
+     (`answeredOnly`), and `pairsFor` reads it there to weed and rank what is offered. A pair a job handed with no kind
+     is an older job's, and every pair of those was two people. */
+  const others = new Set((Array.isArray(job.pairs) ? job.pairs : []).filter((p) => p?.kind !== undefined && p.kind !== 'person').map((p) => p.hash));
   for (const v of said as { hash?: unknown; same?: unknown; confidence?: unknown }[]) {
-    const pair = typeof v?.hash === 'string' ? job.rows?.[v.hash] : undefined;
+    const pair = typeof v?.hash === 'string' && !others.has(v.hash) ? job.rows?.[v.hash] : undefined;
     const confidence = typeof v?.confidence === 'number' ? v.confidence : 0;
     if (!pair || v.same !== true || confidence < BAND_ASK) continue;
-    /* ONE OF THEM GONE is a pair an earlier fold of this answer, or his own hand, already settled. */
-    const [a, b] = [rowById(deps.sql, pair[0]), rowById(deps.sql, pair[1])];
+    /* ONE OF THEM GONE is a pair an earlier fold of this answer, or his own hand, already settled; and both are of the
+       list people are met into, whatever a payload says, so no organisation is ever asked about as a person. */
+    const [a, b] = [inList(deps.sql, list.register, pair[0]), inList(deps.sql, list.register, pair[1])];
     if (!a || !b || a.id === b.id || deps.othersRow?.(a.id) === true || deps.othersRow?.(b.id) === true || refused(deps, list, a, b)) continue;
     const why = agreement(deps, list, a, b);
     /* A SCORE IS BETWEEN 0 AND 1. One past it (85, said as a percentage) is not the top band: it asks, as likely. */

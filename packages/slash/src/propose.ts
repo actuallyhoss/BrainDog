@@ -33,7 +33,7 @@ import { no, ok, refused, type Refusal, type Result } from '@braindog/ports';
 import { compile, type Schema } from '@braindog/where';
 
 import type { Charge, Core } from './call.ts';
-import { BODIES, fenced, PROMPTS, type AnsweredKind } from './prompts.ts';
+import { BODIES, fenced, fill, PROMPTS, type AnsweredKind, type PromptId } from './prompts.ts';
 import {
   checkSchema,
   citable,
@@ -720,6 +720,7 @@ export const palette = (core: Core, record: RecordApi, fallback: Inference): Pal
         read: trimmedRead(it.read, kept.rows),
         filed,
         candidate: ran.candidate,
+        raw: ran.raw,
         ...PROPOSED,
       });
 
@@ -1032,9 +1033,22 @@ export type SetupAnswer = {
   names: { list: string; name: string }[];
   rows: { list: string; fields: Record<string, unknown> }[];
   draft: string | null;
+  /**
+   * The one question the model would ask back, where the answer would change what is built (USE-B06), or null.
+   *
+   * ONE, NEVER TWO (his word of 9 October, `apps/web/src/lib/start/question.ts`, over the scope's two). Absent where the
+   * model said nothing about it, which reads as null.
+   */
+  ask?: SetupQuestion | null;
   /** Who answered, as the ledger names it. */
   by: string;
 };
+
+/** What a question back may be about: the five things a first run builds differently on. */
+export type SetupAbout = 'name' | 'kind' | 'things' | 'who_for' | 'currency';
+
+/** One question back: one line, and up to four short choices to tap. */
+export type SetupQuestion = { about: SetupAbout; question: string; choices: string[] };
 
 /** A list an export may go into, with each field's id, type and, for an enum, its values. */
 export type MappingList = { id: string; name: string; fields: readonly { id: string; type: string; values?: readonly string[] | undefined }[] };
@@ -1107,19 +1121,50 @@ export const setupOf = (raw: Record<string, unknown>, ask: SetupAsk, by: string)
     const kept = Object.fromEntries(Object.entries(fields).filter(([k]) => own.has(k)));
     if (Object.keys(kept).length > 0) rows.push({ list, fields: kept });
   }
+  const held = { name: typed(name) && name.length <= 60 ? name : null, currency: ISO.test(currency) ? currency : null };
   return {
-    name: typed(name) && name.length <= 60 ? name : null,
+    name: held.name,
     summary: oneLine(textOf(raw['summary']), 200),
     usecase,
     also: [...new Set(strings(raw['also']).filter((id) => cases.has(id) && id !== usecase))],
     modules: [...new Set(strings(raw['modules']).filter((id) => mods.has(id)))],
-    currency: ISO.test(currency) ? currency : null,
+    currency: held.currency,
     heard,
     names,
     rows,
     draft: draft === '' ? null : draft,
+    ask: questionOf(raw['ask'], { named: held.name !== null, priced: held.currency !== null || MONEY_SIGN.test(ask.said) }),
     by,
   };
+};
+
+const ABOUTS: ReadonlySet<string> = new Set<SetupAbout>(['name', 'kind', 'things', 'who_for', 'currency']);
+/** A question back is one line of this many characters at most, and a choice to tap this many. */
+const QUESTION_MOST = 120;
+const CHOICE_MOST = 24;
+const CHOICES_MOST = 4;
+/** A currency the person typed as a sign, so a question about which one is not asked of them. */
+const MONEY_SIGN = /[$£€¥₹₩₺₦]/u;
+
+/**
+ * THE ONE QUESTION BACK, HELD TO WHAT A FIRST RUN CAN USE. Kept only about one of the five things it builds differently on,
+ * as one line of 120 characters with at most four choices of 24 each; a question that does not fit is dropped whole and
+ * never cut, because a cut question asks something the model did not. A name is not asked of someone who typed one, nor
+ * a currency of someone who typed one. Where the model answered a list (the scope's first shape was two), the first that
+ * holds is the one kept and the rest are dropped: one question, never two.
+ */
+const questionOf = (raw: unknown, typed: { named: boolean; priced: boolean }): SetupQuestion | null => {
+  for (const q of (Array.isArray(raw) ? raw : [raw]).filter(isRecord)) {
+    const about = textOf(q['about']);
+    const question = textOf(q['question']);
+    const choices = Array.isArray(q['choices']) ? q['choices'] : [];
+    if (!ABOUTS.has(about) || question === '' || /[\r\n]/u.test(question) || [...question].length > QUESTION_MOST) continue;
+    if ((about === 'name' && typed.named) || (about === 'currency' && typed.priced)) continue;
+    const said = choices.map(textOf);
+    if (choices.length > CHOICES_MOST || said.some((c) => c === '' || /[\r\n]/u.test(c) || [...c].length > CHOICE_MOST)) continue;
+    return { about: about as SetupAbout, question, choices: [...new Set(said)] };
+  }
+  return null;
 };
 
 /**
@@ -1221,6 +1266,76 @@ const moduleLines = (offer: SetupOffer): string =>
 const listLines = (lists: readonly MappingList[]): string =>
   lists.map((l) => `${l.id} (${l.name}): ${l.fields.map((f) => `${f.id}:${f.type}${f.values && f.values.length > 0 ? `[${f.values.join('/')}]` : ''}`).join(' · ')}`).join('\n');
 
+/** One model call for a first-run template, answering the checked object and the name it ran under, or the refusal. */
+type Asking = (question: string, slots: Record<string, string>) => Promise<Result<{ value: Record<string, unknown>; by: string }>>;
+
+/**
+ * THE STORE-FREE STEP FROM A SENTENCE TO A READING, which both doors take: the ask as the browser or the host handed it,
+ * the two refusals that ask no model, the prompt's slots, one call through `asking`, and the answer held to the offer
+ * and the words typed (`setupOf`). Who may ask, and who pays, is the caller's: `proposeSetup` holds and settles it on the
+ * record's ledger, and `readSetup` leaves the count to the door that meters strangers.
+ */
+const setupStep = async (raw: SetupAsk, asking: Asking): Promise<Result<SetupAnswer>> => {
+  const ask = setupAskOf(raw);
+  const said = firstBytes(ask.said.trim(), SAID_BYTES);
+  if (said === '') return no('VALUE_MALFORMED', 'Say who you are first. A blank answer has nothing to read.', { at: 'said' });
+  if (ask.offer.usecases.length === 0 && ask.offer.modules.length === 0)
+    return no('VALUE_MALFORMED', 'The first run offered nothing to choose from, so the model was not asked.', { at: 'offer' });
+  const out = await asking(firstBytes(said, ASK_BYTES), {
+    '%USECASES%': caseLines(ask.offer),
+    '%MODULES%': moduleLines(ask.offer),
+    '%TODAY%': ask.today === '' ? 'not said' : ask.today,
+    '%SAID%': fenced('said', said),
+  });
+  return out.ok ? ok(setupOf(out.value.value, { ...ask, said }, out.value.by)) : out;
+};
+
+/**
+ * One template asked once, with no ledger: `core.run`'s own call (`call.ts`) without the hold, the row or the route walk,
+ * and with the same codes for the same faults. A model that threw is `UNREACHABLE`; a reply that is not JSON, not an
+ * object or off the template's schema is `PROPOSAL_SCHEMA`, so the door can say which and fall back on the rules.
+ */
+const askedOnce = async (id: PromptId, slots: Record<string, string>, engine: Inference): Promise<Result<{ value: Record<string, unknown>; by: string }>> => {
+  const template = PROMPTS[id];
+  const named = naming(engine);
+  let reply;
+  try {
+    reply = await named.inference.complete({
+      model: template.model,
+      messages: [
+        { role: 'system', content: template.system },
+        { role: 'user', content: fill(template.user, slots) },
+      ],
+      maxTokens: template.maxTokens,
+      jsonSchema: template.schema,
+    });
+  } catch (e) {
+    return no('UNREACHABLE', `The model did not answer${e instanceof Error && e.message !== '' ? `: ${e.message}` : ''}. Nothing was filed; ask again.`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(reply.text);
+  } catch {
+    return no('PROPOSAL_SCHEMA', 'The model did not answer with JSON. Nothing was filed; ask again.');
+  }
+  const fault = checkSchema(template.schema, parsed);
+  if (fault) return { ok: false, refusal: fault };
+  if (!isRecord(parsed)) return no('PROPOSAL_SCHEMA', 'The model did not answer with an object. Nothing was filed; ask again.');
+  return ok({ value: parsed, by: named.sent() ?? template.model });
+};
+
+/**
+ * THE FIRST READ, BEFORE THERE IS AN ACCOUNT (USE-B05): a stranger's sentence at sign-up read once through `inference`
+ * and held by `setupOf`, as `proposeSetup` reads an owner's.
+ *
+ * NO RECORD, NO OWNER, NO LEDGER AND NO MONTH'S COUNT. There is no record yet to hold a row in or an owner to test, so the
+ * door that calls this meters it (`packages/host/src/first-read.ts`: one address's reads a day, and the day's ceiling for
+ * every stranger) and hands the model it pays for. Nothing here writes anywhere: the answer is what the sign-up page
+ * draws, and the person's press after the mailed link is what builds.
+ */
+export const readSetup = (ask: SetupAsk, inference: Inference): Promise<Result<SetupAnswer>> =>
+  setupStep(ask, (_question, slots) => askedOnce('setup', slots, inference));
+
 /**
  * The first run's two asks, over the ledger every other ask is held and settled in.
  *
@@ -1280,22 +1395,11 @@ export const setups = (core: Core, fallback: Inference): Setups => {
     }
   };
 
+  /* THE SAME STEP AS `readSetup`, between the owner's checks and the ledger's: one path from a sentence to a reading. */
   const proposeSetup = async (raw: SetupAsk, ctx: CallContext, inference?: Inference): Promise<Result<SetupAnswer>> => {
     const stop = owner(ctx) ?? spent(PLANNED);
     if (stop) return { ok: false, refusal: stop };
-    const ask = setupAskOf(raw);
-    const said = firstBytes(ask.said.trim(), SAID_BYTES);
-    if (said === '') return no('VALUE_MALFORMED', 'Say who you are first. A blank answer has nothing to read.', { at: 'said' });
-    if (ask.offer.usecases.length === 0 && ask.offer.modules.length === 0)
-      return no('VALUE_MALFORMED', 'The first run offered nothing to choose from, so the model was not asked.', { at: 'offer' });
-    const out = await asked(
-      'setup',
-      firstBytes(said, ASK_BYTES),
-      { '%USECASES%': caseLines(ask.offer), '%MODULES%': moduleLines(ask.offer), '%TODAY%': ask.today === '' ? 'not said' : ask.today, '%SAID%': fenced('said', said) },
-      inference,
-      PLANNED,
-    );
-    return out.ok ? ok(setupOf(out.value.value, { ...ask, said }, out.value.by)) : out;
+    return setupStep(raw, (question, slots) => asked('setup', question, slots, inference, PLANNED));
   };
 
   const proposeMapping = async (raw: MappingAsk, ctx: CallContext, inference?: Inference): Promise<Result<MappingAnswer>> => {

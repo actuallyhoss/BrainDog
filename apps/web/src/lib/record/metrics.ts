@@ -858,7 +858,7 @@ export function noteOf(template: string, said: (id: string) => string | null | t
 }
 
 /** A `{{path}}` a lead sentence may name: a figure's id, and the page's own paths such as `steps.count` or `tasks#12.state`. */
-const HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}/gu;
+const HOLE = /\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*(?::[^{}\s]+)?)\s*\}\}/gu;
 
 /**
  * A `note lead`'s body, said by `noteOf`'s two rules and with every `{{path}}` LEFT FOR THE RENDERER TO FILL.
@@ -927,7 +927,7 @@ export function leadOf(template: string, read: (path: string) => string | null |
       },
     )
     .replace(
-      /(\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*)\s*\}\}|(?<![\d.,])\b\d[\d,]*(?:\.\d+)?)((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)(?:(\s+)(are|is|were|was|have|has)\b)?/gu,
+      /(\{\{\s*([a-z][a-z0-9_-]*(?:[.#][a-z0-9_-]+)*(?::[^{}\s]+)?)\s*\}\}|(?<![\d.,])\b\d[\d,]*(?:\.\d+)?)((?:\s+[A-Za-z]+)*?)\s+([A-Za-z]+)\(s\)(?:(\s+)(are|is|were|was|have|has)\b)?/gu,
       (_, figure: string, path: string | undefined, between: string, word: string, gap: string | undefined, verb: string | undefined) => {
         const single = one(path === undefined ? figure : (said(path) ?? ''));
         const forms = verb !== undefined && Object.hasOwn(VERB, verb) ? VERB[verb] : undefined;

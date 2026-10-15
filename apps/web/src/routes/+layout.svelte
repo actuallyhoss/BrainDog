@@ -112,7 +112,7 @@
   const bare = $derived.by(() => {
     /* Read inside the record: the address is `/app/acme/start` and the rule is about `/start`. */
     const at = here(page.url.pathname);
-    return at === '/start' || at === '/signin' || at === '/signup' || at === '/invite' || at === '/connect' || at.startsWith('/s/');
+    return at === '/start' || at === '/signin' || at === '/signup' || at === '/invite' || at === '/connect' || at === '/s' || at.startsWith('/s/');
   });
 
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why

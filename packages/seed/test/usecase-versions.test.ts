@@ -1074,6 +1074,39 @@ const DECLARED: Record<string, Version> = {
       "`metric.budgets-set` goes to Money with its id (`hands.metric.budgets-set.money-core`; budgets-set-73, integrate 73): money-core 3.17.0 declares the count itself, two packs cannot own one figure, and `page.home-personal`'s budget tile reads Money's; one id handed on, none added, and 2.3.1, released at 63423720, stays as it was -> f49f7464dd5d89cc",
     ],
   },
+  /* A NEW HOME OFFERS SOMETHING TO PRESS (USE-A08): 2.4.0 is live since the 1b55e940 deploy, so this is a version and not
+     a reset. It holds what 2.4.0 held and one count more, `metric.savings-held`, which Home's line naming a first savings
+     goal waits on; the link and the two lines are blocks of `page.home-personal`. */
+  'personal@2.5.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson hands.metric.budgets-set.money-core
+      metric.goal-log-held metric.goals-active metric.goals-held metric.habits-active metric.logged-by-goal
+      metric.logged-this-week-by-goal metric.put-by-by-goal metric.put-by-held metric.saved-toward-goals
+      metric.savings-active metric.savings-held metric.steps-done metric.steps-left page.goals page.home-personal
+      page.my-project register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_accounts setting.label_books
+      setting.label_categories setting.label_goal_log setting.label_goals setting.label_installments
+      setting.label_obligations setting.label_people setting.label_people__role__accountant
+      setting.label_people__role__client setting.label_people__role__collaborator setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_recurring setting.label_savings_goals
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906
+      setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_accounts
+      setting.one_books setting.one_categories setting.one_goal_log setting.one_goals setting.one_installments
+      setting.one_obligations setting.one_people setting.one_project_steps setting.one_put_by setting.one_recurring
+      setting.one_savings_goals setting.one_things setting.one_transactions setting.shared_version setting.speaks
+      setting.voice_add_first setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you
+      setting.voice_nothing_now setting.voice_overdue setting.voice_record_empty setting.voice_right_now
+      setting.voice_since_away
+    `,
+    declares: '32aff23db88fea96',
+    history: [
+      "`page.home-personal` gains the first acts (USE-A08): Bring your money in while no account counts as cash, a line naming a savings goal while none is kept and one naming a project in the Building lane while none is live, each on its own count; `metric.savings-held` is added for the second, nothing goes, and 2.4.0, live at 1b55e940, stays as it was -> 32aff23db88fea96",
+    ],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard

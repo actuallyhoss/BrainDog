@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 import { COMMANDS } from './palette/admit.ts';
 import { BINDINGS } from './a11y/bindings.ts';
-import { FLOW_VERBS } from './flow/flow.ts';
+import { VERB_LABELS } from './flow/flow.ts';
 
 const SRC = fileURLToPath(new URL('../', import.meta.url));
 /* THIS FILE NAMES THE OLD WORDS to say they are gone, so the scan skips it and nothing else. */
@@ -40,8 +40,8 @@ test('the palette offers Slash by its name, at its address', () => {
 });
 
 test('the canvas offers ask_slash, the step the kernel lints', () => {
-  assert.ok((FLOW_VERBS as readonly string[]).includes('ask_slash'));
-  assert.ok(!(FLOW_VERBS as readonly string[]).includes('ask_spark'));
+  assert.ok(Object.hasOwn(VERB_LABELS, 'ask_slash'));
+  assert.ok(!Object.hasOwn(VERB_LABELS, 'ask_spark'));
 });
 
 test('the key that opens the palette is named for the key, not for the product', () => {

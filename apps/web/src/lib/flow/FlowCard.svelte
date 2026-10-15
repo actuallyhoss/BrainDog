@@ -1,11 +1,15 @@
 <!--
   One step's card: a handle, what the step does in one line, and a menu of the moves.
 
-  A NODE IS A TILE: the white surface at radius `--r-lg` and the first level of depth, sitting straight on
-  the ground with the `--rule` connectors between it and the next. Its verb is the icon in a 28px well, the sentence is
+  A NODE IS A TILE: the flat surface at radius `--r-lg`, no border and no shadow, sitting straight on the board with
+  the `--rule` connectors between it and the next. Its verb is the icon in a 28px well, the sentence is
   a row title, and the card's state is said by the well, which is the system's own language for it: the chosen card's
   well is ink (the rail's chosen place is drawn the same way), and a card with something wrong has a red well over the
-  sentences that say what. No border round a card, ever; the chosen one also lifts to the chrome's depth.
+  sentences that say what. No border round a card, ever, and no lift: the chosen one is said by its well alone.
+
+  EVERY STEP THE GRAMMAR HOLDS GETS A CARD, `meet` and `run_job` with the rest: the sentence is `flow.ts`'s, worked
+  from the step's arguments, and a verb this build has no glyph for takes the group's. A stored id is never the words
+  on a card: a job is said by its name in words, a person by what the step calls them.
 
   THE RADIUS IS THE TILE'S AND THE PADDING IS 8, so the handle's 36px circle and the card's corner are one curve: 18 of
   radius and 8 of inset is the 22 of the corner, give or take a pixel.
@@ -34,7 +38,9 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import Menu from '$lib/ui/Menu.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { ROOT, sayParts, sayStep, verbOf, words, type ListId, type Node, type Nudge, type Verb } from './flow.ts';
+  import { onMount } from 'svelte';
+  import { ROOT, grammarStep, sayParts, sayStep, verbOf, words, type ListId, type Node, type Nudge, type Verb } from './flow.ts';
+  import { grammarNow, grammarState, loadGrammar } from './grammar.ts';
   import type { FlowDraft } from './flow.svelte.ts';
   import { editWords } from './source.ts';
 
@@ -47,12 +53,27 @@
     faults = [],
   }: { flow: FlowDraft; node: Node; list: ListId; at: number; count: number; faults?: string[] } = $props();
 
-  const said = $derived(sayStep(node.step));
+  /* THE TAB'S GRAMMAR, read once (`grammar.ts`): every sentence below is worked out again when it arrives, since a verb
+     and its arguments are the grammar's to name. */
+  /* THE TAB'S GRAMMAR, FOLLOWED BY ITS OWN SUBSCRIPTION and not `$grammarState`: Svelte's store helpers would go into
+     the runtime every screen loads (the entry budget). */
+  let read = $state.raw(grammarNow());
+  $effect(() => grammarState.subscribe((s) => (read = s)));
+  const grammar = $derived(read.state === 'ready' ? read.grammar : null);
+  onMount(() => void loadGrammar());
+
+  const said = $derived.by(() => {
+    void grammar;
+    return sayStep(node.step);
+  });
   /* THE SENTENCE AS PARTS, so a value a step reads is a chip and not a word run into the words round it: the sample
      said "Tell you: Gold is rate a gram". `said` stays the plain join for every
      label and the live region, where a chip has nothing to draw. */
-  const parts = $derived(sayParts(node.step));
-  const verb = $derived(verbOf(node.step));
+  const parts = $derived.by(() => {
+    void grammar;
+    return sayParts(node.step);
+  });
+  const verb = $derived(verbOf(node.step, grammar));
   /* A CARD JUST ADDED KEEPS ITS FAULTS UNTIL THE SHEET HAS CLOSED ON IT ONCE (`FlowDraft.holds`): every required box
      starts empty, and the card was told off while the inspector was still opening on it to be filled. */
   /* THE RECORD'S OWN WORD JOINS THEM, from `checkAutomation`, on the card its `at` names (`FlowDraft.serve`). It is held
@@ -81,9 +102,14 @@
     call: 'globe',
     run: 'plug',
     script: 'code',
+    run_job: 'play',
+    meet: 'user-plus',
     wait: 'clock',
     schedule: 'calendar',
   };
+
+  /** A verb with no glyph of its own takes its group's: an action changes the item, a step's own verb does something else. */
+  const glyph = $derived<IconName>((verb && GLYPH[verb]) || (verb && grammarStep(verb, grammar)?.group === 'action' ? 'edit' : 'refresh'));
 
   let open = $state(false);
 
@@ -102,8 +128,11 @@
     else if (loud && flow.why) toasts.push(flow.why, { intent: 'warn' });
   }
 
+  /* NOTHING MOVES OVER A RECORD WHOSE GRAMMAR WAS NOT READ: the editor opens read only (`grammar.ts` OLDER, UNREAD). */
+  const locked = $derived(read.state === 'older' || read.state === 'unread');
+
   function onkeydown(e: KeyboardEvent) {
-    if (!e.altKey) return;
+    if (!e.altKey || locked) return;
     const dir = ({ ArrowUp: 'up', ArrowDown: 'down', ArrowRight: 'in', ArrowLeft: 'out' } as Record<string, Nudge>)[e.key];
     if (!dir) return;
     e.preventDefault();
@@ -131,7 +160,7 @@
   }
 
   function down(e: PointerEvent) {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || locked) return;
     e.preventDefault();
     const handle = e.currentTarget as HTMLElement;
     handle.setPointerCapture(e.pointerId);
@@ -201,7 +230,7 @@
   </button>
 
   <button type="button" class="say tap" aria-describedby={shown.length > 0 ? `faults-${node.key}` : undefined} onclick={() => flow.select(node.key)}>
-    <IconWell name={(verb && GLYPH[verb]) || 'refresh'} size="m" tone={flow.selected === node.key ? 'ink' : shown.length > 0 ? 'danger' : undefined} />
+    <IconWell name={glyph} size="m" tone={flow.selected === node.key ? 'ink' : shown.length > 0 ? 'danger' : undefined} />
     <span class="said">{#each parts as p, i (i)}{#if p.ref}<span class="ref">{p.text}</span>{:else}{p.text}{/if}{/each}</span>
   </button>
 
@@ -251,16 +280,8 @@
     padding: var(--sp-2);
     background: var(--bg);
     border-radius: var(--r-lg);
-    box-shadow: var(--e1);
     color: var(--ink);
-    transition:
-      box-shadow var(--d-state) var(--ease-out),
-      opacity var(--d-state) var(--ease-out);
-  }
-
-  /* THE CHOSEN CARD LIFTS to the chrome's depth, beside its ink well: the one the panel is about. */
-  .card[data-selected] {
-    box-shadow: var(--e2);
+    transition: opacity var(--d-state) var(--ease-out);
   }
 
   /* A FAULT IS A WORD UNDER THE CARD AND A RED WELL, NOT A TINT ON IT. The card was `--warn-wash` behind its text, and

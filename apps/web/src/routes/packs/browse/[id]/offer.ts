@@ -259,7 +259,16 @@ export async function install(
     return installInTurn(planned, { replan: (u) => planFor(client, u, u.file, states, fallback), install: (p) => install(client, p, states, arrangement, fallback) });
   }
   if (planned.kind === 'pack') {
-    const out = await client.installPack({ doc: planned.doc, source: { kind: 'local' }, planHash: planned.planHash, ...(planned.approve.length > 0 ? { approve: planned.approve } : {}) });
+    /* A PLAN THAT TAKES A LIST AWAY WHILE IT HOLDS ITEMS SHOWED THAT STEP (`Diff.removals`), so Install on it is the
+       press that lifts the refusal, keeping every item. */
+    const removals = (planned.diff as { removals?: unknown } | null)?.removals;
+    const out = await client.installPack({
+      doc: planned.doc,
+      source: { kind: 'local' },
+      planHash: planned.planHash,
+      ...(planned.approve.length > 0 ? { approve: planned.approve } : {}),
+      ...(Array.isArray(removals) && removals.length > 0 ? { retireWithRows: true } : {}),
+    });
     return out.ok ? { ok: true, nav: null } : refusedOf(out, fallback);
   }
   const heard = await speakingStates(client, states);

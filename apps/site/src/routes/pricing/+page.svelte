@@ -19,7 +19,8 @@
    *   faq       the questions a person asks before starting.
    *   close     one line and the button.
    *
-   * NO CREDIT PACKS AND NO EXTRA USAGE ARE SOLD HERE, because neither is built (`plans.ts` says where each would be).
+   * NO CREDIT PACKS ARE SOLD HERE UNTIL BILLING IS ON (`plans.ts` `PACKS`, empty until then), and no extra usage, which
+   * is not built.
    */
   import Icon from '$lib/Icon.svelte';
   import { SIGNUP, site } from '$lib/copy.ts';

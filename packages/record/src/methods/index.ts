@@ -67,6 +67,8 @@ import { methods as toolsSeenMethods } from './tools-seen.ts';
 import { methods as namedTwiceMethods } from './named-twice.ts';
 import { methods as exportPack } from './export-pack.ts';
 import { methods as deviceRenameMethods } from './device-rename.ts';
+import { methods as packsRemovedMethods } from './packs-removed.ts';
+import { methods as flowGrammarMethods } from './flow-grammar.ts';
 /* END METHODS */
 
 /**
@@ -138,6 +140,8 @@ export type RecordDeps = {
   engineLedger?: import('./engine-readings.ts').EngineLedgerRead | undefined;
   /** The host's own build and MIN_CLI (AGT-A02), which doorHealth answers and reads behind against. Absent, both are null. */
   doorBuild?: import('./door.ts').DoorBuild | (() => import('./door.ts').DoorBuild);
+  /** The host's catalogue, by id and title, which packsRemoved names a removed add-on by. Absent, it is said by its id. */
+  catalogue?: readonly { id: string; title: string }[] | undefined;
   /** The operator's cut-off (`TOKENS_VALID_FROM`, `53 §5.11`), so doorHealth counts no key or runner it ended. */
   validFrom?: (() => string | undefined) | undefined;
   /** The record's own checks on a new entry that `create` makes (`mergeShaped`, `keyHeld`, `huedOf` in `index.ts`), which `capture` asks of each entry. Absent, `capture` refuses only a merge. */
@@ -200,6 +204,8 @@ export function methods(deps: RecordDeps) {
     ...namedTwiceMethods(deps),
     ...exportPack(deps),
     ...deviceRenameMethods(deps),
+    ...packsRemovedMethods(deps),
+    ...flowGrammarMethods(deps),
     /* END METHODS */
   };
 }

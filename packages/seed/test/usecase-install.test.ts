@@ -60,7 +60,7 @@ async function put(k: Kernel, doc: unknown): Promise<void> {
 const held = (k: Kernel): string[] => (k.declarations() as { id: string; kind: string }[]).filter((d) => d.kind === 'register').map((d) => d.id.slice('register.'.length));
 
 /** A record made the way onboarding makes one: each module in order, People for the person, then the use case's pack. */
-async function made(id: string): Promise<{ k: Kernel; sql: NodeSql }> {
+async function made(id: string, said: string | null = null): Promise<{ k: Kernel; sql: NodeSql }> {
   const u = useCase(id)!;
   const { k, sql } = await record();
   for (const m of modulesFor(u, ['people'])) {
@@ -68,7 +68,7 @@ async function made(id: string): Promise<{ k: Kernel; sql: NodeSql }> {
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));
   }
-  const carried = carriedDocument(u, TODAY, null, { examples: true });
+  const carried = carriedDocument(u, TODAY, said, { examples: true });
   if (carried) await put(k, carried);
   return { k, sql };
 }
@@ -213,7 +213,8 @@ test('TEAM BOARD AND THE GUIDE OPEN ON THEIR OWN HOME, and the guide on its six 
   for (const b of agentWork) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   team.sql.close();
 
-  const guide = await made('guide');
+  /* THE GUIDE CARRIES NO EXAMPLE ROWS SINCE personal-and-guide-99: its plan is formed from what the person said. */
+  const guide = await made('guide', 'I want to restore an old wooden boat and sail it next summer');
   assert.equal(guide.k.count('milestones'), 6, 'the guide opens on the six milestones a project passes');
   assert.equal(guide.k.count('steps'), 3);
   const home = value<{ blocks: Drawn[] }>(guide.k.page(homePageOf('guide'))).blocks;
@@ -230,7 +231,7 @@ test('A PERSONAL HOME OPENS ON WHAT I HAVE, WHAT IS COMING UP, THE BUDGET LEFT, 
   const home = value<{ blocks: (Drawn & { kind: string })[] }>(k.page(homePageOf('personal'))).blocks;
   /* SINCE PERSONAL 2.2.0: the line where What I have stood, what needs you first, one list of what falls due, and what
      changed folded shut; the feed under the fold carries no heading of its own. */
-  assert.deepEqual(home.map((b) => b.heading), [undefined, 'Worth a look', 'Coming up', 'Budget left', 'My projects', 'Goals', 'Habits this week', 'Since you last looked', undefined]);
+  assert.deepEqual(home.map((b) => b.heading), [undefined, 'Worth a look', 'Bring your money in', 'Name something you are saving for', 'Name something you are making', 'Coming up', 'Budget left', 'My projects', 'Goals', 'Habits this week', 'Since you last looked', undefined]);
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
   for (const slug of ['money', 'goals', 'portfolio']) {
     const page = value<{ blocks: Drawn[] }>(k.page(slug)).blocks;
