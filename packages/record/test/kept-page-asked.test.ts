@@ -46,7 +46,8 @@ async function record(now: { at: number }) {
     const planned = value<{ diff: { planHash: string } }>(await api.planPack({ doc, source: { kind: 'local' } }, owner));
     value(await api.installPack({ doc, source: { kind: 'local' }, planHash: planned.diff.planHash }, owner));
   };
-  for (const id of modulesFor(useCase('founder')!, ['people'])) await put(id);
+  /* A RECORD MADE BEFORE 2.7.0 HOLDS EVERY MODULE (founder 2.7.0 says `needs`). */
+  for (const id of modulesFor(useCase('founder')!, ['people', ...useCase('founder')!.modules])) await put(id);
   await put(PACK, (doc) => ({
     ...doc,
     version: '2.5.0',

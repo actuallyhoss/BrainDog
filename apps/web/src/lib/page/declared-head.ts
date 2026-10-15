@@ -23,6 +23,8 @@ export type DeclaredHead = {
   state?: { tone: HeadTone; words: string };
   action?: Action;
   search?: { param: string };
+  /** What the search found across the page's lists, when a word narrowed it (`searched` on the kernel's head). */
+  searched?: { word: string; found: number };
   back?: { href: string; label: string };
   byline?: true;
 };
@@ -71,6 +73,8 @@ export function headOf(answer: unknown): DeclaredHead | null {
   const action = actionOf(h.action);
   if (action) out.action = action;
   if (isRecord(h.search) && typeof h.search.param === 'string' && PARAM.test(h.search.param)) out.search = { param: h.search.param };
+  if (isRecord(h.searched) && typeof h.searched.word === 'string' && Number.isInteger(h.searched.found) && (h.searched.found as number) >= 0)
+    out.searched = { word: h.searched.word, found: h.searched.found as number };
   if (isRecord(h.back) && typeof h.back.href === 'string' && LOCAL.test(h.back.href)) {
     const label = words(h.back.label, 80);
     if (label) out.back = { href: h.back.href, label };
@@ -82,6 +86,7 @@ export function headOf(answer: unknown): DeclaredHead | null {
 /** The head's own words: the search field's name, and each tone's mark said for a reader who cannot see it. */
 export const HEAD_WORDS = {
   search: 'Search this page',
+  found: (n: number): string => `${String(n)} found`,
   tone: { good: 'On track', warn: 'Worth a look', bad: 'Needs you' } satisfies Record<HeadTone, string>,
 } as const;
 

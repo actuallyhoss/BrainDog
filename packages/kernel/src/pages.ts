@@ -28,7 +28,8 @@ import { cutActions, type OfferedAction } from './row-actions.ts';
 import { GROUPED_BY_FIELD, applyLook, composeLook, figureSaid, lookOf, mergeLook, type LookBody } from './compose.ts';
 /* A PAGE'S HEAD OVER ITS TITLE (PGS-A16), read and resolved by the file that checks it at install. */
 import { headerBody, resolveHead, type HeadFigure, type ResolvedHead } from './page-head.ts';
-import { HANDOFFS_OPEN, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
+import { listRead, searchClauses, searchWord, type SearchShape } from './page-search.ts';
+import { HANDOFFS_OPEN, KIND_SAID, RECORD_ACTIVITY, builtInFigure, type OpenStep } from './built-in-figures.ts';
 import type { ActionBlocking } from './signs-actions.ts';
 import { KEEP, markDrawn, type Why } from './drawn.ts';
 import { kindModule } from './kinds/index.ts';
@@ -139,6 +140,8 @@ export type PageBlock = {
    * newest, with how many more that run wrote (`FeedRow.run_more`).
    */
   fold?: boolean | number | 'run';
+  /** A `cards` or `series` block's: how many it shows before "Show all", 1 to 24 (`mostOf` in braindog-render); six for cards where it says nothing. */
+  most?: number;
   /**
    * A `cards` or a `table` block's: a field of its list that draws its rows in groups. A link groups them by the row it
    * points at, named by that row's title; a choice, or the list's state, by its value, named by the choice's label. Each
@@ -1009,6 +1012,34 @@ export type PageDeps = {
    * not run yet is cut, rather than sent to be refused on every press. Absent, the table is the whole answer.
    */
   runs?: ReadonlySet<string>;
+  /**
+   * WHAT THE RECORD READS THAT THE KERNEL CANNOT (PGS-A11): a source by its name, such as `lists` or `pages`, or
+   * `undefined` for one the host does not hold. Asked only where no registered source answers the name, so a host never
+   * shadows one, and never for a list (`register.<id>`). Absent, such a name is a source nobody knows.
+   */
+  hostSources?: (name: string) => HostSource | undefined;
+  /**
+   * A person who wrote a line of the log, by the name the record holds for them, or `null` where it holds none: what an
+   * Activity page's "who" filter offers them by. Absent, every person is offered together as People, never by an id.
+   */
+  actorName?: (actor: string) => string | null;
+};
+
+/**
+ * One source the record hands the page reader (`PageDeps.hostSources`): its fields, and its rows read as a list's are,
+ * `where`, `order`, `limit` and `cursor` passed through. `whole` says it reads across the whole record, so a page that
+ * draws it is held from a reader who does not read all of it (`WHOLE_RECORD`). `says` is one line about it for a person.
+ */
+export type HostSource = {
+  says?: string;
+  whole?: true;
+  schema: Schema;
+  rows(q: {
+    where?: Predicate | undefined;
+    order?: { field: string; dir?: 'asc' | 'desc' }[];
+    limit?: number;
+    cursor?: string;
+  }): Result<{ rows: Entry[]; next?: string | null; matched?: number }>;
 };
 
 /**
@@ -1038,7 +1069,8 @@ export type ListShape = {
   id: string;
   done?: readonly string[] | undefined;
   /** `to` is the list a ref points at, which names the parts of a figure grouped by it (`pointsBeside`). */
-  fields: readonly { id: string; type: string; to?: string | undefined; deadline?: boolean | undefined; retired?: boolean | undefined }[];
+  /** `search` is whether the field is one a row is searched by (`fts.ts`), which a page's head narrows by too (`page-search.ts`). */
+  fields: readonly { id: string; type: string; to?: string | undefined; deadline?: boolean | undefined; retired?: boolean | undefined; search?: boolean | undefined }[];
 };
 
 /**
@@ -1056,6 +1088,8 @@ export type ListsBeside = {
   metrics?: () => readonly MetricDecl[];
   /** The module a declaration came with, as `PageDeps.packOf` answers, so `<module>.<figure>` names its figure's lists. */
   packOf?: (id: string) => string | null;
+  /** The sources the record reads, as `PageDeps.hostSources` answers, so one that reads across the record is named `*`. */
+  hostSources?: (name: string) => HostSource | undefined;
 };
 
 /** The source a block names for one project's actions in its way (REC-C09), which that source holds. */
@@ -1530,7 +1564,18 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
       return { ...a, block: found.row ? (fill(block, found.row) as PageBlock) : block };
     }),
   );
-  const filters = readerFilters(deps, found.decl, laid.map((l) => l.block), filter);
+  /* THE HEAD'S SEARCH (PGS-A14). The word under its `search: { param }` is taken out of the choices, so it is never read
+     as a field, and narrows every list the page draws to the rows that say it (`page-search.ts`). A page whose head
+     declares no search reads the same key as any other word the address holds: as nothing. */
+  const laidBlocks = laid.map((l) => l.block);
+  const param = searchParamOf(found.decl);
+  const typed = param !== null && filter !== undefined && Object.hasOwn(filter, param) ? filter[param] : undefined;
+  const choices = typed === undefined || filter === undefined ? filter : Object.fromEntries(Object.entries(filter).filter(([k]) => k !== param));
+  const filters = readerFilters(deps, found.decl, laidBlocks, choices);
+  const word = typeof typed === 'string' ? searchWord(typed) : null;
+  const searched = word === null ? new Map<string, Predicate[]>() : searchClauses(searchShapes(deps), laidBlocks, word);
+  const clauses = joinClauses(filters?.clauses, searched);
+  const log = filters?.log ?? null;
   /* A SECTION WHOSE `when:` SAYS NO HIDES WHAT IT HOLDS, the blocks after it in its column up to the next section. It
      hid only its own heading, so a fresh record drew the folded "Not this week" line with nothing under it, and the
      blocks under a hidden heading stood on the page with no heading over them. They are not read: a block nobody
@@ -1546,7 +1591,7 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
     }
     /* THE PAGE'S ROW IS THE ENTRY ITS TEXT SITS ON, so `{{money:price}}` and `{{blockers.count}}` read the row (PGS-B03). */
     const on = found.row ? { ...deps, here: found.row } : deps;
-    const read = rowNamed(deps, found.row, readBlock(filters ? narrowed(on, b, filters.clauses) : on, b));
+    const read = rowNamed(deps, found.row, readBlock(clauses.size > 0 || log ? narrowed(on, b, clauses, log) : on, b));
     if (b !== null && typeof b === 'object' && b.kind === 'section' && read.drawn === false) hiding.add(area);
     const astray = found.decl.for || panelFault(b.panel, null) ? null : panelFault(b.panel, false);
     const drawn = astray ? { ...read, rows: [], matched: 0, refusals: [...read.refusals, astray] } : read;
@@ -1556,6 +1601,8 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
   const shown = deps.reader ? heldFor(blocks, deps.reader.hold) : null;
   const looked = lookedAt(deps, found.decl.page, shown?.blocks ?? blocks, shown, found.decl.layout !== undefined);
   const head = pageHead(deps, found.decl, every, read_at, zone);
+  /* AND THE HEAD SAYS HOW MANY THE WORD FOUND, across the page's lists, as this reader is shown them: "3 found". */
+  const kept = head && word !== null ? { word, found: foundAcross(shown?.blocks ?? blocks, searched) } : null;
   return ok({
     ...found.decl,
     page: found.slug,
@@ -1574,8 +1621,49 @@ export function readPage(host: PageDeps, slug: string, filter?: Readonly<Record<
     blocks: headlineHeld(drawnUnder(looked?.blocks ?? shown?.blocks ?? blocks, looked?.look.pinned)),
     ...(filters ? { filters: filters.answer } : {}),
     ...(looked ? { look: looked.look } : {}),
-    ...(head ? { head } : {}),
+    ...(head ? { head: kept ? { ...head, searched: kept } : head } : {}),
   });
+}
+
+/** The address word a page's head searches under (`header.search.param`), or `null` when its head declares none. */
+function searchParamOf(decl: PageDecl): string | null {
+  const declared = (decl as { header?: unknown }).header;
+  if (declared === undefined) return null;
+  const h = headerBody(declared, { figures: null, fields: null });
+  return h.ok ? (h.value.search?.param ?? null) : null;
+}
+
+/** What the head's search asks of each list: its fields as declared, with which are searched, and its title. */
+function searchShapes(deps: PageDeps): (register: string) => SearchShape | null {
+  const lists = deps.lists?.() ?? null;
+  return (register) => {
+    const declared = lists?.find((l) => l.id === register);
+    const schema = declared ? null : deps.schemaOf(register);
+    if (!declared && !schema) return null;
+    const fields = declared ? declared.fields : Object.entries(schema!.fields).map(([id, f]) => ({ id, type: f.type }));
+    return { fields, title: deps.titleOf(register) };
+  };
+}
+
+/** The reader's choices and the search's clauses together, by the list each narrows. */
+function joinClauses(a: ReadonlyMap<string, readonly Predicate[]> | undefined, b: ReadonlyMap<string, readonly Predicate[]>): Map<string, Predicate[]> {
+  const out = new Map<string, Predicate[]>();
+  for (const from of [a, b]) for (const [register, more] of from ?? []) if (more.length > 0) out.set(register, [...(out.get(register) ?? []), ...more]);
+  return out;
+}
+
+/**
+ * The rows the search kept across the page's lists: each list once, by the most any block over it matched, so two blocks
+ * over one list count its rows once. A block that was refused or held counts nothing.
+ */
+function foundAcross(blocks: readonly BlockResult[], searched: ReadonlyMap<string, readonly Predicate[]>): number {
+  const most = new Map<string, number>();
+  for (const b of blocks) {
+    const register = listRead(b);
+    if (register === null || !searched.has(register) || b.refusals.length > 0) continue;
+    most.set(register, Math.max(most.get(register) ?? 0, typeof b.matched === 'number' ? b.matched : 0));
+  }
+  return [...most.values()].reduce((n, m) => n + m, 0);
 }
 
 /**
@@ -1754,9 +1842,7 @@ function headlineHeld(blocks: readonly BlockResult[]): BlockResult[] {
 /** The most values one filter offers, most held first. Past this a strip of chips is a list nobody reads. */
 const FILTER_VALUES = 50;
 
-/** The register a block reads rows of, or `null` for one over a figure, a computed source or nothing. */
-const listRead = (b: PageBlock): string | null =>
-  b !== null && typeof b === 'object' && typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
+/* THE REGISTER A BLOCK READS ROWS OF is `listRead` in `page-search.ts`, which the head's search narrows by too. */
 
 /** The row a chosen link points at, by its number (`12`), spoken id (`projects#12`) or row id, with its number and title. */
 type Pointed = { id: string; seq: number; label: string };
@@ -1838,7 +1924,7 @@ function readerFilters(
   decl: PageDecl,
   blocks: readonly PageBlock[],
   filter: Readonly<Record<string, string>> | undefined,
-): { answer: PageFilter[]; clauses: Map<string, Predicate[]> } | null {
+): { answer: PageFilter[]; clauses: Map<string, Predicate[]>; log: ((e: ActivityEvent) => boolean) | null } | null {
   const said = Array.isArray(decl.filters) ? (decl.filters as unknown[]) : [];
   const declared = said.flatMap((f): { field: string; control: PageFilter['control'] }[] => {
     const one = f !== null && typeof f === 'object' && !Array.isArray(f) ? (f as { field?: unknown; control?: unknown }) : {};
@@ -1846,6 +1932,12 @@ function readerFilters(
     return typeof one.field === 'string' && control !== null ? [{ field: one.field, control }] : [];
   });
   if (declared.length === 0) return null;
+
+  /* A PAGE THAT DRAWS THE LOG IS FILTERED BY ITS OWN THREE QUESTIONS (PGS-C24): who wrote a line, what kind of change it
+     was and which list it was on, answered from the log and never from a list's field of the same word. */
+  const logged = blocks.some((b) => b !== null && typeof b === 'object' && b.source === 'activity')
+    ? logFilters(deps, declared.filter((d) => (LOG_FILTERS as readonly string[]).includes(d.field)), filter)
+    : null;
 
   /* THE LISTS THE PAGE'S BLOCKS READ, in the page's order: a filter narrows what is drawn, so a list no block draws is
      not counted, and neither is one the reader may not read (`EvalContext.reads`), as `deadlines` leaves it out. The
@@ -1858,6 +1950,7 @@ function readerFilters(
      is answered by the number of the row it points at, however it was chosen, so the chip it lights is the one drawn. */
   const chosen = new Map<string, { value: string; pointed: Pointed | null; to: string | undefined }>();
   for (const { field } of declared) {
+    if (logged?.answers.has(field)) continue;
     const said = filter && Object.hasOwn(filter, field) ? filter[field] : undefined;
     if (typeof said !== 'string') continue;
     const value = said.trim();
@@ -1880,6 +1973,8 @@ function readerFilters(
   const clauses = new Map(lists.map((r) => [r, clausesOn(r)] as const));
 
   const answer = declared.map(({ field, control }): PageFilter => {
+    const fromLog = logged?.answers.get(field);
+    if (fromLog) return { ...fromLog, control };
     const holding = lists.filter((r) => filterable(schemas.get(r) ?? null, field));
     const home = holding[0];
     const spec = home === undefined ? undefined : filterable(schemas.get(home) ?? null, field)!;
@@ -1942,7 +2037,138 @@ function readerFilters(
     }
     return { field, label, control, chosen: pick, values: shown, reads };
   });
-  return { answer, clauses };
+  return { answer, clauses, log: logged?.keep ?? null };
+}
+
+/* ── the sources the record reads (PGS-A11) ──────────────────────────────── */
+
+/** The kinds that draw a host source's rows: a table, cards, and the pack primitives that draw rows. */
+const HOST_ROW_KINDS: ReadonlySet<string> = new Set(['table', 'cards', 'list', 'rows', 'grid']);
+
+/**
+ * A block over a source the record hands in (`PageDeps.hostSources`), read as a list's rows are: its `columns` and `order`
+ * name the source's fields, its `where:` is read against them, and `limit` is passed through, fifty when it says none.
+ * A field the source does not hold is refused here, at read, with the fields it does. The cursor the source answers is
+ * the block's `cursor`, for the page after this one.
+ */
+function hostBlock(deps: PageDeps, block: PageBlock, host: HostSource, base: BlockResult, also: (...more: Refusal[]) => Refusal[]): BlockResult {
+  const name = block.source ?? '';
+  if (!HOST_ROW_KINDS.has(block.kind))
+    return { ...base, refusals: also({ code: 'DECLARATION_INVALID', fix: `${name} is drawn as a table or as cards. Draw it as one of those.`, at: 'kind' }) };
+  const fields = host.schema.fields;
+  const allowed = Object.keys(fields);
+  for (const [at, named] of [
+    ['columns', (block.columns ?? []).map((c) => c?.field)],
+    ['order', (block.order ?? []).map((o) => o?.field)],
+  ] as const) {
+    const missing = named.filter((f) => typeof f !== 'string' || !Object.hasOwn(fields, f));
+    if (missing.length) return { ...base, refusals: also({ code: 'FIELD_UNKNOWN', fix: `${name} has no field called ${missing.join(', ')}.`, at, allowed }) };
+  }
+  const said = predicateOf(block.where, host.schema, deps.ctx);
+  if (said.bad.length) return { ...base, refusals: also(...said.bad) };
+  const limit = block.limit === undefined ? 50 : Math.max(0, Math.floor(block.limit));
+  if (limit === 0) return { ...base, matched: 0 };
+  const got = host.rows({ ...(said.predicate === undefined ? {} : { where: said.predicate }), ...(block.order?.length ? { order: block.order } : {}), limit });
+  if (!got.ok) return { ...base, refusals: refused(got) ? also(got.refusal) : also() };
+  const rows = got.value.rows.slice(0, limit);
+  const cursor = typeof got.value.next === 'string' && got.value.next !== '' ? { cursor: got.value.next } : {};
+  return { ...base, rows, matched: got.value.matched ?? rows.length, ...cursor };
+}
+
+/* ── the log's own filters (PGS-C24) ─────────────────────────────────────── */
+
+/** The three questions a page over the log may filter it by: who wrote a line, what kind of change, which list. */
+export const LOG_FILTERS = ['who', 'kind', 'list'] as const;
+/** How far back the log's choices are counted, in days: what an Activity page says of the last month. */
+const LOG_DAYS = 30;
+/** The most lines the log's choices are counted from, and a narrowed feed reads back through. */
+const LOG_READ = 5000;
+/** What each of the three is called above its choices. */
+const LOG_LABELS: Readonly<Record<(typeof LOG_FILTERS)[number], string>> = { who: 'Who', kind: 'What changed', list: 'List' };
+
+/** A name as an address holds it: lower case, a hyphen between words, so a person is chosen by a word, never an id. */
+const addressWord = (name: string): string =>
+  name
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/gu, '');
+
+/**
+ * Who wrote a line, as a reader chooses it: an agent by the name of its kind ("Claude"), however many runs it was; Slash
+ * by name; the rules and the record's own work together; a person by the name the record holds for them, else every
+ * person together as People. NEVER AN ID: a run's handle and a person's id are only ever what is looked up.
+ */
+function whoOf(deps: PageDeps, actor: string): { value: string; label: string } {
+  if (actor === 'slash') return { value: 'slash', label: 'Slash' };
+  const by = byOf(actor);
+  if (by === 'rule') return { value: 'rules', label: 'Rules' };
+  if (by === 'agent') {
+    const run = RUN_HANDLE.test(actor) ? (deps.runOf?.(actor) ?? null) : null;
+    const agent = actor.startsWith('agent:') ? actor.slice('agent:'.length) : run ? saidText(run.fields.agent) : null;
+    const client = run ? saidText(run.fields.client) : null;
+    if (agent === null && client === null) return { value: 'agents', label: 'Agents' };
+    const named = agentOf({ ...(agent === null ? {} : { agent }), ...(client === null ? {} : { client }) });
+    const value = addressWord(named.agent ?? '') || 'agents';
+    return { value, label: named.name };
+  }
+  const name = deps.actorName?.(actor) ?? null;
+  const value = name === null ? '' : addressWord(name);
+  return value === '' ? { value: 'someone', label: 'People' } : { value, label: name! };
+}
+
+/**
+ * A page's filters over the log answered: for each of who, kind and list it declares, the choices the last 30 days hold
+ * and how many lines each, every count under the other choices as a list's are; and which lines the choices keep.
+ *
+ * A KIND IS SAID IN THE WORDS ACTIVITY SAYS IT IN, the ones the figure "What changed" names each by (`KIND_SAID`), and a
+ * kind with no word there is said in plain words. A LIST IS NAMED BY ITS NAME, and one the reader may not read
+ * is neither offered nor counted.
+ */
+function logFilters(
+  deps: PageDeps,
+  fields: readonly { field: string }[],
+  filter: Readonly<Record<string, string>> | undefined,
+): { answers: Map<string, PageFilter>; keep: ((e: ActivityEvent) => boolean) | null } {
+  const answers = new Map<string, PageFilter>();
+  if (fields.length === 0) return { answers, keep: null };
+  const readable = (r: string): boolean => deps.ctx.reads === undefined || deps.ctx.reads(r);
+  const who = new Map<string, { value: string; label: string }>();
+  const valueOf = (field: string, e: ActivityEvent): { value: string; label: string } | null => {
+    if (field === 'who') {
+      if (!who.has(e.actor)) who.set(e.actor, whoOf(deps, e.actor));
+      return who.get(e.actor)!;
+    }
+    if (field === 'kind') return { value: e.kind, label: Object.hasOwn(KIND_SAID, e.kind) ? KIND_SAID[e.kind]! : wordsOf(e.kind) };
+    const list = listOf(e.target);
+    return list !== null && readable(list) ? { value: list, label: deps.listName?.(list) ?? wordsOf(list) } : null;
+  };
+  const chosen = new Map<string, string>();
+  for (const { field } of fields) {
+    const said = filter && Object.hasOwn(filter, field) ? filter[field]?.trim() : undefined;
+    if (said !== undefined && said !== '') chosen.set(field, said);
+  }
+  const holds = (e: ActivityEvent, except?: string): boolean => [...chosen].every(([field, value]) => field === except || valueOf(field, e)?.value === value);
+  const since = deps.ctx.nowMs - LOG_DAYS * 86_400_000;
+  const lines = deps.activity ? deps.activity(LOG_READ).events.filter((e) => Date.parse(e.ts) >= since) : [];
+  for (const { field } of fields) {
+    const counts = new Map<string, { value: string; label: string; count: number }>();
+    for (const e of lines) {
+      if (!holds(e, field)) continue;
+      const v = valueOf(field, e);
+      if (v === null) continue;
+      const had = counts.get(v.value);
+      counts.set(v.value, { ...v, count: (had?.count ?? 0) + 1 });
+    }
+    const values = [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    const shown = values.slice(0, FILTER_VALUES);
+    const pick = chosen.get(field) ?? null;
+    /* THE ONE CHOSEN IS OFFERED WHATEVER IT HOLDS, so the reader can see what they picked and take it off. */
+    if (pick !== null && !shown.some((v) => v.value === pick)) shown.push(values.find((v) => v.value === pick) ?? { value: pick, label: wordsOf(pick), count: 0 });
+    const label = LOG_LABELS[field as (typeof LOG_FILTERS)[number]];
+    answers.set(field, { field, label, control: 'chips', chosen: pick, values: shown, reads: [WHOLE_RECORD] });
+  }
+  return { answers, keep: chosen.size > 0 ? (e) => holds(e) : null };
 }
 
 /**
@@ -1952,7 +2178,18 @@ function readerFilters(
  * under a card, a `{{path}}` naming one row by its number: those are other reads, and a filter on what is drawn says
  * nothing about them. So a read that names its rows by number or id is left as it is.
  */
-function narrowed(deps: PageDeps, block: PageBlock, clauses: ReadonlyMap<string, readonly Predicate[]>): PageDeps {
+function narrowed(deps: PageDeps, block: PageBlock, clauses: ReadonlyMap<string, readonly Predicate[]>, log: ((e: ActivityEvent) => boolean) | null = null): PageDeps {
+  /* A FEED OVER THE LOG IS NARROWED BY THE LINES IT IS HANDED: the reader's choice of who, what kind and which list. It
+     reads further back to find them, so a feed narrowed to one agent still draws that agent's lines and not a few. */
+  const activity = deps.activity;
+  if (log && activity && block !== null && typeof block === 'object' && block.source === 'activity')
+    return {
+      ...deps,
+      activity: (limit) => {
+        const read = activity(Math.max(limit, LOG_READ));
+        return { ...read, events: read.events.filter(log).slice(0, limit) };
+      },
+    };
   const register = listRead(block);
   const extra = register === null ? [] : (clauses.get(register) ?? []);
   if (register === null || extra.length === 0) return deps;
@@ -2483,6 +2720,10 @@ function readBlockAsWritten(deps: PageDeps, block: PageBlock): BlockResult {
   const computed = sourceModule(block.source);
   /* A GROUP OF WALKS IS OFFERED WHAT IT MAY SELL BY WALK (`walkSells`), which a source that answers one walk leaves be. */
   if (computed) return walkSells(deps, block, computed.read(deps, block, base, also, sourceKit(deps)));
+  /* A SOURCE THE RECORD READS AND THE KERNEL CANNOT (PGS-A11), such as every list with its count, is asked only after the
+     registered ones, so it never shadows one, and never for a list. Its rows come back on the one rows path. */
+  const hosted = block.source.startsWith('register.') || block.source.startsWith('metric.') ? undefined : deps.hostSources?.(block.source);
+  if (hosted) return hostBlock(deps, block, hosted, base, also);
   /* A BAR OR A SPLIT OVER A GROUPED FIGURE draws the figure's parts, so a part may be a monthly share of a yearly
      cost, which a sum over the rows cannot be. The host adds what no part holds as its `unset:` row. */
   if (block.source.startsWith('metric.')) return metricBlock(deps, block, block.source.slice('metric.'.length), base, also);
@@ -4583,6 +4824,10 @@ export function registersOf(decl: PageDecl, metric?: (id: string) => MetricDecl 
        caller may read it is asking whether they read all of it. It is never a list's id: `declare.ts` refuses
        a register id that is not lower-case letters, digits and underscores. */
     if (sourceModule(block.source)?.whole) named.add(WHOLE_RECORD);
+    /* AND SO IS A SOURCE THE RECORD READS ACROSS ITSELF (`HostSource.whole`), such as its census of pages; one that
+       answers each reader only what they may read, such as `lists`, names nothing. Never asked over a registered name. */
+    else if (typeof block.source === 'string' && !block.source.startsWith('register.') && !sourceModule(block.source) && beside?.hostSources?.(block.source)?.whole)
+      named.add(WHOLE_RECORD);
     /* WHAT A PROJECT RUNS ON READS THE KEYS, TOOLS AND SKILLS LISTS AND THE PROJECT `about:` NAMES, each whether or not
        this record holds it, and the scheduled actions beside them, which belong to no list and so are `*`: a key's
        label and an action's host are held back from a member who may not read all of them, as `actions` holds them. */

@@ -3,8 +3,8 @@
  * for the love of it, and the goals and habits they keep.
  *
  * IT BUILDS ON MONEY, NOT BESIDE IT. Money's accounts and bills are the same lists a business keeps, spoken in a
- * person's words through labels ("Bills", not "Money"). Money needs Projects and People, so those come too, and
- * Projects is where a passion project lives, its states relabelled Active, Ongoing, On hold and Finished. The people in
+ * person's words through labels ("Bills", not "Money"). Money points its bills at projects, so Projects comes with it,
+ * and People comes when the person names someone (`needs`, since 2.6.0). Projects is where a passion project lives, its states relabelled Active, Ongoing, On hold and Finished. The people in
  * a life are People's list with Personal's own roles laid on it (`extends` below): family, friend, landlord,
  * tradesperson and adviser.
  *
@@ -146,8 +146,14 @@ export const PERSONAL = {
      to adding an account, forwarding a bank message and the add-ons that bring money in; while no savings goal is
      kept, a line names one; while no project is live, a line names one in the Building lane. Each is drawn on its own
      count, so Home drops it once the thing exists. Three blocks and one count are added and nothing goes, so a minor
-     step beside 2.4.0, which is live. */
-  version: '2.5.0',
+     step beside 2.4.0, which is live.
+     2.6.0: a person's first day holds what their words point at (USE-B08 job 5; "make sure that the braindog
+     experience is not overwhelming for new users", W.149). `needs` is Money and the Projects its bills and this pack's
+     project steps point at; People comes when a name is said, and anything else is offered when its moment comes. Home already leads from
+     Money's own figures and this pack's lists, and a block or a role over a list the record does not hold is cut at
+     install (`fitted`). 2.5.0 is published in the catalogue and frozen, and the file it shares changes (`needs`), so
+     this is a version beside it. Nothing is declared, taken away or reworded, so a record on 2.5.0 keeps all it holds. */
+  version: '2.6.0',
   title: 'Personal',
   summary: 'Your money and bills, what you are saving for, and the projects and goals you care about.',
   author: 'BrainDog',
@@ -162,6 +168,10 @@ export const PERSONAL = {
     'diet', 'reading more', 'family',
   ],
   modules: ['portfolio', 'people', 'money-core'],
+  /* WHAT A PERSON CANNOT STAND WITHOUT, SINCE 2.6.0: their money, and the Projects its bills point at, which this pack's
+     own Project steps point at too (`project_steps.thing`), so it is said here and not left to the install to close
+     over. People comes when a name is said. */
+  needs: ['portfolio', 'money-core'],
   voice: {
     home: 'Day to day',
     right_now: 'This month',

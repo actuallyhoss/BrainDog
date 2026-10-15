@@ -447,17 +447,17 @@ test('THE LIST SAYS WHY AN ACTION IS PAUSED, counts a held run in the month, and
   );
   assert.deepEqual({ outcome: balance.last?.outcome, status: balance.last?.status }, { outcome: 'paused', status: 401 });
   assert.match(balance.last?.note ?? '', /answered 401 to the key "example read"/);
-  assert.deepEqual(balance.month, { runs: 1, requests: 1, bytes: 2, failures: 1, held: 0 });
+  assert.deepEqual(balance.month, { runs: 1, requests: 1, bytes: 2, ms: 3, failures: 1, held: 0 });
   assert.equal(balance.days.length, 15);
-  assert.deepEqual(balance.days[0], { day: '2026-09-01', runs: 0, requests: 0, bytes: 0, failures: 0 });
-  assert.deepEqual(balance.days.at(-1), { day: '2026-09-15', runs: 1, requests: 1, bytes: 2, failures: 1 });
+  assert.deepEqual(balance.days[0], { day: '2026-09-01', runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0 });
+  assert.deepEqual(balance.days.at(-1), { day: '2026-09-15', runs: 1, requests: 1, bytes: 2, ms: 3, failures: 1 });
 
   assert.deepEqual(
     { project: ping.project, key: ping.key, state: ping.state, outcome: ping.last?.outcome, note: ping.last?.note },
     { project: 'studio', key: 'hook key', state: 'pending', outcome: 'held', note: say },
   );
   assert.equal(Date.parse(ping.next ?? ''), OCTOBER);
-  assert.deepEqual(ping.month, { runs: 0, requests: 0, bytes: 0, failures: 0, held: 1 });
+  assert.deepEqual(ping.month, { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 1 });
 
   const said_ = JSON.stringify(rows);
   assert.doesNotMatch(said_, /ciphertext|nonce|kek_2f/);

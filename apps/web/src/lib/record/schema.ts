@@ -314,6 +314,8 @@ export type PageBlock = {
    * than three, and a number that many once it has more; the rest open on the page of the row the group points at.
    */
   fold?: boolean | number;
+  /** A `cards` or `series` block's: how many it shows before "Show all", 1 to 24 (`mostOf` in braindog-render); six for cards where it says nothing. */
+  most?: number;
   /**
    * A `cards` block's: the field its cards are grouped by, a link to one row, such as the organisation a person is with.
    * A group is headed by that row's name and stands where its first card stood; the record answers the name of each

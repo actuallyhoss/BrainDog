@@ -60,7 +60,7 @@ test('THE FILE MAKE IT MINE HANDS THE RECORD HOLDS NO EXAMPLE, and the modules t
     const pack = file.pack as Record<string, unknown> | null;
     assert.deepEqual(seedsOf(pack), [], `${u.usecase}'s file carries its examples`);
     assert.equal(file.links, undefined, `${u.usecase}'s file links examples that are not there`);
-    for (const m of u.modules) assert.ok((file.modules as string[]).includes(m), `${u.usecase}'s file leaves out ${m}, which it stands on`);
+    for (const m of u.needs ?? u.modules) assert.ok((file.modules as string[]).includes(m), `${u.usecase}'s file leaves out ${m}, which it stands on`);
   }
   const podcast = await fileFor(useCase('guide'), [], TODAY, 'I want to start a podcast');
   assert.ok(seedsOf(podcast?.pack as Record<string, unknown>).length > 0, 'the formed plan is not in the file');
@@ -68,7 +68,8 @@ test('THE FILE MAKE IT MINE HANDS THE RECORD HOLDS NO EXAMPLE, and the modules t
 
 test('A USE CASE IS INSTALLED WITH EVERY MODULE IT STANDS ON, whatever was switched off', () => {
   const founder = useCase('founder');
-  assert.deepEqual(withNeeds(founder, []), [...founder.modules]);
+  assert.deepEqual(withNeeds(founder, []), [...(founder.needs ?? founder.modules)]);
+  assert.deepEqual(withNeeds(founder, ['estate']), ['portfolio', 'money-core', 'estate'], 'a module the person kept comes in beside what it stands on');
   assert.deepEqual(withNeeds(null, ['people']), ['people']);
 });
 

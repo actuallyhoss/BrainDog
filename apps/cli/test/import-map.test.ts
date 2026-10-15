@@ -174,3 +174,20 @@ test('APPLIED, TEN RULES FILE ONE QUESTION ON DECIDE, and the second night asks 
   assert.equal(filed.length, 1, 'the second night asked again');
   assert.ok(said(second, { dryRun: false, file: 'export.json' }).includes('Decide: 0 asked, 1 asked before.'));
 });
+
+test('A QUESTION THE IMPORT FILES PRINTS THE LINK THAT OPENS IT ON DECIDE, and with no record named, the count alone', async () => {
+  const door: Door = {
+    schema: async () => ({ ok: true, value: {} }),
+    list: async () => ({ ok: true, value: { rows: [], cursor: null } }),
+    create: async () => ({ ok: true, value: {} }),
+    update: async () => ({ ok: true, value: {} }),
+    governance: async () => ({ ok: true, value: [] }),
+    propose: async () => ({ ok: true, value: { id: 'q_7' } }),
+  };
+  const plan: Plan = { key: 'tallybook:', taken: null, rev: null, rows: [], asks: RULES, polls: [], skipped: [], changed: [] };
+  const report = await applyPlan(plan, door, { dryRun: false });
+  const linked = said(report, { dryRun: false, file: 'export.json', to: { key: 'https://host.example/the-studio' } });
+  assert.ok(linked.some((l) => l.endsWith(' https://host.example/app/the-studio/decide/q_7')), linked.join('\n'));
+  const bare = said(report, { dryRun: false, file: 'export.json', to: { key: 'https://host.example' } });
+  assert.ok(!bare.some((l) => l.includes('/decide/')), 'a host that names no record was handed a guessed link');
+});

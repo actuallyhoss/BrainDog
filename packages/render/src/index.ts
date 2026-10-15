@@ -275,3 +275,5 @@ export * from './actions.ts';
 export * from './form.ts';
 /* The glyph groups (PGS-A08): which glyphs are the core, the set and the shell's, read by the grammar an agent is handed. */
 export { GLYPH_GROUPS, GROUP_SAYS, glyphGroups, groupOf, markGlyphs, markGroups, type GlyphGroup } from './glyphs/groups.ts';
+/* A long block of cards or a series (`most`): how many it shows before "Show all", and the words for the rest. */
+export { MOST_CARDS, MOST_LEAST, MOST_MOST, isMost, mostOf, moreSaid, showAllSaid, type MostKeys } from './most.ts';

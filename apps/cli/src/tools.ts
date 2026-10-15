@@ -47,10 +47,11 @@ import { parseArgs } from 'node:util';
 
 import type { Brief, Client, Context } from '@braindog/client';
 
-import { hostsPath, readHosts } from './http.ts';
+import { hostsPath, readHosts, type Target } from './http.ts';
 import { CLIENTS, clientOf, DEFAULT_CLIENT, foreignPath, onPath, runClaude, type ClaudeRunner, type Env as ClientEnv } from './clients/index.ts';
 import { connectedOf, runClaudeList, type ConnectedList, type ListRunner } from './clients/connected.ts';
 import { HEADER_NAME, keys } from './keys.ts';
+import { decideLink } from './links.ts';
 import { asking, causeOf, connect, fixOf, isObject, joinedSaid, QUESTION, readLock, samePath, sha256, spokenOf, Stopped, thisMachine, valueOf, writeLock, type AgentIo } from './skills.ts';
 
 type Env = Record<string, string | undefined>;
@@ -304,7 +305,23 @@ export type ToolScan = {
   once?: { host: string; hosts: string } | undefined;
   /** What the client says it is connected to beyond its files, read after them. None asked when not given. */
   connected?: (() => Promise<ConnectedList>) | undefined;
+  /**
+   * The host the record is reached at, whose key names it (`target`), so a question the scan files or finds waiting is
+   * printed with the link that opens it on Decide (AGT-C20). Without it the line says the question is on Decide.
+   */
+  to?: Pick<Target, 'key'> | undefined;
 };
+
+/**
+ * A line about a question with the link that opens it on Decide after it, as an add-on install prints (`untilAccepted`),
+ * or the line as it is when there is no host to link to, the host names no record, or the answer named no question.
+ * A QUESTION IS NAMED BY ITS ID OR HANDLE, never in words, so anything with a space in it is not one to link to.
+ */
+function linked(line: string, to: Pick<Target, 'key'> | undefined, id: unknown): string {
+  if (to === undefined || typeof id !== 'string' || !/^\S+$/u.test(id)) return line;
+  const link = decideLink(to, id);
+  return link === null ? line : `${line} ${link}`;
+}
 
 /** Where an integration was found, as its row's origin and its lines name it. */
 const CONNECTED_SOURCE = "Claude Code's connections";
@@ -557,8 +574,11 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
             else if (kept.said !== '') said.push(`${f.name} is recorded${kept.said}.`);
             if (kept.fault !== null) said.push(kept.fault);
           } else if (a.did === 'asked')
-            once(key, row !== null ? `${f.name} runs something else now; the question is on Decide.` : `${f.name} applies everywhere, so recording it was asked on Decide.`);
-          else if (a.did === 'waiting') once(key, `${f.name} waits on a question already on Decide.`);
+            once(
+              key,
+              linked(row !== null ? `${f.name} runs something else now; the question is on Decide.` : `${f.name} applies everywhere, so recording it was asked on Decide.`, s.to, a.question),
+            );
+          else if (a.did === 'waiting') once(key, linked(`${f.name} waits on a question already on Decide.`, s.to, a.question));
           else if (a.did === 'skipped') once(key, `${f.name} was not recorded: ${whyOf(a.why)}`);
         }
       }
@@ -683,12 +703,16 @@ export async function scanTools(s: ToolScan): Promise<string[]> {
       lock.asked[key] = shape;
       const joined = joinedSaid(made);
       lines.push(
-        joined === null
-          ? `${toolSaid(f)} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`
-          : `${toolSaid(f)} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change is asked on Decide already. ${joined}`,
+        linked(
+          joined === null
+            ? `${toolSaid(f)} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change was asked on Decide: ${question}`
+            : `${toolSaid(f)} differs from the one in the record, so that was left as it is${keysSaid(n)}, and the change is asked on Decide already. ${joined}`,
+          s.to,
+          made.id,
+        ),
       );
     }
-    if (everywhere.length > 0) lines.push(await askEverywhere(s.client, everywhere, lock, machine, s.dryRun));
+    if (everywhere.length > 0) lines.push(await askEverywhere(s.client, everywhere, lock, machine, s.dryRun, s.to));
   } catch (e) {
     if (!(e instanceof Stopped)) throw e;
     lines.push('BrainDog stopped answering part way, so the rest of the tools wait for the next scan.');
@@ -736,7 +760,14 @@ function fieldsOf(f: Found, needs: string[], machine: string, now: number): Reco
  * The one question for every server that applies everywhere and was found from a run in a project, and the line saying
  * what became of it. One server keeps its own sentence; several are one rowset, accepted whole or row by row on Decide.
  */
-async function askEverywhere(client: Client, asks: { f: Found; key: string; shape: string; row: Record<string, unknown> }[], lock: ToolsLock, machine: string, dryRun: boolean): Promise<string> {
+async function askEverywhere(
+  client: Client,
+  asks: { f: Found; key: string; shape: string; row: Record<string, unknown> }[],
+  lock: ToolsLock,
+  machine: string,
+  dryRun: boolean,
+  to?: Pick<Target, 'key'>,
+): Promise<string> {
   const [first] = asks;
   const one = asks.length === 1 && first !== undefined ? first.f : null;
   const sources = [...new Set(asks.map((a) => a.f.source))].join(' and ');
@@ -757,9 +788,13 @@ async function askEverywhere(client: Client, asks: { f: Found; key: string; shap
   if (made === null || typeof made.id !== 'string')
     return one ? `${toolSaid(one)} was not proposed: ${fixOf(out)}` : `${String(asks.length)} tools in ${sources} were not proposed: ${fixOf(out)}`;
   for (const a of asks) lock.asked[a.key] = a.shape;
-  return one
-    ? `${toolSaid(one)} applies everywhere and this run is in a project, so its keys were not deposited and recording it was asked on Decide: ${question}`
-    : `${String(asks.length)} tools in ${sources} apply everywhere and this run is in a project, so their keys were not deposited and recording them was asked on Decide in one question: ${question}`;
+  return linked(
+    one
+      ? `${toolSaid(one)} applies everywhere and this run is in a project, so its keys were not deposited and recording it was asked on Decide: ${question}`
+      : `${String(asks.length)} tools in ${sources} apply everywhere and this run is in a project, so their keys were not deposited and recording them was asked on Decide in one question: ${question}`,
+    to,
+    made.id,
+  );
 }
 
 /**
@@ -1012,6 +1047,7 @@ export async function tools(args: string[], io: AgentIo & { cli: string; claude?
           deposit: depositor({ file: hostsPath(io.env), env: io.env, host: at.to.key, headers: await io.headers(at.to.key) }),
           /* By hand, so the ten seconds the list takes are waited for. */
           connected: () => connectedOf(io.list ?? runClaudeList, io.cwd),
+          to: at.to,
         })
       : await writeTools({ ...base, scope: scope ?? null, cli: io.cli, claude: io.claude ?? runClaude, env: io.env });
   for (const line of lines) io.out(line);

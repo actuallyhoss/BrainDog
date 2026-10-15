@@ -76,7 +76,9 @@ async function recordOf() {
 }
 
 test('PERSONAL SET UP SAYS WHAT IT LAYS ON PEOPLE, on its own step, by the values it adds', async () => {
-  const { planOf } = await recordOf();
+  const { planOf, accept } = await recordOf();
+  /* PEOPLE IS IN FIRST: Personal 2.6.0 stands on Money and Projects (`needs`), and lays on People only where it is held. */
+  await accept((await planOf({ install: 'people' }, 'pack')).id);
   const { plan } = await planOf({ why: ['x'], usecase: 'personal' }, 'arrange');
   const personal = plan.find((s) => s.pack === 'usecase-personal');
   assert.deepEqual(personal?.extends, [{ id: 'register.people', adds: ['role.family', 'role.friend', 'role.landlord', 'role.tradesperson', 'role.adviser'] }]);
@@ -87,6 +89,7 @@ test('PERSONAL SET UP SAYS WHAT IT LAYS ON PEOPLE, on its own step, by the value
 
 test('A PEOPLE UPDATE THAT TAKES REGISTRAR OFF A PERSONAL RECORD HOLDING ONE SAYS IT STAYS, with the rows the list holds', async () => {
   const { api, planOf, accept, shed } = await recordOf();
+  await accept((await planOf({ install: 'people' }, 'pack')).id);
   await accept((await planOf({ why: ['x'], usecase: 'personal' }, 'arrange')).id);
   value(api.kernel.create('people', { name: 'Ada', role: 'registrar' } as never, { actor: 'p_owner' }));
   shed();
@@ -104,6 +107,7 @@ test('A PEOPLE UPDATE THAT TAKES REGISTRAR OFF A PERSONAL RECORD HOLDING ONE SAY
    and the accept keeps the choice she is restored under. */
 test('A REGISTRAR ROW IN THE BIN KEEPS REGISTRAR, said as held in the bin, and the row restores after the accept', async () => {
   const { api, planOf, accept, shed } = await recordOf();
+  await accept((await planOf({ install: 'people' }, 'pack')).id);
   await accept((await planOf({ why: ['x'], usecase: 'personal' }, 'arrange')).id);
   const ada = value<{ id: string }>(api.kernel.create('people', { name: 'Ada', role: 'registrar' } as never, { actor: 'p_owner' })).id;
   value(api.kernel.update('people', ada, { deleted_at: 'now' } as never, { actor: 'p_owner' }));

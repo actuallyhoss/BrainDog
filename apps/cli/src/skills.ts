@@ -38,6 +38,7 @@ import { refused, type Result } from '@braindog/ports';
 import { clip } from './clip.ts';
 import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse, type Answering } from './json.ts';
+import { decideLink } from './links.ts';
 import { git } from './position.ts';
 
 type Env = Record<string, string | undefined>;
@@ -353,6 +354,11 @@ export type SkillSync = {
   until?: number;
   /** The time in milliseconds, asked once before each page of the list read; `Date.now` when absent. */
   clock?: () => number;
+  /**
+   * The host the record is reached at, whose key names it (`target`), so a question the sync files is printed with the
+   * link that opens it on Decide (AGT-C20). Without it, or for a host that names no record, the line says its handle.
+   */
+  to?: Pick<Target, 'key'> | undefined;
 };
 
 type Got = { kind: Kind; text: string; managed: boolean; state: string | null };
@@ -381,6 +387,19 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
   const synced = (path: string) => folders.some((f) => resolve(path).startsWith(f + sep));
   const where = (path: string) => (projectBase !== null && inside(path, projectBase) ? `${path} (in the repository, not committed)` : path);
   const tell = (done: string, would: string) => lines.push(s.dryRun ? would : done);
+  /* THE LINK TO THE QUESTION, NOT ITS HANDLE ALONE (AGT-C20): what the person opens to answer it, as an add-on install
+     prints (`untilAccepted`), wherever the host names the record. */
+  const link = (id: string): string | null => (s.to === undefined ? null : decideLink(s.to, id));
+  /* A PROPOSAL THE RECORD REFUSED HAS NO QUESTION TO LINK TO, and says the record's fix as it always did. A host that
+     names no record says the question's handle, which is how Decide lists it. */
+  const onDecide = (asked: { filed: boolean; said: string }): string => {
+    const at = asked.filed ? link(asked.said) : null;
+    return at === null ? ` (${asked.said}).` : `: ${at}`;
+  };
+  const joinedAt = (joined: string, id: string): string => {
+    const at = link(id);
+    return at === null ? joined : `${joined} ${at}`;
+  };
 
   const fetchRow = async (spoken: string, name: string, trigger: string): Promise<Got | null> => {
     const seq = Number(spoken.slice(spoken.indexOf('#') + 1));
@@ -579,11 +598,11 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
         lines.push(
           asked.joined !== null
             ? both
-              ? `Skill ${name} changed here and in the record; kept yours. ${asked.joined}`
-              : `Skill ${name} was edited in ${where(path)}; kept it. ${asked.joined}`
+              ? `Skill ${name} changed here and in the record; kept yours. ${joinedAt(asked.joined, asked.said)}`
+              : `Skill ${name} was edited in ${where(path)}; kept it. ${joinedAt(asked.joined, asked.said)}`
             : both
-              ? `Skill ${name} changed here and in the record; kept yours and asked (${asked.said}).`
-              : `Skill ${name} was edited in ${where(path)}; kept it and proposed it as version ${String(rev + 1)} (${asked.said}).`,
+              ? `Skill ${name} changed here and in the record; kept yours and asked${onDecide(asked)}`
+              : `Skill ${name} was edited in ${where(path)}; kept it and proposed it as version ${String(rev + 1)}${onDecide(asked)}`,
         );
         continue;
       }
@@ -624,8 +643,8 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
       lock[path] = { spoken: row.spoken, version: rev, sha256: sha256(got.text), ...(asked.filed ? { proposed_sha: now } : {}) };
       lines.push(
         asked.joined !== null
-          ? `Skill ${name} in ${where(path)} differs from the record; kept it. ${asked.joined}`
-          : `Skill ${name} in ${where(path)} differs from the record; kept it and proposed it as version ${String(rev + 1)} (${asked.said}).`,
+          ? `Skill ${name} in ${where(path)} differs from the record; kept it. ${joinedAt(asked.joined, asked.said)}`
+          : `Skill ${name} in ${where(path)} differs from the record; kept it and proposed it as version ${String(rev + 1)}${onDecide(asked)}`,
       );
     }
 
@@ -738,7 +757,7 @@ export async function skills(args: string[], io: AgentIo): Promise<number> {
     return 0;
   }
   const dryRun = values['dry-run'] === true;
-  const lines = await syncSkills({ client: at.client, context: at.context, home: io.home, configDir: io.env.CLAUDE_CONFIG_DIR || join(io.home, '.claude'), top: at.top, dryRun, until: Infinity });
+  const lines = await syncSkills({ client: at.client, context: at.context, home: io.home, configDir: io.env.CLAUDE_CONFIG_DIR || join(io.home, '.claude'), top: at.top, dryRun, until: Infinity, to: at.to });
   for (const line of lines) io.out(line);
   if (lines.length === 0) io.out('Skills are in sync.');
   if (dryRun) io.out('That was a dry run, so nothing was written, sent or proposed.');

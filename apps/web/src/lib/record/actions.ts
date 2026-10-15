@@ -888,6 +888,10 @@ export type CallOut = {
   perDay?: number;
   /** The record's own sentence about a project action sending a key, which is approved with the line. */
   note?: string;
+  /** The plan's sentence for what it files, "Writes Numbers on Bake: revenue, customers, 3 more." (`writes_line`). */
+  writes?: string;
+  /** Its interval is the provider's own floor, the least it may run at (`at_floor`). */
+  floor?: true;
 };
 
 const CHANNELS: ReadonlySet<string> = new Set(['pull', 'call', 'poll']);
@@ -909,6 +913,7 @@ export function callsOutOf(raw: unknown): CallOut[] {
     if (!ingest || (!every && trigger !== 'rule')) return [];
     const channel = str(o.channel) ?? 'pull';
     const note = str(o.key_line);
+    const writes = str(o.writes_line);
     return [
       {
         ingest,
@@ -919,6 +924,8 @@ export function callsOutOf(raw: unknown): CallOut[] {
         sends: Array.isArray(o.sends) ? o.sends.filter((s): s is string => typeof s === 'string') : null,
         ...(trigger === null ? {} : { trigger, perDay: typeof o.per_day === 'number' ? o.per_day : 100 }),
         ...(note === null ? {} : { note }),
+        ...(writes === null ? {} : { writes }),
+        ...(o.at_floor === true ? { floor: true as const } : {}),
       },
     ];
   });
@@ -959,11 +966,17 @@ const whenOf = (c: CallOut): string =>
     ? installWords.byRule(c.perDay ?? 100)
     : c.trigger === 'both'
       ? `${often(c.every)} and ${installWords.byRule(c.perDay ?? 100)}`
-      : often(c.every);
+      : c.floor
+        ? `${often(c.every)}, the provider's minimum`
+        : often(c.every);
 
-/** One line per action: what it does, the host, how often, the key by label, and the fields it sends. */
-export const callLine = (c: CallOut): string =>
-  [
+/**
+ * One line per action: what it does, the host, how often, the key by label, and the fields it sends. When the plan says
+ * what it files, that sentence goes on a line under it, after a full stop, so it still reads as two sentences where the
+ * line is drawn without breaks.
+ */
+export const callLine = (c: CallOut): string => {
+  const line = [
     `${words.verb[c.channel]} ${c.host ?? installWords.noHost}`,
     whenOf(c),
     c.key ? words.key(c.key) : installWords.noKey,
@@ -971,6 +984,8 @@ export const callLine = (c: CallOut): string =>
   ]
     .filter(Boolean)
     .join(', ');
+  return c.writes ? `${line}.\n${c.writes}` : line;
+};
 
 /**
  * The sentence under the lines: runs a month these actions add, against the record's allowance. `null`

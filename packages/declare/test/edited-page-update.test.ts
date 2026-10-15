@@ -29,7 +29,8 @@ const packOf = async (doc: unknown): Promise<Pack> => {
   return read.value;
 };
 
-const founder = (): Promise<Pack> => packOf(useCaseDocument('founder', '2026-10-13'));
+/* 2.6.0 AS THE SEED BUILDS IT: 2.7.0 lays what 2.6.0 laid word for word and adds only `needs` (usecase-needs-102). */
+const founder = (): Promise<Pack> => packOf({ ...useCaseDocument('founder', '2026-10-13'), version: '2.6.0' });
 
 /** Home as Founder 2.5.0 had it: called Overview, and with no table for what is late. */
 const before = (now: Body): Body => ({ ...now, title: 'Overview', blocks: now.blocks.filter((b) => b.heading !== 'Late') });

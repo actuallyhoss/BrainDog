@@ -36,6 +36,7 @@ import { runsOn } from './runs-on.ts';
 import { sessionsLive } from './sessions-live.ts';
 import { sessionsWorking } from './sessions-working.ts';
 import { signs } from './signs.ts';
+import { usageActions, usageDays, usageProjects } from './usage.ts';
 
 /** Every refusal the reader already found on the block, with a source's own after them (`pages.ts` `also`). */
 export type Also = (...more: readonly Refusal[]) => Refusal[];
@@ -92,6 +93,9 @@ export const SOURCE_MODULES: Record<string, Source> = {
   'handoffs.open': handoffsOpen,
   [ACTIONS_BLOCKING]: actionsBlocking,
   exceptions,
+  'usage.days': usageDays,
+  'usage.actions': usageActions,
+  'usage.projects': usageProjects,
 };
 
 /** The module that answers `name`, or `undefined` for a word that is no registered source: a list, a figure or nothing. */

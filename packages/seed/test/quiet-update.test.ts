@@ -282,7 +282,7 @@ test("A USE CASE'S UPDATE THAT ONLY TONES A TILE LOSES NOTHING, and goes in over
     const u = useCase(id)!;
     const sql = openSqlite();
     const k = await openRecord(sql, fixedClock(NOW));
-    for (const m of modulesFor(u, ['people'])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
+    for (const m of modulesFor(u, ['people', ...u.modules])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
 
     const now = carriedDocument(u, TODAY)!;
     assert.deepEqual(stands(now).tones, { at_risk: 'warn', off_track: 'bad' }, `${id}: on track wears no mark`);
@@ -1263,7 +1263,7 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
 
     const sql = openSqlite();
     const k = await openRecord(sql, fixedClock(NOW));
-    for (const m of modulesFor(u, ['people'])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
+    for (const m of modulesFor(u, ['people', ...u.modules])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
     const now = carriedDocument(u, TODAY)!;
     await put(k, sql, { ...projectBefore(now, id), version: was.version });
     const pack = `usecase-${id}`;
@@ -1340,7 +1340,7 @@ async function onUseCaseBefore(id: string): Promise<{ k: Kernel; sql: NodeSql }>
   const u = useCase(id)!;
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  for (const m of modulesFor(u, ['people'])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
+  for (const m of modulesFor(u, ['people', ...u.modules])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
   await put(k, sql, agentsBefore());
   await put(k, sql, { ...projectBefore(carriedDocument(u, TODAY)!, id), version: USECASE_BEFORE[id]!.version });
   return { k, sql };

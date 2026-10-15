@@ -19,7 +19,7 @@ import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
-import { MODULE_ORDER, USE_CASES, modulesFor, standsOn } from '../src/usecases/index.ts';
+import { MODULE_ORDER, USE_CASES, modulesFor, standsOn, useCase } from '../src/usecases/index.ts';
 import { dayOf, moduleDocument } from '../src/usecases/install.ts';
 
 const TODAY = dayOf(NOW);
@@ -70,11 +70,14 @@ test('A USE CASE STANDS ON ITS NEEDS, and on all of its modules when it says non
   assert.deepEqual(standsOn(pottery()), ['money-core']);
   const { needs: _, ...without } = pottery();
   assert.deepEqual(standsOn(without as UseCase), ['portfolio', 'people', 'money-core']);
-  /* NO BUILT-IN SAYS ITS NEEDS YET, so every one installs what it did before this. */
+  /* FOUNDER 2.7.0 AND PERSONAL 2.6.0 SAY THEIR NEEDS (USE-B08 job 5), Projects and Money; a built-in that says none
+     installs what it did before this. */
+  assert.deepEqual(useCase('founder')!.needs, ['portfolio', 'money-core']);
+  assert.deepEqual(useCase('personal')!.needs, ['portfolio', 'money-core']);
   for (const u of USE_CASES) {
-    assert.equal(u.needs, undefined, `${u.usecase} says needs`);
     const first: readonly string[] = MODULE_ORDER;
-    assert.deepEqual(modulesFor(u), [...first.filter((m) => u.modules.includes(m)), ...u.modules.filter((m) => !first.includes(m))], u.usecase);
+    const stands = u.needs ?? u.modules;
+    assert.deepEqual(modulesFor(u), [...first.filter((m) => stands.includes(m)), ...stands.filter((m) => !first.includes(m))], u.usecase);
   }
 });
 

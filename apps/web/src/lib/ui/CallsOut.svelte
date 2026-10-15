@@ -71,6 +71,7 @@
 
   .calls-line {
     color: var(--ink2);
+    white-space: pre-line;
   }
 
   .calls-note {

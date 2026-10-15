@@ -32,8 +32,10 @@ import { addressFault } from './address.ts';
 import { columnsFault, readAddColumn, type PageColumnAddition } from './add-column.ts';
 export { addressFault, addressFaults, listingFault } from './address.ts';
 import { holdsOf, resolveWhen, settleWhen } from './when.ts';
+import { scriptSources, type ScriptSource } from './script-source.ts';
+import { namerOf, writesLine, writesOf, type Writes } from './calls-out-writes.ts';
 export { holdsIn, holdsOf, resolveWhen, settleWhen, type Waiting } from './when.ts';
-import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
+import { KINDS, approvalLines, configReads, configValue, digest, egressChanged, egressOf as egressOfBody, fillConfig, intervalMs, jcs, misread, readConfig, rowRegisterOf, sentencesOver, validateDeclaration, widens, type ConfigDecl, type DeclKind, type Egress, type Json } from '@braindog/kernel';
 
 /**
  * What one declaration sends out of the record, or `null` when it sends nothing: every host, how often, the key by label
@@ -49,6 +51,8 @@ export type { Egress };
 /* A use case: a pack with a front, its modules, signals and voice. */
 export { SHARED_MOST_BYTES, SHARED_SUFFIX, exampleFields, exportUseCase, kindUnknownSentence, laterVersion, nextVersion, readShared, sharedFileName, unfilled, type ExportParts, type Shared, type VersionStep } from './shared.ts';
 export { looksLikeCredential } from './credentials.ts';
+export { LARGE_SOURCE_BYTES, SHOWN_LINES, changedLines, scriptSources, type ChangedLine, type ScriptSource } from './script-source.ts';
+export { namerOf, writesLine, writesOf, type Writes } from './calls-out-writes.ts';
 export { takesHold, takesHoldAll, type TakesHold } from './takes-hold.ts';
 export { CARDS_FOLD, CARDS_FOLD_MOST, cardsFault } from './cards.ts';
 export { AUDIENCES, FIRST_PARTY_LISTS, LABEL_KEY, MODULES, MODULE_LISTS, MODULE_WORDS, SHARED_VERSION, SPEAKS, VOICE_KEYS, VOICE_TAB_CHARS, VOICE_TAB_KEYS, labelKeyOf, labelSetting, labelsOf, overHidden, overSettings, speakingPack, voiceWhenAdding, voiceWrites, normaliseUseCase, packIdOf, useCasePack, voiceOf, voiceSetting, wordsOf, type AddonWords, type Audience, type ExampleLink, type ListWords, type ModuleId, type Over, type SpeakingState, type UseCase, type VoiceKey } from './usecase.ts';
@@ -537,7 +541,22 @@ export type Diff = {
     key_line: string | null;
     /** Against what is installed: a new action, one whose host, key or fields differ, or the same. */
     change: 'new' | 'changed' | 'same';
+    /**
+     * What it files: the list, the project or `everywhere`, and each measure, by name (`writesOf`). ABSENT FOR AN
+     * ACTION THAT FILES NOTHING, or one whose mapping names no field, so a plan of an action that names nothing it
+     * writes reads as it did before the key.
+     */
+    writes?: Writes;
+    /** The sentence under the line, "Writes Numbers on Bake: revenue, customers, 3 more." Beside `writes`. */
+    writes_line?: string;
+    /** Its interval is the provider's own floor (`floor:`), the least it may run at: "every 6h, the provider's minimum". */
+    at_floor?: true;
   }[];
+  /**
+   * Each script this install puts in or changes: its source whole, its size in bytes, and on an update only the lines
+   * that changed (`scriptSources`, SHL-D09). An unchanged script is not here. Empty when the pack carries no script.
+   */
+  scripts: ScriptSource[];
   /**
    * The lines installing this plan asks the owner to approve: each `new` or `changed` action's `line`, then its
    * `key_line` when it has one. Empty when it calls nothing new, so an install that only keeps what was approved
@@ -2088,6 +2107,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
       .sort((a, b) => a[0].localeCompare(b[0])),
   };
   const calls = callsOf(pack, installed);
+  const scripts = scriptSources(pack.declarations, installed);
 
   return {
     pack: {
@@ -2116,6 +2136,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
     spawns: spawnsOf(pack),
     calls_out: calls,
+    scripts,
     approve: approvalLines(calls.filter((c) => c.change !== 'same').map((c) => ({ key: c.grant, line: c.line, key_line: c.key_line }))),
     interrupts: interruptsOf(pack),
     touches: { rows_read: 0, rows_written: 0 },
@@ -3247,11 +3268,13 @@ const hostOf = (address: unknown): string | null => {
   }
 };
 
-const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
-  pack.declarations.flatMap((d) => {
+const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] => {
+  /* WHAT EACH ACTION FILES IS SAID BY NAME, the pack's lists first and then the record's (`namerOf`). */
+  const named = namerOf(pack.declarations, installed.declarations, installed.nameOf);
+  return pack.declarations.flatMap((d) => {
     const e = egressOf(d, installed.nameOf, installed.opensOf);
     if (e === null) return [];
-    const body = d.body as { ingest?: string; url?: unknown; fetch?: { base?: unknown } };
+    const body = d.body as { ingest?: string; url?: unknown; fetch?: { base?: unknown }; channel?: unknown; extract?: unknown };
     /* EVERY HOST, STATICALLY. A `call` and a `poll` say `url:`, and a `pull` says `url:` or `fetch.base`. */
     const host = e.host ?? (isObject(body.fetch) ? hostOf(body.fetch.base) : null);
     const line = host === e.host ? e.line : e.line.replace('CALLS OUT no host declared', `CALLS OUT ${host}`);
@@ -3273,6 +3296,12 @@ const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
         : egressChanged(before, e)
           ? 'changed'
           : 'same';
+    /* ONLY A WRITE THAT NAMES WHAT IT FILLS, or a pull's list: a mapping that names no field says nothing a person can
+       weigh, and the plans read before the key stay as they were. */
+    const filed = d.kind === 'ingest' ? writesOf(d.body, named) : null;
+    const writes = filed !== null && (filed.measures.length > 0 || body.channel === 'pull' && body.extract === undefined) ? filed : null;
+    const floor = (d.body as { floor?: unknown }).floor;
+    const atFloor = e.every !== null && typeof floor === 'string' && intervalMs(floor) !== null && intervalMs(e.every) === intervalMs(floor);
     return [
       {
         ingest: e.ingest || String(body.ingest ?? d.id),
@@ -3289,9 +3318,12 @@ const callsOf = (pack: Pack, installed: Installed): Diff['calls_out'] =>
         line,
         key_line: e.key_line,
         change,
+        ...(writes === null ? {} : { writes, writes_line: writesLine(writes) }),
+        ...(atFloor ? { at_floor: true as const } : {}),
       },
     ];
   });
+};
 
 const interruptsOf = (pack: Pack): string[] =>
   pack.declarations

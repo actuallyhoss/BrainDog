@@ -20,7 +20,7 @@ import { FIRST_PARTY, firstPartyDocument, firstPartyManifest, type FirstPartyId 
 import { AGENTS_SIGNALS } from '../module-info.ts';
 import { GUIDE_FORMS, GUIDE_GROWS, GUIDE_NEXT } from './guide.ts';
 import { MODULE_ORDER, USE_CASES, modulesFor, useCase, useCaseDocument } from './index.ts';
-import { moduleDocument, withoutRows } from './install.ts';
+import { fitted, moduleDocument, withoutRows } from './install.ts';
 import { carryForward, linkExamples, type CarryIo, type LinkIo } from './links.ts';
 
 /**
@@ -134,9 +134,12 @@ export function seedCatalogue(): SeedCatalogueEntry[] {
     version,
     /* THE LISTS THE RECORD HOLDS, so an update keeps a list the older version declared (`useCaseDocument`), and none of
        the use case's example rows. */
+    /* AND CUT TO THEM (`fitted`, USE-B08): a use case that says `needs` goes in with only what it stands on (`modules`
+       above), so a page or a link over a module it does not stand on goes in without that list, as `usecase` installs a
+       file, rather than refusing the arrangement REGISTER_UNRESOLVED. A record that holds every list reads the whole. */
     doc: ({ holds }) => {
       const doc = useCaseDocument(u.usecase, today(), holds);
-      return doc ? withoutRows(doc) : null;
+      return doc ? fitted(withoutRows(doc), new Set(holds)) : null;
     },
     /* A SEED CARRIES NO LINK (42 §5.2), so the use case's examples are pointed at each other once they are in (`links.ts`). */
     afterInstall: (io) => linkExamples(io, u.usecase),

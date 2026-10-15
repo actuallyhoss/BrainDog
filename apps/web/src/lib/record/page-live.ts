@@ -34,6 +34,7 @@ import {
   decl as fieldOf,
   feedTable,
   historyTable,
+  homeCurrency,
   markColumns,
   runWords,
   toRows,
@@ -59,6 +60,7 @@ import { REDUCES, SUMS, type Entry, type PageBlock, type PageDecl } from './sche
 import { compile } from './where.ts';
 import { drawerOf } from '../page/kinds/index.ts';
 import { liveOf } from '../ui/face.ts';
+import { sourceRows } from './source-rows.ts';
 import { pathOf } from '../ui/icons.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
@@ -1181,6 +1183,10 @@ const unnamedOf = (b: Answered): string[] | undefined => {
   return Array.isArray(u) && u.length > 0 && u.every((p) => typeof p === 'string') ? [...(u as string[])] : undefined;
 };
 
+/** The primitives a source no arm knows is drawn in, and the types whose cells stand at a column's end. */
+const SOURCE_DRAWN: ReadonlySet<string> = new Set(['table', 'list', 'rows']);
+const END_TYPES: ReadonlySet<string> = new Set(['money', 'int', 'count', 'decimal']);
+
 /** Whether a run the page read is at work, gone quiet or stopped, as a card of runs says it (`face.ts` `liveOf`). */
 const liveOfRun = (run: Readonly<Record<string, unknown>>, now: number): RunCell['live'] =>
   liveOf(run.state, run.state === 'active' && isQuiet({ fields: run as never }, now));
@@ -1717,6 +1723,20 @@ export function blockOf(
   }
 
   const register = registerOf(b);
+  /* A SOURCE NO ARM ABOVE KNOWS, a new one in the kernel's registry or the record's own, is drawn by its fields
+     (`source-rows.ts`): each cell by the type the record answered for it, in the table, list or rows the block names. */
+  if (!register && typeof source === 'string' && !source.startsWith('register.') && !source.startsWith('metric.') && SOURCE_DRAWN.has(kind)) {
+    /* A RUN IS SAID AS THE RUN THE PAGE READ, its app and its day, never its handle. */
+    const ran = new Map([...runs].flatMap(([handle, f]) => { const w = runWords(f); return w === null ? [] : [[handle, w] as const]; }));
+    /* The home currency the record answered on the block, else the shell's. */
+    const home = typeof homeSaid === 'string' && /^[A-Z]{3}$/u.test(homeSaid) ? homeSaid : homeCurrency();
+    const laid = sourceRows(b, b, { now, home, names: ran });
+    if (laid) {
+      const columns = laid.columns.map((c) => ({ field: c.field, label: c.label, width: 'minmax(12ch,1fr)', align: END_TYPES.has(c.type) ? ('end' as const) : ('start' as const), truncate: c.type === 'money' ? ('never' as const) : ('end' as const) }));
+      const rows = laid.rows.map((cells, n) => ({ key: laid.keys[n]!, cells, ...(laid.links[n] ? { href: laid.links[n]! } : {}) }));
+      return { ...shell, columns, rows, shown: rows.length, total: Math.max(matched, rows.length) };
+    }
+  }
   /* A register the seed does not declare has no labels to draw with, and says so rather than drawing half an answer. */
   if (!register || !REGISTERS[register]) return cannot;
   /* THE NUMBERS A PROJECT REPORTED, worked out by the record: one series a measure, drawn as tiles or charts. */
@@ -2133,9 +2153,19 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
   /* A REF ARRIVES AS THE TARGET ROW'S ULID, so each register a ref points at is walked once and kept,
      as the row reader does. A register this reader may not list is left out, and its refs draw as ids. */
   const walked = new Map<string, RecordRow[]>();
-  async function rowsOf(register: string): Promise<RecordRow[] | null> {
+  /* A WALK OUT IS SHARED, as the walks go out together: a list a ref and a bar both point at is asked once. */
+  const walking = new Map<string, Promise<RecordRow[] | null>>();
+  function rowsOf(register: string): Promise<RecordRow[] | null> {
     const kept = walked.get(register);
-    if (kept) return kept;
+    if (kept) return Promise.resolve(kept);
+    let out = walking.get(register);
+    if (!out) {
+      out = walk(register).finally(() => walking.delete(register));
+      walking.set(register, out);
+    }
+    return out;
+  }
+  async function walk(register: string): Promise<RecordRow[] | null> {
     const rows: RecordRow[] = [];
     let cursor: string | null = null;
     do {
@@ -2194,11 +2224,21 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
          lists are declared by the record and by no file here, and a page over them drew
          "cannot be drawn" on every block. This then skipped any list the bundle holds, so a field added to Projects at
          run time was on the record and in no block over Projects: measured in `field-write.test.ts`, where the page
-         asked for `page` and nothing else. `learn` keeps what it asked per reader, so a list two blocks draw is asked once. */
+         asked for `page` and nothing else. `learn` keeps what it asked per reader, so a list two blocks draw is asked once.
+
+         THE ASKS GO OUT TOGETHER, in the page's own order, the figures' lists among them (below): one after another, a
+         page of six lists waited six round trips before its first block. `learn` never throws and a refused ask
+         changes no list, so one list the record will not describe is said by its own block and the rest draw. */
+      const learning = new Set<string>();
       for (const b of blocks) {
         const register = b.refusals?.length ? null : registerOf(b);
-        if (register) await learn(client.schema, register, asked);
+        if (register) learning.add(register);
       }
+      for (const b of blocks) {
+        const by = b.refusals?.length || partsNamed(b) ? null : groupedBy(b);
+        if (by) learning.add(by.register);
+      }
+      await Promise.all([...learning].map((register) => learn(client.schema, register, asked)));
       const wanted = new Set<string>();
       for (const b of blocks) {
         const register = b.refusals?.length ? null : registerOf(b);
@@ -2210,19 +2250,14 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       for (const b of blocks) {
         const by = b.refusals?.length || partsNamed(b) ? null : groupedBy(b);
         if (!by) continue;
-        await learn(client.schema, by.register, asked);
         const target = partsTarget(b);
         if (target) wanted.add(target);
       }
       /* WHO IS READING, for a feed that names the reader as You: the shell's own `boot`, kept, so it costs no call. */
-      const booted = blocks.some((b) => b.source === 'activity') ? await readBoot(base, io) : null;
-      const me = booted?.from === 'live' ? (booted.boot.me?.person ?? null) : null;
-      const names = new Map(Object.entries(booted?.from === 'live' ? (booted.boot.names ?? {}) : {}));
-      const refs = new Map<string, RefMap>();
-      for (const target of wanted) {
-        const map = await mapOf(target);
-        if (map) refs.set(target, map);
-      }
+      const booting = blocks.some((b) => b.source === 'activity') ? readBoot(base, io) : null;
+      /* THE LINKED LISTS ARE WALKED TOGETHER, one step deep as before (a target's own targets are not walked), and kept
+         in the order they were wanted. A list this reader may not walk is left out alone. */
+      const mapping = Promise.all([...wanted].map(async (target) => [target, await mapOf(target)] as const));
       /* THE PAGE IS THE ANSWER, AND THE ONE DERIVED KEY IS DERIVED FROM THE ANSWER. `identity` names
          the row a page is ABOUT, and it is what the page and its rail row wear a project's colour
          from; the record does not send it, but an expanded page sends `param`: the register, the
@@ -2233,9 +2268,15 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       /* A BAR OVER A LIST OF LINKS adds up what the linked rows hold: an organisation's balance is the money in the
          accounts it names. The linked list is walked once, as a ref's target is, and each row's money is handed on by id. */
       const linked = new Map<number, Record<string, unknown>>();
-      for (const [i, b] of blocks.entries()) {
-        const link = b.refusals?.length || (b.kind !== 'bar' && b.kind !== 'split') ? null : linkOf(registerOf(b), b.columns?.[1]?.field);
-        if (!link) continue;
+      const linking = Promise.all([...blocks.entries()].map(async ([i, b]) => {
+        if (b.refusals?.length || (b.kind !== 'bar' && b.kind !== 'split')) return;
+        /* The linked list's money field is known once its own list is learnt, which the walk beside this one asks too. */
+        const register = registerOf(b);
+        const field = b.columns?.[1]?.field;
+        const to = register && field ? fieldOf(register, field)?.to : undefined;
+        if (typeof to === 'string' && to !== '') await learn(client.schema, to, asked);
+        const link = linkOf(register, field);
+        if (!link) return;
         const rows = await rowsOf(link.to);
         /* BY THE ULID AND BY THE NUMBER, because the element the bar looks up is no longer the one that
            arrived. `entryOf` resolves a `list<ref>` element to the target row's SEQUENCE as of
@@ -2255,17 +2296,23 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
               }),
             ),
           );
-      }
+      }));
       /* A RUN A BLOCK NAMES IS ASKED FOR ONCE, by its number, so a card says the app it ran in and its day. A run this
          reader may not open is left out, and its cell says An agent. */
       const runs = new Map<string, Record<string, unknown>>();
-      await Promise.all(
+      const naming = Promise.all(
         [...new Set(blocks.flatMap((b) => runsNamed(b)))].map(async (handle) => {
           const got = await client.get('session', Number(RUN_HANDLE.exec(handle)?.[1]));
           const row = got.ok && isObject(got.value) ? (got.value as { state?: unknown; fields?: unknown }) : null;
           if (row && isObject(row.fields)) runs.set(handle, { ...row.fields, ...(typeof row.state === 'string' ? { state: row.state } : {}) });
         }),
       );
+      /* The walks, the bars' links, the runs and who is reading are all out at once, and the page waits for the slowest. */
+      const [mapped, booted] = await Promise.all([mapping, booting, linking, naming]);
+      const me = booted?.from === 'live' ? (booted.boot.me?.person ?? null) : null;
+      const names = new Map(Object.entries(booted?.from === 'live' ? (booted.boot.names ?? {}) : {}));
+      const refs = new Map<string, RefMap>();
+      for (const [target, map] of mapped) if (map) refs.set(target, map);
       const drawn = blocks.map((b, i) => {
         const block = blockOf(b, refs, now, me, names, runs);
         const lent = linked.get(i);

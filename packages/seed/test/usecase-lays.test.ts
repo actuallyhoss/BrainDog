@@ -95,6 +95,21 @@ const LAID: Record<string, Laid> = {
       'Inside the unreleased 2.6.0 (seen-section-91, ENG-B03): it lays Where it was seen, a section naming panel: seen, after Notes on People\'s pages for an organisation and a person -> 587379d1d9fe0800',
     ],
   },
+  /* 2.7.0, CUT BESIDE THE FROZEN 2.6.0 FOR `needs` (usecase-needs-102): it lays what 2.6.0 laid, word for word. */
+  'founder@2.7.0': {
+    lays: [
+      'adds page.relation after People: Numbers, 30 days',
+      'adds page.relation after People: Latest numbers',
+      'adds page.relation after People: Send numbers here',
+      'adds page.portfolio after In play: ',
+      'adds page.estate after Next ninety days: Server and provider numbers',
+      'adds page.relation after Notes: Where it was seen',
+      'adds page.someone after Notes: Where it was seen',
+      'hands register.organisations to people',
+    ],
+    declares: '587379d1d9fe0800',
+    history: ['2.7.0 lays what 2.6.0 laid, word for word; it adds `needs` and nothing it lays moved -> 587379d1d9fe0800'],
+  },
   /* PERSONAL LAYS FOR THE FIRST TIME AT 2.4.0 (budgets-set-73, integrate 73): the count of budgets set goes to Money,
      which declares it since money-core 3.17.0. 2.3.1, released, laid nothing and has no entry. */
   'personal@2.4.0': {
@@ -107,6 +122,12 @@ const LAID: Record<string, Laid> = {
     lays: ['hands metric.budgets-set to money-core'],
     declares: '5719e519311f68f0',
     history: ['2.5.0 lays what 2.4.0 laid, word for word -> 5719e519311f68f0'],
+  },
+  /* 2.6.0, CUT BESIDE THE FROZEN 2.5.0 FOR `needs` (usecase-needs-102): it lays what 2.5.0 laid, word for word. */
+  'personal@2.6.0': {
+    lays: ['hands metric.budgets-set to money-core'],
+    declares: '5719e519311f68f0',
+    history: ['2.6.0 lays what 2.5.0 laid, word for word; it adds `needs` and nothing it lays moved -> 5719e519311f68f0'],
   },
 };
 

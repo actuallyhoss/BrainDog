@@ -149,8 +149,8 @@ the table.
 | `derived_from` | a declaration id — `register.domains` | — | when `origin: derived` |
 | `placed` | bool — in nav, or in the holding pen | `true` | no |
 | `tone` | intent — `good \| warn \| bad \| info` | — | no |
-| `filters` | `[{ field, control: chips \| segmented }]`, at most 4, each a field of the lists the page's blocks read: reader filters ([21-AUTHORING](21-AUTHORING.md) §3.5). Every block over a list with the field is narrowed by the reader's choice (`page`'s `filter`, a value by field, `{ project: '12' }`), and the answer carries `filters: [{ field, label, control, chosen, values: [{ value, label, count }], reads }]`, counting open rows only, each count under the other choices. A filter counted from a list the reader may not read (its `reads`) is answered with no values and nothing chosen, and its choice narrows nothing | `[]` | no |
-| `header` | the head over the title, up to seven parts, each optional and each checked at install by `page-head.ts` ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5): `kicker`, one plain line of at most 60 bytes, or `day` for today's date in the record's zone · `count: { metric }`, the figure beside the title · `state: { metric, says: { good, warn, bad } }`, a figure's tone said in words of at most 80 bytes each, never colour alone · `action`, one block action (`row.create` or `rule.from_arrivals`, the shape below), the page's one primary button, cut to the reader's level · `search: { param }`, the one lower-case word the address keeps what is typed under · `back: { page }` or `back: { list }`, the one way back · `byline: true`. A figure the record does not hold is refused `METRIC_UNKNOWN`, and a part with nothing to say is left out of the answer, never drawn empty | the page's title alone | no |
+| `filters` | `[{ field, control: chips \| segmented }]`, at most 4, each a field of the lists the page's blocks read: reader filters ([21-AUTHORING](21-AUTHORING.md) §3.5). Every block over a list with the field is narrowed by the reader's choice (`page`'s `filter`, a value by field, `{ project: '12' }`), and the answer carries `filters: [{ field, label, control, chosen, values: [{ value, label, count }], reads }]`, counting open rows only, each count under the other choices. A filter counted from a list the reader may not read (its `reads`) is answered with no values and nothing chosen, and its choice narrows nothing. A feed over `activity` offers who, kind and list | `[]` | no |
+| `header` | the head over the title, up to seven parts, each optional and each checked at install by `page-head.ts` ([29-EMERGENT-PAGES](29-EMERGENT-PAGES.md) §5): `kicker`, one plain line of at most 60 bytes, or `day` for today's date in the record's zone · `count: { metric }`, the figure beside the title · `state: { metric, says: { good, warn, bad } }`, a figure's tone said in words of at most 80 bytes each, never colour alone · `action`, one block action (`row.create` or `rule.from_arrivals`, the shape below), the page's one primary button, cut to the reader's level · `search: { param }`, the one lower-case word the address keeps what is typed under; search narrows every list on the page by the typed word, and the head says how many were found (`searched: { word, found }`) · `back: { page }` or `back: { list }`, the one way back · `byline: true`. A figure the record does not hold is refused `METRIC_UNKNOWN`, and a part with nothing to say is left out of the answer, never drawn empty | the page's title alone | no |
 | `blocks` | `[block]`, at most 24 | — | yes |
 
 **On a block**
@@ -161,7 +161,7 @@ the table.
 | `area` | `main \| rail`: which of the page's two columns the block sits in. Refused on a page with no `layout` | `main` | no |
 | `heading` | text. On a `section` it is the section, drawn as a heading | — | `section` |
 | `span` | int, 1–12 | 12 | no |
-| `source` | `register.<id>` · `metric.<id>` (on a `bar` or `split`, a figure grouped by a word, whose parts it draws; any other kind refuses it) · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now) · `actions` (the record's scheduled actions, one row each) · `runs_on` (what one project runs on, the project named by `about:`) · `deadlines` (what falls due across the lists, overdue first) · `figures.home` (the figures pinned to Home, on a `stat`) · `signs` (the record's vital signs) · `handoffs.open` (the next steps runs left and nobody has taken, newest first). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
+| `source` | `register.<id>` · `metric.<id>` (on a `bar` or `split`, a figure grouped by a word, whose parts it draws; any other kind refuses it) · `block.<n>` (another block on this page) · `activity` (what was done in the record, with the kind of actor; a `feed`'s) · `sessions.live` (the runs working now) · `actions` (the record's scheduled actions, one row each) · `runs_on` (what one project runs on, the project named by `about:`) · `deadlines` (what falls due across the lists, overdue first) · `figures.home` (the figures pinned to Home, on a `stat`) · `signs` (the record's vital signs) · `handoffs.open` (the next steps runs left and nobody has taken, newest first) · `lists` (every list you can open, with its count and newest change) · `pages` (every page off the census, whole-record only). On a `section` it is what the count counts; on a `diff`, the register whose row it reads | — | `table`, `cards`, `feed`, `diff` |
 | `where` | a predicate — [02-DATA-MODEL](02-DATA-MODEL.md) §6. On a `capture`, what a new row is filled with: each `is` of one value on an enum or a text field, at the top of the predicate or under a top-level `all`, other than the title. A set (`is open or doing`), a date and a link are never filled in, because each would be a value nobody chose | every row | no |
 | `register` | a register id, which the page `requires`. On a `capture`, the list a new row is added to; a `capture` takes no `source`, because it reads no row. On `inputs`, the list whose one row it edits, and it takes no `source` either | — | `capture`, `inputs` |
 | `when` | `{ metric: <id>, <op>: v }`, `{ metric: <id>, empty: bool }`, `{ metric: <id>, beyond: bool }`, `{ reader: owner \| member \| agent \| link }` (one word or a list of them: who reads the page; a block whose reader leaf names someone else is never sent to them, and a reader the read cannot name is sent none), or `{ all: [leaf, leaf, …] }` of two or more — evaluated at render, never compiled | always drawn | no |
@@ -191,6 +191,7 @@ the table.
 | `body` | markdown in the dialect | — | `note` |
 | `icon` | a glyph name, drawn beside a `section`'s heading | — | no |
 | `fold` | bool. A `section` that starts shut, folding the blocks after it up to the next section; one press opens it | `false` | no |
+| `most` | int, 1 to 24. On a `cards` or `series`, how many it shows before "Show all N", which opens the rest in place; an export draws the same and says "and N more". Never cuts grouped cards, which fold by `fold`, or a block in the panel | `6` on `cards`, none on `series` | no |
 | `since` | `seen`, the reader's read mark. On a `feed`, the rows after it are new; the evaluator writes the `seen` row where it falls, with an empty time when the reader has no mark yet | absent: nothing is new | no |
 | `first` | int, 1–50. On a `feed` or `agents`, the most rows it draws, newest first, a collapsed burst being one row; what is past it goes in one last row per group, so no count loses anything. On a `steps` block, the short view: the first `n` rows not done, with `matched` still the whole count, so "N more" is `matched` less the rows; refused over a list that does not declare `steps:`, where no row is known to be done | every row | no |
 | `short` | `{ where: <sentence>, label: <text, at most 24 bytes> }`. On a `steps` block, the path's short view: the rows `where` admits, named `label` on the switch. The block still answers every row up to `limit`, and `short_now`, whether each row is in the short view, aligned with `rows`, so a host switches views without a second read | none | no |
@@ -395,6 +396,22 @@ install with the page and the block's place put in front of its sentence, and ag
 any of `pages.ts`'s own arms. Adding one is three files and three lines: that module and its registry line, the app's
 drawer in `apps/web/src/lib/page/kinds/<kind>.ts` with its line in `BLOCK_KIND_DRAWERS`, and the renderer's row in
 `packages/render/src/kinds.ts` `TABLE`. The counts of the kinds are the integrator's.
+
+### 1.3 · Sources are a registry
+
+A block's `source:` is a list (`register.<id>`), a figure (`metric.<id>`), or a source: something the record works out
+that is not one list. The kernel's sources are in `packages/kernel/src/sources/`, one file a source and one line each
+in `SOURCE_MODULES`; the ones only the record can read, such as `lists` (every list with its count) and `pages` (the
+pages census as rows), are in `packages/record/src/sources/`, handed to the kernel as `PageDeps.hostSources`. Adding a
+source is a file and a table line, and nothing else: no sentence anywhere counts them.
+
+The app draws any source by its fields. A block over a source the page reader has no arm for is laid out by
+`apps/web/src/lib/record/source-rows.ts`: the block's own columns, or every field of its rows that says something, each
+cell written by the app's one writer for the type the record answered beside the rows (`types`), or by the value where
+the record sent none. Money goes through the one money writer, a day in the house day words, a count as a whole number.
+A link or a handle (`list` on `lists`, a `slug`, a row id) is never a column it was not asked for and never words, and a
+row with no number links nowhere. So a source added in the kernel or the record draws as a table, list or rows with no
+edit in the app.
 
 ---
 

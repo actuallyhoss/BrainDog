@@ -1107,6 +1107,39 @@ const DECLARED: Record<string, Version> = {
       "`page.home-personal` gains the first acts (USE-A08): Bring your money in while no account counts as cash, a line naming a savings goal while none is kept and one naming a project in the Building lane while none is live, each on its own count; `metric.savings-held` is added for the second, nothing goes, and 2.4.0, live at 1b55e940, stays as it was -> 32aff23db88fea96",
     ],
   },
+  /* CUT BESIDE 2.5.0, WHICH THE CATALOGUE PUBLISHES AND FREEZES (0d9bc36e): the file it shares gains `needs`, Money and
+     the Projects it points at, so a fresh record installs those two and what the words point at. No declaration moved,
+     so the fingerprint is 2.5.0's and a record on 2.5.0 updates without losing a list (usecase-needs-102, USE-B08 job 5). */
+  'personal@2.6.0': {
+    holds: `
+      extends.register.people.role.adviser extends.register.people.role.family extends.register.people.role.friend
+      extends.register.people.role.landlord extends.register.people.role.tradesperson hands.metric.budgets-set.money-core
+      metric.goal-log-held metric.goals-active metric.goals-held metric.habits-active metric.logged-by-goal
+      metric.logged-this-week-by-goal metric.put-by-by-goal metric.put-by-held metric.saved-toward-goals
+      metric.savings-active metric.savings-held metric.steps-done metric.steps-left page.goals page.home-personal
+      page.my-project register.goal_log register.goals register.project_steps register.put_by register.savings_goals
+      setting.holds_obligations setting.holds_people setting.holds_things setting.label_accounts setting.label_books
+      setting.label_categories setting.label_goal_log setting.label_goals setting.label_installments
+      setting.label_obligations setting.label_people setting.label_people__role__accountant
+      setting.label_people__role__client setting.label_people__role__collaborator setting.label_people__role__contractor
+      setting.label_project_steps setting.label_put_by setting.label_recurring setting.label_savings_goals
+      setting.label_things setting.label_things__lane__building setting.label_things__lane__earning
+      setting.label_things__lane__parked setting.label_things__lane__retired setting.label_things__revenue
+      setting.label_transactions setting.lk_10103af7 setting.lk_1d01726f setting.lk_303a3cce setting.lk_4f9bf906
+      setting.lk_666e92eb setting.lk_91a285a5 setting.lk_d66e361a setting.lk_f625eca1 setting.one_accounts
+      setting.one_books setting.one_categories setting.one_goal_log setting.one_goals setting.one_installments
+      setting.one_obligations setting.one_people setting.one_project_steps setting.one_put_by setting.one_recurring
+      setting.one_savings_goals setting.one_things setting.one_transactions setting.shared_version setting.speaks
+      setting.voice_add_first setting.voice_fills_with setting.voice_home setting.voice_inbox_clear setting.voice_lists
+      setting.voice_needs_you setting.voice_no_questions setting.voice_nothing_due setting.voice_nothing_needs_you
+      setting.voice_nothing_now setting.voice_overdue setting.voice_record_empty setting.voice_right_now
+      setting.voice_since_away
+    `,
+    declares: '32aff23db88fea96',
+    history: [
+      "Cut beside the frozen 2.5.0 for `needs` (usecase-needs-102, USE-B08 job 5): a fresh record installs Money, the Projects it points at and what the words point at, `page.home-personal` already leads from Money's figures and this pack's own lists, and a block or a role laid on a list the record does not hold (`extends.register.people.role.family` among them) is cut at install; nothing declared, taken away or reworded -> 32aff23db88fea96",
+    ],
+  },
   'founder@1.15.0': {
     holds: `
       metric.datapoints-30d metric.datapoints-held metric.due-this-week metric.organisations-held page.dashboard
@@ -1520,6 +1553,32 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 2.6.0 (runs-on-section-89, AGT-D12 job 2; batch 89; commit 63423720 holds 2.5.0): `page.project`'s Keys, Tools and servers and Skills draw six rows each where they drew three, and Keys, Tools and servers and And from everywhere name who used each by `used_agents`, labelled Used by, where Keys and Tools named `used_by` and And from everywhere `used_agent`, each labelled Last used by; no id added or taken away -> 6bb5b7dec0fe3e2b",
       "Inside the unreleased 2.6.0 (seen-section-91, ENG-B03 'Seen: the about answer'; batch 91; commit 63423720 holds 2.5.0): `page.project` ends with a section Where it was seen naming `panel: seen`, after its More about tile, and the same section is laid on People's pages for an organisation and a person after Notes, the last block of their own (`adds.page.relation.6`, `adds.page.someone.7`), last among the additions so those before keep their numbers; three blocks added, nothing taken away -> bd926c3bbb84b916",
       "Inside the unreleased 2.6.0 (numbers-order-categories-97, batch 97; commit 63423720 holds 2.5.0): `register.datapoints` (Numbers) declares its order, newest first by `at`, the moment a number is for -> 8a82770e8f8c8827",
+    ],
+  },
+  /* CUT BESIDE 2.6.0, WHICH THE CATALOGUE PUBLISHES AND FREEZES (0d9bc36e): the file it shares gains `needs`, Projects
+     and Money, so a fresh record installs those two and what the words point at. No declaration moved, so the fingerprint
+     is 2.6.0's and a record on 2.6.0 updates without losing a list (usecase-needs-102, USE-B08 job 5). */
+  'founder@2.7.0': {
+    holds: `
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.late-money metric.organisations-held page.dashboard page.home-founder page.project register.datapoints
+      setting.label_accounts setting.label_books setting.label_categories setting.label_datapoints
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories setting.one_datapoints
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+      adds.page.relation.1 adds.page.relation.2 adds.page.relation.3 hands.register.organisations.people
+      metric.project-numbers-7d metric.projects-earning-silent adds.page.portfolio.4
+      adds.page.estate.5 metric.service-numbers adds.page.relation.6 adds.page.someone.7
+    `,
+    declares: '8a82770e8f8c8827',
+    history: [
+      "Cut beside the frozen 2.6.0 for `needs` (usecase-needs-102, USE-B08 job 5): a fresh record installs Projects and Money and what the words point at, Services for domains or renewals; `page.home-founder` already leads from Money and `register.datapoints`, and Lapsing and `metric.lapsing-30d` over a list the record does not hold are cut at install; nothing declared, taken away or reworded -> 8a82770e8f8c8827",
     ],
   },
   'team@2.19.0': {

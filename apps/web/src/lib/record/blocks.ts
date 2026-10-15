@@ -1213,7 +1213,9 @@ export function toSegments(block: BlockResult, kinds?: Readonly<Record<string, K
       ...(split.note ? parse(split.note, { page: true }) : []),
     ];
   }
-  const drawn = groupedSegments(block, kinds) ?? drawSegments(block, kinds);
+  const grouped = groupedSegments(block, kinds);
+  /* A LONG BLOCK OF CARDS SHOWS ITS FIRST SIX (`mostOf`): its own `most:` rides on its cards, and cards drawn in their groups are marked grouped so no group is cut twice. */
+  const drawn = (grouped ?? drawSegments(block, kinds)).map((s) => (s.type === 'block' && s.kind === 'cards' ? { ...s, ...(grouped && block.group ? { group: block.group } : {}), ...(typeof block.most === 'number' ? { most: block.most } : {}) } : s));
   /* A HEAT SAYS WHAT ITS CELLS LEAVE OUT, under them: twelve weeks of days add to less than a list that reaches further back. */
   /* DAYS WHERE THE RECORD COUNTED DAYS (`outsideDays`), and with none of them, as when every entry outside holds no day,
      nothing is said of days. A record that sends no such count is read as before. */

@@ -37,6 +37,7 @@
   import { hrefFor, trendNewest, written } from '../src/html.ts';
   import { AMOUNT_SPACE } from '../src/money.ts';
   import { CARD_EDIT_PAUSE, editAfter, type CardEdit } from '../src/card-edit.ts';
+  import { mostOf, showAllSaid, type MostKeys } from '../src/most.ts';
   import Text from './Text.svelte';
 
   /**
@@ -71,6 +72,12 @@
 
   const L = $derived(cardLayout(block.rows[0]?.cells ?? []));
   const rows = $derived(block.rows.slice(1));
+
+  /* A LONG BLOCK DRAWS ITS FIRST SIX (`mostOf`) and a "Show all" under them, which opens the rest in place and keeps
+     them open while the page is: `html.ts` draws the same six and says how many it left out. */
+  const most = $derived(mostOf(block as Block & MostKeys, rows.length));
+  let all = $state(false);
+  const drawnCards = $derived(all ? rows : rows.slice(0, most.shown));
 
   /* WHERE A ROW APPLIES IS A FACT THAT IS DRAWN AS A CHIP: a fact in a column the host names as a scope. */
   const scoped = (i: number): boolean => opts.scope?.columns.includes(i) ?? false;
@@ -324,8 +331,8 @@
   <p class="cards-empty">{CARDS_NONE}</p>
 {:else}
   <!-- AS MANY COLUMNS AS FIT, AND NEVER MORE THAN THERE ARE CARDS (`cardsCount`), so three cards fill the row. -->
-  <ul class="cards-grid" data-cards={cardsCount(rows.length)}>
-    {#each rows as r, n}
+  <ul class="cards-grid" data-cards={cardsCount(drawnCards.length)}>
+    {#each drawnCards as r, n}
       {@const mark = L.mark >= 0 ? markOf(said(r, L.mark), said(r, L.name)) : null}
       {@const markGlyph = markGlyphOf(mark)}
       {@const run = L.name >= 0 || L.who >= 0 ? runFaceOf(said(r, L.nameIsWho ? L.name : L.who), opts.runs?.[n], isQuiet(L, r.cells)) : null}
@@ -467,6 +474,9 @@
       </li>
     {/each}
   </ul>
+  {#if !all && most.more > 0}
+    <button type="button" class="cards-all" onclick={() => (all = true)}>{showAllSaid(rows.length)}</button>
+  {/if}
 {/if}
 
 <style>
@@ -517,6 +527,26 @@
     :global(.cards-edit) {
       min-block-size: var(--tap);
     }
+  }
+
+  /* "SHOW ALL" IS A RECTANGLE A THUMB CAN HIT, in the one red the product's links take, under the grid. Global, as the
+     rules above are, so the scoped hash marks no card. */
+  :global(.cards-all) {
+    display: block;
+    min-block-size: var(--tap);
+    margin: var(--sp-2) 0 0;
+    padding: 0 var(--sp-3);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: none;
+    color: var(--link);
+    font-size: var(--t-base);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  :global(.cards-all:hover) {
+    background: var(--field);
   }
 
   :global(.cards-said) {

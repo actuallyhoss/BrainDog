@@ -23,6 +23,7 @@ import type { Result } from '@braindog/ports';
 import { TYPED } from 'braindog-render';
 
 import { ROUND_MS, pagesToLint } from '../page-lint.ts';
+import { hostSourcesOf } from '../sources/index.ts';
 import { textFaultLine, textFaults, type LongText, type TextFault, type TextPage, type TextPart } from '../text-check.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -223,7 +224,7 @@ export function methods(deps: RecordDeps) {
       const start = clock.now();
       /* ONE WALK FOR THE WHOLE CALL (`pageWalk`): a figure two pages read is read once, and so is every declaration the
          lists of a block are named from. It writes nothing, so nothing it kept can change under it. */
-      const walk = kernel.pageWalk();
+      const walk = kernel.pageWalk({ hostSources: hostSourcesOf({ kernel, ctx, readable }) });
       const docs = documents(ctx, start, walk);
       const pages = pagesFor(ctx, docs, start, walk);
       const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))], walk);

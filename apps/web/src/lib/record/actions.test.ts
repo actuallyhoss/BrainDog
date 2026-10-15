@@ -442,6 +442,15 @@ test('a call only a rule runs keeps its line, its daily ceiling and the key note
   assert.equal(estimateOf(calls.slice(0, 1), true), null, 'a rule-only call was counted as runs a month');
 });
 
+test('the call line carries the plan\'s writes line under it, and the provider\'s floor', () => {
+  const calls = callsOutOf([
+    { ingest: 'kiln-numbers', channel: 'poll', host: 'stats.kiln.example', every: '6h', grant: 'Kiln read', at_floor: true, writes_line: 'Writes Numbers on Kiln: Revenue, Customers, 3 more.' },
+    { ingest: 'kiln-status', channel: 'poll', host: 'status.kiln.example', every: '1h', grant: 'Kiln read' },
+  ]);
+  assert.equal(callLine(calls[0]!), 'Watches stats.kiln.example, every 6 hours, the provider\'s minimum, with the key "Kiln read".\nWrites Numbers on Kiln: Revenue, Customers, 3 more.');
+  assert.equal(callLine(calls[1]!), 'Watches status.kiln.example, every hour, with the key "Kiln read"');
+});
+
 test('installing a pack that calls out says it asks once, and accepting a proposal says what the press does, with no "would" left', () => {
   for (const said of [installWords.asksOnce, installWords.acceptApproves]) assert.doesNotMatch(said, /—/u);
   assert.equal('wouldAsk' in installWords, false, 'the sample install sentence is still here');

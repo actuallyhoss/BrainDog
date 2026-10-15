@@ -31,10 +31,24 @@ const ACTIONS: Schema = {
     /* The last run's HTTP status and note, so a host can say why an action paused or waits. */
     last_status: { type: 'int' },
     last_note: { type: 'text' },
+    /* THIS MONTH'S COUNTS, as `ActionRow.month` holds them, so this list, a project's "Runs on" and the `usage.*`
+       sources read one month the same (`usage.ts`). A held call is in `held` and in no other count. */
     runs: { type: 'int' },
+    requests: { type: 'int' },
+    bytes: { type: 'int' },
     failures: { type: 'int' },
+    held: { type: 'int' },
   },
 };
+
+/** One action's counts for the month, zero where it has none: the five every place that counts an action reads. */
+export const monthOf = (a: ActionRow): { runs: number; requests: number; bytes: number; failures: number; held: number } => ({
+  runs: a.month.runs,
+  requests: a.month.requests,
+  bytes: a.month.bytes,
+  failures: a.month.failures,
+  held: a.month.held,
+});
 
 /** One action as a row a table or cards block draws. The key is its label, and `seq` is `null` because it is no register's row. */
 export const actionEntry = (a: ActionRow): Entry => ({
@@ -54,8 +68,7 @@ export const actionEntry = (a: ActionRow): Entry => ({
     last_outcome: a.last?.outcome ?? null,
     last_status: a.last?.status ?? null,
     last_note: a.last?.note ?? null,
-    runs: a.month.runs,
-    failures: a.month.failures,
+    ...monthOf(a),
   },
   state: a.state,
   version: 1,

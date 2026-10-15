@@ -2976,8 +2976,39 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "2.6.0",
+      "latest": "2.7.0",
       "versions": [
+        {
+          "version": "2.7.0",
+          "checksum": "be6a854da0fe2f7a0570090b47cf37170db8552501c2ac7b488356196dee484f",
+          "bytes": 42518,
+          "published_at": "2026-10-15T19:58:28.533Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [
+              "Numbers"
+            ],
+            "pages": [
+              "Today",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.6.0",
           "checksum": "33596a76ce724d22e0224a0abc6cd0b768a11938b2a611a4e2b93737f837b2d1",
@@ -3229,8 +3260,40 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "individual",
-      "latest": "2.5.0",
+      "latest": "2.6.0",
       "versions": [
+        {
+          "version": "2.6.0",
+          "checksum": "5af9097b503097022b1d72b6ee1c4d49bd4a3129c32b9b1508749f5432383d22",
+          "bytes": 32085,
+          "published_at": "2026-10-15T19:58:28.533Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core"
+            ],
+            "lists": [
+              "Savings goals",
+              "Goals",
+              "Log",
+              "Put by",
+              "Project steps"
+            ],
+            "pages": [
+              "Day to day",
+              "Goals",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "bill-reminder"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.5.0",
           "checksum": "3b2264260e09a04b2a248cef7b28eef37583dffa9ba2772b0ba4319fb1d03034",

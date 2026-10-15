@@ -25,6 +25,7 @@ import { censusOf, pathsOf, whollyWithheld, type BlockResult, type Census, type 
 import type { Refusal, Result } from '@braindog/ports';
 
 import { ROUND_MS, lintAnswer } from '../page-lint.ts';
+import { hostSourcesOf } from '../sources/index.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -66,7 +67,7 @@ const DASH_RULES: ReadonlySet<string> = new Set(['no-reading', 'only-a-dash']);
 const HELD: Refusal = { code: 'FORBIDDEN', fix: 'This reads a list you may not open.', at: 'source' };
 
 /** The sources that read across the whole record, which only a caller who reads it whole is shown (`ACROSS` in `index.ts`). */
-const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs']);
+const ACROSS: ReadonlySet<string> = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs', 'exceptions', 'usage.days', 'usage.actions', 'usage.projects', 'pages']);
 
 export function methods(deps: RecordDeps) {
   const { kernel, scoped, readable, no, clock } = deps;
@@ -117,6 +118,8 @@ export function methods(deps: RecordDeps) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const listed = kernel.pages().filter((p) => opens(ctx, p));
+      /* THE RECORD'S OWN SOURCES (`lists`, `pages`) ARE HANDED IN, so a page over one is counted as drawn, not refused. */
+      const hostSources = hostSourcesOf({ kernel, ctx, readable });
       /* THE PAGES SOMEBODY WROTE FIRST, then the pages each template made, so a round cut short has counted his own. */
       const order = [...listed.filter((p) => p.template === null), ...listed.filter((p) => p.template !== null)];
       const pages: PageCensus[] = [];
@@ -130,7 +133,7 @@ export function methods(deps: RecordDeps) {
         read += 1;
         let answer: PageResult;
         try {
-          const out = kernel.page(p.slug);
+          const out = kernel.page(p.slug, undefined, { hostSources });
           if (!out.ok) {
             undrawn.push(p.title);
             continue;

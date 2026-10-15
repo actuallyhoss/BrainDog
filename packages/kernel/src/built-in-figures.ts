@@ -467,7 +467,7 @@ const WHO_SAID = { agent: 'Agents', rule: 'Rules', you: 'You' } as const;
  * What each kind of write a feed holds is called, the words Activity says them in. A kind with no word here is said by
  * its key, which is a word already. The owner's kinds (keys, access, links) are never counted, so they need none.
  */
-const KIND_SAID: Readonly<Record<string, string>> = {
+export const KIND_SAID: Readonly<Record<string, string>> = {
   create: 'Created',
   edit: 'Changed',
   state: 'Moved',

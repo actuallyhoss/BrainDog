@@ -11,14 +11,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { install, normalise, plan, type Host, type Installed, type Pack } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 import { NOW, firstPartyManifest } from '../src/index.ts';
-import { modulesFor, useCase } from '../src/usecases/index.ts';
-import { carriedDocument, dayOf, homePageOf, moduleDocument } from '../src/usecases/install.ts';
+import { firstPartyModules } from '../src/module-info.ts';
+import { MODULE_ORDER, modulesFor, signalsIn, standsOn, useCase, useCaseDocument, type UseCase } from '../src/usecases/index.ts';
+import { carriedDocument, claimedBy, dayOf, fitted, homePageOf, moduleDocument } from '../src/usecases/install.ts';
+import { PEOPLE } from '../../../fixtures/names.ts';
 
 const TODAY = dayOf(NOW);
 const OWNER = { actor: 'p_1' };
@@ -62,8 +66,11 @@ async function put(k: Kernel, doc: unknown): Promise<void> {
   value(await install(pack, diff, hostFor(k), diff.planHash));
 }
 
-/** A Personal record made the way a first run makes one: its modules and its pack, and no example row in any list. */
-async function personal(): Promise<Kernel> {
+/**
+ * A Personal record made the way a first run makes one for a person who names someone, so People comes too: its modules
+ * and its pack, and no example row in any list. `version` makes it a record on an earlier version of the same pack.
+ */
+async function personal(version?: string): Promise<Kernel> {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   const u = useCase('personal')!;
   for (const m of modulesFor(u, ['people'])) {
@@ -72,7 +79,7 @@ async function personal(): Promise<Kernel> {
     await put(k, moduleDocument(u, m, { today: TODAY, holds }));
   }
   const carried = carriedDocument(u, TODAY, null);
-  if (carried) await put(k, carried);
+  if (carried) await put(k, version === undefined ? carried : { ...carried, version });
   return k;
 }
 
@@ -145,4 +152,117 @@ test('EACH FIRST ACT GOES ONCE ITS THING EXISTS: an account counted as cash, a s
   home = drawnOn(k);
   assert.equal(headed(home, MAKING).drawn, false, 'a live project ends the line that names one');
   for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+});
+
+/* ── a person's first day holds what the words point at (USE-B08 job 5, Personal 2.6.0) ───────────────────── */
+
+/**
+ * THE MODULES A SENTENCE POINTS AT, as the first run hears them (`modulesOf` in `apps/web/src/lib/start/propose.ts`,
+ * which this package cannot import): a module's own words heard outside what the use case claims for itself, then what
+ * the use case stands on (`modulesFor`) and what each of those leans on (`closeOver`). The first run adds People for a
+ * name it hears too; here People is pointed at by its own words.
+ */
+function pointedAt(u: UseCase, said: string): string[] {
+  const claimed = claimedBy(u, said);
+  const heard = firstPartyModules().filter((m) => signalsIn(said, m.signals).some((span) => !claimed(span))).map((m) => m.id);
+  const want = new Set(modulesFor(u, heard));
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const id of [...want])
+      for (const leans of firstPartyModules().find((m) => m.id === id)?.leans ?? [])
+        if (!want.has(leans)) (want.add(leans), (grew = true));
+  }
+  return MODULE_ORDER.filter((m) => want.has(m));
+}
+
+const listsOf = (m: string): string[] => firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []));
+const OWN = ['savings_goals', 'put_by', 'goals', 'goal_log', 'project_steps'];
+
+/** A Personal record a stranger's first run makes from one sentence: what it points at, then the pack cut to those lists. */
+async function fresh(said: string): Promise<{ k: Kernel; modules: string[]; lists: string[] }> {
+  const bare = held(await openRecord(openSqlite(), fixedClock(NOW)));
+  const k = await openRecord(openSqlite(), fixedClock(NOW));
+  const u = useCase('personal')!;
+  const modules = pointedAt(u, said);
+  for (const m of modules) await put(k, moduleDocument(u, m, { today: TODAY, holds: new Set([...held(k), ...listsOf(m)]) }));
+  const carried = carriedDocument(u, TODAY, said, { holds: new Set(held(k)) });
+  assert.ok(carried, 'Personal carries a pack');
+  await put(k, carried);
+  /* WHAT AN EMPTY RECORD HOLDS OF ITS OWN (the kernel's lists) is left out: it is there whatever was said. */
+  return { k, modules, lists: held(k).filter((l) => !bare.includes(l)).sort() };
+}
+
+/** Every list the record's copy of Home names: what it requires, a block's source and a list a line writes into. */
+const namedLists = (k: Kernel): string[] => {
+  const decl = k.declarations().find((d) => d.id === `page.${homePageOf('personal')}`);
+  assert.ok(decl, 'the record holds Home');
+  const body = String(decl.body);
+  return [...new Set([...body.matchAll(/"register\.([a-z_]+)"/gu), ...body.matchAll(/"register":"([a-z_]+)"/gu)].map((m) => m[1]!))].sort();
+};
+
+const SAID = 'I want my bills and my savings under control';
+
+test("FROM THE SENTENCE ALONE A PERSON'S FIRST DAY HOLDS MONEY, THE PROJECTS IT POINTS AT AND PERSONAL'S OWN LISTS, and no other", async () => {
+  const u = useCase('personal')!;
+  assert.deepEqual(standsOn(u), ['portfolio', 'money-core'], 'Money, and the Projects its bills and project steps point at');
+  const { k, modules, lists } = await fresh(SAID);
+  assert.deepEqual(modules, ['portfolio', 'money-core']);
+  assert.deepEqual(k.packs().map((p) => p.id).sort(), ['money-core', 'portfolio', 'usecase-personal']);
+  assert.deepEqual(lists, [...listsOf('portfolio'), ...listsOf('money-core'), ...OWN].sort());
+  assert.ok(!lists.includes('people'), 'nobody was named, so People is offered later and not installed');
+});
+
+test("ITS HOME NAMES ONLY THE LISTS IT HOLDS, opens on the money, and draws all three first acts with nothing refused", async () => {
+  const { k, lists } = await fresh(SAID);
+  assert.deepEqual(namedLists(k).filter((l) => !lists.includes(l)), [], 'Home names a list the record does not hold');
+  const home = drawnOn(k);
+  for (const b of home) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+  /* THE FIRST TILE IS THE LINE SAID FROM MONEY'S FIGURES. */
+  const first = home.find((b) => b.drawn !== false);
+  assert.ok(first && first.kind === 'note' && first.heading === undefined, `Home opens on ${first?.kind} ${first?.heading}`);
+  for (const h of [MONEY_IN, SAVING, MAKING]) assert.notEqual(headed(home, h).drawn, false, `${h} is not drawn on a fresh record`);
+});
+
+test("WORDS THAT POINT AT PEOPLE BRING PEOPLE, with Personal's own roles laid on it", async () => {
+  const said = `I want my bills under control, and my accountant ${PEOPLE[3]!.name} to see them`;
+  const { k, modules, lists } = await fresh(said);
+  assert.deepEqual(modules, ['portfolio', 'people', 'money-core']);
+  assert.ok(lists.includes('people'));
+  const people = k.declarations().find((d) => d.id === 'register.people');
+  assert.ok(people && String(people.body).includes('"family"'), "Personal's roles are laid on People");
+  for (const b of drawnOn(k)) assert.deepEqual(b.refusals ?? [], [], `${b.heading} was refused`);
+});
+
+/**
+ * A RECORD MADE BEFORE KEEPS EVERYTHING IT HOLDS. 2.6.0 declares what the published 2.5.0 declares, word for word (the
+ * frozen file in the catalogue), so a record on 2.5.0 takes it as a version and nothing else, planned in the order the
+ * record plans an update (`planFile` in `packages/record/src/usecase.ts`): what it stands on and lacks, then its pack cut
+ * to what the record holds.
+ */
+test('A RECORD ON 2.5.0 TAKES 2.6.0 AND LOSES NOTHING, in the order the record plans an update', async () => {
+  const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/personal/2.5.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: unknown; extends: unknown } };
+  const u = useCase('personal')!;
+  const next = carriedDocument(u, TODAY, null)!;
+  assert.equal(frozen.version, '2.5.0');
+  assert.deepEqual([next.declarations, next.extends], [frozen.pack.declarations, frozen.pack.extends], '2.6.0 declares what the published 2.5.0 declares');
+  assert.equal(useCaseDocument('personal', TODAY)?.version, '2.6.0');
+
+  const k = await personal('2.5.0');
+  const lists = held(k).sort();
+  const pages = k.declarations().filter((d) => d.kind === 'page').map((d) => d.id).sort();
+  value(k.create('savings_goals', { name: 'A week by the sea', target: { amount: 80_000, currency: 'GBP' } }, OWNER));
+
+  assert.deepEqual(standsOn(u).filter((m) => !k.packs().some((p) => p.id === m)), [], 'nothing it stands on is missing');
+  const doc = fitted(next, new Set(held(k)));
+  assert.deepEqual(doc, next, 'the record holds every list the pack reads, so nothing is cut');
+  const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
+  const diff = await plan(pack, stateOf(k));
+  assert.equal(diff.installed_version, '2.5.0');
+  assert.deepEqual({ adds: diff.adds.length, changes: diff.changes.length, retires: diff.retires.length, conflicts: diff.conflicts.length }, { adds: 0, changes: 0, retires: 0, conflicts: 0 });
+  value(await install(pack, diff, hostFor(k), diff.planHash));
+
+  assert.equal(k.packs().find((p) => p.id === 'usecase-personal')?.version, '2.6.0');
+  assert.deepEqual(held(k).sort(), lists, 'every list is still held');
+  assert.deepEqual(k.declarations().filter((d) => d.kind === 'page').map((d) => d.id).sort(), pages, 'every page is still there');
+  assert.equal(k.count('savings_goals'), 1, 'the goal is still there');
 });

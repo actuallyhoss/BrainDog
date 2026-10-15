@@ -112,7 +112,7 @@ const held = (k: Kernel): string[] => (k.declarations() as { id: string; kind: s
 async function made(id: string): Promise<{ k: Kernel; sql: NodeSql }> {
   const u = useCase(id)!;
   const { k, sql } = await record();
-  for (const m of modulesFor(u, ['people'])) {
+  for (const m of modulesFor(u, ['people', ...u.modules])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));

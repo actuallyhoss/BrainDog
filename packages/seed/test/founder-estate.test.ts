@@ -75,7 +75,7 @@ async function put(k: Kernel, doc: unknown): Promise<void> {
 async function founder(): Promise<Kernel> {
   const k = await opened();
   const u = useCase('founder')!;
-  for (const m of modulesFor(u, ['people'])) {
+  for (const m of modulesFor(u, ['people', ...u.modules])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: true }));
@@ -192,7 +192,7 @@ test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither 
   assert.deepEqual(refused.unresolved.map((x) => x.register), ['services'], 'the new project page and Home ask for the list Estate brings');
 
   /* THE ORDER `planFile` TAKES: each module the use case names and the record lacks, then the use case's own pack. */
-  const lacking = modulesFor(u).filter((m) => !k.packs().some((p) => p.id === m));
+  const lacking = modulesFor(u, u.modules).filter((m) => !k.packs().some((p) => p.id === m));
   assert.deepEqual(lacking, ['estate'], 'the step offers exactly one module');
   const holds = new Set([...held(k), 'services']);
   await put(k, moduleDocument(u, 'estate', { today: TODAY, holds, examples: true }));

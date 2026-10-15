@@ -268,12 +268,15 @@ const SHAPES: Record<string, string> = {
 const noRovingStop = (t: string): string =>
   t.replace(/<span [^>]*>/gu, (tag) => (tag.includes('role="gridcell"') ? tag.replace(/ tabindex="(?:0|-1)"/u, '') : tag));
 
+/* A LONG BLOCK OF CARDS (`most.ts`): the app's "Show all N" and the export's "and N more" are the one difference, pinned in `most.test.ts`. */
+const noShowAll = (t: string): string => t.replace(/<button [^>]*class="cards-all"[^>]*>Show all \d+<\/button>/u, '').replace(/<p class="cards-more">and \d+ more<\/p>/u, '');
+
 for (const [name, src] of Object.entries(SHAPES)) {
   test(`the two renderers draw one tree: ${name}`, () => {
     const block = page(src);
     const svelte = tree(render(Block, { props: { block } }).body);
     const html = tree(toHTML([block]));
-    assert.equal(noRovingStop(svelte), noRovingStop(html));
+    assert.equal(noShowAll(noRovingStop(svelte)), noShowAll(noRovingStop(html)));
   });
 }
 

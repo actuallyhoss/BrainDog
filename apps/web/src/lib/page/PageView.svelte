@@ -319,6 +319,11 @@
      one block for each it declares, and a body nobody installed yet is installed by the first Done. */
   const shell = $derived(route.data as unknown as Shell);
 
+  /* THE HEAD IS KNOWN BEFORE THE RECORD ANSWERS (EXP-D04): the rail already holds this page's name and glyph, so while
+     its blocks read the head is drawn from that entry and bars stand only where the blocks go. A page the rail does not
+     hold (one past its budget, or opened by its address alone) waits with the head's bar as before. */
+  const railed = $derived(mode === 'page' && got === null ? ((shell?.nav ?? []).find((n) => n.id === slug) ?? null) : null);
+
   /* ── the reader's mark ─────────────────────────────────────────────────────
      A PAGE THAT DRAWS WHAT IS NEW SINCE THE MARK STAMPS THE MARK WHEN THE READER LEAVES IT (PGS-C02), through the one
      stamp Home and Activity use (`read-mark.ts`): one mark a visit, and a mark that did not land is tried at the next
@@ -558,14 +563,22 @@
 </script>
 
 <svelte:head>
-  {#if mode === 'page'}<title>{titleOf(live?.page.page.title)}</title>{/if}
+  {#if mode === 'page'}<title>{titleOf(live?.page.page.title ?? railed?.title)}</title>{/if}
 </svelte:head>
 
 <svelte:window {onkeydown} />
 
 {#if got === null}
-  <!-- Bars until the record answers. -->
-  <Waiting head={mode === 'page'} />
+  {#if railed}
+    <!-- THE HEAD FROM THE RAIL'S OWN ENTRY, AND BARS ONLY FOR THE BLOCKS, until the record answers. -->
+    <div class="hosted">
+      <PageHead icon={railed.icon} hue={railed.hue} title={railed.title} />
+      <div class="waiting-body"><Waiting /></div>
+    </div>
+  {:else}
+    <!-- Bars until the record answers. -->
+    <Waiting head={mode === 'page'} />
+  {/if}
 {:else if got.from === 'refused'}
   <div class="said">
     <Empty kind="error" heading title={got.fix}>
@@ -645,6 +658,10 @@
           value={searched}
           oninput={(e) => onsearch(param, e.currentTarget.value)}
         />
+        <!-- HOW MANY THE WORD FOUND across the page's lists, beside the field, said when it changes. -->
+        {#if declared.searched}
+          <span class="head-found" aria-live="polite">{HEAD_WORDS.found(declared.searched.found)}</span>
+        {/if}
       {/if}
     </div>
   {/snippet}
@@ -790,6 +807,11 @@
     transition: padding-inline-end var(--d-panel) var(--ease-sheet);
   }
 
+  /* The blocks' bars stand in the board's gutter, where the first tile will be. */
+  .waiting-body {
+    padding: var(--sp-4) var(--gutter) var(--sp-8);
+  }
+
   /* ── a home's page menu ───────────────────────────────────────────────────
      AT THE BODY'S TOP END, raised into the space over it, where a page at its own address has its ⋯ in the head. Not
      drawn at rest: it comes in while the pointer is anywhere on the page or focus is in it, and stays while its menu is
@@ -920,6 +942,10 @@
     flex: 1 1 14rem;
     max-inline-size: 24rem;
     min-inline-size: 0;
+  }
+
+  .head-found {
+    color: var(--ink2);
   }
 
   /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID, inside the page's own gutter, so it sits where the page

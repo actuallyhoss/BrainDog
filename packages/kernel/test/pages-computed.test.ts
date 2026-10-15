@@ -437,7 +437,7 @@ test('AN `actions` BLOCK LISTS THE RECORD’S SCHEDULED ACTIONS, keys by label, 
     state,
     next: state === 'paused' ? null : '2026-09-09T13:00:00.000Z',
     last: { at: '2026-09-09T11:00:00.000Z', outcome: 'ok', status: 200, note: '' },
-    month: { runs: 3, requests: 3, bytes: 90, failures: 1, held: 0 },
+    month: { runs: 3, requests: 3, bytes: 90, ms: 0, failures: 1, held: 0 },
     days: [],
   });
   const deps: PageDeps = { ...depsOver(k, sql), actions: () => [action('balance', 'pending', null), action('kiln_status', 'paused', 'Kiln')] };

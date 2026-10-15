@@ -386,6 +386,11 @@ test('A CARD THAT WOULD RUN PAST 150 WORDS IS CUT TO 150, and line one and the s
  */
 test('A TASK HANDED TO THE AGENT LEADS ITS NEXT LINE, before the step', async () => {
   const h = await record(shipped!);
+  /* WORK COMES WHEN TASKS ARE MENTIONED (founder 2.7.0 says `needs`), so it is added here, as a person adding it would. */
+  const work = await h.owner.call<{ id: string }>('propose', { question: 'Install Work?', body_kind: 'pack', body: { install: 'work' } });
+  assert.ok(work.ok, `Work could not be offered on the Worker: ${JSON.stringify(work)}`);
+  const took = await h.owner.call('decide', { id: work.value.id, decide: { option: 'accept', reason: 'tasks for the agent' } });
+  assert.ok(took.ok, `Work would not install on the Worker: ${JSON.stringify(took)}`);
   const task = await h.owner.create({ register: 'tasks', fields: { what: 'Proof the release notes for Kiln', agent: 'claude' } });
   assert.ok(task.ok, `a task could not be handed to the agent: ${JSON.stringify(task)}`);
   await leaves(run(h, 'run-a'), 'run-a', STEP);

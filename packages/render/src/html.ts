@@ -61,6 +61,7 @@ import { hueOf } from './cards.ts';
 import { pathRest, pathShort } from './path.ts';
 import type { Block, Degraded, Markdown, Row, Segment } from './parse.ts';
 import { actionLabels } from './actions.ts';
+import { moreSaid, mostOf, type MostKeys } from './most.ts';
 
 export type RenderOptions = InlineOptions & {
   /**
@@ -1111,7 +1112,11 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
   const drawn = (r: Row, i: number): string => renderInline(inline(r.cells[i] ?? '', o), o);
   const labelled = (i: number): string => (label(i) ? `<span class="cards-label">${escape(label(i))}</span>` : '');
 
+  /* A LONG BLOCK DRAWS ITS FIRST SIX (`mostOf`) and says how many it left out, with nothing to press: the app draws the
+     same six and a "Show all" that opens the rest in place (`Cards.svelte`). */
+  const most = mostOf(b as Block & MostKeys, rows.length);
   const body = rows
+    .slice(0, most.shown)
     .map((r, n) => {
       /* A MARK THAT NAMES A PICTURE IS THE PICTURE, and one that names none is the title's letter, never the first letter
          of the picture's name ("C Crumb.gg"); `Cards.svelte` draws the same slot (`markOf`, `markGlyphOf`). */
@@ -1193,7 +1198,8 @@ function cards(b: Block, o: RenderOptions & { runs?: readonly (RunCell | null)[]
       return `<li class="cards-item"${leading}${toneAttrs(r.tone)}${quiet}${tinted}>${picture}<div class="cards-head">${lead}${name}${toneGlyph(r.tone)}${when}</div>${reply}${helpers}${middle}${facts}${next}${who}</li>`;
     })
     .join('');
-  return `<ul class="cards-grid" data-cards="${cardsCount(rows.length)}">${body}</ul>`;
+  const more = most.more > 0 ? `<p class="cards-more">${escape(moreSaid(most.more))}</p>` : '';
+  return `<ul class="cards-grid" data-cards="${cardsCount(most.shown)}">${body}</ul>${more}`;
 }
 
 /**

@@ -419,8 +419,17 @@ export const FOUNDER = {
      AND EACH PAGE SAYS WHERE ITS THING WAS SEEN (ENG-B03, batch 91). A project's page, and People's pages for an
      organisation and a person, end with "Where it was seen", a section naming `panel: seen`, under which the app draws
      the notes, runs and rows that name it, newest first, from the record's `about` read. Three blocks added, nothing
-     taken away, so still inside the unreleased 2.6.0. */
-  version: '2.6.0',
+     taken away, so still inside the unreleased 2.6.0.
+
+     2.7.0, A FOUNDER'S FIRST DAY HOLDS WHAT THE WORDS POINT AT (USE-B08 job 5; "make sure that the braindog experience
+     is not overwhelming for new users", W.149). `needs` is Projects and Money: a fresh record installs those two, then
+     People for a name, Services for domains or renewals and Work for tasks, each only when the sentence points at it,
+     and the rest is offered when its moment comes. Day 0 opened on eighteen lists. Home already leads from the money
+     and the numbers, this pack's own list; a block over a list the record does not hold is cut at install (`fitted`),
+     Lapsing among them. 2.6.0 is published in the catalogue and frozen, and the file it shares changes (`needs`), so
+     this is a version beside it. Nothing is declared, taken away or reworded, so a record on 2.6.0 keeps every list and
+     page it holds. */
+  version: '2.7.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -434,6 +443,10 @@ export const FOUNDER = {
     'signups', 'churn', 'runway', 'balances', 'my apps', 'my products', 'launch', 'launched', 'shipping',
   ],
   modules: ['portfolio', 'people', 'money-core', 'estate', 'work'],
+  /* WHAT A FOUNDER CANNOT STAND WITHOUT, SINCE 2.7.0: the projects and the money across them. People, Services and Work
+     come when the sentence points at them (`modulesFor`), and Services is still one of `modules`, so a founder who
+     names a domain or a renewal has it on the first day (the default taken for him, scope USE-B08's critic note). */
+  needs: ['portfolio', 'money-core'],
   voice: {
     home: 'Today',
     right_now: 'The numbers',

@@ -46,6 +46,7 @@ import FEED from '@braindog/pack-live-feed/live-feed.pack.json' with { type: 'js
 
 import { TOOLS, type AdapterFetch, folderCatalogue, gatherAsks, holdsKey, isRef, loadAdapter, loadMap, packFrom, type CatalogueRead, type ImportMap, type Offer, type Plan, type PlannedRow, type Settled, type Skipped } from './adapter.ts';
 import { askToRun, fetchAdapter, type Asker } from './adapter-fetch.ts';
+import { decideLink } from './links.ts';
 import { hostCatalogueFor, hostKeys } from './catalogue.ts';
 import { keysOfRow, meeter, metOf, sameName, type Meeting } from './people.ts';
 import type { AgentIo } from './skills.ts';
@@ -244,7 +245,7 @@ export type Report = {
    * THIS AND `waiting` ARE OPTIONAL ONLY FOR A REPORT WRITTEN OUT BY HAND, which a test of `said` does; `applyPlan`
    * always sets both, and every reader takes a missing one as empty.
    */
-  questions?: { label: string; question: string }[];
+  questions?: { label: string; question: string; id?: string }[];
   /**
    * Each question the old tool has answered or put away that an earlier run asked here and nobody has answered on Decide:
    * `answer` is what the old tool did with it, `decided there as D5` or `dismissed there`. See `Settled`.
@@ -1666,7 +1667,9 @@ export async function applyPlan(
         continue;
       }
       report.asked++;
-      questions.push({ label: ask.label, question: ask.question });
+      /* THE QUESTION'S ID, KEPT FROM THE PROPOSE ANSWER, so the report can print the link that opens it on Decide. */
+      const id = isObj(done.value) && typeof done.value.id === 'string' ? done.value.id : undefined;
+      questions.push({ label: ask.label, question: ask.question, ...(id === undefined ? {} : { id }) });
     }
   }
   /* A QUESTION SETTLED IN THE OLD TOOL THAT IS STILL OPEN HERE, said with what to do: see the adapter's `settled`. Only one this
@@ -1833,7 +1836,7 @@ const unfiledSaid = (rows: Unfiled[], name: (register: string) => string, dryRun
 const waitingSaid = (w: Waiting): string => `${w.label}${w.question ? `, ${w.question}` : ''}, ${w.answer}.`;
 
 /** The report as the lines a person reads. */
-export function said(report: Report, o: { dryRun: boolean; file: string }): string[] {
+export function said(report: Report, o: { dryRun: boolean; file: string; to?: Pick<Target, 'key'> }): string[] {
   const { plan } = report;
   const words = report.words ?? plainWords(plan);
   const name = (register: string) => nameIn(words, register);
@@ -1854,6 +1857,12 @@ export function said(report: Report, o: { dryRun: boolean; file: string }): stri
     lines.push(`${name(register)}: ${String(t.added)} ${verb}added, ${String(t.updated)} ${verb}updated, ${String(t.unchanged)} unchanged.`);
   }
   if (plan.asks.length > 0) lines.push(`Decide: ${String(report.asked)} ${o.dryRun ? 'would be asked' : 'asked'}, ${String(report.alreadyAsked)} asked before.`);
+  /* EACH QUESTION FILED PRINTS THE LINK THAT OPENS IT ON DECIDE (`decideLink`), as skills sync and tools scan do; with
+     no host that names a record, or no id, the count above is all that is said. */
+  for (const q of report.questions ?? []) {
+    const link = o.to !== undefined && q.id !== undefined ? decideLink(o.to, q.id) : null;
+    if (link !== null) lines.push(`- ${q.label}, ${q.question} ${link}`);
+  }
   if (report.home) {
     const { currencies, asked, proposed } = report.home;
     const holds = `This import holds money in ${and(currencies)}, and this BrainDog has no home currency to add it up in.`;
@@ -2043,7 +2052,7 @@ export function runOf(report: Report, o: { at: string; host: string; file: strin
     updated: report.changes.filter((c) => !turnedDown.has(`${c.register}\n${c.label}`)).map((c) => ({ register: c.register, label: c.label, fields: c.fields })),
     refused: [...report.refused, ...report.clashes.map((c) => ({ register: 'categories', label: c.label, fix: c.fix }))],
     skipped: report.plan.skipped,
-    asked: report.questions ?? [],
+    asked: (report.questions ?? []).map(({ label, question }) => ({ label, question })),
     retired: report.retired,
     waiting: report.waiting ?? [],
     deleted: report.deleted ?? [],
@@ -2694,7 +2703,7 @@ export async function importCommand(args: string[], io: ImportIo, given?: string
     throw e;
   }
   report.unread = unread;
-  for (const line of said(report, { dryRun: values['dry-run'] === true, file })) io.out(line);
+  for (const line of said(report, { dryRun: values['dry-run'] === true, file, to })) io.out(line);
   /**
    * AND ONCE ITS LAST WRITE HAS ANSWERED, THE RUN IS ENDED `done`, named by the export it carried.
    *

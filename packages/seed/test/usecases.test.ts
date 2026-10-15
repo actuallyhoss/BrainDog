@@ -69,7 +69,7 @@ test('EACH CARRIED PACK INSTALLS ON AN EMPTY RECORD after its modules, with its 
     /* EACH MODULE FITTED TO THE LISTS THE RECORD HOLDS ONCE IT IS IN, as onboarding fits it (`moduleDocument`): Shop
        stands on People alone, and People's link to Projects refused it. */
     const holds = new Set<string>();
-    for (const id of modulesFor(u)) {
+    for (const id of modulesFor(u, u.modules)) {
       if (id === 'agents') continue;
       for (const p of firstPartyManifest(id as never)?.provides ?? []) if (p.startsWith('register.')) holds.add(p.slice(9));
       value(await put(k, firstPartyDocument(id, { holds: [...holds] })));
@@ -112,7 +112,7 @@ test('THE PROPOSAL SAYS WHICH PAGES AND SECTIONS IT MAKES', () => {
   assert.deepEqual(pagesOf(useCase('shop')!), [{ page: 'orders', title: 'Orders', section: 'Orders' }]);
   assert.deepEqual(pagesOf(useCase('business')!), []);
   assert.deepEqual(modulesFor(useCase('student')!, ['people']), ['people']);
-  assert.deepEqual(modulesFor(useCase('founder')!, ['estate']), ['portfolio', 'people', 'money-core', 'estate', 'work']);
+  assert.deepEqual(modulesFor(useCase('founder')!, ['estate']), ['portfolio', 'money-core', 'estate']);
 });
 
 const SENTENCES: [string, string | null][] = [
@@ -211,7 +211,7 @@ test('THE SAME WORDS ALWAYS RANK THE SAME, and each reason is a phrase of what w
 test('EVERY LABEL NAMES A LIST, FIELD OR VALUE THAT THE USE CASE INSTALLS', () => {
   let some = 0;
   for (const u of USE_CASES) {
-    const declared = [...modulesFor(u).filter((id) => id !== 'agents').map((id) => firstPartyDocument(id)), useCaseDocument(u.usecase)]
+    const declared = [...modulesFor(u, u.modules).filter((id) => id !== 'agents').map((id) => firstPartyDocument(id)), useCaseDocument(u.usecase)]
       .flatMap((doc) => ((doc?.declarations ?? []) as Record<string, unknown>[]))
       .filter((d) => typeof d.register === 'string' && Array.isArray(d.fields));
     for (const key of Object.keys(u.labels)) {

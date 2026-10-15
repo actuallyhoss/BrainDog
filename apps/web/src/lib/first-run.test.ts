@@ -23,7 +23,9 @@ test('ONE SENTENCE GIVES THE WHOLE PROPOSAL: the name, the use case, the modules
   assert.equal(p.name, 'Sami');
   assert.equal(p.usecase, 'founder');
   const founder = USE_CASES.find((u) => u.usecase === 'founder')!;
-  for (const m of founder.modules) assert.ok(p.modules.includes(m), `the founder stands on ${m}, and it is not proposed`);
+  for (const m of founder.needs ?? founder.modules) assert.ok(p.modules.includes(m), `the founder stands on ${m}, and it is not proposed`);
+  /* NOTHING SAID POINTS AT SERVICES OR TASKS, SO NEITHER COMES (founder 2.7.0 `needs`): each is offered at its moment. */
+  for (const m of ['estate', 'work']) assert.ok(!p.modules.includes(m), `${m} is proposed, and nothing said points at it`);
   assert.ok(p.heard.length > 0, 'nothing was said back');
   for (const h of p.heard) {
     assert.ok('Sami, I run a few companies and I send invoices'.includes(h.phrase), `${h.phrase} is not a phrase of the sentence`);

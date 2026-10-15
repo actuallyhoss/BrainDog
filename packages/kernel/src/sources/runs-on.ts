@@ -16,7 +16,7 @@ import { evaluate } from '@braindog/where';
 import type { Json } from '../coerce.ts';
 import type { Entry } from '../index.ts';
 import type { BlockResult, PageBlock, PageDeps, SourceKit } from '../pages.ts';
-import { actionEntry } from './actions.ts';
+import { actionEntry, monthOf } from './actions.ts';
 import type { Also, Source } from './index.ts';
 
 /**
@@ -29,6 +29,10 @@ import type { Also, Source } from './index.ts';
  * `used_runs` AND `used_agents` SAY WHO USED IT, AND HOW OFTEN, over ninety days (AGT-D12): how many runs, and the agents
  * of those runs by name, newest first and three at most, "Claude Code, Codex". `used_agent` stays beside them, the one
  * agent of the run that used it last, for the pages that name it. A thing nobody used has 0 and nothing.
+ *
+ * `runs`, `requests`, `bytes`, `failures` AND `held` ARE A SCHEDULED ACTION'S MONTH, the same numbers from the same row
+ * as the `actions` read and the `usage.*` sources (`monthOf`), so a project's page and the usage page cannot disagree.
+ * An action with no runs has zeros; a key, a tool or a skill is no action and has nothing.
  */
 const RUNS_ON: Schema = {
   register: 'runs_on',
@@ -45,8 +49,16 @@ const RUNS_ON: Schema = {
     used_agents: { type: 'text' },
     spoken: { type: 'text' },
     quiet: { type: 'text' },
+    runs: { type: 'int' },
+    requests: { type: 'int' },
+    bytes: { type: 'int' },
+    failures: { type: 'int' },
+    held: { type: 'int' },
   },
 };
+
+/** What a row that is no action holds in the month's counts: nothing, since only an action runs. */
+const NO_MONTH = { runs: null, requests: null, bytes: null, failures: null, held: null };
 
 /**
  * The lists `runs_on` reads, in the order it draws them, each with what one of its rows is called there and the field
@@ -197,6 +209,7 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
           used_agents: agentsNamed(used.runs),
           spoken: r.seq === null ? r.id : `${list.register}#${r.seq}`,
           quiet: scope === 'global' ? 'global' : null,
+          ...NO_MONTH,
         },
       };
     };
@@ -212,7 +225,7 @@ function runsOnBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: 
     if (scope === null) continue;
     acts[scope].push({
       ...actionEntry(a),
-      fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_agent: null, used_at: null, used_runs: 0, used_agents: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null },
+      fields: { kind: 'action', name: a.ingest, scope, state: a.state, detail: a.next, used_by: null, used_agent: null, used_at: null, used_runs: 0, used_agents: null, spoken: a.ingest, quiet: scope === 'global' ? 'global' : null, ...monthOf(a) },
     });
   }
   const all = [...own, ...acts.project.sort(byName), ...everywhere, ...acts.global.sort(byName)];

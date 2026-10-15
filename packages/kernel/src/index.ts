@@ -480,7 +480,7 @@ export { KEEP_DAYS, causeOfFinder, finderOf, finders, registerFinder, staleNow, 
 /* WHAT A ROW IS AND WHERE IT WAS SEEN (ENG-B02, `about.ts`): the one read of a person, an organisation or a project, and the candidates a text may be about. */
 export { CANDIDATES, SEEN_KEPT, SEEN_SHOWN, aboutOf, aboutOfRow, candidatesFor, keysIn } from './about.ts';
 export type { About, AboutDeps, AboutKind, AboutLink, AboutSeen, Candidate as AboutCandidate, FoundBy, Handed, HandleRow } from './about.ts';
-export { lookFault } from './declare.ts';
+export { admitHostSources, lookFault } from './declare.ts';
 export {
   CHANNELS,
   carryingOf,
@@ -635,7 +635,7 @@ export type { Answered, Arrival, Arrived, Confidence, DoorLine, Extracted, Extra
 export type { CycleLine, ForecastDeps, Horizon, Leg, Runway, Step } from './forecast.ts';
 export type { DryRun, Fired, LinkTo, RuleAction, RuleDecl, RulesDeps, RulesOutcome } from './rules.ts';
 export type { Assembled, Channel, DigestDecl, DigestDeps, DigestPart, DigestSection, HeldNotice, Level, Sent } from './digest.ts';
-export type { BlockResult, DecidedQuestion, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
+export type { BlockResult, DecidedQuestion, HostSource, PageBlock, PageDecl, PageDeps, PageFilter, PageResult, PageRow, LastChange, RowChange, QueueCandidate, QueueOption, QueueQuestion, QuestionFacts } from './pages.ts';
 export { doesOf, type DoesNames } from './does.ts';
 export type { Aggregation, Crossed, DeclaredSign, EvalContext, FxRead, Group, Lookups, MetricDecl, Reading, Scored, Snapshot, TargetIn, TrendSaid, Value } from './metrics.ts';
 export type { BindGrantArgs, GrantKind, GrantRow, LeasedSeal, SealedGrant } from './vault.ts';
@@ -6165,6 +6165,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ...(deps.lists ? { lists: deps.lists } : {}),
       ...(deps.metrics ? { metrics: deps.metrics } : {}),
       ...(deps.packOf ? { packOf: deps.packOf } : {}),
+      /* AND THE SOURCES THE RECORD HANDS IN (`PageDeps.hostSources`), so one that reads across the record is named `*`. */
+      ...(deps.hostSources ? { hostSources: deps.hostSources } : {}),
       projects: () => [...registers.values()].find((r) => r.scopes !== undefined)?.id ?? null,
     };
   };
@@ -8300,9 +8302,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND THE RESOLVER GOES WITH IT, because a `stat` block names its registers through the metric
        declarations in its `cells` rather than through a `source` of its own. Without it a page made
        of figures named no register, was treated as prose, and was listed to everybody. */
-    pages: () => {
+    pages: (opts: { hostSources?: PageDeps['hostSources'] } = {}) => {
       /* ONE READ OF THE DECLARATIONS FOR EVERY PAGE (`declaredOnce`): each page asked every figure again. */
-      const deps = declaredOnce(pageDeps());
+      const deps = declaredOnce({ ...pageDeps(), ...(opts.hostSources ? { hostSources: opts.hostSources } : {}) });
       const near = beside(deps);
       return resolvePages(deps).map((p) => ({
         slug: p.slug,
@@ -8342,11 +8344,22 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     page: (
       slug: string,
       filter?: Readonly<Record<string, string>>,
-      opts: { walk?: number | 'last'; reader?: PageDeps['reader']; level?: string; readerIs?: PageDeps['readerIs']; runs?: ReadonlySet<string> } = {},
+      opts: {
+        walk?: number | 'last';
+        reader?: PageDeps['reader'];
+        level?: string;
+        readerIs?: PageDeps['readerIs'];
+        runs?: ReadonlySet<string>;
+        hostSources?: PageDeps['hostSources'];
+        actorName?: PageDeps['actorName'];
+      } = {},
     ): Result<PageResult> =>
       readPage(
         {
           ...pageDeps(),
+          /* WHAT THE RECORD READS THAT THE KERNEL CANNOT (`lists`, `pages`), and the names it holds for the people in the log. */
+          ...(opts.hostSources ? { hostSources: opts.hostSources } : {}),
+          ...(opts.actorName ? { actorName: opts.actorName } : {}),
           ...(opts.walk === undefined ? {} : { walk: opts.walk }),
           ...(opts.reader ? { reader: opts.reader } : {}),
           ...(opts.level === undefined ? {} : { level: opts.level }),
@@ -8374,12 +8387,18 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * ONLY FOR ONE SYNCHRONOUS WALK THAT WRITES NOTHING, which is the one thing that keeps a kept reading true: nothing can
      * change under it. Each reading is handed out as a copy, so a block that reshapes one never reshapes the next's.
      */
-    pageWalk: (): {
+    pageWalk: (
+      opts: { hostSources?: PageDeps['hostSources']; actorName?: PageDeps['actorName'] } = {},
+    ): {
       page: (slug: string, filter?: Readonly<Record<string, string>>) => Result<PageResult>;
       block: (decl: PageBlock, opts?: { here?: Entry }) => BlockResult;
       blockRegisters: (block: PageBlock) => string[];
     } => {
-      const base = declaredOnce(pageDeps());
+      const base = declaredOnce({
+        ...pageDeps(),
+        ...(opts.hostSources ? { hostSources: opts.hostSources } : {}),
+        ...(opts.actorName ? { actorName: opts.actorName } : {}),
+      });
       let built: VitalSign[] | undefined;
       let every: VitalSign[] | undefined;
       let rates: ReturnType<NonNullable<EvalContext['fx']>> | undefined;
@@ -8452,8 +8471,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     /* AND A SOURCE THAT SAYS SOMETHING OF EVERY LIST (`sources/index.ts` `everyList`) NAMES EACH LIST IT WATCHES, so a
        reader held from one of them is held from the block. `*` alone let her through when she had no ceiling. */
-    blockRegisters: (block: PageBlock): string[] => [
-      ...registersOfBlock(block, pageDeps().metric, beside()),
+    blockRegisters: (block: PageBlock, opts: { hostSources?: PageDeps['hostSources'] } = {}): string[] => [
+      ...registersOfBlock(block, pageDeps().metric, { ...beside(), ...(opts.hostSources ? { hostSources: opts.hostSources } : {}) }),
       ...(sourceModule(block.source)?.everyList ? watchedLists().map((l) => l.id) : []),
     ],
 

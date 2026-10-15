@@ -51,7 +51,7 @@ async function founder(): Promise<Kernel> {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   assert.ok(k.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'northwind', name: 'Northwind', tz: 'UTC', locale: 'en', owner: { id: 'p_1', email: 'founder@example.test', name: 'Ada' } }).ok);
   const u = useCase('founder')!;
-  for (const m of modulesFor(u, ['people'])) {
+  for (const m of modulesFor(u, ['people', ...u.modules])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     const pack = value<Pack>(await normalise(moduleDocument(u, m, { today: TODAY, holds, examples: true }), { kind: 'local' }));

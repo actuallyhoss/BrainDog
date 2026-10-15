@@ -82,7 +82,7 @@ async function put(k: Kernel, doc: unknown): Promise<void> {
 async function founder(): Promise<Kernel> {
   const k = await openRecord(openSqlite(), fixedClock(NOW));
   const u = useCase('founder')!;
-  for (const m of modulesFor(u, ['people'])) {
+  for (const m of modulesFor(u, ['people', ...u.modules])) {
     if (m === 'agents') continue;
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     await put(k, moduleDocument(u, m, { today: TODAY, holds, examples: false }));

@@ -1298,6 +1298,32 @@ function beatOn<C>(surface: McpSurface<C>, ctx: C): void {
   }
 }
 
+/** How long a run counts as working after it was last heard from, for `record_index`'s `live`: fifteen minutes. */
+const WORKING_S = 15 * 60;
+
+/**
+ * Who is working, for `record_index` (AGT-C20): how many runs were heard from in the last fifteen minutes, and the ones
+ * in the caller's own tree by name with their handle beside it, "Claude Code (S47)". `null` when none is working.
+ *
+ * FROM `boot`'S `sessions`, WHICH ARE `sessionsLive`'S OWN RUNS held to the caller, `same_repo` worked out from the
+ * caller's own hints (`sameTree`: the same machine and repository, never the caller's own run or its helpers). So the
+ * index asks no method it did not already ask, and a caller who may not read the runs is handed none and told nothing.
+ * A run that is idle or left a step for the next one is not working, whenever it was last heard from.
+ */
+function liveOf(sessions: unknown): { working: number; here: string[] } | null {
+  if (!Array.isArray(sessions)) return null;
+  const working = sessions.filter(
+    (r): r is Record<string, unknown> =>
+      isObject(r) && typeof r.age_s === 'number' && r.age_s <= WORKING_S && (r.presence === undefined || r.presence === 'working'),
+  );
+  if (working.length === 0) return null;
+  const here = working
+    .filter((r) => r.same_repo === true && typeof r.spoken === 'string')
+    /* ON THE CALLER'S OWN MACHINE, so the machine's name would say nothing: the app and the handle. */
+    .map((r) => `${runnerOf({ ...(isObject(r.fields) ? r.fields : {}), host: '' })} (${String(r.spoken)})`);
+  return { working: working.length, here };
+}
+
 /**
  * Run one tool, list the resources, read one.
  *
@@ -2218,11 +2244,13 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       );
       /* `.version.version`, BECAUSE `version` ANSWERS `33 §4`'s OBJECT and not a bare number. An
          agent holding the object as its cursor would send it back and get a range scan from nothing. */
+      const live = liveOf((boot.value as { sessions?: unknown }).sessions);
       const value = bare({
         ...(shell.record === undefined ? {} : { record: shell.record }),
         registers: shell.registers,
         ...(figures.length === 0 ? {} : { figures }),
         ...(version.ok ? { version: version.value.version } : {}),
+        ...(live === null ? {} : { live }),
       }) as Record<string, unknown>;
       return { result: { ok: true, value }, say: () => indexBrief(value) };
     },

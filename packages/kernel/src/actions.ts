@@ -1472,7 +1472,7 @@ export function resumeAction(deps: Pick<ActionDeps, 'sql' | 'mint' | 'nowMs'>, i
 
 /* ── the list a person reads ────────────────────────────────────────────── */
 
-type Totals = { runs: number; requests: number; bytes: number; failures: number };
+type Totals = { runs: number; requests: number; bytes: number; ms: number; failures: number };
 
 /**
  * One scheduled action, as the record's `actions` read answers it.
@@ -1602,8 +1602,8 @@ export function listActions(sql: Sql, nowMs: number): ActionRow[] {
         }
       }
 
-      const totals = { runs: 0, requests: 0, bytes: 0, failures: 0, held: 0 };
-      const days = Array.from({ length: upTo }, (_, i) => ({ day: `${month}-${String(i + 1).padStart(2, '0')}`, runs: 0, requests: 0, bytes: 0, failures: 0 }));
+      const totals = { runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0, held: 0 };
+      const days = Array.from({ length: upTo }, (_, i) => ({ day: `${month}-${String(i + 1).padStart(2, '0')}`, runs: 0, requests: 0, bytes: 0, ms: 0, failures: 0 }));
       /* THE COUNTS ONLY, TAKEN OUT IN SQL. A call's run carries its answer (`ANSWER_KEPT_BYTES`), and a month of a call
          every fifteen minutes is three thousand of them; the sum needs the outcome and the six numbers, so that is all
          that leaves the database. A `to_v` that is not JSON was never a run (`runOf`), and `json_valid` skips it before
@@ -1623,6 +1623,7 @@ export function listActions(sql: Sql, nowMs: number): ActionRow[] {
         totals.runs += u.runs ?? 0;
         totals.requests += u.requests ?? 0;
         totals.bytes += u.bytes ?? 0;
+        totals.ms += u.ms ?? 0;
         totals.failures += u.failures ?? 0;
         totals.held += u.held ?? 0;
         const day = days[Number(e.ts.slice(8, 10)) - 1];
@@ -1630,6 +1631,7 @@ export function listActions(sql: Sql, nowMs: number): ActionRow[] {
           day.runs += u.runs ?? 0;
           day.requests += u.requests ?? 0;
           day.bytes += u.bytes ?? 0;
+          day.ms += u.ms ?? 0;
           day.failures += u.failures ?? 0;
         }
       }

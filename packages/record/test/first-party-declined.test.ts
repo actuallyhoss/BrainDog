@@ -98,7 +98,7 @@ test('A CARRY THAT THROWS AFTER AN UPDATE WENT IN IS SAID, AND THE NIGHT GOES ON
  */
 const NOT_THE_FIVE: { pack: string; before: readonly string[]; off: string }[] = [
   { pack: 'agents', before: ['portfolio'], off: 'page.skill' },
-  { pack: 'usecase-founder', before: modulesFor(useCase('founder')!, ['people']).filter((m) => m !== 'agents'), off: 'page.dashboard' },
+  { pack: 'usecase-founder', before: modulesFor(useCase('founder')!, ['people', ...useCase('founder')!.modules]).filter((m) => m !== 'agents'), off: 'page.dashboard' },
 ];
 
 for (const { pack, before, off } of NOT_THE_FIVE)

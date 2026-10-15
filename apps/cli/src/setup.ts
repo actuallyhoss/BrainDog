@@ -589,7 +589,7 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
   else
     for (const dir of profiles) {
       const where = nameOf(dir, io.home);
-      const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir: dir, top: null, dryRun });
+      const lines = await syncSkills({ client: skills.client, context: skills.context, home: io.home, configDir: dir, top: null, dryRun, to: skills.to });
       if (lines.length > 0) changed = true;
       io.out(lines.length === 0 ? `5. Skills, Claude Code in ${where}: it already holds every skill as the record has it.` : `5. Skills, Claude Code in ${where}: ${dryRun ? 'what would be synced' : 'synced'}:`);
       detail(lines);

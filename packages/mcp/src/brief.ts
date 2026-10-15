@@ -781,7 +781,29 @@ export function indexBrief(value: Record<string, unknown>): string {
     const shown = figures.slice(0, 30);
     lines.push(`Figures, read with get: ${shown.join(', ')}${figures.length > shown.length ? `, and ${grouped(figures.length - shown.length)} more in format full` : ''}`);
   }
+  const live = liveLine(value.live);
+  if (live !== null) lines.push(live);
   return lines.join('\n');
+}
+
+/** How many runs `liveLine` names in this tree before it counts the rest. */
+const HERE_SHOWN = 3;
+
+/**
+ * `record_index`'s `live` as one line (AGT-C20): "2 agents working, one of them here: Claude Code (S47)", or `null` when
+ * none is working, so a record nobody works on says nothing of it. "Here" is the caller's own tree, the same machine and
+ * repository: the one place two runs overwrite each other.
+ */
+export function liveLine(live: unknown): string | null {
+  if (!isObject(live) || typeof live.working !== 'number' || live.working < 1) return null;
+  const n = live.working;
+  const here = Array.isArray(live.here) ? live.here.filter((h): h is string => typeof h === 'string' && h !== '') : [];
+  const head = `${counted(n, 'agent')} working`;
+  if (here.length === 0) return n === 1 ? `${head}, not here.` : `${head}, none of them here.`;
+  const shown = here.slice(0, HERE_SHOWN);
+  const names = here.length > shown.length ? `${shown.join(', ')} and ${grouped(here.length - shown.length)} more` : shown.length === 1 ? shown[0]! : `${shown.slice(0, -1).join(', ')} and ${shown.at(-1)!}`;
+  const which = n === 1 ? 'and it is here' : here.length === 1 ? 'one of them here' : `${grouped(here.length)} of them here`;
+  return `${head}, ${which}: ${names}.`;
 }
 
 /** `schema`: the list, then each field with its id, its label, its type and what it may take. */

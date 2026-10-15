@@ -1057,7 +1057,20 @@ const BLOCK_SOURCE = /^block\.\d{1,2}$/u;
  * code that answers by name (`sourceModule`). The one test a block's `source` is held to at install, said on its own so
  * a reader of an old version of a page can tell a source since taken out of the code (`pageVersions` in the record).
  */
-export const sourceKnown = (source: string): boolean => SOURCE.test(source) || BLOCK_SOURCE.test(source) || sourceModule(source) !== undefined;
+export const sourceKnown = (source: string): boolean =>
+  SOURCE.test(source) || BLOCK_SOURCE.test(source) || sourceModule(source) !== undefined || HOST_SOURCE_NAMES.has(source);
+
+/**
+ * THE SOURCES THE HOST READS THAT THE KERNEL CANNOT (`PageDeps.hostSources`), by name, such as `lists` and `pages`:
+ * admitted by the host that holds them (`admitHostSources`), so a page over one installs first try. A name of the code's
+ * own, as `sourceModule` finds it, is never shadowed: the reader asks the host only for a name no registered source answers.
+ */
+const HOST_SOURCE_NAMES = new Set<string>();
+
+/** Admit the names of the sources a host hands the page reader, so `sourceKnown` and the install know them. */
+export function admitHostSources(names: Iterable<string>): void {
+  for (const name of names) if (/^[a-z][a-z0-9_.-]{0,63}$/u.test(name)) HOST_SOURCE_NAMES.add(name);
+}
 
 /** A metric id as a page says it: `project-owed:Kiln` is one document read about one project. */
 const metricNamed = (said: string): string => said.split(':')[0] ?? '';
@@ -1670,6 +1683,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
       tone?: unknown;
       when?: unknown;
       fold?: unknown;
+      most?: unknown;
       icon?: unknown;
       heading?: unknown;
       empty?: unknown;
@@ -1909,6 +1923,8 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
     if (sayed) return bad('DECLARATION_INVALID', sayed.fix, `${at}.${sayed.at}`, sayed.allowed);
     if (kind !== 'cards' && kind !== 'feed' && block.fold !== undefined && typeof block.fold !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}.${at}'s fold is true or false: whether the section starts shut.`, at);
+    if ((kind === 'cards' || kind === 'series') && block.most !== undefined && !isInt(block.most, 1, 24))
+      return bad('DECLARATION_INVALID', `${id}.${at}'s most is how many it shows before "Show all", a whole number from 1 to 24.`, `${at}.most`);
     const grouped = kind === 'cards' || kind === 'table' ? cardGroupFault(id, at, raw as Readonly<Record<string, unknown>>, installed) : null;
     if (grouped) return grouped;
     if (block.icon !== undefined && (typeof block.icon !== 'string' || !GLYPH.test(block.icon)))

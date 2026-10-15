@@ -40,7 +40,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { costRows, rememberedLine, type Remembered } from '@braindog/kernel';
+import { admitHostSources, costRows, rememberedLine, type Remembered } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
@@ -223,6 +223,7 @@ import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
+import { HOST_SOURCES, hostSourcesOf } from './sources/index.ts';
 import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
 import { byMeaning } from './near.ts';
@@ -254,6 +255,10 @@ export type { EngineLedger, EngineLedgerRead } from './methods/engine-readings.t
 export { AGENT_ROLES, AGENT_LIST_FALLBACK, agentLists, fadeDays, fadeOf, listFor, noListSaid, type AgentRole } from './agent-lists.ts';
 import { fadeDays, fadeOf } from './agent-lists.ts';
 import { placesOf as railPlaces, type AddonNav, type Place } from './places.ts';
+
+/* THE RECORD'S OWN SOURCES (`lists`, `pages`) INSTALL FIRST TRY: the kernel's install knows their names (`admitHostSources`). */
+admitHostSources(Object.keys(HOST_SOURCES));
+
 export { engineReadings, OTHER as READINGS_OTHER, UNSAID as READINGS_UNSAID, type EngineReadings, type Braked, type AskReading, type LedgerCall, type OwedRead, type ReadingsOf } from './engine-readings.ts';
 export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_ROWS_MOST, type ChangePreviewed, type PreviewChangeArgs, type PreviewedPage } from './preview-change.ts';
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
@@ -4705,6 +4710,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * they are to it (its owner, a member signed in, an agent on a token, a link), and the verbs that run here. A caller
    * with no level on the record reads as `read`; the system reads as `read` and is named nobody.
    */
+  /**
+   * WHAT THE RECORD HANDS A PAGE READ MADE FOR A CALLER (PGS-A11): its own sources (`lists`, `pages`, `sources/index.ts`),
+   * made for this reader, and the name of whoever wrote a line of the log, as this reader may be told it (`namesFor`), or
+   * `null`, so an Activity page's who filter says People and never an id.
+   */
+  const pageHost = (ctx: CallContext): { hostSources: ReturnType<typeof hostSourcesOf>; actorName: (actor: string) => string | null } => {
+    let names: Record<string, string> | undefined;
+    return {
+      hostSources: hostSourcesOf({ kernel, ctx, readable }),
+      actorName: (actor) => {
+        names ??= namesFor(ctx) ?? {};
+        return Object.hasOwn(names, actor) ? names[actor]! : null;
+      },
+    };
+  };
+
   const pageCut = (ctx: CallContext): { level: string; readerIs?: 'owner' | 'member' | 'agent' | 'link'; runs: ReadonlySet<string> } => {
     const p = ctx.principal;
     if (p.kind === 'person') return { level: p.level ?? 'read', readerIs: p.level === 'owner' ? 'owner' : 'member', runs: RUNS };
@@ -4718,7 +4739,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * door's resources ask), so `pages` does not list a page that would open onto nothing but held blocks.
    */
   const drawnWithheld = (ctx: CallContext, slug: string): boolean => {
-    const read = kernel.page(slug, undefined, { reader: pageReader(ctx), ...pageCut(ctx) });
+    const read = kernel.page(slug, undefined, { reader: pageReader(ctx), ...pageCut(ctx), ...pageHost(ctx) });
     return read.ok && whollyWithheld(read.value.blocks as never);
   };
 
@@ -4736,7 +4757,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * `actions` both held those back from her. The record asks the source itself rather than waiting for `kernel.blockRegisters` to name something for it, so the
    * block is held whether or not the kernel's answer carries a name for the whole record.
    */
-  const ACROSS = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs', 'exceptions']);
+  const ACROSS = new Set(['activity', 'actions', 'governance.open', 'governance.later', 'governance.decided', 'signs', 'exceptions', 'usage.days', 'usage.actions', 'usage.projects', 'pages']);
 
   /**
    * The lists one block reads that `kernel.blockRegisters` may not name: each leg of a cash walk, and `session` for a
@@ -5058,17 +5079,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             fix:
               b.source === 'activity'
                 ? 'What happened across this BrainDog is shown to people who can read all of it.'
-                : b.source === 'actions'
+                : b.source === 'actions' || b.source.startsWith('usage.')
                   ? 'What this BrainDog does on a schedule is shown to people who can read all of it.'
                   : b.source === 'exceptions'
                     ? 'What went quiet across this BrainDog is shown to people who can read all of it.'
-                    : 'The questions asked across this BrainDog are shown to people who can read all of it.',
+                    : b.source === 'pages'
+                      ? 'The pages across this BrainDog are shown to people who can read all of it.'
+                      : 'The questions asked across this BrainDog are shown to people who can read all of it.',
             at: 'source',
           }
         : null;
     const beyond =
       log ??
-      [...kernel.blockRegisters(b), ...alsoReads(b)]
+      [...kernel.blockRegisters(b, { hostSources: hostSourcesOf({ kernel, ctx, readable }) }), ...alsoReads(b)]
         .map((register) => readable(ctx, register))
         .find((said) => said !== null) ??
       /* AND A LIST HER GRANT NARROWS TO SOME OF ITS ROWS (`wheres`), READ ANY WAY BUT AS THE BLOCK'S OWN ROWS: a figure
@@ -9276,7 +9299,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE READER GOES DOWN WITH THE ASK, so the kernel lays the look over the blocks as this caller is shown them: held
          as `heldBlock` holds them, with her own read mark on a feed. */
       const reader = pageReader(ctx);
-      let out = kernel.page(args.slug, filter, { ...reach, reader, ...pageCut(ctx) });
+      const host = pageHost(ctx);
+      let out = kernel.page(args.slug, filter, { ...reach, reader, ...pageCut(ctx), ...host });
       /* A FILTER IS HELD BY THE LISTS IT WAS COUNTED FROM, as a block is by the list it reads. The kernel counts every
          list the page's blocks read and names each link by its row's title, so a member invited to Tasks alone was handed
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
@@ -9286,7 +9310,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
         const kept = { ...filter };
         for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];
-        out = kernel.page(args.slug, kept, { ...reach, reader, ...pageCut(ctx) });
+        out = kernel.page(args.slug, kept, { ...reach, reader, ...pageCut(ctx), ...host });
       }
       /* AND THE OBSERVATION IS AFTER THE ANSWER, not before it. It ran first, on the caller's raw
          slug, so `GET /api/page?slug=<anything>` inserted a row keyed by whatever a reader typed and

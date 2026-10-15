@@ -20,12 +20,17 @@ const NAMED = (list: string): string =>
 
 export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>> = {
   personal: [
+    { version: '2.6.0', notes: 'A new Personal record starts with Money and the Projects it points at. People comes when you name someone, and anything else when you add it. A record you already have keeps everything it holds, and nothing on its pages changes.' },
     { version: '2.5.0', notes: 'A new Home has something to press. Until an account counts as cash, Bring your money in links to adding one, forwarding a bank message and add-ons for your bank. Until you keep a savings goal or have a project on the go, a line names the first one. Each goes once you have it.' },
     { version: '2.4.0', notes: 'The count of the budgets you have set is kept by Money now, so Home and Money read the same one. Nothing you see on Home changes.' },
     { version: '2.3.1', notes: NAMED('Ledger') },
   ],
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
+    {
+      version: '2.7.0',
+      notes: 'A new founder record starts with Projects and Money. Services comes when you mention domains or renewals, People when you name someone, and Work when you mention tasks, or any of them when you add it. A record you already have keeps everything it holds, and nothing on its pages changes.',
+    },
     {
       version: '2.6.0',
       notes: "Home is called Today. It says the money lasts the year if nothing due ends it, and what stopped reporting. Working now folds under Agents at work. Late has a table above Due this week. Lapsing drops Cost. A number can name its service; one dated after today is left out. A project page has a card per agent run that wrote something, six keys, tools and skills under Runs on with who used each, and money due in as Still to come in. A project, person or organisation page ends with where it was seen.",
