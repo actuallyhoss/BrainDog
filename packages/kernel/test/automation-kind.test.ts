@@ -1,7 +1,7 @@
 /**
  * What an agent's edit of an automation changes, inside the record or out of it (SHL-D15).
  *
- * "Only Sam in a browser turns on what runs unattended" (HD.359), and agents climb one kind of change at a time
+ * "Only Mara in a browser turns on what runs unattended" (HD.359), and agents climb one kind of change at a time
  * (section 37). So an edit that only renames a step or narrows a `when` is `automation.inside`, a kind the ladder may
  * grant, and one that adds a step reaching out, turns a rule on, raises a limit or changes what starts it stays on the
  * `outside` floor as `automation.reaches`.

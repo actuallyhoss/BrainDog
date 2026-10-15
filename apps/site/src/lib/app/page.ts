@@ -110,14 +110,19 @@ export function leadOf(src: string): string {
 export const said = (text: string): string => symbolText(text, true, HOME);
 
 /**
- * A BLOCK WITH ITS MONEY DRAWN AS THE APP DRAWS IT, for the drawers that print a cell as written. A stat already
- * says its figure and its note with a symbol, and a table keeps its codes, as a ledger does. A note says its
- * sentence the way a headline does. A progress row keeps its pence in every cell, `$245.10 of $300.00`, because
- * what is left is worked out from them (a goal of `$300` would say `$55 left` where `$54.90` is left), and a range's
- * high is its fourth cell, so `$50.00 to $120` would sit where `$50.00 to $120.00` belongs.
+ * A BLOCK WITH ITS MONEY DRAWN AS THE APP DRAWS IT. A note says its sentence the way a headline does. Every other
+ * block's cells say each stored amount the way the one writer does for the plans' home (`HOME`), exact: `$42.00`,
+ * never `USD 42.00`. A progress row keeps its pence in every cell, `$245.10 of $300.00`, because what is left is
+ * worked out from them (a goal of `$300` would say `$55 left` where `$54.90` is left), and a range's high is its
+ * fourth cell, so `$50.00 to $120` would sit where `$50.00 to $120.00` belongs.
+ *
+ * EVERY KIND, AND NOT ONLY THE TWO THAT PRINTED A CELL AS WRITTEN ONCE. Since the drawer was told the home (batch 101),
+ * a figure it works out is `$2,360.00`, while a timeline's line, an agent's step, a choice's price and a chart's own
+ * buckets still printed the source's `USD 2,840.00` beside it: one currency by its sign and by its code on one page
+ * (`two-spellings`, the layout gate). A table and a stat already wrote theirs through the writer, so saying them here
+ * first changes nothing they draw.
  */
 export function inSymbols(block: Block): Block {
   const each = (say: (c: string) => string): Block => ({ ...block, rows: block.rows.map((r) => ({ ...r, cells: r.cells.map(say) })) });
-  if (block.kind === 'note') return each(said);
-  return block.kind === 'progress' ? each((c) => symbolText(c, false, HOME)) : block;
+  return block.kind === 'note' ? each(said) : each((c) => symbolText(c, false, HOME));
 }

@@ -2,7 +2,7 @@
  * What an edit of an automation changes: only what happens inside the record, or something that reaches out of it.
  *
  * WHY THIS EXISTS (SHL-D15). Every accept that installs a rule, a script, a digest or an ingest is the owner's in a
- * browser, so an agent's renamed step waits exactly as a new call does. His words: "Only Sam in a browser turns on what
+ * browser, so an agent's renamed step waits exactly as a new call does. His words: "Only Mara in a browser turns on what
  * runs unattended" (HD.359), "(default: only egress change)" (H.514), and "Agents suggest by default and climb one kind
  * of change at a time" (section 37). So the record needs one fact it does not have: whether an edit of a rule changes
  * nothing outside the record (a step renamed, a `when` made narrower), which is a kind the ladder may grant one agent,

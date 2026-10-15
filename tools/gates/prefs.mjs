@@ -73,7 +73,7 @@ import { chromium } from '@playwright/test';
 
 import { ACCENTS } from '../../packages/theme/src/record.ts';
 import { APP_BASE, appShell, budget, openPage, readiness } from './lib.mjs';
-import { answers, forward, forwards, startRecord } from './record.mjs';
+import { answers, forward, forwards, serverKeyFor, startRecord } from './record.mjs';
 
 /* AND WHY THIS GATE NEEDS `builds` AND NOT `web-build`, although it drives a browser like the four
    that declare `web-build`. `52 §5.1` step 2 lets the runner refuse a gate whose prerequisite is
@@ -92,6 +92,26 @@ export const needs = ['builds'];
    are without a browser (PRF-B03 step 3). `ledger.json` holds `prefs.UNCOVERED` at its newest line: the list only
    shrinks, and a fall is a line written there. */
 export const UNCOVERED = new Set(['theme', 'chars', 'seen', 'columns', 'defined']);
+
+/**
+ * Set a look as the record's own, as Settings > Appearance does (`setDeclaration`), with the gate's key.
+ *
+ * THE LOOK IS AN ADD-ON'S, READ OUT OF `packs/harbour-look` AND NOT SPELT HERE, for the reason `look.accent` gives:
+ * a palette written into this file would outlive the look it named. A refusal throws in the record's words, because
+ * `look.theme` measured on a record with no look would call a working key dead.
+ */
+async function ownLook(root, record) {
+  const pack = JSON.parse(await readFile(join(root, 'packs', 'harbour-look', 'harbour-look.pack.json'), 'utf8'));
+  const body = pack.declarations.find((d) => typeof d?.theme === 'string');
+  const said = await fetch(new URL('/api/setDeclaration', record.base), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${serverKeyFor(record.base)}` },
+    body: JSON.stringify({ body }),
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+  if (said?.ok !== true) throw new Error(`the fresh record would not take a look of its own: ${said?.refusal?.fix ?? 'it did not answer'}`);
+}
 
 /**
  * EVERY PREFERENCE, SET AND MEASURED, AS A FUNCTION THE RUNNER CALLS. `52 §5.1` step 3.
@@ -504,6 +524,24 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       ],
       probe: () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || 'no accent',
     },
+    {
+      /**
+       * `look.theme`: which installed look the person is drawn in (PGS-A21, `packages/record/src/theme-pick.ts`). The
+       * record reads the pick at `boot` and answers that look's tokens, so the page's accent is the measurement, as it is
+       * for `look.accent`. Unset, the record draws its own look; `house` is the house look on purpose.
+       *
+       * ON THE FRESH RECORD, WHICH HOLDS A LOOK OF ITS OWN (`ownLook`, set before the cases run): the gates' record
+       * holds none, so there both loads would draw the house and the case could never differ. The fresh record's other
+       * cases read what Today draws and not its colour.
+       */
+      name: 'look.theme',
+      record: true,
+      fresh: true,
+      what: 'which installed look the page is drawn in, when the record keeps the pick (PGS-A21)',
+      route: '/',
+      values: [{ '@record': {} }, { '@record': { 'look.theme': 'house' } }],
+      probe: () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || 'no accent',
+    },
   ];
 
   /**
@@ -690,6 +728,8 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
     /* AND A FIRST TODAY BESIDE IT (`startRecord`'s `fresh`), for the cases marked `fresh`: Today's next steps are a
        first Today's, and the gates' record is kept for months. One `close()` each, in the `finally` below. */
     fresh = await startRecord(0, { fresh: true });
+    /* AND A LOOK OF ITS OWN ON IT, for `look.theme`: the add-on's own declaration, set as the record's own look. */
+    await ownLook(root, fresh);
     /** The record this gate's port answers for: the gates' own, or the fresh one while a `fresh` case loads. */
     let target = record;
 

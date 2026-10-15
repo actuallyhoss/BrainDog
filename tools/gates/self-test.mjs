@@ -312,6 +312,20 @@ export const BROWSER = [
     blind: 'PASSED a panel that never moved on j. The list drawer could stop walking and nothing would say.',
     red: 'red on a panel that stays put on j',
   },
+  /**
+   * `money-where`: `BRAINDOG_GATE_SEED=money-where` hands the walk's judge what was read after Where it went is pressed
+   * as still shut, planted in what the walk read and never in the app, and the judge must say the blocks under it are
+   * not in sight. The second sentence is the walk's own, printed only when the planted reading replaced one that saw
+   * the heading open, so a run whose heading never opens anyway cannot pass for this negative.
+   */
+  {
+    gate: 'money-where',
+    file: join('walks', 'money-where.walk.mjs'),
+    seed: 'money-where',
+    names: ['is not in sight after', 'planted over a reading that had it open'],
+    blind: 'PASSED a heading that never opened. Where it went could stay shut and nothing would say.',
+    red: 'red on a folded heading that stays shut when pressed',
+  },
 ];
 
 /* A STALE BUILD IS AN ABSENT ONE, and this asked only whether `apps/web/build` existed until

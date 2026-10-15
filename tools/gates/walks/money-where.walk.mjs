@@ -16,6 +16,10 @@
  * TWO HALVES, as `row-drawer.walk.mjs` has. `judge` is a pure function of what was read, so each promise taken away is
  * red in the words of what was missing; the drive below it only presses and reads.
  *
+ * AND A PLANTED FAULT (`BRAINDOG_GATE_SEED=money-where`, `seeded` and `planted` below), as `row-drawer` has its own.
+ * `self-test` runs the walk again with what was read after the press put back to shut, and the walk must go red on it,
+ * so a walk that passes while looking at nothing is a red line in `self-test` and not a green one here.
+ *
  * NO BUILD, NO RUN. It says it walked nothing and returns 3, which `run.mjs` counts as a skip and never as a pass. ITS
  * OWN EPHEMERAL PORT (`server.listen(0)`), and every handle it opens is given back in one `finally`.
  */
@@ -81,6 +85,35 @@ export function judge(seen) {
   return out;
 }
 
+/**
+ * THE WALK'S OWN PROOF THAT IT LOOKS AT ANYTHING (`self-test`). True when `BRAINDOG_GATE_SEED` names `money-where`,
+ * alone or among others joined by commas, as `seedsOf` reads it in `a11y.mjs`. Another gate's seed plants nothing here.
+ *
+ * READ FROM THE VARIABLE AND NOTHING ELSE: no argument, no file, so a run nobody seeded cannot be a seeded one.
+ */
+export function seeded(value = process.env.BRAINDOG_GATE_SEED) {
+  return (value ?? '').split(',').some((s) => s.trim() === 'money-where');
+}
+
+/** The planted fault, in the words the seeded run says it planted. */
+export const PLANT = 'what was read after the press put back to shut';
+
+/**
+ * WHAT A SEEDED WALK HANDS `judge`: what it read, with every block under the heading read as out of sight after the
+ * press, as a heading that never opened would read. PLANTED IN WHAT THE WALK READ AND NEVER IN THE APP: the page is
+ * pressed exactly as a real run presses it, and only this copy differs, so a judge that stopped looking at the press
+ * would pass it and `self-test` would say so.
+ */
+export function planted(seen) {
+  return { ...seen, after: Object.fromEntries(UNDER.map((h) => [h, false])) };
+}
+
+/** What the drive hands `judge`: the planted reading in a seeded run, and in any other run what it read, itself. */
+export const handed = (seen, on = seeded()) => (on ? planted(seen) : seen);
+
+/** Whether the walk read the heading open, so the planted reading replaced a true one and the seeded red is the seed's. */
+export const walkedTrue = (seen) => seen.heading === true && UNDER.every((h) => seen.after?.[h] === true);
+
 /** One write through the record's own door with the gate's key, as a person's own writes are. Its new entry's id. */
 async function create(record, register, fields) {
   const said = await fetch(new URL('/api/create', record.base), {
@@ -142,17 +175,35 @@ function serve(ROOT, record) {
   });
 }
 
-/** Whether each of `UNDER` is in sight, read off the page by its words. */
-const sight = async (page) => Object.fromEntries(await Promise.all(UNDER.map(async (h) => [h, await page.getByText(h, { exact: true }).first().isVisible().catch(() => false)])));
+/**
+ * The words where a person can see them, and never the copy kept for a screen reader.
+ *
+ * A SECTION'S NAME IS ON THE PAGE TWICE: the bar every block wears, which the skin hides under a section and keeps for
+ * the region's name (`packages/skin/kinds/section.css`), and the section's own heading, which is the one in sight. The
+ * hidden bar comes first, so the first match of the words was never the heading a person presses, and the walk read
+ * no heading on a page that drew one.
+ */
+const inSight = (page, words) => page.getByText(words, { exact: true }).filter({ visible: true }).first();
 
-/** One walk at one width: find the heading, read what is in sight, press it, read again. Nothing here decides. */
+/** Whether each of `UNDER` is in sight, read off the page by its words. */
+const sight = async (page) => Object.fromEntries(await Promise.all(UNDER.map(async (h) => [h, await inSight(page, h).isVisible().catch(() => false)])));
+
+/**
+ * One walk at one width: find the heading, read what is in sight, press it, read again. Nothing here decides.
+ *
+ * WHAT IS PRESSED IS THE HEADING'S OWN SHOW, the control a folded section draws at the end of its heading row
+ * (`section` in `packages/render/src/html.ts`): the name is words and opens nothing, so a press on it read every
+ * block under it as never opened. A heading drawn with no such control is pressed itself, and stays shut, so the
+ * walk says so.
+ */
 async function walk(page, seen, timeout) {
-  const heading = page.getByText(HEADING, { exact: true }).first();
+  const heading = inSight(page, HEADING);
   seen.heading = await heading.waitFor({ state: 'visible', timeout }).then(() => true, () => false);
   if (!seen.heading) return;
   seen.before = await sight(page);
-  await heading.click();
-  await page.getByText(UNDER[0], { exact: true }).first().waitFor({ state: 'visible', timeout }).catch(() => {});
+  const show = heading.locator('xpath=..').locator('summary').filter({ visible: true });
+  await ((await show.count()) > 0 ? show.first() : heading).click();
+  await inSight(page, UNDER[0]).waitFor({ state: 'visible', timeout }).catch(() => {});
   seen.after = await sight(page);
 }
 
@@ -164,6 +215,8 @@ export default async function moneyWhere(root = join(import.meta.dirname, '..', 
     return 3;
   }
   const findings = [];
+  /** Read once, at the start, so every width of one run is seeded or none is. */
+  const SEEDED = seeded();
   let record = null;
   let server = null;
   let browser = null;
@@ -190,7 +243,10 @@ export default async function moneyWhere(root = join(import.meta.dirname, '..', 
       } finally {
         await opened?.context.close().catch(() => {});
       }
-      findings.push(...judge(seen));
+      /* A SEEDED RUN JUDGES THE PLANTED READING, and says whether it was planted over a walk that saw the heading open:
+         without that line a run whose heading never opened anyway would be red in the seed's words for another reason. */
+      if (SEEDED && walkedTrue(seen)) console.log(`  money-where: seeded at ${width}: ${PLANT}, planted over a reading that had it open.`);
+      findings.push(...judge(handed(seen, SEEDED)));
     }
     const blind = ready.nothingDrawn();
     if (blind) findings.push(blind);
