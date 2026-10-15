@@ -14,8 +14,10 @@
  *   - DEBTS. A debt's newest line higher than the one before is red. A debt owed against a budget prints the budget,
  *     what is owed, and the newest reason.
  *   - HELD LISTS. Each is `<gate>.<EXPORT>`, read off the gate's own module. Larger than its newest line is red; smaller
- *     is red too, until a line records the fall. A line higher than the one before is red. A gate that does not export
- *     the list yet is counted as a debt and said, never red.
+ *     is red too, until a line records the fall. A line higher than the one before is red unless `by` quotes the owner,
+ *     as a ceiling's is: on 16 October he was asked whether to hold or rename what three gates found, and answered
+ *     "Hold them, deploy tonight" (DIRECTION 44), and a held list had no way to take his word. A gate that does not
+ *     export the list yet is counted as a debt and said, never red.
  *   - NUMBERS IN A GATE FILE. A number above 1 written in `tools/gates/*.mjs` or a gate's parts one level down, and not read from `budgets.json`, is a
  *     finding. Today's are debts, one per file, written up front: more than the newest line is red, fewer is said.
  *   - DEVIATIONS. Each is named, with what it is, why, and the unit that ends it.
@@ -247,7 +249,8 @@ export function judge(book, budgets, measured, direction = '') {
   for (const [name, entry] of Object.entries(book.held)) {
     const n = valueOf(entry.lines.at(-1));
     for (const [before, line] of moves(entry, opened, UP))
-      findings.push(`  ${name}: its line rose from ${valueOf(before)} to ${valueOf(line)} on ${line.on}. A held list only shrinks.`);
+      if (!quotesOwner(line.by, direction))
+        findings.push(`  ${name}: its line rose from ${valueOf(before)} to ${valueOf(line)} on ${line.on}, and \`by\` quotes no words of the owner's. A held list only shrinks.`);
     const read = measured.held.get(name) ?? { missing: true };
     if (read.missing) {
       said.push(`  ledger: ${name}: not exported yet, held at ${n} by its newest line`);

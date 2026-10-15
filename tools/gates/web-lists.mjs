@@ -242,6 +242,25 @@ export const HELD = {
     ids: ['agents', 'people'],
     why: 'the settings areas called `people` and `agents` that only an owner is shown.',
   },
+
+  /* HELD AT HIS WORD, 16 OCTOBER. Asked whether to hold or rename what this gate, core-names and colour-grep found, he
+     answered "Hold them, deploy tonight" (DIRECTION 44). Each says what its id is, so the change that renames it knows. */
+  'apps/web/src/lib/flow/try-step.ts': {
+    ids: ['steps'],
+    why: "an automation's `steps:` key, which the try sheet walks to place each step, and not the guide's list.",
+  },
+  'apps/web/src/lib/home/imported-rules.ts': {
+    ids: ['categories', 'filing_rules'],
+    why: "Money's filing rules and the categories a rule files under, which Home's offer to make imported automations filing rules writes into by their list ids.",
+  },
+  'apps/web/src/lib/record/page-write.ts': {
+    ids: ['agents', 'steps'],
+    why: 'block kinds called `agents` and `steps` in the table of which keys a block takes, which are not the lists.',
+  },
+  'apps/web/src/lib/signup.ts': {
+    ids: ['things'],
+    why: "`things`, what a question back from the reading door may be about (`SetupAbout` in `@braindog/slash`), which is not the list.",
+  },
 };
 
 /**

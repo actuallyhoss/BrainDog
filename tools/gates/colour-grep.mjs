@@ -156,7 +156,7 @@ const LITERAL_NAMED = new RegExp(String.raw`\b${COLOUR_PROP}\s*:[^;{}]*\b(?:${NA
 const ALLOWED_LINES = [/^\s*--brand:\s*#[0-9a-fA-F]{6};\s*$/, /^\s*@property\s+--[a-z0-9-]+\s*\{/];
 
 /**
- * AND FIVE MORE, EACH NAMED WITH THE ONE FILE IT LIVES IN. The two above are shapes a stylesheet is
+ * AND SEVEN MORE, EACH NAMED WITH THE ONE FILE IT LIVES IN. The two above are shapes a stylesheet is
  * entitled to anywhere; these are not, so the same line in any other file is still a finding.
  *
  *   shot.mjs, four lines   the stylesheet of the contact sheet: `body`, `section`, `img` and `.red`.
@@ -168,6 +168,8 @@ const ALLOWED_LINES = [/^\s*--brand:\s*#[0-9a-fA-F]{6};\s*$/, /^\s*@property\s+-
  *   live-bounds.json, one  the `colours` list: the reds and the ink the LIVE site is held to. It is
  *                          the expected half of a comparison, a value asserted on, and nothing
  *                          paints with it. Only that key: another colour in the file is caught.
+ *   harbour-look, two      the look add-on's `seed` accent, in its pack file and the catalogue's copy,
+ *                          held at his word on 16 October (below).
  */
 const HEX = String.raw`#[0-9a-fA-F]{6}`;
 const ALLOWED_IN = [
@@ -183,6 +185,14 @@ const ALLOWED_IN = [
     file: 'apps/site/scripts/live-bounds.json',
     lines: [new RegExp(String.raw`^\s*"colours": \["${HEX}"(?:, "${HEX}")*\],?\s*$`)],
   },
+  /* THE HARBOUR LOOK'S ACCENT, HELD AT HIS WORD, 16 OCTOBER: the one hex a look add-on hands the theme as its seed, in the
+     pack's file and in the copy the catalogue publishes. Asked whether to hold or rename what this gate, core-names and
+     web-lists found, he answered "Hold them, deploy tonight" (DIRECTION 44). Only the `seed` line, so another colour in
+     either file is still caught. */
+  ...['packs/harbour-look/harbour-look.pack.json', 'apps/web/static/catalogue/packs/harbour-look/1.0.0.pack.json'].map((file) => ({
+    file,
+    lines: [new RegExp(String.raw`^\s*"seed": \{ "accent": "${HEX}", "neutral_hue": \d+ \}\s*$`)],
+  })),
 ];
 
 /**

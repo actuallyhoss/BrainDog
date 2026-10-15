@@ -25,6 +25,9 @@ async function fieldsOf(ctx, list) {
   return { ids: new Set(fields.map((f) => f?.id)) };
 }
 
+/** What a line adds when the modules the file stands on went in first (`installFromCatalogue`'s `brought`). */
+const after = (put) => (put.brought?.length > 0 ? ` It went in after ${put.brought.join(' and ')}, which it stands on.` : '');
+
 /** `project-brief`: every field the file lays on Projects is there after one install, and the plan asked nobody anything. */
 export async function projectBrief(ctx) {
   const name = 'project-brief';
@@ -37,7 +40,7 @@ export async function projectBrief(ctx) {
   const missing = laid.filter((f) => !held.ids.has(f.id)).map((f) => f.label ?? f.id);
   if (missing.length > 0) return [red(ctx, name, `Projects lacks ${missing.join(', ')} after the install.`)];
   if (put.approve.length > 0) return [red(ctx, name, `its ${laid.length} fields are on Projects, and the plan asked ${put.approve.length} question${put.approve.length === 1 ? '' : 's'} first.`)];
-  return [ok(ctx, name, `its ${laid.length} fields (${laid.map((f) => f.label ?? f.id).join(', ')}) are on Projects, and the plan asked nobody to press anything.`)];
+  return [ok(ctx, name, `its ${laid.length} fields (${laid.map((f) => f.label ?? f.id).join(', ')}) are on Projects, and the plan asked nobody to press anything.${after(put)}`)];
 }
 
 /**
@@ -88,7 +91,7 @@ export async function roadmap(ctx) {
     const faulted = blocks.find((b) => b?.refusal || b?.fault || b?.error);
     if (faulted) return [red(ctx, name, `the ${p.title} page drew with a fault: “${String(faulted.refusal?.fix ?? faulted.fault ?? faulted.error)}”`)];
   }
-  return [ok(ctx, name, `the ${pages.map((p) => p.title).join(' and ')} page${pages.length === 1 ? '' : 's'} drew with no fault.`)];
+  return [ok(ctx, name, `the ${pages.map((p) => p.title).join(' and ')} page${pages.length === 1 ? '' : 's'} drew with no fault.${after(put)}`)];
 }
 
 /** The project checks, in the order the lane runs them, by the line each one starts. */

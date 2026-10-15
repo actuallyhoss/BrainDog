@@ -86,7 +86,8 @@ export async function signUp(ctx) {
  * Install add-on `id` from the catalogue through the record's own door: the version the catalogue offers (its latest
  * when every version is withdrawn, which the answer says), held to the checksum the index lists, `fill` applied when
  * the file names what a person supplies, then planned, and installed with the lines the plan calls out approved, as the
- * owner's press approves them. Answers `{ pass, said, doc, diff, version, withdrawn }`, `said` the refusal's own words.
+ * owner's press approves them. Answers `{ pass, said, doc, diff, version, withdrawn, brought }`, `said` the refusal's
+ * own words, `brought` the modules the file stands on that went in first.
  */
 export async function installFromCatalogue(ctx, id, { fill = null } = {}) {
   const fail = (said) => ({ pass: false, said: hide(ctx, said) });
@@ -116,11 +117,26 @@ export async function installFromCatalogue(ctx, id, { fill = null } = {}) {
      a pause a person reading the plan would take: measured on the harness, the work a founder's setup leaves running
      beside its answer moves the record's version for a moment after, so a press at once is stale. A third stale answer
      in a row is the fault, and the line says the record's sentence. */
+  /* A PLAN REFUSED FOR A LIST THE RECORD DOES NOT HOLD YET puts in the modules the file stands on (`requires.packs`), as
+     the refusal tells a person to ("Install work first") and as an agent's arrange of the add-on does (the catalogue
+     offers it with those modules under it), then is read again, once. A founder's record holds Projects and Money on
+     its first day and Work only when the words point at it (USE-B08, founder 2.7.0), so project-brief and roadmap go
+     in after Work. The modules go in through the record's own first-run door, `setup` with `again`, which passes over
+     one that is on. */
   let diff = {};
   let approve = [];
   let stale = 0;
+  let brought = [];
   for (;;) {
     const planned = await api(ctx, 'planPack', { doc, source: { kind: 'local' } });
+    if (planned.said?.ok !== true && planned.said?.refusal?.code === 'REGISTER_UNRESOLVED' && brought.length === 0) {
+      const under = Object.keys(doc?.requires?.packs ?? {});
+      const set = under.length === 0 ? null : await api(ctx, 'setup', { again: true, packs: { install: under } });
+      if (set?.said?.ok === true && (set.said.value?.failed ?? []).length === 0) {
+        brought = set.said.value?.done?.installed ?? [];
+        if (brought.length > 0) continue;
+      }
+    }
     if (planned.said?.ok !== true) return fail(`the plan was refused: “${fixOf(planned)}”`);
     diff = planned.said.value?.diff ?? {};
     approve = Array.isArray(diff.approve) ? diff.approve : [];
@@ -130,7 +146,7 @@ export async function installFromCatalogue(ctx, id, { fill = null } = {}) {
     await new Promise((r) => setTimeout(r, 500 * stale));
   }
   const withdrawn = offered === null ? (v.yanked?.reason ?? 'withdrawn') : null;
-  const out = { pass: true, said: '', doc, diff, approve, version: v.version, withdrawn, stale };
+  const out = { pass: true, said: '', doc, diff, approve, version: v.version, withdrawn, stale, brought };
   ctx.installed.set(doc.pack ?? id, out);
   return out;
 }
