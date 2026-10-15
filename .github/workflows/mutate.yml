@@ -13,13 +13,9 @@ name: mutate
 # IT DEPLOYS NOTHING AND WAITS FOR NOTHING. No workflow runs off this one's completion, so a red run here is a finding
 # to read and never a deploy held back or let through.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  pull_request:
-    # `labeled` SO ADDING THE LABEL ASKS AT ONCE, as `gates.yml` does. Only this workflow's one job re-runs on it.
-    types: [opened, synchronize, reopened, labeled]
-  schedule:
-    # Monday, 06:30 UTC, between the Windows run and CodeQL, so the three weekly runs do not share one runner at once.
-    - cron: '30 6 * * 1'
   workflow_dispatch:
 
 permissions:

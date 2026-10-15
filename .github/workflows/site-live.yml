@@ -20,9 +20,9 @@ name: site-live
 # A FORCED FAILURE: run it by hand with `origin` set to any other https site. Its links are not this site's
 # red and its home page has no bound it meets, so the run is red and the sheet shows that site.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  schedule:
-    - cron: '43 5 * * *'
   workflow_dispatch:
     inputs:
       origin:

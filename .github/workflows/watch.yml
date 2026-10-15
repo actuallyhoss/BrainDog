@@ -28,14 +28,9 @@ name: watch
 # A FORCED MISS: run it by hand with `host` set to a name that answers 503, and the run is red.
 # The input reaches the script through the environment, never pasted into the command.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  schedule:
-    - cron: '7 * * * *'
-    # THE FIRST OF THE MONTH, 04:23 UTC: going back on the canary. Off the hour for the reason above, and at an hour
-    # when the nightly copies are long done.
-    - cron: '23 4 1 * *'
-    # EVERY DAY, 05:41 UTC: the repository's settings held to `.github/settings.expected.json` (LCH-C12).
-    - cron: '41 5 * * *'
   workflow_dispatch:
     inputs:
       go_back:

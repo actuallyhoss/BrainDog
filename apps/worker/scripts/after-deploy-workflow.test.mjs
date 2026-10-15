@@ -85,10 +85,12 @@ function runStep(name, env, cwd = ROOT) {
   }
 }
 
-test('it runs when the deploy ends, from this repository only, and never on a pull request', () => {
+/* BY HAND ONLY SINCE 15 OCTOBER: the owner moved CI and the deploy onto his Mac (`tools/ship`), so the lane no longer
+   follows `deploy.yml` on its own. The job's guard below is unchanged and still lets a dispatch through. */
+test('it runs by hand alone, from this repository only, and never on a pull request', () => {
   const on = text.slice(text.indexOf('\non:'), text.indexOf('\npermissions:'));
-  assert.match(on, /workflow_run:\n\s+workflows: \[deploy\]\n\s+types: \[completed\]\n\s+branches: \[master\]/);
-  assert.doesNotMatch(on, /pull_request/);
+  assert.equal(on.split('\n').filter((line) => /^ {2}\S/.test(line)).join('\n'), '  workflow_dispatch:');
+  assert.doesNotMatch(on, /pull_request|workflow_run|schedule|push/);
   const job = text.slice(text.indexOf('\n  lane:'), text.indexOf('\n    steps:'));
   assert.match(job, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(job, /github\.event\.workflow_run\.head_repository\.full_name == github\.repository/);

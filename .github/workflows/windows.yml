@@ -20,11 +20,10 @@ name: windows
 # ONE COPY OF THE JOB. `ci.yml` calls this file rather than repeating the steps, so the pull-request run and the weekly
 # run are the same run.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_call:
-  schedule:
-    # Monday, 06:00 UTC: an hour after `gates.yml`'s weekly run and an hour before `codeql.yml`'s.
-    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 permissions:

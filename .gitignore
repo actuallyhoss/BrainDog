@@ -53,6 +53,9 @@ build-*/
 # The CLI the deploy copies into the site before building it (deploy.yml, "Build the CLI for the site"); built, never committed.
 apps/site/static/cli/braindog.mjs*
 
+# What `tools/ship` writes on the machine that runs CI and the deploy: each run's logs, its scratch, and the pass marker.
+/.ship/
+
 # Working notes, briefs and reports kept on the machine that builds BrainDog, never in the repository.
 /loop/
 /REPORT.md

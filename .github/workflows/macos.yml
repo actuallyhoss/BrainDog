@@ -15,21 +15,9 @@ name: macos
 # WHEN IT RUNS: when the command, its test or this file changes, on master or in a pull request; weekly, because a
 # macOS image moves `curl` under an unchanged tree; and by hand.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  push:
-    branches: [master]
-    paths:
-      - apps/worker/scripts/provision-check.mjs
-      - apps/worker/scripts/provision-ask.test.mjs
-      - .github/workflows/macos.yml
-  pull_request:
-    paths:
-      - apps/worker/scripts/provision-check.mjs
-      - apps/worker/scripts/provision-ask.test.mjs
-      - .github/workflows/macos.yml
-  schedule:
-    # Monday, 06:30 UTC: half an hour after `windows.yml`'s weekly run.
-    - cron: '30 6 * * 1'
   workflow_dispatch:
 
 permissions:

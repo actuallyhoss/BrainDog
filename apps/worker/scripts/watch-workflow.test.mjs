@@ -40,10 +40,11 @@ const jobs = under(lines, 0, 'jobs');
 const watch = under(jobs, 2, 'watch').join('\n');
 const goBack = under(jobs, 2, 'go-back').join('\n');
 
-test('HOURLY AT MINUTE 7, AND BY HAND WITH A host INPUT', () => {
+/* BY HAND ONLY SINCE 15 OCTOBER: the owner stopped every schedule so the workflows spend no Actions minutes on their own.
+   The steps that read `github.event.schedule` are kept as they were, for the day a schedule comes back. */
+test('BY HAND ALONE, WITH A host INPUT', () => {
   const on = under(lines, 0, 'on');
-  /* AND ONCE A DAY AT 05:41 THE REPOSITORY'S SETTINGS ARE HELD TO WHAT WAS DECIDED (`tools/watch/settings.mjs`, LCH-C12). */
-  assert.deepEqual(under(on, 2, 'schedule'), ["    - cron: '7 * * * *'", "    - cron: '23 4 1 * *'", "    - cron: '41 5 * * *'"]);
+  assert.deepEqual(on.filter((line) => /^ {2}\S/.test(line)), ['  workflow_dispatch:']);
   const inputs = under(under(on, 2, 'workflow_dispatch'), 4, 'inputs');
   assert.ok(inputs.includes('      host:'), inputs.join('\n'));
   assert.ok(under(inputs, 6, 'host').includes('        required: false'));

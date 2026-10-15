@@ -62,53 +62,9 @@ name: gates
 # those builds read. `apps/worker/scripts/gates-workflow.test.mjs` walks those imports and is red
 # when one of them falls outside the list.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  push:
-    branches: [master]
-    paths:
-      # The two builds `layout` and `a11y` measure, the self-host their record runs on, and every
-      # package those three are built from.
-      - 'apps/web/**'
-      - 'apps/site/**'
-      - 'apps/selfhost/**'
-      - 'packages/**'
-      # The web build begins by writing the catalogue from every pack (`apps/web/package.json`).
-      - 'packs/**'
-      - 'tools/catalogue/**'
-      # The runner a push run starts them through, the two gates, the helpers they import, and
-      # the budgets `lib.mjs` reads.
-      - 'tools/gates/run.mjs'
-      - 'tools/gates/layout.mjs'
-      # The parts `layout` is split into by rule (PRF-B04 job 8).
-      - 'tools/gates/layout/**'
-      - 'tools/gates/a11y.mjs'
-      - 'tools/gates/lib.mjs'
-      # What a screen may not print (`layout` reads each screen through it).
-      - 'tools/gates/printed.mjs'
-      # The record the gates draw can be built from a real record's shape (`lived.mjs`, PRF-A07), and the self-host the
-      # gates start reads the command line's surface.
-      - 'tools/gates/lived.mjs'
-      - 'fixtures/shapes/**'
-      - 'apps/cli/**'
-      # The `cloud` variant of the gates' record is the Worker itself (`apps/worker/test/cloud-serve.ts`, PRF-B05).
-      - 'apps/worker/**'
-      - 'tools/gates/record.mjs'
-      - 'tools/gates/routes.mjs'
-      - 'tools/gates/budgets.json'
-      # The dependencies (Chromium and axe-core among them), the compiler settings every build
-      # shares, and the setup this job runs.
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'pnpm-workspace.yaml'
-      - 'tsconfig.base.json'
-      - '.github/actions/setup/**'
-      - '.github/workflows/gates.yml'
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-  schedule:
-    # Monday, 05:00 UTC. An hour before anything else scheduled in this repository, so a browser
-    # download and an npm registry read are not competing with one.
-    - cron: '0 5 * * 1'
   workflow_dispatch:
 
 permissions:

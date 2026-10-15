@@ -25,10 +25,9 @@ name: model-checks
 # A FORCED RED: run it by hand on a branch whose `MODELS` in `apps/worker/src/inference.ts` names
 # an id Workers AI does not serve. The route reads `measured-below` and the run is red.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  schedule:
-    - cron: '43 2 * * 1-6'
-    - cron: '43 2 * * 0'
   workflow_dispatch:
     inputs:
       size:

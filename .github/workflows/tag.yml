@@ -34,12 +34,10 @@ name: tag
 # THIS FILE NEEDS NO WRITE PERMISSION AT ALL NOW, which is the other thing the change bought. The
 # only `contents: write` in this repository's workflows was the job that created the Release.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  push:
-    tags:
-      - 'v2*' # the app: `v<YYYY.MM.DD>[.n]`, and this repository's years begin with 2
-      - 'render-v*'
-      - 'cli-v*'
+  workflow_dispatch:
 
 permissions:
   contents: read

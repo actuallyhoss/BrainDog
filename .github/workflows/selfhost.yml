@@ -21,17 +21,10 @@ name: selfhost
 #
 # NOTHING IS PUSHED, DEPLOYED OR SIGNED IN AS ANYBODY. The image is built and thrown away; no secret is read.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
-  schedule:
-    # Mondays, 05:17 UTC: off the hour, as the scheduler asks.
-    - cron: '17 5 * * 1'
-  push:
-    paths:
-      - 'apps/selfhost/**'
-      - 'packages/host/**'
-      - 'README.md'
-      - '.github/workflows/selfhost.yml'
 
 permissions:
   contents: read

@@ -35,14 +35,10 @@ name: ci
 # `actions/*` and `pnpm/*` is the exposure this repository has accepted, and it is written down here
 # rather than left as an omission.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  push:
-    branches: [master]
-  # 52 §2 says `on: push, pull_request` with no branch filter. A bare `push:` beside
-  # `pull_request:` runs this twice for every commit on a branch that has a pull request open
-  # (same commit, same result, twice the minutes), so `push` is master alone and the branch's runs
-  # come from the pull request.
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

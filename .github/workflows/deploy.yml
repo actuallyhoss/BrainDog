@@ -20,11 +20,10 @@ name: deploy
 # killed between uploading a version and activating it. The queue is the correct behaviour here
 # even though it is the wrong behaviour for `ci`.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  workflow_run:
-    workflows: [ci]
-    types: [completed]
-    branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: read

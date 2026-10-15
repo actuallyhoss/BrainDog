@@ -9,11 +9,10 @@ name: image
 # THE TAG IS `<date>-<sha>` (docs/53 section 3), and `latest` beside it when pushed from a tag, because the app has no
 # semver and a date and a commit are what a self-hoster reads to know what they run.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
 
 permissions:
   contents: read

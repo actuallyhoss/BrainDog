@@ -28,11 +28,9 @@ name: after-deploy
 # whose head is in another repository, and its first step refuses a commit that is not on this repository's master,
 # so neither a fork's branch named master nor a branch run by hand reaches the secrets below.
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  workflow_run:
-    workflows: [deploy]
-    types: [completed]
-    branches: [master]
   workflow_dispatch:
 
 # `actions: read` to fetch the deploy's `live-before`; `issues: write` for the finding; `statuses: write` for the

@@ -48,13 +48,13 @@ test('THE LEG IS A MAC, ON THE NODE EVERY OTHER JOB PINS', () => {
   assert.match(code, new RegExp(`node-version: ${pinned.replace(/\./g, '\\.')}$`, 'm'), `macos.yml runs another Node than ${pinned}`);
 });
 
-test('IT RUNS WHEN THE COMMAND OR ITS TEST CHANGES, weekly, and deploys nothing', () => {
-  for (const path of ['apps/worker/scripts/provision-check.mjs', 'apps/worker/scripts/provision-ask.test.mjs', '.github/workflows/macos.yml'])
-    assert.equal(code.split('\n').filter((line) => line.trim() === `- ${path}`).length, 2, `${path} does not start both the push and the pull request run`);
-  assert.match(code, /- cron: '30 6 \* \* 1'/);
+/* BY HAND ONLY SINCE 15 OCTOBER: the owner moved CI onto his Mac (`tools/ship/ci.mjs`), which runs the worker's tests,
+   these two among them, on macOS on every run. */
+test('IT RUNS BY HAND ALONE, and deploys nothing', () => {
   assert.match(code, /^ {2}workflow_dispatch:$/m);
-  /* `deploy.yml` follows a run of `ci`, so a workflow by any other name deploys nothing. */
-  assert.match(read('.github', 'workflows', 'deploy.yml'), /workflows: \[ci\]/);
+  assert.doesNotMatch(code, /^ {2}(push|pull_request|schedule|workflow_run):/m);
+  /* `deploy.yml` follows no workflow, so a run of this one deploys nothing. */
+  assert.doesNotMatch(read('.github', 'workflows', 'deploy.yml'), /^ {2}workflow_run:/m);
 });
 
 test('APPLE\'S BASH GOES FIRST ON THE PATH, AND THE SKIP COUNT IS READ', () => {

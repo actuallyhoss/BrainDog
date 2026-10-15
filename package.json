@@ -19,7 +19,9 @@
     "dev:site": "pnpm --filter @braindog/site dev",
     "shots:site": "pnpm --filter @braindog/site exec node scripts/shot.mjs",
     "shots:product": "pnpm --filter @braindog/site exec node scripts/product.mjs",
-    "door-check": "node tools/door-check/run.mjs"
+    "door-check": "node tools/door-check/run.mjs",
+    "ship:ci": "node tools/ship/ci.mjs",
+    "ship:deploy": "node tools/ship/deploy.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

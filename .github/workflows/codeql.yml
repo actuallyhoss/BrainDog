@@ -27,16 +27,10 @@
 
 name: codeql
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
-  schedule:
-    # Monday morning, an hour after `gate1.yml`. A scheduled run is what catches a query that was
-    # written after the code was — most CodeQL findings on a stable tree arrive that way, not from
-    # a commit.
-    - cron: '0 7 * * 1'
+  workflow_dispatch:
 
 # Read-only by default; the job below adds the one write it cannot avoid.
 permissions:

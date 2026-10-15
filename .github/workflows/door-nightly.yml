@@ -26,13 +26,9 @@ name: door-nightly
 # key cannot open is no test: with DOOR_TOKEN the key alone names the record, and the address only
 # names the host.)
 
+# BY HAND ONLY. The owner, 15 October: "can you switch to local ci/cd or on cloudflare? so we dont keep fucking our
+# github usages". CI and the deploy run on his Mac now, through tools/ship.
 on:
-  schedule:
-    - cron: '17 3 * * *'
-  workflow_run:
-    workflows: [deploy]
-    types: [completed]
-    branches: [master]
   workflow_dispatch:
     inputs:
       host:
