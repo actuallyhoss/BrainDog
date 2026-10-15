@@ -120,7 +120,7 @@
     {
       "page": "people",
       "title": "People",
-      "nav": { "section": "People", "order": 10 },
+      "nav": { "section": "People", "order": 10, "place": 50 },
       "icon": "people",
       "requires": [ "register.people", "register.organisations" ],
       "blocks": [
@@ -129,7 +129,7 @@
           "lead": true,
           "span": 12,
           "when": { "metric": "people-quiet", "is": 0 },
-          "body": "{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days"
+          "body": "{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)"
         },
         {
           "kind": "note",
@@ -153,6 +153,14 @@
           "span": 12,
           "when": { "metric": "held-twice", "gt": 0 },
           "body": "{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1)."
+        },
+        {
+          "kind": "stat",
+          "heading": "In touch",
+          "icon": "gauge",
+          "span": 12,
+          "when": { "metric": "people-count", "gt": 0 },
+          "cells": [ { "metric": "people-in-touch-30d", "label": "In touch, 30 days", "trend": "30d" } ]
         },
         {
           "kind": "cards",
@@ -187,6 +195,15 @@
             { "field": "domain", "label": "Website", "as": "fact" }
           ],
           "order": [ { "field": "name", "dir": "asc" } ]
+        },
+        {
+          "kind": "agents",
+          "heading": "What agents did",
+          "icon": "activity",
+          "span": 12,
+          "source": "activity",
+          "where": "list is people or organisations",
+          "first": 3
         }
       ]
     },
@@ -425,6 +442,11 @@
       "icon": "activity",
       "pack": "people",
       "layout": { "rail": 4 },
+      "filters": [
+        { "field": "who", "control": "chips" },
+        { "field": "kind", "control": "chips" },
+        { "field": "list", "control": "chips" }
+      ],
       "blocks": [
         {
           "kind": "note",
@@ -517,7 +539,8 @@
       "format": "int",
       "target": { "gte": 0 },
       "window": "30d",
-      "compare": "none"
+      "compare": "none",
+      "snapshot": { "grain": "day", "into": "series.people-in-touch-30d" }
     },
     {
       "metric": "people-in-touch-12w",

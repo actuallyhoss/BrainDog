@@ -1,6 +1,7 @@
 /**
  * `braindog tidy [--json]`: what went stale on the record and the call that clears each, read in GETs and said a line a
- * kind, and the record's refusal said plainly when it cannot read them yet. What `--ask` files is `tidy-ask.test.ts`'s.
+ * kind, and the record's refusal said plainly when it cannot read them yet. What `--ask` files is `tidy-ask.test.ts`'s,
+ * but for the fold of what is held twice, which is sent here through the real client to a stub that answers it.
  *
  * THE HOST IS A STUB ON node:http, as in `signs.test.ts`, because apps never import apps. What is under test is the
  * command: the one read it sends, that it names no run, and what it prints.
@@ -237,4 +238,79 @@ test('BRAINDOG TIDY, AS A PERSON RUNS IT: the word is wired, --json prints one d
   const help = await run(h.base, ['help']);
   /* `--ask` joins this line when main.ts names it (blocked for batch 89's file), so either form passes. */
   assert.match(help.stdout, /^braindog tidy (\[--ask\] )?\[--json\] \[--host <host>\]$/mu);
+});
+
+/**
+ * A host keeping three lists, two that say what makes two things the same (`same:`) and one that does not, with `pairs`
+ * the numbers `heldTwice` answers for each. It answers the reads the fold makes, and the fold itself as the record
+ * does, `{ question }`, keeping every request with its body.
+ */
+async function foldHost(t: { after: (fn: () => Promise<void>) => void }, pairs: Record<string, number[]>) {
+  const seen: { method: string; verb: string | undefined; register: string | null; body: string }[] = [];
+  const lists: Record<string, Record<string, unknown>> = {
+    tools: { id: 'tools', name: 'Tools', one: 'tool', same: { fields: ['name'], within: 'project', fold: 'text' } },
+    skills: { id: 'skills', name: 'Skills', one: 'skill', same: { fields: ['name'], within: 'project', fold: 'text', keep: 'oldest' } },
+    notes: { id: 'notes', name: 'Notes', one: 'note' },
+  };
+  const server = createServer((req, res) => {
+    let body = '';
+    req.on('data', (c: Buffer) => (body += c.toString('utf8')));
+    req.on('end', () => {
+      const url = new URL(req.url ?? '/', 'http://stub');
+      const method = url.pathname.replace(/^\/api\//, '');
+      const register = url.searchParams.get('register') ?? ((body === '' ? {} : JSON.parse(body)) as { register?: string }).register ?? null;
+      seen.push({ method, verb: req.method, register, body });
+      let value: unknown;
+      if (method === 'stale') value = { lines: [], count: 0 };
+      else if (method === 'boot') value = { registers: Object.values(lists).map((l) => ({ id: l.id, name: l.name, count: 3, icon: null })), now: '2026-10-15T09:00:00.000Z' };
+      else if (method === 'schema' && register !== null) value = lists[register];
+      else if (method === 'heldTwice' && register !== null) value = lists[register]?.same ? { seqs: pairs[register] ?? [] } : null;
+      else if (method === 'askFoldTwice') value = { question: '01JQUESTIONQUESTIONQUESTIO' };
+      const known = value !== undefined;
+      res.writeHead(known ? 200 : 404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(known ? { ok: true, value } : { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `There is no method called ${method}.` } }));
+    });
+  });
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  t.after(
+    () =>
+      new Promise<void>((done) => {
+        server.closeAllConnections();
+        server.close(() => done());
+      }),
+  );
+  return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, seen };
+}
+
+test('--ask FILES ONE FOLD QUESTION A LIST THAT HOLDS A PAIR, through the real client, and none for a list with none', async (t) => {
+  const h = await foldHost(t, { tools: [2, 5, 7, 9], skills: [] });
+  const one = io(h.base);
+  assert.equal(await tidyCommand(['--ask'], one), 0, one.said.join('\n'));
+  /* THE FOLD IS ASKED OF THE LISTS THAT SAY `same:` ONLY, and filed for the one holding a pair, once, as a POST. */
+  assert.deepEqual(h.seen.filter((s) => s.method === 'heldTwice').map((s) => [s.register, s.verb]), [['tools', 'GET'], ['skills', 'GET']]);
+  const folds = h.seen.filter((s) => s.method === 'askFoldTwice');
+  assert.equal(folds.length, 1);
+  assert.equal(folds[0]!.verb, 'POST');
+  assert.deepEqual(JSON.parse(folds[0]!.body), { register: 'tools' });
+  assert.ok(one.lines.includes('Asked on Decide: 4 tools may be here twice. Keep one of each?'), one.lines.join('\n'));
+  for (const line of one.lines) assert.doesNotMatch(line, /01J[0-9A-Z]{10,}|—/u, `${line} holds an id or an em dash`);
+  /* THE QUESTION IS THE LOGIN'S, so it names no run either. */
+  assert.deepEqual(one.said, []);
+
+  /* NO PAIR, NO QUESTION: the reads go and nothing is filed. */
+  const calm = await foldHost(t, { tools: [], skills: [] });
+  const two = io(calm.base);
+  assert.equal(await tidyCommand(['--ask'], two), 0, two.said.join('\n'));
+  assert.equal(calm.seen.filter((s) => s.method === 'heldTwice').length, 2);
+  assert.equal(calm.seen.filter((s) => s.method === 'askFoldTwice').length, 0);
+  assert.ok(!two.lines.some((l) => l.includes('may be here twice')));
+});
+
+test('WITHOUT --ask NOTHING OF THE FOLD IS READ OR FILED: no index read, no heldTwice, no question, nothing but GETs', async (t) => {
+  const h = await foldHost(t, { tools: [2, 5], skills: [1, 3] });
+  const one = io(h.base);
+  assert.equal(await tidyCommand([], one), 0, one.said.join('\n'));
+  assert.ok(!h.seen.some((s) => ['boot', 'schema', 'heldTwice', 'askFoldTwice'].includes(s.method)), h.seen.map((s) => s.method).join(' '));
+  for (const s of h.seen) assert.equal(s.verb, 'GET');
+  assert.ok(!one.lines.some((l) => l.includes('may be here twice')));
 });

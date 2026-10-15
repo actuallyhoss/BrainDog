@@ -395,6 +395,10 @@ export const PEOPLE_METRICS: Record<string, SeedMetric> = {
     target: { gte: 0 },
     window: '30d',
     compare: 'none',
+    /* REMEMBERED EACH NIGHT, SINCE People 3.4.0 (PGS-C18), so the page's figure draws how many you were in touch with
+       over the month as a line (`trend: 30d` on In touch). A save writes the figure and asks nothing. Until the record
+       has kept three nights the cell is the figure alone. */
+    snapshot: { grain: 'day', into: 'series.people-in-touch-30d' },
   },
   /* WHAT THE CHART DREW, counted, until People 3.1.0, when the chart of twelve weeks went. STILL DECLARED, because a
      record holds it and a page somebody made may draw on it: a figure taken away is something an update has to ask
@@ -472,13 +476,17 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
    * page's line, and `people-in-touch-90d` stays declared and draws nothing, as `people-in-touch-12w` does.
    *
    * WHAT WAITS ON YOU ABOUT THEM, SINCE People 3.4.0 (PGS-C18). The line opens on how many questions about somebody here
-   * are open, and Waiting on you under it answers three. Before the fold at most four tiles: Waiting on you, the note on
-   * somebody held twice, Everyone and Organisations, each drawn only while it has something.
+   * are open, and Waiting on you under it answers three. In touch says how many you were in touch with in the month,
+   * with its line, and What agents did, last, what the runs changed here. Six tiles at most, and no fold: Waiting on
+   * you, the note on somebody held twice, In touch, Everyone, Organisations and What agents did, each drawn only while
+   * it has something.
    */
   people: {
     page: 'people',
     title: 'People',
-    nav: { section: 'People', order: 10 },
+    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+       Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
+    nav: { section: 'People', order: 10, place: 50 },
     icon: 'people',
     requires: ['register.people', 'register.organisations'],
     blocks: [
@@ -495,7 +503,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         lead: true,
         span: 12,
         when: { metric: 'people-quiet', is: 0 },
-        body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s), {{people-in-touch-30d}} in touch in the last 30 days',
+        /* NOT HOW MANY WERE IN TOUCH, SINCE People 3.4.0: In touch under it says that figure with its month as a line,
+           and a page says a figure once. */
+        body: '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)',
       },
       {
         /* WHO HAS GONE QUIET, BY NAME, SINCE People 2.7.0 (the visual review of October 2nd), where the line said "1 quiet
@@ -554,6 +564,17 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         body: '{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1).',
       },
       {
+        /* HOW MANY YOU WERE IN TOUCH WITH, AND HOW THAT MOVED OVER THE MONTH, SINCE People 3.4.0 (PGS-C18): the figure with
+           its line, from the night's save of `people-in-touch-30d`. Until three nights are kept the cell is the figure
+           alone. Only while the record keeps somebody, so a fresh record reads Everyone's empty line and nothing else. */
+        kind: 'stat',
+        heading: 'In touch',
+        icon: 'gauge',
+        span: 12,
+        when: { metric: 'people-count', gt: 0 },
+        cells: [{ metric: 'people-in-touch-30d', label: 'In touch, 30 days', trend: '30d' }],
+      },
+      {
         /* CARDS, with a face for each person, rather than a table of four columns read
            as a directory. Each card still opens the person's row. Their role, and the projects they were
            met in, because most people here arrive from an agent's commit rather than by hand, and the one you
@@ -608,6 +629,19 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
           { field: 'domain', label: 'Website', as: 'fact' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
+      },
+      {
+        /* WHAT AGENTS DID HERE, SINCE People 3.4.0 (PGS-C18): who an agent met, merged or wrote down, one group per run,
+           from the record's own log, as the Agents page draws what runs added to the brain. `first:` folds each run's
+           rest into one line with its count, so one busy run cannot push the others off the page. No `empty:`: with no
+           agent's change to a person or an organisation the block is not drawn. Last, because the people come first. */
+        kind: 'agents',
+        heading: 'What agents did',
+        icon: 'activity',
+        span: 12,
+        source: 'activity',
+        where: 'list is people or organisations',
+        first: 3,
       },
     ],
   },

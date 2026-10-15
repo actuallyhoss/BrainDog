@@ -127,3 +127,123 @@ export async function serveFirstRead(request: Request, door: FirstReadDoor, now 
     return refused(503, 'UNREACHABLE', UNANSWERED);
   }
 }
+
+/* ── what is on offer: the catalogue's use cases over the build's (USE-A16) ─────────────────────────────────────── */
+
+/** One use case the reader may read a sentence into: what the model is told, the words it is heard in, the modules it stands on. */
+export type FirstReadCase = { id: string; title: string; summary: string; signals: readonly string[]; modules: readonly string[] };
+
+/** One entry of a catalogue's index, as far as this door reads it (`CatalogueEntry` in `@braindog/declare/catalogue`). */
+export type FirstReadEntry = {
+  kind: string;
+  id: string;
+  title?: unknown;
+  summary?: unknown;
+  unlisted?: unknown;
+  signals?: unknown;
+  modules?: unknown;
+};
+
+/** The merged offer, and the ids of entries left out for having no title, for the host to say once in its log. */
+export type FirstReadMerged = { cases: FirstReadCase[]; untitled: string[] };
+
+/* Words kept only as words: each a string with something in it, trimmed, the first of any repeat kept. */
+const wordsOf = (x: unknown): string[] | null => {
+  if (!Array.isArray(x)) return null;
+  const out: string[] = [];
+  for (const w of x) if (typeof w === 'string' && w.trim() !== '' && !out.includes(w.trim())) out.push(w.trim());
+  return out;
+};
+
+const textOf = (x: unknown): string => (typeof x === 'string' ? x.trim() : '');
+
+/**
+ * THE CATALOGUE'S USE CASES MERGED OVER THE BUILD'S, BY ID. A front published as a file is offered with no code change:
+ * the landlord who types "I rent out six flats" can be read into Landlord because the catalogue lists it.
+ *
+ * THE CATALOGUE'S WINS where both name one id, and what it leaves unsaid (a summary, its signals, its modules) is the
+ * build's. An entry whose latest file says `unlisted` is left out, built-in or not, as every listing leaves it out. An
+ * entry with no title is left out and its id handed back to be said, and the build's case of that id, if any, stands:
+ * a broken entry never takes away what the build already offered. Only the first entry for an id counts.
+ *
+ * THE ORDER IS THE CATALOGUE'S, THEN THE BUILD'S, AND NOTHING ELSE. Two cases claiming one word ("rent" is Landlord's
+ * and Personal's) stand in the order the index lists them, every read, since nothing here sorts by anything but where an
+ * entry stood: one sentence is never proposed two use cases on two nights (the unit's risk). The build's cases the
+ * catalogue does not list follow, in their compiled order. Pure: it reads nothing and says nothing.
+ */
+export function firstReadOfferFrom(entries: readonly FirstReadEntry[], builtIns: readonly FirstReadCase[]): FirstReadMerged {
+  const built = new Map(builtIns.map((b) => [b.id, b] as const));
+  const seen = new Set<string>();
+  const settled = new Set<string>();
+  const cases: FirstReadCase[] = [];
+  const untitled: string[] = [];
+  for (const e of entries) {
+    if (e.kind !== 'usecase' || typeof e.id !== 'string' || e.id === '' || seen.has(e.id)) continue;
+    seen.add(e.id);
+    const title = textOf(e.title);
+    if (title === '') {
+      untitled.push(e.id);
+      continue;
+    }
+    settled.add(e.id);
+    if (e.unlisted === true) continue;
+    const was = built.get(e.id);
+    cases.push({
+      id: e.id,
+      title,
+      summary: textOf(e.summary) || (was?.summary ?? ''),
+      signals: wordsOf(e.signals) ?? [...(was?.signals ?? [])],
+      modules: wordsOf(e.modules) ?? [...(was?.modules ?? [])],
+    });
+  }
+  for (const b of builtIns) if (!settled.has(b.id)) cases.push({ ...b, signals: [...b.signals], modules: [...b.modules] });
+  return { cases, untitled };
+}
+
+/** Each word on offer and the cases that claim it, in offer order: the first is the one a tie goes to, every read. */
+export function firstReadClaims(cases: readonly FirstReadCase[]): Map<string, string[]> {
+  const claims = new Map<string, string[]>();
+  for (const c of cases)
+    for (const w of c.signals) {
+      const key = w.toLowerCase();
+      const by = claims.get(key) ?? [];
+      if (!by.includes(c.id)) by.push(c.id);
+      claims.set(key, by);
+    }
+  return claims;
+}
+
+/** The most of a case's words the model is told, so one case with a long list cannot crowd the others out of the prompt. */
+export const FIRST_READ_SIGNALS_TOLD = 48;
+
+/**
+ * What the model is told of a case: its summary and the words it is heard in. The reader's prompt prints an id, a title
+ * and a summary (`caseLines` in `@braindog/slash`), so the words ride in the summary until it prints them itself.
+ */
+export function firstReadTold(c: FirstReadCase): { id: string; title: string; summary: string; signals: readonly string[]; modules: readonly string[] } {
+  const words = c.signals.slice(0, FIRST_READ_SIGNALS_TOLD);
+  const summary = words.length === 0 ? c.summary : `${c.summary}${c.summary === '' || /[.!?]$/u.test(c.summary) ? '' : '.'} Heard in: ${words.join(', ')}.`.trim();
+  return { id: c.id, title: c.title, summary, signals: c.signals, modules: c.modules };
+}
+
+/** What a host's log says when the catalogue could not be read: the build's own use cases are what is offered. */
+export const FIRST_READ_CATALOGUE_UNREAD = "first read: this host's catalogue did not read, so a sign-up is read against the use cases built in.";
+
+/** What a host's log says when it has no catalogue to read at all. */
+export const FIRST_READ_NO_CATALOGUE = 'first read: this host has no catalogue, so a sign-up is read against the use cases built in.';
+
+/**
+ * The cases on offer, read from a catalogue: its index's entries over the build's, or the build's alone where there is
+ * no catalogue or it does not read, never a refusal, since a stranger's sentence can always be read against what was
+ * built. `said` is the one log line the host writes, or null when all of it read; it names ids only, never a sentence.
+ */
+export async function firstReadCasesRead(
+  readEntries: (() => Promise<readonly FirstReadEntry[] | null>) | null,
+  builtIns: readonly FirstReadCase[],
+): Promise<{ cases: FirstReadCase[]; said: string | null }> {
+  const entries = readEntries === null ? null : await readEntries().catch(() => null);
+  if (entries === null) return { cases: firstReadOfferFrom([], builtIns).cases, said: readEntries === null ? FIRST_READ_NO_CATALOGUE : FIRST_READ_CATALOGUE_UNREAD };
+  const merged = firstReadOfferFrom(entries, builtIns);
+  const said = merged.untitled.length === 0 ? null : `first read: the catalogue lists use cases with no title, so they are not offered: ${merged.untitled.join(', ')}.`;
+  return { cases: merged.cases, said };
+}

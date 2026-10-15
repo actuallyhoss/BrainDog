@@ -202,7 +202,7 @@ the table.
 | `who` | bool. On a `heat`, a line a person with a dot in each of the twelve weeks they were in touch, `columns: [{ field: <a day> }, { field: <a name> }]`. Written `people` before People 2.6.0, which the record still reads | `false` | no |
 | `box` | bool. On a `section`, the blocks after it, up to the next section, are drawn on one surface | `false` | no |
 | `panel` | `actions \| reporting`. On a `section` of a page per row (`for:`), the host panel drawn for the page's row under the section's heading: what the row's work runs on and is scheduled to do, or where its numbers are sent. Refused on a page with no `for:`. It is not `source: actions`, which lists the record's scheduled actions | none | no |
-| `actions` | a list of at most 8 actions (below). On any kind, the buttons the block offers over the whole block; its verbs are `row.create` and `rule.from_arrivals` | none | no |
+| `actions` | a list of at most 8 actions (below). On any kind, the buttons the block offers over the whole block; its verbs are `row.create`, `rule.from_arrivals` and `question.ask`. A `form` block runs `row.create` or `question.ask` | none | no |
 | `row_actions` | a list of at most 8 actions (below). On a kind that draws rows (`table`, `cards`, `todo`, `board`, `steps`, `queue`, `roadmap`, `progress`, `timeline`, and a registered kind on the table, list, rows or grid primitive), the buttons each row offers | none | no |
 | `field` | a field id on that row, `document` or `text`. On a `diff`, the field whose versions it compares | — | `diff` |
 | `versions` | int, 2–10. On a `diff`, how many versions it shows, newest first; each is compared with the one before it, one `diff` fence each | `2` | no |
@@ -224,6 +224,7 @@ none left carries neither key.
 | `row.move` | write | `field`, `to` |
 | `suggestion.answer` | decide | `option`, `reason` |
 | `rule.from_arrivals` | owner, hard | `arrivals`. Not on this host yet: the record refuses every press |
+| `question.ask` | write | `question`, `why`, `first`, `second`. Files an options question through propose, signed by whoever pressed; Undo takes it back while it is open |
 
 `tone_when` on a column is a `where:` leaf without `field:` — the column supplies it — plus a `tone`,
 evaluated at render like `when`. **It is specified and not built.** No evaluator reads it: the app's

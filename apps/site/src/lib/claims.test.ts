@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { CLAIMS } from './claims.ts';
 import { site } from './copy.ts';
 import { HELD, LAUNCH, held } from './launch.ts';
+import { launchOrder, ownerMarkers } from './launch-order.ts';
 import { SUPPORT_EMAIL } from './links.ts';
 import { PAGES, PLACES } from './nav.ts';
 
@@ -208,4 +209,42 @@ test('no sentence in the copy says a claim the ledger marks not yet', () => {
     said.filter((s) => s.toLowerCase().includes(c.said.toLowerCase())).map((s) => `${c.id}: "${s}"`),
   );
   assert.deepEqual(found, [], `${found.length} sentence(s) say what is not true yet:\n${found.join('\n')}`);
+});
+
+/**
+ * THE ORDER OF LAUNCH (LCH-A02, H.14): the legal pages go live before sign-up opens, a bot check is keyed before it does,
+ * billing goes live only with both prices and a door a person can come through, and the legal pages only once their
+ * texts hold no `[owner:` marker. `launchOrder` says every broken rule in a line.
+ *
+ * ON PLANTED CONFIGS ONLY. Production today is `SIGNUP: open` with `LAUNCH.legal` false and an empty site key, so the
+ * same test on the real config would be red on master: whether it is asserted there is the owner's to rule. The first
+ * case plants on a copy of production's own vars, so the rule is proven against the config it will one day read.
+ */
+test('the order of launch: sign-up open before the legal pages fails with the legal line', () => {
+  const production: { [key: string]: string } = wranglerConfig(fileURLToPath(REPO)).env?.['production']?.vars ?? {};
+  const planted = launchOrder({ ...production, SIGNUP: 'open' }, { legal: false });
+  assert.ok(
+    planted.some((line) => line.includes('Set LAUNCH.legal to true first, so /legal/<name> goes live before sign-up opens')),
+    `a copy of production with SIGNUP open and LAUNCH.legal false was not refused for the legal pages: ${JSON.stringify(planted)}`,
+  );
+  assert.deepEqual(launchOrder({ SIGNUP: 'open', TURNSTILE_SITE_KEY: '0x-planted-site-key' }, { legal: false }), [
+    'Sign-up is open before the legal pages are live. Set LAUNCH.legal to true first, so /legal/<name> goes live before sign-up opens.',
+  ]);
+});
+
+test('the order of launch: a legal, keyed, open config passes, and so does one not yet open', () => {
+  assert.deepEqual(launchOrder({ SIGNUP: 'open', TURNSTILE_SITE_KEY: '0x-planted-site-key', BILLING: 'off' }, { legal: true }, 0), []);
+  for (const signup of [undefined, '', 'invite', 'closed'])
+    assert.deepEqual(launchOrder({ ...(signup === undefined ? {} : { SIGNUP: signup }) }, { legal: false }), [], `SIGNUP ${String(signup)}`);
+});
+
+test('the order of launch: open with no site key, billing live short of a price or with sign-up closed, legal with markers', () => {
+  assert.match(launchOrder({ SIGNUP: ' open ', TURNSTILE_SITE_KEY: '  ' }, { legal: true }).join('\n'), /no bot check\. Put TURNSTILE_SITE_KEY/);
+  const short = launchOrder({ SIGNUP: 'invite', BILLING: 'live', STRIPE_PRICE_HOSTED: 'price_planted_one' }, { legal: false });
+  assert.deepEqual(short, ['Billing is live without STRIPE_PRICE_PLUS. Set both prices before BILLING is live.']);
+  const shut = launchOrder({ BILLING: 'live', STRIPE_PRICE_HOSTED: 'price_planted_one', STRIPE_PRICE_PLUS: 'price_planted_two' }, { legal: false });
+  assert.deepEqual(shut, ['Billing is live while sign-up is closed, so nobody can reach a plan to pay for. Set SIGNUP to invite or open first.']);
+  assert.equal(ownerMarkers(['Kept by [owner: a planted name].', 'Held in [owner: a place] for [owner: how long].', 'Finished.']), 3);
+  assert.deepEqual(launchOrder({}, { legal: true }, 3), ['LAUNCH.legal is true while the legal texts still hold 3 [owner: markers. Finish them in apps/site/legal/ first.']);
+  for (const line of [...short, ...shut, ...launchOrder({ SIGNUP: 'open' }, { legal: true }, 1)]) assert.ok(!line.includes('\u2014'), line);
 });

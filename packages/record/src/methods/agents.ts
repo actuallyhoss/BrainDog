@@ -14,6 +14,7 @@ import { agentOf, sessionDeclaration, type ArrivalSettled, type Entry, type Patc
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { listFor } from '../agent-lists.ts';
 
 /** One run's use of a key or a tool: the run by its spoken id, its agent and machine, when it last used it, and how often. */
 export type UsedByRun = { run: string; agent: string | null; machine: string | null; at: string; count: number };
@@ -32,10 +33,10 @@ export const USED_BY_MOST = 10;
 export const USED_BY_WALK = 5_000;
 
 /**
- * The two lists this method answers for, and the field a key's grant id is held in, as the agents pack declares them
- * (`packages/seed/src/packs/agents.ts`) and as `index.ts` reads a key (`KEYS`, `KEY_FIELD`).
+ * The tools list this method answers for beside the keys, and the field a key's grant id is held in, as the agents pack
+ * declares them (`packages/seed/src/packs/agents.ts`). The list of keys by name is the one that plays `keys-index`
+ * (`agent-lists.ts` `listFor`), read per call.
  */
-const KEYS = 'credentials';
 const KEY_FIELD = 'value';
 const TOOLS = 'tools';
 
@@ -268,6 +269,7 @@ export function methods(deps: RecordDeps) {
       const row = kernel.get(said);
       if (!row || readable(ctx, row.register) !== null)
         return no('REF_UNKNOWN', 'There is no key or tool you can read by that name.', { at: 'spoken' });
+      const KEYS = listFor('keys-index', kernel.registers());
       if (row.register !== KEYS && row.register !== TOOLS)
         return no('VALUE_MALFORMED', `That is a row of ${kernel.register(row.register)?.name ?? row.register}, and only a key or a tool has uses to list.`, { at: 'spoken' });
 

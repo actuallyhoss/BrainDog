@@ -159,6 +159,8 @@ export const offerWords = {
   /** Who made the offer, beside Slash's mark: an offer drawn from use is Slash's (ENG-B17). */
   noticed: 'Slash noticed',
   make: 'Make it',
+  /** A place offered for a view he already uses (`place:`, USE-B13): Keep writes it as it stands, so nothing is made. */
+  keep: 'Keep it',
   making: 'Making it',
   notNow: 'Not now',
   /** What the small drawing is, for a screen reader: the page the offer would make. */
@@ -166,6 +168,9 @@ export const offerWords = {
   /** A block of figures, named without a number, since the drawing has read none. */
   figures: 'Figures',
 } as const;
+
+/** The card's make button: Keep it for a place offer (`place:`), Make it for the rest. */
+export const makeLabel = (item: Pick<PenItem, 'id'>): string => (item.id.startsWith('place:') ? offerWords.keep : offerWords.make);
 
 /** What the card is told about the person's choices: the pen's switch, and whether an offer is gone (dismissed or made). */
 export type OfferHeld = { suggest: boolean; gone: (id: string) => boolean };

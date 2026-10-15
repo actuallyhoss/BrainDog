@@ -3,7 +3,7 @@
   "version": "1.19.0",
   "title": "Work",
   "summary": "Tasks, the threads of work they belong to, and how each thread is going.",
-  "changes": "A thread has six states and the moves between them, and a day it aims for. A follow-up takes its parent's project, thread and owner, each one it left empty, and its agent when that agent made it. The Board opens with the line to add work. Which project a task or a thread is for waits until Projects is there, and who owns a task until People is. A project that has had nothing written on its tasks for more than thirty days is marked quiet. Work counts and answers the questions about your tasks.",
+  "changes": "A thread has six states and the moves between them, and a day it aims for. A follow-up takes its parent's project, thread and owner where it left them empty, and its agent when that agent made it. The Board opens with the line to add work. A project waits for Projects, and an owner for People. A project with nothing written on its tasks for thirty days is marked quiet. Work answers the questions about your tasks, has a head with a search, and lists open work with no project.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -152,10 +152,15 @@
     {
       "page": "work",
       "title": "Work",
-      "nav": { "section": "Work", "order": 10 },
+      "nav": { "section": "Work", "order": 10, "place": 10 },
       "icon": "task",
       "requires": [ "register.tasks" ],
       "pack": "work",
+      "header": {
+        "count": { "metric": "open-tasks" },
+        "action": { "verb": "row.create", "label": "Add" },
+        "search": { "param": "q" }
+      },
       "filters": [
         { "field": "thing", "control": "chips", "when": { "holds": [ "things" ] } }
       ],
@@ -302,6 +307,26 @@
           "order": [ { "field": "by", "dir": "asc" } ],
           "limit": 8,
           "when": { "metric": "tasks-later", "gt": 0 }
+        },
+        {
+          "kind": "section",
+          "heading": "Needs a project",
+          "icon": "inbox",
+          "span": 12,
+          "fold": true,
+          "when": { "metric": "tasks-no-project", "gt": 0 }
+        },
+        {
+          "kind": "table",
+          "heading": "With no project",
+          "icon": "folder",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is not backlog or done or dropped, thing is empty",
+          "columns": [ { "field": "what", "width": "minmax(20ch,1fr)" }, { "field": "by", "label": "Due", "width": "13ch", "align": "end" } ],
+          "order": [ { "field": "created_at", "dir": "desc" } ],
+          "limit": 5,
+          "when": { "holds": [ "things" ] }
         },
         {
           "kind": "section",
@@ -695,6 +720,18 @@
       "target": { "gte": 0 },
       "window": "30d",
       "compare": "none"
+    },
+    {
+      "metric": "tasks-no-project",
+      "name": "With no project",
+      "source": "register.tasks",
+      "where": "state is not backlog or done or dropped, thing is empty",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "when": { "holds": [ "things" ] }
     },
     {
       "rule": "close_follow_ups",

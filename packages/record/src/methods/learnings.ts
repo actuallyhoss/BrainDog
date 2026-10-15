@@ -45,6 +45,7 @@ import type { Entry } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { fadeDays, fadeOf } from '../agent-lists.ts';
 import { PROMOTED_WHY, promotionQuestion, promotionsFor, type Lesson, type Promotion } from '../learning-promote.ts';
 
 /** One learning as a session reads it. `made` and `confirmed_on` are days; `where` is never a project's handle. */
@@ -72,8 +73,10 @@ export const LEARNED_MOST = 200;
 /** The most read from one place before the order is made, which is the most the kernel hands of one. */
 const READ_MOST = 200;
 
-/** The field that makes a list one whose rows fade, and how long a row stands unconfirmed (`FADES` in `index.ts`). */
-const FADES = 'confirmed_on';
+/**
+ * How long a row stands unconfirmed on a list that declares no fade of its own and has the old `confirmed_on` day. A list
+ * that declares `fade: { field, after }` fades by that instead (`agent-lists.ts` `fadeOf`).
+ */
 export const LEARNED_FADE_MS = 90 * 86_400_000;
 
 type Field = { id: string; type?: string; to?: string; retired?: boolean; scope?: unknown; values?: readonly string[] };
@@ -182,7 +185,9 @@ export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, li
   /* WHAT A LEARNING THAT STANDS REPLACES is left out, judged across both places and among the rows this caller reads.
      One that has faded still replaces: it says the old one stopped being true, whether or not it is handed itself. */
   const out = replacedIn([...here, ...wide], replacesField(id, decl.fields as readonly Field[]));
-  const cutoff = new Date(nowMs - LEARNED_FADE_MS).toISOString().slice(0, 10);
+  const fade = fadeOf(decl);
+  const FADES = fade?.field ?? 'confirmed_on';
+  const cutoff = new Date(nowMs - (fade === null ? LEARNED_FADE_MS : fadeDays(fade.after)! * 86_400_000)).toISOString().slice(0, 10);
   let faded = 0;
   let replaced = 0;
   const said = (rows: readonly Entry[], where: Learned['where']): Learned[] =>
@@ -237,7 +242,7 @@ const kindsOf = (fields: readonly Field[]): readonly string[] => fields.find((f)
 function fadingList(deps: RecordDeps) {
   for (const [id, decl] of deps.kernel.registers()) {
     const fields = decl.fields as readonly Field[];
-    const fades = fields.some((f) => f.id === FADES && f.type === 'day' && !f.retired);
+    const fades = fadeOf(decl) !== null;
     if (fades && fields.some((f) => f.scope !== undefined && !f.retired)) return { id, decl };
   }
   return null;

@@ -1507,12 +1507,14 @@ export function advance(deps: FlowDeps, id: string): number | null {
           continue;
         }
         if (was?.state === 'waiting') {
-          const spec = step[op.verb] as { wait?: string };
+          const spec = step[op.verb] as { wait?: string; question?: unknown };
+          /* THE QUESTION'S OWN WORDS, never the suggestion id the step row holds while it waits. */
+          const said = typeof spec.question === 'string' && spec.question.trim() !== '' ? `"${spec.question.trim()}"` : 'a question';
           return fail(
             i,
             op.verb,
             op.verb === 'ask_person'
-              ? `rule.${run.rule} asked ${was.answer ?? 'a question'} at step ${i + 1}, and nobody answered it within ${spec.wait ?? ASK_PERSON_WAIT}, so the run stopped there.`
+              ? `rule.${run.rule} asked ${said} at step ${i + 1}, and nobody answered it within ${spec.wait ?? ASK_PERSON_WAIT}, so the run stopped there.`
               : `rule.${run.rule} asked Slash at step ${i + 1}, and Slash did not answer within a day, so the run stopped there.`,
           );
         }

@@ -1671,6 +1671,19 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 1.2.0 (owed-words-70-71, audit 69 finding 4; commit 63423720 holds 1.0.0): `page.orders` heads its tile of orders not paid in full Still to come in, as Today's money tile says it, with its empty line, and `setting.voice_fills_with` says the money still to come in -> 68b91519bbf178bd",
     ],
   },
+  /* THE ORDERS PAGE'S PLACE ON THE RAIL (places-and-computed-101, SHL-A18). 1.2.0 IS IN THE CATALOGUE, so a version. */
+  'shop@1.3.0': {
+    holds: `
+      metric.orders-30d metric.orders-due-7d metric.orders-late metric.orders-owed metric.orders-owed-named metric.orders-owed-other
+      page.orders register.orders register.products setting.label_orders
+      setting.label_people setting.label_products setting.one_orders setting.one_people setting.one_products
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_nothing_due
+    `,
+    declares: '3ebf3b51d97bdce0',
+    history: [
+      '`page.orders` says its place on the rail, `nav.place` 20, second after Work (places-and-computed-101, SHL-A18; batch 101) -> 3ebf3b51d97bdce0',
+    ],
+  },
 };
 
 /** The shortest a reason may be. The value it justifies is sixteen characters, and a reason has to be worth more room than that. */

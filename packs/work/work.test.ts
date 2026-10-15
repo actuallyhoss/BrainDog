@@ -206,14 +206,15 @@ function waits(doc: File): { at: string; holds: unknown }[] {
 /**
  * The module with the two places the plan still stores more laid on as the file says them, on a record without
  * Projects: a task's and a thread's phone line still name the project, second, and Work keeps an empty list of filters
- * where its filter by project was, before its blocks.
+ * where its filter by project was, before its blocks. And the one place the module stores more taken out (`unplaced`).
  */
 function apart(pack: Pack, holds: readonly string[]): Pack {
   const body = (d: Pack['declarations'][number], next: Body): Pack['declarations'][number] => ({ ...d, body: next as never });
   if (holds.includes(PROJECTS)) return pack;
+  const kept = unplaced(pack, holds);
   return {
-    ...pack,
-    declarations: pack.declarations.map((d) => {
+    ...kept,
+    declarations: kept.declarations.map((d) => {
       if (d.id === 'register.tasks' || d.id === 'register.tracks') {
         const mobile = [...((d.body as Body).mobile as string[])];
         mobile.splice(1, 0, 'thing');
@@ -228,18 +229,37 @@ function apart(pack: Pack, holds: readonly string[]): Pack {
   };
 }
 
+/**
+ * THE ONE PLACE THE MODULE STILL STORES MORE, on a record without Projects: Work's With no project, whose sentence reads
+ * the project. The file waits it on Projects (`when: { holds }`); the module keeps it, since `without` in
+ * `packages/seed/src/packs/first-party.ts` takes out a figure over a field that is gone and not yet a block
+ * (work-head-and-no-project-101 asks for that line). Taken out here only where the module still has it, so the day the
+ * line lands nothing here goes red; the day after, this can go.
+ */
+function unplaced(pack: Pack, holds: readonly string[]): Pack {
+  if (holds.includes(PROJECTS)) return pack;
+  return {
+    ...pack,
+    declarations: pack.declarations.map((d) => {
+      if (d.id !== 'page.work') return d;
+      const blocks = ((d.body as Body).blocks as Body[]).filter((b) => b.heading !== 'With no project');
+      return { ...d, body: { ...(d.body as Body), blocks } as never };
+    }),
+  };
+}
+
 /* ── The file's own checks ─────────────────────────────────────────────────────────────────────── */
 
 const SCRIPTS: Readonly<Record<string, string>> = { close_follow_ups: './close-follow-ups.js', start_with_parent: './start-with-parent.js' };
 const source = (script: string): string => readFileSync(new URL(SCRIPTS[script]!, import.meta.url), 'utf8');
 
-test('THE FILE IS WORK AND ONLY WORK: three lists, two pages, twenty-six figures over its own lists, two rules, two scripts', () => {
+test('THE FILE IS WORK AND ONLY WORK: three lists, two pages, twenty-seven figures over its own lists, two rules, two scripts', () => {
   const doc = file();
   assert.equal(doc.pack, 'work');
   const kinds = doc.declarations.map((d) => ['rule', 'script', 'ingest', 'register', 'page', 'metric'].find((k) => typeof d[k] === 'string') ?? 'something else');
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule', 'script'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    { register: 3, page: 2, metric: 26, rule: 2, script: 2 },
+    { register: 3, page: 2, metric: 27, rule: 2, script: 2 },
   );
   assert.ok(!kinds.includes('ingest') && !kinds.includes('something else'), 'the file declares something that is none of the five');
   assert.deepEqual(doc.declarations.flatMap((d) => (typeof d.register === 'string' && d.rule === undefined ? [d.register] : [])), [...OWN]);
@@ -293,7 +313,7 @@ test('ITS VERSION IS THE MODULE\'S, ONE MINOR STEP ABOVE THE RELEASED ONE, and i
   assert.equal(firstPartyDocument('work')!.config, undefined);
 });
 
-test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: eighteen parts wait, each on one of the two', () => {
+test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty parts wait, each on one of the two', () => {
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'Work installs on a record with no other add-on');
   assert.deepEqual(firstPartyManifest('work').requires, [], 'and so does the module');
@@ -304,12 +324,15 @@ test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: eighteen parts
     { at: '"Work", "thing"', holds: [PROJECTS] },
     { at: '"Work", "No due day", "thing"', holds: [PROJECTS] },
     { at: '"Work", "Later", "thing"', holds: [PROJECTS] },
+    /* OPEN WORK WITH NO PROJECT ASKS FOR PROJECTS WHOLE, SINCE work 1.19.0: its sentence is about the project. */
+    { at: '"Work", "With no project"', holds: [PROJECTS] },
     { at: '"Board", "board", "owner"', holds: [PEOPLE] },
     { at: '"Board", "Everything open", "Project"', holds: [PROJECTS] },
     { at: '"Board", "Everything open", "Owner"', holds: [PEOPLE] },
     ...['Open', 'Due soon', 'In review', 'Handed back or blocked', 'Changed this week', 'Last worked', 'Done this week', 'Planned with a day', 'Done, by week'].map(
       (name) => ({ at: `"${name}"`, holds: [PROJECTS] }),
     ),
+    { at: '"With no project"', holds: [PROJECTS] },
   ]);
   /* EVERY PART THAT NAMES THE PROJECT OR THE OWNER WAITS, and nothing else does: no column, field or figure over either
      is there unconditionally, so nothing the record lacks is ever drawn. */
@@ -375,7 +398,7 @@ test('TWO THINGS THE PLAN STILL STORES MORE THAN THE MODULE, word for word, only
   for (const { name, holds } of SUBSETS) {
     const { api, close } = await record(holds);
     const { pack } = await resolved(api);
-    assert.deepEqual(parity(pack, await moduleFor(holds)), want[name], `${name}, the file and the module differ in other ways than the two`);
+    assert.deepEqual(parity(pack, unplaced(await moduleFor(holds), holds)), want[name], `${name}, the file and the module differ in other ways than the two`);
     close();
   }
 });
@@ -427,7 +450,7 @@ const TASK = { what: 'Proof the spring catalogue', state: 'open', by: '2026-03-1
 const THREAD = { name: 'Spring catalogue', state: 'open' };
 
 for (const holds of [[PROJECTS, PEOPLE], [PROJECTS]])
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record with ${holds.length === 2 ? 'both neighbours' : 'Projects alone'} stores the same thirty-five parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record with ${holds.length === 2 ? 'both neighbours' : 'Projects alone'} stores the same thirty-six parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, moduleDoc(holds, [])));
@@ -435,7 +458,7 @@ for (const holds of [[PROJECTS, PEOPLE], [PROJECTS]])
     const mine = stored(filed.api);
     const theirs = stored(built.api);
     const work = (await read(file())).declarations.map((d) => d.id);
-    assert.equal(work.length, 35);
+    assert.equal(work.length, 36);
     for (const id of work) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));

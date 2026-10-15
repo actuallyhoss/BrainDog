@@ -6,6 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { LiveLook } from '../record/page-live.ts';
+import { blockAt, changeBlock, changeWords, kindPatch, setBody, withPatch, withoutBlock } from '../record/page-write.ts';
+import type { Fetch as ClientFetch, PageBody } from '../record/pages-live.ts';
 import { actionsFor, editOf, hideBody, laidAfter, laidOf, placeOf, saidOf, words, type Laid, type MenuBlock } from './block-menu.ts';
 
 const LATE: MenuBlock = { key: 'late', kind: 'todo', columns: 0, span: 12, name: 'Late', kindName: 'to-do list' };
@@ -170,4 +172,140 @@ test('THE MARK IS THE OWNER\'S, behind `?menu`, on a page that writes and is not
   assert.match(menu, /<Icon name="more" size="s" \/>/u);
   assert.match(menu, /lookOfArrangement\(/u);
   assert.match(menu, /writeLook\(/u);
+});
+
+/* ── Change to and Remove (PGS-B08 c, d) ─────────────────────────────────── */
+
+const BILLS: MenuBlock = { key: 'bills', kind: 'table', columns: 2, span: 12, name: 'Bills', kindName: 'table' };
+/* WHAT `kindsFor` ANSWERS FOR A TABLE OF NAMES AND NOTES, handed in as the menu is, so this needs no renderer. */
+const TABLE_KINDS = ['cards', 'todo'];
+const NAMES: Record<string, string> = { cards: 'Cards', todo: 'To-do list', table: 'Table' };
+const kindName = (k: string) => NAMES[k] ?? k;
+
+test('CHANGE TO ON HIS PAGE: the kinds by name after the widths, then Hide, then Remove', () => {
+  const rows = actionsFor(BILLS, { ...owner, change: { mine: true, kinds: TABLE_KINDS, kindName } });
+  assert.deepEqual(rows.map((a) => a.id).slice(-4), ['kind-cards', 'kind-todo', 'hide', 'remove']);
+  assert.deepEqual(rows.filter((a) => a.kind).map((a) => a.label), ['Cards', 'To-do list']);
+  assert.ok(!rows.some((a) => a.kind === 'table'), 'never the kind it is');
+  assert.deepEqual(editOf(rows.find((a) => a.id === 'kind-cards')!, BILLS, { laid: laid('bills') }), { kind: 'cards' });
+  assert.deepEqual(editOf(rows.find((a) => a.id === 'remove')!, BILLS, { laid: laid('bills') }), { remove: true });
+  /* A KIND HANDED IN THAT IS THE BLOCK'S OWN IS LEFT OUT. */
+  assert.ok(!actionsFor(BILLS, { ...owner, change: { mine: true, kinds: ['table', 'cards'] } }).some((a) => a.id === 'kind-table'));
+});
+
+test('NOT ON AN ADD-ON\'S PAGE: one greyed row says where Change to is, and nothing is removed', () => {
+  const rows = actionsFor(BILLS, { ...owner, change: { mine: false, kinds: TABLE_KINDS, kindName } });
+  const change = rows.find((a) => a.id === 'change')!;
+  assert.equal(change.disabled, true);
+  assert.equal(change.why, 'Change to is on pages you made');
+  assert.ok(!rows.some((a) => a.id === 'remove' || a.kind !== undefined));
+  assert.equal(editOf(change, BILLS, { laid: laid('bills') }), null, 'pressing it changes nothing');
+  /* A PAGE NOT READ YET, AND THE MENU AS IT WAS, offer neither. */
+  assert.deepEqual(ids(BILLS, { ...owner, change: { kinds: TABLE_KINDS } }), ids(BILLS, owner));
+  assert.ok(!ids(BILLS, { ...owner, change: { mine: false, kinds: [] } }).includes('change'), 'a block that can become nothing else says nothing');
+  assert.deepEqual(actionsFor(BILLS, { ...owner, owner: false, change: { mine: true, kinds: TABLE_KINDS } }), [], 'a member is offered none');
+});
+
+test('THE LINE OVER UNDO names the block and what it became', () => {
+  assert.equal(saidOf({ kind: 'cards' }, 'Bills', 'kind-cards', 'Cards'), 'Bills is now cards.');
+  assert.equal(saidOf({ kind: 'todo' }, 'Bills', 'kind-todo', 'To-do list'), 'Bills is now a to-do list.');
+  assert.equal(saidOf({ kind: 'lines' }, 'Spent', 'kind-lines', 'Line over time'), 'Spent is now a line over time.');
+  assert.equal(saidOf({ remove: true }, 'Bills', 'remove'), 'Bills is off the page.');
+});
+
+/* ── the page's write: a change of kind and a removal, with Undo ─────────── */
+
+const BASE = 'http://record.test';
+const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+const STORED: PageBody = {
+  page: 'money',
+  title: 'Money',
+  blocks: [
+    { kind: 'stat', heading: 'Cash', cells: [] },
+    { kind: 'table', key: 'bills', heading: 'Bills', source: 'register.bills', columns: [{ field: 'payee' }, { field: 'due' }], group: 'payee', about: 'payee' },
+    { kind: 'cards', heading: 'Late', source: 'register.bills', columns: [{ field: 'payee' }, { field: 'due', as: 'when', metric: 'late' }], lead: true, fold: 4 },
+  ],
+};
+
+/** A record holding one page: `arrangement` answers it with who signed it, and `setDeclaration` keeps what it is sent. */
+function record(pack: string | null = null): { io: ClientFetch; held: () => PageBody; sets: unknown[] } {
+  let body = structuredClone(STORED);
+  let version = 3;
+  const sets: unknown[] = [];
+  const io: ClientFetch = async (input, init) => {
+    const url = String(input);
+    const sent = init?.body ? JSON.parse(String(init.body)) : {};
+    if (url.includes('/api/arrangement')) return json(200, { ok: true, value: { id: 'page.money', version, pack, body } });
+    if (url.includes('/api/setDeclaration')) {
+      sets.push(sent);
+      if (sent.version !== undefined && sent.version !== version) return json(409, { ok: false, conflict: true });
+      body = sent.body;
+      version += 1;
+      return json(200, { ok: true, value: [{ id: 'page.money', version }] });
+    }
+    return json(404, { ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No such method.' } });
+  };
+  return { io, held: () => body, sets };
+}
+
+test('KIND GOES THROUGH ONLY TO A KIND kindsFor ALLOWED, and the keys the new kind cannot read come off with it', () => {
+  const table = STORED.blocks[1]!;
+  assert.equal(withPatch(table, { kind: 'cards' }).kind, 'table', 'the block editor never changes what a block is');
+  assert.equal(withPatch(table, { kind: 'cards' }, ['cards', 'todo']).kind, 'cards');
+  assert.equal(withPatch(table, { kind: 'board' }, ['cards', 'todo']).kind, 'table', 'a kind not offered is no change');
+  assert.equal(kindPatch(table, 'board', ['cards', 'todo']), null);
+  assert.equal(kindPatch(table, 'table', ['table']), null, 'what it already is');
+  assert.deepEqual(kindPatch(table, 'todo', ['cards', 'todo']), { kind: 'todo', group: null, about: null });
+  assert.deepEqual(kindPatch(table, 'cards', ['cards', 'todo']), { kind: 'cards' }, 'cards read a grouping and an about');
+  const cards = STORED.blocks[2]!;
+  const toTable = kindPatch(cards, 'table', ['table', 'todo'])!;
+  assert.equal(toTable.lead, null);
+  assert.equal(toTable.fold, null);
+  assert.deepEqual(toTable.columns, [{ field: 'payee' }, { field: 'due' }], 'a card\'s roles are a card\'s only');
+  assert.deepEqual(withPatch(cards, toTable, ['table', 'todo']), { kind: 'table', heading: 'Late', source: 'register.bills', columns: [{ field: 'payee' }, { field: 'due' }] });
+});
+
+test('THE BLOCK PRESSED IS FOUND BY ITS KEY, else by kind, list and heading, and never by a guess', () => {
+  assert.equal(blockAt(STORED, { key: 'bills', kind: 'table' }), 1);
+  assert.equal(blockAt(STORED, { key: 'a1b2c3', kind: 'cards', source: 'register.bills', heading: 'Late' }), 2, 'the record\'s own name for it');
+  assert.equal(blockAt(STORED, { kind: 'cards', source: 'register.bills', heading: 'Early' }), null);
+  const twice = { ...STORED, blocks: [...STORED.blocks, { ...STORED.blocks[2]! }] };
+  assert.equal(blockAt(twice, { kind: 'cards', source: 'register.bills', heading: 'Late' }), null, 'two alike: neither is written');
+  assert.equal(withoutBlock(STORED, 5), null);
+  assert.deepEqual(withoutBlock(STORED, 0)?.blocks.map((b) => b.kind), ['table', 'cards']);
+});
+
+test('REMOVE GIVES THE PAGE WITHOUT THE BLOCK, and Undo puts it back', async () => {
+  const { io, held } = record();
+  const out = await changeBlock(BASE, 'money', { key: 'bills', kind: 'table' }, { remove: true }, io);
+  assert.equal(out.from, 'written');
+  assert.deepEqual(held().blocks.map((b) => b.heading), ['Cash', 'Late']);
+  assert.equal(Object.keys(held())[0], 'page', 'the record reads a declaration by its first key');
+  if (out.from !== 'written') return;
+  const back = await setBody(BASE, out.before, io, out.version);
+  assert.equal(back.from, 'written');
+  assert.deepEqual(held(), STORED);
+});
+
+test('CHANGE TO WRITES THE NEW KIND, and Undo puts the block back as it was', async () => {
+  const { io, held, sets } = record();
+  const out = await changeBlock(BASE, 'money', { key: 'bills', kind: 'table' }, { kind: 'cards', kinds: TABLE_KINDS }, io);
+  assert.equal(out.from, 'written');
+  assert.equal(held().blocks[1]!.kind, 'cards');
+  assert.equal((sets[0] as { version?: number }).version, 3, 'written at the version read');
+  if (out.from === 'written') await setBody(BASE, out.before, io, out.version);
+  assert.equal(held().blocks[1]!.kind, 'table');
+  /* A KIND NOT OFFERED IS NOT WRITTEN. */
+  sets.length = 0;
+  assert.equal((await changeBlock(BASE, 'money', { key: 'bills', kind: 'table' }, { kind: 'board', kinds: TABLE_KINDS }, io)).from, 'refused');
+  assert.equal(sets.length, 0);
+});
+
+test('AN ADD-ON\'S PAGE IS NEVER SET WHOLE from the menu: it would become his copy and stop taking updates', async () => {
+  const { io, sets } = record('money-pack');
+  const out = await changeBlock(BASE, 'money', { key: 'bills', kind: 'table' }, { remove: true }, io);
+  assert.deepEqual(out, { from: 'refused', fix: changeWords.notYours });
+  assert.equal(sets.length, 0);
+  assert.doesNotMatch(changeWords.notYours, /—|\brow\b|\bentity\b/u);
 });

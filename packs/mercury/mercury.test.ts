@@ -224,7 +224,8 @@ async function withMoney(): Promise<{ sql: NodeSql; plan: (doc: unknown) => Prom
 const LEDGER_LINES = [
   'CALLS OUT api.mercury.com · every 1h · key "Mercury (read only)" to api.mercury.com',
   'mercury_ledger reads accounts, transactions and categories and may send what it reads to api.mercury.com.',
-  'Keys are not kept per project yet, so any action in this record can send any key it names.',
+  /* SINCE SHL-C05 (key-own-host-100) a key is held to its project and its host, so the list ends on who else can open it. */
+  'A scheduled action opens this key with nobody present, so the server that runs it can open it too.',
 ];
 
 

@@ -9,9 +9,17 @@
  *
  * THE COUNT IS IN MEMORY AND STARTS OVER WITH THE PROCESS, which can only give strangers more of a day than it should
  * after a restart, never fewer; a self-host is one process, so one count holds every request it serves.
+ *
+ * WHAT IS ON OFFER IS THE CATALOGUE THIS HOST SERVES (USE-A16): the use cases in the folder it answers `/app/catalogue/`
+ * from, read once and merged over the ones compiled in (`catalogueOffer`). No folder, or an index that does not read,
+ * is the compiled list, said once in the log.
  */
 
-import type { FirstReadDoor } from '@braindog/host/first-read';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { CATALOGUE_INDEX, readCatalogue } from '@braindog/declare/catalogue';
+import { firstReadCasesRead, firstReadTold, type FirstReadCase, type FirstReadDoor, type FirstReadEntry } from '@braindog/host/first-read';
 import { endpointInference } from '@braindog/host/slash';
 import type { Result } from '@braindog/ports';
 import { AGENTS_PACK } from '@braindog/seed/packs';
@@ -20,6 +28,7 @@ import { moduleDocument } from '@braindog/seed/usecases/install';
 import { moduleName } from '@braindog/seed/usecases/names';
 import type { Inference, SetupAnswer, SetupAsk, SetupOffer } from '@braindog/slash';
 
+import { catalogueFolder } from './catalogue.ts';
 import type { SlashConfig } from './slash.ts';
 
 /** The reader: one model call over what was said and what is on offer, with no record, no owner and no ledger. */
@@ -35,6 +44,13 @@ export type SelfhostFirstReadDeps = {
   readSetup: ReadSetup | null;
   /** How a call leaves this host, to the model and to the bot check: `fetch`, a fake in tests. */
   send?: Send | undefined;
+  /**
+   * The catalogue folder this host serves at `/app/catalogue/` (`catalogueFolder`), or `null` for none. Left out, it is
+   * the one the environment names (`firstReadFolder`).
+   */
+  catalogue?: string | null | undefined;
+  /** Where the one line about the catalogue goes: `console.warn`, a list in tests. */
+  log?: ((line: string) => void) | undefined;
 };
 
 /** Readings one address may have in a UTC day. */
@@ -111,13 +127,46 @@ function listsOf(module: string): SetupOffer['modules'][number]['lists'] {
 
 let built: SetupOffer | null = null;
 
-/** Every use case and module this build serves, as the first run's own screen offers them; the agents' lists by name only. */
+/** The use cases compiled into this build, with the words each is heard in and the modules it stands on. */
+export const builtInCases = (): FirstReadCase[] =>
+  USE_CASES.map((u) => ({ id: u.usecase, title: u.title, summary: u.summary, signals: [...u.signals], modules: [...u.modules] }));
+
+/**
+ * Every use case and module this build serves, as the first run's own screen offers them; the agents' lists by name only.
+ * What is offered when no catalogue reads; each case told with the words it is heard in (`firstReadTold`).
+ */
 export function firstReadOffer(): SetupOffer {
   built ??= {
-    usecases: USE_CASES.map((u) => ({ id: u.usecase, title: u.title, summary: u.summary })),
+    usecases: builtInCases().map(firstReadTold),
     modules: MODULE_ORDER.map((id) => ({ id, name: moduleName(id), lists: id === AGENTS_PACK.manifest.id ? [] : listsOf(id) })),
   };
   return built;
+}
+
+/**
+ * The folder this host serves its catalogue from, as the environment names it: `BRAINDOG_CATALOGUE`, else the bundled one
+ * in `BRAINDOG_SHELL`, or `null`. Only what the environment says, never a guess at a build on disk, so a door built over
+ * a given environment reads the same everywhere; the server hands the folder it serves (`deps.catalogue`) where it knows it.
+ */
+export function firstReadFolder(env: Record<string, string | undefined>): string | null {
+  return catalogueFolder(env.BRAINDOG_CATALOGUE, env.BRAINDOG_SHELL) ?? null;
+}
+
+/** The folder's index entries, or null where it has no index or the index does not read (`readCatalogue`). */
+const entriesIn = (dir: string) => async (): Promise<readonly FirstReadEntry[] | null> => {
+  const index = readCatalogue(JSON.parse(await readFile(join(dir, CATALOGUE_INDEX), 'utf8')));
+  return index.ok ? index.value.entries : null;
+};
+
+/**
+ * WHAT A STRANGER'S SENTENCE MAY BE READ INTO (USE-A16): the use cases of the catalogue this host serves, merged over the
+ * build's (`firstReadOfferFrom`), so a front the operator publishes into the folder is offered at sign-up with no code
+ * change. The modules are the build's. No folder, or one whose index does not read, is the build's list and one log line.
+ */
+export async function catalogueOffer(dir: string | null, log: (line: string) => void = (line) => console.warn(line)): Promise<SetupOffer> {
+  const { cases, said } = await firstReadCasesRead(dir === null ? null : entriesIn(dir), builtInCases());
+  if (said !== null) log(said);
+  return { usecases: cases.map(firstReadTold), modules: firstReadOffer().modules };
 }
 
 /**
@@ -143,12 +192,14 @@ export function selfhostFirstReadDoor(env: Record<string, string | undefined>, d
   const send = deps.send ?? fetch;
   const model = modelOf(deps.slash, send);
   const readSetup = deps.readSetup;
+  /* READ LAZILY, ONCE, AND KEPT FOR THE PROCESS: the door is built once (`server.ts`), so the first sign-up reads it. */
+  let offered: Promise<SetupOffer> | null = null;
   return {
     origin: deps.origin,
     on: daily > 0 && model !== undefined,
     botCheck: turnstileCheck(env.TURNSTILE_SECRET, send),
     meter: memoryMeter(daily),
-    offer: async () => firstReadOffer(),
+    offer: () => (offered ??= catalogueOffer(deps.catalogue === undefined ? firstReadFolder(env) : deps.catalogue, deps.log)),
     read:
       readSetup === null || model === undefined
         ? null

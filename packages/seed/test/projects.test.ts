@@ -196,7 +196,7 @@ test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and Parked and fin
      none. The record still draws it, so it comes after the line with no figure: the nightly line is written for the
      first line a page draws (`leadBlockOf` in `packages/record/src/headlines.ts`), and asked of "across 0 projects" the
      model's line would be drawn over this one saying the same. */
-  assert.match(String(leads[2]!.body), /^[^,]*\{\{projects-live\}\}[^,]*, \{\{questions-open-in:things\}\} question\(s\) for you$/u, 'the line over the projects in play says something with nothing in play');
+  assert.equal(leads[2]!.body, 'Nothing needs a push, {{questions-open-in:things}} question(s) for you', 'the quiet line is not the one that leaves In play to the strip');
   const first = leads.find((b) => b.drawn !== false);
   assert.doesNotMatch(String(first?.body), /\{\{/u, `the nightly line is asked of a line of noughts: ${first?.body}`);
   assert.equal(block(overview, 'In play').drawn, false, 'In play is drawn over nothing');
@@ -364,7 +364,7 @@ test('THE OVERVIEW OPENS WITH ONE SENTENCE AND DRAWS HOW THE PROJECTS IN PLAY AR
 
   /* EVERY PROJECT IN PLAY IS A PART OF HOW THEY ARE GOING, and Where they are, which said the line again, is gone
      (portfolio 1.11.0). */
-  assert.ok(!overview.blocks.some((b) => b.heading === 'Where they are'), 'Where they are is still drawn');
+  assert.equal(block(overview, 'Where they are').drawn, false, 'Where they are is drawn over three projects in play');
   const read = k.metric(PROJECT_METRICS['projects-by-health'] as never);
   assert.ok(read.ok, sayOf(read));
   const health = read.value.groups ?? [];
@@ -395,11 +395,12 @@ test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a ca
   /* SINCE portfolio 1.11.0 the row is one track of how they are going, the whole width: Where they are said the line
      again beside it. */
   const row = blocks.filter((b) => ['Where they are', 'How they are going'].includes(String(b.heading)));
-  assert.deepEqual(row.map((b) => [b.heading, b.span]), [['How they are going', 12]], 'the row is not one whole tile');
+  assert.deepEqual(row.map((b) => [b.heading, b.span]), [['Where they are', 12], ['How they are going', 12]], 'a split is not one whole tile');
   /* ONLY PAST FOUR IN PLAY, SINCE portfolio 1.12.0: three projects drew three equal thirds, which the line and the cards
      already say. */
-  assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ metric: 'projects-live', gt: 4 }), 'the track draws over a few projects');
-  assert.deepEqual(blocks.findIndex((b) => b.heading === 'How they are going'), blocks.findIndex((b) => !b.lead), 'the row is not the first under the line');
+  assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ metric: 'projects-live', gt: 4 }), 'the lanes draw over a few projects');
+  assert.equal(JSON.stringify(row[1]!.when), JSON.stringify({ all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] }), 'the track draws over a few projects, or over none that says');
+  assert.equal(blocks.find((b) => !b.lead)?.heading, 'In play and earning', 'the strip is not the first under the line');
 
   const k = await seeded();
   const going = () => opened(k, 'portfolio').blocks.find((b) => b.heading === 'How they are going')!;

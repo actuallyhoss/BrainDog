@@ -159,7 +159,7 @@ function aboveTheFold(blocks: readonly Block[]): string[] {
 }
 
 test('AT MOST SIX TILES BEFORE EACH FOLD AT 1440, in the order each page names', () => {
-  assert.deepEqual(aboveTheFold(blocksOf('people')), ['Waiting on you', 'note', 'Everyone', 'Organisations']);
+  assert.deepEqual(aboveTheFold(blocksOf('people')), ['Waiting on you', 'note', 'In touch', 'Everyone', 'Organisations', 'What agents did']);
   assert.deepEqual(aboveTheFold(blocksOf('estate')), ['Points at nothing', 'At a glance', 'Waiting on you', 'Each month, by type', 'Next ninety days']);
   /* AND WITH THE SERVER AND PROVIDER NUMBERS A FOUNDER'S RECORD LAYS UNDER WHAT RENEWS, the sixth and not a seventh. */
   const estate = [...blocksOf('estate')];

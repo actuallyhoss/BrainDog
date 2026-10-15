@@ -48,7 +48,7 @@ export type ArgFrom = 'list' | 'field' | 'person' | 'call' | 'script' | 'door' |
  * One argument. `name` is where it sits, dotted: under the step for a step (`ask_person.question`, or `wait` for a step
  * whose value is the argument), under `on` for a trigger (`written.register`, `every`, `at`).
  */
-export type Arg = { name: string; type: ArgType; required: boolean; from?: ArgFrom; values?: readonly string[] };
+export type Arg = { name: string; type: ArgType; required: boolean; from?: ArgFrom; values?: readonly string[]; of?: string };
 
 export type Verb = (typeof ACTIONS)[number] | (typeof FLOW)[number];
 export type Trigger = (typeof TRIGGERS)[number];
@@ -75,81 +75,96 @@ export type FlowGrammar = {
 const need = (name: string, type: ArgType, from?: ArgFrom, values?: readonly string[]): Arg => ({ name, type, required: true, ...(from ? { from } : {}), ...(values ? { values } : {}) });
 const may = (name: string, type: ArgType, from?: ArgFrom, values?: readonly string[]): Arg => ({ name, type, required: false, ...(from ? { from } : {}), ...(values ? { values } : {}) });
 
-/** Each trigger's keys, as `shapeFault` and `calendarFault` read them. Typed by `TRIGGERS`, so a new one needs a line. */
-const TRIGGER_ARGS: Record<Trigger, readonly Arg[]> = {
-  written: [need('written.register', 'text', 'list'), may('written.op', 'list', undefined, OPS), may('written.fields', 'list', 'field'), may('written.from_rules', 'boolean')],
-  arrival: [may('arrival.ingest', 'text', 'door'), may('arrival.channel', 'choice', undefined, CHANNELS), may('arrival.state', 'list'), may('arrival.unverified', 'boolean')],
-  /* `day`, `at` AND `month` ARE REQUIRED ONLY OF SOME CLOCKS (a week needs a day, months need a day and a time), so
-     they are optional here and the lint says which on the card. */
-  every: [need('every', 'clock'), may('at', 'time'), may('day', 'day'), may('month', 'choice', undefined, MONTHS), may('late', 'span')],
-  metric: [need('metric.id', 'text', 'figure'), need('metric.crosses', 'crossing')],
-  decided: [may('decided.about', 'text'), may('decided.option', 'text')],
-  manual: [need('manual', 'true')],
-};
-
-/** `meet`'s keys from `MEET_KEYS`: text each, `keys` a list, `kind` and `only` a choice, and `where` always. */
-const MEET_ARGS: readonly Arg[] = MEET_KEYS.map((k) =>
-  k === 'where'
-    ? need('meet.where', 'text')
-    : k === 'keys'
-      ? may('meet.keys', 'list')
-      : k === 'kind'
-        ? may('meet.kind', 'choice', undefined, ['person', 'organisation'])
-        : k === 'only'
-          ? may('meet.only', 'choice', undefined, ['known'])
-          : may(`meet.${k}`, 'text'),
-);
-
-/** `run_job`'s keys from `RUN_JOB_KEYS`. */
-const RUN_JOB_ARGS: readonly Arg[] = RUN_JOB_KEYS.map((k) => (k === 'kind' ? need('run_job.kind', 'text', 'job') : k === 'args' ? may('run_job.args', 'map') : may('run_job.as', 'name')));
+/** A field argument whose list another argument picks: `of` is that argument's name (`link.to.by` of `link.to.register`). */
+const of = (arg: Arg, picker: string): Arg => ({ ...arg, of: picker });
 
 /**
- * Each step's arguments, as `stepFault`, `fillFault`, `writeFault` and `declare.ts`'s action checks read them. Typed by
- * the lint's verbs, so a verb added to `ACTIONS` or `FLOW` without a line here does not compile.
+ * THE TABLES ARE MADE ON FIRST ASK, NOT AS THIS FILE LOADS. They read `flow-lint.ts`'s words, and `flow-lint.ts` reaches
+ * `change-kind.ts` through its own imports, which reaches this file through `automation-kind.ts`: a process that loads
+ * `flow-lint.ts` first met these tables before its words were set.
  */
-const STEP_ARGS: Record<Verb, readonly Arg[]> = {
-  if: [need('if', 'condition'), need('then', 'steps'), may('else', 'steps')],
-  set_var: [need('set_var.name', 'name'), need('set_var.to', 'text')],
-  script: [need('script.id', 'text', 'script'), may('script.input', 'map'), may('script.as', 'name')],
-  call: [need('call.ingest', 'text', 'call'), may('call.as', 'name')],
-  ask_slash: [
-    need('ask_slash.question', 'text'),
-    may('ask_slash.shape', 'choice', undefined, SHAPES),
-    may('ask_slash.choices', 'list'),
-    may('ask_slash.about', 'list', 'field'),
-    need('ask_slash.as', 'name'),
-  ],
-  ask_person: [need('ask_person.question', 'text'), need('ask_person.options', 'list'), may('ask_person.to', 'text', 'person'), need('ask_person.as', 'name'), may('ask_person.wait', 'span')],
-  wait: [need('wait', 'span')],
-  meet: MEET_ARGS,
-  run_job: RUN_JOB_ARGS,
-  tag: [need('tag', 'text')],
-  untag: [need('untag', 'text')],
-  set: [need('set.field', 'text', 'field'), need('set.to', 'text')],
-  move: [need('move', 'text')],
-  link: [
-    may('link.field', 'text', 'field'),
-    may('link.to.register', 'text', 'list'),
-    may('link.to.by', 'text', 'field'),
-    need('link.to.value', 'text'),
-    may('link.to.where', 'condition'),
-    may('link.to.take', 'text', 'field'),
-    may('link.to.also', 'text', 'field'),
-  ],
-  note: [need('note', 'text')],
-  notify: [need('notify.say', 'text'), may('notify.tone', 'text'), may('notify.urgent', 'boolean')],
-  schedule: [need('schedule.in', 'later'), need('schedule.note', 'text'), may('schedule.kind', 'text')],
-  create: [may('create.register', 'text', 'list'), may('create.each', 'list', 'field'), need('create.bound', 'number'), may('create.fields', 'map')],
-  suggest: [need('suggest.question', 'text'), may('suggest.options', 'list')],
-  run: [need('run', 'text', 'call')],
-  stop: [may('stop', 'true')],
-};
+let tables: { TRIGGER_ARGS: Record<Trigger, readonly Arg[]>; STEP_ARGS: Record<Verb, readonly Arg[]> } | null = null;
+function argTables(): { TRIGGER_ARGS: Record<Trigger, readonly Arg[]>; STEP_ARGS: Record<Verb, readonly Arg[]> } {
+  if (tables !== null) return tables;
+  /** Each trigger's keys, as `shapeFault` and `calendarFault` read them. Typed by `TRIGGERS`, so a new one needs a line. */
+  const TRIGGER_ARGS: Record<Trigger, readonly Arg[]> = {
+    written: [need('written.register', 'text', 'list'), may('written.op', 'list', undefined, OPS), of(may('written.fields', 'list', 'field'), 'written.register'), may('written.from_rules', 'boolean')],
+    arrival: [may('arrival.ingest', 'text', 'door'), may('arrival.channel', 'choice', undefined, CHANNELS), may('arrival.state', 'list'), may('arrival.unverified', 'boolean')],
+    /* `day`, `at` AND `month` ARE REQUIRED ONLY OF SOME CLOCKS (a week needs a day, months need a day and a time), so
+       they are optional here and the lint says which on the card. */
+    every: [need('every', 'clock'), may('at', 'time'), may('day', 'day'), may('month', 'choice', undefined, MONTHS), may('late', 'span')],
+    metric: [need('metric.id', 'text', 'figure'), need('metric.crosses', 'crossing')],
+    decided: [may('decided.about', 'text'), may('decided.option', 'text')],
+    manual: [need('manual', 'true')],
+  };
+
+  /** `meet`'s keys from `MEET_KEYS`: text each, `keys` a list, `kind` and `only` a choice, and `where` always. */
+  const MEET_ARGS: readonly Arg[] = MEET_KEYS.map((k) =>
+    k === 'where'
+      ? need('meet.where', 'text')
+      : k === 'keys'
+        ? may('meet.keys', 'list')
+        : k === 'kind'
+          ? may('meet.kind', 'choice', undefined, ['person', 'organisation'])
+          : k === 'only'
+            ? may('meet.only', 'choice', undefined, ['known'])
+            : may(`meet.${k}`, 'text'),
+  );
+
+  /** `run_job`'s keys from `RUN_JOB_KEYS`. */
+  const RUN_JOB_ARGS: readonly Arg[] = RUN_JOB_KEYS.map((k) => (k === 'kind' ? need('run_job.kind', 'text', 'job') : k === 'args' ? may('run_job.args', 'map') : may('run_job.as', 'name')));
+
+  /**
+   * Each step's arguments, as `stepFault`, `fillFault`, `writeFault` and `declare.ts`'s action checks read them. Typed by
+   * the lint's verbs, so a verb added to `ACTIONS` or `FLOW` without a line here does not compile.
+   */
+  const STEP_ARGS: Record<Verb, readonly Arg[]> = {
+    if: [need('if', 'condition'), need('then', 'steps'), may('else', 'steps')],
+    set_var: [need('set_var.name', 'name'), need('set_var.to', 'text')],
+    script: [need('script.id', 'text', 'script'), may('script.input', 'map'), may('script.as', 'name')],
+    call: [need('call.ingest', 'text', 'call'), may('call.as', 'name')],
+    ask_slash: [
+      need('ask_slash.question', 'text'),
+      may('ask_slash.shape', 'choice', undefined, SHAPES),
+      may('ask_slash.choices', 'list'),
+      may('ask_slash.about', 'list', 'field'),
+      need('ask_slash.as', 'name'),
+    ],
+    ask_person: [need('ask_person.question', 'text'), need('ask_person.options', 'list'), may('ask_person.to', 'text', 'person'), need('ask_person.as', 'name'), may('ask_person.wait', 'span')],
+    wait: [need('wait', 'span')],
+    meet: MEET_ARGS,
+    run_job: RUN_JOB_ARGS,
+    tag: [need('tag', 'text')],
+    untag: [need('untag', 'text')],
+    set: [need('set.field', 'text', 'field'), need('set.to', 'text')],
+    move: [need('move', 'text')],
+    link: [
+      may('link.field', 'text', 'field'),
+      may('link.to.register', 'text', 'list'),
+      of(may('link.to.by', 'text', 'field'), 'link.to.register'),
+      need('link.to.value', 'text'),
+      may('link.to.where', 'condition'),
+      of(may('link.to.take', 'text', 'field'), 'link.to.register'),
+      of(may('link.to.also', 'text', 'field'), 'link.to.register'),
+    ],
+    note: [need('note', 'text')],
+    notify: [need('notify.say', 'text'), may('notify.tone', 'text'), may('notify.urgent', 'boolean')],
+    schedule: [need('schedule.in', 'later'), need('schedule.note', 'text'), may('schedule.kind', 'text')],
+    create: [may('create.register', 'text', 'list'), of(may('create.each', 'list', 'field'), 'create.register'), need('create.bound', 'number'), may('create.fields', 'map')],
+    suggest: [need('suggest.question', 'text'), may('suggest.options', 'list')],
+    run: [need('run', 'text', 'call')],
+    stop: [may('stop', 'true')],
+  };
+  tables = { TRIGGER_ARGS, STEP_ARGS };
+  return tables;
+}
 
 /** Somebody named, by any of these: `stepFault`'s `meet` case. An organisation may be named by its domain too. */
 const MEET_WHO: readonly string[] = ['meet.name', 'meet.email', 'meet.handle', 'meet.keys'];
 
 /** The grammar, in the lint's own order: triggers as `TRIGGERS` lists them, steps as `VERBS` does. */
 export function flowGrammar(): FlowGrammar {
+  const { TRIGGER_ARGS, STEP_ARGS } = argTables();
   return {
     triggers: TRIGGERS.map((id) => ({ id, args: TRIGGER_ARGS[id] })),
     steps: (VERBS as readonly Verb[]).map((verb) => ({

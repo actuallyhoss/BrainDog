@@ -19,6 +19,10 @@
  * what a machine holds, not an agent choosing what the record should say. Nothing here runs on a clock, and nothing is
  * signed by the record itself: every write and every question is the caller's run.
  *
+ * THE LIST IS THE ONE THAT PLAYS THE PART OF THE TOOLS (`listFor` in `../agent-lists.ts`), whatever it is called. A
+ * record that keeps none is no refusal: every tool sent is answered `skipped`, with why in one sentence, and the
+ * session goes on.
+ *
  * ONE CALL READS THE LIST ONCE, A PAGE AT A TIME, and every found tool is matched against what it read and what this
  * call has written since. Every write is made before the call gives way, so two calls at once are taken one after the
  * other and the second finds the row the first one added.
@@ -28,6 +32,7 @@ import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { looksLikeCredential, type Entry, type WriteContext } from '@braindog/kernel';
 
+import { listFor, noListSaid } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -48,9 +53,6 @@ export type FoundTool = {
 /** What became of one found tool: its row by its spoken id, the question asked or waiting, or why it was left. */
 export type SeenTool = { name: string; did: 'added' | 'seen' | 'asked' | 'waiting' | 'skipped'; row?: string; question?: string; why?: string };
 export type ToolsSeen = { tools: SeenTool[] };
-
-/** The list a tool is kept in, as the agents add-on declares it and as `agents.ts` names it. */
-const TOOLS = 'tools';
 
 /** The most tools one call takes: more than any one machine's configs hold. */
 export const FOUND_MOST = 50;
@@ -239,8 +241,8 @@ export function methods(deps: RecordDeps) {
   /** A project by its row's id, however a field holds it, so a run's project and a tool's are compared as one. */
   const placeOf = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? (kernel.get(v)?.id ?? v) : null);
 
-  /** Every live tool, a page at a time, once a call. */
-  const liveTools = (): Result<Entry[]> => {
+  /** Every live tool in the list that keeps them, a page at a time, once a call. */
+  const liveTools = (TOOLS: string): Result<Entry[]> => {
     const rows: Entry[] = [];
     let cursor: string | null = null;
     do {
@@ -264,10 +266,10 @@ export function methods(deps: RecordDeps) {
      * written, and its tool is skipped with why.
      */
     async toolsSeen(args: { machine?: unknown; found?: unknown } | undefined, ctx: CallContext): Promise<Result<ToolsSeen>> {
-      const stop = guard(ctx, 'write', TOOLS);
+      const kept = listFor('tools', kernel.registers());
+      const stop = kept === null ? guard(ctx, 'write') : guard(ctx, 'write', kept);
       if (stop) return { ok: false, refusal: stop };
-      const decl = kernel.register(TOOLS);
-      if (!decl) return no('REGISTER_UNKNOWN', 'This record keeps no tools yet. Turn on the add-on that keeps them, then send them again.', { at: 'register' });
+      const decl = kept === null ? undefined : kernel.register(kept);
       if (ctx.principal.kind === 'system' || ctx.principal.kind === 'share' || ctx.principal.kind === 'runner')
         return no('FORBIDDEN', 'What a machine holds is written down by the agent on it, or by a person, and never by the record itself.', { at: 'principal' });
       const machine = text(args?.machine);
@@ -282,11 +284,14 @@ export function methods(deps: RecordDeps) {
       }
       const found = sent as FoundTool[];
       if (found.length === 0) return ok({ tools: [] });
+      /* NO LIST KEEPS TOOLS: nothing is written, and each tool is answered in the one sentence that says why. */
+      if (kept === null || !decl) return ok({ tools: found.map((f) => ({ name: f.name.trim(), did: 'skipped' as const, why: noListSaid('tools') })) });
+      const TOOLS: string = kept;
 
       const signed = signerOf(ctx);
       if (!signed.ok) return signed as Result<never>;
       const { w, project } = signed.value;
-      const read = liveTools();
+      const read = liveTools(TOOLS);
       if (!read.ok) return read as Result<never>;
       const now = clock.now();
       const at = new Date(now).toISOString();

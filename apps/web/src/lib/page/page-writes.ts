@@ -131,7 +131,7 @@ const ROW_VERBS: ReadonlySet<string> = new Set(['row.create', 'row.update', 'row
 const ANSWER_VERB = 'suggestion.answer';
 
 /** Whether this host can carry out `verb` at all. */
-export const actable = (verb: string): boolean => ROW_VERBS.has(verb) || verb === ANSWER_VERB || (Object.hasOwn(ACT_CALLS, verb) && ACT_CALLS[verb] !== null);
+export const actable = (verb: string): boolean => ROW_VERBS.has(verb) || verb === ANSWER_VERB || (Object.hasOwn(ACT_CALLS, verb) && ACT_CALLS[verb] !== null) || verb === 'question.ask';
 
 /** What a press was made on, as `act` reads it: the drawn row, the record row, a question's id, its name and fields. */
 type On = { drawn: Row | null; ref: RowRef | null; id: string | null; title: string | null; fields: Readonly<Record<string, unknown>>; block: LiveBlock | null };
@@ -783,6 +783,35 @@ export function pageWrites(deps: WritesDeps) {
       });
       await deps.reread();
       return out.ok ? { ok: true, value: out.value } : { ok: false };
+    }
+    /* A FORM THAT ASKS (PGS-A15): an options question filed through propose, signed by whoever pressed, as Decide's own
+       "Ask yourself" sheet files one; its Undo takes it back while it is open. */
+    if (a.verb === 'question.ask') {
+      const said = value && typeof value === 'object' ? (value as Record<string, unknown>) : args.fields && typeof args.fields === 'object' ? (args.fields as Record<string, unknown>) : {};
+      const word = (k: string): string => (typeof said[k] === 'string' ? (said[k] as string) : '');
+      const { askYourself } = await import('../record/decide-write.ts');
+      const out = await optimist(toasts).run<{ id: string }>({
+        apply: () => {},
+        revert: () => {},
+        send: () =>
+          askYourself(deps.base(), { question: word('question'), why: word('why'), options: [{ label: word('first'), because: '' }, { label: word('second'), because: '' }], recommended: null }).then((x) => {
+            if (x.from === 'filed') return { ok: true as const, value: { id: x.id } };
+            const at = x.at === 'option-1' ? 'first' : x.at === 'option-2' ? 'second' : x.at;
+            return { ok: false as const, fix: x.fix, ...(at ? { at } : {}) };
+          }),
+        said: w.done(label, null),
+        undo: (filed) =>
+          keepsUndo && filed.id !== ''
+            ? () =>
+                void undoBack(label, async () => {
+                  const { createClient } = await import('@braindog/client');
+                  const x = await createClient({ base: deps.base() }).call<unknown>('withdraw', { id: filed.id });
+                  return x.ok ? { from: 'undone' } : { from: 'refused', ...('refusal' in x ? { fix: x.refusal.fix } : {}) };
+                })
+            : null,
+      });
+      await deps.reread();
+      return out.ok ? { ok: true, value: out.value } : { ok: false, fix: out.fix, ...(out.at ? { at: out.at } : {}) };
     }
     if (!ROW_VERBS.has(a.verb)) return generic(a, at, args, what, keepsUndo);
     if (a.verb === 'row.create') {

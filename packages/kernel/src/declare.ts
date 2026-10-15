@@ -45,7 +45,7 @@ import { MAP_TYPES } from './map.ts';
 import { ON_CONFLICTS } from './ingest.ts';
 import { STRIP_MOST } from './ingest.ts';
 import { HOME_CURRENCY_SETTING, convertMinor, homeFrom, rateFor } from './fx.ts';
-import { HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, type RoleKey, type RoleList, type RoleName } from './roles.ts';
+import { AGENT_ROLES, HOLDS, PARTS as ROLE_PARTS, aims, legacyShaped, plays, type RoleField, type RoleKey, type RoleList, type RoleName } from './roles.ts';
 /* THE FUNCTION THE REMINDERS ARE DERIVED WITH, so an offset this file accepts is one `remindersFor`
    can read. A copy of its regular expression here would be a second list, and `MATCH_FIELDS` above
    is what two lists that disagree cost. */
@@ -1578,7 +1578,7 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
      an item in no menu, and one with no order sorts against whatever the reader last wrote. Both
      install cleanly and both produce a page you can only reach by typing its slug. */
   if (body.nav !== undefined) {
-    const nav = body.nav as { section?: unknown; order?: unknown; tabs?: unknown; icon?: unknown };
+    const nav = body.nav as { section?: unknown; order?: unknown; place?: unknown; tabs?: unknown; icon?: unknown };
     if (nav === null || typeof nav !== 'object')
       return bad('DECLARATION_INVALID', `${id}'s nav is a section and an order.`, 'nav');
     if (typeof nav.section !== 'string' || nav.section.trim() === '' || byteLength(nav.section) > 40)
@@ -1589,7 +1589,10 @@ function pageBody(decl: Declaration, installed?: Known): Refusal | null {
        any word under `nav` did, so a misspelt `tab: true` was a strip nobody would ever see. */
     const stray = Object.keys(nav).find((k) => !NAV_KEYS.has(k));
     if (stray !== undefined)
-      return bad('DECLARATION_INVALID', `${id}'s nav has ${stray}:, and nav is { section, order, icon, tabs }. Tabs are tabs: true.`, 'nav', [...NAV_KEYS]);
+      return bad('DECLARATION_INVALID', `${id}'s nav has ${stray}:, and nav is { section, order, place, icon, tabs }. Tabs are tabs: true.`, 'nav', [...NAV_KEYS]);
+    /* `place:` IS WHERE THE SECTION SITS ON THE RAIL, lowest first (`packages/record` `places.ts`). */
+    if (nav.place !== undefined && !isInt(nav.place, 0, 9999))
+      return bad('DECLARATION_INVALID', `${id}'s nav place is ${JSON.stringify(nav.place)}; a place is a whole number from 0 to 9999, lowest first on the rail.`, 'nav.place');
     if (nav.tabs !== undefined && typeof nav.tabs !== 'boolean')
       return bad('DECLARATION_INVALID', `${id}'s nav tabs is ${JSON.stringify(nav.tabs)}; it is true, to draw the pages of ${String(nav.section)} as tabs, or false.`, 'nav');
     if (nav.icon !== undefined && (typeof nav.icon !== 'string' || !GLYPH.test(nav.icon)))
@@ -4401,6 +4404,8 @@ const REGISTER_KEYS = [
   'hand',
   'once',
   'same',
+  'role',
+  'fade',
 ] as const;
 
 /**
@@ -5886,6 +5891,21 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
   const ownerOnly = decl.body.owner_only;
   if (ownerOnly !== undefined && ownerOnly !== true)
     return bad('DECLARATION_INVALID', `${id}'s owner_only is true, or left out. ${JSON.stringify(ownerOnly)} is not.`, 'owner_only', ['true']);
+
+  /* `role:` IS ONE PART A LIST PLAYS FOR THE RECORD'S AGENTS, and `fade:` the live day field its rows fade by and how
+     many days after it (`packages/record` `agent-lists.ts`). Checked here, at install, so a misspelt one is never inert. */
+  const role = decl.body.role;
+  if (role !== undefined && (typeof role !== 'string' || !(AGENT_ROLES as readonly string[]).includes(role)))
+    return bad('DECLARATION_INVALID', `${id}'s role is one of ${AGENT_ROLES.join(', ')}. ${JSON.stringify(role)} is not.`, 'role', [...AGENT_ROLES]);
+  const fade = decl.body.fade;
+  if (fade !== undefined) {
+    const f = fade !== null && typeof fade === 'object' && !Array.isArray(fade) ? (fade as Record<string, unknown>) : null;
+    const days = (fields as unknown as { id?: unknown; type?: unknown; retired?: unknown }[]).filter((x) => x.type === 'day' && x.retired !== true).map((x) => String(x.id));
+    if (f === null || Object.keys(f).some((k) => k !== 'field' && k !== 'after') || typeof f.field !== 'string' || !days.includes(f.field))
+      return bad('DECLARATION_INVALID', `${id}'s fade is { field, after }, its field one of this list's day fields${days.length > 0 ? ` (${days.join(', ')})` : ', and it has none'}.`, 'fade.field', days);
+    if (typeof f.after !== 'string' || !/^[1-9][0-9]{0,4}d$/u.test(f.after))
+      return bad('DECLARATION_INVALID', `${id}'s fade after is a number of days, such as 90d. ${JSON.stringify(f.after)} is not.`, 'fade.after');
+  }
 
   /* `hand:` NAMES FIELDS OF THIS LIST OF THE TYPES A HAND WRITES, or pressing "Hand to" would set a person into a text
      field or leave a row in a state its list does not have. Checked here, at install, and not when somebody presses. */

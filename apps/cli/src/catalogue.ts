@@ -103,6 +103,7 @@ import { budgetOf, clientFor, hostsPath, target, type Target } from './http.ts';
 import { refuse } from './json.ts';
 import { kennelBase, submitToKennel, takeKennel, yankFromKennel } from './kennel.ts';
 import { untilAccepted } from './links.ts';
+import { packFromPage } from './pack-from-page.ts';
 import { readPackTest, runPackTest, testFileName } from './pack-test.ts';
 import { checkInScratch } from './scratch.ts';
 import type { AgentIo } from './skills.ts';
@@ -241,23 +242,27 @@ function yamlOf(value: unknown, indent = ''): string {
 }
 
 /**
- * `pack new <id> [--yaml] [--out <folder>]`: a folder shaped like `packs/<id>/`, holding `<id>.pack.json` (or
- * `.pack.yaml`), `<id>.test.json` and a README, where a first `check` and a first `test` both pass.
+ * `pack new <id> [--yaml] [--out <folder>] [--from-page <file.dog>]`: a folder shaped like `packs/<id>/`, holding
+ * `<id>.pack.json` (or `.pack.yaml`), `<id>.test.json` and a README, where a first `check` and a first `test` both pass.
+ *
+ * `--from-page` STARTS IT FROM A PAGE PULLED WITH `braindog page pull`: the add-on document is `packFromPage`'s, made
+ * from that file and scrubbed of everything of the author's, in place of the blank one, and each thing it took, made or
+ * left out is said. The test file and the README are the ones a blank add-on starts with.
  *
  * NEVER OVER A FOLDER ALREADY THERE, as `new` never writes over a file.
  */
 async function createPack(args: string[], io: AgentIo): Promise<number> {
-  let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined; yaml?: boolean | undefined };
+  let values: { title?: string | undefined; author?: string | undefined; out?: string | undefined; yaml?: boolean | undefined; 'from-page'?: string | undefined };
   let positionals: string[];
   try {
     ({ values, positionals } = parseArgs({
       args,
       allowPositionals: true,
       strict: true,
-      options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' }, yaml: { type: 'boolean' } },
+      options: { title: { type: 'string' }, author: { type: 'string' }, out: { type: 'string' }, yaml: { type: 'boolean' }, 'from-page': { type: 'string' } },
     }));
   } catch {
-    io.say('braindog pack new takes an id, and --title, --author, --out <folder> and --yaml.');
+    io.say('braindog pack new takes an id, and --title, --author, --out <folder>, --yaml and --from-page <file.dog>.');
     return 1;
   }
   const [id, ...more] = positionals;
@@ -266,8 +271,28 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
     return 1;
   }
   const words = id.replace(/-/gu, ' ');
-  const title = values.title ?? words.charAt(0).toUpperCase() + words.slice(1);
-  const doc = packStarter(id, title, values.author ?? 'Your name');
+  let title = values.title ?? words.charAt(0).toUpperCase() + words.slice(1);
+  let doc = packStarter(id, title, values.author ?? 'Your name');
+  let taken: string[] = [];
+  const fromPage = values['from-page'];
+  if (fromPage !== undefined) {
+    const where = resolve(io.cwd, fromPage);
+    let text: string;
+    try {
+      text = readFileSync(where, 'utf8');
+    } catch {
+      io.say(`${fromPage} could not be read. Pull a page into a file first, as in braindog page pull invoicing.`);
+      return 1;
+    }
+    const made = await packFromPage(id, text, { title: values.title, author: values.author });
+    if (!made.ok) {
+      refuse(io, made, saidWithCode(made));
+      return 1;
+    }
+    doc = made.value.file;
+    title = String(doc.title);
+    taken = made.value.lines;
+  }
   const read = await readCatalogueFile(`${JSON.stringify(doc)}\n`);
   if (!read.ok) {
     refuse(io, read, saidWithCode(read));
@@ -283,7 +308,9 @@ async function createPack(args: string[], io: AgentIo): Promise<number> {
   writeFileSync(join(dir, file), values.yaml ? `${yamlOf(doc)}\n` : `${JSON.stringify(doc, null, 2)}\n`);
   writeFileSync(join(dir, testFileName(id)), `${JSON.stringify(packStarterTest(), null, 2)}\n`);
   writeFileSync(join(dir, 'README.md'), packReadme(id, title, file));
-  io.out(`${title} 1.0.0 written to ${dir}: ${file} with one list, a page over it and two example rows, ${testFileName(id)} and a README. Check it with braindog pack check ${values.out ?? id}, and test it with braindog pack test ${values.out ?? id}.`);
+  const holds = fromPage === undefined ? 'one list, a page over it and two example rows' : `what ${basename(fromPage)} shows`;
+  io.out(`${title} 1.0.0 written to ${dir}: ${file} with ${holds}, ${testFileName(id)} and a README. Check it with braindog pack check ${values.out ?? id}, and test it with braindog pack test ${values.out ?? id}.`);
+  for (const line of taken) io.out(line);
   return 0;
 }
 
@@ -1285,7 +1312,7 @@ export function sdkVerb(verb: string | undefined, kind: EntryKind = 'usecase'): 
 }
 
 const PACK_USAGE =
-  'braindog pack takes new <id> [--yaml], check <file|dir>, test <dir>, preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run] [--trust-key]. install <file> --force or uninstall <id> [--force] takes away a list that still holds items, keeping every one of them.';
+  'braindog pack takes new <id> [--yaml] [--from-page <file.dog>], check <file|dir>, test <dir>, preview <file|dir>, diff <a> <b>, key <file> --author <name>, key rotate <old key file> <new key file> --to <folder>, key revoke <key file> --to <folder> --reason <why> [--successor <key id>], publish <file> --to <folder> or --kennel [host] [--sign <key file>], yank <id> <version> --reason <why> [--kennel host], search [words] [--from <catalogue>], or install <id|file> [--from <catalogue>] [--version <x.y.z>] [--host <host>] [--dry-run] [--trust-key]. install <file> --force or uninstall <id> [--force] takes away a list that still holds items, keeping every one of them.';
 
 /**
  * `pack install <file>`: a `.pack.json` from a path or an address, read through the add-on door here first, then asked for

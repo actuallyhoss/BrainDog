@@ -178,6 +178,9 @@ const SLASH_ASKS = keys({ asks: list(keys(SLASH_ASKED)) });
 /** `LiveRun`, a row of `boot.sessions`. */
 const LIVE_RUN = keys({ id: 'string', seq: 'number', spoken: 'string', state: or('string', 'null'), version: 'number', fields: map('any'), stale: 'boolean' });
 
+/** `BootPlace`, a place in the rail. */
+const PLACE = keys({ page: 'string', icon: or('string', 'null'), name: 'string', by: is('addon', 'person', 'engine'), section: or('string', 'null') });
+
 /**
  * `Boot`, with exactly the type's keys. What the type leaves optional for a host older than the field is optional here,
  * and the tests below say which of those the Cloud must send all the same.
@@ -208,7 +211,7 @@ const BOOT = {
       keys({
         slug: 'string',
         title: 'string',
-        nav: or(keys({ section: 'string', order: 'number' }), 'null'),
+        nav: or(keys({ section: 'string', order: 'number', place: optional('number') }), 'null'),
         icon: or('string', 'null'),
         list: optional(or('string', 'null')),
         about: optional(or(keys({ register: 'string', seq: or('number', 'null'), updated_at: optional('string'), hue: optional(or('number', 'null')) }), 'null')),
@@ -229,6 +232,8 @@ const BOOT = {
   voice: optional(keys({ pack: or('string', 'null'), values: map('any'), labels: map('string') })),
   slash: optional('boolean'),
   copies: optional(keys({ last_copy_at: or('string', 'null'), last_copy_bytes: or('number', 'null'), last_export_at: or('string', 'null') })),
+  places: optional(keys({ places: list(PLACE), more: list(PLACE) })),
+  computed: optional(list(keys({ source: 'string', drawsAs: 'string' }))),
 } satisfies Record<keyof Required<Boot>, Shape>;
 
 /* ── one Cloud, two people ──────────────────────────────────────────────── */

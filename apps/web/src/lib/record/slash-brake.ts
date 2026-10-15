@@ -10,7 +10,7 @@
  */
 
 /** The brake as `engineReadings` answers it: on or off, the share he took up, and how many answers it was read from. */
-export type Braked = { on: boolean; share: number; of: number };
+export type Braked = { on: boolean; share: number; of: number; lapsed?: number };
 
 type Refused = { ok: false; refusal: { code: string; fix: string } } | { ok: false; conflict: unknown };
 type Answer<T> = { ok: true; value: T } | Refused;
@@ -28,6 +28,7 @@ export function brakeLine(braked: Braked | null | undefined): string | null {
   if (!Number.isSafeInteger(of) || of < 1 || !Number.isFinite(share) || share < 0 || share > 1) return null;
   const down = of - Math.round(share * of);
   if (down < 1) return null;
+  if (typeof braked.lapsed === 'number' && braked.lapsed > 0) return `Slash stopped offering: you took up ${of - down} of its last ${of}, counting the ones you let pass.`;
   const what = of === 1 ? 'its last suggestion' : `${down} of its last ${of} suggestions`;
   return `Slash is asking less: you turned down ${what}. It asks again as you accept more.`;
 }

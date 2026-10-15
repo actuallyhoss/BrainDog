@@ -535,7 +535,10 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   its sentence (board-capture-line-83, batch 83, inside the unreleased step): one block added to a page that is
  *   there, nothing taken away. And Work draws the questions about its own list (`list is tasks`) as a queue gated on
  *   `questions-open-in:tasks`, with a clause in the line (waiting-work-projects-99, PGS-C18, batch 99, inside the
- *   unreleased step): one block added to a page that is there, nothing taken away.
+ *   unreleased step): one block added to a page that is there, nothing taken away. And Work declares a head, its open
+ *   count, Add and a search word, and lists open work with no project under a fold of its own, over a new figure
+ *   `tasks-no-project` (work-head-and-no-project-101, AGT-D14 job 1, PGS-A14, batch 101, inside the unreleased step):
+ *   one figure and two blocks added, nothing taken away.
  * - money-core 3.17.0, still unreleased, takes three more things of batch 61 with no version of its own: the Ledger
  *   pairs a move between two currencies at the rate of the day it left, within 2% (`pairs.across_currency`,
  *   pairs-fx-61); two figures over who made each Ledger entry, `filed-for-you-30d` and `filed-today`, read from
@@ -808,6 +811,10 @@ function without(d: Body, gone: ReadonlySet<string>): Body | null {
   if (Array.isArray(d.blocks))
     out.blocks = (d.blocks as Body[])
       .filter((b) => !(GROUPED.has(String(b.kind)) && Array.isArray(b.columns) && gone.has(String((b.columns as Body[])[0]?.field))))
+      /* A BLOCK WHOSE SENTENCE READS A FIELD THAT IS GONE is left out whole, as a figure over one is: Work's With no
+         project lists open tasks whose project is empty, and a record with no projects has no such field
+         (FIELD_UNKNOWN at install). */
+      .filter((b) => !(typeof b.where === 'string' && [...gone].some((f) => new RegExp(`(?:^|,\\s*)${f}\\s`, 'u').test(b.where as string))))
       .map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => !gone.has(String(c.field))) } : b));
   return out;
 }

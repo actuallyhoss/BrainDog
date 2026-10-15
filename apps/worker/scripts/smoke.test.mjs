@@ -23,6 +23,7 @@
  */
 
 import { strict as assert } from 'node:assert';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -33,6 +34,8 @@ import { unflipped } from './flip-fixture.mjs';
 import { UNBOUND, boundSite } from './site-fixture.mjs';
 import { FIRST_DRAW } from '../../web/src/lib/record/first-draw.ts';
 import smoke, { argsFor, canary, checks, judge, migrationCount, readCheck, refusals } from './smoke.mjs';
+import { ELSEWHERE, FILE_MOST, HELD as FENCE_HELD, PNG, PNG_SHA256, UNAUTHORIZED_BODY, fenceChecks, heldOf } from './fence.mjs';
+import { FILE_HEADERS, FILE_MOST as WORKER_MOST, agrees, sniff } from '../src/files.ts';
 
 const html = { 'content-type': 'text/html; charset=utf-8' };
 const json = { 'content-type': 'application/json' };
@@ -283,13 +286,14 @@ const HELD = {
 };
 
 /** A stub host: `faults` maps a method to the answer it gives instead, `held` what the canary holds. */
-function host({ faults = {}, held = HELD, stranger = null, elsewhere = null } = {}) {
+function host({ faults = {}, held = HELD, stranger = null, elsewhere = null, fence = null } = {}) {
   const sent = [];
   const unsigned = checks(staged('B2'), 'production', BOTH_BOUND);
   const io = async (url, init) => {
     const u = new URL(url);
     const bearer = init.headers?.authorization ?? null;
-    sent.push({ method: init.method, url, bearer, body: init.body });
+    sent.push({ method: init.method, url, bearer, body: init.body, origin: init.headers?.origin ?? null });
+    if (init.headers?.origin === ELSEWHERE) return fenceHost(url, init, fence);
     const at = u.pathname.match(/^\/app\/([a-z0-9-]+)\/api\/(\w+)$/);
     if (!at) {
       const check = unsigned.find((c) => c.url === url && c.method === init.method);
@@ -310,10 +314,10 @@ function host({ faults = {}, held = HELD, stranger = null, elsewhere = null } = 
   return { sent, io };
 }
 
-const run = async (opts = {}, signedIn = { token: TOKEN, slug: 'ops' }) => {
+const run = async (opts = {}, signedIn = { token: TOKEN, slug: 'ops' }, more = {}) => {
   const lines = [];
   const { sent, io } = host(opts);
-  const code = await smoke('production', staged('B2'), BOTH_BOUND, signedIn, { fetch: io, log: (l) => lines.push(l), nowhere: NOWHERE });
+  const code = await smoke('production', staged('B2'), BOTH_BOUND, signedIn, { fetch: io, log: (l) => lines.push(l), nowhere: NOWHERE, ...more });
   return { code, lines, sent, out: lines.join('\n') };
 };
 
@@ -389,4 +393,167 @@ test('the pure parts: names, the second name, and how a read is sent', () => {
   const post = readCheck(staged('B2'), 'production', 'ops', { method: 'previewPage', ask: 'body', post: true, by: 'Home' }, { body: { page: 'p' } });
   assert.equal(post.url, 'https://brain.dog/app/ops/api/previewPage');
   assert.equal(post.body, '{"body":{"page":"p"}}');
+});
+
+/* THE FENCE (LCH-C08 job 4), RUN WHOLE AGAINST ITS OWN STUB. `fenceHost` gives each of the fence's questions the
+   answer the hosts give once LCH-C08 lands: the file door's own headers, sniff and type rule from `files.ts`, so the
+   stub cannot drift from the door it stands in for. `wrong` is `{ check, answer }`, or a list of them: each question
+   answered otherwise. */
+const STORE = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
+const SHELL = { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self'; script-src 'self' 'sha256-AAAA'; style-src-attr 'unsafe-inline'; frame-ancestors 'none'" };
+const FENCE = fenceChecks(staged('B2'), 'production', 'ops', TOKEN);
+const one = (key, n = 0) => FENCE.filter((c) => c.key === key)[n];
+const sameAsk = (check, url, init) => check.method === init.method && check.url === url && (check.headers?.['content-type'] ?? null) === (init.headers?.['content-type'] ?? null);
+const reply = (status, body, headers = STORE) => new Response(body === null ? null : JSON.stringify(body), { status, headers });
+const refused = (status, code) => reply(status, { ok: false, refusal: { code, fix: 'unauthorized' } });
+
+function fenceHost(url, init, wrong) {
+  const instead = (wrong === null ? [] : [wrong].flat()).find((w) => sameAsk(w.check, url, init));
+  if (instead) return instead.answer();
+  const path = new URL(url).pathname;
+  const signed = init.headers?.authorization === `Bearer ${TOKEN}`;
+  if (init.method === 'OPTIONS') return new Response(null, { status: 204, headers: { allow: 'GET, POST' } });
+  if (path === '/app/') return new Response('<!doctype html>', { status: 200, headers: SHELL });
+  if (path === '/mcp') return new Response(null, { status: 405, headers: { allow: 'POST' } });
+  if (!path.startsWith('/app/ops/')) return path === '/api/boot' || path === '/account/usage' ? reply(401, UNAUTHORIZED_BODY) : reply(200, { ok: true });
+  if (!signed) return reply(401, UNAUTHORIZED_BODY);
+  if (path === '/app/ops/api/boot') return reply(200, { ok: true, value: HELD.boot });
+  if (path === '/app/ops/api/files/') return refused(405, 'ROUTE_UNKNOWN');
+  if (init.method === 'GET')
+    return path === `/app/ops/api/files/${PNG_SHA256}` ? new Response(PNG, { status: 200, headers: { ...FILE_HEADERS, 'content-type': 'image/png', 'content-length': String(PNG.length) } }) : refused(404, 'ROUTE_UNKNOWN');
+  const bytes = typeof init.body === 'string' ? new TextEncoder().encode(init.body) : init.body;
+  if (bytes.byteLength > WORKER_MOST) return refused(413, 'OUT_OF_BOUNDS');
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  const at = /\/files\/([0-9a-f]{64})$/.exec(path)?.[1];
+  if (at && at !== sha256) return refused(422, 'CHECKSUM_MISMATCH');
+  const mime = sniff(bytes);
+  if (mime === null || !agrees(init.headers?.['content-type'] ?? '', mime)) return refused(415, 'BODY_MALFORMED');
+  return reply(200, { sha256, mime, bytes: bytes.byteLength });
+}
+
+/** The lines one fence check printed: its own line and the sentence under it. */
+const lineOf = (out, check) => {
+  const lines = out.split('\n');
+  const at = lines.findIndex((l) => l.endsWith(`  ${check.method} ${check.shown ?? check.url}  expects ${check.expects}`));
+  if (at < 0) return '';
+  let end = at + 1;
+  while (end < lines.length && lines[end].startsWith('         ')) end += 1;
+  return lines.slice(at, end).join('\n').trimStart();
+};
+
+test('the fence: every line green on a host that answers right, the picture put at its hash and read back from it', async () => {
+  const { code, out, sent } = await run();
+  assert.equal(code, 0, out);
+  assert.equal(FILE_MOST, WORKER_MOST, "the fence's limit is the file door's");
+  for (const check of FENCE) assert.match(lineOf(out, check), /^ok {5}/, `${check.key}: ${lineOf(out, check)}`);
+  const fenced = sent.filter((s) => s.origin === ELSEWHERE);
+  assert.equal(fenced.length, FENCE.length, 'every fence question carries the other site');
+  assert.ok(fenced.filter((s) => s.method === 'GET' || s.method === 'OPTIONS').length >= 10, 'ten doors are asked from another site');
+  const put = fenced.find((s) => s.method === 'PUT' && s.url.endsWith(PNG_SHA256));
+  assert.equal(createHash('sha256').update(put.body).digest('hex'), PNG_SHA256);
+  assert.ok(fenced.findIndex((s) => s === put) < fenced.findIndex((s) => s.method === 'GET' && s.url.endsWith(PNG_SHA256)), 'read back after the put');
+  assert.ok(fenced.some((s) => s.method === 'PUT' && s.body?.byteLength === WORKER_MOST + 1), 'two MB and one byte is put');
+  assert.ok(fenced.every((s) => s.method === 'GET' || s.method === 'OPTIONS' || new URL(s.url).pathname.startsWith('/app/ops/api/files')), 'it writes only files, on the canary');
+});
+
+const OPEN = { ...STORE, 'access-control-allow-origin': ELSEWHERE };
+const { 'x-robots-tag': _robots, ...UNLISTED } = FILE_HEADERS;
+/* EACH FENCE QUESTION, ANSWERED THE WAY A HOST THAT LOST THAT PART OF THE FENCE WOULD ANSWER IT. */
+const BROKEN = [
+  [one('wrong-bearer'), () => reply(200, { ok: true, value: { version: 9 } }), /opened to a guess/],
+  [one('door', 0), () => reply(200, { ok: true }, OPEN), /access-control-allow-origin https:\/\/elsewhere\.example/],
+  [one('door', 1), () => reply(401, UNAUTHORIZED_BODY, { 'content-type': 'application/json' }), /cache-control unset, where every JSON answer is no-store/],
+  [one('door', 2), () => new Response('boom', { status: 500 }), /answered 500/],
+  [one('door', 3), () => reply(200, {}, { ...STORE, 'cache-control': 'public, max-age=3600' }), /cache-control public, max-age=3600/],
+  [one('door', 4), () => reply(200, {}, { ...STORE, 'access-control-allow-origin': '*' }), /access-control-allow-origin \*/],
+  [one('door', 5), () => reply(401, UNAUTHORIZED_BODY, OPEN), /access-control-allow-origin/],
+  [one('door', 6), () => new Response(null, { status: 405, headers: { 'access-control-allow-origin': '*' } }), /access-control-allow-origin/],
+  [one('door', 7), () => reply(200, { ok: true, value: {} }, { ...OPEN, 'access-control-allow-credentials': 'true' }), /a page on another site may read it/],
+  [one('door', 8), () => new Response(null, { status: 204, headers: { 'access-control-allow-origin': ELSEWHERE, 'access-control-allow-methods': 'POST' } }), /access-control-allow-origin/],
+  [one('shell'), () => new Response('<!doctype html>', { status: 200, headers: { ...SHELL, 'content-security-policy': "default-src 'self'; script-src 'self' 'sha256-AAAA' 'unsafe-inline'" } }), /script-src carries 'unsafe-inline'/],
+  [one('files-list'), () => reply(200, { ok: true, value: [] }), /the files can be listed/],
+  [one('png-put'), () => reply(200, { sha256: '0'.repeat(64), mime: 'image/png', bytes: PNG.length }), /not its SHA-256/],
+  [one('png-read'), () => new Response(PNG, { status: 200, headers: { ...UNLISTED, 'content-type': 'image/png' } }), /without noindex/],
+  [one('svg-put'), () => reply(200, { sha256: '1'.repeat(64), mime: 'image/svg+xml', bytes: 90 }), /an SVG was kept/],
+  [one('oversize-put'), () => reply(200, { sha256: '2'.repeat(64), mime: 'image/png', bytes: WORKER_MOST + 1 }), /over 2 MB was kept/],
+  [one('false-type-put'), () => reply(200, { sha256: PNG_SHA256, mime: 'text/html', bytes: PNG.length }), /the header's word and not its bytes/],
+];
+
+test('the fence: each line goes red by itself on a host that answers that one question wrong', async () => {
+  assert.equal(new Set(BROKEN.map(([check]) => check)).size, FENCE.length, 'a fence question has no wrong answer here');
+  for (const [check, answer, says] of BROKEN) {
+    const { code, out } = await run({ fence: { check, answer } });
+    assert.equal(code, 1, `${check.key} ${check.url}: ${out}`);
+    assert.match(lineOf(out, check), /^WRONG {2}/, `${check.key} ${check.url}`);
+    assert.match(lineOf(out, check), says, `${check.key} ${check.url}`);
+  }
+  const noHash = { ...SHELL, 'content-security-policy': "default-src 'self'; script-src 'self'" };
+  assert.match(judge(one('shell'), answer(200, noHash, '<!doctype html>')), /names no hash/);
+  assert.match(judge(one('shell'), answer(200, { 'content-type': 'text/html' }, '<!doctype html>')), /has no script-src/);
+});
+
+/** Today's 401, as `apps/worker/src/index.ts` `unauthorized` answers it before job 2. */
+const TODAY_401 = () =>
+  reply(401, { ok: false, refusal: { code: 'UNAUTHORIZED', at: 'authorization', fix: 'This record takes a bearer token it already knows. If the record is yours, sign in and mint one in Settings.' } });
+
+test('a 401 that says more than unauthorized is HELD while job 2 waits, said and not counted, and WRONG once HELD drops it', async () => {
+  const check = one('wrong-bearer');
+  assert.equal(heldOf(check, { status: 401, headers: new Headers(STORE), text: await TODAY_401().text() }), FENCE_HELD['unauthorized-body']);
+  const held = await run({ fence: { check, answer: TODAY_401 } });
+  assert.equal(held.code, 0, held.out);
+  assert.match(lineOf(held.out, check), /^HELD {3}GET [\s\S]*a fix of \d+ word\(s\), and at[\s\S]*held: job 2 of LCH-C08/);
+  assert.doesNotMatch(held.out, /WRONG/);
+  const landed = await run({ fence: { check, answer: TODAY_401 } }, undefined, { held: {} });
+  assert.equal(landed.code, 1);
+  assert.match(lineOf(landed.out, check), /^WRONG {2}/);
+  /* HELD NAMES A FAULT AND NOT A CHECK: the same line is red for an answer that is not the held one. */
+  const opened = await run({ fence: { check, answer: () => reply(200, { ok: true, value: {} }) } });
+  assert.equal(opened.code, 1);
+  /* AND A HELD FAULT NEVER HIDES A FENCE-WIDE ONE: today's 401 opened to another site, or a scope refusal kept by a
+     shared cache, is red for that. */
+  const today = await TODAY_401().json();
+  const crossed = await run({ fence: { check, answer: () => reply(401, today, OPEN) } });
+  assert.equal(crossed.code, 1, crossed.out);
+  assert.match(lineOf(crossed.out, check), /^WRONG {2}[\s\S]*access-control-allow-origin/);
+  const put = one('png-put');
+  const cached = await run({ fence: { check: put, answer: () => reply(403, { ok: false, refusal: { code: 'LEVEL_REQUIRED', fix: 'unauthorized' } }, { 'content-type': 'application/json' }) } });
+  assert.equal(cached.code, 1, cached.out);
+  assert.match(lineOf(cached.out, put), /^WRONG {2}[\s\S]*cache-control unset/);
+});
+
+test("a canary key that may not put a file: the five file lines are HELD and say why, and a lost picture is still red", async () => {
+  const no = () => refused(403, 'LEVEL_REQUIRED');
+  const puts = ['png-put', 'svg-put', 'oversize-put', 'false-type-put'].map((key) => ({ check: one(key), answer: no }));
+  const read = { check: one('png-read'), answer: () => refused(404, 'ROUTE_UNKNOWN') };
+  const { code, out } = await run({ fence: [...puts, read] });
+  assert.equal(code, 0, out);
+  for (const { check } of [...puts, read]) assert.match(lineOf(out, check), /^HELD [\s\S]*held: the canary's key may not put a file/, check.key);
+  assert.equal((await run({ fence: [...puts, read] }, undefined, { held: {} })).code, 1);
+  /* A 404 AFTER THE PICTURE WAS KEPT IS NO KEY'S FAULT. */
+  const lost = await run({ fence: read });
+  assert.equal(lost.code, 1);
+  assert.match(lineOf(lost.out, read.check), /^WRONG {2}/);
+});
+
+test('no line holds the token, the wrong bearer, a cookie or the address of a file', async () => {
+  const { out, sent } = await run({ fence: { check: one('wrong-bearer'), answer: TODAY_401 } });
+  const wrong = sent.find((s) => s.origin === ELSEWHERE && s.url.endsWith('/api/version')).bearer;
+  assert.ok(wrong && wrong !== `Bearer ${TOKEN}` && !wrong.includes('s3cret'), 'the wrong bearer is made from the token');
+  for (const secret of [TOKEN, 's3cret', wrong.slice('Bearer '.length), wrong.split('.')[1], 'Bearer ', PNG_SHA256, 'set-cookie', '__Host-'])
+    assert.ok(!out.includes(secret), `a line holds ${secret === PNG_SHA256 ? "the picture's address" : 'a credential'}`);
+  assert.match(out, /api\/files\/<the 1x1 picture's SHA-256>/);
+});
+
+test('the fence asks the canary alone: a slug no record could have, or a key on a record that is not the canary, is refused before anything is asked', async () => {
+  assert.throws(() => fenceChecks(staged('B2'), 'production', '../x', TOKEN), /not a record's name/);
+  const named = structuredClone(staged('B2'));
+  named.env.production.vars.OPS_RECORD = 'rec_canary';
+  assert.throws(() => fenceChecks(named, 'production', 'ops', TOKEN), /not a key on production's canary/);
+  assert.equal(fenceChecks(named, 'production', 'ops', 'rec_canary.k').length, FENCE.length);
+  const lines = [];
+  const { sent, io } = host();
+  const code = await smoke('production', named, BOTH_BOUND, { token: TOKEN, slug: 'ops' }, { fetch: io, log: (l) => lines.push(l), nowhere: NOWHERE });
+  assert.equal(code, 1);
+  assert.match(lines.join('\n'), /WRONG {2}SMOKE_TOKEN is not a key on production's canary/);
+  assert.ok(sent.every((s) => s.method !== 'PUT'), 'a file was put on a record that is not the canary');
 });

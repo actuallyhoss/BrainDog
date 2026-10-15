@@ -38,6 +38,7 @@ import type { Sql } from '@braindog/ports';
 import { meetsRole, orgRole, type RoleField } from './roles.ts';
 import { SESSION, SESSION_PREFIX } from './session.ts';
 import { SLASH } from './slash.ts';
+import { kindOfAutomationChange } from './automation-kind.ts';
 
 /** The rungs, lowest first: ask before writing, write and say so, write and say nothing. */
 export const RUNGS = ['ask', 'tell', 'quiet'] as const;
@@ -105,6 +106,8 @@ export type KindReader = {
   madeBy?: (list: string, at: string) => string | null;
   fieldsOf?: (list: string, at: string) => Record<string, unknown> | null;
   person?: string | null;
+  /** The installed rule's live body, by the declaration a change names, `null` when none is installed. */
+  ruleBody?: (d: Record<string, unknown>) => unknown | null;
 };
 
 const obj = (v: unknown): Record<string, unknown> => (v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
@@ -342,7 +345,7 @@ const UNATTENDED = new Set(['rule', 'script', 'digest', 'ingest']);
  * TAKING AWAY IS A DELETE. A retired field, or an enum narrowed, takes values off rows somebody has, so it is the
  * `delete` floor. Adding a field or a value, or retyping one, is `shape:<list>`, which may climb.
  */
-function changeKinds(body: Record<string, unknown>): ChangeKind[] {
+function changeKinds(body: Record<string, unknown>, read: KindReader): ChangeKind[] {
   const to = obj(body.to);
   const named = listOf(body.declaration_id);
   if ('add' in to) return [kind(null, `shape:${listOf(obj(to.add).register) ?? named ?? '?'}`, null)];
@@ -351,7 +354,7 @@ function changeKinds(body: Record<string, unknown>): ChangeKind[] {
   const members = Array.isArray(to.declarations) ? to.declarations.map(obj) : [to];
   return members.map((d) => {
     const k = typeof d.kind === 'string' ? d.kind : '';
-    if (UNATTENDED.has(k)) return kind(null, AUTOMATION, 'outside');
+    if (UNATTENDED.has(k)) return k === 'rule' ? kindOfAutomationChange(read.ruleBody?.(d) ?? null, d.body) : kind(null, AUTOMATION, 'outside');
     if (k === 'register') return kind(null, `shape:${listOf(obj(d.body).id) ?? listOf(d.id) ?? '?'}`, null);
     return kind(null, `declare:${k || '?'}`, null);
   });
@@ -394,7 +397,7 @@ export function kindsOfProposal(bodyKind: string, body: unknown, read: KindReade
       );
     }
     case 'change': {
-      const out = changeKinds(b);
+      const out = changeKinds(b, read);
       return merged(arr(b.egress).length > 0 ? out.map((k) => ({ ...k, floor: dearerFloor(k.floor, 'outside') })) : out);
     }
     case 'pattern':
@@ -585,6 +588,15 @@ export function recordReader(sql: Sql, actor: string): KindReader {
       return row === undefined ? null : parsed(row.fields);
     },
     person: personOf(sql, actor),
+    ruleBody: (d) => {
+      const id = typeof d.id === 'string' && d.id !== '' ? d.id : null;
+      if (id === null) return null;
+      const row = sql.one<{ body: string }>(
+        "SELECT body FROM declaration WHERE id = ? AND kind = 'rule' AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1",
+        id,
+      );
+      return row === undefined ? null : parsed(row.body);
+    },
   };
 }
 

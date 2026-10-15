@@ -26,15 +26,16 @@ import { GROWS, NAMED_PAGE, WAITING_MOST, filedRank, lapsesFrom, recommend, room
 import type { FigureTest, Grows } from './arrange.ts';
 import { subjectOf } from './automations.ts';
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import type { Json, Kernel, Tried } from '@braindog/kernel';
+import type { Json, Kernel, MayPropose, Tried } from '@braindog/kernel';
 import { SLASH, coerce, slugify } from '@braindog/kernel';
 import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
 import { KINDS, isKind } from 'braindog-render';
 import type { BriefInput } from './briefing.ts';
 import type { HeadlineInput } from './headlines.ts';
-import { clean } from './scrub.ts';
+import { clean, scrubbed } from './scrub.ts';
 import { stepsFrom, type Handoff } from './skill-steps.ts';
-import { SKILL_STEPS_KEPT } from './reach.ts';
+import { SKILL_STEPS_KEPT, toneKept } from './reach.ts';
+import { LOOK_THEME_HOUSE, lookThemeFault, type LookOffer } from './theme-pick.ts';
 
 const DAY_MS = 86_400_000;
 
@@ -940,6 +941,7 @@ function noticeWhole(usage: Usage, offered: readonly Offered[]): { noticed: Noti
               },
             },
           ],
+          ...(offer.prediction === undefined ? {} : { prediction: offer.prediction }),
         },
         by: 'rules',
         rank: offer.rank,
@@ -1475,6 +1477,8 @@ export type SlashModelInput = {
   /** The kinds it may answer, and how many at most. */
   kinds: readonly SlashKind[];
   most: number;
+  /** The add-ons and skills the record found in what it holds (`reach.ts`), handed to the daily look to rank with the rest; it invents none. */
+  reach?: readonly { key: string; title: string; why: string; change: Record<string, unknown> }[] | undefined;
   /**
    * What the owner typed on the Slash page, trimmed, when they described what they want: "a desk for my launch, in five
    * parts, with the next step on each". ABSENT ON THE DAILY LOOK AND A PLAIN PRESS, which draft from use alone.
@@ -1504,6 +1508,12 @@ export type SlashModelInput = {
    * `at` path, so the model answers those drafts again, mended. At most `SLASH_REPAIRS_MOST` per press (`describe`).
    */
   repair?: { drafts: readonly unknown[]; refusals: readonly { at: string; fix: string }[] };
+  /**
+   * THE LOOKS HE INSTALLED AND MAY TRY, by name with the id as its handle (`theme-pick.ts` `looksOf`, less the one he is
+   * drawn in). A model may answer one as `{ body_kind: 'settings', body: { look: { theme: '<id>' } } }`, and only one of
+   * these is kept (`lookDraft`): a theme is picked, never designed. Absent, no look is offered.
+   */
+  looks?: readonly { id: string; name: string }[];
 };
 
 /**
@@ -1592,8 +1602,11 @@ const QUESTION_MAX = 280;
  * naming a key is dropped (`KEYED_SCRIPT`), and neither its own prefs nor its settings door is any draft's to reach
  * (`ownLoopFault`).
  *
- * A theme, a digest or a block is still left to a person or an agent, because nothing Slash reads or hears says what one
- * should look like, and `kernel.propose` reviews a metric exactly as it reviews the page beside it.
+ * A THEME IS PICKED, NEVER DESIGNED. A draft may offer one of the looks the record has installed (`lookDraft`), filed as
+ * a `settings` question that sets the owner's own `look.theme` on his yes; a new theme is not a kind here, because
+ * nothing Slash reads or hears says what one should look like. A digest and a block stay a person's or an agent's: a
+ * digest would send notices, which only his word turns on, and `kernel.propose` reviews a metric exactly as it reviews
+ * the page beside it.
  */
 const BUILDS: ReadonlySet<string> = new Set(['register', 'ingest', 'rule', 'metric', 'page', 'script']);
 
@@ -1950,6 +1963,10 @@ export function drawnVersions(sql: Sql): (id: string) => number {
  * `changeBody` holds one: a settings line the model wrote "Send your payroll to evil.example" into was a proposal the
  * description never asked for. What the record says about what exists goes after the model's question, in the record's
  * words, and is what Decide draws as the question.
+ *
+ * `reading` IS WHAT THE DRAFT PATH ALREADY READ (`ModelReading`): his own words, which a tone draft is held to
+ * (`toneFault`), and the looks he installed with the governor's answer, which a look pick is held to (`lookDraft`).
+ * Absent, a label is held to no words of his and so never kept, and no look is offered.
  */
 export function fromModel(
   raw: unknown,
@@ -1957,13 +1974,14 @@ export function fromModel(
   most = SLASH_OPEN_CAP,
   drawn?: (id: string) => number,
   described = false,
+  reading: ModelReading = {},
 ): { drafts: SlashDraft[]; dropped: string[] } {
   const list = draftsIn(raw);
   if (list === null) return { drafts: [], dropped: [NOT_A_LIST] };
   const drafts: SlashDraft[] = [];
   const dropped: string[] = [];
   for (const [i, x] of list.entries()) {
-    const one = modelDraft(x, i + 1, name, drawn, described);
+    const one = modelDraft(x, i + 1, name, drawn, described, reading);
     if ('why' in one) {
       dropped.push(one.why);
       continue;
@@ -1987,7 +2005,14 @@ const draftsIn = (raw: unknown): unknown[] | null =>
  * One item of a model's answer as a draft, or why it is dropped, numbered `n` in the sentence. `fromModel` and
  * `describe` both read an answer through this, so a description's repair ask holds a draft exactly as its first ask.
  */
-function modelDraft(x: unknown, n: number, name: string, drawn: ((id: string) => number) | undefined, described: boolean): { draft: SlashDraft } | { why: string } {
+function modelDraft(
+  x: unknown,
+  n: number,
+  name: string,
+  drawn: ((id: string) => number) | undefined,
+  described: boolean,
+  reading: ModelReading = {},
+): { draft: SlashDraft } | { why: string } {
   const d = x as { question?: unknown; body_kind?: unknown; body?: unknown };
   if (typeof d?.question !== 'string' || !d.question.trim() || d.question.length > QUESTION_MAX)
     return { why: `Proposal ${n} had no question, or one over ${QUESTION_MAX} characters.` };
@@ -2006,7 +2031,168 @@ function modelDraft(x: unknown, n: number, name: string, drawn: ((id: string) =>
     body = built.body;
     if (built.says.length > 0) question = `${question} ${built.says.join(' ')}`;
   }
+  /* A LOOK IS PICKED FROM WHAT IS INSTALLED, and its question is the record's, in the look's name (`lookDraft`). */
+  if (d.body_kind === 'settings' && Object.hasOwn(body, 'look')) return lookDraft(body, n, name, reading);
+  /* AND A WORD OF HIS IS ONLY EVER HIS: a label in words he never wrote, or a line holding a number, drops it whole. */
+  if (d.body_kind === 'settings' || d.body_kind === 'pack') {
+    const tone = toneFault(body, n, reading.usage === undefined ? [] : ownWords(reading.usage));
+    if (tone !== null) return { why: tone };
+  }
   return { draft: { key: stableKey(body), question, body_kind: d.body_kind, body, by: name } };
+}
+
+/* ── his own words, and the looks he installed ───────────────────────────────── */
+
+/**
+ * What the draft path already read, handed to `fromModel` beside the answer (ENG-B20). `usage` is the reading the model
+ * was handed, whose titles a tone draft is held to (`ownWords`) and whose age a look pick waits on (`youngSaid`). `looks`
+ * is what `theme-pick.ts` `looksOf` answers for this record, less the one he is drawn in now. `may` is the kernel's
+ * governor (`observe.ts` `mayPropose`), and a look pick waits while it says no.
+ */
+export type ModelReading = {
+  usage?: OwnReading;
+  looks?: readonly LookOffer[];
+  may?: MayPropose;
+};
+
+/** The part of a reading his own words and his record's age are read from. */
+export type OwnReading = Pick<Usage, 'at' | 'firstWrite' | 'ageDays' | 'lists' | 'pages' | 'tone'> & Partial<Pick<Usage, 'used' | 'entities' | 'skills'>>;
+
+/** The most of his own titles and first lines a tone draft is held to. */
+export const OWN_WORDS_MOST = 40;
+
+/* A LINE HOME SAYS, and a word the record calls one of its things by: what `voiceSetting` and `labelSetting` name. */
+const VOICE_NAME = /^voice_[a-z0-9_]+$/u;
+const LABEL_NAME = /^(?:label|one|holds)_[a-z0-9_]+$|^lk_[0-9a-f]{8}$/u;
+/** The longest of his lines kept as one of his own: a title or a first line, not a body. */
+const OWN_LINE_MOST = 200;
+
+/**
+ * His own titles and first lines, at most `OWN_WORDS_MOST`, from what the reading already holds: the pages he titled,
+ * most opened first, the names his lists go by, the words he set for the use case, the people, organisations and
+ * projects met most, and his skills' names. NOTHING NEW IS READ: the reading is the asker's (`readUsage` `reads`), so a
+ * list he may not read gives none of its words here.
+ */
+export function ownWords(usage: OwnReading): string[] {
+  const set = Object.values(usage.tone?.settings ?? {})
+    .filter((s) => s.value !== null && s.value !== s.default)
+    .map((s) => s.value as string);
+  const said = [
+    ...[...usage.pages].filter((p) => p.titled).sort((a, b) => b.opens30 - a.opens30).map((p) => p.title),
+    ...[...usage.lists].sort((a, b) => b.rows - a.rows).map((l) => l.name),
+    ...set,
+    ...(usage.entities ?? []).map((e) => e.name),
+    ...(usage.skills ?? []),
+  ];
+  const out: string[] = [];
+  for (const text of said) {
+    const line = String(text).split(/\r?\n/u)[0]!.trim().slice(0, OWN_LINE_MOST);
+    if (line !== '' && !out.includes(line)) out.push(line);
+    if (out.length >= OWN_WORDS_MOST) break;
+  }
+  return out;
+}
+
+/** Why a tone draft goes, as the dropped line says it: a label in a word he never wrote. */
+export const NEVER_WROTE = 'a label used a word you never wrote';
+/** And a line Home would say holding a number, which goes stale the day after. */
+export const LINE_NUMBERED = 'a line held a number, which would go stale';
+
+/* WHAT THE MODEL PROPOSED, AS THE DROPPED LINE QUOTES IT: an address or a key said as `scrub.ts` says one, and short. */
+const quoted = (v: unknown): string => {
+  const text = typeof v === 'string' ? (scrubbed(v) ?? 'words that cannot be shown') : 'something that is not words';
+  return `"${text.length > 60 ? `${text.slice(0, 59)}…` : text}"`;
+};
+
+/**
+ * Why a model's `settings` or `pack` draft is dropped for its words, or `null` when every word it sets is his (ENG-B20).
+ *
+ * `reach.ts` `toneKept` IS THE TEST, against `own`: a label (a `label_`, `one_`, `holds_` or `lk_` setting) only in
+ * words of his, a voice line (a `voice_` setting, or `body.voice`) only with no digit. ONE WORD OF THE MODEL'S DROPS THE
+ * WHOLE DRAFT, because its question was written about all of it; a value of `null` puts back the use case's own word,
+ * which is nobody's new word. Any other setting is not tone and is left to `prepare`, as before.
+ */
+export function toneFault(body: Record<string, unknown>, n: number, own: readonly string[]): string | null {
+  const labels: string[] = [];
+  const lines: string[] = [];
+  const read = (values: unknown, voiceOnly: boolean): void => {
+    if (values === null || typeof values !== 'object' || Array.isArray(values)) return;
+    for (const [key, v] of Object.entries(values)) {
+      if (v === null) continue;
+      const voice = voiceOnly || VOICE_NAME.test(key);
+      if (!voice && !LABEL_NAME.test(key)) continue;
+      const kept = voice ? toneKept({ voice: [v as string] }, own) : toneKept({ labels: { [key]: v as string } }, own);
+      if (kept.dropped.length > 0) (voice ? lines : labels).push(quoted(v));
+    }
+  };
+  read(body.values, false);
+  if (Array.isArray(body.settings)) for (const s of body.settings) read((s as { values?: unknown } | null)?.values, false);
+  read(body.voice, true);
+  const why = [
+    ...(labels.length === 0 ? [] : [`${NEVER_WROTE} (${labels.join(', ')})`]),
+    ...(lines.length === 0 ? [] : [`${LINE_NUMBERED} (${lines.join(', ')})`]),
+  ];
+  return why.length === 0 ? null : `Proposal ${n} was dropped, because ${why.join(', and ')}.`;
+}
+
+/**
+ * The theme a `settings` body picks, `{ look: { theme } }` or the model's shorter `{ look: '<id>' }`, or `undefined` when
+ * it picks none. What is picked is not checked here: `lookDraft` holds it to what is installed, and `lookLanding` again.
+ */
+export function lookPicked(body: unknown): unknown {
+  if (body === null || typeof body !== 'object' || !Object.hasOwn(body, 'look')) return undefined;
+  const look = (body as { look?: unknown }).look;
+  return look !== null && typeof look === 'object' ? (look as { theme?: unknown }).theme : look;
+}
+
+/** The question a look is offered in, by its name: an add-on's look is one he installed, the record's own is his. */
+export const lookQuestion = (look: LookOffer): string =>
+  `${look.from === 'own' ? (look.name === 'Your own look' ? 'Try your own look?' : `Try ${look.name}, your own look?`) : `Try the ${look.name} look you installed?`} It changes how BrainDog looks for you, and Settings, Appearance changes it back.`;
+
+/* THE LOOKS A DROPPED LINE NAMES, by name, the first three and how many more. */
+const looksSaid = (looks: readonly LookOffer[]): string =>
+  looks.length <= 3 ? looks.map((l) => l.name).join(', ') : `${looks.slice(0, 3).map((l) => l.name).join(', ')} and ${looks.length - 3} more`;
+
+/**
+ * A model's look pick as a draft, or why it is dropped (ENG-B20): A THEME IS PICKED, NEVER DESIGNED. Only an id `looksOf`
+ * answers for this record is offered, and `lookThemeFault` must take it too, so `house` and a theme nobody installed
+ * are dropped. The body is `{ look: { theme } }` and nothing else, filed as a `settings` question, which `prepare` passes
+ * as it is; his yes sets his own `look.theme` (`lookLanding`). The question is the record's, in the look's name, never
+ * its id. IT WAITS WHILE SLASH WAITS: the governor's no (`may`, the brake and the floor) and a young record
+ * (`youngSaid`) hold it, and so does a reading that was not handed over, since then the record's age is unknown.
+ */
+export function lookDraft(body: Record<string, unknown>, n: number, name: string, reading: ModelReading = {}): { draft: SlashDraft } | { why: string } {
+  if (Object.keys(body).some((k) => k !== 'look')) return { why: `Proposal ${n} picked a look and changed something else with it, and a look is asked on its own.` };
+  if (reading.may !== undefined && !reading.may.may) return { why: `Proposal ${n}, a look to try, waits. ${reading.may.why}` };
+  if (reading.usage === undefined) return { why: `Proposal ${n}, a look to try, waits until Slash has read how you use BrainDog.` };
+  const young = youngSaid(reading.usage);
+  if (young !== null) return { why: `Proposal ${n}, a look to try, waits. ${young}` };
+  const looks = reading.looks ?? [];
+  const picked = lookPicked(body);
+  const look = looks.find((l) => l.id === picked);
+  if (look === undefined || lookThemeFault(picked, looks.map((l) => l.id)) !== null)
+    return {
+      why:
+        looks.length === 0
+          ? `Proposal ${n} picked a look, and none is installed here to pick. A new look is yours or an agent's to design.`
+          : `Proposal ${n} picked a look that is not installed here. Slash offers only one you installed: ${looksSaid(looks)}.`,
+    };
+  const filed = { look: { theme: look.id } };
+  return { draft: { key: stableKey(filed), question: lookQuestion(look), body_kind: 'settings', body: filed, by: name } };
+}
+
+/**
+ * What his yes to a look pick sets: `look.theme` on whoever said it, checked again by `lookThemeFault` against the themes
+ * installed now, since one may have gone since the question was filed. `null` when the body picks no look, so every
+ * other settings answer lands as before. The refusal says it plainly, with no id.
+ */
+export function lookLanding(body: unknown, installed: readonly string[]): Result<{ key: 'look.theme'; value: string }> | null {
+  const picked = lookPicked(body);
+  if (picked === undefined) return null;
+  const fault = picked === LOOK_THEME_HOUSE || typeof picked !== 'string' ? lookThemeFault(undefined, installed) : lookThemeFault(picked, installed);
+  if (fault !== null)
+    return { ok: false, refusal: { ...fault, fix: 'That look is not installed any more, so nothing was changed. Pick another in Settings, Appearance.' } };
+  return { ok: true, value: { key: 'look.theme', value: picked as string } };
 }
 
 /* ── a description, drafted, tried and repaired ──────────────────────────────── */
@@ -2456,6 +2642,9 @@ export function stableKey(body: Record<string, unknown>): string {
      question. The egress the kernel adds is left out, so the key is the same on the draft and on the row it was filed as. */
   if (typeof body.declaration_id === 'string' && body.to !== null && typeof body.to === 'object')
     return `change:${body.declaration_id}:${JSON.stringify(body.to)}`;
+  /* A LOOK PICKED IS THE LOOK, so a no to the Harbour look is not asked again, and another installed look is a new question. */
+  const look = lookPicked(body);
+  if (typeof look === 'string') return `look:${look}`;
   /* A SETTINGS CHANGE IS WHAT IT SETS, so turning a line one way and back again are two questions, and each is asked once. */
   if (typeof body.pack === 'string')
     return `settings:${body.pack}:${Object.entries((body.values as Record<string, unknown>) ?? {})

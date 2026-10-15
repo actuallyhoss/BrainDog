@@ -199,14 +199,16 @@ function drawn(doc: File): { metric: string; when: unknown }[] {
   return out;
 }
 
-test('THE FILE IS DATA AND ONLY ITS OWN: no script, one list, one page, eighteen figures over that list, one rule', () => {
+test('THE FILE IS DATA AND ONLY ITS OWN: no script, one list, one page, twenty figures over that list, one rule', () => {
   const doc = file();
   assert.equal(doc.pack, 'portfolio');
   const kinds = doc.declarations.map(kindOf);
   assert.deepEqual(
     Object.fromEntries(['register', 'page', 'metric', 'rule'].map((k) => [k, kinds.filter((x) => x === k).length])),
-    { register: 1, page: 1, metric: 18, rule: 1 },
-    'one list, one page, eighteen figures and one rule',
+    /* TWENTY SINCE 1.17.0 (PGS-C17): `projects-with-health`, what the health split waits on, and `projects-lane-earning`,
+       the strip's Earning with its nights. */
+    { register: 1, page: 1, metric: 20, rule: 1 },
+    'one list, one page, twenty figures and one rule',
   );
   assert.ok(!kinds.includes('script') && !kinds.includes('something else'), 'the file declares a script, or something that is none of the four');
   assert.doesNotMatch(JSON.stringify(doc.declarations), /"script":|"egress"|"hosts"/u, 'a step that runs a script or reaches out');
@@ -327,14 +329,14 @@ function project(api: Api, name: string): string {
 }
 
 for (const { name, holds } of SUBSETS)
-  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same twenty-one parts, word for word`, async () => {
+  test(`INSTALLED FROM THE FILE OR FROM THE MODULE, a record ${name} stores the same twenty-three parts, word for word`, async () => {
     const built = await record(holds);
     const filed = await record(holds);
     said(await put(built.api, theModule(holds)));
     said(await put(filed.api, file()));
     const [mine, theirs] = [stored(filed.api), stored(built.api)];
     const parts = await ours();
-    assert.equal(parts.length, 21);
+    assert.equal(parts.length, 23);
     for (const id of parts) {
       assert.ok(theirs.has(id), `${id} is in the file and the module did not store it`);
       const lines = differences(JSON.parse(mine.get(id)!), JSON.parse(theirs.get(id)!), id.slice(id.indexOf('.') + 1));
@@ -440,8 +442,10 @@ test('PROJECTS ASKS ITS OWN QUESTIONS: a queue of the questions about projects, 
   for (const l of lines) assert.match(l.body!, /\{\{questions-open-in:things\}\} question\(s\) for you/u);
 });
 
-test('FOUR TILES BEFORE THE FOLD AT 1440, the questions under In play and before the open tile', () => {
-  assert.deepEqual(beforeTheFold(projectsPage()), ['How they are going', 'In play', 'Waiting on you', 'Earnings, agents and dates']);
+/* SIX SINCE 1.17.0 (PGS-C17): the strip and Where they are lead, over How they are going, and the page is at the most a
+   page shows before its fold (`calm-pages.test.ts`). */
+test('SIX TILES BEFORE THE FOLD AT 1440, the strip and the lanes first, the questions under In play and before the open tile', () => {
+  assert.deepEqual(beforeTheFold(projectsPage()), ['In play and earning', 'Where they are', 'How they are going', 'In play', 'Waiting on you', 'Earnings, agents and dates']);
 });
 
 test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT PROJECTS: nothing at nought, two at two, and not the one about a task', async () => {

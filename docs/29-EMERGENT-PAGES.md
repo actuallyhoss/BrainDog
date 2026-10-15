@@ -122,8 +122,10 @@ written until a person keeps it. Each item is a whole page declaration, which pa
 |---|---|---|
 | T1 with T6 | yes | a page for a list with a row that no page reads: a `stat` of up to three figures whose `source` is the list, then a `table` of its first six fields a table may draw |
 | T5 | yes | the field filled on at least 80% of at least 20 rows that the page's first `table` over the list does not show, added as that table's last column. A table naming no columns draws the default projection and is left alone. The filter chip is not built |
-| T2, T3 | no | both count what a person does (opens, re-typed filters), which needs an instrument per person that the record does not keep |
-| T4 | no | a grouping inside a page is no key a block declares today (`packages/kernel/src/block-keys.ts`) |
+| T2 | yes | a saved view (a page under Views, as the list screen saves one) opened 5 times in 14 days is offered its place at the end of the section that already draws its list, after every page there, the person's and an add-on's alike: "Keep Open tasks in the rail?", "Opened 6 times in two weeks." Keeping it moves only the view's `nav`. The opens are the `page.render` lines the record already writes for every page read, so nothing new is kept (`packages/record/src/emergent-views.ts`, `place:<view>`) |
+| T3 | no | counting a re-typed filter needs it stored in one normal form, once a day at most, which is a new table or a new line in the record's wiring: the owner's migration, so it waits for him. Until it lands nothing counts what a person typed |
+| T4 | yes | a table over a list of 300 rows or more is offered a grouping by its best field: a choice or a link filled on 8 rows in 10, with 2 to 12 values. Keeping it writes `group:` on that one table, which a `table` block now declares (`packages/kernel/src/block-keys.ts`), and nothing else moves (`packages/record/src/emergent-grows.ts`, `block:<page>:group:<list>`) |
+| Open work | yes | a list with an open state (a `done`, or a state no move leaves) holding more than 12 entries that have each stood open 3 days or more is offered a page "Open <list>", grouped by the state (`page:<list>:open`). This is not the bare row count refused below: it counts only what is still open, and only what has stayed open over days, so a busy month that gets finished offers nothing |
 
 Beside the triggers, a page that draws a list without the block that list's shape asks for is offered that block,
 appended at the end of the page's main column:
@@ -289,7 +291,13 @@ T1 with T6 is built in the record, not in the kernel and not in the browser:
 
 A proposed page carries no `header:` and no `filters:`: both are refused at install as keys this build
 draws nowhere (`kernel/src/block-keys.ts` `PAGE_UNBUILT`), so the header above is not written into it.
-T2 to T5, and `kind: 'block'` and `kind: 'column'` items, are not built here.
+T2, T4, T5, the open work and `kind: 'block'` and `kind: 'column'` items are built beside this, in the same pen,
+under the same three-at-a-time rule and the same lapse (§3, "Which are built"). T3 is not.
+
+**Why T2 is not the visit count refused in §3.** Office's menus counted visits and then moved and hid what was there by
+themselves. T2 moves nothing: it offers one view, once, after the young-record fortnight, a place at the end of a
+section, and nothing changes until the person presses Keep. A view turned down (`place:<view>` in `pen.dismissed`) is
+never offered again, and nothing placed is ever taken out.
 
 ---
 

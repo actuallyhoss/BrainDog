@@ -190,7 +190,7 @@ The artefacts an operator handles, each with invariants a test can check.
 | **The version tuple** | `app <date>+<sha> · format <user_version> · kernel <migration> · primitives <PRIMITIVES_VERSION>` (31 §6) | `format` moves only with `-- format-bump`; `kernel` = `MAX(migration.version)`; a bug report without it is sent back for it |
 | **A device grant** | a `device_grant` row (30 §1) | `pending approved active expired denied revoked`; `token_hash`, never the token; `expires` rewritten to +90 d on activation; `last_used` older than 14 d → `expired`, the customer told (26 §2.4); a `denied` row is never purged |
 | **The dead-letter suggestion** | a `suggestion` row, `body_kind = 'change'`, `opened_by = 'system'` (30 §8) | names kind, error and a payload summary, never a payload value; one per `dead` outbox row |
-| **Billing state** | a Directory `dir_billing` row, one per record somebody pays for: `state` ∈ `active past_due lapsed`, `lapsed_at`, `told` ∈ `'' 0 0,60 0,60,83 0,60,83,90` (§13 #5) | a record with no row is never capped and never deleted; `lapsed` caps every principal at `read`, export admitted; deletion only at `lapsed_at + 90 d` with `told = 0,60,83` (§5.10) |
+| **Billing state** | a Directory `dir_billing` row, one per record somebody pays for or was given a plan: `state` ∈ `active past_due lapsed comp`, `lapsed_at`, `told` ∈ `'' 0 0,60 0,60,83 0,60,83,90` (§13 #5) | a record with no row is never capped and never deleted; `comp` never lapses; `lapsed` caps every principal at `read`, export admitted; deletion only at `lapsed_at + 90 d` with `told = 0,60,83` (§5.10) |
 | **An operator audit line** | a `note` in the ops record | ≤ 280 chars: `<procedure> <rec_id> · <reason>`; written **before** the action. The walk's own note and the drill's line are the two that are written after |
 
 Twelve, counted.
@@ -634,6 +634,14 @@ pays for through Stripe, is never capped and never deleted by anything here. The
 the walk's one clock; the deletion day is `LAPSE_DELETES_DAYS` (90), the same constant Settings reads, so the date in
 a letter, on the banner and in Settings > Billing is one date.
 
+**The states and their order are [ADR-059](16-DECISIONS.md)'s amendment of October 15th 2026**, which this section follows: a row is
+`active`, `past_due`, `lapsed` or `comp`, and a record with no row is not billed. The Directory decides the state from
+a verified Stripe event; `lapse.ts` refuses writes with its one sentence and keeps export; the nightly walk mails and
+deletes. A paid plan cancelled goes **back to Free** instead of lapsing when the record fits Free (one person on it,
+and no other record of its owner's on Free): writable, off the ladder, its row keeping the Stripe customer and losing
+the subscription. A `comp` row is a plan given by the operator's door `POST /account/ops/plan`, with no Stripe
+customer: it never lapses and is never charged, and taking it back goes through the same back to Free rule.
+
 | Day | State | The record | The letter, to the payer and every owner (`lapse.*` in `mail.ts`) | In the app |
 |---|---|---|---|---|
 | 0 | `lapsed` | read-only; connectors, inference and digests paused; export and reads work | "<name> is read-only until billing resumes": the last payment did not go through, everything is still there, export any time, and it is deleted on the day-90 date if billing has not resumed | the banner: "Read-only until billing resumes. Export is available.", and Settings > Billing: "Read-only since <day>, and deleted on <day 90> unless it is paid. Export is always available." |
@@ -676,6 +684,20 @@ nothing is undone.
 **Held is not lapsed.** A scheduled action on an `active` record that has used its month's allowance is `held`: the
 run is counted, the `pull` event says the day it runs again, and the record stays writable. A lapsed record starts no
 runs at all, so it holds none.
+
+**Setting billing up.** The plans and the credit packs are made in Stripe from the one table (`PLAN_TABLE` and `PACKS`
+in `packages/record/src/plans.ts`) by one command, with the key on standard input and never as an argument:
+
+1. `pbpaste | node tools/ops/stripe-setup.mjs` with a test key (`sk_test_` or `rk_test_`). It asks Stripe for each
+   price by its `lookup_key` (`braindog-hosted-month`, `braindog-plus-month`, `braindog-credits-100`,
+   `braindog-credits-500`), creates only the products and prices that are missing, and never edits or archives one
+   that exists. A price whose figure differs from the table is named and left for a person to settle in Stripe. Run
+   again, it makes nothing. The extra-usage meters are listed and skipped until their migration is built.
+2. Each price line names the setting its id goes into (`STRIPE_PRICE_HOSTED`, `STRIPE_PRICE_PLUS`,
+   `STRIPE_PRICE_PACK_100`, `STRIPE_PRICE_PACK_500`); those ids go into `apps/worker/wrangler.jsonc` for that
+   environment, and the checkout refuses a plan whose Stripe price does not agree with the table.
+3. A live key is refused with nothing sent unless `--live-ok` is given, which is the owner's word in the one live
+   sitting. The only line that names the key says its mode and its last four characters.
 
 ### 5.11 · Incident response
 

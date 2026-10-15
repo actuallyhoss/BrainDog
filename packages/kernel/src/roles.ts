@@ -90,6 +90,12 @@ export const PARTS: Readonly<Record<RoleName, readonly Part[]>> = {
 };
 
 /** The list each role was read from by name before the keys, and still is while no list declares the role. */
+/**
+ * The parts a list may play for the record's agents (`role:` on a register), which `packages/record` `agent-lists.ts`
+ * reads: its skills, its tools, its learnings and its index of keys by name. Checked at install by `declare.ts`.
+ */
+export const AGENT_ROLES = ['skills', 'tools', 'learnings', 'keys-index'] as const;
+
 export const LEGACY: Readonly<Record<RoleName, string>> = { rates: 'fx', meets: 'people', org: 'organisations' };
 
 /** What each role's list holds, for a sentence. */

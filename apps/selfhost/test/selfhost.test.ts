@@ -218,10 +218,9 @@ test('with a token set, a request without it is refused before it reaches the re
     const res = await fetch(`http://127.0.0.1:${s.port}/api/boot`);
     assert.equal(res.status, 401);
     const none = ((await res.json()) as Answer).refusal;
-    assert.equal(none?.code, 'UNAUTHORIZED');
-    /* Nothing sent is not a credential the record failed to know, and the sentence does not say it was. */
-    assert.doesNotMatch(String(none?.fix), /does not know that credential/);
-    assert.match(String(none?.fix), /Bearer/);
+    /* AND IT SAYS ONLY `unauthorized` (LCH-C08 job 2, his words "A `401` says only `unauthorized`."), the Worker's one
+       401 body: which of the two it was, nothing sent or a credential nobody issued, goes to the log. */
+    assert.deepEqual(none, { code: 'UNAUTHORIZED', fix: 'unauthorized' });
 
     /* AND AN AGENT TOKEN IS THE SAME TABLE AND THE SAME CHECK THE WORKER USES. A deployment that
        recognised only one shared string is one where an agent cannot be given less than everything,

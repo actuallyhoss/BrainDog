@@ -788,7 +788,7 @@ const withoutBatch100 = (doc: Body): Body => {
 /** Batch 63's four figures of this month's spending against last (spend-figures-63), new in the unreleased money-core 3.17.0. */
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 /** Projects' quiet line with the clause for its list's questions, added inside the unreleased portfolio 1.17.0 (waiting-work-projects-99, PGS-C18). */
-const QUIET_PROJECTS = 'Nothing needs a push across {{projects-live}} project(s) in play, {{questions-open-in:things}} question(s) for you';
+const QUIET_PROJECTS = 'Nothing needs a push, {{questions-open-in:things}} question(s) for you';
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
   'money-core': {
@@ -832,7 +832,10 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
            project, added inside the same unreleased 1.17.0 (projects-last-worked-96, REC-C16). */
         (now) =>
           now
-            .filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said' && !(b.kind === 'queue' && b.where === 'list is things'))
+            .filter((b) => b.key !== 'open-earns-said' && b.key !== 'earns-said' && !(b.kind === 'queue' && b.where === 'list is things') && b.key !== 'in-play-earning' && b.key !== 'where-they-are')
+            /* AND BATCH 101'S STRIP AND LANES (projects-lanes-lines-101, PGS-C17), inside the same unreleased 1.17.0: the
+               strip In play and earning and the split Where they are go, and How they are going draws past four again. */
+            .map((b) => (b.kind === 'split' && b.heading === 'How they are going' ? { ...b, when: { metric: 'projects-live', gt: 4 } } : b))
             /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the same unreleased 1.17.0
                (waiting-work-projects-99, PGS-C18). */
             .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body === QUIET_PROJECTS ? 'Nothing needs you across {{projects-live}} project(s) in play' : b.body.replace('{{questions-open-in:things}} question(s) for you, ', '') } : b))
@@ -841,7 +844,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
                 ? { ...b, columns: (b.columns as Body[]).filter((c) => c.as !== 'when').map(({ edit: _edit, ...c }) => c) }
                 : b,
             ),
-        (d) => d.metric !== 'project-said',
+        (d) => d.metric !== 'project-said' && d.metric !== 'projects-with-health' && d.metric !== 'projects-lane-earning',
       ),
   },
   /* A CARD NAMED ITS PROJECT, where it says its day and who holds it. A record without Projects had no third column. */
@@ -871,8 +874,16 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       /* AND THE BOARD'S CAPTURE LINE comes off too, added inside the unreleased 1.19.0 (board-capture-line-83). */
       /* AND THE QUESTIONS ABOUT ITS LIST, a queue and a clause in the line, added inside the unreleased 1.19.0
          (waiting-work-projects-99, PGS-C18). */
-      const asked = withPage(doc, 'work', (now) =>
-        now.filter((b) => !(b.kind === 'queue' && b.where === 'list is tasks')).map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:tasks}} question(s) for you, ', '') } : b)),
+      /* AND WORK'S HEAD AND ITS OPEN WORK WITH NO PROJECT, a fold, a list and the figure both are gated on, added inside
+         the unreleased 1.19.0 (work-head-and-no-project-101, AGT-D14 job 1, PGS-A14). */
+      const headless = {
+        ...doc,
+        declarations: (doc.declarations as Body[]).filter((d) => d.metric !== 'tasks-no-project').map((d) => (d.page === 'work' ? (({ header: _head, ...rest }) => rest)(d) : d)),
+      };
+      const asked = withPage(headless, 'work', (now) =>
+        now
+          .filter((b) => !(b.kind === 'queue' && b.where === 'list is tasks') && b.heading !== 'Needs a project' && b.heading !== 'With no project')
+          .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:tasks}} question(s) for you, ', '') } : b)),
       );
       return withPage(asked, 'work-board', (now) =>
         now.filter((b) => b.kind !== 'capture').map((b) => (b.kind === 'board' ? { ...b, columns: [{ field: 'state' }, { field: 'what' }, ...(linked ? [{ field: 'thing' }] : [])] } : b)),
@@ -888,10 +899,13 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.1.0',
     released: '36328d2fcaeb58f3',
     undo: (raw) =>
-      withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity') }, 'people', (now) =>
+      withPage({ ...raw, declarations: (raw.declarations as Body[]).filter((d) => d.page !== 'health' && d.page !== 'calendar' && d.page !== 'activity').map((d) => (d.metric === 'people-in-touch-30d' ? (({ snapshot: _save, ...rest }) => rest)(d) : d)) }, 'people', (now) =>
         /* AND PEOPLE 3.4.0'S QUESTIONS ABOUT SOMEBODY, a queue and a clause in each line (waiting-people-services-99, PGS-C18). */
+        /* AND PEOPLE 3.4.0'S IN TOUCH AND WHAT AGENTS DID, with the night's save of the figure and the line's clause that
+           In touch took over (services-people-five-parts-101, PGS-C18). */
         now
-          .filter((b) => !(b.kind === 'queue' && b.where === 'list is people'))
+          .filter((b) => !(b.kind === 'queue' && b.where === 'list is people') && b.heading !== 'In touch' && b.heading !== 'What agents did')
+          .map((b) => (b.kind === 'note' && b.body === '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)' ? { ...b, body: `${b.body}, {{people-in-touch-30d}} in touch in the last 30 days` } : b))
           .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:people}} question(s) for you, ', '') } : b))
           .flatMap((b) =>
             (b.when as Body | undefined)?.metric === 'held-twice'
@@ -930,6 +944,15 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       ),
   },
 };
+
+/**
+ * A LEAD PAGE'S PLACE ON THE RAIL, `nav.place`, taken off every page: batch 101 put it inside each module's unreleased
+ * step (places-and-computed-101, SHL-A18), and no released version said one.
+ */
+const unplaced = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) => (d.nav !== null && typeof d.nav === 'object' && 'place' in (d.nav as Body) ? { ...d, nav: (({ place: _place, ...nav }) => nav)(d.nav as Body) } : d)),
+});
 
 /** A document as the version before this build's declared it, for a module this build moved on, else as it is. */
 const latestUndone = (id: string, doc: Body): Body => LATEST[id]?.undo(doc) ?? doc;
@@ -1008,7 +1031,7 @@ test('THE VERSIONS BEFORE THE SECOND DESIGN REVIEW, REBUILT, ARE THE ONES RELEAS
   for (const [id, was] of [...Object.entries(BEFORE), ...Object.entries(LATEST)]) {
     const now = firstPartyDocument(id as never, { seeds: [] }) as unknown as Body;
     assert.notEqual(FIRST_PARTY_VERSIONS[id as 'work'], was.version, `${id} has not moved on from ${was.version}`);
-    assert.equal(fingerprintOf(was.undo(now)), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
+    assert.equal(fingerprintOf(was.undo(unplaced(now))), was.released, `${id}: undoing this build's change does not give ${was.version} as it was released`);
     assert.notEqual(fingerprintOf(now), was.released, `${id}: this build declares what ${was.version} did under a new version`);
   }
 });

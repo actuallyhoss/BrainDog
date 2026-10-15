@@ -1,7 +1,7 @@
 /**
  * A RUN AS A CONVERSATION, TOP TO BOTTOM (`RunPanel.svelte`, AGT-C12 build 5): who it was and where it worked, its
- * stretches (started, came back, ended), what it said it is doing, what it asked, its dead ends, its helpers, and the
- * run whose step it took. The panel's own two parts, what it did (`run-lines.ts`) and the step it left (`api.ts`
+ * stretches (started, came back, ended), what it said it is doing, what it asked, its dead ends, what it noted, its
+ * helpers, and the run whose step it took. The panel's own two parts, what it did (`run-lines.ts`) and the step it left (`api.ts`
  * `stepLeft`), sit between `doing` and `asked`, and after `tried`.
  *
  * A SECTION IS ABSENT WHEN IT HAS NOTHING TRUE TO SAY. A run that only started says who and one stretch, and no heading
@@ -40,16 +40,20 @@ export type RunParts = {
   took?: { fields: Readonly<Record<string, unknown>> } | null;
 };
 
-export type TalkKey = 'who' | 'stretches' | 'doing' | 'asked' | 'tried' | 'helpers' | 'took';
+export type TalkKey = 'who' | 'stretches' | 'doing' | 'asked' | 'tried' | 'noted' | 'helpers' | 'took';
 export type TalkSection = { key: TalkKey; heading: string; lines: string[] };
 
-/** The order the sections are said in, which never changes. */
-export const TALK_ORDER = ['who', 'stretches', 'doing', 'asked', 'tried', 'helpers', 'took'] as const satisfies readonly TalkKey[];
+/**
+ * The order the sections are said in, which never changes. What it noted is `noted`, not its field's own word, which
+ * add-ons declare as a list of their own (`tools/gates/core-names.mjs`).
+ */
+export const TALK_ORDER = ['who', 'stretches', 'doing', 'asked', 'tried', 'noted', 'helpers', 'took'] as const satisfies readonly TalkKey[];
 
-/** How many returns are each said before they are counted, and how many helpers and dead ends are listed. */
+/** How many returns are each said before they are counted, and how many helpers, dead ends and notes are listed. */
 const RETURNS_MOST = 3;
 const HELPERS_MOST = 6;
 const TRIED_MOST = 6;
+const NOTES_MOST = 6;
 const LINE_MOST = 240;
 
 const n = (v: number): string => v.toLocaleString('en-GB');
@@ -61,6 +65,7 @@ export const talkHeadings = {
   doing: 'What it said it is doing',
   asked: 'What it asked',
   tried: 'What it tried that did not work',
+  noted: 'What it noted',
   helpers: 'Its helpers',
   took: 'Where it picked up',
 } as const satisfies Record<TalkKey, string>;
@@ -167,6 +172,40 @@ const stateWord = (v: unknown): string => (typeof v === 'string' ? v.replace(/^"
 /** The words a person wrote in a list of text, clipped, with what is not text left out. */
 const said = (v: unknown): string[] => (Array.isArray(v) ? v.map(text).filter((t) => t !== '').map(clip) : []);
 
+/**
+ * A file path or a folder in a note: one that starts at a root, at home or here, or two slashes or more, or a last part
+ * with a file ending. "and/or" is words.
+ */
+const isPath = (w: string): boolean =>
+  /[\\/]/u.test(w) && (/^(?:~|\.{1,2}|[A-Za-z]:)?[\\/]/u.test(w) || (w.match(/[\\/]/gu)?.length ?? 0) >= 2 || /[\\/][^\\/]*\.[A-Za-z][A-Za-z0-9]{0,7}$/u.test(w));
+
+/** A handle the record or a tool gave, never words: a ULID, a UUID, a long hash, `tools#8`, `S42`, `wf_3fa9c2`. */
+const IDLIKE = /^(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-f]{12,}|[a-z][a-z0-9_]*#[1-9][0-9]*|S[1-9][0-9]*|[a-z]+_(?=[0-9a-z]*[0-9])[0-9a-z]{6,})$/u;
+
+/** A path's last plain words: the last part that holds a letter and is not a handle, its ending and joins said as spaces. */
+function lastPlainWords(path: string): string {
+  for (const part of path.split(/[\\/]+/u).reverse()) {
+    const words = part.replace(/\.[A-Za-z0-9]{1,8}$/u, '').replace(/[-_.]+/gu, ' ').trim();
+    if (/\p{L}/u.test(words) && !IDLIKE.test(part.replace(/\.[A-Za-z0-9]{1,8}$/u, ''))) return words;
+  }
+  return '';
+}
+
+/**
+ * A NOTE AS A PERSON READS IT: a path in it is said by its last plain words and a handle is left out, so a note that is
+ * only a path reads "run notes and words" and one that is only an id says nothing and is not drawn.
+ */
+const noteSaid = (note: string): string =>
+  note
+    .split(/\s+/u)
+    .map((word) => {
+      const bare = word.replace(/^[("'`]+|[)"'`,.;:]+$/gu, '');
+      if (IDLIKE.test(bare)) return '';
+      return isPath(bare) ? lastPlainWords(bare) : word;
+    })
+    .filter((w) => w !== '')
+    .join(' ');
+
 /** A question's words, ended as a sentence, then what became of it: "Keep the archive? Open". */
 const askedLine = (words: string, status: AskedStatus): string => `${/[.?!]$/u.test(words) ? words : `${words}.`} ${talkWords.status[status]}`;
 
@@ -227,12 +266,15 @@ function tookLines(row: RunRow, parts: RunParts): string[] {
  */
 export function runTalk(row: RunRow, parts: RunParts, now: number = Date.now(), zone?: string): TalkSection[] {
   const tried = said(row.fields.tried);
+  /* NEWEST FIRST: a run adds its notes at the end. */
+  const notes = said(row.fields.notes).map(noteSaid).filter((t) => t !== '').reverse();
   const lines: Record<TalkKey, string[]> = {
     who: whoLines(row, parts),
     stretches: stretchLines(row, parts, now, zone),
     doing: placeholderName(row.fields, parts.project ?? null) ? [] : [clip(text(row.fields.doing))],
     asked: askedLines(parts),
     tried: tried.length > TRIED_MOST ? [...tried.slice(0, TRIED_MOST), talkWords.more(tried.length - TRIED_MOST)] : tried,
+    noted: notes.length > NOTES_MOST ? [...notes.slice(0, NOTES_MOST), talkWords.more(notes.length - NOTES_MOST)] : notes,
     helpers: helperLines(parts),
     took: tookLines(row, parts),
   };

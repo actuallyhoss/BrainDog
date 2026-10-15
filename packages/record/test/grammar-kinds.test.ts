@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { KINDS, type Kind } from 'braindog-render';
+import { KINDS, kindsFor, type Kind } from 'braindog-render';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { grammarOf, kindWhole, KINDS_SHORT } from '../src/grammar.ts';
@@ -48,7 +48,8 @@ test('THE LONG FORM IS ONE KIND WHOLE, ASKED BY NAME, and a name that is not a k
     const whole = value<Record<string, unknown>>(grammarOf(`kind/${kind}`));
     assert.equal(whole.kind, kind);
     assert.equal(whole.line, KINDS_SHORT.kinds[kind]);
-    assert.deepEqual(whole, kindWhole(kind));
+    /* AND WHAT A BLOCK OF THAT KIND MAY BE CHANGED TO (`kindsFor`, block-menu-change-to-101). */
+    assert.deepEqual(whole, { ...(kindWhole(kind) as object), becomes: kindsFor(kind, []) });
   }
   assert.deepEqual(value<{ forms: string[] }>(grammarOf('kind/progress')).forms, ['budget', 'range']);
   assert.equal(value<{ on_a_page_only: boolean }>(grammarOf('kind/table')).on_a_page_only, true);

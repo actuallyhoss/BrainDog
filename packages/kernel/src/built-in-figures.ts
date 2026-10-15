@@ -179,7 +179,44 @@ const HANDOFFS: HandoffsDecl = {
  * One open step with the place it was left (the project's spoken id, else the repository) and the client its run said it
  * was, so a page calls the run "Claude Code" as the run's own name does and not only "Claude".
  */
-export type OpenStep = OpenHandoff & { project: string | null; repo: string | null; client: string | null };
+export type OpenStep = OpenHandoff & { project: string | null; repo: string | null; client: string | null; next_said: string };
+
+/**
+ * A file path or a folder in a step: one that starts at a root, at home or here, or two slashes or more, or a last part
+ * with a file ending. "and/or" is words. The same rule as the run panel's notes (apps/web run-talk.ts `noteSaid`).
+ */
+const isPath = (w: string): boolean =>
+  /[\\/]/u.test(w) && (/^(?:~|\.{1,2}|[A-Za-z]:)?[\\/]/u.test(w) || (w.match(/[\\/]/gu)?.length ?? 0) >= 2 || /[\\/][^\\/]*\.[A-Za-z][A-Za-z0-9]{0,7}$/u.test(w));
+
+/** A handle the record or a tool gave, never words: a ULID, a UUID, a long hash, `tools#8`, `S42`, `wf_3fa9c2`. */
+const IDLIKE = /^(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-f]{12,}|[a-z][a-z0-9_]*#[1-9][0-9]*|S[1-9][0-9]*|[a-z]+_(?=[0-9a-z]*[0-9])[0-9a-z]{6,})$/u;
+
+/** A path's last plain words: the last part that holds a letter and is not a handle, its ending and joins said as spaces. */
+function lastPlainWords(path: string): string {
+  for (const part of path.split(/[\\/]+/u).reverse()) {
+    const words = part.replace(/\.[A-Za-z0-9]{1,8}$/u, '').replace(/[-_.]+/gu, ' ').trim();
+    if (/\p{L}/u.test(words) && !IDLIKE.test(part.replace(/\.[A-Za-z0-9]{1,8}$/u, ''))) return words;
+  }
+  return '';
+}
+
+/**
+ * A STEP AS A PERSON READS IT (`next_said`): each file-path word said by its last plain words and each handle left out,
+ * falling back to the step as written when nothing plain is left.
+ */
+export function stepSaid(next: string): string {
+  const said = next
+    .split(/\s+/u)
+    .map((word) => {
+      const bare = word.replace(/^[("'`]+|[)"'`,.;:]+$/gu, '');
+      if (IDLIKE.test(bare)) return '';
+      return isPath(bare) ? lastPlainWords(bare) : word;
+    })
+    .filter((w) => w !== '')
+    .join(' ')
+    .trim();
+  return said === '' ? next : said;
+}
 
 /**
  * The open steps in one project (`project`, a spoken id as a run holds it), or with none every open step on the record,
@@ -197,7 +234,7 @@ export function openSteps(sql: Sql, nowMs: number, project?: string | null): Ope
     SESSION,
   );
   const seen = new Set<string>();
-  const out: Omit<OpenStep, 'client'>[] = [];
+  const out: Omit<OpenStep, 'client' | 'next_said'>[] = [];
   for (const place of places)
     for (const h of openHandoffs(sql, place.project ? { project: place.project } : { repo: place.repo }, null, nowMs))
       if (!seen.has(h.id)) {
@@ -208,7 +245,7 @@ export function openSteps(sql: Sql, nowMs: number, project?: string | null): Ope
 }
 
 /** Each step with its run's client, in one read over the runs that left them, their ids bound as one array (AGT-B03). */
-function clientsOf(sql: Sql, steps: Omit<OpenStep, 'client'>[]): OpenStep[] {
+function clientsOf(sql: Sql, steps: Omit<OpenStep, 'client' | 'next_said'>[]): OpenStep[] {
   if (steps.length === 0) return [];
   const rows = sql.all<{ id: string; client: string | null }>(
     `SELECT id, json_extract(fields, '$.client') AS client FROM entry WHERE register = ? AND id IN (SELECT value FROM json_each(?))`,
@@ -216,7 +253,7 @@ function clientsOf(sql: Sql, steps: Omit<OpenStep, 'client'>[]): OpenStep[] {
     JSON.stringify(steps.map((s) => s.id)),
   );
   const client = new Map(rows.map((r) => [r.id, typeof r.client === 'string' && r.client !== '' ? r.client : null]));
-  return steps.map((s) => ({ ...s, client: client.get(s.id) ?? null }));
+  return steps.map((s) => ({ ...s, client: client.get(s.id) ?? null, next_said: stepSaid(s.next) }));
 }
 
 /** How many next steps wait, on the record or in the one project `about` names. Always now, as the briefing reads them. */

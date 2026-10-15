@@ -887,11 +887,12 @@ const DECLARED: Record<string, Version> = {
       rule.renew-soon rule.renewal-cancelled rule.renewal-kept rule.renewal-passed
       setting.most_a_month setting.most_a_year setting.most_a_year_on_a_project setting.most_lapsing setting.most_renewing_30d
     `,
-    declares: 'ec4895c39c078fc5',
+    declares: 'c1fcbf2f04e75a76',
     history: [
       "`register.services`'s `kind` gains `server`, `database`, `storage` and `network` with their labels -> 7cccb015ec1bb242",
       "Folded into the unreleased 2.2.0 (sketchpad-60; integrate 60): `project-cost` reads only services whose cost is set, so a project whose services say no cost draws no Costs a year where it drew 0; no id added or taken away -> a593ca243fd01b37",
       "Folded into the unreleased 2.2.0 (waiting-people-services-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 2.1.0): `page.estate`'s Waiting on you is gated on `questions-open-in:services`, the questions about a service, where it was gated on every open question, and its line opens on a clause saying how many; and `register.services`'s `kind` names `vm`, `edge` and `object` Virtual machine, Edge network and Object storage; a block added, nothing taken away, no id added or taken away -> ec4895c39c078fc5",
+      "Folded into the unreleased 2.2.0 (services-people-five-parts-101, PGS-C18; batch 101; commit 63423720, the deployed build, holds 2.1.0): `page.estate` gains What agents did under its fold, an agents block over the log narrowed to services, first three a run; a block added, nothing taken away, no id added or taken away -> c1fcbf2f04e75a76",
     ],
   },
   /** A VERSION AND NOT A RESET: work's last version is on `origin/master`. */
@@ -1473,7 +1474,7 @@ const DECLARED: Record<string, Version> = {
       rule.payment-unsettles script.unsettle
       metric.lasts-no-income
     `,
-    declares: 'e217149ab3abd4e8',
+    declares: 'db5273f19a418802',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1506,6 +1507,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (batch 95; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for two changes, one id added and none taken away: `metric.lasts-no-income`, the days Cash now lasts over the walk's legs that take money off, five years at the longest, and Money's three lead notes each end on it as a clause of their own (money-lasts-no-income-95, REC-B07 step 8); and `page.money` takes Waiting on you out of the side column, the questions being Decide's, and places Every month, by category, the bar over `metric.every-month-by-category`, straight after Every month in its block, so the page still declares 24 blocks (money-board-place-95, REC-B23 step 7) -> aad901acf80b6e8a",
       "Folded into the unreleased 3.17.0 (numbers-order-categories-97, batch 97; commit 63423720, the deployed build, holds 3.16.0): `page.money-book` opens, while a live category is marked the other way from how the Ledger books it, on one line saying how many over `categories-against-direction` with a link to Categories -> bb886a37434f889a",
       "Folded into the unreleased 3.17.0 (batch 100, integrate 100; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for four changes, two ids added and none taken away: the side column's tile is Lasts, calm, drawn while there is an account and Cash now is at or above nought, and Runs out, in the danger colour while Cash now is under nought, is declared and not placed yet (money-lasts-tile-100, REC-B07 step 8); `page.money`'s and `page.money-book`'s Cash ahead open on ten weeks, `horizon: 70`, offer `horizons: [70, 90, 180, 365, 730, 1825, last]` and declare `axis: fit`, and a book's empty line says Nothing in {{name}} is dated ahead yet. (money-ten-weeks-100, REC-B08); `page.money` ends on Where it went, a folded heading over the split This month, by category (`spent-by-category-month`, unset No category yet) and the bar No category yet, by who was paid (Ledger entries going out with no category in the last 91 days by `payee`, eight bars, drawn while `txn-uncategorised` is more than nought), and gives up This month's spending, Budgets and Last confirmed, which stay declared in their files, so the page still declares 24 blocks (money-where-it-went-100, PGS-C20 job 2); and `script.settle_matched_line` is back as payment-matches' second step, moving a repeating line's Next by the host's ctx.cycle, and `rule.recurring-went-through` moves Next on when 'It went through' is pressed; settle gains quiet and told (money-next-moves-100, REC-B11 jobs 4 and 5) -> e217149ab3abd4e8",
+      "Inside the unreleased 3.17.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 3.16.0): `page.money` says its place on the rail, `nav.place` 40, lowest first; no id added or taken away -> db5273f19a418802",
     ],
   },
   'work@1.17.0': {
@@ -1563,7 +1565,7 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: '72cb3cab41d4f86a',
+    declares: 'fc96cb39590d3016',
     history: [
       "`page.people` says how many people may be on the record twice, in one note under its two lead notes, from the built-in figure held-twice and drawn only above nought; a note added, nothing taken away -> 3c1698b71103bfe4",
       "Folded into the unreleased 3.4.0 (people-twice-link-74; integrate 74; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list of everyone in order of name (`/r/people?sort=name`) and says what to look for; no id added or taken away -> 900ff4486ed1626e",
@@ -1572,6 +1574,8 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.4.0 (batch 82, integrate 82; commit 63423720, the deployed build, holds 3.3.0), one fingerprint for two changes, a page added and nothing taken away: `page.people`'s note of people who may be held twice says the people the link shows and then how many too many ('N people may be on this record twice, M too many'), from the built-in figures held-twice-shown and held-twice, the link and the when unchanged (people-twice-note-82); and `page.calendar`, its line and one calendar over the computed deadlines, this month and the two after it, off the rail (calendar-page-82) -> 69d90b1f513c065d",
       "Folded into the unreleased 3.4.0 (activity-page-88; batch 88; commit 63423720, the deployed build, holds 3.3.0), a page added and nothing taken away: `page.activity`, off the rail, its one line, a feed over the record's log with a heading a day and one line a run, and beside it Who worked, What changed and Busy hours from the built-in figures activity-by-who, activity-by-kind and activity-by-hour, and a queue of what an agent asked -> 4d18d12f51e37829",
       "Folded into the unreleased 3.4.0 (waiting-people-services-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 3.3.0): `page.people` draws the questions about somebody as a queue, Waiting on you, gated on `questions-open-in:people`, with a clause in its line saying how many; a block added, nothing taken away, no id added or taken away -> 72cb3cab41d4f86a",
+      "Folded into the unreleased 3.4.0 (services-people-five-parts-101, PGS-C18 and PGS-C24; batch 101; commit 63423720, the deployed build, holds 3.3.0): `metric.people-in-touch-30d` is saved each night into series.people-in-touch-30d; `page.people` gains In touch, the figure with its month as a line, and What agents did, an agents block over the log narrowed to people or organisations, and its line no longer says how many were in touch; `page.activity` declares filters on who, kind and list; two blocks and a save added, nothing taken away, no id added or taken away -> 07e8a5aa097e7ca8",
+      "Inside the unreleased 3.4.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 3.3.0): `page.people` says its place on the rail, `nav.place` 50, lowest first; no id added or taken away -> fc96cb39590d3016",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
@@ -1591,24 +1595,27 @@ const DECLARED: Record<string, Version> = {
       "`register.things` declares `delete: refuse_while_referenced`; `page.portfolio` draws a note beside What each one earns, open and folded, counting `projects-earning-said` of `projects-live`; `project-said` counts a project whose health, progress, aim or agent is set -> ae8100fc45762bd5",
     ],
   },
-  /* THE EARNINGS LINE ONLY WHILE ONE SAYS (seed-58, the look of 13 October, fault J). 1.16.0 IS RELEASED. The same ids. */
+  /* THE EARNINGS LINE ONLY WHILE ONE SAYS (seed-58, the look of 13 October, fault J). 1.16.0 IS RELEASED. The same ids
+     until batch 101 added two figures. */
   'portfolio@1.17.0': {
     holds: `
       metric.project-said
       metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
-      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-live
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-lane-earning metric.projects-live
       metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked
-      metric.projects-past-aim metric.projects-retired metric.projects-with-agent
+      metric.projects-past-aim metric.projects-retired metric.projects-with-agent metric.projects-with-health
       page.portfolio
       register.things
       rule.project-past-aim
     `,
-    declares: '9609a0f244086314',
+    declares: 'accdb3abd217d7d7',
     history: [
       "`page.portfolio` draws the note beside What each one earns, open and folded, only while `projects-earning-said` is above nought, where it was drawn while `projects-live` was and read 0 of 11 on a record where nobody had said; the words are the same -> bc4e48dea660614a",
       "`page.portfolio`'s In play cards say `edit: true` on `about`, so a project's one line is typed on its card (PGS-C15) -> 88eb91d28c23081b",
       "`page.portfolio`'s In play cards draw `project-last-worked` for each card as its when, Worked on 2 days ago or Quiet for 40 days, and nothing for a project with no task (projects-last-worked-96, REC-C16) -> 9ace1e3844609180",
       "Inside the unreleased 1.17.0 (waiting-work-projects-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 1.16.0): `page.portfolio` draws the questions about its own list (`list is things`) as a queue, Waiting on you, gated on `questions-open-in:things`, with a clause in the line saying how many, and the quiet line says Nothing needs a push where it said Nothing needs you; a block added, nothing taken away, no id added or taken away -> 9609a0f244086314",
+      "Inside the unreleased 1.17.0 (projects-lanes-lines-101, PGS-C17; batch 101): `page.portfolio` draws a strip In play and earning over the nightly saves of `projects-live` and the new `projects-lane-earning`, a split Where they are over `projects-by-lane` past four in play, How they are going only while `projects-with-health` is above nought, and the quiet line leaves In play to the strip; two figures added -> 2e86a79dbf8e0777",
+      "Inside the unreleased 1.17.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 1.16.0): `page.portfolio` says its place on the rail, `nav.place` 30, lowest first; no id added or taken away -> accdb3abd217d7d7",
     ],
   },
   /* WHAT WAS WORKED ON A PROJECT THIS WEEK, a figure over tasks and so Work's (batch 46, REC-C16). 1.17.0 IS RELEASED. */
@@ -1636,13 +1643,13 @@ const DECLARED: Record<string, Version> = {
       metric.open-tasks metric.project-dated metric.project-done-7d metric.project-done-by-week metric.project-due-soon
       metric.project-held-up metric.project-in-review metric.project-last-worked metric.project-moved-7d metric.project-open metric.tasks-after-week-yours
       metric.tasks-done-7d metric.tasks-done-7d-agents metric.tasks-done-by-week metric.tasks-due-7d
-      metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-not-this-week
+      metric.tasks-due-by-week metric.tasks-late-yours metric.tasks-later metric.tasks-no-project metric.tasks-not-this-week
       metric.tasks-overdue metric.tasks-today-yours metric.tasks-undated-yours metric.tasks-waiting
       metric.tasks-this-week-yours
       metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
       register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
     `,
-    declares: 'a5e781318a2c7ef7',
+    declares: 'cda5ad94ed61f9bc',
     history: [
       "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
       "Inside the unreleased 1.19.0 (work-moves-62-63, audit 61 claim 6; integrate 63; commit 63423720, the deployed build, holds 1.18.0): on `register.tracks` holding leads to done, and `script.start_with_parent` no longer copies the agent; no id added or taken away -> 424cfe3512924e3b",
@@ -1650,6 +1657,8 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 1.19.0 (board-capture-line-83, PGS-C08 job 3; commit 63423720, the deployed build, holds 1.18.0): `page.work-board` gains Work's capture line, What needs doing?, first after its sentence and before the board, adding to `register.tasks`; no id added or taken away -> 6de550d0463bb74b",
       "Inside the unreleased 1.19.0 (projects-last-worked-96, REC-C16; commit 63423720, the deployed build, holds 1.18.0): `project-last-worked` has a target of at most 30 days where it had none, so a project with nothing written on its tasks for longer misses it and is drawn as quiet; no id added or taken away -> e20a7069ac0b3816",
       "Inside the unreleased 1.19.0 (waiting-work-projects-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 1.18.0): `page.work` draws the questions about its own list (`list is tasks`) as a queue, Questions for you, gated on `questions-open-in:tasks`, with a clause in the line; a block added, nothing taken away, no id added or taken away -> a5e781318a2c7ef7",
+      "Inside the unreleased 1.19.0 (work-head-and-no-project-101, AGT-D14 job 1 and PGS-A14; batch 101; commit 63423720, the deployed build, holds 1.18.0): `page.work` declares a head (count open-tasks, Add, search q) and lists open tasks with no project under a fold of its own, Needs a project, over a new figure `metric.tasks-no-project`; one figure and two blocks added, nothing taken away -> 98e297748df7a157",
+      "Inside the unreleased 1.19.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 1.18.0): `page.work` says its place on the rail, `nav.place` 10, lowest first; no id added or taken away -> cda5ad94ed61f9bc",
     ],
   },
 };

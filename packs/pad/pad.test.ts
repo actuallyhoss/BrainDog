@@ -1,10 +1,14 @@
 /**
- * The pad as a pack: a list of notes beside the work, and a second opinion from Slash written under each one.
+ * The pad as a pack: a list of notes beside the work, each with room for a reply, and a page that draws them.
  *
  * NO NEW KIND AND NO CODE, which is the point of building it here. Every half of it measured as something a
- * record already says: `capture` adds a note, `cards` draws the notes with the new `reply` role under each title, and
- * an automation on the notes list asks Slash and writes the answer back with `set`. So a launch desk, a study plan and
- * a founder's page install the same pad instead of three people drawing three.
+ * record already says: `capture` adds a note, and `cards` draws the notes with the `reply` role under each title. So a
+ * launch desk, a study plan and a founder's page install the same pad instead of three people drawing three.
+ *
+ * NO MODEL EITHER, SINCE 1.2.0 (SHL-A11, "it sohuld be a facade. a display layer"). 1.1.0 held its own rule that put
+ * each note to Slash, so a record with no model could not keep a pad at all: a pack is installed whole, and the step
+ * that asks was refused. The second opinion is `packs/pad-second-opinion` now, an add-on that needs this one, and the
+ * `reply` field stays here so a pad written under 1.1.0 keeps every reply it was given.
  *
  * RED FIRST, MEASURED: with no `pad.pack.json` beside it this file failed at its first read, ENOENT,
  * before a single test ran; the first test below is what holds the fresh record to having no notes list of its own.
@@ -36,12 +40,18 @@ type Api = Awaited<ReturnType<typeof createRecordApi>>;
 type Diff = { planHash: string; approve: unknown[]; conflicts: unknown[] };
 type Note = { id: string; version: number; fields: Record<string, unknown> };
 type Decl = Record<string, unknown>;
+type Doc = { pack: string; version: string; declarations: Decl[] };
 
-/** The file as it ships, read fresh each time so no test can hand the next one a copy it changed. */
-const PACK_FILE = new URL('./pad.pack.json', import.meta.url);
-const TEXT = readFileSync(PACK_FILE, 'utf8');
-const pad = (): { pack: string; declarations: Decl[] } => JSON.parse(TEXT) as { pack: string; declarations: Decl[] };
-const RULE = pad().declarations.find((d) => typeof d.rule === 'string') as Decl & { rule: string };
+/** A file as it ships, read fresh each time so no test can hand the next one a copy it changed. */
+const fileAt = (path: string): (() => Doc) => {
+  const text = readFileSync(new URL(path, import.meta.url), 'utf8');
+  return () => JSON.parse(text) as Doc;
+};
+const TEXT = readFileSync(new URL('./pad.pack.json', import.meta.url), 'utf8');
+const pad = fileAt('./pad.pack.json');
+/** 1.1.0 as the catalogue serves it, the pad that asked Slash itself. Released, so it is read and never written. */
+const was = fileAt('../../apps/web/static/catalogue/packs/pad/1.1.0.pack.json');
+const opinion = fileAt('../pad-second-opinion/pad-second-opinion.pack.json');
 const PAGE = pad().declarations.find((d) => typeof d.page === 'string') as Decl & { blocks: Decl[] };
 
 /**
@@ -56,15 +66,17 @@ async function record(answersSlash?: boolean): Promise<{ api: Api; sql: NodeSql 
 
 const planOf = async (api: Api, doc: unknown): Promise<Out> => (await api.planPack({ doc, source: { kind: 'local' } } as never, owner)) as Out;
 
-/** Plan and install with exactly what the plan asked to be approved. */
+/** Plan and install with exactly what the plan asked to be approved. A refused plan is handed back as it came. */
 async function put(api: Api, doc: unknown = pad()): Promise<Out> {
-  const diff = said<{ diff: Diff }>(await planOf(api, doc)).diff;
+  const plan = await planOf(api, doc);
+  if (!plan.ok) return plan;
+  const diff = (plan.value as { diff: Diff }).diff;
   return (await api.installPack({ doc, source: { kind: 'local' }, planHash: diff.planHash, approve: diff.approve } as never, owner)) as Out;
 }
 
-/** A record with the pad installed on a host that answers Slash, which is where its second opinion is served. */
+/** A record with no model and the pad installed: the record every person can have. */
 async function padded(): Promise<{ api: Api; sql: NodeSql }> {
-  const r = await record(true);
+  const r = await record();
   said(await put(r.api));
   return r;
 }
@@ -72,15 +84,16 @@ async function padded(): Promise<{ api: Api; sql: NodeSql }> {
 const write = (api: Api, fields: Record<string, unknown>): Note => said<Note>(api.kernel.create('notes', fields, { actor: 'p_1' }));
 const noteOf = (api: Api, id: string): Note => api.kernel.get(id) as unknown as Note;
 const asked = (sql: NodeSql): number => sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'infer.ask'")!.n;
-const runs = (sql: NodeSql): number => sql.one<{ n: number }>('SELECT count(*) AS n FROM automation_run WHERE rule = ?', RULE.rule)!.n;
+const waitingAsks = (sql: NodeSql): number =>
+  sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'infer.ask' AND state = 'pending'")!.n;
+const rules = (api: Api): string[] => api.kernel.declarations().filter((d) => d.id.startsWith('rule.')).map((d) => d.id);
 
 /** Slash's host, by hand: lease the one question waiting, answer it with `text`, and let the run carry on. */
-async function answer(api: Api, text: string): Promise<Record<string, unknown>> {
+async function answer(api: Api, text: string): Promise<void> {
   const [job] = api.kernel.leaseOutbox(['infer.ask'], 10);
   assert.ok(job, 'no question was queued for Slash');
   said(api.kernel.ackOutbox({ id: job.id, state: 'done', leasedUntil: job.leasedUntil, result: { text } }));
   await api.kernel.drain();
-  return JSON.parse(job.payload) as Record<string, unknown>;
 }
 
 /* ── before ───────────────────────────────────────────────────────────── */
@@ -106,90 +119,49 @@ test('the same file passes as an add-on somebody opens from disk, and asks for n
   assert.deepEqual(file.pack.manifest.requires.packs, {}, 'the pad is placed beside any work, so it may not need a particular one');
 });
 
-test('the rule asks Slash only about a note with no reply, once per wording, and writes the answer back as the reply', () => {
-  /* THE RULE AS IT WAS DESIGNED, held here word by word because the three tests below only see its effects. */
-  assert.deepEqual(RULE.on, { written: { register: 'notes', op: ['create', 'update'], fields: ['text', 'reply'] } });
-  assert.equal(RULE.when, 'reply is empty');
-  const [ask, set] = RULE.steps as [{ ask_slash: { question: string; as: string } }, { set: { field: string; to: string } }];
-  assert.match(ask.ask_slash.question, /\{\{trigger\.row\.text\}\}/u);
-  assert.deepEqual(set, { set: { field: 'reply', to: `{{vars.${ask.ask_slash.as}}}` } });
+test('1.2.0 IS A LIST AND A PAGE: no automation, no step that asks a model, and the reply field kept', () => {
+  const doc = pad();
+  assert.equal(doc.version, '1.2.0');
+  assert.notEqual(doc.version, was().version, 'the released 1.1.0 was changed in place instead of cut beside');
+  assert.deepEqual(doc.declarations.map((d) => (d.register ? 'register' : d.page ? 'page' : 'other')), ['register', 'page']);
+  assert.doesNotMatch(TEXT, /ask_slash|"rule"/u, 'the pad still holds a step that asks a model');
+  const notes = doc.declarations.find((d) => d.register === 'notes') as Decl & { fields: { id: string; type: string }[] };
+  const kept = was().declarations.find((d) => d.register === 'notes') as Decl & { fields: { id: string; type: string }[] };
+  assert.deepEqual(
+    notes.fields.map((f) => [f.id, f.type]),
+    kept.fields.map((f) => [f.id, f.type]),
+    'a field went or changed type, so a pad written under 1.1.0 would lose what it holds',
+  );
 });
 
-/* ── the second opinion ───────────────────────────────────────────────── */
+test('THE PAGE SAYS NOTHING OF A SECOND OPINION OR A MODEL, which is the other add-on\'s to say', () => {
+  const page = JSON.stringify(PAGE);
+  assert.doesNotMatch(page, /opinion|Slash|model/iu);
+  const notes = JSON.stringify(pad().declarations.find((d) => d.register === 'notes'));
+  assert.doesNotMatch(notes, /opinion|Slash|model/iu, 'the list still names the second opinion in a label or what it holds');
+});
 
-test('A NOTE WITH NO REPLY IS PUT TO SLASH, and what Slash answers is written under it as its reply', async () => {
+/* ── a record with no model ───────────────────────────────────────────── */
+
+test('ON A FRESH RECORD WITH NO MODEL THE PAD INSTALLS AND ITS PAGE READS, with no refusal and nothing put to Slash', async () => {
+  /* 1.1.0 WAS REFUSED HERE, `NOT_IN_THIS_BUILD` at its rule's question, and nothing of it installed. Measured on the
+     released file below, so the test says what changed and not only what is. */
+  const old = await record();
+  const refused = await put(old.api, was());
+  assert.equal(refused.ok, false, '1.1.0 installed on a host with no model, so the split proves nothing');
+  assert.equal(refused.refusal?.code, 'NOT_IN_THIS_BUILD');
+  old.sql.close();
+
   const { api, sql } = await padded();
-  const note = write(api, { text: 'Ask the printer for a proof on the heavier paper before the whole run.' });
+  assert.equal(api.kernel.packs().find((p) => p.id === 'pad')?.version, '1.2.0');
+  assert.deepEqual(rules(api), [], 'the pad brought an automation with it');
+  write(api, { text: 'Ask the printer for a proof on the heavier paper before the whole run.' });
   await api.kernel.drain();
+  assert.equal(asked(sql), 0, 'a note on the pad was put to a model');
 
-  const payload = await answer(api, 'A proof costs a day and saves reprinting the run if the paper curls.');
-  assert.match(String(payload.question), /Ask the printer for a proof on the heavier paper before the whole run\./u, 'Slash was not handed the note');
-  assert.equal(noteOf(api, note.id).fields.reply, 'A proof costs a day and saves reprinting the run if the paper curls.');
-  /* THE RULE'S OWN WRITE STARTS NOTHING, so writing the reply does not put the note to Slash a second time. */
-  assert.equal(asked(sql), 1);
-  assert.equal(runs(sql), 1);
-  sql.close();
-});
-
-test('AN EMPTY ANSWER FROM SLASH LEAVES THE REPLY EMPTY, never a mark under the note', async () => {
-  /* MEASURED BEFORE THE KERNEL'S FIX: the question acked `done` with no text wrote `—` as the reply.
-     `packages/slash`'s own pass refuses a blank answer before it acks, so this is a host that acks the outbox itself,
-     which the kernel accepts. The run fills `{{vars.opinion}}` with the dash a hole in a sentence gets, and the `set`
-     took the dash as the whole value. `once_per` had marked the note by then, so it was never asked again either. A
-     reply that is empty is at least one a person can see is missing, and write. */
-  const { api, sql } = await padded();
-  const note = write(api, { text: 'Try the green ink on the cover.' });
-  await api.kernel.drain();
-  await answer(api, '');
-  assert.equal(noteOf(api, note.id).fields.reply ?? null, null, 'an empty answer was written under the note as a mark');
-  assert.equal(runs(sql), 1);
-  sql.close();
-});
-
-test('A NOTE WRITTEN WITH A REPLY QUEUES NOTHING: no run and no question', async () => {
-  const { api, sql } = await padded();
-  write(api, { text: 'Move the stall to the corner by the door.', reply: 'Written by hand, beside the note.' });
-  await api.kernel.drain();
-  assert.equal(runs(sql), 0, 'a note that already had its reply started a run');
-  assert.equal(asked(sql), 0, 'a note that already had its reply was put to Slash');
-  sql.close();
-});
-
-test('ASKING AGAIN IS REWORDING THE NOTE WITH ITS REPLY CLEARED; clearing the reply on the same words asks nothing', async () => {
-  /* MEASURED, AND IT IS NOT THE OBVIOUS READING, "asking again is clearing the reply". A rule that asks Slash
-     about a row must declare `once_per` (`flow-lint.ts`: "asks about a row and declares no once_per"), and the marker
-     `once_per` leaves is kept for good, so with `once_per: [entry]` a note is asked about once in its life and clearing
-     its reply asks nothing ever again. Keyed on the entry and its text instead, a new wording is a new question, and
-     the same words cleared are not sent again. */
-  const { api, sql } = await padded();
-  const note = write(api, { text: 'Price the small tin at nine.' });
-  await api.kernel.drain();
-  await answer(api, 'Nine sits under the large tin by enough to make the choice easy.');
-
-  let now = noteOf(api, note.id);
-  said(api.kernel.update('notes', note.id, { reply: null } as never, { actor: 'p_1', version: now.version }));
-  await api.kernel.drain();
-  assert.equal(asked(sql), 1, 'the same words were put to Slash a second time');
-  assert.equal(noteOf(api, note.id).fields.reply ?? null, null);
-
-  now = noteOf(api, note.id);
-  said(api.kernel.update('notes', note.id, { text: 'Price the small tin at eight.' } as never, { actor: 'p_1', version: now.version }));
-  await api.kernel.drain();
-  const payload = await answer(api, 'Eight makes the pair of tins read as a set.');
-  assert.match(String(payload.question), /at eight\./u);
-  assert.equal(noteOf(api, note.id).fields.reply, 'Eight makes the pair of tins read as a set.');
-  assert.equal(asked(sql), 2);
-  sql.close();
-});
-
-test('ON A HOST THAT DOES NOT ANSWER SLASH THE PAD IS REFUSED at the rule\'s question, and nothing of it is installed', async () => {
-  /* ONE PACK, ONE INSTALL. The notes list and the page would work without Slash, but a pack is installed whole, and a
-     host that serves no `infer.ask` refuses the step that asks (`answersSlash`, off unless the host says so). */
-  const { api, sql } = await record();
-  const r = await put(api);
-  assert.equal(r.ok, false, 'the pad installed on a host where nothing would ever answer its question');
-  assert.equal(r.refusal?.code, 'NOT_IN_THIS_BUILD');
-  assert.equal(api.kernel.declarations().find((d) => d.id === 'register.notes'), undefined);
+  assert.ok(said<{ slug: string }[]>(await api.pages(owner)).some((p) => p.slug === 'pad'), 'the pad has no page in the list of pages');
+  const page = said<{ blocks: { kind: string; refusals: Refusal[] }[] }>(await api.page({ slug: 'pad' }, owner));
+  for (const b of page.blocks) assert.deepEqual(b.refusals, [], `the ${b.kind} block was refused`);
   sql.close();
 });
 
@@ -250,5 +222,67 @@ test('uninstalling the pad takes its page and keeps every note and reply already
   said(await api.uninstallPack({ id: 'pad' } as never, owner));
   assert.equal(noteOf(api, note.id).fields.reply, 'One folder is easier to hand over at the end of the year.');
   assert.ok(!said<{ slug: string }[]>(await api.pages(owner)).some((p) => p.slug === 'pad'));
+  sql.close();
+});
+
+/* ── from 1.1.0 ───────────────────────────────────────────────────────── */
+
+test('A RECORD ON 1.1.0 TAKES 1.2.0 WITH EVERY NOTE AND REPLY KEPT, and its rule goes, so nothing is put to Slash again', async () => {
+  /* The released 1.1.0 on the host it needed, with a note Slash answered, one answered by hand, and one still waiting. */
+  const { api, sql } = await record(true);
+  said(await put(api, was()));
+  const answered = write(api, { text: 'Price the small tin at nine.' });
+  await api.kernel.drain();
+  await answer(api, 'Nine sits under the large tin by enough to make the choice easy.');
+  const byHand = write(api, { text: 'Move the stall to the corner by the door.', reply: 'Written by hand, beside the note.' });
+  const waiting = write(api, { text: 'Try the green ink on the cover.' });
+  await api.kernel.drain();
+  assert.equal(asked(sql), 2, 'the note still waiting was never put to Slash, so the upgrade has nothing to leave behind');
+
+  const diff = said<{ diff: Diff }>(await planOf(api, pad())).diff;
+  assert.deepEqual(diff.conflicts, [], 'the upgrade asks about something a person wrote');
+  said(await put(api));
+  assert.equal(api.kernel.packs().find((p) => p.id === 'pad')?.version, '1.2.0');
+  assert.deepEqual(rules(api), [], 'the upgrade left the rule that asks Slash behind');
+
+  assert.equal(noteOf(api, answered.id).fields.reply, 'Nine sits under the large tin by enough to make the choice easy.');
+  assert.equal(noteOf(api, byHand.id).fields.reply, 'Written by hand, beside the note.');
+  assert.equal(noteOf(api, waiting.id).fields.text, 'Try the green ink on the cover.');
+  const cards = said<{ blocks: { kind: string; rows: { fields: Record<string, unknown> }[]; refusals: Refusal[] }[] }>(
+    await api.page({ slug: 'pad' }, owner),
+  ).blocks.find((b) => b.kind === 'cards')!;
+  assert.deepEqual(cards.refusals, []);
+  assert.deepEqual(cards.rows.map((r) => r.fields.reply ?? null), [null, 'Written by hand, beside the note.', 'Nine sits under the large tin by enough to make the choice easy.']);
+
+  /* MEASURED: THE QUESTION STILL WAITING IS WITHDRAWN WITH THE RULE, its run cancelled, so no answer lands after the
+     upgrade. A note written after it is only a note. */
+  assert.equal(waitingAsks(sql), 0, 'a question the retired rule queued is still waiting for Slash');
+  write(api, { text: 'Ask the market for a pitch nearer the gate.' });
+  await api.kernel.drain();
+  assert.equal(waitingAsks(sql), 0, 'a note written on 1.2.0 was put to Slash');
+  sql.close();
+});
+
+/* ── the second opinion, an add-on of its own ─────────────────────────── */
+
+test('THE SECOND OPINION INSTALLS ON TOP OF THE PAD, and is refused on a record with no pad, at the notes list it writes to', async () => {
+  /* MEASURED: REFUSED AT PLAN, `REGISTER_UNRESOLVED`, before `requires.packs` is read at install: the rule's trigger
+     names the notes list, and the record holds none. */
+  const bare = await record(true);
+  const refused = await put(bare.api, opinion());
+  assert.equal(refused.ok, false, 'the second opinion installed on a record with no pad to write under');
+  assert.equal(refused.refusal?.code, 'REGISTER_UNRESOLVED');
+  assert.match(refused.refusal?.fix ?? '', /notes list/u);
+  assert.equal(bare.api.kernel.declarations().find((d) => d.id === 'rule.pad_second_opinion'), undefined);
+  bare.sql.close();
+
+  const { api, sql } = await record(true);
+  said(await put(api));
+  said(await put(api, opinion()));
+  assert.deepEqual(rules(api), ['rule.pad_second_opinion']);
+  assert.deepEqual(
+    api.kernel.packs().filter((p) => p.id.startsWith('pad')).map((p) => [p.id, p.version]).sort(),
+    [['pad', '1.2.0'], ['pad-second-opinion', '1.0.0']],
+  );
   sql.close();
 });

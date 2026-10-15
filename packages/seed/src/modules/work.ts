@@ -601,6 +601,23 @@ export const WORK_METRICS: Record<string, SeedMetric> = {
     window: '30d',
     compare: 'none',
   },
+  /**
+   * OPEN WORK THAT BELONGS TO NO PROJECT, SINCE work 1.19.0 (AGT-D14): what Open counts, with the project left empty,
+   * which With no project draws and is gated on. A task typed into the capture line has no project, and the Board
+   * showed such tasks with a dash under Project and nowhere said how many. Over `thing`, so it is left out with every
+   * figure over a project on a record that holds no projects (`without` in `packs/first-party.ts`).
+   */
+  'tasks-no-project': {
+    metric: 'tasks-no-project',
+    name: 'With no project',
+    source: 'register.tasks',
+    where: `${OPEN}, thing is empty`,
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
 };
 
 /* ── follow-ups ───────────────────────────────────────────────────────────── */
@@ -739,6 +756,26 @@ const TIER_THEN_DUE = [
   { field: 'by', dir: 'asc' },
 ] as const;
 
+/**
+ * OPEN WORK WITH NO PROJECT, AS ONE TILE, SINCE work 1.19.0 (AGT-D14 job 1): the five newest, each with its due day, so
+ * a task typed in a hurry is seen where it can be given a project. A record whose every open task has a project draws
+ * nothing: a table holding no task is not drawn (`holdsNothing` in `packages/kernel/src/drawn.ts`), and on Work the
+ * fold over it is gated on `tasks-no-project`. NO `when:` OF ITS OWN, because the add-on file waits it on Projects
+ * (`when: { holds }`), and a block says one `when:`. EXPORTED so a Home can take the same tile, word for word (AGT-D14
+ * job 2, a new version of each use case).
+ */
+export const WITH_NO_PROJECT = {
+  kind: 'table',
+  heading: 'With no project',
+  icon: 'folder',
+  span: 12,
+  source: 'register.tasks',
+  where: `${OPEN}, thing is empty`,
+  columns: [DESCRIPTION, { field: 'by', label: 'Due', width: '13ch', align: 'end' }],
+  order: [{ field: 'created_at', dir: 'desc' }],
+  limit: 5,
+} as const;
+
 export const WORK_PAGES: Record<string, SeedPage> = {
   /**
    * WORK LEADS WITH WHAT IS IN PLAY AND WHAT WAITS ON YOU. "What I
@@ -792,7 +829,9 @@ export const WORK_PAGES: Record<string, SeedPage> = {
     page: 'work',
     /* CALLED WORK, as the section it heads is, because the page is the to-do and not a report about one. */
     title: 'Work',
-    nav: { section: 'Work', order: 10 },
+    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+       Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
+    nav: { section: 'Work', order: 10, place: 10 },
     icon: 'task',
     requires: ['register.tasks'],
     pack: 'work',
@@ -800,6 +839,15 @@ export const WORK_PAGES: Record<string, SeedPage> = {
        every band, where the Work screen drew the same choice as a select, as chips and as a tile. The field is the
        tasks' `thing`, which the page calls Project; a record without Projects has no such field, and no strip
        (`without` in `packs/first-party.ts`). */
+    /* A HEAD BESIDE THE NAME, SINCE work 1.19.0 (PGS-A14): how many are open, one Add and a search box, so Work opens
+       with its name, its count and the two things done first on it. The count is Open's own figure; the search is held
+       in the address as `q`, and narrowing the page by it is the page read's. BEFORE `filters`, which a record without
+       Projects goes without, so the page's keys keep one order whether the strip is there or not. */
+    header: {
+      count: { metric: 'open-tasks' },
+      action: { verb: 'row.create', label: 'Add' },
+      search: { param: 'q' },
+    },
     filters: [{ field: 'thing', control: 'chips' }],
     blocks: [
       {
@@ -1015,6 +1063,18 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         limit: 8,
         when: { metric: 'tasks-later', gt: 0 },
       },
+      {
+        /* OPEN WORK WITH NO PROJECT, FOLDED SHUT, SINCE work 1.19.0 (AGT-D14): a fold of its own, so the tile is below
+           the fold whatever else the page draws, and a tap away where a project can be given. Not under Not this week,
+           which is drawn only while something is further off, and a task with no project may be due today. */
+        kind: 'section',
+        heading: 'Needs a project',
+        icon: 'inbox',
+        span: 12,
+        fold: true,
+        when: { metric: 'tasks-no-project', gt: 0 },
+      },
+      { ...WITH_NO_PROJECT },
       {
         /* WHAT WAS FINISHED, FOLDED SHUT, SINCE work 1.11.0: how fast work moves and what moved, a tap away. Above the
            fold the page is what is still to do. */

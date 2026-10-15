@@ -64,7 +64,8 @@ import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 /* `change-kind.ts` IMPORTS ONLY `roles.ts`, `session.ts` AND `slash.ts`, so it adds no load ring. */
-import { madeByIn } from './change-kind.ts';
+import { madeByIn, shapeIn } from './change-kind.ts';
+import { foldFill, identityFloor, type FoldFilled, type Offered } from './mentions.ts';
 import { instant } from './coerce.ts';
 import { FOLD_HOPS, holderOf, holders, nameKey, noteMention, sourceKeys } from './entities.ts';
 import type { Proposal } from './govern.ts';
@@ -1613,75 +1614,60 @@ function order(list: DeclaredList<MeetsFields>, a: Row, b: Row): [Row, Row] {
 }
 
 /**
- * What the kept row gains from the folded ones (H2): every field it leaves empty, filled from the first fold that has
- * it; every list joined; the later day in touch; and each fold's address, kept as a key when the kept row has its own.
- * A fold's other name joins `aliases`, once, and never the kept row's own name again.
+ * What the kept row gains from the folded ones (H2), and what is only offered (`mentions.ts`'s `foldFill`): every list
+ * joined, the later day in touch, each fold's address kept as a key, a fold's other name joined to `aliases`, and every
+ * empty field the identity floor does not hold filled from the first fold that has it.
+ *
+ * AN EMPTY FIELD THE FLOOR HOLDS IS OFFERED, NEVER WRITTEN (D38.53, D38.54). The organisation a fold held used to become
+ * the kept person's on the fold itself, which is a change of who somebody is with no person behind it. Which fields
+ * the floor holds is `change-kind.ts`'s own reading of the list (`shapeIn`), so the ladder and the fold agree.
  */
-function carried(list: DeclaredList<MeetsFields>, keep: Row, folds: readonly Row[]): Record<string, unknown> {
-  const at = list.fields;
-  const patch: Record<string, unknown> = {};
-  const now = (field: string): unknown => (field in patch ? patch[field] : keep.fields[field]);
-  const skip = new Set([at.merged_into, at.self].filter((f): f is string => f !== undefined));
-  for (const fold of folds) {
-    for (const f of list.declaredFields) {
-      if (f.retired === true || f.derived !== undefined || skip.has(f.id) || f.id.startsWith('_')) continue;
-      const theirs = fold.fields[f.id];
-      if (theirs === undefined || theirs === null) continue;
-      const ours = now(f.id);
-      if (f.type === 'list') {
-        const union = f.id === at.met ? metLines(listOf(ours), listOf(theirs)) : [...new Set([...listOf(ours), ...listOf(theirs)])];
-        if (!same(union, ours ?? [])) patch[f.id] = union;
-      } else if (ours === undefined || ours === null || ours === '') patch[f.id] = theirs;
-    }
-    if (at.in_touch !== undefined) {
-      const touched = later(now(at.in_touch), fold.fields[at.in_touch]);
-      if (touched !== undefined && touched !== now(at.in_touch)) patch[at.in_touch] = touched;
-    }
-    /* THE FOLD'S ADDRESS IS NEVER LOST: the kept row holds its own, so the other one goes in as a key. */
-    const theirs = textOf(fold.fields[at.email]);
-    const into = at.keys ?? at.handles;
-    if (theirs !== undefined && textOf(now(at.email)) !== theirs && into !== undefined) {
-      const key = keyOf('email', theirs);
-      if (key !== null && !listOf(now(into)).includes(key)) patch[into] = [...listOf(now(into)), key];
-    }
-    const named = textOf(fold.fields[at.name]);
-    if (at.aliases !== undefined && named !== undefined) patch[at.aliases] = [...listOf(now(at.aliases)), named];
-  }
-  /* ONE OF EACH NAME, NOT THE KEPT ROW'S OWN: three folds called Karim Assaf are one alias, and "kas" beside Kas none. */
-  if (at.aliases !== undefined && at.aliases in patch) {
-    const had = new Set([nameKey(textOf(now(at.name)) ?? '')]);
-    const aliases = listOf(patch[at.aliases]).filter((n) => {
-      const key = nameKey(n);
-      if (key === '' || had.has(key)) return false;
-      had.add(key);
-      return true;
-    });
-    if (same(aliases, keep.fields[at.aliases] ?? [])) delete patch[at.aliases];
-    else patch[at.aliases] = aliases;
-  }
-  return patch;
+function carried(deps: Pick<PeopleDeps, 'sql'>, list: DeclaredList<MeetsFields>, keep: Row, folds: readonly Row[]): FoldFilled {
+  const floor = identityFloor(shapeIn(deps.sql, list.register), list.fields);
+  return foldFill({ declared: list.declaredFields, at: list.fields, metCap: MET_CAP }, keep, folds, floor);
 }
 
 /**
  * Fold rows into one, now, as one batch the record can undo (`undoMerge` in `index.ts`). Each fold is pointed at the
  * kept row first, which moves every row that pointed at it there too (the write path's merge step), then taken out;
  * the kept row gains what they carried last, once the address it may take is free. Answers the batch.
+ *
+ * WHAT IS ONLY OFFERED IS KEPT IN THE FOLD'S OWN LINE (`carried`): the note of each folded row's taking out says, in
+ * names, what it held that the kept row was not given, so the batch says it and its Undo has nothing of it to take back.
+ * The line that points the fold keeps the note as it was, which is the one `matched` reads its sentence from.
  */
 function fold_(deps: PeopleDeps, list: DeclaredList<MeetsFields>, keep: Row, folds: readonly Row[], note: string, batch = deps.mint()): Result<string> {
   const register = list.register;
+  const { offered } = carried(deps, list, rowById(deps.sql, keep.id) ?? keep, folds);
   for (const fold of folds) {
     const pointed = deps.write(register, fold.id, { [list.fields.merged_into]: keep.id }, { version: fold.version, batch, note });
     if (!pointed.ok) return pointed as Result<never>;
-    const gone = deps.write(register, fold.id, { deleted_at: instant(deps.nowMs) }, { version: pointed.value.version, batch, note });
+    const left = offeredLine(deps, list, offered.filter((o) => o.from === fold.id));
+    const gone = deps.write(register, fold.id, { deleted_at: instant(deps.nowMs) }, { version: pointed.value.version, batch, note: left === '' ? note : `${note} ${left}` });
     if (!gone.ok) return gone as Result<never>;
   }
   const kept = rowById(deps.sql, keep.id) ?? keep;
-  const patch = carried(list, kept, folds);
+  const patch = carried(deps, list, kept, folds).write;
   if (Object.keys(patch).length > 0) {
     const wrote = deps.write(register, kept.id, patch, { version: kept.version, batch, note });
     if (!wrote.ok) return wrote as Result<never>;
   }
   return ok(batch);
+}
+
+/**
+ * What one fold held that the kept row was not given, as a sentence: "Not filled in, for you to say: Northbank as the
+ * organisation." Each value by its name, a row by its title, never an id; empty when nothing was offered.
+ */
+function offeredLine(deps: Pick<PeopleDeps, 'titleOf'>, list: DeclaredList<MeetsFields>, offered: readonly Offered[]): string {
+  const said = offered.flatMap((o) => {
+    const f = list.declaredFields.find((d) => d.id === o.field) as (FieldShape & { label?: string }) | undefined;
+    const value = f?.type === 'ref' ? deps.titleOf(String(o.value)) : textOf(o.value) ?? null;
+    if (value === null || value === '') return [];
+    const label = (f?.label ?? '').trim().toLowerCase();
+    return [label === '' ? value : `${value} as the ${label}`];
+  });
+  return said.length === 0 ? '' : `Not filled in, for you to say: ${listed(said)}.`;
 }
 
 /** What a person is known by, for a question: where they were met, how often, what they answer to. Never an id. */
@@ -1768,7 +1754,8 @@ function clusterBody(deps: Pick<PeopleDeps, 'sql' | 'nameOf' | 'titleOf' | 'nowM
   const folds = sorted.filter((r) => r.id !== keep.id);
   if (folds.length === 0) return null;
   const keepName = deps.nameOf(keep.id);
-  const patch = carried(list, keep, folds);
+  /* ACCEPTING WRITES THE FOLD, NOT WHAT ONLY A PRESS OF ITS OWN GIVES: an empty field the floor holds stays empty. */
+  const patch = carried(deps, list, keep, folds).write;
   const body = {
     register: list.register,
     rows: [

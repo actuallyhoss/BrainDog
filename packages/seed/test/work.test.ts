@@ -119,7 +119,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
     headings,
     [
       undefined, undefined, undefined, 'What needs doing?', 'Late', 'Questions for you', 'At a glance', 'This week', 'With an agent', 'Waiting on you',
-      'Not this week', 'After this week', 'No due day', 'Later',
+      'Not this week', 'After this week', 'No due day', 'Later', 'Needs a project', 'With no project',
       'Done lately', 'Done recently',
     ],
     headings.join(', '),
@@ -142,7 +142,7 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   );
   assert.ok(!drawn.some((b) => b.kind === 'section' && (b as { box?: boolean }).box === true), 'a boxed section would take the capture line onto its surface');
   assert.equal(Object.hasOwn((PAGES.work!.blocks as { heading?: string }[]).find((b) => b.heading === 'Late')!, 'span'), true, 'Late names no width of its own');
-  for (const folded of ['Not this week', 'Done lately'])
+  for (const folded of ['Not this week', 'Needs a project', 'Done lately'])
     assert.equal((page.blocks.find((b) => b.heading === folded) as { fold?: boolean }).fold, true, `${folded} is not folded`);
 
   /* PAST ITS DATE IS LATE, AND ON TOP, because it is still the next thing to do. The sample's is four days late. */
@@ -159,8 +159,11 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
   assert.ok(done.length > 0 && done.every((d) => d > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)), done.join(', '));
   assert.deepEqual(done, [...done].sort().reverse(), 'not newest first');
 
+  /* BUT WITH NO PROJECT, SINCE work 1.19.0 (AGT-D14): a table under its own fold of tasks drawn and ticked in a list
+     above, there to be given a project. As a list that ticks it would draw each of them twice
+     (work-overview-twice.test.ts). */
   const untickable = page.blocks
-    .filter((b) => b.kind !== 'todo')
+    .filter((b) => b.kind !== 'todo' && b.heading !== 'With no project')
     .flatMap((b) => b.rows.filter((r) => typeof r.fields.what === 'string' && !['done', 'dropped'].includes(String(r.fields.state))).map((r) => `${b.heading}: ${String(r.fields.what)}`));
   assert.deepEqual(untickable, [], 'a task in play drawn in a block with no tick');
 });

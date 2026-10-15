@@ -23,6 +23,7 @@
  */
 
 import type { Sql } from '@braindog/ports';
+import { fadeOf } from './agent-lists.ts';
 import {
   LADDER_RULE,
   SLASH,
@@ -96,8 +97,6 @@ const withdrawn = (agent: string, kind: string, why: DropWhy | undefined): strin
   return `${said} ${agent === SLASH ? 'Slash' : 'It'} asks again before it puts a name on anyone.`;
 };
 
-/** The day field a list of learnings fades its rows by, which is how one is told from any other list (`learnt`). */
-const FADES = 'confirmed_on';
 
 /** The migration that made the ladder, whose run lifted the write tokens already there (`seedLadder` in the kernel). */
 const LADDER_ARRIVED = 25;
@@ -302,7 +301,7 @@ export function ladder(deps: LadderDeps) {
    * learning needs nobody", AGT-C14): asked about, the first ten never got written, so no agent kept what it found out.
    *
    * A LEARNING IS READ FROM WHAT ITS LIST DECLARES, never from the list's name: a day the record fades rows by
-   * (`FADES`, the same reading `context` and the card make). Any add-on's list that declares one is treated alike.
+   * (`fadeOf`, the same reading `context` and the card make). Any add-on's list that declares one is treated alike.
    *
    * CAPTURED WHERE THE RUN IS, AND NOWHERE ELSE. A new one that names no place is put in its run's project by the
    * kernel. One that names a place passes only when that is the project its run already stands in; before a run's
@@ -312,9 +311,11 @@ export function ladder(deps: LadderDeps) {
    * applies, its words and its status are edits like any other and stand on their own rung, and a day more than one
    * ahead would keep a row from ever fading, so it asks too.
    */
-  const learnt = (c: Caller, shape: ListShape | null, op: 'create' | 'update', patch: Record<string, unknown>, was: Record<string, unknown> | null): boolean => {
+  const learnt = (c: Caller, list: string, shape: ListShape | null, op: 'create' | 'update', patch: Record<string, unknown>, was: Record<string, unknown> | null): boolean => {
     const live = (shape?.fields ?? []).filter((f) => (f as { retired?: unknown }).retired !== true);
-    if (!live.some((f) => f.id === FADES && f.type === 'day')) return false;
+    const fade = fadeOf(kernel.registers().get(list) ?? { fields: shape?.fields ?? [] });
+    if (fade === null || !live.some((f) => f.id === fade.field && f.type === 'day')) return false;
+    const FADES = fade.field;
     const scoped = live.find((f) => f.scope !== undefined);
     if (op === 'create') {
       if (scoped === undefined || patch[scoped.id] === undefined) return true;
@@ -346,7 +347,7 @@ export function ladder(deps: LadderDeps) {
     /* A LEARNING CAPTURED OR CONFIRMED NEEDS NOBODY (`learnt`), below the two lines above and never over them. It is
        answered as written and told, and with no kinds: `kept` counts what is handed to it towards the next rung, and
        a kind that never asked has no rung to be offered. */
-    if (op !== 'delete' && learnt(c, shape, op, patch, was)) return { write: true, rung: 'tell', kinds: [] };
+    if (op !== 'delete' && learnt(c, list, shape, op, patch, was)) return { write: true, rung: 'tell', kinds: [] };
     const rung = rungFor(c.token, c.scope, kinds);
     if (rung === 'ask') return { write: false, kinds, why: `Changes like this ask until ${OFFER_AFTER} of them have been kept as they were.` };
     return { write: true, rung, kinds };

@@ -9,7 +9,12 @@
  *
  * PURE, AND NO NEW WAY TO WRITE. Every binding calls a method a screen already calls: `create` and `update` as the six
  * writes do (`apps/web/src/lib/page/page-writes.ts`), a delete as `rows-write.ts` archives (`deleted_at`), and `decide`
- * as Decide answers a question. The method's own guard still runs, so a press is refused exactly as the screen's is.
+ * as Decide answers a question, and `propose` as Decide's "Ask yourself" sheet files one (`apps/web` `decide-write.ts`).
+ * The method's own guard still runs, so a press is refused exactly as the screen's is.
+ *
+ * SIGNED BY THE CALLER, NEVER BY THE SYSTEM. A call here carries no actor: the host makes it as whoever pressed, and the
+ * record signs it as it signs that person's own writes (`writerOf`). So an ask a page files is the presser's question,
+ * waiting on Decide for the owner, and nothing here can file one by itself.
  */
 
 import type { Result } from '@braindog/ports';
@@ -66,6 +71,11 @@ export const VERBS = Object.freeze({
   'row.move': { method: 'update', args: { field: { from: 'page' }, to: { from: 'form' } }, undo: 'The field is written back to the value the row held.' },
   'suggestion.answer': { method: 'decide', args: { option: { from: 'form' }, reason: { from: 'form', optional: true } }, undo: 'Undo takes the decision back, a look first and then the press.' },
   'rule.from_arrivals': { method: null, args: { arrivals: { from: 'row' } }, undo: 'None on this host yet.' },
+  'question.ask': {
+    method: 'propose',
+    args: { question: { from: 'form' }, why: { from: 'form', optional: true }, first: { from: 'form' }, second: { from: 'form' } },
+    undo: 'Withdrawn while it is still open, by whoever asked it.',
+  },
 } as const satisfies Readonly<Record<string, VerbBinding>>);
 
 export type BoundVerb = keyof typeof VERBS;
@@ -75,6 +85,17 @@ export const RUNS: ReadonlySet<string> = new Set(Object.entries(VERBS as Readonl
 
 /** The reason a question's answer carries when the press sent none. */
 export const ANSWERED_ON_PAGE = 'Answered on a page.';
+
+/**
+ * What an ask says under a field left empty, by the field: the record's own sentence, which a form draws beneath it.
+ * Every field but `same` is one the ask needs, in the order a form asks them.
+ */
+export const ASK_WORDS = Object.freeze({
+  question: 'Write the question you want to answer.',
+  first: 'Write the first answer it offers.',
+  second: 'Write the second answer it offers.',
+  same: 'The two answers are the same. Make the second one different.',
+});
 
 const own = <T>(table: Readonly<Record<string, T>>, key: string): T | undefined => (Object.hasOwn(table, key) ? table[key] : undefined);
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -107,6 +128,8 @@ export function verbCall(verb: string, args: VerbArgs, row: VerbRow | null, now:
   if (!bound) return no('DECLARATION_UNKNOWN', `${JSON.stringify(verb)} is not a verb a page may press.`, { at: 'verb', allowed: Object.keys(VERBS) });
   if (bound.method === null)
     return no('NOT_IN_THIS_BUILD', `${verb} is not on this host yet: the record has no single change that files these and writes the rule. Make the rule from the Inbox.`, { at: 'verb' });
+  /* AN ASK SAYS ITS OWN SENTENCE UNDER A FIELD LEFT OUT OR LEFT EMPTY, the same either way, so it is asked first. */
+  if (bound.method === 'propose') return askCall(args);
   for (const [arg, spec] of Object.entries(bound.args))
     if (!spec.optional && (!Object.hasOwn(args, arg) || args[arg] === undefined))
       return no('REQUIRED_MISSING', `${verb} needs ${arg}, and the press sent none.`, { at: arg, allowed: Object.keys(bound.args) });
@@ -138,9 +161,26 @@ export function verbCall(verb: string, args: VerbArgs, row: VerbRow | null, now:
 }
 
 /**
+ * AN ASK IS AN `options` QUESTION, filed through `propose` with the body Decide's own sheet builds (`askBody`): why it
+ * is asked as `context`, where the gate reads it, and the two answers as options, each an id, a label and a because.
+ * The ids are places, `o1` and `o2`, since nobody reads them and two answers worded alike must still be two; the
+ * because is left for whoever answers, as the sheet leaves an empty one. A field left empty is refused at that field.
+ */
+function askCall(args: VerbArgs): Result<VerbCall> {
+  for (const [arg, fix] of Object.entries(ASK_WORDS))
+    if (arg !== 'same' && !text(args[arg])) return no('REQUIRED_MISSING', fix, { at: arg });
+  const [question, first, second] = [args.question, args.first, args.second].map((v) => (v as string).trim()) as [string, string, string];
+  if (first.toLowerCase() === second.toLowerCase()) return no('VALUE_MALFORMED', ASK_WORDS.same, { at: 'second' });
+  const why = text(args.why) ? args.why.trim() : '';
+  const options = [first, second].map((label, i) => ({ id: `o${i + 1}`, label, because: '' }));
+  return ok({ method: 'propose', params: { question, body_kind: 'options', body: { ...(why ? { context: why } : {}), options } } });
+}
+
+/**
  * The call that takes a press back, or a refusal. `answered` is what the press's call answered: a created row's list
- * and number for `row.create`, the decision's id for `suggestion.answer`. A field written back takes the value the row held when it was pressed, so a press on a
- * row read without that field has no way back and is refused rather than written empty.
+ * and number for `row.create`, the decision's id for `suggestion.answer`, the question's id for `question.ask`. A
+ * field written back takes the value the row held when it was pressed, so a press on a row read without that field
+ * has no way back and is refused rather than written empty.
  *
  * A QUESTION'S ANSWER IS TAKEN BACK IN TWO STEPS, as Undo always takes a decision back: this is the look (`dry`), and
  * its answer carries the hash the second press sends.
@@ -154,6 +194,13 @@ export function undoCall(verb: string, args: VerbArgs, row: VerbRow | null, answ
     if (!text(made.register) || !Number.isInteger(made.seq))
       return no('REQUIRED_MISSING', 'Undo of row.create needs the row it made, and the answer named none.', { at: 'answered' });
     return ok({ method: 'update', params: { register: made.register, seq: made.seq, patch: { deleted_at: now } } });
+  }
+  /* AN ASK IS TAKEN BACK BY ITS QUESTION, withdrawn while it is still open: the record lets whoever asked it do that
+     (`withdraw`), and refuses it once it is answered, which is the owner's answer standing. */
+  if (bound.method === 'propose') {
+    const made = isRecord(answered) ? answered : {};
+    if (!text(made.id)) return no('REQUIRED_MISSING', 'Undo of question.ask needs the question it filed, and the answer named none.', { at: 'answered' });
+    return ok({ method: 'withdraw', params: { id: made.id } });
   }
   /* BY THE DECISION, NOT THE QUESTION: `decide` answers `{ decision: 'D12', suggestion }`, and the record's undo reads
      the log by the decision's own id. The question's id finds nothing there. */

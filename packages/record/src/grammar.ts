@@ -17,7 +17,7 @@
 
 import type { Result } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { KINDS, KIND_LINES, REACH_FOR, isKind, kindLine, type Kind } from 'braindog-render';
+import { KINDS, KIND_LINES, REACH_FOR, isKind, kindLine, kindsFor, type Kind } from 'braindog-render';
 import { VOICE_KEYS } from '@braindog/declare';
 import { AGGREGATIONS, CAPABILITIES, FIELD_TYPES } from '@braindog/kernel';
 import * as kernel from '@braindog/kernel';
@@ -157,7 +157,7 @@ const PAGE = {
     },
     back: 'on a calendar, whole months before this one; series, stat and lines read it too',
     ahead: 'on a calendar, whole months after this one; a series reads it too',
-    panel: "actions or reporting, on a section of a page with for: the host draws that part of the row's page under the section's heading",
+    panel: "one of actions, reporting, run, seen, job (about the page's row, on a section of a page with for:), or look-editor, slash-model, trust, slash-reads, my-keys, new-action (needs: none, so it stands on any page): the host draws that part under the section's heading",
     short: '{where, label}: on steps, the short view: the rows the sentence keeps, named by a label of at most 24 bytes',
     order: '[{field, dir: asc or desc}], 1 to 3',
     limit: 'rows, 0 to 500',
@@ -243,6 +243,8 @@ const REGISTER = {
     once: 'the fields an add-on plants and never changes after, by id: [name]. Its own update leaves each as the row holds it; a person still edits them',
     order: '{field, dir?: asc|desc}: the order a read with none of its own comes back in, by a number, day, time or text field of this list',
     same: "{fields: [<text field>], within?: <scope or ref field>, fold: text|exact, keep?: oldest|latest|sealed}: what makes two rows one thing, such as two skills of one name in one project. text reads 'Ponytail (copy)' and 'ponytail.md' as 'ponytail'; exact reads them as written",
+    role: "one of skills, tools, learnings, keys-index: the part the list plays for the record's agents, so a list under any id is read as that part",
+    fade: '{field: <day field>, after: <days, such as 90d>}: the day a row fades by and how long after it, as learnings fade unconfirmed',
   },
   field: {
     id: 'lower-case letters, digits and single underscores; never id, seq, register, created_at, updated_at, deleted_at, version, spoken or title, and never starting with _ (required)',
@@ -558,7 +560,7 @@ export function grammarOf(name: string): Result<unknown> {
   if ((GRAMMARS as readonly string[]).includes(name)) return ok(SERVED[name as (typeof GRAMMARS)[number]]);
   if (name.startsWith('kind/')) {
     const kind = name.slice('kind/'.length);
-    if (isKind(kind)) return ok(kindWhole(kind));
+    if (isKind(kind)) return ok({ ...(kindWhole(kind) as object), becomes: kindsFor(kind, []) });
     return no('ENUM_VALUE_UNKNOWN', `There is no kind of block called ${kind}. Read grammar kinds for every kind and its line.`, {
       at: 'grammar',
       allowed: Object.keys(KINDS).map((k) => `kind/${k}`),

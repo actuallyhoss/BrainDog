@@ -120,7 +120,8 @@ Roughly from the simplest to the most involved, each with what it shows you how 
 | `harbour-look` | A sea blue-green in place of the house red, on a cooler grey, in light and in dark. | A pack that is only a theme: one `theme` declaration and nothing else. |
 | `roadmap` | Your dated tasks on one time axis, each dragged to a new date. | A page over another add-on's list, named in `requires`. |
 | `project-brief` | On each project, one line on what it is, the plan, and what is in the way. | `extends`: optional fields laid on another add-on's list, and a block added to its page. |
-| `pad` | Notes beside the work, with a second opinion from Slash under each one. | An automation that asks Slash and writes the answer back, with no code. |
+| `pad` | Notes beside the work, each with room for a reply under it. | A list and its page and nothing else, so it installs on any record, model or not. |
+| `pad-second-opinion` | A second opinion from Slash written under each note on the pad, spending your record's model allowance. | An add-on that needs another (`requires`) and brings only an automation that asks Slash and writes the answer back, with no code. |
 | `standup` | One message every morning: what moved, what is blocked, and what agents finished. | A daily digest whose sections are left out when empty, so a quiet morning sends nothing. |
 | `agent-notes` | Two short notes a day about your agents: what they ask you, what they did, what is stuck. | Two daily digests over computed sources, every section left out when empty, in the app and by push, never by mail. |
 | `week-in-money` | One message every Monday: cash now, what fell due each way, and what money arrived. | A weekly digest with a figure, and two sentences from Slash on top (`prose: slash`). |

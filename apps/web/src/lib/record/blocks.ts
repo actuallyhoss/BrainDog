@@ -575,10 +575,11 @@ export function bucketLabel(key: string, bucket: string): string {
  * A figure's trend as the dialect's fourth `stat` cell: whole units, a gap as `-`.
  *
  * WHOLE UNITS FOR MONEY, because the line's accessible name reads these numbers out, and `3385000` is
- * pence nobody says. The shape is the same at any scale. A trend of gaps only draws no cell at all.
+ * pence nobody says. The shape is the same at any scale. A trend of fewer than three readings draws no cell at all.
  */
 export function trendCell(trend: readonly (number | null)[] | undefined, money = false): string {
-  if (!trend || !trend.some((v) => v !== null)) return '';
+  /* A LINE FROM THREE SAVED NIGHTS AT LEAST, as Home's linesKept draws one: two points are a slope, not a line. */
+  if (!trend || trend.filter((v) => v !== null).length < 3) return '';
   return ` | ${trend.map((v) => (v === null ? '-' : String(money ? Math.round(v / 100) : v))).join(' ')}`;
 }
 

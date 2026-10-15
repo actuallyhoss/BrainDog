@@ -79,3 +79,31 @@ test('a form with no fields is refused the way every kind says it has nothing to
   assert.deepEqual(form.draw(answered({ form: undefined }) as never, OPTS), { segments: [], refusal: NOTHING });
   assert.deepEqual(form.draw(answered({ form: { ...FORM, register: '' } }) as never, OPTS), { segments: [], refusal: NOTHING });
 });
+
+/* A FORM THAT PUTS A QUESTION TO THE OWNER, as the kernel answers one: no list, its fields the verb's own. */
+const ASK = {
+  verb: 'question.ask',
+  fields: [
+    { id: 'question', label: 'What should be decided?', type: 'text', required: true },
+    { id: 'why', label: 'Why ask now?', type: 'long', required: false },
+    { id: 'first', label: 'One answer', type: 'text', required: true },
+    { id: 'second', label: 'The other answer', type: 'text', required: true },
+  ],
+  submit: 'Ask it',
+  after: 'stay',
+};
+
+test('a form that asks a question names no list, and is drawn all the same', () => {
+  const drawn = form.draw(answered({ form: ASK }) as never, OPTS);
+  assert.equal(drawn.refusal, null);
+  assert.equal(drawn.segments.length, 1);
+  const spec = specOf(drawn.segments[0]) as (Spec & { verb: string }) | null;
+  assert.ok(spec, 'the ask form put no form on the segment');
+  assert.equal(spec.verb, 'question.ask');
+  assert.equal(Object.hasOwn(spec, 'register'), false, 'an ask carries no list');
+  assert.equal(spec.submit, 'Ask it');
+  assert.deepEqual(spec.fields.map((f) => [f.id, f.required]), [['question', true], ['why', false], ['first', true], ['second', true]]);
+  /* AND A FORM THAT ADDS A ROW STILL NEEDS ITS LIST: one with none, or with no verb said, is nothing to draw. */
+  assert.deepEqual(form.draw(answered({ form: { ...FORM, register: undefined } }) as never, OPTS), { segments: [], refusal: NOTHING });
+  assert.deepEqual(form.draw(answered({ form: { ...ASK, verb: undefined } }) as never, OPTS), { segments: [], refusal: NOTHING });
+});

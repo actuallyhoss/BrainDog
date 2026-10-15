@@ -27,6 +27,7 @@ import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { sessionDeclaration, whereFor, type MetricDecl } from '@braindog/kernel';
 
+import { listFor } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -44,8 +45,7 @@ export type Offered = { fixed: string[]; lists: OfferedList[]; pages: OfferedPag
 export const SKILLS_CHUNK = 200;
 export const SKILLS_MOST = 1_000;
 
-/** The list a skill is kept in, and the list of runs, which `sessionsLive` asks by name. */
-const SKILLS = 'skills';
+/** The list of runs, which `sessionsLive` asks by name. The skills are the list that plays their part (`listFor`). */
 const SESSION = (sessionDeclaration().body as unknown as { id: string }).id;
 
 /** Which check a fixed address's reader makes before it does any work. */
@@ -156,16 +156,19 @@ export function methods(deps: RecordDeps) {
   /**
    * The skills by name, with when to use each, read a chunk at a time and never with their text.
    *
+   * THE LIST THAT PLAYS THE PART OF THE SKILLS, whatever it is called, and none on a record that keeps no skills.
+   *
    * ONCE A NAME, THE ONE THE LIST HANDS FIRST. A skill kept for every project and again for one project is two entries
    * with one name, and `braindog:skill/<name>` reads the first the list hands it. A retired skill is not offered.
    */
   const skillsFor = (ctx: CallContext): OfferedSkill[] => {
-    if (!kernel.registers().has(SKILLS) || readable(ctx, SKILLS) !== null) return [];
-    const rule = whereFor(ctx.wheres, SKILLS);
+    const skillList = listFor('skills', kernel.registers());
+    if (skillList === null || readable(ctx, skillList) !== null) return [];
+    const rule = whereFor(ctx.wheres, skillList);
     const named = new Map<string, OfferedSkill>();
     let cursor: string | null | undefined;
     do {
-      const page = kernel.list({ register: SKILLS, limit: SKILLS_CHUNK, ...(cursor ? { cursor } : {}) }, rule);
+      const page = kernel.list({ register: skillList, limit: SKILLS_CHUNK, ...(cursor ? { cursor } : {}) }, rule);
       if (!page.ok) break;
       for (const entry of page.value.rows) {
         const name = entry.fields.name;

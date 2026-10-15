@@ -20,9 +20,12 @@ export type Raw = Readonly<Record<string, unknown>>;
  * The host panels a `section` may name with `panel:`, drawn by the host under the section's heading. Four are about the
  * page's row: what the row's work runs on and is scheduled to do (`actions`), where its numbers are sent
  * (`reporting`), on a run's own page what that run did (`run`, drawn only when the page is for a run), and where the
- * row was seen (`seen`, the notes, runs and rows that name it, newest first, from the record's `about` read). Two are
- * about the record and need no row, so they stand on any page: the look editor (`look-editor`) and the form that says
- * which model Slash uses (`slash-model`).
+ * row was seen (`seen`, the notes, runs and rows that name it, newest first, from the record's `about` read). The rest
+ * are about the record and need no row, so they stand on any page: the look editor (`look-editor`), the form that says
+ * which model Slash uses (`slash-model`), the ladder of who may do what on their own (`trust`), whether Slash reads on
+ * its own and what it sends (`slash-reads`), the reader's own agent keys (`my-keys`, the reader's and never another
+ * person's, so it is drawn for anyone who reads) and the button that opens the new scheduled action sheet
+ * (`new-action`).
  *
  * A KEY AND NOT TWO KINDS, because the renderer cannot draw either: each is the host's own screen, placed by the page.
  * The web still reads the two English headings a page carried before this key, and nothing new relies on them.
@@ -33,7 +36,18 @@ export type Raw = Readonly<Record<string, unknown>>;
  * the panel is. The web holds one loader for each key (`apps/web/src/lib/page/panels/index.ts`), and a test holds the
  * two lists equal.
  */
-export type Panel = 'actions' | 'reporting' | 'run' | 'seen' | 'look-editor' | 'slash-model';
+export type Panel =
+  | 'actions'
+  | 'reporting'
+  | 'run'
+  | 'seen'
+  | 'job'
+  | 'look-editor'
+  | 'slash-model'
+  | 'trust'
+  | 'slash-reads'
+  | 'my-keys'
+  | 'new-action';
 
 /** What a host panel is about, who it is drawn for and what it is, in one line. */
 export type PanelEntry = Readonly<{ needs: 'row' | 'none'; level: 'read' | 'write' | 'owner'; says: string }>;
@@ -43,8 +57,13 @@ export const PANEL_TABLE: Readonly<Record<Panel, PanelEntry>> = {
   reporting: { needs: 'row', level: 'write', says: 'Where its numbers are sent' },
   run: { needs: 'row', level: 'read', says: 'What this run did, and its way back' },
   seen: { needs: 'row', level: 'read', says: 'Where the record saw it' },
+  job: { needs: 'row', level: 'write', says: 'The jobs for this, and a way to start one' },
   'look-editor': { needs: 'none', level: 'owner', says: 'Change how this record looks' },
   'slash-model': { needs: 'none', level: 'owner', says: 'The model Slash uses' },
+  trust: { needs: 'none', level: 'owner', says: 'Who may do what by themselves' },
+  'slash-reads': { needs: 'none', level: 'owner', says: 'What Slash read and why' },
+  'my-keys': { needs: 'none', level: 'read', says: 'Your own keys to this record' },
+  'new-action': { needs: 'none', level: 'owner', says: 'Make a new action' },
 };
 
 /* THE KEYS IN THE TABLE'S ORDER, the four of before first, as the refusal lists them and the web's list equals. */

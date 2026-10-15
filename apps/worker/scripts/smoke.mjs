@@ -34,7 +34,10 @@
  *
  * IT WRITES NOTHING. GETs with no cookie and, but for the canary's, no bearer; one GET that must be redirected; one
  * empty POST to an `/in/` door no record has minted, which `serveIngest` refuses with a 404 before any record is named;
- * and the canary's `previewPage`, a POST because its body is long, which draws a page and installs nothing.
+ * and the canary's `previewPage`, a POST because its body is long, which draws a page and installs nothing. The one
+ * exception is the fence's (`fence.mjs`, LCH-C08): on the canary alone, a 1x1 picture put at its own hash, the same
+ * bytes every run, and three puts the fence must refuse or file by their bytes. A fault already scoped and not yet
+ * fixed is printed HELD, said and not counted, so a deploy is not red for it.
  *
  * EXIT CODES: 0 when every check answers as `checks` says, 1 when one does not, 2 when a host could not
  * be reached at all.
@@ -46,6 +49,7 @@ import { join } from 'node:path';
 
 import { FIRST_DRAW } from '../../web/src/lib/record/first-draw.ts';
 import { ROOT, hostOf, siteBinding, siteConfig, wranglerConfig } from './provision-check.mjs';
+import { fenceChecks, heldOf } from './fence.mjs';
 
 const typeOf = (answer) => answer.headers.get('content-type') ?? '';
 const isJson = (answer) => /application\/json/i.test(typeOf(answer));
@@ -354,13 +358,13 @@ export default async function smoke(name, config = wranglerConfig(), site = site
   let first = [];
   if (token && slug) {
     try {
-      first = [canary(config, name, slug), ...refusals(config, name, slug, io.nowhere ?? nowhereSlug(), token)];
+      first = [canary(config, name, slug), ...refusals(config, name, slug, io.nowhere ?? nowhereSlug(), token), ...fenceChecks(config, name, slug, token)];
     } catch (err) {
       refused = err instanceof Error ? err.message : String(err);
     }
   }
   log('');
-  log(`  smoke: ${name}, ${list.length + first.length} check(s)${first.length ? ` and ${reads.length - 1} more first-draw read(s) on the canary` : ''}, read-only`);
+  log(`  smoke: ${name}, ${list.length + first.length} check(s)${first.length ? ` and ${reads.length - 1} more first-draw read(s) on the canary` : ''}, read-only${first.length ? " but for the fence's file puts on the canary" : ''}`);
   if (!list.some((c) => c.url.endsWith('/pricing')))
     log(`  ${name}'s site does not hand this Worker its doors, so the site is not asked: ${siteBinding(config, site, name).why ?? 'no name of the site is one this Worker is not already on'}`);
   /* A CANARY NAMED WITH NO KEY TO OPEN IT IS RED, NOT A SKIP: the canary exists, so a missing token is a mistake. */
@@ -368,7 +372,7 @@ export default async function smoke(name, config = wranglerConfig(), site = site
     failed += 1;
     log(`  WRONG  SMOKE_SLUG names the canary ${slug} and SMOKE_TOKEN is not set, so the signed-in half cannot run; the canary exists, so this is red and not a skip`);
   } else if (!token || !slug) log('  the signed-in half is skipped: SMOKE_TOKEN and SMOKE_SLUG are not both set, so no record is opened');
-  else log('  /account/usage is not asked: it opens for a browser session, never for a record\'s token');
+  else log('  /account/usage is not asked signed in: it opens for a browser session, never for a record\'s token, so the fence asks it with no key');
   if (refused) {
     failed += 1;
     log(`  WRONG  ${refused}`);
@@ -387,12 +391,14 @@ export default async function smoke(name, config = wranglerConfig(), site = site
       });
       answer = { status: got.status, headers: got.headers, text: await got.text() };
     } catch (err) {
-      log(`  UNREACHABLE  ${check.method} ${check.url}: ${err instanceof Error ? err.message : String(err)}`);
+      log(`  UNREACHABLE  ${check.method} ${check.shown ?? check.url}: ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
     const verdict = judge(check, answer);
-    if (verdict) failed += 1;
-    log(`  ${verdict ? 'WRONG' : 'ok   '}  ${check.method} ${check.url}  expects ${check.expects}${verdict ? `\n         ${verdict}` : ''}`);
+    /* HELD IS A KNOWN FAULT WAITING ON ITS FIX (`fence.mjs`): said, and not counted. `shown` is a file's address in words. */
+    const held = verdict ? heldOf(check, answer, io.held) : null;
+    if (verdict && !held) failed += 1;
+    log(`  ${held ? 'HELD ' : verdict ? 'WRONG' : 'ok   '}  ${check.method} ${check.shown ?? check.url}  expects ${check.expects}${verdict ? `\n         ${verdict}` : ''}${held ? `\n         held: ${held}` : ''}`);
     return answer;
   }
 

@@ -22,7 +22,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { installEvery } from '../src/install.ts';
+import { descriptionOf, installEvery } from '../src/install.ts';
 import { REPLACE, REPLACE_FILE } from './replace.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -209,4 +209,50 @@ test('THROUGH main.ts, each profile lists + mcpServers.braindog and - skills/old
   assert.equal(lines.filter((l) => l.startsWith('  - skills/old-brain')).length, 2, ran.stdout);
   const dirty = execFileSync('git', ['--no-optional-locks', 'status', '--porcelain', '--untracked-files=no'], { cwd: APP, encoding: 'utf8', windowsHide: true }).trim() !== '';
   assert.equal(lines.filter((l) => MOVING.test(l)).length, dirty ? 1 : 0, ran.stdout);
+});
+
+/*
+ * A SKILL IS TOLD BY ITS DESCRIPTION LINE AND NOTHING ELSE (H.620). Read by its whole text, a folder of notes that
+ * mentions the old host further down was taken for the old tool's skill and set aside, and these three cases are the
+ * shapes that went wrong: the same body under two descriptions, a body that mentions the host, and no front matter.
+ */
+const BODY = '\n# Moving\n\nThe old notes lived at https://tallybook.example until spring.\n';
+
+test('TWO SKILLS WITH THE SAME BODY AND DIFFERENT DESCRIPTIONS ARE TOLD APART: only the one whose description names the host moves', () => {
+  const home = folder('home');
+  const p = profile(home, '.claude-studio');
+  mkdirSync(join(p.dir, 'skills', 'mover'));
+  mkdirSync(join(p.dir, 'skills', 'diary'));
+  writeFileSync(join(p.dir, 'skills', 'mover', 'SKILL.md'), `---\nname: mover\ndescription: Sync with the brain at\n  tallybook.example every hour.\n---\n${BODY}`);
+  writeFileSync(join(p.dir, 'skills', 'diary', 'SKILL.md'), `---\nname: diary\ndescription: Keep a diary of the move.\n---\n${BODY}`);
+  const diary = tree(join(p.dir, 'skills', 'diary'));
+
+  const lines = installEvery([p.dir], [], { apply: true, replace: REPLACE, scripts, home, checkout: still() });
+  const moved = lines.filter((l) => l.startsWith('  - skills/')).map((l) => l.split(',')[0]);
+  /* The description carried on to an indented line is still the description. */
+  assert.deepEqual(moved.sort(), ['  - skills/mover', '  - skills/old-brain'], lines.join('\n'));
+  assert.ok(!existsSync(join(p.dir, 'skills', 'mover')));
+  assert.deepEqual(tree(join(p.dir, 'skills', 'diary')), diary);
+});
+
+test('A NOTES FOLDER THAT MENTIONS THE HOST IN ITS BODY STAYS, and so does a skill with no front matter', () => {
+  const home = folder('home');
+  const p = profile(home, '.claude-studio');
+  mkdirSync(join(p.dir, 'skills', 'bare'));
+  writeFileSync(join(p.dir, 'skills', 'bare', 'SKILL.md'), `description: tallybook.example${BODY}`);
+  const bare = tree(join(p.dir, 'skills', 'bare'));
+
+  const dry = installEvery([p.dir], [], { apply: false, replace: REPLACE, scripts, home, checkout: still() });
+  assert.deepEqual(dry.filter((l) => l.startsWith('  - skills/')).map((l) => l.split(',')[0]), ['  - skills/old-brain'], dry.join('\n'));
+  installEvery([p.dir], [], { apply: true, replace: REPLACE, scripts, home, checkout: still() });
+  assert.deepEqual(tree(join(p.dir, 'skills', 'bare')), bare);
+  /* `tidy` has front matter and a description that names nothing of the old tool's. */
+  assert.ok(existsSync(p.tidy));
+});
+
+test('THE READER RETURNS THE DESCRIPTION LINE ONLY, carried on by indented lines, and null without front matter', () => {
+  assert.equal(descriptionOf('---\nname: a\ndescription: One\n  two\nother: x\n---\nbody tallybook.example\n'), 'One two');
+  assert.equal(descriptionOf('﻿---\r\ndescription: Win\r\n---\r\n'), 'Win');
+  assert.equal(descriptionOf('---\nname: a\n---\ndescription: in the body\n'), null);
+  assert.equal(descriptionOf('# no front matter\ndescription: x\n'), null);
 });

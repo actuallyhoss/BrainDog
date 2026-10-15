@@ -4,7 +4,7 @@
  * WHAT WAS WRONG BEFORE THIS FILE. Every panel was about one row, so `panelFault` refused any panel on a page about no
  * row, and an existing screen part about the whole record (the look editor, the model Slash uses) could not be placed
  * on a declared page at all. These cases hold the new rule: a panel that needs no row installs on a plain page, one
- * that needs a row is still refused there, and a name that is none of them is refused with all six named.
+ * that needs a row is still refused there, and a name that is none of them is refused with every one named.
  */
 
 import { test } from 'node:test';
@@ -40,11 +40,11 @@ test("ACTIONS ARE STILL REFUSED ON A PAGE ABOUT NO ROW, since they are one row's
   assert.equal(panelFault('look-editor', true), null, 'a page per row may hold it too');
 });
 
-test('A NAME THAT IS NO PANEL IS REFUSED, naming all six', () => {
+test('A NAME THAT IS NO PANEL IS REFUSED, naming every one', () => {
   const odd = panelFault('mood-board', null);
   assert.ok(odd);
   assert.equal(odd.code, 'DECLARATION_INVALID');
-  assert.deepEqual([...(odd.allowed ?? [])], ['actions', 'reporting', 'run', 'seen', 'look-editor', 'slash-model']);
+  assert.deepEqual([...(odd.allowed ?? [])], ['actions', 'reporting', 'run', 'seen', 'job', 'look-editor', 'slash-model', 'trust', 'slash-reads', 'my-keys', 'new-action']);
   for (const name of PANELS) assert.ok(odd.fix.includes(name), `the sentence names ${name}`);
   /* A KEY OF EVERY OBJECT IS NO PANEL. */
   assert.ok(panelFault('constructor', null));

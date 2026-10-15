@@ -116,7 +116,7 @@ const isOurs = (command: string, which: Which): boolean => new RegExp(`braindog-
  * EACH IS MATCHED AS NARROWLY AS THE FIRST ONES WERE, because a false match deletes somebody else's tool and a miss is
  * only a line to remove by hand. `hooks` are patterns a hook's command must match; `programs` patterns a server's command
  * or arguments must match; `hosts` the hosts a server was reached at, by its own URL or through a proxy's arguments;
- * `skills` texts a skill's `SKILL.md` must hold for the skill to be set aside. Every pattern is read without case, as
+ * `skills` texts the description line of a skill's `SKILL.md` must hold for the skill to be set aside. Every pattern is read without case, as
  * the constants were. `name` is what the lines call the tool, as "${name}'s".
  */
 export type Replace = { file: string; name: string; hooks: RegExp[]; programs: RegExp[]; hosts: string[]; skills: string[]; mcpJson: string[] };
@@ -918,8 +918,29 @@ function planServers(file: string, options: Options): Plan {
 }
 
 /**
+ * THE `description:` OF A SKILL'S FRONT MATTER, AND NOTHING ELSE OF ITS TEXT (H.620), with the indented lines that
+ * carry it on, or null when there is no front matter or no description in it. Whose skill a folder is, is said by
+ * its description: a folder of notes that mentions the old host further down is nobody's skill, and one with no
+ * front matter says nothing about whose it is. `doctor` reads skills by this same reader, so the two never disagree.
+ */
+export function descriptionOf(text: string): string | null {
+  const lines = text.replace(/^﻿/, '').split(/\r?\n/);
+  if (lines[0]?.trim() !== '---') return null;
+  const end = lines.findIndex((line, i) => i > 0 && line.trim() === '---');
+  const front = lines.slice(1, end === -1 ? lines.length : end);
+  const at = front.findIndex((line) => /^description\s*:/i.test(line));
+  if (at === -1) return null;
+  const more: string[] = [];
+  for (const line of front.slice(at + 1)) {
+    if (!/^\s+\S/.test(line)) break;
+    more.push(line.trim());
+  }
+  return [front[at]?.replace(/^description\s*:/i, '').trim() ?? '', ...more].join(' ');
+}
+
+/**
  * The old tool's skills in one profile's `skills/` folder, each set aside under `skills/.replaced/<name>-<date>/`: a
- * folder whose `SKILL.md` names the old tool's host. MOVED, NEVER DELETED, so the skill is one rename from back if he
+ * folder whose `SKILL.md` names the old tool's host in its description line (`descriptionOf`). MOVED, NEVER DELETED, so the skill is one rename from back if he
  * wants it, and the copy is dated because the cut-over may be run again after a restore.
  *
  * A NAME STARTING WITH A DOT IS NEVER A SKILL HERE, because `.replaced` is this command's own. The skip is said
@@ -944,8 +965,9 @@ function planSkills(skills: string, options: Options): Plan {
       /* No `SKILL.md`, or one that cannot be read: nothing says whose it is, so it is left. */
       continue;
     }
-    const lower = text.toLowerCase();
-    if (!old || !old.skills.some((marker) => lower.includes(marker.toLowerCase()))) continue;
+    /* THE DESCRIPTION LINE ONLY (H.620): a body or a reference file that mentions the host is somebody's notes. */
+    const description = descriptionOf(text)?.toLowerCase();
+    if (!old || description === undefined || !old.skills.some((marker) => description.includes(marker.toLowerCase()))) continue;
     let to = join(skills, '.replaced', `${name}-${date}`);
     for (let n = 2; existsSync(to); n++) to = join(skills, '.replaced', `${name}-${date}-${String(n)}`);
     moves.push({ from, to });

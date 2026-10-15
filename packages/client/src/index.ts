@@ -133,7 +133,8 @@ export type Boot = {
   pages?: {
     slug: string;
     title: string;
-    nav: { section: string; order: number; tabs?: true } | null;
+    /** `place` is the page's own place in the rail, a whole number 0 to 9999, absent where it names none or from an older host. */
+    nav: { section: string; order: number; place?: number; tabs?: true } | null;
     icon: string | null;
     list?: string | null;
     /**
@@ -190,7 +191,17 @@ export type Boot = {
    * for anybody else and from an older host.
    */
   copies?: BootCopies;
+  /**
+   * The rail's places, in the order the record keeps them: each page with its glyph, its name, who put it there (an
+   * add-on, the person, or the engine) and its section, and `more` for what does not fit. Absent from an older host.
+   */
+  places?: { places: BootPlace[]; more: BootPlace[] };
+  /** Each computed source the record reads and how it draws. Absent from an older host. */
+  computed?: { source: string; drawsAs: string }[];
 };
+
+/** One place in the rail, as `boot` says it (`places`). */
+export type BootPlace = { page: string; icon: string | null; name: string; by: 'addon' | 'person' | 'engine'; section: string | null };
 
 /** What `boot` says about the record's copies. See `CopyFacts` in `@braindog/kernel`. */
 export type BootCopies = { last_copy_at: string | null; last_copy_bytes: number | null; last_export_at: string | null };
@@ -740,7 +751,12 @@ export type AutomationRun = {
 };
 
 /** `automations({ rule })`: one automation with its body and its last ten runs, newest first. */
-export type Automation = AutomationRow & { body: Record<string, unknown>; runs: AutomationRun[] };
+export type Automation = AutomationRow & {
+  body: Record<string, unknown>;
+  runs: AutomationRun[];
+  /** The title of every id the body names that the caller can see, keyed by the id as the body holds it. Absent from an older host. */
+  names?: Record<string, string>;
+};
 
 /** `automationRun`: the run it started, which the next drain takes. */
 export type AutomationStarted = { run: string };

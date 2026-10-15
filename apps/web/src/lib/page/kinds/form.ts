@@ -12,6 +12,10 @@
  * `form_spec`: a parsed block's `form` is the word after its kind in a fence, which `Block.svelte` writes into an
  * attribute, so the answer's own key would be read as that word.
  *
+ * A LIST IS NEEDED ONLY FOR A NEW ROW. A form over `row.create` names the list it adds to, and one with none is
+ * nothing to draw; a form that puts a question to the owner names no list (the kernel refuses one that does), and is
+ * drawn all the same, its fields the question, why, and the two answers.
+ *
  * NARROWED HERE TO THE KEYS A FORM DRAWS, and narrowed again by the drawer (`readForm`), because the answer may be a
  * record on another build. A form with no field this can read is drawn as every kind draws nothing, `opts.nothing()`.
  */
@@ -23,13 +27,17 @@ import type { KindDrawer } from './index.ts';
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const words = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
+/** The verb a form over a list writes with, and the one read where an answer names none. */
+const ROW_VERB = 'row.create';
+
 /** The form an answer carries, cut to what a form draws, or null where it has no field to draw. */
 export function formOfAnswer(result: unknown): Record<string, unknown> | null {
   const form = isRecord(result) ? result.form : undefined;
   if (!isRecord(form) || !Array.isArray(form.fields)) return null;
+  const verb = words(form.verb) || ROW_VERB;
   const register = words(form.register);
   const submit = words(form.submit);
-  if (register === '' || submit === '') return null;
+  if ((verb === ROW_VERB && register === '') || submit === '') return null;
   const fields = form.fields.flatMap((f) => {
     if (!isRecord(f) || words(f.id) === '' || words(f.label) === '') return [];
     /* THE KEYS OF ONE FIELD A FORM DRAWS, and nothing else the record sent beside them. */
@@ -37,7 +45,7 @@ export function formOfAnswer(result: unknown): Record<string, unknown> | null {
     return [Object.fromEntries(Object.entries({ id, label, type, required, options, show_when }).filter(([, v]) => v !== undefined))];
   });
   if (fields.length === 0) return null;
-  return { verb: words(form.verb) || 'row.create', register, fields, submit, after: words(form.after) || 'stay' };
+  return { verb, ...(register === '' ? {} : { register }), fields, submit, after: words(form.after) || 'stay' };
 }
 
 export const form: KindDrawer = {

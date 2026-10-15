@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 
 import { PEOPLE, PROJECTS } from '../../../fixtures/names.ts';
 import {
-  FIRST_READ_ADDRESS_SPENT, FIRST_READ_DAY_SPENT, FIRST_READ_NOT_PERSON, FIRST_READ_OFF, serveFirstRead, type FirstReadDoor,
+  FIRST_READ_ADDRESS_SPENT, FIRST_READ_CATALOGUE_UNREAD, FIRST_READ_DAY_SPENT, FIRST_READ_NO_CATALOGUE, FIRST_READ_NOT_PERSON, FIRST_READ_OFF,
+  firstReadCasesRead, firstReadClaims, firstReadOfferFrom, firstReadTold, serveFirstRead, type FirstReadCase, type FirstReadDoor, type FirstReadEntry,
 } from '../src/first-read.ts';
 
 const ORIGIN = 'https://braindog.example';
@@ -163,4 +164,84 @@ test('what she said is never printed and never put in a header', async (t) => {
     for (const [, v] of res.headers) assert.doesNotMatch(v, new RegExp(PROJECTS[0]));
   }
   assert.ok(printed.every((line) => !line.includes(SAID) && !line.includes(PROJECTS[0])), 'nothing printed carries the sentence');
+});
+
+/* ── the offer: the catalogue's use cases over the build's (USE-A16) ─────────────────────────────────────────── */
+
+/* Invented use cases, as a build and a catalogue might hold them. */
+const BUILT: FirstReadCase[] = [
+  { id: 'personal', title: 'Personal', summary: 'Your money and bills.', signals: ['money', 'rent', 'bills'], modules: ['money-core'] },
+  { id: 'shop', title: 'Shop', summary: 'Orders and stock.', signals: ['shop', 'orders'], modules: ['people'] },
+  { id: 'student', title: 'Student', summary: 'Courses and what is due.', signals: ['exam'], modules: [] },
+];
+const LANDLORD: FirstReadEntry = {
+  kind: 'usecase', id: 'landlord', title: 'Landlord', summary: 'The flats you rent out and who rents each one.',
+  signals: ['landlord', 'flats', 'rent out', 'rent', 'tenants'], modules: ['people', 'landlord'],
+};
+const SHOP_NEWER: FirstReadEntry = { kind: 'usecase', id: 'shop', title: 'Market stall', summary: 'What you sell and to whom.', signals: ['stall', 'shop'], modules: ['people'] };
+
+test('THE MERGE: a catalogue front is offered with its signals, and the catalogue wins over the build by id', () => {
+  const { cases, untitled } = firstReadOfferFrom([LANDLORD, SHOP_NEWER, { kind: 'pack', id: 'landlord-pack', title: 'An add-on' }], BUILT);
+  assert.deepEqual(untitled, []);
+  assert.deepEqual(cases.map((c) => c.id), ['landlord', 'shop', 'personal', 'student'], 'catalogue order, then the build, and no add-on');
+  const landlord = cases.find((c) => c.id === 'landlord')!;
+  assert.equal(landlord.title, 'Landlord');
+  assert.deepEqual(landlord.signals, ['landlord', 'flats', 'rent out', 'rent', 'tenants']);
+  assert.deepEqual(landlord.modules, ['people', 'landlord']);
+  const shop = cases.find((c) => c.id === 'shop')!;
+  assert.equal(shop.title, 'Market stall', "the catalogue's title won");
+  assert.deepEqual(shop.signals, ['stall', 'shop']);
+});
+
+test('WHAT THE CATALOGUE LEAVES UNSAID IS THE BUILD’S: a summary, signals or modules it does not give', () => {
+  const { cases } = firstReadOfferFrom([{ kind: 'usecase', id: 'personal', title: 'Your life' }], BUILT);
+  const personal = cases.find((c) => c.id === 'personal')!;
+  assert.equal(personal.title, 'Your life');
+  assert.equal(personal.summary, 'Your money and bills.');
+  assert.deepEqual(personal.signals, ['money', 'rent', 'bills']);
+  assert.deepEqual(personal.modules, ['money-core']);
+});
+
+test('AN UNLISTED ENTRY IS LEFT OUT, built-in or not; one with no title is left out, said, and the build’s case stands', () => {
+  const entries: FirstReadEntry[] = [
+    { ...LANDLORD, unlisted: true },
+    { kind: 'usecase', id: 'student', title: 'Student', unlisted: true },
+    { kind: 'usecase', id: 'shop', title: '  ' },
+    { kind: 'usecase', id: 'nameless', summary: 'Something.' },
+    { kind: 'usecase', id: 'shop', title: 'A second shop' },
+  ];
+  const { cases, untitled } = firstReadOfferFrom(entries, BUILT);
+  assert.deepEqual(cases.map((c) => c.id), ['personal', 'shop']);
+  assert.equal(cases.find((c) => c.id === 'shop')!.title, 'Shop', 'a broken entry took away what the build offered, or a second entry counted');
+  assert.deepEqual(untitled, ['shop', 'nameless']);
+});
+
+test('THE TIE-BREAK: two cases claiming one word stand in the catalogue’s order, and two reads never flip', () => {
+  const entries = [LANDLORD, { kind: 'usecase', id: 'personal', title: 'Personal', signals: ['money', 'rent'] }];
+  const first = firstReadOfferFrom(entries, BUILT);
+  assert.deepEqual(firstReadClaims(first.cases).get('rent'), ['landlord', 'personal']);
+  const flipped = firstReadOfferFrom([...entries].reverse(), BUILT);
+  assert.deepEqual(firstReadClaims(flipped.cases).get('rent'), ['personal', 'landlord'], 'the index order is the order');
+  for (let i = 0; i < 5; i += 1) assert.deepEqual(firstReadOfferFrom(entries, BUILT), first, 'one input read twice gave two offers');
+});
+
+test('WHAT THE MODEL IS TOLD carries the words a case is heard in', () => {
+  const told = firstReadTold(firstReadOfferFrom([LANDLORD], []).cases[0]!);
+  assert.equal(told.summary, 'The flats you rent out and who rents each one. Heard in: landlord, flats, rent out, rent, tenants.');
+  assert.equal(firstReadTold({ ...BUILT[2]!, signals: [] }).summary, 'Courses and what is due.');
+});
+
+test('THE FALLBACK: no catalogue, or one that does not read, is the build’s list with one line said, never a throw', async () => {
+  const none = await firstReadCasesRead(null, BUILT);
+  assert.deepEqual(none.cases.map((c) => c.id), ['personal', 'shop', 'student']);
+  assert.equal(none.said, FIRST_READ_NO_CATALOGUE);
+  for (const broken of [async () => null, async () => Promise.reject(new Error('unreadable'))]) {
+    const out = await firstReadCasesRead(broken, BUILT);
+    assert.deepEqual(out.cases, BUILT);
+    assert.equal(out.said, FIRST_READ_CATALOGUE_UNREAD);
+  }
+  const read = await firstReadCasesRead(async () => [LANDLORD, { kind: 'usecase', id: 'nameless' }], BUILT);
+  assert.equal(read.cases[0]!.id, 'landlord');
+  assert.match(read.said ?? '', /no title.*nameless/u);
+  assert.equal((await firstReadCasesRead(async () => [LANDLORD], BUILT)).said, null);
 });

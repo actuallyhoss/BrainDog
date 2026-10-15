@@ -248,3 +248,9 @@ test('Make it pressed twice, at once and again after, makes one page', async () 
   assert.equal(api.kernel.pages().filter((p: { slug: string }) => p.slug === 'orders-week').length, 1);
   assert.equal(offerFor(penOn(16), 'orders', open), null, 'the page made, the card came back');
 });
+
+test('A PLACE OFFER IS KEPT, NOT MADE: its button says Keep it, every other offer Make it', async () => {
+  const { makeLabel, offerWords: w } = await import('./pen.ts');
+  assert.equal(makeLabel({ id: 'place:orders' }), w.keep);
+  assert.equal(makeLabel({ id: 'week:orders' }), w.make);
+});

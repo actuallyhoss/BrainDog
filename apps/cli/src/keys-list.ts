@@ -32,7 +32,7 @@ import type { KeysIo } from './keys.ts';
 const USAGE = 'braindog keys list takes [--project <name>] or [--everywhere], [--json] and [--host <host>], and nothing else.';
 
 /** The list a key's row lives in. */
-const KEYS = 'credentials';
+export const KEYS = 'credentials';
 
 /** How many keys one read asks for. */
 export const KEYS_PAGE = 50;
@@ -165,10 +165,11 @@ export function countLine(keys: readonly KeyRead[], where: string): string {
   return `${String(keys.length)} ${keys.length === 1 ? 'key' : 'keys'}${place}: ${parts.join(', ')}.`;
 }
 
-type Reader = { call: (name: string, args?: Record<string, unknown>) => Promise<Result<unknown>> };
+/** The one call the reader makes of a client, so `keys scan --ask` reads Keys the same way. */
+export type Reader = { call: (name: string, args?: Record<string, unknown>) => Promise<Result<unknown>> };
 
 /** Every row of one list, read fifty at a time to the end, or the answer that stopped it. */
-async function readAll(client: Reader, register: string, where?: string): Promise<Result<unknown[]>> {
+export async function readAll(client: Reader, register: string, where?: string): Promise<Result<unknown[]>> {
   const rows: unknown[] = [];
   let cursor: string | null = null;
   for (let page = 0; page < PAGES; page++) {

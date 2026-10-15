@@ -269,6 +269,10 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   'projects-aim-30d': counted('projects-aim-30d', 'Aiming within 30 days', `${LIVE}, aim after yesterday, aim before +31d`),
   'projects-past-aim': counted('projects-past-aim', 'Past the day they aimed for', `${LIVE}, aim before today`, { lte: 0 }),
   'projects-parked': counted('projects-parked', 'Parked', 'lane is parked'),
+  /* HOW MANY ARE EARNING, REMEMBERED EACH NIGHT, SINCE portfolio 1.17.0 (PGS-C17), for the strip on Projects that says it
+     beside In play with the line of its nights. A count and not the year's money: that is the sum of What each one earns,
+     and a figure is said once on a page (`packages/seed/test/portfolio.test.ts`). */
+  'projects-lane-earning': { ...counted('projects-lane-earning', 'Earning', 'lane is earning'), snapshot: { grain: 'day', into: 'series.projects-lane-earning' } },
   /* WHAT THE OVERVIEW'S FOLDED TILES ARE DRAWN ON, SINCE portfolio 1.8.0, each over its tile's own clauses, so a tile is
      never drawn empty and never hidden while it holds a project. */
   'projects-aiming': counted('projects-aiming', 'Aiming for a day', `${LIVE}, aim is set`),
@@ -287,6 +291,9 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
   'projects-retired': counted('projects-retired', 'Finished', 'lane is retired'),
   /* HOW THE PROJECTS IN PLAY ARE GOING, as parts of one whole, with the ones nobody has said about as their own part. */
   'projects-by-health': { ...counted('projects-by-health', 'How they are going', LIVE), group_by: 'health' },
+  /* WHAT THE SPLIT ABOVE IS DRAWN ON, SINCE portfolio 1.17.0 (PGS-C17): the projects in play somebody said how they are
+     going about. A record where nobody has drew one grey bar of Not said yet, which says nothing a person can act on. */
+  'projects-with-health': counted('projects-with-health', 'Saying how they are going', `${LIVE}, health is set`),
   /* EVERY PROJECT BY ITS STATUS, SINCE portfolio 1.6.0: one track cut into earning, building, parked and finished, so the
      Overview says in one line where the projects are before it lists any of them. Over every project and not only
      those in play, because a strip of the whole is what says how much of it is parked. `lane` is required, so no
@@ -818,7 +825,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
     /* CALLED WHAT THE NAVIGATION CALLS IT, SINCE portfolio 1.9.0: the title read Overview under a top bar that says
        Projects, so a person pressed one word and landed on another. */
     title: 'Projects',
-    nav: { section: 'Projects', order: 5 },
+    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+       Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
+    nav: { section: 'Projects', order: 5, place: 30 },
     icon: 'thing',
     requires: ['register.things'],
     pack: 'portfolio',
@@ -863,8 +872,38 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         span: 12,
         when: { metric: 'projects-need-you', is: 0 },
         /* A PUSH AND NOT YOU, AND THE QUESTIONS SECOND, SINCE portfolio 1.17.0: "Nothing needs you" read false beside two
-           questions waiting, and first they would put "Nothing" mid-line, since the writer never mends a capital. */
-        body: 'Nothing needs a push across {{projects-live}} project(s) in play, {{questions-open-in:things}} question(s) for you',
+           questions waiting, and first they would put "Nothing" mid-line, since the writer never mends a capital.
+           AND NO COUNT OF THE PROJECTS IN PLAY, inside the same 1.17.0 (PGS-C17): the strip under the line says it, with
+           how it moved, and a figure is said once on a page. */
+        body: 'Nothing needs a push, {{questions-open-in:things}} question(s) for you',
+      },
+      {
+        /* HOW MANY ARE IN PLAY AND HOW MANY EARN, OVER TIME, SINCE portfolio 1.17.0 (PGS-C17): two counts the record saves
+           every night (`snapshot:` on each; In play since 1.6.0, Earning since 1.17.0), each with the line of those saves
+           over twelve weeks. A line is drawn from its third saved night; before that the cell is the figure alone.
+           Drawn while a project is in play, as In play is. */
+        kind: 'stat',
+        heading: 'In play and earning',
+        icon: 'gauge',
+        span: 12,
+        key: 'in-play-earning',
+        when: { metric: 'projects-live', gt: 0 },
+        cells: [
+          { metric: 'projects-live', label: 'In play', trend: '12w' },
+          { metric: 'projects-lane-earning', label: 'Earning', trend: '12w' },
+        ],
+      },
+      {
+        /* WHERE THEY ARE, BY LANE, SINCE portfolio 1.17.0 (PGS-C17): every project in Building, Earning, Parked or
+           Finished as one track, the figure `projects-by-lane` declared since 1.6.0 and drawn by nothing since 1.11.0.
+           Past four in play, as How they are going is: three projects are three cards and say it themselves. */
+        kind: 'split',
+        heading: 'Where they are',
+        icon: 'thing',
+        span: 12,
+        key: 'where-they-are',
+        source: 'metric.projects-by-lane',
+        when: { metric: 'projects-live', gt: 4 },
       },
       /* NO RIGHT NOW TILE, SINCE portfolio 1.10.0. It held In play and what aims to land within thirty days in a third of
          the row, beside two splits a third its height, so the row ended at three heights. In play is the line's now;
@@ -875,7 +914,7 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            were two half-width tracks under a line that already counts the projects in play and the ones at risk, so the
            row said the line twice; the health track is the one that says something the line does not (which part is
            off track, and how much of it nobody has said about). What is parked or finished is folded under the cards, and
-           `projects-by-lane` stays declared for a page that draws it. EACH PART IN ITS INTENT, so off track reads as
+           `projects-by-lane` is drawn again above it since 1.17.0. EACH PART IN ITS INTENT, so off track reads as
            trouble at a glance, in the theme's colour and not only in words. */
         kind: 'split',
         heading: 'How they are going',
@@ -886,8 +925,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         tones: { on_track: 'good', at_risk: 'warn', off_track: 'bad' },
         /* ONLY PAST FOUR PROJECTS IN PLAY, SINCE portfolio 1.12.0 (the visual review of October 2nd). Three projects drew
            three equal thirds, which says nothing the line and the cards under it do not; a bar earns its row when there
-           are too many cards to read at a glance. */
-        when: { metric: 'projects-live', gt: 4 },
+           are too many cards to read at a glance. AND ONLY WHILE ONE OF THEM SAYS HOW IT IS GOING, SINCE portfolio 1.17.0
+           (PGS-C17): with no health set on any it drew one bar of Not said yet. */
+        when: { all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] },
       },
       /* NO NEEDS YOU TABLE, SINCE portfolio 1.11.0. It listed the projects at risk with their health and next step, and
          the cards under it say both on every project in play, while the line counts them: Kiln's next step was on the
@@ -941,8 +981,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            one tile each, and the rest in Decide: the questions whose row is on Projects (`list is things`), counted by
            `questions-open-in:things` and drawn only while that is above nought. A project's own page draws its own
            (`about is {{spoken}}`); this is every project's at once. UNDER IN PLAY AND BEFORE THE OPEN TILE, which takes
-           every block after it up to the next heading: at 1440 How they are going, In play, this and that tile, four
-           before the fold. */
+           every block after it up to the next heading: at 1440 In play and earning, Where they are, How they are going,
+           In play, this and that tile, six before the fold (since 1.17.0, PGS-C17). */
         kind: 'queue',
         heading: 'Waiting on you',
         icon: 'ask',

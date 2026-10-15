@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { BEHIND_DAYS, behindLine, behindSaid, CHECK_EVERY_MS, CHECK_MS, checkPath, hostName } from '../src/behind.ts';
+import { BEHIND_DAYS, behindLine, behindSaid, CHECK_EVERY_MS, CHECK_MS, checkPath, DOCTOR_EVERY_MS, doctorCheckPath, doctorLine, hostName } from '../src/behind.ts';
 
 type T = { after: (f: () => void | Promise<void>) => void };
 
@@ -101,4 +101,22 @@ test('an unreachable host, a wrong answer, a checkout and a broken hosts file ar
   writeFileSync(join(broken.env.XDG_CONFIG_HOME, 'braindog', 'hosts.json'), '{ not json');
   assert.equal(await behindLine({ env: { XDG_CONFIG_HOME: broken.env.XDG_CONFIG_HOME }, home: broken.home, build: '2026.10.01+4e712da', now: NOW }), null);
   assert.equal(existsSync(checkPath(broken.home)), false);
+});
+
+/* ONCE A WEEK, A QUIET DOCTOR RUN (AGT-A10 job 4): its line only when it lists something, run again only after seven days,
+   when it was run written before the run, and a run that throws is no line. */
+test('the weekly doctor line: said when doctor lists places, kept quiet for seven days, and nothing on a throw', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'braindog-doctor-line-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let runs = 0;
+  const listed = () => (runs++, { report: { places: [1, 2, 3] }, code: 1 });
+  assert.equal(doctorLine(root, NOW, listed), 'braindog doctor lists 3 places to fix. Run braindog doctor to see them.');
+  assert.equal(JSON.parse(readFileSync(doctorCheckPath(root), 'utf8')).at, new Date(NOW).toISOString());
+  assert.equal(doctorLine(root, NOW + DOCTOR_EVERY_MS - 1, listed), null, 'inside the week it is not run again');
+  assert.equal(runs, 1);
+  assert.equal(doctorLine(root, NOW + DOCTOR_EVERY_MS, () => ({ report: { places: [] }, code: 0 })), null, 'nothing listed is no line');
+  const thrown = mkdtempSync(join(tmpdir(), 'braindog-doctor-line-'));
+  t.after(() => rmSync(thrown, { recursive: true, force: true }));
+  assert.equal(doctorLine(thrown, NOW, () => { throw new Error('ps failed'); }), null);
+  assert.ok(existsSync(doctorCheckPath(thrown)), 'written before the run, so a run that throws is not tried on every start');
 });

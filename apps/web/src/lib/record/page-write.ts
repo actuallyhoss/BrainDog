@@ -47,7 +47,7 @@ export type Updated =
 export type Declared = {
   state?: string | undefined;
   done?: readonly string[] | undefined;
-  fields: readonly { id: string; values?: readonly string[] | undefined; default?: unknown }[];
+  fields: readonly { id: string; type?: string | undefined; values?: readonly string[] | undefined; default?: unknown }[];
 };
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
@@ -245,8 +245,14 @@ function footOf(rows: readonly Row[], lanes: readonly string[], lane: string): n
  */
 export type Patch = Readonly<Record<string, unknown>>;
 
-/** A block with one edit laid over it. `kind` is never patched away: a block without one is not a block. */
-export function withPatch(block: BlockBody, patch: Patch | undefined): BlockBody {
+/**
+ * A block with one edit laid over it. `kind` is never patched away: a block without one is not a block.
+ *
+ * `kind` IS LET THROUGH ONLY TO A KIND `kinds` NAMES, which is what `kindsFor` (`braindog-render`) answered for this
+ * block: the kinds that read the cells it reads. Without `kinds`, as the block editor and arranging call it, a patch
+ * never changes what a block is.
+ */
+export function withPatch(block: BlockBody, patch: Patch | undefined, kinds: readonly string[] = []): BlockBody {
   if (!patch) return block;
   const out: Record<string, unknown> = { ...block };
   for (const [key, value] of Object.entries(patch)) {
@@ -254,7 +260,79 @@ export function withPatch(block: BlockBody, patch: Patch | undefined): BlockBody
     if (value === null) delete out[key];
     else out[key] = value;
   }
-  return { ...out, kind: block.kind };
+  const to = patch.kind;
+  return { ...out, kind: typeof to === 'string' && to !== block.kind && kinds.includes(to) ? to : block.kind };
+}
+
+/* ── changing what a block is, and taking it off ─────────────────────────── */
+
+/**
+ * THE KEYS ONE KIND READS AND ANOTHER REFUSES, from the kernel's table (`packages/kernel/src/block-keys.ts` `KEY_KINDS`),
+ * for the kinds `kindsFor` moves between. A key the new kind does not read would install as a refusal, so a change of
+ * kind takes it off in the same write, and Undo puts the block back with it.
+ */
+const KIND_KEYS: Readonly<Record<string, readonly string[]>> = {
+  lead: ['stat', 'cards', 'note', 'queue'],
+  fold: ['section', 'cards', 'feed'],
+  group: ['cards', 'table', 'feed'],
+  about: ['table', 'cards'],
+  stale: ['cards'],
+  unset: ['bar', 'split'],
+  tones: ['bar', 'split', 'cards', 'lanes'],
+  back: ['series', 'stat', 'lines'],
+  bucket: ['stat', 'lines'],
+  first: ['feed', 'agents', 'steps'],
+  short: ['steps'],
+};
+
+/** The one column role every kind reads (`block-edit.ts` `rolesFor`); a card's other roles are a card's only. */
+const ANY_ROLE = 'scope';
+
+/**
+ * The patch that changes a block to `to`, or `null` where `to` is not one of `kinds` (what `kindsFor` answered) or is
+ * what the block already is. The keys and card roles the new kind does not read go in the same patch, as `null`.
+ */
+export function kindPatch(block: BlockBody, to: string, kinds: readonly string[]): Patch | null {
+  if (to === block.kind || !kinds.includes(to)) return null;
+  const patch: Record<string, unknown> = { kind: to };
+  for (const [key, readers] of Object.entries(KIND_KEYS)) if (key in block && !readers.includes(to)) patch[key] = null;
+  if (to !== 'cards' && Array.isArray(block.columns) && block.columns.some((c) => isRole(c)))
+    patch.columns = (block.columns as unknown[]).map((c) => (isRole(c) ? withoutRole(c as Record<string, unknown>) : c));
+  return patch;
+}
+
+const isRole = (c: unknown): boolean => typeof c === 'object' && c !== null && typeof (c as { as?: unknown }).as === 'string' && (c as { as: string }).as !== ANY_ROLE;
+
+function withoutRole(c: Record<string, unknown>): Record<string, unknown> {
+  const { as: _role, metric: _metric, ...rest } = c;
+  return rest;
+}
+
+/** Which stored block a drawn one is: by the record's name for it, else by the three it is named from. */
+export type Which = { key?: string | undefined; kind: string; source?: string | undefined; heading?: string | undefined };
+
+/**
+ * THE STORED BLOCK THE HEAD IS FOR, or `null` where the body does not hold exactly one.
+ *
+ * NOT BY PLACE. The page the reader sees is the stored one with its look laid over it, so the fourth block on screen
+ * may be the first in the body. A block that declares a `key` is found by it; one that does not is found by its kind,
+ * its source and its heading, the three the record names it from, and only where one block alone has all three, so a
+ * change is never written to a block the reader did not press on.
+ */
+export function blockAt(body: PageBody, which: Which): number | null {
+  const keyed = which.key ? body.blocks.findIndex((b) => b.key === which.key) : -1;
+  if (keyed >= 0) return keyed;
+  const said = (v: unknown) => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+  const alike = body.blocks.flatMap((b, i) =>
+    b.kind === which.kind && said(b.source) === said(which.source) && said(b.heading) === said(which.heading) ? [i] : [],
+  );
+  return alike.length === 1 ? alike[0]! : null;
+}
+
+/** The body with block `at` taken off, or `null` where it holds no such block. */
+export function withoutBlock(body: PageBody, at: number): PageBody | null {
+  if (!Number.isInteger(at) || at < 0 || at >= body.blocks.length) return null;
+  return { ...body, blocks: body.blocks.filter((_, i) => i !== at) };
 }
 
 /**
@@ -454,4 +532,75 @@ export async function setBody(
   if (out.refusal.code === 'UNREACHABLE') return { from: 'unreachable', fix: copy.recordNotReached };
   if (out.refusal.code === 'UNAUTHORIZED') return { from: 'refused', fix: copy.signInAgain };
   return { from: 'refused', fix: out.refusal.fix };
+}
+
+/**
+ * The page's own declaration as the record stores it, read through `arrangement({ page })`, the read an agent makes
+ * before it proposes a change, with whether the reader wrote it.
+ *
+ * `mine` IS NO ADD-ON SIGNED IT (`pack` absent). An add-on's page set whole by a change of kind or a removal would become
+ * the person's own copy and stop taking that add-on's updates, until a change to one block of it is an overlay of its
+ * own (PGS-B07); so the menu offers both only where `mine` holds. A page drawn for each row of a list is its template's,
+ * and the template is what is changed.
+ */
+export type Authored = { body: PageBody; version: number | null; template: string | null; mine: boolean };
+
+export async function authoredOf(base: string, slug: string, io?: ClientFetch): Promise<Authored | { from: 'refused' | 'unreachable'; fix: string }> {
+  const client = createClient({ base, ...(io ? { fetch: io } : {}) });
+  const out = await client.call<unknown>('arrangement', { page: slug });
+  if (!out.ok) {
+    if (!('refusal' in out) || out.refusal.code === 'UNREACHABLE') return { from: 'unreachable', fix: copy.recordNotReached };
+    if (out.refusal.code === 'UNAUTHORIZED') return { from: 'refused', fix: copy.signInAgain };
+    return { from: 'refused', fix: out.refusal.fix };
+  }
+  const answer = out.value as { body?: unknown; version?: unknown; pack?: unknown } | null;
+  const raw = answer?.body;
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw) || typeof (raw as { page?: unknown }).page !== 'string')
+    return { from: 'refused', fix: copy.recordNotReached };
+  const page = (raw as { page: string }).page;
+  const own = slug.startsWith('page.') ? slug.slice('page.'.length) : slug;
+  const pack = answer?.pack ?? (raw as { pack?: unknown }).pack;
+  return {
+    body: asPageBody(raw as Record<string, unknown>, page),
+    version: typeof answer?.version === 'number' ? answer.version : null,
+    template: page === own ? null : page,
+    mine: pack === null || pack === undefined || pack === '',
+  };
+}
+
+/** What a change of kind or a removal sends: the kind and what `kindsFor` allowed, or the block taken off. */
+export type BlockChange = { kind: string; kinds: readonly string[] } | { remove: true };
+
+/** The receipts of the two writes, in the words `block-menu.ts` says them; here the one sentence of refusal. */
+export const changeWords = {
+  notYours: 'Change to and Remove are on pages you made. This page came with an add-on, so hide the block instead.',
+};
+
+/**
+ * A change of kind, or a block taken off, on a page the person wrote: the stored body read, the one block found
+ * (`blockAt`), the body set whole at the version read. `before` and `version` come back so Undo is `setBody` with them,
+ * as Done's is.
+ */
+export async function changeBlock(
+  base: string,
+  slug: string,
+  which: Which,
+  change: BlockChange,
+  io?: ClientFetch,
+): Promise<Arranged> {
+  const read = await authoredOf(base, slug, io);
+  if ('from' in read) return read;
+  if (!read.mine) return { from: 'refused', fix: changeWords.notYours };
+  const at = blockAt(read.body, which);
+  if (at === null) return { from: 'refused', fix: copy.arrangeMoved };
+  let body: PageBody | null;
+  if ('remove' in change) body = withoutBlock(read.body, at);
+  else {
+    const block = read.body.blocks[at]!;
+    const patch = kindPatch(block, change.kind, change.kinds);
+    body = patch ? { ...read.body, blocks: read.body.blocks.map((b, i) => (i === at ? withPatch(b, patch, change.kinds) : b)) } : null;
+  }
+  if (!body) return { from: 'refused', fix: copy.arrangeMoved };
+  const out = await setBody(base, body, io, read.version);
+  return out.from === 'written' ? { from: 'written', before: read.body, version: out.version, template: read.template } : out;
 }

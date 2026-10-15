@@ -34,6 +34,8 @@ export type Outcomes = {
   slash: KindOutcome[];
   folds: { made: number; undone: number } | null;
   outside: number | null;
+  /** How Slash's offers were graded (ENG-B17): the predictions that came due (`scored`) and how many did what they said. */
+  predictions?: { scored: number; met: number };
 };
 
 /** One line of the tile. `bad` is the word that says it is a fault, drawn in the deeper red beside the sentence. */
@@ -104,12 +106,14 @@ function kindOf(v: unknown): KindOutcome | null {
  */
 export function outcomesOf(value: unknown): Outcomes | null {
   if (!isMap(value)) return null;
-  const has = Array.isArray(value.slash) || isMap(value.folds) || count(value.outside);
+  const p = value.predictions;
+  const predictions = isMap(p) && count(p.scored) && count(p.met) && p.met <= p.scored ? { scored: p.scored, met: p.met } : null;
+  const has = Array.isArray(value.slash) || isMap(value.folds) || count(value.outside) || predictions !== null;
   if (!has) return null;
   const slash = Array.isArray(value.slash) ? value.slash.map(kindOf).filter((k): k is KindOutcome => k !== null) : [];
   const f = value.folds;
   const folds = isMap(f) && count(f.made) && count(f.undone) ? { made: f.made, undone: f.undone } : null;
-  return { slash, folds, outside: count(value.outside) ? value.outside : null };
+  return { slash, folds, outside: count(value.outside) ? value.outside : null, ...(predictions ? { predictions } : {}) };
 }
 
 /** "Pages: 4 suggested, 2 taken as they were, 1 changed, 1 turned down. 1 was undone." */
@@ -150,6 +154,12 @@ export function outcomeLines(readings: Outcomes | null | undefined): OutcomeLine
   const out = readings.outside;
   if (out !== null && out > 0) lines.push({ key: 'outside', text: words.outside(out), bad: words.bad });
   else if (out === 0 && lines.length > 0) lines.push({ key: 'outside', text: words.clean });
+  /* THE GRADED SUGGESTIONS (ENG-B17), beside the brake: "Of 4 suggestions graded, 3 did what they said." */
+  const p = readings.predictions;
+  if (p && p.scored > 0) {
+    const one = p.scored === 1;
+    lines.push({ key: 'predictions', text: `Of ${whole(p.scored)} ${one ? 'suggestion' : 'suggestions'} graded, ${whole(p.met)} did what ${one ? 'it' : 'they'} said.` });
+  }
   return lines;
 }
 

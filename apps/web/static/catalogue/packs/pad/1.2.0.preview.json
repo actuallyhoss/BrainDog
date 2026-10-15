@@ -1,0 +1,81 @@
+{
+  "format": 1,
+  "made_at": "2026-10-15T17:52:18.817Z",
+  "pages": [
+    {
+      "blocks": [
+        {
+          "empty": "Nothing on the pad yet.",
+          "heading": "The pad",
+          "kind": "section",
+          "source": "register.notes",
+          "key": "k17y3jgk",
+          "rows": [],
+          "matched": 0,
+          "refusals": []
+        },
+        {
+          "heading": "A thought",
+          "kind": "capture",
+          "register": "notes",
+          "span": 12,
+          "key": "k0bvfna5",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "fills": {}
+        },
+        {
+          "columns": [
+            {
+              "as": "title",
+              "field": "text"
+            },
+            {
+              "as": "reply",
+              "field": "reply"
+            }
+          ],
+          "empty": "Nothing on the pad yet. Write a thought above.",
+          "kind": "cards",
+          "limit": 6,
+          "order": [
+            {
+              "dir": "desc",
+              "field": "seq"
+            }
+          ],
+          "source": "register.notes",
+          "span": 12,
+          "key": "k0ez5mxk",
+          "rows": [],
+          "matched": 0,
+          "refusals": [],
+          "drawn": false,
+          "why": "when"
+        }
+      ],
+      "icon": "doc",
+      "nav": {
+        "order": 10,
+        "section": "Pad"
+      },
+      "page": "pad",
+      "requires": [
+        "register.notes"
+      ],
+      "title": "Pad",
+      "read_at": "2026-10-15T17:52:18.817Z",
+      "zone": "UTC",
+      "look": {
+        "look": "pad",
+        "basis": "r1o5kanr",
+        "by": "rule",
+        "hide": [
+          "k0ez5mxk"
+        ]
+      },
+      "declared_version": 1
+    }
+  ]
+}

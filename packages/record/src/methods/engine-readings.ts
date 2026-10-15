@@ -145,12 +145,38 @@ export function outsideOf(sql: Pick<Sql, 'all'>, since: string): number {
   return out;
 }
 
+/**
+ * How Slash's offers were graded: the predictions that came due and were read (`scored`), and how many of them did what
+ * they said (`met`). A prediction scored with no reading has no verdict, so it is neither.
+ */
+export type Predictions = { scored: number; met: number };
+
+/** What the method answers: the arithmetic's readings, and beside the brake, the predictions graded where one was written. */
+export type EngineReadingsAnswer = EngineReadings & { predictions?: Predictions };
+
+/**
+ * The predictions graded on this record, read from the kernel's `prediction` table, which `scorePrediction` settles:
+ * `met` is 1 or 0 once a reading was taken, `null` before and where nothing could be read.
+ *
+ * `null` WHERE THERE IS NOTHING TO SAY: a store that answered no line (a host's bare read), or a record where no offer
+ * has carried a prediction yet. Neither is a pair of zeros, as an unread brake is not a free one. Once one is written
+ * the pair is answered, 0 of 0 while none is due.
+ */
+export function predictionsOf(sql: Pick<Sql, 'all'>): Predictions | null {
+  const [row] = sql.all<{ written: number; scored: number | null; met: number | null }>(
+    `SELECT count(*) AS written, sum(scored_at IS NOT NULL AND met IS NOT NULL) AS scored, sum(scored_at IS NOT NULL AND met = 1) AS met
+     FROM prediction`,
+  );
+  if (row === undefined || Number(row.written ?? 0) === 0) return null;
+  return { scored: Number(row.scored ?? 0), met: Number(row.met ?? 0) };
+}
+
 export function methods(deps: RecordDeps) {
   const { scoped, clock } = deps;
 
   return {
     /** What the model was asked and answered in the last 30 days, and what is not yet understood. `null` where the host wired no ledger. READ+. */
-    async engineReadings(_args: unknown, ctx: CallContext): Promise<Result<EngineReadings | null>> {
+    async engineReadings(_args: unknown, ctx: CallContext): Promise<Result<EngineReadingsAnswer | null>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
       const read = deps.engineLedger;
@@ -159,21 +185,22 @@ export function methods(deps: RecordDeps) {
       const { calls, mentions, questions } = await read(new Date(now - MONTH_DAYS * DAY).toISOString());
       const month = new Date(now - MONTH_DAYS * DAY).toISOString();
       const kernel = deps.kernel as Kernel | undefined;
-      return {
-        ok: true,
-        value: engineReadings({
-          now,
-          calls,
-          owed: [],
-          mentions,
-          questions,
-          braked: slashBrake(deps.sql),
-          slash: slashFiled(deps.sql, month),
-          today: dayIn(now, kernel?.identity?.()?.tz),
-          folds: foldsOf(deps.sql, kernel, new Date(now - WEEK_DAYS * DAY).toISOString()),
-          outside: outsideOf(deps.sql, month),
-        }),
-      };
+      const tz = kernel?.identity?.()?.tz;
+      /* THE BRAKE COUNTS AN OFFER HE LET PASS AS A NO (ENG-B17 job 2), so it is asked what today is in the record's zone. */
+      const readings = engineReadings({
+        now,
+        calls,
+        owed: [],
+        mentions,
+        questions,
+        braked: slashBrake(deps.sql, now, tz),
+        slash: slashFiled(deps.sql, month),
+        today: dayIn(now, tz),
+        folds: foldsOf(deps.sql, kernel, new Date(now - WEEK_DAYS * DAY).toISOString()),
+        outside: outsideOf(deps.sql, month),
+      });
+      const predictions = predictionsOf(deps.sql);
+      return { ok: true, value: predictions === null ? readings : { ...readings, predictions } };
     },
   };
 }

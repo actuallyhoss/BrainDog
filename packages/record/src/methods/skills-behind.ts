@@ -23,6 +23,9 @@
  * may not read, and no refusal that says the add-on is there. A grant narrowed to some rows reads only those rows. A
  * project is said by its name only to somebody who reads the list that holds it, and as "A project" otherwise.
  *
+ * THE TWO LISTS ARE FOUND BY THE PART THEY PLAY (`listFor` in `../agent-lists.ts`), never by their ids, so the agents
+ * add-on can be renamed or replaced and this reads on. A record that keeps neither answers the empty answer.
+ *
  * NO ID LEAVES HERE. A skill and a learning are called what a person calls them (`LN12`), each beside its words.
  *
  * IT WRITES NOTHING, ASKS NOTHING AND CALLS NO MODEL. Proposing the next version is an agent's, by `propose`, and
@@ -32,12 +35,10 @@
 import type { Result } from '@braindog/ports';
 import { whereFor } from '@braindog/kernel';
 
+import { listFor } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 
-/** The two lists this read answers for, as the agents add-on declares them (`packages/seed/src/packs/agents.ts`). */
-const LESSONS = 'learnings';
-const SKILLS = 'skills';
 /** The lesson's field that names the skill it bears on ("Skill or topic it bears on"). */
 const TOPIC = 'topic';
 
@@ -136,7 +137,8 @@ export function methods(deps: RecordDeps) {
    * One list's standing rows as the caller's grant admits them, newest 500 read and handed oldest first, with its
    * declaration's fields. `null` when the record does not hold the list or she may not read it.
    */
-  const standingRows = (ctx: CallContext, id: string) => {
+  const standingRows = (ctx: CallContext, id: string | null) => {
+    if (id === null) return null;
     const decl = kernel.register(id);
     if (!decl || readable(ctx, id) !== null) return null;
     const fields = decl.fields as readonly Field[];
@@ -161,15 +163,17 @@ export function methods(deps: RecordDeps) {
         return no('VALUE_MALFORMED', `limit is a whole number from 1 to ${SKILLS_BEHIND_MOST}.`, { at: 'limit' });
       const none: SkillsBehind = { skills: [], total: 0 };
 
-      const lessons = standingRows(ctx, LESSONS);
-      const skills = lessons === null ? null : standingRows(ctx, SKILLS);
+      const lists = kernel.registers();
+      const lessonList = listFor('learnings', lists);
+      const lessons = standingRows(ctx, lessonList);
+      const skills = lessons === null ? null : standingRows(ctx, listFor('skills', lists));
       if (lessons === null || skills === null) return { ok: true, value: none };
       /* EACH FIELD BY WHAT THE LISTS DECLARE: the one a lesson names its replaced one in points at its own list, where a
          row applies is the field that scopes it, and a skill's lessons are the list of refs to the lessons. */
-      const replaces = lessons.fields.find((f) => f.type === 'ref' && f.to === LESSONS && !f.retired)?.id;
+      const replaces = lessons.fields.find((f) => f.type === 'ref' && f.to === lessonList && !f.retired)?.id;
       const lessonPlace = lessons.fields.find((f) => f.scope !== undefined && !f.retired)?.id;
       const skillPlace = skills.fields.find((f) => f.scope !== undefined && !f.retired)?.id;
-      const carries = skills.fields.find((f) => f.type === 'list' && f.of === 'ref' && f.to === LESSONS && !f.retired)?.id;
+      const carries = skills.fields.find((f) => f.type === 'list' && f.of === 'ref' && f.to === lessonList && !f.retired)?.id;
       if (!lessons.fields.some((f) => f.id === TOPIC && !f.retired) || carries === undefined) return { ok: true, value: none };
 
       const lessonIn: LessonIn[] = lessons.rows.map((row) => ({

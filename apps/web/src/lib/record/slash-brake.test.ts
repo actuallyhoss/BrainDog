@@ -64,3 +64,11 @@ test('READ, A REFUSAL, NO READINGS OR A THROW: null, and the tile says nothing',
   const throws: BrakeClient = { call: (async () => { throw new Error('offline'); }) as BrakeClient['call'] };
   assert.equal(await readBrake(throws), null);
 });
+
+test('LAPSES COUNTED (ENG-B17): the sentence says it stopped offering, counting the ones he let pass', () => {
+  assert.equal(
+    brakeLine({ on: true, share: 0.1, of: 20, lapsed: 4 }),
+    'Slash stopped offering: you took up 2 of its last 20, counting the ones you let pass.',
+  );
+  assert.equal(brakeLine({ on: true, share: 0.3, of: 20, lapsed: 0 }), 'Slash is asking less: you turned down 14 of its last 20 suggestions. It asks again as you accept more.');
+});

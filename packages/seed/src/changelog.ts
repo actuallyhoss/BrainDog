@@ -22,7 +22,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   portfolio: [
     {
       version: '1.17.0',
-      notes: 'Projects says how many of those in play say what they earned in a year only once one of them does. With none saying, the line is not drawn. A project page lists up to six of its own keys, tools and skills under Runs on, and says which agents used each one. On Projects, the one line under each name can be typed straight on its card. Each project in play on Projects says how long since anybody worked on it.',
+      notes: 'Projects says how many of those in play say what they earned in a year only once one of them does. With none saying, the line is not drawn. A project page lists up to six of its own keys, tools and skills under Runs on, and says which agents used each one. On Projects, the one line under each name can be typed straight on its card. Each project in play on Projects says how long since anybody worked on it. Projects says where each one stands by lane, and how many are in play and earning, with the line of each over the nights. How they are going waits until a project says how it is going.',
     },
     {
       version: '1.16.0',
@@ -75,7 +75,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   people: [
-    { version: '3.4.0', notes: 'People says when somebody may be on your record twice, with a link that opens the list at those people. Calendar is a new page: this month and the next two, with everything that has a day it is due, from every list. Activity is a page of its own: everything that changed, a day at a time, with one line for each run, and who worked, what changed, the busy hours and what an agent asked beside it. What is asked about somebody here waits on the People page to be answered, and its first line says how many.' },
+    { version: '3.4.0', notes: 'People says when somebody may be on your record twice, with a link that opens the list at those people. Calendar is a new page: this month and the next two, with everything that has a day it is due, from every list. Activity is a page of its own: everything that changed, a day at a time, with one line for each run, and who worked, what changed, the busy hours and what an agent asked beside it. What is asked about somebody here waits on the People page to be answered, and its first line says how many. People shows how many you were in touch with in the last 30 days, with a line of the month, and what agents did to the people and organisations here. Activity can be narrowed by who, what kind of change and which list.' },
     { version: '3.3.0', notes: 'Health is a page of its own: each check this record runs on itself, by name, with what it last found. Anything that needs a look comes first, said in words and marked, and a check with nothing to go on yet says Not read yet. Under the first line it says how many checks have not been read yet.' },
     {
       version: '3.2.0',
@@ -188,7 +188,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
     },
   ],
   estate: [
-    { version: '2.2.0', notes: 'A service can be a Server, a Database, Storage or a Network, each with its name. Types you added yourself stay as they are. A project page no longer says Costs a year 0 when nothing it runs on has a cost recorded; the figure is left out until one is. Services shows what is asked about a service and says how many in its first line, and Virtual machine, Edge network and Object storage are types with names.' },
+    { version: '2.2.0', notes: 'A service can be a Server, a Database, Storage or a Network, each with its name. Types you added yourself stay as they are. A project page no longer says Costs a year 0 when nothing it runs on has a cost recorded; the figure is left out until one is. Services shows what is asked about a service and says how many in its first line, and Virtual machine, Edge network and Object storage are types with names. Services shows what agents did to your services, under everything you keep.' },
     {
       version: '2.1.0',
       notes:
@@ -204,7 +204,7 @@ export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly M
   work: [
     {
       version: '1.19.0',
-      notes: "A thread can be an idea or planned before it is open, and moves only where it makes sense: an idea cannot go to done in one step. A thread can say the day it aims for, and shows in Due this week. A follow-up takes its task's project, thread and owner where it names none. A step an agent adds under its own task stays with that agent. A thread that is held up can be marked done. Board has a line to add a task. A project with nothing written on its tasks for more than thirty days is marked quiet.",
+      notes: "A thread can be an idea or planned before it is open, and moves only where it makes sense: an idea cannot go to done in one step. A thread can say the day it aims for, and shows in Due this week. A follow-up takes its task's project, thread and owner where it names none. A step an agent adds under its own task stays with that agent. A thread that is held up can be marked done. Board has a line to add a task. A project with nothing written on its tasks for more than thirty days is marked quiet. Work has a head with a search, and lists open work with no project.",
     },
     {
       version: '1.18.0',

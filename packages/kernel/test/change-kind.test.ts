@@ -115,9 +115,9 @@ test('A PROPOSAL BREAKS DOWN INTO THE SAME KINDS, plus shape, automation, add-on
   assert.deepEqual(floors(kindsOfProposal('change', { declaration_id: 'register.tasks', to: { add: { fields: [{ id: 'due', type: 'day' }] } } }, reader())), { 'shape:tasks': null });
   assert.deepEqual(floors(kindsOfProposal('change', { declaration_id: 'register.tasks', to: { retire: { fields: ['due'] } } }, reader())), { 'shape:tasks': 'delete' });
   const bundle = { declaration_id: 'register.tasks', to: { declarations: [{ id: 'register.tasks', kind: 'register', body: { id: 'tasks' } }, { id: 'rule.nag', kind: 'rule', body: {} }, { id: 'page.home', kind: 'page', body: {} }] } };
-  assert.deepEqual(floors(kindsOfProposal('change', bundle, reader())), { automation: 'outside', 'shape:tasks': null, 'declare:page': null });
+  assert.deepEqual(floors(kindsOfProposal('change', bundle, reader())), { 'automation.reaches': 'outside', 'shape:tasks': null, 'declare:page': null });
   /* WHAT IT SENDS OUT PUTS EVERY KIND ON THE FLOOR. */
-  assert.deepEqual(floors(kindsOfProposal('change', { ...bundle, egress: [{ line: 'x' }] }, reader())), { automation: 'outside', 'shape:tasks': 'outside', 'declare:page': 'outside' });
+  assert.deepEqual(floors(kindsOfProposal('change', { ...bundle, egress: [{ line: 'x' }] }, reader())), { 'automation.reaches': 'outside', 'shape:tasks': 'outside', 'declare:page': 'outside' });
   /* AND A ROW ANOTHER PERSON MADE is read through the reader. */
   const theirs = kindsOfProposal('rowset', { register: 'tasks', rows: [{ at: 'tasks#3', version: 1, patch: { state: 'done' } }] }, reader({ 'tasks#3': 'p_ada' }));
   assert.equal(theirs[0]?.floor, 'others');

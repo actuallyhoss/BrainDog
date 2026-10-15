@@ -46,14 +46,15 @@ import { SLASH } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
 
 import { groupingsOffered, growsWeighed, openRowsOffered } from './emergent-grows.ts';
+import { placesWeighed, viewPlacesOffered } from './emergent-views.ts';
 import { LAPSE_DAYS, TIER, WAITING_MOST, WITHIN_MOST, queueOf, recommend, type DrawnPage, type Earned, type GrowingList, type Held, type Offer as Recommended } from './design-agent.ts';
 
 /** One thing the pen offers, and the whole declaration accepting it would write. */
 export type PenItem = {
   /**
    * The dismissal signature, which is also how the item is told apart from every other: `page:<list>`,
-   * `block:<page>:<kind>:<list>`, `block:<page>:group:<list>`, `column:<page>:<block>:<field>`, `page:<list>:open` or
-   * `week:<list>`.
+   * `block:<page>:<kind>:<list>`, `block:<page>:group:<list>`, `column:<page>:<block>:<field>`, `page:<list>:open`,
+   * `week:<list>` or `place:<view>`.
    */
   id: string;
   kind: 'page' | 'block' | 'column';
@@ -93,8 +94,8 @@ export const PEN_ROWS_DRAWN = 50;
 /** The most dismissals a person's `pen.dismissed` keeps; past it the oldest is let go first. */
 export const PEN_DISMISSED_MOST = 500;
 
-/** What an offer is about: a list's page, its week, a block on a page, or a column on a page's table. */
-export type PenSignatureKind = 'page' | 'week' | 'block' | 'column';
+/** What an offer is about: a list's page, its week, a block on a page, a column on a page's table, or a saved view's place in the rail. */
+export type PenSignatureKind = 'page' | 'week' | 'block' | 'column' | 'place';
 
 /**
  * THE ONE MAKER OF AN OFFER'S SIGNATURE, which is its id and what `pen.dismissed` holds, so another rule offering the
@@ -335,6 +336,8 @@ export function penQueued(deps: PenDeps): PenQueue {
   const pages = pagesOffered(deps).filter((p) => !weekly.has(p.register));
   const shapes = shapesOffered(deps);
   const grows = [...groupingsOffered(deps), ...openRowsOffered(deps)];
+  /* A SAVED VIEW OPENED OFTEN (USE-B13 job 2, `emergent-views.ts`): its place in the rail, weighed beside the grows offers. */
+  const places = viewPlacesOffered(deps);
   const asked = slashAsked(deps);
   const names = new Map([...deps.kernel.registers()].map(([id, decl]) => [id, decl.name]));
 
@@ -347,6 +350,7 @@ export function penQueued(deps: PenDeps): PenQueue {
   const weighed = new Map(recommend({ nowMs, pages: drawnOf(deps), lists: grownOf(deps, pages, nowMs), earned }).map((o) => [o.key, o]));
   /* THE GROWS OFFERS (USE-B13 jobs 5 and 7) are weighed beside the recommender's, so `asOffer` knows a grouping it never weighed. */
   for (const o of growsWeighed(grows)) weighed.set(o.key, o);
+  for (const o of placesWeighed(places)) weighed.set(o.key, o);
 
   const lapses = dayOf(nowMs + LAPSE_DAYS * DAY_MS);
   const asOffer = (item: Made): Recommended | null => {
@@ -360,7 +364,7 @@ export function penQueued(deps: PenDeps): PenQueue {
   };
 
   /* THE USE ORDER FIRST, then a stable sort by rank, so where two rank the same the one opened lately leads. */
-  const made = rank(deps, [...weeks, ...pages, ...grows, ...shapes.map((o) => o.item)])
+  const made = rank(deps, [...weeks, ...pages, ...grows, ...places, ...shapes.map((o) => o.item)])
     .flatMap((item) => ((offer) => (offer ? [{ item, offer }] : []))(asOffer(item)))
     .sort((a, b) => b.offer.rank - a.offer.rank);
   const lists = new Set<string>();

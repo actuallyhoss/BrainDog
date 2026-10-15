@@ -80,7 +80,7 @@ export type ReadingsOf = {
 };
 
 /** Whether Slash's questions are braked, with the share and the count it was worked out from. */
-export type Braked = { on: boolean; share: number; of: number };
+export type Braked = { on: boolean; share: number; of: number; lapsed?: number };
 
 /** One question Slash filed, as much of it as is counted: never its words, its body or who answered it. */
 export type SlashFiled = {
@@ -188,7 +188,7 @@ const byName = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const brakedOf = (b: Braked | null | undefined): Braked | null => {
   if (b === null || b === undefined || typeof b.on !== 'boolean') return null;
   if (!Number.isFinite(b.share) || b.share < 0 || b.share > 1 || !Number.isInteger(b.of) || b.of < 0) return null;
-  return { on: b.on, share: b.share, of: b.of };
+  return { on: b.on, share: b.share, of: b.of, ...(Number.isInteger(b.lapsed) && (b.lapsed as number) > 0 ? { lapsed: b.lapsed } : {}) };
 };
 
 /** A day as a lapse is spelled, `YYYY-MM-DD`, and a real one: the 31st of September is not one. */

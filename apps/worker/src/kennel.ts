@@ -34,7 +34,7 @@
 import { httpStatus } from '@braindog/host';
 import { clearCookie, readSid, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
 import { emptyCatalogue, readCatalogue, type CatalogueEntry, type CatalogueIndex, type CatalogueVersion, type EntryKind } from '@braindog/declare/catalogue';
-import { catalogueFile, fileChecksum, installedIdOf, listedEntries, offeredVersion } from '@braindog/declare/catalogue';
+import { catalogueFile, fileChecksum, installedIdOf, listedEntries, offeredVersion, readCatalogueFile } from '@braindog/declare/catalogue';
 import {
   acceptSubmission,
   emptyPublishers,
@@ -64,8 +64,10 @@ import {
 import { no, ok } from '@braindog/ports';
 import type { AuthResult, Refusal, Result, Who } from '@braindog/ports';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
+import { moduleDocument } from '@braindog/seed/usecases/install';
 
 import type { Assets } from './catalogue.ts';
+import { scratchInstall, type ScratchDeps } from './kennel-scratch.ts';
 import { op } from './oplog.ts';
 import { bearerOf, withCookie, type BearerDeps } from './session.ts';
 
@@ -94,6 +96,11 @@ export type KennelDeps = {
    * check before the day's cap is counted. Left out, nothing is limited.
    */
   spend?: (request: Request) => Promise<Response | null>;
+  /**
+   * The empty record every submission is installed into before it is listed or waits, and the modules it requires
+   * (`kennel-scratch.ts`). Left out, the door answers as it did and says once in its log that no scratch ran.
+   */
+  scratch?: ScratchDeps | undefined;
   now?: () => Date;
 };
 
@@ -397,6 +404,44 @@ export function kennelReader(deps: Pick<KennelDeps, 'blobs' | 'assets'>): Kennel
       return ok({ entry, version: listed, text });
     },
   };
+}
+
+/**
+ * The documents a scratch install requires (`kennel-scratch.ts` `required`), by id: BrainDog's own module as a record
+ * installs one with no use case and no example rows (`moduleDocument`), else the version the Kennel lists as latest of
+ * an add-on, its checksum held (`kennelReader`). An id neither holds is left out, and the scratch names it.
+ */
+export async function kennelRequired(deps: Pick<KennelDeps, 'blobs' | 'assets'>, ids: readonly string[], now: Date): Promise<Record<string, unknown>[]> {
+  const reader = kennelReader(deps);
+  const today = now.toISOString().slice(0, 10);
+  const out: Record<string, unknown>[] = [];
+  let index: CatalogueIndex | null = null;
+  /* A MODULE'S LINK TO A LIST THE SCRATCH WILL NOT HOLD IS LEFT OUT, as a record leaves it out (`holds`): the lists are
+     what BrainDog's own modules asked for here declare, so People installed without Portfolio links to no projects. */
+  const holds = ids.flatMap((id) => {
+    const bare = moduleDocument(null, id, { today });
+    const decls = Array.isArray(bare?.declarations) ? (bare.declarations as unknown[]) : [];
+    return decls.flatMap((d) => (typeof d === 'object' && d !== null && typeof (d as { register?: unknown }).register === 'string' ? [(d as { register: string }).register] : []));
+  });
+  for (const id of ids) {
+    const own = moduleDocument(null, id, { today, holds });
+    if (own !== null) {
+      out.push(own as Record<string, unknown>);
+      continue;
+    }
+    index ??= await reader.index();
+    const entry = index.entries.find((e) => e.kind === 'pack' && e.id === id);
+    if (entry === undefined) continue;
+    const found = await reader.version('pack', id, entry.latest);
+    if (!found.ok) continue;
+    try {
+      const doc = JSON.parse(found.value.text) as unknown;
+      if (typeof doc === 'object' && doc !== null && !Array.isArray(doc)) out.push(doc as Record<string, unknown>);
+    } catch {
+      /* A listed file that is not JSON is a module nobody holds, and the scratch says so. */
+    }
+  }
+  return out;
 }
 
 /* ── the four vital signs ───────────────────────────────────────────────── */
@@ -742,8 +787,41 @@ async function submit(request: Request, deps: KennelDeps, now: () => Date): Prom
       const kept = await blobs.get(PREFIX + path);
       return kept !== null ? kept.text() : waitingCopy(blobs, index, path);
     };
-  const out = await changed(blobs, (state) => acceptSubmission({ ...state, bundled, reserved: reservedIds(), read: readIn(state.index) }, text, identity, now()));
+  /* THE SCRATCH INSTALL, FOR EVERY PUBLISHER, TRUSTED OR NOT, before anything is written: a trusted version is listed by
+     this call and a waiting one by a verdict with no install between, so this is the one place a page that does not
+     draw is caught before a record installs it (SHL-B06). IT RUNS ONLY FOR A SUBMISSION THE DOOR TAKES, once its
+     signature is verified, its id is the sender's and the day's cap is counted, so a forged signature or a file the
+     door refuses never costs an install, and is told the door's own sentence. Asked once, kept across a race's retry. */
+  let undrawn: Promise<Refusal | null> | undefined;
+  const scratch: { refused: Refusal | null } = { refused: null };
+  const out = await changed(blobs, async (state) => {
+    const took = await acceptSubmission({ ...state, bundled, reserved: reservedIds(), read: readIn(state.index) }, text, identity, now());
+    if (!took.ok) return took;
+    scratch.refused = await (undrawn ??= scratched(text, deps.scratch));
+    return scratch.refused === null ? took : { ok: false, refusal: scratch.refused };
+  });
+  if (scratch.refused !== null) return withCookie(refusedWith(422, scratch.refused), cookie);
   return withCookie(settled(out), cookie);
+}
+
+/** Whether this isolate has said that its Kennel lists with no scratch install. Said once, not on every submission. */
+let unscratchedSaid = false;
+
+/**
+ * The scratch install (`kennel-scratch.ts`) of a submission the door has taken (`acceptSubmission`), or `null` to go on.
+ * The file is read again as the door read it: cheap beside an install.
+ */
+async function scratched(text: string, scratch: ScratchDeps | undefined): Promise<Refusal | null> {
+  if (scratch === undefined) {
+    if (!unscratchedSaid) op({ op: 'kennel', ask: 'submit', scratch: 'none', why: 'no scratch record was handed to this Kennel, so a submission is taken without one' });
+    unscratchedSaid = true;
+    return null;
+  }
+  const read = await readCatalogueFile(text, { kind: 'kennel' });
+  if (!read.ok) return null;
+  if (read.value.kind === 'pack') return scratchInstall(read.value.file.doc, scratch);
+  const { shared } = read.value;
+  return shared.doc === null ? null : scratchInstall(shared.doc, scratch, shared.usecase.modules);
 }
 
 async function yank(request: Request, deps: KennelDeps, now: () => Date): Promise<Response> {

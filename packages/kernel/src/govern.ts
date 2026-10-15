@@ -2017,6 +2017,10 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
     return null;
   }
 
+  if (kind === 'settings' && isMap(body.look))
+    return typeof body.look.theme === 'string' && body.look.theme !== '' && Object.keys(body).every((k) => k === 'look' || k === 'rank' || k === 'lapses')
+      ? null
+      : { code: 'VALUE_MALFORMED', fix: 'A look pick is {"look":{"theme":"<an installed theme id>"}} and nothing else.', at: 'body.look' };
   if (kind === 'settings') return settings(body, 'body');
 
   /* AN ARRANGEMENT SAYS WHY. It is the one proposal that changes the shape of the whole record, and a
@@ -2134,6 +2138,7 @@ function checkArranging(deps: GovernDeps, kind: Arranging, body: Record<string, 
   if (kind === 'arrange') {
     const bad = offerFault(body, null);
     if (bad) return bad;
+    if (body.prediction !== undefined) { const wrong = checkPrediction(body.prediction); if (wrong) return wrong; }
   }
 
   /* THE ONE HOLDING THIS CAUSE IS NOT COUNTED: the proposal joins it, or widens it (step 8), and opens nothing. AT THE CAP
@@ -3058,6 +3063,8 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       const wrote_ = writePrediction(deps, id, body.prediction as Prediction, String(body.declaration_id ?? id), at);
       if (!wrote_.ok) return wrote_ as Result<Decided>;
     }
+    /* AN ACCEPTED ARRANGEMENT IS GRADED WHERE IT CAN BE (ENG-B17): one the record already meets, or that reads nothing today, is accepted ungraded, never refused. */
+    if (row.body_kind === 'arrange' && isMap(body.prediction)) writePrediction(deps, id, body.prediction as Prediction, id, at);
   }
 
   /* AN OPTION THAT CHANGES ENTRIES (F61), such as a script asking which day a payment falls on: the one picked is

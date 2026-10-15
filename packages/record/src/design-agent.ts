@@ -49,12 +49,33 @@ export type Held = {
   lapses: string;
 };
 
+/**
+ * What an offer says it will do, in the shape of the kernel's `Prediction` (`kernel/src/govern.ts`): a claim, the figure
+ * that grades it, the bound it reaches and when to look. Spelt here because the kernel does not export the type; it is
+ * the same shape, so a filed body carries it as it is.
+ *
+ * `on_miss` IS ALWAYS `none`: a miss is counted on the Slash page and files nothing by itself.
+ */
+export type OfferPrediction = {
+  claim: string;
+  measure: { source: string; where?: unknown; value: unknown };
+  target: { gte: number } | { lte: number };
+  window: string;
+  unit?: string;
+  on_miss: 'none';
+};
+
 export type Offer = Held & {
   /** What it is called on the screen. */
   title: string;
   /** One sentence in the record's words, saying why it is offered. */
   why: string;
   change: OfferChange;
+  /**
+   * How it is graded later, only where it rests on a figure the kernel can read again (`predictionOf`). Never invented:
+   * an offer over nothing the kernel counts carries none.
+   */
+  prediction?: OfferPrediction;
 };
 
 /** A page as it is drawn: one somebody wrote, or one a template made for a row, which carries that row. */
@@ -226,6 +247,30 @@ function shapeFor(nav: NonNullable<DesignSignals['nav']>): { shape: NavShape; wh
 
 const SHAPE_TITLE: Record<NavShape, string> = { rail: 'A rail for your pages', bar: 'A top bar for your pages', menu: 'A menu for your pages' };
 
+/** The window an offer's prediction is read over: the thirty days its basis was counted in. */
+export const PREDICTION_WINDOW = '30d';
+/** A list id the kernel reads a figure over (`events.<list>`), as the record's own rules write one. */
+const LIST_ID = /^[a-z][a-z0-9_]*$/u;
+
+/**
+ * The prediction a growing list's page offer carries: the entries made in the list in the thirty days after it has a
+ * page rise past the thirty days before. THE FIGURE IS THE ONE THE OFFER RESTS ON (`added30`), read again by the kernel
+ * as `events.<list>` `{ count: made }` over the same window, so the grade is the same count the offer was made from. The
+ * target is one more than it was, since a prediction the record already meets grades nothing (govern.ts refuses it).
+ * `null` for a list id the kernel would not read.
+ */
+export function predictionOf(l: Pick<GrowingList, 'id' | 'name' | 'added30'>): OfferPrediction | null {
+  if (!LIST_ID.test(l.id) || !Number.isInteger(l.added30) || l.added30 < 0) return null;
+  return {
+    claim: `More is added to ${l.name} in the thirty days after it has a page than the ${count(l.added30)} in the thirty before.`,
+    measure: { source: `events.${l.id}`, value: { count: 'made' } },
+    target: { gte: l.added30 + 1 },
+    window: PREDICTION_WINDOW,
+    unit: 'count',
+    on_miss: 'none',
+  };
+}
+
 /** The last day an offer made at `nowMs` waits, `LAPSE_DAYS` on (HD.579, "every proposal states a deadline"). */
 export const lapsesFrom = (nowMs: number): string => dayOf(nowMs + LAPSE_DAYS * DAY_MS);
 
@@ -241,6 +286,9 @@ export function recommend(signals: DesignSignals): Offer[] {
   const out: Offer[] = [];
   const offer = (o: Omit<Offer, 'class' | 'lapses'>): void => void out.push({ ...o, class: 'arrange', lapses });
   const drafted = (draft: Draft | undefined): { draft?: Draft } => (draft === undefined ? {} : { draft });
+  /* A PREDICTION ONLY WHERE THE OFFER RESTS ON A FIGURE THE KERNEL READS AGAIN: a growing list's count. Somebody met in
+     dated lines, a block or column a list earned, the shape and an icon rest on nothing it can grade, so carry none. */
+  const predicted = (p: OfferPrediction | null): { prediction?: OfferPrediction } => (p === null ? {} : { prediction: p });
 
   const shape = signals.nav ? shapeFor(signals.nav) : null;
   if (shape) offer({ key: `shape:${shape.shape}`, rank: TIER.shape, basis: shape.basis, title: SHAPE_TITLE[shape.shape], why: shape.why, change: { kind: 'shape', shape: shape.shape } });
@@ -255,6 +303,7 @@ export function recommend(signals: DesignSignals): Offer[] {
       title: `A page for ${l.name}`,
       why: `${l.name} grew by ${count(l.added30)} in the last thirty days, and no page shows it yet.`,
       change: { kind: 'page', list: l.id, ...drafted(l.draft) },
+      ...predicted(predictionOf(l)),
     });
   }
 

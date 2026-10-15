@@ -8,12 +8,16 @@
  * Even on, it reads nothing without the included model (`includedInference`), a reader (`readSetup`, handed in), a bot
  * check keyed by `TURNSTILE_SECRET` and a place to count in (`MeterStore`); any one missing is the same 501.
  *
- * THE COUNT IS THE DIRECTORY'S, AND IT HAS NONE YET. Six readings a day for one address and the ceiling for all are
- * counted by key and UTC day over `MeterStore`. The Directory has no count by key and day (`dir_fail` is the sign-in
- * lockout's fifteen minutes), so the Cloud hands `store: null` until the owner adds one, and the door stays off.
+ * THE COUNT IS THE DIRECTORY'S. Six readings a day for one address and the ceiling for all are counted by key and UTC
+ * day over `MeterStore`, which the Cloud hands as the Directory's `firstReadHit`; `store: null` keeps the door off.
+ *
+ * WHAT IS ON OFFER IS THE CATALOGUE'S (USE-A16): the use cases bundled with the shell, read once from the static assets
+ * and merged over the ones compiled in (`catalogueOffer`), so the landlord who types "I rent out six flats" can be read
+ * into Landlord. Without the assets, or with a catalogue that does not read, the compiled list, said once in the log.
  */
 
-import type { FirstReadDoor } from '@braindog/host/first-read';
+import { CATALOGUE_INDEX, readCatalogue } from '@braindog/declare/catalogue';
+import { firstReadCasesRead, firstReadTold, type FirstReadCase, type FirstReadDoor, type FirstReadEntry } from '@braindog/host/first-read';
 import type { Result } from '@braindog/ports';
 import { AGENTS_PACK } from '@braindog/seed/packs';
 import { MODULE_ORDER, USE_CASES } from '@braindog/seed/usecases';
@@ -21,6 +25,7 @@ import { moduleDocument } from '@braindog/seed/usecases/install';
 import { moduleName } from '@braindog/seed/usecases/names';
 import type { Inference, SetupAnswer, SetupAsk, SetupOffer } from '@braindog/slash';
 
+import { assetsReader, type Assets } from './catalogue.ts';
 import { includedInference, type SlashEnv } from './slash.ts';
 
 /** The reader: one model call over what was said and what is on offer, with no record, no owner and no ledger. */
@@ -36,6 +41,8 @@ export type FirstReadEnv = SlashEnv & {
   /** The day's ceiling of readings for all strangers, and his yes to them. Unset or 0 is off. */
   FIRST_READ_DAILY?: string | undefined;
   TURNSTILE_SECRET?: string | undefined;
+  /** The static assets, holding the catalogue bundled with the shell (`/app/catalogue/index.json`); absent in a test. */
+  ASSETS?: Assets | undefined;
 };
 
 export type FirstReadDeps = {
@@ -45,6 +52,8 @@ export type FirstReadDeps = {
   store: MeterStore | null;
   /** How the bot check leaves the Worker: `fetch`, a fake in tests. */
   send?: ((input: string, init: RequestInit) => Promise<Response>) | undefined;
+  /** Where the one line about the catalogue goes: `console.warn`, a list in tests. */
+  log?: ((line: string) => void) | undefined;
 };
 
 /** Readings one address may have in a UTC day. */
@@ -113,17 +122,54 @@ function listsOf(module: string): SetupOffer['modules'][number]['lists'] {
 
 let built: SetupOffer | null = null;
 
+/** The use cases compiled into this build, with the words each is heard in and the modules it stands on. */
+export const builtInCases = (): FirstReadCase[] =>
+  USE_CASES.map((u) => ({ id: u.usecase, title: u.title, summary: u.summary, signals: [...u.signals], modules: [...u.modules] }));
+
+/** The modules on offer, the same whatever the catalogue lists: the agents' lists by name only. */
+const modulesOffer = (): SetupOffer['modules'] => firstReadOffer().modules;
+
 /**
- * WHAT A STRANGER'S SENTENCE MAY BE READ INTO: every use case and module this build serves, as the first run's own screen
- * offers them (`setupOffer` in `apps/web/src/lib/start/propose.ts`). The agents' lists are offered by name only, since an
- * agent writes what goes in them and a person's sentence about themselves does not. Built once, as the build is fixed.
+ * WHAT A STRANGER'S SENTENCE MAY BE READ INTO WHEN NO CATALOGUE READS: every use case and module this build serves, as
+ * the first run's own screen offers them (`setupOffer` in `apps/web/src/lib/start/propose.ts`). The agents' lists are
+ * offered by name only, since an agent writes what goes in them and a person's sentence about themselves does not.
+ * Built once, as the build is fixed. Each case is told with the words it is heard in (`firstReadTold`).
  */
 export function firstReadOffer(): SetupOffer {
   built ??= {
-    usecases: USE_CASES.map((u) => ({ id: u.usecase, title: u.title, summary: u.summary })),
+    usecases: builtInCases().map(firstReadTold),
     modules: MODULE_ORDER.map((id) => ({ id, name: moduleName(id), lists: id === AGENTS_PACK.manifest.id ? [] : listsOf(id) })),
   };
   return built;
+}
+
+/** The index's entries as read from the assets, or null where there is none or it does not read (`readCatalogue`). */
+const entriesIn = (assets: Assets) => async (): Promise<readonly FirstReadEntry[] | null> => {
+  const text = await assetsReader(assets)(CATALOGUE_INDEX);
+  if (text === null) return null;
+  const index = readCatalogue(JSON.parse(text));
+  return index.ok ? index.value.entries : null;
+};
+
+/* One read per assets binding, kept for as long as this isolate lives; a test's stub is its own binding. */
+const readOnce = new WeakMap<Assets, Promise<SetupOffer>>();
+let bare: Promise<SetupOffer> | null = null;
+
+/**
+ * WHAT A STRANGER'S SENTENCE MAY BE READ INTO (USE-A16): the catalogue's use cases bundled with the shell, merged over the
+ * build's (`firstReadOfferFrom`), so a front published as a file is offered at sign-up with no code change. Read lazily,
+ * once, and kept. No assets, or a catalogue that does not read, is the build's list and one log line, never a 500.
+ */
+export function catalogueOffer(assets: Assets | undefined, log: (line: string) => void = (line) => console.warn(line)): Promise<SetupOffer> {
+  const held = assets === undefined ? bare : readOnce.get(assets);
+  if (held !== null && held !== undefined) return held;
+  const reading = firstReadCasesRead(assets === undefined ? null : entriesIn(assets), builtInCases()).then(({ cases, said }) => {
+    if (said !== null) log(said);
+    return { usecases: cases.map(firstReadTold), modules: modulesOffer() };
+  });
+  if (assets === undefined) bare = reading;
+  else readOnce.set(assets, reading);
+  return reading;
 }
 
 /** The reader bound to one model, or `null` without either. A throw is the model not reached, with its real code kept. */
@@ -147,7 +193,7 @@ export function firstReadDoorOf(env: FirstReadEnv, deps: FirstReadDeps): FirstRe
     on: daily > 0 && store !== null,
     botCheck: turnstileCheck(env.TURNSTILE_SECRET, deps.send),
     meter: store === null ? { take: async () => 'day' } : meterOver(store, daily),
-    offer: async () => firstReadOffer(),
+    offer: () => catalogueOffer(env.ASSETS, deps.log),
     read: readerOver(deps.readSetup, includedInference(env)),
   };
 }

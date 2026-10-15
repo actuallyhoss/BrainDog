@@ -124,7 +124,9 @@ import { WHERE_IT_WENT } from './parts/where-it-went.ts';
 export const MONEY_PAGE: SeedPage = {
   page: 'money',
   title: 'Money',
-  nav: { section: 'Money', order: 10 },
+  /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+     Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
+  nav: { section: 'Money', order: 10, place: 40 },
   icon: 'money',
   requires: ['register.accounts', 'register.obligations', 'register.transactions', 'register.recurring', 'register.installments', 'register.categories', 'register.books', 'register.balances'],
   pack: 'money-core',

@@ -71,3 +71,25 @@ export const sameFilter = (a: Readonly<Record<string, string>>, b: Readonly<Reco
   const ka = Object.keys(a);
   return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k]);
 };
+
+/**
+ * THE WORD TYPED ON THE PAGE'S HEAD (PGS-A14), as the address holds it under the head's own param (`?q=kiln`, which
+ * `declared-head.ts` `searchQuery` writes): trimmed, and `null` where there is none, so an empty field asks nothing.
+ * No param, a page whose head has no search, is no word.
+ */
+export function searchOf(params: URLSearchParams, param: string | null | undefined): string | null {
+  if (!param) return null;
+  const said = params.get(param)?.trim() ?? '';
+  return said === '' ? null : said;
+}
+
+/**
+ * THE CHOICE SENT TO THE RECORD, WITH THE WORD: the strip's fields as they were, and the word under the param's own
+ * key, which the kernel reads as the page's search. No word sends the choice untouched, the same object, so a page
+ * with no search is asked exactly as before. A param is never `f.`-spelt (`declared-head.ts` `PARAM`), so the word
+ * never stands in a field's place.
+ */
+export function withSearch(filter: Readonly<Record<string, string>>, param: string | null | undefined, word: string | null): Record<string, string> {
+  if (!param || word === null) return filter as Record<string, string>;
+  return { ...filter, [param]: word };
+}

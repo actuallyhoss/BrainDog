@@ -9,8 +9,11 @@
  * kind says the call that clears it, and making that call is the reader's.
  *
  * WITH `--ask` IT FILES, AND ONLY THEN: `proposeScopes` and `promoteLearnings`, each a person's write, put each clean-up
- * on Decide as one question, and a line a question says where to answer it. Nothing is moved or kept once until he
- * answers there. Only a person typing the flag asks: no hook and no schedule passes it, so nothing asks by itself.
+ * on Decide as one question, and a line a question says where to answer it. And the fold of what is held twice
+ * (AGT-D03): for each list whose declaration says what makes two of its things the same (`same:`), `heldTwice` reads
+ * which may be here twice, and when it names any, `askFoldTwice` files one question for that list to keep one of each.
+ * Nothing is moved, kept once or folded until he answers there. Only a person typing the flag asks: no hook and no
+ * schedule passes it, so nothing asks by itself.
  * Under `--json` every answer goes out untouched, each under the name of the call that gave it.
  *
  * THE ANSWER IS READ AS THE RECORD GIVES IT, a part it leaves out read as nothing, so a kind a finder adds later is
@@ -187,6 +190,26 @@ function twiceWords(read: TwiceRead | null): (entry: Record<string, unknown>, i:
   };
 }
 
+/** One list that says what makes two of its things the same: its handle, never printed, and its name. */
+export type SameList = { register: string; name: string };
+
+/** The lists of `boot`'s index whose declaration (`schema`) says `same:`, each read as `unknown`, in the index's order. */
+export function sameLists(boot: unknown, decls: readonly unknown[]): SameList[] {
+  const index = isObject(boot) && Array.isArray(boot.registers) ? boot.registers : [];
+  return index.flatMap((r, i): SameList[] => {
+    const decl = decls[i];
+    if (!isObject(r) || text(r.id) === '' || !isObject(decl) || !isObject(decl.same) || !Array.isArray(decl.same.fields)) return [];
+    return [{ register: text(r.id), name: text(decl.name) || text(r.name) }];
+  });
+}
+
+/** How many things `heldTwice` names as maybe here twice: its `seqs`, and nothing for a list it did not look in. */
+export const twiceCount = (value: unknown): number => (isObject(value) && Array.isArray(value.seqs) ? value.seqs.length : 0);
+
+/** The words of a fold the record sent only the handle of: "4 tools may be here twice. Keep one of each?" A list with no name is said as one. */
+export const foldWords = (list: SameList, n: number): string =>
+  list.name === '' ? `${String(n)} things in one of your lists may be here twice. Keep one of each?` : `${String(n)} ${noun(list.name)} may be here twice. Keep one of each?`;
+
 /** Whether the record refused because it has no such read: an older build, or a host that knows no such route. */
 const older = (r: Result<unknown>): boolean => refused(r) && (r.refusal.code === 'NOT_IN_THIS_BUILD' || r.refusal.code === 'ROUTE_UNKNOWN');
 
@@ -256,6 +279,36 @@ export async function tidyCommand(args: string[], io: AgentIo, make: (to: Target
     };
     if (scopes) await ask('proposeScopes', scopeWords(scopes));
     if (twice) await ask('promoteLearnings', twiceWords(twice));
+    /* THE FOLD, A LIST AT A TIME, each behind its own read: a list `heldTwice` names nothing in is asked nothing. A
+       record too old to say which lists fold, or which things are here twice, is asked nothing and says nothing. */
+    const boot = await client.call('boot');
+    if (!boot.ok && !older(boot)) failed.push(boot);
+    const index = boot.ok && isObject(boot.value) && Array.isArray(boot.value.registers) ? boot.value.registers : [];
+    const decls = await Promise.all(
+      index.map(async (r) => (isObject(r) && text(r.id) !== '' ? await client.call('schema', { register: text(r.id) }) : null)),
+    );
+    const heldBy: Record<string, unknown> = {};
+    const foldedBy: Record<string, unknown> = {};
+    for (const list of sameLists(boot.ok ? boot.value : null, decls.map((d) => (d?.ok ? d.value : null)))) {
+      const held = await client.call('heldTwice', { register: list.register });
+      if (!held.ok) {
+        if (!older(held)) failed.push(held);
+        continue;
+      }
+      heldBy[list.register] = held.value;
+      const n = twiceCount(held.value);
+      if (n === 0) continue;
+      const r = await client.call('askFoldTwice', { register: list.register });
+      if (r.ok) {
+        wrote = true;
+        foldedBy[list.register] = r.value;
+        asked.push(...printable(readAsked([r.value], () => foldWords(list, n))));
+      } else if (older(r)) askOlder = true;
+      /* NOTHING HERE TWICE BY THE TIME IT WAS PRESSED is nothing to ask, and no failure. */
+      else if (!(refused(r) && r.refusal.code === 'ALREADY_KNOWN')) failed.push(r);
+    }
+    if (Object.keys(heldBy).length > 0) value.heldTwice = heldBy;
+    if (Object.keys(foldedBy).length > 0) value.askFoldTwice = foldedBy;
     tail.push(...askedLines(asked));
     if (wrote && asked.length === 0) tail.push(sort.length > 0 ? 'Nothing new was asked on Decide.' : 'Nothing to ask about.');
   } else if (sort.length > 0) tail.push('Ask about them with braindog tidy --ask.');

@@ -28,7 +28,9 @@ import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { isColumn } from '@braindog/where';
 
+import { dayIn } from './finished.ts';
 import { instant } from './migrate.ts';
+import { recordIdentity } from './provision.ts';
 
 /** The nine the `CHECK` admits. `subject` is a register, a page slug, or `<register>.<field>:<code>`. */
 export const SIGNALS = [
@@ -683,8 +685,11 @@ const brakeNote = (deps: AnalyseDeps, said: string): void => {
 
 /* ── whether Slash may file another question at all (ENG-B17) ──────────────────────────────────────────────────────── */
 
-/** The brake as it stands: on or off, the share of the window he took up, and how many answers it was worked out from. */
-export type Brake = { on: boolean; share: number; of: number };
+/**
+ * The brake as it stands: on or off, the share of the window he took up, and how many answers it was worked out from.
+ * `lapsed` is how many of that window were offers he let pass, counted as a no, and is absent where there were none.
+ */
+export type Brake = { on: boolean; share: number; of: number; lapsed?: number };
 
 /** Whether Slash may file another question, and when it may not, the one sentence that says why. */
 export type MayPropose = { may: true } | { may: false; why: string; share?: number; of?: number };
@@ -717,21 +722,63 @@ export function brakeOf(answers: readonly boolean[]): Brake {
   return { on, share, of: BRAKE_OF };
 }
 
+/** A day as an offer's `lapses` spells it, and a real one: the 31st of September is not. */
+const isLapseDay = (s: unknown): s is string =>
+  typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+
+/** The `lapses` an offer's body carries, read in the query; a body that is not JSON carries none rather than throwing. */
+const LAPSES_SQL = "CASE WHEN json_valid(s.body) THEN json_extract(s.body, '$.lapses') END";
+
+/** One of Slash's answers as the brake reads it: whether he took it up, whether it lapsed, and when. */
+type Answer = { took: boolean; lapsed: boolean; at: string; seq: number };
+
 /**
- * The brake on this record: Slash's answered questions in the order he answered them.
+ * The brake on this record: Slash's answered questions in the order he answered them, a lapse counting as a no.
  *
  * HIS ANSWER, NEVER THE RECORD'S. Answered is resolved as `addressed`, `wont-fix` or `incorrect`; one withdrawn, moot,
  * asked again or still deferred was never put to him and decided, so it is in no window.
+ *
+ * A LAPSE IS A NO (ENG-B17, "Slash learns from being ignored"). An offer nobody answered by its `lapses` day is closed
+ * by govern.ts `sweepLapsed` as `withdrawn` with `lapsedNote`, after that day; one a stronger offer took the place of
+ * (`makeRoom`) or its filer took back is `withdrawn` before it, and stays out. Until the sweep runs, a lapsed offer is
+ * still open with its day behind it, and that counts too, as the record's engine readings already read it (`endingOf`):
+ * open, not put off past now, its day before today in the record's zone. Each is ordered by when it lapsed: the sweep's
+ * close, or the end of its day. Without `nowMs` only the swept ones count, since nothing says what today is. `tz` is
+ * the record's zone, UTC where it is not said. ONLY `all` IS ASKED OF THE STORE, so a host's bare read can ask it too.
  */
-export function slashBrake(sql: Sql): Brake {
-  const rows = sql.all<{ r: string }>(
-    `SELECT s.resolved_as AS r FROM suggestion s
-     WHERE s.opened_by = 'slash' AND s.status = 'resolved' AND s.resolved_as IN ('addressed', 'wont-fix', 'incorrect')
-     ORDER BY (SELECT max(e.rowid) FROM event e WHERE e.target = 'suggestion:' || s.id AND e.kind = 'resolve') DESC, s.rowid DESC
+export function slashBrake(sql: Pick<Sql, 'all'>, nowMs?: number, tz?: string | null): Brake {
+  const closed = sql.all<{ r: string; lapses: unknown; at: string | null; seq: number | null; rid: number }>(
+    `SELECT s.resolved_as AS r, ${LAPSES_SQL} AS lapses, e.ts AS at, e.rowid AS seq, s.rowid AS rid FROM suggestion s
+     LEFT JOIN event e ON e.rowid = (SELECT max(x.rowid) FROM event x WHERE x.target = 'suggestion:' || s.id AND x.kind = 'resolve')
+     WHERE s.opened_by = 'slash' AND s.status = 'resolved' AND s.resolved_as IN ('addressed', 'wont-fix', 'incorrect', 'withdrawn')
+     ORDER BY e.rowid DESC, s.rowid DESC
      LIMIT ?`,
-    ANSWERS_READ,
+    ANSWERS_READ * 2,
   );
-  return brakeOf(rows.reverse().map((row) => row.r === 'addressed'));
+  const answers: Answer[] = [];
+  for (const c of closed) {
+    const at = c.at ?? '';
+    const seq = c.seq ?? 0;
+    if (c.r !== 'withdrawn') answers.push({ took: c.r === 'addressed', lapsed: false, at, seq });
+    else if (isLapseDay(c.lapses) && at.slice(0, 10) > c.lapses) answers.push({ took: false, lapsed: true, at, seq });
+  }
+  if (nowMs !== undefined) {
+    const today = dayIn(nowMs, tz);
+    const now = instant(nowMs);
+    const open = sql.all<{ lapses: unknown; deferred: string | null }>(
+      `SELECT ${LAPSES_SQL} AS lapses, s.defer_until AS deferred FROM suggestion s
+       WHERE s.opened_by = 'slash' AND s.status = 'open' AND (s.defer_until IS NULL OR s.defer_until <= ?)`,
+      now,
+    );
+    for (const o of open)
+      if (isLapseDay(o.lapses) && o.lapses < today)
+        answers.push({ took: false, lapsed: true, at: instant(Date.parse(`${o.lapses}T00:00:00Z`) + DAY_MS), seq: Number.MAX_SAFE_INTEGER });
+  }
+  answers.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.seq - b.seq));
+  const kept = answers.slice(-ANSWERS_READ);
+  const brake = brakeOf(kept.map((a) => a.took));
+  const lapsed = kept.slice(-brake.of).filter((a) => a.lapsed).length;
+  return lapsed > 0 ? { ...brake, lapsed } : brake;
 }
 
 const plural = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'}`;
@@ -759,10 +806,14 @@ export function mayPropose(sql: Sql, nowMs: number, opts: { arrangement?: boolea
     return { may: false, why: `Slash waits until you have used BrainDog for two weeks, and you began ${since === 0 ? 'today' : `${plural(since, 'day')} ago`}.` };
   if (days < FLOOR.used) return { may: false, why: `Slash waits until you have used BrainDog on five days, and you have used it on ${plural(days, 'day')}.` };
 
-  const brake = slashBrake(sql);
+  const brake = slashBrake(sql, nowMs, recordIdentity(sql)?.tz);
   if (brake.on) {
-    const down = brake.of - Math.round(brake.share * brake.of);
-    return { may: false, why: `You turned down ${down} of the last ${brake.of}, so Slash waits.`, share: brake.share, of: brake.of };
+    const took = Math.round(brake.share * brake.of);
+    /* THE ONES HE LET PASS ARE SAID, so a no he never typed is not read as one he did. */
+    const why = brake.lapsed
+      ? `Slash stopped offering: you took up ${took} of its last ${brake.of}, counting the ones you let pass.`
+      : `You turned down ${brake.of - took} of the last ${brake.of}, so Slash waits.`;
+    return { may: false, why, share: brake.share, of: brake.of };
   }
 
   if (opts.arrangement) {

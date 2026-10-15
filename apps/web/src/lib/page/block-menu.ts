@@ -8,6 +8,12 @@
  * (`hideBody`). Each is one `setDeclaration` of `look.<page>`, and its Undo is the look before (`arrange-look.ts` `lookUndo`).
  *
  * THE OWNER'S, AS EVERY LOOK IS. A member is offered nothing here, so the list is empty and no mark is drawn.
+ *
+ * CHANGE TO AND REMOVE ARE THE PAGE'S, NOT ITS LOOK (PGS-B08 c, d). Each sets the page he wrote whole, through
+ * `page-write.ts` `changeBlock`, with the body before as its Undo. On an add-on's page the page would become his own copy
+ * and stop taking the add-on's updates, so there the menu says where Change to is instead, until a change to one block
+ * is an overlay of its own (PGS-B07). The kinds offered are `kindsFor`'s (`braindog-render`), handed in, so this file
+ * stays pure and its test needs no renderer.
  */
 
 import { STEPS, spanLabel, spanOf, stepsFor, type Area } from '../record/arrange.ts';
@@ -28,15 +34,28 @@ export const lookKey = (key: unknown): key is string => typeof key === 'string' 
 export type MenuBlock = { key: string; kind: string; columns: number; span: number; name: string; kindName?: string };
 
 /** Where the block stands: who is reading, its column (`null` on a page with no side column), its ends, and the widths it may take. */
-export type MenuAt = { owner: boolean; area: Area | null; first: boolean; last: boolean; hidden: boolean; steps?: readonly number[] };
+export type MenuAt = { owner: boolean; area: Area | null; first: boolean; last: boolean; hidden: boolean; steps?: readonly number[]; change?: ChangeAt | undefined };
 
-export type ActionId = 'up' | 'down' | 'rail' | 'main' | `width-${number}` | 'hide' | 'show';
+/**
+ * Where a block stands, and whether Change to and Remove are offered: `mine` is a page the person wrote, `false` one an
+ * add-on wrote, and absent a page not read yet, where neither is offered. `kinds` is what the block may become, in its
+ * order (`kindsFor`), and `kindName` a kind's name as a person says it.
+ */
+export type ChangeAt = { mine?: boolean | undefined; kinds?: readonly string[] | undefined; kindName?: ((kind: string) => string) | undefined };
 
-/** One row of the menu. A width carries its `span`, and the width the block has now is `current`. */
-export type Action = { id: ActionId; label: string; span?: number; current?: true; disabled?: true; why?: string };
+export type ActionId = 'up' | 'down' | 'rail' | 'main' | `width-${number}` | 'hide' | 'show' | `kind-${string}` | 'change' | 'remove';
 
-/** What a press changes, for the look: the keys in their new order, a width, a column, or hidden or shown. */
-export type Edit = { order: string[] } | { span: number } | { area: Area } | { hide: boolean };
+/**
+ * One row of the menu. A width carries its `span`, and the width the block has now is `current`. A kind to change to
+ * carries its `kind`; `change` is Change to where it cannot act, greyed, with where it can.
+ */
+export type Action = { id: ActionId; label: string; span?: number; kind?: string; current?: true; disabled?: true; why?: string };
+
+/**
+ * What a press changes: for the look, the keys in their new order, a width, a column, or hidden or shown; for the page,
+ * the kind the block becomes, or the block taken off.
+ */
+export type Edit = { order: string[] } | { span: number } | { area: Area } | { hide: boolean } | { kind: string } | { remove: true };
 
 type Body = Record<string, unknown>;
 
@@ -49,6 +68,9 @@ export const words = {
   width: 'Width',
   hide: 'Hide',
   show: 'Show',
+  change: 'Change to',
+  remove: 'Remove',
+  changeElsewhere: 'Change to is on pages you made',
   tooNarrow: (kind: string) => `Too narrow for this ${kind}`,
   unnamed: 'This block',
   /* WHAT THE PRESS DID, one line over Undo: "Late is half the row." */
@@ -59,6 +81,8 @@ export const words = {
   hidden: (name: string) => `${name} is hidden.`,
   shown: (name: string) => `${name} is back on the page.`,
   sized: (name: string, span: number) => `${name} is ${SHARE[span] ?? `${span} twelfths of the row`}.`,
+  changed: (name: string, kind: string) => `${name} is now ${article(kind)}.`,
+  removed: (name: string) => `${name} is off the page.`,
   undone: 'Put back as it was.',
 };
 
@@ -71,8 +95,16 @@ const SHARE: Readonly<Record<number, string>> = {
   3: 'a quarter of the row',
 };
 
+/** A kind's name in a sentence: lower case, with "a" or "an" before one that is not already many. */
+function article(kind: string): string {
+  const said = String(kind).trim().toLowerCase();
+  if (said === '' || /s$/u.test(said)) return said;
+  return `${/^[aeiou]/u.test(said) ? 'an' : 'a'} ${said}`;
+}
+
 /**
- * The menu's rows, in order: Move up, Move down, the other column, the five widths, Hide.
+ * The menu's rows, in order: Move up, Move down, the other column, the five widths, Change to and its kinds, Hide,
+ * Remove.
  *
  * A MOVE THAT CANNOT GO IS ABSENT, as a control that cannot act is (the renderer's rule): no Move up on the first block.
  * A WIDTH UNDER THE KIND'S FLOOR IS THERE AND GREYED, with the reason, because five widths are the board's and a person
@@ -92,8 +124,23 @@ export function actionsFor(block: MenuBlock, at: MenuAt): Action[] {
     if (!steps.includes(span)) Object.assign(row, { disabled: true, why: words.tooNarrow(block.kindName ?? 'block') });
     out.push(row);
   }
+  out.push(...changesFor(block, at.change));
   out.push(at.hidden ? { id: 'show', label: words.show } : { id: 'hide', label: words.hide });
+  if (at.change?.mine === true) out.push({ id: 'remove', label: words.remove });
   return out;
+}
+
+/**
+ * CHANGE TO, as the kinds the block may become by name, on a page the person wrote; one greyed row saying where it is,
+ * on an add-on's page; and nothing on a page not read yet, or for a block that can become nothing else.
+ */
+function changesFor(block: MenuBlock, change: ChangeAt | undefined): Action[] {
+  if (!change || change.mine === undefined) return [];
+  const kinds = (change.kinds ?? []).filter((k) => k !== block.kind);
+  if (kinds.length === 0) return [];
+  if (!change.mine) return [{ id: 'change', label: words.change, disabled: true, why: words.changeElsewhere }];
+  const named = change.kindName ?? ((k: string) => k);
+  return kinds.map((kind) => ({ id: `kind-${kind}` as const, label: named(kind), kind }));
 }
 
 /**
@@ -117,6 +164,9 @@ export function editOf(action: Action, block: MenuBlock, page: { laid: readonly 
   }
   if (action.id === 'rail' || action.id === 'main') return (page.laid[at]!.area ?? 'main') === action.id ? null : { area: action.id };
   if (action.id === 'hide' || action.id === 'show') return { hide: action.id === 'hide' };
+  if (action.id === 'remove') return { remove: true };
+  if (action.id === 'change') return null;
+  if (action.kind !== undefined) return action.kind === block.kind ? null : { kind: action.kind };
   if (action.span === undefined || action.current || page.laid[at]!.span === action.span) return null;
   return { span: action.span };
 }
@@ -201,8 +251,10 @@ export function hideBody(slug: string, live: LiveLook | null, key: string, hide:
 const isMap = (v: unknown): boolean => typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length > 0;
 
 /** The line a press says over its Undo. */
-export function saidOf(edit: Edit, name: string, action?: ActionId): string {
+export function saidOf(edit: Edit, name: string, action?: ActionId, kindName?: string): string {
   const who = name.trim() || words.unnamed;
+  if ('kind' in edit) return words.changed(who, kindName ?? edit.kind);
+  if ('remove' in edit) return words.removed(who);
   if ('span' in edit) return words.sized(who, edit.span);
   if ('area' in edit) return edit.area === 'rail' ? words.toRail(who) : words.toMain(who);
   if ('hide' in edit) return edit.hide ? words.hidden(who) : words.shown(who);

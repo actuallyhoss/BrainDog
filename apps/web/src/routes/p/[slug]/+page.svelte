@@ -7,6 +7,14 @@
   and `closed()` bracket, and the rule that an answer for a page somebody has already left draws
   nothing, are all questions about the URL, and the URL is the route's.
 -->
+<script lang="ts" module>
+  /**
+   * THE HEAD'S SEARCH PARAM OF EACH PAGE THIS TAB READ, by the record's address and the slug, held as long as the tab's
+   * kept answers are (`kept-pages.ts`), so a page opened again after another screen is asked with its word at once.
+   */
+  const heads = new Map<string, string | null>();
+</script>
+
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import { goto } from '$app/navigation';
@@ -19,7 +27,9 @@
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { pageReader, type Opened } from '$lib/record/page-live.ts';
-  import { filterOf, sameFilter } from '$lib/page/filters.ts';
+  import { filterOf, sameFilter, searchOf, withSearch } from '$lib/page/filters.ts';
+  import { headOf } from '$lib/page/declared-head.ts';
+  import { HOLD_MS, leaving, type Shown } from '$lib/page/leaving.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
   import OfferCard from '$lib/design/OfferCard.svelte';
   import { offerActs } from '$lib/design/pen.ts';
@@ -32,11 +42,37 @@
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
+
   /**
-   * WHAT THE READER NARROWED THE PAGE TO, kept in the address (`?f.thing=12`) so a narrowed page is a link, Back
-   * undoes a choice and a reload keeps it. `filtered` is the choice the last read went out with.
+   * WHERE THE PAGE CAME FROM: the record's `page` answer, the record saying it has no such page, or the
+   * record's own sentence, with the slug it answered for. It is not let go when the reader opens another page: the
+   * page being left stays a moment while the next one reads (`leaving.ts`), so no frame between two pages is blank.
    */
-  const filter = $derived(filterOf(route.url.searchParams));
+  let answer = $state<Shown<Opened> | null>(null);
+  /* The answer for the page at this address, `null` until it has one. */
+  const got = $derived(answer?.slug === slug ? answer.got : null);
+
+  /**
+   * THE HEAD'S SEARCH PARAM, as the page's own answer declares it (`header: { search: { param } }`, PGS-A14), and as
+   * the last answer of each page said it, so a page opened again is asked with its word from the first read and its
+   * kept copy is found under that word. A page this tab has not read yet is asked without one, and again with it once
+   * its head is known.
+   */
+  const paramOf = (o: Opened | null): string | null => (o?.from === 'live' ? (headOf(o.page.page)?.search?.param ?? null) : null);
+  const searchParam = $derived(got ? paramOf(got) : (heads.get(`${apiBase()} ${slug}`) ?? null));
+  function answered(asked: string, out: Opened) {
+    if (out.from === 'live') heads.set(`${apiBase()} ${asked}`, paramOf(out));
+    answer = { slug: asked, got: out };
+  }
+
+  /**
+   * WHAT THE READER NARROWED THE PAGE TO, kept in the address (`?f.thing=12`, and the head's word under its own param,
+   * `?q=kiln`) so a narrowed page is a link, Back undoes a choice and a reload keeps it. `filtered` is the choice the
+   * last read went out with.
+   */
+  const filter = $derived(
+    withSearch(filterOf(route.url.searchParams), searchParam, searchOf(route.url.searchParams, searchParam)),
+  );
   let filtered: Record<string, string> = {};
 
   /**
@@ -51,11 +87,6 @@
   });
   setContext('braindog-render.calendar-day', () => day);
 
-  /**
-   * WHERE THE PAGE CAME FROM: the record's `page` answer, the record saying it has no such page, or the
-   * record's own sentence. Nothing draws until it answers.
-   */
-  let got = $state<Opened | null>(null);
   /* A READ IS OUT OVER A PAGE DRAWN FROM WHAT THIS TAB KEPT OF IT (`kept-pages.ts`): marked busy, never dimmed. */
   let reading = $state(false);
   let reader: ReturnType<typeof pageReader> | null = null;
@@ -67,17 +98,37 @@
      after the one the tick started, and drawing it last put the row back as it was before the tick. */
   let started = 0;
 
+  /**
+   * HOW LONG THE PAGE BEING LEFT HAS STOOD, as far as `leaving` asks: none when the next page is opened, and
+   * `HOLD_MS` once that long has gone without its answer, when the next page's head and bars take its place.
+   */
+  let waited = $state(0);
+  let holdTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => () => clearTimeout(holdTimer));
+
+  /**
+   * WHAT IS DRAWN: this page's answer or kept copy, else the page being left for a moment, else this page's head and
+   * bars, never an empty frame (`leaving.ts`). The page being left draws under its own slug, untouched.
+   */
+  const view = $derived(leaving(answer, { slug, got, reading }, waited));
+
   async function readLive(asked: string) {
     const at = opened();
     reader ??= pageReader(apiBase());
-    got = reader.kept(asked, filtered);
+    /* THE PAGE BEING LEFT IS KEPT, not let go: what this tab kept of the next page replaces it at once, and where it
+       kept nothing the old page stands until the hold runs out. */
+    const keptCopy = reader.kept(asked, filtered);
+    if (keptCopy) answered(asked, keptCopy);
+    waited = 0;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => (waited = HOLD_MS), HOLD_MS);
     reading = true;
     const mine = ++started;
     const out = await reader.read(asked, filtered);
     /* An answer for a page somebody has already left draws nothing, and nor does one a later read, with a choice made
        while this was out, has already drawn over. */
     if ((route.params.slug ?? '') !== asked || (mine !== started && got !== null)) return closed(true, at);
-    got = out;
+    answered(asked, out);
     reading = false;
     closed(out.from !== 'refused', at);
   }
@@ -110,7 +161,7 @@
       const out = await reader.read(asked, filtered);
       if (mine === started && (route.params.slug ?? '') === asked) {
         reading = false;
-        if (out.from === 'live') got = out;
+        if (out.from === 'live') answered(asked, out);
       }
     } finally {
       own -= 1;
@@ -211,7 +262,7 @@
 <!-- THE OFFER SITS UNDER THE PAGE'S OWN BLOCKS (PageView's `offer`), as one quiet line that opens on tap, so the page's
      content comes first on a phone and on a laptop alike. -->
 {#snippet offerCard()}{#if offer}<OfferCard item={offer} acts={offerActions} busy={offerBusy} compact />{/if}{/snippet}
-<div class="read" aria-busy={reading ? 'true' : undefined}><PageView {slug} {showSource} {got} {reread} offer={offer ? offerCard : undefined} /></div>
+<div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={view.got} {reread} offer={offer ? offerCard : undefined} /></div>
 
 <style>
   .read {

@@ -302,6 +302,13 @@ export const BASE_PAGES: Record<string, SeedPage> = {
     icon: 'activity',
     pack: 'people',
     layout: { rail: 4 },
+    /* WHO, WHAT KIND AND WHICH LIST, SINCE PGS-C24 (job 3): the three things a person narrows the log by, as chips over
+       it. A filter is `{ field, control }` (`filtersFault` in the kernel); the log answers them by its own words. */
+    filters: [
+      { field: 'who', control: 'chips' },
+      { field: 'kind', control: 'chips' },
+      { field: 'list', control: 'chips' },
+    ],
     blocks: [
       { kind: 'note', lead: true, key: 'line', span: 12, body: 'Everything that changed, a day at a time, newest first.' },
       { kind: 'feed', key: 'feed', span: 12, source: 'activity', group: 'day', fold: 'run', since: 'seen', first: 50, empty: 'Nothing has changed yet.' },

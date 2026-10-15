@@ -77,6 +77,8 @@ import {
   carryingOf,
   headline,
   keysOf,
+  computedSet,
+  mayPropose,
   mutedFor,
   type Decided,
   type GovernRegister,
@@ -152,7 +154,7 @@ import { catalogueDrafts, describedPresses, drawnVersions, FORM_SAID_MOST, forme
 import { grammarOf } from './grammar.ts';
 import { askedFault, describe, DESCRIBED_NO_MODEL, DESCRIBED_NO_PREVIEW, draftedOf, pageFault, previewerOf, type SlashDescribed, type SlashDrafted, type SlashPreviewer } from './slash.ts';
 import { describedGrammar } from './grammar.ts';
-import { skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
+import { lookLanding, skillBearings, skillDraftInput, skillDraftOf } from './slash.ts';
 import {
   askedOn,
   factsBasis,
@@ -249,6 +251,9 @@ export type { PenItem } from './emergent.ts';
 /* THE ENGINE'S READINGS, THE ARITHMETIC ALONE (engine-readings-59): what was asked, answered, kept and refused, the
    mentions not attached and the open questions by cause, from rows a caller hands in. No method reads them yet. */
 export type { EngineLedger, EngineLedgerRead } from './methods/engine-readings.ts';
+export { AGENT_ROLES, AGENT_LIST_FALLBACK, agentLists, fadeDays, fadeOf, listFor, noListSaid, type AgentRole } from './agent-lists.ts';
+import { fadeDays, fadeOf } from './agent-lists.ts';
+import { placesOf as railPlaces, type AddonNav, type Place } from './places.ts';
 export { engineReadings, OTHER as READINGS_OTHER, UNSAID as READINGS_UNSAID, type EngineReadings, type Braked, type AskReading, type LedgerCall, type OwedRead, type ReadingsOf } from './engine-readings.ts';
 export { PREVIEW_DECLARATIONS_MOST, PREVIEW_SAMPLE_ROWS_A_LIST, PREVIEW_SAMPLE_ROWS_MOST, type ChangePreviewed, type PreviewChangeArgs, type PreviewedPage } from './preview-change.ts';
 export { SAMPLE_ROWS_MOST, SLASH_REPAIRS_MOST, type DescribedDraft, type SlashDecl, type SlashDrafted, type SlashPreview, type SlashPreviewedPage, type SlashPreviewer, type SlashRows } from './slash.ts';
@@ -754,12 +759,8 @@ const LINKED = 50;
 const ORGS = 5;
 /** The open questions, newest first. */
 const ASKED = 8;
-/**
- * A register whose rows fade: one with a `confirmed_on` day, as the agents pack's learnings have. A row
- * neither confirmed nor made in the last ninety days is left out of `context` and counted in `faded`.
- */
-const FADES = 'confirmed_on';
-const FADE_MS = 90 * 86_400_000;
+/* A REGISTER WHOSE ROWS FADE declares `fade: { field, after }`, or has the old `confirmed_on` day (`agent-lists.ts`
+   `fadeOf`). A row neither confirmed nor made within its fade is left out of `context` and counted in `faded`. */
 /** What a `Brief` is made of. A field with one of these ids does not overwrite it. */
 const BRIEF_KEYS: readonly string[] = ['spoken', 'version', 'scope', 'state'];
 /** A spoken id with a prefix, `S42` or `LN7`, as against `tasks#3`. */
@@ -1087,8 +1088,8 @@ export type Boot = {
   pages: {
     slug: string;
     title: string;
-    /** `tabs: true` when the page draws its nav section as a strip of tabs over each of its pages. */
-    nav: { section: string; order: number; tabs?: true } | null;
+    /** `tabs: true` when the page draws its nav section as a strip of tabs over each of its pages; `place` where the section sits on the rail. */
+    nav: { section: string; order: number; place?: number; tabs?: true } | null;
     icon: string | null;
     list: string | null;
     /**
@@ -1110,6 +1111,10 @@ export type Boot = {
      */
     about: { register: string; seq: number | null; updated_at: string; hue?: number | null } | null;
   }[];
+  /** The rail's places in order, the frame's two first, `PLACES_MOST` drawn and the rest under More (`places.ts`). */
+  places: { places: Place[]; more: Place[] };
+  /** The figures the engine computes, by the source each draws as (`computed-set.ts`). */
+  computed: { source: string; drawsAs: string }[];
   /**
    * The page Home draws, by slug: the Home page of the use case the record speaks in (`speakingNow`, `home-<use case>`)
    * when the caller may open it, else the page called `home` when they may open that, else `null` and Home draws the
@@ -1541,7 +1546,7 @@ export type Context = {
    * leaves, five in all unless `format: 'full'` asked for twenty of each (`capRegister`, AGT-B09). `here` and
    * `everywhere` count every open row of each, `more` how many this answer leaves out, and `rest` the call that lists them.
    */
-  registers: { id: string; name: string; rows: Brief[]; inherited: Brief[]; truncated: boolean; here?: number; everywhere?: number; more?: number; rest?: string | null }[];
+  registers: { id: string; name: string; role?: string; rows: Brief[]; inherited: Brief[]; truncated: boolean; here?: number; everywhere?: number; more?: number; rest?: string | null }[];
   /** The people linked to this project, most recently in touch first, each with their role and organisation. */
   people: PersonBrief[];
   /** How many people other than the record's own are linked here, sent only when there are more than `people` holds. */
@@ -2884,6 +2889,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const slashFile = async (ctx?: CallContext, daily = false): Promise<SlashFiled> => {
     const r = slashReading(ctx);
     const drawn = drawnVersions(sql);
+    const drawnIn = ctx?.principal.kind === 'person' ? (kernel.prefsOf(ctx.principal.id) as Prefs)['look.theme'] : undefined;
+    const looks = looksOf(kernel.declarations().filter((d) => d.kind === 'theme')).filter((l) => l.id !== drawnIn);
     let drafts: SlashDraft[] = r.drafts;
     let by = 'rules';
     const dropped: string[] = [];
@@ -2901,13 +2908,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             offered: r.offered.map(({ id, kind, title }) => ({ id, kind, title })),
             kinds: ['pack', 'settings', 'arrange', 'change'],
             most: SLASH_OPEN_CAP,
+            ...(looks.length > 0 ? { looks: looks.map(({ id, name }) => ({ id, name })) } : {}),
             ...(r.partial ? { partial: true as const } : {}),
           },
           (input) => model.draft(input),
         );
         if ('spent' in asked) dropped.push(`${asked.spent} ${fell.charAt(0).toUpperCase()}${fell.slice(1)}`);
         else {
-          const got = fromModel(asked.raw, model.name, SLASH_OPEN_CAP, drawn);
+          const got = fromModel(asked.raw, model.name, SLASH_OPEN_CAP, drawn, false, { usage: r.usage, looks, may: mayPropose(sql, clock.now()) });
           dropped.push(...got.dropped);
           if (got.drafts.length > 0) {
             drafts = got.drafts;
@@ -7352,7 +7360,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { accentOf, hueOf };
   };
 
-  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names'> => {
+  /** The installed add-ons in the order they were installed, each with the pages its declarations hold, for the rail (`placesOf`). */
+  const addonNavs = (): AddonNav[] => {
+    const navs = new Map<string, string[]>();
+    for (const r of sql.all<{ addon: string; page: string | null }>(
+      `SELECT p.id AS addon, json_extract(d.body, '$.page') AS page FROM pack p
+         LEFT JOIN declaration d ON d.pack_id = p.id AND d.kind = 'page' AND d.superseded_at IS NULL AND d.retired = 0
+        ORDER BY p.installed_at, p.id, d.rowid`,
+    )) {
+      const pages = navs.get(r.addon) ?? [];
+      navs.set(r.addon, pages);
+      if (typeof r.page === 'string' && r.page !== '') pages.push(r.page);
+    }
+    return [...navs].map(([addon, pages]) => ({ addon, pages }));
+  };
+
+  const shellFor = (ctx: CallContext): Pick<Boot, 'record' | 'currency' | 'money' | 'me' | 'pages' | 'home' | 'counts' | 'pen' | 'whatsNew' | 'names' | 'places' | 'computed'> => {
     const p = ctx.principal;
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
@@ -7377,6 +7400,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        planted row they changed, and it is theirs. Asked of the whole list, as the planted rows are counted. */
     const planted = plantedRows();
     const theirs = (id: string): boolean => planted[id] === undefined || planted[id] < kernel.count(id);
+    /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
+    const pages: Boot['pages'] = opens
+      /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail.
+         A name the kernel gives a read across the whole record is not a list (`*`, a character no register id holds). */
+      .map((page) => ({
+        slug: page.slug,
+        title: page.title,
+        nav: page.nav,
+        icon: page.icon,
+        list: page.registers.length === 1 && /^[a-z]/u.test(page.registers[0]!) && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
+        /* EVERY LIST IT READS, held to what this caller reads, for a rail that waits on them (`Boot.pages`). */
+        /* `null` AND NOT `[]` WHEN IT READS SOME AND ALL OF THEM ARE STARTER SETS NOBODY TOUCHED, so the rail can tell a
+           place that waits from a page that reads no list at all. */
+        lists: ((read) => ((mine) => (read.length > 0 && mine.length === 0 ? null : mine))(read.filter(theirs)))(
+          [...new Set(page.registers)].filter((id) => /^[a-z]/u.test(id) && !readable(ctx, id)),
+        ),
+        /* AND WHICH ROW IT GREW OUT OF, the key the rail's cap is written against (`railRoom`). This
+           map copied four keys and dropped the kernel's fifth, so on a large record 72 of 72 rail pages arrived with no
+           `about` and the shell drew one entry per project, service and skill where the sample, which has the key,
+           draws 15. It names no row the caller cannot read: `seesPage` above already drops a page about one. */
+        about: page.about === null || accentOf(page.about.register) === null ? page.about : { ...page.about, hue: hueOf(page.about) },
+      }));
     return {
       record: identity ? { slug: identity.slug, name: identity.name, locale: identity.locale, ...drawn } : null,
       ...drawn,
@@ -7390,28 +7435,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         levels: levelsOf(ctx),
         ...(p.kind === 'person' ? { prefs } : {}),
       },
-      /* THE SAME FILTER `pages` RUNS, and the register list stays behind for the same reason. */
-      pages: opens
-        /* THE ONE LIST A PAGE DRAWS, when it draws one this caller reads, so a saved view sits under its list in the rail.
-           A name the kernel gives a read across the whole record is not a list (`*`, a character no register id holds). */
-        .map((page) => ({
-          slug: page.slug,
-          title: page.title,
-          nav: page.nav,
-          icon: page.icon,
-          list: page.registers.length === 1 && /^[a-z]/u.test(page.registers[0]!) && !readable(ctx, page.registers[0]!) ? page.registers[0]! : null,
-          /* EVERY LIST IT READS, held to what this caller reads, for a rail that waits on them (`Boot.pages`). */
-          /* `null` AND NOT `[]` WHEN IT READS SOME AND ALL OF THEM ARE STARTER SETS NOBODY TOUCHED, so the rail can tell a
-             place that waits from a page that reads no list at all. */
-          lists: ((read) => ((mine) => (read.length > 0 && mine.length === 0 ? null : mine))(read.filter(theirs)))(
-            [...new Set(page.registers)].filter((id) => /^[a-z]/u.test(id) && !readable(ctx, id)),
-          ),
-          /* AND WHICH ROW IT GREW OUT OF, the key the rail's cap is written against (`railRoom`). This
-             map copied four keys and dropped the kernel's fifth, so on a large record 72 of 72 rail pages arrived with no
-             `about` and the shell drew one entry per project, service and skill where the sample, which has the key,
-             draws 15. It names no row the caller cannot read: `seesPage` above already drops a page about one. */
-          about: page.about === null || accentOf(page.about.register) === null ? page.about : { ...page.about, hue: hueOf(page.about) },
-        })),
+      pages,
+      /* THE RAIL'S PLACES IN ORDER (`places.ts`), and which figures the engine computes. */
+      places: railPlaces({ pages, navs: addonNavs() }),
+      computed: computedSet(),
       home,
       counts: {
         decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
@@ -7731,7 +7758,6 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /* THE REGISTERS THAT SAY WHERE A ROW APPLIES, each held to the caller's level. A register whose
        scope links a row to projects, as people are linked, is who is here rather than what applies. */
-    const cutoff = new Date(clock.now() - FADE_MS).toISOString().slice(0, 10);
     const registers: Context['registers'] = [];
     const me = (text(run?.fields.agent) ?? hints.agent ?? '').trim().toLowerCase().replace(/^agent:/u, '');
     /* EVERY LEARNING READ, before any is cut, so a rule older than the newest lessons still reaches the card (`rulesOf`). */
@@ -7787,7 +7813,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         }
         continue;
       }
-      const fades = decl.fields.some((field) => field.id === FADES && field.type === 'day' && !field.retired);
+      const fade = fadeOf(decl);
+      const fades = fade !== null;
+      const cutoff = fade === null ? '' : new Date(clock.now() - fadeDays(fade.after)! * 86_400_000).toISOString().slice(0, 10);
       const got = kernel.inScope(id, home?.id ?? null, { limit: SCOPE_READ, open: true });
       if (!got.ok) continue;
       /* WHAT A LEARNING THAT STANDS REPLACES IS NOT HANDED (`replacedIn`), exactly as the `learnings` read leaves it out. */
@@ -7795,7 +7823,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const fresh = (rows: Entry[]): Entry[] => {
         if (!fades) return rows;
         const standing = rows.filter((row) => !replaced.has(row.id));
-        const kept = standing.filter((row) => String(row.fields[FADES] ?? row.created_at.slice(0, 10)) >= cutoff);
+        const kept = standing.filter((row) => String(row.fields[fade!.field] ?? row.created_at.slice(0, 10)) >= cutoff);
         faded += standing.length - kept.length;
         return kept;
       };
@@ -7853,6 +7881,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       registers.push({
         id,
         name: decl.name,
+        ...(typeof (decl as { role?: unknown }).role === 'string' ? { role: (decl as unknown as { role: string }).role } : {}),
         rows: capped.rows.map((row) => brief(decl, f.id, row, 'project')),
         inherited: capped.inherited.map((row) => brief(decl, f.id, row, 'global')),
         truncated: capped.truncated || (fades && Math.max(got.value.rows.length, got.value.inherited.length) >= SCOPE_READ),
@@ -10692,6 +10721,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!landed.ok) return tail(landed);
         return tail(settledAs(ctx, args.id, out));
       }
+      /* A LOOK PICK (ENG-B20) SETS HIS OWN look.theme, checked again against the themes installed now. */
+      const look = out.ok && out.value.apply?.kind === 'settings' ? lookLanding(out.value.apply.body, kernel.declarations().filter((d) => d.kind === 'theme').map((d) => d.id)) : null;
+      if (out.ok && look !== null) {
+        if (!look.ok) {
+          kernel.reopen(out.value.suggestion, 'refusal' in look ? look.refusal.fix : undefined);
+          return tail(look);
+        }
+        if (ctx.principal.kind === 'person') kernel.setPref(ctx.principal.id, look.value.key, look.value.value);
+        const { apply: _handed, ...decided } = out.value;
+        return tail(settledAs(ctx, args.id, ok({ ...decided, applied: look.value })));
+      }
       if (out.ok && out.value.apply) {
         /* AND IT LANDS BEFORE THE ANSWER IS TRUE. What will not apply reopens the question, with what was kept in its sentence. */
         const applied = await arrangement.apply(out.value.apply.kind, out.value.apply.body, actorOf(ctx));
@@ -10938,7 +10978,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('VALUE_MALFORMED', `limit is how many runs one page holds, a whole number from 1 to ${RUNS_PAGE_MOST}.`, { at: 'limit' });
       const before = args?.before;
       if (before !== undefined && (typeof before !== 'string' || before === '')) return no('VALUE_MALFORMED', 'before is the id of a run, as the last page named it under older.', { at: 'before' });
-      const found = oneAutomation(sql, named, clock.now(), { before, limit });
+      const found = oneAutomation(sql, named, clock.now(), { before, limit }, (list) => sees(ctx, [list]));
       if (found === null || !shown(found.id, found.body)) {
         const id = named.startsWith('rule.') ? named : `rule.${named}`;
         return no('DECLARATION_UNKNOWN', `There is no automation called ${id}${id.endsWith('.') ? '' : '.'}`, { at: 'rule' });

@@ -1,0 +1,14 @@
+{
+  "name": "@braindog/pack-flow-check",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    "./flow-check.pack.json": "./flow-check.pack.json"
+  },
+  "scripts": {
+    "test": "node --test flow-check.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

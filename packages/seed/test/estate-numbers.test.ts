@@ -234,7 +234,7 @@ test('RENEWALS IS STILL ESTATE\'S OWN PAGE: it reads on a record with no Numbers
   assert.ok(!held(k).includes('datapoints'), 'this record holds no Numbers');
   assert.equal(renewals(k).some((b) => b.heading === HEADING), false);
   const own = ESTATE_PAGES.estate!.blocks as { heading?: string }[];
-  assert.equal(own.length, 10, 'Renewals holds the ten blocks it held');
+  assert.equal(own.length, 11, 'Renewals holds the eleven blocks it held');
   assert.ok(own.length + 1 <= CEILING, `Renewals with the block laid on it is ${own.length + 1} blocks, over ${CEILING}`);
   assert.equal(SERVICE_NUMBERS.page, 'page.estate');
   assert.equal(SERVICE_NUMBERS.block.heading, HEADING);

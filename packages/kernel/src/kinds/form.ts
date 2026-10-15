@@ -6,10 +6,15 @@
  * `inputs` edits one row, but a page could not say "these four questions, then Add it". A form names its verb, the
  * list it writes into, its fields, the words on its button and where the reader goes after.
  *
- * ONE VERB IN THIS BUILD, `row.create`: a new row in the list `register:` names, its fields the form's. The other verbs
- * the scope names (`question.ask`, `pref.set`, `pack.configure`, `record.configure`) and a field's `repeat:` and
- * `file:` are refused in words that say they are not built yet, so an author hears it at install rather than a reader
- * at the first press.
+ * TWO VERBS IN THIS BUILD (`FORM_VERBS`). `row.create` adds a row to the list `register:` names, its fields the form's.
+ * `question.ask` puts a question to the record's owner, filed by whoever pressed and waiting on Decide like any other:
+ * it names no list, and its fields are the verb's own args (`ASK_ARGS`), the question, why, and the two answers. The
+ * other verbs the scope names (`pref.set`, `pack.configure`, `record.configure`) and a field's `repeat:` and `file:`
+ * are refused in words that say they are not built yet, so an author hears it at install rather than a reader at the
+ * first press.
+ *
+ * A FORM'S FIELDS ARE HELD TO ITS VERB'S ARGS. A verb that sends `fields` sends a row's, so its form names the list's
+ * fields; any other names its args and nothing else, and a field it does not send is refused naming the field.
  *
  * THE LIST IS RIGHT ABOUT ITS FIELDS. At read each field id is checked against the list (`deps.schemaOf`), a field that
  * says no `type:` takes the list's own, and a field that says one is held to it, so a form never offers a number box
@@ -28,12 +33,32 @@ import type { FieldSpec } from '@braindog/where';
 
 import type { Why } from '../drawn.ts';
 import type { BlockResult, PageDeps } from '../pages.ts';
-import { cutActions } from '../row-actions.ts';
+import { ACTION_VERBS, cutActions } from '../row-actions.ts';
 import type { KindModule } from './index.ts';
 import { invalid } from './listed.ts';
 
-/** The one verb a form writes with in this build. */
-export const FORM_VERB = 'row.create';
+/** The verbs a form writes with: a new row of a list, or a question put to the record's owner. */
+export const FORM_VERBS = ['row.create', 'question.ask'] as const;
+export type FormVerb = (typeof FORM_VERBS)[number];
+
+/** The verb a form over a list writes with, and the one a host reads when an answer says none. */
+export const FORM_VERB: FormVerb = 'row.create';
+
+/** The one arg of a verb that sends a whole row, whose form names the list's fields rather than the verb's args. */
+const ROW_ARG = 'fields';
+/** The args a form over a verb's args may leave out: why a question is asked. Every other one the verb needs. */
+const OPTIONAL_ARGS: ReadonlySet<string> = new Set(['why']);
+/** The args asked in a long box when the form says no type; the rest in a short one. */
+const LONG_ARGS: ReadonlySet<string> = new Set(['why']);
+/** The types a field over a verb's arg may say: words, short or long. */
+const ARG_TYPES: readonly FormType[] = ['text', 'long'];
+
+const isFormVerb = (v: unknown): v is FormVerb => (FORM_VERBS as readonly unknown[]).includes(v);
+/** The args a form's fields are held to, or `null` for a verb whose fields are a list's. */
+const argsOf = (verb: FormVerb): readonly string[] | null => {
+  const args: readonly string[] = ACTION_VERBS[verb].args;
+  return args.includes(ROW_ARG) ? null : args;
+};
 
 /** What a field of a form may be. */
 export const FORM_TYPES = ['text', 'long', 'number', 'money', 'date', 'choice', 'bool'] as const;
@@ -82,8 +107,8 @@ export type FormField = {
   show_when?: { field: string; is: string | number | boolean };
 };
 
-/** The form as the read sends it. */
-export type FormRead = { verb: typeof FORM_VERB; register: string; fields: FormField[]; submit: string; after: string };
+/** The form as the read sends it. A form over an ask names no list, so it carries no `register`. */
+export type FormRead = { verb: FormVerb; register?: string; fields: FormField[]; submit: string; after: string };
 
 /** A form block's answer: the block, and its form where the reader may write. */
 export type FormAnswer = BlockResult & { form?: FormRead };
@@ -138,9 +163,10 @@ const sayable = (own: FormType, spec: FieldSpec): readonly FormType[] =>
 
 /**
  * What is wrong with one field, or `null`. `earlier` is the ids of the fields before it, which is all a `show_when:`
- * may name: a field shown by one below it would appear above the answer that shows it.
+ * may name: a field shown by one below it would appear above the answer that shows it. `over` is the verb and its
+ * args where the form's fields are held to them, and `null` where they are a list's, checked at read.
  */
-function fieldFault(raw: unknown, i: number, earlier: ReadonlySet<string>): Refusal | null {
+function fieldFault(raw: unknown, i: number, earlier: ReadonlySet<string>, over: { verb: string; args: readonly string[] } | null): Refusal | null {
   const at = `fields[${i}]`;
   if (!isRecord(raw)) return invalid(`${at} is a field: { id, label }, and a type when the list's own will not do.`, at);
   const named = typeof raw.label === 'string' && raw.label.trim() ? `${at} (${raw.label.trim()})` : at;
@@ -152,11 +178,17 @@ function fieldFault(raw: unknown, i: number, earlier: ReadonlySet<string>): Refu
   if (typeof raw.id !== 'string' || !ID.test(raw.id))
     return invalid(`${named}'s id is the field of the list it fills in, such as id: what.`, `${at}.id`);
   if (earlier.has(raw.id)) return invalid(`${named} fills in ${raw.id}, and a field above it already does. Each field of a form fills in a different one.`, `${at}.id`);
+  if (over && !over.args.includes(raw.id))
+    return invalid(`${named} fills in ${raw.id}, and ${over.verb} sends ${over.args.join(', ')}. Name one of those, listed with this refusal.`, `${at}.id`, over.args);
   const label = typeof raw.label === 'string' ? raw.label.trim() : '';
   if (!label || bytes(label) > LABEL_MOST)
     return invalid(`${named}'s label is the question a person reads above the box, 1 to ${LABEL_MOST} bytes. Write a short one, such as "What is it?".`, `${at}.label`);
   if (raw.type !== undefined && !(FORM_TYPES as readonly unknown[]).includes(raw.type))
     return invalid(`${named}'s type is ${JSON.stringify(raw.type)}, and a form's field is one of ${FORM_TYPES.join(', ')}. Or leave it off, and the list's own is used.`, `${at}.type`, FORM_TYPES);
+  if (over && raw.type !== undefined && !ARG_TYPES.includes(raw.type as FormType))
+    return invalid(`${named}'s type is ${String(raw.type)}, and ${over.verb} sends words, so it is asked as ${ARG_TYPES.join(' or ')}. Take the type off, or say one of those.`, `${at}.type`, ARG_TYPES);
+  if (over && raw.options !== undefined)
+    return invalid(`${named} offers options:, and ${over.verb} sends what is typed. Take the options off.`, `${at}.${KEY.options}`);
   if (raw.required !== undefined && typeof raw.required !== 'boolean') return invalid(`${named}'s required is true or false.`, `${at}.required`, ['true', 'false']);
   if (raw.options !== undefined) {
     if (raw.type !== undefined && raw.type !== 'choice') return invalid(`${named} offers options:, which only a choice does. Make its type choice, or take the options off.`, `${at}.${KEY.options}`);
@@ -189,6 +221,15 @@ function formFault(block: Readonly<Record<string, unknown>>, stage: 'install' | 
   for (const key of UNREAD_HERE)
     if (Object.hasOwn(block, key) && block[key] !== undefined)
       return invalid(`A form writes into register: and reads nothing, so it does nothing with ${key}:. Take it off.`, key);
+  const verb = block.verb;
+  /* ANY OTHER VERB IS LATER, said in the record's code for a thing not built yet, and the verbs there are offered. A
+     value that is no verb at all is told so, since "not built yet" would promise it. */
+  if (verb !== undefined && !isFormVerb(verb))
+    return typeof verb === 'string' && VERB.test(verb)
+      ? notBuilt(`A form over ${verb} is not built yet. A form adds a row to a list with verb: ${FORM_VERB}, or puts a question to the owner with verb: ${FORM_VERBS[1]}.`, 'verb', FORM_VERBS)
+      : invalid(`A form's verb is what its button does, and ${JSON.stringify(verb)} is not a verb. Write verb: ${FORM_VERB}, or one listed with this refusal.`, 'verb', FORM_VERBS);
+  const args = isFormVerb(verb) ? argsOf(verb) : null;
+  const over = args && isFormVerb(verb) ? { verb, args } : null;
   if (stage === 'read')
     for (const [key, said] of [
       ['verb', `verb: ${FORM_VERB}`],
@@ -196,14 +237,11 @@ function formFault(block: Readonly<Record<string, unknown>>, stage: 'install' | 
       ['fields', 'fields: and what each asks'],
       ['submit', 'submit: and the words on its button'],
     ] as const)
-      if (block[key] === undefined) return invalid(`A form says what it writes and how, and this one has no ${key}:. Write ${said}.`, key);
-  const verb = block.verb;
-  /* ANY OTHER VERB IS LATER, said in the record's code for a thing not built yet, and the one verb there is offered. A
-     value that is no verb at all is told so, since "not built yet" would promise it. */
-  if (verb !== undefined && verb !== FORM_VERB)
-    return typeof verb === 'string' && VERB.test(verb)
-      ? notBuilt(`A form over ${verb} is not built yet. A form writes a new row of a list today, with verb: ${FORM_VERB}.`, 'verb', [FORM_VERB])
-      : invalid(`A form's verb is what its button does, and ${JSON.stringify(verb)} is not a verb. Write verb: ${FORM_VERB}.`, 'verb', [FORM_VERB]);
+      if (block[key] === undefined && !(key === 'register' && over))
+        return invalid(`A form says what it writes and how, and this one has no ${key}:. Write ${said}.`, key);
+  /* A FORM OVER A VERB'S ARGS WRITES INTO NO LIST, so a register: on it would be read by nothing. */
+  if (over && block.register !== undefined)
+    return invalid(`A form over ${over.verb} writes into no list, so it names no register:. Take it off.`, 'register');
   if (block.register !== undefined && (typeof block.register !== 'string' || !ID.test(block.register)))
     return invalid(`A form's register is the list it adds a row to, by its id, such as register: tasks.`, 'register');
   if (block.fields !== undefined) {
@@ -213,10 +251,14 @@ function formFault(block: Readonly<Record<string, unknown>>, stage: 'install' | 
       return invalid(`A form holds ${fields.length} fields, and one holds at most ${FIELDS_MOST}. Keep the ones a person must answer, or make it two forms.`, 'fields');
     const earlier = new Set<string>();
     for (const [i, raw] of fields.entries()) {
-      const fault = fieldFault(raw, i, earlier);
+      const fault = fieldFault(raw, i, earlier, over);
       if (fault) return fault;
       earlier.add((raw as { id: string }).id);
     }
+    /* AND EVERY ARG THE VERB NEEDS HAS A FIELD, or no press of it could ever be filed. */
+    const lacks = over ? over.args.filter((a) => !OPTIONAL_ARGS.has(a) && !earlier.has(a)) : [];
+    if (lacks.length)
+      return invalid(`A form over ${over!.verb} asks ${over!.args.filter((a) => !OPTIONAL_ARGS.has(a)).join(', ')}, and this one has no field for ${lacks.join(' or ')}. Add a field with id: ${lacks[0]}.`, 'fields', lacks);
   }
   if (block.submit !== undefined) {
     const submit = typeof block.submit === 'string' ? block.submit.trim() : '';
@@ -229,8 +271,39 @@ function formFault(block: Readonly<Record<string, unknown>>, stage: 'install' | 
   return null;
 }
 
+/** Where the reader goes after a press, or the refusal that says the record has no such page. */
+function afterOf(deps: PageDeps, block: Readonly<Record<string, unknown>>): string | Refusal {
+  const after = typeof block.after === 'string' ? block.after : 'stay';
+  if (after !== 'stay' && !deps.pages().some((p) => p.page === after))
+    return invalid(`A form's after is the page the reader goes to, and this record has no page called ${after}. Write stay, or a page it has.`, 'after');
+  return after;
+}
+
+/**
+ * A form over a verb's args, read: no list to ask, each field typed as words, and every arg the verb needs required,
+ * so the drawer marks it and a press that leaves it empty is told under that field, in the record's own sentence.
+ */
+function readArgsForm(deps: PageDeps, block: Readonly<Record<string, unknown>>, verb: FormVerb): FormRead | Refusal {
+  const fields = (block.fields as Record<string, unknown>[]).map((raw): FormField => {
+    const id = raw.id as string;
+    const field: FormField = {
+      id,
+      label: (raw.label as string).trim(),
+      type: (raw.type as FormType | undefined) ?? (LONG_ARGS.has(id) ? 'long' : 'text'),
+      required: !OPTIONAL_ARGS.has(id) || raw.required === true,
+    };
+    if (isRecord(raw.show_when)) field.show_when = { field: raw.show_when.field as string, is: raw.show_when.is as string | number | boolean };
+    return field;
+  });
+  const after = afterOf(deps, block);
+  if (typeof after !== 'string') return after;
+  return { verb, fields, submit: (block.submit as string).trim(), after };
+}
+
 /** The form read against its list, or the refusal that names the field and the fix. */
 function readForm(deps: PageDeps, block: Readonly<Record<string, unknown>>): FormRead | Refusal {
+  const verb = isFormVerb(block.verb) ? block.verb : FORM_VERB;
+  if (argsOf(verb)) return readArgsForm(deps, block, verb);
   const register = block.register as string;
   const schema = deps.schemaOf(register);
   if (!schema) return { code: 'SOURCE_UNKNOWN', fix: `A form adds a row to ${register}, and this record holds no list called ${register}.`, at: 'register' };
@@ -262,10 +335,9 @@ function readForm(deps: PageDeps, block: Readonly<Record<string, unknown>>): For
     if (isRecord(raw.show_when)) field.show_when = { field: raw.show_when.field as string, is: raw.show_when.is as string | number | boolean };
     fields.push(field);
   }
-  const after = typeof block.after === 'string' ? block.after : 'stay';
-  if (after !== 'stay' && !deps.pages().some((p) => p.page === after))
-    return invalid(`A form's after is the page the reader goes to, and this record has no page called ${after}. Write stay, or a page it has.`, 'after');
-  return { verb: FORM_VERB, register, fields, submit: (block.submit as string).trim(), after };
+  const after = afterOf(deps, block);
+  if (typeof after !== 'string') return after;
+  return { verb, register, fields, submit: (block.submit as string).trim(), after };
 }
 
 export const form: KindModule = {
@@ -282,8 +354,9 @@ export const form: KindModule = {
        which of them the list lacks. `cutActions` drops a verb the host does not run as well, and either way there is
        nothing this reader could press. */
     const raw = block as unknown as Readonly<Record<string, unknown>>;
-    const submit = typeof raw.submit === 'string' ? raw.submit.trim() : FORM_VERB;
-    if (cutActions([{ verb: FORM_VERB, label: submit }], deps.level ?? 'read', deps.runs).length === 0) return { ...base, drawn: false, why: LEVEL };
+    const verb = isFormVerb(raw.verb) ? raw.verb : FORM_VERB;
+    const submit = typeof raw.submit === 'string' ? raw.submit.trim() : verb;
+    if (cutActions([{ verb, label: submit }], deps.level ?? 'read', deps.runs).length === 0) return { ...base, drawn: false, why: LEVEL };
     const read = readForm(deps, raw);
     if ('code' in read) return { ...base, refusals: [...base.refusals, read] };
     const answer: FormAnswer = { ...base, form: read };

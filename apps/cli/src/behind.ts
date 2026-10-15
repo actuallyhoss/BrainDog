@@ -26,6 +26,7 @@ import { dirname, join } from 'node:path';
 
 import { buildDay } from '@braindog/mcp/build';
 
+import { doctor } from './doctor.ts';
 import { hostKey, hostsPath, readHosts } from './http.ts';
 import { cliBuild } from './position.ts';
 
@@ -148,6 +149,44 @@ export async function behindLine(io: BehindIo): Promise<string | null> {
       said ??= kept === undefined ? null : { app: next.app, min_cli: next.min_cli };
     }
     return said === null ? null : behindSaid(build, said, hostName(key));
+  } catch {
+    return null;
+  }
+}
+
+/** How long one quiet doctor run is kept before the start hook runs it again (AGT-A10 job 4). */
+export const DOCTOR_EVERY_MS = 7 * 86_400_000;
+
+/**
+ * Whether this command is an installed build (one with a day), not a checkout run by `node`. The weekly doctor line is
+ * said only by an installed build, as `behindLine` is, so a checkout's own tests and a developer's starts never run it.
+ */
+export const installedBuild = (build: string = cliBuild()): boolean => buildDay(build) !== null;
+
+export const doctorCheckPath = (home: string): string => join(home, '.braindog', 'doctor-check.json');
+
+/**
+ * ONCE A WEEK, THE START HOOK RUNS `braindog doctor` QUIETLY, and says one line beside `behindLine`'s when it lists
+ * anything. When it was last run is kept in `~/.braindog/doctor-check.json` as `{ at }`, written before the run, so a run
+ * that throws or hangs is not tried again on every start. It asks nothing and files nothing, and any fault is no line.
+ */
+export function doctorLine(home: string, now = Date.now(), run: () => { report: { places: readonly unknown[] }; code: number } = () => doctor([], { home })): string | null {
+  try {
+    const file = doctorCheckPath(home);
+    let at = Number.NaN;
+    try {
+      const kept: unknown = JSON.parse(readFileSync(file, 'utf8'));
+      if (isObject(kept) && typeof kept.at === 'string') at = Date.parse(kept.at);
+    } catch {
+      /* None yet: run now. */
+    }
+    if (Number.isFinite(at) && at <= now && now - at < DOCTOR_EVERY_MS) return null;
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+    const tmp = `${file}.${String(process.pid)}.tmp`;
+    writeFileSync(tmp, `${JSON.stringify({ at: new Date(now).toISOString() })}\n`, { mode: 0o600 });
+    renameSync(tmp, file);
+    const out = run();
+    return out.code === 1 ? `braindog doctor lists ${String(out.report.places.length)} places to fix. Run braindog doctor to see them.` : null;
   } catch {
     return null;
   }

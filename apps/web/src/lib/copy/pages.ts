@@ -97,6 +97,10 @@ export const pages = {
     series: 'Bars by month',
     forecast: 'Cash ahead',
     bridge: 'From start to end',
+    heat: 'Heat map',
+    ring: 'Ring',
+    lanes: 'Lanes',
+    form: 'Form',
   } as Record<string, string>,
 
   kinds: {
@@ -122,6 +126,11 @@ export const pages = {
     sparkline: 'a figure with the run of numbers that led to it',
     split: 'one total cut into its parts',
     bridge: 'how a start became an end, step by step',
+    heat: 'each day of twelve weeks, darker the busier it was',
+    ring: 'one figure toward its target, or up to five parts of a whole',
+    lanes: 'each item as a span from its start to its end',
+    cards: 'each item as a card, its name and a few facts',
+    form: 'a few questions and a button that adds to this list',
   } as Record<string, string>,
   arrangeNothing: 'Nothing moved.',
   arranged: (title: string) => `${title} rearranged.`,

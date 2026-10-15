@@ -8,11 +8,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { serveFirstRead, FIRST_READ_ADDRESS_SPENT, FIRST_READ_DAY_SPENT, FIRST_READ_OFF } from '@braindog/host/first-read';
+import { CATALOGUE_FORMAT } from '@braindog/declare/catalogue';
+import { serveFirstRead, FIRST_READ_ADDRESS_SPENT, FIRST_READ_CATALOGUE_UNREAD, FIRST_READ_DAY_SPENT, FIRST_READ_OFF } from '@braindog/host/first-read';
 import { ok } from '@braindog/ports';
+import type { SetupOffer } from '@braindog/slash';
 
 import { PEOPLE } from '../../../fixtures/names.ts';
-import { dailyOf, firstReadDoorOf, firstReadOffer, type FirstReadEnv, type MeterStore, type ReadSetup } from '../src/first-read.ts';
+import { catalogueOffer, dailyOf, firstReadDoorOf, firstReadOffer, type FirstReadEnv, type MeterStore, type ReadSetup } from '../src/first-read.ts';
+import type { Assets } from '../src/catalogue.ts';
 
 const ORIGIN = 'https://cloud.braindog.example';
 const NOW = Date.parse('2026-10-14T10:00:00Z');
@@ -139,4 +142,106 @@ test('THE OFFER IS THE BUILD: every use case, and modules with their lists', () 
   const offer = firstReadOffer();
   assert.ok(offer.usecases.length > 0 && offer.usecases.every((u) => u.id !== '' && u.title !== ''));
   assert.ok(offer.modules.some((m) => m.lists.length > 0 && m.lists.every((l) => l.fields.length > 0)));
+});
+
+/* ── the catalogue's use cases on offer (USE-A16) ───────────────────────────────────────────────────────────── */
+
+const LANDLORD_SAID = 'I rent out six flats and need to keep track of rent and repairs.';
+const LANDLORD_SIGNALS = ['landlord', 'flats', 'flat', 'tenants', 'rent out', 'repairs'];
+
+/* An entry as the catalogue build writes one: its versions with a checksum, and a use case's signals and modules. */
+const entry = (id: string, title: string, more: Record<string, unknown> = {}) => ({
+  kind: 'usecase', id, title, summary: `${title}, as the catalogue says it.`, author: 'BrainDog', license: 'MIT', audience: 'business',
+  latest: '1.0.0', versions: [{ version: '1.0.0', checksum: 'a'.repeat(64), reach: {} }], ...more,
+});
+const INDEX = {
+  format: CATALOGUE_FORMAT,
+  name: 'BrainDog',
+  entries: [
+    entry('landlord', 'Landlord', { summary: 'The flats you rent out, who rents each one, and the repairs.', signals: LANDLORD_SIGNALS, modules: ['people', 'landlord'] }),
+    entry('hidden-front', 'A front for one firm', { unlisted: true, signals: ['flats'] }),
+    { ...entry('landlord-tools', 'Landlord tools'), kind: 'pack' },
+  ],
+};
+
+/** The static assets with the landlord front at `/app/catalogue/index.json`, and the shell, as HTML, for any other path. */
+const landlordAssets = () => {
+  const asked: string[] = [];
+  const assets: Assets = {
+    fetch: async (request) => {
+      const path = new URL(request.url).pathname;
+      asked.push(path);
+      if (path === '/app/catalogue/index.json') return new Response(JSON.stringify(INDEX), { headers: { 'content-type': 'application/json' } });
+      return new Response('<!doctype html><title>BrainDog</title>', { headers: { 'content-type': 'text/html' } });
+    },
+  };
+  return { assets, asked };
+};
+
+/** A reader standing in for the model: it keeps the offer it was handed and picks the first case whose words it hears. */
+const hearingRead = (seen: SetupOffer[]): ReadSetup => async (ask) => {
+  seen.push(ask.offer);
+  const said = ask.said.toLowerCase();
+  const pick = ask.offer.usecases.find((u) => ((u as { signals?: readonly string[] }).signals ?? []).some((w) => said.includes(w)));
+  return ok({ name: null, summary: 'A reading.', usecase: pick?.id ?? null, also: [], modules: [], currency: null, heard: [], names: [], rows: [], draft: null, by: 'glm-5.3-flash' });
+};
+
+const askSaying = (said: string, ip = '203.0.113.9'): Request =>
+  new Request(`${ORIGIN}/auth/signup/read`, {
+    method: 'POST',
+    headers: { origin: ORIGIN, 'content-type': 'application/json', 'cf-connecting-ip': ip },
+    body: JSON.stringify({ said, today: '2026-10-14', zone: 'Europe/London', locale: 'en-GB', turnstile: 'good' }),
+  });
+
+test('THE CATALOGUE IS ON OFFER: the landlord front reaches the model with its signals, and the sentence is read as Landlord', async () => {
+  const { assets, asked } = landlordAssets();
+  const seen: SetupOffer[] = [];
+  const lines: string[] = [];
+  const d = firstReadDoorOf({ ...allOn(), ASSETS: assets }, { origin: ORIGIN, readSetup: hearingRead(seen), store: memoryStore(), send: verify, log: (l) => lines.push(l) });
+  const res = await serveFirstRead(askSaying(LANDLORD_SAID), d, NOW);
+  assert.equal(res.status, 200);
+  assert.equal(((await res.json()) as { value: { usecase: string | null } }).value.usecase, 'landlord');
+  const landlord = seen[0]!.usecases.find((u) => u.id === 'landlord') as SetupOffer['usecases'][number] & { signals: readonly string[]; modules: readonly string[] };
+  assert.equal(landlord.title, 'Landlord');
+  assert.deepEqual(landlord.signals, LANDLORD_SIGNALS);
+  assert.deepEqual(landlord.modules, ['people', 'landlord']);
+  assert.match(landlord.summary, /Heard in: landlord, flats/u, 'the words did not reach what the model is told');
+  const ids = seen[0]!.usecases.map((u) => u.id);
+  assert.equal(ids[0], 'landlord', 'the catalogue comes first');
+  for (const built of firstReadOffer().usecases) assert.ok(ids.includes(built.id), `${built.id}, compiled in, was dropped`);
+  assert.ok(!ids.includes('hidden-front') && !ids.includes('landlord-tools'), 'an unlisted front or an add-on was offered');
+  assert.deepEqual(seen[0]!.modules, firstReadOffer().modules);
+  assert.deepEqual(lines, []);
+
+  /* READ ONCE AND KEPT: a second sign-up, through a second door over the same binding, asks the assets nothing. */
+  const reads = asked.length;
+  const again = firstReadDoorOf({ ...allOn(), ASSETS: assets }, { origin: ORIGIN, readSetup: hearingRead(seen), store: memoryStore(), send: verify });
+  assert.equal((await serveFirstRead(askSaying(LANDLORD_SAID, '198.51.100.9'), again, NOW)).status, 200);
+  assert.equal(asked.length, reads);
+  assert.deepEqual(seen[1], seen[0]);
+});
+
+test('WITHOUT THE ASSETS, THE COMPILED LIST: the offer handed to the model is the build’s own', async () => {
+  const seen: SetupOffer[] = [];
+  const d = firstReadDoorOf(allOn(), { origin: ORIGIN, readSetup: hearingRead(seen), store: memoryStore(), send: verify, log: () => {} });
+  assert.equal((await serveFirstRead(askSaying(LANDLORD_SAID), d, NOW)).status, 200);
+  assert.deepEqual(seen[0], firstReadOffer());
+  assert.ok(!seen[0]!.usecases.some((u) => u.id === 'landlord'));
+});
+
+test('A CATALOGUE THAT DOES NOT READ is the compiled list and one line in the log, never a 500', async () => {
+  const broken: Assets[] = [
+    { fetch: async () => Promise.reject(new Error('no assets')) },
+    { fetch: async () => new Response('{"format":', { headers: { 'content-type': 'application/json' } }) },
+    { fetch: async () => new Response('<!doctype html>', { headers: { 'content-type': 'text/html' } }) },
+  ];
+  for (const assets of broken) {
+    const lines: string[] = [];
+    const seen: SetupOffer[] = [];
+    const d = firstReadDoorOf({ ...allOn(), ASSETS: assets }, { origin: ORIGIN, readSetup: hearingRead(seen), store: memoryStore(), send: verify, log: (l) => lines.push(l) });
+    assert.equal((await serveFirstRead(askSaying(LANDLORD_SAID), d, NOW)).status, 200);
+    assert.deepEqual(seen[0]!.usecases, firstReadOffer().usecases);
+    await catalogueOffer(assets, (l) => lines.push(l));
+    assert.deepEqual(lines, [FIRST_READ_CATALOGUE_UNREAD], 'said not once');
+  }
 });

@@ -62,7 +62,6 @@
   import Recovery from './areas/Recovery.svelte';
   import Sessions from './areas/Sessions.svelte';
   import People from './areas/People.svelte';
-  import Agents from './areas/Agents.svelte';
   import Ingest from './areas/Ingest.svelte';
   import Keyboard from './areas/Keyboard.svelte';
   import Look from './areas/Look.svelte';
@@ -477,7 +476,10 @@
     {:else if area === 'identity'}
       <Identity {shell} {area} />
     {:else if area === 'agents'}
-      <Agents {shell} {area} />
+      <!-- AGENTS BY `import()`: its tiles are the panels a page may host too (trust, Slash reads, the reader's keys), so
+           drawn from both places their styles are chunks of their own, and listed here they pushed the entry script
+           past its ceiling. -->
+      {#await import('./areas/Agents.svelte') then { default: Agents }}<Agents {shell} {area} />{/await}
     {:else if area === 'ingest'}
       <Ingest {shell} {area} />
     {:else if area === 'notifications'}

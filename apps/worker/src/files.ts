@@ -203,7 +203,8 @@ const MISMATCH: Refusal = { code: 'CHECKSUM_MISMATCH', fix: 'These bytes do not 
 const EMPTY: Refusal = { code: 'BODY_MALFORMED', fix: 'The file arrived empty. Send its bytes as the body.' };
 const CANNOT_READ: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Reading a file here takes somebody who can read this record, or a token.' };
 const CANNOT_WRITE: Refusal = { code: 'LEVEL_REQUIRED', fix: 'Adding a file takes somebody who can write here, or a token with write scope.' };
-const NOBODY: Refusal = { code: 'UNAUTHORIZED', fix: 'Sign in, or send a bearer token this record knows.' };
+/** The one 401 body (LCH-C08 job 2): "A `401` says only `unauthorized`." What to do is the app's to say, not a stranger's to read. */
+const NOBODY: Refusal = { code: 'UNAUTHORIZED', fix: 'unauthorized' };
 
 /**
  * The door itself: who is asking, whether they may, and then the bytes.

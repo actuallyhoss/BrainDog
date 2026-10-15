@@ -33,11 +33,19 @@ export type ActionLevel = (typeof ACTION_LEVELS)[number];
  */
 export type ActionVerb = { level: ActionLevel; undo: boolean; hard: boolean; args: readonly string[]; undo_level?: ActionLevel };
 
+/** What an ask sends: the question, why it is asked, and the two answers it offers (`question` is `propose`'s own word). */
+export const ASK_ARGS = ['question', 'why', 'first', 'second'] as const;
+
 /**
  * THE VERBS A PAGE MAY NAME. The first five are the six writes said as verbs (a capture is `row.create`, a typed field
- * `row.update`), and their old paths stay; the last two are the Decide answer and the Inbox's make-a-rule press.
+ * `row.update`), and their old paths stay; then the Decide answer, the Inbox's make-a-rule press, and the ask.
  * The answer is `suggestion.answer`, the kernel's own word for what Decide holds (`governanceRow('suggestion')`): the
  * scope wrote `question.answer`, and `question` is a field an add-on declares, which `core-names` keeps out of the core.
+ *
+ * `question.ask` PUTS A QUESTION TO THE RECORD'S OWNER (PGS-A15), filed as Decide's own "Ask yourself" sheet files one,
+ * by whoever pressed, and waits on Decide like any other. Its args (`ASK_ARGS`) are what the record builds that
+ * question from, and a form over it names them as its fields. It needs no row, so it is a block's verb, and its way
+ * back is the question taken back while it is still open.
  *
  * `args` ARE WHAT A PRESS SENDS, by name. A page binds one to a field of the block's source (`args: { field: state }`),
  * and what it leaves unbound comes from the press itself: the value picked, the line typed.
@@ -50,12 +58,13 @@ export const ACTION_VERBS = Object.freeze({
   'row.move': { level: 'write', undo: true, hard: false, args: ['field', 'to'] },
   'suggestion.answer': { level: 'decide', undo: true, hard: false, args: ['option', 'reason'], undo_level: 'owner' },
   'rule.from_arrivals': { level: 'owner', undo: true, hard: true, args: ['arrivals'] },
+  'question.ask': { level: 'write', undo: true, hard: false, args: ASK_ARGS },
 } as const satisfies Readonly<Record<string, ActionVerb>>);
 
 export type VerbName = keyof typeof ACTION_VERBS;
 
 /** The verbs a block's own `actions` may name, which need no row to act on. The rest are a row's. */
-export const BLOCK_VERBS: ReadonlySet<string> = new Set<VerbName>(['row.create', 'rule.from_arrivals']);
+export const BLOCK_VERBS: ReadonlySet<string> = new Set<VerbName>(['row.create', 'rule.from_arrivals', 'question.ask']);
 
 /** How an action is drawn: a button, a switch over a yes-or-no field, a choice of a few, a value copied, a link. */
 export const ACTION_AS = ['button', 'switch', 'choice', 'copy', 'link'] as const;

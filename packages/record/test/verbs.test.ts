@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { refused } from '@braindog/ports';
 
 import { ACTION_VERBS } from '@braindog/kernel';
-import { ANSWERED_ON_PAGE, RUNS, VERBS, undoCall, verbCall, type VerbRow } from '../src/verbs.ts';
+import { ANSWERED_ON_PAGE, ASK_WORDS, RUNS, VERBS, undoCall, verbCall, type VerbRow } from '../src/verbs.ts';
 import { PROJECTS } from '../../../fixtures/names.ts';
 
 const NOW = '2026-10-14T09:00:00.000Z';
@@ -93,4 +93,64 @@ test('each undo puts the row back as it was', () => {
   assert.ok(refused(undoCall('suggestion.answer', { option: 'accept' }, { id: 'sugg_1' }, null, NOW)), 'no decision answered, no way back');
   const blind = undoCall('row.update', { field: 'owner', value: PROJECTS[3] }, ROW, null, NOW);
   assert.ok(refused(blind), 'a field the row was read without has no way back');
+});
+
+/* AN ASK AS A FORM SENDS IT: an invented question about where the shipments go. */
+const ASK = { question: `Ship to ${PROJECTS[0]} first?`, why: '  Both are waiting.  ', first: 'Yes, first', second: 'No, wait a week' };
+
+test('an ask is an options question filed through propose, with the body Decide files', () => {
+  const out = verbCall('question.ask', ASK, null, NOW);
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(out.value.method, VERBS['question.ask'].method);
+  assert.deepEqual(out.value, {
+    method: 'propose',
+    params: {
+      question: `Ship to ${PROJECTS[0]} first?`,
+      body_kind: 'options',
+      body: {
+        context: 'Both are waiting.',
+        options: [
+          { id: 'o1', label: 'Yes, first', because: '' },
+          { id: 'o2', label: 'No, wait a week', because: '' },
+        ],
+      },
+    },
+  });
+  /* WHY MAY BE LEFT OUT, and the body then carries no context rather than an empty one. */
+  const bare = verbCall('question.ask', { ...ASK, why: '' }, null, NOW);
+  assert.ok(bare.ok);
+  assert.equal(Object.hasOwn(bare.value.params.body as object, 'context'), false);
+  assert.equal(RUNS.has('question.ask'), true, 'so the read sends a form over it');
+});
+
+test('an ask is signed by whoever pressed: the call carries no signer of its own, and no system', () => {
+  const out = verbCall('question.ask', ASK, null, NOW);
+  assert.ok(out.ok);
+  /* THE HOST MAKES THE CALL AS THE PRESSER, and the record signs it as theirs. A key here would let a page sign as somebody else. */
+  assert.deepEqual(Object.keys(out.value.params).sort(), ['body', 'body_kind', 'question']);
+  assert.doesNotMatch(JSON.stringify(out.value), /system|actor|principal|"by"/u);
+});
+
+test('an empty question or answer is refused at its field, in the record\'s own sentence', () => {
+  for (const field of ['question', 'first', 'second'] as const) {
+    for (const value of ['', '   ', undefined]) {
+      const out = verbCall('question.ask', { ...ASK, [field]: value }, null, NOW);
+      assert.ok(refused(out), `${field} ${JSON.stringify(value)} was filed`);
+      assert.equal(out.refusal.code, 'REQUIRED_MISSING');
+      assert.equal(out.refusal.at, field);
+      assert.equal(out.refusal.fix, ASK_WORDS[field]);
+    }
+  }
+  const same = verbCall('question.ask', { ...ASK, second: ' yes, FIRST ' }, null, NOW);
+  assert.ok(refused(same));
+  assert.equal(same.refusal.at, 'second');
+  assert.equal(same.refusal.fix, ASK_WORDS.same);
+});
+
+test('an ask is undone by taking its question back while it is open', () => {
+  const back = undoCall('question.ask', ASK, null, { id: 'SG12', state: 'open' }, NOW);
+  assert.deepEqual(back.ok && back.value, { method: 'withdraw', params: { id: 'SG12' } });
+  const none = undoCall('question.ask', ASK, null, null, NOW);
+  assert.ok(refused(none), 'no question filed, nothing to take back');
+  assert.equal(none.refusal.at, 'answered');
 });

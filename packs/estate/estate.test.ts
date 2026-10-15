@@ -183,7 +183,7 @@ test('THE FILE IS DATA AND ONLY ITS OWN: no script, one list, a page and ten fig
     'one list, one page, ten figures and four rules',
   );
   assert.ok(!kinds.includes('script') && !kinds.includes('something else'), 'the file declares a script, or something that is none of the four');
-  assert.doesNotMatch(JSON.stringify(doc.declarations), /"script"|"source":"(?!register\.|metric\.|governance\.)|"egress"|"keys"/u, 'a step that runs a script or reaches out');
+  assert.doesNotMatch(JSON.stringify(doc.declarations), /"script"|"source":"(?!register\.|metric\.|governance\.|activity")|"egress"|"keys"/u, 'a step that runs a script or reaches out');
 
   /* NO LIST AND NO FIGURE IT DOES NOT OWN: every figure reads Services, and so does every block that reads a list. */
   assert.deepEqual(doc.declarations.flatMap((d) => (typeof d.register === 'string' && d.rule === undefined ? [d.register] : [])), ['services']);

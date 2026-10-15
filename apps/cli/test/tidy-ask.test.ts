@@ -132,7 +132,8 @@ test('BRAINDOG TIDY --ask CALLS BOTH WRITES AND SAYS EACH QUESTION FILED, with w
   const c = standIn({ stale: ok(STALE), scopeProposals: ok(SCOPES), learningsTwice: ok(TWICE), proposeScopes: ok(filed), promoteLearnings: ok(promoted) });
   const one = io();
   assert.equal(await tidyCommand(['--ask'], one, c.make), 0, one.said.join('\n'));
-  assert.deepEqual(c.calls, ['stale', 'scopeProposals', 'learningsTwice', 'proposeScopes', 'promoteLearnings']);
+  /* `boot` is the fold's read of which lists say what makes two things the same; this stand-in is older than it. */
+  assert.deepEqual(c.calls, ['stale', 'scopeProposals', 'learningsTwice', 'proposeScopes', 'promoteLearnings', 'boot']);
   assert.deepEqual(one.lines, [
     'Nothing is stale.',
     '',
@@ -159,8 +160,8 @@ test('A RECORD OLDER THAN THE NEW CALLS IS SAID IN ONE LINE AND THE COMMAND STIL
       const c = standIn({ stale: ok(STALE), scopeProposals: no(code, 'No such call.'), learningsTwice: no(code, 'No such call.') });
       const one = io();
       assert.equal(await tidyCommand(args, one, c.make), 0, `${code} ${args.join(' ')}`);
-      /* A WRITE IS SENT ONLY BEHIND A READ THAT ANSWERED. */
-      assert.deepEqual(c.calls, ['stale', 'scopeProposals', 'learningsTwice']);
+      /* A WRITE IS SENT ONLY BEHIND A READ THAT ANSWERED; `--ask` reads the index for the fold too, and stops there. */
+      assert.deepEqual(c.calls, ['stale', 'scopeProposals', 'learningsTwice', ...(args.length > 0 ? ['boot'] : [])]);
       assert.deepEqual(one.lines, ['Nothing is stale.', '', 'This BrainDog cannot say yet what looks like it belongs to a project, or which lessons were learned twice. It will once it is updated.']);
       assert.deepEqual(one.said, []);
       assert.deepEqual(one.answered, [{ value: { stale: STALE } }]);
@@ -209,4 +210,79 @@ test('ONLY A PERSON TYPING --ask ASKS: no hook and no install step passes it, so
     const source = readFileSync(join(SRC, file), 'utf8');
     assert.doesNotMatch(source, /tidy/u, `${file} runs braindog tidy`);
   }
+});
+
+/** The index and the declarations the fold reads: Tools and Skills say what makes two the same, Notes does not. */
+const BOOT = { registers: [{ id: 'tools', name: 'Tools' }, { id: 'skills', name: 'Skills' }, { id: 'notes', name: 'Notes' }] };
+const DECLS: Record<string, unknown> = {
+  tools: { id: 'tools', name: 'Tools', same: { fields: ['name'], within: 'project' } },
+  skills: { id: 'skills', name: 'Skills', same: { fields: ['name'], within: 'project', keep: 'oldest' } },
+  notes: { id: 'notes', name: 'Notes' },
+};
+
+/** A stand-in that answers the fold's calls by list, from `held` (each list's numbers) and `fold` (the press's answer). */
+function foldIn(held: Record<string, number[]>, fold: (register: string) => Result<unknown> = () => ok({ question: '01JABCDEFGHJKMNPQRSTVWXYZA' })) {
+  const calls: [string, string | undefined][] = [];
+  const make = (): Caller => ({
+    call: async (name, args) => {
+      const register = typeof args?.register === 'string' ? args.register : undefined;
+      calls.push([name, register]);
+      if (name === 'stale') return ok(STALE);
+      if (name === 'scopeProposals') return ok({ lists: [] });
+      if (name === 'learningsTwice') return ok({ pairs: [] });
+      if (name === 'proposeScopes' || name === 'promoteLearnings') return ok({ asked: [] });
+      if (name === 'boot') return ok(BOOT);
+      if (name === 'schema') return ok(DECLS[register ?? '']);
+      if (name === 'heldTwice') return ok(register && register in held ? { seqs: held[register] } : null);
+      if (name === 'askFoldTwice') return fold(register ?? '');
+      return OLDER(name);
+    },
+  });
+  return { make, calls };
+}
+
+test('--ask FILES ONE FOLD QUESTION A LIST THAT HOLDS A PAIR, in its own words, and the answer handed on by list', async () => {
+  const c = foldIn({ tools: [2, 5, 7, 9], skills: [3, 4] });
+  const one = io();
+  assert.equal(await tidyCommand(['--ask'], one, c.make), 0, one.said.join('\n'));
+  /* Notes says no `same:`, so it is never asked which of its things are here twice. */
+  assert.deepEqual(c.calls.filter(([n]) => n === 'heldTwice' || n === 'askFoldTwice'), [['heldTwice', 'tools'], ['askFoldTwice', 'tools'], ['heldTwice', 'skills'], ['askFoldTwice', 'skills']]);
+  assert.deepEqual(one.lines, ['Nothing is stale.', '', 'Asked on Decide: 4 tools may be here twice. Keep one of each?', 'Asked on Decide: 2 skills may be here twice. Keep one of each?']);
+  plain(one.lines);
+  const doc = (one.answered[0] as { value: Record<string, unknown> }).value;
+  assert.deepEqual(doc.heldTwice, { tools: { seqs: [2, 5, 7, 9] }, skills: { seqs: [3, 4] } });
+  assert.deepEqual(Object.keys(doc.askFoldTwice as object), ['tools', 'skills']);
+});
+
+test('NO PAIR, NO FOLD QUESTION, and nothing of the fold is read or filed without --ask', async () => {
+  const none = foldIn({ tools: [], skills: [] });
+  const one = io();
+  assert.equal(await tidyCommand(['--ask'], one, none.make), 0);
+  assert.equal(none.calls.filter(([n]) => n === 'heldTwice').length, 2);
+  assert.equal(none.calls.filter(([n]) => n === 'askFoldTwice').length, 0);
+  assert.deepEqual(one.lines, ['Nothing is stale.', '', 'Nothing to ask about.']);
+
+  const bare = foldIn({ tools: [2, 5] });
+  const two = io();
+  assert.equal(await tidyCommand([], two, bare.make), 0);
+  assert.deepEqual(bare.calls.map(([n]) => n), ['stale', 'scopeProposals', 'learningsTwice']);
+  assert.ok(!two.lines.some((l) => l.includes('here twice')));
+});
+
+test('A FOLD THE RECORD REFUSES IS SAID BY ITS FIX; one with nothing left twice, or a record too old to fold, is no failure', async () => {
+  const fix = 'Folding what is here twice changes many things at once, and only a person decides that, signed in. Open the list in the app.';
+  const refusedHere = foldIn({ tools: [2, 5] }, () => no('NEEDS_BROWSER_SESSION', fix));
+  const one = io();
+  assert.equal(await tidyCommand(['--ask'], one, refusedHere.make), 1);
+  assert.deepEqual(one.said, [fix]);
+
+  const gone = foldIn({ tools: [2, 5] }, () => no('ALREADY_KNOWN', 'Nothing in Tools is here twice, so nothing was asked.'));
+  const two = io();
+  assert.equal(await tidyCommand(['--ask'], two, gone.make), 0);
+  assert.deepEqual(two.said, []);
+
+  const older = foldIn({ tools: [2, 5] }, () => no('NOT_IN_THIS_BUILD', 'This BrainDog cannot fold what is here twice in Tools yet.'));
+  const three = io();
+  assert.equal(await tidyCommand(['--ask'], three, older.make), 0);
+  assert.ok(three.lines.includes('This BrainDog cannot put these on Decide yet. It will once it is updated.'));
 });

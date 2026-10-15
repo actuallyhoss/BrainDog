@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { filterOf, filterQuery, filtersOf, sameFilter } from './filters.ts';
+import { filterOf, filterQuery, filtersOf, sameFilter, searchOf, withSearch } from './filters.ts';
 
 test('THE STRIP IS READ OFF THE ANSWER, a row number spelt as its digits, none kept as a choice, and a shape it cannot read draws nothing', () => {
   const page = {
@@ -58,4 +58,31 @@ test('A CHOICE IS THE SAME CHOICE whatever order its fields were set in', () => 
   assert.equal(sameFilter({ a: '1', b: '2' }, { b: '2', a: '1' }), true);
   assert.equal(sameFilter({ a: '1' }, { a: '1', b: '2' }), false);
   assert.equal(sameFilter({}, {}), true);
+});
+
+test('THE WORD ON THE HEAD IS READ UNDER ITS OWN PARAM, trimmed, and an empty field is no word', () => {
+  const at = new URLSearchParams('f.thing=12&q=%20kiln%20&src=0');
+  assert.equal(searchOf(at, 'q'), 'kiln');
+  assert.equal(searchOf(new URLSearchParams('q=%20%20'), 'q'), null, 'spaces alone ask nothing');
+  assert.equal(searchOf(new URLSearchParams('q='), 'q'), null);
+  assert.equal(searchOf(new URLSearchParams('f.thing=12'), 'q'), null, 'no word in the address');
+  assert.equal(searchOf(at, null), null, 'a page whose head has no search reads no word');
+  assert.equal(searchOf(new URLSearchParams('find=glaze'), 'find'), 'glaze', 'the head names its own param');
+});
+
+test('THE WORD GOES WITH THE CHOICE under the param, the strip fields untouched, and no word sends the choice as it was', () => {
+  const chosen = filterOf(new URLSearchParams('f.thing=12&f.state=&q=kiln'));
+  assert.deepEqual(chosen, { thing: '12', state: '' }, 'the word is not an f. field');
+  assert.deepEqual(withSearch(chosen, 'q', 'kiln'), { thing: '12', state: '', q: 'kiln' });
+  assert.deepEqual(chosen, { thing: '12', state: '' }, 'the choice it was given is not changed');
+  assert.equal(withSearch(chosen, 'q', null), chosen, 'an empty word sends nothing new');
+  assert.equal(withSearch(chosen, null, 'kiln'), chosen, 'nor does a page with no search');
+  assert.deepEqual(withSearch({}, 'q', searchOf(new URLSearchParams('q='), 'q')), {}, 'an empty field asks the whole page');
+});
+
+test('A READ IS ASKED AGAIN ONLY WHEN THE WORD CHANGED', () => {
+  const sent = withSearch({ thing: '12' }, 'q', 'kiln');
+  assert.equal(sameFilter(sent, withSearch({ thing: '12' }, 'q', searchOf(new URLSearchParams('q=kiln%20'), 'q'))), true, 'a trailing space is the same word');
+  assert.equal(sameFilter(sent, withSearch({ thing: '12' }, 'q', 'kilns')), false);
+  assert.equal(sameFilter(sent, { thing: '12' }), false, 'clearing the field reads the whole page again');
 });

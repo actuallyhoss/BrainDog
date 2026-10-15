@@ -103,6 +103,14 @@ for (const fixture of slice) {
       assert.ok(refusal !== undefined && !Array.isArray(refusal), `${where} was refused with no refusal object`);
       assert.equal(refusal.code, fixture.keys.get('code'));
 
+      /* A 401 SAYS ONLY `unauthorized` (LCH-C08 job 2, his words, P.154): the one body on both hosts, with no `at` and no
+         sentence, whatever the fixture's header still says. Its reason is in the log. */
+      if (refusal.code === 'UNAUTHORIZED') {
+        assert.equal(res.status, 401, `${where} answered ${String(res.status)}`);
+        assert.deepEqual(refusal, { code: 'UNAUTHORIZED', fix: 'unauthorized' }, `${where} said more than unauthorized`);
+        return;
+      }
+
       /* SILENCE IS A CLAIM, AND SO IS AN ADDRESS. `authorization` and `record` are the two words these
          refusals carry today, and a sentence reworded without its `at` is a regression a client that
          highlights the field it was told about would meet first. */

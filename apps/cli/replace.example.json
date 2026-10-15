@@ -1,0 +1,19 @@
+{
+  "name": "Ledgerline",
+  "hooks": [
+    "[\\\\/]ledgerline[\\\\/]hooks[\\\\/]on-(?:start|stop)\\.(?:ps1|sh)(?![\\w.])"
+  ],
+  "programs": [
+    "(?:^|[\\\\/\\s\"'=])ledgerline-mcp\\.(?:mjs|js|py)(?![\\w.])"
+  ],
+  "hosts": [
+    "ledgerline.example",
+    "api.ledgerline.example"
+  ],
+  "skills": [
+    "ledgerline.example"
+  ],
+  "mcpJson": [
+    "~/Projects/shop/.mcp.json"
+  ]
+}

@@ -219,6 +219,15 @@
           "empty": "No services yet.",
           "limit": 50,
           "when": { "metric": "services-held", "gt": 0 }
+        },
+        {
+          "kind": "agents",
+          "heading": "What agents did",
+          "icon": "activity",
+          "span": 12,
+          "source": "activity",
+          "where": "list is services",
+          "first": 3
         }
       ]
     },

@@ -212,11 +212,20 @@ function slashLedger(dir: string): string {
  * is. Whichever way they arrive, the answer is the same `CallContext` the hosted product builds, so every
  * permission check below this line is the same code. `contextFor`, further down, is the order.
  */
-/** A credential this record does not know. 401, `49 §5.4` step 1. */
-const UNKNOWN: Refusal = { code: 'UNAUTHORIZED', fix: 'This record does not know that credential.', at: 'authorization' };
-
-/** None at all, where one is needed. The same 401, saying what to send rather than that it was not known. */
-const NONE: Refusal = { code: 'UNAUTHORIZED', fix: 'This record takes a bearer token. Send it as Authorization: Bearer <token>.', at: 'authorization' };
+/**
+ * THE ONE 401 BODY (LCH-C08 job 2, his words "A `401` says only `unauthorized`.", P.154), the Worker's exactly: a
+ * credential this record does not know (`49 §5.4` step 1) and none at all where one is needed answer the same, and which
+ * of the two it was goes to the log.
+ */
+const UNAUTHORIZED_ONLY: Refusal = { code: 'UNAUTHORIZED', fix: 'unauthorized' };
+const said401 = (why: string): { refused: Refusal } => {
+  console.error(`auth: bearer refused (${why})`);
+  return { refused: UNAUTHORIZED_ONLY };
+};
+/** A credential this record does not know. */
+const UNKNOWN = (): { refused: Refusal } => said401('This record does not know that credential.');
+/** None at all, where one is needed. */
+const NONE = (): { refused: Refusal } => said401('This record takes a bearer token. Send it as Authorization: Bearer <token>.');
 
 /** A credential it knows, belonging to somebody it does not. 403, and the Worker says the same. */
 const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach this record.', at: 'principal' };
@@ -446,7 +455,7 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
      matched above and never reaches here. */
   /* A CREDENTIAL THAT MATCHED NOTHING IS REFUSED, and never falls through to open mode: revoking a scoped
      token used to promote it to the owner, and `Authorization: x` on an open self-host was the owner. */
-  if (!sent.includes('.')) return { refused: UNKNOWN };
+  if (!sent.includes('.')) return UNKNOWN();
   /* A TOKEN MADE BEFORE THE OPERATOR'S CUT-OFF IS NOT ONE THIS RECORD KNOWS, in the same sentence, and at an operation
      door it falls to `operationFor`, which holds a grant to the same instant. */
   /* `cli` IS THE COMMAND'S BUILD (`x-braindog-cli`, AGT-A02), kept on the token row in the same write as its last use, so
@@ -460,9 +469,9 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
        own device grants, held to the same cut-off, and every method but the JOBS ones refuses it. */
     if (door !== undefined && RUNNER_DOORS.has(door)) {
       const ran = await runnerContext(api, sent, validFrom());
-      return ran === null ? { refused: UNKNOWN } : { ctx: ran };
+      return ran === null ? UNKNOWN() : { ctx: ran };
     }
-    return { refused: UNKNOWN };
+    return UNKNOWN();
   }
 
   /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant, so a token outlives nothing its
@@ -552,7 +561,7 @@ async function operationFor(sent: string, api: Api): Promise<Known> {
      refused unspent, as the token check above refuses a token. The record reads it through the `validFrom` it was
      built with, so this call and the key door's carry the same instant. */
   const grant = await api.operationGrant(sent);
-  if (!grant.ok) return { refused: UNKNOWN };
+  if (!grant.ok) return UNKNOWN();
   const held = api.kernel.access(grant.value.person);
   if (!held) return { refused: OFF };
   return {
@@ -614,7 +623,7 @@ async function contextFor(request: Request, host: string, site: Site, door?: str
   }
 
   /* AND NOTHING AT ALL, WHERE A CREDENTIAL IS NEEDED, IS 401. */
-  return { refused: NONE };
+  return NONE();
 }
 
 /**
@@ -2065,7 +2074,7 @@ export async function start(options: {
       resolve: options.shared?.resolve,
     }),
     /* THE FIRST READ OF A STRANGER'S SENTENCE, built once here where the origin is known, so its count lasts the process. */
-    firstRead: selfhostFirstReadDoor(env, { origin, slash: slashConfig, readSetup }),
+    firstRead: selfhostFirstReadDoor(env, { origin, slash: slashConfig, readSetup, catalogue: catalogueDir ?? null }),
     snapshots: kept,
     blobs: blobsFolder(options.file),
     /* THE TWO EMAIL ROUTES, GIVEN ONLY WHERE THIS HOST CAN MAIL THE LETTERS, as the magic-link door beside it is

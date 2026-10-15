@@ -1,13 +1,15 @@
 /**
- * `braindog doctor [--replaced <replace.json>] [--under <folder>] [--config-dir <folder>] [--json]`: what on this
- * machine still names a replaced tool, what holds something shaped like a key, and which profile lacks BrainDog.
+ * `braindog doctor [--replaced <replace.json>] [--under <folder>] [--config-dir <folder>] [--json]`: for every agent
+ * app and profile on this machine, whether BrainDog is set up there; what still names a replaced tool; what holds
+ * something shaped like a key; and which BrainDog server still runs a build older than the installed command.
  *
  * IT CHANGES NOTHING. `install --replace` takes the old tool out of the files it is pointed at, and nothing said
  * afterwards what was left: the one reading of a real machine was done by hand, once, three folders deep, for one
  * app. This reads the same places and more, and prints each by its file and its entry so a person can go to it.
  *
  * A PLAN AND A PRINTER. `planDoctor` reads files and is handed everything else (the home, the profiles, the crontab's
- * text), so a test plants a home and no real profile or schedule is read. `printDoctor` turns the plan into lines.
+ * text, the apps of the clients table, the machine's processes and the installed command's time), so a test plants a
+ * home and no real profile, schedule or process is read. `printDoctor` turns the plan into lines.
  * `doctor` reads the arguments and joins the two, and leaves the printing and the exit to `main.ts`.
  *
  * NO VALUE IS EVER PUT IN A PLACE. A place is a kind, a file and an entry's name, and the sentence beside it is
@@ -18,22 +20,48 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { BRAINDOG_SERVER, isOldServer, looksLikeToken, readReplace, serversFileOf, wordsOf, type Replace } from './install.ts';
+import { CLIENTS, clientOf, type Client } from './clients/index.ts';
+import { BRAINDOG_SERVER, descriptionOf, isOldServer, looksLikeToken, readReplace, serversFileOf, wordsOf, type Replace } from './install.ts';
 
 type Env = Record<string, string | undefined>;
 
-/** `profile` is a profile lacking something of BrainDog's; `key` is an entry holding something shaped like one. */
-export type Kind = 'server' | 'hook' | 'skill' | 'schedule' | 'startup' | 'key' | 'profile';
-/** One thing to go and fix: its file (or `crontab`), the entry's name in it, and one sentence of fixed words. */
+/**
+ * `profile` is a profile lacking something of BrainDog's; `key` is an entry holding something shaped like one;
+ * `process` is a BrainDog server still running a build older than the installed command.
+ */
+export type Kind = 'server' | 'hook' | 'skill' | 'schedule' | 'startup' | 'key' | 'profile' | 'process';
+/**
+ * One thing to go and fix: its file (or `crontab`), the entry's name in it, and one sentence of fixed words. For a
+ * `process` the file is the app to restart, by its name, and the entry is the process's number, a handle beside it.
+ */
 export type Place = { kind: Kind; file: string; entry: string; says: string };
 /** One profile: whether BrainDog's server is there and runs this command, and whether each of its two hooks is. */
 export type Profile = { dir: string; server: 'this' | 'other' | 'none'; start: boolean; end: boolean };
-export type Report = { replaced: string | null; profiles: Profile[]; places: Place[] };
-/** Everything the plan is handed. `crontab` is what `crontab -l` printed, or null where there is none. */
-export type Seen = { home: string; profiles: string[]; replace?: Replace | undefined; under?: string[]; crontab?: string | null };
+/** One agent app found on this machine other than Claude Code (whose profiles say it): BrainDog's server there, and the old tool's. */
+export type App = { app: string; server: 'this' | 'other' | 'none'; replaced: boolean; unread: boolean };
+export type Report = { replaced: string | null; profiles: Profile[]; apps: App[]; places: Place[] };
+/** One process of the machine, as `ps` lists it: its number, its parent's, when it started (ms) and its command. */
+export type Proc = { pid: number; ppid: number; started: number; command: string };
+/** The installed command: the file a server runs, and when it last changed (ms). */
+export type Installed = { file: string; changed: number };
+/**
+ * Everything the plan is handed. `crontab` is what `crontab -l` printed, or null where there is none; `clients` the
+ * apps to look in (the table, or a test's own); `processes` and `installed` what the old-server check compares.
+ */
+export type Seen = {
+  home: string;
+  profiles: string[];
+  replace?: Replace | undefined;
+  under?: string[];
+  crontab?: string | null;
+  clients?: readonly Client[];
+  env?: Env;
+  processes?: Proc[];
+  installed?: Installed | null;
+};
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
@@ -101,8 +129,8 @@ const holdsToken = (word: string): boolean => word.split(/[\\/=:?&"',;\s]+/).som
 
 /** A name that says its value is a secret, for an `env` or `headers` entry whose value is too short to look like one. */
 const SECRET_NAME = /token|secret|password|passwd|api[_-]?key|authorization|credential/i;
-/** A value that points at a secret kept elsewhere, `${NAME}` or `$NAME`, holds none itself. */
-const isReference = (value: string): boolean => /^\$\{?[A-Za-z_]\w*\}?$/.test(value.trim());
+/** A value that points at a secret kept elsewhere, `${NAME}` or `$NAME` (after `Bearer`, as Codex's bearer variable reads), holds none itself. */
+const isReference = (value: string): boolean => /^(?:Bearer\s+)?\$\{?[A-Za-z_]\w*\}?$/i.test(value.trim());
 
 /** Where in a server entry something shaped like a key sits, in fixed words, or null when nothing is. */
 function keyIn(server: Record<string, unknown>): string | null {
@@ -165,26 +193,7 @@ function hookPlaces(file: string, r: Replace | undefined): Place[] {
   return places;
 }
 
-/**
- * THE `description:` OF A SKILL'S FRONT MATTER, AND NOTHING ELSE OF ITS TEXT (H.620), with the indented lines that
- * carry it on. A folder of notes that mentions the old host further down is nobody's skill, and one with no front
- * matter says nothing about whose it is.
- */
-function descriptionOf(text: string): string | null {
-  const lines = text.replace(/^﻿/, '').split(/\r?\n/);
-  if (lines[0]?.trim() !== '---') return null;
-  const end = lines.findIndex((line, i) => i > 0 && line.trim() === '---');
-  const front = lines.slice(1, end === -1 ? lines.length : end);
-  const at = front.findIndex((line) => /^description\s*:/i.test(line));
-  if (at === -1) return null;
-  const more: string[] = [];
-  for (const line of front.slice(at + 1)) {
-    if (!/^\s+\S/.test(line)) break;
-    more.push(line.trim());
-  }
-  return [front[at]?.replace(/^description\s*:/i, '').trim() ?? '', ...more].join(' ');
-}
-
+/* A skill is read by its description line, by `install.ts`'s own reader, so the two never disagree about whose it is. */
 function skillPlaces(skills: string, r: Replace): Place[] {
   const places: Place[] = [];
   let names: string[] = [];
@@ -239,12 +248,14 @@ const JOB_FOLDERS = [join('Library', 'LaunchAgents'), join('.config', 'systemd',
 /** The two servers files a profile may have (`install.ts`, the default profile's second one), each once. */
 const serverFilesOf = (dir: string, home: string): string[] => [...new Set([serversFileOf(dir, home), join(resolve(dir), '.claude.json')])];
 
+/* THIS COMMAND, by the file it runs: the first argument, with the slashes one way round as `BRAINDOG_SERVER` keeps it. */
+const runsThis = (entry: Record<string, unknown>): boolean =>
+  Array.isArray(entry.args) && typeof entry.args[0] === 'string' && entry.args[0].replaceAll('\\', '/') === BRAINDOG_SERVER.args[0];
+
 function profileOf(dir: string, home: string): { state: Profile; places: Place[] } {
   const settings = join(dir, 'settings.json');
   const files = serverFilesOf(dir, home);
   const entries = files.map((file) => readJson(file)?.mcpServers).flatMap((servers) => (isObject(servers) && isObject(servers.braindog) ? [servers.braindog] : []));
-  /* THIS COMMAND, by the file it runs: the first argument, with the slashes one way round as `BRAINDOG_SERVER` keeps it. */
-  const runsThis = (entry: Record<string, unknown>) => Array.isArray(entry.args) && typeof entry.args[0] === 'string' && entry.args[0].replaceAll('\\', '/') === BRAINDOG_SERVER.args[0];
   const server = entries.length === 0 ? 'none' : entries.some(runsThis) ? 'this' : 'other';
   const commands = hooksOf(settings).map((hook) => hook.command);
   const state: Profile = { dir, server, start: commands.some((c) => isOurHook(c, 'start')), end: commands.some((c) => isOurHook(c, 'end')) };
@@ -255,6 +266,92 @@ function profileOf(dir: string, home: string): { state: Profile; places: Place[]
   if (!state.start) places.push({ kind: 'profile', file: settings, entry: 'hooks.SessionStart', says: "BrainDog's start hook is missing" });
   if (!state.end) places.push({ kind: 'profile', file: settings, entry: 'hooks.SessionEnd', says: "BrainDog's end hook is missing" });
   return { state, places };
+}
+
+/* The member each app keeps its servers under, so an entry is named as a person finds it in that app's file. */
+const SERVERS_KEY: Record<string, string> = { codex: 'mcp_servers', vscode: 'servers' };
+
+/**
+ * EVERY OTHER AGENT APP ON THIS MACHINE, from the clients table: whether BrainDog's server is in its servers, whether
+ * one of them is the old tool's, and what holds something shaped like a key. Each set is named by the label the client
+ * gives it (`~/.cursor/mcp.json`), which is the file a person opens. CLAUDE CODE IS LEFT TO ITS PROFILES, which read
+ * the same `~/.claude.json` and every profile's beside it, so its servers are never listed twice.
+ */
+function appPlaces(clients: readonly Client[], home: string, env: Env, r: Replace | undefined): { apps: App[]; places: Place[] } {
+  const apps: App[] = [];
+  const places: Place[] = [];
+  for (const client of clients) {
+    if (client.id === 'claude' || !client.found(home, env)) continue;
+    const app: App = { app: client.title, server: 'none', replaced: false, unread: false };
+    const key = SERVERS_KEY[client.id] ?? 'mcpServers';
+    let sets: ReturnType<Client['servers']> = [];
+    try {
+      sets = client.servers(home, null);
+    } catch {
+      /* A reader that throws is a file doctor cannot read, and is said as one. */
+      app.unread = true;
+    }
+    for (const set of sets) {
+      if (set.fault !== null) app.unread = true;
+      if (!isObject(set.servers)) continue;
+      for (const [name, server] of Object.entries(set.servers)) {
+        if (!isObject(server)) continue;
+        const entry = `${key}.${name}`;
+        if (name === 'braindog') app.server = runsThis(server) || app.server === 'this' ? 'this' : 'other';
+        else if (r && isOldServer(server, r)) {
+          app.replaced = true;
+          places.push({ kind: 'server', file: set.source, entry, says: `a server of ${r.name}'s in ${client.title}` });
+        }
+        const held = keyIn(server);
+        if (held) places.push({ kind: 'key', file: set.source, entry, says: `something shaped like a key in ${held}` });
+      }
+    }
+    apps.push(app);
+  }
+  return { apps, places };
+}
+
+/** The app a server process was started for: the `--agent` it was given, else the first app among its parents. */
+const APP_OF_PARENT: [RegExp, string][] = [
+  [/\/Claude\.app\//, 'claude-desktop'],
+  [/cursor/i, 'cursor'],
+  [/Visual Studio Code|Code Helper|(?:^|\/)code(?:\s|$)/, 'vscode'],
+  [/(?:^|[/\s])codex(?:\s|$)/i, 'codex'],
+  [/(?:^|[/\s])claude(?:\s|$)/i, 'claude'],
+];
+
+function appOfProcess(proc: Proc, byPid: Map<number, Proc>, words: string[]): string {
+  const agent = words[words.indexOf('--agent') + 1];
+  const named = words.includes('--agent') && agent !== undefined ? clientOf(agent) : undefined;
+  if (named) return named.title;
+  let at = byPid.get(proc.ppid);
+  for (let hops = 0; at !== undefined && hops < 6; hops++, at = byPid.get(at.ppid)) {
+    const command = at.command;
+    const hit = APP_OF_PARENT.find(([re]) => re.test(command));
+    const client = hit ? clientOf(hit[1]) : undefined;
+    if (client) return client.title;
+  }
+  return 'the app that started it';
+}
+
+/**
+ * EVERY BRAINDOG SERVER STILL RUNNING A BUILD OLDER THAN THE INSTALLED COMMAND: a process whose command runs the
+ * installed file with `mcp`, started before that file last changed. An agent app starts its servers once and keeps
+ * them, so after `braindog update` the old one serves on until the app restarts. The command line is matched here
+ * and never copied out: it is the app's to say, and it can hold anything.
+ */
+function processPlaces(processes: Proc[], installed: Installed | null | undefined): Place[] {
+  if (!installed) return [];
+  const file = installed.file.replaceAll('\\', '/');
+  const byPid = new Map(processes.map((p) => [p.pid, p]));
+  const places: Place[] = [];
+  for (const proc of processes) {
+    const words = proc.command.split(/\s+/).map((w) => w.replace(/^["']|["']$/g, '').replaceAll('\\', '/'));
+    const at = words.indexOf(file);
+    if (at === -1 || words[at + 1] !== 'mcp' || !(proc.started < installed.changed)) continue;
+    places.push({ kind: 'process', file: appOfProcess(proc, byPid, words), entry: `process ${String(proc.pid)}`, says: 'started before this command was updated' });
+  }
+  return places;
 }
 
 /**
@@ -275,6 +372,8 @@ export function planDoctor(seen: Seen): Report {
     if (r) places.push(...skillPlaces(join(dir, 'skills'), r));
     places.push(...missing);
   }
+  const { apps, places: inApps } = appPlaces(seen.clients ?? [], seen.home, seen.env ?? {}, r);
+  places.push(...inApps);
   for (const folder of seen.under ?? []) for (const file of projectFiles(resolve(folder))) if (once(file)) places.push(...serverPlaces(file, r));
   if (r) {
     places.push(...linePlaces('schedule', 'crontab', seen.crontab ?? null, r, `a scheduled job that runs ${r.name}`));
@@ -289,27 +388,55 @@ export function planDoctor(seen: Seen): Report {
     }
     for (const name of STARTUP) places.push(...linePlaces('startup', join(seen.home, name), readText(join(seen.home, name)), r, `a start-up line that names ${r.name}`));
   }
-  return { replaced: r?.name ?? null, profiles, places };
+  places.push(...processPlaces(seen.processes ?? [], seen.installed));
+  return { replaced: r?.name ?? null, profiles, apps, places };
 }
 
 const count = (n: number, one: string, many: string): string => `${String(n)} ${n === 1 ? one : many}`;
 
-/** The plan as lines: each profile in a sentence, then the places under three headings, then how many there are. */
-export function printDoctor(report: Report): string[] {
-  const lines = [`braindog doctor read ${count(report.profiles.length, 'profile', 'profiles')} and changed nothing.`];
+/** A file as a person goes to it: under the home it is `~/...`, and anything else is as it is. */
+const shown = (file: string, home: string | undefined): string =>
+  home !== undefined && home !== '' && (file === home || file.startsWith(`${home}/`) || file.startsWith(`${home}\\`)) ? `~${file.slice(home.length)}` : file;
+
+/** A Claude Code profile by its name: the default one, `.claude-<name>` by its name, and any other by where it is. */
+export function profileName(dir: string, home?: string): string {
+  const name = basename(dir);
+  const inHome = home !== undefined && resolve(dirname(dir)) === resolve(home);
+  if (inHome && name === '.claude') return 'Claude Code, the default profile';
+  if (inHome && name.startsWith('.claude-')) return `Claude Code, profile ${name.slice('.claude-'.length)}`;
+  return `Claude Code, the profile at ${shown(dir, home)}`;
+}
+
+const serverWords = (server: 'this' | 'other' | 'none'): string =>
+  server === 'this' ? "BrainDog's server is registered and runs this command" : server === 'other' ? "BrainDog's server is registered and runs another copy of the command" : "BrainDog's server is not registered";
+
+/**
+ * The plan as lines: each profile and each other app in a sentence, then the places under three headings, then each
+ * app to restart, then how many there are. `home` is the folder shown as `~`, so a line names a file a person can open.
+ */
+export function printDoctor(report: Report, home?: string): string[] {
+  const apps = report.apps.length > 0 ? ` and ${count(report.apps.length, 'other app', 'other apps')}` : '';
+  const lines = [`braindog doctor read ${count(report.profiles.length, 'profile', 'profiles')}${apps}, and changed nothing.`];
   for (const p of report.profiles) {
-    const server = p.server === 'this' ? "BrainDog's server is registered and runs this command" : p.server === 'other' ? "BrainDog's server is registered and runs another copy of the command" : "BrainDog's server is not registered";
     const hooks = p.start && p.end ? 'Both hooks are there' : p.start ? 'The end hook is missing' : p.end ? 'The start hook is missing' : 'Both hooks are missing';
-    lines.push(`${p.dir}: ${server}. ${hooks}.`);
+    lines.push(`${profileName(p.dir, home)}: ${serverWords(p.server)}. ${hooks}.`);
+  }
+  for (const a of report.apps) {
+    const old = a.replaced && report.replaced !== null ? ` A server of ${report.replaced}'s is still there.` : '';
+    lines.push(`${a.app}: ${serverWords(a.server)}.${old}${a.unread ? ' Its servers file could not be read.' : ''}`);
   }
   const group = (heading: string, kinds: Kind[]) => {
     const held = report.places.filter((place) => kinds.includes(place.kind));
     if (held.length === 0) return;
-    lines.push(heading, ...held.map((place) => `  ${place.file}, ${place.entry}: ${place.says}`));
+    lines.push(heading, ...held.map((place) => `  ${shown(place.file, home)}, ${place.entry}: ${place.says}`));
   };
   if (report.replaced !== null) group(`Still naming ${report.replaced}:`, ['server', 'hook', 'skill', 'schedule', 'startup']);
   group('Shaped like a key, and the value is never shown here:', ['key']);
   group('Not as braindog install leaves a profile:', ['profile']);
+  /* One line an app, however many of its servers are old: restarting the app restarts every one. */
+  const stale = new Map<string, number>();
+  for (const place of report.places) if (place.kind === 'process') stale.set(place.file, (stale.get(place.file) ?? 0) + 1);
+  for (const [app, n] of stale) lines.push(`Started before this command was updated: restart ${app}${n > 1 ? ` (${String(n)} servers)` : ''}.`);
   const n = report.places.length;
   lines.push(n === 0 ? `Nothing to fix${report.replaced === null ? '' : `, and nothing names ${report.replaced}`}.` : `${count(n, 'place', 'places')} to fix.`);
   return lines;
@@ -324,7 +451,61 @@ function crontabOf(): string | null {
   }
 }
 
-export type DoctorIo = { home?: string; env?: Env; crontab?: () => string | null };
+/**
+ * Every process of this machine, as `ps -A` lists it with its start time, or none where there is no such command
+ * (Windows, which a later job reads its own way). Read, never signalled: doctor says which app to restart and the
+ * person restarts it. LC_ALL=C keeps the start time in the one form `Date` reads.
+ */
+export function psOf(): Proc[] {
+  if (process.platform === 'win32') return [];
+  let text: string;
+  try {
+    text = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,lstart=,command='], { encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' }, stdio: ['ignore', 'pipe', 'ignore'], timeout: 5_000, maxBuffer: 16 * 1024 * 1024 });
+  } catch {
+    return [];
+  }
+  const procs: Proc[] = [];
+  for (const line of text.split('\n')) {
+    const m = /^\s*(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d+\s+[\d:]+\s+\d{4})\s+(.*)$/.exec(line);
+    const started = m ? Date.parse(m[3] ?? '') : NaN;
+    if (m && !Number.isNaN(started)) procs.push({ pid: Number(m[1]), ppid: Number(m[2]), started, command: m[4] ?? '' });
+  }
+  return procs;
+}
+
+/**
+ * The installed command and when it last changed. THE FILE A SERVER RUNS IS `BRAINDOG_SERVER`'s, the one `install`
+ * registers, and never `process.argv[1]`: a command on the path is a link to the bundle, and Node keeps the link's
+ * name there, so a server running the bundle would never be matched. A bundle is one file, so its own time is the
+ * build's. A checkout's `main.ts` may be untouched by a pull that changed the files beside it or the packages the
+ * server is made of, so there the newest `.ts` source in its folder and in the checkout's `packages` is the build's
+ * time (tests left out, which no server runs).
+ */
+export function installedOf(file: string | undefined = BRAINDOG_SERVER.args[0]): Installed | null {
+  if (file === undefined || file === '') return null;
+  const at = resolve(file);
+  try {
+    if (!at.endsWith('.ts')) return { file: at, changed: statSync(at).mtimeMs };
+    let newest = statSync(at).mtimeMs;
+    const walk = (dir: string, depth: number) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        const skip = entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'test' || entry.name === 'dist';
+        if (entry.isDirectory() && depth > 0 && !skip) walk(path, depth - 1);
+        else if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) newest = Math.max(newest, statSync(path).mtimeMs);
+      }
+    };
+    walk(dirname(at), 3);
+    const packages = resolve(dirname(at), '..', '..', '..', 'packages');
+    if (existsSync(packages)) walk(packages, 3);
+    return { file: at, changed: newest };
+  } catch {
+    return null;
+  }
+}
+
+/** What the verb reads beyond the arguments, each one a test's to hand in: no real home, schedule or process then. */
+export type DoctorIo = { home?: string; env?: Env; crontab?: () => string | null; clients?: readonly Client[]; ps?: () => Proc[]; installed?: () => Installed | null };
 
 /**
  * The verb: its arguments read, the plan made and printed. THROWS ONE SENTENCE for an argument it does not take or a
@@ -348,6 +529,17 @@ export function doctor(args: string[], io: DoctorIo = {}): { lines: string[]; re
     }
   }
   const home = io.home ?? homedir();
-  const report = planDoctor({ home, profiles: profilesIn(home, values['config-dir'] ?? [], io.env ?? process.env), replace, under: values.under ?? [], crontab: (io.crontab ?? crontabOf)() });
-  return { lines: printDoctor(report), report, json: values.json === true, code: report.places.length > 0 ? 1 : 0 };
+  const env = io.env ?? process.env;
+  const report = planDoctor({
+    home,
+    profiles: profilesIn(home, values['config-dir'] ?? [], env),
+    replace,
+    under: values.under ?? [],
+    crontab: (io.crontab ?? crontabOf)(),
+    clients: io.clients ?? CLIENTS,
+    env,
+    processes: (io.ps ?? psOf)(),
+    installed: (io.installed ?? installedOf)(),
+  });
+  return { lines: printDoctor(report, home), report, json: values.json === true, code: report.places.length > 0 ? 1 : 0 };
 }

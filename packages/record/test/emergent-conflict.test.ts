@@ -13,6 +13,11 @@
  *
  * WHAT SLASH LEAVES TO THE PEN WAITS IN THE ONE QUEUE (ENG-B14): three at most are shown, and the rest wait their turn,
  * asked in no second place (`emergent-queue.test.ts`).
+ *
+ * USER, THEN ADD-ON, THEN AN OFFER (`29 §6`: "User > pack > derived"). A page the person wrote carries no `pack`, an
+ * add-on's carries its pack, and a page the pen offers carries `origin: derived` and `derived_from` (`block-keys.ts`
+ * `PAGE_KEYS`). One list with the person's page and an add-on's draws the person's, the add-on's next, and the pen offers
+ * it no page; and a saved view of that list opened often is offered its place after both, never in front of either.
  */
 
 import { test } from 'node:test';
@@ -22,6 +27,7 @@ import type { Declaration } from '@braindog/kernel';
 
 import { createRecordApi, type Boot, type CallContext } from '../src/index.ts';
 import { pageSignatures, pageSpokenFor, signatureOf } from '../src/emergent.ts';
+import { VIEWS_SECTION } from '../src/emergent-views.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
 const OWNER: CallContext = { principal: { kind: 'person', id: 'p_owner', level: 'owner' } };
@@ -143,5 +149,60 @@ test('NO ON DECIDE IS NOT NOW IN THE PEN: declining Slash\'s page writes page:ta
   value(await api.decide({ id: asked[0]!.id, resolved_as: 'wont-fix', reason: 'Not now.' }, OWNER));
   const prefs = value<Boot>(await api.boot(OWNER)).me.prefs;
   assert.ok(prefs?.['pen.dismissed']?.includes('page:tasks'), `pen.dismissed holds ${JSON.stringify(prefs?.['pen.dismissed'] ?? [])}`);
+  sql.close();
+});
+
+/** A page over Tasks: the person's (no `pack`), an add-on's (`pack`), or a saved view under Views. */
+const tasksPage = (slug: string, title: string, nav: { section: string; order: number }, pack?: string): Declaration =>
+  ({
+    id: `page.${slug}`,
+    kind: 'page',
+    ...(pack ? { pack } : {}),
+    body: { page: slug, title, nav, requires: ['register.tasks'], blocks: [{ kind: 'table', source: 'register.tasks', empty: 'Nothing yet.' }] },
+  }) as never;
+const MY_TASKS = tasksPage('my-tasks', 'My tasks', { section: 'Tasks', order: 10 });
+const CHORES = tasksPage('chore-board', 'Chore board', { section: 'Tasks', order: 20 }, 'chore-kit');
+/** Where the rail draws the pages over Tasks: in its section, by the order each declares. */
+const railOf = async (api: Api): Promise<string[]> =>
+  value<Boot>(await api.boot(OWNER))
+    .pages.filter((p) => p.list === 'tasks' && p.nav !== null && p.nav.section !== VIEWS_SECTION)
+    .sort((a, b) => a.nav!.order - b.nav!.order)
+    .map((p) => p.slug);
+const offeredForTasks = async (api: Api): Promise<string[]> =>
+  value<Boot>(await api.boot(OWNER)).pen.filter((i) => i.register === 'tasks').map((i) => i.id);
+
+test('AN ADD-ON\'S PAGE BEATS AN OFFER: alone it takes the offer\'s place, and beside the person\'s it is drawn next', async () => {
+  const control = await growing();
+  assert.deepEqual(await offeredForTasks(control.api), ['page:tasks'], 'the control failed: Tasks with no page was offered none');
+  control.sql.close();
+
+  const alone = await growing();
+  value(await alone.api.kernel.install([CHORES]));
+  assert.deepEqual(await offeredForTasks(alone.api), [], 'Tasks was offered a page beside the one its add-on gives it');
+  alone.sql.close();
+
+  const { sql, api } = await growing();
+  value(await api.kernel.install([CHORES]));
+  value(await api.kernel.install([MY_TASKS]));
+  assert.deepEqual(await railOf(api), ['my-tasks', 'chore-board'], 'the person\'s page was not drawn first and the add-on\'s next');
+  assert.deepEqual(await offeredForTasks(api), [], 'Tasks was offered a page beside the person\'s and the add-on\'s');
+  assert.deepEqual(asksForTasks(await press(api)), [], 'Slash asked for a page of a list two pages already draw');
+  sql.close();
+});
+
+test('A VIEW\'S PLACE NEVER PUSHES IN FRONT: a saved view opened often is offered the place after the person\'s page and the add-on\'s', async () => {
+  const { sql, clock, api } = await growing();
+  value(await api.kernel.install([MY_TASKS, CHORES, tasksPage('urgent', 'Urgent', { section: VIEWS_SECTION, order: 900 })]));
+  for (const day of [16, 17, 18, 19, 20]) {
+    clock.set(T0 + day * DAY);
+    value(api.kernel.observe([{ kind: 'page.render', subject: 'urgent' }]));
+  }
+  const place = value<Boot>(await api.boot(OWNER)).pen.find((i) => i.id === signatureOf('place', 'urgent'));
+  assert.ok(place, `the view opened five times was not offered its place: the pen held ${JSON.stringify(await offeredForTasks(api))}`);
+  assert.deepEqual(place.change.to.body.nav, { section: 'Tasks', order: 30 });
+
+  value(await api.kernel.install([{ id: place.change.to.id, kind: 'page', body: place.change.to.body } as never]));
+  assert.deepEqual(await railOf(api), ['my-tasks', 'chore-board', 'urgent'], 'the kept place moved a page in front of it');
+  assert.deepEqual(await offeredForTasks(api), [], 'a place kept was offered again');
   sql.close();
 });

@@ -51,8 +51,10 @@ export const SHOP = {
      oldest and left the rest out.
      FOLDED INTO THE UNRELEASED 1.2.0 (owed-words-70-71, audit 69 finding 4): the tile of what is not paid in full is
      headed Still to come in, the words Today's money tile opens it with, where it said Owed to you. Commit 63423720,
-     the deployed build, holds 1.0.0, so no version is cut for it. */
-  version: '1.2.0',
+     the deployed build, holds 1.0.0, so no version is cut for it.
+     1.3.0: the Orders page says its place on the rail, second after Work (places-and-computed-101, SHL-A18). 1.2.0 IS IN
+     THE CATALOGUE (published by batch 99), so this is a version of its own. */
+  version: '1.3.0',
   title: 'Shop',
   summary: 'The orders you take, who they are for and when they are due, what has been paid, and the things you sell.',
   author: 'BrainDog',
@@ -146,7 +148,8 @@ export const SHOP = {
       {
         page: 'orders',
         title: 'Orders',
-        nav: { section: 'Orders', order: 10 },
+        /* ITS PLACE ON THE RAIL, SINCE 1.3.0 (places-and-computed-101, SHL-A18): second, after Work. */
+        nav: { section: 'Orders', order: 10, place: 20 },
         icon: 'board',
         requires: ['register.orders'],
         blocks: [

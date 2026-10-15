@@ -30,7 +30,7 @@ import { FORMAT_VERSION, KERNEL_MIGRATION } from '@braindog/kernel';
 import { PRIMITIVES_VERSION } from 'braindog-render';
 
 import { automations, scripts } from './automations.ts';
-import { behindLine } from './behind.ts';
+import { behindLine, doctorLine, installedBuild } from './behind.ts';
 import { serveBridge } from './bridge.ts';
 import { exportFile, importFile } from './brainfile.ts';
 import { HOOK_MS, heldHere, hookBudget, hookEnd, hookStart, parentOf, unreachable } from './hooks.ts';
@@ -185,7 +185,7 @@ const usage = () =>
     '  Deposit the value on standard input as a key. The host seals it, and it is never an argument.',
     'braindog keys put --from <file or folder> [--project <name>] [--opens <what>] [--kind <kind>] [--dry-run] [--host <host>]',
     '  Seal every key in a file of NAME=value lines, or a folder of one key a file, asking you about each on the terminal first. Names are printed, never a value.',
-    'braindog keys scan [<folder>] [--project <name>] [--deposit] [--host <host>]',
+    'braindog keys scan [<folder>] [--project <name>] [--deposit] [--ask] [--host <host>]',
     '  Name every key lying in a repository\'s files (.env, .secrets, .pem) and the file it lies in, and the command that seals them. It sends nothing unless --deposit.',
     'braindog keys exec <label | credentials#n> [--as <ENV_NAME>] [--vault <project>] [--host <host>] -- <command> [args...]',
     '  Run the command with the key in one environment variable, named from the label unless --as names it. It is never printed.',
@@ -229,7 +229,7 @@ const usage = () =>
     '  List what a catalogue holds, the Kennel when no --from is named, with what each can reach and call out to. Nothing is sent to a record.',
     'braindog usecase preview <file> [--port <n>]',
     '  Start a scratch BrainDog on this machine with the file in its catalogue, to install and look at. Removed when it stops.',
-    'braindog pack new <id> [--title <title>] [--author <name>] [--out <folder>] [--yaml]',
+    'braindog pack new <id> [--title <title>] [--author <name>] [--out <folder>] [--yaml] [--from-page <file.dog>]',
     '  Write a starting add-on folder: its .pack.json (or .pack.yaml), a first page over a first list with two example rows, its test and a README.',
     'braindog pack check <file|dir>',
     '  Read an add-on, JSON or YAML, warn on any key its manifest does not take, and install it in a scratch record here, saying every refusal a record would give. Nothing is sent.',
@@ -669,7 +669,10 @@ async function hook(args: string[]): Promise<void> {
   /* AND ONCE A DAY, WHEN THIS COMMAND IS OLDER THAN THE HOST NEEDS, a line saying so under it (`behind.ts`): it never
      throws, waits at most two seconds and only on the first start of a day, and rides the same one write. */
   const behind = which === 'start' ? await behindLine({ env: process.env }) : null;
-  const lapse = [which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, behind].filter((line): line is string => line !== null).join('\n') || null;
+  /* AND ONCE A WEEK, A QUIET `braindog doctor` (`doctorLine`): one line beside it when the run lists anything. Only from
+     an installed build, as `behindLine`: a checkout run by `node` is a developer's, and its tests never touch the home. */
+  const doctored = which === 'start' && installedBuild() ? doctorLine(homedir()) : null;
+  const lapse = [which === 'start' ? lapseWarning(process.env, hostsPath(process.env)) : null, behind, doctored].filter((line): line is string => line !== null).join('\n') || null;
   const write = (text: string) => {
     said = true;
     writeFileSync(1, `${lapse === null ? '' : `${lapse}\n`}${text}\n`);

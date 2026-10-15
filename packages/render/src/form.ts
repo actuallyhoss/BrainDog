@@ -111,7 +111,8 @@ export function readForm(v: unknown): FormSpec | null {
   const f = v as Record<string, unknown>;
   const register = words(f.register);
   const submit = words(f.submit);
-  if (!Array.isArray(f.fields) || register === '' || submit === '') return null;
+  const verb = words(f.verb) || 'row.create';
+  if (!Array.isArray(f.fields) || (verb === 'row.create' && register === '') || submit === '') return null;
   const seen = new Set<string>();
   const fields: FormField[] = [];
   for (const raw of f.fields) {
@@ -121,7 +122,7 @@ export function readForm(v: unknown): FormSpec | null {
     fields.push(field);
   }
   if (fields.length === 0) return null;
-  return { verb: words(f.verb) || 'row.create', register, fields, submit, after: words(f.after) || 'stay' };
+  return { verb, register, fields, submit, after: words(f.after) || 'stay' };
 }
 
 /** The form a drawn block carries, or null. */

@@ -23,7 +23,7 @@
   import Tile from '../ui/Tile.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
-  import { draftDrawing, offerWords, type OfferActs, type PenItem } from './pen.ts';
+  import { draftDrawing, makeLabel, offerWords, type OfferActs, type PenItem } from './pen.ts';
 
   let {
     item,
@@ -89,7 +89,7 @@
     </div>
   {/if}
   <div class="offer-acts">
-    <Button weight="primary" disabled={Boolean(busy)} onclick={() => void acts.make(item)}>{making ? offerWords.making : offerWords.make}</Button>
+    <Button weight="primary" disabled={Boolean(busy)} onclick={() => void acts.make(item)}>{making ? offerWords.making : makeLabel(item)}</Button>
     <Button weight="bare" disabled={making} onclick={() => void acts.notNow(item)}>{offerWords.notNow}</Button>
   </div>
 </Tile>

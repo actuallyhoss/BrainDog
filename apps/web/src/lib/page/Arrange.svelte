@@ -189,7 +189,7 @@
       ...(arrangement.slots ?? declared.map((b, i) => slotOf(b, i, layout))),
       { i: declared.length + extra.length - 1, span: block.span ?? 12 },
     ];
-    const named = copy.kindNames[block.kind] ?? block.kind;
+    const named = copy.kindNames[block.kind] ?? blockWords.kindNames[block.kind] ?? block.kind;
     toasts.push(copy.blockAddedLive(named));
   }
 

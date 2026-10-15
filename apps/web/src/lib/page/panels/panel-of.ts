@@ -21,14 +21,27 @@
 
 /**
  * The panels the host draws, the kernel's list in its order (`packages/kernel/src/kinds/words.ts` `PANEL_TABLE`), which
- * `panel-of.test.ts` holds equal: four about the page's row (a project's scheduled actions, the key a row's numbers are
- * sent with, a run's changes, and where the record saw the row, `Seen.svelte`), then two about the record that stand on
- * any page (the look editor and the model Slash uses).
+ * `panel-of.test.ts` holds equal: five about the page's row (a project's scheduled actions, the key a row's numbers are
+ * sent with, a run's changes, where the record saw the row, `Seen.svelte`, and its jobs, `Job.svelte`), then the ones about the record that stand
+ * on any page: the look editor, the model Slash uses, the ladder of trust, whether Slash reads on its own, the reader's
+ * own keys and the button that opens a new scheduled action.
  *
  * A COPY AND NOT AN IMPORT, because this file is pure and the kernel's index is the whole record; the test is what keeps
  * the two one list.
  */
-export const PANELS = ['actions', 'reporting', 'run', 'seen', 'look-editor', 'slash-model'] as const;
+export const PANELS = [
+  'actions',
+  'reporting',
+  'run',
+  'seen',
+  'job',
+  'look-editor',
+  'slash-model',
+  'trust',
+  'slash-reads',
+  'my-keys',
+  'new-action',
+] as const;
 
 export type Panel = (typeof PANELS)[number];
 
@@ -42,8 +55,15 @@ export const PANEL_WHO: Readonly<Record<Panel, { needs: 'row' | 'none'; level: '
   reporting: { needs: 'row', level: 'write' },
   run: { needs: 'row', level: 'read' },
   seen: { needs: 'row', level: 'read' },
+  /* THE JOBS FOR A PROJECT, AND A WAY TO START ONE (`Job.svelte`), where the page writes. */
+  job: { needs: 'row', level: 'write' },
   'look-editor': { needs: 'none', level: 'owner' },
   'slash-model': { needs: 'none', level: 'owner' },
+  trust: { needs: 'none', level: 'owner' },
+  'slash-reads': { needs: 'none', level: 'owner' },
+  /* ANYONE WHO READS, since the keys it lists are the reader's own (`ownTokens`), never another person's. */
+  'my-keys': { needs: 'none', level: 'read' },
+  'new-action': { needs: 'none', level: 'owner' },
 };
 
 /* A `Set`, so a `panel:` of `constructor` names nothing. */

@@ -9,6 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { PANELS, PANEL_WHO, panelOf } from './panel-of.ts';
 import { PANEL_LOADERS, panelNeeds } from './index.ts';
@@ -70,4 +71,45 @@ test('THE LOOK EDITOR IS NAMED BY A SECTION ON ANY PAGE, and needs no row', () =
   assert.equal(panelOf({ kind: 'section', heading: 'The model', panel: 'slash-model' } as never), 'slash-model');
   assert.equal(panelNeeds('look-editor'), 'none');
   assert.equal(panelNeeds('actions'), 'row');
+});
+
+/* THE FOUR PANELS OF PGS-A17 JOB 3, each an existing screen: who they are drawn for is the kernel's word. */
+const FOUR = { trust: 'owner', 'slash-reads': 'owner', 'my-keys': 'read', 'new-action': 'owner' } as const;
+
+test('THE LADDER OF TRUST, WHAT SLASH READS, YOUR OWN KEYS AND A NEW ACTION STAND ON ANY PAGE, each for its reader', async () => {
+  const { PANEL_TABLE } = await kernel();
+  for (const [name, level] of Object.entries(FOUR) as [keyof typeof FOUR, string][]) {
+    assert.ok((PANELS as readonly string[]).includes(name), `${name} is a panel`);
+    assert.equal(panelNeeds(name), 'none', `${name} needs no row`);
+    assert.equal(PANEL_WHO[name].level, level, `${name} is drawn for ${level}`);
+    assert.equal(PANEL_TABLE[name].level, level);
+    assert.ok(!PANEL_TABLE[name].says.includes('—'), `${name} says a plain line`);
+  }
+  assert.equal(panelOf({ kind: 'section', heading: 'Who acts alone', panel: 'trust' } as never), 'trust');
+  assert.equal(panelOf({ kind: 'section', heading: 'Make one', panel: 'new-action' } as never), 'new-action');
+  assert.equal(PANEL_TABLE['my-keys'].says, 'Your own keys to this record');
+});
+
+/* THE FILES BEHIND THE LOADERS, read as text: Node cannot load a Svelte component, and the rule is in what it calls. */
+const source = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8');
+const MY_TOKENS = '../../../routes/settings/[area]/areas/MyTokens.svelte';
+
+test("YOUR OWN KEYS NEVER DRAW ANOTHER PERSON'S KEY: the panel calls only the caller's own key methods", () => {
+  const index = source('./index.ts');
+  assert.match(index, /'my-keys': \(\) => import\('\.\.\/\.\.\/\.\.\/routes\/settings\/\[area\]\/areas\/MyTokens\.svelte'\)/u);
+  const screen = source(MY_TOKENS);
+  const calls = [...screen.matchAll(/clientOf\(\)\.(\w+)\(/gu)].map((m) => m[1]);
+  assert.ok(calls.includes('ownTokens'), 'it lists the reader\'s own keys');
+  for (const call of calls) assert.ok(['ownTokens', 'createOwnToken', 'revokeOwnToken'].includes(call!), `${call} is the caller's own`);
+  /* THE OWNER'S CALLS, which answer every person's keys, are never made here. */
+  assert.doesNotMatch(screen, /\blistTokens\b|\.revokeToken\(|\.createToken\(/u);
+});
+
+test('THE NEW ACTION PANEL IS ONE BUTTON OVER THE EXISTING SHEET, for the owner alone', () => {
+  const panel = source('./NewActionPanel.svelte');
+  assert.match(panel, /import NewAction from '\$lib\/ui\/NewAction\.svelte'/u, 'the sheet is mounted, not rewritten');
+  assert.match(panel, /<NewAction \{open\} kind="action" onclose=/u, 'handed what the hub hands it');
+  assert.match(panel, /\{#if owner\}/u, 'nothing is drawn for anyone but the owner');
+  assert.equal((panel.match(/<Button\b/gu) ?? []).length, 1, 'one button');
+  assert.doesNotMatch(panel, /<h[1-6]\b/u, 'the section gives the heading');
 });

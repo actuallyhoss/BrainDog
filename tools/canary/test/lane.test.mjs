@@ -15,6 +15,7 @@ import { liveSmoke, selfHostSmoke } from '../lane.d/10-smoke.mjs';
 import { envFor } from '../lane.d/20-signin-live.mjs';
 import { argsFor, judge as judgeLook, productErrors } from '../lane.d/30-look.mjs';
 import { judge as judgeSigns, MOST_HOURS, newestReading } from '../lane.d/40-signs.mjs';
+import { keptStep, planFor as keptPlan } from '../lane.d/70-kept.mjs';
 
 const DIR = join(import.meta.dirname, '..', 'lane.d');
 /** The workflow's own reading of a step's red (`.github/workflows/after-deploy.yml`). */
@@ -133,4 +134,21 @@ test('without the zone it calls a reading old only when it is old in every zone,
   const own = judgeSigns({ signs: signs('2026-10-08', []) }, { live: false });
   assert.equal(own.red, false);
   assert.match(own.line, /waits for the canary/u);
+});
+
+/* THE KEPT LANE ON THE CANARY (`70-kept.mjs`, SHL-A19): skipped on production and without the drill's names, skipped on a
+   host whose billing is not test, and red on any FAIL line, with nothing run when it skips. */
+test('the kept step skips on production, without the drill’s names, or where billing is not test, and is red on a FAIL', async () => {
+  const names = { SMOKE_SLUG: 'ops', CANARY_MAIL_DOOR: 'door@example.test', CANARY_INVITE_CODE: 'c', CANARY_INBOX_KEY: 'k' };
+  let ran = 0;
+  const run = async (_ctx, { say }) => (ran++, say('  PASS  invoices: read back'), [{ name: 'invoices', pass: true }]);
+  assert.match(keptPlan(names).line, /production/u);
+  assert.match(keptPlan({ ...names, CANARY_ORIGIN: 'https://alpha.example.test', CANARY_INBOX_KEY: '' }).line, /CANARY_INBOX_KEY is not set/u);
+  assert.deepEqual(keptPlan({ SMOKE_SLUG: '' }).run, false);
+  const alpha = { ...names, CANARY_ORIGIN: 'https://alpha.example.test' };
+  assert.deepEqual(await keptStep(alpha, { run, billing: async () => 'billing on alpha.example.test is live, and the lane runs only where it is test.' }), { code: 3, lines: ['skipped: billing on alpha.example.test is live, and the lane runs only where it is test.'] });
+  assert.equal(ran, 0);
+  assert.deepEqual(await keptStep(alpha, { run, billing: async () => null }), { code: 0, lines: ['PASS  invoices: read back'] });
+  const red = await keptStep(alpha, { run: async () => [{ name: 'stripe', pass: false }], billing: async () => null });
+  assert.equal(red.code, 1);
 });

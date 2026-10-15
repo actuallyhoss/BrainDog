@@ -103,7 +103,7 @@
   });
   /** The parts said before what it changed, between that and the step it left, and after the step. */
   const BEFORE: readonly TalkKey[] = ['who', 'stretches', 'doing'];
-  const BETWEEN: readonly TalkKey[] = ['asked', 'tried'];
+  const BETWEEN: readonly TalkKey[] = ['asked', 'tried', 'noted'];
   const AFTER: readonly TalkKey[] = ['helpers', 'took'];
   let closing = $state(false);
   let why = $state('');

@@ -639,11 +639,12 @@ const FIGURES_13 = ['learnings-arrived', 'learnings-charted', 'skills-changed', 
 
 /**
  * AND WHAT 1.13.0 PUT IN THE LISTS (AGT-C13 e, AGT-D15 1, AGT-B09 4): `same:` on all four, the kind `rule` with its
- * label, and the four-part test after what learnings hold. Taken out the same way, each key back where it stood.
+ * label, and the four-part test after what learnings hold. Taken out the same way, each key back where it stood. AND
+ * `role:` on all four and `fade:` on learnings (agents-by-role-101), so a renamed list is still found by its part.
  */
 const HOLDS_12 = 'what an agent found out the hard way, with the failure that taught it';
 const listBefore13 = <T extends Record<string, unknown>>(list: T): T => {
-  const { same: _same, ...rest } = list as Record<string, unknown>;
+  const { same: _same, role: _role, fade: _fade, ...rest } = list as Record<string, unknown>;
   if (_same === undefined) return list;
   const fields = (rest.fields as Record<string, unknown>[]).map((f) => {
     if (rest.holds !== undefined && list.title === 'lesson' && f.id === 'kind') {
@@ -670,7 +671,7 @@ const before13 = (declarations: Record<string, unknown>[]): Record<string, unkno
     .filter((d) => d.page !== 'brain' && !FIGURES_13.includes(String(d.metric)))
     .map((d) =>
       d.page === 'agents'
-        ? { ...d, blocks: staleBefore13((d.blocks as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
+        ? { ...d, nav: (({ place: _place, ...rest }) => rest)(d.nav as Record<string, unknown>), blocks: staleBefore13((d.blocks as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
         : listBefore13(d),
     );
 
@@ -767,11 +768,13 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
    two figures over the record's log, a second series on the chart and a clause in the line; it was 7c0c9cb8f919f32f),
    and again for Needs a look's line of what is here twice (tidy-rows-same-92, AGT-C18; it was 421923fd971c9103), and
    again for the stale line made two lines in words (tidied-breakdown-96, AGT-C18 item 5; it was 7bc8400d00577416),
-   which `before13` puts back as 1.11.0 wrote it. */
+   which `before13` puts back as 1.11.0 wrote it, and again for `role:` on the four lists and `fade:` on learnings
+   (agents-by-role-101; it was 111daac7b0d94aee), and again for the Agents page's place on the rail, `nav.place` 60
+   (places-and-computed-101; it was a9f073bfd65c161a), which `before13` takes off as it does the rest. */
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.13.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), '111daac7b0d94aee', 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(doc.declarations), 'c8e4bf508d3d4bfa', 'the Agents add-on changed what it declares with no new version');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
   assert.equal(doc.declarations.length - before13(doc.declarations).length, 5, '1.13.0 put in a page and four figures');
 });

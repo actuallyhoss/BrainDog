@@ -29,6 +29,7 @@ import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import { TOKEN_REACHES, type CallContext } from '@braindog/record';
 
 import { recordOf } from './route.ts';
+import { op } from './oplog.ts';
 import { capped, LAPSED_FIX, mayWrite, mcpWrites } from './lapse.ts';
 
 /**
@@ -55,7 +56,12 @@ export type Door =
   /** `refusal` absent on a 401 is the Worker's own sentence for "nothing presented"; a 429 has `retryAfter`. */
   | { door: 'refused'; status: 401 | 403 | 429 | 503; refusal?: Refusal; retryAfter?: number; cookie?: string };
 
-const NOT_YOU: Refusal = { code: 'UNAUTHORIZED', fix: 'That did not sign you in.' };
+/** The one 401 body (LCH-C08 job 2): "A `401` says only `unauthorized`." The sentence goes to the log (`notYou`). */
+const NOT_YOU: Refusal = { code: 'UNAUTHORIZED', fix: 'unauthorized' };
+const notYou = (): Refusal => {
+  op({ op: 'unauthorized', door: 'session', why: 'That did not sign you in.' });
+  return NOT_YOU;
+};
 const CROSS: Refusal = { code: 'FORBIDDEN', fix: 'A change here is accepted only from a page on this BrainDog.', at: 'origin' };
 const SAFE = new Set(['GET', 'HEAD']);
 
@@ -86,7 +92,7 @@ export async function doorOf(request: Request, deps: Deps, slug: string | null =
        `idFromName` on a name nobody has creates the object, so `access` below must never run for a refused slug. */
     if (out.status === 403) return { door: 'refused', status: 403, refusal: out.refusal, ...carried };
     /* Expired, signed out, or sign-in switched off: the same 401, and the cookie goes. */
-    if (out.status !== 200) return { door: 'refused', status: 401, refusal: NOT_YOU, cookie: clear };
+    if (out.status !== 200) return { door: 'refused', status: 401, refusal: notYou(), cookie: clear };
 
     const record = out.body.record;
     if (record === null) return { door: 'refused', status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are signed in and on no record yet.' }, ...carried };

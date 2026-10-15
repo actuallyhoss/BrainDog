@@ -1340,6 +1340,53 @@ mechanism:** a lapsed record starts no scheduled run at all and writes no per-ru
 lapse sentence, on the banner and in every refused write, is the record's one message
 ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md) §5.10, §13 #6).
 
+**Amended October 15th 2026: a lapse in the order the code takes it, the gift, and back to Free.**
+A row is in one of four states, `active`, `past_due`, `lapsed` and `comp`, and a record with no
+row is in none of them: it is not billed and never lapses. What happens, step by step:
+
+1. **The Directory decides the state.** Only a verified Stripe event moves a paid row
+   (`apps/worker/src/billing.ts`), and the subscription is read again from Stripe so events out of
+   order still write what is true now. Stripe's `active` and `trialing` are `active`; its
+   `past_due` is `past_due`, still writable while Stripe retries the card; its `unpaid` and
+   `incomplete_expired` are `lapsed`. A subscription cancelled is first asked whether the record
+   fits Free (below): when it does, the record goes **back to Free**; when it does not, it is
+   `lapsed`. Entering `lapsed` sets `lapsed_at` once; staying there never restarts the ladder.
+   Within one event the record's own lapse switch is flipped first, then the plan follows the
+   price, then the row is written, then the letter goes, so a delivery cut halfway is put right by
+   the next one. An invoice paid on a `lapsed` row makes it `active` again, empties `lapsed_at`
+   and `told`, and sends the letter that says it can be written again.
+2. **`apps/worker/src/lapse.ts` refuses writes and keeps export.** While `lapsed`, every write on
+   the app, `/api` and `/mcp` is answered `403 FORBIDDEN` with its one sentence, "Read-only until
+   billing resumes. Export is available."; a person is held to `read`, a token to `scope ∩ {read}`,
+   and only the owner's own session, or a grant approved for `export`, may export. The drain drops
+   fetches, model jobs and digests unsent; reminders still deliver. No credit pack is sold to a
+   lapsed record.
+3. **The nightly walk mails and deletes** (`apps/worker/src/ladder.ts`): one letter a night at
+   most, the earliest still owed, on day 0, day 60 and day 83 to the payer and every owner; on day
+   90 a deletion, only for a row still `lapsed` when asked again, whose three letters all went. One
+   final copy is kept for thirty days.
+
+**Back to Free.** A record whose paid plan is cancelled goes back to Free when it fits Free: one
+person on it, and no other record of its owner's already on Free. How many agents it holds does
+not decide this. The record stays writable and stays off the ladder: its lapse switch is turned off
+if an unpaid card had turned it on, its plan becomes Free with Free's allowance, and its row keeps
+the Stripe customer, so paying again is the same customer, and loses the subscription, price and
+period, state `active`. A record with colleagues, or an owner who already has a record on Free,
+lapses as in step 1. While nobody can count the people on a record it does not fit, and a count
+that fails is an error Stripe delivers again, so a record never lapses on a guess. This is a
+default taken for the owner and his to change; `fitsFree` in `billing.ts` is the one place it lives.
+
+**`comp`, a plan given as a gift.** The operator's door `POST /account/ops/plan`, behind the
+provision key, writes a row with no Stripe customer, no subscription and no price, state `comp`,
+and puts the record on Cloud or Cloud Plus. No Stripe event can find such a row, the walk never
+reads it, and the Directory refuses to write `lapsed` or `past_due` over it: a gift never lapses,
+is never charged, offers no payment portal, and may still buy credit packs. A record paying through
+a subscription, or one already lapsed, cannot be given one. The same door with no plan takes the
+gift back by the same rule a cancel goes through: when the record fits Free it goes back to Free
+with no billing row at all, as a record nobody pays for; when it does not, nothing changes and the
+answer says why. A gift has no end date yet: it ends when the operator takes it back. The door
+mails nobody.
+
 ---
 
 ## ADR-060 · No admin token; VAULT is a browser session only, ADMIN a session or one operation grant

@@ -13,8 +13,15 @@
  * A TONE DRAFT IS KEPT ONLY IN HIS OWN WORDS. The model may answer labels and voice lines; `toneKept` keeps a label only
  * when every word of it is a word of his own titles and first lines, and a voice line only when it holds no digit.
  *
+ * AN ADD-ON IS OFFERED FOR WHAT THE RECORD ALREADY HOLDS. The catalogue says, as data, what each add-on's automations
+ * write and how often (a script's `writes` and `runs.every`, a poll's `writes.register` and `every`), and which arrivals
+ * its doors read. `addonOffers` offers one the record lacks when it holds the thing that add-on keeps current: figures
+ * that read a list gone stale, arrivals of a shape it reads, or a list it writes that nothing installed fills. One
+ * sentence, with the count and the day it rests on, the add-on by the catalogue's own title.
+ *
  * IT IS PURE. It files nothing, asks no model, opens no table and does not know the day: the caller hands the runs, the
- * skills, the draft and `nowMs`. Nothing here names an add-on, a use case or anybody's list.
+ * skills, the draft, the catalogue and `nowMs`. Nothing here names an add-on, a use case or anybody's list: every word
+ * an offer says comes from a catalogue entry or the record.
  */
 
 import { LAPSE_DAYS, queueOf } from './design-agent.ts';
@@ -29,8 +36,15 @@ export type SkillChange = {
   steps: { text: string; quote: string; from: string }[];
 };
 
-/** `design-agent.ts`'s `Offer`, with one more kind of change. */
-export type ReachOffer = Omit<Offer, 'change'> & { change: OfferChange | SkillChange };
+/**
+ * An add-on to install, by its catalogue id. `design-agent.ts` files no install, so this is the kind: the caller files
+ * it as `slash.ts` files every install, `body_kind: 'pack'` with `{ install: pack }`, and the install asks the same
+ * approval it always asks, its origins and its key on Decide, before anything of it calls out.
+ */
+export type AddonChange = { kind: 'install'; pack: string };
+
+/** `design-agent.ts`'s `Offer`, with two more kinds of change. */
+export type ReachOffer = Omit<Offer, 'change'> & { change: OfferChange | SkillChange | AddonChange };
 
 /** A run as the caller reads it: its spoken name, its project, and its handoff as written. */
 export type ReachRun = { spoken: string; project: string | null; handoff: string };
@@ -271,14 +285,206 @@ export function toneKept(draft: { labels?: Record<string, string>; voice?: strin
   return { labels: Object.fromEntries(kept), voice, dropped };
 }
 
+/* ── an add-on for what the record holds ────────────────────────────────────────────────────────────────────────── */
+
+/** A list an add-on's automations write, and how often they run, in milliseconds, or `null` when it says no clock. */
+export type ReachKeeps = { list: string; everyMs: number | null };
+
+/**
+ * One catalogue entry as the add-on source reads it: its id and title as the catalogue lists them, the lists it keeps
+ * current, the arrival shapes its doors read (`channel:address` as the kernel's `shapeOf` names a shape, or
+ * `channel:@domain` for every sender at that domain), and whether any of it sends a key the owner holds.
+ */
+export type ReachCatalogueEntry = { id: string; title: string; keeps: readonly ReachKeeps[]; shapes: readonly string[]; needsKey: boolean };
+
+/** What the record holds, as the caller reads it for `addonOffers`. */
+export type AddonSignals = {
+  catalogue: readonly ReachCatalogueEntry[];
+  /** Every add-on installed, on or off: one installed is never offered again. */
+  installed: readonly string[];
+  /** Each list: its handle, the role it plays when it plays one, its name as shown, its newest entry's day and how many it holds. */
+  lists: readonly { list: string; role?: string | undefined; name?: string | undefined; newest: string | null; rows: number }[];
+  /** Each figure installed: the list it reads, and the day of the oldest input it rests on, when that is known. */
+  figures: readonly { id: string; reads: string; oldest: string | null }[];
+  /** What waits at a door with no pattern, by shape, and the day the first of them came when the caller knows it. */
+  arrivals: readonly { shape: string; waiting: number; since?: string | null | undefined }[];
+};
+
+/** An add-on ranks under a page and over the blocks a list has earned (`design-agent.ts` tiers: page 4000, block 3000). */
+const ADDON_TIER = 3500;
+/** Within the tier: figures that rest on stale input first, then what waits at a door, then a list nothing fills. */
+const ADDON_WITHIN = { figures: 300, arrivals: 150, list: 0 } as const;
+/** How many of one shape wait before an add-on that reads them is offered: the kernel's own three (`ingest.ts` `PROPOSE_AT`). */
+export const ADDON_ARRIVALS = 3;
+/** A figure is stale past twice the add-on's clock, and never under a day; a list nobody reads, never under a week. */
+export const ADDON_STALE = { runs: 2, figureMs: DAY_MS, listMs: 7 * DAY_MS } as const;
+
+const UNIT_MS: Record<string, number> = { m: 60_000, h: 3_600_000, d: DAY_MS, w: 7 * DAY_MS };
+
+/** `15m`, `1h`, `6h`, `1d` or `1w` in milliseconds, or `null` for anything else. */
+export const everyMs = (every: unknown): number | null => {
+  const m = typeof every === 'string' ? /^\s*(\d+)\s*([mhdw])\s*$/u.exec(every) : null;
+  return m && Number(m[1]) > 0 ? Number(m[1]) * UNIT_MS[m[2]!]! : null;
+};
+
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * A pack's document read for the add-on source. A `{{config:<key>}}` is filled from that setting's default, as the
+ * install fills it when nobody chose another. A script keeps its `writes` on `runs.every` and needs a key when it names
+ * one; a poll or a pull keeps its `writes.register` on `every`, and needs a key when it names a grant; a door reads the
+ * shapes it declares (`shapes`, or `from` beside its channel). A document that is not one reads as keeping nothing.
+ */
+export function reachEntryOf(entry: { id: string; title: string }, doc: Record<string, unknown> | null): ReachCatalogueEntry {
+  const config = isRecord(doc?.config) ? doc.config : {};
+  const fill = (v: unknown): unknown =>
+    typeof v === 'string'
+      ? v.replace(/\{\{config:([^}]+)\}\}/gu, (all, key: string) => {
+          const set = config[key.trim()];
+          return isRecord(set) && typeof set.default === 'string' ? set.default : all;
+        })
+      : v;
+  const keeps: ReachKeeps[] = [];
+  const shapes: string[] = [];
+  let needsKey = false;
+  const named = (v: unknown): boolean => typeof v === 'string' && v.trim() !== '';
+  for (const d of Array.isArray(doc?.declarations) ? doc.declarations : []) {
+    if (!isRecord(d)) continue;
+    if (typeof d.script === 'string') {
+      const every = everyMs(fill(isRecord(d.runs) ? d.runs.every : undefined));
+      for (const list of Array.isArray(d.writes) ? d.writes : []) if (named(list)) keeps.push({ list: (list as string).trim(), everyMs: every });
+      if (Array.isArray(d.keys) && d.keys.some(named)) needsKey = true;
+      continue;
+    }
+    if (typeof d.ingest !== 'string') continue;
+    const channel = typeof d.channel === 'string' ? d.channel : '';
+    const register = isRecord(d.writes) ? d.writes.register : undefined;
+    if ((channel === 'poll' || channel === 'pull') && named(register)) {
+      keeps.push({ list: (register as string).trim(), everyMs: everyMs(fill(d.every)) });
+      if (named(d.grant) || named(d.key)) needsKey = true;
+    }
+    for (const s of Array.isArray(d.shapes) ? d.shapes : []) if (named(s)) shapes.push((s as string).trim().toLowerCase());
+    if (channel !== '' && named(d.from)) shapes.push(`${channel}:${(d.from as string).trim().toLowerCase()}`);
+  }
+  return { id: entry.id, title: entry.title, keeps, shapes: [...new Set(shapes)], needsKey };
+}
+
+/** Whether an arrival's shape is one an add-on declares: the same, or a sender at a domain it names as `channel:@domain`. */
+export const shapeFits = (declared: string, shape: string): boolean => {
+  const want = declared.toLowerCase();
+  const got = shape.toLowerCase();
+  if (want === got) return true;
+  const at = want.indexOf(':@');
+  return at > 0 && got.startsWith(want.slice(0, at + 1)) && got.endsWith(want.slice(at + 1));
+};
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** A day as a person says it: `28 September`, with the year when it is not this one. */
+const spokenDay = (day: string, nowMs: number): string => {
+  const at = new Date(`${day.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(at.getTime())) return day;
+  const year = at.getUTCFullYear() === new Date(nowMs).getUTCFullYear() ? '' : ` ${at.getUTCFullYear()}`;
+  return `${at.getUTCDate()} ${MONTHS[at.getUTCMonth()]}${year}`;
+};
+
+const olderThan = (day: string | null, ms: number, nowMs: number): boolean => day === null || Date.parse(`${day.slice(0, 10)}T00:00:00Z`) < nowMs - ms;
+
+type Why = { reason: keyof typeof ADDON_WITHIN; n: number; day: string | null; said: string };
+
+/**
+ * The add-ons the record lacks for what it holds, strongest first, at most one an add-on. For each one not installed:
+ *
+ * - FIGURES THAT REST ON A LIST IT KEEPS, gone stale: the list's newest entry is older than twice the add-on's clock (a
+ *   day at least), and no installed add-on keeps that list. "6 figures here use rates from 28 September."
+ * - ARRIVALS OF A SHAPE IT READS: `ADDON_ARRIVALS` or more wait at a door with no pattern.
+ * - A LIST IT KEEPS THAT NOTHING FILLS: the record holds entries in it, no installed add-on writes it, and its newest is
+ *   a week old or more. An empty list is not offered for, so a fresh record is not sold a feed before it holds anything.
+ *
+ * ONE ADD-ON A LIST: where several would keep the same list, the one that needs no key comes first, then the one that
+ * runs most often, then the catalogue's own order. An add-on that needs a key says so in its sentence. The key is
+ * `addon:<id>`, and the basis is the reason, the day and the count (`figures:2026-09-28@6`), so one turned down comes
+ * back when the day it rests on moves or the count grows tenfold (`design-agent.ts` `basisMoved`).
+ */
+export function addonOffers(signals: AddonSignals, nowMs: number): ReachOffer[] {
+  const lapses = dayOf(nowMs + LAPSE_DAYS * DAY_MS);
+  const installed = new Set(signals.installed);
+  const kept = new Set(signals.catalogue.filter((e) => installed.has(e.id)).flatMap((e) => e.keeps.map((k) => k.list)));
+  const keeps = (l: AddonSignals['lists'][number], list: string): boolean => l.list === list || l.role === list;
+  const filled = (l: AddonSignals['lists'][number]): boolean => kept.has(l.list) || (l.role !== undefined && kept.has(l.role));
+  const free = signals.catalogue
+    .map((entry, at) => ({ entry, at }))
+    .filter(({ entry }) => !installed.has(entry.id))
+    .sort((a, b) => Number(a.entry.needsKey) - Number(b.entry.needsKey) || fastest(a.entry) - fastest(b.entry) || a.at - b.at);
+
+  const claimed = new Set<string>();
+  const out: ReachOffer[] = [];
+  for (const { entry } of free) {
+    let best: Why | null = null;
+    const better = (w: Why): void => {
+      if (best === null || ADDON_WITHIN[w.reason] + w.n > ADDON_WITHIN[best.reason] + best.n) best = w;
+    };
+    const lists: string[] = [];
+    for (const keep of entry.keeps) {
+      const clock = Math.max(keep.everyMs ?? DAY_MS, 0) * ADDON_STALE.runs;
+      for (const l of signals.lists.filter((x) => keeps(x, keep.list) && !filled(x) && !claimed.has(x.list))) {
+        const name = l.name?.trim() || null;
+        const what = name === null ? 'what is kept there' : name.toLowerCase();
+        const stale = signals.figures.filter((f) => keeps(l, f.reads) && olderThan(f.oldest ?? l.newest, Math.max(clock, ADDON_STALE.figureMs), nowMs));
+        if (stale.length > 0 && olderThan(l.newest, Math.max(clock, ADDON_STALE.figureMs), nowMs)) {
+          const n = stale.length;
+          better({
+            reason: 'figures',
+            n,
+            day: l.newest,
+            said: l.newest === null ? `${count(n)} ${n === 1 ? 'figure here reads' : 'figures here read'} ${what}, and none has come in yet` : `${count(n)} ${n === 1 ? 'figure here uses' : 'figures here use'} ${what} from ${spokenDay(l.newest, nowMs)}`,
+          });
+          lists.push(l.list);
+        } else if (keep.everyMs !== null && l.rows > 0 && olderThan(l.newest, Math.max(clock, ADDON_STALE.listMs), nowMs)) {
+          better({
+            reason: 'list',
+            n: l.rows,
+            day: l.newest,
+            said: `${name ?? 'A list here'} holds ${count(l.rows)} ${l.rows === 1 ? 'entry' : 'entries'}, ${l.newest === null ? 'none dated' : `the newest from ${spokenDay(l.newest, nowMs)}`}, and nothing keeps it current`,
+          });
+          lists.push(l.list);
+        }
+      }
+    }
+    const waiting = signals.arrivals.filter((a) => entry.shapes.some((s) => shapeFits(s, a.shape)));
+    const n = waiting.reduce((sum, a) => sum + Math.max(0, Math.floor(a.waiting)), 0);
+    if (n >= ADDON_ARRIVALS) {
+      const since = waiting.map((a) => a.since ?? null).filter((d): d is string => d !== null).sort()[0] ?? null;
+      better({ reason: 'arrivals', n, day: since, said: `${count(n)} messages that came in ${since === null ? '' : `since ${spokenDay(since, nowMs)} `}wait with nothing to read them` });
+    }
+    const why = best as Why | null;
+    if (why === null) continue;
+    for (const l of lists) claimed.add(l);
+    out.push({
+      key: `addon:${entry.id}`,
+      class: 'arrange',
+      rank: ADDON_TIER + ADDON_WITHIN[why.reason] + Math.min(149, why.n),
+      basis: `${why.reason}:${why.day ?? 'none'}@${why.n}`,
+      lapses,
+      title: `Turn on ${entry.title}?`,
+      why: `${why.said}${entry.needsKey ? `, and ${entry.title} needs your key` : ''}.`,
+      change: { kind: 'install', pack: entry.id },
+    });
+  }
+  return out.sort((a, b) => b.rank - a.rank);
+}
+
+/** How often an add-on's quickest automation runs, for choosing among those that keep one list; no clock is last. */
+const fastest = (e: ReachCatalogueEntry): number => Math.min(Number.MAX_SAFE_INTEGER, ...e.keeps.map((k) => k.everyMs ?? Number.MAX_SAFE_INTEGER));
+
 /* ── the one queue ──────────────────────────────────────────────────────────────────────────────────────────────── */
 
 export type ReachQueue = Omit<Queue, 'waiting' | 'fresh'> & { waiting: (ReachOffer | Held)[]; fresh: ReachOffer[] };
 
 /**
- * `design-agent.ts`'s `queueOf` for offers that may be a skill: the same gate, the same cap of three and the same day it
- * lapses. `queueOf` reads only what an offer holds in the queue (key, class, rank, basis, lapses) and hands back the
- * offers it was given, so a skill offer goes through it whole and comes back as it went in.
+ * `design-agent.ts`'s `queueOf` for offers that may be a skill or an add-on: the same gate, the same cap of three and
+ * the same day it lapses. `queueOf` reads only what an offer holds in the queue (key, class, rank, basis, lapses) and
+ * hands back the offers it was given, so a skill or an add-on offer goes through it whole and comes back as it went in.
  */
 export function reachQueue(offers: readonly ReachOffer[], open: readonly Held[], dismissed: readonly Pick<Held, 'key' | 'basis'>[], nowMs: number): ReachQueue {
   return queueOf(offers as readonly Offer[], open, dismissed, nowMs) as ReachQueue;

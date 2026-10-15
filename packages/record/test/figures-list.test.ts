@@ -78,9 +78,10 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      chart is drawn on (book-page-months-73), made it 109, and plan-share-left went out again when the plan page's leads
      came to wait on two counts held together (plan-lead-one-figure-74), which made it 108, and
      book-lasts-until, the day one book's money runs out (book-lasts-until-76), made it 109, and the four counts of the Ledger by the rule that filed each entry (filing-rules-page-91) made it 113, and the same
-     3.17.0's lasts-no-income, how many days the cash lasts with no income (money-lasts-no-income-95), made it 114. The number is
+     3.17.0's lasts-no-income, how many days the cash lasts with no income (money-lasts-no-income-95), made it 114, and portfolio's projects-lane-earning and projects-with-health, the earning lane and the projects saying
+     how they are going (projects-lanes-lines-101), made it 116. The number is
      asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its own. */
-  assert.equal(declared.length, 114);
+  assert.equal(declared.length, 116);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
@@ -172,7 +173,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 114);
+  assert.equal(listed.length, 116);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });

@@ -17,8 +17,10 @@
  * day they part.
  */
 
-import { CAPABILITIES, REFUSED_IN_A_ROW, capability, serves } from '@braindog/kernel';
+import { CAPABILITIES, REFUSED_IN_A_ROW, capability, serves, touches } from '@braindog/kernel';
 import type { Sql } from '@braindog/ports';
+
+import { automationNames, listsNamed, type NamesRead } from './automation-names.ts';
 
 /* THE KERNEL'S ONE CAPABILITY TABLE, HANDED ON FOR THE GRAMMAR AN AGENT READS (`packages/mcp/src/automations.ts`).
    `@braindog/mcp` depends on this package and not on the kernel, and `31 §2` forbids reaching into another package by a
@@ -491,7 +493,12 @@ export type AutomationRun = {
  * One automation with a page of its runs, newest first. `older` is the run to pass as `before` for the page after this
  * one, or `null` when this page reaches the first run the record keeps.
  */
-export type Automation = AutomationRow & { body: Body; runs: AutomationRun[]; older: string | null };
+/**
+ * One automation as its read answers it: the row, its body, a page of its runs, and `names`, the title of every list,
+ * field, person, call, script, door, figure and kind of job the body names, keyed by the id as the body holds it
+ * (`automation-names.ts`). An id the caller cannot see, or one that is gone, has no name.
+ */
+export type Automation = AutomationRow & { body: Body; runs: AutomationRun[]; older: string | null; names: Record<string, string> };
 
 /** How many runs one automation shows. Ten: the list is for reading what just happened, not an archive. */
 export const RUNS_SHOWN = 10;
@@ -696,6 +703,143 @@ export function automations(sql: Sql, nowMs: number, shown: (id: string, body: B
     .map((d) => row(sql, d, nowMs).row);
 }
 
+/* ── the names one automation's body points at ─────────────────────── */
+
+/** A live declaration's body by its id, or `undefined` when there is none or it is not a map. */
+function declared(sql: Sql, id: string): Body | undefined {
+  try {
+    const d = sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', id);
+    const body: unknown = d ? JSON.parse(d.body) : undefined;
+    return isObject(body) ? body : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** An id said as words, `_` and `-` as spaces: what `listName` and the canvas call a thing that names itself nothing. */
+const inWords = (id: string): string => {
+  const spoken = id.replace(/[_-]+/g, ' ').trim();
+  return spoken.charAt(0).toUpperCase() + spoken.slice(1);
+};
+
+/** The first of `keys` a body holds as text. */
+const textAt = (body: Body | undefined, keys: readonly string[]): string | null => {
+  for (const key of keys) {
+    const v = body?.[key];
+    if (typeof v === 'string' && v.trim() !== '') return v.trim();
+  }
+  return null;
+};
+
+/**
+ * Whether the caller sees every list a script or a figure reads, by the kernel's one walk (`touches`, the question
+ * Decide and the automations read ask), never a copy of it here. A figure counting another figure is placed through
+ * that one's body, and a figure nothing places (`unknown`) is held, as is one naming no list (`ANY_LIST`) from anybody
+ * who does not read every list.
+ *
+ * MEASURED: the first form of this walked `register.<id>` strings alone, so a figure with a leg naming its list by a
+ * bare `register:` key read as touching only its other list, and was named to a member held from the first.
+ */
+function seesAll(sql: Sql, id: string, body: Body, sees: (list: string) => boolean): boolean {
+  const { lists, unknown } = touches(id, body, {
+    figure: (figure) => {
+      const found = declared(sql, `metric.${figure}`);
+      return found === undefined ? [] : [found];
+    },
+    door: (door) => declared(sql, `ingest.${door}`),
+    fields: () => new Set(),
+  });
+  return unknown.size === 0 && [...lists].every(sees);
+}
+
+/**
+ * The list playing People and the field holding a person's name, as `roles.ts`'s `meetsRole` reads it: the one list
+ * declaring `meets:`. Two declaring lists are none, as there. A record older than the key, whose list is found by its
+ * old name, is not read here: the core spells no add-on's id, so that list's people keep the web's words until the
+ * kernel hands the role itself to the record.
+ */
+function peopleList(sql: Sql): { list: string; name: string } | null {
+  const lists = sql
+    .all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0")
+    .flatMap((d) => {
+      try {
+        const body: unknown = JSON.parse(d.body);
+        return isObject(body) ? [{ list: d.id.slice('register.'.length), body }] : [];
+      } catch {
+        return [];
+      }
+    });
+  const declaring = lists.filter((l) => l.body.meets !== undefined);
+  if (declaring.length > 1) return null;
+  const [one] = declaring;
+  return one ? { list: one.list, name: (isObject(one.body.meets) ? textAt(one.body.meets, ['name']) : null) ?? 'name' } : null;
+}
+
+/**
+ * What the read of one automation can name, from the record's own tables, held to `sees`.
+ *
+ * A LIST THE CALLER CANNOT READ GIVES NO NAME, and neither do its fields, a person on it, or a figure or a script that
+ * reads it: its title is the first thing `views` keeps from somebody it is not shared with. A door's and a call's
+ * titles are the record's, which `actions` shows any reader, and a kind of job is the owner's approved list.
+ */
+function namesOf(sql: Sql, body: Body, sees: (list: string) => boolean): Record<string, string> {
+  const lists = new Map<string, Body | undefined>();
+  const list = (id: string): Body | undefined => {
+    if (!lists.has(id)) lists.set(id, sees(id) ? declared(sql, `register.${id}`) : undefined);
+    return lists.get(id);
+  };
+  let people: { list: string; name: string } | null | undefined;
+  const read: NamesRead = {
+    listTitle: (id) => {
+      const decl = list(id);
+      return decl === undefined ? null : (textAt(decl, ['name']) ?? inWords(id));
+    },
+    fieldTitle: (of, id) => {
+      const fields = list(of)?.fields;
+      const field = Array.isArray(fields) ? fields.find((f): f is Body => isObject(f) && f.id === id && f.retired !== true) : undefined;
+      return field === undefined ? null : (textAt(field, ['label']) ?? inWords(id));
+    },
+    /* A MEMBER BY THE NAME THE RECORD HOLDS FOR THEM (`ask_person.to`), and otherwise somebody on the list playing People,
+       by the field its role says holds a name. Never an email, which is not a name. */
+    personName: (id) => {
+      const member = sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', id)?.name?.trim();
+      if (member) return member;
+      people ??= peopleList(sql);
+      if (people === null || list(people.list) === undefined) return null;
+      const row = sql.one<{ fields: string }>('SELECT fields FROM entry WHERE id = ? AND register = ? AND deleted_at IS NULL', id, people.list);
+      try {
+        const fields: unknown = row ? JSON.parse(row.fields) : undefined;
+        return isObject(fields) ? textAt(fields, [people.name]) : null;
+      } catch {
+        return null;
+      }
+    },
+    declarationTitle: (id) => {
+      const decl = declared(sql, id);
+      if (decl === undefined) return null;
+      if (id.startsWith('script.') && !seesAll(sql, id, decl, sees)) return null;
+      return textAt(decl, ['name', 'title', 'heading']) ?? inWords(id.slice(id.indexOf('.') + 1));
+    },
+    figureTitle: (id) => {
+      const decl = declared(sql, `metric.${id}`);
+      if (decl === undefined || !seesAll(sql, `metric.${id}`, decl, sees)) return null;
+      return textAt(decl, ['name', 'title', 'label']) ?? inWords(id);
+    },
+    door: (name) => declared(sql, `ingest.${name}`),
+  };
+  return automationNames(body, read);
+}
+
+/**
+ * The sight a read of one automation holds when its caller hands none: the lists its body names. The record shows a
+ * rule only to whoever reads every list it touches (`automations` in `index.ts`), so these are lists the caller reads;
+ * a list it does not name, the one playing People or one a figure reads, is unseen here and gives no name.
+ */
+const seenIn = (sql: Sql, body: Body): ((list: string) => boolean) => {
+  const named = listsNamed(body, (name) => declared(sql, `ingest.${name}`));
+  return (list) => named.has(list);
+};
+
 /**
  * One live rule, by `chase` or `rule.chase`, with its body and a page of its runs, newest first; `null` when there is
  * none.
@@ -705,8 +849,11 @@ export function automations(sql: Sql, nowMs: number, shown: (id: string, body: B
  * the same runs however many start after it. Ordered as the first page always was, by when each started and then by
  * the order the table holds them, so two runs of one instant keep one order. A `before` that names no run of this rule
  * reads as no page at all, and the caller refuses it first (`automations` in `index.ts`).
+ *
+ * `names` IS HELD TO `sees`, the caller's sight of one list. Without it, the lists the body itself names are the sight,
+ * since the read is refused to anybody who cannot read them; nothing else gets a name.
  */
-export function automation(sql: Sql, named: string, nowMs: number, page: RunsPage = {}): Automation | null {
+export function automation(sql: Sql, named: string, nowMs: number, page: RunsPage = {}, sees?: (list: string) => boolean): Automation | null {
   const id = named.startsWith('rule.') ? named : `rule.${named}`;
   const d = sql.one<Declared>(`SELECT id, version, body, pack_id FROM declaration WHERE id = ? AND ${LIVE}`, id);
   if (!d) return null;
@@ -741,7 +888,7 @@ export function automation(sql: Sql, named: string, nowMs: number, page: RunsPag
         steps: sql.all<AutomationRun['steps'][number]>('SELECT n, kind, state, answer, at FROM automation_step WHERE run = ? ORDER BY n', r.id),
       };
     });
-  return { ...shown, body, runs, older };
+  return { ...shown, body, runs, older, names: namesOf(sql, body, sees ?? seenIn(sql, body)) };
 }
 
 /* ── the installed scripts, and how their runs went ────────────────── */

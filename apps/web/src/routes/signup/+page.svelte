@@ -139,6 +139,7 @@
   import type { Accepting, NotMade } from '../start/accept.ts';
   import { accepting, nameSent, picked, replyOf, settle, titleSent } from './build.ts';
   import NameField from './NameField.svelte';
+  import { loadWidget, widgetWords, type WidgetState } from './turnstile.ts';
   import { words } from './words.ts';
 
   type Step =
@@ -215,6 +216,8 @@
   let widget = $state<HTMLElement | null>(null);
   let human = $state<string | null>(null);
   let widgetId: string | null = null;
+  /* WHERE CLOUDFLARE'S SCRIPT IS, for the form's widget: the box's line and Send's label read it (`widgetWords`). */
+  let widgetState = $state<WidgetState>('loading');
 
   type Turnstile = {
     render: (el: HTMLElement, options: Record<string, unknown>) => string;
@@ -231,7 +234,8 @@
    * that pushes the page sideways at 320. The answer is single use, so every failed send resets it.
    */
   function loadTurnstile(key: string, el: HTMLElement): void {
-    withTurnstile((t) => {
+    widgetState = 'loading';
+    void withTurnstile((t) => {
       if (widgetId !== null) return;
       widgetId = t.render(el, {
         sitekey: key,
@@ -240,25 +244,23 @@
         'expired-callback': () => (human = null),
         'error-callback': () => (human = null),
       });
-    });
+    }).then((state) => (widgetState = state));
   }
 
-  /** Cloudflare's script, added to the page once, and `then` once it is there. */
-  function withTurnstile(then: (t: Turnstile) => void): void {
-    const now = turnstileOf();
-    if (now) return then(now);
-    let script = document.querySelector<HTMLScriptElement>('script[data-turnstile]');
-    if (script === null) {
-      script = document.createElement('script');
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.dataset.turnstile = '';
-      document.head.append(script);
-    }
-    script.addEventListener('load', () => {
-      const t = turnstileOf();
-      if (t) then(t);
-    });
+  /**
+   * Cloudflare's script, through `loadWidget` (`turnstile.ts`), and `then` once it is there. A script that failed or did
+   * not arrive in ten seconds is `failed`, and `then` is not called: the box says so and offers Try again.
+   */
+  async function withTurnstile(then: (t: Turnstile) => void): Promise<WidgetState> {
+    const state = await loadWidget({ doc: document });
+    const t = turnstileOf();
+    if (state === 'ready' && t) then(t);
+    return state;
+  }
+
+  /* TRY AGAIN, after the script failed: a fresh tag, in the same held box. */
+  function retryTurnstile(): void {
+    if (siteKey !== null && widget !== null) loadTurnstile(siteKey, widget);
   }
 
   /*
@@ -305,7 +307,8 @@
         } catch {
           end(null);
         }
-      });
+        /* A SCRIPT THAT DID NOT LOAD IS NO ANSWER, at once: the rules read instead of waiting out `HUMAN_MS`. */
+      }).then((state) => state === 'failed' && end(null));
     });
   }
 
@@ -766,6 +769,9 @@
   /* ── keeping it: one email ───────────────────────────────────────────────── */
 
   const ready = $derived(slug !== '' && free && !busy && !naming && (signedIn !== null || (email.trim() !== '' && (siteKey === null || human !== null))));
+  /* NEVER A DEAD SEND: when the check's answer is all the form still waits for, Send's label says so (`widgetWords`). */
+  const waitsForCheck = $derived(slug !== '' && free && !busy && !naming && signedIn === null && email.trim() !== '' && siteKey !== null && human === null);
+  const checkWords = $derived(widgetWords(widgetState));
 
   /**
    * The sentence as it is kept across the mail, and the whole reading on screen where it is the reading of these very
@@ -1344,7 +1350,15 @@
               </span>
             </div>
             {#if siteKey !== null}
-              <div class="human" role="group" aria-label={copy.signupHuman} bind:this={widget}></div>
+              <!-- THE HELD BOX STAYS WHEN THE SCRIPT FAILS: its line and Try again sit in it, side by side, at its height. -->
+              <div class="human" role="group" aria-label={copy.signupHuman} bind:this={widget}>
+                {#if widgetState === 'failed'}
+                  <div class="human-failed">
+                    <p class="human-line" role="alert">{checkWords.line}</p>
+                    <span class="human-again"><Button onclick={retryTurnstile}>{checkWords.again}</Button></span>
+                  </div>
+                {/if}
+              </div>
             {/if}
           {/if}
 
@@ -1352,7 +1366,7 @@
 
           <div class="go sticky">
             <Button weight="primary" type="submit" disabled={!ready} aria-busy={busy}>
-              {signedIn ? words.makeNow : busy ? words.sending : words.send}
+              {signedIn ? words.makeNow : busy ? words.sending : waitsForCheck ? checkWords.send : words.send}
             </Button>
           </div>
           {#if signedIn === null && plan === 'free'}<p class="quiet open-here">{onPhone ? words.openHere : words.openHereWide}</p>{/if}
@@ -1780,6 +1794,27 @@
   .human {
     min-block-size: 65px;
     inline-size: 100%;
+  }
+
+  /* THE FAILED LINE AND ITS BUTTON IN ONE ROW, so the box keeps the 65px it held for the widget. */
+  .human-failed {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: 65px;
+  }
+
+  .human-line {
+    flex: 1;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--danger-text);
+    font-size: var(--t-base);
+    line-height: var(--lh-body);
+  }
+
+  .human-again :global(.btn) {
+    min-block-size: 44px;
   }
 
   /* THE READ'S BOT CHECK TAKES NO ROOM until Cloudflare draws something the person must do. */

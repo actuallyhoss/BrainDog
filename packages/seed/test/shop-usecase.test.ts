@@ -123,9 +123,9 @@ const DAY = 86_400_000;
 const lineOf = (k: Kernel): Line => value<{ blocks: Line[] }>(k.page('orders')).blocks.find((b) => b.kind === 'note')!;
 const daysOn = (n: number): string => dayOf(Date.parse(`${TODAY}T00:00:00Z`) + n * DAY);
 
-test('THE ORDERS PAGE SITS IN THE ORDERS SECTION, the word in her bar', () => {
+test('THE ORDERS PAGE SITS IN THE ORDERS SECTION, the word in her bar, second on the rail since 1.3.0', () => {
   const page = (SHOP.pack.declarations as { page?: string; nav?: { section?: string } }[]).find((d) => d.page === 'orders');
-  assert.deepEqual(page?.nav, { section: 'Orders', order: 10 });
+  assert.deepEqual(page?.nav, { section: 'Orders', order: 10, place: 20 });
 });
 
 test('THE LEAD SAYS THE MONTH, THE WEEK AND WHO STILL OWES, and the owed clause has nothing to say once she is paid', async () => {

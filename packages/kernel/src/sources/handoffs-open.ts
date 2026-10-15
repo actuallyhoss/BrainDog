@@ -18,7 +18,8 @@ import type { Also, Source } from './index.ts';
 
 /**
  * What a `handoffs.open` block's `where` and columns may name: one row a step left. `run` is the run that left it, a
- * handle a host draws as `agent` and links by, never alone; `next` is the step in the run's words; `left_at` when.
+ * handle a host draws as `agent` and links by, never alone; `next` is the step in the run's words, `next_said` the same
+ * step as a person reads it, a path said by its last plain words and a handle left out; `left_at` when.
  * `mark` is `next` for the one a new session is handed and `earlier` for the rest, older than a week or passed over.
  */
 const handoffsSchema = (kit: SourceKit): Schema => ({
@@ -27,6 +28,7 @@ const handoffsSchema = (kit: SourceKit): Schema => ({
     run: { type: 'text' },
     agent: { type: 'text' },
     next: { type: 'text' },
+    next_said: { type: 'text' },
     left_at: { type: 'instant' },
     mark: { type: 'enum', values: ['next', 'earlier'] },
   },
@@ -41,7 +43,7 @@ function stepEntry(h: OpenStep, { SESSION, agentOf }: SourceKit): Entry {
     id: h.id,
     register: SESSION,
     seq: null,
-    fields: { run: h.spoken, agent: agentOf({ agent: h.agent ?? undefined, client: h.client ?? undefined }).name, next: h.next, left_at: h.left_at, mark: h.mark, project: h.project },
+    fields: { run: h.spoken, agent: agentOf({ agent: h.agent ?? undefined, client: h.client ?? undefined }).name, next: h.next, next_said: h.next_said, left_at: h.left_at, mark: h.mark, project: h.project },
     state: 'handoff',
     version: 1,
     created_at: h.left_at,

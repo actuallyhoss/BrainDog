@@ -1,9 +1,9 @@
 {
   "pack": "pad",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "title": "Pad",
-  "summary": "Notes beside the work, with a second opinion from Slash written under each one.",
-  "changes": "Nothing a person sees changed. Each version says what it changed in a line like this one.",
+  "summary": "Notes beside the work, each with room for a reply under it. It asks no model, so it keeps on any record.",
+  "changes": "The pad asks no model now. The second opinion that was written under each note is an add-on of its own, Pad second opinion, for whoever wants it. Every note and every reply already written stays.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -16,7 +16,7 @@
       "register": "notes",
       "name": "Notes",
       "one": "note",
-      "holds": "thoughts written down beside the work, and a second opinion under each one",
+      "holds": "thoughts written down beside the work, and a reply under each one",
       "title": "text",
       "fields": [
         {
@@ -33,45 +33,9 @@
         },
         {
           "id": "reply",
-          "label": "Second opinion",
+          "label": "Reply",
           "type": "text",
           "search": true
-        }
-      ]
-    },
-    {
-      "rule": "pad_second_opinion",
-      "name": "Write a second opinion under each note",
-      "on": {
-        "written": {
-          "register": "notes",
-          "op": [
-            "create",
-            "update"
-          ],
-          "fields": [
-            "text",
-            "reply"
-          ]
-        }
-      },
-      "when": "reply is empty",
-      "once_per": [
-        "entry",
-        "text"
-      ],
-      "steps": [
-        {
-          "ask_slash": {
-            "question": "Give a short second opinion on this note, in two or three plain sentences: what it gets right, and what it may be missing. The note: {{trigger.row.text}}",
-            "as": "opinion"
-          }
-        },
-        {
-          "set": {
-            "field": "reply",
-            "to": "{{vars.opinion}}"
-          }
         }
       ]
     },
@@ -120,7 +84,7 @@
             }
           ],
           "limit": 6,
-          "empty": "Nothing on the pad yet. Write a thought above, and a second opinion is written under it."
+          "empty": "Nothing on the pad yet. Write a thought above."
         }
       ]
     }

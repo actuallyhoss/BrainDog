@@ -34,7 +34,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { LADDER_RULE, SLASH, whereFor } from '@braindog/kernel';
+import { LADDER_RULE, MET_CAP, SLASH, foldFill, identityFloor, shapeIn, whereFor } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -70,6 +70,8 @@ export type Match = {
   at: string;
   batch: string;
   sentence?: string;
+  /** What the folded held that the kept one was not given (the organisation), for the owner to press: the value as written, its name, and who it came from by name. */
+  offered?: { field: string; value: unknown; said: string; from: string }[];
 };
 
 /** What `matched` answers, or `null` on a record that keeps no people. */
@@ -263,6 +265,8 @@ export function methods(deps: RecordDeps) {
         return why === '' ? 'The rules for a certain match held for the two.' : `${why.charAt(0).toUpperCase()}${why.slice(1)}`;
       };
 
+      const shape = shapeIn(sql, register);
+      const floor = identityFloor(shape, at);
       /* ONE ANSWER A BATCH AND THE ONE ITS FOLDS ENDED AT, in the order the log met them: newest first. */
       const groups = new Map<string, { batch: string; end: string; folded: Folded[] }>();
       const decided = new Map<string, boolean>();
@@ -286,9 +290,16 @@ export function methods(deps: RecordDeps) {
         if (!admitted(seq)) continue;
         /* Said in the order they were folded, and when the last of them was. */
         const folded = [...g.folded].sort((a, b) => a.n - b.n);
+        const { offered } = foldFill(
+          { declared: shape?.fields ?? [], at, metCap: MET_CAP },
+          { id: g.end, fields: fieldsOf(person(g.end)?.fields ?? '') },
+          folded.map((f) => ({ id: f.row, fields: fieldsOf(f.fields) })),
+          floor,
+        );
+        const left = offered.map((o) => ({ field: o.field, value: o.value, said: typeof o.value === 'string' ? (kernel.titleOfRow(o.value) ?? o.value) : String(o.value), from: named(o.from) }));
         found.push({
           n: g.folded[0]!.n,
-          match: { kind: 'fold', from: folded.map((f) => named(f.row)), into: { name: named(g.end), seq }, evidence: evidenceOf(folded, g.end), at: g.folded[0]!.ts, batch: g.batch },
+          match: { kind: 'fold', from: folded.map((f) => named(f.row)), into: { name: named(g.end), seq }, evidence: evidenceOf(folded, g.end), at: g.folded[0]!.ts, batch: g.batch, ...(left.length > 0 ? { offered: left } : {}) },
         });
       }
       found.push(...attachesOf(register, at.met, limit, admitted, named));

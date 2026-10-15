@@ -2357,9 +2357,10 @@ test('THE CLOSED LISTS ARE `42 §4.4`’s OWN, and this is the test that stops t
    *   `search`           on a FIELD, which is what `fts.ts` actually reads.
    *   `derived`          the kernel's own flag, which refuses a write and skips validation.
    *   `org`              the organisations `meet` writes (`roles.ts`), batch 17, beside `rates` and `meets`.
+   *   `role` · `fade`    the part a list plays for the record's agents and the day its rows fade by (`agent-lists.ts`).
    */
   const undocumented = (mine: readonly string[], theirs: readonly string[]) => mine.filter((k) => !theirs.includes(k)).sort();
-  assert.deepEqual(undocumented(register, REG), ['done', 'finished', 'holds', 'icon', 'id', 'org', 'state', 'steps']);
+  assert.deepEqual(undocumented(register, REG), ['done', 'fade', 'finished', 'holds', 'icon', 'id', 'org', 'role', 'state', 'steps']);
   assert.deepEqual(undocumented(field, FLD), ['deadline', 'derived', 'label', 'qualifies', 'search', 'to', 'unit']);
 });
 

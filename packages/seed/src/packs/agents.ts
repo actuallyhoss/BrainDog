@@ -24,13 +24,17 @@ export type PackManifest = { id: string; version: string; requires: readonly str
  */
 type Same = { fields: readonly string[]; within?: string; fold: 'text' | 'exact'; keep?: 'oldest' | 'latest' | 'sealed' };
 
-export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same }> = {
+export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same; role?: string; fade?: { field: string; after: string } }> = {
   learnings: {
     id: 'learnings',
     name: 'Learnings',
     one: 'learning',
     icon: 'learning',
     pack: 'agents',
+    /* THE PART EACH LIST PLAYS FOR THE RECORD'S AGENTS, SINCE 1.13.0 (agents-by-role-101), said by the list and not by its
+       id, so a list renamed on a real record is still found; and the day a learning fades by, ninety days unconfirmed. */
+    role: 'learnings',
+    fade: { field: 'confirmed_on', after: '90d' },
     seq_prefix: 'LN',
     /* THE FOUR-PART TEST IN ONE LINE, SINCE 1.13.0 (AGT-D15 job 1): an agent reads a list's own words with its shape, and
        the test was in one document and in nothing an agent reads. No full stop, because a page says "Learnings holds"
@@ -89,6 +93,7 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same }> = 
     one: 'skill',
     icon: 'skill',
     pack: 'agents',
+    role: 'skills',
     holds: 'what a session can do here, the moment to reach for it, and its text, versioned',
     title: 'name',
     state: 'state',
@@ -126,6 +131,7 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same }> = 
     one: 'key',
     icon: 'key',
     pack: 'agents',
+    role: 'keys-index',
     holds: 'what each key opens and where it applies; the key itself is sealed in the vault or kept somewhere named',
     title: 'label',
     state: 'state',
@@ -160,6 +166,7 @@ export const AGENTS_REGISTERS: Record<string, SeedRegister & { same?: Same }> = 
     one: 'tool',
     icon: 'plug',
     pack: 'agents',
+    role: 'tools',
     holds: 'every MCP server, command line and integration an agent uses, how it starts, and the keys it needs by name',
     title: 'name',
     state: 'state',
@@ -445,7 +452,9 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
   agents: {
     page: 'agents',
     title: 'Agents',
-    nav: { section: 'Agents', order: 10 },
+    /* ITS PLACE ON THE RAIL, SINCE batch 101 (places-and-computed-101, SHL-A18): the lead pages sit Work, Orders, Projects,
+       Money, People, Agents, lowest first (`placesOf` in `packages/record/src/places.ts`). */
+    nav: { section: 'Agents', order: 10, place: 60 },
     icon: 'session',
     requires: ['register.session', 'register.learnings', 'register.skills', 'register.tools', 'register.credentials'],
     blocks: [

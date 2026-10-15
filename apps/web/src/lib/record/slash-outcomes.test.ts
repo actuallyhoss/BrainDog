@@ -140,3 +140,12 @@ test('READ, A HOST THAT SENDS SOME OF THE FIELDS: what it sent, the rest unread 
   assert.deepEqual(out, { slash: [], folds: null, outside: 2 });
   assert.deepEqual(texts(out), ['Slash wrote 2 changes outside what it may.']);
 });
+
+test('GRADED SUGGESTIONS (ENG-B17): one line once a prediction came due, nothing before or on numbers that do not add up', async () => {
+  const out = await readOutcomes(answering({ ok: true, value: { predictions: { scored: 4, met: 3 } } }));
+  assert.deepEqual(out, { slash: [], folds: null, outside: null, predictions: { scored: 4, met: 3 } });
+  assert.deepEqual(texts(out), ['Of 4 suggestions graded, 3 did what they said.']);
+  assert.deepEqual(texts(outcomesOf({ predictions: { scored: 1, met: 0 } })), ['Of 1 suggestion graded, 0 did what it said.']);
+  assert.deepEqual(texts(outcomesOf({ outside: 0, predictions: { scored: 0, met: 0 } })), []);
+  assert.equal(outcomesOf({ predictions: { scored: 2, met: 3 } }), null);
+});

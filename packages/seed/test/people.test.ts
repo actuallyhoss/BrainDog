@@ -69,7 +69,8 @@ test('PEOPLE OPENS ON ONE LINE SAID FROM ITS OWN FIGURES, and the figures count 
   assert.equal(leads.length, 2);
   const [counts, quiet] = leads as (typeof leads[number] & { body?: string; drawn?: boolean })[];
   const body = String(counts!.body);
-  for (const id of ['people-in-touch-30d', 'people-count']) assert.ok(body.includes(`{{${id}}}`), `the line does not say ${id}`);
+  for (const id of ['people-count']) assert.ok(body.includes(`{{${id}}}`), `the line does not say ${id}`);
+  assert.ok(!body.includes('{{people-in-touch-30d}}'), 'In touch says it under the line, and a page says a figure once');
   /* HOW MANY IS A CLAUSE OF ITS OWN, and each other clause holds one figure, so a record with no Last in touch days
      (whoever `meet` added) reads "12 contacts" and never "0 of your 12 contacts were in touch". */
   const clauses = body.split(/,\s+/u);
@@ -361,7 +362,8 @@ test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never 
   const at = page.blocks.indexOf(note);
   assert.equal(at, 3);
   assert.ok((page.blocks.slice(0, at) as Drawn[]).every((b) => (b.kind === 'note' && b.lead === true) || b.heading === 'Waiting on you'));
-  assert.equal(page.blocks[at + 1]?.heading, 'Everyone');
+  assert.equal(page.blocks[at + 1]?.heading, 'In touch');
+  assert.equal(page.blocks[at + 2]?.heading, 'Everyone');
   assert.notEqual(note.lead, true);
   /* NO ID, NO LIST'S NUMBER: the count and plain words. */
   assert.doesNotMatch(String(note.body).replace('{{held-twice-shown}}', '2').replace('{{held-twice}}', '1'), /people#|#\d|\b[0-9A-HJKMNP-TV-Z]{26}\b|—/u);

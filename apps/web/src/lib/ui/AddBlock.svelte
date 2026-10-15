@@ -37,9 +37,12 @@
   import { resolverOf, type LiveBlock } from '../record/page-live.ts';
   import { page as route } from '$app/state';
   import { REGISTERS } from '../record/held.ts';
-  import { homeCurrency } from '../record/api.ts';
+  import { display, homeCurrency } from '../record/api.ts';
   import { toSegments } from '../record/blocks.ts';
-  import { bindableFor, seedBlock, seedPackBlock } from '../record/seed.ts';
+  import { bindableFor, notOfferedLine, seedBlock, seedPackBlock, seedStrip } from '../record/seed.ts';
+  /* ALREADY IN THIS CHUNK: `blocks.ts` reaches it through the drawers' registry (`page/kinds/index.ts`), so the form's
+     tile is drawn by the form's own reading of an answer and nothing new loads with the menu. */
+  import { formOfAnswer } from '../page/kinds/form.ts';
   import { blockWords } from '../record/block-edit.ts';
   import type { InstalledKind } from '../record/kinds.ts';
   import type { PageBlock } from '../record/schema.ts';
@@ -91,6 +94,17 @@
 
   const PURPOSES = ['figure', 'list', 'plan', 'say', 'media'] as const;
 
+  /** The strip's own id in the menu: a calendar, seeded as the next five weeks (`seedStrip`). */
+  const STRIP = 'calendar-weeks';
+
+  /**
+   * THE MENU'S WORDS FOR WHAT NEITHER SHARED TABLE NAMES YET (`copy.kindNames`, `blockWords.kindNames`), so a tile says a
+   * name and never an id. The shared tables win wherever they name one.
+   */
+  const MENU: Readonly<Record<string, { name: string; what: string }>> = {
+    [STRIP]: { name: 'Next five weeks', what: 'this week and the four after it, a line of days each' },
+  };
+
   /**
    * One seeded block per kind, resolved against the page's own register, rendered.
    *
@@ -102,10 +116,30 @@
     const decl = REGISTERS[register];
     /* THE ROWS A SEED IS PROPOSED FROM ARE THE ONES THIS PAGE DREW, and not the sample's rows of the list (`seed.ts`). */
     const bound = blocks.find((b) => b.register === register);
-    return bindableFor(register).map((kind) => {
+    /* THE STRIP IS A SECOND SEED OF THE CALENDAR, offered beside it wherever a calendar is, so an offer is keyed by its
+       own id and not by its kind alone. */
+    const offers = bindableFor(register).flatMap((kind) => {
       const seed = seedBlock(kind, register, bound?.entries ?? []);
+      const strip = kind === 'calendar' ? seedStrip(register, bound?.entries ?? []) : null;
+      return [{ id: kind, kind, seed }, ...(strip ? [{ id: STRIP, kind, seed: strip as PageBlock }] : [])];
+    });
+    return offers.map(({ id, kind, seed }) => {
       const preview = (isKind(kind) ? KINDS[kind].rows : undefined) ?? 3;
       let segments: ReturnType<typeof toSegments> = [];
+      /* A FORM IS DRAWN FROM AN ANSWER, never from rows (`page/kinds/form.ts`), so its tile is the seed read as the
+         record answers a form, through the same reading the page's form takes. With no `act` the drawer draws it as a
+         preview: its questions, the boxes shown and not pressable. */
+      if (seed?.kind === 'form') {
+        const spec = formOfAnswer({ form: seed });
+        if (spec) {
+          const raw = ['```form', ...(spec.fields as { label: string }[]).map((f) => f.label), String(spec.submit), '```'].join('\n');
+          segments = [{ type: 'block', kind: 'form', rows: [], raw, start: 0, end: raw.length, form_spec: spec } as ReturnType<typeof toSegments>[number]];
+        }
+        return { id, kind, seed, segments, spec: kindSpec(kind, installed) };
+      }
+      /* WHAT CHANGED IS THE RECORD'S LOG, which this sheet does not read, and a list's rows drawn as a log would be a
+         picture of something else. The tile says what the block is, the documented degrade. */
+      if (seed?.kind === 'feed') return { id, kind, seed, segments, spec: kindSpec(kind, installed) };
       /* An AUTHORED seed previews from its own rows and must not be handed a register — a block
          with both a source and authored rows is refused, so the preview would be the refusal. */
       if (seed?.authored) {
@@ -124,7 +158,7 @@
         } catch {
           segments = [];
         }
-        return { kind, seed, segments, spec: kindSpec(kind, installed) };
+        return { id, kind, seed, segments, spec: kindSpec(kind, installed) };
       }
       if (seed && bound) {
         try {
@@ -153,7 +187,13 @@
                takes one; three seeded rows against a one-row cap degrades to a visible fence, so
                the tile for the one kind that shows a single figure was showing a parse error. */
             entries: bound.entries.slice(0, preview),
-            rows: bound.rows.slice(0, preview),
+            /* THE ROWS IN THE SEED'S OWN COLUMNS. They were the page block's rows, cut by that block's columns, so a heat
+               seeded `day | value` over a page whose table led with the name read each name as a day. Each cell is said
+               as the page's reader says it (`display`), which is what every kind is drawn from on the page. */
+            rows: bound.rows.slice(0, preview).map((r, i) => ({
+              ...r,
+              cells: (seed.columns ?? []).map((c) => display(register, c.field, bound.entries[i]?.fields[c.field], route.data.now) ?? ''),
+            })),
           });
         } catch {
           segments = [];
@@ -173,20 +213,25 @@
        * answer, and naming the one that does it today is how this comes back.
        */
       if (segments.length > 0 && segments.every((s2) => s2.type === 'degraded')) segments = [];
-      return { kind, seed, segments, spec: kindSpec(kind, installed) };
+      return { id, kind, seed, segments, spec: kindSpec(kind, installed) };
     });
   });
 
   /** A kind's name and its one line, from the shared table first, then this component's words for the kinds it adds. */
-  const nameOf = (kind: string): string => copy.kindNames[kind] ?? blockWords.kindNames[kind] ?? installed[kind]?.title ?? kind;
-  const whatOf = (kind: string): string => copy.kinds[kind] ?? blockWords.kinds[kind] ?? '';
+  const nameOf = (kind: string): string =>
+    kind === STRIP ? MENU[kind]!.name : (copy.kindNames[kind] ?? blockWords.kindNames[kind] ?? MENU[kind]?.name ?? installed[kind]?.title ?? kind);
+  const whatOf = (kind: string): string => (kind === STRIP ? MENU[kind]!.what : (copy.kinds[kind] ?? blockWords.kinds[kind] ?? MENU[kind]?.what ?? ''));
+
+  /* WHAT THIS LIST CANNOT FILL, said once under the groups: a kind with no field to stand on is not a tile, and the
+     menu says which and why rather than leaving a person to wonder where the heat map went. */
+  const notOffered = $derived(notOfferedLine(register, nameOf));
 
   /* THE RECORD'S OWN KINDS, each seeded over the list, left out where the list cannot fill it. No segments: the tile
      draws the kind's title in the description's slot, the documented degrade. */
   const packTiles = $derived(
     Object.entries(installed).flatMap(([kind, spec]) => {
       const seed = seedPackBlock(kind, spec, register);
-      return seed ? [{ kind, seed: seed as PageBlock | null, segments: [] as ReturnType<typeof toSegments>, spec: spec as { purpose: string } | undefined }] : [];
+      return seed ? [{ id: kind, kind, seed: seed as PageBlock | null, segments: [] as ReturnType<typeof toSegments>, spec: spec as { purpose: string } | undefined }] : [];
     }),
   );
   const allTiles = $derived([...tiles, ...packTiles]);
@@ -224,8 +269,8 @@
                 }}
               >
                 <span class="tile-head">
-                  <span class="tile-kind">{nameOf(tile.kind)}</span>
-                  <span class="tile-what">{whatOf(tile.kind)}</span>
+                  <span class="tile-kind">{nameOf(tile.id)}</span>
+                  <span class="tile-what">{whatOf(tile.id)}</span>
                 </span>
                 <!-- `inert` AND NOT `aria-hidden`. It takes the subtree out of the tab order, out
                      of the accessibility tree and out of hit-testing in one attribute, which is
@@ -244,7 +289,7 @@
                          IT PRINTED THE NAME, which the tile's own head prints two lines above — so a
                          tile that could not draw itself read `Bar chart / amounts side by side,
                          biggest first / Bar chart`. -->
-                    <span class="tile-fallback">{whatOf(tile.kind) || nameOf(tile.kind)}</span>
+                    <span class="tile-fallback">{whatOf(tile.id) || nameOf(tile.id)}</span>
                   {/if}
                 </span>
               </button>
@@ -254,6 +299,7 @@
       </section>
     {/if}
   {/each}
+  {#if notOffered}<p class="not-offered">{notOffered}</p>{/if}
   {/if}
 </Sheet>
 
@@ -351,6 +397,13 @@
 
   .tile-draw :global(.block) {
     margin: 0;
+  }
+
+  /* ONE LINE, AND READ: what this list cannot fill and why, under the groups, at body size. */
+  .not-offered {
+    margin: var(--sp-5) 0 0;
+    color: var(--dim);
+    font-size: var(--t-row);
   }
 
   .tile-fallback {

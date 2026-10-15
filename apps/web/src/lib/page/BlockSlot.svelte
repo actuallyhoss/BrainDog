@@ -636,6 +636,9 @@
     <!-- A RUN'S PAGE, drawn for one row of the list of runs: what it did and its way back, by its handle (`S42`). -->
     {#if param.register === 'session'}<RunPanel run={`S${param.seq}`} title={param.title} onchanged={writes.reread} />{/if}
   {:else}<Reporting register={param.register} seq={param.seq} title={param.title} />{/if}
+{:else if panel === 'job' && param && writes && !arranging}
+  <!-- THE JOBS FOR THIS ROW AND A WAY TO START ONE (`panel: job`), a row panel, so the hosted branch never draws it. -->
+  {#await import('./panels/Job.svelte') then { default: Job }}<Job project={{ spoken: `${param.register}#${param.seq}`, title: param.title }} />{/await}
 {:else if hosted}
   <!-- A PANEL ABOUT THE RECORD (`panels/index.ts`), on any page: the screen part as its own screen mounts it, handed
        whether the reader owns the record. The registry and the panel are both reached by `import()`, so neither is in

@@ -370,6 +370,8 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
    * CALMER, SINCE estate 2.1.0 (DIRECTION §35): the line, what needs the person, two figures, the month by type and the
    * next ninety days, and what each domain points at and every service folded shut. Every heading wears a glyph, every
    * tile is drawn only while it has something, and a fresh record reads one note of what belongs here.
+   *
+   * WHAT AGENTS DID, SINCE estate 2.2.0 (PGS-C18), last and under the fold: the runs that changed a service.
    */
   estate: {
     page: 'estate',
@@ -529,6 +531,20 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
         limit: 50,
         when: { metric: 'services-held', gt: 0 },
       },
+      {
+        /* WHAT AGENTS DID HERE, SINCE estate 2.2.0 (PGS-C18): the services a run added, renewed or changed, one group per
+           run, from the record's own log, as the Agents page draws what runs added to the brain. `first:` folds each
+           run's rest into one line with its count. No `empty:`: with no agent's change to a service the block is not
+           drawn. UNDER THE FOLD, with everything kept, because the page already shows six tiles before it on a founder's
+           record, and what an agent did is looked up, not read each time the page opens. */
+        kind: 'agents',
+        heading: 'What agents did',
+        icon: 'activity',
+        span: 12,
+        source: 'activity',
+        where: 'list is services',
+        first: 3,
+      },
     ],
   },
 };
@@ -541,7 +557,7 @@ export const ESTATE_PAGES: Record<string, SeedPage> = {
  * LAID ON THE PAGE AND NOT ONE OF ITS OWN BLOCKS, because a page requires every list its blocks read and Numbers is
  * the pack's that declares it (`usecases/founder.ts`): written among the blocks above, Estate would no longer go in on
  * a record that holds no Numbers. So the block is said here, beside the page it stands on, and that pack lays it
- * (`adds`) under what renews and above everything folded shut. Renewals keeps its own ten blocks, eleven with this one.
+ * (`adds`) under what renews and above everything folded shut. Renewals keeps its own eleven blocks, twelve with this one.
  *
  * `SERVICE_NUMBERS_WHERE` IS THE BLOCK'S OWN CLAUSES, for the figure that hides it: the pack counts the same readings
  * over the same ninety days, so the heading is never drawn over nothing.

@@ -33,6 +33,7 @@
  * Typed on `Context` alone, by a type-only import, so the record's `briefing()` can call it without a cycle.
  */
 
+import { listFor, type AgentRole } from './agent-lists.ts';
 import { RULE, rulesOf, type Rules } from './context-caps.ts';
 import type { Brief, Context } from './index.ts';
 import { ALSO_HERE_MOST, TRIED_MOST } from './same-tree.ts';
@@ -185,9 +186,16 @@ const wordsOf = (row: Brief, field?: string): string => {
   return '';
 };
 
-const register = (c: Context, id: string) => c.registers.find((r) => r.id === id);
-const rowsOf = (c: Context, id: string): Brief[] => {
-  const r = register(c, id);
+/**
+ * The list that plays one of the agents' parts, found by the role it declares and never by its id (`listFor`), and its
+ * rows. A record that keeps no such list has none, so the card leaves that line out.
+ */
+const register = (c: Context, role: AgentRole) => {
+  const id = listFor(role, c.registers);
+  return id === null ? undefined : c.registers.find((r) => r.id === id);
+};
+const rowsOf = (c: Context, role: AgentRole): Brief[] => {
+  const r = register(c, role);
   return r ? [...r.rows, ...r.inherited] : [];
 };
 
@@ -208,7 +216,7 @@ export function plainly(said: string, c: Context, all: boolean, at?: CardAt): st
     .replace(HANDLE, (handle, list: string) => {
       const row = c.registers.flatMap((r) => [...r.rows, ...r.inherited]).find((b) => b.spoken === handle);
       const said = row ? words(wordsOf(row), 40) : '';
-      return said || at?.named?.(handle) || `one of ${register(c, list)?.name ?? list.replace(/_/gu, ' ')}`;
+      return said || at?.named?.(handle) || `one of ${c.registers.find((r) => r.id === list)?.name ?? list.replace(/_/gu, ' ')}`;
     });
 }
 
@@ -326,8 +334,10 @@ function alsoSlot(c: Context, own: string | null, at: CardAt): Slot | null {
 function handedTo(c: Context, agent: string | null): Brief[] {
   const me = agent?.trim().toLowerCase().replace(/^agent:/u, '') ?? '';
   if (!me) return [];
+  /* THE RUNS AND THREE OF THE AGENTS' OWN LISTS ARE NOT WORK ANYBODY IS HANDED, each found by the part it plays. */
+  const kept = new Set(['session', ...(['learnings', 'keys-index', 'skills'] as const).map((role) => listFor(role, c.registers))]);
   return c.registers
-    .filter((r) => !['session', 'learnings', 'credentials', 'skills'].includes(r.id))
+    .filter((r) => !kept.has(r.id))
     .flatMap((r) => [...r.rows, ...r.inherited])
     .filter((row) => typeof row.agent === 'string' && row.agent.trim().toLowerCase().replace(/^agent:/u, '') === me);
 }
@@ -513,11 +523,11 @@ const RULE_CHARS = 60;
  * How many rows a list has where the session stands: what `context` counted when it capped the list (`capRegister`'s
  * `here` and `everywhere`), else the rows it sent, with a `+` when it said there were more.
  */
-function countedOf(c: Context, id: string): { n: number; plus: string } {
-  const r = register(c, id) as (Context['registers'][number] & { here?: unknown; everywhere?: unknown }) | undefined;
+function countedOf(c: Context, role: AgentRole): { n: number; plus: string } {
+  const r = register(c, role) as (Context['registers'][number] & { here?: unknown; everywhere?: unknown }) | undefined;
   const whole = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
   if (r && whole(r.here) && whole(r.everywhere)) return { n: r.here + r.everywhere, plus: '' };
-  return { n: rowsOf(c, id).length, plus: r?.truncated ? '+' : '' };
+  return { n: rowsOf(c, role).length, plus: r?.truncated ? '+' : '' };
 }
 
 /**
@@ -557,7 +567,7 @@ function learnedAndMore(c: Context, at: CardAt, handedLeft: number): Slot[] {
   const learnt = countedOf(c, 'learnings');
   const lessonsIn = learnt.n > rowsOf(c, 'learnings').length ? learnt.n : lessons.length;
   if (lessonsIn > learned.length + ruled.length) more.push(`${String(lessonsIn)}${learnt.plus} learnings`);
-  const keys = countedOf(c, 'credentials');
+  const keys = countedOf(c, 'keys-index');
   if (keys.n > 0) more.push(`${String(keys.n)}${keys.plus} ${keys.n === 1 && !keys.plus ? 'key' : 'keys'} by name`);
   const skills = countedOf(c, 'skills');
   if (skills.n > 0) more.push(`${String(skills.n)}${skills.plus} ${skills.n === 1 && !skills.plus ? 'skill' : 'skills'}`);

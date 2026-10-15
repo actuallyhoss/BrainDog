@@ -1,6 +1,6 @@
 /**
  * A RUN AS A CONVERSATION, TOP TO BOTTOM (`run-talk.ts`, AGT-C12 build 5): who and where, its stretches, what it said
- * it is doing, what it asked, its dead ends, its helpers and the run whose step it took, each a section that is absent
+ * it is doing, what it asked, its dead ends, what it noted, its helpers and the run whose step it took, each a section that is absent
  * when it has nothing true to say. Read in UTC here, so a time is the same wherever the test runs.
  */
 import { test } from 'node:test';
@@ -27,6 +27,7 @@ const FULL = row(
     started: '2026-10-14T09:12:00.000Z',
     last_seen: '2026-10-14T12:05:00.000Z',
     tried: ['Reading the plan twice', 'A second heading under the first'],
+    notes: ['The panel reads the run once', 'Helpers come after the step'],
     took: 'S41',
   },
   'done',
@@ -50,8 +51,8 @@ const PARTS: RunParts = {
 };
 
 test('the sections come in one fixed order', () => {
-  assert.deepEqual(keys(FULL, PARTS), ['who', 'stretches', 'doing', 'asked', 'tried', 'helpers', 'took']);
-  assert.deepEqual([...TALK_ORDER], ['who', 'stretches', 'doing', 'asked', 'tried', 'helpers', 'took']);
+  assert.deepEqual(keys(FULL, PARTS), ['who', 'stretches', 'doing', 'asked', 'tried', 'noted', 'helpers', 'took']);
+  assert.deepEqual([...TALK_ORDER], ['who', 'stretches', 'doing', 'asked', 'tried', 'noted', 'helpers', 'took']);
 });
 
 test('who says the app and where, never a path in full or an id', () => {
@@ -107,6 +108,50 @@ test('asked says each question by its words and what became of it', () => {
 test('tried says the dead ends, and nothing when there are none', () => {
   assert.deepEqual(section(FULL, PARTS, 'tried')?.lines, ['Reading the plan twice', 'A second heading under the first']);
   assert.equal(section(row({ agent: 'claude', tried: ['', 7] }), {}, 'tried'), undefined);
+});
+
+test('notes say what it noted, the newest first, under their own heading', () => {
+  const notes = section(FULL, PARTS, 'noted');
+  assert.equal(notes?.heading, 'What it noted');
+  assert.deepEqual(notes?.lines, ['Helpers come after the step', 'The panel reads the run once']);
+});
+
+test('a run without notes has no notes part', () => {
+  assert.equal(section(row({ agent: 'claude' }), {}, 'noted'), undefined);
+  assert.equal(section(row({ agent: 'claude', notes: [] }), {}, 'noted'), undefined);
+  assert.equal(section(row({ agent: 'claude', notes: ['', '  ', 7, null] }), {}, 'noted'), undefined);
+});
+
+test('notes past the cap are counted, not listed', () => {
+  const many = Array.from({ length: 9 }, (_, i) => `Note number ${i + 1}`);
+  const lines = section(row({ agent: 'claude', notes: many }), {}, 'noted')?.lines;
+  assert.deepEqual(lines, ['Note number 9', 'Note number 8', 'Note number 7', 'Note number 6', 'Note number 5', 'Note number 4', 'and 3 more']);
+});
+
+test('a note that is only a path is said by its last plain words, never the path', () => {
+  const r = row({
+    agent: 'claude',
+    notes: [
+      '/Users/someone/Developer/orchard/loop/progress/garden-beds-12.md',
+      'apps/web/src/lib/page/panels/run-talk.ts',
+      '~/Desktop/letter-to-pell.txt',
+      'C:\\Work\\orchard\\plans\\spring_planting.md',
+      '01J9ZK4X7M2Q8R5T3V6W0YB1CD',
+      'tools#8',
+      'Wrote the plan to ~/Developer/orchard/docs/spring-plan.md and checked it',
+      'Kept the and/or wording',
+    ],
+  });
+  const lines = section(r, {}, 'noted')?.lines ?? [];
+  assert.deepEqual(lines, [
+    'Kept the and/or wording',
+    'Wrote the plan to spring plan and checked it',
+    'spring planting',
+    'letter to pell',
+    'run talk',
+    'garden beds 12',
+  ]);
+  for (const line of lines) assert.doesNotMatch(line, /[\\/](?!or\b)|#\d|01J9ZK/u);
 });
 
 test('helpers are counted, then each said by what it did', () => {

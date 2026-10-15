@@ -485,7 +485,7 @@ export const FILTER_TYPES: ReadonlySet<string> = new Set(['enum', 'ref', 'bool',
 export const FILTERS_MOST = 4;
 
 /** The keys of `nav`. `tabs: true` draws every page of the section as a strip of tabs over each of them. */
-export const NAV_KEYS: ReadonlySet<string> = new Set(['section', 'order', 'icon', 'tabs']);
+export const NAV_KEYS: ReadonlySet<string> = new Set(['section', 'order', 'place', 'icon', 'tabs']);
 
 const PAGE_INSTEAD: Readonly<Record<string, string>> = {
   tabs: 'Tabs are a nav section drawn as a strip: nav: { section, order, tabs: true } on the pages that share it.',

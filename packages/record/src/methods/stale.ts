@@ -55,6 +55,7 @@ import {
   type ScopeUse,
 } from '../scope-propose.ts';
 import type { RecordDeps } from './index.ts';
+import { fadeOf } from '../agent-lists.ts';
 
 /** One kind of stale thing as a person or an agent reads it. `clear` is the one call that clears it, in words. */
 export type StaleLine = { kind: string; said: string; count: number; clear: string };
@@ -74,8 +75,6 @@ export const OLD_QUESTION_MS = 14 * DAY_MS;
 const READ_MOST = 100;
 const NAMED_MOST = 8;
 
-/** The day field a list fades by, which is how `context` finds one too (`FADES` in `index.ts`), whatever it is called. */
-const FADES = 'confirmed_on';
 /** A thing on a fading list is worth confirming again once nobody has for this many days. */
 export const UNCONFIRMED_DAYS = 60;
 /** The most handles the call for a fading list or for the skills spells out. The rest are counted. */
@@ -217,7 +216,9 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
   const cutMs = nowMs - UNCONFIRMED_DAYS * DAY_MS;
   const cutDay = new Date(cutMs).toISOString().slice(0, 10);
   for (const [id, decl] of kernel.registers()) {
-    if (!decl.fields.some((f) => f.id === FADES && f.type === 'day' && !f.retired) || readable(ctx, id) !== null) continue;
+    /* THE DAY FIELD A LIST FADES BY, as `context` finds it too (`agent-lists.ts` `fadeOf`), whatever it is called. */
+    const FADES = fadeOf(decl)?.field;
+    if (FADES === undefined || readable(ctx, id) !== null) continue;
     const held: Json[] = decl.state !== undefined && decl.done !== undefined && decl.done.length > 0 ? [{ field: decl.state, not_in: [...decl.done] }] : [];
     const unconfirmed: Json = {
       any: [{ field: FADES, before: cutDay }, { all: [{ field: FADES, empty: true }, { field: 'created_at', before: new Date(cutMs).toISOString() }] }],

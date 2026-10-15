@@ -533,13 +533,14 @@ export type { MeetArgs, Met, MetRow, ResolveJob, ResolveSide } from './people.ts
 /* THE BANDS A MODEL'S ANSWER IS SETTLED IN (ENG-B04, `people.ts`). Nothing here folds by itself: `settleVerdicts` folds
    only for a caller that hands it the switch, and no caller in this file does. */
 export { BAND_ASK, BAND_SURE, corroborated, settleVerdicts, type BandFold, type Settlement, type SettleOpts } from './people.ts';
+export { foldFill, identityFloor, type FoldField, type FoldFields, type FoldFilled, type FoldRow as FoldFillRow, type Offered } from './mentions.ts';
 /* THE OTHER PAIRS (ENG-B04, `resolve.ts`): two organisations or two projects that read as one, and a name seen that no
    row is called. A read that writes nothing and asks nothing. */
 export { PAIRS_MOST, evidenceOf, pairsFor, type Pair, type PairHow, type PairRow, type PairSide, type Pairs } from './resolve.ts';
 export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
 /* THE LIST HOLDING THE RATES, by its `rates:` key or, on a record older than the key, by the name it had (`roles.ts`):
    exported so a page that draws the rates finds the same list the conversion reads. */
-export { ratesRole } from './roles.ts';
+export { meetsRole, ratesRole } from './roles.ts';
 /* THE IDENTITY KEYS (`identity-keys.ts`), for every door that reads who something is about: one normaliser, so a key
    the CLI harvests from a commit and one the record holds are the same string. */
 export { KEY_KINDS, PUBLIC_MAIL, WEAK_KINDS, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, isWeakKey, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, nameWords, parseFrom, payeeName, registrable, sameFold, valueOfKey } from './identity-keys.ts';
@@ -582,6 +583,9 @@ export type {
   Posted,
 } from './jobs.ts';
 export type { ArrangePart, Arranging, Decision, Decided, Filed, Proposal, Remembered, Suggestion, Verdict, GovernRegister, BodyKind } from './govern.ts';
+export type { Prediction } from './govern.ts';
+export { computedSet, computedFor, type Computed } from './computed-set.ts';
+export { AUTOMATION_INSIDE, AUTOMATION_REACHES, kindOfAutomationChange, stepsDiff } from './automation-kind.ts';
 /* `exponentOf` IS EXPORTED SO THE RECORD'S CURRENCY TABLE IS NOT A SECOND EXPONENT READER. It is
    `Intl`, cached per code; a table built from a copy of it could disagree with the reading. */
 export { CHANNELS as INGEST_CHANNELS, CONFIDENCES, PROPOSE_AT, arrive, day as ingestDay, exponentOf, extract as extractField, fileAsSecond, patternReport, resolve as extractOutcome, senderOf, shapeOf, tailCause } from './ingest.ts';
@@ -1104,11 +1108,11 @@ export type ArrivalSettled = { id: string; state: 'matched' | 'ignored' | 'untri
  * the page draws its section as a strip of tabs. Only the literal `true` is carried: dropped here, a declared strip
  * installed clean and no host ever drew it.
  */
-const navOf = (nav: unknown): { section: string; order: number; tabs?: true } | null => {
+const navOf = (nav: unknown): { section: string; order: number; place?: number; tabs?: true } | null => {
   if (typeof nav !== 'object' || nav === null) return null;
-  const { section, order, tabs } = nav as { section?: unknown; order?: unknown; tabs?: unknown };
+  const { section, order, place, tabs } = nav as { section?: unknown; order?: unknown; place?: unknown; tabs?: unknown };
   return typeof section === 'string' && section !== ''
-    ? { section, order: typeof order === 'number' ? order : 0, ...(tabs === true ? { tabs: true as const } : {}) }
+    ? { section, order: typeof order === 'number' ? order : 0, ...(typeof place === 'number' ? { place } : {}), ...(tabs === true ? { tabs: true as const } : {}) }
     : null;
 };
 

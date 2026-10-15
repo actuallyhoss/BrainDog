@@ -66,7 +66,8 @@ import { fallbackWire, includedCandidates, includedInference } from './slash.ts'
 import { slashReplay, workerSlashMeter } from './slash-meter.ts';
 import { workerMeaning, workerModelJobs } from './slash-jobs.ts';
 import { workerCatalogueOffers, workerCatalogueShelf } from './catalogue.ts';
-import { kennelVitals, serveKennel, servesKennel, writeCounts } from './kennel.ts';
+import { kennelRequired, kennelVitals, serveKennel, servesKennel, writeCounts } from './kennel.ts';
+import { recordScratch } from './kennel-scratch.ts';
 /* MAIL ON THE CLOUD: Email Routing's messages into the same door as a forwarder's post. */
 import { fileKeeper, takeMail } from './email.ts';
 import { fileKey, serveFiles, servesFiles } from './files.ts';
@@ -1709,6 +1710,20 @@ export class Record$ extends DurableObject<Env> {
    * AN RPC AND NEVER A ROUTE. `createRecord` is INTERNAL, because whoever calls it becomes the owner, and the
    * only way here is `/auth/provision`, behind the operator key. `null` is made.
    */
+  /** One call of the Kennel's scratch install (kennel-scratch.ts), on an object under a kennel-scratch: name nobody signs in to, as its owner. */
+  async scratchCall(method: 'planPack' | 'installPack' | 'pages' | 'page', args: unknown): Promise<unknown> {
+    const api = await this.#record();
+    const owner: CallContext = { principal: { kind: 'person', id: 'kennel-scratch', level: 'owner' } };
+    return method === 'pages' ? api.pages(owner) : (api[method] as (a: unknown, c: CallContext) => Promise<unknown>).call(api, args, owner);
+  }
+
+  /** The scratch emptied whole once its answer is known, so nothing of a submission is kept. */
+  async scratchDrop(): Promise<void> {
+    this.#api = null;
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+  }
+
   async create(args: CreateRecordArgs): Promise<Refusal | null> {
     const api = await this.#record();
     const made = await api.createRecord(args);
@@ -1955,7 +1970,7 @@ export class Record$ extends DurableObject<Env> {
        AUTHORISATION — every permission check is inside `createRecordApi`, one place, so the CLI and
        the MCP server answer to the same ladder as the browser. */
     const ctx = JSON.parse(request.headers.get('x-braindog-ctx') ?? 'null') as CallContext | null;
-    if (!ctx) return json({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'This record needs a caller.' } }, 401);
+    if (!ctx) return saidUnauthorized('record', 'This record needs a caller.');
 
     /* `/mcp` READS ITS BODY HERE. The router checked the bearer from the headers alone, so nothing a stranger
        sent is parsed, and the tools reach this record through the same methods `/api` calls. */
@@ -2789,27 +2804,21 @@ const buildId = (env: Env): Response => json({ app: env.BRAINDOG_BUILD || null, 
  * place that is honest about which: the changelog, on the marketing site, with no credential
  * needed to read it.
  */
-/* AND WHICH OF THE TWO SITUATIONS THE HOST IS IN, IT NOW KNOWS. The paragraph above was written when no
-   door existed anywhere, and it stopped being true the moment `SESSION_SECRET` was set: the block at the
-   bottom of this file wires the device grant and the invite door on exactly that condition, so sign-in is
-   on for this deployment or off for it. That is a fact about the deployment and not about any record,
-   which is why it can be said out loud. What stayed unsaid is still unsaid: neither branch admits whether
-   the record named exists, because telling those apart is the thing this one sentence exists to avoid. */
+/* AND NOW IT SAYS ONLY `unauthorized` (LCH-C08 job 2): the sentence and whether sign-in is on go to the log, and the
+   body is the one 401 every door of this Worker answers, so nothing is taught to a stranger that the owner's log does not
+   already hold. */
 const unauthorized = (env: Env): Response =>
-  json(
-    {
-      ok: false,
-      refusal: {
-        code: 'UNAUTHORIZED',
-        at: 'authorization',
-        fix:
-          (env.SESSION_SECRET ?? '').length >= 32
-            ? 'This record takes a bearer token it already knows. If the record is yours, sign in and mint one in Settings, or run `braindog login`. https://brain.dog/changelog says what is built.'
-            : 'This record takes a bearer token it already knows, and sign-in is off on this host, so there is no way to be issued one. https://brain.dog/changelog says what is built.',
-      },
-    },
-    401,
-  );
+  saidUnauthorized('bearer', (env.SESSION_SECRET ?? '').length >= 32 ? 'a bearer this record does not know, sign-in on' : 'a bearer this record does not know, sign-in off');
+
+/**
+ * THE ONE 401 BODY (LCH-C08 job 2, his words "A `401` says only `unauthorized`.", P.154): every 401 this Worker answers
+ * itself carries `{ code: 'UNAUTHORIZED', fix: 'unauthorized' }` and nothing else, and the reason goes to one
+ * `op: 'unauthorized'` line, so a stranger learns nothing of which door or why (`scripts/fence.mjs` checks it).
+ */
+function saidUnauthorized(door: string, why: string): Response {
+  op({ op: 'unauthorized', door, why });
+  return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'unauthorized' } }, 401);
+}
 
 /**
  * A crash at the front door: a reference and no reason, through `crashed` (`@braindog/host`), the one function every
@@ -3147,6 +3156,21 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         session: (sid) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).auth({ flow: 'session', sid }) as unknown as Promise<AuthResult<Who>>,
         bearer: bearerDeps(env),
         spend: (asked) => overLimit(env, null, asked, 'write'),
+        scratch: {
+          open: () => {
+            const scratch = env.RECORD.get(env.RECORD.idFromName(`kennel-scratch:${crypto.randomUUID()}`));
+            return recordScratch(
+              {
+                planPack: (args) => scratch.scratchCall('planPack', args),
+                installPack: (args) => scratch.scratchCall('installPack', args),
+                pages: () => scratch.scratchCall('pages', null),
+                page: (args) => scratch.scratchCall('page', args),
+              },
+              () => scratch.scratchDrop(),
+            );
+          },
+          required: (ids) => kennelRequired({ blobs: env.BLOBS, assets: env.ASSETS }, ids, new Date()),
+        },
       });
     /* A RECORD'S FILES, AT EITHER ADDRESS (`files.ts`): the bytes go to `BLOBS` and never through the record's
        object, and who may is asked of the same session and bearer doors `recordApi` asks, in its order. */
@@ -3882,7 +3906,7 @@ async function opsInvite(request: Request, env: Env): Promise<Response> {
   }
   const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
   if (bearer === '' || !(await sameKey(bearer, key)))
-    return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } }, 401);
+    return saidUnauthorized('operator', 'This route takes the operator key.');
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const ask = <C extends InviteCall>(call: C) => directory.invites(call) as unknown as Promise<InviteAnswers[C['flow']]>;
   if (request.method === 'GET') return json({ ok: true, value: { codes: await ask({ flow: 'invite.list' }) } }, 200);
@@ -3932,7 +3956,7 @@ async function opsAlertDoor(request: Request, env: Env): Promise<Response> {
     return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/alert is written with POST.' } }, 405, [['allow', 'POST']]);
   const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
   if (bearer === '' || !(await sameKey(bearer, key)))
-    return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } }, 401);
+    return saidUnauthorized('operator', 'This route takes the operator key.');
   let body: unknown = null;
   try {
     body = JSON.parse((await request.text()).slice(0, SIGNUP_BODY_MAX));
@@ -3970,7 +3994,7 @@ async function opsRestorePoint(request: Request, env: Env): Promise<Response> {
     return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/restore-point is asked with POST.' } }, 405, [['allow', 'POST']]);
   const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
   if (bearer === '' || !(await sameKey(bearer, key)))
-    return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } }, 401);
+    return saidUnauthorized('operator', 'This route takes the operator key.');
   let body: unknown = null;
   try {
     body = JSON.parse((await request.text()).slice(0, SIGNUP_BODY_MAX));
@@ -4015,7 +4039,7 @@ async function opsDrill(request: Request, env: Env): Promise<Response> {
     return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/drill is told with POST.' } }, 405, [['allow', 'POST']]);
   const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
   if (bearer === '' || !(await sameKey(bearer, key)))
-    return json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'This route takes the operator key.', at: 'authorization' } }, 401);
+    return saidUnauthorized('operator', 'This route takes the operator key.');
   let body: unknown = null;
   try {
     body = JSON.parse((await request.text()).slice(0, SIGNUP_BODY_MAX));
@@ -4056,7 +4080,7 @@ async function drillRead(request: Request, env: Env): Promise<Response> {
     return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/drill is read with GET.' } }, 405, [['allow', 'GET, HEAD']]);
   const mode = cookieMode(`https://${env.PUBLIC_HOST ?? ''}`);
   const sid = mode === null || (env.SESSION_SECRET ?? '').length < 32 ? undefined : readSid(request, mode);
-  const refused = () => json({ ok: false, refusal: { code: 'UNAUTHORIZED', fix: 'Sign in to read when this host last tested its backups.' } }, 401);
+  const refused = () => saidUnauthorized('drill', 'Sign in to read when this host last tested its backups.');
   if (mode === null || sid === undefined) return refused();
   const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
   const out = (await directory.auth({ flow: 'session', sid })) as unknown as AuthResult<Who>;

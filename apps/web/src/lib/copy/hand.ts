@@ -21,8 +21,8 @@ export const hand = {
   handedToast: (name: string): string => `Handed to ${name}`,
   handPutBack: 'Put back',
   handPutBackDone: 'Put back as it was',
-  /* AN AGENT HOLDS A ROW UNTIL ITS NEXT SESSION TAKES IT, or while a job it was started as runs. */
-  handWaiting: (agent: string): string => `Waiting for ${agent}'s next session`,
+  /* AN AGENT HOLDS A ROW UNTIL ITS NEXT RUN TAKES IT, or while a job it was started as runs. */
+  handWaiting: (agent: string): string => `Waiting for ${agent}'s next run`,
   handRunning: (agent: string): string => `${agent} is on it`,
   handReadFailed: 'BrainDog could not reach this record.',
   handRetry: 'Retry',

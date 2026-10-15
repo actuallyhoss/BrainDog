@@ -61,7 +61,7 @@
     {
       "page": "portfolio",
       "title": "Projects",
-      "nav": { "section": "Projects", "order": 5 },
+      "nav": { "section": "Projects", "order": 5, "place": 30 },
       "icon": "thing",
       "requires": [ "register.things" ],
       "pack": "portfolio",
@@ -85,7 +85,28 @@
           "lead": true,
           "span": 12,
           "when": { "metric": "projects-need-you", "is": 0 },
-          "body": "Nothing needs a push across {{projects-live}} project(s) in play, {{questions-open-in:things}} question(s) for you"
+          "body": "Nothing needs a push, {{questions-open-in:things}} question(s) for you"
+        },
+        {
+          "kind": "stat",
+          "heading": "In play and earning",
+          "icon": "gauge",
+          "span": 12,
+          "key": "in-play-earning",
+          "when": { "metric": "projects-live", "gt": 0 },
+          "cells": [
+            { "metric": "projects-live", "label": "In play", "trend": "12w" },
+            { "metric": "projects-lane-earning", "label": "Earning", "trend": "12w" }
+          ]
+        },
+        {
+          "kind": "split",
+          "heading": "Where they are",
+          "icon": "thing",
+          "span": 12,
+          "key": "where-they-are",
+          "source": "metric.projects-by-lane",
+          "when": { "metric": "projects-live", "gt": 4 }
         },
         {
           "kind": "split",
@@ -95,7 +116,7 @@
           "source": "metric.projects-by-health",
           "unset": "Not said yet",
           "tones": { "on_track": "good", "at_risk": "warn", "off_track": "bad" },
-          "when": { "metric": "projects-live", "gt": 4 }
+          "when": { "all": [ { "metric": "projects-live", "gt": 4 }, { "metric": "projects-with-health", "gt": 0 } ] }
         },
         {
           "kind": "cards",
@@ -387,6 +408,18 @@
       "compare": "none"
     },
     {
+      "metric": "projects-lane-earning",
+      "name": "Earning",
+      "source": "register.things",
+      "where": "lane is earning",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none",
+      "snapshot": { "grain": "day", "into": "series.projects-lane-earning" }
+    },
+    {
       "metric": "projects-aiming",
       "name": "Aiming for a day",
       "source": "register.things",
@@ -452,6 +485,17 @@
       "window": "30d",
       "compare": "none",
       "group_by": "health"
+    },
+    {
+      "metric": "projects-with-health",
+      "name": "Saying how they are going",
+      "source": "register.things",
+      "where": "lane is building or earning, health is set",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
     },
     {
       "metric": "projects-by-lane",
