@@ -209,7 +209,17 @@
     .links :global(a) {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       min-block-size: var(--tap);
+      min-inline-size: var(--tap);
+    }
+
+    .brand {
+      min-block-size: var(--tap);
+    }
+
+    .go :global(.btn) {
+      block-size: var(--tap);
     }
   }
 

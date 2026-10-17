@@ -78,7 +78,8 @@
   }
 
   .line[data-tone='dim'] {
-    color: var(--term-dim);
+    /* --term-dim is under 4.5:1 on the dark terminal; the night's second ink passes in both schemes. */
+    color: var(--on-night-2);
   }
 
   .line[data-tone='bold'] {

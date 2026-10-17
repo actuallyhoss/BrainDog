@@ -706,6 +706,13 @@
     text-decoration: none;
   }
 
+  /* 44 tall under a thumb (the layout gate's coarse-pointer target). */
+  @media (pointer: coarse) {
+    .more {
+      min-block-size: var(--tap);
+    }
+  }
+
   .more:hover {
     text-decoration: underline;
     text-underline-offset: 4px;

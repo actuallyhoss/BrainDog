@@ -73,7 +73,7 @@
     gap: 8px;
     margin: 0 0 10px;
     font: 500 12.5px/1.2 var(--ui);
-    color: var(--muted);
+    color: var(--ink2);
   }
 
   .th .r {
