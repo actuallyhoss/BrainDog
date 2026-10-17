@@ -154,6 +154,13 @@ export async function routesFor(appRoot, record = null, { every = false, extra =
       else routes.add(pattern);
       continue;
     }
+    /* AND AN ADDRESS UNDER A HELD ONE IS HELD WITH IT: `/packs/[id]` names a pack's page, which the site writes none of
+       while `/packs` is held (`launch.ts`), so a visitor has no such route and nothing here opens it. */
+    const under = [...holding].find((h) => pattern.startsWith(`${h}/`));
+    if (under !== undefined) {
+      kept.push(pattern);
+      continue;
+    }
     const entry = SAMPLE_OF[`${app}:${pattern}`];
     if (entry === undefined) {
       unsampled.push(`${pattern} has no sample for ${dynamic[0]}`);

@@ -384,6 +384,7 @@
       display: inline-flex;
       align-items: center;
       min-block-size: var(--tap);
+      min-inline-size: var(--tap);
     }
   }
 </style>

@@ -56,9 +56,12 @@ test('a site address the site holds from visitors is not audited, and is named a
   const site = apps.find((a) => a.name === 'site');
   const shut = held() ? [...HELD].filter((h) => !h.endsWith('.xml')) : [];
   for (const h of shut) assert.ok(!site.routes.includes(h), `${h} is held by the site and still audited`);
-  assert.deepEqual(said, shut.map((h) => `site: ${h}`));
+  /* A route under a held address is held with it: a pack's own page while `/packs` is (`routes.mjs`). */
+  const under = held() ? ['/packs/[id]'] : [];
+  assert.ok(!site.routes.some((r) => r.startsWith('/packs/')), 'a pack page is audited while the packs are held');
+  assert.deepEqual([...said].sort(), [...shut, ...under].map((h) => `site: ${h}`).sort());
   const open = await routesFor(join(root, 'apps', 'site'));
-  assert.deepEqual(open.held, shut);
+  assert.deepEqual([...open.held].sort(), [...shut, ...under].sort());
 });
 
 test('every route the record app has is a route the gate audits', async () => {
