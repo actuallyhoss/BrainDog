@@ -95,7 +95,7 @@ const SLUG = /^[a-z][a-z0-9-]{0,30}[a-z0-9]$/;
  *   - every name the app is on, `PUBLIC_HOST` and each Custom Domain of the site's same environment when that
  *     environment hands this Worker every door (`siteBinding`), is asked for the shell, a 401 at `/api/boot` and
  *     `/healthz` with `kernel` equal to `kernel`, which is this checkout's `migrationCount()` unless a test hands it one;
- *   - a name the site hands over is shared with the site, so it is asked `/pricing` first, which is the check that the
+ *   - a name the site hands over is shared with the site, so it is asked `/slash` first (a page the site always shows; `/pricing` is held until BrainDog is priced), which is the check that the
  *     site's `run_worker_first` is not wider than the doors. A name held as this Worker's Custom Domain has no site on
  *     it to ask;
  *   - the old name, `LEGACY_HOSTS`, or before the move the public host itself when it is a Custom Domain, is asked for a
@@ -132,7 +132,7 @@ export function checks(config, name, site = siteConfig(), kernel = migrationCoun
     if (shared)
       list.push({
         method: 'GET',
-        url: `https://${on}/pricing`,
+        url: `https://${on}/slash`,
         expects: '200 from the site',
         judge: (a) =>
           a.status === 200 && isHtml(a) ? null
@@ -365,7 +365,7 @@ export default async function smoke(name, config = wranglerConfig(), site = site
   }
   log('');
   log(`  smoke: ${name}, ${list.length + first.length} check(s)${first.length ? ` and ${reads.length - 1} more first-draw read(s) on the canary` : ''}, read-only${first.length ? " but for the fence's file puts on the canary" : ''}`);
-  if (!list.some((c) => c.url.endsWith('/pricing')))
+  if (!list.some((c) => c.url.endsWith('/slash')))
     log(`  ${name}'s site does not hand this Worker its doors, so the site is not asked: ${siteBinding(config, site, name).why ?? 'no name of the site is one this Worker is not already on'}`);
   /* A CANARY NAMED WITH NO KEY TO OPEN IT IS RED, NOT A SKIP: the canary exists, so a missing token is a mistake. */
   if (slug && !token) {

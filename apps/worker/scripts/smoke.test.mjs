@@ -67,13 +67,13 @@ test('production in push A\'s shape beside a site that does not bind it asks the
 
 test('once production\'s site binds production\'s app (push 3), production is asked the site and the doors on brain.dog as well, before its flip', () => {
   /* THE WINDOW ALPHA WAS IN BETWEEN PUSH 1 AND PUSH 2, and production is in it between push 3 and push 4: the app on
-     both names, its own name still the public host, and `brain.dog` shared with the site, so `/pricing` is asked there
+     both names, its own name still the public host, and `brain.dog` shared with the site, so `/slash` is asked there
      first. */
   assert.deepEqual(asked(checks(B1, 'production', BOTH_BOUND)), [
     'GET https://app.brain.dog/app/',
     'GET https://app.brain.dog/api/boot',
     'GET https://app.brain.dog/healthz',
-    'GET https://brain.dog/pricing',
+    'GET https://brain.dog/slash',
     'GET https://brain.dog/app/',
     'GET https://brain.dog/api/boot',
     'GET https://brain.dog/healthz',
@@ -84,7 +84,7 @@ test('once production\'s site binds production\'s app (push 3), production is as
 
 test('each flip is asked the five answers of the design and /healthz, on the two names it holds', () => {
   assert.deepEqual(asked(checks(B1, 'alpha', ALPHA_BOUND)), [
-    'GET https://alpha.brain.dog/pricing',
+    'GET https://alpha.brain.dog/slash',
     'GET https://alpha.brain.dog/app/',
     'GET https://alpha.brain.dog/api/boot',
     'GET https://alpha.brain.dog/healthz',
@@ -92,7 +92,7 @@ test('each flip is asked the five answers of the design and /healthz, on the two
     'POST https://app.alpha.brain.dog/in/anything',
   ]);
   assert.deepEqual(asked(checks(staged('B2'), 'production', BOTH_BOUND)), [
-    'GET https://brain.dog/pricing',
+    'GET https://brain.dog/slash',
     'GET https://brain.dog/app/',
     'GET https://brain.dog/api/boot',
     'GET https://brain.dog/healthz',

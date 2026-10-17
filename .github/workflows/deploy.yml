@@ -369,10 +369,10 @@ jobs:
       # `/app/`, a 401 at `/api/boot`, `/healthz`, a 308 from `/r/x` to `/app/r/x` on the same name,
       # and a POST to an `/in/` door that is served rather than redirected; `brain.dog` is not asked,
       # because the site does not hand it this Worker's doors yet. Once production's site binds this
-      # Worker it adds `brain.dog`'s `/pricing`, `/app/`, `/api/boot` and `/healthz`, and after the
+      # Worker it adds `brain.dog`'s `/slash`, `/app/`, `/api/boot` and `/healthz`, and after the
       # flip it is the design's answers and `/healthz`.
       #
-      # AFTER THE SITE, because `/pricing` is the site's answer and asking it before the site deploys
+      # AFTER THE SITE, because `/slash` is the site's answer and asking it before the site deploys
       # measures the previous site. It writes nothing. It asks `/healthz` on every name the app is on,
       # and holds its `kernel` to the migration files in this checkout.
       #
