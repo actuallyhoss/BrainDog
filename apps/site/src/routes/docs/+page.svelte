@@ -71,6 +71,11 @@
 </section>
 
 <style>
+  /* THE LINK FOR AGENTS IS ON THE NIGHT GROUND, so it takes the night's text: the page's red is for the paper. */
+  .more {
+    color: var(--on-night);
+  }
+
   /* THE SEARCH IN THE HEAD'S SLOT, under the link for agents, at a width a field reads well at. */
   .head-search {
     max-inline-size: 560px;

@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { LAUNCH } from '../src/lib/launch.ts';
+import { HELD as HELD_PATHS, LAUNCH, held } from '../src/lib/launch.ts';
 import { PLANS, TABLE, priceOf } from '../src/lib/plans.ts';
 import { cardsFor } from '../src/lib/pricing/cards.ts';
 import { BUILD, STRICT, missing, when } from './built.ts';
@@ -173,7 +173,10 @@ const stale = (): string | null =>
     ? 'the built pricing.html is older than the pricing page’s sources: it is the page before this one'
     : null;
 
-test('the built pricing page: one h1 with no $, three plan names, and the seven meters', when(missing(['pricing.html']) ?? stale()), () => {
+/* WHILE THE PAGE IS HELD the build writes no pricing.html (`HELD` in launch.ts), so there is nothing built to read. */
+const HIDDEN = held() && (HELD_PATHS as readonly string[]).includes('/pricing');
+
+test('the built pricing page: one h1 with no $, three plan names, and the seven meters', HIDDEN ? { skip: 'the pricing page is held until BrainDog is priced' } : when(missing(['pricing.html']) ?? stale()), () => {
   const html = readFileSync(page, 'utf8');
   const h1 = [...html.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => words(m[1]!));
   assert.equal(h1.length, 1, `pricing.html has ${h1.length} h1`);

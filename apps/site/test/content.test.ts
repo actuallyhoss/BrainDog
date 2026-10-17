@@ -24,7 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
-import { LAUNCH, held } from '../src/lib/launch.ts';
+import { HELD, LAUNCH, held } from '../src/lib/launch.ts';
 import { BUILD, missing, when } from './built.ts';
 
 /**
@@ -42,7 +42,8 @@ const REQUIRED: readonly string[] = [
   'slash.html',
   'agents.html',
   /* No `packs.html`: the packs are held with the changelog until `LAUNCH.public` (DIRECTION §47, batch 103). */
-  'pricing.html',
+  /* No `pricing.html` while BrainDog is not priced: the page is held and the build writes none (`HELD` in launch.ts). */
+  ...((HELD as readonly string[]).includes('/pricing') && held() ? [] : ['pricing.html']),
   'docs.html',
   /* Only once the site is public: until `LAUNCH.public` the changelog is held and the build writes none. */
   ...(held() ? [] : ['changelog.html']),
@@ -482,7 +483,7 @@ test('the build writes 404.html, in the site shell and not indexed', when(NO_BUI
   const html = read('404.html');
   assert.match(html, /There is no page here/);
   assert.match(html, /name="robots" content="noindex"/);
-  assert.match(html, /href="\/pricing"/);
+  assert.match(html, /href="\/slash"/);
 });
 
 /** THE HASHED FILES ARE CACHED FOR GOOD and the screenshots for a day; they were served max-age=0. */

@@ -24,14 +24,15 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 
 import { ENTRIES } from '../src/routes/changelog/entries.ts';
-import { held } from '../src/lib/launch.ts';
+import { HELD, held } from '../src/lib/launch.ts';
 import { BUILD, missing, when } from './built.ts';
 
 /* `changelog.html` ONLY ONCE THE SITE IS PUBLIC: until `LAUNCH.public` the page is held and the build writes none
    (`launch.ts`). The entries are its source and are read on every day, in the first test below. */
 const SHOWN = !held();
 
-const REQUIRED: readonly string[] = ['index.html', 'slash.html', 'pricing.html', 'agents.html', ...(SHOWN ? ['changelog.html'] : []), '404.html'];
+const PRICED = !(held() && (HELD as readonly string[]).includes('/pricing'));
+const REQUIRED: readonly string[] = ['index.html', 'slash.html', ...(PRICED ? ['pricing.html'] : []), 'agents.html', ...(SHOWN ? ['changelog.html'] : []), '404.html'];
 
 const NO_BUILD = missing(REQUIRED);
 
