@@ -92,12 +92,12 @@
 
 <style>
   .sec {
-    padding-top: 140px;
+    padding-block-start: 140px;
   }
 
   .sec .say {
     margin: 16px 0 0;
-    font-size: 19px;
+    font-size: var(--t-site-19);
     color: var(--ink2);
     max-width: 30em;
   }
@@ -113,7 +113,7 @@
 
   @media (max-width: 760px) {
     .sec {
-      padding-top: 96px;
+      padding-block-start: 96px;
     }
   }
 </style>

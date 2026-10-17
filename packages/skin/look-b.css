@@ -1,56 +1,10 @@
-/* LOOK B, as tokens (DIRECTION §45 d9, §47).
+/* LOOK B (DIRECTION §45 d9, §47): the sheet a page imports for Look B's colours and faces.
 
-   The owner's approved design for the site, 17 October: one flat board, BrainDog red as the one working accent, Lexend
-   600 for page names and big figures, Geist for text and Geist Mono for code and times. The names and values are the
-   prototype's own (loop/site-2026-10-17/src/site.html), verbatim, so the site's builders code against these names.
+   It writes no colour of its own. The palette is in the theme package, the one place a colour may be spelled out
+   (`packages/theme/look-b.css`, hand-set from the approved prototype until the generator makes Look B), and this pulls
+   it in whole, `@layer tokens` and all, so the site keeps importing `@braindog/skin/look-b.css` and the names it codes
+   against (--page, --red, --red-fill, --tile, --head ...) do not move.
 
-   The site uses it from batch 103; the app adopts it in 107 and keeps tokens.css until then. The dark values come
-   twice, under the reader's scheme unless the page says light, and under [data-theme="dark"], so a page can answer
-   either. No colour is written anywhere else in this sheet. */
+   The site uses it from batch 103; the app adopts it in 107 and keeps tokens.css until then. */
 
-@layer tokens {
-  :root {
-    --page: #FFFFFF; --paper: #F4F5F7; --night: #0F1012; --night-2: #1A1C20; --night-rule: rgba(255, 255, 255, .09);
-    --on-night: #F3F4F6; --on-night-2: rgba(243, 244, 246, .62);
-    --ink: #101114; --ink2: #3B4048; --muted: #686E77; --faint: #A0A5AD; --rule: #E3E5E9; --rule2: #EDEFF2; --soft: #F5F6F8;
-    --red: #CF413A; --red-press: #B3322C; --red-ink: #B3322C; --red-tint: #FBEBE9; --redcard: #CF413A; --on-red: #FFFFFF;
-    --on-red-2: rgba(255, 255, 255, .82); --red-rule: rgba(255, 255, 255, .24);
-    --board: #F3F4F6; --tile: #FFFFFF; --bar: #DCDFE4; --chart: #101114; --good: #2E7D4F; --good-tint: #E7F3EC; --warn: #B7791F;
-    --term: #0F1114; --term-ink: #D9DEE5; --term-dim: #7D8794;
-    --live: #2E9E5B; --live-ring: rgba(46, 158, 91, .18); --term-red: #F07068; --term-green: #6FCF97; --term-bright: #FFFFFF;
-    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #FF8F87;
-    --shadow-lift: rgba(16, 24, 40, .08); --shadow-pop: rgba(16, 24, 40, .32);
-    --agent-claude: #D97757; --agent-vscode: #007ACC;
-    --win-shadow: 0 50px 100px -40px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .06);
-    --head: "Lexend", "Geist", ui-sans-serif, system-ui, sans-serif;
-    --ui: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    color-scheme: light;
-  }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --page: #0A0B0D; --paper: #131619; --night: #121418; --night-2: #1B1E23; --night-rule: rgba(255, 255, 255, .08);
-    --on-night: #ECEEF1; --on-night-2: rgba(236, 238, 241, .6);
-    --ink: #ECEEF1; --ink2: #C3C8CF; --muted: #8F96A0; --faint: #5F6670; --rule: #242A31; --rule2: #1D2228; --soft: #1A1F26;
-    --red: #E05148; --red-press: #EA6A61; --red-ink: #F07A71; --red-tint: #3A1F1C; --redcard: #B5372F; --on-red: #FFFFFF;
-    --on-red-2: rgba(255, 255, 255, .84); --red-rule: rgba(255, 255, 255, .22);
-    --board: #0D1014; --tile: #161A20; --bar: #2B3139; --chart: #ECEEF1; --good: #72C08F; --good-tint: #17281E; --warn: #E0A84F;
-    --term: #07090B; --term-ink: #D9DEE5; --term-dim: #6E7884;
-    --live: #2E9E5B; --live-ring: rgba(46, 158, 91, .18); --term-red: #F07068; --term-green: #6FCF97; --term-bright: #FFFFFF;
-    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #FF8F87;
-    --shadow-lift: rgba(0, 0, 0, .3); --shadow-pop: rgba(0, 0, 0, .6);
-    --agent-vscode: #3C9DF0;
-    --win-shadow: 0 50px 100px -40px rgba(0, 0, 0, .8), 0 0 0 1px rgba(255, 255, 255, .07); color-scheme: dark; } }
-  :root[data-theme="dark"] {
-    --page: #0A0B0D; --paper: #131619; --night: #121418; --night-2: #1B1E23; --night-rule: rgba(255, 255, 255, .08);
-    --on-night: #ECEEF1; --on-night-2: rgba(236, 238, 241, .6);
-    --ink: #ECEEF1; --ink2: #C3C8CF; --muted: #8F96A0; --faint: #5F6670; --rule: #242A31; --rule2: #1D2228; --soft: #1A1F26;
-    --red: #E05148; --red-press: #EA6A61; --red-ink: #F07A71; --red-tint: #3A1F1C; --redcard: #B5372F; --on-red: #FFFFFF;
-    --on-red-2: rgba(255, 255, 255, .84); --red-rule: rgba(255, 255, 255, .22);
-    --board: #0D1014; --tile: #161A20; --bar: #2B3139; --chart: #ECEEF1; --good: #72C08F; --good-tint: #17281E; --warn: #E0A84F;
-    --term: #07090B; --term-ink: #D9DEE5; --term-dim: #6E7884;
-    --live: #2E9E5B; --live-ring: rgba(46, 158, 91, .18); --term-red: #F07068; --term-green: #6FCF97; --term-bright: #FFFFFF;
-    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #FF8F87;
-    --shadow-lift: rgba(0, 0, 0, .3); --shadow-pop: rgba(0, 0, 0, .6);
-    --agent-vscode: #3C9DF0;
-    --win-shadow: 0 50px 100px -40px rgba(0, 0, 0, .8), 0 0 0 1px rgba(255, 255, 255, .07); color-scheme: dark; }
-}
+@import '@braindog/theme/look-b.css';

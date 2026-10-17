@@ -203,7 +203,7 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
       return {
         subject: 'Your BrainDog invite',
         parts: [
-          { say: v.name ? `Hi ${v.name},` : 'Hello,' },
+          { say: v.name ? `Hi ${v.name},` : 'Hi there,' },
           { say: 'Your invite to BrainDog is ready. Open this link to make your account:' },
           ...link,
           { say: /^[1-9]\d*$/u.test(v.days) ? `It works once, and it ends in ${v.days} ${v.days === '1' ? 'day' : 'days'}.` : 'It works once.' },

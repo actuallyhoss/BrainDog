@@ -5,7 +5,9 @@
   "type": "module",
   "license": "Apache-2.0",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./look-b.css": "./look-b.css",
+    "./look-b.ts": "./src/look-b.ts"
   },
   "scripts": {
     "test": "node --test src/*.test.ts",

@@ -77,7 +77,7 @@ export const slashPage = {
   },
   faq: {
     title: 'Questions',
-    items: [
+    questions: [
       { q: 'Does Slash change things on its own?', a: 'No. What it makes is a draft until you add it, and anything added can be undone.' },
       { q: 'Can it move money or delete things?', a: 'Never. Money, keys, sharing and deletes always wait for you.' },
       { q: 'Can I use my own model key?', a: 'Yes, in Settings under Agents. Asks on your own key have no monthly limit.' },

@@ -105,8 +105,8 @@
 
   .hero-mark {
     position: absolute;
-    right: -170px;
-    top: 30px;
+    inset-inline-end: -170px;
+    inset-block-start: 30px;
     width: 940px;
     color: var(--night-mark);
     pointer-events: none;
@@ -143,7 +143,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 34px;
+    margin-block-start: 34px;
   }
 
   .works {
@@ -152,7 +152,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 16px;
-    font-size: 14px;
+    font-size: var(--t-site-small);
     color: var(--on-night-2);
   }
 
@@ -171,16 +171,16 @@
   .stage::after {
     content: '';
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
+    inset-block-end: 0;
     height: 42%;
     background: var(--page);
   }
 
   .stage .wrap {
     position: relative;
-    z-index: 1;
+    z-index: var(--z-raise);
   }
 
   /* THE FOUR CARDS, one under another. The cards' grounds, titles and lines are the shell's (`app.css`), and each
@@ -188,12 +188,12 @@
   .story {
     display: grid;
     gap: 20px;
-    padding-top: 112px;
+    padding-block-start: 112px;
   }
 
   /* IT STAYS YOURS, in three short columns. */
   .yours {
-    padding-top: 140px;
+    padding-block-start: 140px;
   }
 
   .yours h2,
@@ -207,16 +207,16 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 40px;
-    margin-top: 44px;
+    margin-block-start: 44px;
   }
 
   .three > div {
-    padding-top: 22px;
-    border-top: 1.5px solid var(--ink);
+    padding-block-start: 22px;
+    border-block-start: 1.5px solid var(--ink);
   }
 
   .three h3 {
-    font-size: 22px;
+    font-size: var(--t-figure);
     line-height: 1.15;
     letter-spacing: -0.03em;
   }
@@ -224,17 +224,17 @@
   .three p {
     margin: 10px 0 0;
     color: var(--ink2);
-    font-size: 16px;
+    font-size: var(--t-site-16);
   }
 
   /* THE PLANS, Free first. */
   .sec {
-    padding-top: 140px;
+    padding-block-start: 140px;
   }
 
   .sec .say {
     margin: 16px 0 0;
-    font-size: 19px;
+    font-size: var(--t-site-19);
     color: var(--ink2);
     max-width: 30em;
   }
@@ -242,7 +242,7 @@
   @media (max-width: 1060px) {
     .hero-mark {
       width: 700px;
-      right: -260px;
+      inset-inline-end: -260px;
     }
 
     .three {
@@ -258,18 +258,18 @@
 
     .hero-mark {
       width: 520px;
-      right: -250px;
-      top: 120px;
+      inset-inline-end: -250px;
+      inset-block-start: 120px;
     }
 
     .story {
-      padding-top: 80px;
+      padding-block-start: 80px;
       gap: 14px;
     }
 
     .yours,
     .sec {
-      padding-top: 96px;
+      padding-block-start: 96px;
     }
   }
 

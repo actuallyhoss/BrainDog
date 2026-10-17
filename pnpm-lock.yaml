@@ -221,6 +221,9 @@ importers:
       '@braindog/slash':
         specifier: workspace:*
         version: link:../../packages/slash
+      '@braindog/theme':
+        specifier: workspace:*
+        version: link:../../packages/theme
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 5.20260907.1

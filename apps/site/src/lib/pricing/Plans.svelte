@@ -48,11 +48,11 @@
     display: grid;
     grid-template-columns: 1.2fr 1fr 1fr;
     gap: 16px;
-    margin-top: 56px;
+    margin-block-start: 56px;
   }
 
   .plans.compact {
-    margin-top: 44px;
+    margin-block-start: 44px;
   }
 
   .plan {
@@ -102,7 +102,7 @@
     font: 400 15px/1 var(--ui);
     letter-spacing: 0;
     color: var(--muted);
-    margin-left: 6px;
+    margin-inline-start: 6px;
   }
 
   .free .price span {
@@ -116,7 +116,7 @@
     display: grid;
     gap: 10px;
     align-content: start;
-    font-size: 15px;
+    font-size: var(--t-site-15);
     color: var(--ink2);
   }
 
@@ -134,7 +134,7 @@
   .plan li :global(.icon) {
     width: 17px;
     height: 17px;
-    margin-top: 3px;
+    margin-block-start: 3px;
   }
 
   .go :global(.btn),

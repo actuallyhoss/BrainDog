@@ -63,7 +63,7 @@ test("the page's words are the prototype's headings, and every count of asks is 
     ['Ask', 'Find', 'Make', 'How asks are counted', 'Slash and your agents', 'Questions'],
   );
   assert.equal(slashPage.close.title, 'Press / and ask.');
-  assert.equal(slashPage.faq.items.length, 4);
+  assert.equal(slashPage.faq.questions.length, 4);
   assert.equal(slashPage.agents.lines.length, 4);
   assert.deepEqual(slashPage.counted.plans, [TABLE.free.name, TABLE.hosted.name, TABLE.plus.name]);
   assert.deepEqual(slashPage.counted.month.cells, [TABLE.free.credits, TABLE.hosted.credits, TABLE.plus.credits]);

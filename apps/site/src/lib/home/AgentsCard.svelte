@@ -45,7 +45,7 @@
     align-items: end;
     justify-content: space-between;
     gap: 40px;
-    margin-bottom: 40px;
+    margin-block-end: 40px;
     flex-wrap: wrap;
   }
 
@@ -90,13 +90,13 @@
 
   .note p {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--t-site-15);
     color: var(--on-night);
   }
 
   .note .meta {
-    margin-top: 2px;
-    font-size: 12px;
+    margin-block-start: 2px;
+    font-size: var(--t-app-xs);
     color: var(--on-night-2);
   }
 
@@ -124,7 +124,7 @@
 
     .top-head {
       gap: 18px;
-      margin-bottom: 28px;
+      margin-block-end: 28px;
     }
   }
 </style>

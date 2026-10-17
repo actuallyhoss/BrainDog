@@ -53,7 +53,7 @@
   </div>
 
   <div class="t s3 hide-phone">
-    <p class="th"><Icon name="people" />{PROJECT.people.head}</p>
+    <p class="th"><Icon name="users" />{PROJECT.people.head}</p>
     <div class="list">
       {#each PROJECT.people.who as id}
         {@const who = PEOPLE[id]}
@@ -104,18 +104,18 @@
   }
 
   .next {
-    margin-left: auto;
+    margin-inline-start: auto;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 7px 11px;
     border-radius: 9px;
     background: var(--tile);
-    font-size: 13px;
+    font-size: var(--t-app-sm);
   }
 
   .stands {
-    font-size: 18px;
+    font-size: var(--t-site-18);
     line-height: 1.5;
     margin: 0;
     text-wrap: pretty;
@@ -133,7 +133,7 @@
 
   .up {
     color: var(--good);
-    font-size: 12px;
+    font-size: var(--t-app-xs);
     font-weight: 500;
   }
 
@@ -148,7 +148,8 @@
   }
 
   .bars rect.now {
-    fill: hsl(var(--ph) 65% 45%);
+    --now: hsl(var(--ph) 65% 45%);
+    fill: var(--now);
   }
 
   .bars text {
@@ -163,20 +164,23 @@
     display: grid;
     place-items: center;
     font: 600 10.5px/1 var(--ui);
-    background: hsl(var(--h) 45% 88%);
-    color: hsl(var(--h) 45% 28%);
+    /* The person's hue (`--h`, set on the face) is the one thing that varies; the two steps are named once and read below. */
+    --face-bg: hsl(var(--h) 45% 88%);
+    --face-ink: hsl(var(--h) 45% 28%);
+    background: var(--face-bg);
+    color: var(--face-ink);
     flex: none;
   }
 
   :global(:root[data-theme='dark']) .face {
-    background: hsl(var(--h) 25% 24%);
-    color: hsl(var(--h) 55% 82%);
+    --face-bg: hsl(var(--h) 25% 24%);
+    --face-ink: hsl(var(--h) 55% 82%);
   }
 
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme='light'])) .face {
-      background: hsl(var(--h) 25% 24%);
-      color: hsl(var(--h) 55% 82%);
+      --face-bg: hsl(var(--h) 25% 24%);
+      --face-ink: hsl(var(--h) 55% 82%);
     }
   }
 
@@ -194,11 +198,11 @@
 
   @media (max-width: 760px) {
     .stands {
-      font-size: 16.5px;
+      font-size: var(--t-site-16-5);
     }
 
     .next {
-      margin-left: 0;
+      margin-inline-start: 0;
     }
   }
 </style>

@@ -95,7 +95,7 @@
 
   @media (max-width: 760px) {
     .term {
-      font-size: 12px;
+      font-size: var(--t-app-xs);
       padding: 14px;
       min-height: 0;
     }

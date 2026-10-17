@@ -18,7 +18,9 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 
 const FACES = [
-  { file: 'lexend-600.woff2', query: 'family=Lexend:wght@600', subset: 'latin' },
+  /* LEXEND IS CUT TO THE CHARACTERS A TITLE USES (printable ASCII, the curly quotes, the middle dot, the en dash and the
+     ellipsis), so it fits the display face's 10 KB budget: Google's own `text=` subset, about 9 KB against 14.5 KB for latin. */
+  { file: 'lexend-600.woff2', query: 'family=Lexend:wght@600', text: String.fromCharCode(...Array.from({ length: 95 }, (_, i) => 32 + i)) + '\u2018\u2019\u201c\u201d\u00b7\u2013\u2026' },
   { file: 'poppins-600.woff2', query: 'family=Poppins:wght@600', subset: 'latin' },
   { file: 'geist.woff2', query: 'family=Geist:wght@300..800', subset: 'latin' },
   { file: 'geist-mono.woff2', query: 'family=Geist+Mono:wght@400..500', subset: 'latin' },
@@ -36,9 +38,10 @@ await mkdir(OUT, { recursive: true });
 
 for (const face of FACES) {
   const css = await (
-    await fetch(`https://fonts.googleapis.com/css2?${face.query}&display=swap`, { headers: { 'User-Agent': UA } })
+    await fetch(`https://fonts.googleapis.com/css2?${face.query}${face.text ? `&text=${encodeURIComponent(face.text)}` : ''}&display=swap`, { headers: { 'User-Agent': UA } })
   ).text();
-  const urls = pick(css, face.subset);
+  /* A `text=` subset answers one block with no subset comment, so its one URL is the file. */
+  const urls = face.text ? [...css.matchAll(/url\((https:[^)]+)\)/g)].map((m) => m[1]) : pick(css, face.subset);
   if (urls.length === 0) {
     console.error(`  ${face.file}: no ${face.subset} block found`);
     continue;

@@ -20,6 +20,7 @@ import { sameKey } from '@braindog/host/auth';
 import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall } from '@braindog/record/directory';
 import type { Refusal, Result } from '@braindog/ports';
 
+import { NOSNIFF } from './admin.ts';
 import { SIGNUP_CLOSED, type SignupMode } from './launch.ts';
 
 /** The most of an application body this door reads, as sign-up's: a name, an address, two short texts and an answer. */
@@ -39,7 +40,7 @@ type Extra = readonly (readonly [string, string])[];
 const reply = (status: number, payload: object, extra: Extra = []): Response =>
   new Response(JSON.stringify(payload), {
     status,
-    headers: [['content-type', 'application/json; charset=utf-8'], ['cache-control', 'no-store'], ['x-content-type-options', 'nosniff'], ...extra.map(([k, v]): [string, string] => [k, v])],
+    headers: [['content-type', 'application/json; charset=utf-8'], ['cache-control', 'no-store'], ...NOSNIFF, ...extra.map(([k, v]): [string, string] => [k, v])],
   });
 
 const refused = (status: number, refusal: Refusal, extra: Extra = []): Response => reply(status, { ok: false, refusal }, extra);

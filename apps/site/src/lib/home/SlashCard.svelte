@@ -26,7 +26,7 @@
     display: grid;
     justify-items: center;
     text-align: center;
-    margin-bottom: 44px;
+    margin-block-end: 44px;
   }
 
   .head h2 {
@@ -57,7 +57,7 @@
 
   @media (max-width: 760px) {
     .head {
-      margin-bottom: 28px;
+      margin-block-end: 28px;
     }
   }
 </style>

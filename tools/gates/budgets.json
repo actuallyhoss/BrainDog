@@ -10,8 +10,7 @@
     "htmlBrotli": 25600,
     "//fonts": "22 §9 budgets 45 KB over 2 files for one Latin face plus Arabic. This ships two Latin faces, so the workhorse keeps the original number and the display face — used only above 20px — gets its own. A recorded deviation, not a moved goalpost.",
     "uiFaceBytes": 46080,
-    "//displayFaceBytes": "Raised from 10240 on 17 October (DIRECTION §47): Lexend 600 replaced Poppins 600 as the display face, and its Latin file is 14856 bytes where Poppins was 8000. The budget is that file rounded up to the next KB, so a heavier fetch still fails.",
-    "displayFaceBytes": 15360
+    "displayFaceBytes": 10240
   },
   "layout": {
     "//": "13 §8, 22 §10. The widths a page is drawn at, and what counts as overflowing.",

@@ -42,35 +42,35 @@ export const CLAIMS: readonly Claim[] = [
   /* The home page (`copy/home.ts`, spread into `site`, so `hero.sub` is its `home.hero.sub`). */
   { id: 'every-agent', said: 'every AI agent you use', where: 'hero.sub', state: 'true' },
   { id: 'brief-rewritten', said: 'rewritten whenever something changes', where: 'cards.brief.say', state: 'true' },
-  { id: 'agents-leave-notes', said: 'leaves a note when it', where: 'cards.agents.say', state: 'true' },
+  { id: 'agents-leave-a-note', said: 'leaves a note when it', where: 'cards.agents.say', state: 'true' },
   { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'cards.chores.say', state: 'true' },
   { id: 'floor-waits', said: 'Money, keys, sharing and deletes always wait for your yes.', where: 'cards.chores.floor', state: 'true' },
   { id: 'slash-card-yes', said: 'Nothing goes in without your yes.', where: 'cards.slash.say', state: 'true' },
   { id: 'undo-any-change', said: 'you can undo it', where: 'yours.points.0.body', state: 'true' },
   { id: 'export-any-time', said: 'Export the whole record as one file', where: 'yours.points.1.body', state: 'true' },
   { id: 'keys-unseen', said: 'Agents use your keys without ever seeing them', where: 'yours.points.2.body', state: 'true' },
-  { id: 'first-brief-minutes', said: 'read your first brief in a few minutes', where: 'closing.body', state: 'true', flag: 'signup' },
+  { id: 'first-brief-quick', said: 'read your first brief in a few minutes', where: 'closing.body', state: 'true', flag: 'signup' },
 
   /* The Slash page (`copy/slash.ts`, its own export `slashPage`, which the ledger reads beside `site`). */
   { id: 'slash-asks-first', said: 'Nothing it makes goes in until you say yes.', where: 'slashPage.head.lead', state: 'true' },
   { id: 'finding-free', said: 'Finding is free and never spends an ask.', where: 'slashPage.find.body.1', state: 'true' },
-  { id: 'own-key-unlimited', said: 'Asks on your own key have no monthly limit.', where: 'slashPage.faq.items.2.a', state: 'true' },
+  { id: 'own-key-unlimited', said: 'Asks on your own key have no monthly limit.', where: 'slashPage.faq.questions.2.a', state: 'true' },
 
   /* The connect page (`copy/agents.ts`). */
   { id: 'mcp-approve-once', said: 'no key is copied anywhere', where: 'agents.lead', state: 'true' },
-  { id: 'agent-sees-no-key', said: 'See a key. It uses them from the vault, by name.', where: 'agents.cannot.items.0', state: 'true' },
-  { id: 'agent-asks-first', said: 'Move money, share or delete without your yes.', where: 'agents.cannot.items.1', state: 'true' },
-  { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.items.2', state: 'true' },
-  { id: 'agent-write-undo', said: 'A receipt with an undo for everything it writes.', where: 'agents.gets.items.2', state: 'true' },
+  { id: 'agent-sees-no-key', said: 'See a key. It uses them from the vault, by name.', where: 'agents.cannot.lines.0', state: 'true' },
+  { id: 'agent-asks-first', said: 'Move money, share or delete without your yes.', where: 'agents.cannot.lines.1', state: 'true' },
+  { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.lines.2', state: 'true' },
+  { id: 'agent-write-undo', said: 'A receipt with an undo for everything it writes.', where: 'agents.gets.lines.2', state: 'true' },
   { id: 'five-apps-connect', said: 'Claude, ChatGPT, Codex, Cursor and VS Code can read your record, propose changes and leave notes.', where: 'agents.lead', state: 'true' },
 
   /* The pricing page (`copy/pricing.ts`, `pricing`). */
   { id: 'free-no-card', said: 'No card for the free plan.', where: 'pricing.close.body', state: 'true', flag: 'signup' },
-  { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.items.2.a', state: 'true' },
-  { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.items.3.a', state: 'flag', flag: 'billing' },
+  { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },
+  { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'flag', flag: 'billing' },
   { id: 'extra-use-soon', said: 'Coming soon.', where: 'pricing.extra.soon', state: 'not-yet', flag: 'billing', soon: true },
   { id: 'waits-next-month', said: 'Nothing stops at the limit. It waits for next month.', where: 'pricing.holds.say', state: 'true' },
-  { id: 'brief-spends-no-ask', said: 'Your brief, filing and your rules never spend one.', where: 'pricing.faq.items.0.a', state: 'true' },
+  { id: 'brief-spends-no-ask', said: 'Your brief, filing and your rules never spend one.', where: 'pricing.faq.questions.0.a', state: 'true' },
   { id: 'extra-use-capped', said: 'Turn it on with a monthly cap, and BrainDog never goes past it.', where: 'pricing.extra.say', state: 'flag', flag: 'billing' },
   { id: 'upgrade-earns-it', said: 'Upgrade when it earns it.', where: 'pricing.close.body', state: 'flag', flag: 'billing' },
 

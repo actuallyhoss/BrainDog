@@ -81,7 +81,8 @@
     src: url('/fonts/lexend-600.woff2') format('woff2');
     font-weight: 600;
     font-display: swap;
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212;
+    /* The title characters only (apps/web/scripts/fonts.mjs): anything else falls back to Geist. */
+    unicode-range: U+0020-007E, U+00B7, U+2013, U+2018-2019, U+201C-201D, U+2026;
   }
 
   /* ── THE BOARD (DIRECTION §39) ─────────────────────────────────────────────

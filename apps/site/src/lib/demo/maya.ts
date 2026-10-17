@@ -34,7 +34,7 @@ export const CENTS = {
   awsCard: 52_000,
   cashAhead: 4_821_000,
   billsMonth: 694_000,
-  payroll: 440_000,
+  salaries: 440_000,
   googleWorkspace: 15_600,
   figmaBill: 6_400,
 } as const;
@@ -156,7 +156,7 @@ export const TODAY: {
 } = {
   needs: [
     { what: `Chase Northbound for ${usd(CENTS.northboundInvoice)}`, sub: '4 days late · Sam Patel', act: 'Chase it', tone: 'quiet' },
-    { what: `Pay Dana Reyes ${usd(CENTS.danaInvoice)}`, sub: 'due Friday · you usually pay on payroll day', act: 'Plan it', tone: 'tint' },
+    { what: `Pay Dana Reyes ${usd(CENTS.danaInvoice)}`, sub: 'due Friday · you usually pay her with the salaries', act: 'Plan it', tone: 'tint' },
   ],
   cash: {
     head: 'Cash ahead',
@@ -240,7 +240,7 @@ export const PROJECT: {
       { month: 'Mar', cents: 840_000 },
     ],
   },
-  people: { head: 'People', who: ['dana', 'leo'] },
+  people: { head: 'Who works on it', who: ['dana', 'leo'] },
   runsOn: {
     head: 'Runs on',
     services: [
@@ -259,15 +259,15 @@ export const NEEDS: Need[] = [
     id: 'pay',
     kind: 'Money',
     by: 'BrainDog',
-    ask: `Dana Reyes sent a ${usd(CENTS.danaInvoice)} invoice, due Friday. Pay it with payroll?`,
-    why: 'Her invoice came in Monday. You paid her last three on payroll day.',
+    ask: `Dana Reyes sent a ${usd(CENTS.danaInvoice)} invoice, due Friday. Pay it with the salaries?`,
+    why: 'Her invoice came in Monday. You paid her last three with the salaries.',
     yes: 'Plan it for Friday',
     no: 'Not now',
-    done: "Dana's invoice is planned for Friday, with payroll",
+    done: "Dana's invoice is planned for Friday, with the salaries",
   },
   {
     id: 'sam',
-    kind: 'People',
+    kind: 'Person',
     by: 'BrainDog',
     ask: 'Sam P. and Sam Patel look like one person. Merge them?',
     why: "Same email, both on Northbound, both in last week's call notes.",
@@ -348,13 +348,13 @@ export const ASKS: Ask[] = [
     q: 'What do I owe this month?',
     lead: [{ text: usd(CENTS.billsMonth) }, ' across five bills. Most of it goes on Friday.'],
     bars: [
-      { label: 'Payroll', cents: CENTS.payroll, when: 'Fri 20' },
+      { label: 'Salaries', cents: CENTS.salaries, when: 'Fri 20' },
       { label: 'Dana Reyes', cents: CENTS.danaInvoice, when: 'Fri 20' },
       { label: 'AWS', cents: CENTS.awsCard, when: 'Mon 23' },
       { label: 'Google Workspace', cents: CENTS.googleWorkspace, when: 'Tue 24' },
       { label: 'Figma', cents: CENTS.figmaBill, when: 'Wed 25' },
     ],
-    read: 'Read 6 bills and payroll',
+    read: 'Read 6 bills and the salaries',
     actions: [KEEP],
   },
   {
@@ -404,7 +404,7 @@ export const FINDS: Find[] = [
     count: 4,
     aside: FOUND,
     hits: [
-      { icon: 'people', title: 'Dana Reyes', sub: 'Designer · Tidepool and Pocketlab', kind: 'Person' },
+      { icon: 'users', title: 'Dana Reyes', sub: 'Designer · Tidepool and Pocketlab', kind: 'Person' },
       { icon: 'cash', title: `Invoice from Dana Reyes · ${usd(CENTS.danaInvoice)}`, sub: 'Due Friday · waits for you', kind: 'Invoice' },
       { icon: 'message', title: "Onboarding copy waits on Dana's icons", sub: 'Note by Cursor · yesterday', kind: 'Note' },
       { icon: 'file', title: "Dana's contract", sub: 'Tidepool · signed in January', kind: 'Page' },
@@ -433,7 +433,7 @@ export const FINDS: Find[] = [
         sub: '4 days late · reminder drafted',
         kind: 'Invoice',
       },
-      { icon: 'people', title: 'Sam Patel', sub: 'Northbound · last call Tuesday', kind: 'Person' },
+      { icon: 'users', title: 'Sam Patel', sub: 'Northbound · last call Tuesday', kind: 'Person' },
       { icon: 'message', title: 'Northbound wants the April sprint a week later', sub: 'Note by ChatGPT · Tuesday', kind: 'Note' },
     ],
   },
@@ -468,14 +468,14 @@ export const MAKES: Make[] = [
     draft: {
       title: 'Wholesale orders',
       sub: 'New page · Ferment & Co',
-      head: [{ text: 'Shop' }, { text: 'Cases', numeric: true }, { text: 'Total', numeric: true }, { text: 'Paid' }],
+      head: [{ text: 'Store' }, { text: 'Cases', numeric: true }, { text: 'Total', numeric: true }, { text: 'Paid' }],
       cells: [
         ['Kiln & Crumb', '12', usd(144_000), 'Yes'],
         ['Hart Street Grocer', '8', usd(96_000), 'Due Friday'],
         ['The Pickle Room', '20', usd(240_000), 'Yes'],
         ['Lowtide Café', '6', usd(72_000), { text: '9 days late', late: true }],
       ],
-      foot: `4 shops · ${usd(552_000)} in March`,
+      foot: `4 stores · ${usd(552_000)} in March`,
     },
     from: 'From Slash · reads Orders and Shopify',
     yes: 'Add it',

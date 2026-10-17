@@ -270,10 +270,9 @@ const EXEMPT = {
     },
   },
   'apps/site': {
-    why: 'the public site is prose about the product, not code that runs a record (3 hits).',
+    why: 'the public site is prose about the product, not code that runs a record (1 hit).',
     words: {
       egypt: 'the changelog entry at `routes/changelog/entries.ts:569` says `Egyptian pounds` about a currency fix that shipped.',
-      mercury: 'the home page names the Mercury pack twice, in `lib/copy/home.ts`: the inbox example ("connect Stripe and Mercury") and the packs line, exactly as it names Stripe, Money and Work.',
     },
   },
   'apps/worker/src/mail.ts': {

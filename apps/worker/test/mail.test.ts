@@ -164,7 +164,7 @@ test('THE INVITE LETTER GREETS BY NAME, SAYS WHEN IT ENDS, AND ONLY ITS LINK CAR
   assert.ok(!letter.subject.includes(CODE));
 
   const nameless = letterOf('invite.ready', { link, days: '1' });
-  assert.ok(nameless.text.startsWith('Hello,'));
+  assert.ok(nameless.text.startsWith('Hi there,'));
   assert.ok(nameless.text.includes('It works once, and it ends in 1 day.'));
   assert.ok(letterOf('invite.ready', { link }).text.includes('It works once.'));
 });

@@ -45,7 +45,7 @@ test('A FAILED CHECK IS check, A LIMIT IS limit WITH ITS WAIT, and anything else
   assert.deepEqual(await sendApplication(header.io, { name: 'Maya', email: 'maya@example.com' }), { ok: false, why: 'limit', retryAfter: 61 });
   const silent = host({}, 429);
   assert.deepEqual(await sendApplication(silent.io, { name: 'Maya', email: 'maya@example.com' }), { ok: false, why: 'limit', retryAfter: 900 });
-  const other = host({ ok: false, refusal: { code: 'BAD_REQUEST', fix: 'Say an email.', at: 'email' } }, 400);
+  const other = host({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'Say an email.', at: 'email' } }, 422);
   assert.deepEqual(await sendApplication(other.io, { name: 'Maya', email: 'x' }), { ok: false, why: 'other' });
   const broken = host('not json', 500);
   assert.deepEqual(await sendApplication(broken.io, { name: 'Maya', email: 'maya@example.com' }), { ok: false, why: 'other' });

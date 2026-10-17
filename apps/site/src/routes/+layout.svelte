@@ -244,6 +244,12 @@
     display: none;
   }
 
+  /* SHUT, THE PANEL IS NOT DRAWN AT ALL. A closed disclosure's content is skipped, but its links' boxes still answer a
+     measurement, at their own widths and past the phone's edge; taking it out of the layout leaves nothing to reach. */
+  .menu:not([open]) .menu-panel {
+    display: none;
+  }
+
   .menu[open] .menu-btn {
     background: var(--night-2);
   }

@@ -146,7 +146,7 @@ test('A DIRECT INVITATION BY ADDRESS MAILS ONE CODE AND MARKS A WAITING APPLICAT
 });
 
 test('A LETTER THAT COULD NOT GO STILL ANSWERS THE LINK, with mailed false', async () => {
-  const c = await door({ EMAIL: { send: async () => { throw Object.assign(new Error('down'), { code: 'E_INTERNAL' }); } } });
+  const c = await door({ EMAIL: { send: async () => { throw new Error('down'); } } });
   try {
     await c.apply('Dana Reyes', 'dana@example.test');
     const [row] = await c.listed();

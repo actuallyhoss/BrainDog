@@ -76,4 +76,4 @@ export const extra: readonly { key: string; name: string; price: string }[] = p.
 
 /** The questions drawn for these flags: one that rests on billing is left out while billing is off. */
 export const faqFor = (flags: Flags): readonly { q: string; a: string }[] =>
-  p.faq.items.filter((item) => !('billing' in item) || flags.billing).map(({ q, a }) => ({ q, a }));
+  p.faq.questions.filter((item) => !('billing' in item) || flags.billing).map(({ q, a }) => ({ q, a }));

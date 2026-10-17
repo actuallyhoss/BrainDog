@@ -98,7 +98,7 @@
   <div class="facts">
     <h2>{s.faq.title}</h2>
     <div class="faq">
-      {#each s.faq.items as f (f.q)}
+      {#each s.faq.questions as f (f.q)}
         <div><h3>{f.q}</h3><p>{f.a}</p></div>
       {/each}
     </div>
@@ -114,7 +114,7 @@
     place-items: center;
     inline-size: 60px;
     block-size: 60px;
-    margin-bottom: 26px;
+    margin-block-end: 26px;
     border-radius: 15px;
     background: var(--night-2);
     box-shadow:
@@ -134,11 +134,11 @@
     gap: 64px;
     align-items: start;
     padding-block: 88px;
-    border-top: 1px solid var(--rule);
+    border-block-start: 1px solid var(--rule);
   }
 
   .read > .srow:first-child {
-    border-top: 0;
+    border-block-start: 0;
   }
 
   .stext h2,
@@ -153,7 +153,7 @@
     max-inline-size: 32em;
     margin: 18px 0 0;
     color: var(--ink2);
-    font-size: 18px;
+    font-size: var(--t-site-18);
     line-height: 1.65;
     text-wrap: pretty;
   }
@@ -169,7 +169,7 @@
   .eg li {
     display: flex;
     gap: 12px;
-    font-size: 16.5px;
+    font-size: var(--t-site-16-5);
   }
 
   .eg li::before {
@@ -180,33 +180,33 @@
 
   .facts {
     padding-block: 88px;
-    border-top: 1px solid var(--rule);
+    border-block-start: 1px solid var(--rule);
   }
 
   .tablebox {
     max-inline-size: 760px;
-    margin-top: 28px;
+    margin-block-start: 28px;
     overflow-x: auto;
   }
 
   .ptable {
     inline-size: 100%;
     border-collapse: collapse;
-    font-size: 15px;
+    font-size: var(--t-site-15);
   }
 
   .ptable th,
   .ptable td {
     padding: 14px 10px;
-    border-top: 1px solid var(--rule);
-    text-align: left;
+    border-block-start: 1px solid var(--rule);
+    text-align: start;
   }
 
   .ptable thead th,
   .ptable thead td {
-    border-top: 0;
+    border-block-start: 0;
     color: var(--muted);
-    font-size: 13.5px;
+    font-size: var(--t-site-13-5);
     font-weight: 500;
   }
 
@@ -216,7 +216,7 @@
 
   .ptable:not(.plain-left) td,
   .ptable:not(.plain-left) thead th {
-    text-align: right;
+    text-align: end;
     font-variant-numeric: tabular-nums;
   }
 
@@ -224,19 +224,19 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 34px 56px;
-    margin-top: 40px;
+    margin-block-start: 40px;
   }
 
   .faq h3 {
-    margin-bottom: 8px;
-    font-size: 21px;
+    margin-block-end: 8px;
+    font-size: var(--t-site-21);
     letter-spacing: -0.03em;
   }
 
   .faq p {
     margin: 0;
     color: var(--ink2);
-    font-size: 16px;
+    font-size: var(--t-site-16);
   }
 
   @media (max-width: 1060px) {

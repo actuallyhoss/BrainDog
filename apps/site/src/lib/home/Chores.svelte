@@ -105,7 +105,7 @@
     align-items: end;
     justify-content: space-between;
     gap: 40px;
-    margin-bottom: 40px;
+    margin-block-end: 40px;
     flex-wrap: wrap;
   }
 
@@ -139,7 +139,7 @@
   }
 
   .th .r {
-    margin-left: auto;
+    margin-inline-start: auto;
     font-weight: 600;
   }
 
@@ -169,16 +169,16 @@
     display: grid;
     gap: 8px;
     padding: 14px 0;
-    border-top: 1px solid var(--rule2);
+    border-block-start: 1px solid var(--rule2);
   }
 
   .ask:first-child {
-    border-top: 0;
-    padding-top: 2px;
+    border-block-start: 0;
+    padding-block-start: 2px;
   }
 
   .by {
-    font-size: 12px;
+    font-size: var(--t-app-xs);
     color: var(--muted);
   }
 
@@ -188,13 +188,13 @@
   }
 
   .q {
-    font-size: 15.5px;
+    font-size: var(--t-site-16);
     font-weight: 600;
     letter-spacing: -0.005em;
   }
 
   .why {
-    font-size: 13px;
+    font-size: var(--t-app-sm);
     color: var(--ink2);
   }
 
@@ -202,12 +202,12 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    margin-top: 2px;
+    margin-block-start: 2px;
   }
 
   .empty {
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-app-sm);
     padding: 10px 0 2px;
   }
 
@@ -215,8 +215,8 @@
   .done .th {
     color: var(--on-red);
     margin: 20px 0 4px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--red-rule);
+    padding-block-end: 12px;
+    border-block-end: 1px solid var(--red-rule);
   }
 
   .item {
@@ -224,13 +224,13 @@
     align-items: center;
     gap: 10px;
     padding: 12px 0;
-    border-top: 1px solid var(--red-rule);
-    font-size: 14px;
+    border-block-start: 1px solid var(--red-rule);
+    font-size: var(--t-site-small);
     color: var(--on-red);
   }
 
   .item:first-child {
-    border-top: 0;
+    border-block-start: 0;
   }
 
   .item p {
@@ -239,14 +239,14 @@
   }
 
   .tag {
-    font-size: 11.5px;
-    color: var(--on-red-2);
+    font-size: var(--t-app-xs);
+    color: var(--on-red);
   }
 
   .undo {
     all: unset;
     cursor: pointer;
-    font-size: 12.5px;
+    font-size: var(--t-app-sm);
     font-weight: 500;
     color: var(--on-red);
     text-decoration: underline;
@@ -280,19 +280,19 @@
     gap: 12px;
     align-items: flex-start;
     margin: 40px 0 0;
-    padding-top: 24px;
-    border-top: 1px solid var(--red-rule);
-    font-size: 16.5px;
+    padding-block-start: 24px;
+    border-block-start: 1px solid var(--red-rule);
+    font-size: var(--t-site-16-5);
     line-height: 1.5;
     color: var(--on-red);
   }
 
   .floor :global(.icon) {
-    margin-top: 3px;
+    margin-block-start: 3px;
   }
 
   .floor span {
-    color: var(--on-red-2);
+    color: var(--on-red);
   }
 
   @media (pointer: coarse) {
@@ -324,7 +324,7 @@
 
     .top-head {
       gap: 18px;
-      margin-bottom: 28px;
+      margin-block-end: 28px;
     }
   }
 </style>

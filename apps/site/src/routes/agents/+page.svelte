@@ -47,7 +47,7 @@
     <div>
       <h2>{a.gets.title}</h2>
       <ul class="plain">
-        {#each a.gets.items as item, i (item)}
+        {#each a.gets.lines as item, i (item)}
           <li><span class="ico"><Icon name={GETS[i] ?? 'check'} size="s" /></span>{item}</li>
         {/each}
       </ul>
@@ -55,7 +55,7 @@
     <div>
       <h2>{a.cannot.title}</h2>
       <ul class="plain">
-        {#each a.cannot.items as item, i (item)}
+        {#each a.cannot.lines as item, i (item)}
           <li><span class="ico"><Icon name={CANNOT[i] ?? 'x'} size="s" /></span>{item}</li>
         {/each}
       </ul>
@@ -92,7 +92,7 @@
 
   .two-lists h2 {
     margin: 0 0 18px;
-    font-size: 28px;
+    font-size: var(--t-title);
     line-height: 1.1;
     letter-spacing: -0.035em;
   }
@@ -109,7 +109,7 @@
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
     gap: 10px;
-    font-size: 16.5px;
+    font-size: var(--t-site-16-5);
     line-height: 1.5;
     color: var(--ink2);
   }

@@ -32,6 +32,10 @@
     --lh-site-body: 1.647;
     --t-site-small: 14px;
     /* THE SITE DESIGN'S OTHER STEPS (DIRECTION §47), named once here so a component reads a step and not a size. */
+    --t-site-11-5: 11.5px;
+    --t-site-12: 12px;
+    --t-site-12-5: 12.5px;
+    --t-site-13-5: 13.5px;
     --t-site-14-5: 14.5px;
     --t-site-15: 15px;
     --t-site-16: 16px;
@@ -39,6 +43,8 @@
     --t-site-18: 18px;
     --t-site-19: 19px;
     --t-site-21: 21px;
+    /* The one stacking step the site's own pages need above the shared `--z-raise`. */
+    --z-site-lift: 2;
     /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
     --t-app-xs: var(--t-xs);
     --t-app-sm: var(--t-sm);
@@ -414,14 +420,16 @@
     block-size: 17px;
   }
 
+  /* The solid red is `--red-fill`, which clears 4.5 to 1 under white text in both themes; `--red` stays for red words. */
   .btn.red {
-    background: var(--red);
+    background: var(--red-fill);
     box-shadow: none;
     color: var(--on-red);
   }
 
+  /* Darker than the fill in both themes, so the white text only gains on it. */
   .btn.red:hover {
-    background: var(--red-press);
+    background: color-mix(in srgb, var(--red-fill), var(--night) 14%);
   }
 
   /* The design's white at 8 and 14 in a hundred over the night, mixed from the night's own ink. */
@@ -685,7 +693,7 @@
   }
 
   .card.redc .say {
-    color: var(--on-red-2);
+    color: var(--on-red);
   }
 
   /* A LINK THAT LEADS ON to the rest: words and an arrow. */

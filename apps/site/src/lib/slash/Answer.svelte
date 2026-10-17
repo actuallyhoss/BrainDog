@@ -100,7 +100,9 @@
         {#if make.project}{@render face(make.project)}{/if}
         <div><b>{make.draft.title}</b><span>{make.draft.sub}</span></div>
       </div>
-      <div class="dtbox">
+      <!-- The table scrolls sideways on a phone, so the box is a region the keyboard can reach and scroll. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="dtbox" role="region" aria-label={make.draft.title} tabindex="0">
         <table class="dt">
           <thead><tr>{#each make.draft.head as h (h.text)}<th class:n={h.numeric}>{h.text}</th>{/each}</tr></thead>
           <tbody>
@@ -141,60 +143,63 @@
 
 <style>
   .t { background: var(--tile); border-radius: 14px; padding: 16px; min-width: 0; }
-  .who { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
-  .who b { font-weight: 600; font-size: 14px; }
+  .who { display: flex; align-items: center; gap: 9px; margin-block-end: 8px; }
+  .who b { font-weight: 600; font-size: var(--t-site-small); }
   .pface {
     width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none;
-    background: color-mix(in srgb, hsl(var(--ph) 70% 45%) 14%, var(--tile)); color: hsl(var(--ph) 65% 38%);
+    --pf-bg: color-mix(in srgb, hsl(var(--ph) 70% 45%) 14%, var(--tile)); --pf-ink: hsl(var(--ph) 65% 38%);
+    background: var(--pf-bg); color: var(--pf-ink);
   }
-  :global(:root[data-theme='dark']) .pface { color: hsl(var(--ph) 70% 70%); background: color-mix(in srgb, hsl(var(--ph) 70% 45%) 24%, var(--tile)); }
+  :global(:root[data-theme='dark']) .pface { --pf-ink: hsl(var(--ph) 70% 70%); --pf-bg: color-mix(in srgb, hsl(var(--ph) 70% 45%) 24%, var(--tile)); }
   @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme='light'])) .pface { color: hsl(var(--ph) 70% 70%); background: color-mix(in srgb, hsl(var(--ph) 70% 45%) 24%, var(--tile)); }
+    :global(:root:not([data-theme='light'])) .pface { --pf-ink: hsl(var(--ph) 70% 70%); --pf-bg: color-mix(in srgb, hsl(var(--ph) 70% 45%) 24%, var(--tile)); }
   }
-  .brief { font-size: 18px; line-height: 1.5; margin: 0; text-wrap: pretty; }
+  .brief { font-size: var(--t-site-18); line-height: 1.5; margin: 0; text-wrap: pretty; }
   .fig { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .late { color: var(--red-ink); }
-  .hbar { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 12px; align-items: center; padding: 7px 0; font-size: 14px; }
+  .hbar { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 12px; align-items: center; padding: 7px 0; font-size: var(--t-site-small); }
   .meter { display: block; height: 6px; border-radius: 4px; background: var(--bar); overflow: hidden; }
   .meter i { display: block; height: 100%; border-radius: 4px; background: var(--chart); }
   .num { font-variant-numeric: tabular-nums; }
-  .when2 { color: var(--muted); font-size: 12px; }
+  .when2 { color: var(--muted); font-size: var(--t-site-12); }
   .spark-t { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .sub { display: block; color: var(--muted); font-size: 12.5px; margin: 0; }
+  .sub { display: block; color: var(--muted); font-size: var(--t-site-12-5); margin: 0; }
   .big { font: 600 27px/1.05 var(--head); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
   .spark { width: 140px; height: 44px; overflow: visible; flex: none; }
-  .spark .l { fill: none; stroke: hsl(var(--ph) 65% 45%); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
-  .spark .a { fill: color-mix(in srgb, hsl(var(--ph) 65% 45%) 12%, transparent); stroke: none; }
+  .spark { --pf-line: hsl(var(--ph) 65% 45%); }
+  .spark .l { fill: none; stroke: var(--pf-line); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
+  .spark .a { fill: color-mix(in srgb, var(--pf-line) 12%, transparent); stroke: none; }
   .read { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px; }
   .read .sub { flex: 1; min-width: 10em; }
   .th { display: flex; align-items: center; gap: 8px; margin: 2px 4px 0; font: 500 12.5px/1.2 var(--ui); color: var(--muted); }
   .t .th { margin: 0 0 10px; }
-  .r { margin-left: auto; }
+  .r { margin-inline-start: auto; }
   .hit { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--tile); min-width: 0; }
   .agent { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; flex: none; background: var(--soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
   .grow { flex: 1; min-width: 0; }
   .grow b { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .grow span { display: block; color: var(--muted); font-size: 12.5px; }
+  .grow span { display: block; color: var(--muted); font-size: var(--t-site-12-5); }
   mark { background: var(--red-tint); color: inherit; border-radius: 3px; padding: 0 1px; }
-  .tag { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .tag { font-size: var(--t-site-11-5); color: var(--muted); white-space: nowrap; }
   .draft { background: var(--tile); border-radius: 14px; overflow: hidden; min-width: 0; }
   .draft-top { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
   .draft-top b { display: block; font: 600 16px/1.2 var(--head); letter-spacing: -0.02em; }
-  .draft-top span { display: block; color: var(--muted); font-size: 12px; }
+  .draft-top span { display: block; color: var(--muted); font-size: var(--t-site-12); }
   .dtbox { overflow-x: auto; }
-  .dt { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  .dt th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 6px 16px; border-top: 1px solid var(--rule2); }
-  .dt td { padding: 8px 16px; border-top: 1px solid var(--rule2); white-space: nowrap; }
-  .dt .n { text-align: right; font-variant-numeric: tabular-nums; }
-  .draft-foot { padding: 10px 16px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--rule2); }
-  .rule-s { margin: 0; font-size: 18px; line-height: 1.55; text-wrap: pretty; }
-  .rule-s b { font-weight: 600; border-bottom: 2px solid var(--faint); }
-  .rule-sub { margin-top: 10px; }
-  .propose { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--tile); font-size: 13.5px; }
+  .dtbox:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+  .dt { width: 100%; border-collapse: collapse; font-size: var(--t-site-13-5); }
+  .dt th { text-align: start; font-weight: 500; color: var(--muted); font-size: var(--t-site-12); padding: 6px 16px; border-block-start: 1px solid var(--rule2); }
+  .dt td { padding: 8px 16px; border-block-start: 1px solid var(--rule2); white-space: nowrap; }
+  .dt .n { text-align: end; font-variant-numeric: tabular-nums; }
+  .draft-foot { padding: 10px 16px; color: var(--muted); font-size: var(--t-site-12-5); border-block-start: 1px solid var(--rule2); }
+  .rule-s { margin: 0; font-size: var(--t-site-18); line-height: 1.55; text-wrap: pretty; }
+  .rule-s b { font-weight: 600; border-block-end: 2px solid var(--faint); }
+  .rule-sub { margin-block-start: 10px; }
+  .propose { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--tile); font-size: var(--t-site-13-5); }
   .propose .sub { flex: 1; min-width: 11em; }
   .propose .said { flex: 1; }
   .ok { display: inline-flex; color: var(--good); }
-  .undo { all: unset; cursor: pointer; font-size: 12.5px; font-weight: 500; color: var(--red-ink); }
+  .undo { all: unset; cursor: pointer; font-size: var(--t-site-12-5); font-weight: 500; color: var(--red-ink); }
   .undo:hover { text-decoration: underline; }
   .undo:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; border-radius: 4px; }
   @media (pointer: coarse) {

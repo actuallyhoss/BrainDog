@@ -15,6 +15,13 @@
  * the liveness line.
  */
 import { ADMIN_CSS, ADMIN_HTML, ADMIN_JS } from './admin-page.ts';
+import { FILE_HEADERS } from './files.ts';
+
+/**
+ * `nosniff` under its header's name, read off the headers every file goes out with (`FILE_HEADERS`), so the worker
+ * writes that header once and this host and the application door send it in the same words.
+ */
+export const NOSNIFF: readonly [string, string][] = Object.entries(FILE_HEADERS).filter(([, value]) => value === 'nosniff');
 
 /** The five headers on every answer this host gives, the 404 and the 405 included. */
 export const ADMIN_HEADERS: Readonly<Record<string, string>> = {
@@ -23,7 +30,7 @@ export const ADMIN_HEADERS: Readonly<Record<string, string>> = {
   'cache-control': 'no-store',
   'x-robots-tag': 'noindex, nofollow',
   'referrer-policy': 'no-referrer',
-  'x-content-type-options': 'nosniff',
+  ...Object.fromEntries(NOSNIFF),
 };
 
 /** The operator doors, which the normal router answers on this host as on any other. */

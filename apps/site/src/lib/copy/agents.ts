@@ -22,7 +22,7 @@ export const agents = {
     lead: 'Claude, ChatGPT, Codex, Cursor and VS Code can read your record, propose changes and leave notes. You approve it once in the app, and no key is copied anywhere.',
     gets: {
       title: 'What your agent gets',
-      items: [
+      lines: [
         "Your brief first: where things stand, what's next, and what waits on you.",
         `Names, never ids, so it talks about ${DANA} and ${TIDEPOOL} the way you do.`,
         'A receipt with an undo for everything it writes.',
@@ -30,7 +30,7 @@ export const agents = {
     },
     cannot: {
       title: "What it can't do",
-      items: [
+      lines: [
         'See a key. It uses them from the vault, by name.',
         'Move money, share or delete without your yes.',
         'Hide what it did. Everything it writes carries its name.',

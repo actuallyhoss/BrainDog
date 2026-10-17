@@ -111,7 +111,7 @@
 <style>
   .desk-ask {
     position: relative;
-    margin-left: auto;
+    margin-inline-start: auto;
     width: 250px;
     flex: none;
     transition: width 0.2s;
@@ -164,7 +164,7 @@
   }
 
   kbd {
-    margin-left: auto;
+    margin-inline-start: auto;
     font: 500 11px/1 var(--mono);
     padding: 3px 5px;
     border-radius: 5px;
@@ -175,21 +175,21 @@
 
   .desk-drop {
     position: absolute;
-    z-index: 5;
-    top: 100%;
-    left: 0;
-    right: 0;
+    z-index: var(--z-raise);
+    inset-block-start: 100%;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
     background: var(--tile);
     border: 1.5px solid var(--red);
-    border-top: 0;
+    border-block-start: 0;
     border-radius: 0 0 14px 14px;
     box-shadow: 0 24px 48px -20px var(--shadow-pop);
     overflow: hidden;
   }
 
   .desk-drop :global(.tries) {
-    border-right: 0;
-    border-bottom: 1px solid var(--rule);
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--rule);
   }
 
   .pal-out {
@@ -209,7 +209,7 @@
 
   .thinking {
     color: var(--muted);
-    font-size: 13.5px;
+    font-size: var(--t-app-sm);
     display: flex;
     align-items: center;
     gap: 8px;

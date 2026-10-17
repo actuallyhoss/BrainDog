@@ -50,7 +50,7 @@ test('/signed-in.js and isSignedIn agree on every cookie', () => {
   assert.equal(SIGNED_IN, 'bd_in');
   const cases: [string, boolean][] = [
     ['bd_in=x', true],
-    ['a=1; bd_in=sam-co', true],
+    ['a=1; bd_in=acme-co', true],
     ['bd_in=', false],
     ['xbd_in=1', false],
     ['', false],

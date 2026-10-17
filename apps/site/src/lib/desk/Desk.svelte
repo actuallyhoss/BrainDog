@@ -4,8 +4,9 @@
 
   ALL FOUR PLACES ARE IN THE HTML. With scripting on, only the chosen one shows and the tab bar is a real tablist
   (arrows, Home and End move). With scripting off, the <noscript> rule below lays every place out one under another,
-  each headed by its tab's name, and the bar no longer marks one as chosen. A <style> is not held by the page's
-  script policy, so the rule needs no hash.
+  each headed by its tab's name, and the bar no longer marks one as chosen. A style element is not held by the page's
+  script policy, so the rule needs no hash. It reaches the bar and the buttons other parts write by attribute, because
+  this part does not write those classes itself.
 
   THE BAR OPENS IN PLACE (`Ask.svelte`), widening the way the app's does, and the window takes `slashing` while it is
   open. The count on Needs you reads the shared asks (`needs.svelte.ts`), so the home page's red card moves it too.
@@ -14,7 +15,7 @@
   import { onMount } from 'svelte';
 
   import Mark from '../Mark.svelte';
-  import { FOUNDER } from '../demo/maya.ts';
+  import { FOUNDER as MAYA } from '../demo/maya.ts';
   import Agents from './Agents.svelte';
   import Ask from './Ask.svelte';
   import Needs from './Needs.svelte';
@@ -61,11 +62,11 @@
 <noscript>
   <style>
     .desk .desk-pane { display: block !important; }
-    .desk .desk-pane + .desk-pane { border-top: 1px solid var(--rule); }
+    .desk .desk-pane + .desk-pane { border-block-start: 1px solid var(--rule); }
     .desk .desk-pane-name { display: block !important; }
     .desk .desk-tab[aria-selected='true'] { background: none !important; box-shadow: none !important; color: var(--muted) !important; }
-    .desk .desk-tab, .desk .desk-ask-bar { pointer-events: none; }
-    .desk .desk-js { display: none !important; }
+    .desk .desk-tab, .desk [class~='desk-ask-bar'] { pointer-events: none; }
+    .desk [class~='desk-js'] { display: none !important; }
   </style>
 </noscript>
 
@@ -92,7 +93,7 @@
       {/each}
     </div>
     <Ask bind:open={asking} />
-    <span class="face" style="--h:{FOUNDER.hue}" aria-hidden="true">{FOUNDER.initials}</span>
+    <span class="face" style="--h:{MAYA.hue}" aria-hidden="true">{MAYA.initials}</span>
   </div>
   {#each TABS as tab}
     <div
@@ -124,7 +125,7 @@
     background: var(--board);
     box-shadow: var(--win-shadow);
     overflow: hidden;
-    font-size: 13.5px;
+    font-size: var(--t-app-sm);
     line-height: 1.45;
     color: var(--ink);
     text-align: start;
@@ -138,8 +139,8 @@
     min-height: 54px;
     padding: 0 16px;
     background: var(--tile);
-    border-bottom: 1px solid var(--rule);
-    z-index: 2;
+    border-block-end: 1px solid var(--rule);
+    z-index: var(--z-raise);
   }
 
   .who {
@@ -211,20 +212,23 @@
     display: grid;
     place-items: center;
     font: 600 10.5px/1 var(--ui);
-    background: hsl(var(--h) 45% 88%);
-    color: hsl(var(--h) 45% 28%);
+    /* The person's hue (`--h`, set on the face) is the one thing that varies; the two steps are named once and read below. */
+    --face-bg: hsl(var(--h) 45% 88%);
+    --face-ink: hsl(var(--h) 45% 28%);
+    background: var(--face-bg);
+    color: var(--face-ink);
     flex: none;
   }
 
   :global(:root[data-theme='dark']) .face {
-    background: hsl(var(--h) 25% 24%);
-    color: hsl(var(--h) 55% 82%);
+    --face-bg: hsl(var(--h) 25% 24%);
+    --face-ink: hsl(var(--h) 55% 82%);
   }
 
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme='light'])) .face {
-      background: hsl(var(--h) 25% 24%);
-      color: hsl(var(--h) 55% 82%);
+      --face-bg: hsl(var(--h) 25% 24%);
+      --face-ink: hsl(var(--h) 55% 82%);
     }
   }
 
@@ -303,7 +307,7 @@
   }
 
   .win :global(.th .r) {
-    margin-left: auto;
+    margin-inline-start: auto;
   }
 
   .win :global(.big) {
@@ -314,8 +318,8 @@
 
   .win :global(.sub) {
     color: var(--muted);
-    font-size: 12.5px;
-    margin-top: 4px;
+    font-size: var(--t-app-sm);
+    margin-block-start: 4px;
   }
 
   .win :global(.sub.late),
@@ -350,13 +354,13 @@
     align-items: center;
     gap: 10px;
     padding: 8px 0;
-    border-top: 1px solid var(--rule2);
+    border-block-start: 1px solid var(--rule2);
     min-width: 0;
   }
 
   .win :global(.li:first-child) {
-    border-top: 0;
-    padding-top: 0;
+    border-block-start: 0;
+    padding-block-start: 0;
   }
 
   .win :global(.grow) {
@@ -367,7 +371,7 @@
   .win :global(.grow span) {
     display: block;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--t-app-xs);
   }
 
   .win :global(.agent) {
@@ -393,8 +397,11 @@
     border-radius: 8px;
     display: grid;
     place-items: center;
-    background: color-mix(in srgb, hsl(var(--ph) 70% 45%) 14%, var(--tile));
-    color: hsl(var(--ph) 65% 38%);
+    /* The project's hue (`--ph`) tints its square; the steps are named here and the dark rules below only swap them. */
+    --pface-hue: hsl(var(--ph) 70% 45%);
+    --pface-ink: hsl(var(--ph) 65% 38%);
+    background: color-mix(in srgb, var(--pface-hue) 14%, var(--tile));
+    color: var(--pface-ink);
     flex: none;
   }
 
@@ -404,19 +411,21 @@
   }
 
   :global(:root[data-theme='dark']) .win :global(.pface) {
-    color: hsl(var(--ph) 70% 70%);
-    background: color-mix(in srgb, hsl(var(--ph) 70% 45%) 24%, var(--tile));
+    --pface-ink: hsl(var(--ph) 70% 70%);
+    color: var(--pface-ink);
+    background: color-mix(in srgb, var(--pface-hue) 24%, var(--tile));
   }
 
   @media (prefers-color-scheme: dark) {
     :global(:root:not([data-theme='light'])) .win :global(.pface) {
-      color: hsl(var(--ph) 70% 70%);
-      background: color-mix(in srgb, hsl(var(--ph) 70% 45%) 24%, var(--tile));
+      --pface-ink: hsl(var(--ph) 70% 70%);
+      color: var(--pface-ink);
+      background: color-mix(in srgb, var(--pface-hue) 24%, var(--tile));
     }
   }
 
   .win :global(.tag) {
-    font-size: 11.5px;
+    font-size: var(--t-app-xs);
     color: var(--muted);
     white-space: nowrap;
   }
@@ -472,7 +481,7 @@
     }
 
     .face {
-      margin-left: auto;
+      margin-inline-start: auto;
     }
 
     .places {
@@ -485,14 +494,14 @@
     .desk-tab {
       justify-content: center;
       padding: 8px 0;
-      font-size: 12px;
+      font-size: var(--t-app-xs);
       gap: 3px;
     }
 
     .count {
       min-width: 16px;
       height: 16px;
-      font-size: 10px;
+      font-size: var(--t-app-xs);
       line-height: 16px;
       padding: 0 4px;
     }
@@ -522,7 +531,7 @@
   /* At 320 the window is under 300 wide and "Needs you" with its count would spill its cell. */
   @media (max-width: 360px) {
     .desk-tab {
-      font-size: 11px;
+      font-size: var(--t-app-xs);
       gap: 2px;
     }
   }

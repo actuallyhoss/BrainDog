@@ -81,6 +81,7 @@
 
 <style>
   .t:focus {
+    /* focus-ok: tabindex="-1", a landing place for focus once an ask leaves, never a control; every button inside keeps its own ring. */
     outline: none;
   }
 
@@ -88,16 +89,16 @@
     display: grid;
     gap: 8px;
     padding: 14px 0;
-    border-top: 1px solid var(--rule2);
+    border-block-start: 1px solid var(--rule2);
   }
 
   .th + .q {
-    border-top: 0;
-    padding-top: 2px;
+    border-block-start: 0;
+    padding-block-start: 2px;
   }
 
   .by {
-    font-size: 12px;
+    font-size: var(--t-app-xs);
     color: var(--muted);
     display: flex;
     gap: 6px;
@@ -110,13 +111,13 @@
   }
 
   .ask {
-    font-size: 15.5px;
+    font-size: var(--t-site-16);
     font-weight: 600;
     letter-spacing: -0.005em;
   }
 
   .why {
-    font-size: 13px;
+    font-size: var(--t-app-sm);
     color: var(--ink2);
     margin: 0;
   }
@@ -125,7 +126,7 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    margin-top: 2px;
+    margin-block-start: 2px;
   }
 
   .q.gone {
@@ -144,13 +145,13 @@
     align-items: center;
     gap: 10px;
     padding: 9px 0;
-    border-top: 1px solid var(--rule2);
-    font-size: 13px;
+    border-block-start: 1px solid var(--rule2);
+    font-size: var(--t-app-sm);
     color: var(--good);
   }
 
   .th + .h-item {
-    border-top: 0;
+    border-block-start: 0;
   }
 
   .h-item p {
@@ -163,7 +164,7 @@
   .undo {
     all: unset;
     cursor: pointer;
-    font-size: 12.5px;
+    font-size: var(--t-app-sm);
     font-weight: 500;
     color: var(--red-ink);
   }
@@ -195,7 +196,7 @@
 
   .empty {
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-app-sm);
     padding: 10px 0 2px;
     margin: 0;
   }

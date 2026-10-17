@@ -35,7 +35,7 @@
     padding: 12px 14px;
     border-radius: 12px;
     background: var(--tile);
-    font-size: 15px;
+    font-size: var(--t-site-15);
     box-shadow: inset 0 0 0 1.5px var(--red);
   }
   .sl {

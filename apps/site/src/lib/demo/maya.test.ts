@@ -118,9 +118,9 @@ test('nothing says BrainDog pays, sends or charges on its own', () => {
 
 test('the truth fixes are in', () => {
   const pay = NEEDS.find((n) => n.id === 'pay');
-  assert.equal(pay?.ask, 'Dana Reyes sent a $1,800 invoice, due Friday. Pay it with payroll?');
+  assert.equal(pay?.ask, 'Dana Reyes sent a $1,800 invoice, due Friday. Pay it with the salaries?');
   assert.equal(pay?.yes, 'Plan it for Friday');
-  assert.equal(pay?.done, "Dana's invoice is planned for Friday, with payroll");
+  assert.equal(pay?.done, "Dana's invoice is planned for Friday, with the salaries");
   assert.deepEqual(
     TODAY.needs.map((n) => [n.what, n.act]),
     [

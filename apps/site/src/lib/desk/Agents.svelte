@@ -47,13 +47,13 @@
 
   .note p {
     margin: 0;
-    font-size: 14px;
+    font-size: var(--t-site-small);
   }
 
   .meta {
     color: var(--muted);
-    font-size: 12px;
-    margin-top: 2px;
+    font-size: var(--t-app-xs);
+    margin-block-start: 2px;
   }
 
   .small {

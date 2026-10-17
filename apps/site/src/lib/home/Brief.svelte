@@ -77,11 +77,11 @@
   }
 
   .th .r {
-    margin-left: auto;
+    margin-inline-start: auto;
   }
 
   .brief-big {
-    font-size: 22px;
+    font-size: var(--t-figure);
     line-height: 1.5;
     letter-spacing: -0.005em;
     margin: 0;
@@ -102,7 +102,7 @@
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    border-bottom: 2px solid var(--faint);
+    border-block-end: 2px solid var(--faint);
     line-height: 1.2;
     transition: background 0.15s;
   }
@@ -127,9 +127,9 @@
   }
 
   .evidence {
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top: 1px dashed var(--rule);
+    margin-block-start: 18px;
+    padding-block-start: 16px;
+    border-block-start: 1px dashed var(--rule);
     display: grid;
     gap: 8px;
   }
@@ -142,7 +142,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px;
-    font-size: 14px;
+    font-size: var(--t-site-small);
     padding: 9px 12px;
     background: var(--soft);
     border-radius: 9px;
@@ -183,7 +183,7 @@
     }
 
     .brief-big {
-      font-size: 18px;
+      font-size: var(--t-site-18);
     }
   }
 </style>

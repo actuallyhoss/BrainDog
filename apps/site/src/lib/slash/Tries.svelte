@@ -69,7 +69,7 @@
     gap: 10px;
     padding: 10px;
     border-radius: 9px;
-    font-size: 14px;
+    font-size: var(--t-site-small);
     line-height: 1.35;
     color: var(--ink2);
   }
@@ -84,7 +84,7 @@
   }
   .g {
     display: inline-flex;
-    color: var(--faint);
+    color: var(--muted);
   }
   .k {
     display: inline-grid;
@@ -92,7 +92,7 @@
     min-width: 19px;
     height: 19px;
     padding: 0 5px;
-    margin-left: auto;
+    margin-inline-start: auto;
     border-radius: 5px;
     background: var(--soft);
     box-shadow: inset 0 0 0 1px var(--rule);

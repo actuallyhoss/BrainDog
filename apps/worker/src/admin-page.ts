@@ -9,6 +9,8 @@
  * typed by whoever applied, so every one goes in through `textContent` and a link is drawn only when it is http(s).
  */
 
+import { LOOK_B_CSS } from '@braindog/theme/look-b.ts';
+
 export const ADMIN_HTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -67,21 +69,10 @@ export const ADMIN_HTML = `<!doctype html>
 </html>
 `;
 
-export const ADMIN_CSS = String.raw`:root {
-  --page: #FFFFFF; --ink: #101114; --ink2: #3B4048; --muted: #686E77; --faint: #A0A5AD; --rule: #E3E5E9; --soft: #F5F6F8;
-  --red: #CF413A; --red-press: #B3322C; --red-ink: #B3322C; --red-tint: #FBEBE9; --on-red: #FFFFFF;
-  --board: #F3F4F6; --tile: #FFFFFF; --good: #2E7D4F; --good-tint: #E7F3EC;
-  --head: "Lexend", "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --ui: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) { :root {
-  --page: #0A0B0D; --ink: #ECEEF1; --ink2: #C3C8CF; --muted: #8F96A0; --faint: #5F6670; --rule: #242A31; --soft: #1A1F26;
-  --red: #E05148; --red-press: #EA6A61; --red-ink: #F07A71; --red-tint: #3A1F1C; --on-red: #FFFFFF;
-  --board: #0D1014; --tile: #161A20; --good: #72C08F; --good-tint: #17281E;
-  color-scheme: dark;
-} }
+/* THE TOKENS ARE LOOK B'S OWN, from the theme package, the one place a colour may be written, so this page and the
+   site draw from one palette and this file names none. It carries more names than the page uses; the rules below
+   read only the semantic ones. */
+export const ADMIN_CSS = String.raw`${LOOK_B_CSS}
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
@@ -101,7 +92,7 @@ input { font: inherit; color: var(--ink); background: var(--soft); border: 0; bo
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 button { font: 500 15px/1.2 var(--ui); color: var(--ink); background: var(--soft); border: 0; border-radius: 8px; padding: 10px 14px; min-height: 40px; cursor: pointer; }
 button:hover { background: var(--rule); }
-button.primary { background: var(--red); color: var(--on-red); }
+button.primary { background: var(--red-fill); color: var(--on-red); }
 button.primary:hover { background: var(--red-press); }
 button:disabled { opacity: .55; cursor: default; }
 .said { margin: 8px 0 0; font-size: 15px; color: var(--ink2); }

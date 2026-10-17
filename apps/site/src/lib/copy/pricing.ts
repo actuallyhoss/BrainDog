@@ -199,7 +199,7 @@ export const pricing = {
     faq: {
       title: 'Questions people ask',
       /** `billing: true` is a question drawn only while `LAUNCH.billing` is on: nobody can cancel what nobody sells. */
-      items: [
+      questions: [
         // `ASK_CAP_*` and `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`: the brief and filing spend no ask.
         { q: 'What is a question to Slash?', a: 'One question or one draft, however much work it takes. Your brief, filing and your rules never spend one.' },
         // An agent key per app (`agents` in `PLAN_TABLE`).

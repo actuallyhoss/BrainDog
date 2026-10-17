@@ -114,7 +114,7 @@
 
 <style>
   .brief {
-    font-size: 18px;
+    font-size: var(--t-site-18);
     line-height: 1.5;
     margin: 0;
     text-wrap: pretty;
@@ -125,8 +125,8 @@
     align-items: center;
     gap: 12px;
     padding: 11px 0 0;
-    margin-top: 11px;
-    border-top: 1px solid var(--rule2);
+    margin-block-start: 11px;
+    border-block-start: 1px solid var(--rule2);
   }
 
   .needrow p {
@@ -138,7 +138,7 @@
   .needrow p span {
     display: block;
     color: var(--muted);
-    font-size: 12.5px;
+    font-size: var(--t-app-sm);
   }
 
   .pcard {
@@ -155,12 +155,12 @@
 
   .row1 b {
     font-weight: 600;
-    font-size: 14px;
+    font-size: var(--t-site-small);
   }
 
   .lane {
-    margin-left: auto;
-    font-size: 11.5px;
+    margin-inline-start: auto;
+    font-size: var(--t-app-xs);
     color: var(--muted);
   }
 
@@ -172,7 +172,7 @@
   }
 
   .val .big {
-    font-size: 23px;
+    font-size: var(--t-site-21);
   }
 
   .spark {
@@ -184,14 +184,16 @@
 
   .spark .l {
     fill: none;
-    stroke: hsl(var(--ph) 65% 45%);
+    --spark: hsl(var(--ph) 65% 45%);
+    stroke: var(--spark);
     stroke-width: 1.8;
     stroke-linejoin: round;
     stroke-linecap: round;
   }
 
   .spark .a {
-    fill: color-mix(in srgb, hsl(var(--ph) 65% 45%) 12%, transparent);
+    --spark: hsl(var(--ph) 65% 45%);
+    fill: color-mix(in srgb, var(--spark) 12%, transparent);
   }
 
   .meter {
@@ -206,14 +208,15 @@
     display: block;
     height: 100%;
     border-radius: 4px;
-    background: hsl(var(--ph, 0) 60% 50%);
+    --meter: hsl(var(--ph, 0) 60% 50%);
+    background: var(--meter);
   }
 
   .area {
     width: 100%;
     height: 64px;
     display: block;
-    margin-top: 10px;
+    margin-block-start: 10px;
   }
 
   .area .l {
@@ -256,7 +259,7 @@
 
   @media (max-width: 760px) {
     .brief {
-      font-size: 16.5px;
+      font-size: var(--t-site-16-5);
     }
   }
 

@@ -86,6 +86,6 @@ export const shell = {
     connect: 'Connect an agent',
     terms: 'Terms',
     privacy: 'Privacy',
-    owner: '© 2026 Quartz Apps LLC',
+    owner: '© 2026 BrainDog',
   },
 } as const;

@@ -74,9 +74,9 @@
 <noscript>
   <style>
     .cbox .cbox-pane, .cbox .cbox-way { display: block !important; }
-    .cbox .cbox-pane + .cbox-pane { margin-top: 28px; }
+    .cbox .cbox-pane + .cbox-pane { margin-block-start: 28px; }
     .cbox .cbox-name, .cbox .cbox-where { position: static !important; inline-size: auto !important; block-size: auto !important; clip-path: none !important; overflow: visible !important; white-space: normal !important; }
-    .cbox .cbox-way + .cbox-way { margin-top: 16px; }
+    .cbox .cbox-way + .cbox-way { margin-block-start: 16px; }
     .cbox .ctabs, .cbox .cbox-ways, .cbox .cbox-copy { display: none !important; }
   </style>
 </noscript>
@@ -208,7 +208,7 @@
     gap: 10px;
     padding: 8px 8px 8px 14px;
     border-block-end: 1px solid var(--night-rule);
-    color: var(--term-dim);
+    color: var(--on-night-2);
     font: 500 13px/1 var(--ui);
   }
 
@@ -238,9 +238,10 @@
     font: 500 13px/1 var(--ui);
   }
 
+  /* The secondary light of the night, not the terminal's dim grey: that grey is 4.45 to 1 on the dark terminal. */
   .vbtn {
     padding: 6px 8px;
-    color: var(--term-dim);
+    color: var(--on-night-2);
   }
 
   .vbtn[aria-pressed='true'] {
@@ -265,7 +266,7 @@
 
   .hint {
     margin: 12px 0 0;
-    font-size: 15px;
+    font-size: var(--t-site-15);
     line-height: 1.45;
     color: var(--on-night-2);
   }
