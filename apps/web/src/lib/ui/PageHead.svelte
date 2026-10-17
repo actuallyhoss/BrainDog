@@ -172,7 +172,7 @@
   {/if}
   <p class="bar-title" dir="auto" aria-hidden="true">{title}</p>
   {#if !searching}
-    <button type="button" class="find tap" aria-label={copy.paletteLabel} onclick={() => (palette.open = true)}>
+    <button type="button" class="find tap" data-palette-from aria-label={copy.paletteLabel} onclick={() => (palette.open = true)}>
       <Icon name="search" size="l" />
     </button>
   {/if}

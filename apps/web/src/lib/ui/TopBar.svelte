@@ -87,7 +87,8 @@
     </button>
   </div>
 
-  <button type="button" class="bar-find tap" onclick={() => onfind?.()}>
+  <!-- THE FIELD THE PALETTE OPENS OUT OF (`data-palette-from`): it widens in place and the results drop under it. -->
+  <button type="button" class="bar-find tap" data-palette-from="bar" onclick={() => onfind?.()}>
     <Icon name="search" size="m" /><span class="bar-find-words">{words.find}</span><kbd>/</kbd>
   </button>
   <!-- THE FACE OPENS A SMALL MENU: Settings, and Sign out, the two things a person does to their own session. -->

@@ -497,8 +497,9 @@
     </button>
   </div>
 
-  <!-- THE ASK FIELD: the palette, drawn as the field it opens. Its two keys are in the tooltip, and `/` on the cap. -->
-  <button type="button" class="ask tap" data-label={words.ask} aria-label={words.ask} aria-keyshortcuts="/ Control+K Meta+K" title={copy.searchKeys} onclick={() => (palette.open = true)}>
+  <!-- THE ASK FIELD: the palette, drawn as the field it opens, and the field it opens out of (`data-palette-from`). Its
+       two keys are in the tooltip, and `/` on the cap. -->
+  <button type="button" class="ask tap" data-palette-from="bar" data-label={words.ask} aria-label={words.ask} aria-keyshortcuts="/ Control+K Meta+K" title={copy.searchKeys} onclick={() => (palette.open = true)}>
     <Icon name="search" size="m" />
     <span class="ask-words">{words.ask}</span>
     <span class="ask-key" aria-hidden="true"><Kbd keys="/" /></span>

@@ -1,12 +1,14 @@
 <!--
-  The palette: a centred dialog that reaches OBJECTS, not only the screens they live on.
+  The palette: the ask field, opened, reaching OBJECTS and not only the screens they live on.
 
-  A 640px DIALOG 12vh FROM THE TOP, AND THE WHOLE SCREEN BELOW 640PX. It was a panel
-  two thirds of the width, pinned to the inline end, and at 1440 it cut the page title in half and
-  read as a second app beside the first. Centred and narrow, it sits over the page as one question
-  being asked of it; on a phone the field is in the top bar and the results fill what is left. Each
-  result is a glyph, a title and one line saying where it sits (`Result.svelte`), so the width a
-  result needs is the width of its title and not of a row of columns.
+  IT GROWS OUT OF THE FIELD IT WAS ASKED FROM, AND THE WHOLE SCREEN BELOW 640PX. It was a panel
+  two thirds of the width, pinned to the inline end, and then a 640px box centred 12vh down, which
+  opened somewhere other than where the person had just clicked or was looking. Now the rail's or the
+  top bar's ask field (`data-palette-from="bar"`) is the field: it widens in place to 640 and the
+  results drop down under it as one surface, so what was pressed is what is typed into. With no field
+  on screen it hangs from the top of the screen, full width; on a phone the field is in the top bar and
+  the results fill what is left. Each result is a glyph, a title and one line saying where it sits
+  (`Result.svelte`), so the width a result needs is the width of its title and not of a row of columns.
 
   AND THE OBJECTS COME FIRST IN IT. The groups used to be ranked commands, destinations, pages,
   figures, decisions, with everything the record answered with underneath all of them, so typing
@@ -29,8 +31,8 @@
   at desktop width: its binding, read from the keymap registry so it cannot drift from what is bound,
   and `↵`. The `?` sheet is where the whole map lives.
 
-  GLASS, THE STRONG ONE: 640 wide, level 2, radius `--r-lg`, a 52px field, and the
-  results grouped under meta headings. Slash's answers are drawn in the same surface, under the same
+  GLASS, THE STRONG ONE: 640 wide, level 2, the field's own height and radius on top and `--r-lg`
+  under the results, and the results grouped under meta headings. Slash's answers are drawn in the same surface, under the same
   headings, rather than in a second panel.
 
   Prefixes work in EVERY mode: `>` commands, `#` rows, `@` people, `/` pages and registers, none is
@@ -1038,9 +1040,79 @@
     document.getElementById(id)?.scrollIntoView({ block: 'nearest' });
   });
 
+  /**
+   * WHERE IT OPENS FROM: the ask field it was asked from, which it grows out of and shrinks back into.
+   *
+   * A FIELD SAYS SO ON ITSELF, `data-palette-from="bar"` (the rail's and the top bar's), and a small door like the
+   * phone's search button says `data-palette-from` with no value. The one pressed is the focused one where the
+   * browser focuses a pressed button; past that, and for `/` or `⌘K` pressed anywhere, it is the field on screen.
+   *
+   * WRITTEN STRAIGHT ONTO THE DIALOG, not through the template, because `@starting-style` reads them on the frame
+   * `showModal()` draws it, and a template's attribute lands on Svelte's next flush rather than before that frame.
+   * A field opens it in place (`bar`): the field's box, then 640 wide or the screen less its edges, growing toward the
+   * side of the screen with the room. Anything else hangs it from the top of the screen at full width (`top`), opening
+   * out of the door when the door is in the top strip and dropping from the strip when it is not.
+   */
+  const FROM = '[data-palette-from]';
+  const PHONE = '(width < 640px)';
+  const WIDE = 640;
+  const EDGE = 16;
+  let from: HTMLElement | null = null;
+
+  const shown = (e: Element | null | undefined): DOMRect | null => {
+    if (!(e instanceof HTMLElement)) return null;
+    const r = e.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight ? r : null;
+  };
+
+  function pickFrom(): HTMLElement | null {
+    const pressed = document.activeElement?.closest<HTMLElement>(FROM) ?? null;
+    const all = [...document.querySelectorAll<HTMLElement>(FROM)];
+    return [pressed, ...all.filter((a) => a.dataset.paletteFrom === 'bar'), ...all].find((a) => shown(a) !== null) ?? null;
+  }
+
+  function place() {
+    if (!el) return;
+    const r = shown(from);
+    const vw = document.documentElement.clientWidth;
+    const s = from && r ? getComputedStyle(from) : null;
+    if (r && s && from?.dataset.paletteFrom === 'bar' && !matchMedia(PHONE).matches) {
+      /* IN THE LINE'S OWN DIRECTION, as `inset-inline-start` reads it. */
+      const x0 = getComputedStyle(document.documentElement).direction === 'rtl' ? vw - r.right : r.left;
+      const w = Math.max(r.width, Math.min(WIDE, vw - 2 * EDGE));
+      const grown = x0 + r.width / 2 > vw / 2 ? x0 + r.width - w : x0;
+      const x = Math.max(Math.min(grown, vw - EDGE - w), Math.min(x0, EDGE));
+      const radius = s.borderStartStartRadius;
+      const clip = `inset(0 0 calc(100% - ${r.height}px) 0 round ${radius})`;
+      el.dataset.from = 'bar';
+      el.setAttribute(
+        'style',
+        `--bar-x: ${x0}px; --bar-y: ${r.top}px; --bar-w: ${r.width}px; --bar-h: ${r.height}px; --bar-r: ${radius}; --bar-pad: ${s.paddingInlineStart}; --bar-text: ${s.fontSize}; --to-x: ${x}px; --to-w: ${w}px; --from-clip: ${clip};`,
+      );
+      return;
+    }
+    const door = r && s && r.bottom <= 120 ? `inset(${r.top}px ${vw - r.right}px calc(100% - ${r.bottom}px) ${r.left}px round ${s.borderStartStartRadius})` : null;
+    el.dataset.from = 'top';
+    el.setAttribute('style', `--from-clip: ${door ?? 'inset(0 0 calc(100% - var(--sticky)) 0)'};`);
+  }
+
+  /* AND IT FOLLOWS THE FIELD while it is open, so a window resized or a page scrolled under it keeps the two as one. */
+  $effect(() => {
+    if (!open) return;
+    const again = () => place();
+    addEventListener('resize', again);
+    addEventListener('scroll', again, { capture: true, passive: true });
+    return () => {
+      removeEventListener('resize', again);
+      removeEventListener('scroll', again, { capture: true });
+    };
+  });
+
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
+      from = pickFrom();
+      place();
       el.showModal();
       overlays.open();
       /* WHAT TODAY'S ASK BAR HANDED OVER, taken once and cleared, so the next open starts empty as it always has. */
@@ -1056,6 +1128,8 @@
       if (slashHere) warm();
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
+      /* MEASURED AGAIN, so it shrinks back into the field where the field is now. */
+      place();
       el.close();
       overlays.close();
     }
@@ -1237,8 +1311,8 @@
    * A modal `<dialog>` does not do this on its own, and the absence reads as the app being stuck:
    * the surface behind is visibly inert, so the first thing anybody tries is clicking it, and
    * nothing happening is the only feedback they get. Esc has always worked, which is exactly why
-   * this went unnoticed by whoever wrote it. A 640px dialog leaves most of a desktop screen dimmed
-   * around it, and all of that is somewhere a pointer will aim.
+   * this went unnoticed by whoever wrote it. A 640px field and its results leave most of a desktop
+   * screen around them, and all of that is somewhere a pointer will aim.
    *
    * The test is GEOMETRY, not `e.target === el`. A click on the dialog's own padding also targets
    * the dialog, so identity would close it when somebody clicks the gap beside the query.
@@ -1284,7 +1358,7 @@
 
       `19 §4` gives Esc the job of closing "the topmost layer, one per press"; this is the same verb
       for the pointer that has no Esc key. With a fine pointer on a wide screen it is not drawn:
-      Esc and the dimmed page around the dialog are both there, and no key is printed to say so.
+      Esc and the page around the field are both there, and no key is printed to say so.
     -->
     <!-- THE COUNT, ANNOUNCED AND VISIBLE. `13 §7` asks for a debounced `role="status"`; a reader who
          can see the list still benefits from knowing twelve of forty-eight are on screen, and a
@@ -1440,8 +1514,8 @@
 {/snippet}
 
 <style>
-  /* THE BUTTON IS FOR A THUMB, and a fine pointer on a wide screen has Esc and the dimmed page
-     around the dialog, so it is drawn only where neither is to hand. */
+  /* THE BUTTON IS FOR A THUMB, and a fine pointer on a wide screen has Esc and the page around
+     the field, so it is drawn only where neither is to hand. */
   .p-close {
     display: none;
   }
@@ -1475,38 +1549,56 @@
   }
 
   /**
-   * A 640px DIALOG, CENTRED, 12vh FROM THE TOP, and the whole screen below 640px.
+   * OUT OF THE FIELD, NOT IN THE MIDDLE OF THE SCREEN, and the whole screen below 640px.
+   *
+   * THE FALLBACK FIRST (`top`): with no ask field on screen it hangs from the top of the screen at full width, its
+   * results under the field and its lower corners `--r-lg`. A FIELD (`bar`) puts it where the field is: its top edge,
+   * height and radius are the field's, it is 640 wide, and the results drop down under it as one surface, so the
+   * field's lower corners are gone and the panel's top is the field's bottom. `place()` writes the numbers.
    *
    * GLASS, THE STRONG ONE, AT LEVEL 2: the palette opens over whatever the page holds, and legibility over
-   * busy content is what the strong glass is for. Radius `--r-lg`, the hairline pair and the floating shadow; no border.
-   * Its height is its content's, up to what leaves the same 12vh free below it, and past that the list scrolls inside.
+   * busy content is what the strong glass is for. The hairline pair and `--e2`, the light shadow; no border.
+   * Its height is its content's, up to what leaves room under it, and past that the list scrolls inside.
    *
    * THE EXPLICIT SIZES ARE NOT REDUNDANT: see `Sheet.svelte`. The UA stylesheet gives `<dialog>` a
    * `max-height: calc(100% - 6px - 2em)`, a matching `max-width` and an automatic margin on both
    * axes, and each of those would move or cut the dialog this places.
    */
   .palette {
+    /* ITS WAY IN, AND A STEP QUICKER ITS WAY OUT, as the panel's are. */
+    --palette-d: var(--d-panel);
+
     position: fixed;
-    inset-block-start: 12vh;
-    inset-block-end: auto;
+    inset-block: 0 auto;
     inset-inline: 0;
     z-index: var(--z-palette);
     display: flex;
     flex-direction: column;
-    inline-size: 640px;
-    max-inline-size: calc(100% - 2 * var(--gutter));
+    inline-size: 100%;
+    max-inline-size: 100%;
     block-size: auto;
     max-block-size: 76dvh;
-    margin-block: 0;
-    margin-inline: auto;
+    margin: 0;
     padding: 0;
+    padding-block-start: env(safe-area-inset-top, 0px);
     background: var(--glass-strong);
     backdrop-filter: var(--glass-blur);
     border: 0;
-    border-radius: var(--r-lg);
+    border-radius: 0;
+    border-end-start-radius: var(--r-lg);
+    border-end-end-radius: var(--r-lg);
     color: var(--ink);
     box-shadow: var(--glass-edge), var(--e2);
     overflow: hidden;
+    /* PAST ITS OWN EDGES, so the shadow is not cut: the clip is only there to be the field on the first frame. */
+    clip-path: inset(-64px);
+    transition:
+      inset-inline-start var(--palette-d) var(--ease-out),
+      inline-size var(--palette-d) var(--ease-out),
+      clip-path var(--palette-d) var(--ease-out),
+      opacity var(--palette-d) var(--ease-fade),
+      display var(--palette-d) allow-discrete,
+      overlay var(--palette-d) allow-discrete;
   }
 
   /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives: the
@@ -1519,19 +1611,55 @@
     }
   }
 
-  /* NO ENTRANCE. It is opened from the keyboard far more often than from anything else, and nothing
-     moves on a keyboard action. It is there on the frame the key is pressed. */
-  .palette:not([open]) {
-    display: none;
-  }
-
+  /* THE FIELD WIDENS AND THE RESULTS DROP. It is there on the frame the key is pressed, as the field it was, and grows
+     from it in `--d-panel`; closing runs it back into the field and lets the field show through. Under
+     `prefers-reduced-motion` `a11y.css` keeps only the fade, so it is simply open, and simply gone. A browser without
+     `@starting-style` opens it at once, which is what it did before. */
   .palette[open] {
     display: flex;
   }
 
-  /* `--scrim`, THE ONE *BEHIND*, and no blur on it: the blur is the palette's own glass, over the dimmed page. */
+  .palette:not([open]) {
+    --palette-d: var(--d-panel-out);
+
+    display: none;
+    clip-path: var(--from-clip);
+    opacity: 0;
+  }
+
+  @starting-style {
+    .palette[open] {
+      clip-path: var(--from-clip);
+      opacity: 0;
+    }
+
+    .palette:global([data-from='bar'])[open] {
+      inset-inline-start: var(--bar-x);
+      inline-size: var(--bar-w);
+    }
+  }
+
+  /* THE FIELD'S PLACE. The room under it is the screen's less where it sits, so the last row is never off the bottom.
+     `:global` ON THE ATTRIBUTE ONLY: `place()` writes it, so the template never shows it to Svelte, which would drop the
+     rule as unused. */
+  .palette:global([data-from='bar']) {
+    inset-block-start: var(--bar-y);
+    inset-inline: var(--to-x) auto;
+    inline-size: var(--to-w);
+    max-block-size: min(76dvh, calc(100dvh - var(--bar-y) - var(--sp-5)));
+    padding-block-start: 0;
+    border-start-start-radius: var(--bar-r);
+    border-start-end-radius: var(--bar-r);
+  }
+
+  .palette:global([data-from='bar']):not([open]) {
+    inset-inline-start: var(--bar-x);
+    inline-size: var(--bar-w);
+  }
+
+  /* NO DIM. The page stays as it was around the field; the backdrop is only there to catch the click that closes it. */
   .palette::backdrop {
-    background: var(--scrim);
+    background: transparent;
   }
 
   /* THE 52PX FIELD: the glyph, the query, the count. The hairline under it is the one rule in the panel. */
@@ -1587,6 +1715,19 @@
 
   .p-input::placeholder {
     color: var(--dim);
+  }
+
+  /* OPENED FROM A FIELD, THE HEAD IS THAT FIELD: its height, its inset before the glyph and its text size, so the glyph
+     does not jump and the words start where the field's did. */
+  .palette:global([data-from='bar']) .p-head {
+    gap: var(--sp-2);
+    min-block-size: var(--bar-h);
+    padding-inline-start: var(--bar-pad);
+  }
+
+  .palette:global([data-from='bar']) .p-input {
+    min-block-size: 0;
+    font-size: var(--bar-text);
   }
 
   /* THE CHIPS A PLAIN LINE WAS READ INTO: rectangles at the control radius, flat on the board's sunk colour. */
@@ -1823,7 +1964,8 @@
   /**
    * ON A PHONE THE PALETTE IS THE SCREEN, with the field in a top bar `--sticky` tall, because a
    * dialog floating over 390px would be a narrower screen inside the screen. It is a sheet there and
-   * not glass: the whole screen, on the tile's surface.
+   * not glass: the whole screen, on the tile's surface. It opens out of the head bar's search button
+   * (`PageHead.svelte`), across the bar and then down to the foot of the screen, as the field does above.
    *
    * EACH INSET IS PAID HERE, ONCE. The top one is under the bar, because the palette sits in the top
    * layer and nothing of the shell's padding reaches it; the bottom one and the keyboard (`--kb`,
@@ -1833,6 +1975,7 @@
   @media (width < 640px) {
     .palette {
       inset-block: 0;
+      inset-inline: 0;
       inline-size: 100%;
       max-inline-size: 100%;
       block-size: 100dvh;
