@@ -218,9 +218,6 @@
       min-block-size: var(--tap);
     }
 
-    .go :global(.btn) {
-      block-size: var(--tap);
-    }
   }
 
   .go {
@@ -231,6 +228,12 @@
   .go :global(.btn) {
     block-size: 40px;
     font-size: var(--t-site-14-5);
+  }
+
+  @media (pointer: coarse) {
+    .go :global(.btn) {
+      block-size: var(--tap);
+    }
   }
 
   /* ── The phone's menu ───────────────────────────────────────────────────── */
