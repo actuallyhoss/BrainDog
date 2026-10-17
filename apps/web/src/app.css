@@ -82,8 +82,8 @@
 
   /* EVERY HEADING IN THE RECORD IS GEIST. The shared base sets headings in the
      display face because the marketing site is a document with a brand voice; in the app that put
-     Poppins on every page title and every section, next to Geist rows, so each screen carried two
-     type systems. Poppins stays where a component names it on purpose: the wordmark and the one hero
+     the display face on every page title and every section, next to Geist rows, so each screen carried two
+     type systems. The display face stays where a component names it on purpose: the wordmark and the one hero
      line on `/start` and `/signin`. */
   h1,
   h2,

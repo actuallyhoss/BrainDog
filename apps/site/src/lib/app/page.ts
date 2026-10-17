@@ -56,7 +56,7 @@ const answerable = (cells: readonly string[]): boolean => {
 /**
  * A queue with the questions already answered here taken out, options and all.
  *
- * AN ANSWERED QUESTION LEAVES THE QUEUE, as it leaves Decide in the product, rather than staying with
+ * AN ANSWERED QUESTION LEAVES THE QUEUE, as it leaves Needs you in the product, rather than staying with
  * its buttons greyed: a control that can no longer act is absent (`19 §6`). When the last one goes,
  * the queue's drawer says its own sentence for an empty queue.
  */

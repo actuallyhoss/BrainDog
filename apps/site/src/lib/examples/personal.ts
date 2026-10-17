@@ -4,7 +4,7 @@
  * EVERY FIGURE IS FICTIONAL AND AGREES WITH EVERY OTHER. The drawing is dated `DRAWN_ON` (Monday 28
  * September 2026), so "in 2 days" is 30 September everywhere it is said. The three bills due this
  * week (USD 10.99, 18.00 and 850.00) add to the USD 878.99 on Home; Groceries and Transport have
- * USD 54.90 and USD 61.80 left of their budgets, which is what the question on Decide moves money
+ * USD 54.90 and USD 61.80 left of their budgets, which is what the question in Needs you moves money
  * between; and the six bills on Bills add to USD 1,148.99.
  */
 import type { Example } from './types.ts';
@@ -67,8 +67,8 @@ ${runs.join('\n')}
       },
     },
     {
-      id: 'decide',
-      title: 'Decide',
+      id: 'needs',
+      title: 'Needs you',
       glyph: 'decide',
       src: `~~~queue | Waiting on you
 q | p1 | Budget helper | 2h ago | Move USD 50.00 from Transport to Groceries this month? | Groceries has USD 54.90 left with ten days to go, and Transport has USD 61.80. | call
@@ -118,7 +118,7 @@ Council tax | USD 142.00 | 21 Oct | Monthly
 Starts when | A bill arrives in the Inbox | trigger
 Only if | Its amount is over USD 50.00 | condition
 Then | File it to Bills with its amount and due day | step
-Then | Ask you on Decide when it is higher than last month | action
+Then | Ask you in Needs you when it is higher than last month | action
 ~~~`,
     },
     {

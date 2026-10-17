@@ -8,15 +8,16 @@
   filters nothing with scripting off is a control that cannot act. Without a script the section list
   beside it is the way in.
 
-  THE FIELD IS THE DESIGN SYSTEM'S: the label above it, the tile's second fill, radius 12, 40 high and 44 on a
-  phone, the search glyph at its start and the 2px ink ring on focus. The hits are a list in the tile.
+  THE FIELD IS LOOK B'S (DIRECTION §47): the label above it, a flat fill a step off the ground it sits on, radius 8,
+  44 high, the search glyph at its start and a 2px ring in the ground's ink on focus. The hits are a list under it.
+  `night` draws it on the night ground of the docs' PageHead, in the night's inks; otherwise it sits on the board.
 -->
 <script lang="ts">
   import Icon from '../Icon.svelte';
   import { search, type Entry } from './pages.ts';
   import { docsWords } from './words.ts';
 
-  let { index, id }: { index: readonly Entry[]; id: string } = $props();
+  let { index, id, night = false }: { index: readonly Entry[]; id: string; night?: boolean } = $props();
 
   const w = docsWords.search;
 
@@ -38,7 +39,7 @@
 </script>
 
 {#if live}
-  <div class="search" role="search">
+  <div class="search" class:night role="search">
     <label class="search-label" for={id}>{w.label}</label>
     <span class="search-field">
       <Icon name="search" size="m" />
@@ -79,7 +80,7 @@
 
   .search-label {
     color: var(--ink2);
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-15);
     font-weight: 500;
   }
 
@@ -87,11 +88,11 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: 40px;
+    min-block-size: var(--tap);
     padding-inline: var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
-    color: var(--dim);
+    background: var(--tile);
+    border-radius: 8px;
+    color: var(--muted);
   }
 
   /* THE FIELD DRAWS THE RING, offset 2 in ink, so the input inside it draws none of its own. */
@@ -104,21 +105,25 @@
   .search-input {
     flex: 1;
     min-inline-size: 0;
-    min-block-size: 40px;
+    min-block-size: var(--tap);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--t-site-16);
     /* focus-ok: the ring is drawn on `.search-field:focus-within`, round the whole field. */
     outline: none;
   }
 
+  .search-input::placeholder {
+    color: var(--muted);
+  }
+
   .search-said {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-site-small);
+    color: var(--muted);
+    font-size: var(--t-site-15);
   }
 
   .search-said:empty {
@@ -133,7 +138,7 @@
   }
 
   .search-hits li + li {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .search-hit {
@@ -141,39 +146,66 @@
     gap: 2px;
     min-block-size: var(--tap);
     padding: var(--sp-2);
-    border-radius: var(--r-md);
+    border-radius: 8px;
     color: var(--ink2);
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
 
   .search-hit:hover {
-    background: var(--hover-wash);
+    background: var(--tile);
   }
 
   .hit-title {
     color: var(--ink);
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-15);
     font-weight: 600;
   }
 
   .hit-where,
   .hit-line {
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-15);
   }
 
   .hit-where {
-    color: var(--dim);
+    color: var(--muted);
   }
 
   .hit-line {
     overflow-wrap: anywhere;
   }
 
-  @media (width < 640px) {
-    .search-field,
-    .search-input {
-      min-block-size: var(--tap);
-    }
+  /* ON THE NIGHT GROUND: the night's second fill under the field, its two inks for the words, its hairline. */
+  .night .search-label,
+  .night .search-said,
+  .night .hit-where,
+  .night .search-hit {
+    color: var(--on-night-2);
+  }
+
+  .night .search-field {
+    background: var(--night-2);
+    color: var(--on-night-2);
+  }
+
+  .night .search-field:focus-within {
+    outline-color: var(--on-night);
+  }
+
+  .night .search-input,
+  .night .hit-title {
+    color: var(--on-night);
+  }
+
+  .night .search-input::placeholder {
+    color: var(--on-night-2);
+  }
+
+  .night .search-hits li + li {
+    border-block-start-color: var(--night-rule);
+  }
+
+  .night .search-hit:hover {
+    background: var(--night-tint-2);
   }
 </style>

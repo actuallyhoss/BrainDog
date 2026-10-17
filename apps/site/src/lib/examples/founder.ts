@@ -5,7 +5,7 @@
  * 2026). September's USD 8,420.00 in and USD 3,115.00 out are the last bar of the series and the
  * sentence at the top of Home; the USD 1,850.00 owed is the two unpaid invoices on Invoices
  * (1,200.00 and 650.00); and Northwind Studio's invoice, sent on 9 September on seven days' terms,
- * is 12 days late on the 28th, which is what the Bookkeeper asks about on Decide.
+ * is 12 days late on the 28th, which is what the Bookkeeper asks about in Needs you.
  */
 import type { Example } from './types.ts';
 
@@ -54,8 +54,8 @@ Paying customers | 12 | 15
       },
     },
     {
-      id: 'decide',
-      title: 'Decide',
+      id: 'needs',
+      title: 'Needs you',
       glyph: 'decide',
       src: `~~~queue | Waiting on you
 q | f1 | Bookkeeper | 20 min ago | Send Northwind Studio a reminder for USD 1,200.00? | The invoice is 12 days late. They paid the last three within a week of a reminder. | call
@@ -93,7 +93,7 @@ Tern Labs | USD 2,400.00 | 1 Sep | Paid 3 Sep
 Starts when | An invoice is 7 days past its due day | trigger
 Only if | The customer has paid you before | condition
 Then | Draft a friendly reminder | step
-Then | Ask you on Decide before it is sent | action
+Then | Ask you in Needs you before it is sent | action
 ~~~`,
     },
     {

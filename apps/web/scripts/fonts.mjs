@@ -21,7 +21,6 @@ const FACES = [
   /* LEXEND IS CUT TO THE CHARACTERS A TITLE USES (printable ASCII, the curly quotes, the middle dot, the en dash and the
      ellipsis), so it fits the display face's 10 KB budget: Google's own `text=` subset, about 9 KB against 14.5 KB for latin. */
   { file: 'lexend-600.woff2', query: 'family=Lexend:wght@600', text: String.fromCharCode(...Array.from({ length: 95 }, (_, i) => 32 + i)) + '\u2018\u2019\u201c\u201d\u00b7\u2013\u2026' },
-  { file: 'poppins-600.woff2', query: 'family=Poppins:wght@600', subset: 'latin' },
   { file: 'geist.woff2', query: 'family=Geist:wght@300..800', subset: 'latin' },
   { file: 'geist-mono.woff2', query: 'family=Geist+Mono:wght@400..500', subset: 'latin' },
   { file: 'plex-arabic.woff2', query: 'family=IBM+Plex+Sans+Arabic:wght@400;600', subset: 'arabic' },

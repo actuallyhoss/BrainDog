@@ -70,7 +70,7 @@ test('app.html loads /signed-in.js in the head, blocking, and carries no inline 
   const head = APP_HTML.slice(APP_HTML.indexOf('<head>'), APP_HTML.indexOf('</head>'));
   assert.ok(head.includes('<script src="/signed-in.js"></script>'), 'the head does not load /signed-in.js as a plain blocking script');
   const scripts = APP_HTML.match(/<script\b[^>]*>/g) ?? [];
-  assert.deepEqual(scripts, ['<script src="/signed-in.js">'], 'app.html carries a script of its own besides /signed-in.js');
+  assert.deepEqual(scripts, ['<script src="/signed-in.js">', '<script src="/seen.js" defer>'], 'app.html carries a script of its own besides /signed-in.js and /seen.js');
   assert.ok(!APP_HTML.includes('\u2014'), 'app.html ships an em dash in its bytes');
 });
 

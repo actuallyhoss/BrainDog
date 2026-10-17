@@ -71,8 +71,8 @@ Launch ads | USD 0.00 | USD 200.00 | USD 400.00
       },
     },
     {
-      id: 'decide',
-      title: 'Decide',
+      id: 'needs',
+      title: 'Needs you',
       glyph: 'decide',
       src: `~~~queue | Waiting on you
 q | h1 | Planner | yesterday | Where should the landing page live? | Both fit the budget. They differ in how much you look after yourself. | call

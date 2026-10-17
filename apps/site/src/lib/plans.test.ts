@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 
 import { site } from './copy.ts';
 import { home } from './copy/home.ts';
+import { slashPage } from './copy/slash.ts';
 import { LAUNCH } from './launch.ts';
 import { PACKS, PAID, PLANS, TABLE, TABLE_PACKS, packsOnSale, priceOf, type Allowance } from './plans.ts';
 import { cardsFor, extra, holds } from './pricing/cards.ts';
@@ -173,21 +174,21 @@ test("with billing on, every pack the site shows is the table's, at its price, a
   /* THE PLANTED FAULT: a pack at a price of its own is seen to differ. */
   const moved = shown.map((p, i) => (i === 0 ? { ...p, cents: 400, price: '$4' } : p));
   assert.notDeepEqual(moved, TABLE_PACKS_HELD.map((p) => ({ ...p, price: tablePriceOf(p.cents) })));
-  /* The packs' sentences name each pack at its price. */
-  assert.equal(site.slash.allowance.packsUnit(shown), 'credits for $5, or 500 for $20, and they do not end with the month');
+  /* NO PAGE OF THE SITE SELLS A PACK, even with billing on: the old Slash page's pack sentence went with that page
+     (batch 103b), so a pack named at its price anywhere in the site's words is one nothing here was built to say. */
+  const words = JSON.stringify({ site, slashPage });
+  for (const pack of shown) assert.ok(!words.includes(`for ${pack.price}`), `the site's words sell a pack at ${pack.price}`);
 });
 
 test('with billing off, no pack is shown and no sentence names one', () => {
   assert.deepEqual(packsOnSale(false), [], 'with billing off the site shows a credit pack no card can buy');
   assert.deepEqual(PACKS, packsOnSale(LAUNCH.billing), 'PACKS is not the packs on sale for LAUNCH.billing');
   if (!LAUNCH.billing) assert.equal(PACKS.length, 0, 'billing is off and plans.ts puts a credit pack on sale');
-  const off = site.slash.allowance.packsUnit(packsOnSale(false));
-  assert.doesNotMatch(off, /\$\d|\bcredits for\b|never expire|do not end with the month/i, `"${off}" names a pack while none is sold`);
+  const said = JSON.stringify({ site, slashPage });
+  assert.doesNotMatch(said, /\bcredits for\b|never expire|do not end with the month/i, 'the site names a credit pack while none is sold');
   /* THE PRICING PAGE NAMES NO PACK AT ALL, on or off: no sentence of it says a pack, its credits or its price. */
   const page = JSON.stringify({ pricing: site.pricing, off: cardsFor({ billing: false }), on: cardsFor({ billing: true }) });
   assert.doesNotMatch(page, /\bpacks?\b|\$5\b|\$20\b/i, 'the pricing page names a credit pack');
-  /* What the pages draw today is the off state while billing is off. */
-  if (!LAUNCH.billing) assert.equal(site.slash.allowance.packsUnit(), off);
 });
 
 test('nothing promises what the checkout does not sell: extra use is coming soon and sold by nothing, and no $12 headline', () => {
@@ -207,7 +208,7 @@ test('nothing promises what the checkout does not sell: extra use is coming soon
     cards: [cardsFor({ billing: false }), cardsFor({ billing: true })],
     extra,
     home: home.plans,
-    slash: [site.slash.allowance.lead, site.slash.allowance.packsUnit(PACKS), site.slash.drawn.creditsReading('five')],
+    slash: slashPage,
   });
   assert.doesNotMatch(said, /never charged past|charge for usage past|top up with a pack|billed for extra|extra use is on/i, 'the pricing copy sells extra use');
   /* A PAID CARD LINKS NOTHING WHILE BILLING IS OFF: its button's place says "Coming soon" and is no link. */

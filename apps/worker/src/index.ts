@@ -39,7 +39,7 @@ import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
 import { FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
-import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
+import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SeenAnswers, SeenCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
 import type { Plan } from '@braindog/record/directory';
@@ -92,6 +92,8 @@ import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } fr
 import { withSignedIn } from './signed-in.ts';
 import { isAdminHost, serveAdmin } from './admin.ts';
 import { applyDoor, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
+import { seenDoor, servesSeen } from './seen.ts';
+import { opsFunnel } from './funnel.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { LAPSED_FIX, lapseDrops } from './lapse.ts';
@@ -266,6 +268,8 @@ type Env = {
   OPS_ALERT_TO?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
   PUBLIC_HOST?: string;
+  /** `yes` counts the site's visits by day, page and where they came from (`seen.ts`). Unset, and `/api/seen` counts nothing. His to set. */
+  COUNT_VISITS?: string;
   /**
    * The passkeys' relying party, when it is a parent of `PUBLIC_HOST` rather than the host itself: `brain.dog` in
    * production and `alpha.brain.dog` in alpha. Unset or empty, and it is `PUBLIC_HOST`. A name `PUBLIC_HOST` is not
@@ -1335,6 +1339,19 @@ export class Record$ extends DurableObject<Env> {
       .map((m) => m.email ?? '');
   }
 
+  /**
+   * When this record first met an agent and first had a briefing, each epoch ms or `null`, for the operator's funnel
+   * (`funnel.ts`): the record's own `firsts`, asked as the host. `null` for a record deleted or refused by this build,
+   * which the funnel counts as one it could not ask.
+   */
+  async firsts(): Promise<{ agent: number | null; brief: number | null } | null> {
+    if (this.#gone) return null;
+    const api = await this.#record();
+    if (api.kernel.refused()) return null;
+    const out = await api.firsts(undefined, { principal: { kind: 'system', id: 'funnel' } });
+    return out.ok ? out.value : null;
+  }
+
   /** How many people are on this record, suspended ones left out: whether a cancelled plan fits Free (billing.ts fitsFree). `null` for a record deleted or refused by this build. */
   async walkPeople(): Promise<number | null> {
     if (this.#gone) return null;
@@ -2121,6 +2138,11 @@ export class Directory$ extends DurableObject<Env> {
   /** Asking for an invitation: `apply.submit` from `/auth/apply`, the rest from `/account/ops/applications` and `/account/ops/invite`. */
   applications<C extends ApplyCall>(call: C): Promise<ApplyAnswers[C['flow']]> {
     return this.#directory().applications(call);
+  }
+
+  /** A visit counted (`seen.count`, from `/api/seen`) and the operator's week totals (`funnel.read`, from `/account/ops/funnel`). */
+  seen<C extends SeenCall>(call: C): SeenAnswers[C['flow']] {
+    return this.#directory().seen(call);
   }
 
   /** The host's last restore drill: `put` by the operator's door only (`/account/ops/drill`), `read` for `GET /account/drill`. */
@@ -3236,6 +3258,16 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
         return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/api/push/key takes a GET.' } }, 405, [['allow', 'GET, HEAD']]);
       return json({ key: await pushKeyOf(env) }, 200);
     }
+    /* A VISIT TO A PAGE OF THE SITE (`seen.ts`), AT THE ROOT ONLY, answered as the push key is, before any door: it is
+       nobody's and carries no cookie. Always 204, and counted only with `COUNT_VISITS` on, from the public host's own
+       pages, under the write limit. */
+    if (slug === null && servesSeen(url.pathname))
+      return seenDoor(request, {
+        on: (env.COUNT_VISITS ?? '').trim() === 'yes',
+        host: env.PUBLIC_HOST ?? '',
+        limit: (r) => overLimit(env, null, r, 'write'),
+        count: (call) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).seen(call),
+      });
     /* THE KEY DOORS NAME THEIR RECORD BY THE GRANT, AND ONLY AT THE ROOT. A grant under a slug would be a second way to
        say which record, and the vault is the last place to accept two answers to that. */
     if (slug !== null && servesVault(url.pathname))
@@ -3805,6 +3837,17 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
   };
   if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, opsApplyDeps(env));
   if (OPS_APPLICATIONS.test(new URL(request.url).pathname)) return opsApplications(request, opsApplyDeps(env));
+  /* THE OPERATOR'S FUNNEL (`funnel.ts`): the Directory's week totals and each open record's firsts, as counts only. */
+  if (OPS_FUNNEL.test(new URL(request.url).pathname))
+    return opsFunnel(request, {
+      key: (env.PROVISION_KEY ?? '').trim(),
+      readLimit: (r) => overLimit(env, null, r, 'read'),
+      unauthorized: () => saidUnauthorized('operator', 'This route takes the operator key.'),
+      read: (since) => directory.seen({ flow: 'funnel.read', since }),
+      records: async (cursor) => directory.listRecords(cursor),
+      firsts: (record) => env.RECORD.get(env.RECORD.idFromName(record)).firsts(),
+      now: () => Date.now(),
+    });
   /* THE OPERATOR'S GIFT OF A PLAN (`ops-plan.ts`): a record found by its name or id with who owns it, and the plan set
      through the same `setPlan` billing uses, so the record's own object hears of it. */
   if (OPS_PLAN.test(new URL(request.url).pathname))
@@ -3900,6 +3943,9 @@ const OPS_PLAN = /^\/+account\/+ops\/+plan\/*$/;
 
 /** The operator's door to the applications (`apply.ts`), with the same forgiveness. */
 const OPS_APPLICATIONS = /^\/+account\/+ops\/+applications\/*$/;
+
+/** The operator's funnel (`funnel.ts`), with the same forgiveness. */
+const OPS_FUNNEL = /^\/+account\/+ops\/+funnel\/*$/;
 
 /**
  * What `/account/ops/invite` and `/account/ops/applications` are handed (`apply.ts`): the provision key, a GET's count by

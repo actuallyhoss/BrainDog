@@ -90,7 +90,7 @@
   const segments = $derived(parse(src, { page: true }));
 
   /* THE QUESTIONS ANSWERED ON THIS PAGE, by id. Kept across a change of `src`, so a question asked on
-     two pages of one record (a Home and its Decide) is gone from both once it is answered on either. */
+     two pages of one record (a Home and its Needs you) is gone from both once it is answered on either. */
   let answered = $state<string[]>([]);
   const gone = $derived(new Set([...settled, ...answered]));
   /* What the last answer was, said on the page it was given on and on no other. */
@@ -270,31 +270,23 @@
     margin-block-end: calc(-1 * var(--sp-3));
   }
 
-  /* A two-way segmented switch on glass, the toolbar's shape (the design system): the chosen half a tile-white pill. */
+  /* A TWO-WAY SWITCH, ONE FLAT RECTANGLE (DIRECTION §39): the second rule's fill, which shows on the page and on a
+     paper card alike, with no edge and no shadow, radius 8. The chosen half is the tile's own fill in the full ink
+     and a heavier weight, so it reads by more than colour. */
   .switch {
     display: inline-flex;
     gap: 2px;
     margin-inline-start: auto;
     padding: 3px;
-    border-radius: var(--r-pill);
-    background: var(--glass);
-    box-shadow: var(--glass-edge);
-    backdrop-filter: var(--glass-blur);
-  }
-
-  /* Safari before 18 knows the blur only by its prefixed name. */
-  @supports (-webkit-backdrop-filter: none) {
-    .switch {
-      -webkit-backdrop-filter: var(--glass-blur);
-      backdrop-filter: var(--glass-blur);
-    }
+    border-radius: 8px;
+    background: var(--rule2);
   }
 
   .seg {
     min-block-size: var(--ctl-h-sm);
     padding-inline: 14px;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: 6px;
     background: none;
     color: var(--ink2);
     font: inherit;
@@ -304,9 +296,9 @@
   }
 
   .seg[aria-pressed='true'] {
-    background: var(--bg);
+    background: var(--tile);
     color: var(--ink);
-    box-shadow: var(--e1);
+    font-weight: 600;
   }
 
   .said {

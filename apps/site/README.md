@@ -53,7 +53,7 @@ barrel; a new key goes in its area's file. Every address is in `src/lib/links.ts
 - Say the limits out loud.
 - No em dash anywhere a person reads. Write two sentences, or use a colon.
 - Sentence case. No uppercase or letter-spaced label, and no band numbers.
-- One face for words, Geist. Poppins is the wordmark's alone, and mono is for code and addresses.
+- One face for words, Geist. Lexend is for page names, big figures and the wordmark, and mono is for code and addresses.
 - Colour through tokens only. The accent is for the hero's words, focus and a chart's primary series;
   buttons are ink, and the state hues mean state.
 - One motion per band, played once, finished in under five seconds, and still under reduced motion.

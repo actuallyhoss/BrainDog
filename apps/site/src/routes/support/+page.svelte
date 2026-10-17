@@ -4,7 +4,8 @@
   EVERY CHANNEL HERE IS ONE THAT IS READ. The address is `SUPPORT_EMAIL`, which stays empty until the
   owner routes it to an inbox, and while it is empty the page says when it
   arrives instead of printing an address nobody reads. GitHub's Issues and Discussions answer 404
-  while the repository is private, so they are listed only once `LAUNCH.repo` is on.
+  while the repository is private, so they are listed only once `LAUNCH.repo` is on, last and the board's whole
+  width, so the address and the checklist beside it stay a pair.
 -->
 <script lang="ts">
   import { LAUNCH } from '$lib/launch.ts';
@@ -22,6 +23,7 @@
     address === ''
       ? { id: 'mail-title', title: s.mail.title, glyph: 'mail', span: 5, body: [s.mail.pending] }
       : { id: 'mail-title', title: s.mail.title, glyph: 'mail', span: 5, body: [s.mail.body], action: { label: address, href: `mailto:${address}` } },
+    { id: 'report-title', title: s.report.title, glyph: 'file', span: 7, lines: s.report.items },
     ...(repo === null
       ? []
       : [
@@ -36,7 +38,6 @@
             ],
           },
         ]),
-    { id: 'report-title', title: s.report.title, glyph: 'file', span: 7, lines: s.report.items },
   ];
 </script>
 

@@ -106,3 +106,19 @@ test('every reading line sits under a block the page has', () => {
   }
   assert.deepEqual(wrong, [], wrong.join('\n'));
 });
+
+/**
+ * THE SCREEN THAT WAITS ON YOU IS NEEDS YOU (LAUNCH.md 103, "Needs you, not Decide"). Every example carries it under
+ * the id `needs`, which `routes/for/Person.svelte` counts its questions on, and no page's title or text says the old
+ * name, so a visitor never meets a screen the product no longer has.
+ */
+test('every example has a Needs you page holding its questions, and none says Decide', () => {
+  const wrong: string[] = [];
+  for (const e of EXAMPLES) {
+    const needs = e.pages.find((p) => p.id === 'needs');
+    if (needs?.title !== 'Needs you') wrong.push(`${e.id}: no page "needs" titled Needs you`);
+    else if (!parse(needs.src, { page: true }).some((s) => s.type === 'block' && s.kind === 'queue')) wrong.push(`${e.id}: Needs you holds no questions`);
+  }
+  for (const { page, at } of PAGES) if (/\bDecide\b/.test(`${page.title}\n${page.src}`)) wrong.push(`${at}: says Decide`);
+  assert.deepEqual(wrong, [], wrong.join('\n'));
+});

@@ -2,7 +2,7 @@ DRAFT for review, not in force.
 
 # Data Processing Addendum
 
-Last updated: 2026-10-01
+Last updated: 2026-10-17
 
 ## The short version
 
@@ -16,7 +16,7 @@ Last updated: 2026-10-01
 
 This addendum is between Quartz Apps LLC ("we" or "us") and the business that uses BrainDog ("you").
 
-It is part of the [Terms of Service](/legal/terms), and it applies whenever you use BrainDog for a business and we process personal data for you. By accepting the Terms for a business, you accept this addendum too. If you'd like a copy signed by both of us, write to support@brain.dog. [owner: confirm you will countersign on request]
+It is part of the [Terms of Service](/legal/terms), and it applies whenever you use BrainDog for a business and we process personal data for you. By accepting the Terms for a business, you accept this addendum too. If you'd like a copy signed by both of us, write to support@brain.dog and we'll sign one.
 
 Words like "personal data", "controller", "processor", "data subject" and "personal data breach" mean what they mean in the GDPR and the UK GDPR. If this addendum and the Terms disagree about personal data, this addendum wins.
 
@@ -52,7 +52,7 @@ We keep your data secure with the measures in Annex 2. We may improve them over 
 
 You agree that we may use the sub-processors listed in Annex 3. Each is bound by a written contract that protects your data at least as well as this addendum, and we remain responsible for them.
 
-Before we add or replace a sub-processor, we will email the owners of your records at least 30 days ahead. [owner: confirm 30 days] If you object on reasonable data protection grounds, tell us at support@brain.dog within that time. We will try to find a way forward. If we can't, you may end the Terms for the affected records, and we'll refund any time you've paid for and not used. [owner: confirm this refund]
+Before we add or replace a sub-processor, we will email the owners of your records at least 30 days ahead. If you object on reasonable data protection grounds, tell us at support@brain.dog within that time. We will try to find a way forward. If we can't, you may end the Terms for the affected records, and we'll refund any time you've paid for and not used.
 
 Services you choose to connect, such as your own model provider or the services your connections call, are not our sub-processors. You choose them, and your own agreement with each of them applies.
 
@@ -70,7 +70,7 @@ We will also give you the information you reasonably need for a data protection 
 
 ## If something goes wrong
 
-If we become aware of a personal data breach affecting your data, we will tell you without undue delay, and within 72 hours. [owner: confirm 72 hours] We will tell you what we know: what happened, what data and how many people it touches, what we are doing about it, and who to contact. We will keep you updated as we learn more.
+If we become aware of a personal data breach affecting your data, we will tell you without undue delay, and within 72 hours. We will tell you what we know: what happened, what data and how many people it touches, what we are doing about it, and who to contact. We will keep you updated as we learn more.
 
 Telling you about a breach is not an admission of fault.
 
@@ -78,17 +78,17 @@ Telling you about a breach is not an admission of fault.
 
 - **At any time**, an owner can export the whole record, and delete it.
 - **When a plan ends**, the record becomes read-only and can still be exported. After 90 days it is deleted, unless it is paid for again. We email you before that happens.
-- **After deletion**, every other copy is deleted at once, and we keep one sealed final copy for 30 days. Then nothing of the record remains, in backups or anywhere else. [owner: confirm 30 days for the final copy]
+- **After deletion**, every other copy is deleted at once, and we keep one sealed final copy for 30 days. Then nothing of the record remains, in backups or anywhere else.
 
 We keep data longer only where the law requires it.
 
 ## Audits
 
-Our security page is published, and the BrainDog software is open source, so you can check how it works. [owner: true only once the repository is public (LAUNCH.repo)] We will answer your reasonable written questions about how we protect your data, once a year or after a breach. If a regulator requires more, we will work with you on it in good faith, at your cost. [owner: confirm no on-site audits]
+Our security page is published, and once the BrainDog software is published as open source, you can check how it works yourself. We will answer your reasonable written questions about how we protect your data, once a year or after a breach. We don't offer on-site audits. If a regulator requires more, we will work with you on it in good faith, at your cost.
 
 ## Transfers out of the UK and the EU
 
-We are in the United States, and so are our sub-processors. When your personal data leaves the UK, the EU or Switzerland, we protect it with the EU Standard Contractual Clauses (Module Two, controller to processor), which this addendum includes by reference, with the UK's International Data Transfer Addendum for UK data. Where a clause needs a choice: the optional docking clause is out, sub-processors are approved by general authorisation with the notice above, and the governing law and courts are those of Ireland. [owner: confirm these SCC choices with counsel]
+We are in the United States, and so are our sub-processors. When your personal data leaves the UK, the EU or Switzerland, we protect it with the EU Standard Contractual Clauses (Module Two, controller to processor), which this addendum includes by reference, with the UK's International Data Transfer Addendum for UK data. Where a clause needs a choice: the optional docking clause is out, sub-processors are approved by general authorisation with the notice above, and the governing law and courts are those of Ireland.
 
 Where a sub-processor is certified under the EU-US Data Privacy Framework, we may rely on that instead.
 
@@ -122,7 +122,7 @@ This addendum lasts as long as we process personal data for you, and ends when y
 - **Accountability.** Every change in a record says who or which agent made it.
 - **Slash.** Slash has no way to write to a record by itself: its drafts wait for a person to accept them. It never sees saved keys.
 - **Logs.** Our own log lines record what kind of request was made and how it ended, and are written not to carry your content or keys.
-- **The code.** Open source, with a published security page and a private way to report weaknesses.
+- **The code.** A published security page and a private way to report weaknesses. The code itself is to be published as open source.
 
 ## Annex 3: Sub-processors
 
@@ -133,13 +133,15 @@ This addendum lasts as long as we process personal data for you, and ends when y
 - The AI models behind Slash and search by meaning (Workers AI, through AI Gateway): the parts of your record a question, daily check, daily email or filing draft needs, and the text the search index is built from. Each call asks the gateway not to keep prompts or answers.
 - Sending email (Email Service): sign-in links, notices, and the daily email and alerts you asked for.
 - Receiving email (Email Routing): the email you forward to a record's address.
-- Usage counts (Workers Analytics Engine), if turned on: the kind of each request and a scrambled record ID, never content. [owner: off until TELEMETRY is bound]
+- Usage counts (Workers Analytics Engine), if turned on: the kind of each request and a scrambled record ID, never content.
 - Bot checks at sign-up (Turnstile): browser and connection details.
 
 **Stripe, Inc.** (USA)
 
 - Payments, subscriptions and invoices: your billing contact and payment details, and each paid record's name and web address. Stripe never receives what's in your records.
 
-[owner: name the inbox provider support@brain.dog is routed to, if support mail may carry personal data from records]
+**Google LLC** (USA)
+
+- Our support inbox (Gmail): the messages you send to support@brain.dog, and anything from your records you choose to put in them.
 
 GitHub hosts BrainDog's source code only, and never receives customer data, so it is not a sub-processor.

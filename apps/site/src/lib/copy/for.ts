@@ -2,7 +2,7 @@
  * The words of the five pages written for each kind of person, `/for/<who>` (`routes/for/`).
  *
  * ONE ENTRY PER EXAMPLE RECORD, by the example's id (`lib/examples/types.ts`). The page's address is
- * `cases.drawn.moreFor`, the link the drawn app on the home page carries, so it is written once. What
+ * `cases.drawn.moreFor`, the link the footer and the other pages carry, so it is written once. What
  * each page draws is that example's own pages, and each row's drawing is one segment of one of them,
  * named here by page and index, so a figure on these pages is the figure the home page's window shows.
  *
@@ -28,16 +28,16 @@ export type Person = {
 
 export const forPages = {
   person: {
-    /* What a screen reader calls the row of the example's pages under 900px, where the rail is not drawn. */
+    /* What a screen reader calls the row of the example's pages over the drawn record. */
     pages: 'Pages in this record',
-    rowsTitle: 'What it does for you',
-    /* FREE LEADS (DIRECTION §35): the line under the example names Free first and the paid plans as more. It keeps
+    /* FREE LEADS (DIRECTION §35): the close names Free first and the paid plans as more. It keeps
        `Person.svelte`'s two arguments, the paid plan's figure and unit, so the call does not change; "$12 a month" is
        never the headline. */
     price: (_price: string, _unit: string) => 'Free for one person, with the whole app. Cloud and Cloud Plus add colleagues and more.',
+    /* The quiet button beside "Start free" in the page's head (`lib/site/Start.svelte` draws that one). */
     pricing: 'See the pricing',
-    /* The header's filled action (`copy/shell.ts` `nav.start`), which opens `SIGNUP`. */
-    start: 'Start for free',
+    /* The close's one huge line (`lib/site/Close.svelte`), the home page's own. */
+    close: 'Start your record.',
     others: 'Written for someone else',
 
     who: {
@@ -49,10 +49,10 @@ export const forPages = {
           'moves money happens until you say yes.',
         tag: 'For personal records',
         said: 'What is due, what is left to spend, and am I still on track?',
-        /* Inbox is docs/07 §4; Decide is `apps/web/src/routes/decide/`, where every proposal waits. */
+        /* Inbox is docs/07 §4; Needs you (once Decide, `apps/web/src/routes/decide/`) is where every proposal waits. */
         sub:
           'Keep your bills, budgets, savings and habits in one record. Bills that arrive are filed for you, ' +
-          'and anything that would move money waits for your answer on Decide.',
+          'and anything that would move money waits for your answer in Needs you.',
         rows: [
           {
             head: 'Bills file themselves',
@@ -117,10 +117,10 @@ export const forPages = {
           'nothing is sent until you say yes.',
         tag: 'For founders',
         said: 'I run it on my own. Who owes me, and how long does the money last?',
-        /* Automations are `apps/web/src/routes/automations/`; Decide is `apps/web/src/routes/decide/`. */
+        /* Automations are `apps/web/src/routes/automations/`; Needs you (once Decide) is `apps/web/src/routes/decide/`. */
         sub:
           'Keep your money, customers and invoices in one record. Automations chase what is late and file ' +
-          'every receipt, and nothing goes out until you accept it on Decide.',
+          'every receipt, and nothing goes out until you accept it in Needs you.',
         rows: [
           {
             head: 'Money in and out, month by month',

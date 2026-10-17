@@ -26,7 +26,7 @@ export const ADMIN_HTML = `<!doctype html>
 <main class="board">
 <header class="head">
 <h1>BrainDog admin</h1>
-<p class="lead">Who applied, who to invite, and the invites already out.</p>
+<p class="lead">Who applied, who to invite, the invites already out, and how people find their way in.</p>
 </header>
 <noscript><p class="tile said">This page needs JavaScript to reach BrainDog.</p></noscript>
 <section class="tile" id="key" aria-labelledby="key-title">
@@ -62,6 +62,18 @@ export const ADMIN_HTML = `<!doctype html>
 <h2 id="invites-title">Invites</h2>
 <p class="said" id="invites-said" role="status" aria-live="polite"></p>
 <ul class="things" id="invites-list"></ul>
+</section>
+<section class="tile wide" id="funnel" aria-labelledby="funnel-title">
+<h2 id="funnel-title">Funnel</h2>
+<p class="what">The last eight weeks, from a visit to a first brief. Visits are counted only while counting is switched on.</p>
+<p class="said" id="funnel-said" role="status" aria-live="polite"></p>
+<div class="scroll" id="funnel-scroll" tabindex="0" role="region" aria-labelledby="funnel-title" hidden>
+<table class="weeks">
+<thead><tr><th scope="col">Week of</th><th scope="col">Visits</th><th scope="col">Applied</th><th scope="col">Invites used</th><th scope="col">Signed up</th><th scope="col">First agent</th><th scope="col">First brief</th></tr></thead>
+<tbody id="funnel-weeks"></tbody>
+</table>
+</div>
+<p class="said" id="funnel-note"></p>
 </section>
 </div>
 </main>
@@ -111,6 +123,13 @@ button:disabled { opacity: .55; cursor: default; }
 .state.done { color: var(--good); }
 .copy { display: flex; gap: 8px; margin-top: 8px; }
 .copy input { font-family: var(--mono); font-size: 13px; }
+.scroll { overflow-x: auto; margin-block-start: 12px; }
+.weeks { border-collapse: collapse; inline-size: 100%; min-inline-size: 640px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.weeks th, .weeks td { padding-block: 10px; padding-inline: 0 16px; text-align: end; white-space: nowrap; }
+.weeks th:first-child, .weeks td:first-child { text-align: start; }
+.weeks thead th { font-weight: 500; color: var(--ink2); }
+.weeks tbody tr { border-block-start: 1px solid var(--rule); }
+.weeks tbody tr:last-child td { font-weight: 600; }
 @media (min-width: 900px) {
   .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .wide { grid-column: 1 / -1; }
@@ -185,6 +204,9 @@ export const ADMIN_JS = String.raw`'use strict';
     $('forget').hidden = true;
     $('applications-list').textContent = '';
     $('invites-list').textContent = '';
+    $('funnel-weeks').textContent = '';
+    $('funnel-scroll').hidden = true;
+    say('funnel-note', '');
     say('invite-said', '');
     say('key-said', words, words === WRONG_KEY);
   }
@@ -309,12 +331,45 @@ export const ADMIN_JS = String.raw`'use strict';
     }, failed('invites-said'));
   }
 
+  var STEPS = ['seen', 'applied', 'invites_used', 'signed_up', 'agent', 'brief'];
+
+  function weekOf(day, last) {
+    if (last) return 'This week';
+    var at = new Date(String(day) + 'T00:00:00Z');
+    return isNaN(at.getTime()) ? String(day) : at.toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  }
+
+  function loadFunnel() {
+    say('funnel-said', 'Counting.');
+    return ask('/account/ops/funnel').then(function (value) {
+      var weeks = Array.isArray(value.weeks) ? value.weeks : [];
+      var body = $('funnel-weeks');
+      body.textContent = '';
+      var visits = 0;
+      weeks.forEach(function (week, i) {
+        var tr = el('tr');
+        tr.appendChild(el('th', '', weekOf(week.week, i === weeks.length - 1)));
+        STEPS.forEach(function (step) { tr.appendChild(el('td', '', typeof week[step] === 'number' ? week[step] : 0)); });
+        visits += typeof week.seen === 'number' ? week.seen : 0;
+        body.appendChild(tr);
+      });
+      $('funnel-scroll').hidden = weeks.length === 0;
+      say('funnel-said', weeks.length === 0 ? 'Nothing to count yet.' : '');
+      var notes = [];
+      if (weeks.length > 0 && visits === 0) notes.push('No visits were counted in these weeks.');
+      if (value.more === true) notes.push('Only the first ' + String(value.asked) + ' records were asked, so the last two steps are short.');
+      if (typeof value.missed === 'number' && value.missed > 0) notes.push(String(value.missed) + (value.missed === 1 ? ' record' : ' records') + ' could not be asked.');
+      say('funnel-note', notes.join(' '));
+    }, failed('funnel-said'));
+  }
+
   function open() {
     say('key-said', '');
     $('desk').hidden = false;
     $('forget').hidden = false;
     loadApplications();
     loadInvites();
+    loadFunnel();
   }
 
   document.addEventListener('DOMContentLoaded', function () {

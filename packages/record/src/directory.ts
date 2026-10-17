@@ -341,7 +341,8 @@ CREATE TABLE IF NOT EXISTS dir_invite (
 -- DIRECTORY_VERSION unmoved, so an older Worker still opens this Directory and only never reads the table.
 -- CARRIED BY EVERY COPY, unlike dir_invite: an application opens nothing (no code, no link, no hash of one; the
 -- code an invitation mints lives in dir_invite and is named here only by its ref), so a restore keeps who asked.
--- It does hold an address and what they wrote, which is why the host seals the copy.
+-- It does hold an address and what they wrote, which is why the host seals the copy, and why a decided one is deleted
+-- APPLY_DECIDED_DAYS after it was decided (applications() sweeps on every call). A waiting one stays until answered.
 CREATE TABLE IF NOT EXISTS dir_apply (
   id         TEXT PRIMARY KEY,              -- a ULID, the operator's handle for it
   email      TEXT NOT NULL UNIQUE,          -- lower-cased and trimmed
@@ -354,6 +355,19 @@ CREATE TABLE IF NOT EXISTS dir_apply (
   decided_at INTEGER,                       -- epoch ms
   invite_ref TEXT                           -- the ref of the code that invited them, as the invite list shows it
 );
+
+-- A day's visits to the public site, one count a page and where the visit came from (seen.count), so the operator's
+-- funnel can say how many looked before they signed up (funnel.read). A NEW TABLE AND NOT A COLUMN, for the reason
+-- dir_inbound gives above: created on the next open, DIRECTORY_VERSION unmoved. NOBODY IS IN IT: no person, address,
+-- id, hash, time finer than a day or anything else that tells one visitor from another. page and came are names
+-- from two closed lists (SEEN_PAGES, SEEN_CAME), checked in code, so nothing a browser sends is kept as it was sent.
+CREATE TABLE IF NOT EXISTS dir_seen (
+  day  TEXT NOT NULL,                       -- YYYY-MM-DD, UTC
+  page TEXT NOT NULL,                       -- one of SEEN_PAGES
+  came TEXT NOT NULL,                       -- one of SEEN_CAME
+  n    INTEGER NOT NULL,                    -- visits counted that day
+  PRIMARY KEY (day, page, came)
+) WITHOUT ROWID;
 
 -- One row per record somebody pays for. A record with no row is not billed and never lapses: every record the
 -- operator provisioned has none, and a row is written only when a Stripe checkout for that record completes.
@@ -772,8 +786,11 @@ export const CARRIED = [
      copy still ends on a forwarding digest, as copies before it did; `load` reads the tables in any order. */
   'dir_credit',
   /* WHO ASKED FOR AN INVITATION, AND WHAT BECAME OF IT. Not a credential: a restore that lost it would forget every
-     person waiting, and one that lost the decided ones would let a declined address apply as new. */
+     person waiting, and one that lost the decided ones would let a declined address apply as new before its 90 days. */
   'dir_apply',
+  /* THE SITE'S VISITS A DAY. Counts and no visitor, so nothing here opens anything, and a restore that lost them would
+     leave the funnel's first step empty for every week before it. */
+  'dir_seen',
   'dir_inbound',
 ] as const;
 
@@ -813,10 +830,11 @@ const COPY_ORDER: Record<Carried, string> = {
   dir_inbound: 'token_sha256',
   dir_credit: 'rowid',
   dir_apply: 'rowid',
+  dir_seen: 'day, page, came',
 };
 
 /** The carried tables a copy written before they existed does not name (new tables at the same Directory version). */
-const ADDED_LATER: readonly Carried[] = ['dir_apply'];
+const ADDED_LATER: readonly Carried[] = ['dir_apply', 'dir_seen'];
 
 /** A copy's first line, then its version: `#dogdir 4`. Not `#dogl`, so `checkBrainl` and `verify` never take one for a record. */
 const COPY_HEAD = '#dogdir';
@@ -1181,6 +1199,51 @@ function applyStrike(sql: Sql, key: string, now: number, rule: Rule): number | n
   if (row.until !== null && Number(row.until) > now) return Math.ceil((Number(row.until) - now) / 1000);
   return null;
 }
+
+/** How long a decided application is kept: past it, the row is deleted by the next call `applications` answers. */
+export const APPLY_DECIDED_DAYS = 90;
+
+/* ── visits and the funnel ───────────────────────────────────────────────────── */
+
+/**
+ * The public site's pages a visit is counted against, each the first part of its path (`home` for `/`). The Worker
+ * maps a path to one of these and the Directory checks it again, so a name sent by hand is never kept.
+ */
+export const SEEN_PAGES = ['home', 'pricing', 'agents', 'build', 'changelog', 'docs', 'for', 'legal', 'packs', 'security', 'slash', 'support'] as const;
+export type SeenPage = (typeof SEEN_PAGES)[number];
+
+/**
+ * Where a visit came from: `direct` with no referrer, `site` from another page of the site, a search engine as one,
+ * the few places named, and `other` for the rest. Never the host itself, so the table says no more than this list does.
+ */
+export const SEEN_CAME = ['direct', 'site', 'search', 'github', 'x', 'linkedin', 'reddit', 'hacker-news', 'other'] as const;
+export type SeenCame = (typeof SEEN_CAME)[number];
+
+/** The most weeks `funnel.read` answers: a year. */
+export const FUNNEL_WEEKS_MOST = 53;
+
+/**
+ * A visit counted, and the operator's funnel. `seen.count` is the Worker's `/api/seen` door's, after its own checks;
+ * `funnel.read` is the operator's, behind the provision key. `since` is epoch ms, read as the ISO week it falls in.
+ */
+export type SeenCall = { flow: 'seen.count'; page: string; came: string } | { flow: 'funnel.read'; since: number };
+
+/**
+ * One ISO week of the funnel, Monday to Sunday in UTC: visits counted, people who signed up, records made,
+ * applications sent and sign-up codes used. `week` is its Monday, YYYY-MM-DD.
+ */
+export type FunnelWeek = { week: string; seen: number; signed_up: number; records: number; applied: number; invites_used: number };
+
+export type SeenAnswers = {
+  'seen.count': { counted: boolean };
+  'funnel.read': Result<{ weeks: FunnelWeek[] }>;
+};
+
+/** The Monday, 00:00 UTC, of the ISO week an instant falls in. */
+const weekOf = (ms: number): number => {
+  const d = new Date(ms);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - ((d.getUTCDay() + 6) % 7) * DAY_MS;
+};
 
 /**
  * The token as it is stored: an HMAC under the Directory's key, with its own prefix, so a pending row never holds the
@@ -2800,6 +2863,9 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     applications: async <C extends ApplyCall>(call: C): Promise<ApplyAnswers[C['flow']]> => {
       type A = ApplyAnswers[C['flow']];
       const now = clock.now();
+      /* A DECIDED APPLICATION IS KEPT `APPLY_DECIDED_DAYS` AND THEN DELETED, by whichever call comes next, so the table
+         holds an address and what they wrote no longer than the answer needs it. A waiting one is never swept. */
+      sql.exec("DELETE FROM dir_apply WHERE state <> 'waiting' AND decided_at IS NOT NULL AND decided_at < ?", now - APPLY_DECIDED_DAYS * DAY_MS);
       if (call.flow === 'apply.list')
         return sql.all<ApplyRow>(`SELECT ${APPLY_COLUMNS} FROM dir_apply ORDER BY made_at DESC, id DESC LIMIT ?`, APPLY_LIST_MOST).map(applyRow) as A;
       if (call.flow === 'apply.invited') {
@@ -2860,6 +2926,57 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         mint(), email, name, use, link, now,
       );
       return ok({}) as A;
+    },
+
+    /**
+     * A visit to the public site, and the operator's funnel (`SeenCall`).
+     *
+     * `seen.count` ADDS ONE TO A DAY'S COUNT FOR A PAGE AND WHERE THE VISIT CAME FROM, both checked against their
+     * closed lists again here, whatever the Worker already checked, and answers whether it counted. It takes nothing
+     * else, so nothing about the visitor can reach the table.
+     *
+     * `funnel.read` ANSWERS EACH ISO WEEK FROM THE ONE `since` FALLS IN TO THIS ONE, every week present and a quiet
+     * one zero: visits from `dir_seen`, people from `dir_person.created_at`, records from `dir_record.created_at`
+     * (closed ones too, since they were made), applications from `dir_apply.made_at` and codes used from
+     * `dir_invite.spent_at`. Applications are swept 90 days after they are decided, so a week older than that counts
+     * only those still kept. It changes nothing.
+     */
+    seen: <C extends SeenCall>(call: C): SeenAnswers[C['flow']] => {
+      type A = SeenAnswers[C['flow']];
+      const now = clock.now();
+      if (call.flow === 'seen.count') {
+        const { page, came } = call as Extract<SeenCall, { flow: 'seen.count' }>;
+        if (!(SEEN_PAGES as readonly unknown[]).includes(page) || !(SEEN_CAME as readonly unknown[]).includes(came)) return { counted: false } as A;
+        sql.exec(
+          'INSERT INTO dir_seen (day, page, came, n) VALUES (?, ?, ?, 1) ON CONFLICT (day, page, came) DO UPDATE SET n = n + 1',
+          dayOf(now), page, came,
+        );
+        return { counted: true } as A;
+      }
+      const since = (call as Extract<SeenCall, { flow: 'funnel.read' }>).since;
+      if (typeof since !== 'number' || !Number.isSafeInteger(since) || since < 0)
+        return no('VALUE_MALFORMED', 'since is a time in epoch milliseconds.', { at: 'since' }) as A;
+      const first = weekOf(Math.min(since, now));
+      const last = weekOf(now);
+      const count = Math.round((last - first) / (7 * DAY_MS)) + 1;
+      if (count > FUNNEL_WEEKS_MOST)
+        return no('OUT_OF_BOUNDS', `The funnel reads at most ${String(FUNNEL_WEEKS_MOST)} weeks back.`, { at: 'since' }) as A;
+      const weeks: FunnelWeek[] = Array.from({ length: count }, (_, i) => ({
+        week: dayOf(first + i * 7 * DAY_MS), seen: 0, signed_up: 0, records: 0, applied: 0, invites_used: 0,
+      }));
+      const add = (at: number, key: Exclude<keyof FunnelWeek, 'week'>, n = 1): void => {
+        if (!Number.isFinite(at)) return;
+        const w = weeks[Math.floor((weekOf(at) - first) / (7 * DAY_MS))];
+        if (w !== undefined) w[key] += n;
+      };
+      const fromIso = new Date(first).toISOString();
+      for (const r of sql.all<{ day: string; n: number }>('SELECT day, SUM(n) AS n FROM dir_seen WHERE day >= ? GROUP BY day', dayOf(first)))
+        add(Date.parse(`${r.day}T00:00:00Z`), 'seen', Number(r.n));
+      for (const r of sql.all<{ at: string }>('SELECT created_at AS at FROM dir_person WHERE created_at >= ?', fromIso)) add(Date.parse(r.at), 'signed_up');
+      for (const r of sql.all<{ at: string }>('SELECT created_at AS at FROM dir_record WHERE created_at >= ?', fromIso)) add(Date.parse(r.at), 'records');
+      for (const r of sql.all<{ at: number }>('SELECT made_at AS at FROM dir_apply WHERE made_at >= ?', first)) add(Number(r.at), 'applied');
+      for (const r of sql.all<{ at: number }>('SELECT spent_at AS at FROM dir_invite WHERE spent_at >= ?', first)) add(Number(r.at), 'invites_used');
+      return ok({ weeks }) as A;
     },
 
     /**

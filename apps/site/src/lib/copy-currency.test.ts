@@ -21,7 +21,8 @@ import { readFileSync } from 'node:fs';
 
 import { site } from './copy.ts';
 import { home } from './copy/home.ts';
-import { PACKS as ON_SALE, PLANS, plan } from './plans.ts';
+import { slashPage } from './copy/slash.ts';
+import { PLANS, plan } from './plans.ts';
 import { cardsFor, extra, holds } from './pricing/cards.ts';
 
 const REPO = new URL('../../../../', import.meta.url);
@@ -49,6 +50,7 @@ const BESIDE_A_PRICE = [
   'apps/site/src/lib/pricing/Plans.svelte',
   'apps/site/src/routes/pricing/+page.svelte',
   'apps/site/src/lib/copy/home.ts',
+  'apps/site/src/lib/copy/slash.ts',
   'apps/site/src/lib/app/page.ts',
   'apps/site/src/lib/app/Page.svelte',
 ];
@@ -98,10 +100,10 @@ const p = site.pricing;
 /** A meter of the pricing table as the figure check reads it: its cell, then the word the check knows it by. */
 const WORD: Record<string, string> = { agents: 'agents', credits: 'questions', runs: 'automation runs' };
 
-/** What the pricing page, the home page's plans band and the Slash page's credits say, as the routes put it together. */
+/** What the pricing page, the home page's plans band and the Slash page's asks say, as the routes put it together. */
 const said: string[] = [
-  JSON.stringify({ pricing: p, plans: home.plans, allowance: site.slash.allowance }),
-  site.slash.allowance.packsUnit(ON_SALE),
+  JSON.stringify({ pricing: p, plans: home.plans, slash: slashPage }),
+  ...slashPage.counted.month.cells.map((n) => `${n} questions`),
   home.plans.say(plan('cloud').price),
   ...PLANS.flatMap((pl) => [pl.price, pl.unit, pl.for]),
   ...[cardsFor({ billing: false }), cardsFor({ billing: true })].flat().flatMap((card) => [

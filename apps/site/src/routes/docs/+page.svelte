@@ -1,11 +1,12 @@
 <!--
-  /docs: the opening tile with the search, then every section of the docs as a tile with its pages.
+  /docs: the page's head with the search in it, then every section of the docs as a card with its pages.
 
-  THE LOOK IS THE DESIGN SYSTEM'S: tiles on the ground, each section's tile headed by its glyph in a well, its name and how
-  many pages it holds, then its sentence and its pages as a quiet list.
+  THE LOOK IS LOOK B'S (DIRECTION §47, LAUNCH 103 job 7): `PageHead` on the night ground, holding the search and the
+  link for agents in its slot, then the sections as flat --paper cards on the page, each with its name, how many pages
+  it holds, its sentence and its pages as a quiet list.
 
-  A SECTION WITH NO PAGE YET IS STILL A TILE, saying so, because the sections are the shape of the docs
-  and each fills as its pages are written. Its title links nowhere until it has a page to open, so no tile sends a reader
+  A SECTION WITH NO PAGE YET IS STILL A CARD, saying so, because the sections are the shape of the docs
+  and each fills as its pages are written. Its title links nowhere until it has a page to open, so no card sends a reader
   to an address with nothing at it.
 
   `/llms.txt` IS LINKED FROM HERE, so the prerender crawler reaches it from a page as well as from the sitemap, and so a
@@ -13,6 +14,7 @@
 -->
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
+  import PageHead from '$lib/site/PageHead.svelte';
   import Search from '$lib/docs/Search.svelte';
   import { docsWords } from '$lib/docs/words.ts';
   import type { PageProps } from './$types';
@@ -31,168 +33,192 @@
   <meta property="og:description" content={w.meta.description} />
 </svelte:head>
 
-<section class="band" aria-labelledby="docs-title">
-  <div class="in">
-    <div class="tiles">
-      <div class="tile lead head">
-        <div class="head-words">
-          <span class="well l"><Icon name="book" /></span>
-          <h1 class="h2" id="docs-title">{w.title}</h1>
-          <p class="lede">{w.lede}</p>
-          <a class="onward" href="/llms.txt" data-sveltekit-reload>{w.forAgents}<Icon name="arrow" size="m" /></a>
-        </div>
-        <div class="head-search">
-          <Search index={data.index} id="docs-search" />
-        </div>
-      </div>
-    </div>
+<PageHead title={w.title} lead={w.lede}>
+  <a class="more" href="/llms.txt" data-sveltekit-reload>{w.forAgents}<Icon name="arrow" size="m" /></a>
+  <div class="head-search">
+    <Search index={data.index} id="docs-search" night />
   </div>
-</section>
+</PageHead>
 
-<!-- No name of its own: the band above is the region the page title names, and this one named the same was a second landmark with that name. -->
-<section class="band">
-  <div class="in">
-    <ul class="tiles cards">
-      {#each data.sections as section (section.id)}
-        {@const first = section.pages[0]?.path ?? null}
-        <li class="tile card span-4">
-          <div class="tile-head">
-            <span class="well"><Icon name={section.glyph} /></span>
-            <h2 class="tile-title">
-              {#if first}<a class="card-link" href={first}>{section.label}</a>{:else}{section.label}{/if}
-            </h2>
-            {#if section.pages.length > 0}<span class="tile-count num">{section.pages.length}</span>{/if}
-          </div>
-          <p class="card-blurb">{section.blurb}</p>
-          {#if section.pages.length > 0}
-            <ul class="card-pages">
-              {#each section.pages as page (page.path)}
-                <li>
-                  <a class="card-page" href={page.path}><span>{page.title}</span><Icon name="chevron-right" size="m" /></a>
-                </li>
-              {/each}
-            </ul>
-          {:else}
-            <p class="card-empty meta">{w.empty}</p>
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  </div>
+<!-- No name of its own: the head above is the region the page title names, and this one named the same was a second landmark with that name. -->
+<section class="wrap secs">
+  <ul class="cards">
+    {#each data.sections as section (section.id)}
+      {@const first = section.pages[0]?.path ?? null}
+      <li class="sec">
+        <div class="sec-head">
+          <Icon name={section.glyph} size="m" />
+          <h2 class="sec-title">
+            {#if first}<a class="sec-link" href={first}>{section.label}</a>{:else}{section.label}{/if}
+          </h2>
+          {#if section.pages.length > 0}<span class="sec-count">{section.pages.length}</span>{/if}
+        </div>
+        <p class="sec-blurb">{section.blurb}</p>
+        {#if section.pages.length > 0}
+          <ul class="sec-pages">
+            {#each section.pages as page (page.path)}
+              <li>
+                <a class="sec-page" href={page.path}><span>{page.title}</span><Icon name="chevron-right" size="m" /></a>
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="sec-empty">{w.empty}</p>
+        {/if}
+      </li>
+    {/each}
+  </ul>
 </section>
 
 <style>
-  .head {
+  /* THE SEARCH IN THE HEAD'S SLOT, under the link for agents, at a width a field reads well at. */
+  .head-search {
+    max-inline-size: 560px;
+    margin-block-start: var(--sp-5);
+  }
+
+  .secs {
+    padding-block: 56px 96px;
+  }
+
+  /* THREE CARDS A ROW AT A DESK, two between, one on a phone. */
+  .cards {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5);
-  }
-
-  .head-words {
-    display: grid;
-    justify-items: start;
-    gap: var(--sp-3);
-  }
-
-  .head-search {
-    min-inline-size: 0;
-  }
-
-  .cards {
+    gap: 18px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .card {
+  /* A CARD: flat --paper, radius 24, no edge and no shadow, as the design's plans are. */
+  .sec {
+    display: grid;
+    align-content: start;
     gap: var(--sp-3);
+    min-inline-size: 0;
+    padding: 28px 30px 24px;
+    background: var(--paper);
+    border-radius: 24px;
   }
 
-  .card-link {
+  .sec-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+  }
+
+  .sec-title {
+    flex: 1;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-site-21);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.03em;
+  }
+
+  .sec-link {
     color: inherit;
     text-decoration: none;
   }
 
-  /* A THUMB'S TARGET WITHOUT MOVING A LINE: 13px above and below takes a 19px link past 44, and the negative margin
+  /* A THUMB'S TARGET WITHOUT MOVING A LINE: 10px above and below takes a 25px link past 44, and the negative margin
      gives it back, so the words sit where they did and the press lands on a 44px box. */
   @media (pointer: coarse) {
-    .card-link {
+    .sec-link {
       display: inline-block;
       min-inline-size: var(--tap);
-      padding-block: 13px;
-      margin-block: -13px;
+      padding-block: 10px;
+      margin-block: -10px;
     }
   }
 
-  .card-link:hover {
+  .sec-link:hover {
     text-decoration: underline;
     text-underline-offset: 3px;
   }
 
-  .card-blurb {
+  /* HOW MANY PAGES: the one pill on the card, because it is a count. */
+  .sec-count {
+    padding: 2px 10px;
+    background: var(--tile);
+    border-radius: 999px;
+    color: var(--ink2);
+    font-size: var(--t-site-15);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sec-blurb,
+  .sec-empty {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-site-small);
-    line-height: 20px;
+    font-size: var(--t-site-15);
+    line-height: 1.5;
   }
 
-  .card-empty {
-    margin: 0;
+  .sec-empty {
+    color: var(--muted);
   }
 
-  /* THE PAGES SIT IN THE TILE AS A LIST, with a hairline between rows and the row's wash under the pointer. */
-  .card-pages {
+  /* THE PAGES SIT IN THE CARD AS A LIST, with a hairline between them and the tile's fill under the pointer. */
+  .sec-pages {
     display: grid;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .card-pages li + li {
-    border-block-start: 1px solid var(--line);
+  .sec-pages li + li {
+    border-block-start: 1px solid var(--rule);
   }
 
-  .card-page {
+  .sec-page {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-2);
-    margin-inline: calc(-1 * var(--sp-2));
-    border-radius: var(--r-md);
+    min-block-size: var(--tap);
+    padding-inline: 10px;
+    margin-inline: -10px;
+    border-radius: 8px;
     color: var(--ink);
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-15);
     font-weight: 500;
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  .card-page :global(svg) {
-    color: var(--dim);
+  .sec-page :global(svg) {
+    flex: none;
+    color: var(--muted);
   }
 
-  .card-page:hover {
-    background: var(--hover-wash);
+  .sec-page:hover {
+    background: var(--tile);
   }
 
-  @media (pointer: coarse) {
-    .card-page {
-      min-block-size: var(--tap);
+  @media (width >= 700px) {
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
-  @media (width >= 900px) {
-    .head {
-      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-      align-items: end;
-      gap: var(--sp-7);
+  @media (width >= 1060px) {
+    .cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
-  @media (width < 640px) {
-    .card-page {
-      min-block-size: var(--tap);
+  @media (max-width: 760px) {
+    .secs {
+      padding-block: 32px 64px;
+    }
+
+    .sec {
+      padding: 22px 20px 18px;
     }
   }
 </style>

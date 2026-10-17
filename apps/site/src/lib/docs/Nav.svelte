@@ -1,10 +1,11 @@
 <!--
   The docs' section nav: the search, then every section with its pages, the open page marked.
 
-  A TILE BESIDE THE PAGE: the search field, "All sections", then each section under its
-  glyph and name with its pages as rows, and the page you are on filled in ink.
+  FLAT ON THE BOARD, NO TILE (DIRECTION §47, LAUNCH 103 job 7): the search field, "All sections", then each section's
+  name with its pages under it, and the page you are on on the tile's fill with a red mark at its start and in bold,
+  so it is told by more than colour.
 
-  TWO DRAWINGS OF ONE LIST, and only one is ever shown. At 900px and wider it is a tile beside the page that stays in
+  TWO DRAWINGS OF ONE LIST, and only one is ever shown. At 900px and wider it is a column beside the page that stays in
   view as the page scrolls. Below 900px it is a disclosure at the top of the page, closed, so the page's first words
   are near the top of a phone. A `<details>` cannot be told to stay open on a wide screen and closed on a narrow one
   without a script, and the list has to work without one, so each width has its own element and the other is not
@@ -27,7 +28,7 @@
 {#snippet list(phone: boolean)}
   <a class="nav-home" class:nav-tap={phone} href="/docs"><Icon name="arrow-left" size="m" />{w.home}</a>
   {#each filled as section (section.id)}
-    <p class="nav-sec"><Icon name={section.glyph} size="m" /><span>{section.label}</span></p>
+    <p class="nav-sec">{section.label}</p>
     <ul class="nav-pages">
       {#each section.pages as page (page.path)}
         <li>
@@ -52,11 +53,9 @@
 </nav>
 
 <style>
-  .nav-phone,
-  .nav-desk {
-    background: var(--bg);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1);
+  /* THE PHONE'S DISCLOSURE: one 44px line with a hairline under it, on the board like the rest. */
+  .nav-phone {
+    border-block-end: 1px solid var(--rule);
   }
 
   .nav-open {
@@ -64,9 +63,8 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--tap);
-    padding-inline: 20px;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--t-site-16);
     font-weight: 600;
     cursor: pointer;
     list-style: none;
@@ -87,7 +85,7 @@
   .nav-in {
     display: grid;
     gap: 2px;
-    padding: 0 var(--sp-3) var(--sp-4);
+    padding-block: var(--sp-2) var(--sp-4);
   }
 
   .nav-desk {
@@ -99,11 +97,12 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
+    min-block-size: 36px;
     padding-inline: 10px;
-    border-radius: var(--r-md);
+    border-inline-start: 3px solid transparent;
+    border-radius: 8px;
     color: var(--ink2);
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-15);
     font-weight: 500;
     line-height: 20px;
     text-decoration: none;
@@ -112,15 +111,16 @@
 
   .nav-home:hover,
   .nav-page:hover {
-    background: var(--hover-wash);
+    background: var(--tile);
     color: var(--ink);
   }
 
-  /* THE OPEN PAGE IN INK, as the rail fills the place you are in: marked by more than colour. */
+  /* THE OPEN PAGE: the tile's fill, the ink, bold, and the red mark at its start. */
   .nav-page[aria-current='page'],
   .nav-page[aria-current='page']:hover {
-    background: var(--ink);
-    color: var(--on-ink);
+    background: var(--tile);
+    border-inline-start-color: var(--red);
+    color: var(--ink);
     font-weight: 600;
   }
 
@@ -129,7 +129,7 @@
     min-block-size: var(--tap);
   }
 
-  /* A tablet held wide draws the tile, and a thumb needs the same 44px row there. */
+  /* A tablet held wide draws the column, and a thumb needs the same 44px row there. */
   @media (pointer: coarse) {
     .nav-home,
     .nav-page {
@@ -138,14 +138,11 @@
   }
 
   .nav-sec {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: var(--sp-4) 0 var(--sp-1);
-    padding-inline: 10px;
-    color: var(--dim);
-    font-size: var(--t-site-small);
-    font-weight: 500;
+    margin: var(--sp-5) 0 var(--sp-1);
+    padding-inline: 13px;
+    color: var(--muted);
+    font-size: var(--t-site-15);
+    font-weight: 600;
   }
 
   .nav-pages {
@@ -161,16 +158,21 @@
       display: none;
     }
 
-    /* IN VIEW AS THE PAGE SCROLLS, under the floating bar, and scrolling by itself only when the list is taller than
-       the window. */
+    /* IN VIEW AS THE PAGE SCROLLS, and scrolling by itself only when the list is taller than the window. */
     .nav-desk {
       position: sticky;
-      inset-block-start: calc(56px + 2 * var(--inset));
+      inset-block-start: var(--sp-5);
       display: grid;
       gap: 2px;
-      max-block-size: calc(100vh - 56px - 4 * var(--inset));
+      max-block-size: calc(100vh - 2 * var(--sp-5));
       overflow-y: auto;
-      padding: var(--sp-3);
     }
+
+  }
+
+  /* The search sits clear of the list under it. */
+  .nav-in > :global(.search),
+  .nav-desk > :global(.search) {
+    margin-block-end: var(--sp-3);
   }
 </style>

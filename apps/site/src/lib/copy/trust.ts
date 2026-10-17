@@ -12,6 +12,7 @@
 export const trust = {
   legal: {
     title: 'Legal',
+    lede: 'What BrainDog is published under, and the terms of a hosted record.',
     licence: {
       title: 'Licence',
       body: [
@@ -82,7 +83,7 @@ export const trust = {
       description: 'How a BrainDog record is kept: one database per record, sealed keys, sealed nightly copies, passkeys and export at any time.',
     },
     title: 'Security',
-    lede: 'How your record is kept, one fact to a line.',
+    lede: 'How your record is kept, and how to tell us about a weakness.',
     kept: {
       title: 'How a record is kept',
       /* One tile each on /security: a short name, the glyph its well draws, and the fact as it has always been worded. */
@@ -155,7 +156,7 @@ export const trust = {
         cannot: 'Cannot',
       },
       exportName: 'Everything, in one file',
-      exportNote: 'Its lists, pages, rules and rows',
+      exportNote: 'Every list, page and rule in it',
       exportVerb: 'Export the record',
     },
     report: {

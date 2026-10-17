@@ -2,7 +2,7 @@ DRAFT for review, not in force.
 
 # Terms of Service
 
-Last updated: 2026-10-02
+Last updated: 2026-10-17
 
 ## The short version
 
@@ -30,7 +30,7 @@ BrainDog is only offered as a hosted service at brain.dog. These terms cover tha
 
 ## Who can use BrainDog
 
-- You must be **18 or older**. [owner: confirm 18 as the minimum age]
+- You must be **18 or older**.
 - If you use BrainDog for a company or other organisation, you confirm that you may agree to these terms for it. "You" then means the organisation as well as you.
 - You can't use BrainDog if we have closed your account before, or if the law doesn't allow you to.
 
@@ -80,7 +80,7 @@ The licence ends when you delete the content or the record, except for copies of
 
 **Sharing a page.** You can make a link to one page. Anyone with that link can see that page, so share it with care. A link works for 30 days unless you choose another length, up to 90, and you can close it early in Settings.
 
-**Packs.** If you publish a pack to BrainDog's public catalogue, anyone can see it and install it. You give us the same licence to host and share it there, and you confirm it holds nothing private and no one else's work without permission. [owner: confirm publishing packs is open to customers at launch]
+**Packs.** If you publish a pack to BrainDog's public catalogue, anyone can see it and install it. You give us the same licence to host and share it there, and you confirm it holds nothing private and no one else's work without permission. We may review a pack before it is listed, and take down one that breaks these terms.
 
 ## Services you connect
 
@@ -119,8 +119,8 @@ Credits have no cash value, and can't be sold, transferred or moved to another r
 - Payments are handled by Stripe. We never see your card number.
 - Free is never billed, and there is no free trial of a paid plan.
 - Paid plans are billed monthly in advance, from the day you pay.
-- Prices are in US dollars. [owner: tax is off until Stripe Tax is turned on; say whether prices include or exclude tax]
-- You can change plan or cancel at any time from Settings, on Stripe's own page. A change of plan takes effect straight away. [owner: confirm how the Stripe customer portal prorates a mid-month change] A cancellation takes effect at the end of the period you've paid for, and the record then becomes read-only (see below). [owner: set the customer portal to cancel at the end of the period, not at once]
+- Prices are in US dollars and don't include tax. Where the law requires us to charge sales tax or VAT, we add it at checkout, and you see it before you pay.
+- You can change plan or cancel at any time from Settings, on Stripe's own page. A change of plan takes effect straight away, and Stripe works out the difference for the rest of the month: a bigger plan is charged for the days left, and a smaller one leaves a credit against your next payments. A cancellation takes effect at the end of the period you've paid for, and the record then becomes read-only (see below).
 - We may change our prices. We'll tell you by email at least 30 days before a new price applies to you. If you don't agree, you can cancel before it does.
 - Refunds are covered in the next section.
 
@@ -128,14 +128,13 @@ Credits have no cash value, and can't be sold, transferred or moved to another r
 
 - Cancelling stops the next payment. We don't refund the rest of a month you've paid for, a move to a smaller plan, or unused allowances or credits.
 - If we charged you by mistake, or twice, write to support@brain.dog and we'll refund it.
-- If the law gives you a right to a refund, such as a consumer's right to cancel in the UK or the EU, nothing here takes it away.
-
-[owner: confirm this refund stance, and whether UK and EU consumers are asked at checkout to give up the 14-day right to cancel]
+- If you're a consumer in the UK or the EU, you can cancel within 14 days of first paying for a plan, and we'll refund that first payment in full. Write to support@brain.dog.
+- If the law gives you any other right to a refund, nothing here takes it away.
 
 ## If a payment fails, or your plan ends
 
 - **Payment failed.** Your record keeps working while Stripe tries your card again. Update your card in Settings to fix it.
-- **Plan ended.** [owner: billing.ts makes a cancelled paid record read-only, as below; say if it should move back to Free instead] If the plan is cancelled, or a payment still hasn't gone through after Stripe's tries, the record becomes **read-only**. Its people and agents can still read it, and nothing new runs: no connectors, automations, scripts or Slash.
+- **Plan ended.** If the plan is cancelled, or a payment still hasn't gone through after Stripe's tries, the record becomes **read-only**. Its people and agents can still read it, and nothing new runs: no connectors, automations, scripts or Slash.
 - **You can always export.** An owner can export the whole record at any time while it is read-only. We never hold your data back to make you pay.
 - **Before we delete it, we tell you.** We email the payer and every owner when the record becomes read-only, and again 60 days and 83 days later.
 - **After 90 days** of being read-only, the record is deleted, and we email you to say so. Paying again at any time before then brings it straight back.
@@ -146,7 +145,7 @@ An owner can export the whole record, at any time, from Settings, as one file yo
 
 ## Deleting a record or closing your account
 
-- An owner can delete a record in Settings, by typing its name. It is deleted straight away, with every copy of it except one sealed final copy, which we keep for 30 days in case it was deleted by mistake. Then that is deleted too, and nothing of the record remains. [owner: confirm 30 days for the final copy, and whether we restore a deleted record on request]
+- An owner can delete a record in Settings, by typing its name. It is deleted straight away, with every copy of it except one sealed final copy, which we keep for 30 days in case it was deleted by mistake. Then that is deleted too, and nothing of the record remains. If you deleted one by mistake, write to support@brain.dog within those 30 days. We'll try to bring it back from that copy, but we can't promise to.
 - You can close your account in Settings. If you're the only owner of a record that is still open, delete it or make somebody else its owner first.
 - **Closing your account doesn't cancel a plan you pay for.** Cancel it in Settings first. If you've already closed your account, write to support@brain.dog and we'll cancel it.
 - Closing your account removes you from BrainDog. Records you were a member of keep their own history, which each record's owner can erase.
@@ -154,7 +153,7 @@ An owner can export the whole record, at any time, from Settings, as one file yo
 
 ## Our part of BrainDog
 
-The BrainDog software is open source. [owner: true only once the repository is public (LAUNCH.repo)] Its licences (Apache License 2.0, and MIT for the renderer) give you rights to the code, and these terms don't take them away. These terms cover the hosted service at brain.dog.
+We plan to publish the BrainDog software as open source. Once we do, its licences (Apache License 2.0, and MIT for the renderer) give you rights to the code, and these terms don't take them away. These terms cover the hosted service at brain.dog.
 
 The BrainDog name, logo and look belong to us. Don't use them in a way that suggests we made or endorse something we didn't.
 
@@ -192,7 +191,7 @@ Nothing in these terms limits liability that the law doesn't allow us to limit, 
 
 ## If you use BrainDog for a business
 
-If you use BrainDog for a business, you'll cover our reasonable costs if someone makes a claim against us because of your content, your use of BrainDog against these terms, or what your agents did with the access you gave them. [owner: keep or drop this clause]
+If you use BrainDog for a business, you'll cover our reasonable costs if someone makes a claim against us because of your content, your use of BrainDog against these terms, or what your agents did with the access you gave them.
 
 ## The law and disputes
 

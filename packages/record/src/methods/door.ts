@@ -19,12 +19,17 @@
  * that would each have said something on the week his record had no tools. Each sign is a number, or `null` where there
  * is nothing to judge yet (no run in a day, no build said, no runner set up), because a sign that read 0 there would
  * read green over nothing.
+ *
+ * THE FIRST HELLO IS ALSO KEPT ONCE, as `first.agent` (`../firsts.ts`), and `firsts` answers it with the briefing's own
+ * first to the host's funnel and to nobody else.
  */
 
+import type { Result } from '@braindog/ports';
 import type { Kernel, DoorMark, TokenRow } from '@braindog/kernel';
 import { DOOR_KINDS, endedByCutOff, type WriteContext } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
+import { firsts, markFirst, type Firsts } from '../firsts.ts';
 import type { RecordDeps } from './index.ts';
 
 type Heard = ReturnType<Kernel['heard']>;
@@ -306,6 +311,9 @@ export function methods(deps: RecordDeps) {
         : { actor: p.id, principal: { kind: 'person' } };
     const kept = kernel.heard(w, checked.mark);
     if (kept.ok && checked.mark.kind === 'called' && p.kind === 'token') kernel.noteTool(p.id);
+    /* THE RECORD'S FIRST AGENT (`firsts.ts`): the first hello the door keeps, written once, so the funnel still has it
+       after the sweep has taken the mark itself. */
+    if (kept.ok && method === 'doorHeard' && checked.mark.kind === 'hello') markFirst(kernel, 'first.agent', clock.now());
     return kept;
   };
 
@@ -362,6 +370,16 @@ export function methods(deps: RecordDeps) {
       const stop = admin(ctx, 'read how the agent door is doing');
       if (stop) return { ok: false, refusal: stop };
       return { ok: true, value: health() };
+    },
+
+    /**
+     * When an agent first said hello at the door and when the briefing first answered a card, each epoch ms or `null`
+     * (`firsts.ts`). NOT ROUTED, as `doorHeard` is not: the host's operator funnel asks it of each record with a system
+     * principal, and nobody else is answered. It takes nothing and changes nothing.
+     */
+    async firsts(_args: unknown, ctx: CallContext): Promise<Result<Firsts>> {
+      if (ctx.principal.kind !== 'system') return no('FORBIDDEN', 'Only the host reads when this record first met an agent and a briefing, for its funnel.', { at: 'principal' }) as Result<Firsts>;
+      return { ok: true, value: firsts(kernel) };
     },
   };
 }

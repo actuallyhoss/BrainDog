@@ -1,15 +1,16 @@
 <!--
-  The trust pages' one skeleton: a band of tiles on the ground. /support and /legal draw with it.
+  The trust pages' one skeleton: the night head, then a board of tiles. /support and /legal draw with it.
 
-  THE LEAD TILE HOLDS THE PAGE'S HEADING, ITS LEDE AND ITS FIRST PART, as every page's opening tile does (the design system),
-  so the one thing a reader came for is in the first tile and not under a heading on its own. Every part after it is a
-  tile of its own, headed by an icon well, the way every tile on the site is headed.
+  THE HEAD IS `PageHead` (DIRECTION §47): the page's name and its one line on the night ground, as every page of the
+  site opens. Under it is one flat board (Look B), and every part is a tile on it: flat and opaque, radius 16, no edge
+  and no shadow, headed by its glyph and its title in Lexend.
 
   ONE FILE FOR THE TRUST PAGES, because they are read and never sold, and a reader arriving from the footer's Trust
   group should meet the same page each time. Each page builds its list of parts from its copy and the launch flags, so
   a part that is not true yet is left out of the list rather than drawn empty.
 
-  THE PROSE IS 17/28 AT A 68CH MEASURE, inside the 45-to-75 band every typographic reference agrees on.
+  THE PROSE IS 17/28 AT A 68CH MEASURE, inside the 45-to-75 band every typographic reference agrees on. A part's
+  action is an outlined button and never red: the one solid red a page carries is "Start free".
 -->
 <script lang="ts" module>
   import type { IconName } from '$lib/icons.ts';
@@ -24,7 +25,7 @@
     /** One line each, with a hairline between: the checklist on /support. */
     lines?: readonly string[];
     links?: readonly Link[];
-    /** The page's one filled button, drawn under the part's words. */
+    /** The part's one button, drawn under its words. */
     action?: Link;
     /** How many of the twelve columns the part's tile takes at a desk. Twelve when absent. */
     span?: 5 | 6 | 7;
@@ -33,84 +34,130 @@
 
 <script lang="ts">
   import Icon from '$lib/Icon.svelte';
+  import PageHead from '$lib/site/PageHead.svelte';
 
   let { title, lede, parts }: { title: string; lede?: string; parts: readonly Part[] } = $props();
 
-  const first = $derived(parts[0]);
-  const rest = $derived(parts.slice(1));
-  const span = (p: Part | undefined): string => (p?.span ? `span-${p.span}` : '');
   const external = (href: string): boolean => /^https?:/.test(href);
 </script>
 
-{#snippet content(part: Part)}
-  {#each part.body ?? [] as paragraph}
-    <p class="part-body">{paragraph}</p>
-  {/each}
-  {#if part.lines?.length}
-    <ol class="part-lines">
-      {#each part.lines as line, i}
-        <li><span class="line-n num" aria-hidden="true">{i + 1}</span><span>{line}</span></li>
-      {/each}
-    </ol>
-  {/if}
-  {#if part.links?.length}
-    <ul class="part-links">
-      {#each part.links as link}
-        <li>
-          <a href={link.href} rel={external(link.href) ? 'external' : undefined}
-            ><span>{link.label}</span><Icon name={external(link.href) ? 'arrow-up-right' : 'arrow'} size="m" /></a
-          >
-        </li>
-      {/each}
-    </ul>
-  {/if}
-  {#if part.action}
-    <p class="part-do"><a class="btn btn-primary btn-lg" href={part.action.href}>{part.action.label}</a></p>
-  {/if}
-{/snippet}
+<PageHead {title} {...(lede === undefined ? {} : { lead: lede })} />
 
-<section class="band" aria-labelledby="page-title">
-  <div class="in">
-    <div class="tiles">
-      <article class="tile lead opening {span(first)}">
-        <h1 class="h2" id="page-title">{title}</h1>
-        {#if lede}<p class="lede">{lede}</p>{/if}
-        {#if first}
-          <section class="first" aria-labelledby={first.id}>
-            <h2 class="tile-head">
-              {#if first.glyph}<span class="well"><Icon name={first.glyph} /></span>{/if}
-              <span class="tile-title" id={first.id}>{first.title}</span>
-            </h2>
-            {@render content(first)}
-          </section>
+<section class="board" aria-label={title}>
+  <div class="wrap parts">
+    {#each parts as part (part.id)}
+      <section
+        class="part"
+        class:span-5={part.span === 5}
+        class:span-6={part.span === 6}
+        class:span-7={part.span === 7}
+        class:span-12={part.span === undefined}
+        aria-labelledby={part.id}
+      >
+        <h2 class="part-head">
+          {#if part.glyph}<span class="glyph"><Icon name={part.glyph} /></span>{/if}
+          <span id={part.id}>{part.title}</span>
+        </h2>
+        {#each part.body ?? [] as paragraph}
+          <p class="part-body">{paragraph}</p>
+        {/each}
+        {#if part.lines?.length}
+          <ol class="part-lines">
+            {#each part.lines as line, i}
+              <li><span class="line-n" aria-hidden="true">{i + 1}</span><span>{line}</span></li>
+            {/each}
+          </ol>
         {/if}
-      </article>
-
-      {#each rest as part (part.id)}
-        <section class="tile lead {span(part)}" aria-labelledby={part.id}>
-          <h2 class="tile-head">
-            {#if part.glyph}<span class="well"><Icon name={part.glyph} /></span>{/if}
-            <span class="tile-title" id={part.id}>{part.title}</span>
-          </h2>
-          {@render content(part)}
-        </section>
-      {/each}
-    </div>
+        {#if part.links?.length}
+          <ul class="part-links">
+            {#each part.links as link}
+              <li>
+                <a href={link.href} rel={external(link.href) ? 'external' : undefined}
+                  ><span>{link.label}</span><Icon name={external(link.href) ? 'arrow-up-right' : 'arrow'} size="m" /></a
+                >
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        {#if part.action}
+          <p class="part-do"><a class="btn line" href={part.action.href}>{part.action.label}</a></p>
+        {/if}
+      </section>
+    {/each}
   </div>
 </section>
 
 <style>
-  .opening > .lede {
-    max-inline-size: 48ch;
+  /* THE BOARD: one flat ground under the head, the tiles on it a gap apart. It runs on to the footer with no strip of
+     the page's white between: its own padding is the room at the page's end. */
+  .board {
+    margin-block-end: 0;
+    padding-block: 56px 96px;
+    background: var(--board);
   }
 
-  /* THE FIRST PART SITS UNDER A HAIRLINE in the opening tile, so the heading reads as the page's and the part as its first. */
-  .first {
+  /* TWELVE COLUMNS AT A DESK, a part saying how many it takes; one column below 900. */
+  .parts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  @media (width >= 900px) {
+    .parts {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .span-5 {
+      grid-column: span 5;
+    }
+
+    .span-6 {
+      grid-column: span 6;
+    }
+
+    .span-7 {
+      grid-column: span 7;
+    }
+
+    .span-12 {
+      grid-column: span 12;
+    }
+  }
+
+  /* A TILE: flat and opaque, radius 16, no edge and no shadow (DIRECTION §39). */
+  .part {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
-    padding-block-start: var(--sp-5);
-    border-block-start: 1px solid var(--line);
+    gap: 16px;
+    min-inline-size: 0;
+    padding: clamp(20px, 1.6vw + 14px, 32px);
+    background: var(--tile);
+    border-radius: 16px;
+    color: var(--ink);
+  }
+
+  .part-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--ink);
+    font-size: var(--t-site-21);
+    line-height: 1.2;
+    letter-spacing: -0.035em;
+  }
+
+  /* THE GLYPH'S SQUARE: 32 on the board's own fill, radius 8. */
+  .glyph {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    background: var(--board);
+    border-radius: 8px;
+    color: var(--ink2);
   }
 
   .part-body {
@@ -123,7 +170,7 @@
     text-wrap: pretty;
   }
 
-  /* A CHECKLIST, a line to an item: a small numbered well and the line, with a hairline between. */
+  /* A CHECKLIST, a line to an item: a small numbered square and the line, with a hairline between. */
   .part-lines {
     display: flex;
     flex-direction: column;
@@ -134,10 +181,10 @@
 
   .part-lines li {
     display: grid;
-    grid-template-columns: var(--well) minmax(0, 1fr);
-    gap: var(--sp-3);
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
     align-items: start;
-    padding-block: var(--sp-3);
+    padding-block: 12px;
     color: var(--ink);
     font-size: var(--t-site-body);
     line-height: var(--lh-site-body);
@@ -146,22 +193,23 @@
   }
 
   .part-lines li + li {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .line-n {
     display: grid;
     place-items: center;
-    inline-size: var(--well);
-    block-size: var(--well);
-    background: var(--s1);
-    border-radius: var(--r-well);
+    inline-size: 32px;
+    block-size: 32px;
+    background: var(--board);
+    border-radius: 8px;
     color: var(--ink2);
     font-size: var(--t-site-small);
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* LINKS AS ROWS, each a whole target: 44 tall, the words and an arrow saying where it goes. */
+  /* LINKS, each a whole target: 44 tall, the words and an arrow saying where it goes. */
   .part-links {
     display: flex;
     flex-direction: column;
@@ -171,17 +219,17 @@
   }
 
   .part-links li + li {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .part-links a {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--sp-3);
+    gap: 12px;
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-16);
     font-weight: 500;
     text-decoration: none;
     overflow-wrap: anywhere;
@@ -192,11 +240,22 @@
     text-underline-offset: 3px;
   }
 
-  .part-links a:active {
-    opacity: var(--press-dim);
+  .part-do {
+    margin: 4px 0 0;
   }
 
-  .part-do {
-    margin: var(--sp-2) 0 0;
+  /* An address can be long; on a narrow phone it wraps inside its button rather than pushing past the window. */
+  .part-do .btn {
+    max-inline-size: 100%;
+    block-size: auto;
+    min-block-size: 48px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  @media (width < 640px) {
+    .board {
+      padding-block: 24px 64px;
+    }
   }
 </style>

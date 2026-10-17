@@ -9,7 +9,7 @@
   in `apps/site/legal/`. Until `LAUNCH.legal` says they are in force, this page says so in one sentence
   and links none of them; after it, it lists the three, each at `/legal/<name>`.
 
-  The page is one band of tiles, the licence in the opening tile beside the terms, with the prose at a 68ch
+  The page is the night head and a board of two tiles, the licence beside the terms, with the prose at a 68ch
   reading measure inside them (`Parts.svelte`).
 -->
 <script lang="ts">
@@ -48,4 +48,4 @@
   <meta property="og:description" content={site.meta.legal.description} />
 </svelte:head>
 
-<Parts title={l.title} {parts} />
+<Parts title={l.title} lede={l.lede} {parts} />

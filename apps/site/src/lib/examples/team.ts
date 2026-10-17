@@ -4,7 +4,7 @@
  * EVERY FIGURE IS FICTIONAL AND AGREES WITH EVERY OTHER, dated as the drawing is (Monday 28 September
  * 2026). The nine open tickets on Home are the board's To do, Doing and Review columns (four, three
  * and two); the 17 closed last week is the series' bar for 21 September; and Search filters, which
- * the Planner asks to move on Decide, is one of the four still in To do.
+ * the Planner asks to move in Needs you, is one of the four still in To do.
  */
 import type { Example } from './types.ts';
 
@@ -64,8 +64,8 @@ Closed last week | 17 | the most since August
       },
     },
     {
-      id: 'decide',
-      title: 'Decide',
+      id: 'needs',
+      title: 'Needs you',
       glyph: 'decide',
       src: `~~~queue | Waiting on you
 q | t1 | Planner | 1h ago | Move Search filters to next week's release? | It has not started, and Omar is on Faster sign in until Wednesday. | call

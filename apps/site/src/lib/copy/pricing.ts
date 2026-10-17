@@ -1,10 +1,9 @@
 /**
- * The pricing page and the Slash page. What a plan holds is the reader's question on `/pricing`, and those figures
+ * The pricing page. What a plan holds is the reader's question on `/pricing`, and those figures
  * live in `plans.ts`, not here: this file holds only the sentences said about them, and a sentence that carries a
- * figure is a function of it, so `lib/pricing/cards.ts` fills it from `TABLE` and no figure is typed twice.
+ * figure is a function of it, so `lib/pricing/cards.ts` fills it from `TABLE` and no figure is typed twice. The Slash
+ * page's words are `copy/slash.ts`'s.
  */
-
-import { PACKS, type Pack } from '../plans.ts';
 
 /** A count as every figure on the site is grouped: 1,000 and 750,000. */
 const grouped = (n: number): string => n.toLocaleString('en-US');
@@ -27,99 +26,6 @@ export type Figures = {
 };
 
 export const pricing = {
-  /**
-   * THE SLASH PAGE. Everything it says Slash does is in
-   * `packages/record/src/slash.ts` and `packages/slash`, and the limits are the product's: drafts are
-   * questions in Decide (`arrange.ts`), the vault is closed to it, it is quiet on a record younger than
-   * two weeks (`YOUNG_DAYS`), and background work has its own allowance.
-   */
-  slash: {
-    title: 'Slash',
-    sub:
-      'The assistant built into every record. Press / anywhere to ask a question, have it build a page ' +
-      'or a rule, or see what needs you today. Nothing it writes goes in until you say yes.',
-    primary: 'Start for free',
-    secondary: 'How credits work',
-    abilities: [
-      {
-        id: 'ask',
-        title: 'Ask',
-        lead:
-          'Ask the way you would ask a person. The answer comes from your own lists, says which one, and ' +
-          'you can click a number to see what makes it up.',
-        examples: ['What do I owe in the next two weeks?', 'Which clients are late, and by how much?', 'How much went on hosting this year?'],
-      },
-      {
-        id: 'draft',
-        title: 'Draft',
-        lead:
-          'Describe a page, a list, a rule or an edit. Slash puts together a draft and shows you exactly ' +
-          'what it would change. You accept it, tweak it, or throw it away.',
-        examples: ['Make me a page for the Lisbon trip', 'Add a field for the invoice number', 'Ask me when a bill is a week late'],
-      },
-      {
-        id: 'notice',
-        title: 'Notice',
-        lead:
-          'Once a day Slash looks over the record and flags what is due, what changed and what looks off. ' +
-          'It shows up on Home and in your daily email, and on a quiet day there is nothing.',
-        examples: ['Rent is due before pay day', 'A card bill is higher than usual', 'Three tickets have waited a week in review'],
-      },
-      {
-        id: 'learn',
-        title: 'Learn',
-        lead:
-          'Forward a few emails of the same kind and Slash works out how to file them. Once you approve ' +
-          'that, every one after is filed automatically, and it costs no credits.',
-        examples: ['Card alerts into Spending', 'Invoices into Money', 'A skill that learned your filing rules'],
-      },
-    ],
-    rulesTitle: 'Ground rules',
-    rules: [
-      { head: 'You approve every change', said: 'Anything Slash wants to add or edit waits in Decide until you accept it.' },
-      { head: 'It can’t see your keys', said: 'Saved API keys and passwords are off limits. It only knows their names.' },
-      { head: 'The daily check is free', said: 'Flagging what is due, writing your daily email and learning how to file things never use your credits.' },
-      { head: 'It waits before flagging things', said: 'On a new record it stays quiet for the first two weeks, until there is enough history to go on.' },
-    ],
-    allowance: {
-      title: 'How credits work',
-      lead: 'Each question or draft uses one credit, no matter how long the answer takes. Every plan comes with a monthly amount, Free included.',
-      credits: 'credits a month',
-      packs: 'Credit packs',
-      // `PACKS` in `plans.ts` is `packsOnSale(LAUNCH.billing)`: empty until billing is on, and then these say what each is.
-      packsN: (credits: number) => (credits > 0 ? `+${credits.toLocaleString('en-US')}` : ''),
-      packsUnit: (packs: readonly Pick<Pack, 'credits' | 'price'>[] = PACKS) =>
-        packs.length === 0
-          ? 'Credit packs are coming later.'
-          : `credits for ${packs[0]?.price}` +
-            packs.slice(1).map((p) => `, or ${p.credits.toLocaleString('en-US')} for ${p.price}`).join('') +
-            ', and they do not end with the month',
-      more: 'See pricing',
-    },
-    /**
-     * THE DRAWINGS ON /slash. Every figure in them is the palette demo's above, or the home page's inbox scene, so
-     * nothing drawn here says a thing the page does not already say in words.
-     */
-    drawn: {
-      askReading: (what: string, pct: number) => `${what} is ${pct}% of what is owed in the next two weeks.`,
-      draftReading: 'Adds one page. Nothing else changes until you accept it.',
-      noticeSpare: (amount: string) => `It covers the rent with ${amount} to spare.`,
-      accept: 'You accept',
-      into: (list: string) => `Into ${list}`,
-      learnReading: 'No credits, for the learning or the filing.',
-      learnLabel: (list: string) =>
-        `Three card alerts arrive, you accept how to file them once, and every one after goes into ${list}`,
-      /* FREE LEADS THE BARS (DIRECTION §35), so the label names every plan and the reading starts at Free. The lead
-         above already says Free has credits, so the reading says when they come back (`nextMonth` in `directory.ts`). */
-      creditsLabel: 'Slash credits a month on each plan',
-      creditsReading: (times: string) => `Free’s credits come back on the first of every month. Cloud Plus has ${times} times the credits of Cloud.`,
-      /* The four rules' glyphs, in the order `rules` says them. */
-      ruleGlyphs: ['decide', 'key', 'coins', 'clock'],
-    },
-    closeTitle: 'Try it on your own record.',
-    closeBody: 'Slash is included on every plan from day one.',
-  },
-
   /**
    * THE PRICING PAGE, the prototype's `#pricing` (`loop/site-2026-10-17/src/site.html`, DIRECTION §47). Free leads
    * (§35): it is the headline and the first card, the black one. Every figure is `TABLE`'s in `plans.ts`, which

@@ -3,7 +3,7 @@
  *
  * EVERY FIGURE IS FICTIONAL AND AGREES WITH EVERY OTHER, dated as the drawing is (Monday 28 September
  * 2026). The essay's 1,400 of 2,000 words and its Friday deadline are the same on Home, on
- * Assignments and in the question on Decide, and the two deadlines this week are the two marked on
+ * Assignments and in the question in Needs you, and the two deadlines this week are the two marked on
  * Home's timeline.
  */
 import type { Example } from './types.ts';
@@ -51,8 +51,8 @@ Revision cards | 45 | 120 | cards made
       },
     },
     {
-      id: 'decide',
-      title: 'Decide',
+      id: 'needs',
+      title: 'Needs you',
       glyph: 'decide',
       src: `~~~queue | Waiting on you
 q | s1 | Study planner | 1h ago | Move Thursday's reading to Saturday morning? | Thursday has the lab and two lectures, and the essay is due on Friday. | call

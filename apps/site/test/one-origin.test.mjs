@@ -160,3 +160,21 @@ test('app.html loads /signed-in.js from this origin, under script-src self, with
     assert.ok(src.startsWith('/') && !src.startsWith('//'), `app.html loads a script from another origin: ${src}`);
   }
 });
+
+/**
+ * THE VISIT COUNT RUNS UNDER THE SAME POLICY (batch 103b, LAUNCH 103 job 9). `/seen.js` posts to this origin's
+ * `/api/seen`, so it is a file from this origin like `/signed-in.js`, and it is deferred, because a count must never
+ * hold up the first paint. The loop above already holds that app.html carries no inline script.
+ */
+test('app.html loads /seen.js once, from this origin, deferred, and it posts only to this origin', () => {
+  const shell = text('src/app.html').replace(/<!--[\s\S]*?-->/g, ' ');
+  const loads = [...shell.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter((m) => /\ssrc="\/seen\.js"/.test(m[1]));
+  assert.equal(loads.length, 1, 'app.html does not load /seen.js exactly once, so visits go uncounted or counted twice');
+  assert.match(loads[0][1], /\sdefer\b/, '/seen.js is not deferred, so the count holds up the first paint');
+  assert.equal(loads[0][2].trim(), '', '/seen.js carries an inline body, which script-src self refuses');
+
+  const script = text('static/seen.js').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const urls = [...script.matchAll(/fetch\(\s*'([^']*)'/g)].map((m) => m[1]);
+  assert.deepEqual(urls, ['/api/seen'], `/seen.js fetches something other than this origin's /api/seen: ${JSON.stringify(urls)}`);
+  assert.match(script, /credentials:\s*'omit'/, '/seen.js lets the session cookie go with the count');
+});

@@ -48,8 +48,8 @@
 
   h1, h2, h3, h4 {
     margin: 0;
-    /* GEIST, NOT POPPINS (Geist for every word). Poppins stays declared in tokens.css for the
-       wordmark's own use, and nothing in the base reaches for it. */
+    /* GEIST, NOT THE DISPLAY FACE (Geist for every word). Lexend is declared in tokens.css for page
+       names and the wordmark, and nothing in the base reaches for it. */
     font-family: var(--font-ui);
     font-weight: 600;
     line-height: var(--lh-tight);

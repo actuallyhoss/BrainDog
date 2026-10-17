@@ -72,7 +72,7 @@ test('HEAD answers as GET with no body, any other method is 405', async () => {
 });
 
 test('the operator doors are the router\'s, any method, and an unknown path is a plain 404', async () => {
-  for (const path of ['/account/ops/applications', '/account/ops/invite', '/account/ops', '//account//ops/invite/'])
+  for (const path of ['/account/ops/applications', '/account/ops/invite', '/account/ops/funnel', '/account/ops', '//account//ops/invite/'])
     for (const method of ['GET', 'POST']) assert.equal(serveAdmin(at(path, method)), null, `${method} ${path}`);
   for (const path of ['/nope', '/account', '/account/opsx', '/api/boot', '/mcp', '/app/', '/index.html', '/admin.js.map']) {
     const out = served(at(path));
@@ -126,6 +126,16 @@ test('the script calls the operator doors and says the owner\'s sentences', () =
   ])
     assert.ok(ADMIN_JS.includes(said), said);
   for (const words of ['Applications', 'Invite someone', 'Invites', 'Forget the key']) assert.ok(ADMIN_HTML.includes(words), words);
+});
+
+test('the Funnel section reads the funnel door and draws its eight weeks as text, a step to a column', () => {
+  assert.match(ADMIN_HTML, /<section class="tile wide" id="funnel" aria-labelledby="funnel-title">/);
+  for (const words of ['Funnel', 'Week of', 'Visits', 'Applied', 'Invites used', 'Signed up', 'First agent', 'First brief']) assert.ok(ADMIN_HTML.includes(words), words);
+  assert.ok(ADMIN_JS.includes("ask('/account/ops/funnel')"));
+  /* THE DIRECTORY'S NAMES FOR ITS STEPS, and the record's two, in the order the columns are drawn. */
+  assert.ok(ADMIN_JS.includes("var STEPS = ['seen', 'applied', 'invites_used', 'signed_up', 'agent', 'brief'];"));
+  assert.match(ADMIN_HTML, /<div class="scroll" id="funnel-scroll" tabindex="0" role="region"/, 'a wide table scrolls inside its tile, never the page');
+  assert.match(ADMIN_CSS, /\.scroll \{ overflow-x: auto;/);
 });
 
 test('no em dash and none of the words a person never reads, in any of the three', () => {

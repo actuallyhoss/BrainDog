@@ -99,3 +99,52 @@ test('/llms.txt names every doc, and the build serves each doc as a page and as 
   }
   assert.deepEqual(wrong, [], wrong.join('\n'));
 });
+
+/**
+ * THE DOCS IN LOOK B (DIRECTION §47, LAUNCH 103 job 7), read off the source because no browser runs here: the index
+ * opens on `PageHead` with the search in its slot, a page reads on one sheet of paper with its nav and contents flat
+ * on the board, and nothing in the docs still draws the old tiles, wells, glass or palette.
+ */
+const SRC = new URL('../src/', import.meta.url);
+const source = (rel: string): string => readFileSync(new URL(rel, SRC), 'utf8');
+const DRAWN = [
+  'routes/docs/+page.svelte',
+  'routes/docs/[section]/[slug]/+page.svelte',
+  'lib/docs/Body.svelte',
+  'lib/docs/Nav.svelte',
+  'lib/docs/Search.svelte',
+  'lib/docs/CopyText.svelte',
+];
+
+test('the docs index opens on the page head with the search in it', () => {
+  const index = source('routes/docs/+page.svelte');
+  const head = index.slice(index.indexOf('<PageHead'), index.indexOf('</PageHead>'));
+  assert.ok(head.length > 0, 'routes/docs/+page.svelte draws no PageHead');
+  assert.match(head, /<Search\b[^>]*\bnight\b/, 'the search is not in the head, drawn for the night ground');
+  assert.match(head, /href="\/llms\.txt"/, 'the link for agents left the head');
+});
+
+test('the docs draw no tile, well, glass or old palette, and their buttons are quiet and small', () => {
+  const old = /class="[^"]*\b(tile|tiles|well|band|glass|btn-sm|btn-primary)\b|var\(--(bg|s1|dim|line|e1|r-lg|on-ink|hover-wash)\)/;
+  const wrong = DRAWN.filter((rel) => old.test(source(rel))).map((rel) => `${rel}: ${source(rel).match(old)?.[0]}`);
+  assert.deepEqual(wrong, [], wrong.join('\n'));
+  const page = source('routes/docs/[section]/[slug]/+page.svelte');
+  for (const btn of page.match(/class="btn[^"]*"/g) ?? []) assert.equal(btn, 'class="btn quiet sm"');
+  assert.match(source('lib/docs/CopyText.svelte'), /class="btn quiet sm"/);
+});
+
+test('a doc page puts its title on a night strip and its text on paper at 68ch', () => {
+  const page = source('routes/docs/[section]/[slug]/+page.svelte');
+  assert.match(page, /<header class="night strip">[\s\S]*<h1 class="doc-title"/, 'the title is not on the night strip');
+  assert.match(page, /\.board \{[^}]*background: var\(--board\)/, 'the nav and contents are not on the board');
+  const body = source('lib/docs/Body.svelte');
+  assert.match(body, /\.doc-body \{[^}]*background: var\(--paper\)/, 'the page is not on paper');
+  assert.match(body, /max-inline-size: 68ch/, 'the reading measure is not 68ch');
+});
+
+/** "EDIT ON GITHUB" ONLY ONCE THE REPOSITORY IS PUBLIC: until then the address answers 404 to everyone but the owner. */
+test('the edit link on a doc page waits on LAUNCH.repo', () => {
+  const page = source('routes/docs/[section]/[slug]/+page.svelte');
+  assert.match(page, /LAUNCH\.repo \? SOURCE : null/);
+  assert.match(page, /\{#if edit\}<a [^>]*href=\{edit\}/);
+});

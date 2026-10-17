@@ -38,7 +38,7 @@
 </script>
 
 {#if live}
-  <button type="button" class="btn btn-sm" onclick={copy}>{w.copy}</button>
+  <button type="button" class="btn quiet sm" onclick={copy}>{w.copy}</button>
   <p class="copy-said" role="status">{said === 'copied' ? w.copied : said === 'failed' ? w.failed : ''}</p>
 {/if}
 
@@ -46,7 +46,7 @@
   .copy-said {
     flex-basis: 100%;
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-site-small);
+    color: var(--muted);
+    font-size: var(--t-site-15);
   }
 </style>

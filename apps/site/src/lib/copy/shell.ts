@@ -1,11 +1,9 @@
 /**
- * The words every page shares: the product's name, the slogan, each page's search result, the header,
- * the footer and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
+ * The words every page shares: the product's name, each page's search result, the header, the footer (which
+ * carries the slogan) and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
  */
 export const shell = {
   product: 'BrainDog',
-  /** The slogan. It is the README's headline, unchanged, and it takes no full stop. */
-  tagline: 'Give your business a memory',
 
   /** The search result and the shared card, about 150 characters each. */
   meta: {

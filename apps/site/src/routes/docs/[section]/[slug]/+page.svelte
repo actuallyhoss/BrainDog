@@ -1,9 +1,10 @@
 <!--
-  One docs page: the section nav, the page drawn by the product's renderer in tiles, and the list of its parts.
+  One docs page: a slim night strip with where the page sits and its title, then the section nav, the page drawn by the
+  product's renderer, and the list of its parts.
 
-  THE LOOK IS THE DESIGN SYSTEM'S: at a desk the nav is a tile at the start, the page is a
-  column of tiles (its opening, then one tile for each `##` part), and "On this page" is a tile at the end; the two
-  side tiles stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
+  THE LOOK IS LOOK B'S (DIRECTION §47, LAUNCH 103 job 7): the strip carries on from the header's night, then the board.
+  The page is one sheet of --paper read at 68ch (`Body`); the nav and "On this page" are flat on the board with no tile
+  round them, and stay in view as the page scrolls. From 900px the nav and the page; below 900px the nav is a closed
   disclosure at the top and the list of parts is not drawn, because on a phone the page itself is the list. A code
   block scrolls inside its well and nothing else on the page moves sideways.
 
@@ -48,8 +49,20 @@
   <meta property="og:description" content={description} />
 </svelte:head>
 
-<div class="in">
-  <div class="docs-frame">
+<!-- A header and not a named section: the article below is the region its title names, so a second would repeat it. -->
+<header class="night strip">
+  <div class="wrap strip-in">
+    <p class="doc-where">
+      <a class="doc-crumb" href="/docs">{w.nav.home}</a>
+      <Icon name="chevron-right" size="s" />
+      <span>{section.label}</span>
+    </p>
+    <h1 class="doc-title" id="doc-title">{doc.title}</h1>
+  </div>
+</header>
+
+<div class="board">
+  <div class="wrap docs-frame">
     <div class="docs-nav">
       <Nav sections={data.sections} current={doc.path} index={data.index} />
     </div>
@@ -57,17 +70,9 @@
     <article class="doc" aria-labelledby="doc-title">
       <Body src={doc.src}>
         {#snippet head()}
-          <p class="doc-where meta">
-            <a class="doc-crumb" href="/docs">{w.nav.home}</a>
-            <Icon name="chevron-right" size="s" />
-            <span>{section.label}</span>
-          </p>
-          <h1 class="h2 doc-title" id="doc-title">{doc.title}</h1>
-          <div class="doc-tools">
-            <CopyText text={doc.src} />
-            <a class="btn btn-sm" href={`${doc.path}.md`} data-sveltekit-reload>{w.raw}</a>
-            {#if edit}<a class="btn btn-sm" href={edit}>{w.edit}</a>{/if}
-          </div>
+          <CopyText text={doc.src} />
+          <a class="btn quiet sm" href={`${doc.path}.md`} data-sveltekit-reload>{w.raw}</a>
+          {#if edit}<a class="btn quiet sm" href={edit}>{w.edit}</a>{/if}
         {/snippet}
       </Body>
 
@@ -75,20 +80,14 @@
         <nav class="pager" aria-label={w.pager}>
           {#if data.prev}
             <a class="pager-link" rel="prev" href={data.prev.path}>
-              <span class="well"><Icon name="arrow-left" /></span>
-              <span class="pager-words">
-                <span class="pager-dir">{w.prev}</span>
-                <span class="pager-title">{data.prev.title}</span>
-              </span>
+              <span class="pager-dir"><Icon name="arrow-left" size="s" />{w.prev}</span>
+              <span class="pager-title">{data.prev.title}</span>
             </a>
           {/if}
           {#if data.next}
             <a class="pager-link pager-next" rel="next" href={data.next.path}>
-              <span class="pager-words">
-                <span class="pager-dir">{w.next}</span>
-                <span class="pager-title">{data.next.title}</span>
-              </span>
-              <span class="well"><Icon name="arrow-right" /></span>
+              <span class="pager-dir">{w.next}<Icon name="arrow-right" size="s" /></span>
+              <span class="pager-title">{data.next.title}</span>
             </a>
           {/if}
         </nav>
@@ -96,11 +95,8 @@
     </article>
 
     {#if doc.headings.length > 0}
-      <aside class="contents tile" aria-labelledby="doc-contents">
-        <div class="tile-head">
-          <span class="well"><Icon name="rows" /></span>
-          <h2 class="tile-title" id="doc-contents">{w.contents}</h2>
-        </div>
+      <aside class="contents" aria-labelledby="doc-contents">
+        <h2 class="contents-title" id="doc-contents">{w.contents}</h2>
         <ol class="contents-list">
           {#each doc.headings as heading (heading.id)}
             <li><a class="contents-link" href={`#${heading.id}`}>{plainOf(heading.text)}</a></li>
@@ -112,22 +108,11 @@
 </div>
 
 <style>
-  /* ONE COLUMN ON A PHONE, the nav's disclosure over the page. The frame is the site's column. */
-  .docs-frame {
+  /* THE NIGHT STRIP: slim, carrying on from the header's night, with where the page sits and its title. */
+  .strip-in {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--inset);
-    align-items: start;
-  }
-
-  .doc {
-    display: grid;
-    gap: var(--inset);
-    min-inline-size: 0;
-  }
-
-  .contents {
-    display: none;
+    gap: 14px;
+    padding-block: 28px 44px;
   }
 
   .doc-where {
@@ -136,10 +121,12 @@
     align-items: center;
     gap: 6px;
     margin: 0;
+    color: var(--on-night-2);
+    font-size: var(--t-site-15);
   }
 
   .doc-crumb {
-    color: var(--ink2);
+    color: var(--on-night-2);
     text-decoration: none;
   }
 
@@ -153,40 +140,66 @@
   }
 
   .doc-crumb:hover {
-    color: var(--ink);
+    color: var(--on-night);
     text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .doc-title {
-    margin-block-start: calc(-1 * var(--sp-2));
+    max-inline-size: 22ch;
+    margin: 0;
+    font-size: clamp(2.1rem, 3.8vw, 3.2rem);
+    line-height: 1.02;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
   }
 
-  .doc-tools {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
+  /* THE BOARD under the strip, flat and full width, down to the footer with no gap above it. */
+  .board {
+    padding-block: var(--sp-6) 72px;
+    margin-block-end: 0;
+    background: var(--board);
   }
 
-  /* THE PAGES BEFORE AND AFTER, as two tiles on the ground: a well with its arrow, the direction and the title. */
+  /* ONE COLUMN ON A PHONE, the nav's disclosure over the page. */
+  .docs-frame {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+    align-items: start;
+  }
+
+  .doc {
+    display: grid;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+  }
+
+  .contents {
+    display: none;
+  }
+
+  /* THE PAGES BEFORE AND AFTER, flat on the paper: the direction with its arrow, then the title. */
   .pager {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--inset);
+    gap: var(--sp-3);
   }
 
   .pager-link {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
+    display: grid;
+    gap: 4px;
     min-block-size: var(--tap);
-    padding: var(--sp-4) 20px;
-    background: var(--bg);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1);
+    padding: 18px 22px;
+    background: var(--paper);
+    border-radius: 16px;
     color: var(--ink);
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
+  }
+
+  .pager-link:hover {
+    background: var(--tile);
   }
 
   .pager-link:hover .pager-title {
@@ -194,19 +207,26 @@
     text-underline-offset: 3px;
   }
 
-  .pager-words {
-    display: grid;
-    gap: 2px;
-    min-inline-size: 0;
-  }
-
   .pager-dir {
-    color: var(--dim);
-    font-size: var(--t-site-small);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: var(--t-site-15);
   }
 
   .pager-title {
-    font-size: var(--t-row);
+    font-size: var(--t-site-16-5);
+    font-weight: 600;
+  }
+
+  /* "ON THIS PAGE", flat on the board: a small heading and the parts as quiet links. */
+  .contents-title {
+    margin: 0 0 var(--sp-2);
+    padding-inline: 10px;
+    color: var(--muted);
+    font-family: var(--ui);
+    font-size: var(--t-site-15);
     font-weight: 600;
   }
 
@@ -221,18 +241,18 @@
   .contents-link {
     display: flex;
     align-items: center;
-    min-block-size: var(--ctl-h);
-    padding: 6px var(--sp-2);
-    border-radius: var(--r-md);
+    min-block-size: 36px;
+    padding: 6px 10px;
+    border-radius: 8px;
     color: var(--ink2);
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-15);
     line-height: 20px;
     text-decoration: none;
     transition: background var(--d-state) var(--ease-out);
   }
 
   .contents-link:hover {
-    background: var(--hover-wash);
+    background: var(--tile);
     color: var(--ink);
   }
 
@@ -250,28 +270,39 @@
 
     .pager-next {
       grid-column: 2;
-      justify-content: flex-end;
+      justify-items: end;
       text-align: end;
     }
   }
 
   @media (width >= 900px) {
     .docs-frame {
-      grid-template-columns: 248px minmax(0, 1fr);
+      grid-template-columns: 232px minmax(0, 1fr);
+      gap: var(--sp-6);
     }
   }
 
   /* THE LIST OF PARTS ONLY WHERE THERE IS ROOM FOR IT beside a page still wide enough to read, and it stays in view
-     as the page scrolls, under the floating bar. */
+     as the page scrolls. */
   @media (width >= 1180px) {
     .docs-frame {
-      grid-template-columns: 248px minmax(0, 1fr) 236px;
+      grid-template-columns: 220px minmax(0, 1fr) 208px;
     }
 
     .contents {
       position: sticky;
-      inset-block-start: calc(56px + 2 * var(--inset));
-      display: flex;
+      inset-block-start: var(--sp-5);
+      display: block;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .strip-in {
+      padding-block: 20px 32px;
+    }
+
+    .board {
+      padding-block: var(--sp-4) 48px;
     }
   }
 </style>

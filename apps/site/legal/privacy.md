@@ -2,7 +2,7 @@ DRAFT for review, not in force.
 
 # Privacy Policy
 
-Last updated: 2026-10-01
+Last updated: 2026-10-17
 
 ## The short version
 
@@ -29,8 +29,9 @@ Write to us about privacy at **support@brain.dog**, with "Privacy" in the subjec
 
 ### When you visit brain.dog
 
-- **Connection details.** Our host, Cloudflare, receives your IP address and browser details to send you the page, as every website's host does. Technical logs of requests are kept for a short time to fix faults and stop attacks. [owner: confirm how long Workers logs are kept, 7 days on the paid plan]
-- **No tracking.** The marketing site sets no cookies and runs no ad or tracking scripts. [owner: confirm Cloudflare Web Analytics is off for brain.dog, or add a paragraph for it]
+- **Connection details.** Our host, Cloudflare, receives your IP address and browser details to send you the page, as every website's host does. Technical logs of requests are kept for up to 7 days to fix faults and stop attacks.
+- **No tracking.** The marketing site sets no cookies of its own and runs no ad or tracking scripts, and we don't use Cloudflare Web Analytics or any other analytics service. If you're signed in, the site reads the small signed-in marker (see "Cookies and storage") so it can show "Open BrainDog" in place of "Start free".
+- **Counting visits.** When a page opens, it tells us which of our pages it is and the name of the site that linked to it, if any. We add one to that day's total for that page and that kind of place: no link, one of our own pages, one of a short list of sites such as search engines and AI assistants, or somewhere else. We keep only the daily totals, never your IP address, your browser, the full link you came from, or anything that tells one visitor from another. The request carries no cookie, and if your browser sends Global Privacy Control, it isn't sent at all.
 
 ### When you sign up
 
@@ -38,6 +39,14 @@ Write to us about privacy at **support@brain.dog**, with "Privacy" in the subjec
 - **A name for your record**, and your time zone, so dates in the record are right.
 - **A bot check.** When sign-up asks for it, Cloudflare Turnstile checks that you are a person and not a script. It looks at your browser and connection, and Cloudflare uses what it sees only to tell people from bots.
 - **Payment.** You pay through Stripe (see below).
+
+### When you ask for an invitation
+
+While sign-up is by invitation, you can ask for one. We keep the name and email address you give, what you'd use BrainDog for and the link you add, if any, so we can decide. The bot check above may run here too. Once we've invited you or said no, we keep your application for 90 days, then delete it.
+
+### When you're invited
+
+An invitation is a link with a code in it, and we email it to you. We keep only a scrambled form of the code, a note of who it is for (usually your email address) and when it ends. When the code is used, we note when, and which account it made.
 
 ### Your account
 
@@ -76,7 +85,7 @@ A record may hold information about other people, such as clients or colleagues.
 
 ### Slash
 
-When you ask Slash a question, or it does its daily check, writes your daily email or learns how to file something that arrived, it reads the parts of your record the job needs and sends them to an AI model. The model runs on Cloudflare (Workers AI), through Cloudflare's AI Gateway. Each call asks the gateway not to keep prompts or answers. [owner: confirm gateway logging and caching of prompts and answers are off in the dashboard]
+When you ask Slash a question, or it does its daily check, writes your daily email or learns how to file something that arrived, it reads the parts of your record the job needs and sends them to an AI model. The model runs on Cloudflare (Workers AI), through Cloudflare's AI Gateway. Each call asks the gateway not to keep prompts or answers.
 
 To make search by meaning work, text from your record is also sent to a model on Workers AI, through the same gateway, which turns it into numbers for the search index.
 
@@ -90,7 +99,7 @@ When you connect an agent or app, we keep the key's label, its access (read, pro
 
 ### Email we send
 
-We send sign-in links, notices about your account and billing, and, if you want them, your record's daily email and alerts. We send them through Cloudflare's email service from hello@brain.dog. Cloudflare may keep a copy of each email we send for a short time. [owner: confirm how long Cloudflare Email Service keeps sent mail and its logs; the draft said about 7 days]
+We send sign-in links, invitations, notices about your account and billing, and, if you want them, your record's daily email and alerts. We send them through Cloudflare's email service from hello@brain.dog. Cloudflare keeps a log of each email we send, and may keep a copy of it, for a short time.
 
 ### Notifications on your devices
 
@@ -98,9 +107,11 @@ If you turn on notifications, your browser gives us an address to ring on its pu
 
 ### Counting how BrainDog is used
 
-We may count requests to BrainDog by their kind: which door they came in by, what kind of app sent them, what they asked for, how they ended and how long they took. A count never holds content, names or email addresses, and the record's ID in it is scrambled with a key that changes every month. Counts are kept in Cloudflare's Analytics Engine for 3 months. [owner: this is off until TELEMETRY is bound in wrangler.jsonc]
+We may count requests to BrainDog by their kind: which door they came in by, what kind of app sent them, what they asked for, how they ended and how long they took. A count never holds content, names or email addresses, and the record's ID in it is scrambled with a key that changes every month. Counts are kept in Cloudflare's Analytics Engine for 3 months.
 
 Each night we also count how many records have each pack from the public catalogue installed. Only the rounded totals are published, and they name no record.
+
+To see how well BrainDog helps people get started, each record notes once when its first agent connected and when its first brief was written. We count how many new accounts reach each step each week. The counts name nobody and are seen only by us.
 
 ### Publishing a pack
 
@@ -116,7 +127,8 @@ UK and EU law asks us to give a legal reason for each use of your information.
 
 - **Your account, sign-in, records, Slash and email we send:** contract. It's the service you asked for.
 - **Billing and usage counts:** contract, and legal obligation for tax records.
-- **Bot checks, failed-attempt counts, logs, counting how BrainDog is used, and security:** legitimate interests, keeping BrainDog safe and working.
+- **Applications and invitations:** legitimate interests, letting people in while sign-up is by invitation.
+- **Bot checks, failed-attempt counts, logs, counting visits and how BrainDog is used, and security:** legitimate interests, keeping BrainDog safe and working.
 - **Looking inside a record to support you:** contract, when you ask us; legitimate interests, when we must fix a fault or stop abuse.
 - **Answering your emails:** legitimate interests.
 - **What's in a record:** the owner's legal reason, since they are the controller. We process it on their behalf.
@@ -126,6 +138,7 @@ Where we rely on legitimate interests, you can object, and we will stop unless t
 ## Cookies and storage
 
 - **One sign-in cookie** keeps you signed in. It holds a random session ID and lasts up to 30 days from your last visit, and a session ends 90 days after you last signed in with a passkey or a link, however often you visit. Signing out removes it.
+- **One signed-in marker** tells brain.dog that someone is signed in on this browser, so the site can show "Open BrainDog" in place of "Start free". It holds your record's web address, or just a 1, and never your email or anything that could sign you in. It lasts up to 30 days, and signing out removes it. Scripts on the page can read it, which is why it holds nothing more.
 - **One preferences cookie** in the app remembers how you like it to look, such as dark mode and text size, so the page draws right away. It holds no ID.
 - **Small settings in your browser's storage**, such as a hint you dismissed. They never leave your device.
 
@@ -139,7 +152,7 @@ These companies help us run BrainDog, and handle your information only to do tha
 
 - **Cloudflare** (USA): hosting, every record's database, running your scripts, file and backup storage, the AI models behind Slash and search, receiving the email you forward in, sending email, bot checks, usage counts and security.
 - **Stripe** (USA): payments and invoices.
-- **Our email provider**: stores the messages you send to our @brain.dog addresses. [owner: name the inbox provider support@brain.dog is routed to]
+- **Google** (USA), through Gmail: stores the messages you send to our @brain.dog addresses, which Cloudflare passes on to it.
 
 We also share information:
 
@@ -163,26 +176,29 @@ We'd rather say this plainly.
 
 ## Where your information goes
 
-We are in the United States. Our providers store and process information in the United States and across Cloudflare's worldwide network. [owner: confirm; records and the storage bucket have no EU-only setting] If you are in the UK or the EU, your information goes to the US. Our providers protect it with approved safeguards, such as the EU-US Data Privacy Framework with its UK extension, or standard contractual clauses.
+We are in the United States. Our providers store and process information in the United States and across Cloudflare's worldwide network. If you are in the UK or the EU, your information goes to the US. Our providers protect it with approved safeguards, such as the EU-US Data Privacy Framework with its UK extension, or standard contractual clauses.
 
 ## How long we keep it
 
 - **Your account:** until you close it.
 - **Sessions:** until you sign out, or they expire.
 - **Failed-attempt counts:** 15 minutes.
+- **An application for an invitation:** until we decide, then 90 days.
+- **An invitation:** the note of who it was for, and when it was used, as long as sign-up is by invitation.
 - **A record:** until an owner deletes it, or it has been read-only for 90 days after a plan ended.
-- **A deleted record's final sealed copy:** 30 days, then nothing of the record remains. [owner: confirm 30 days]
+- **A deleted record's final sealed copy:** 30 days, then nothing of the record remains.
 - **Nightly backups:** we copy each record, and our account directory, every night, sealed so the stored copy alone opens nothing. We keep the last 30. So anything deleted is gone from nightly backups 30 days later. Cloudflare's own history of each database also covers 30 days.
-- **Copies taken by hand:** a copy an owner takes with Back up now, and the copy taken before a restore, is kept until newer ones replace it (we keep up to 30) or the record is deleted. [owner: these have no age limit today, so an erasure can outlive them; consider expiring them at 30 days too]
+- **Copies taken by hand:** a copy an owner takes with Back up now, and the copy taken before a restore, is kept until newer ones replace it (we keep up to 30) or the record is deleted.
 - **An automation's runs:** 90 days.
 - **Pages a connection fetched:** their contents are kept 30 days, so a filing rule can still be rolled back.
 - **A shared page's link:** until it ends (30 days unless the owner chooses another length, up to 90) or the owner closes it.
-- **Billing records:** as long as the law requires for tax and accounting. [owner: confirm 7 years]
+- **Billing records:** 7 years, as tax and accounting law requires.
 - **A record's usage counts:** as long as the record exists.
 - **Counts of how BrainDog is used:** 3 months.
+- **Daily visit totals:** as long as they're useful. They name nobody.
 - **Technical logs:** a short time, as above.
 - **Copies of emails we send:** a short time, at Cloudflare.
-- **Emails with us:** 2 years. [owner: confirm 2 years]
+- **Emails with us:** 2 years.
 
 We keep anything longer only when the law requires it.
 
@@ -209,7 +225,7 @@ If your information is in somebody else's record, that record's owner controls i
 
 ## Children
 
-BrainDog is for people aged 18 and over. [owner: confirm 18] We don't knowingly collect information from anyone younger. If we learn that an account belongs to a child, we close it.
+BrainDog is for people aged 18 and over. We don't knowingly collect information from anyone younger. If we learn that an account belongs to a child, we close it.
 
 ## Keeping it safe
 

@@ -18,12 +18,13 @@
  *
  * A MODEL'S CARDS ARE ANSWERED THE MOMENT ONE IS KEPT, AND ONLY WHILE THEY ARE STILL TRUE. The write (`../brief-write.ts`,
  * at 08:00, at 17:00 and when the basis moves) keeps what a model answered as one pref of the model's own holder, with
- * the basis it was written from. This read asks no model and writes nothing: it gathers the caller's own facts, and the
- * kept answer stands only when its basis is the basis of those facts (`keptBrief`). So a bill paid a minute ago is said
- * by the rules at once and never by a stale card, and somebody who reads less than the facts were gathered for has a
- * basis of their own and is answered the rules' cards, never lines written about what they were not shown. A kept card
- * is still held to the facts handed over here (`briefOf`): its holes are filled from the record's own figures and a
- * handle this caller was not handed is left out. When the rules speak in a model's place, `said` is the sentence why.
+ * the basis it was written from. This read asks no model and writes nothing of the briefing: it gathers the caller's
+ * own facts, and the kept answer stands only when its basis is the basis of those facts (`keptBrief`). So a bill paid a
+ * minute ago is said by the rules at once and never by a stale card, and somebody who reads less than the facts were
+ * gathered for has a basis of their own and is answered the rules' cards, never lines written about what they were not
+ * shown. A kept card is still held to the facts handed over here (`briefOf`): its holes are filled from the record's
+ * own figures and a handle this caller was not handed is left out. When the rules speak in a model's place, `said` is
+ * the sentence why.
  *
  * EVERY FACT IS HELD TO THE CALLER BEFORE IT IS A FACT. A list closed to them gives no row, a narrowed grant gives the
  * rows it admits (the read goes through the grant's own rule), a question is one `sightOf` shows them and is called
@@ -38,6 +39,7 @@ import { SLASH, localDays, openHandoffs, readableZone, sessionDeclaration, spoke
 import type { Entry, HandoffPlace, Json } from '@braindog/kernel';
 
 import { BRIEF_KEPT, keptBrief } from '../brief-write.ts';
+import { markFirst } from '../firsts.ts';
 import { BRIEF_RANK, briefFrom, type Brief, type BriefFact } from '../briefing.ts';
 import { hashOf } from '../headlines.ts';
 import type { CallContext } from '../index.ts';
@@ -247,7 +249,9 @@ export function methods(deps: RecordDeps) {
      * `{}`: what matters on this record now, as `{ cards, at, basis, said }`. Each card is one line a person reads, the
      * row it opens and who wrote the line: `slash` when a model's kept answer still stands for this caller's own facts,
      * else `rule`. `said` is why the rules wrote it when a model would have, or `null`. No card when nothing is
-     * pressing. READ+, held to what the caller may read, and it changes nothing.
+     * pressing. READ+, held to what the caller may read. It changes nothing but one thing, once: the first time it
+     * answers a person or an agent a card, it keeps when as `first.brief` (`../firsts.ts`). The host's own reads,
+     * a system principal, never do, so a check the host runs is not taken for somebody's first briefing.
      */
     async briefing(_args: unknown, ctx: CallContext): Promise<Result<Briefing>> {
       const stop = scoped(ctx, 'read');
@@ -258,6 +262,7 @@ export function methods(deps: RecordDeps) {
          only for the basis it was written from: a moved basis, or another caller's, is answered by the rules. */
       const kept = keptBrief(kernel.prefsOf(SLASH)[BRIEF_KEPT], facts);
       const brief = briefFrom(kept === null ? null : { cards: kept.cards }, facts, new Date(nowMs).toISOString(), kept?.said ?? null);
+      if (brief.cards.length > 0 && ctx.principal.kind !== 'system') markFirst(kernel, 'first.brief', nowMs);
       return { ok: true, value: { ...brief, said: brief.said ?? null } };
     },
   };
