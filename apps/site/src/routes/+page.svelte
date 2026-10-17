@@ -11,14 +11,14 @@
    *   chores   red: it does the chores, you make the calls, sharing the desk's Needs you.
    *   slash    white: press / and ask anything.
    *
-   * Then "It stays yours" in three short columns, Free first in the plans, and the close.
+   * Then "It stays yours" in three short columns and the close. The plans left with the pricing page, which is held
+   * until BrainDog is priced (`HELD` in `launch.ts`).
    *
    * EVERY PAGE READS WITH SCRIPTING OFF. Every card's content is in the prerendered HTML, and a control that only a
    * script can work is drawn once it runs. `scripts/product.mjs` reads `section.hero`, `#hero-title` and `.sub` here
    * for the social picture, so those three stay.
    *
-   * EVERY WORD IS IN `lib/copy/home.ts`; the names and figures in the drawings are `lib/demo/maya.ts`, and the plan
-   * figures are `lib/plans.ts`. The title and description are `copy/shell.ts`.
+   * EVERY WORD IS IN `lib/copy/home.ts`; the names and figures in the drawings are `lib/demo/maya.ts`,. The title and description are `copy/shell.ts`.
    */
   import AgentMark from '$lib/AgentMark.svelte';
   import Icon from '$lib/Icon.svelte';
@@ -30,12 +30,9 @@
   import Brief from '$lib/home/Brief.svelte';
   import Chores from '$lib/home/Chores.svelte';
   import SlashCard from '$lib/home/SlashCard.svelte';
-  import { plan } from '$lib/plans.ts';
-  import Plans from '$lib/pricing/Plans.svelte';
   import Close from '$lib/site/Close.svelte';
   import Start from '$lib/site/Start.svelte';
 
-  const cloud = plan('cloud').price;
 </script>
 
 <svelte:head>
@@ -87,12 +84,6 @@
   </div>
 </section>
 
-<section class="wrap sec reveal" aria-labelledby="plans-title">
-  <h2 id="plans-title">{home.plans.title}</h2>
-  <p class="say">{home.plans.say(cloud)}</p>
-  <Plans compact />
-  <a class="more" href="/pricing">{home.plans.more}<Icon name="arrow-right" size="s" /></a>
-</section>
 
 <Close title={home.closing.title} body={home.closing.body} />
 
@@ -196,8 +187,7 @@
     padding-block-start: 140px;
   }
 
-  .yours h2,
-  .sec h2 {
+  .yours h2 {
     font-size: clamp(2.4rem, 5vw, 4.4rem);
     line-height: 1;
     letter-spacing: -0.045em;
@@ -225,18 +215,6 @@
     margin: 10px 0 0;
     color: var(--ink2);
     font-size: var(--t-site-16);
-  }
-
-  /* THE PLANS, Free first. */
-  .sec {
-    padding-block-start: 140px;
-  }
-
-  .sec .say {
-    margin: 16px 0 0;
-    font-size: var(--t-site-19);
-    color: var(--ink2);
-    max-width: 30em;
   }
 
   @media (max-width: 1060px) {
@@ -267,15 +245,9 @@
       gap: 14px;
     }
 
-    .yours,
-    .sec {
+    .yours {
       padding-block-start: 96px;
     }
   }
 
-  @media (pointer: coarse) {
-    .more {
-      min-height: 44px;
-    }
-  }
 </style>

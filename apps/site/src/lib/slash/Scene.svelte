@@ -198,7 +198,7 @@
     .modes { order: 3; width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); }
     .modes button { text-align: center; }
     .pal-body { grid-template-columns: 1fr; min-height: 0; }
-    .side { border-inline-end: 0; border-block-end: 1px solid var(--rule); }
+    .side { display: none; }
     .pal-out { padding: 10px; }
     .k-hide { display: none; }
     .r { margin-inline-start: 0; }

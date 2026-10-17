@@ -35,7 +35,6 @@ export const forPages = {
        never the headline. */
     price: (_price: string, _unit: string) => 'Free for one person, with the whole app. Cloud and Cloud Plus add colleagues and more.',
     /* The quiet button beside "Start free" in the page's head (`lib/site/Start.svelte` draws that one). */
-    pricing: 'See the pricing',
     /* The close's one huge line (`lib/site/Close.svelte`), the home page's own. */
     close: 'Start your record.',
     others: 'Written for someone else',

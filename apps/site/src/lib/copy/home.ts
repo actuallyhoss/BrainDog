@@ -8,7 +8,6 @@
  * THE DRAWINGS' NAMES AND FIGURES ARE NOT HERE. Maya Okafor's record is one file, `lib/demo/maya.ts`, and every card
  * draws from it. The plan figures are `lib/plans.ts`, read below and never typed.
  */
-import { TABLE } from '../plans.ts';
 
 /** A small count as a word ("three agents"), as the design says it; past twelve, the digits. */
 const SMALL = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
@@ -74,14 +73,6 @@ export const home = {
       { title: 'Take it all with you.', body: 'Export the whole record as one file, whenever you like.' },
       { title: 'Keys stay in the vault.', body: 'Agents use your keys without ever seeing them, and no key goes into a chat.' },
     ],
-  },
-
-  plans: {
-    title: 'Free for one person.',
-    /* Free's agents and questions are `PLAN_TABLE`'s, through `lib/plans.ts`; the Cloud price is passed in from there. */
-    say: (cloud: string) =>
-      `The whole app, ${spell(TABLE.free.agents)} agents and ${TABLE.free.credits} questions a month. Cloud is ${cloud} when you need more.`,
-    more: 'See everything each plan holds',
   },
 
   closing: {

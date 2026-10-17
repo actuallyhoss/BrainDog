@@ -22,10 +22,6 @@
          anywhere in the served HTML, which is a thing `grep` can check rather than a thing somebody
          has to remember. -->
     <script src="/signed-in.js"></script>
-    <!-- THE VISIT COUNT, deferred so it never holds up the first paint: one POST to this origin's /api/seen with the
-         page's path and the host it came from, no cookie either way, and nothing under Global Privacy Control
-         (src/lib/site/seen.ts says what it mirrors and what the Worker keeps). -->
-    <script src="/seen.js" defer></script>
     <!--
       THE SHARED CARD. Pasted into a message, a post or a chat, a page shows this preview rather than
       a bare URL.

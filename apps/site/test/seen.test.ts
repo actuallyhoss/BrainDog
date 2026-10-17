@@ -52,7 +52,7 @@ test('/seen.js and seenBody send the same path and came-from host on every visit
   }
 });
 
-test('/seen.js makes the request SEEN_INIT says: POST, kept alive, no cookie, a simple text/plain request', () => {
+test('/seen.js makes the request SEEN_INIT says: POST, kept alive, no cookie, a simple request', () => {
   const { body, ...init } = run('/', '')[0]?.init ?? {};
   assert.equal(typeof body, 'string');
   assert.deepEqual(JSON.parse(JSON.stringify(init)), JSON.parse(JSON.stringify(SEEN_INIT)));

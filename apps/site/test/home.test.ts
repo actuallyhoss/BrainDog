@@ -3,7 +3,7 @@
  *
  * THE WORDS ARE THE APPROVED DESIGN'S. `copy/home.ts` holds them at the key paths the claims ledger reads, word for
  * word as `loop/site-2026-10-17/src/site.html` says them, with no em dash and none of the words a reader never meets
- * (`docs/54-WRITING.md`). The plans sentence types none of its figures: change `TABLE` and the sentence moves.
+ * (`docs/54-WRITING.md`). The plans band left with the pricing page, which is held until BrainDog is priced.
  *
  * THE BUILT PAGE reads completely with scripting off: one h1, the four cards in order with everything they draw
  * already in the HTML, the makers by name, no picture, and no solid red but the Start free button. Those checks read
@@ -12,16 +12,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 import { home } from '../src/lib/copy/home.ts';
-import { plan, TABLE } from '../src/lib/plans.ts';
 import { BUILD, missing, when } from './built.ts';
 
-const LIB = fileURLToPath(new URL('../src/lib/', import.meta.url));
 const NO_BUILD = missing(['index.html'], 'the home page checks read the built page');
 
 /** Every string a reader can meet in `home`, the functions said with a sample figure. */
@@ -76,12 +71,6 @@ test('home.ts holds the design words at the key paths the ledger reads', () => {
     { title: 'Take it all with you.', body: 'Export the whole record as one file, whenever you like.' },
     { title: 'Keys stay in the vault.', body: 'Agents use your keys without ever seeing them, and no key goes into a chat.' },
   ]);
-  assert.equal(home.plans.title, 'Free for one person.');
-  assert.equal(
-    home.plans.say(plan('cloud').price),
-    'The whole app, three agents and 20 questions a month. Cloud is $12 when you need more.',
-  );
-  assert.equal(home.plans.more, 'See everything each plan holds');
   assert.equal(home.closing.title, 'Start your record.');
   assert.equal(home.closing.body, 'Say what you work on, connect an agent, and read your first brief in a few minutes.');
 });
@@ -97,29 +86,10 @@ test('the hero sentence names no mechanism', () => {
   assert.doesNotMatch(home.hero.sub, /\b(events?|logs?|rows?|MCP|ledger)\b/i);
 });
 
-test('the plans sentence reads its figures from plans.ts', async () => {
-  assert.equal(TABLE.free.credits, 20);
-  assert.equal(TABLE.free.agents, 3);
+test('the home page draws no plans while the pricing page is held', () => {
+  assert.ok(!('plans' in home), 'home.ts holds a plans band');
   const page = readFileSync(new URL('../src/routes/+page.svelte', import.meta.url), 'utf8');
-  assert.match(page, /plan\('cloud'\)\.price/, 'the page passes the Cloud price from plans.ts');
-
-  /* A copy of the library with other figures in its table: the sentence follows them. */
-  const dir = mkdtempSync(join(tmpdir(), 'home-plans-'));
-  try {
-    cpSync(LIB, dir, { recursive: true, filter: (src) => !src.includes('node_modules') });
-    const plans = join(dir, 'plans.ts');
-    const source = readFileSync(plans, 'utf8');
-    const moved = source.replace('credits: 20,', 'credits: 35,').replace('agents: 3,', 'agents: 4,');
-    assert.notEqual(moved, source, 'plans.ts still holds the free row as the test expects');
-    writeFileSync(plans, moved);
-    const copied = (await import(pathToFileURL(join(dir, 'copy', 'home.ts')).href)) as { home: typeof home };
-    assert.equal(
-      copied.home.plans.say('$15'),
-      'The whole app, four agents and 35 questions a month. Cloud is $15 when you need more.',
-    );
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  assert.doesNotMatch(page, /\/pricing|Plans\.svelte/, 'the home page links the held pricing page or draws its cards');
 });
 
 /** The built home page, and its readable text: tags and Svelte's markers out, entities said, spaces closed up. */
@@ -147,7 +117,7 @@ test('the hero is section.hero with the slogan and the .sub sentence', when(NO_B
   assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One record of your projects/);
 });
 
-test('the four cards, then It stays yours, the plans and the close, in order', when(NO_BUILD), () => {
+test('the four cards, then It stays yours and the close, in order', when(NO_BUILD), () => {
   const said = text(page());
   const order = [
     home.cards.brief.title,
@@ -155,7 +125,6 @@ test('the four cards, then It stays yours, the plans and the close, in order', w
     home.cards.chores.title,
     home.cards.slash.title,
     home.yours.title,
-    home.plans.title,
     home.closing.title,
   ];
   let at = 0;

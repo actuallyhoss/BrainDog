@@ -19,7 +19,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { site } from './copy.ts';
-import { home } from './copy/home.ts';
 import { slashPage } from './copy/slash.ts';
 import { LAUNCH } from './launch.ts';
 import { PACKS, PAID, PLANS, TABLE, TABLE_PACKS, packsOnSale, priceOf, type Allowance } from './plans.ts';
@@ -207,13 +206,12 @@ test('nothing promises what the checkout does not sell: extra use is coming soon
     pricing: p,
     cards: [cardsFor({ billing: false }), cardsFor({ billing: true })],
     extra,
-    home: home.plans,
     slash: slashPage,
   });
   assert.doesNotMatch(said, /never charged past|charge for usage past|top up with a pack|billed for extra|extra use is on/i, 'the pricing copy sells extra use');
   /* A PAID CARD LINKS NOTHING WHILE BILLING IS OFF: its button's place says "Coming soon" and is no link. */
   for (const card of cardsFor({ billing: false }).filter((c) => c.id !== 'free'))
     assert.deepEqual(card.button, { kind: 'soon', label: p.cards.soon }, `${card.name} links a checkout while billing is off`);
-  for (const head of [p.title, p.sub, home.plans.title])
+  for (const head of [p.title, p.sub])
     assert.doesNotMatch(head, /\$\d/, `"${head}" is a headline with a price in it, and Free leads`);
 });

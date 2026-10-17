@@ -96,7 +96,6 @@
   <p class="sub">{person.sub}</p>
   <div class="actions">
     <Start />
-    <a class="btn ghost" href="/pricing">{f.pricing}</a>
   </div>
 </PageHead>
 
@@ -339,7 +338,7 @@
       padding-block-start: 72px;
     }
 
-    .actions .btn {
+    .actions :global(.btn) {
       flex: 1 1 auto;
     }
   }

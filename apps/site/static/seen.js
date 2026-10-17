@@ -14,7 +14,6 @@
       method: 'POST',
       keepalive: true,
       credentials: 'omit',
-      headers: { 'content-type': 'text/plain' },
       body: JSON.stringify({ p: location.pathname, r: r }),
     }).catch(function () {});
   } catch (e) {}

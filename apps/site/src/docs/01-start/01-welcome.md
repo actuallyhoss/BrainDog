@@ -44,6 +44,5 @@ Ask Slash for a page | Press / and say what you want to see | On any page
 
 ## Where to go next
 
-- [What it costs](/pricing): free for one person. Cloud and Cloud Plus add colleagues, more Slash and more automations.
 - [How agents connect](/agents): the MCP address, and what an agent can do once it is in.
 - The rest of these docs, from the list of sections beside this page.

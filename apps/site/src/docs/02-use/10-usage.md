@@ -15,7 +15,7 @@ Data fetched from other services | 100 MB | 1 GB | 5 GB
 Script time | 5 hours | 50 hours | 250 hours
 ```
 
-Failures are counted and never limited. The owner sets Slash's limit in Settings, under Agents, and zero turns it off. See [Slash](/docs/use/slash). Prices are on the [pricing page](/pricing).
+Failures are counted and never limited. The owner sets Slash's limit in Settings, under Agents, and zero turns it off. See [Slash](/docs/use/slash).
 
 ## Reading the Usage page
 

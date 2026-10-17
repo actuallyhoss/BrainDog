@@ -64,9 +64,9 @@ An agent you connect works at a level too: read only, read and propose changes t
 
 **Share this setup**, in Settings under Export, packs the way your record works (its lists, pages and rules) as an add-on somebody else can install. You pick which rows, if any, go with it as examples. Nothing else of yours leaves.
 
-## What it costs
+## Who can share
 
-Free is for one person. Colleagues come with Cloud and Cloud Plus, as many as you like at no extra cost, since those plans are priced per record. See [pricing](/pricing).
+Free is for one person. Colleagues come with Cloud and Cloud Plus, as many as you like at no extra cost.
 
 ## Leaving a record, or closing your account
 

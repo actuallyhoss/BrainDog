@@ -65,14 +65,14 @@ A comparison is authored rows. The `table` kind, which reads the rows of a list,
 A row is a title, an address and a note, the note optional. The address is an `https:` address, a `mailto:` address or a path on the same site, and anything else refuses the block. The host is drawn under the title, and nothing is fetched to draw it: no icon and no preview.
 
 ```link | Worth keeping
-Pricing | /pricing | what a record costs
+Slash | /slash | asking your record
 How agents connect | /agents
 A note to yourself | mailto:you@example.com | opens your mail
 ```
 
 ~~~code | As written
 ```link | Worth keeping
-Pricing | /pricing | what a record costs
+Slash | /slash | asking your record
 How agents connect | /agents
 A note to yourself | mailto:you@example.com | opens your mail
 ```

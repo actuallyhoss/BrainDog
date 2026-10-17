@@ -98,7 +98,7 @@
     </div>
   </div>
 
-  <div class="t s6">
+  <div class="t s6 hide-phone">
     <p class="th"><Icon name="download" />{TODAY.heads.arrivals}<span class="r">{TODAY.heads.arrivalsAside}</span></p>
     <div class="list">
       {#each shown as item (item.n)}

@@ -51,7 +51,7 @@ A long text field in a `list` answer is cut at 280 characters, and the row says 
 
 Your plan's monthly allowance is spent by the work your record does by itself: the scheduled actions and scripts that fetch from other services, counted as runs, requests, data fetched and running time. Your own calls to the API and to MCP are not counted against it. Trying a draft script with `scriptTry` is the one call that is, as a run, because it fetches for real.
 
-Past the allowance, an action waits for the first of next month, and failures are never held against it. [Pricing](/pricing) has each plan's figures.
+Past the allowance, an action waits for the first of next month, and failures are never held against it.
 
 ## Seeing where you stand
 

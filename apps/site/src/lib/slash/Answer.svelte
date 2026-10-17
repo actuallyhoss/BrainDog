@@ -209,5 +209,6 @@
     .grow b { white-space: normal; }
     .tag { display: none; }
     .hbar { grid-template-columns: minmax(0, 1fr) 56px auto; }
+    .hbar:nth-child(n + 4) { display: none; }
   }
 </style>

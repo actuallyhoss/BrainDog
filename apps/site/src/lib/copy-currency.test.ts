@@ -7,7 +7,7 @@
  *
  *   - CURRENCY. A copy file that sits beside a price says no other currency: no `£`, `€` or other symbol but `$`, and
  *     no code but `USD` in front of a figure. Comments may keep theirs (`page.ts` explains how the app draws a code).
- *   - FIGURES. Every `$` figure the pricing page, the home page's plans band and the Slash page's credits say is a price
+ *   - FIGURES. Every `$` figure the pricing page and the Slash page's credits say is a price
  *     the table holds (a plan by the month or year, a pack, extra usage), and every count of credits, questions, agents
  *     or runs is one a plan holds. The pricing page's cards are read with billing on and with it off.
  *
@@ -20,9 +20,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { site } from './copy.ts';
-import { home } from './copy/home.ts';
 import { slashPage } from './copy/slash.ts';
-import { PLANS, plan } from './plans.ts';
+import { PLANS } from './plans.ts';
 import { cardsFor, extra, holds } from './pricing/cards.ts';
 
 const REPO = new URL('../../../../', import.meta.url);
@@ -100,11 +99,10 @@ const p = site.pricing;
 /** A meter of the pricing table as the figure check reads it: its cell, then the word the check knows it by. */
 const WORD: Record<string, string> = { agents: 'agents', credits: 'questions', runs: 'automation runs' };
 
-/** What the pricing page, the home page's plans band and the Slash page's asks say, as the routes put it together. */
+/** What the pricing page and the Slash page's asks say, as the routes put it together. */
 const said: string[] = [
-  JSON.stringify({ pricing: p, plans: home.plans, slash: slashPage }),
+  JSON.stringify({ pricing: p, slash: slashPage }),
   ...slashPage.counted.month.cells.map((n) => `${n} questions`),
-  home.plans.say(plan('cloud').price),
   ...PLANS.flatMap((pl) => [pl.price, pl.unit, pl.for]),
   ...[cardsFor({ billing: false }), cardsFor({ billing: true })].flat().flatMap((card) => [
     `${card.price} ${card.per}`,

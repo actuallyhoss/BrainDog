@@ -70,7 +70,7 @@ test('app.html loads /signed-in.js in the head, blocking, and carries no inline 
   const head = APP_HTML.slice(APP_HTML.indexOf('<head>'), APP_HTML.indexOf('</head>'));
   assert.ok(head.includes('<script src="/signed-in.js"></script>'), 'the head does not load /signed-in.js as a plain blocking script');
   const scripts = APP_HTML.match(/<script\b[^>]*>/g) ?? [];
-  assert.deepEqual(scripts, ['<script src="/signed-in.js">', '<script src="/seen.js" defer>'], 'app.html carries a script of its own besides /signed-in.js and /seen.js');
+  assert.deepEqual(scripts, ['<script src="/signed-in.js">'], 'app.html carries a script of its own besides /signed-in.js');
   assert.ok(!APP_HTML.includes('\u2014'), 'app.html ships an em dash in its bytes');
 });
 
@@ -107,10 +107,10 @@ test('PageHead draws one h1 and its lead', async () => {
   assert.ok(head.includes('Every plan has the whole app.'));
 });
 
-test('the header row is Slash, Agents, Pricing and Docs', () => {
+test('the header row is Slash, Agents and Docs while pricing is held', () => {
   const row = reachable({ public: false }).filter((p) => p.header);
-  assert.deepEqual(row.map((p) => p.label), ['Slash', 'Agents', 'Pricing', 'Docs']);
-  assert.deepEqual(row.map((p) => p.path), ['/slash', '/agents', '/pricing', '/docs']);
+  assert.deepEqual(row.map((p) => p.label), ['Slash', 'Agents', 'Docs']);
+  assert.deepEqual(row.map((p) => p.path), ['/slash', '/agents', '/docs']);
 });
 
 test('/packs is held, so the sitemap and the 404 do not name it', () => {
@@ -140,7 +140,7 @@ test('the footer is Product, Learn and Company, as the design draws them', () =>
   assert.deepEqual(
     groups.map((g) => [g.title, g.links.map((l) => l.label)]),
     [
-      ['Product', ['Agents', 'Slash', 'Pricing', 'Security']],
+      ['Product', ['Agents', 'Slash', 'Security']],
       ['Learn', ['Get started', 'Connect an agent', 'Docs']],
       ['Company', ['Support', 'Legal']],
     ],

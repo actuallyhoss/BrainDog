@@ -126,5 +126,10 @@
       gap: 18px;
       margin-block-end: 28px;
     }
+
+    /* ON A PHONE, TWO NOTES SAY IT. */
+    .note:nth-child(n + 3) {
+      display: none;
+    }
   }
 </style>

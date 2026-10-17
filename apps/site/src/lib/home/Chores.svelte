@@ -326,5 +326,11 @@
       gap: 18px;
       margin-block-end: 28px;
     }
+
+    /* ON A PHONE, ONE QUESTION AT A TIME AND TWO CHORES: answering one brings the next up. */
+    .ask:nth-child(n + 2),
+    .item:nth-child(n + 3) {
+      display: none;
+    }
   }
 </style>

@@ -29,9 +29,9 @@ Slash also does quieter work in the background: the inbox's patterns, a digest's
 
 ## Asks and the monthly limit
 
-Each question you ask Slash, or each thing you ask it to draft, is one ask, however much reading it takes. The pricing page calls these credits.
+Each question you ask Slash, or each thing you ask it to draft, is one ask, however much reading it takes.
 
-- Free includes 20 asks a month, Cloud 80 and Cloud Plus 400. The [pricing page](/pricing) lists what each plan includes.
+- Free includes 20 asks a month, Cloud 80 and Cloud Plus 400.
 - The owner sets the limit in Settings, under Agents. Zero turns Slash off.
 - Usage lists your asks by day: what was asked, when, what it cost and a link to what it filed. See [Usage and limits](/docs/use/usage).
 

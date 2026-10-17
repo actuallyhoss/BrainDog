@@ -182,7 +182,7 @@ export const TODAY: {
     { agent: 'chatgpt', project: 'northbound', what: 'ChatGPT on Northbound', sub: 'logged call notes with Sam · Tuesday', live: false },
   ],
   heads: { working: 'Working now', arrivals: 'Just in', arrivalsAside: 'files itself', done: 'done' },
-  hidePhone: ['pocketlab', 'ferment'],
+  hidePhone: ['tidepool', 'northbound', 'pocketlab', 'ferment'],
 };
 
 /** What lands while she watches, and where it was filed. `amount` is null when nothing was paid. */
