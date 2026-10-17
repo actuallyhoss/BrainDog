@@ -7,6 +7,7 @@
   "description": "The token layer, element defaults and a11y layer, shared by both apps. CSS, and the marks as data.",
   "exports": {
     "./tokens.css": "./tokens.css",
+    "./look-b.css": "./look-b.css",
     "./base.css": "./base.css",
     "./a11y.css": "./a11y.css",
     "./house.css": "./house.css",
@@ -20,6 +21,7 @@
   },
   "files": [
     "tokens.css",
+    "look-b.css",
     "base.css",
     "a11y.css",
     "house.css",

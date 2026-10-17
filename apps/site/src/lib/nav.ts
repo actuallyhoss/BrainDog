@@ -1,8 +1,8 @@
 /**
  * The site's pages, in the order the header and the footer draw them, and which of them exist.
  *
- * ONE LIST FOR FOUR READERS: the header, the footer, the 404's list and `/sitemap.xml`, so a page is
- * never named by one and missing from another. A page is shown only once its
+ * ONE LIST FOR FOUR READERS: the header, the footer (`site/footer.ts`, which picks its groups from it), the 404's
+ * list and `/sitemap.xml`, so a page is never named by one and missing from another. A page is shown only once its
  * route folder holds a `+page.svelte`, so adding a page never edits this file, and a link to
  * a page that does not exist yet can never be drawn, which would also stop the strict prerender.
  */
@@ -12,55 +12,50 @@ import { forPages } from './copy/for.ts';
 import { DOCS, PACKS, SECURITY, SUPPORT } from './links.ts';
 import { HELD, LAUNCH, held } from './launch.ts';
 
-export type Group = 'product' | 'build' | 'trust';
-
 export type Place = {
   path: string;
   label: string;
   /** Drawn in the header's row of links at 1440 and in the phone's menu. */
   header: boolean;
-  group: Group;
 };
 
-const place = (path: string, key: keyof typeof shell.nav, group: Group, header: boolean): Place => ({
+const place = (path: string, key: keyof typeof shell.nav, header: boolean): Place => ({
   path,
   label: shell.nav[key],
   header,
-  group,
 });
 
 /* A PAGE WRITTEN FOR ONE KIND OF PERSON (`routes/for/`), at the address the drawn app's "More for" link
-   opens, in the footer's Product group and never in the header's row. */
+   opens, in the 404's list and the sitemap and never in the header's row. */
 const person = (id: keyof typeof forPages.person.who): Place => ({
   path: cases.drawn.moreFor[id].href,
   label: forPages.person.who[id].nav,
   header: false,
-  group: 'product',
 });
 
 /**
  * Every page a reader may be sent to, home aside. `/legal/*` stays out: those pages are unlinked until their texts arrive.
  *
- * THE HEADER'S ROW IS FINAL: Slash, For agents, Packs, Pricing, Docs, Changelog, and then GitHub, which
- * `+layout.svelte` adds from `SOURCE` in `links.ts` because it is not a page of this site. Slash leads
- * because it has a page of its own since the redesign of 26 September. Changelog is drawn only once
- * `LAUNCH.public` is on (`reachable` below): until then the row ends at Docs.
+ * THE HEADER'S ROW IS THE SITE DESIGN'S (DIRECTION §47): Slash, Agents, Pricing, Docs, then "Sign in" and "Start
+ * free", which `+layout.svelte` draws because they are not pages of this site. Packs left the row with that design;
+ * it and the changelog are held until the site is public (`HELD` in `launch.ts`), and the changelog comes back to
+ * the row's end the day `LAUNCH.public` is on (`reachable` below).
  */
 export const PLACES: readonly Place[] = [
-  place('/slash', 'slash', 'product', true),
-  place('/agents', 'agents', 'build', true),
-  place(PACKS, 'packs', 'product', true),
-  place('/pricing', 'pricing', 'product', true),
+  place('/slash', 'slash', true),
+  place('/agents', 'agents', true),
+  place(PACKS, 'packs', false),
+  place('/pricing', 'pricing', true),
   person('personal'),
   person('student'),
   person('founder'),
   person('team'),
   person('project'),
-  place(DOCS, 'docs', 'build', true),
-  place('/changelog', 'changelog', 'product', true),
-  place(SUPPORT, 'support', 'trust', false),
-  place(SECURITY, 'security', 'trust', false),
-  place('/legal', 'legal', 'trust', false),
+  place(DOCS, 'docs', true),
+  place('/changelog', 'changelog', true),
+  place(SUPPORT, 'support', false),
+  place(SECURITY, 'security', false),
+  place('/legal', 'legal', false),
 ];
 
 /**
@@ -86,8 +81,8 @@ export const exists = (path: string): boolean => found === null || found.has(pat
 
 /**
  * The places a visitor may reach under these flags, in order: each that exists, less the ones `launch.ts` holds
- * until the site is public. The changelog is one of `PLACES` on every day, so flipping `LAUNCH.public` draws it in
- * the header again and edits nothing here. Takes the flags so a test can pass a copy with one turned on.
+ * until the site is public. Packs and the changelog are `PLACES` on every day, so flipping `LAUNCH.public` draws them
+ * again and edits nothing here. Takes the flags so a test can pass a copy with one turned on.
  */
 export const reachable = (launch: { public: boolean } = LAUNCH): readonly Place[] =>
   PLACES.filter((p) => exists(p.path) && !(held(launch) && (HELD as readonly string[]).includes(p.path)));
@@ -96,4 +91,4 @@ export const reachable = (launch: { public: boolean } = LAUNCH): readonly Place[
 export const LIVE: readonly Place[] = reachable();
 
 /** Home and every live place: what the 404 lists and the sitemap names. */
-export const PAGES: readonly Place[] = [{ path: '/', label: shell.nav.home, header: false, group: 'product' }, ...LIVE];
+export const PAGES: readonly Place[] = [{ path: '/', label: shell.nav.home, header: false }, ...LIVE];

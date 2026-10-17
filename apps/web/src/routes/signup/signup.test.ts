@@ -306,9 +306,29 @@ test('THE MAKING STEP HAS NO BAR THAT MOVES FOR EVER (USE-B07)', () => {
 
 /* ── closed, and signed in (the checker's two) ───────────────────────── */
 
+test('INVITE ONLY IS ITS OWN SCREEN: the invite-only step draws Apply with the host\'s check, and the closed step does not', () => {
+  const closed = PAGE.slice(PAGE.indexOf("{:else if step === 'closed'}"), PAGE.indexOf("{:else if step === 'invite-only'}"));
+  const invite = PAGE.slice(PAGE.indexOf("{:else if step === 'invite-only'}"), PAGE.indexOf("{:else if step === 'describe'}"));
+  assert.ok(closed.length > 0 && invite.length > 0, 'the two screens are not two branches');
+  assert.doesNotMatch(closed, /<Apply\b|words\.invite/, 'the closed page asks to apply');
+  assert.match(invite, /<Apply \{siteKey\} \/>/, 'the invite-only step does not draw Apply');
+  assert.match(PAGE, /import Apply from '\.\/Apply\.svelte';/);
+  /* THE SITE KEY IS SET BEFORE THE STEP, so the application carries the host's check. */
+  const ask = PAGE.slice(PAGE.indexOf('async function ask('), PAGE.indexOf("step = 'describe'", PAGE.indexOf('async function ask(')));
+  assert.ok(ask.indexOf('siteKey = out.value.turnstile') > -1, 'the site key is not read');
+  assert.ok(ask.indexOf('siteKey = out.value.turnstile') < ask.indexOf("step = 'invite-only'"), 'the site key is set after the invite-only step');
+  /* A CODE OR A SIGNED-IN PERSON NEVER SEES IT: the step is taken only with neither. */
+  assert.match(ask, /mode === 'invite' && signedIn === null && codeKept\(tabStore\(\)\) === null\) \{\s*step = 'invite-only';/);
+  const apply = readFileSync(new URL('./Apply.svelte', import.meta.url), 'utf8');
+  assert.match(apply, /words\.haveOne/, 'the way to sign in is gone');
+  assert.match(apply, /widgetWords\(widgetState\)/, 'the check is not drawn as the sign-up form draws it');
+  assert.match(apply, /\{#if siteKey !== null\}/, 'the check is drawn with no site key');
+});
+
+
 test('CLOSED ASKS NOTHING: no field, no question, and the page waits for the host before it says "Who are you?"', () => {
-  const closed = PAGE.slice(PAGE.indexOf("{:else if step === 'closed' || step === 'invite-only'}"), PAGE.indexOf("{:else if step === 'describe'}"));
-  assert.ok(closed.length > 0, 'the closed page is gone');
+  const closed = PAGE.slice(PAGE.indexOf("{:else if step === 'closed'}"), PAGE.indexOf("{:else if step === 'invite-only'}"));
+  assert.ok(PAGE.includes("{:else if step === 'closed'}") && closed.length > 0, 'the closed page is gone');
   assert.doesNotMatch(closed, /<textarea|<input|first-q|whoQuestion/, 'the closed page asks something');
   const loading = PAGE.slice(PAGE.indexOf("{#if step === 'loading' || step === 'verifying'}"), PAGE.indexOf("{:else if step === 'unreachable'}"));
   assert.doesNotMatch(loading, /whoQuestion/, 'the page asks who you are before it knows sign-up is open');

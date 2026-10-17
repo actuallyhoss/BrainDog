@@ -1,14 +1,18 @@
 <!--
-  The site shell: a glass bar, the page, and the footer tile. Which pages the bar and the footer name is `nav.ts`'s.
+  The site shell: the night header, the page, and the dark footer (DIRECTION §47, the site design of 17 October).
 
-  THE SHELL IS THE DESIGN SYSTEM'S. The bar is glass, floating one inset below the top of the window and lined up with the
-  tiles under it: the mark and the name, the page links, GitHub, "Sign in" and "Start your record" as the one ink pill.
-  The page is the ground with its light, and the footer is one tile, the last on every page.
+  THE HEADER IS ON THE NIGHT GROUND AND SCROLLS AWAY WITH THE PAGE. Every page opens on the night ground too (its own
+  head, `lib/site/PageHead.svelte`, or the home page's hero), so the band runs on from the header unbroken. It holds
+  the brand, Slash, Agents, Pricing and Docs (`nav.ts`), "Sign in", and "Start free" in red. Signed in, the last two
+  become "Open BrainDog" (`lib/site/Start.svelte`, `signed-in.ts`). At 760 and under the links go and "Start free"
+  stays at the right, with a 44px menu beside it holding the links.
 
   NOTHING HERE IS NEEDED TO READ THE SITE. The nav is links, the theme follows the operating system, and every page is
-  finished HTML. Scripting adds two things: a tile rising into place as it scrolls in (`reveal.ts`), and closing the
+  finished HTML. Scripting adds two things: a block rising into place as it scrolls in (`reveal.ts`), and closing the
   phone menu after a tap, on a press of Escape or on a tap outside it; without scripting it is a native disclosure that
   opens and closes on its own 44px button, and a link inside it loads the next page anyway.
+
+  `header .brand` is read by `scripts/product.mjs`, which draws the shared card from the built home page.
 -->
 <script lang="ts">
   import '@braindog/skin/tokens.css';
@@ -16,8 +20,11 @@
      `BRAINDOG_ENV` aliases this specifier, so an alpha build resolves it to `alpha.css` and ships
      one palette rather than two (28 §4). */
   import '@braindog/skin/house.css';
+  /* LOOK B, the site design's colours and faces (DIRECTION §47). */
+  import '@braindog/skin/look-b.css';
   import '@braindog/skin/base.css';
   import '@braindog/skin/a11y.css';
+  /* The product's blocks, which the security page, the docs and the pages for one kind of person still draw. */
   import '@braindog/skin/blocks.css';
   import '@braindog/skin/blocks-kinds.css';
   import '@braindog/skin/blocks-charts.css';
@@ -28,38 +35,24 @@
   import Icon from '$lib/Icon.svelte';
   import Mark from '$lib/Mark.svelte';
   import { site } from '$lib/copy.ts';
-  import { SIGNIN, SIGNUP, SOURCE } from '$lib/links.ts';
-  import { LIVE, type Group } from '$lib/nav.ts';
+  import { LIVE } from '$lib/nav.ts';
   import { reveal } from '$lib/reveal.ts';
+  import { footerGroups } from '$lib/site/footer.ts';
+  import SignIn from '$lib/site/SignIn.svelte';
+  import Start from '$lib/site/Start.svelte';
 
   let { children } = $props();
 
   let menuOpen = $state(false);
   let menu: HTMLDetailsElement | undefined = $state();
 
-  type Link = { href: string; label: string; rel?: 'external' };
-
-  /* THE HEADER'S LINKS ARE `nav.ts`'s, so each page appears the day its route does and never before. GitHub is drawn
-     from `SOURCE` at the bar's end with the code glyph, because it is not a page of this site. */
-  const github: Link[] = SOURCE ? [{ href: SOURCE, label: site.nav.source }] : [];
-  const links: Link[] = LIVE.filter((p) => p.header).map((p) => ({ href: p.path, label: p.label }));
-
-  /* `rel="external"` ON EVERY LINK UNDER `/app`, because `/app` is on this site's name and is not a page of this site.
-     Without it the prerender crawler follows the link and the build stops at "404 /app". */
-  const signin: Link = { href: SIGNIN, label: site.nav.signin, rel: 'external' };
-
-  /* THE FOOTER: three groups of the same pages beside the brand. GitHub sits with Build and Sign in with Product, and
-     the licence is named only on /legal. */
-  const group = (g: Group): Link[] => LIVE.filter((p) => p.group === g).map((p) => ({ href: p.path, label: p.label }));
-  const columns: { title: string; links: Link[] }[] = [
-    { title: site.footer.groups.product, links: [...group('product'), signin] },
-    { title: site.footer.groups.build, links: [...group('build'), ...github] },
-    { title: site.footer.groups.trust, links: group('trust') },
-  ].filter((c) => c.links.length > 0);
+  /* THE HEADER'S LINKS ARE `nav.ts`'s, so each page appears the day its route does and never before. */
+  const links = LIVE.filter((p) => p.header).map((p) => ({ href: p.path, label: p.label }));
+  const groups = footerGroups();
 
   const here = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
 
-  /* THE TILES THAT RISE INTO PLACE are found again on every page, the first one included (`reveal.ts`). */
+  /* THE BLOCKS THAT RISE INTO PLACE are found again on every page, the first one included (`reveal.ts`). */
   let unreveal = (): void => {};
   afterNavigate(() => {
     menuOpen = false;
@@ -82,45 +75,34 @@
 
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="bar">
-  <div class="bar-in">
-    <a class="brand" href="/">
-      <Mark height={20} />
-      <span class="wordmark">{site.product}</span>
-    </a>
+<header class="nav night">
+  <div class="wrap bar">
+    <a class="brand" href="/" aria-label="{site.product} home"><Mark height={24} tone="inherit" />{site.product}</a>
 
     <nav class="links" aria-label="Site">
       {#each links as link}
         <a href={link.href} aria-current={here(link.href) ? 'page' : undefined}>{link.label}</a>
       {/each}
+      <SignIn />
     </nav>
 
-    <div class="ends">
-      {#each github as link}
-        <a class="end gh" href={link.href} rel="external"><Icon name="code" size="m" />{link.label}</a>
-      {/each}
-      <a class="end signin" href={signin.href} rel="external">{signin.label}</a>
-      <a class="btn btn-primary cta" href={SIGNUP} rel="external">{site.nav.start}</a>
-    </div>
+    <div class="go"><Start /></div>
 
-    <!-- THE PHONE'S BAR IS ONE ROW: the brand and this 44px button. The links, Sign in and the action live in this
-         disclosure in 44px rows, and the action comes first in each page's opening tile instead. -->
+    <!-- THE PHONE'S HEADER IS ONE ROW: the brand, "Start free" and this 44px button, which holds the links. -->
     <details class="menu" bind:open={menuOpen} bind:this={menu}>
       <summary class="menu-btn" aria-label={site.nav.menu}>
         <Icon name={menuOpen ? 'close' : 'menu'} size="l" />
       </summary>
-      <nav class="menu-panel" aria-label="Site">
-        {#each [...links, ...github] as link}
+      <nav class="menu-panel" aria-label="Site menu">
+        {#each links as link}
           <a
             class="menu-link"
             href={link.href}
-            rel={link.href === SOURCE ? 'external' : undefined}
             aria-current={here(link.href) ? 'page' : undefined}
             onclick={() => (menuOpen = false)}>{link.label}<Icon name="chevron-right" size="m" /></a
           >
         {/each}
-        <a class="menu-link" href={signin.href} rel="external">{signin.label}<Icon name="chevron-right" size="m" /></a>
-        <a class="btn btn-primary btn-lg menu-app" href={SIGNUP} rel="external">{site.nav.start}</a>
+        <SignIn class="menu-link" />
       </nav>
     </details>
   </div>
@@ -128,22 +110,23 @@
 
 <main id="main">{@render children()}</main>
 
-<footer class="foot">
-  <div class="foot-tile">
-    <div class="foot-brand">
-      <a class="brand" href="/">
-        <Mark height={20} />
-        <span class="wordmark">{site.product}</span>
-      </a>
-      <p class="foot-tagline">{site.footer.tagline}</p>
+<footer class="night site-foot">
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="brand" href="/" aria-label="{site.product} home"><Mark height={24} tone="inherit" />{site.product}</a>
+        <p>{site.footer.tagline}</p>
+      </div>
+      {#each groups as group}
+        <nav aria-label={group.title}>
+          <h2>{group.title}</h2>
+          <ul>
+            {#each group.links as link}<li><a href={link.href} rel={link.rel}>{link.label}</a></li>{/each}
+          </ul>
+        </nav>
+      {/each}
     </div>
-
-    {#each columns as column}
-      <nav class="foot-col" aria-label={column.title}>
-        <h2 class="foot-title">{column.title}</h2>
-        {#each column.links as link}<a href={link.href} rel={link.rel}>{link.label}</a>{/each}
-      </nav>
-    {/each}
+    <p class="owner">{site.footer.owner}</p>
   </div>
 </footer>
 
@@ -154,13 +137,12 @@
     align-items: center;
     min-block-size: var(--tap);
     position: fixed;
-    inset-block-start: var(--sp-2);
-    inset-inline-start: var(--sp-2);
+    inset-block-start: 8px;
+    inset-inline-start: 8px;
     z-index: var(--z-hint);
-    padding-inline: var(--sp-4);
-    background: var(--bg);
-    border-radius: var(--r-pill);
-    box-shadow: var(--e2);
+    padding-inline: 16px;
+    background: var(--page);
+    border-radius: 8px;
     color: var(--ink);
     transform: translateY(-200%);
   }
@@ -169,118 +151,76 @@
     transform: none;
   }
 
-  /* ── The bar ────────────────────────────────────────────────────────────── */
+  /* ── The header ─────────────────────────────────────────────────────────── */
 
-  /* FLOATING ONE INSET BELOW THE TOP OF THE WINDOW, in the tiles' own column, so its edges are theirs. The wrapper
-     is the sticky thing; the glass is the row inside it. */
-  .bar {
-    position: sticky;
-    inset-block-start: var(--inset);
+  /* ON THE NIGHT GROUND, NOT STICKY: it scrolls away with the page, as the design draws it. */
+  .nav {
+    position: relative;
     z-index: var(--z-hint);
-    max-inline-size: calc(var(--site-max) + 2 * var(--site-gutter));
-    margin: var(--inset) auto 0;
-    padding-inline: var(--site-gutter);
   }
 
-  /* GLASS, AND IT HOLDS ONLY CHROME: the frosted fill, its blur, the hairline pair and level two (the design system). */
-  .bar-in {
-    position: relative;
+  .bar {
     display: flex;
     align-items: center;
-    gap: var(--sp-4);
-    min-block-size: 56px;
-    padding-inline: var(--sp-4) 10px;
-    background: var(--glass);
-    border-radius: var(--r-lg);
-    box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
+    gap: 30px;
+    block-size: 76px;
   }
 
-  /* Safari before 18 knows the blur only by its prefixed name. */
-  @supports (-webkit-backdrop-filter: none) {
-    .bar-in {
-      -webkit-backdrop-filter: var(--glass-blur);
-      backdrop-filter: var(--glass-blur);
-    }
-  }
-
+  /* THE BRAND: the mark in red and the name in Lexend 600, the footer's the same. */
   .brand {
     display: flex;
     flex: none;
     align-items: center;
     gap: 10px;
-    min-block-size: var(--ctl-h);
-    color: var(--ink);
+    color: inherit;
+    font: 600 20px/1 var(--head);
+    letter-spacing: -0.02em;
     text-decoration: none;
   }
 
-  /* GEIST, AS EVERY WORD IS. The wordmark is the name set at the group step, and the mark beside it is the red. */
-  .wordmark {
-    color: var(--ink);
-    font-size: var(--t-group);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+  .brand :global(.mark) {
+    color: var(--red);
   }
 
   .links {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 26px;
+    margin-inline-start: auto;
+    color: var(--on-night-2);
+    font-size: var(--t-site-15);
   }
 
   .links a,
-  .end {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding-inline: var(--sp-3);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-site-small);
-    font-weight: 500;
+  .links :global(a) {
+    color: inherit;
     text-decoration: none;
-    white-space: nowrap;
-    transition:
-      background var(--d-state) var(--ease-out),
-      opacity var(--d-release) var(--ease-out);
   }
 
   .links a:hover,
-  .end:hover {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  /* THE PAGE YOU ARE ON is drawn chosen as the rail draws its place: the tile fill on the glass, in ink at 600. */
+  .links :global(a:hover),
   .links a[aria-current] {
-    background: var(--bg);
-    color: var(--ink);
-    font-weight: 600;
+    color: var(--on-night);
   }
 
-  .links a:active,
-  .end:active,
-  .menu-link:active {
-    opacity: var(--press-dim);
-    transition-duration: var(--d-press);
-    transition-timing-function: var(--ease-push);
+  /* 44 tall under a thumb, on a tablet wide enough to show the links. */
+  @media (pointer: coarse) {
+    .links a,
+    .links :global(a) {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
   }
 
-  .ends {
+  .go {
     display: flex;
     flex: none;
-    align-items: center;
-    gap: 2px;
-    margin-inline-start: auto;
   }
 
-  .signin {
-    color: var(--ink);
-  }
-
-  .cta {
-    margin-inline-start: 6px;
+  .go :global(.btn) {
+    block-size: 40px;
+    font-size: var(--t-site-14-5);
   }
 
   /* ── The phone's menu ───────────────────────────────────────────────────── */
@@ -294,8 +234,8 @@
     place-items: center;
     inline-size: var(--tap);
     block-size: var(--tap);
-    border-radius: var(--r-pill);
-    color: var(--ink);
+    border-radius: 8px;
+    color: var(--on-night);
     cursor: pointer;
     list-style: none;
   }
@@ -305,135 +245,53 @@
   }
 
   .menu[open] .menu-btn {
-    background: var(--hover-wash);
+    background: var(--night-2);
   }
 
-  /* UNDER THE BAR, the bar's own width: glass-strong at level two, where legibility over the page matters (the design system). */
+  /* UNDER THE HEADER, the column's width: one flat tile on the night ground, a 44px line per page. */
   .menu-panel {
     position: absolute;
-    inset-block-start: calc(100% + var(--sp-2));
-    inset-inline: 0;
+    inset-block-start: 100%;
+    inset-inline: 16px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: var(--sp-2);
-    background: var(--glass-strong);
-    border-radius: var(--r-lg);
-    box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
+    padding: 8px;
+    background: var(--night-2);
+    border-radius: 16px;
   }
 
-  @supports (-webkit-backdrop-filter: none) {
-    .menu-panel {
-      -webkit-backdrop-filter: var(--glass-blur);
-      backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  /* CLOSED, THE PANEL IS NOT LAID OUT AT ALL. A closed disclosure only skips painting its content, so a measurement
-     still finds the links, squeezed into the button's own box and past the edge of the screen. */
-  .menu:not([open]) .menu-panel {
-    display: none;
-  }
-
-  .menu-link {
+  .menu-panel a,
+  .menu-panel :global(.menu-link) {
     display: flex;
     align-items: center;
     justify-content: space-between;
     min-block-size: var(--tap);
-    padding-inline: var(--sp-3);
-    border-radius: var(--r-md);
-    color: var(--ink);
-    font-size: var(--t-md);
+    padding-inline: 12px;
+    border-radius: 8px;
+    color: var(--on-night);
+    font-size: var(--t-site-16);
     font-weight: 500;
     text-decoration: none;
   }
 
-  .menu-link:hover,
-  .menu-link[aria-current] {
-    background: var(--hover-wash);
+  .menu-panel a:hover,
+  .menu-panel :global(.menu-link:hover),
+  .menu-panel a[aria-current] {
+    background: var(--night-rule);
   }
 
-  .menu-app {
-    margin-block-start: var(--sp-2);
-  }
+  @media (max-width: 760px) {
+    .bar {
+      gap: 8px;
+      block-size: 64px;
+    }
 
-  /* ── The footer tile ────────────────────────────────────────────────────── */
-
-  /* The last tile on every page, one inset under the band above it and above the window's edge. */
-  .foot {
-    max-inline-size: calc(var(--site-max) + 2 * var(--site-gutter));
-    margin: var(--inset) auto var(--inset);
-    padding-inline: var(--site-gutter);
-  }
-
-  .foot-tile {
-    display: grid;
-    grid-template-columns: minmax(0, 6fr) repeat(3, minmax(0, 2fr));
-    align-items: start;
-    gap: var(--sp-5) var(--inset);
-    padding: clamp(24px, 2vw + 12px, 40px);
-    background: var(--bg);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1);
-  }
-
-  .foot-brand {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-2);
-  }
-
-  .foot-tagline {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-site-body);
-  }
-
-  .foot-col {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    min-inline-size: 0;
-  }
-
-  .foot-title {
-    margin-block-end: var(--sp-1);
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 600;
-    letter-spacing: 0;
-    line-height: 20px;
-  }
-
-  /* Each row is its own target: 36 under a mouse and 44 under a thumb, never narrower than tall. */
-  .foot-col a {
-    display: inline-flex;
-    align-items: center;
-    min-block-size: var(--ctl-h);
-    min-inline-size: var(--tap);
-    color: var(--ink2);
-    font-size: var(--t-site-small);
-    text-decoration: none;
-  }
-
-  .foot-col a:hover {
-    color: var(--ink);
-    text-decoration: underline;
-  }
-
-  .foot-col a:active {
-    opacity: var(--press-dim);
-  }
-
-  /* ── Narrower than a desk ───────────────────────────────────────────────── */
-
-  /* BELOW 1100 THE LINKS GO INTO THE MENU, and the bar keeps the brand, Sign in and the action. */
-  @media (width < 1100px) {
-    .links,
-    .gh {
+    .links {
       display: none;
+    }
+
+    .go {
+      margin-inline-start: auto;
     }
 
     .menu {
@@ -441,43 +299,72 @@
     }
   }
 
-  /* THE PHONE'S BAR IS THE BRAND AND THE MENU BUTTON (SITE-SHELLS.md, Phone header), each a thumb's height. */
-  @media (width < 640px) {
-    .bar-in {
-      min-block-size: 56px;
-      padding-inline: var(--sp-4) 6px;
+  /* ── The footer ─────────────────────────────────────────────────────────── */
+
+  .site-foot {
+    padding: 64px 0 calc(40px + env(safe-area-inset-bottom, 0px));
+    font-size: var(--t-site-15);
+  }
+
+  .foot {
+    display: grid;
+    grid-template-columns: 1.5fr repeat(3, 1fr);
+    gap: 28px;
+  }
+
+  .foot h2 {
+    margin: 0 0 12px;
+    color: var(--on-night-2);
+    font: 500 14px/1 var(--ui);
+  }
+
+  .foot ul {
+    display: grid;
+    gap: 9px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .foot a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .foot ul a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .foot p {
+    margin: 12px 0 0;
+    color: var(--on-night-2);
+  }
+
+  .owner {
+    margin: 56px 0 0;
+    padding-block-start: 20px;
+    border-block-start: 1px solid var(--night-rule);
+    color: var(--on-night-2);
+    font-size: var(--t-site-small);
+  }
+
+  @media (max-width: 1060px) {
+    .foot {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  /* A 44px target for each footer link under a thumb. */
+  @media (pointer: coarse) {
+    .foot ul {
+      gap: 0;
     }
 
-    .ends {
-      display: none;
-    }
-
-    .menu {
-      margin-inline-start: auto;
-    }
-
-    .foot-tile {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .foot-brand {
-      grid-column: 1 / -1;
-    }
-
-    .foot-col a {
+    .foot ul a {
+      display: inline-flex;
+      align-items: center;
       min-block-size: var(--tap);
-    }
-  }
-
-  @media (640px <= width < 1100px) {
-    .menu {
-      order: 3;
-    }
-  }
-
-  @media (width < 360px) {
-    .foot-tile {
-      grid-template-columns: minmax(0, 1fr);
     }
   }
 </style>

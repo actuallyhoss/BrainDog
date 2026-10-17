@@ -39,7 +39,7 @@ import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
 import { FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
-import type { InviteAnswers, InviteCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
+import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
 import type { Plan } from '@braindog/record/directory';
@@ -89,6 +89,9 @@ import { consume, pump } from './pump.ts';
 import { afterRestore, appPath, pollAsked, recoverRestore, restoredOf, asPage, atRoot, cloudIngest, copyAsked, copyRefusal, drained, ingestBudget, inward, isRecordId, legacyRedirect, restoreAsked, servesAccount, servesApi, servesAuth, servesBuild, servesIn, servesKey, servesMcp, type AppPath, type CloudIngestDeps, type Restored, type Stranded } from './route.ts';
 import { HEALTHZ, healthz, type Night } from './health.ts';
 import { CODE_NEEDED, SIGNUP_CLOSED, botCheckKeyed, launchState, signupMode } from './launch.ts';
+import { withSignedIn } from './signed-in.ts';
+import { isAdminHost, serveAdmin } from './admin.ts';
+import { applyDoor, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
 import { LAPSED_FIX, lapseDrops } from './lapse.ts';
@@ -2115,6 +2118,11 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().invites(call);
   }
 
+  /** Asking for an invitation: `apply.submit` from `/auth/apply`, the rest from `/account/ops/applications` and `/account/ops/invite`. */
+  applications<C extends ApplyCall>(call: C): Promise<ApplyAnswers[C['flow']]> {
+    return this.#directory().applications(call);
+  }
+
   /** The host's last restore drill: `put` by the operator's door only (`/account/ops/drill`), `read` for `GET /account/drill`. */
   drill(call: DrillCall): HostDrill | null {
     const drill = this.#directory().drill;
@@ -2912,6 +2920,8 @@ export default {
          and 503 is what a client waits on and asks again. */
       answer = restoring(e) ? json({ ok: false, refusal: RESTORING }, 503) : crashAnswer(request, e, (fields) => ctx.waitUntil(opsAlert(env, fields, alertClaim(env))));
     }
+    /* SIGNED IN, THE SITE SAYS SO: the readable `bd_in` cookie follows the session (`signed-in.ts`, DIRECTION §48). */
+    answer = withSignedIn(answer, request);
     /* ONE POINT PER REQUEST, CRASHES INCLUDED, AFTER THE ANSWER (`51 §5.18`, `telemetry.ts`). Inside `waitUntil` so the
        caller never waits on a count, and it does nothing at all while `TELEMETRY` is unbound. */
     ctx.waitUntil(telemetry(env, request, answer, Date.now() - began));
@@ -3110,6 +3120,10 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        on `PUBLIC_HOST` and a 308 to `/app/healthz` on a legacy host for a caller sending `accept: text/html`, so a monitor
        either read the Worker as down or followed the redirect to the app shell and read somebody else's 200. */
     if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD, launchState(env), request.method === 'GET' ? await nightOf(env) : undefined);
+    if (isAdminHost(request, env.PUBLIC_HOST)) {
+      const page = serveAdmin(request);
+      if (page) return page;
+    }
     /* THE OLD HOST FIRST, AND ONLY FOR A PAGE LOAD. `legacyRedirect` answers
        `null` for every path this Worker serves itself, the build id and sign-in included, so an agent, a webhook
        sender and a stale tab on `app.brain.dog` are served where they stand. Unset `LEGACY_HOSTS` is no host at all. */
@@ -3789,7 +3803,8 @@ async function account(request: Request, env: Env, ctx: ExecutionContext): Promi
     }
     return null;
   };
-  if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, env);
+  if (OPS_INVITE.test(new URL(request.url).pathname)) return opsInvite(request, opsApplyDeps(env));
+  if (OPS_APPLICATIONS.test(new URL(request.url).pathname)) return opsApplications(request, opsApplyDeps(env));
   /* THE OPERATOR'S GIFT OF A PLAN (`ops-plan.ts`): a record found by its name or id with who owns it, and the plan set
      through the same `setPlan` billing uses, so the record's own object hears of it. */
   if (OPS_PLAN.test(new URL(request.url).pathname))
@@ -3883,61 +3898,26 @@ const OPS_INVITE = /^\/+account\/+ops\/+invite\/*$/;
 /** The operator's door to a plan given as a gift (`ops-plan.ts`), with the same forgiveness. */
 const OPS_PLAN = /^\/+account\/+ops\/+plan\/*$/;
 
-/**
- * `/account/ops/invite`: the sign-up codes, behind the provision key, beside `/auth/provision`.
- *
- * `POST { note?, days?, count? }` MINTS, at most fifty a call (`INVITE_MINT_MOST`), and answers each as the link a person
- * opens, `https://<host>/app/signup#code=<code>`: the fragment never reaches a server, and the page wipes it as it reads
- * it. No `days` is a code that never ends, which is the lane's. `POST { end }` ends one by the `ref` the list shows or
- * by the code, and `GET` lists them, newest first, never with the code. A code is answered once, at minting.
- *
- * ANSWERED WHATEVER `SIGNUP` SAYS, so the codes can be made before the host is switched to `invite`. WITHOUT
- * `PROVISION_KEY` IT IS 404, as the two operator routes under `/auth` are, and a wrong key is a 401 that says which
- * header. POSTs are already counted by address in `account()`; a GET is counted here.
- */
-async function opsInvite(request: Request, env: Env): Promise<Response> {
-  const key = (env.PROVISION_KEY ?? '').trim();
-  if (key === '') return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'This BrainDog has no operator key, so it has no operator doors.' } }, 404);
-  if (request.method !== 'GET' && request.method !== 'POST')
-    return json({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: '/account/ops/invite is read with GET and written with POST.' } }, 405, [['allow', 'GET, POST']]);
-  if (request.method === 'GET') {
-    const over = await overLimit(env, null, request, 'read');
-    if (over !== null) return over;
-  }
-  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '')?.[1]?.trim() ?? '';
-  if (bearer === '' || !(await sameKey(bearer, key)))
-    return saidUnauthorized('operator', 'This route takes the operator key.');
-  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
-  const ask = <C extends InviteCall>(call: C) => directory.invites(call) as unknown as Promise<InviteAnswers[C['flow']]>;
-  if (request.method === 'GET') return json({ ok: true, value: { codes: await ask({ flow: 'invite.list' }) } }, 200);
+/** The operator's door to the applications (`apply.ts`), with the same forgiveness. */
+const OPS_APPLICATIONS = /^\/+account\/+ops\/+applications\/*$/;
 
-  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json'))
-    return json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: '/account/ops/invite takes a JSON object, sent as application/json.' } }, 400);
-  let body: unknown = null;
-  try {
-    body = JSON.parse((await request.text()).slice(0, SIGNUP_BODY_MAX));
-  } catch {
-    body = null;
-  }
-  if (typeof body !== 'object' || body === null || Array.isArray(body))
-    return json({ ok: false, refusal: { code: 'BODY_MALFORMED', fix: '/account/ops/invite takes a JSON object, sent as application/json.' } }, 400);
-  const said = body as Record<string, unknown>;
-  if (said['end'] !== undefined) {
-    const ended = await ask({ flow: 'invite.end', ref: typeof said['end'] === 'string' ? said['end'] : '' });
-    return ended.ok ? json({ ok: true, value: ended.value }, 200) : json(ended, httpStatus(ended));
-  }
-  const days = said['days'];
-  const count = said['count'];
-  const note = said['note'];
-  const out = await ask({
-    flow: 'invite.mint',
-    ...(typeof note === 'string' ? { note } : note === undefined ? {} : { note: note as string }),
-    ...(days === undefined || days === null ? {} : { days: days as number }),
-    ...(count === undefined ? {} : { count: count as number }),
-  });
-  if (!out.ok) return json(out, httpStatus(out));
-  const origin = `https://${env.PUBLIC_HOST ?? ''}`;
-  return json({ ok: true, value: { links: out.value.codes.map((code) => `${origin}/app/signup#code=${code}`), ends_at: out.value.ends_at } }, 200);
+/**
+ * What `/account/ops/invite` and `/account/ops/applications` are handed (`apply.ts`): the provision key, a GET's count by
+ * address (a POST is already counted in `account()`), the one 401, the Directory's two groups, and the `invite.ready`
+ * letter, sent from `AUTH_MAIL_FROM` and awaited, so the answer can say whether it went.
+ */
+function opsApplyDeps(env: Env): OpsApplyDeps {
+  const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+  return {
+    key: (env.PROVISION_KEY ?? '').trim(),
+    origin: `https://${env.PUBLIC_HOST ?? ''}`,
+    readLimit: (request) => overLimit(env, null, request, 'read'),
+    unauthorized: () => saidUnauthorized('operator', 'This route takes the operator key.'),
+    invites: (call) => directory.invites(call) as never,
+    applications: (call) => directory.applications(call) as never,
+    mail: (to, vars) => sendMail(env, 'invite.ready', to, vars),
+    now: () => Date.now(),
+  };
 }
 
 /** The operator's door to the `model` mail, with the slashes every other door here forgives. */
@@ -4115,6 +4095,19 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
       }),
     );
   if (Object.hasOwn(SIGNUP_ROUTES, signupPath)) return signUp(request, env, ctx, signupPath as keyof typeof SIGNUP_ROUTES);
+  /* ASKING FOR AN INVITATION (`apply.ts`), answered only while sign-up is by invitation, in the order `signUp` keeps. */
+  if (signupPath === '/auth/apply') {
+    const origin = `https://${env.PUBLIC_HOST ?? ''}`;
+    return applyDoor(request, {
+      mode: signupMode(env),
+      on: (env.SESSION_SECRET ?? '').length >= 32 && cookieMode(origin) !== null,
+      origin,
+      sameOrigin: (asked) => sameOrigin(asked, origin),
+      checked: botCheckKeyed(env),
+      turnstile: (answer, ip) => turnstilePassed(env, answer, ip),
+      apply: (call) => directory.applications(call) as never,
+    });
+  }
   /* GOOGLE IS ANSWERED HERE FOR THE SAME REASON, and only where sign-in is on and a client is set. Without one the
      rows fall through to `serveAuth`, which answers each as a way in this host does not offer. */
   const origin = `https://${env.PUBLIC_HOST ?? ''}`;

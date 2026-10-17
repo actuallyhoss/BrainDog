@@ -5,14 +5,14 @@
   a path the build has no file for answers a 404 status with this page in the site's own shell,
   rather than a blank white page. It is not in the sitemap and asks not to be indexed.
 
-  IT IS ONE CALM TILE, the way the site's single-purpose pages are drawn: the heading, the one sentence, and every
-  page `nav.ts` knows exists as a row with its arrow, so it names a page the day its folder lands and a reader who
-  arrived by accident is one press from somewhere real.
+  THE NIGHT HEAD, then every page `nav.ts` knows exists, each a 44px link with its arrow in one flat tile, so it names
+  a page the day its folder lands and a reader who arrived by accident is one press from somewhere real.
 -->
 <script lang="ts">
   import { site } from '$lib/copy.ts';
   import Icon from '$lib/Icon.svelte';
   import { PAGES } from '$lib/nav.ts';
+  import PageHead from '$lib/site/PageHead.svelte';
 
   const n = site.notFound;
 </script>
@@ -23,79 +23,59 @@
   <meta name="robots" content="noindex" />
 </svelte:head>
 
-<section class="band" aria-labelledby="lost-title">
-  <div class="in">
-    <div class="tiles">
-      <article class="tile lead lost span-8">
-        <span class="well l"><Icon name="help" /></span>
-        <h1 class="h2" id="lost-title">{n.title}</h1>
-        <p class="lede">{n.lede}</p>
-        <ul class="part-links">
-          {#each PAGES as link}
-            <li><a href={link.path}><span>{link.label}</span><Icon name="chevron-right" size="m" /></a></li>
-          {/each}
-        </ul>
-      </article>
-    </div>
-  </div>
+<PageHead title={n.title} lead={n.lede} />
+
+<section class="wrap pages" aria-label="The pages">
+  <ul>
+    {#each PAGES as link}
+      <li><a href={link.path}><span>{link.label}</span><Icon name="chevron-right" size="m" /></a></li>
+    {/each}
+  </ul>
 </section>
 
 <style>
-  /* One tile in the middle of the ground, the width of a reading column, with the pages as two columns of rows. */
-  @media (width >= 900px) {
-    .lost {
-      grid-column: 3 / span 8;
-    }
+  .pages {
+    padding-block: 56px 96px;
   }
 
-  .lost > .well {
-    align-self: flex-start;
-  }
-
-  .lost .lede {
-    max-inline-size: 48ch;
-  }
-
-  .part-links {
+  /* ONE FLAT TILE holding the pages, two columns at a desk and one on a phone. */
+  ul {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 var(--sp-5);
+    gap: 0 32px;
+    max-inline-size: 820px;
     margin: 0;
-    /* `padding-inline: 0` is load-bearing: base.css resets a list's MARGIN and not its padding. */
-    padding-inline: 0;
+    padding: 12px 24px;
+    background: var(--paper);
+    border-radius: 16px;
     list-style: none;
-    border-block-start: 1px solid var(--line);
   }
 
-  .part-links li {
-    border-block-end: 1px solid var(--line);
+  li {
+    border-block-end: 1px solid var(--rule);
   }
 
-  /* Each row is its own target, 44 tall whatever the pointer. */
-  .part-links a {
+  a {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--sp-3);
+    gap: 12px;
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-site-small);
+    font-size: var(--t-site-16);
     font-weight: 500;
     text-decoration: none;
   }
 
-  .part-links a:hover span {
+  a:hover span {
     text-decoration: underline;
     text-underline-offset: 3px;
   }
 
-  .part-links a:active {
-    opacity: var(--press-dim);
-  }
-
-  @media (width < 640px) {
-    .part-links {
+  @media (max-width: 640px) {
+    ul {
       grid-template-columns: minmax(0, 1fr);
+      padding-inline: 16px;
     }
   }
 </style>

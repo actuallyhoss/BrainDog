@@ -1,5 +1,5 @@
 import adapter from '@sveltejs/adapter-static';
-import { HELD } from './src/lib/launch.ts';
+import { HELD, held } from './src/lib/launch.ts';
 
 const OUT = process.env.BRAINDOG_ENV ? `build-${process.env.BRAINDOG_ENV}` : 'build';
 
@@ -32,6 +32,11 @@ export default {
          answers it. Any other failure still stops the build. */
       handleHttpError: ({ status, path, message }) => {
         if (status === 404 && HELD.includes(path)) return;
+        throw new Error(message);
+      },
+      /* `/packs/[id]` names no page while the packs are held, so it is never reached; anything else unseen still stops the build. */
+      handleUnseenRoutes: ({ routes, message }) => {
+        if (held() && routes.every((r) => r === '/packs/[id]')) return;
         throw new Error(message);
       },
     },

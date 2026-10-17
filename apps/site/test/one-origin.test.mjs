@@ -134,3 +134,29 @@ test('"Open the app" is /app once the app lives on the site name, and the site h
     for (const path of ['/app', '/app/signin']) assert.ok(checker.workerFirst(first, path), `${env}: the site answers ${path} with its 404 page, so the link goes nowhere`);
   }
 });
+
+/**
+ * THE SIGNED-IN SWAP RUNS UNDER THE SAME POLICY (batch 103, DIRECTION §48). The site reads `bd_in` before the first
+ * paint, so "Start free" and "Sign in" become "Open BrainDog" with nothing flickering. That needs a script in the head,
+ * and the policy above allows only this origin's own files and the start script SvelteKit hashes. So the shell loads
+ * `/signed-in.js` as a file from this origin, blocking on purpose, and writes no inline script of its own: one would
+ * be refused under `script-src 'self'`, and a hash or `unsafe-inline` added to let it through would let others in.
+ */
+test('app.html loads /signed-in.js from this origin, under script-src self, with no inline script of its own', () => {
+  assert.deepEqual(config.kit.csp?.directives['script-src'], ['self'], 'the script policy is no longer this origin alone');
+
+  const shell = text('src/app.html').replace(/<!--[\s\S]*?-->/g, ' ');
+  const head = shell.slice(0, shell.indexOf('</head>'));
+  const scripts = [...shell.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+  const loads = scripts.filter((m) => /\ssrc="\/signed-in\.js"/.test(m[1]));
+  assert.equal(loads.length, 1, 'app.html does not load /signed-in.js, so a signed-in reader is offered Start free');
+  assert.ok(head.includes(loads[0][0]), 'app.html loads /signed-in.js outside the head, so the page paints before it runs');
+  assert.doesNotMatch(loads[0][1], /\s(async|defer|type="module")\b/, '/signed-in.js is deferred, so Start free flickers into Open BrainDog');
+  assert.ok(text('static/signed-in.js').trim().length > 0, 'static/signed-in.js is missing or empty, so the tag loads nothing');
+
+  for (const [tag, attrs, body] of scripts) {
+    const src = /\ssrc="([^"]*)"/.exec(attrs)?.[1];
+    assert.ok(src !== undefined && body.trim() === '', `app.html holds an inline script, which script-src 'self' refuses: ${tag.slice(0, 80)}`);
+    assert.ok(src.startsWith('/') && !src.startsWith('//'), `app.html loads a script from another origin: ${src}`);
+  }
+});

@@ -166,6 +166,9 @@ test('the only GitHub address is the bare repository the owner asked for', () =>
  * that says a plan is not open, or that there is no way to sign up, is a page written for a day that has passed by
  * the time this copy is deployed.
  */
+/** A vague "soon": refused everywhere but the two lines `SOON` below allows. */
+const COMING_SOON = /\bcoming soon\b/i;
+
 const NOT_YET = [
   /\bneither plan is open\b/i,
   /\bnot open yet\b/i,
@@ -179,7 +182,7 @@ const NOT_YET = [
   /\b(at|after|until|before) launch\b/i,
   /\bwhen the product launches\b/i,
   /\bsign[- ]?ups? opens\b/i,
-  /\bcoming soon\b/i,
+  COMING_SOON,
   /\bnot yet\b/i,
   /* THE AUDIT'S NOT-YET CLAIMS (`src/lib/claims.ts`, marked `not-yet`). The repository stays private on his word, so
      no sentence says the code can be read or that the product is open source; the licence may still be named. */
@@ -188,7 +191,41 @@ const NOT_YET = [
   /\bread (the|our) code\b/i,
 ];
 
+/**
+ * THE TWO "COMING SOON"S THE OWNER ASKED FOR (DIRECTION §47: "Extra use says 'coming soon' until a checkout sells it.
+ * The paid buttons follow `LAUNCH.billing`."). Extra use is sold by no checkout, and the paid plans are not charged
+ * while billing is off, so the pricing page says so in exactly two places: the extra-use section's own line and the
+ * paid cards' word in their buttons' place. Each is allowed at its own path, as those exact words, and only while
+ * `LAUNCH.billing` is false; anywhere else, in any other words, or with billing on, "coming soon" is refused as before.
+ */
+const SOON = { 'site.pricing.extra.soon': 'Coming soon.', 'site.pricing.cards.soon': 'Coming soon' };
+
+/** Whether a sentence at a path is one of the two allowed "coming soon"s, for a set of launch flags. */
+const soonAllowed = (at, text, launch = LAUNCH) => !launch.billing && Object.hasOwn(SOON, at) && SOON[at] === text;
+
+/** Every sentence of `said` a NOT_YET pattern refuses, as `path: text`, for a set of launch flags. */
+const notYet = (said, launch = LAUNCH) =>
+  NOT_YET.flatMap((pattern) =>
+    said
+      .filter(([at, text]) => pattern.test(text) && !(pattern === COMING_SOON && soonAllowed(at, text, launch)))
+      .map(([at, text]) => `${at}: ${text}`),
+  );
+
 test('no sentence says the product is not open yet', () => {
-  const found = NOT_YET.flatMap((pattern) => SAID.filter(([, text]) => pattern.test(text)).map(([at, text]) => `${at}: ${text}`));
+  const found = notYet(SAID);
   assert.deepEqual(found, [], `${found.length} sentence(s) describe the product before launch:\n${found.join('\n')}`);
+});
+
+test('"Coming soon" is said only where the owner asked for it, and only while billing is off', () => {
+  /* Both allowed lines are there, so the allowance is not a pass over nothing. */
+  for (const [at, words] of Object.entries(SOON))
+    assert.ok(SAID.some(([path, text]) => path === at && text === words), `${at} does not say "${words}"`);
+  /* THE PLANTED FAULTS: the same words at another path, other words at an allowed path, and either with billing on. */
+  assert.deepEqual(notYet([['site.home.plans.more', 'Coming soon']]), ['site.home.plans.more: Coming soon']);
+  assert.ok(notYet([['site.pricing.extra.soon', 'Coming soon, after launch.']]).length > 0, 'other words at an allowed path pass');
+  assert.deepEqual(notYet([['site.pricing.extra.say', 'Packs are coming soon.']]), ['site.pricing.extra.say: Packs are coming soon.']);
+  const on = { ...LAUNCH, billing: true };
+  assert.deepEqual(notYet([['site.pricing.cards.soon', 'Coming soon']], on), ['site.pricing.cards.soon: Coming soon']);
+  /* AND THE REST STILL HOLDS: open source is refused while the repository is private. */
+  if (!LAUNCH.repo) assert.deepEqual(notYet([['site.pricing.extra.soon', 'BrainDog is open source.']]), ['site.pricing.extra.soon: BrainDog is open source.']);
 });

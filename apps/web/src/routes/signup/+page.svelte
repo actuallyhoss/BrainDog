@@ -138,6 +138,7 @@
   import PasskeyFirst from '../start/PasskeyFirst.svelte';
   import type { Accepting, NotMade } from '../start/accept.ts';
   import { accepting, nameSent, picked, replyOf, settle, titleSent } from './build.ts';
+  import Apply from './Apply.svelte';
   import NameField from './NameField.svelte';
   import { loadWidget, widgetWords, type WidgetState } from './turnstile.ts';
   import { words } from './words.ts';
@@ -754,13 +755,13 @@
       step = 'closed';
       return;
     }
-    /* BY INVITATION, A STRANGER WITH NO CODE IS SHOWN THE CLOSED PAGE WITH ITS OWN LINE. A person signed in needs none:
-       their account is made, and a record of their own is checkout's to say. */
+    siteKey = out.value.turnstile;
+    /* BY INVITATION, A STRANGER WITH NO CODE IS ASKED TO APPLY (`Apply.svelte`), with the host's check when it gives one.
+       A person signed in needs none: their account is made, and a record of their own is checkout's to say. */
     if (out.value.mode === 'invite' && signedIn === null && codeKept(tabStore()) === null) {
       step = 'invite-only';
       return;
     }
-    siteKey = out.value.turnstile;
     step = 'describe';
     await tick();
     field?.focus();
@@ -1179,10 +1180,12 @@
         <Empty kind="error" title={copy.unreachableTitle} body={copy.unreachableWhy}>
           {#snippet actions()}<Button onclick={() => void ask()}>{copy.askAgain}</Button>{/snippet}
         </Empty>
-      {:else if step === 'closed' || step === 'invite-only'}
-        <h1 class="title">{step === 'closed' ? copy.signupClosedTitle : words.inviteTitle}</h1>
-        <p class="lede">{step === 'closed' ? copy.signupClosedWhy : words.inviteWhy}</p>
+      {:else if step === 'closed'}
+        <h1 class="title">{copy.signupClosedTitle}</h1>
+        <p class="lede">{copy.signupClosedWhy}</p>
         <div class="go"><Button weight="primary" href="/signin">{copy.signIn}</Button></div>
+      {:else if step === 'invite-only'}
+        <Apply {siteKey} />
       {:else if step === 'describe'}
         <h1 class="title" id="who-h">{firstRun.whoQuestion}</h1>
         <p class="lede">{words.lede}</p>

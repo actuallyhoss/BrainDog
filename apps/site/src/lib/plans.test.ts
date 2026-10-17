@@ -22,6 +22,7 @@ import { site } from './copy.ts';
 import { home } from './copy/home.ts';
 import { LAUNCH } from './launch.ts';
 import { PACKS, PAID, PLANS, TABLE, TABLE_PACKS, packsOnSale, priceOf, type Allowance } from './plans.ts';
+import { cardsFor, extra, holds } from './pricing/cards.ts';
 
 const REPO = new URL('../../../../', import.meta.url);
 
@@ -78,8 +79,9 @@ test("each card's agents and credits are its row's in PLAN_TABLE", () => {
     const held = PLAN_TABLE[row[plan.id]]!;
     assert.equal(plan.allowance.agents, held.agents, `${plan.name}: the site says ${plan.allowance.agents} agents, the table holds ${held.agents}`);
     assert.equal(plan.allowance.credits, held.credits, `${plan.name}: the site says ${plan.allowance.credits} credits, the table holds ${held.credits}`);
-    const line = site.pricing.plans[plan.id].points.find((p) => /agents/.test(p));
-    assert.ok(line?.includes(String(held.agents)), `${plan.name}'s card says no "${held.agents} agents" line`);
+    const card = cardsFor(LAUNCH).find((c) => c.id === plan.id)!;
+    assert.ok(card.lines.includes(`${held.agents} agents`), `${plan.name}'s card says no "${held.agents} agents" line`);
+    assert.ok(card.lines.some((l) => l.startsWith(`${held.credits} questions`)), `${plan.name}'s card says no "${held.credits} questions" line`);
   }
 });
 
@@ -129,21 +131,30 @@ test("Cloud's and Free's Slash credits are the monthly ask limits Slash names fo
 });
 
 test('Cloud Plus is five times the Cloud allowance, as its card says', () => {
-  /* THE CARD'S FIRST LINE (`copy/pricing.ts`, `plans.plus.points`) is a claim about every figure, so
+  /* THE CARD'S LAST LINE (`copy/pricing.ts`, `cards.plus.lines`) is a claim about every figure, so
      every figure is checked: a Plus allowance raised on one meter alone makes the line false. */
   const cloud = PLANS.find((p) => p.id === 'cloud');
   const plus = PLANS.find((p) => p.id === 'plus');
   assert.ok(cloud && plus, 'plans.ts is missing Cloud or Cloud Plus');
-  if (!site.pricing.plans.plus.points.some((line) => /five times/i.test(line))) return;
+  if (!cardsFor(LAUNCH).find((c) => c.id === 'plus')!.lines.some((line) => /five times/i.test(line))) return;
   for (const key of Object.keys(cloud.allowance) as (keyof Allowance)[]) {
     assert.equal(plus.allowance[key], cloud.allowance[key] * 5, `Cloud Plus has ${plus.allowance[key]} ${key}, not five times Cloud's ${cloud.allowance[key]}`);
   }
 });
 
-test('the allowance table has a row for every meter', () => {
-  const rows = site.pricing.usage.map((u) => u.key);
-  for (const plan of PLANS)
-    assert.deepEqual([...rows].sort(), Object.keys(plan.allowance).sort(), `copy/pricing.ts usage leaves out a meter of ${plan.name}, or names one plans.ts has not`);
+test('the table of what each plan holds has a row for every meter, each cell its plan\'s figure', () => {
+  /* THE SEVEN ROWS: the agents, credits and people of a row of the table, and its four metered allowances. */
+  const meters = ['agents', 'credits', 'people', ...Object.keys(TABLE.free.allowance)];
+  assert.deepEqual(holds.map((r) => r.key).sort(), [...meters].sort(), 'copy/pricing.ts holds.rows leaves out a meter of the table, or names one it has not');
+  const columns = [TABLE.free, TABLE.hosted, TABLE.plus];
+  const cell = (key: string, i: number) => holds.find((r) => r.key === key)!.cells[i];
+  columns.forEach((row, i) => {
+    assert.equal(cell('agents', i), row.agents.toLocaleString('en-US'), `${row.name}'s agents cell is not its figure`);
+    assert.equal(cell('credits', i), row.credits.toLocaleString('en-US'), `${row.name}'s questions cell is not its figure`);
+    assert.equal(cell('runs', i), row.allowance.runs.toLocaleString('en-US'), `${row.name}'s runs cell is not its figure`);
+    assert.equal(cell('requests', i), row.allowance.requests.toLocaleString('en-US'), `${row.name}'s requests cell is not its figure`);
+    assert.equal(cell('people', i), row.people === 1 ? 'Just you' : 'Everyone you invite', `${row.name}'s people cell is not its figure`);
+  });
 });
 
 test("with billing on, every pack the site shows is the table's, at its price, and one the checkout sells", () => {
@@ -164,28 +175,44 @@ test("with billing on, every pack the site shows is the table's, at its price, a
   assert.notDeepEqual(moved, TABLE_PACKS_HELD.map((p) => ({ ...p, price: tablePriceOf(p.cents) })));
   /* The packs' sentences name each pack at its price. */
   assert.equal(site.slash.allowance.packsUnit(shown), 'credits for $5, or 500 for $20, and they do not end with the month');
-  assert.doesNotMatch(site.pricing.laterFor(shown), /credit packs .*coming later/i, 'with packs on sale the pricing page says they are coming later');
 });
 
 test('with billing off, no pack is shown and no sentence names one', () => {
   assert.deepEqual(packsOnSale(false), [], 'with billing off the site shows a credit pack no card can buy');
   assert.deepEqual(PACKS, packsOnSale(LAUNCH.billing), 'PACKS is not the packs on sale for LAUNCH.billing');
   if (!LAUNCH.billing) assert.equal(PACKS.length, 0, 'billing is off and plans.ts puts a credit pack on sale');
-  const off = [site.slash.allowance.packsUnit(packsOnSale(false)), site.pricing.laterFor(packsOnSale(false))];
-  for (const line of off) assert.doesNotMatch(line, /\$\d|\bcredits for\b|never expire|do not end with the month/i, `"${line}" names a pack while none is sold`);
-  assert.match(off[1]!, /Credit packs and extra usage are coming later/, 'with billing off the pricing page does not say packs are coming later');
+  const off = site.slash.allowance.packsUnit(packsOnSale(false));
+  assert.doesNotMatch(off, /\$\d|\bcredits for\b|never expire|do not end with the month/i, `"${off}" names a pack while none is sold`);
+  /* THE PRICING PAGE NAMES NO PACK AT ALL, on or off: no sentence of it says a pack, its credits or its price. */
+  const page = JSON.stringify({ pricing: site.pricing, off: cardsFor({ billing: false }), on: cardsFor({ billing: true }) });
+  assert.doesNotMatch(page, /\bpacks?\b|\$5\b|\$20\b/i, 'the pricing page names a credit pack');
   /* What the pages draw today is the off state while billing is off. */
-  if (!LAUNCH.billing) assert.deepEqual([site.slash.allowance.packsUnit(), site.pricing.later], off);
+  if (!LAUNCH.billing) assert.equal(site.slash.allowance.packsUnit(), off);
 });
 
-test('nothing promises what the checkout does not sell: no billed extra usage, and no $12 headline', () => {
-  /* EXTRA USAGE IS NOT BUILT (`mayRun` holds a record at its allowance); packs are held by the two tests above. */
+test('nothing promises what the checkout does not sell: extra use is coming soon and sold by nothing, and no $12 headline', () => {
+  /* EXTRA USE IS NOT BUILT (`mayRun` in `directory.ts` holds a record at its allowance), so its section says it is
+     coming soon whatever billing is, its prices are the table's, and no sentence sells it or a pack. */
+  const p = site.pricing;
+  assert.equal(p.extra.soon, 'Coming soon.', 'the extra-use section does not say it is coming soon');
+  const cost = TABLE.hosted.extra!;
+  assert.deepEqual(TABLE.plus.extra, cost, 'Cloud Plus prices extra use apart from Cloud, and the page draws one price');
+  assert.deepEqual(
+    extra.map((r) => [r.key, r.price.split(' ')[0]]),
+    Object.entries(cost).map(([key, c]) => [key, priceOf(c.cents)]),
+    "an extra-use price is not TABLE.hosted.extra's",
+  );
   const said = JSON.stringify({
-    pricing: site.pricing,
-    home: home.home.plans,
+    pricing: p,
+    cards: [cardsFor({ billing: false }), cardsFor({ billing: true })],
+    extra,
+    home: home.plans,
     slash: [site.slash.allowance.lead, site.slash.allowance.packsUnit(PACKS), site.slash.drawn.creditsReading('five')],
   });
-  assert.doesNotMatch(said, /never charged past|charge for usage past|top up with a pack/i, 'the pricing copy still sells extra usage');
-  for (const head of [site.pricing.title, site.pricing.sub, home.home.plans.title])
+  assert.doesNotMatch(said, /never charged past|charge for usage past|top up with a pack|billed for extra|extra use is on/i, 'the pricing copy sells extra use');
+  /* A PAID CARD LINKS NOTHING WHILE BILLING IS OFF: its button's place says "Coming soon" and is no link. */
+  for (const card of cardsFor({ billing: false }).filter((c) => c.id !== 'free'))
+    assert.deepEqual(card.button, { kind: 'soon', label: p.cards.soon }, `${card.name} links a checkout while billing is off`);
+  for (const head of [p.title, p.sub, home.plans.title])
     assert.doesNotMatch(head, /\$\d/, `"${head}" is a headline with a price in it, and Free leads`);
 });

@@ -18,6 +18,7 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 
 const FACES = [
+  { file: 'lexend-600.woff2', query: 'family=Lexend:wght@600', subset: 'latin' },
   { file: 'poppins-600.woff2', query: 'family=Poppins:wght@600', subset: 'latin' },
   { file: 'geist.woff2', query: 'family=Geist:wght@300..800', subset: 'latin' },
   { file: 'geist-mono.woff2', query: 'family=Geist+Mono:wght@400..500', subset: 'latin' },

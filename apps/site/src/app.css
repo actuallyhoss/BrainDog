@@ -1,15 +1,16 @@
 /**
- * The site's own half of the stylesheet. Everything else is `@braindog/skin`.
+ * The site's own half of the stylesheet. Everything else is `@braindog/skin`, and the colours and faces are Look B's
+ * (`look-b.css`, DIRECTION §47).
  *
- * THE LOOK IS "WINDOW FOR EVERYONE" (30 September): the product itself at full size, in glass, on a ground with two
- * soft lights, a rose one from the mark's side and a cool one opposite. The header is a glass bar floating 12 in; a
- * band is words on the ground beside one glass frame holding the product at work; the footer is one tile. Content is
- * opaque and chrome is glass. The house red is the accent: the mark, a count waiting on you, a chosen agent and a
- * figure that needs looking at. It is never the colour of a paragraph or of the one filled button, which stays ink.
+ * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER (`loop/site-2026-10-17/src/site.html`): a dark night band at the top of
+ * every page (the header, then the page's own head), the page on a flat white ground below it with big flat cards,
+ * a huge centred close and a dark footer. No glass, no gradients, no glows. Titles are Lexend 600 set tight, every
+ * other word is Geist. The one solid red on a page is "Start free"; inside the product's drawings red means late or
+ * needs you.
  *
- * WHAT EVERY PAGE DRAWS THE SAME WAY IS HERE, and a page's own sheet only places it: the column, the band, the tile
- * grid and its spans, the tile and its heading row, the icon well, the heading sizes, the reading text, the buttons
- * and the key cap. Three copies of a button once drifted into three buttons, which is why they live in one place.
+ * WHAT EVERY PAGE DRAWS THE SAME WAY IS HERE, and a page's own sheet only places it: the column (`.wrap`), the night
+ * ground, the buttons, the cards, the tables, the questions and the key cap, beside the older tile grid the kept
+ * pages still draw (`.in`, `.band`, `.tile`) until each is restyled. A component's own look is in the component.
  */
 
 @layer components {
@@ -30,6 +31,14 @@
     --t-site-body: clamp(16px, 15.63px + 0.095vw, 17px);
     --lh-site-body: 1.647;
     --t-site-small: 14px;
+    /* THE SITE DESIGN'S OTHER STEPS (DIRECTION §47), named once here so a component reads a step and not a size. */
+    --t-site-14-5: 14.5px;
+    --t-site-15: 15px;
+    --t-site-16: 16px;
+    --t-site-16-5: 16.5px;
+    --t-site-18: 18px;
+    --t-site-19: 19px;
+    --t-site-21: 21px;
     /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
     --t-app-xs: var(--t-xs);
     --t-app-sm: var(--t-sm);
@@ -41,12 +50,9 @@
     }
   }
 
-  /* THE GROUND AND ITS LIGHT, painted once on the document, so every band and every tile sits on the same field. One
-     soft light from the top (DIRECTION §37), the skin's own and the only gradient: no tinted glows in the corners. */
+  /* THE GROUND, flat and painted once on the document: the page's white, or its dark under the dark scheme. */
   html {
-    background-color: var(--sunk);
-    background-image: var(--ground-light);
-    background-repeat: no-repeat;
+    background: var(--page);
     scroll-behavior: smooth;
   }
 
@@ -58,7 +64,9 @@
   }
 
   body {
-    background: transparent;
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--ui);
     font-size: var(--t-site-body);
     font-variant-numeric: tabular-nums;
     /**
@@ -88,13 +96,18 @@
     --t-sm: var(--t-app-sm);
   }
 
-  /* A HEADING OF A BAND IS SET IN THE DISPLAY FACE, the wordmark's own, and every other word is Geist. The display face
-     is loaded at one weight and never set under 20px (`bundle`'s budget line), so only `.display` and `.h2` name it. */
+  /* TITLES ARE LEXEND 600 (DIRECTION §47, as on quartz.gg), loaded at that one weight; a page sets each one's size and
+     its tight spacing. Every other word is Geist, a group's small label included. */
   h1,
   h2,
-  h3,
+  h3 {
+    margin: 0;
+    font-family: var(--head);
+    font-weight: 600;
+  }
+
   h4 {
-    font-family: var(--font-ui);
+    font-family: var(--ui);
   }
 
   /* ── The column and the band ─────────────────────────────────────────────── */
@@ -115,7 +128,9 @@
     margin-block-start: var(--inset);
   }
 
-  main > :first-child {
+  /* A PAGE THAT OPENS ON THE NIGHT GROUND joins the header's band with no gap; one that opens on the page's white
+     leaves room under it. */
+  main > :first-child:not(.night) {
     margin-block-start: var(--sp-6);
   }
 
@@ -357,96 +372,109 @@
   /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
   /**
-   * THE BUTTON IS A PILL, and exactly one per view is filled. The filled one is ink with the on-ink word (the design system);
-   * the quiet one is the tile's second fill; the glass one sits on the ground or on chrome. No hue is spent on an
-   * action, and red is never a fill.
+   * THE SITE DESIGN'S BUTTONS (DIRECTION §47): a 48px rectangle, radius 12, in Geist 500. `.red` is "Start free", the
+   * one solid red a page carries, and is drawn only by `lib/site/Start.svelte`; `.ghost` sits on the night ground,
+   * `.line` and `.quiet` on the page, `.tint` is the red's tint, and `.sm` is the 34px one. A `.btn` with none of these
+   * is the quiet one, so a kept page's plain button stays drawn.
    *
-   * THE PRESS IS A SCALE AND AN OPACITY: under `prefers-reduced-motion` a11y collapses every duration, so a press
-   * written as a transform alone is not damped for those readers, it is absent. Opacity is a state and lands.
+   * THE PRESS IS A ONE-PIXEL DROP, which `a11y.css` stills under reduced motion along with every transition.
    */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--sp-2);
-    min-block-size: var(--ctl-h);
-    padding-inline: 16px;
-    background: var(--s1);
+    gap: 8px;
+    block-size: 48px;
+    padding: 0 20px;
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px var(--rule);
     color: var(--ink);
-    font: inherit;
-    font-size: var(--t-site-small);
-    font-weight: 500;
-    line-height: 1.2;
+    cursor: pointer;
+    font: 500 15.5px/1 var(--ui);
     text-decoration: none;
     white-space: nowrap;
-    cursor: pointer;
     transition:
-      transform var(--d-release) var(--ease-out),
-      opacity var(--d-release) var(--ease-out),
-      background var(--d-state) var(--ease-out);
+      background 0.15s,
+      transform 0.1s,
+      box-shadow 0.15s;
   }
 
   .btn:hover {
-    background: var(--s2);
+    background: var(--soft);
   }
 
   .btn:active {
-    transform: scale(var(--press-scale));
-    opacity: var(--press-dim);
-    transition-duration: var(--d-press);
-    transition-timing-function: var(--ease-push);
+    transform: translateY(1px);
   }
 
+  .btn svg {
+    inline-size: 17px;
+    block-size: 17px;
+  }
+
+  .btn.red {
+    background: var(--red);
+    box-shadow: none;
+    color: var(--on-red);
+  }
+
+  .btn.red:hover {
+    background: var(--red-press);
+  }
+
+  /* The design's white at 8 and 14 in a hundred over the night, mixed from the night's own ink. */
+  .btn.ghost,
+  .btn-glass {
+    background: color-mix(in srgb, var(--on-night) 8%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--on-night) 14%, transparent);
+    color: var(--on-night);
+  }
+
+  .btn.ghost:hover,
+  .btn-glass:hover {
+    background: color-mix(in srgb, var(--on-night) 14%, transparent);
+  }
+
+  .btn.line {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink);
+  }
+
+  .btn.tint,
+  .btn.tint:hover {
+    background: var(--red-tint);
+    box-shadow: none;
+    color: var(--red-ink);
+  }
+
+  /* THE OLD FILLED BUTTON, ink, which a kept page may still draw until its own builder moves it to `Start`. */
   .btn-primary {
     background: var(--ink);
-    color: var(--on-ink);
+    box-shadow: none;
+    color: var(--page);
   }
 
   .btn-primary:hover {
-    background: var(--primary-hover);
+    background: var(--ink2);
   }
 
-  .btn-glass {
-    background: var(--glass);
-    box-shadow: var(--glass-edge);
-    backdrop-filter: var(--glass-blur);
-  }
-
-  /* Safari before 18 knows the blur only by its prefixed name; every glass rule here repeats it the same way. */
-  @supports (-webkit-backdrop-filter: none) {
-    .btn-glass {
-      -webkit-backdrop-filter: var(--glass-blur);
-      backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  .btn-lg {
-    min-block-size: var(--tap);
-    padding-inline: 20px;
-  }
-
+  .btn.sm,
   .btn-sm {
-    min-block-size: var(--ctl-h-sm);
-    padding-inline: 12px;
+    block-size: 34px;
+    padding: 0 13px;
+    border-radius: 9px;
+    /* The design's 13.5, held at the site's floor of 14. */
+    font-size: var(--t-site-small);
   }
 
-  /* 44 on both axes under a thumb, and every button on the site is wider than it is tall. */
+  /* 44 on both axes under a thumb, whatever the button's own size. */
   @media (pointer: coarse) {
-    .btn {
-      min-block-size: var(--tap);
-    }
-  }
-
-  /* The arrow in a primary button leans towards where it goes, a little, under the pointer. */
-  @media (prefers-reduced-motion: no-preference) {
-    .btn-primary svg {
-      transition: transform var(--d-state) var(--ease-out);
-    }
-
-    .btn-primary:hover svg {
-      transform: translateX(2px);
+    .btn.sm,
+    .btn-sm {
+      block-size: var(--tap);
     }
   }
 
@@ -577,13 +605,214 @@
     --hue: var(--warn);
   }
 
+  /* ── The site design's shared parts (DIRECTION §47) ──────────────────────── */
+
+  /* THE COLUMN: 1200 wide, 24 in from the window's edge, 16 on a phone, and clear of a notch either side. */
+  .wrap {
+    max-inline-size: 1200px;
+    margin-inline: auto;
+    padding-inline: max(24px, env(safe-area-inset-left, 0px)) max(24px, env(safe-area-inset-right, 0px));
+  }
+
+  /* THE NIGHT GROUND: the header, each page's own head, the footer and the black card. */
+  .night {
+    background: var(--night);
+    color: var(--on-night);
+  }
+
+  /* SIGNED IN OR NOT, decided before the first paint by `/signed-in.js` (`lib/site/signed-in.ts`). Both are in the
+     HTML; with scripting off the page reads as signed out. THEY ARE !important because this file is in a layer and
+     a component's own unlayered rule (the phone menu's links draw display: flex) would otherwise win and keep
+     "Sign in" on the page of someone who is signed in. */
+  html[data-in] .when-out {
+    display: none !important;
+  }
+
+  html:not([data-in]) .when-in {
+    display: none !important;
+  }
+
+  /* THE BIG CARDS: paper, the black one and the red one, each one value of the product with the product working in it. */
+  .card {
+    position: relative;
+    overflow: hidden;
+    padding: 52px;
+    border-radius: 30px;
+  }
+
+  .card.paper {
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  .card.dark {
+    background: var(--night);
+    color: var(--on-night);
+  }
+
+  .card.redc {
+    background: var(--redcard);
+    color: var(--on-red);
+  }
+
+  .card h2 {
+    max-inline-size: 12ch;
+    font-size: clamp(2.3rem, 4.5vw, 3.9rem);
+    line-height: 1;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+
+  .card.dark h2 {
+    max-inline-size: 15ch;
+  }
+
+  /* A CARD'S ONE LINE under its title. */
+  .say {
+    max-inline-size: 25em;
+    margin: 18px 0 0;
+    font-size: var(--t-site-18);
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .card.paper .say {
+    color: var(--ink2);
+  }
+
+  .card.dark .say {
+    color: var(--on-night-2);
+  }
+
+  .card.redc .say {
+    color: var(--on-red-2);
+  }
+
+  /* A LINK THAT LEADS ON to the rest: words and an arrow. */
+  .more {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-block-start: 22px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .more:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .more svg {
+    inline-size: 18px;
+    block-size: 18px;
+  }
+
+  /* A TABLE OF PLANS OR FIGURES, which scrolls inside its own box on a phone and never the page. */
+  .tablebox {
+    overflow-x: auto;
+    margin-block-start: 28px;
+  }
+
+  .ptable {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: var(--t-site-15);
+  }
+
+  .ptable th,
+  .ptable td {
+    padding: 14px 10px;
+    border-block-start: 1px solid var(--rule);
+    text-align: start;
+  }
+
+  .ptable th {
+    border-block-start: 0;
+    color: var(--muted);
+    font-size: var(--t-site-small);
+    font-weight: 500;
+  }
+
+  .ptable td:not(:first-child),
+  .ptable th:not(:first-child) {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+
+  /* QUESTIONS PEOPLE ASK: two columns at a desk, one below 1060. */
+  .faq {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 34px 56px;
+    margin-block-start: 40px;
+  }
+
+  .faq h3 {
+    margin-block-end: 8px;
+    font-size: var(--t-site-21);
+    letter-spacing: -0.03em;
+  }
+
+  .faq p {
+    margin: 0;
+    color: var(--ink2);
+    font-size: var(--t-site-16);
+  }
+
+  /* THE SLASH KEY, a 60px cap with the / in red, on the page or (`.on-night`) on the night ground. */
+  .keycap {
+    display: grid;
+    place-items: center;
+    inline-size: 60px;
+    block-size: 60px;
+    margin-block-end: 26px;
+    background: var(--tile);
+    border-radius: 15px;
+    box-shadow:
+      inset 0 0 0 1px var(--rule),
+      inset 0 -3px 0 var(--rule);
+    color: var(--red);
+    font: 600 28px/1 var(--head);
+  }
+
+  .keycap.on-night {
+    background: var(--night-2);
+    box-shadow:
+      inset 0 0 0 1px var(--night-rule),
+      inset 0 -3px 0 var(--night-rule);
+    /* The design's light red on the night, mixed from the red and the night's ink. */
+    color: color-mix(in srgb, var(--red) 60%, var(--on-night));
+  }
+
+  @media (max-width: 1060px) {
+    .faq {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .wrap {
+      padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+    }
+
+    .card {
+      padding: 30px 20px 22px;
+      border-radius: 24px;
+    }
+
+    .say {
+      font-size: var(--t-site-16-5);
+    }
+  }
+
   /* A TILE RISES INTO PLACE THE FIRST TIME IT SCROLLS IN, and only on a page the script has marked `js` (`reveal.ts`).
      Without scripting, under reduced motion (as `scripts/shot.mjs` captures) or printed, it is simply there. */
   @media (prefers-reduced-motion: no-preference) {
     :root.js .reveal {
       transition:
-        opacity 480ms var(--ease-out),
-        transform 480ms var(--ease-out);
+        opacity 0.7s ease,
+        transform 0.7s ease;
     }
 
     :root.js .reveal:not(.seen) {

@@ -1,25 +1,30 @@
 /**
- * The pricing page and the Slash page. What a plan includes is the reader's question on `/pricing`,
- * and those figures live in `plans.ts`, not here: this file holds only the sentences said about them.
+ * The pricing page and the Slash page. What a plan holds is the reader's question on `/pricing`, and those figures
+ * live in `plans.ts`, not here: this file holds only the sentences said about them, and a sentence that carries a
+ * figure is a function of it, so `lib/pricing/cards.ts` fills it from `TABLE` and no figure is typed twice.
  */
 
-import { PACKS, plan, type Allowance, type Pack, type Plan } from '../plans.ts';
-import { home } from './home.ts';
+import { PACKS, type Pack } from '../plans.ts';
 
-/** A figure a month, grouped the way every figure on the site is. */
-const aMonth = (n: number): string => `${n.toLocaleString('en-US')} a month`;
+/** A count as every figure on the site is grouped: 1,000 and 750,000. */
+const grouped = (n: number): string => n.toLocaleString('en-US');
 
-/* A card's agents line, from the plan's own figure (`agents` in `PLAN_TABLE`): what a record may hold live at once. */
-const agentsOn = (id: Plan['id']): string => `Connect up to ${plan(id).allowance.agents.toLocaleString('en-US')} agents`;
+/** Who may hold a record: `people` in `PLAN_TABLE`, where `null` is no limit. */
+const people = (n: number | null): string => (n === 1 ? 'Just you' : 'Everyone you invite');
 
-/**
- * The pricing page's line on what is not sold, for the packs on sale: while none is, it says packs and extra usage are
- * coming later and names no pack; with billing on it says only extra usage is. Extra usage is sold by no checkout.
- */
-const laterFor = (packs: readonly Pick<Pack, 'credits'>[]): string =>
-  packs.length === 0
-    ? 'Credit packs and extra usage are coming later. Until then, work over the allowance waits for the next month.'
-    : 'Extra usage is coming later. Until then, runs over the allowance wait for the next month, and credit packs give Slash credits that do not end with the month.';
+/** A figure of bytes as a person says it: Free's 100,000,000 reads as 100 MB, never 0.1 GB. */
+const size = (bytes: number): string => (bytes < 1_000_000_000 ? `${grouped(bytes / 1_000_000)} MB` : `${grouped(bytes / 1_000_000_000)} GB`);
+
+/** A figure of milliseconds as hours: `ms` in `PLAN_TABLE`. */
+const hours = (ms: number): string => `${grouped(ms / 3_600_000)} hours`;
+
+/** The figures a card's lines and the table's cells read, one row of `TABLE` (`plans.ts`). */
+export type Figures = {
+  agents: number;
+  credits: number;
+  people: number | null;
+  allowance: { runs: number; requests: number; bytes: number; ms: number };
+};
 
 export const pricing = {
   /**
@@ -35,8 +40,6 @@ export const pricing = {
       'or a rule, or see what needs you today. Nothing it writes goes in until you say yes.',
     primary: 'Start for free',
     secondary: 'How credits work',
-    /** The palette this page and the home page draw. Its words are the home page's, in `copy/home.ts`. */
-    demo: home.home.slash.demo,
     abilities: [
       {
         id: 'ask',
@@ -118,124 +121,95 @@ export const pricing = {
   },
 
   /**
-   * THE PRICING PAGE. Free leads (DIRECTION §35): it is the page's headline and its first tile, and Cloud and Cloud
-   * Plus follow as the plans for pros. The plans it sells are `HOSTED_PLANS` in `apps/worker/src/billing.ts`, Free is
-   * `FREE_PLAN` there, their names and prices come from `PLAN_TABLE` in `packages/record/src/plans.ts`, and the
-   * allowance a record is held to is `ALLOWANCE` in `packages/record/src/directory.ts`; `plans.test.ts` holds `plans.ts`
-   * to all of them. Credit packs are shown only with billing on (`packsOnSale` in `plans.ts`), and extra usage is sold
-   * by no checkout, so while billing is off the page says both are coming later in one line and sells neither.
+   * THE PRICING PAGE, the prototype's `#pricing` (`loop/site-2026-10-17/src/site.html`, DIRECTION §47). Free leads
+   * (§35): it is the headline and the first card, the black one. Every figure is `TABLE`'s in `plans.ts`, which
+   * `plans.test.ts` holds to `PLAN_TABLE`, the checkout's `HOSTED_PLANS` and the Directory's `ALLOWANCE`, and
+   * `lib/pricing/cards.ts` puts each figure into these sentences.
+   *
+   * HONEST AT LAUNCH (§47). The paid buttons follow `LAUNCH.billing`: with billing off the paid cards say "Coming soon"
+   * in the button's place and link nothing. Extra use is sold by no checkout (`mayRun` in `directory.ts` holds a
+   * record at its allowance), so its section always says it is coming soon. No sentence says a card is charged.
+   *
+   * TWO METERS ARE NAMED FOR WHAT THE CODE COUNTS, not the prototype's words: `bytes` is data fetched from other
+   * services in the month (`dir_usage_day` in `directory.ts`), so it reads "Data fetched", never "Storage", and
+   * `requests` is the calls a record's automations and scripts make out, so it reads "Requests to other services".
    */
   pricing: {
     // A headline with no price in it: `plans.test.ts` checks that "$12 a month" never leads.
     title: 'Free for one person.',
-    // The free door is `makeFree` in `billing.ts`: no Stripe call and no card, and no date it ends.
-    sub:
-      'One record with the whole app: your lists and pages, Slash, agents and automations. No card, and no trial ' +
-      'that runs out. Pay only when you need more.',
-    /** The column header a screen reader hears over the table's row names. */
-    what: 'What',
-    /** Each card's button and the lines under its allowance, by `Plan['id']`. */
-    plans: {
+    sub: 'Every plan has the whole app. You pay for room: more agents, more questions, more people.',
+    /** The three cards, Free first. A line that carries a figure is filled from the plan's row of `TABLE`. */
+    cards: {
       free: {
-        cta: 'Start for free',
-        // Nothing in the app is gated by plan; backups are `apps/worker/src/snapshots.ts`; export is Settings' one file.
-        points: ['Every part of the app', 'Nightly backups, last 30 kept', 'Export everything, any time', agentsOn('free')],
+        // Signed out the tag invites; signed in (`html[data-in]`, `lib/site/signed-in.ts`) it says whose plan it is.
+        tag: 'Start here',
+        mine: 'Your plan',
+        // The free door is `makeFree` in `billing.ts`: no Stripe call and no card.
+        per: 'no card',
+        lines: (f: Figures) => ['The whole app', `${grouped(f.agents)} agents`, `${grouped(f.credits)} questions to Slash a month`, people(f.people)],
       },
       cloud: {
+        per: 'a month',
         cta: 'Choose Cloud',
-        // `dir_member` has no limit per record; the switch and the cancel are `billing.ts`' portal.
-        points: ['Colleagues, as many as you like', 'Change or cancel any time', agentsOn('cloud')],
+        lines: (f: Figures) => [`${grouped(f.agents)} agents`, `${grouped(f.credits)} questions a month`, people(f.people), 'More runs, data and script time'],
       },
       plus: {
+        per: 'a month',
         cta: 'Choose Cloud Plus',
         // Five times is every figure in `ALLOWANCE.plus` over `ALLOWANCE.hosted`, held by `plans.test.ts`.
-        points: ['Five times the Cloud allowance', 'Colleagues, as many as you like', agentsOn('plus')],
+        lines: (f: Figures) => [`${grouped(f.agents)} agents`, `${grouped(f.credits)} questions a month`, people(f.people), 'Five times Cloud'],
       },
+      /** A paid card's word in its button's place while `LAUNCH.billing` is off. Plain text: nothing to press. */
+      soon: 'Coming soon',
     },
-    /* What the Free card sums up of its allowance, under the price. */
-    summary: (credits: string, runs: string) => `${credits} Slash credits and ${runs} automation runs a month`,
-    /* THE PLANS FOR PROS, second and quieter: one tile, a line each. */
-    prosTitle: 'For pros',
-    prosLead: 'More Slash, more automations, and your colleagues in the same record. Paid by the month, per record.',
-    /** A paid plan's line under its name: what it includes, from its own figures. */
-    prosLine: (credits: string, runs: string) => `${credits} Slash credits and ${runs} runs a month`,
-    usageTitle: 'Compare plans',
-    // The month is `nextMonth` in `directory.ts`, UTC; pages, lists and history are no meter in `Allowance`.
-    usageLead: 'Allowances reset on the first of each month. Pages, lists and history are never counted.',
-    /* The line under the comparison, from Free's own runs: how many automations it can run once a day through a long month. */
-    compareReading: (daily: string) => `On Free, ${daily} can run every day, all month.`,
-    automations: (n: number, word: string) => (n === 1 ? 'one automation' : `${word} automations`),
-    // Packs from `PACKS`, so none is named while none is sold; extra usage is built nowhere, and `mayRun` in `directory.ts` holds a record at its allowance.
-    later: laterFor(PACKS),
-    laterFor,
-    /**
-     * The allowance table's rows, in the order they are drawn: what each meter is called, what it counts,
-     * and how a plan's figure for it reads. Every key of `Allowance` has one, which `plans.test.ts` checks.
-     */
-    usage: [
-      // One ask is one credit however many passes it takes, and background work has `BACKGROUND_ASKS_MONTH` of its own (`packages/slash/src/types.ts`).
-      { key: 'credits', name: 'Slash credits', said: 'One for each question or draft. Background work never spends them.', amount: aMonth },
-      // `agents` in `PLAN_TABLE`: agent keys a record holds live, so a figure at once and not a month. A self-host's server key and a share link are not agents.
-      { key: 'agents', name: 'Agents', said: 'Claude, Codex or any app that speaks MCP, connected at the same time.', amount: (n: number) => `${n.toLocaleString('en-US')} at once` },
-      // A scheduled action's run and an automation's `rule:` run count (`COUNTED_ONLY` in `directory.ts`).
-      { key: 'runs', name: 'Automation and script runs', said: 'Each time a pull, an automation or a script runs.', amount: aMonth },
-      // What a run fetches is metered as requests; a delivery the outbox sends is `COUNTED_ONLY` and never limited.
-      { key: 'requests', name: 'Requests to other services', said: 'Pulls and calls your automations and scripts make.', amount: aMonth },
-      // Free's 0.1 GB reads as 100 MB: a decimal of a gigabyte is a figure nobody says.
-      { key: 'gb', name: 'Data fetched', said: 'What those requests bring back.', amount: (n: number) => (n < 1 ? `${Math.round(n * 1000)} MB a month` : `${n} GB a month`) },
-      // `ms` in `Allowance`, shown in hours.
-      { key: 'hours', name: 'Script time', said: 'Time your scripts spend running.', amount: (n: number) => `${n} hours a month` },
-    ] as { key: keyof Allowance; name: string; said: string; amount: (n: number) => string }[],
-    bothTitle: 'On every plan',
-    backupsLabel: (n: number) => `The last ${n} nightly copies, the newest at the right`,
-    /** A line whose plans differ: Free's own, then the paid plans', when those two agree. */
-    differs: (free: string, paid: string) => `${free} on Free, ${paid.toLowerCase()} on Cloud and Cloud Plus`,
-    // What, then Free, Cloud and Cloud Plus. Each record is its own Durable Object (`apps/worker/src/index.ts`);
-    // backups are `KEEP` in `snapshots.ts`; export is the CLI's and Settings' one file. Free is one person's (§35).
-    rows: [
-      ['People', 'Just you', 'Unlimited', 'Unlimited'],
-      ['Database', 'Your own, not shared', 'Your own, not shared', 'Your own, not shared'],
-      ['Backups', 'Nightly, last 30 kept', 'Nightly, last 30 kept', 'Nightly, last 30 kept'],
-      ['Email and webhook inbox', 'Included', 'Included', 'Included'],
-      ['Export', 'Any time, as one file', 'Any time, as one file', 'Any time, as one file'],
-    ] as [string, string, string, string][],
-    faqTitle: 'Questions',
-    faq: [
-      {
-        // A record is one SQLite database, one Durable Object on the Worker (`packages/kernel`).
-        q: 'What is a record?',
-        a: 'Everything one person, family or company keeps track of: its lists, pages, rules and history, in one file. Most people need one. A second business is a second record.',
-      },
-      {
-        // `makeFree` in `billing.ts`: no card, no row, no end date; one free record a person.
-        q: 'Is Free really free?',
-        a: 'Yes. One record for you, with every part of the app, for as long as you like. No card, and nothing ends after a trial.',
-      },
-      {
-        // The upgrade is checkout with the record (`billing.ts`), and the allowance follows the plan.
-        q: 'When would I pay?',
-        a: 'When you want colleagues in the record, or more Slash, automations or agents than Free includes. Upgrade from Settings and the larger allowance applies straight away.',
-      },
-      {
-        // A scheduled pull and an automation count; an arrival or a delivery is `COUNTED_ONLY` in `directory.ts`.
-        q: 'What counts as a run?',
-        a: 'Each time a scheduled pull, an automation or a script runs. Mail and webhooks arriving at your record, and the notices it sends you, are never counted.',
-      },
-      {
-        // `ASK_CAP_DEFAULT`, `ASK_CAP_FREE` and `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`.
-        q: 'What is a Slash credit?',
-        a: 'One question or one draft, however long Slash works on it. Each plan includes a month of credits. Slash’s own daily read never spends yours.',
-      },
-      {
-        // `mayRun` in `directory.ts` holds the action and says so in its event.
-        q: 'What happens when I reach the allowance?',
-        a: 'Work that needs more waits for the next month, and the record tells you what is waiting. Nothing is charged, and nothing is lost.',
-      },
-      {
-        // The plan change and the portal are `billing.ts`; export is never withheld from a lapsed record (`settings/[area]/areas/Billing.svelte`).
-        q: 'Can I change plan or cancel?',
-        a: 'Whenever you like, from Settings. A change takes effect straight away, and a cancelled record can still be exported.',
-      },
-    ],
+    holds: {
+      title: 'What each plan holds',
+      // The month is `nextMonth` in `directory.ts`; `mayRun` holds the work that needs more until then.
+      say: 'Per record, each month. Nothing stops at the limit. It waits for next month.',
+      /** The header a screen reader hears over the meters' names; drawn hidden, as the prototype's empty cell. */
+      what: 'What it holds',
+      /** The table's seven rows, in the order they are drawn: a name and a plan's cell from its own figures. */
+      rows: [
+        // `agents` in `PLAN_TABLE`: agent keys a record holds live at once.
+        { key: 'agents', name: 'Agents connected', cell: (f: Figures) => grouped(f.agents) },
+        // One question or draft is one credit, however many passes it takes (`packages/slash/src/types.ts`).
+        { key: 'credits', name: 'Questions and drafts from Slash', cell: (f: Figures) => grouped(f.credits) },
+        { key: 'people', name: 'People on the record', cell: (f: Figures) => people(f.people) },
+        { key: 'runs', name: 'Automation runs', cell: (f: Figures) => grouped(f.allowance.runs) },
+        { key: 'requests', name: 'Requests to other services', cell: (f: Figures) => grouped(f.allowance.requests) },
+        { key: 'bytes', name: 'Data fetched', cell: (f: Figures) => size(f.allowance.bytes) },
+        { key: 'ms', name: 'Script time', cell: (f: Figures) => hours(f.allowance.ms) },
+      ],
+    },
+    extra: {
+      title: 'Extra use, if you want it',
+      say: 'Off by default. Turn it on with a monthly cap, and BrainDog never goes past it.',
+      // No checkout sells extra use, so this is said whatever `LAUNCH.billing` is (`promises.test.mjs` allows it here).
+      soon: 'Coming soon.',
+      on: 'On Cloud and Cloud Plus',
+      price: 'Price',
+      /** `extra` in `PLAN_TABLE`'s Cloud row: a name, and how the amount a price buys reads after the price. */
+      rows: [
+        { key: 'runs', name: 'Automation runs', per: (n: number) => `per ${grouped(n)}` },
+        { key: 'requests', name: 'Requests to other services', per: (n: number) => `per ${grouped(n)}` },
+        { key: 'bytes', name: 'Data fetched', per: (n: number) => (n === 1_000_000_000 ? 'per GB' : `per ${size(n)}`) },
+        { key: 'ms', name: 'Script time', per: (n: number) => `per ${hours(n)}` },
+      ],
+    },
+    faq: {
+      title: 'Questions people ask',
+      /** `billing: true` is a question drawn only while `LAUNCH.billing` is on: nobody can cancel what nobody sells. */
+      items: [
+        // `ASK_CAP_*` and `BACKGROUND_ASKS_MONTH` in `packages/slash/src/types.ts`: the brief and filing spend no ask.
+        { q: 'What is a question to Slash?', a: 'One question or one draft, however much work it takes. Your brief, filing and your rules never spend one.' },
+        // An agent key per app (`agents` in `PLAN_TABLE`).
+        { q: 'What counts as an agent?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
+        // Export is the CLI's and Settings' one file, on every plan.
+        { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, on every plan.' },
+        // The portal is `billing.ts`; export is never withheld from a lapsed record.
+        { q: 'Can I cancel any time?', a: 'Yes, from Settings. Your record stays readable, and you can export it.', billing: true },
+      ],
+    },
+    close: { title: 'Start free.', body: 'Upgrade when it earns it. No card for the free plan.' },
   },
 } as const;

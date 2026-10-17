@@ -8,8 +8,8 @@
  *   - CURRENCY. A copy file that sits beside a price says no other currency: no `£`, `€` or other symbol but `$`, and
  *     no code but `USD` in front of a figure. Comments may keep theirs (`page.ts` explains how the app draws a code).
  *   - FIGURES. Every `$` figure the pricing page, the home page's plans band and the Slash page's credits say is a price
- *     the table holds (a plan by the month or year, a pack, extra usage), and every count of credits, agents or runs is
- *     one a plan holds.
+ *     the table holds (a plan by the month or year, a pack, extra usage), and every count of credits, questions, agents
+ *     or runs is one a plan holds. The pricing page's cards are read with billing on and with it off.
  *
  * Each check has a planted fault beside it, so it is seen to fail by itself. The table is read by its runtime URL, as
  * `plans.test.ts` reads it: the site declares no `@braindog/record`.
@@ -21,7 +21,8 @@ import { readFileSync } from 'node:fs';
 
 import { site } from './copy.ts';
 import { home } from './copy/home.ts';
-import { PACKS as ON_SALE, PLANS } from './plans.ts';
+import { PACKS as ON_SALE, PLANS, plan } from './plans.ts';
+import { cardsFor, extra, holds } from './pricing/cards.ts';
 
 const REPO = new URL('../../../../', import.meta.url);
 
@@ -40,10 +41,13 @@ const { PLAN_TABLE, PACKS, CURRENCY, priceOf } = (await import(new URL('packages
   priceOf: (cents: number) => string;
 };
 
-/** The copy files that sit beside a price: the plans, the pricing and home copy, and the drawn app. */
+/** The copy files that sit beside a price: the plans, the pricing and home copy, the pricing page, and the drawn app. */
 const BESIDE_A_PRICE = [
   'apps/site/src/lib/plans.ts',
   'apps/site/src/lib/copy/pricing.ts',
+  'apps/site/src/lib/pricing/cards.ts',
+  'apps/site/src/lib/pricing/Plans.svelte',
+  'apps/site/src/routes/pricing/+page.svelte',
   'apps/site/src/lib/copy/home.ts',
   'apps/site/src/lib/app/page.ts',
   'apps/site/src/lib/app/Page.svelte',
@@ -81,31 +85,32 @@ const HELD: Record<string, Set<number>> = {
 function figuresNotHeld(text: string): string[] {
   const out: string[] = [];
   for (const m of text.matchAll(/\$\d[\d,]*(?:\.\d+)?/g)) if (!PRICES.has(m[0])) out.push(m[0]);
-  const meter = /(\d[\d,]*) (?:Slash credits|credits|agents|automation runs|runs)\b/g;
+  const meter = /(\d[\d,]*) (?:Slash credits|credits|questions|agents|automation runs|runs)\b/g;
   for (const m of text.matchAll(meter)) {
-    const key = /credits/.test(m[0]) ? 'credits' : /agents/.test(m[0]) ? 'agents' : 'runs';
+    const key = /credits|questions/.test(m[0]) ? 'credits' : /agents/.test(m[0]) ? 'agents' : 'runs';
     if (!HELD[key]!.has(Number(m[1]!.replace(/,/g, '')))) out.push(m[0]);
   }
   return out;
 }
 
-const grouped = (n: number): string => n.toLocaleString('en-US');
 const p = site.pricing;
+
+/** A meter of the pricing table as the figure check reads it: its cell, then the word the check knows it by. */
+const WORD: Record<string, string> = { agents: 'agents', credits: 'questions', runs: 'automation runs' };
 
 /** What the pricing page, the home page's plans band and the Slash page's credits say, as the routes put it together. */
 const said: string[] = [
-  JSON.stringify({ pricing: p, plans: home.home.plans, allowance: site.slash.allowance }),
+  JSON.stringify({ pricing: p, plans: home.plans, allowance: site.slash.allowance }),
   site.slash.allowance.packsUnit(ON_SALE),
-  ...PLANS.flatMap((plan) => [
-    plan.price,
-    plan.unit,
-    plan.for,
-    home.home.plans.price(plan.price, plan.unit),
-    p.summary(grouped(plan.allowance.credits), grouped(plan.allowance.runs)),
-    p.prosLine(grouped(plan.allowance.credits), grouped(plan.allowance.runs)),
-    ...p.plans[plan.id].points,
-    ...p.usage.map((u) => `${u.amount(plan.allowance[u.key])} ${u.name}`),
+  home.plans.say(plan('cloud').price),
+  ...PLANS.flatMap((pl) => [pl.price, pl.unit, pl.for]),
+  ...[cardsFor({ billing: false }), cardsFor({ billing: true })].flat().flatMap((card) => [
+    `${card.price} ${card.per}`,
+    ...card.lines,
+    card.button.kind === 'start' ? '' : card.button.label,
   ]),
+  ...holds.flatMap((row) => row.cells.map((cell) => (WORD[row.key] ? `${cell} ${WORD[row.key]}` : `${cell} ${row.name}`))),
+  ...extra.map((row) => `${row.name} ${row.price}`),
 ];
 
 test('no copy file beside a price says a currency the plans are not sold in', () => {
@@ -133,10 +138,14 @@ test('the figure check sees what it is meant to', () => {
   /* THE PLANTED FAULTS: a price no plan has, Free with a fourth agent, and the roadmap's old Cloud Plus runs. */
   assert.deepEqual(figuresNotHeld('Cloud is $14 a month'), ['$14']);
   assert.deepEqual(figuresNotHeld('Connect up to 4 agents'), ['4 agents']);
+  assert.deepEqual(figuresNotHeld('30 questions to Slash a month'), ['30 questions']);
   assert.deepEqual(figuresNotHeld('400 Slash credits and 60,000 runs a month'), ['60,000 runs']);
   assert.deepEqual(figuresNotHeld('$12 a month, $29 a month, $0.50 a GB, 100 credits for $5'), []);
-  /* And it is reading the cards: every card's own price and agents are in what it read. */
-  for (const plan of PLANS) assert.ok(said.some((s) => s.includes(`${plan.allowance.agents} agents`)), `${plan.name}'s agents are not on its card`);
+  /* And it is reading the cards and the table: every plan's agents and runs are in what it read. */
+  for (const pl of PLANS) {
+    assert.ok(said.some((s) => s.includes(`${pl.allowance.agents} agents`)), `${pl.name}'s agents are not on its card`);
+    assert.ok(said.includes(`${pl.allowance.runs.toLocaleString('en-US')} automation runs`), `${pl.name}'s runs are not in the table`);
+  }
 });
 
 test('no sentence says a card is charged today', () => {

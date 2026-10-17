@@ -563,8 +563,14 @@
          navigation is a 308 to `https://brain.dog/app<path>`, and `/api/*`, `/mcp` and `/in/*` are
          served and never redirected, because the CLI refuses redirects, a webhook sender does not
          follow one, and a 301 or 302 turns a POST into a GET. It stays for at least the 90 days a token
-         lives and until every `/in/` address handed out on it is re-minted. */
-      "routes": [{ "pattern": "app.brain.dog", "custom_domain": true }],
+         lives and until every `/in/` address handed out on it is re-minted.
+
+         `admin.brain.dog` IS THE OWNER'S ADMIN PAGE (DIRECTION §49, `src/admin.ts`), its own Custom Domain, made by
+         the next deploy on his word; Cloudflare Access can be put in front of it later with no code change. */
+      "routes": [
+        { "pattern": "app.brain.dog", "custom_domain": true },
+        { "pattern": "admin.brain.dog", "custom_domain": true }
+      ],
 
       "vars": {
         /* THE CSRF ORIGIN, THE MAGIC LINK'S ORIGIN AND THE DEVICE FLOW'S HOST, ALL AT ONCE, and
@@ -645,8 +651,10 @@
         "STRIPE_PRICE_PACK_500": "",
         /* WHO MAY MAKE AN ACCOUNT, as alpha's comment says. OPEN TO STRANGERS ON HIS WORD (DIRECTION §42, 8 October):
            with no bot check keyed, the strikes are tightened until it is. The site's `LAUNCH.signup` mirrors this value,
-           and a site test holds them equal and fails when this line is missing. */
-        "SIGNUP": "open",
+           and a site test holds them equal and fails when this line is missing.
+           INVITE ONLY FROM 17 OCTOBER (DIRECTION §49, "make it invite only"): a new address needs a code, minted at
+           admin.brain.dog or by an application he invites, and the site still says "Start free". */
+        "SIGNUP": "invite",
         /* THE SIGN-UP PAGE'S TURNSTILE WIDGET, as alpha's comment says. */
         "TURNSTILE_SITE_KEY": "",
         /* FIRST_READ_DAILY: the day's ceiling of sign-up readings by the included model for all strangers, and his yes to them. Unset is off, and the page reads by rules. His to set. */

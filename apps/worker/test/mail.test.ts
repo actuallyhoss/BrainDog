@@ -18,6 +18,7 @@ const KINDS: MailKind[] = [
   'signup.verify',
   'signup.known',
   'invite.prove',
+  'invite.ready',
   'passkey.added',
   'passkey.removed',
   'sessions.ended',
@@ -33,7 +34,7 @@ const KINDS: MailKind[] = [
 ];
 
 /** The kinds whose letter is a link, and so carries the one button. */
-const LINKED: MailKind[] = ['signin', 'signup.verify', 'signup.known', 'invite.prove', 'email.change', 'lapse.0', 'lapse.60', 'lapse.83', 'lapse.back', 'welcome'];
+const LINKED: MailKind[] = ['signin', 'signup.verify', 'signup.known', 'invite.prove', 'invite.ready', 'email.change', 'lapse.0', 'lapse.60', 'lapse.83', 'lapse.back', 'welcome'];
 
 const ADDRESS = 'ada@example.test';
 const LINK = 'https://brain.dog/app/signin#magic=abc';
@@ -139,6 +140,43 @@ test('THE BUTTON SAYS WHAT IT DOES, and a link that works once also shows itself
   assert.equal(button('lapse.0'), 'Open your record');
   assert.match(letterOf('signin', { link: LINK }).html, /Or paste this link into your browser:<br><a href="https:\/\/brain\.dog\/app\/signin#magic=abc"/u);
   assert.doesNotMatch(letterOf('welcome', { link: LINK, record: 'Acme' }).html, /Or paste this link/u);
+});
+
+test('THE INVITE LETTER GREETS BY NAME, SAYS WHEN IT ENDS, AND ONLY ITS LINK CARRIES THE CODE', () => {
+  const CODE = 'Q'.repeat(43);
+  const link = `https://brain.dog/app/signup#code=${CODE}`;
+  const letter = letterOf('invite.ready', { name: 'Dana Reyes', link, days: '30' });
+  assert.equal(letter.subject, 'Your BrainDog invite');
+  for (const said of ['Hi Dana Reyes,', 'Your invite to BrainDog is ready. Open this link to make your account:', 'It works once, and it ends in 30 days.', SENDER]) {
+    assert.ok(letter.text.includes(said), said);
+    assert.ok(letter.html.includes(said), said);
+  }
+  assert.ok(!`${letter.subject}${letter.text}${letter.html}`.includes(EM_DASH));
+  /* THE LINK ONCE IN THE TEXT, on its own line, and the code nowhere but inside it. */
+  assert.equal(letter.text.split(link).length - 1, 1);
+  assert.equal(letter.text.split(CODE).length - 1, 1);
+  assert.ok(letter.text.split('\n').includes(link));
+  /* IN THE HTML, THE BUTTON AND THE PASTE LINE UNDER IT are anchors to the link, and the code is in nothing else. */
+  const anchors = [...letter.html.matchAll(/<a href="([^"]*)"[^>]*>([^<]*)<\/a>/gu)].filter((m) => m[1]?.includes(CODE));
+  assert.equal(anchors.length, 2);
+  assert.equal(anchors[0]?.[2], 'Make your account');
+  assert.ok(!letter.html.split(link).join('').includes(CODE), 'the code is printed outside the link');
+  assert.ok(!letter.subject.includes(CODE));
+
+  const nameless = letterOf('invite.ready', { link, days: '1' });
+  assert.ok(nameless.text.startsWith('Hello,'));
+  assert.ok(nameless.text.includes('It works once, and it ends in 1 day.'));
+  assert.ok(letterOf('invite.ready', { link }).text.includes('It works once.'));
+});
+
+test('THE INVITE LETTER GOES FROM AUTH_MAIL_FROM, and not without a link', async () => {
+  const email = binding();
+  const env = { EMAIL: email, AUTH_MAIL_FROM: 'signin@brain.dog', MAIL_FROM: 'hello@brain.dog' };
+  assert.equal(await sendMail(env, 'invite.ready', ADDRESS, { name: 'Dana', link: 'https://brain.dog/app/signup#code=abc', days: '30' }), true);
+  assert.deepEqual(email.sent[0]?.from, { email: 'signin@brain.dog', name: 'BrainDog' });
+  assert.equal(email.sent[0]?.subject, 'Your BrainDog invite');
+  assert.equal(await sendMail(env, 'invite.ready', ADDRESS, { name: 'Dana' }), false);
+  assert.equal(email.sent.length, 1);
 });
 
 test('THE WELCOME READS WITHOUT "OPEN IT HERE": the button says it, and the text puts the link on its own line', () => {

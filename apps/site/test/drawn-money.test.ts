@@ -52,25 +52,44 @@ test('a range keeps its pence on the low and the high alike', () => {
   assert.deepEqual(inSymbols(block).rows[0]?.cells, ['Design', '$350.00', '$300.00', '$600.00']);
 });
 
-test('the home page and /slash draw their demo money with a symbol and the pence, never a code', async () => {
-  const { home } = await import('../src/lib/copy/home.ts');
-  const { pricing } = await import('../src/lib/copy/pricing.ts');
-  const h = home.home;
-  assert.equal(pricing.slash.demo, h.slash.demo, '/slash draws a palette of its own, not the home page’s');
-  const said = [
-    ...h.slash.demo.modes.flatMap((m) => [m.lead, ...m.rows.flat()]),
-    ...h.inbox.arrivals.map((a) => a.text),
-    ...h.inbox.rows.flat(),
-  ];
-  assert.deepEqual(said.filter((s) => CODED.test(s)), []);
-  assert.ok(said.includes('$910.99, across four bills.') && said.includes('You paid $32.00 to PUREGYM on 3 Oct.'));
+/* THE DEMO RECORD (batch 103). The desk, the cards and Slash draw every figure from `src/lib/demo/maya.ts`, which keeps
+   money as integer cents and says it through `usd()`. So the helper is held to the prototype's three spellings, every
+   figure it holds to one shape, and every string in the file to a `$` and never a code. */
+const DOLLARS = /^-?\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?$/;
+const strings = (v: unknown): string[] =>
+  typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
+
+test('the demo record says its money with a $ and the pence where it has them, never a code', async () => {
+  const maya = await import('../src/lib/demo/maya.ts');
+  assert.equal(maya.usd(842_000), '$8,420');
+  assert.equal(maya.usd(6_420), '$64.20');
+  assert.equal(maya.usd(320_000, { pence: true }), '$3,200.00');
+  assert.throws(() => maya.usd(64.2), /whole cents/, 'usd() takes a fraction of a cent, so a figure could be typed in dollars');
+
+  for (const [name, cents] of Object.entries(maya.CENTS)) {
+    assert.ok(Number.isInteger(cents), `CENTS.${name} is ${cents}, not whole cents`);
+    assert.match(maya.usd(cents), DOLLARS, `CENTS.${name} is said as ${maya.usd(cents)}`);
+    assert.match(maya.usd(cents, { pence: true }), DOLLARS);
+  }
+
+  const said = strings(Object.values(maya));
+  assert.ok(said.length > 20, `src/lib/demo/maya.ts holds only ${said.length} strings, so this would read almost nothing`);
+  const coded = said.filter((s) => CODED.test(s) || /\d\s?(?:USD|EUR|GBP)\b|US\$/u.test(s));
+  assert.deepEqual(coded, [], 'the demo record says money with a currency code');
+  /* A figure with pence is money here, and money is said with its mark in front. */
+  const bare = said.filter((s) => /(?<![$\d,.])\d{1,3}(?:,\d{3})*\.\d{2}\b(?!\s?%)/u.test(s));
+  assert.deepEqual(bare, [], 'the demo record says an amount with no $ in front of it');
+  assert.ok(said.some((s) => s.includes(maya.usd(maya.CENTS.northboundInvoice))), 'no string of the demo record says its first figure, so this read the wrong file');
 });
 
 test('a part of a gigabyte is said in megabytes', async () => {
+  /* The pricing table's cell for data fetched (batch 103 moved it from `usage` to `holds.rows`). */
   const { pricing } = await import('../src/lib/copy/pricing.ts');
-  const gb = pricing.pricing.usage.find((u) => u.key === 'gb');
-  assert.equal(gb?.amount(0.1), '100 MB a month');
-  assert.equal(gb?.amount(5), '5 GB a month');
+  const bytes = pricing.pricing.holds.rows.find((r) => r.key === 'bytes');
+  assert.ok(bytes, 'the pricing table has no row for data fetched');
+  const of = (n: number) => ({ agents: 1, credits: 1, people: 1, allowance: { runs: 0, requests: 0, bytes: n, ms: 0 } });
+  assert.equal(bytes.cell(of(100_000_000)), '100 MB');
+  assert.equal(bytes.cell(of(5_000_000_000)), '5 GB');
 });
 
 test('the drawn app spells a dollar as its copy does, $ and never US$, and another currency keeps its own mark', () => {

@@ -29,6 +29,7 @@ export type MailKind =
   | 'signup.verify'
   | 'signup.known'
   | 'invite.prove'
+  | 'invite.ready'
   | 'passkey.added'
   | 'passkey.removed'
   | 'sessions.ended'
@@ -47,6 +48,7 @@ const KINDS: ReadonlySet<string> = new Set<MailKind>([
   'signup.verify',
   'signup.known',
   'invite.prove',
+  'invite.ready',
   'passkey.added',
   'passkey.removed',
   'sessions.ended',
@@ -73,6 +75,7 @@ const SIGN_IN_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'signup.verify',
   'signup.known',
   'invite.prove',
+  'invite.ready',
   'passkey.added',
   'passkey.removed',
   'sessions.ended',
@@ -81,7 +84,7 @@ const SIGN_IN_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
 ]);
 
 /** The kinds whose whole point is a link. Without one there is nothing to send, and `sendMail` says so and sends nothing. */
-const NEEDS_LINK: ReadonlySet<MailKind> = new Set<MailKind>(['signin', 'signup.verify', 'signup.known', 'invite.prove', 'email.change']);
+const NEEDS_LINK: ReadonlySet<MailKind> = new Set<MailKind>(['signin', 'signup.verify', 'signup.known', 'invite.prove', 'invite.ready', 'email.change']);
 
 /**
  * What a letter may say beyond its own words. Each is optional, and a letter leaves out the sentence a value is missing
@@ -105,6 +108,10 @@ export type MailVars = {
   support?: string | undefined;
   /** The one sentence the Directory already wrote, printed whole as the letter's body (`usage.notice`). */
   say?: string | undefined;
+  /** The person's own name, for a letter that greets them (`invite.ready`). */
+  name?: string | undefined;
+  /** The days a link lives, written as a whole number ("30"), for a letter that says when it ends (`invite.ready`). */
+  days?: string | undefined;
 };
 
 /** One letter: its subject, its text, and the same words as simple HTML. */
@@ -131,6 +138,7 @@ const WHY: Record<MailKind, string> = {
   'signup.verify': 'because somebody asked to make a BrainDog record with this address',
   'signup.known': 'because somebody asked to make a BrainDog record with this address',
   'invite.prove': 'because somebody accepted an invitation to a BrainDog record with this address',
+  'invite.ready': 'because this address was invited to make a BrainDog account',
   'passkey.added': 'because the passkeys that sign in with this address changed',
   'passkey.removed': 'because the passkeys that sign in with this address changed',
   'sessions.ended': 'because every session for this address ended',
@@ -189,6 +197,16 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
           { say: v.record ? `To accept the invitation to ${v.record}, open this link. It proves this address is yours, and it works once.` : 'To accept your invitation, open this link. It proves this address is yours, and it works once.' },
           ...link,
           { say: 'If you did not accept an invitation, you can ignore this message and nothing changes.' },
+        ],
+      };
+    case 'invite.ready':
+      return {
+        subject: 'Your BrainDog invite',
+        parts: [
+          { say: v.name ? `Hi ${v.name},` : 'Hello,' },
+          { say: 'Your invite to BrainDog is ready. Open this link to make your account:' },
+          ...link,
+          { say: /^[1-9]\d*$/u.test(v.days) ? `It works once, and it ends in ${v.days} ${v.days === '1' ? 'day' : 'days'}.` : 'It works once.' },
         ],
       };
     case 'passkey.added':
@@ -296,6 +314,8 @@ function actionOf(kind: MailKind, record: string): string {
       return 'Finish making your record';
     case 'invite.prove':
       return 'Accept the invitation';
+    case 'invite.ready':
+      return 'Make your account';
     case 'email.change':
       return 'Confirm this address';
     default:
@@ -500,6 +520,8 @@ export function letterOf(kind: MailKind, vars: MailVars = {}): Letter {
     label: flat(vars.label),
     support: flat(vars.support),
     say: flat(vars.say),
+    name: flat(vars.name),
+    days: flat(vars.days),
   };
   const { subject, parts } = partsOf(kind, v);
   const line = (p: Part): string => ('say' in p ? p.say : shown(p.link));

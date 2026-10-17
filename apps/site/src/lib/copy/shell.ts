@@ -12,26 +12,26 @@ export const shell = {
     home: {
       title: 'BrainDog · Give your business a memory',
       description:
-        'One record for everything you keep track of, arranged around you. You, Slash and your AI ' +
-        'agents keep it current, and every change says who made it.',
+        'One record of your projects, money and people, shared by you and every AI agent you use. ' +
+        'It tells you where things stand and asks only what matters.',
     },
     slash: {
       title: 'Slash · BrainDog',
       description:
-        'Slash is the assistant inside every BrainDog record. It answers from your own lists, drafts ' +
-        'what you describe, and writes nothing until you accept it.',
+        'Press / anywhere in BrainDog and ask in plain words. Slash answers from your record, finds ' +
+        'anything, and drafts what you ask for, with nothing added until you say yes.',
     },
     pricing: {
       title: 'Pricing · BrainDog',
       description:
-        'Free for one person, with the whole app and Slash included. Cloud and Cloud Plus add more ' +
-        'Slash, more automations and colleagues.',
+        'Free for one person, with the whole app, three agents and 20 questions to Slash a month. ' +
+        'Cloud and Cloud Plus add room when you need it.',
     },
     agents: {
-      title: 'For agents · BrainDog',
+      title: 'Connect your agent · BrainDog',
       description:
-        'Connect Claude, Codex, Cursor or any MCP client to your record by URL: what an agent reads, ' +
-        'what it writes, and what only a person can do.',
+        'Connect Claude, ChatGPT, Codex, Cursor or VS Code to your record in one line. Your agent ' +
+        'starts with your brief and leaves a note when it is done.',
     },
     notFound: {
       title: 'Page not found · BrainDog',
@@ -51,7 +51,7 @@ export const shell = {
   nav: {
     home: 'Home',
     slash: 'Slash',
-    agents: 'For agents',
+    agents: 'Agents',
     packs: 'Packs',
     pricing: 'Pricing',
     docs: 'Docs',
@@ -60,9 +60,10 @@ export const shell = {
     security: 'Security',
     legal: 'Legal',
     source: 'GitHub',
-    open: 'Open the app',
+    /** Drawn in place of "Start free" and "Sign in" once the visitor is signed in (`lib/site/signed-in.ts`). */
+    open: 'Open BrainDog',
     signin: 'Sign in',
-    start: 'Start for free',
+    start: 'Start free',
     menu: 'Menu',
   },
 
@@ -72,12 +73,19 @@ export const shell = {
     lede: 'The address may be mistyped, or the page may have moved. These are the pages brain.dog has.',
   },
 
+  /** The dark footer: the brand and its line, three groups (`lib/site/footer.ts`) and the company's name. */
   footer: {
-    tagline: 'Give your business a memory',
+    tagline: 'Give your business a memory.',
     groups: {
       product: 'Product',
-      build: 'Build',
-      trust: 'Trust',
+      learn: 'Learn',
+      company: 'Company',
     },
+    /* The links that are not a page's own label: the first doc, the connect page by what it does, and the texts. */
+    start: 'Get started',
+    connect: 'Connect an agent',
+    terms: 'Terms',
+    privacy: 'Privacy',
+    owner: '© 2026 Quartz Apps LLC',
   },
 } as const;

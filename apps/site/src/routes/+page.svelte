@@ -1,53 +1,41 @@
 <script lang="ts">
   /**
-   * brain.dog's home page, in the look the owner chose on 30 September: "Window for everyone".
+   * brain.dog's home page, the second design of 17 October (DIRECTION §47, `loop/site-2026-10-17/src/site.html`).
    *
-   * THE PRODUCT AT FULL SIZE, ONE THING PER BAND. The hero is the promise and the drawn app, whose tabs show a record
-   * for each kind of person (`lib/app/Window.svelte`). Every band under it is a heading and one sentence on the ground,
-   * beside the product doing that one thing in a glass frame:
+   * THE PRODUCT, WORKING, AND FEW WORDS. A dark hero with the slogan huge and the mark drawn as a thin line behind it,
+   * two buttons and the makers it works with, then Maya's desk across the hero's edge (`lib/desk/Desk.svelte`). Under
+   * it, four cards, each a value drawn as the product doing it, with no label or time over them (§47 his notes):
    *
-   *   decide   an agent proposes, a person decides, and the row lands under the agent's name.
-   *   slash    the assistant, as its palette.
-   *   inbox    three messages arrive, the shape is learned once, and every one is filed.
-   *   agents   the connect sheet, with the makers' own marks and the record's MCP address.
-   *   yours    three plain facts about whose the record is.
-   *   plans    Free, first and largest, then the plans for pros in one quieter tile (DIRECTION §35).
-   *   close    one line and the button.
+   *   brief    white: it tells you where things stand, every figure opening where it comes from.
+   *   agents   black: your agents share one memory, with the connect line.
+   *   chores   red: it does the chores, you make the calls, sharing the desk's Needs you.
+   *   slash    white: press / and ask anything.
    *
-   * NOTHING SAID TWICE. The price is said once, in the plans, and not beside the first button; the pages a record
-   * draws are the hero's to show, so they have no band of their own. The owner's words on 30 September: take out the
-   * redundant things that make a page read as generated.
+   * Then "It stays yours" in three short columns, Free first in the plans, and the close.
    *
-   * EVERY WORD IS IN `lib/copy/home.ts`, read here directly, except the page's title and description
-   * (`copy/shell.ts`) and the palette's demo, which `/slash` draws too (`copy/pricing.ts`).
+   * EVERY PAGE READS WITH SCRIPTING OFF. Every card's content is in the prerendered HTML, and a control that only a
+   * script can work is drawn once it runs. `scripts/product.mjs` reads `section.hero`, `#hero-title` and `.sub` here
+   * for the social picture, so those three stay.
+   *
+   * EVERY WORD IS IN `lib/copy/home.ts`; the names and figures in the drawings are `lib/demo/maya.ts`, and the plan
+   * figures are `lib/plans.ts`. The title and description are `copy/shell.ts`.
    */
   import AgentMark from '$lib/AgentMark.svelte';
-  import Decide from '$lib/Decide.svelte';
   import Icon from '$lib/Icon.svelte';
-  import InboxFlow from '$lib/InboxFlow.svelte';
-  import SlashPalette from '$lib/SlashPalette.svelte';
-  import Window from '$lib/app/Window.svelte';
-  import { AGENT_MARKS, type MarkedAgent } from '@braindog/skin/agent-marks.ts';
-  import { MCP_URL, SIGNUP, SOURCE, site } from '$lib/copy.ts';
+  import Mark from '$lib/Mark.svelte';
+  import { site } from '$lib/copy.ts';
   import { home } from '$lib/copy/home.ts';
-  import type { IconName } from '$lib/icons.ts';
-  import { PAID, plan } from '$lib/plans.ts';
+  import Desk from '$lib/desk/Desk.svelte';
+  import AgentsCard from '$lib/home/AgentsCard.svelte';
+  import Brief from '$lib/home/Brief.svelte';
+  import Chores from '$lib/home/Chores.svelte';
+  import SlashCard from '$lib/home/SlashCard.svelte';
+  import { plan } from '$lib/plans.ts';
+  import Plans from '$lib/pricing/Plans.svelte';
+  import Close from '$lib/site/Close.svelte';
+  import Start from '$lib/site/Start.svelte';
 
-  const h = home.home;
-  const free = plan('free');
-  const agents = Object.keys(AGENT_MARKS) as MarkedAgent[];
-
-  /* THE ADDRESS COPIES FOR REAL, and says so for two seconds. Without a clipboard the address is still there to select. */
-  let copied = $state(false);
-  async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(MCP_URL);
-      copied = true;
-      setTimeout(() => (copied = false), 2000);
-    } catch {
-      copied = false;
-    }
-  }
+  const cloud = plan('cloud').price;
 </script>
 
 <svelte:head>
@@ -59,422 +47,235 @@
   <meta property="og:description" content={site.meta.home.description} />
 </svelte:head>
 
-<!-- ── The hero: the promise and the action, then the drawn app with a record for each kind of person. ── -->
-<section class="band spaced hero" aria-labelledby="hero-title">
-  <div class="in">
-    <div class="hero-words">
-      <h1 class="display" id="hero-title">{home.hero.title} {home.hero.titleAccent}</h1>
-      <p class="lede">{home.hero.sub}</p>
-      <div class="actions">
-        <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{home.hero.primary}<Icon name="arrow" size="m" /></a>
-        <a class="btn btn-glass btn-lg" href="/pricing">{home.hero.secondary}</a>
+<section class="hero night" aria-labelledby="hero-title">
+  <span class="hero-mark" aria-hidden="true"><Mark tone="line" height={731} /></span>
+  <div class="wrap copy">
+    <h1 id="hero-title">{home.hero.title}</h1>
+    <p class="lead sub">{home.hero.sub}</p>
+    <div class="ctas">
+      <Start />
+      <a class="btn ghost" href="/agents">{home.hero.secondary}<Icon name="arrow-right" size="s" /></a>
+    </div>
+    <p class="works">
+      {home.hero.works}
+      {#each home.hero.makers as maker}<span class="maker"><AgentMark id={maker.id} size={16} />{maker.name}</span>{/each}
+    </p>
+  </div>
+  <div class="stage">
+    <div class="wrap">
+      <Desk />
+    </div>
+  </div>
+</section>
+
+<section class="wrap story">
+  <Brief />
+  <AgentsCard />
+  <Chores />
+  <SlashCard />
+</section>
+
+<section class="wrap yours reveal" aria-labelledby="yours-title">
+  <h2 id="yours-title">{home.yours.title}</h2>
+  <div class="three">
+    {#each home.yours.points as point}
+      <div>
+        <h3>{point.title}</h3>
+        <p>{point.body}</p>
       </div>
-    </div>
-
-    <div class="showcase">
-      <Window />
-    </div>
+    {/each}
   </div>
 </section>
 
-<!-- ── Decide: the scene first, the words beside it. No onward link: the Agents band below carries "How agents connect". ── -->
-<section class="band spaced" aria-labelledby="decide-title">
-  <div class="in feature flip">
-    <div class="words">
-      <h2 class="h2" id="decide-title">{h.decide.title}</h2>
-      <p class="lede">{h.decide.lead}</p>
-    </div>
-    <div class="frame">
-      <Decide scene={home.decide} />
-    </div>
-  </div>
+<section class="wrap sec reveal" aria-labelledby="plans-title">
+  <h2 id="plans-title">{home.plans.title}</h2>
+  <p class="say">{home.plans.say(cloud)}</p>
+  <Plans compact />
+  <a class="more" href="/pricing">{home.plans.more}<Icon name="arrow-right" size="s" /></a>
 </section>
 
-<!-- ── Slash: the words, and the palette answering. ── -->
-<section class="band spaced" aria-labelledby="slash-title">
-  <div class="in feature">
-    <div class="words">
-      <h2 class="h2" id="slash-title">{h.slash.title}</h2>
-      <p class="lede">{h.slash.lead}</p>
-      <a class="onward" href="/slash">{h.slash.more}<Icon name="arrow" size="m" /></a>
-    </div>
-    <div class="frame">
-      <SlashPalette demo={h.slash.demo} />
-    </div>
-  </div>
-</section>
-
-<!-- ── The inbox: the words, then the three steps. The lead names the doors, so no row of chips repeats them. ── -->
-<section class="band spaced" aria-labelledby="inbox-title">
-  <div class="in feature flip">
-    <div class="words">
-      <h2 class="h2" id="inbox-title">{h.inbox.title}</h2>
-      <p class="lede">{h.inbox.lead}</p>
-    </div>
-    <div class="frame">
-      <div class="tile"><InboxFlow flow={h.inbox} /></div>
-    </div>
-  </div>
-</section>
-
-<!-- ── Agents: the connect sheet, with each maker's own mark and the record's address. ── -->
-<section class="band spaced" aria-labelledby="agents-title">
-  <div class="in feature">
-    <div class="words">
-      <h2 class="h2" id="agents-title">{h.agents.title}</h2>
-      <p class="lede">{h.agents.lead}</p>
-      <a class="onward" href="/agents">{h.agents.more}<Icon name="arrow" size="m" /></a>
-    </div>
-    <div class="frame">
-      <div class="tile sheet">
-        <p class="h3">{h.agents.sheet}</p>
-        <ul class="makers">
-          {#each agents as a (a)}
-            <li class="maker"><span class="maker-mark"><AgentMark agent={a} /></span>{AGENT_MARKS[a].maker}</li>
-          {/each}
-        </ul>
-        <div class="address">
-          <span class="meta" id="mcp-label">{h.agents.connect}</span>
-          <div class="addr">
-            <code aria-labelledby="mcp-label">{MCP_URL}</code>
-            <button type="button" class="btn btn-sm copy" onclick={copyAddress} aria-label={h.agents.copy}>
-              <Icon name={copied ? 'check' : 'copy'} size="m" />
-            </button>
-          </div>
-        </div>
-        <p class="meta keys"><Icon name="key" size="m" />{h.agents.keys}</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── Whose the record is: three facts. ── -->
-<section class="band spaced" aria-labelledby="yours-title">
-  <div class="in">
-    <div class="yours-head">
-      <h2 class="h2" id="yours-title">{h.yours.title}</h2>
-      {#if SOURCE}<a class="onward" href={SOURCE} rel="external"><Icon name="code" size="m" />{h.yours.source}</a>{/if}
-    </div>
-    <ul class="facts">
-      {#each h.yours.body as p, i (p)}
-        <li><span class="well"><Icon name={(h.yours.glyphs[i] ?? 'check') as IconName} size="m" /></span><p>{p}</p></li>
-      {/each}
-    </ul>
-  </div>
-</section>
-
-<!-- ── The plans: Free first and largest, then the plans for pros, quieter. ── -->
-<section class="band spaced" aria-labelledby="plans-title">
-  <div class="in">
-    <div class="yours-head">
-      <div class="plans-words">
-        <h2 class="h2" id="plans-title">{h.plans.title}</h2>
-        <p class="lede">{h.plans.lead}</p>
-      </div>
-      <a class="onward" href="/pricing">{h.plans.more}<Icon name="arrow" size="m" /></a>
-    </div>
-    <div class="frame plans">
-      <div class="tile plan">
-        <span class="plan-name">{free.name}</span>
-        <span class="plan-price"><span class="price">{free.price}</span><span class="meta">{free.unit}</span></span>
-        <span class="meta">{free.for}</span>
-        <dl class="allow">
-          <div><dt>{h.plans.meters.credits}</dt><dd class="num">{free.allowance.credits.toLocaleString('en-US')}</dd></div>
-          <div><dt>{h.plans.meters.runs}</dt><dd class="num">{free.allowance.runs.toLocaleString('en-US')}</dd></div>
-        </dl>
-      </div>
-      <div class="tile plan pros">
-        <span class="plan-name">{h.plans.pros.head}</span>
-        <span class="meta">{h.plans.pros.said}</span>
-        <dl class="allow">
-          {#each PAID as p (p.id)}
-            <div><dt>{p.name}</dt><dd class="num">{h.plans.price(p.price, p.unit)}</dd></div>
-          {/each}
-        </dl>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ── The close. ── -->
-<section class="band spaced" aria-labelledby="close-title">
-  <div class="in">
-    <div class="frame close">
-      <div class="close-words">
-        <h2 class="h2" id="close-title">{home.closing.title}</h2>
-        <p class="lede">{home.closing.body}</p>
-      </div>
-      <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{home.closing.primary}<Icon name="arrow" size="m" /></a>
-    </div>
-  </div>
-</section>
+<Close title={home.closing.title} body={home.closing.body} />
 
 <style>
-  /* ── The hero ─────────────────────────────────────────────────────────── */
-
-  .hero-words {
-    display: grid;
-    justify-items: start;
-    gap: var(--sp-5);
-    padding: var(--sp-7) var(--sp-2) var(--sp-7);
-  }
-
-  .hero .display {
-    max-inline-size: 14ch;
-  }
-
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-  }
-
-  .showcase {
+  /* THE HERO: night ground, the slogan huge, the mark a thin line behind it. */
+  .hero {
     position: relative;
+    overflow: hidden;
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    .showcase {
-      animation: stage-in 640ms var(--ease-out) 120ms both;
-    }
+  .hero-mark {
+    position: absolute;
+    right: -170px;
+    top: 30px;
+    width: 940px;
+    color: var(--night-mark);
+    pointer-events: none;
   }
 
-  @keyframes stage-in {
-    from {
-      opacity: 0;
-      transform: translateY(var(--sp-5));
-    }
-
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  /* ── The connect sheet ───────────────────────────────────────────────── */
-
-  .sheet {
-    gap: var(--sp-4);
-  }
-
-  .makers {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .maker {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-3);
-    padding: 14px;
-    border-radius: var(--r-md);
-    box-shadow: inset 0 0 0 1px var(--line);
-    color: var(--ink);
-    font-size: var(--t-site-small);
-    font-weight: 500;
-  }
-
-  .maker-mark {
-    display: grid;
-    place-items: center;
-    inline-size: 32px;
-    block-size: 32px;
-  }
-
-  .maker-mark :global(.agent-mark) {
-    inline-size: 26px;
-    block-size: 26px;
-  }
-
-  .address {
-    display: grid;
-    gap: var(--sp-2);
-  }
-
-  .addr {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--tap);
-    padding-inline: 12px 4px;
-    border-radius: var(--r-md);
-    background: var(--s1);
-  }
-
-  .addr code {
-    flex: 1;
-    min-inline-size: 0;
-    overflow-x: auto;
-    color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-site-small);
-    white-space: nowrap;
+  .hero-mark :global(svg) {
+    width: 100%;
+    height: auto;
   }
 
   .copy {
-    min-inline-size: var(--ctl-h);
-    padding-inline: 0;
-    background: var(--bg);
-    box-shadow: inset 0 0 0 1px var(--line);
+    position: relative;
+    padding-block: 72px 56px;
   }
 
-  .keys {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
+  h1 {
+    font-size: clamp(3.3rem, 7.6vw, 6.9rem);
+    line-height: 0.95;
+    letter-spacing: -0.05em;
+    max-width: 11ch;
+    text-wrap: balance;
   }
 
-  /* ── Yours, and the plans' heading row ───────────────────────────────── */
-
-  .yours-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-3) var(--sp-5);
-    margin-block-end: var(--sp-6);
-  }
-
-  .facts {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--sp-6);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .facts li {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-3);
-  }
-
-  .facts p {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-site-body);
-    line-height: var(--lh-site-body);
+  .lead {
+    margin: 28px 0 0;
+    font-size: clamp(1.08rem, 1.55vw, 1.32rem);
+    line-height: 1.5;
+    color: var(--on-night-2);
+    max-width: 31em;
     text-wrap: pretty;
   }
 
-  /* ── Plans ─────────────────────────────────────────────────────────────── */
-
-  .plans-words {
-    display: grid;
-    gap: var(--sp-3);
-  }
-
-  /* FREE TAKES THE WIDER SHARE; the plans for pros sit beside it, in smaller type. */
-  .plans {
-    display: grid;
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-    gap: var(--inset);
-  }
-
-  .pros .plan-name {
-    font-size: var(--t-md);
-  }
-
-  .pros .allow {
-    margin-block-start: auto;
-  }
-
-  .plan {
-    gap: var(--sp-3);
-  }
-
-  .plan-name {
-    color: var(--ink);
-    font-size: var(--t-group);
-    font-weight: 600;
-  }
-
-  .plan-price {
+  .ctas {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-2);
+    gap: 10px;
+    margin-top: 34px;
   }
 
-  .price {
-    color: var(--ink);
-    font-family: var(--font-display);
-    font-size: var(--t-site-hero);
+  .works {
+    margin: 26px 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    font-size: 14px;
+    color: var(--on-night-2);
+  }
+
+  .maker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--on-night);
+  }
+
+  /* THE DESK ACROSS THE HERO'S EDGE: the page's ground comes up under its lower part. */
+  .stage {
+    position: relative;
+  }
+
+  .stage::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 42%;
+    background: var(--page);
+  }
+
+  .stage .wrap {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* THE FOUR CARDS, one under another. The cards' grounds, titles and lines are the shell's (`app.css`), and each
+     card's inside is its own component's. */
+  .story {
+    display: grid;
+    gap: 20px;
+    padding-top: 112px;
+  }
+
+  /* IT STAYS YOURS, in three short columns. */
+  .yours {
+    padding-top: 140px;
+  }
+
+  .yours h2,
+  .sec h2 {
+    font-size: clamp(2.4rem, 5vw, 4.4rem);
     line-height: 1;
+    letter-spacing: -0.045em;
+  }
+
+  .three {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px;
+    margin-top: 44px;
+  }
+
+  .three > div {
+    padding-top: 22px;
+    border-top: 1.5px solid var(--ink);
+  }
+
+  .three h3 {
+    font-size: 22px;
+    line-height: 1.15;
     letter-spacing: -0.03em;
   }
 
-  .allow {
-    display: grid;
-    margin: var(--sp-2) 0 0;
-  }
-
-  .allow div {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    padding-block: 10px;
-    border-block-start: 1px solid var(--line);
-  }
-
-  .allow dt {
+  .three p {
+    margin: 10px 0 0;
     color: var(--ink2);
-    font-size: var(--t-site-small);
+    font-size: 16px;
   }
 
-  .allow dd {
-    margin: 0;
-    color: var(--ink);
-    font-weight: 600;
+  /* THE PLANS, Free first. */
+  .sec {
+    padding-top: 140px;
   }
 
-  /* ── The close ─────────────────────────────────────────────────────────── */
-
-  .close {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--sp-5) var(--sp-7);
-    padding: clamp(28px, 3vw + 12px, 56px);
+  .sec .say {
+    margin: 16px 0 0;
+    font-size: 19px;
+    color: var(--ink2);
+    max-width: 30em;
   }
 
-  .close-words {
-    display: grid;
-    gap: var(--sp-3);
-    max-inline-size: 60ch;
-  }
+  @media (max-width: 1060px) {
+    .hero-mark {
+      width: 700px;
+      right: -260px;
+    }
 
-  /* ── Narrower than a desk ─────────────────────────────────────────────── */
-
-  @media (width < 900px) {
-    .facts,
-    .plans {
-      grid-template-columns: minmax(0, 1fr);
+    .three {
+      grid-template-columns: 1fr;
+      gap: 26px;
     }
   }
 
-  @media (width < 640px) {
-    .hero-words {
-      padding: var(--sp-5) var(--sp-1) var(--sp-5);
+  @media (max-width: 760px) {
+    .copy {
+      padding-block: 40px 36px;
     }
 
-    .makers {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    .hero-mark {
+      width: 520px;
+      right: -250px;
+      top: 120px;
     }
 
-    .actions > :global(.btn) {
-      flex: 1 1 auto;
+    .story {
+      padding-top: 80px;
+      gap: 14px;
+    }
+
+    .yours,
+    .sec {
+      padding-top: 96px;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .more {
+      min-height: 44px;
     }
   }
 </style>

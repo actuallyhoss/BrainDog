@@ -28,7 +28,8 @@ import { no, ok } from '@braindog/ports';
 import { ulids } from '@braindog/kernel';
 
 import { PACKS, PLANS, PLAN_TABLE, type Allowance, type Plan } from './plans.ts';
-import { codeHash, createAuth, signInForgotten, type AuthConfig } from './identity.ts';
+import { SIGNUP_UNCHECKED, codeHash, createAuth, signInForgotten, type AuthConfig, type Rule } from './identity.ts';
+import { ipBucket, mailCanon } from './signup-keys.ts';
 import type { DirectoryAuth, SessionAsk } from './identity.ts';
 
 export type { AuthConfig, DirectoryAuth, DirectoryBodies, PasskeyRename, Reason, Rule, SessionAsk, SignupNeeds, SignupStart } from './identity.ts';
@@ -332,6 +333,26 @@ CREATE TABLE IF NOT EXISTS dir_invite (
   spent_at   INTEGER,                       -- epoch ms, set when the proof it held made a person
   person     TEXT,                          -- p_..., who it made
   held_until INTEGER                        -- epoch ms, while a proof sent with it is still live
+);
+
+-- An application: somebody who asked for an invitation while sign-up is by invitation (POST /auth/apply), waiting
+-- for the operator to invite or decline them (applications(), apply.decide). One per address, lower-cased and
+-- trimmed. A NEW TABLE AND NOT A COLUMN, for the reason dir_inbound gives above: created on the next open,
+-- DIRECTORY_VERSION unmoved, so an older Worker still opens this Directory and only never reads the table.
+-- CARRIED BY EVERY COPY, unlike dir_invite: an application opens nothing (no code, no link, no hash of one; the
+-- code an invitation mints lives in dir_invite and is named here only by its ref), so a restore keeps who asked.
+-- It does hold an address and what they wrote, which is why the host seals the copy.
+CREATE TABLE IF NOT EXISTS dir_apply (
+  id         TEXT PRIMARY KEY,              -- a ULID, the operator's handle for it
+  email      TEXT NOT NULL UNIQUE,          -- lower-cased and trimmed
+  name       TEXT NOT NULL,                 -- 1 to 120 characters
+  use        TEXT NOT NULL DEFAULT '',      -- what they would use it for, 0 to 300 characters
+  link       TEXT NOT NULL DEFAULT '',      -- a page about them, 0 to 200 characters
+  made_at    INTEGER NOT NULL,              -- epoch ms
+  updated_at INTEGER NOT NULL,              -- epoch ms, moved by a second application while still waiting
+  state      TEXT NOT NULL DEFAULT 'waiting', -- 'waiting', 'invited' or 'declined', checked in code
+  decided_at INTEGER,                       -- epoch ms
+  invite_ref TEXT                           -- the ref of the code that invited them, as the invite list shows it
 );
 
 -- One row per record somebody pays for. A record with no row is not billed and never lapses: every record the
@@ -750,6 +771,9 @@ export const CARRIED = [
   /* THE PACKS BOUGHT AND WHAT IS LEFT OF EACH: money paid, which a restore must not forget. Before `dir_inbound`, so a
      copy still ends on a forwarding digest, as copies before it did; `load` reads the tables in any order. */
   'dir_credit',
+  /* WHO ASKED FOR AN INVITATION, AND WHAT BECAME OF IT. Not a credential: a restore that lost it would forget every
+     person waiting, and one that lost the decided ones would let a declined address apply as new. */
+  'dir_apply',
   'dir_inbound',
 ] as const;
 
@@ -788,7 +812,11 @@ const COPY_ORDER: Record<Carried, string> = {
   dir_stripe_event: 'rowid',
   dir_inbound: 'token_sha256',
   dir_credit: 'rowid',
+  dir_apply: 'rowid',
 };
+
+/** The carried tables a copy written before they existed does not name (new tables at the same Directory version). */
+const ADDED_LATER: readonly Carried[] = ['dir_apply'];
 
 /** A copy's first line, then its version: `#dogdir 4`. Not `#dogl`, so `checkBrainl` and `verify` never take one for a record. */
 const COPY_HEAD = '#dogdir';
@@ -1049,6 +1077,110 @@ const inviteRow = (row: InviteStored, now: number): InviteRow => {
     row.spent_at !== null && row.spent_at !== undefined ? 'spent' : ends !== null && ends <= now ? 'ended' : held !== null && held > now ? 'held' : 'open';
   return { ref: row.code_hash.slice(0, 12), note: row.note, made_at: Number(row.made_at), ends_at: ends, state, made: row.made ?? null };
 };
+
+/* ── applications ────────────────────────────────────────────────────────────── */
+
+/** The bounds an application keeps, in characters, and the most `apply.list` answers. */
+const APPLY_NAME_MOST = 120;
+const APPLY_USE_MOST = 300;
+const APPLY_LINK_MOST = 200;
+const APPLY_LIST_MOST = 500;
+
+/** The days a code an application is invited with lives, when the operator says none. */
+export const APPLY_DAYS = 30;
+
+/**
+ * Applying's two strikes, `apply:<ip, an IPv6 address as its /64>` and `apply-email:<address>`, in `dir_fail` beside
+ * sign-up's: ten an hour each behind the bot check, and `SIGNUP_UNCHECKED`'s three an hour without it, for the reason
+ * sign-up gives. An application sends no mail, so the only harm is a full table, and an hour is the brake on that.
+ */
+const APPLY_CHECKED: Rule = { most: 10, window: 60 * 60_000 };
+
+/**
+ * Asking for an invitation, and the operator's answer to it. `apply.submit` is the public door's (`/auth/apply`); the
+ * other three are the operator's, behind the provision key.
+ *
+ * `apply.decide` NAMES AN APPLICATION BY ITS ID, the handle the operator's list shows beside the name.
+ */
+export type ApplyCall =
+  | { flow: 'apply.submit'; name: string; email: string; use?: string; link?: string; ip: string; checked: boolean }
+  | { flow: 'apply.list' }
+  | { flow: 'apply.decide'; id: string; decision: 'invite' | 'decline'; days?: number }
+  | { flow: 'apply.invited'; email: string; ref: string };
+
+/** An application as the operator's list shows it. */
+export type ApplyRow = {
+  id: string;
+  name: string;
+  email: string;
+  use: string;
+  link: string;
+  made_at: number;
+  updated_at: number;
+  state: 'waiting' | 'invited' | 'declined';
+  decided_at: number | null;
+  invite_ref: string | null;
+};
+
+/** `apply.decide`'s answer: the code, once, on an invitation; nothing on a decline. */
+export type ApplyDecided = { code: string; email: string; name: string; ends_at: number | null } | { declined: true };
+
+export type ApplyAnswers = {
+  'apply.submit': Result<Record<string, never>>;
+  'apply.list': ApplyRow[];
+  'apply.decide': Result<ApplyDecided>;
+  'apply.invited': Result<{ marked: boolean }>;
+};
+
+const APPLY_COLUMNS = 'id, name, email, use, link, made_at, updated_at, state, decided_at, invite_ref';
+
+const applyRow = (r: ApplyRow): ApplyRow => ({
+  id: r.id,
+  name: r.name,
+  email: r.email,
+  use: r.use,
+  link: r.link,
+  made_at: Number(r.made_at),
+  updated_at: Number(r.updated_at),
+  state: r.state === 'invited' || r.state === 'declined' ? r.state : 'waiting',
+  decided_at: numberOrNull(r.decided_at),
+  invite_ref: r.invite_ref ?? null,
+});
+
+/** A field of an application as text, trimmed, or the refusal that names it. */
+function applyText(v: unknown, at: string, least: number, most: number): string | Result<never> {
+  if (v !== undefined && v !== null && typeof v !== 'string') return no('VALUE_MALFORMED', `${at} is text.`, { at });
+  const s = (v ?? '').trim();
+  if (s.length < least) return no('VALUE_MALFORMED', `Say a ${at}.`, { at });
+  if (s.length > most) return no('VALUE_MALFORMED', `A ${at} is at most ${String(most)} characters.`, { at });
+  return s;
+}
+
+/**
+ * One strike against `key` under `rule`, with sign-up's own statement (`LOCKOUT` in `identity.ts`, copied because it is
+ * not exported), and `null` to go on or the seconds to wait. FAIL CLOSED: a statement that throws is a wait, never a pass.
+ */
+function applyStrike(sql: Sql, key: string, now: number, rule: Rule): number | null {
+  let row: { n: number; until: number | null } | undefined;
+  try {
+    row = sql.one<{ n: number; until: number | null }>(
+      `INSERT INTO dir_fail (key, n, first, until) VALUES (?1, 1, ?2, NULL)
+       ON CONFLICT (key) DO UPDATE SET
+         n     = CASE WHEN (until IS NOT NULL AND until <= ?2) OR (until IS NULL AND first <= ?3) THEN 1 ELSE MIN(n + 1, ?5) END,
+         first = CASE WHEN (until IS NOT NULL AND until <= ?2) OR (until IS NULL AND first <= ?3) THEN ?2 ELSE first END,
+         until = CASE WHEN until IS NOT NULL AND until <= ?2 THEN NULL
+                      WHEN until IS NULL AND first <= ?3 THEN NULL
+                      WHEN n >= ?5 THEN COALESCE(until, ?4) ELSE until END
+       RETURNING n, until`,
+      key, now, now - rule.window, now + rule.window, rule.most,
+    );
+  } catch {
+    row = undefined;
+  }
+  if (!row) return 60;
+  if (row.until !== null && Number(row.until) > now) return Math.ceil((Number(row.until) - now) / 1000);
+  return null;
+}
 
 /**
  * The token as it is stored: an HMAC under the Directory's key, with its own prefix, so a pending row never holds the
@@ -2252,7 +2384,10 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           return no<Loaded>('FILE_MALFORMED', `This line is not a row of ${table ?? 'any table'}: a row is one JSON object of column names to text, numbers or null.`, { at });
         rows.push({ table, row: row as Record<string, string | number | null>, line: i + 1 });
       }
-      if (seen.size !== CARRIED.length)
+      /* A TABLE ADDED WITHOUT A VERSION STEP MAY BE ABSENT FROM A COPY MADE BEFORE IT: `dir_apply` is a new IF NOT EXISTS
+         table at the same version, so a copy from the build before it names one table fewer and is whole, not cut short. */
+      const needed = CARRIED.filter((t) => !ADDED_LATER.includes(t));
+      if (!needed.every((t) => seen.has(t)))
         return no<Loaded>('FILE_MALFORMED', `This copy names ${String(seen.size)} of the ${String(CARRIED.length)} tables a copy carries, so it was cut short.`);
 
       /* A ROW THE SCHEMA REFUSES IS A THROW OUT OF THE TRANSACTION, which rolls every row before it back, and it is
@@ -2649,6 +2784,82 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
         for (const hash of hashes) sql.exec('INSERT INTO dir_invite (code_hash, note, made_at, ends_at) VALUES (?, ?, ?, ?)', hash, note, now, ends_at);
       });
       return ok({ codes, ends_at }) as InviteAnswers[C['flow']];
+    },
+
+    /**
+     * Asking for an invitation (`ApplyCall`): `apply.submit` from the public door, the rest from the operator's.
+     *
+     * ONE APPLICATION PER ADDRESS, AND ONE ANSWER FOR EVERY SUBMIT. A second submit while waiting updates what they
+     * wrote; one for an address already invited or declined changes nothing; and all three answer `{}`, so the door
+     * says nothing about who has asked. A struck limit is the one other answer, and it is struck for every address.
+     *
+     * AN INVITATION MINTS ONE CODE AS `invite.mint` DOES and marks the application with its ref in the same
+     * transaction, so an application is never invited without a code or a code minted for one twice. The code is
+     * answered once, here, and only its hash is kept.
+     */
+    applications: async <C extends ApplyCall>(call: C): Promise<ApplyAnswers[C['flow']]> => {
+      type A = ApplyAnswers[C['flow']];
+      const now = clock.now();
+      if (call.flow === 'apply.list')
+        return sql.all<ApplyRow>(`SELECT ${APPLY_COLUMNS} FROM dir_apply ORDER BY made_at DESC, id DESC LIMIT ?`, APPLY_LIST_MOST).map(applyRow) as A;
+      if (call.flow === 'apply.invited') {
+        const email = typeof call.email === 'string' ? call.email.trim().toLowerCase() : '';
+        const ref = typeof call.ref === 'string' ? call.ref.trim() : '';
+        if (!/^[0-9a-f]{12}$/.test(ref)) return no('VALUE_MALFORMED', 'ref is the twelve characters the invite list shows.', { at: 'ref' }) as A;
+        const marked =
+          sql.all<{ id: string }>("UPDATE dir_apply SET state = 'invited', decided_at = ?, invite_ref = ? WHERE email = ? AND state = 'waiting' RETURNING id", now, ref, email).length > 0;
+        return ok({ marked }) as A;
+      }
+      if (call.flow === 'apply.decide') {
+        const found = typeof call.id === 'string' ? sql.one<ApplyRow>(`SELECT ${APPLY_COLUMNS} FROM dir_apply WHERE id = ?`, call.id) : undefined;
+        if (!found || found.state !== 'waiting')
+          return no('OUT_OF_BOUNDS', 'No application waiting goes by that. Name one the list shows as waiting.', { at: 'id' }) as A;
+        if (call.decision === 'decline') {
+          sql.exec("UPDATE dir_apply SET state = 'declined', decided_at = ? WHERE id = ? AND state = 'waiting'", now, found.id);
+          return ok({ declined: true }) as A;
+        }
+        if (call.decision !== 'invite') return no('VALUE_MALFORMED', 'decision is invite or decline.', { at: 'decision', allowed: ['invite', 'decline'] }) as A;
+        const days = call.days ?? APPLY_DAYS;
+        if (!Number.isSafeInteger(days) || days < 1 || days > INVITE_DAYS_MOST)
+          return no('VALUE_MALFORMED', `days is a whole number from 1 to ${INVITE_DAYS_MOST}.`, { at: 'days' }) as A;
+        const code = mintedToken();
+        const hash = await codeHash(code);
+        const ends_at = now + days * DAY_MS;
+        const note = `application: ${found.email}`.slice(0, INVITE_NOTE_MOST);
+        const marked = sql.transactionSync(() => {
+          const moved = sql.all<{ id: string }>(
+            "UPDATE dir_apply SET state = 'invited', decided_at = ?, invite_ref = ? WHERE id = ? AND state = 'waiting' RETURNING id",
+            now, hash.slice(0, 12), found.id,
+          );
+          if (moved.length === 0) return false;
+          sql.exec('INSERT INTO dir_invite (code_hash, note, made_at, ends_at) VALUES (?, ?, ?, ?)', hash, note, now, ends_at);
+          return true;
+        });
+        if (!marked) return no('OUT_OF_BOUNDS', 'That application was decided a moment ago. Read the list again.', { at: 'id' }) as A;
+        return ok({ code, email: found.email, name: found.name, ends_at }) as A;
+      }
+
+      const asked = call as Extract<ApplyCall, { flow: 'apply.submit' }>;
+      const name = applyText(asked.name, 'name', 1, APPLY_NAME_MOST);
+      if (typeof name !== 'string') return name as A;
+      const use = applyText(asked.use, 'use', 0, APPLY_USE_MOST);
+      if (typeof use !== 'string') return use as A;
+      const link = applyText(asked.link, 'link', 0, APPLY_LINK_MOST);
+      if (typeof link !== 'string') return link as A;
+      const email = typeof asked.email === 'string' ? asked.email.trim().toLowerCase() : '';
+      if (!EMAIL_ADDRESS.test(email)) return no('VALUE_MALFORMED', 'That is not an email address.', { at: 'email' }) as A;
+      const rule = asked.checked === true ? APPLY_CHECKED : SIGNUP_UNCHECKED;
+      for (const key of [`apply:${ipBucket(typeof asked.ip === 'string' ? asked.ip : '')}`, `apply-email:${mailCanon(email)}`]) {
+        const wait = applyStrike(sql, key, now, rule);
+        if (wait !== null) return no('RATE_LIMITED', 'Too many applications from here. Try again later.', { retry_after: wait }) as A;
+      }
+      sql.exec(
+        `INSERT INTO dir_apply (id, email, name, use, link, made_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)
+         ON CONFLICT (email) DO UPDATE SET name = excluded.name, use = excluded.use, link = excluded.link, updated_at = excluded.updated_at
+         WHERE dir_apply.state = 'waiting'`,
+        mint(), email, name, use, link, now,
+      );
+      return ok({}) as A;
     },
 
     /**

@@ -75,7 +75,7 @@ test('BILLING IS test OR live, and anything else is off', () => {
   for (const said of [undefined, '', 'on', 'LIVE']) assert.equal(billingMode(said === undefined ? {} : { BILLING: said }), 'off');
 });
 
-test('BOTH ENVIRONMENTS SAY open: production on his word, and alpha so the walk kit signs up with no code', async () => {
+test('PRODUCTION SAYS invite on his word (DIRECTION §49), and alpha open so the walk kit signs up with no code', async () => {
   const checker = new URL('../scripts/provision-check.mjs', import.meta.url).href;
   const { wranglerConfig } = (await import(checker)) as {
     wranglerConfig: (root: string) => { env?: { [name: string]: { vars?: { [key: string]: string } } } };
@@ -83,7 +83,7 @@ test('BOTH ENVIRONMENTS SAY open: production on his word, and alpha so the walk 
   const config = wranglerConfig(fileURLToPath(new URL('../../../', import.meta.url)));
   for (const name of ['alpha', 'production']) {
     const vars = config.env?.[name]?.vars ?? {};
-    assert.equal(vars['SIGNUP'], 'open', `${name}'s SIGNUP in apps/worker/wrangler.jsonc`);
+    assert.equal(vars['SIGNUP'], name === 'production' ? 'invite' : 'open', `${name}'s SIGNUP in apps/worker/wrangler.jsonc`);
     assert.notEqual(billingMode(vars), 'live', `${name} takes real cards, which is a separate word of his`);
   }
 });

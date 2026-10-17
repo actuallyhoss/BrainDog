@@ -24,7 +24,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
-import { held } from '../src/lib/launch.ts';
+import { LAUNCH, held } from '../src/lib/launch.ts';
 import { BUILD, missing, when } from './built.ts';
 
 /**
@@ -41,7 +41,7 @@ const REQUIRED: readonly string[] = [
   'index.html',
   'slash.html',
   'agents.html',
-  'packs.html',
+  /* No `packs.html`: the packs are held with the changelog until `LAUNCH.public` (DIRECTION §47, batch 103). */
   'pricing.html',
   'docs.html',
   /* Only once the site is public: until `LAUNCH.public` the changelog is held and the build writes none. */
@@ -230,13 +230,17 @@ test('the marketing pages name no licence, and /legal names both', when(NO_BUILD
 });
 
 /**
- * THE GITHUB LINK IS IN THE NAV AND THE FOOTER of every page, and the footer reaches /legal.
+ * EVERY PAGE REACHES /legal, AND THE REPOSITORY ONLY ONCE IT IS PUBLIC. The footer links /legal on every page. The
+ * GitHub link used to be on every page too, and it pointed a stranger at a private repository: from batch 103 the
+ * shell draws it only when `LAUNCH.repo` is on, so with the flag off a link to the repository anywhere is a fault.
  */
-test('every page links GitHub and the legal page', when(NO_BUILD), () => {
+test('every page links /legal, and links the repository only when LAUNCH.repo', when(NO_BUILD), () => {
+  const repository = /href="https:\/\/github\.com\/actuallyhoss\/BrainDog[^"]*"/i;
   for (const page of PAGES) {
     const html = uncommented(read(page));
-    assert.match(html, /href="https:\/\/github\.com\/actuallyhoss\/BrainDog"/, `${page} does not link the repository`);
     assert.match(html, /href="\/legal"/, `${page} does not link /legal`);
+    if (LAUNCH.repo) assert.match(html, repository, `${page} does not link the repository`);
+    else assert.doesNotMatch(html, repository, `${page} links the repository, and LAUNCH.repo is off, so it is private`);
   }
 });
 
@@ -268,27 +272,29 @@ test('the home page does not use the word register', when(NO_BUILD), () => {
  * gave way to a drawn decision whose history names what changed in words, so the anchor this test
  * needed is gone on purpose, and the rule is the opposite one: no address at all.
  *
- * IT READS THE SERVED BYTES AND ALSO `site.decide`, because the scene's last row arrives after
- * load and a claim a reader is shown three seconds late is the same claim. An `#uc-personal` in an
- * href is not read, because `prose` reads text and the attributes a person hears, not links.
+ * IT READS THE SERVED BYTES AND ALSO THE DEMO RECORD, `src/lib/demo/maya.ts`, every string in it: the desk and the
+ * cards draw from that one file, and what a tab or a figure opens after load is a claim the reader is shown too.
+ * An `#uc-personal` in an href is not read, because `prose` reads text and the attributes a person hears, not links.
  */
-test('the home page names no row by its address', when(NO_BUILD), async () => {
-  const rowRef = /\b[a-z_]+#\d+\b/g;
+const rowRef = /\b[a-z_]+#\d+\b/g;
+
+/** Every string anywhere in a value, so a nested figure or a note's line is read like a heading. */
+const strings = (v: unknown): string[] =>
+  typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
+
+test('the home page names no row by its address', when(NO_BUILD), () => {
   const served = [...prose(read('index.html')).matchAll(rowRef)].map((m) => m[0]);
   assert.deepEqual(served, [], `index.html shows a stranger the record's own row addresses: ${served.join(', ')}`);
+});
 
-  type Copy = { site: { decide?: unknown } };
-  const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as Copy;
-  /* THE KEY IS ASKED FOR BY NAME, OR THE CHECK IS OF NOTHING. `strings(undefined)` is `[]`, so with
-     `decide` renamed to `decideRenamed` in `copy.ts` this test passed while reading no scene at all
-     (measured on 2026-09-22). An absent scene is a failure here, and so is one with no words in it. */
-  assert.ok(site.decide && typeof site.decide === 'object', '`site.decide` is gone from copy.ts, so this test would read nothing: point it at the scene the home page draws now');
-  const strings = (v: unknown): string[] =>
-    typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
-  const lines = strings(site.decide);
-  assert.ok(lines.length > 0, '`site.decide` holds no words, so the address check below would pass over nothing');
+test('the demo record names no row by its address', async () => {
+  /* THE FILE IS ASKED FOR BY PATH, AND AN EMPTY READ FAILS. `strings` of nothing is `[]`, and the old form of this
+     check passed while reading no scene at all once its key was renamed (measured on 2026-09-22). */
+  const maya = (await import(new URL('../src/lib/demo/maya.ts', import.meta.url).href)) as Record<string, unknown>;
+  const lines = strings(Object.values(maya));
+  assert.ok(lines.length > 20, `src/lib/demo/maya.ts holds only ${lines.length} strings, so the address check would read almost nothing`);
   const scripted = lines.flatMap((line) => [...line.matchAll(rowRef)].map((m) => m[0]));
-  assert.deepEqual(scripted, [], `site.decide names rows by address, and the scene shows them after load: ${scripted.join(', ')}`);
+  assert.deepEqual(scripted, [], `the demo record names rows by address, and the desk shows them after load: ${scripted.join(', ')}`);
 });
 
 /**
@@ -301,42 +307,13 @@ test('the home page names no row by its address', when(NO_BUILD), async () => {
  * mechanism band is about mechanism on purpose.
  */
 test('the hero sentence names no mechanism', async () => {
-  type Copy = { site: { hero: { sub: string } } };
-  const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as Copy;
+  /* Read from the home page's own copy file, which the page imports directly (batch 103). */
+  type Copy = { home: { hero: { sub: string } } };
+  const { home } = (await import(new URL('../src/lib/copy/home.ts', import.meta.url).href)) as Copy;
   const MECHANISM = /\b(events?|log|logs|registers?|rows?|MCP|append|ledger|typed|overwritten)\b/i;
-  const hit = MECHANISM.exec(site.hero.sub);
-  assert.equal(hit, null, `hero.sub explains the storage on the first screen ("${hit?.[0]}"): ${site.hero.sub}`);
-});
-
-/**
- * EVERY KIND OF PERSON THE PRODUCT IS FOR IS NAMED ON THE HOME PAGE, and each can be reached.
- *
- * The owner's word, 2026-09-17: the product is for everyone, and the site
- * read as a product for small businesses. Five use cases are named and none may quietly drop out.
- *
- * THE PHOTOGRAPHS ARE GONE ON PURPOSE and that half of this check went with them. Five screenshots
- * of five arrangements of the same application, each painted at about three quarters of full size,
- * were five pictures a reader could not read and could not tell apart, which made the point they
- * were there to make worse rather than better. One switcher does it instead: pressing a case
- * redraws the section in front of the reader. So what is checked now is that each case is still
- * named and still has a control of its own to press, under the id the old row carried.
- */
-const USE_CASES = [
-  ['personal', 'Personal'],
-  ['student', 'Student'],
-  ['founder', 'Solo founder'],
-  ['team', 'Team'],
-  ['project', 'New project'],
-] as const;
-
-test('the home page names all five use cases, each with a control of its own', when(NO_BUILD), () => {
-  const html = uncommented(read('index.html'));
-  const words = readable(read('index.html'));
-  assert.match(html, /\srole="tablist"/, 'index.html no longer has the switcher the use cases are drawn in');
-  for (const [id, title] of USE_CASES) {
-    assert.match(words, new RegExp(`\\b${title}\\b`), `index.html no longer names the ${title} use case`);
-    assert.match(html, new RegExp(`\\sid="uc-${id}"`), `index.html has no control for the ${title} use case (id="uc-${id}")`);
-  }
+  assert.equal(typeof home.hero.sub, 'string', 'home.hero.sub is gone from copy/home.ts: point this at the sentence under the slogan');
+  const hit = MECHANISM.exec(home.hero.sub);
+  assert.equal(hit, null, `home.hero.sub explains the storage on the first screen ("${hit?.[0]}"): ${home.hero.sub}`);
 });
 
 /**
@@ -404,58 +381,38 @@ test('the home page counts none of the product own parts at a stranger', when(NO
 });
 
 /**
- * THE HOME PAGE IS AT MOST FIVE BANDS, THE PRODUCT IS IN THE FIRST ONE, AND IT IS DRAWN.
+ * THE HOME PAGE OPENS ON THE PRODUCT, THEN FOUR CARDS, AND IT IS DRAWN.
  *
- * Two measurements, one test, because they are the same complaint. The owner's words:
- * *i dont like how it's so long, and it's all records and text. i want it to be more graphical, and
- * shows the value, not what it does technically (at least not for the first blocks).*
+ * The owner's words that started this check: *i dont like how it's so long, and it's all records and text. i want it
+ * to be more graphical, and shows the value, not what it does technically (at least not for the first blocks).*
+ * It held a band count and the drawn app in the first band. The page he designed on 17 October (DIRECTION §47) has
+ * its own shape, and this holds that shape:
  *
- * THE LENGTH, AS A NUMBER A BUILD CAN SEE. Driven over `apps/site/build` at 1440 by 900 at a device
- * scale of 1 with motion reduced, the page he complained about was 5,658px over seven bands of 904,
- * 966, 630, 726, 1,153, 573 and 397, and 7,042px at 390. Pixels need a browser and this file reads
- * bytes, so what is held here is the band count, which is the thing the pixels were made of: seven
- * bands is seven arguments, and a band added to be thorough is how a page gets to 5,658px one
- * reasonable decision at a time. Six would pass this and be a regression worth arguing about, which
- * is why the bound is the number the page actually has rather than a round one above it.
- *
- * THE ORDER, AS THE ONE THING IN THE MARKUP THAT SHOWS IT. The first band has to hold the product,
- * and since 22 September the product is the drawn app: its case tabs are the `role="tablist"` this
- * reads. It was once in the SECOND band, 235px of mark, heading and lead below the hairline that
- * opened it, with a five-row ledger and four counted figures in the first. There is no way to check
- * "graphical" from bytes, but there is a way to check that the product is not below the fold of the
- * argument, and that was the fault.
- *
- * AND NO PHOTOGRAPH OF IT. The owner said of the screenshots this page carried *i hate those
- * screenshots. they look terrible. dont just add scnreehots like that*. A `<picture>` or an `<img>`
- * coming back into the home page is that regression, so it fails here by name.
+ *   - THE FIRST SECTION IS THE HERO, AND THE DESK IS IN IT. The live desk's tabs (Today, Projects, Needs you,
+ *     Agents) are the `role="tablist"` this reads. The product was once below a band of words and counted figures,
+ *     and that was the fault.
+ *   - FOUR CARDS, THE FOUR VALUES: the brief, the agents, the chores and Slash, each an `article.card`. A fifth card
+ *     is a feature-card grid on its way back, and fewer is a value gone quietly.
+ *   - NO PHOTOGRAPH OF IT. He said of the screenshots this page carried *i hate those screenshots. they look
+ *     terrible. dont just add scnreehots like that*. A `<picture>` or an `<img>` coming back is that regression.
  */
-/*
- * EIGHT BANDS FROM 26 SEPTEMBER, AND THE BOUND MOVED WITH THEM. The owner asked for the page under the hero to be
- * rebuilt and for Slash to have a section of its own, and each band now shows one thing the
- * product does, drawn, rather than a paragraph about it: Slash, agents, the inbox, pages, why it is yours, the plans
- * and the close. The complaint this answered was prose and length for their own sake, so the bound is the page as
- * built, and a ninth band is the argument to have first.
- */
-test('the home page is at most eight bands, opens on the drawn product, and holds no screenshot', when(NO_BUILD), () => {
+test('the home page opens on the hero with the desk, holds the four cards, and holds no picture', when(NO_BUILD), () => {
   const html = uncommented(read('index.html'));
 
-  const bands = [...html.matchAll(/<section class="band\b/g)];
-  assert.equal(
-    bands.length <= 8,
-    true,
-    `index.html draws ${bands.length} bands. Eight is the page as rebuilt on 26 September, and a ` +
-      'band that exists to be thorough is what this bound is against.',
-  );
-  assert.equal(bands.length >= 4, true, `index.html draws ${bands.length} bands, so this check is reading a page it does not recognise`);
-
-  const first = html.slice(bands[0]?.index ?? 0, bands[1]?.index ?? html.length);
+  const sections = [...html.matchAll(/<section\b[^>]*>/g)];
+  const first = sections[0];
+  assert.ok(first, 'index.html has no section, so this check is reading a page it does not recognise');
+  assert.match(first[0], /\sclass="[^"]*\bhero\b/, `the first section of index.html is not the hero: ${first[0]}`);
+  const hero = html.slice(first.index, sections[1]?.index ?? html.length);
   assert.match(
-    first,
+    hero,
     /\srole="tablist"/,
-    'the first band of index.html does not hold the drawn app, so the page opens on words again. The ' +
-      'product is the best thing this page has, and the fault it was once part of was being used as ' +
-      'an illustration beside prose further down.',
+    'the hero of index.html does not hold the desk and its tabs, so the page opens on words again. The product is ' +
+      'the best thing this page has.',
   );
+
+  const cards = [...html.matchAll(/<article\b[^>]*\sclass="(?:[^"]*\s)?card(?:\s[^"]*)?"/g)];
+  assert.equal(cards.length, 4, `index.html draws ${cards.length} cards, where the page holds four: the brief, the agents, the chores and Slash`);
 
   const pictures = [...html.matchAll(/<(?:picture|img)\b[^>]*>/g)].map((m) => m[0]);
   assert.deepEqual(pictures, [], 'index.html draws a photograph again, where the product on this page is drawn in HTML and CSS');
@@ -536,41 +493,31 @@ test('_headers caches hashed assets immutably and the screenshots for a day', ()
 });
 
 /**
- * /AGENTS COUNTS THE MCP SURFACE OFF THE MCP'S OWN ARRAYS, NOT OFF WHOEVER LAST COUNTED IT.
+ * THE DOCS NAME THE MCP SURFACE OFF THE MCP'S OWN ARRAYS, NOT OFF WHOEVER LAST COUNTED IT.
  *
- * It said "And five addresses a client can read directly" and listed five, under a comment naming
- * `RESOURCES` as the array it came from. The array is `TEMPLATES` (`RESOURCES` does not exist; the
- * fixed resources are `FIXED`), and it held six: the count was true on 21 September when it was
- * written, and `braindog:automation/{id}` landed the next day without the page hearing of it.
- * Nothing failed, because the page was a hand count and
- * nothing compared it with the code.
+ * /agents once said "And five addresses a client can read directly" and listed five, under a comment naming
+ * `RESOURCES` as the array it came from. The array is `TEMPLATES` (`RESOURCES` does not exist; the fixed resources
+ * are `FIXED`), and it held six: the count was true on 21 September when it was written, and
+ * `braindog:automation/{id}` landed the next day without the page hearing of it. Nothing failed, because the page
+ * was a hand count and nothing compared it with the code.
  *
- * SO THIS IMPORTS THE ARRAYS THEMSELVES. The addresses are held to `TEMPLATES` in order, the read
- * and write names to `TOOLS` split on `writes`, and each title's number word to the length it
- * claims to be, so the next template or tool added fails here until the page says it.
+ * FROM BATCH 103 THE CONNECT PAGE LISTS NO TOOLS (DIRECTION §47: one line for each app, and what the agent gets), and
+ * the docs do: `03-agents/02-tools.md` names every tool and `03-agents/03-resources.md` every address. So this
+ * imports the arrays themselves and holds those two pages to them, and the next tool or template added fails here
+ * until the docs say it.
  */
-test('/agents names every MCP tool and template the MCP declares, and counts them right', async () => {
-  type Mcp = { mcp: { title: string; reads: readonly string[]; writes: readonly string[]; resourcesTitle: string; resources: readonly { uri: string }[] } };
-  const { site } = (await import(new URL('../src/lib/copy.ts', import.meta.url).href)) as { site: { agents: Mcp } };
+test('the docs name every MCP tool and template the MCP declares', async () => {
   const { TEMPLATES, TOOLS } = (await import(new URL('../../../packages/mcp/src/index.ts', import.meta.url).href)) as {
     TEMPLATES: readonly { uriTemplate: string }[];
     TOOLS: readonly { name: string; writes: boolean }[];
   };
-  const page = site.agents.mcp;
-  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
-  const word = (n: number): string => WORDS[n] ?? String(n);
-  const says = (line: string, n: number): boolean => new RegExp(`\\b${word(n)}\\b`, 'i').test(line);
+  const docs = new URL('../src/docs/03-agents/', import.meta.url);
+  const tools = readFileSync(new URL('02-tools.md', docs), 'utf8');
+  const resources = readFileSync(new URL('03-resources.md', docs), 'utf8');
+  assert.ok(TOOLS.length > 0 && TEMPLATES.length > 0, 'packages/mcp/src/index.ts declares no tools or no templates, so this would check nothing');
 
-  assert.deepEqual(
-    page.resources.map((r) => r.uri),
-    TEMPLATES.map((t) => t.uriTemplate),
-    '/agents lists other addresses than TEMPLATES in packages/mcp/src/index.ts declares',
-  );
-  assert.ok(says(page.resourcesTitle, TEMPLATES.length), `"${page.resourcesTitle}" and TEMPLATES holds ${TEMPLATES.length}`);
-
-  const reads = TOOLS.filter((t) => !t.writes).map((t) => t.name);
-  const writes = TOOLS.filter((t) => t.writes).map((t) => t.name);
-  assert.deepEqual(page.reads, reads, '/agents lists other read tools than TOOLS declares');
-  assert.deepEqual(page.writes, writes, '/agents lists other write tools than TOOLS declares');
-  assert.ok(says(page.title, TOOLS.length) && says(page.title, reads.length), `"${page.title}" and TOOLS holds ${TOOLS.length}, ${reads.length} of them reads`);
+  const untold = TOOLS.map((t) => t.name).filter((name) => !tools.includes(`\`${name}\``));
+  assert.deepEqual(untold, [], `the docs page on tools (03-agents/02-tools.md) never names ${untold.join(', ')}`);
+  const unlisted = TEMPLATES.map((t) => t.uriTemplate).filter((uri) => !resources.includes(uri));
+  assert.deepEqual(unlisted, [], `the docs page on addresses (03-agents/03-resources.md) never names ${unlisted.join(', ')}`);
 });

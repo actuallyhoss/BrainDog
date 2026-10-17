@@ -100,7 +100,33 @@ export const words = {
   /** The mailed link opened while the host could not be reached: the link is not spent, so it is not called expired. */
   linkUnreached: 'We could not reach BrainDog. Open the link again in a minute.',
   haveOne: 'Already have a BrainDog? Sign in',
-  /** Sign-up by invitation, reached with no code: the closed page's own line, and the way to sign in under it. */
-  inviteTitle: 'Sign-up is by invitation',
-  inviteWhy: 'Open the link you were sent to start your BrainDog here. If you already have one, sign in.',
+  /**
+   * SIGN-UP BY INVITATION, REACHED WITH NO CODE (LAUNCH 103, item 10): its own screen (`Apply.svelte`), not the closed
+   * page. The site says nothing about invites; only this page does, and it offers a way in: apply, and be emailed.
+   */
+  inviteTitle: 'BrainDog is invite only for now',
+  inviteWhy: 'If you were sent an invite, open its link. Otherwise, apply and we will email you when your invite is ready.',
+  applyName: 'Your name',
+  applyEmail: 'Your email',
+  applyUse: 'What would you use it for?',
+  applyLink: 'Your website or X handle',
+  /** Beside the two questions a person may leave blank. */
+  optional: 'Optional',
+  applySend: 'Send my application',
+  applySending: 'Sending',
+  /** In place of the form once the host has it. */
+  applied: "Thanks. We'll email you when your invite is ready.",
+  /** Refused, in this screen's words: too many tries says when to come back, a failed check says to do it again. */
+  applyLimit: (seconds: number) => `Too many tries from here. Try again in ${waitOf(seconds)}.`,
+  applyCheck: 'The check that you are a person did not pass. Try the check again, then send it.',
+  applyFailed: 'That did not go through. Try again in a minute.',
 } as const;
+
+/** How long a wait is, said the way a person says it: a minute, 5 minutes, 2 hours. */
+function waitOf(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 60) return 'a minute';
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return `${minutes} minutes`;
+  const hours = Math.ceil(minutes / 60);
+  return hours === 1 ? 'an hour' : `${hours} hours`;
+}

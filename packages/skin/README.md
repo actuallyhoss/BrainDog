@@ -15,7 +15,10 @@ a11y.css     the focus ring, forced colours, the target floor
 house.css    GENERATED — do not edit. `pnpm theme`. The palette, and beside it the glass, the ground's
              light, the row washes and the shadows
 blocks.css   the block markup contract both apps draw against; blocks-charts.css carries its chart kinds
+look-b.css   Look B (DIRECTION §45 d9, §47): the site's tokens from batch 103, the app's from 107. Its own
+             names (--page, --red, --tile, --head ...), light and dark; it declares no layer order
 mark.ts      the artwork, as path data
+agent-marks.ts  the agents' marks and the two apps' makers' marks (ChatGPT, VS Code), as path data
 ```
 
 ## The layer order is the enforcement boundary
@@ -57,7 +60,8 @@ site is a document, and documents scroll. A shared base that picks one forces th
 and an undone rule is a rule nobody can find.
 
 **Fonts.** The `@font-face` rules are here, but the `.woff2` files are each app's own `static/fonts`,
-because the URL in `src:` is absolute and an app serves its own assets.
+because the URL in `src:` is absolute and an app serves its own assets. The display face is Lexend 600
+(`lexend-600.woff2`, fetched by `apps/web/scripts/fonts.mjs`), in both apps' folders.
 
 ## Generated files
 

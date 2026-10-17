@@ -11,13 +11,15 @@
  *
  * `isMarked` AND `markedOf` AGREE: what one calls marked the other names as itself, and every other word `markedOf`
  * answers with is an id that has a mark.
+ *
+ * THE APPS' MARKS (ChatGPT, VS Code) are drawn on the same grid, under ids no agent has, and `markOf` answers both sets.
  */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { AGENT_MARKS, isMarked, markedOf, type MarkedAgent } from './agent-marks.ts';
+import { AGENT_MARKS, APP_MARKS, isMarked, markOf, markedOf, type AppMark, type MarkedAgent } from './agent-marks.ts';
 
 const ids = Object.keys(AGENT_MARKS) as MarkedAgent[];
 const source = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -141,4 +143,40 @@ test('the skin and the app know the same agents by the same other words', () => 
   assert.ok(Object.keys(app).length > 0, 'face.ts declares its aliases');
   assert.deepEqual(Object.entries(skin).sort(), Object.entries(app).sort());
   for (const [word, kind] of Object.entries(app)) assert.equal(markedOf(word), kind, word);
+});
+
+const apps = Object.keys(APP_MARKS) as AppMark[];
+
+test("every app's mark is one path on a 24 grid, in ink or its maker's colour", () => {
+  assert.deepEqual([...apps].sort(), ['chatgpt', 'vscode']);
+  for (const id of apps) {
+    const { d, rule, maker } = APP_MARKS[id];
+    assert.match(d, /^M[\d\s.,a-z+-]+z$/iu, `${id}: one path, moved to and closed`);
+    assert.ok(!/[<>"']/u.test(d), `${id}: path data and nothing else`);
+    const points = pointsOf(d);
+    assert.ok(points.length > 8, `${id}: a drawing, not a dot`);
+    for (const [x, y] of points) {
+      assert.ok(x >= -0.05 && x <= 24.05 && y >= -0.05 && y <= 24.05, `${id}: (${x.toFixed(3)}, ${y.toFixed(3)}) is on the grid`);
+    }
+    const [xs, ys] = [points.map((p) => p[0]), points.map((p) => p[1])];
+    assert.ok(Math.max(...xs) - Math.min(...xs) > 16, `${id}: fills the box across`);
+    assert.ok(Math.max(...ys) - Math.min(...ys) > 12, `${id}: fills the box down`);
+    assert.ok(rule === 'evenodd' || rule === 'nonzero', `${id}: a fill rule`);
+    assert.ok(maker.trim().length > 0 && maker === maker.trim(), `${id}: its maker is named`);
+  }
+  assert.deepEqual(
+    { chatgpt: [APP_MARKS.chatgpt.tone, APP_MARKS.chatgpt.rule, APP_MARKS.chatgpt.maker], vscode: [APP_MARKS.vscode.tone, APP_MARKS.vscode.rule, APP_MARKS.vscode.maker] },
+    { chatgpt: ['ink', 'evenodd', 'ChatGPT'], vscode: ['vscode', 'nonzero', 'VS Code'] },
+  );
+});
+
+test("the apps' ids are no agent's, and markOf answers both sets", () => {
+  for (const id of apps) {
+    assert.ok(!Object.hasOwn(AGENT_MARKS, id), `${id} is not an agent's id`);
+    assert.equal(isMarked(id), false, `${id} is not a marked agent`);
+    assert.equal(markedOf(id), null, `${id} names no agent`);
+    assert.equal(markOf(id), APP_MARKS[id]);
+  }
+  for (const id of ids) assert.equal(markOf(id), AGENT_MARKS[id]);
+  assert.equal(markedOf('OpenAI'), 'codex', 'openai still names Codex, not ChatGPT');
 });

@@ -328,7 +328,7 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
    * budget rows `stat` a file under `build/fonts/`, and guarding the shell alone would have moved the
    * stack trace rather than removed it.
    */
-  const NEEDED = ['index.html', join('fonts', 'geist.woff2'), join('fonts', 'poppins-600.woff2')];
+  const NEEDED = ['index.html', join('fonts', 'geist.woff2'), join('fonts', 'lexend-600.woff2')];
   const missing = [];
   for (const f of NEEDED) if (!(await stat(join(BUILD, f)).then((s) => s.isFile(), () => false))) missing.push(f.split(/[\\/]/).join('/'));
   if (missing.length > 0) {
@@ -380,9 +380,10 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
    *
    * 22 §9 budgets "≤ 45 KB total, 2 files", assuming ONE Latin face plus Arabic. This ships two Latin
    * faces on purpose: a workhorse that has to hold up at 11px with tabular figures, and a display face
-   * used only above 20px because it is the wordmark's own. So the workhorse keeps the original 45 KB
-   * and the display face gets its own small budget, which is the honest way to say "we chose to spend
-   * eight more kilobytes" instead of quietly widening one number to 55.
+   * used only above 20px because it is the wordmark's own (Lexend since 17 October, DIRECTION §47).
+   * So the workhorse keeps the original 45 KB and the display face gets its own small budget, which is
+   * the honest way to say "we chose to spend fifteen more kilobytes" instead of quietly widening one
+   * number to 60.
    *
    * Arabic is not in either row: `unicode-range` is evaluated per page, so an English-only session
    * never fetches it.
@@ -415,7 +416,7 @@ export default async function bundle(root = process.env.BRAINDOG_GATE_ROOT ?? pr
     { name: 'entry CSS, brotli', size: css, budget: B.mainCssBrotli, note: 'tokens, a11y, blocks, rows and the shell' },
     { name: 'index.html, brotli', size: shell, budget: B.htmlBrotli, note: 'it carries no record state' },
     { name: 'UI face (Geist)', size: await font('geist.woff2'), budget: B.uiFaceBytes, note: "22 §9's budget, unchanged" },
-    { name: 'display face (Poppins)', size: await font('poppins-600.woff2'), budget: B.displayFaceBytes, note: 'nothing below 20px' },
+    { name: 'display face (Lexend)', size: await font('lexend-600.woff2'), budget: B.displayFaceBytes, note: 'nothing below 20px' },
   ];
 
   const report = process.argv.includes('--report');

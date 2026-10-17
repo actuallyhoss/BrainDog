@@ -81,14 +81,8 @@ test('a file the script cannot read is a finding, never an empty set written out
   assert.match(plan(APP, SITE.replace('/* icons:end */', '')).findings.join('\n'), /two marks are gone/);
 });
 
-test('every name the table takes is drawn, and the scene that draws its glyphs inline draws the set\'s', () => {
+test('every name the table takes is drawn', () => {
+  /* Its second half read the inline glyphs of `Decide.svelte`, the old home page's scene, and left with that scene when
+     the new home (batch 103) retired it. */
   for (const name of Object.keys(FROM)) assert.ok(Object.hasOwn(GLYPHS, name), name);
-
-  /* `Decide.svelte` writes its glyphs into its own markup (its server-render test compiles that file alone), so they
-     are a second place a drawing could go stale. Each one on the 24 grid is a shape of the set. */
-  const scene = readFileSync(new URL('Decide.svelte', import.meta.url), 'utf8');
-  const drawn = new Set<string>(Object.values(GLYPHS));
-  const inline = [...scene.matchAll(/<svg(?: class="[a-z]+")? viewBox="0 0 24 24"[^>]*>(.*?)<\/svg>/g)].map((m) => m[1]!.replaceAll(' />', '/>'));
-  assert.ok(inline.length >= 5, `read only ${inline.length} glyphs from the scene`);
-  for (const markup of inline) assert.ok(drawn.has(markup), `the scene draws a shape the set does not: ${markup}`);
 });

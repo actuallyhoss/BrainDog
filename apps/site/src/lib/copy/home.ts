@@ -1,204 +1,91 @@
 /**
- * The home page's words: the hero, the decision scene, the bands under it and the close.
+ * The home page's words: the hero, the four cards, "It stays yours", the plans teaser and the close.
  *
- * THE DRAWINGS ARE COPY TOO. Every name and figure in the decision scene is read off `packages/seed`,
- * the record the gates install, so a reader who starts a Personal record meets what the page showed.
+ * VERBATIM FROM THE APPROVED DESIGN (DIRECTION §47, `loop/site-2026-10-17/src/site.html`), with the site's word fixes
+ * (`docs/54-WRITING.md`): the brief's "the rows behind it" says "where it comes from". The claims ledger
+ * (`lib/claims.ts`) reads these key paths, so a key that moves moves there too.
+ *
+ * THE DRAWINGS' NAMES AND FIGURES ARE NOT HERE. Maya Okafor's record is one file, `lib/demo/maya.ts`, and every card
+ * draws from it. The plan figures are `lib/plans.ts`, read below and never typed.
  */
+import { TABLE } from '../plans.ts';
+
+/** A small count as a word ("three agents"), as the design says it; past twelve, the digits. */
+const SMALL = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+export const spell = (n: number): string => SMALL[n] ?? String(n);
+
 export const home = {
   hero: {
-    /* THE SLOGAN, in two halves for the history of the thing, drawn as one sentence in one colour since 29 September:
-       red is the accent and never a heading's colour. The words are the owner's and unchanged, with no full stop. */
-    title: 'Give your business',
-    titleAccent: 'a memory',
-    sub: 'Everything you keep track of, in one place. You and your AI agents keep it up to date, and every change says who made it.',
-    /* FREE LEADS (DIRECTION §35): the first button says what it costs, which is nothing. */
-    primary: 'Start for free',
-    secondary: 'See pricing',
-  },
-
-  /**
-   * THE DECISION, drawn as a scene: an agent proposes, a person decides, and the change lands carrying
-   * the agent's name. The proposal's words are `SG33` in `packages/seed/src/index.ts`, the record the gates
-   * install, with one liberty: in the seed the question is opened by the record's reader of the invoice, and
-   * here by Claude, as `propose` over MCP really can. Each history row says below where its words come from.
-   *
-   * `history` is oldest first, and its last row is the one that lands when the reader accepts.
-   */
-  decide: {
-    /* What a screen reader calls the scene, and the line a sighted reader sees over it. */
-    label: 'An agent proposes. You decide.',
-    agent: 'Claude',
-    person: 'You',
-    proposal: {
-      title: 'Add the two services on the Fenwick invoice?',
-      change: 'Object storage and the Workers plan, with the renewal dates from the invoice.',
-    },
-    /* `acceptIt` in `apps/web/src/lib/copy.ts`: the word the app's own button says. */
-    verb: 'Accept',
-    accepted: 'Accepted by you',
-    /* THE TWO TILES' HEADINGS, as the app names the screen and the list, and the line under the history, which is
-       what `yours` below says of every change. */
-    heads: { ask: 'Decide', history: 'History', order: 'Newest first' },
-    undo: 'Any change can be undone, and the name stays on it.',
-    history: [
-      /* The times are `sample.ts`'s: `seq 4160` at `stamp(-31)`, and `stamp` counts hours. */
-      { who: 'Codex', what: 'Opened a question about the Kiln licensing model', when: '1d ago' },
-      /* `seq 4188` in `sample.ts`, written by `rule.reply`, which the app names `Reply` through `names.ts`'s `actor`. */
-      { who: 'Reply', what: 'Added a note to an invoice that is late', when: '9h ago', rule: true },
-      /* `seq 4192` and `4191` in `sample.ts`. It says `just now` because it lands as the reader presses
-         Accept, and `decide-copy.test.ts` reads that word from `since` in `packages/render/src/format.ts`. */
-      { who: 'Claude', what: 'Added Object storage and the Workers plan, from the Fenwick invoice', when: 'just now' },
+    /* THE SLOGAN, his words, with its full stop (§47). */
+    title: 'Give your business a memory.',
+    /* No mechanism in the promise: no event, log, row or ledger (`test/content.test.ts`). */
+    sub: 'One record of your projects, money and people, shared by you and every AI agent you use.',
+    secondary: 'Connect an agent',
+    works: 'Works with',
+    /* The makers, once each: Claude, not "Claude Code" (§47 his notes). Their marks are `@braindog/skin/agent-marks.ts`. */
+    makers: [
+      { id: 'claude', name: 'Claude' },
+      { id: 'chatgpt', name: 'ChatGPT' },
+      { id: 'codex', name: 'Codex' },
+      { id: 'cursor', name: 'Cursor' },
+      { id: 'vscode', name: 'VS Code' },
     ],
   },
 
-  /**
-   * THE HOME PAGE UNDER THE HERO. Each band shows one thing the product does,
-   * drawn working, with a heading that says what the reader gets and one sentence under it.
-   */
-  home: {
-    /* THE DECISION'S BAND: the heading and one sentence beside the scene above. */
-    decide: {
-      title: 'An agent proposes. You decide.',
-      lead: 'When an agent wants to change something, you get a question first. Accept it and the change lands with its name on it.',
+  cards: {
+    brief: {
+      title: 'It tells you where things stand.',
+      say: 'A short brief every morning, rewritten whenever something changes. Tap a figure to see why.',
+      label: "Maya's brief",
+      behind: 'where it comes from',
     },
-
-    slash: {
-      title: 'Press / and ask.',
-      lead: 'Ask what you owe this month and it shows the bills. Ask for a page and it builds one. Nothing it writes goes in until you say yes.',
-      more: 'More about Slash',
-      /**
-       * THE PALETTE this band and `/slash` draw (`pricing.ts` reads it from here). Every figure is the Personal
-       * record's, said as the app says money: a symbol and the pence, never a code. The four bills add to the lead.
-       */
-      demo: {
-        label: 'Slash, drawn',
-        placeholder: 'Ask, or say what you want',
-        accept: 'Accept',
-        reject: 'Reject',
-        modes: [
-          {
-            id: 'ask',
-            label: 'Ask',
-            prompt: 'What do I owe in the next two weeks?',
-            lead: '$910.99, across four bills.',
-            rows: [
-              ['Streaming subscription', '$10.99', 'In 2 days'],
-              ['Phone contract', '$18.00', 'In 3 days'],
-              ['Rent', '$850.00', 'In 6 days'],
-              ['Gym membership', '$32.00', 'In 12 days'],
-            ],
-            source: 'From Bills',
-          },
-          {
-            id: 'draft',
-            label: 'Draft',
-            prompt: 'Make me a page for the Lisbon trip',
-            lead: 'A new page, Trip to Lisbon, with three blocks:',
-            rows: [
-              ['A figure', '$420.00 of $900.00 put by', ''],
-              ['A list', 'Everything put by for the trip', ''],
-              ['A chart', 'What was put by, month by month', ''],
-            ],
-            source: 'Waits in Decide until you accept it',
-          },
-          {
-            id: 'notice',
-            label: 'Notice',
-            prompt: 'This morning',
-            lead: 'Rent is due in 6 days, and pay day is in 10.',
-            rows: [
-              ['Current account', '$1,240.56', 'Today'],
-              ['Rent', '$850.00', 'In 6 days'],
-            ],
-            source: 'Your current account covers it',
-          },
-        ],
-      },
-    },
-
     agents: {
-      title: 'Bring your own agents.',
-      /* The OAuth at `/mcp`: the client opens the app to approve it once, and no key is copied (`copy/agents.ts`). */
-      lead: 'Claude, Codex, Cursor or anything else that speaks MCP connects at one address. You approve it once in the app, and no key is copied anywhere.',
-      /* The connect sheet's own words, as the app's sheet says them. */
-      sheet: 'Connect an agent',
-      connect: 'MCP address',
-      copy: 'Copy the address',
-      keys: 'Agents use your API keys without ever seeing them.',
-      more: 'How agents connect',
+      title: 'Your agents share one memory.',
+      say: "Each starts with your brief and leaves a note when it's done. Nothing gets explained twice.",
+      notes: 'Notes on Tidepool',
+      connect: 'Connect yours in one line',
     },
+    chores: {
+      title: 'It does the chores. You make the calls.',
+      say: 'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
+      waits: 'Waits for you',
+      done: 'Done on its own',
+      floor: 'Money, keys, sharing and deletes always wait for your yes.',
+      floorMore: 'No rule and no agent can change that.',
+      /* The counts beside the two headings, and the lines the drawing says as it changes. */
+      waiting: (n: number) => (n ? `${n} waiting` : 'all clear'),
+      today: (n: number) => `${n} today`,
+      empty: 'Nothing needs you. Everything else is handled.',
+      askedBy: 'asked by',
+      undo: 'Undo',
+    },
+    slash: {
+      name: 'Slash',
+      title: 'Press / and ask anything.',
+      say: 'Slash answers from your record, finds anything in a keystroke, and drafts what you ask for. Nothing goes in without your yes.',
+      more: 'How Slash works',
+    },
+  },
 
-    /**
-     * THE DOORS AND THE LEARNED PATTERN, drawn as three steps. The flow is `docs/07` §4: an unmatched
-     * payload lands raw, Slash proposes an ingest pattern from three examples, one approval makes it
-     * a declaration, and no model runs on that shape again. The three alerts are the Personal
-     * record's own gym and phone bills and a groceries shop.
-     */
-    inbox: {
-      title: 'Forward it once. It files itself after that.',
-      lead:
-        'Send bank texts and receipts by email, point a webhook at your record, or connect Stripe and Mercury. ' +
-        'After three of a kind, Slash suggests how to file them. Say yes and the rest file themselves, with no credits spent.',
-      steps: ['Arrives', 'Learned once', 'Filed'],
-      arrivals: [
-        { from: 'Card alert', text: 'You paid $32.00 to PUREGYM on 3 Oct.' },
-        { from: 'Card alert', text: 'You paid $18.00 to VODAFONE on 4 Oct.' },
-        { from: 'Card alert', text: 'You paid $64.20 to TESCO STORES on 5 Oct.' },
-      ],
-      pattern: {
-        name: 'Card alerts',
-        fields: [
-          ['Amount', 'the money after “paid”'],
-          ['Merchant', 'the words after “to”'],
-          ['Date', 'the day after “on”'],
-        ],
-        tested: 'Matches all three',
-        writes: 'Files into Spending',
-      },
-      list: 'Spending',
-      columns: ['What', 'Amount', 'On'],
-      rows: [
-        ['Puregym', '$32.00', '3 Oct'],
-        ['Vodafone', '$18.00', '4 Oct'],
-        ['Tesco Stores', '$64.20', '5 Oct'],
-      ],
-    },
+  yours: {
+    title: 'It stays yours.',
+    points: [
+      { title: 'Every change has a name on it.', body: 'You see who changed what, you or which agent, and you can undo it.' },
+      { title: 'Take it all with you.', body: 'Export the whole record as one file, whenever you like.' },
+      { title: 'Keys stay in the vault.', body: 'Agents use your keys without ever seeing them, and no key goes into a chat.' },
+    ],
+  },
 
-    yours: {
-      title: 'Your data stays yours.',
-      body: [
-        'Each record is its own database. Export all of it as one file whenever you like.',
-        'Every change is saved with who made it, and any change can be undone.',
-        'Nothing is locked away: your agents, your scripts and the command line all reach the same record you do.',
-      ],
-      source: 'See the code on GitHub',
-      /* A glyph for each paragraph of `body`, in order: its own database, every change named, everything reaches the same record. */
-      glyphs: ['server', 'undo', 'code'],
-    },
-
-    /**
-     * THE PLANS, FREE FIRST (DIRECTION §35): the heading is Free's and never a price, Free is the large tile with its
-     * figures, and the paid plans share one quieter tile, a line each. The figures are `lib/plans.ts`.
-     */
-    plans: {
-      title: 'Free for one person.',
-      lead: 'The whole app, for one record, with no card and no trial that runs out.',
-      /* The two meters Free is drawn with. */
-      meters: { credits: 'Slash credits a month', runs: 'Automation runs a month' },
-      pros: {
-        head: 'For pros',
-        said: 'More Slash and automations, and colleagues in the same record at no extra cost.',
-      },
-      /* A paid plan's line in the pros tile: its price, then its unit, read from `lib/plans.ts`. */
-      price: (price: string, unit: string) => `${price} ${unit.replace(', per record', '')}`,
-      more: 'Full pricing',
-    },
+  plans: {
+    title: 'Free for one person.',
+    /* Free's agents and questions are `PLAN_TABLE`'s, through `lib/plans.ts`; the Cloud price is passed in from there. */
+    say: (cloud: string) =>
+      `The whole app, ${spell(TABLE.free.agents)} agents and ${TABLE.free.credits} questions a month. Cloud is ${cloud} when you need more.`,
+    more: 'See everything each plan holds',
   },
 
   closing: {
     title: 'Start your record.',
-    body: 'Tell it who you are and what it is for, and Slash sets up the first lists and pages.',
-    primary: 'Start for free',
-    secondary: 'See the pricing',
+    body: 'Say what you work on, connect an agent, and read your first brief in a few minutes.',
   },
 } as const;

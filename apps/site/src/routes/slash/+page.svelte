@@ -1,79 +1,29 @@
 <script lang="ts">
   /**
-   * /slash: the assistant inside every record, on a page of its own (the owner's ask of 26 September),
-   * drawn as Bento tiles on the ground (the design system).
+   * /slash: Slash on a page of its own, for a reader who wants to know more (DIRECTION §47: "have a separate page for
+   * Slash ... make it super readable and neat"). The prototype's `#slash` (loop/site-2026-10-17/src/site.html
+   * ~:679-756):
    *
-   *   hero        the name, what it is, the action, and the palette drawn beside them.
-   *   abilities   ask, draft, notice and learn, a tile each: what it does, things a person would type, and a
-   *               drawing of it working on the Personal record the palette answers from.
-   *   rules       its ground rules, each with its glyph, beside how credits work drawn as bars.
-   *   close       start a record.
+   *   head       the / key on the night ground, the page's one h1 and its lead.
+   *   modes      Ask, Find and Make: plain words beside one drawn answer each, with the questions to try.
+   *   facts      how asks are counted (from `plans.ts`), Slash beside your agents, and four questions.
+   *   close      "Press / and ask."
    *
-   * EVERY FIGURE IN A DRAWING IS ONE THE PAGE ALREADY SAYS: the palette demo's rows (`copy/home.ts`), the home
-   * page's inbox scene and `plans.ts`. What is worked out here (a share, a sum, a ratio) is worked out from them, so a
-   * figure changed there is changed in the drawing too.
+   * THE WORDS ARE `copy/slash.ts`; the questions and every name and figure in a drawing are the made-up record's
+   * (`demo/maya.ts`), and every count of asks is `PLAN_TABLE`'s. Nothing here types a figure.
    */
-  import Icon from '$lib/Icon.svelte';
-  import SlashPalette from '$lib/SlashPalette.svelte';
-  import { SIGNUP, site } from '$lib/copy.ts';
-  import { isIconName } from '$lib/icons.ts';
-  import { PACKS, plan } from '$lib/plans.ts';
+  import Close from '$lib/site/Close.svelte';
+  import PageHead from '$lib/site/PageHead.svelte';
+  import Mini from '$lib/slash/Mini.svelte';
+  import { site } from '$lib/copy.ts';
+  import { slashPage as s, type Mode } from '$lib/copy/slash.ts';
+  import { ASKS, FINDS, MAKES } from '$lib/demo/maya.ts';
 
-  const s = site.slash;
-  const d = s.drawn;
-  const free = plan('free');
-  const cloud = plan('cloud');
-  const plus = plan('plus');
-
-  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-  const word = (n: number): string => (Number.isInteger(n) && n >= 0 && n < WORDS.length ? (WORDS[n] ?? String(n)) : String(n));
-
-  /** `£1,240.56` as whole pence, and pence back in the palette's own spelling, its symbol and its pence. */
-  const amount = (text: string): number => Math.round((Number.parseFloat(text.replace(/[^0-9.]/g, '')) || 0) * 100);
-  const currency = (text: string): string => text.match(/^[^\d\s]+/)?.[0] ?? '';
-  const money = (unit: string, pence: number): string =>
-    `${unit}${(pence / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-  const [askMode, draftMode, noticeMode] = s.demo.modes;
-  const byId = Object.fromEntries(s.abilities.map((a) => [a.id, a])) as Record<string, (typeof s.abilities)[number]>;
-
-  /* ASK: the bills the palette answers with, as bars on one scale, the largest in ink. */
-  const bills = (askMode?.rows ?? []).map((r) => ({ what: r[0] ?? '', value: amount(r[1] ?? ''), shown: r[1] ?? '', when: r[2] ?? '' }));
-  const billMax = Math.max(1, ...bills.map((b) => b.value));
-  const billSum = bills.reduce((t, b) => t + b.value, 0);
-  const biggest = bills.reduce((a, b) => (b.value > a.value ? b : a), bills[0] ?? { what: '', value: 0, shown: '', when: '' });
-  const biggestPct = billSum > 0 ? Math.round((biggest.value / billSum) * 100) : 0;
-
-  /* DRAFT: the three blocks the draft would add, each with the glyph of what it is. */
-  const DRAFT_GLYPHS = ['target', 'work', 'bars'] as const;
-
-  /* NOTICE: the current account against the rent, and what is left. */
-  const account = noticeMode?.rows[0];
-  const rent = noticeMode?.rows[1];
-  const accountValue = amount(account?.[1] ?? '');
-  const rentValue = amount(rent?.[1] ?? '');
-  const rentPct = accountValue > 0 ? Math.min(100, (rentValue / accountValue) * 100) : 0;
-  const spare = money(currency(account?.[1] ?? ''), accountValue - rentValue);
-
-  /* LEARN: the home page's three card alerts, learned once and filed. */
-  const inbox = site.home.inbox;
-  const merchants = inbox.rows.map((r) => r[0]);
-
-  /* CREDITS: each plan's month and each pack, on one scale. FREE LEADS (DIRECTION §35): Free is first and the one bar
-     in ink, and the paid plans follow as more. `PACKS` is empty until billing is on (`plans.ts` `packsOnSale`), so
-     until then no pack bar is drawn and the meta line says they are coming later. */
-  const credits = [
-    { label: free.name, n: free.allowance.credits, shown: String(free.allowance.credits), ink: true },
-    { label: cloud.name, n: cloud.allowance.credits, shown: String(cloud.allowance.credits), ink: false },
-    { label: plus.name, n: plus.allowance.credits, shown: String(plus.allowance.credits), ink: false },
-    ...PACKS.map((p) => ({ label: s.allowance.packs, n: p.credits, shown: `${s.allowance.packsN(p.credits)} · ${p.price}`, ink: false })),
+  const MODES: { mode: Mode; words: { title: string; body: readonly string[] }; tries: readonly string[] }[] = [
+    { mode: 'ask', words: s.ask, tries: ASKS.map((a) => a.q) },
+    { mode: 'find', words: s.find, tries: FINDS.map((f) => f.q) },
+    { mode: 'make', words: s.make, tries: MAKES.map((m) => m.q) },
   ];
-  const creditMax = Math.max(1, ...credits.map((c) => c.n));
-
-  const ruleGlyph = (i: number) => {
-    const g = d.ruleGlyphs[i] ?? 'check';
-    return isIconName(g) ? g : 'check';
-  };
 </script>
 
 <svelte:head>
@@ -85,566 +35,225 @@
   <meta property="og:description" content={site.meta.slash.description} />
 </svelte:head>
 
-{#snippet examples(list: readonly string[])}
-  <ul class="examples" aria-label="For example">
-    {#each list as e (e)}
-      <li><span class="kbd" aria-hidden="true">/</span>{e}</li>
-    {/each}
-  </ul>
-{/snippet}
+<PageHead title={s.head.title} lead={s.head.lead}>
+  {#snippet before()}<span class="keycap" aria-hidden="true">/</span>{/snippet}
+</PageHead>
 
-<!-- ── What Slash is, the action, and the palette drawn beside it ── -->
-<section class="band" aria-labelledby="slash-h1">
-  <div class="in">
-    <div class="tiles">
-      <div class="tile lead span-5 intro">
-        <h1 class="h2" id="slash-h1">{s.title}</h1>
-        <p class="lede">{s.sub}</p>
-        <div class="actions">
-          <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{s.primary}<Icon name="arrow" size="s" /></a>
-          <a class="btn btn-lg" href="#allowance">{s.secondary}</a>
-        </div>
+<section class="wrap read">
+  {#each MODES as m (m.mode)}
+    <div class="srow">
+      <div class="stext">
+        <h2>{m.words.title}</h2>
+        {#each m.words.body as p (p)}<p>{p}</p>{/each}
+        <ul class="eg" aria-label={s.examples}>
+          {#each m.tries as q (q)}<li>{q}</li>{/each}
+        </ul>
       </div>
-      <div class="span-7 stage">
-        <SlashPalette demo={s.demo} size="l" />
-      </div>
+      <Mini mode={m.mode} />
     </div>
-  </div>
+  {/each}
 </section>
 
-<!-- ── The four things it does, each drawn working ── -->
-<section class="band" aria-label={s.demo.label}>
-  <div class="in">
-    <div class="tiles">
-      {#if byId.ask}
-        <article class="tile lead span-5 reveal" aria-labelledby="ask-title">
-          <header class="tile-head"><span class="well"><Icon name="search" /></span><h2 class="tile-title" id="ask-title">{byId.ask.title}</h2></header>
-          <p class="lede">{byId.ask.lead}</p>
-          {@render examples(byId.ask.examples)}
-          <div class="drawn" role="img" aria-label="{askMode?.prompt} {askMode?.lead}">
-            <p class="said">{askMode?.lead}</p>
-            <ul class="hbars">
-              {#each bills as b (b.what)}
-                <li>
-                  <span class="hb-what">{b.what}</span>
-                  <span class="hb-track"><span class="hb-bar" class:ink={b === biggest} style="--w:{(b.value / billMax) * 100}%"></span></span>
-                  <span class="hb-val num">{b.shown}</span>
-                </li>
-              {/each}
-            </ul>
-          </div>
-          <p class="reading">{d.askReading(biggest.what, biggestPct)}</p>
-        </article>
-      {/if}
-
-      {#if byId.draft}
-        <article class="tile lead span-7 reveal" aria-labelledby="draft-title">
-          <header class="tile-head">
-            <span class="well"><Icon name="file" /></span><h2 class="tile-title" id="draft-title">{byId.draft.title}</h2>
-            <span class="tile-meta">{draftMode?.source}</span>
-          </header>
-          <div class="pair">
-            <div class="words">
-              <p class="lede">{byId.draft.lead}</p>
-              {@render examples(byId.draft.examples)}
-            </div>
-            <div class="drawn card" role="group" aria-label={draftMode?.source}>
-              <p class="asked"><span class="kbd" aria-hidden="true">/</span>{draftMode?.prompt}</p>
-              <p class="said">{draftMode?.lead}</p>
-              <ul class="blocks">
-                {#each draftMode?.rows ?? [] as r, i (r[0])}
-                  <li>
-                    <span class="well"><Icon name={DRAFT_GLYPHS[i] ?? 'bars'} /></span>
-                    <span class="b-text"><b>{r[0]}</b><span>{r[1]}</span></span>
-                  </li>
-                {/each}
-              </ul>
-              <p class="verbs">
-                <span class="pill ink">{s.demo.accept}<span class="kbd">1</span></span>
-                <span class="pill">{s.demo.reject}<span class="kbd">2</span></span>
-              </p>
-            </div>
-          </div>
-          <p class="reading">{d.draftReading}</p>
-        </article>
-      {/if}
-
-      {#if byId.notice}
-        <article class="tile lead span-7 reveal" aria-labelledby="notice-title">
-          <header class="tile-head"><span class="well"><Icon name="bell" /></span><h2 class="tile-title" id="notice-title">{byId.notice.title}</h2></header>
-          <div class="pair">
-            <div class="words">
-              <p class="lede">{byId.notice.lead}</p>
-              {@render examples(byId.notice.examples)}
-            </div>
-            <div class="drawn card" role="group" aria-label={noticeMode?.prompt}>
-              <p class="asked"><Icon name="bell" size="s" />{noticeMode?.prompt}</p>
-              <p class="said">{noticeMode?.lead}</p>
-              <div class="meter" role="img" aria-label="{rent?.[0]} {rent?.[1]} of {account?.[0]} {account?.[1]}">
-                <span class="m-fill" style="--w:{rentPct}%"></span>
-              </div>
-              <p class="m-legend">
-                <span><i class="dot ink"></i>{rent?.[0]} <b class="num">{rent?.[1]}</b></span>
-                <span><i class="dot"></i>{account?.[0]} <b class="num">{account?.[1]}</b></span>
-              </p>
-              <p class="source"><Icon name="check" size="s" />{noticeMode?.source}</p>
-            </div>
-          </div>
-          <p class="reading">{d.noticeSpare(spare)}</p>
-        </article>
-      {/if}
-
-      {#if byId.learn}
-        <article class="tile lead span-5 reveal" aria-labelledby="learn-title">
-          <header class="tile-head"><span class="well"><Icon name="zap" /></span><h2 class="tile-title" id="learn-title">{byId.learn.title}</h2></header>
-          <p class="lede">{byId.learn.lead}</p>
-          <div class="learn" role="img" aria-label={d.learnLabel(inbox.list)}>
-            <ul class="alerts">
-              {#each merchants as m (m)}<li><span class="well"><Icon name="mail" /></span><span>{m}</span></li>{/each}
-            </ul>
-            <Icon name="arrow" size="m" />
-            <span class="step"><span class="well ink"><Icon name="check" /></span><span>{d.accept}</span></span>
-            <Icon name="arrow" size="m" />
-            <span class="step"><span class="well"><Icon name="inbox" /></span><span>{d.into(inbox.list)}</span></span>
-          </div>
-          <p class="reading">{d.learnReading}</p>
-          {@render examples(byId.learn.examples)}
-        </article>
-      {/if}
+<section class="wrap read">
+  <div class="facts">
+    <h2>{s.counted.title}</h2>
+    <p>{s.counted.say}</p>
+    <div class="tablebox">
+      <table class="ptable">
+        <thead>
+          <tr><td></td>{#each s.counted.plans as name (name)}<th scope="col">{name}</th>{/each}</tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">{s.counted.month.label}</th>
+            {#each s.counted.month.cells as n, i (i)}<td>{n.toLocaleString('en-US')}</td>{/each}
+          </tr>
+          <tr>
+            <th scope="row">{s.counted.key.label}</th>
+            {#each s.counted.plans as name (name)}<td>{s.counted.key.cell}</td>{/each}
+          </tr>
+        </tbody>
+      </table>
     </div>
+    <p>{s.counted.after}</p>
   </div>
-</section>
 
-<!-- ── Its ground rules, and how credits work ── -->
-<section class="band" aria-labelledby="rules-title">
-  <div class="in">
-    <div class="tiles">
-      <article class="tile lead span-7 reveal">
-        <header class="tile-head"><span class="well"><Icon name="shield" /></span><h2 class="tile-title" id="rules-title">{s.rulesTitle}</h2></header>
-        <dl class="rules">
-          {#each s.rules as r, i (r.head)}
-            <div>
-              <dt><span class="well l"><Icon name={ruleGlyph(i)} /></span>{r.head}</dt>
-              <dd>{r.said}</dd>
-            </div>
+  <div class="facts">
+    <h2>{s.agents.title}</h2>
+    <p>{s.agents.say}</p>
+    <div class="tablebox">
+      <table class="ptable plain-left">
+        <thead>
+          <tr><td></td>{#each s.agents.head as h (h)}<th scope="col">{h}</th>{/each}</tr>
+        </thead>
+        <tbody>
+          {#each s.agents.lines as [what, slash, agents] (what)}
+            <tr><th scope="row">{what}</th><td>{slash}</td><td>{agents}</td></tr>
           {/each}
-        </dl>
-      </article>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-      <article class="tile lead span-5 reveal" id="allowance" aria-labelledby="allowance-title">
-        <header class="tile-head">
-          <span class="well"><Icon name="coins" /></span><h2 class="tile-title" id="allowance-title">{s.allowance.title}</h2>
-          <a class="onward" href="/pricing">{s.allowance.more}<Icon name="arrow" size="s" /></a>
-        </header>
-        <p class="lede">{s.allowance.lead}</p>
-        <!-- The picture is the wrapper, because a list cannot take the `img` role and keep its items. -->
-        <div role="img" aria-label={d.creditsLabel}>
-          <ul class="cbars">
-            {#each credits as c, i (i)}
-              <li>
-                <span class="cb-label">{c.label}</span>
-                <span class="hb-track"><span class="hb-bar" class:ink={c.ink} style="--w:{(c.n / creditMax) * 100}%"></span></span>
-                <span class="cb-val num">{c.shown}</span>
-              </li>
-            {/each}
-          </ul>
-        </div>
-        <p class="reading">{d.creditsReading(word(plus.allowance.credits / cloud.allowance.credits))}</p>
-        <p class="meta">{s.allowance.packsN(PACKS[0]?.credits ?? 0)} {s.allowance.packsUnit(PACKS)}</p>
-      </article>
+  <div class="facts">
+    <h2>{s.faq.title}</h2>
+    <div class="faq">
+      {#each s.faq.items as f (f.q)}
+        <div><h3>{f.q}</h3><p>{f.a}</p></div>
+      {/each}
     </div>
   </div>
 </section>
 
-<!-- ── The close ── -->
-<section class="band" aria-labelledby="slash-close">
-  <div class="in">
-    <div class="tiles">
-      <div class="tile lead close reveal">
-        <div class="close-words">
-          <h2 class="h2" id="slash-close">{s.closeTitle}</h2>
-          <p class="lede">{s.closeBody}</p>
-        </div>
-        <a class="btn btn-primary btn-lg" href={SIGNUP} rel="external">{s.primary}<Icon name="arrow" size="s" /></a>
-      </div>
-    </div>
-  </div>
-</section>
+<Close title={s.close.title} body={s.close.body} />
 
 <style>
-  /* ── The opening ─────────────────────────────────────────────────────── */
-
-  .intro {
-    justify-content: center;
-  }
-
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-
-  .stage {
+  /* THE / KEY on the night ground, above the title (PageHead's `before`). */
+  .keycap {
     display: grid;
-    align-items: center;
+    place-items: center;
+    inline-size: 60px;
+    block-size: 60px;
+    margin-bottom: 26px;
+    border-radius: 15px;
+    background: var(--night-2);
+    box-shadow:
+      inset 0 0 0 1px var(--night-rule),
+      inset 0 -3px 0 var(--night-rule);
+    color: var(--night-accent);
+    font: 600 28px/1 var(--head);
   }
 
-  /* ── The abilities ───────────────────────────────────────────────────── */
-
-  .examples {
-    display: grid;
-    gap: 2px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+  .read {
+    max-inline-size: 1120px;
   }
 
-  .examples li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-block-size: 32px;
-    color: var(--ink);
-    font-size: var(--t-site-small);
-  }
-
-  /* The drawing and the words beside it; they stack below a desk. */
-  .pair {
+  .srow {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-    gap: var(--sp-5);
+    gap: 64px;
     align-items: start;
+    padding-block: 88px;
+    border-top: 1px solid var(--rule);
   }
 
-  .words {
-    display: grid;
-    gap: var(--sp-4);
+  .read > .srow:first-child {
+    border-top: 0;
   }
 
-  /* A DRAWING OF THE PRODUCT'S OWN PARTS inside a tile: the tile's second fill, never a tile of its own. */
-  .card {
-    display: grid;
-    gap: var(--sp-3);
-    padding: var(--sp-4);
-    background: var(--s1);
-    border-radius: var(--r-md);
+  .stext h2,
+  .facts h2 {
+    font-size: clamp(2.2rem, 4vw, 3.2rem);
+    line-height: 1;
+    letter-spacing: -0.045em;
   }
 
-  .drawn {
-    min-inline-size: 0;
-  }
-
-  .said {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-md);
-    font-weight: 600;
-    line-height: 24px;
-  }
-
-  .asked {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  /* Horizontal bars on one scale: the label, the track, the figure. The largest is ink, the rest grey. */
-  .hbars,
-  .cbars {
-    display: grid;
-    gap: var(--sp-2);
-    margin: var(--sp-3) 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .hbars li,
-  .cbars li {
-    display: grid;
-    grid-template-columns: minmax(0, 11em) minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--sp-3);
-    font-size: var(--t-sm);
-  }
-
-  .hb-what,
-  .cb-label {
-    overflow: hidden;
+  .stext p,
+  .facts p {
+    max-inline-size: 32em;
+    margin: 18px 0 0;
     color: var(--ink2);
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    font-size: 18px;
+    line-height: 1.65;
+    text-wrap: pretty;
   }
 
-  .hb-track {
-    display: block;
-    block-size: 10px;
-    background: var(--s1);
-    border-radius: var(--r-pill);
-  }
-
-  .hb-bar {
-    display: block;
-    inline-size: var(--w);
-    min-inline-size: 6px;
-    block-size: 100%;
-    background: var(--dim);
-    border-radius: var(--r-pill);
-  }
-
-  .hb-bar.ink {
-    background: var(--ink);
-  }
-
-  .hb-val,
-  .cb-val {
-    color: var(--ink);
-    font-weight: 600;
-    text-align: end;
-  }
-
-  .blocks {
+  .eg {
     display: grid;
-    gap: var(--sp-2);
-    margin: 0;
+    gap: 10px;
+    margin: 26px 0 0;
     padding: 0;
     list-style: none;
   }
 
-  .blocks li {
+  .eg li {
     display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    padding: var(--sp-2);
-    background: var(--bg);
-    border-radius: var(--r-md);
+    gap: 12px;
+    font-size: 16.5px;
   }
 
-  .blocks .well {
-    background: var(--s1);
+  .eg li::before {
+    content: '/';
+    color: var(--red);
+    font: 600 16px/1.55 var(--head);
   }
 
-  .b-text {
-    display: grid;
-    min-inline-size: 0;
-    font-size: var(--t-sm);
+  .facts {
+    padding-block: 88px;
+    border-top: 1px solid var(--rule);
   }
 
-  .b-text b {
-    color: var(--ink);
-    font-weight: 600;
+  .tablebox {
+    max-inline-size: 760px;
+    margin-top: 28px;
+    overflow-x: auto;
   }
 
-  .b-text span {
-    color: var(--dim);
+  .ptable {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
   }
 
-  /* Drawn, not pressed: a button on a page that does nothing when pressed is a broken control. */
-  .verbs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-    margin: 0;
+  .ptable th,
+  .ptable td {
+    padding: 14px 10px;
+    border-top: 1px solid var(--rule);
+    text-align: left;
   }
 
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: 32px;
-    padding-inline: 14px 8px;
-    background: var(--bg);
-    border-radius: var(--r-pill);
-    color: var(--ink);
-    font-size: var(--t-sm);
+  .ptable thead th,
+  .ptable thead td {
+    border-top: 0;
+    color: var(--muted);
+    font-size: 13.5px;
     font-weight: 500;
   }
 
-  .pill.ink {
-    background: var(--ink);
-    color: var(--on-ink);
+  .ptable tbody th {
+    font-weight: 400;
   }
 
-  .pill.ink .kbd {
-    background: color-mix(in srgb, var(--on-ink) 18%, transparent);
-    color: var(--on-ink);
+  .ptable:not(.plain-left) td,
+  .ptable:not(.plain-left) thead th {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 
-  /* The notice's meter: the account is the track and the rent the ink part of it. */
-  .meter {
-    block-size: 12px;
-    background: var(--bg);
-    border-radius: var(--r-pill);
+  .faq {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 34px 56px;
+    margin-top: 40px;
   }
 
-  .m-fill {
-    display: block;
-    inline-size: var(--w);
-    block-size: 100%;
-    background: var(--ink);
-    border-radius: var(--r-pill);
+  .faq h3 {
+    margin-bottom: 8px;
+    font-size: 21px;
+    letter-spacing: -0.03em;
   }
 
-  .m-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-1) var(--sp-4);
+  .faq p {
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: 16px;
   }
 
-  .m-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
+  @media (max-width: 1060px) {
+    .srow {
+      grid-template-columns: 1fr;
+      gap: 32px;
+      padding-block: 64px;
+    }
 
-  .m-legend b {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  .dot {
-    display: inline-block;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: var(--r-pill);
-  }
-
-  .dot.ink {
-    background: var(--ink);
-    border-color: var(--ink);
-  }
-
-  .source {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
-  }
-
-  /* Learn: three alerts, one yes, and the list they go into. */
-  .learn {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-3);
-    padding: var(--sp-4);
-    background: var(--s1);
-    border-radius: var(--r-md);
-    color: var(--dim);
-  }
-
-  .alerts {
-    display: grid;
-    gap: 6px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .alerts li,
-  .step {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    color: var(--ink);
-    font-size: var(--t-sm);
-  }
-
-  .learn .well:not(.ink) {
-    background: var(--bg);
-  }
-
-  .step {
-    font-weight: 600;
-  }
-
-  /* ── Rules and credits ───────────────────────────────────────────────── */
-
-  .rules {
-    display: grid;
-    margin: 0;
-  }
-
-  /* THE WELL IS IN THE TERM, because a `dl`'s groups hold only terms and descriptions, and it is lifted out to
-     the rule's start beside both lines, where a grid column of its own used to put it. */
-  .rules div {
-    --lead: calc(var(--well-l) + var(--sp-4));
-    padding-block: var(--sp-4);
-    padding-inline-start: var(--lead);
-    border-block-start: 1px solid var(--line);
-  }
-
-  .rules div:first-child {
-    border-block-start: 0;
-    padding-block-start: 0;
-  }
-
-  .rules .well {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: calc(-1 * var(--lead));
-  }
-
-  .rules dt {
-    position: relative;
-    color: var(--ink);
-    font-size: var(--t-md);
-    font-weight: 600;
-  }
-
-  .rules dd {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-site-small);
-    line-height: 20px;
-  }
-
-  .cbars li {
-    grid-template-columns: minmax(0, 7em) minmax(0, 1fr) auto;
-  }
-
-  /* ── The close ───────────────────────────────────────────────────────── */
-
-  .close {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .close-words {
-    display: grid;
-    gap: var(--sp-3);
-  }
-
-  @media (width < 1100px) {
-    .pair {
-      grid-template-columns: minmax(0, 1fr);
+    .faq {
+      grid-template-columns: 1fr;
     }
   }
 
-  @media (width < 640px) {
-    .hbars li {
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    .hbars .hb-track {
-      grid-column: 1 / -1;
-      grid-row: 2;
-    }
-
-    .actions .btn {
-      flex: 1;
+  @media (max-width: 760px) {
+    .facts {
+      padding-block: 64px;
     }
   }
 </style>

@@ -40,8 +40,9 @@
      figures, and as one variable file from 300 to 800 it is 25.5 KB where Plex was 45.7 KB for
      three weights.
 
-     Poppins carries the brand: it is the wordmark's own face, geometric where Geist is neutral, and
-     it appears only at display sizes. It never touches a table.
+     Lexend carries the brand at display sizes (the owner, 17 October: Lexend replaces Poppins for
+     page names, big figures and the wordmark, on the site and in the app). It is the wordmark's own
+     face, geometric where Geist is neutral, and it never touches a table.
 
      The identifier face is the system monospace stack and costs zero bytes. It is the ROLE that
      makes #125 and D41 read as identifiers, not a chosen face (13 §3.1). */
@@ -76,8 +77,8 @@
   }
 
   @font-face {
-    font-family: 'Poppins';
-    src: url('/fonts/poppins-600.woff2') format('woff2');
+    font-family: 'Lexend';
+    src: url('/fonts/lexend-600.woff2') format('woff2');
     font-weight: 600;
     font-display: swap;
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2212;
@@ -167,7 +168,7 @@
 
   :root {
     --font-ui: 'Geist', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-display: 'Poppins', 'Geist', 'Plex', system-ui, sans-serif;
+    --font-display: 'Lexend', 'Geist', 'Plex', system-ui, sans-serif;
     /* The design system names Geist Mono for key caps, addresses, code and times: `geist-mono.woff2` in both apps'
        `static/fonts`, declared above. */
     --font-id: 'Geist Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;

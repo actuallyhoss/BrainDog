@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CLAIMS } from './claims.ts';
 import { site } from './copy.ts';
+import { slashPage } from './copy/slash.ts';
 import { HELD, LAUNCH, held } from './launch.ts';
 import { launchOrder, ownerMarkers } from './launch-order.ts';
 import { SUPPORT_EMAIL } from './links.ts';
@@ -51,6 +52,12 @@ const productionRecipient = (): string | undefined => wranglerConfig(fileURLToPa
 const strings = (v: unknown): string[] =>
   typeof v === 'string' ? [v] : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [];
 
+/**
+ * EVERY WORD THE SITE HOLDS: `site`, and the Slash page's own export, which that page imports directly and `copy.ts`
+ * does not spread (batch 103). The ledger's paths and the scans below read this.
+ */
+const COPY = { ...site, slashPage } as const;
+
 test('nav.ts names every page the site prerenders, so the header, the 404 and the sitemap do', () => {
   /* THE ROUTE DIRECTORIES ARE THE LIST, because `svelte.config.js` prerenders `*` and every one of
      these has no parameter. The 404's list and `/sitemap.xml` are both built from `nav.ts`'s
@@ -79,7 +86,10 @@ test('every place nav.ts names is a route the site has', () => {
 
 /**
  * THE SITE'S LAUNCH FLAGS MIRROR THE WORKER'S VARS. Production's `SIGNUP` is sign-up's switch (`apps/worker/src/launch.ts`),
- * so `LAUNCH.signup` is on exactly when it is `open`; `BILLING` is billing's, so `LAUNCH.billing` is on exactly when it
+ * so `LAUNCH.signup` is on exactly when it is `open` or `invite`: either way a stranger who presses Start free reaches
+ * sign-up, where an invited person signs up and anyone else applies. His word, 17 October: "make it invite only... you
+ * only know it's invite only when you click sign up, and you can apply" (DIRECTION §49). So the site keeps Start free
+ * and says nothing about invites, and the check below this one holds it to that. `BILLING` is billing's, so `LAUNCH.billing` is on exactly when it
  * is `live`. Before 8 October there was no `SIGNUP` and `LAUNCH.signup` read `BILLING`, so a host open to anybody and a
  * site that said it was closed passed together. A production config with no `SIGNUP` fails here, because then nothing
  * says who may sign up. The support address is the Worker's `SUPPORT_ADDRESS`, and `/support` shows `SUPPORT_EMAIL`, so
@@ -90,7 +100,7 @@ test("the launch flags and the support address match production's Worker vars", 
   const vars: { [key: string]: string } = wranglerConfig(fileURLToPath(REPO)).env?.['production']?.vars ?? {};
   const signup = vars['SIGNUP'];
   assert.ok(signup !== undefined, 'no SIGNUP in the production environment of apps/worker/wrangler.jsonc, so nothing says who may sign up');
-  assert.equal(LAUNCH.signup, signup === 'open', `production's SIGNUP is "${signup}", and LAUNCH.signup in src/lib/launch.ts is ${LAUNCH.signup}`);
+  assert.equal(LAUNCH.signup, signup === 'open' || signup === 'invite', `production's SIGNUP is "${signup}", and LAUNCH.signup in src/lib/launch.ts is ${LAUNCH.signup}`);
   const billing = vars['BILLING'];
   assert.ok(billing !== undefined, 'no BILLING in the production environment of apps/worker/wrangler.jsonc, so nothing says whether cards are charged');
   assert.equal(LAUNCH.billing, billing === 'live', `production's BILLING is "${billing}", and LAUNCH.billing in src/lib/launch.ts is ${LAUNCH.billing}`);
@@ -99,38 +109,54 @@ test("the launch flags and the support address match production's Worker vars", 
   assert.equal(SUPPORT_EMAIL, support, `production's SUPPORT_ADDRESS is "${support}", and SUPPORT_EMAIL in src/lib/links.ts is "${SUPPORT_EMAIL}"`);
 });
 
-test('the hosted backup cell does not promise copies while the sealing key is a placeholder', () => {
+/**
+ * THE SITE SAYS NOTHING ABOUT INVITES, AND SO NEVER THAT SIGN-UP IS OPEN TO EVERYONE. With production on `invite`, a
+ * sentence like "anyone can sign up" is false the moment a stranger presses Start free and is asked for an invite or
+ * an application. It is checked whatever `SIGNUP` says: if sign-up opens to all one day, the site still need not
+ * say so, and a sentence planted now must not wait for that day.
+ */
+const OPEN_TO_ALL = /anyone can sign up|open to everyone|no invite|no waitlist/i;
+
+test('no sentence on the site says sign-up is open to everyone', () => {
+  const said = strings(COPY).filter((s) => OPEN_TO_ALL.test(s));
+  assert.deepEqual(said, [], `the site says sign-up is open to everyone, and production may be invite only: ${said.join(' | ')}`);
+  /* THE PLANTED FAULT, so the pattern is seen to catch each shape, whatever its case. */
+  for (const planted of ['Anyone can sign up today.', 'BrainDog is OPEN TO EVERYONE.', 'No invite needed.', 'No waitlist, just start.'])
+    assert.match(planted, OPEN_TO_ALL, planted);
+});
+
+/**
+ * THE SITE'S WORD ON BACKUPS, HELD TO PRODUCTION'S SEALING KEY. Until batch 103 this read one cell, the pricing
+ * table's Backups row; the table the owner designed on 17 October has no such row, and the copy that speaks of nightly
+ * copies is the security page's. So it reads every sentence the site holds about backups or sealed copies, and holds
+ * each to the key the way the cell was held. With no such sentence there is nothing to hold.
+ */
+const backupLines = (): string[] => strings(COPY).filter((s) => /\bbackups?\b|\bcop(y|ies)\b.*\bseal|\bseal.*\bcop(y|ies)\b/i.test(s));
+
+test('no sentence promises backups while the sealing key is a placeholder', () => {
   /* `sealerOf` in `apps/worker/src/snapshots.ts` refuses a placeholder recipient before the walk
      starts, so with `age1<production-recipient>` no hosted copy is written at all. */
   const recipient = productionRecipient();
   assert.ok(recipient !== undefined, 'no AGE_RECIPIENT in the production environment of wrangler.jsonc');
-
-  const row = site.pricing.rows.find((r: readonly string[]) => r[0] === 'Backups');
-  assert.ok(row, 'the pricing table has no Backups row');
-  const hosted = row[2] ?? '';
   if (recipient.includes('<')) {
-    assert.match(hosted, /\byet\b/, `the key is ${recipient}, so no hosted copy is kept, and the cell says "${hosted}"`);
+    for (const line of backupLines()) assert.match(line, /\byet\b/, `the key is ${recipient}, so no hosted copy is kept, and the site says "${line}"`);
   }
 });
 
-test('the hosted backup cell does not still wait on a sealing key once production has one', () => {
+test('no sentence about backups still waits on a sealing key once production has one', () => {
   /* Production's `AGE_RECIPIENT` became a real `age1` key on
      54a16ffb (22 September, 20:12) and the cell went on saying "None yet ... once we set the key"
      for a day, because the check above only speaks while the value is a placeholder and was green
-     either way. This is the other half: a real recipient means the cell must not wait on one, and an
-     empty one, which `sealerOf` takes as a decision to keep unsealed copies, means it must not say
+     either way. This is the other half: a real recipient means no sentence may wait on one, and an
+     empty one, which `sealerOf` takes as a decision to keep unsealed copies, means none may say
      the copies are sealed. */
   const recipient = productionRecipient();
   assert.ok(recipient !== undefined, 'no AGE_RECIPIENT in the production environment of wrangler.jsonc');
-
-  const row = site.pricing.rows.find((r: readonly string[]) => r[0] === 'Backups');
-  assert.ok(row, 'the pricing table has no Backups row');
-  const hosted = row[2] ?? '';
-  if (recipient !== '' && !recipient.includes('<')) {
-    assert.doesNotMatch(hosted, /once we set|None yet/, `production seals to ${recipient.slice(0, 10)}..., and the cell says "${hosted}"`);
-  }
-  if (recipient === '') {
-    assert.doesNotMatch(hosted, /seal/i, `production's AGE_RECIPIENT is empty, so its copies are unsealed, and the cell says "${hosted}"`);
+  for (const line of backupLines()) {
+    if (recipient !== '' && !recipient.includes('<')) {
+      assert.doesNotMatch(line, /once we set|None yet/, `production seals to ${recipient.slice(0, 10)}..., and the site says "${line}"`);
+    }
+    if (recipient === '') assert.doesNotMatch(line, /seal/i, `production's AGE_RECIPIENT is empty, so its copies are unsealed, and the site says "${line}"`);
   }
 });
 
@@ -162,7 +188,7 @@ test('no sentence says there is no model while an environment includes one', () 
     if (included === 'yes' || endpoint.trim() !== '') modelled.push(name);
   }
 
-  const said = strings(site).filter((s) => NO_MODEL.test(s));
+  const said = strings(COPY).filter((s) => NO_MODEL.test(s));
   if (modelled.length > 0) {
     assert.deepEqual(said, [], `a model is included in ${modelled.join(' and ')}, and the site says there is none: ${said.join(' | ')}`);
   }
@@ -175,19 +201,19 @@ test('no sentence says there is no model while an environment includes one', () 
  * ledger never says a stale thing for long. A `not-yet` claim is checked across every string the site holds.
  */
 
-/** The value at a dotted path into `site`, an array index as a number. */
+/** The value at a dotted path into the copy, an array index as a number. */
 const at = (path: string): unknown =>
-  path.split('.').reduce<unknown>((v, key) => (v && typeof v === 'object' ? (v as { [k: string]: unknown })[key] : undefined), site);
+  path.split('.').reduce<unknown>((v, key) => (v && typeof v === 'object' ? (v as { [k: string]: unknown })[key] : undefined), COPY);
 
 test('every claim in the ledger is said where it says, in its own words', () => {
   const ids = new Set<string>();
   for (const claim of CLAIMS) {
     assert.ok(!ids.has(claim.id), `two claims are called ${claim.id}`);
     ids.add(claim.id);
-    if (claim.state === 'not-yet') continue;
+    if (claim.state === 'not-yet' && !claim.soon) continue;
     const value = at(claim.where);
-    assert.equal(typeof value, 'string', `${claim.id}: site.${claim.where} is not a sentence`);
-    assert.ok((value as string).includes(claim.said), `${claim.id}: site.${claim.where} no longer says "${claim.said}"; it says "${value}"`);
+    assert.equal(typeof value, 'string', `${claim.id}: ${claim.where} is not a sentence`);
+    assert.ok((value as string).includes(claim.said), `${claim.id}: ${claim.where} no longer says "${claim.said}"; it says "${value}"`);
   }
 });
 
@@ -204,10 +230,15 @@ test('every claim on a flag names a flag launch.ts has, and agrees with it', () 
 });
 
 test('no sentence in the copy says a claim the ledger marks not yet', () => {
-  const said = strings(site);
-  const found = CLAIMS.filter((c) => c.state === 'not-yet').flatMap((c) =>
-    said.filter((s) => s.toLowerCase().includes(c.said.toLowerCase())).map((s) => `${c.id}: "${s}"`),
-  );
+  const said = strings(COPY);
+  /* A `soon` claim is said once, as not yet, at its own place: that one sentence is left out, and any other fails. */
+  const found = CLAIMS.filter((c) => c.state === 'not-yet').flatMap((c) => {
+    const own = c.soon ? at(c.where) : undefined;
+    let excused = own === undefined ? 0 : 1;
+    return said
+      .filter((s) => s.toLowerCase().includes(c.said.toLowerCase()) && !(s === own && excused-- > 0))
+      .map((s) => `${c.id}: "${s}"`);
+  });
   assert.deepEqual(found, [], `${found.length} sentence(s) say what is not true yet:\n${found.join('\n')}`);
 });
 

@@ -21,7 +21,7 @@
   const l = trust.legal;
 
   const parts: Part[] = [
-    { id: 'licence-title', title: l.licence.title, glyph: 'code', span: 7, body: l.licence.body, links: l.licence.links },
+    { id: 'licence-title', title: l.licence.title, glyph: 'code', span: 7, body: l.licence.body, links: LAUNCH.repo ? l.licence.links : [] },
     LAUNCH.legal
       ? {
           id: 'terms-title',

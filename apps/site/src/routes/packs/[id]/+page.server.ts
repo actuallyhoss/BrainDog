@@ -6,6 +6,7 @@
  * `lib/app/Page.svelte`, the product's renderer, so the page carries words and never a file path.
  */
 import { error } from '@sveltejs/kit';
+import { held } from '$lib/launch.ts';
 import { APP } from '$lib/links.ts';
 import { addsSrc, cardOf, changeOf, dayOf, installPath, isPublic, offered, slugOf } from '$lib/packs/catalogue.ts';
 import { readCounts, readEntries, readPreview } from '$lib/packs/read.server.ts';
@@ -15,7 +16,8 @@ export const prerender = true;
 
 const listed = () => readEntries().filter(isPublic);
 
-export const entries: EntryGenerator = () => listed().map((e) => ({ id: slugOf(e) }));
+/* NO PAGE PER PACK WHILE `/packs` IS HELD (`HELD` in `launch.ts`): none is prerendered, so none is written. */
+export const entries: EntryGenerator = () => (held() ? [] : listed().map((e) => ({ id: slugOf(e) })));
 
 export const load: PageServerLoad = async ({ params }) => {
   const entry = listed().find((e) => slugOf(e) === params.id);

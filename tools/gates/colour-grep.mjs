@@ -140,7 +140,7 @@ const NAMED = [
 /** A property whose value is a colour. `border`/`outline`/`box-shadow` carry one among other parts. */
 const COLOUR_PROP = String.raw`(?:[a-z-]*color|background(?:-color)?|fill|stroke|border(?:-[a-z]+)?|outline(?:-color)?|box-shadow|text-shadow|caret-color|accent-color)`;
 
-const LITERAL_NAMED = new RegExp(String.raw`\b${COLOUR_PROP}\s*:[^;{}]*\b(?:${NAMED.join('|')})\b`, 'i');
+const LITERAL_NAMED = new RegExp(String.raw`\b${COLOUR_PROP}\s*:[^;{}]*(?<![-\w])(?:${NAMED.join('|')})(?![-\w])`, 'i');
 
 /**
  * Two lines are allowed to hold a literal, and they are named rather than exempted by file. A
@@ -172,7 +172,13 @@ const ALLOWED_LINES = [/^\s*--brand:\s*#[0-9a-fA-F]{6};\s*$/, /^\s*@property\s+-
  *                          held at his word on 16 October (below).
  */
 const HEX = String.raw`#[0-9a-fA-F]{6}`;
+/* A LINE THAT ONLY DEFINES TOKENS: custom properties and nothing else, the shape a palette file is written in. */
+const TOKEN_LINE = /^\s*(?:--[a-z0-9-]+:\s*[^;{}]+;\s*)+(?:color-scheme:\s*[a-z]+;\s*)?(?:\}\s*)*$/;
 const ALLOWED_IN = [
+  /* LOOK B'S PALETTE AND THE ADMIN PAGE'S COPY OF IT (DIRECTION §47, §49), hand-set from the approved prototype until the
+     theme generator makes Look B. Only lines that define tokens: a colour in a rule of either file is still caught. */
+  { file: 'packages/skin/look-b.css', lines: [TOKEN_LINE] },
+  { file: 'apps/worker/src/admin-page.ts', lines: [TOKEN_LINE] },
   {
     file: 'apps/site/scripts/shot.mjs',
     lines: [
