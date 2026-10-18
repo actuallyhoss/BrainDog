@@ -432,6 +432,12 @@ function guardedSql(storage: DurableObjectStorage): Sql {
 /** Where an object keeps the build it last opened as, in its own storage and outside the record (`Record$` `#booted`). */
 const BOOTED = 'braindog.booted';
 
+/** Where an object keeps the alarm step it is in, so an alarm cut off by the runtime is named by the next one (`#step`). */
+const ALARM_STEP = 'braindog.alarm-step';
+
+/** A step slower than this writes an `alarm-step` line with its time. */
+const SLOW_STEP_MS = 5_000;
+
 /** Where an object keeps whether its record's billing has lapsed, beside `BOOTED` and outside the record (`setLapsed`). */
 const LAPSED = 'braindog.lapsed';
 
@@ -1048,26 +1054,70 @@ export class Record$ extends DurableObject<Env> {
       if (more) await this.#alarm.set(Date.now());
       return;
     }
-    await api.kernel.drain(this.#alarm);
-    const more = await this.#act(api);
-    const asked = await this.#ask(api);
-    const modelled = await this.#model(api);
-    await slashLook(api, { sql: this.#jobsStore });
+    await this.#cutOff(api);
+    await this.#step(api, 'drain', () => api.kernel.drain(this.#alarm));
+    const more = await this.#step(api, 'act', () => this.#act(api));
+    const asked = await this.#step(api, 'ask', () => this.#ask(api));
+    const modelled = await this.#step(api, 'model', () => this.#model(api));
+    await this.#step(api, 'look', () => slashLook(api, { sql: this.#jobsStore }));
     /* AND THE RECORD LINTS ITS OWN PAGES (PRF-A04), at most once a UTC day: `lintTick` keeps the day itself, so each alarm asks only a pref. */
-    await api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e)));
+    await this.#step(api, 'lint', () => api.lintTick().catch((e: unknown) => console.error('lint:', e instanceof Error ? e.message : String(e))));
     /* AND WHETHER THE MODEL ANSWERS (`model-answers`), from this object's Slash ledger. A later filing the same day
        replaces the earlier one, so each alarm may file it; the provider's last words ride along from `#modelFailed`. */
-    try {
-      fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now());
-    } catch (e) {
-      console.error('signs:', e instanceof Error ? e.message : String(e));
-    }
+    await this.#step(api, 'signs', () => {
+      try {
+        fileModelSign(api.kernel, guardedSql(this.ctx.storage), Date.now());
+      } catch (e) {
+        console.error('signs:', e instanceof Error ? e.message : String(e));
+      }
+    });
+    await this.#stepDone();
     /* WORK LEFT FOR THE NEXT INVOCATION SETS THE ALARM FOR NOW, AND IT IS SET LAST. `kernel.tail` sets the alarm from the
        `schedule` table alone, and both the ask pass and the daily look tail it, so a `set(now)` made inside `#act`
        before either of them could be moved out to the next schedule row, or cleared, by a pass that answered one
        question. Neither jobs `#act` released nor questions left in the outbox are schedule rows, so nothing else here
        would set it back. */
     if (more || asked || modelled) await this.#alarm.set(Date.now());
+  }
+
+  /**
+   * One step of the alarm, with its name kept in the object's storage while it runs.
+   *
+   * THE RUNTIME RESETS AN OBJECT THAT RUNS PAST ITS CPU LIMIT, and nothing of the alarm runs after that, its own catch
+   * included, so the only way to learn which step it was is to have written it down first. The next alarm reads it back
+   * (`#cutOff`). A slow step says so too, from wall time, which counts what the step waited on and not its pure CPU.
+   */
+  async #step<T>(api: RecordApi, step: string, run: () => T | Promise<T>): Promise<T> {
+    try {
+      await this.ctx.storage.put(ALARM_STEP, step);
+    } catch {
+      /* A step not written down still runs. */
+    }
+    const started = Date.now();
+    const out = await run();
+    const ms = Date.now() - started;
+    if (ms >= SLOW_STEP_MS) op({ op: 'alarm-step', rec: recOf(api), step, ms });
+    return out;
+  }
+
+  /** The alarm finished: no step is left running. */
+  async #stepDone(): Promise<void> {
+    try {
+      await this.ctx.storage.delete(ALARM_STEP);
+    } catch {
+      /* The next alarm would name a step that finished; it says so only once, then this clears it. */
+    }
+  }
+
+  /** A step left written down by an alarm that never finished: the line that names it, once. */
+  async #cutOff(api: RecordApi): Promise<void> {
+    let left: unknown;
+    try {
+      left = await this.ctx.storage.get(ALARM_STEP);
+    } catch {
+      return;
+    }
+    if (typeof left === 'string') op({ op: 'alarm-step', rec: recOf(api), step: left, cut: true }, 'error');
   }
 
   /**

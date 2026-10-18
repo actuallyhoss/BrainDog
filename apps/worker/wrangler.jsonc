@@ -112,6 +112,11 @@
      what makes a alpha incident debuggable with the same `wrangler tail` the runbook names. */
   "observability": { "enabled": true },
 
+  /* FIVE MINUTES OF CPU, NOT THE DEFAULT THIRTY SECONDS. On 18 Oct a record's alarm ran past thirty seconds and the
+     object was reset, failing every request waiting on it (`/api/whoami` among them). Only CPU spent is billed, so the
+     ceiling costs nothing until a pass needs it, and `Record$`'s `alarm-step` line names the pass that did. Inheritable. */
+  "limits": { "cpu_ms": 300000 },
+
   /* -------------------------------------------------------------------------------------------
      THE STATIC SHELL. Inheritable, so both environments serve the same `build/` — there is one
      artefact and it is host-agnostic by construction (50 §2.1, §13 D1/D2).
