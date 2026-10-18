@@ -14,7 +14,7 @@
  * state rather than about whether there is one. `forget` drops the answer after a write that changes it.
  */
 
-import { createClient, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
+import { createClient, forgetSchemas, type Boot, type ClientOptions, type Cursor, type EventLine } from '@braindog/client';
 import { railRoom } from '@braindog/kernel';
 /* THE BUILT-IN ADD-ONS' NAMES AND LISTS: a line about an add-on names it from here. It read the sample's `PACKS`, which
    carried the same six and the sample's two made-up add-ons, until the sample left the app, then a hand copy in `modules.ts` until each module's
@@ -482,6 +482,7 @@ export const recordsAsked = (): Promise<Answer<SwitcherRow[]>> | null => reach;
 export function forget(): void {
   kept = null;
   refusal = null;
+  forgetSchemas();
 }
 
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. The reader's own

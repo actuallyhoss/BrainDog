@@ -1272,7 +1272,12 @@ type SchemaStore = { version: number | null; lists: Map<string, { version: numbe
  * client kept nothing: nine screens asked `schema` 48 times (`loop/research-104.md` 2.3). The fetch is in the key so a
  * test's stub never shares with another's, and the token so two people on one host never do.
  */
-const SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
+let SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
+
+/** Drop every kept schema, as the app's `forget` does on a record switch and a sign-out, so the next ask goes out. */
+export function forgetSchemas(): void {
+  SCHEMAS = new WeakMap();
+}
 
 export function createClient(options: ClientOptions) {
   const doFetch = options.fetch ?? globalThis.fetch;
