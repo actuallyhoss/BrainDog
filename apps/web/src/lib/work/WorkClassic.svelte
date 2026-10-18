@@ -211,6 +211,7 @@
   const work = read<Work>(
     () => (data.refused ? null : apiBase()),
     () => readWork(apiBase()),
+    { kept: 'WorkClassic' },
   );
 
   /* WHILE A ROW IS BEING RE-DATED IN PLACE THE ANSWER IS HELD, so a read that lands meanwhile cannot move the row the

@@ -28,6 +28,7 @@ import { currencyOf } from './money.ts';
 import { learnPages, REGISTERS } from './held.ts';
 import { learnRowPages } from './row-href.ts';
 import { copy } from '../copy.ts';
+import { forgetKept } from '../data/kept.ts';
 import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
@@ -483,6 +484,7 @@ export function forget(): void {
   kept = null;
   refusal = null;
   forgetSchemas();
+  forgetKept();
 }
 
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. The reader's own

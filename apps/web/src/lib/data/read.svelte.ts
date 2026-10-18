@@ -17,6 +17,7 @@
 import { untrack } from 'svelte';
 
 import { closed, drew, opened, undrew } from '../ui/screen.svelte.ts';
+import { keep, keptAnswer } from './kept.ts';
 import { live } from './live.svelte.ts';
 import { reader, type Resource, type Result, type Snapshot } from './read.ts';
 
@@ -32,7 +33,7 @@ export type { Phase, Resource, Result } from './read.ts';
 export function read<T>(
   key: () => string | null,
   fn: () => Promise<Result<T>>,
-  opts: { empty?: (value: T) => boolean } = {},
+  opts: { empty?: (value: T) => boolean; kept?: string } = {},
 ): Resource<T> {
   const m = reader<T>(opts.empty, untrack(() => live.version));
   /* RAW, because an answer is drawn and never edited in place: a deep proxy over every row of a list would cost a
@@ -45,6 +46,16 @@ export function read<T>(
   let gone = false;
 
   async function ask(k: string | null, quiet = false): Promise<void> {
+    /* A KEPT ANSWER IS DRAWN AT ONCE (`kept.ts`): at this version nothing is asked, at another it is asked quietly. */
+    const version = untrack(() => live.version);
+    const was = opts.kept !== undefined && k !== null && !quiet ? keptAnswer<T>(opts.kept, k, version) : null;
+    if (was !== null) {
+      const drawn = m.ask(k, false);
+      if (drawn !== null) m.answer(drawn, was.got);
+      now = m.now();
+      if (was.fresh) return;
+      quiet = true;
+    }
     const ticket = m.ask(k, quiet);
     now = m.now();
     if (ticket === null || gone) return;
@@ -52,7 +63,9 @@ export function read<T>(
     out.set(ticket.n, at);
     let took: boolean;
     try {
-      took = m.answer(ticket, await fn());
+      const got = await fn();
+      took = m.answer(ticket, got);
+      if (took && opts.kept !== undefined && k !== null) keep(opts.kept, k, version, got);
     } catch (e) {
       took = m.failed(ticket, e instanceof Error ? e.message : String(e));
     }
