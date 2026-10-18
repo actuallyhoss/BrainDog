@@ -24,8 +24,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 
-import { HELD, LAUNCH, held } from '../src/lib/launch.ts';
-import { BUILD, missing, when } from './built.ts';
+import { LAUNCH, held } from '../src/lib/launch.ts';
+import { BUILD, missing, shown, when } from './built.ts';
 
 /**
  * The documents a build must have written for these checks to mean anything: one per page the header and the
@@ -37,21 +37,19 @@ import { BUILD, missing, when } from './built.ts';
  * backtick, a dead href or a missing picture. It is prerendered from `src/routes/404` through the
  * same layout as the rest, so it carries the same nav, the same footer and the same risks.
  */
-const REQUIRED: readonly string[] = [
+const REQUIRED: readonly string[] = shown([
   'index.html',
   'slash.html',
   'agents.html',
-  /* No `packs.html`: the packs are held with the changelog until `LAUNCH.public` (DIRECTION §47, batch 103). */
-  /* No `pricing.html` while BrainDog is not priced: the page is held and the build writes none (`HELD` in launch.ts). */
-  ...((HELD as readonly string[]).includes('/pricing') && held() ? [] : ['pricing.html']),
+  /* `shown` drops what launch.ts holds (pricing, the changelog), which the build does not write. */
+  'pricing.html',
   'docs.html',
-  /* Only once the site is public: until `LAUNCH.public` the changelog is held and the build writes none. */
-  ...(held() ? [] : ['changelog.html']),
+  'changelog.html',
   'support.html',
   'security.html',
   'legal.html',
   '404.html',
-];
+]);
 
 const NO_BUILD = missing(REQUIRED);
 

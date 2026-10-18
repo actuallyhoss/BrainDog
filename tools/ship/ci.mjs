@@ -57,6 +57,18 @@ const HEAD = git('rev-parse', 'HEAD').out;
 const dirtyAtStart = git('status', '--porcelain').out;
 const diffAtStart = git('diff').out;
 
+/* SELF-TEST ONLY WHEN THE GATES CHANGED (his yes, 18 Oct). It plants a fault for every gate and takes ~7 min; when
+   nothing under tools/gates moved since the last green full run, its answer cannot have changed. */
+const lastGreen = (() => {
+  try {
+    return JSON.parse(readFileSync(MARKER, 'utf8')).sha ?? null;
+  } catch {
+    return null;
+  }
+})();
+const gatesMoved =
+  lastGreen === null || !git('cat-file', '-e', `${lastGreen}^{commit}`).ok || git('diff', '--name-only', lastGreen, '--', 'tools/gates').out !== '';
+
 /* ── THE PLAN ───────────────────────────────────────────────────────────────────────────────────────────────────── */
 
 /** `{ title, script, env, timeoutMin, gate? , fail? }` in run order, and what is not run with why. */
@@ -186,6 +198,10 @@ for (const gate of listed.stdout.split('\n').map((s) => s.trim()).filter(Boolean
   /* In --quick the four leg typechecks above are the same command as the `typecheck` gate (`pnpm -r run typecheck`). */
   if (QUICK && gate === 'typecheck' && legTypechecks) continue;
   const skip = allowSkip.length > 0 ? ` --allow-skip ${allowSkip.join(',')}` : '';
+  if (!QUICK && gate === 'self-test' && !gatesMoved) {
+    add({ title: `gate ${gate}`, gate, note: `not run: tools/gates is unchanged since ${lastGreen.slice(0, 12)}, the last green full run` });
+    continue;
+  }
   add({ title: `gate ${gate}`, gate, script: `node tools/gates/run.mjs --only ${gate}${skip}`, timeoutMin: gatesWf.jobs.get('gates-shard').timeout });
 }
 
@@ -233,15 +249,32 @@ console.log(`  run here by name: ${QUICK ? 'run.mjs --unbuilt' : 'every gate run
 for (const [what, why] of notRun) console.log(`  ----  not run here: ${what}: ${why}`);
 console.log('');
 
+/* THE TWO SLOW BROWSER GATES RUN SIDE BY SIDE (his yes, 18 Oct): each serves its build on its own random port, so they
+   share nothing, and together they were 21 of the run's 44 minutes. Started when the loop reaches the first of them. */
+const TOGETHER = new Set(['layout', 'a11y']);
+const early = new Map();
+const logOf = (n, entry) => join(LOGS, `${String(n + 1).padStart(width, '0')}-${entry.title.replace(/[^\w.-]+/g, '-').slice(0, 60)}.log`);
+const start = (n, entry) =>
+  runShell(entry.script, { env: baseEnv({ RUNNER_TEMP: TMP, ...entry.env }), log: logOf(n, entry), timeoutMs: (entry.timeoutMin ?? 45) * 60_000, tmp: TMP });
+
 const results = [];
 const t0 = Date.now();
 for (const [n, entry] of plan.entries()) {
   if (interrupted) break;
   const num = String(n + 1).padStart(width, '0');
-  const log = join(LOGS, `${num}-${entry.title.replace(/[^\w.-]+/g, '-').slice(0, 60)}.log`);
+  const log = logOf(n, entry);
   let status;
   let ms = 0;
-  if (entry.fail) {
+  if (entry.gate && TOGETHER.has(entry.gate) && entry.script && !early.has(n))
+    for (const [m, other] of plan.entries()) if (other.gate && TOGETHER.has(other.gate) && other.script && !early.has(m)) early.set(m, start(m, other));
+  if (early.has(n)) {
+    const r = await early.get(n);
+    status = r.status;
+    ms = r.ms;
+  } else if (entry.note) {
+    writeFileSync(log, `${entry.note}\n`);
+    status = 0;
+  } else if (entry.fail) {
     writeFileSync(log, `${entry.fail}\n`);
     status = 1;
   } else if (entry.diff) {
@@ -259,7 +292,7 @@ for (const [n, entry] of plan.entries()) {
   const red = status !== 0;
   const excused = red && entry.gate && allowed.includes(entry.gate);
   /* A gate the runner could not run and the workflow's `--allow-skip` accepts is green there too, and said as a skip. */
-  const skipped = !red && entry.gate && /\b1 could not run\b/.test(readFileSync(log, 'utf8'));
+  const skipped = !red && entry.gate && (Boolean(entry.note) || /\b1 could not run\b/.test(readFileSync(log, 'utf8')));
   const mark = !red ? (skipped ? 'skip ok' : 'pass') : excused ? 'EXCUSED' : 'FAIL';
   results.push({ ...entry, status, ms, log, red, excused, skipped });
   console.log(`  ${mark.padEnd(7)} ${secs(ms).padStart(8)}  [${num}] ${entry.title}${entry.diff ? ' (against the diff at the start)' : ''}`);

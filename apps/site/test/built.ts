@@ -20,6 +20,8 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { HELD, held } from '../src/lib/launch.ts';
+
 const elsewhere = process.env['SITE_BUILD_DIR'];
 
 /** True in the step that has just built the site, where a missing build fails instead of skipping. */
@@ -53,3 +55,7 @@ export function when(reason: string | null): { skip: string } | Record<string, n
   if (STRICT) throw new Error(`SITE_BUILT=1 says the site was just built, and ${reason}`);
   return { skip: reason };
 }
+
+/** The built files a held page would write (`pricing.html` for `/pricing`): the build writes none of them. */
+export const shown = (files: readonly string[]): string[] =>
+  files.filter((f) => !(held() && (HELD as readonly string[]).includes(`/${f.replace(/\.html$/, '')}`)));

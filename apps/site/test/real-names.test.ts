@@ -25,8 +25,7 @@ import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { HELD, held } from '../src/lib/launch.ts';
-import { BUILD, missing, when } from './built.ts';
+import { BUILD, missing, shown, when } from './built.ts';
 
 const SITE = fileURLToPath(new URL('../', import.meta.url));
 const gate = (name: string) => new URL(`../../../tools/gates/${name}`, import.meta.url).href;
@@ -147,8 +146,7 @@ test('the sources the site is drawn and worded from hold no name from the owner\
   assert.deepEqual(hits.map(said), []);
 });
 
-/* No pricing.html while the pricing page is held (`HELD` in launch.ts): the build writes none. */
-const PAGES = ['index.html', 'slash.html', 'agents.html', ...(held() && (HELD as readonly string[]).includes('/pricing') ? [] : ['pricing.html'])];
+const PAGES = shown(['index.html', 'slash.html', 'agents.html', 'pricing.html']);
 
 test('the pages a stranger lands on read no name from the owner\'s record', when(missing(PAGES, 'this reads the pages as served')), () => {
   const hits = PAGES.flatMap((p) => hitsIn(readable(readFileSync(new URL(p, BUILD), 'utf8')), `build/${p}`));
