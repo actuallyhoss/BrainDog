@@ -488,6 +488,10 @@
     };
   });
 
+  /** When the tab has nothing else to do, or a moment from now where the browser cannot say. */
+  const idle = (): Promise<void> =>
+    new Promise((done) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(() => done(), { timeout: 1_000 }) : setTimeout(done, 16)));
+
   /**
    * THE BOARD'S LAST TILES WAIT FOR THE PAGE. They are out of the screen's bracket, and landing late they move nothing
    * drawn over them, but each is a call the record answers in turn: asked beside the page read they went ahead of it, and
@@ -500,37 +504,48 @@
     void moving.version;
     const base = apiBase();
     let here = true;
+    /* ONE TILE AT A TIME, EACH WHEN THE TAB IS IDLE (`loop/research-104.md` 2.1). The record answers one call at a time,
+       so six asked at once were six places in its queue ahead of the next screen, and of the poll. */
+    const tiles: (() => Promise<unknown>)[] = [];
     /* THE BOARD'S LAST TILE: what the record found wrong in its own pages and notes. */
-    void Promise.all([import('./text-faults.ts'), import('./TextFaults.svelte')]).then(async ([m, part]) => {
+    tiles.push(() => Promise.all([import('./text-faults.ts'), import('./TextFaults.svelte')]).then(async ([m, part]) => {
       const found = await m.textFaultsOnce(base);
       if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
-    }, () => undefined);
+    }, () => undefined));
     /* AND AFTER IT, WHAT THE ANSWERS TAUGHT, out of the bracket the same way. */
-    void Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
+    tiles.push(() => Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
       const found = await m.loadLearned(base);
       if (here) learned = found && found.rows.length > 0 ? { found, Part: part.default } : null;
-    }, () => undefined);
+    }, () => undefined));
     /* AND AFTER IT, WHAT EVERY AGENT IS TOLD, out of the bracket the same way. */
-    void Promise.all([import('./told.ts'), import('./Told.svelte')]).then(async ([m, part]) => {
+    tiles.push(() => Promise.all([import('./told.ts'), import('./Told.svelte')]).then(async ([m, part]) => {
       const tile = m.lessonsTile(await m.loadLessons(base));
       if (here) agentsTold = tile ? { tile, Part: part.default } : null;
-    }, () => undefined);
+    }, () => undefined));
     /* AND THEN WHAT MAY BE ONE, out of the bracket the same way. */
-    void Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
+    tiles.push(() => Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
       const found = await m.loadNamedTwice(base);
       if (here) named = found && found.lines.length > 0 ? { found, Part: part.default } : null;
-    }, () => undefined);
+    }, () => undefined));
     /* AND WHAT HAS NO COLOUR OF ITS OWN, out of the bracket the same way. */
-    void Promise.all([import('./hues.ts'), import('./Hues.svelte')]).then(async ([m, part]) => {
+    tiles.push(() => Promise.all([import('./hues.ts'), import('./Hues.svelte')]).then(async ([m, part]) => {
       const found = await m.loadHues(base);
       if (here) hues = found && found.lists.length > 0 ? { found, Part: part.default } : null;
-    }, () => undefined);
+    }, () => undefined));
     /* AND THE IMPORTED AUTOMATIONS TO KEEP AS FILING RULES. Never set back to null on a reload: after the press the
        automations are off and the reload finds none, and the tile must keep its Undo. */
-    void Promise.all([import('./imported-rules.ts'), import('./ImportedRules.svelte')]).then(async ([m, part]) => {
+    tiles.push(() => Promise.all([import('./imported-rules.ts'), import('./ImportedRules.svelte')]).then(async ([m, part]) => {
       const found = await m.loadImported(base);
       if (here && found && found.rules.length > 0) imported = { found, Part: part.default };
-    }, () => undefined);
+    }, () => undefined));
+    void (async () => {
+      for (const tile of tiles) {
+        await idle();
+        if (!here) return;
+        /* A TILE THAT FAILS IS NOT DRAWN, and the next is still asked. */
+        await tile().catch(() => undefined);
+      }
+    })();
     return () => {
       here = false;
     };

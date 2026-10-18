@@ -250,3 +250,11 @@ test('THE TILE IS FLAT, NAMES ITS MARK BESIDE ITS WORDS, AND IS 44 UNDER A THUMB
   assert.match(style, /@media \(pointer: coarse\) \{\s*a\.f-line \{\s*min-block-size: var\(--tap\);/u);
   assert.doesNotMatch(bare(part), /\u2014/u);
 });
+
+test('THE LAST TILES ARE ASKED ONE AT A TIME, each when the tab is idle, so none queues ahead of the next screen', () => {
+  const late = home.split('$effect(').slice(1).find((e) => e.includes('textFaultsOnce(base)'))!;
+  const body = late.slice(0, late.indexOf('return () =>'));
+  assert.equal(body.match(/tiles\.push\(\(\) => Promise\.all\(/gu)?.length, 6, 'every tile waits its turn');
+  assert.doesNotMatch(body, /void Promise\.all\(/u, 'a tile asked at once beside the others');
+  assert.match(body, /for \(const tile of tiles\) \{\s*await idle\(\);\s*if \(!here\) return;/u);
+});
