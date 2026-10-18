@@ -19,6 +19,8 @@
   import { tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { apiBase } from '$lib/at.ts';
+  import { keep, keptAnswer } from '$lib/data/kept.ts';
+  import { live } from '$lib/data/live.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { pageReader, type Opened } from '$lib/record/page-live.ts';
   import PageView from '$lib/page/PageView.svelte';
@@ -51,8 +53,20 @@
   let own = 0;
 
   /* A FIRST READ BLANKS THE PAGE; A NEW CHOICE OF FILTER DOES NOT, so the strip stays under the finger that chose. */
+  /* THE PAGE AS IT WAS LAST DRAWN IN THIS TAB IS DRAWN AT ONCE (`kept.ts`): at the same version nothing is asked, at
+     another it is asked over it without blanking. A visit read the whole tasks list again, five times over nine screens. */
   async function readLive(asked: Readonly<Record<string, string>>, blank: boolean) {
     const at = opened();
+    const key = `${apiBase()} ${JSON.stringify(asked)}`;
+    const version = live.version;
+    if (blank) {
+      const was = keptAnswer<Opened>('WorkPage', key, version);
+      if (was !== null && was.got.ok) {
+        got = was.got.value;
+        if (was.fresh) return closed(true, at);
+        blank = false;
+      }
+    }
     if (blank) got = null;
     reader ??= pageReader(apiBase());
     const mine = ++started;
@@ -61,6 +75,7 @@
        live never leaves the page waiting. */
     if (mine !== started && got !== null) return closed(true, at);
     got = out;
+    if (out.from === 'live') keep('WorkPage', key, version, { ok: true, value: out });
     closed(out.from !== 'refused', at);
   }
 
@@ -75,8 +90,12 @@
     own += 1;
     const mine = ++started;
     try {
+      const version = live.version;
       const out = await reader.read(WORK_PAGE, filter);
-      if (mine === started && out.from === 'live') got = out;
+      if (mine === started && out.from === 'live') {
+        got = out;
+        keep('WorkPage', `${apiBase()} ${JSON.stringify(filter)}`, version, { ok: true, value: out });
+      }
     } finally {
       own -= 1;
     }
