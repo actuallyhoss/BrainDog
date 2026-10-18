@@ -24,7 +24,7 @@ import { GLYPH_NAMES } from 'braindog-render/glyphs/names';
 import { censusOf, pathsOf, viewerOfRead, whollyWithheld, type BlockResult, type Census, type PageBlock, type PageResult } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 
-import { ROUND_MS, lintAnswer } from '../page-lint.ts';
+import { lintAnswer, roundOver } from '../page-lint.ts';
 import { hostSourcesOf } from '../sources/index.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -125,11 +125,11 @@ export function methods(deps: RecordDeps) {
       const pages: PageCensus[] = [];
       const undrawn: string[] = [];
       /* A ROUND IS BOUNDED AS THE PAGE LINT'S IS: drawing is synchronous, so a record with a page per run stops counting
-         at `ROUND_MS` and says how many it left, rather than holding the host. */
+         at `ROUND_PAGES` or `ROUND_MS` and says how many it left, rather than holding the host. */
       const start = clock.now();
       let read = 0;
       for (const p of order) {
-        if (read > 0 && clock.now() - start > ROUND_MS) break;
+        if (roundOver(read, start, clock.now())) break;
         read += 1;
         let answer: PageResult;
         try {

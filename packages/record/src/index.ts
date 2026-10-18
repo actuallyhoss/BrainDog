@@ -272,7 +272,7 @@ export { fileRecordSigns, readBriefingSign, readToolsSign, type RecordSignsDeps 
 export { PASS_KIND, installedTwice, passSentence, type ByWho, type PassSaid, type UpdatePass } from './update-pass.ts';
 export { CARD_AIM, CARD_MOST, OLDER, TWO_SESSIONS, card, type Card, type CardAt } from './card.ts';
 export { ALSO_HERE_MOST, STEP_DAYS, TREE_WARNING, alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
-export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, TEMPLATE_ALL, type AnswerRule, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
+export { lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_MS, ROUND_PAGES, TEMPLATE_ALL, type AnswerRule, type PageFinding, type PageLintRound, type PagesCleanReading } from './page-lint.ts';
 export {
   HEADLINE_ASKS_DAY,
   HEADLINE_MOST,

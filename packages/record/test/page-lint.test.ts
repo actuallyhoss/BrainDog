@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createRecordApi, lintAnswer, lintRound, pagesCleanReading, pagesToLint, type CallContext } from '../src/index.ts';
+import { createRecordApi, lintAnswer, lintRound, pagesCleanReading, pagesToLint, ROUND_PAGES, type CallContext } from '../src/index.ts';
 import type { PageResult } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -111,6 +111,16 @@ test('A TEMPLATE PAST TWENTY-FOUR PAGES IS READ AT ITS NEWEST, OLDEST AND MIDDLE
 test('NOTHING TO READ IS NOTHING TO JUDGE BY, and a round the budget cut says so', () => {
   assert.equal(pagesCleanReading({ findings: [], pages: 0, unread: 0, withFindings: [], cells: 0, cut: [] }).state, 'none');
   assert.equal(pagesCleanReading({ findings: [], pages: 3, unread: 2, withFindings: [], cells: 0, cut: [] }).said, 'All 3 pages read print clean: headings and notes. 2 more were not reached in this round.');
+});
+
+test('A ROUND STOPS AT ROUND_PAGES UNDER A CLOCK THAT STANDS STILL, as a Worker’s does', () => {
+  const clean = { title: 'Desk', blocks: [] } as unknown as PageResult;
+  const listed = Array.from({ length: ROUND_PAGES + 3 }, (_, i) => ({ slug: `p${i}`, title: `Page ${i}`, template: null, about: null }));
+  let drawn = 0;
+  const round = lintRound({ pages: () => listed, page: () => (drawn++, { ok: true, value: clean }), questionsOpen: () => 0, now: () => 0 });
+  assert.equal(drawn, ROUND_PAGES);
+  assert.equal(round.pages, ROUND_PAGES);
+  assert.equal(round.unread, 3);
 });
 
 test('A PAGE THAT WILL NOT DRAW IS A FINDING, refused or thrown, and the round reads on', () => {

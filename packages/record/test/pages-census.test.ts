@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { no, type Refusal, type Result } from '@braindog/ports';
 
-import { createRecordApi, lintAnswer, type CallContext } from '../src/index.ts';
+import { createRecordApi, lintAnswer, ROUND_PAGES, type CallContext } from '../src/index.ts';
 import { methods, type PagesCensus } from '../src/methods/pages-census.ts';
 import type { RecordDeps } from '../src/methods/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
@@ -123,6 +123,20 @@ test('A CALLER HELD TO SOME LISTS reads only the pages they may open, and a held
   assert.deepEqual(overview.unresolved, [], 'no path of a held block is named to them');
   assert.doesNotMatch(JSON.stringify(got), /payroll|Payday/u);
   assert.equal(got.totals.refused, 1);
+  sql.close();
+});
+
+test('A ROUND STOPS AT ROUND_PAGES UNDER A CLOCK THAT STANDS STILL, as a Worker’s does, and says how many it left', async () => {
+  const { sql, api, read } = await census();
+  for (let i = 0; i < ROUND_PAGES + 5; i++) {
+    const made = (await api.create({ register: 'projects', fields: { name: `Run ${i}` } }, owner)) as { ok: boolean };
+    assert.ok(made.ok, JSON.stringify(made));
+  }
+  const listed = api.kernel.pages().length;
+  const got = value(await read.pagesCensus({}, owner));
+  assert.equal(got.pages.length, ROUND_PAGES);
+  assert.equal(got.totals.unread, listed - ROUND_PAGES);
+  assert.ok(got.pages.some((p) => p.slug === 'overview') && got.pages.some((p) => p.slug === 'payday'), 'the pages somebody wrote are counted first');
   sql.close();
 });
 

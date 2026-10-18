@@ -80,6 +80,15 @@ export const TEMPLATE_ALL = 24;
 /** How long one round may draw, in milliseconds. The draw is synchronous, so this bounds how long a host's tick holds. */
 export const ROUND_MS = 5_000;
 
+/**
+ * The most pages one round draws, whatever the clock says. A Worker's clock stands still while synchronous code runs, so
+ * `ROUND_MS` never cut a round there: the census drew all of a record's run pages and every alarm ran out of CPU.
+ */
+export const ROUND_PAGES = 100;
+
+/** Whether a round that has drawn `read` pages since `start` stops before the next one. */
+export const roundOver = (read: number, start: number, now: number): boolean => read >= ROUND_PAGES || (read > 0 && now - start > ROUND_MS);
+
 /** The pages one round reads, in order: every page somebody wrote, then each template's pages as `TEMPLATE_ALL` says. */
 export function pagesToLint(listed: readonly ListedPage[]): ListedPage[] {
   const written = listed.filter((p) => p.template === null);
@@ -298,7 +307,7 @@ export function lintRound(deps: PageLintDeps): PageLintRound {
   let cells = 0;
   const cut: PageLintRound['cut'] = [];
   for (const p of order) {
-    if (read > 0 && deps.now() - start > ROUND_MS) break;
+    if (roundOver(read, start, deps.now())) break;
     read++;
     let found: PageFinding[];
     let title = p.title;

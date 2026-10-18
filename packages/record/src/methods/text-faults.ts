@@ -22,7 +22,7 @@ import { viewerOfRead, type BlockResult, type Entry, type PageBlock, type PageRe
 import type { Result } from '@braindog/ports';
 import { TYPED } from 'braindog-render';
 
-import { pagesToLint } from '../page-lint.ts';
+import { ROUND_MS, pagesToLint, roundOver } from '../page-lint.ts';
 import { hostSourcesOf } from '../sources/index.ts';
 import { textFaultLine, textFaults, type LongText, type TextFault, type TextPage, type TextPart } from '../text-check.ts';
 import type { CallContext } from '../index.ts';
@@ -187,7 +187,7 @@ export function methods(deps: RecordDeps) {
     const listed = kernel.pages().filter(opens);
     const out: TextPage[] = [];
     for (const p of pagesToLint(listed)) {
-      if (out.length > 0 && clock.now() - start > ASK_MS) break;
+      if (roundOver(out.length, start, clock.now())) break;
       let answer: PageResult;
       try {
         const got = walk.page(p.slug);

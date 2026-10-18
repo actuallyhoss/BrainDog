@@ -14,7 +14,7 @@
 import { censusOf, viewerOfRead, type PageResult } from '@braindog/kernel';
 import type { Schema } from '@braindog/where';
 
-import { ROUND_MS, lintAnswer } from '../page-lint.ts';
+import { lintAnswer, roundOver } from '../page-lint.ts';
 import { answerRows, sourceRow, type SourceMaker } from './index.ts';
 
 /** The two findings of the page lint that draw a dash, as `pages-census.ts` counts them. */
@@ -48,8 +48,10 @@ export const pages: SourceMaker = ({ kernel, ctx }) => {
       /* THE PAGES SOMEBODY WROTE FIRST, then the ones each template made, and bounded as the census's round is. */
       const order = [...listed.filter((p) => p.template === null), ...listed.filter((p) => p.template !== null)];
       const start = Date.now();
+      let read = 0;
       for (const p of order) {
-        if (held.length > 0 && Date.now() - start > ROUND_MS) break;
+        if (roundOver(read, start, Date.now())) break;
+        read += 1;
         let answer: PageResult;
         try {
           const out = kernel.page(p.slug, undefined, { viewer: viewerOfRead(ctx) });
