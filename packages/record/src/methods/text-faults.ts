@@ -22,7 +22,7 @@ import { whereFor, type BlockResult, type Entry, type PageBlock, type PageResult
 import type { Result } from '@braindog/ports';
 import { TYPED } from 'braindog-render';
 
-import { ROUND_MS, pagesToLint } from '../page-lint.ts';
+import { pagesToLint } from '../page-lint.ts';
 import { hostSourcesOf } from '../sources/index.ts';
 import { textFaultLine, textFaults, type LongText, type TextFault, type TextPage, type TextPart } from '../text-check.ts';
 import type { CallContext } from '../index.ts';
@@ -37,6 +37,23 @@ export const FAULTS_MOST = 100;
 export const TEXT_ROWS_MOST = 2_000;
 
 const DAY_MS = 86_400_000;
+
+/**
+ * How long one ask may walk, a second and not the night lint's five (`ROUND_MS`).
+ *
+ * A PERSON IS WAITING, AND SO IS EVERY CALL BEHIND THIS ONE. The record answers one call at a time and the walk is
+ * synchronous, so the five seconds it was allowed were five seconds the poll, the next page and every tile waited
+ * (`loop/research-104.md` 2.1). What the second does not reach is said with `truncated`.
+ */
+export const ASK_MS = 1_000;
+
+/**
+ * How long an answer is kept for the same caller at the same version: five minutes, because a pinned note's age moves
+ * with the clock and a host's sources (a calendar) move without a write.
+ */
+export const KEPT_MS = 300_000;
+/** The most callers kept at once; past it the oldest is dropped. */
+const KEPT_MOST = 16;
 
 /** The words before a colon that are forms and never a figure's name. */
 const NOT_FIGURES: ReadonlySet<string> = new Set([...TYPED, 'bad', 'icon']);
@@ -111,7 +128,7 @@ export function methods(deps: RecordDeps) {
       const ownLists = list.fields.filter((f) => f.type === 'list').map((f) => f.id);
       const rule = whereFor(ctx.wheres, id);
       let read = 0;
-      for (let cursor: string | null | undefined; cursor !== null && read < TEXT_ROWS_MOST && clock.now() - start <= ROUND_MS; ) {
+      for (let cursor: string | null | undefined; cursor !== null && read < TEXT_ROWS_MOST && clock.now() - start <= ASK_MS; ) {
         const got = kernel.list({ register: id, limit: 500, reads: (other: string) => readable(ctx, other) === null, ...(cursor ? { cursor } : {}) }, rule);
         if (!got.ok) break;
         for (const row of got.value.rows as Entry[]) {
@@ -170,7 +187,7 @@ export function methods(deps: RecordDeps) {
     const listed = kernel.pages().filter(opens);
     const out: TextPage[] = [];
     for (const p of pagesToLint(listed)) {
-      if (out.length > 0 && clock.now() - start > ROUND_MS) break;
+      if (out.length > 0 && clock.now() - start > ASK_MS) break;
       let answer: PageResult;
       try {
         const got = walk.page(p.slug);
@@ -210,6 +227,24 @@ export function methods(deps: RecordDeps) {
     return out;
   };
 
+  /**
+   * The last answer per caller, with what it was true at: the record's version, its declarations, and when.
+   *
+   * THE SAME ASK AT THE SAME VERSION WALKS NOTHING. Home asks this on every open, and the answer moves only when a row,
+   * a page or the clock does. The declarations are read beside the version because an install nobody is named for
+   * writes no event (`DeclaredBy` in the kernel), and a retire is an update, so their count, top and retired are read.
+   */
+  const kept = new Map<string, { stamp: string; at: number; value: TextFaultsRead }>();
+  const stampOf = (): string => {
+    let decl: unknown = null;
+    try {
+      decl = sql.one('SELECT count(*) AS n, max(rowid) AS top, coalesce(sum(retired), 0) AS r, count(superseded_at) AS s FROM declaration');
+    } catch {
+      decl = clock.now();
+    }
+    return JSON.stringify([kernel.version(), decl]);
+  };
+
   return {
     /**
      * `{}`: every fault in the words of the pages the caller may open and the documents of the lists they may read, as
@@ -222,6 +257,10 @@ export function methods(deps: RecordDeps) {
       const extra = args !== null && typeof args === 'object' ? Object.keys(args)[0] : undefined;
       if (extra !== undefined) return no('FIELD_UNKNOWN', `${extra} is not something this call takes. It takes nothing.`, { at: extra, allowed: [] });
       const start = clock.now();
+      const who = JSON.stringify([ctx.principal, ctx.registers ?? null, ctx.levels ?? null, ctx.wheres ?? null]);
+      const stamp = stampOf();
+      const was = kept.get(who);
+      if (was !== undefined && was.stamp === stamp && start - was.at < KEPT_MS && start >= was.at) return { ok: true, value: was.value };
       /* ONE WALK FOR THE WHOLE CALL (`pageWalk`): a figure two pages read is read once, and so is every declaration the
          lists of a block are named from. It writes nothing, so nothing it kept can change under it. */
       const walk = kernel.pageWalk({ hostSources: hostSourcesOf({ kernel, ctx, readable }) });
@@ -229,15 +268,19 @@ export function methods(deps: RecordDeps) {
       const pages = pagesFor(ctx, docs, start, walk);
       const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))], walk);
       const found = textFaults(pages, docs.map(({ key: _key, ...d }) => d), names);
+      const value: TextFaultsRead = {
+        count: found.faults.length,
+        pages: found.pages,
+        line: textFaultLine(found),
+        faults: found.faults.slice(0, FAULTS_MOST),
+        truncated: found.faults.length > FAULTS_MOST || clock.now() - start > ASK_MS,
+      };
+      kept.delete(who);
+      kept.set(who, { stamp, at: start, value });
+      if (kept.size > KEPT_MOST) kept.delete(kept.keys().next().value!);
       return {
         ok: true,
-        value: {
-          count: found.faults.length,
-          pages: found.pages,
-          line: textFaultLine(found),
-          faults: found.faults.slice(0, FAULTS_MOST),
-          truncated: found.faults.length > FAULTS_MOST,
-        },
+        value,
       };
     },
   };

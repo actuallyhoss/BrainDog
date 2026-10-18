@@ -63,7 +63,7 @@ async function record(pages: number) {
     no,
     clock: fixedClock(NOW),
   } as unknown as RecordDeps;
-  return { sql, reads, read: methods(deps) };
+  return { sql, api, reads, read: methods(deps) };
 }
 
 const value = (out: Result<TextFaultsRead>): TextFaultsRead => {
@@ -96,4 +96,28 @@ test('THE WORK OF A WALK IS THE PAGES\' OWN: a page more is a few statements mor
   assert.ok(perPage < 20, `each further page cost ${perPage.toFixed(1)} reads`);
   small.sql.close();
   big.sql.close();
+});
+
+test('THE SAME ASK AT THE SAME VERSION WALKS NOTHING; a row, a page or another caller walks again', async () => {
+  const { api, reads, read } = await record(6);
+  const first = value(await read.textFaults({}, owner));
+  let before = reads.all;
+  assert.deepEqual(value(await read.textFaults({}, owner)), first);
+  /* TWO STATEMENTS, the version and the declarations' stamp, and no page. */
+  assert.equal(reads.all - before, 2);
+
+  before = reads.all;
+  assert.ok(api.kernel.create('projects', { name: 'Kiln' } as never, { actor: 'p_1' }).ok);
+  value(await read.textFaults({}, owner));
+  assert.ok(reads.all - before > 1, 'a row moved the version, and the walk ran again');
+
+  before = reads.all;
+  assert.ok((await api.kernel.install([page(7)])).ok);
+  const more = value(await read.textFaults({}, owner));
+  assert.ok(reads.all - before > 1, 'an install nobody is named for writes no event, and still walks again');
+  assert.equal(more.faults.filter((f) => /projects\.cuont/u.test(f.said)).length, 7);
+
+  before = reads.all;
+  value(await read.textFaults({}, { principal: { kind: 'person', id: 'p_2', level: 'owner' } }));
+  assert.ok(reads.all - before > 1, 'another caller is never handed the first one\'s answer');
 });
