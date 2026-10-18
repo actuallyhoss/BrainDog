@@ -28,6 +28,7 @@
   import { listen } from '$lib/page/listen.svelte.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { WORK_PAGE, workView } from './page.ts';
+  import { workKey } from './warm.ts';
 
   let { data }: { data: Shell } = $props();
 
@@ -57,10 +58,10 @@
      another it is asked over it without blanking. A visit read the whole tasks list again, five times over nine screens. */
   async function readLive(asked: Readonly<Record<string, string>>, blank: boolean) {
     const at = opened();
-    const key = `${apiBase()} ${JSON.stringify(asked)}`;
+    const key = workKey(apiBase(), asked);
     const version = live.version;
     if (blank) {
-      const was = keptAnswer<Opened>('WorkPage', key, version);
+      const was = keptAnswer<Opened>(WORK_PAGE, key, version);
       if (was !== null && was.got.ok) {
         got = was.got.value;
         if (was.fresh) return closed(true, at);
@@ -75,7 +76,7 @@
        live never leaves the page waiting. */
     if (mine !== started && got !== null) return closed(true, at);
     got = out;
-    if (out.from === 'live') keep('WorkPage', key, version, { ok: true, value: out });
+    if (out.from === 'live') keep(WORK_PAGE, key, version, { ok: true, value: out });
     closed(out.from !== 'refused', at);
   }
 
@@ -94,7 +95,7 @@
       const out = await reader.read(WORK_PAGE, filter);
       if (mine === started && out.from === 'live') {
         got = out;
-        keep('WorkPage', `${apiBase()} ${JSON.stringify(filter)}`, version, { ok: true, value: out });
+        keep(WORK_PAGE, workKey(apiBase(), filter), version, { ok: true, value: out });
       }
     } finally {
       own -= 1;

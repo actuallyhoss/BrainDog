@@ -751,9 +751,22 @@
         .finally(() => (keymapOpen = true));
     }
   }
+
+  /* WORK IS READ AHEAD OF THE PRESS (`lib/work/warm.ts`): a pointer resting on a link to it for 60 ms, a finger down on
+     one, or the keyboard reaching one. Only on a live record the poll has heard, and loaded on the first, so the shell
+     carries none of it. */
+  let ahead: ReturnType<typeof setTimeout> | undefined;
+  function readAhead(e: Event, wait: number): void {
+    clearTimeout(ahead);
+    const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+    if (!(link instanceof HTMLAnchorElement) || link.origin !== page.url.origin || data.live !== true || data.refused || live.version === null) return;
+    if (placeOf('/', new URLSearchParams(link.search)) !== WORK || new URLSearchParams(link.search).has('classic')) return;
+    ahead = setTimeout(() => void import('$lib/work/warm.ts').then((m) => m.warmWork(apiBase(), live.version)), wait);
+  }
 </script>
 
 <svelte:window {onkeydown} />
+<svelte:document onpointerover={(e) => readAhead(e, 60)} ontouchstart={(e) => readAhead(e, 0)} onfocusin={(e) => readAhead(e, 0)} />
 
 <a class="skip" href="#main">Skip to content</a>
 
