@@ -25,6 +25,7 @@
   the sentence beside it, so the pill itself is kept from a screen reader. A link is 44 tall under a thumb.
 -->
 <script lang="ts">
+  import { idle } from '$lib/ui/idle.ts';
   import { goto } from '$app/navigation';
   import { apiBase, at } from '$lib/at.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -55,7 +56,9 @@
     if (!line) return;
     void rows;
     let here = true;
-    void import('./tidy-week.ts').then(async (m) => {
+    /* AFTER THE TAB IS IDLE: two figures a finder are a dozen calls, each a place in the record's queue ahead of the next screen. */
+    void Promise.all([import('./tidy-week.ts'), idle()]).then(async ([m]) => {
+      if (!here) return;
       const found = await m.loadTidyWeek(apiBase());
       if (here) tidy = m.tidyWeekLines(found);
     }, () => {});

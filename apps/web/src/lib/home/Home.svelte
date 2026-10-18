@@ -50,6 +50,7 @@
 </script>
 
 <script lang="ts">
+  import { idle } from '$lib/ui/idle.ts';
   import { apiBase } from '$lib/at.ts';
   import { onAppendOnly, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
@@ -487,10 +488,6 @@
       here = false;
     };
   });
-
-  /** When the tab has nothing else to do, or a moment from now where the browser cannot say. */
-  const idle = (): Promise<void> =>
-    new Promise((done) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(() => done(), { timeout: 1_000 }) : setTimeout(done, 16)));
 
   /**
    * THE BOARD'S LAST TILES WAIT FOR THE PAGE. They are out of the screen's bracket, and landing late they move nothing

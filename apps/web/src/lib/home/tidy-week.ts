@@ -52,16 +52,16 @@ async function countOf(metric: Metric, id: string): Promise<number | null> {
 }
 
 /**
- * Every finder's two figures, asked side by side, in the finders' order. A finder either figure is refused for is
+ * Every finder's two figures, a finder at a time, in the finders' order. A finder either figure is refused for is
  * left out. Never throws.
  */
 export async function tidyWeekFrom(metric: Metric): Promise<Found[]> {
-  const read = await Promise.all(
-    TIDY_FINDERS.map(async (f) => {
-      const [stale, cleared] = await Promise.all([countOf(metric, `stale-${f.id}`), countOf(metric, `tidied-${f.id}`)]);
-      return stale === null || cleared === null ? null : { id: f.id, name: f.name, stale, cleared };
-    }),
-  );
+  /* ONE FINDER AT A TIME, its two figures side by side: all of them at once were a dozen places in the record's queue. */
+  const read: (Found | null)[] = [];
+  for (const f of TIDY_FINDERS) {
+    const [stale, cleared] = await Promise.all([countOf(metric, `stale-${f.id}`), countOf(metric, `tidied-${f.id}`)]);
+    read.push(stale === null || cleared === null ? null : { id: f.id, name: f.name, stale, cleared });
+  }
   return read.filter((f): f is Found => f !== null);
 }
 

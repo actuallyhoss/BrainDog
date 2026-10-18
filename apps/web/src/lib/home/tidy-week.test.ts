@@ -103,3 +103,17 @@ test("THROUGH THE CLIENT: each figure is the record's metric by its id, and its 
   assert.equal(asked.length, TIDY_FINDERS.length * 2);
   assert.deepEqual(tidyWeekLines(got), [{ id: 'runs-empty', said: 'Empty runs: 41 stale, 3 cleared this week' }]);
 });
+
+test('A FINDER AT A TIME: never more than its two figures are out at once, so the tile is never a dozen places in the queue', async () => {
+  let out = 0;
+  let most = 0;
+  const metric: Metric = async () => {
+    out += 1;
+    most = Math.max(most, out);
+    await new Promise((done) => setTimeout(done, 1));
+    out -= 1;
+    return { ok: true, value: { value: 0 } } as never;
+  };
+  await tidyWeekFrom(metric);
+  assert.equal(most, 2);
+});
