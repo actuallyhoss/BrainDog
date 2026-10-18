@@ -2090,8 +2090,10 @@ export class Record$ extends DurableObject<Env> {
     /* BUT NEVER FOR THE VERSION POLL. An open tab asks `/api/version` every 1.5 s while it has focus
        (`apps/web/src/lib/data/live.ts`), and the poll is the one call that must stay one `MAX(rowid)`: a daily look
        woken by it would put Slash's model calls behind a question that only asks whether anything changed. The alarm
-       and every other read still start it. */
-    if (!pollAsked(request.method, new URL(request.url).pathname) && !(await this.lapsed())) this.ctx.waitUntil(slashLook(api, { sql: this.#jobsStore }));
+       and every other read still start it. NOR FOR `boot`, the first call of every open: the look's first run of the day
+       landed on it, and every call after waited (`loop/research-104.md` 2.1). */
+    const path = new URL(request.url).pathname;
+    if (!pollAsked(request.method, path) && !/^\/+api\/+boot\/*$/u.test(path) && !(await this.lapsed())) this.ctx.waitUntil(slashLook(api, { sql: this.#jobsStore }));
     /* THE METHOD ROUTER'S HANDLERS, WITH THE VAULT PASSPHRASE'S TWO ROUTES ANSWERED THROUGH THE ROOT KEY INSIDE THIS OBJECT
        (`withVaultPassphrase`), which takes the passphrase off before the record is called. Built once, so both calls
        below serve the same table. */
