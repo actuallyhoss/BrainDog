@@ -1260,9 +1260,33 @@ export type DoorHealth = {
  * The verb follows the route table rather than the caller's guess, so a write is a POST because the
  * table says it changes something — the same rule the server enforces, read from the same list.
  */
+/** How long a list's schema is kept at one version: a host's own install can move it without a version a tab saw. */
+export const SCHEMA_KEPT_MS = 300_000;
+
+type SchemaStore = { version: number | null; lists: Map<string, { version: number | null; at: number; answer: Promise<Result<unknown>> }> };
+
+/**
+ * Every client's kept schemas, by the fetch it sends through, then its host and its token.
+ *
+ * ONE STORE FOR THE TAB AND NOT ONE A CLIENT. The app builds a client wherever it reads (196 places), so a store per
+ * client kept nothing: nine screens asked `schema` 48 times (`loop/research-104.md` 2.3). The fetch is in the key so a
+ * test's stub never shares with another's, and the token so two people on one host never do.
+ */
+const SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
+
 export function createClient(options: ClientOptions) {
   const doFetch = options.fetch ?? globalThis.fetch;
   const base = options.base.replace(/\/+$/, '');
+
+  /** This client's kept schemas: dropped whole on a write it sent, and stale once a `version` answer moves. */
+  const schemas = (): SchemaStore => {
+    let byHost = SCHEMAS.get(doFetch);
+    if (byHost === undefined) SCHEMAS.set(doFetch, (byHost = new Map()));
+    const key = `${base} ${options.token ?? ''}`;
+    let store = byHost.get(key);
+    if (store === undefined) byHost.set(key, (store = { version: null, lists: new Map() }));
+    return store;
+  };
 
   /** Past this many encoded bytes of arguments a read is sent as a POST body, well under any server's header ceiling. */
   const READ_URL_CEILING = 6000;
@@ -1336,7 +1360,10 @@ export function createClient(options: ClientOptions) {
       return { ok: false, refusal: unreachable(`${res.status} with a body that is not JSON`) };
     }
 
-    return answered<T>(res.status, body);
+    const out = answered<T>(res.status, body);
+    /* A WRITE THIS CLIENT SENT MAY HAVE DECLARED SOMETHING, and the version it moved is not seen until the next poll. */
+    if (WRITES.has(name)) schemas().lists.clear();
+    return out;
   }
 
   /**
@@ -1482,8 +1509,30 @@ export function createClient(options: ClientOptions) {
       return out;
     },
     boot: () => call<Boot>('boot'),
-    version: () => call<Version>('version'),
-    schema: (register: string) => call<unknown>('schema', { register }),
+    version: async () => {
+      const out = await call<Version>('version');
+      if (out.ok && typeof out.value.version === 'number') {
+        const store = schemas();
+        /* THE FIRST VERSION HEARD names what was asked before it, the boot's schemas, so they are not all asked again. */
+        if (store.version === null) for (const kept of store.lists.values()) if (kept.version === null) kept.version = out.value.version;
+        store.version = out.value.version;
+      }
+      return out;
+    },
+    /** A list's schema, asked once a version for the whole tab (`SCHEMAS`). A refusal is not kept. */
+    schema: (register: string) => {
+      const store = schemas();
+      const now = Date.now();
+      const was = store.lists.get(register);
+      if (was !== undefined && was.version === store.version && now - was.at < SCHEMA_KEPT_MS && now >= was.at) return was.answer;
+      const answer = call<unknown>('schema', { register });
+      const entry = { version: store.version, at: now, answer };
+      store.lists.set(register, entry);
+      void answer.then((r) => {
+        if (!r.ok && store.lists.get(register) === entry) store.lists.delete(register);
+      });
+      return answer;
+    },
     get: (register: string, seq: number) => call<unknown>('get', { register, seq }),
     list: (args: {
       register: string;
