@@ -25,7 +25,7 @@
   /* This screen's own words, in a `words` object in the module that draws them. */
   const words = {
     title: 'Nothing is at this address',
-    body: 'The address may be mistyped, or the page has moved. Go back to Home.',
+    body: 'The address may be mistyped, or the page has moved. Go back to Today.',
   } as const;
 
   let {

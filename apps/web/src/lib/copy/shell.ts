@@ -139,7 +139,7 @@ export const shell = {
     rolling: { title: 'BrainDog is updating', body: 'It will be back in a minute. Load it again then.', action: 'Load it again' },
     broken: { title: 'This screen did not load', body: 'Nothing was changed. Load it again.', action: 'Load it again' },
     stuck: (address: string) => `Still not working? Write to ${address}.`,
-    home: 'Back to Home',
+    home: 'Go to Today',
   },
   /* WHAT A FIGURE SAYS WHEN THE LIST UNDER IT IS EMPTY. Not a verdict — there is nothing to judge —
      and not silence either, because a bare `GBP 0.00` with no note beside it is the same tile a
