@@ -95,7 +95,7 @@
   import { madeSteps } from '$lib/start/made.ts';
   import { playedBy } from '$lib/start/parts.ts';
   import type { TellOptions } from '$lib/tell/read.ts';
-  import { createClient, type Cursor } from '@braindog/client';
+  import { createClient, type Cursor, type EventLine } from '@braindog/client';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { words } from '$lib/home/words.ts';
@@ -264,8 +264,10 @@
    * ASKED BEFORE THE PAGE READ IT GOES WITH, and kept only once that page is drawn, so the mark does not reach past
    * what this screen held. `null` until one has answered, and the shell's cursor is stamped then, as before.
    */
-  type News = { upTo: Cursor | null; unseen: number; held: number };
+  type News = { upTo: Cursor | null; unseen: number; held: number; lines: readonly EventLine[] };
   let news: News | null = null;
+  /* THE LINES THAT WERE NEW, kept beside the page for the desk's What landed (`landed.ts`). */
+  let newLines = $state.raw<readonly EventLine[]>([]);
   /** Which read of the page is the latest: an older one's answer, landing late, is not the page on screen. */
   let pageRead = 0;
   async function newsNow(): Promise<News | null> {
@@ -273,7 +275,7 @@
       const out = await createClient({ base: apiBase() }).whatsNew();
       if (!out.ok) return null;
       const held = out.value.events.reduce((top, e) => Math.max(top, e.rowid ?? 0), 0);
-      return { upTo: out.value.upTo, unseen: out.value.events.length, held };
+      return { upTo: out.value.upTo, unseen: out.value.events.length, held, lines: out.value.events };
     } catch {
       return null;
     }
@@ -281,7 +283,10 @@
   /** Keep what was new beside the page just drawn, unless a later read of the page has gone out since. */
   function keepNews(before: Promise<News | null>, mine: number): void {
     void before.then((now) => {
-      if (now !== null && mine === pageRead) news = now;
+      if (now !== null && mine === pageRead) {
+        news = now;
+        newLines = now.lines;
+      }
     });
   }
 
@@ -403,9 +408,10 @@
      nothing beside it, or nothing in it, is one column. */
   const drawn = $derived.by((): Opened | null => {
     if (!got || got.from !== 'live' || !shaped) return got;
-    if (railed(shaped.blocks)) return { ...got, page: { page: got.page.page, blocks: shaped.blocks } };
+    const blocks = deskWorking ? shaped.blocks.map((b) => (b.source === 'sessions.working' ? { ...b, drawn: false } : b)) : shaped.blocks;
+    if (railed(blocks)) return { ...got, page: { page: got.page.page, blocks } };
     const { layout: _rail, ...flat } = got.page.page;
-    return { ...got, page: { page: flat, blocks: shaped.blocks } };
+    return { ...got, page: { page: flat, blocks } };
   });
   const slug = $derived(live?.page.page.page ?? declares ?? 'today');
 
@@ -448,6 +454,8 @@
   type HuesFound = import('./hues.ts').HuesFound;
   type ImportedPart = typeof import('./ImportedRules.svelte').default;
   type ImportedFound = import('./imported-rules.ts').ImportedFound;
+  type DeskPart = typeof import('./Desk.svelte').default;
+  type DeskCards = import('./desk-read.ts').Cards;
   let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; Part: BriefingPart } | null>(null);
   let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
   let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
@@ -488,6 +496,35 @@
       here = false;
     };
   });
+
+  /**
+   * THE DESK UNDER THE PAGE: who is working, the live projects as cards, and what landed (`Desk.svelte`). Fetched with its
+   * reader once the page has answered, so the front door loads nothing more. A read that fails draws no cards, and the
+   * desk then draws what it still has.
+   */
+  let desk = $state.raw<{ cards: DeskCards | null; Part: DeskPart } | null>(null);
+  $effect(() => {
+    if (data.refused || !settled) return;
+    void moving.version;
+    const base = apiBase();
+    let here = true;
+    void Promise.all([import('./desk-read.ts'), import('./Desk.svelte')]).then(
+      async ([m, part]) => {
+        const cards = await m.readCards(base, data.lists, asked).catch(() => null);
+        if (here) desk = { cards, Part: part.default };
+      },
+      () => undefined,
+    );
+    return () => {
+      here = false;
+    };
+  });
+
+  /**
+   * THE PAGE'S OWN WORKING TABLE GIVES WAY TO THE DESK'S where the desk draws who is working, so no agent is drawn twice.
+   * Applied to what the reader draws only: the head's line was worked out from the blocks before this.
+   */
+  const deskWorking = $derived(desk !== null && workingNow().length > 0);
 
   /**
    * THE BOARD'S LAST TILES WAIT FOR THE PAGE. They are out of the screen's bracket, and landing late they move nothing
@@ -719,6 +756,20 @@
           <div class="body">
             <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} opens={paged && brief && brief.cards.length > 0 ? briefed : undefined} />
           </div>
+        {/if}
+
+        <!-- THE DESK: who is working, the live projects as cards and what landed, each left out where it has nothing. -->
+        {#if desk}
+          {@const Desk = desk.Part}
+          <Desk
+            cards={desk.cards}
+            working={workingNow()}
+            lines={newLines}
+            lists={data.lists}
+            names={data.names}
+            me={data.me?.person ?? null}
+            now={data.now}
+          />
         {/if}
 
         <!-- AND UNDER TODAY'S BLOCKS, THE NEXT STEPS, until they are hidden. -->
