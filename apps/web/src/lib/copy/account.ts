@@ -616,10 +616,10 @@ export const account = {
   linkExpiredTitle: 'That link has expired or was already used',
   linkExpiredWhy: (kind: 'magic' | 'claim', canAsk: boolean) =>
     kind === 'claim'
-      ? 'Ask whoever set up your record for a new one.'
+      ? 'Ask whoever set up your account for a new link.'
       : canAsk
-        ? 'A link works once, for fifteen minutes. Ask for a new one below.'
-        : 'A link works once, for fifteen minutes.',
+        ? 'A link works once, for fifteen minutes. Ask for a new link below.'
+        : 'A link works once, for fifteen minutes. Go back to sign in and ask for a new link.',
   unreachableTitle: 'The server did not answer',
   unreachableWhy: 'Check your connection, then try again.',
   /* After a press of Try again that came back the same, so the press visibly did something. */

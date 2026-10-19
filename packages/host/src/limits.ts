@@ -192,7 +192,7 @@ export function refusedFor(retryAfter: number): Response {
   const wait = Number.isFinite(retryAfter) ? Math.max(1, Math.ceil(retryAfter)) : WINDOW_MS / 1000;
   const refusal: Refusal = {
     code: 'RATE_LIMITED',
-    fix: `This caller has sent as many requests as a minute allows. The same request is answered again after ${wait} ${wait === 1 ? 'second' : 'seconds'}.`,
+    fix: `Too many requests just now. Try again in ${wait} ${wait === 1 ? 'second' : 'seconds'}.`,
     retry_after: wait,
   };
   return new Response(JSON.stringify({ ok: false, refusal }), {

@@ -58,7 +58,7 @@ test('A DEAD NETWORK IS ONE SENTENCE, whichever control was pressed', () => {
    * rather than the words. They are one `notReached` now, and this is what says they stay one.
    */
   assert.equal(copy.recordNotReached, copy.writeNotReached);
-  assert.equal(copy.recordNotReached, 'The record could not be reached, so nothing was saved. Try again in a moment.');
+  assert.equal(copy.recordNotReached, 'Nothing was saved. Check your connection, then try again.');
   /* AND IT NAMES WHAT DID NOT HAPPEN, which is the half a person acts on: nothing was saved, so
      pressing again is safe. A refusal that only says the request failed leaves them guessing. */
   assert.match(copy.recordNotReached, /nothing was saved/u);

@@ -134,7 +134,7 @@ import { telemetry } from './telemetry.ts';
 import { readSetup } from '@braindog/slash/propose';
 
 /** What a record answers between arming a restore and being reset: the gap between `51 D15`'s two calls. */
-const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'This record is going back to a copy and starts again in a moment. Ask again then.', at: 'record' };
+const RESTORING: Refusal = { code: 'RECORD_UNAVAILABLE', fix: 'BrainDog is restoring a copy. Try again in a minute.', at: 'record' };
 
 /** The copies port `Record$` hands its record, which is `copies.ts`'s own and says it `reopens`. */
 type CloudPort = ReturnType<typeof cloudSnapshots>;

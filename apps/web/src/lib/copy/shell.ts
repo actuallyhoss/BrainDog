@@ -53,7 +53,7 @@ const folded = (said: string): string => said.toLowerCase().replace(/[^a-z0-9]+/
  * caught it: both keys are rendered, so `dead-copy` is content and the tests assert against the key
  * rather than the words.
  */
-const notReached = 'The record could not be reached, so nothing was saved. Try again in a moment.';
+const notReached = 'Nothing was saved. Check your connection, then try again.';
 
 /** Where a person writes when retrying will not fix it. The same address the site and the Worker's mail footer name. */
 export const SUPPORT_EMAIL = 'support@brain.dog';
@@ -99,7 +99,7 @@ export const shell = {
   everything: 'everything in it',
   switchRecord: 'Switch record',
   recordSettings: 'Record settings',
-  recordNotOpened: 'That record could not be opened just now. Try again in a moment.',
+  recordNotOpened: 'That did not open. Check your connection, then try again.',
 
   /* Toasts. Past tense, the row named, and the undo is the sentence's point — never "Row archived
      successfully", which reports on the software rather than on the record. */
