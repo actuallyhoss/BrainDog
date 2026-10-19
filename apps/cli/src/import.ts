@@ -37,7 +37,7 @@ import { parseArgs } from 'node:util';
 
 import { satisfies } from '@braindog/declare';
 import type { KnownKeys } from '@braindog/declare/catalogue';
-import { coerce, isMarkGlyph, isPublicMail, looksLikeCredential, type FieldDecl } from '@braindog/kernel';
+import { cleanImportedNote, coerce, isMarkGlyph, isPublicMail, looksLikeCredential, type FieldDecl } from '@braindog/kernel';
 import { no, ok, refused, type Result } from '@braindog/ports';
 
 import { budgetOf, hostsPath, target, type Target } from './http.ts';
@@ -810,6 +810,31 @@ export async function applyPlan(
     plan = { ...plan, rows: plan.rows.map((r) => (r.lacking !== undefined && absent.includes(r.lacking.register) ? { ...r, fields: { ...r.fields, ...r.lacking.fields } } : r)) };
     report.plan = plan;
   }
+
+  /* A NOTE ARRIVES CLEAN (REC 105): the old tool's status line, a heading repeating the name, chips blocks with unfilled
+     slots and "Key: value" lines are not carried. A key the list declares as a field moves there, once, on create only. */
+  plan = {
+    ...plan,
+    rows: plan.rows.map((row) => {
+      const note = row.fields.note;
+      if (typeof note !== 'string' || note === '') return row;
+      const own = texts.get(row.register);
+      const { note: clean, moved } = cleanImportedNote(
+        note,
+        row.label,
+        { text: new Set([...(own?.entries() ?? [])].filter(([, d]) => d.type !== 'list').map(([id]) => id)), closed: closed.get(row.register) ?? new Map() },
+        row.fields,
+      );
+      if (clean === note && Object.keys(moved).length === 0) return row;
+      const { note: _old, ...rest } = row.fields;
+      return {
+        ...row,
+        fields: { ...rest, ...moved, ...(clean === '' ? {} : { note: clean }) },
+        ...(Object.keys(moved).length === 0 ? {} : { onCreate: [...new Set([...(row.onCreate ?? []), ...Object.keys(moved)])] }),
+      };
+    }),
+  };
+  report.plan = plan;
 
   /**
    * A FIELD THIS RECORD'S LIST DOES NOT DECLARE IS LEFT OFF THE ROW, AND THE ROW STILL ARRIVES.
