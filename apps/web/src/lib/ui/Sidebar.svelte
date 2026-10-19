@@ -888,24 +888,21 @@
     display: grid;
     flex: 1;
     min-inline-size: 0;
+    line-height: 1.2;
   }
 
   .brand-name {
-    overflow: hidden;
     font-family: var(--font-display);
-    line-height: 1.2;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .titles .record-name {
     color: var(--dim);
     font-size: var(--t-xs);
     font-weight: 500;
-    line-height: 1.2;
   }
 
   .mi-name,
+  .brand-name,
   .record-name {
     flex: 1;
     min-inline-size: 0;
