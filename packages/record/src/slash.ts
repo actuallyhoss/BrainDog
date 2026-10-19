@@ -31,6 +31,7 @@ import { SLASH, coerce, slugify } from '@braindog/kernel';
 import { MODULE_WORDS, labelSetting, voiceSetting } from '@braindog/declare';
 import { KINDS, isKind } from 'braindog-render';
 import type { BriefInput } from './briefing.ts';
+import type { WrittenInput } from './written-brief.ts';
 import type { HeadlineInput } from './headlines.ts';
 import { clean, scrubbed } from './scrub.ts';
 import { stepsFrom, type Handoff } from './skill-steps.ts';
@@ -1467,6 +1468,11 @@ export interface SlashModel {
    * passes `@braindog/host`'s `SLASH_BRIEF_INSTRUCTIONS`.
    */
   brief?(input: BriefInput): Promise<unknown>;
+  /**
+   * The written brief (`written-brief.ts`): `{ sentences: ["..."] }` over the facts handed in, a figure said as a hole
+   * `{{<handle>.<figure>}}`. OPTIONAL: a model without it writes none, and the cards above stand as before.
+   */
+  written?(input: WrittenInput): Promise<unknown>;
 }
 
 export type SlashModelInput = {

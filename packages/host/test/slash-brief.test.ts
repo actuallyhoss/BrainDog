@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { anthropicModel, endpointModel, SLASH_BRIEF_INSTRUCTIONS, type SlashBriefInput, type SlashUnderstandingModel } from '../src/slash.ts';
+import { anthropicModel, endpointModel, SLASH_BRIEF_INSTRUCTIONS, SLASH_WRITTEN_INSTRUCTIONS, type SlashBriefInput, type SlashUnderstandingModel } from '../src/slash.ts';
 import { briefFault, briefFrom, briefInput, briefOf, type BriefFact, type BriefModel } from '../../record/src/briefing.ts';
 
 const FAKE_KEY = 'fake-key-for-tests-only';
@@ -135,4 +135,19 @@ test('THE LINE THE MODEL IS TOLD NOT TO WRITE IS ONE THE RECORD THROWS AWAY: mar
   assert.match(SLASH_BRIEF_INSTRUCTIONS, /no markup, brackets or line breaks/u);
   for (const line of ['**The EDF bill** is {{days}} late.', 'The EDF bill [late] is {{days}} late.', 'The EDF bill is {{days}} late.\nPay it.'])
     assert.match(String(briefFault({ cards: [{ h: 'f1', line }] }, HANDED)), /not one plain sentence/u);
+});
+
+test('THE WRITTEN BRIEF IS ASKED THE SAME WAY, with its own instructions, and its sentences come back as the model wrote them', async () => {
+  const SENTENCES = { sentences: ['The EDF bill is {{f1.days}} late.'] };
+  const net = endpoint(() => chat(JSON.stringify(SENTENCES)));
+  const model = overEndpoint(net.send) as SlashUnderstandingModel & { written(input: unknown): Promise<unknown> };
+  const input = { ...INPUT, sentences: 3 };
+  assert.deepEqual(await model.written(input), SENTENCES);
+  const body = JSON.parse(String(net.sent[0]!.init.body)) as { messages: { role: string; content: string }[] };
+  assert.equal(body.messages[0]!.content, SLASH_WRITTEN_INSTRUCTIONS);
+  assert.deepEqual(JSON.parse(body.messages[1]!.content), input);
+  /* The model is told the hole form, that it types no number, and that it answers sentences. */
+  assert.match(SLASH_WRITTEN_INSTRUCTIONS, /\{\{<handle>\.<figure name>\}\}/u);
+  assert.match(SLASH_WRITTEN_INSTRUCTIONS, /Never type a digit/u);
+  assert.match(SLASH_WRITTEN_INSTRUCTIONS, /\{"sentences":/u);
 });

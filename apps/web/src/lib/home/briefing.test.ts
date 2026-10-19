@@ -95,6 +95,7 @@ test('THE WHOLE READ IS THE CARDS, WHO WROTE THEM AND WHAT THE RECORD SAID: Slas
     rows: briefingRows(answer(both)),
     written: 'slash',
     said: 'Slash ran out of its budget for today.',
+    paused: null,
   });
   assert.equal(briefingRead(saying([card('a', 'One.', 'tasks#1'), card('b', 'Two.', 'tasks#2')], null)).written, 'rule');
   assert.equal(briefingRead(saying([card('a', 'One.', 'tasks#1', 'slash')])).written, 'slash');
@@ -107,7 +108,7 @@ test('AN OLDER HOST SAYS NOTHING: no `said`, an empty one and one that is no sen
   for (const said of [undefined, null, '', '   ', 7, {}, ['x']]) assert.equal(briefingRead(saying(cards, said)).said, null);
   assert.equal(briefingRead(saying(cards, '  Slash is switched off.  ')).said, 'Slash is switched off.');
   for (const odd of [null, undefined, 'x', {}, { ok: true, value: null }, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } }])
-    assert.deepEqual(briefingRead(odd), { rows: [], written: 'rule', said: null });
+    assert.deepEqual(briefingRead(odd), { rows: [], written: 'rule', said: null, paused: null });
 });
 
 test('THE FOOT SAYS WHY THE RULES WROTE IT, once, and nothing where Slash wrote it or nothing was said', () => {
@@ -138,7 +139,7 @@ test('THE FOOT IS A SENTENCE AND NEVER AN ADDRESS OR A LONG DASH, since its word
 });
 
 test('THE READ WITH WHAT WAS SAID NEVER FAILS THE SCREEN EITHER', async () => {
-  const none = { ok: true, value: { rows: [], written: 'rule', said: null } };
+  const none = { ok: true, value: { rows: [], written: 'rule', said: null, paused: null } };
   assert.deepEqual(await readBriefingSaid('http://record.test', async () => Promise.reject(new Error('offline'))), none);
   assert.deepEqual(await readBriefingSaid('http://record.test', async () => json(403, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'No.' } })), none);
   const cards = [card('a', 'One.', 'tasks#1')];
@@ -165,4 +166,25 @@ test('THE TILE DRAWS THE FOOT AS PLAIN TEXT UNDER THE CARDS: 15px, no pill, no i
   assert.match(rule, /color: var\(--dim\);/u);
   assert.match(rule, /overflow-wrap: anywhere;/u, 'a long sentence would push the tile wide at 390');
   assert.doesNotMatch(rule, /background|border|radius|var\(--(red|accent|late)/u, 'the foot is a pill or has a colour of its own');
+});
+
+test('A WRITTEN BRIEF IS ONE PARAGRAPH WHOSE FIGURES OPEN THEIR ROWS, then the few needs as lines', () => {
+  const written = {
+    sentences: [{ parts: [{ text: 'The EDF bill', row: 'bills#4' }, { text: ' is ' }, { text: '3 days', row: 'bills#4' }, { text: ' late.' }] }],
+    needs: [{ h: 'asked-001', line: 'A question waits on you: "Which card?"', row: 'suggestion:s1' }],
+  };
+  const rows = briefingRows({ ok: true, value: { cards: [card('a', 'Rules line.', 'tasks#1')], written } });
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]!.line, 'The EDF bill is 3 days late.');
+  assert.deepEqual(rows[0]!.parts?.filter((p) => p.href !== null).map((p) => p.href), ['/r/bills/4', '/r/bills/4']);
+  assert.equal(rows[1]!.href, '/decide/s1');
+  assert.equal(footOf(briefingRead({ ok: true, value: { cards: [], written, said: 'Slash is off.' } })), null);
+});
+
+test('A PAUSED WRITTEN BRIEF LEAVES THE RULES LINES AND ONE QUIET LINE, and no line under no lines', () => {
+  const paused = 'The written brief is paused. Slash has no model on this host, so BrainDog works from its rules.';
+  const read = briefingRead({ ok: true, value: { cards: [card('a', 'One.', 'tasks#1')], written: null, paused } });
+  assert.equal(read.rows[0]!.parts, undefined);
+  assert.equal(footOf(read), paused);
+  assert.equal(footOf(briefingRead({ ok: true, value: { cards: [], paused } })), null);
 });

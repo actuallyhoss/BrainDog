@@ -217,6 +217,12 @@ export function slashModelFor(
       if (model.brief === undefined) throw Object.assign(new Error('The model Slash answers with here writes no briefing.'), { sent: false });
       return model.brief(input);
     },
+    /* AND THE WRITTEN BRIEF, the same way: a model that writes none is never sent, and the cards stand. */
+    written: async (input) => {
+      const model = chosen();
+      if (model.written === undefined) throw Object.assign(new Error('The model Slash answers with here writes no brief.'), { sent: false });
+      return model.written(input);
+    },
   };
 }
 

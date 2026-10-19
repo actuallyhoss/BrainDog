@@ -218,6 +218,7 @@ import { learnedOrder, learnedSorted, replacedIn, replacesField } from './method
 import { briefFactsFor } from './methods/briefing.ts';
 import { doorFacts, doorIsOff, turnedAway as doorTurnedAway, type DoorFacts } from './methods/door-switch.ts';
 import { briefTick } from './brief-write.ts';
+import { writtenTick } from './written-brief.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
 import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
@@ -301,6 +302,8 @@ export {
 export { BRIEF_CARDS_MOST, BRIEF_FACTS_MOST, BRIEF_KINDS, BRIEF_LINE_MOST, BRIEF_RANK, BRIEF_RULES_MOST, briefBasis, briefCandidates, briefFault, briefFrom, briefInput, briefOf, rulesBrief, type Brief as Briefing, type BriefAnswer, type BriefCard, type BriefFact, type BriefInput, type BriefKind, type BriefModel } from './briefing.ts';
 /* AND THE MODEL'S HALF (`brief-write.ts`): when it is asked, and the one answer kept. The tick is `slashBrief` below. */
 export { BRIEF_ASKED, BRIEF_ASKS_DAY, BRIEF_HOURS, BRIEF_KEPT, BRIEF_NO_ANSWER, briefSlot, briefTick, keptBrief, type BriefAsk, type BriefAsked, type KeptBrief } from './brief-write.ts';
+/* AND THE WRITTEN BRIEF (`written-brief.ts`): sentences rewritten when the rows the brief reads change. */
+export { WRITTEN_ASKS_DAY, WRITTEN_KEPT, WRITTEN_NEEDS_MOST, WRITTEN_QUIET_MS, WRITTEN_RETRY_MS, WRITTEN_SENTENCES_MOST, WRITTEN_STATE, needsOf, writtenOf, writtenShown, writtenTick, type WrittenInput, type WrittenRead } from './written-brief.ts';
 /* THE ONE RECOMMENDER AND THE ONE QUEUE OF WHAT THE RECORD OFFERS TO ARRANGE (ENG-B14, `design-agent.ts`), under one name
    because its own are short words (`Offer`, `Queue`, `recommend`). Nothing in the record calls it yet. */
 export * as designAgent from './design-agent.ts';
@@ -4453,9 +4456,29 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * request and the gathering reads every list that keeps a date. Kept in memory, so a restart looks once more, which
    * costs a read and never an ask: the ask is bounded by `BRIEF_ASKS_DAY`.
    */
+  /** How often a later tick looks: the version check is cheap, so far oftener than the cards' fifteen minutes. */
+  const WRITTEN_LOOK_MS = 30_000;
   let briefLooked = Number.NEGATIVE_INFINITY;
   const slashBrief = async (nowMs: number, again = false): Promise<string[]> => {
     const model = deps.slashModel;
+    /* A MODEL THAT WRITES THE BRIEF IS ASKED FOR IT WHEN ITS ROWS CHANGE, NOT BY THE SLOT OF THE DAY (`writtenTick`): the
+       record's version is the mark, so a tick that finds it unmoved gathers nothing. Counted as a headline's ask is. */
+    if (typeof model?.written === 'function') {
+      if (again && nowMs - briefLooked < WRITTEN_LOOK_MS) return [];
+      briefLooked = nowMs;
+      const written = model.written.bind(model);
+      const owner = { principal: { kind: 'system', id: SLASH } } as const;
+      const out = await writtenTick({
+        version: kernel.version(),
+        facts: () => briefFactsFor(methodDeps(), owner, nowMs),
+        now: nowMs,
+        zone: kernel.identity()?.tz ?? 'UTC',
+        read: (key) => kernel.prefsOf(SLASH)[key],
+        write: (key, value) => kernel.setPref(SLASH, key, value as never),
+        ask: (input) => slashAsked('headline', input, (i) => written(i)),
+      });
+      return out.dropped === null ? [] : [out.dropped];
+    }
     if (typeof model?.brief !== 'function') return [];
     if (again && nowMs - briefLooked < HEADLINE_LOOK_MS) return [];
     briefLooked = nowMs;

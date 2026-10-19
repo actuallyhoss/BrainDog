@@ -40,7 +40,12 @@
     <ul class="brief" data-briefing>
       {#each cards as card (card.key)}
         <li>
-          {#if card.href}
+          {#if card.parts}
+            <!-- THE WRITTEN BRIEF: a paragraph, each figure or name opening its own row. -->
+            <p class="b-line b-written" data-written dir="auto">
+              <span class="b-text">{#each card.parts as part}{#if part.href}<a class="b-part" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}</span>
+            </p>
+          {:else if card.href}
             <a class="b-line" href={at(card.href)} data-by={card.by}>
               <span class="b-text" dir="auto">{card.line}</span>
               {#if card.by === 'slash'}<span class="b-by" title={words.bySlash}><span aria-hidden="true">{words.slash}</span><span class="sr-only">{words.bySlash}</span></span>{/if}
@@ -105,6 +110,22 @@
     flex: 1;
     min-inline-size: 0;
     overflow-wrap: anywhere;
+  }
+
+  /* A paragraph reads as one, where a card is a row: its links are the words themselves, underlined quietly. */
+  .b-written {
+    align-items: flex-start;
+  }
+
+  .b-part {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 3px;
+  }
+
+  .b-part:hover {
+    text-decoration-color: currentColor;
   }
 
   .b-by {

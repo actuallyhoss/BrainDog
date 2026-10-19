@@ -43,6 +43,7 @@ import {
   SLASH_INSTRUCTIONS,
   SLASH_KEY_GONE,
   SLASH_PLAN_INSTRUCTIONS,
+  SLASH_WRITTEN_INSTRUCTIONS,
   SlashAnsweredError,
   SlashKeyClosedError,
   answerOf,
@@ -180,6 +181,7 @@ export const LOOK: JsonSchema = {
 };
 /* The briefing: the cards Today opens on, each a handle it was handed and one line. Each card is checked by the record
    (`briefFault`), which keeps only the handles it handed out. */
+const WRITTEN: JsonSchema = { type: 'object', properties: { sentences: { type: 'array', items: { type: 'string' } } }, required: ['sentences'] };
 const CARDS: JsonSchema = { type: 'object', properties: { cards: { type: 'array', items: { type: 'object' } } }, required: ['cards'] };
 /* Who is who: a number for each doubtful pair, keyed by the pair's handle, and the names read in the night's notes. Each
    is checked by `@braindog/host/understand` (`settleResolve`, `mentionsKept`), which keeps only what it handed out. */
@@ -412,6 +414,8 @@ export function includedModel(env: SlashEnv, onFail?: OnModelFail): WorkerSlashM
     headline: (input) => ask(SLASH_COMPOSE_INSTRUCTIONS, input, LOOK),
     /* THE BRIEFING, held to the same worst ask as the rest: a background ask, and never one of his. */
     brief: (input) => ask(SLASH_BRIEF_INSTRUCTIONS, input, CARDS),
+    /* THE WRITTEN BRIEF, the same background ask: a few sentences, rewritten when the rows it reads change. */
+    written: (input) => ask(SLASH_WRITTEN_INSTRUCTIONS, input, WRITTEN),
     resolve: (input) => ask(SLASH_RESOLVE_INSTRUCTIONS, input, VERDICTS),
     mentions: (input) => ask(SLASH_MENTIONS_INSTRUCTIONS, input, MENTIONS),
     /* WHO AND WHAT A THING IS ABOUT, the same background ask under the same worst-ask bound. */
@@ -561,6 +565,12 @@ export function workerSlashModel(env: SlashEnv, api: () => Pick<RecordApi, 'kern
       const model = chosen();
       if (model.brief === undefined) throw new NotSent('The model Slash answers with here writes no briefing.');
       return model.brief(input);
+    },
+    /* AND THE WRITTEN BRIEF, through the same choice: a model that writes none is never sent, and the cards stand. */
+    written: async (input) => {
+      const model = chosen();
+      if (model.written === undefined) throw new NotSent('The model Slash answers with here writes no brief.');
+      return model.written(input);
     },
     /* WHO IS WHO, the model-jobs pass's two asks, through the same choice: the doubtful pairs and the night's notes. */
     resolve: async (input) => chosen().resolve(input),

@@ -46,13 +46,20 @@ import { hashOf } from '../headlines.ts';
 import type { CallContext } from '../index.ts';
 import { scrubbed } from '../scrub.ts';
 import { exceptionsFor } from './exceptions.ts';
+import { WRITTEN_KEPT, WRITTEN_STATE, writtenFailed, writtenShown, type WrittenRead } from '../written-brief.ts';
 import type { RecordDeps } from './index.ts';
 
 /**
  * What `briefing` answers: the cards, when they were worked out, the hash of the facts they were worked out from, and
  * `said`: the sentence why the rules wrote them where a model would have, or `null`.
  */
-export type Briefing = Brief & { said: string | null };
+export type Briefing = Brief & {
+  said: string | null;
+  /** The written brief (`../written-brief.ts`) while it stands for this caller's facts, else `null`. */
+  written: WrittenRead | null;
+  /** One quiet sentence saying the written brief is paused, where the model is off or failing and the rules speak. */
+  paused: string | null;
+};
 
 /** The list runs are kept in, read out of the kernel's own declaration so there is one copy of its name. */
 const SESSION = (sessionDeclaration().body as unknown as { id: string }).id;
@@ -271,6 +278,16 @@ function firstCards(deps: RecordDeps, ctx: CallContext): BriefCard[] {
   });
 }
 
+/**
+ * Why the written brief is paused, in one sentence, or `null` when it is only waiting to be written. The engine's own
+ * sentence leads when the model is off, not answering or its key will not open; else a failed ask says so.
+ */
+async function pausedLine(deps: RecordDeps, failed: boolean): Promise<string | null> {
+  const health = deps.engineHealth === undefined ? null : await deps.engineHealth().catch(() => null);
+  if (health !== null && health.health.state !== 'answering' && health.health.state !== 'never_asked') return `The written brief is paused. ${health.said.text}`;
+  return failed ? 'The written brief is paused: the model did not answer the last time it was asked.' : null;
+}
+
 export function methods(deps: RecordDeps) {
   const { kernel, scoped, clock } = deps;
 
@@ -295,7 +312,11 @@ export function methods(deps: RecordDeps) {
       /* A NEW RECORD'S FIRST LINES COME FROM THE AGENT'S FIRST SESSION, while no briefing was written and its draft project stands. */
       if (kept === null) brief.cards = [...firstCards(deps, ctx), ...brief.cards];
       if (brief.cards.length > 0 && ctx.principal.kind !== 'system') markFirst(kernel, 'first.brief', nowMs);
-      return { ok: true, value: { ...brief, said: brief.said ?? null } };
+      /* THE WRITTEN BRIEF, KEPT AS PARTS AND FILLED FROM THESE FACTS: it asks no model and waits on nothing. */
+      const prefs = kernel.prefsOf(SLASH);
+      const written = facts.length === 0 ? null : writtenShown(prefs[WRITTEN_KEPT], facts);
+      const paused = facts.length === 0 || (written !== null && !writtenFailed(prefs[WRITTEN_STATE])) ? null : await pausedLine(deps, writtenFailed(prefs[WRITTEN_STATE]));
+      return { ok: true, value: { ...brief, said: brief.said ?? null, written: paused === null ? written : null, paused } };
     },
   };
 }
