@@ -59,6 +59,9 @@
   import { Sparkline, Stacked } from '$lib/viz/index.ts';
   import { fieldWords } from '$lib/record/field-words.ts';
   import AddValue from './AddValue.svelte';
+  import ProjectBlocks from './ProjectBlocks.svelte';
+  import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, rowsOf, type Block, type DataRow, type Figure } from './project.ts';
+  import { workingNow } from '$lib/home/waits.svelte.ts';
   import { putBackOf, valueWords } from '$lib/record/field-write.ts';
   import { draftOf, editable, isFile, isJson, isQuantity, patchOf, unitOf, unitsOf, wrongValue } from '$lib/record/field-draft.ts';
   import FileField from '$lib/ui/FileField.svelte';
@@ -171,6 +174,8 @@
   let moneyAll = $state<string | null>(null);
   let workAll = $state<string | null>(null);
   let figures: FigureReader | null = null;
+  /* A PROJECT'S THREE MONEY FIGURES, said by name of the project (`project.ts`); each is nothing until the record answers. */
+  let pjMoney = $state<{ in: Figure | null; out: Figure | null; owed: Figure | null }>({ in: null, out: null, owed: null });
 
   /* THE ROW AND ITS HISTORY, IN ONE BRACKET, so `data-screen` never appears between the two reads. An
      answer for a row somebody has already left is dropped. `clock` is the reader's, taken again as
@@ -191,6 +196,7 @@
     openWork = null;
     moneyAll = null;
     workAll = null;
+    pjMoney = { in: null, out: null, owed: null };
     archived = false;
     stopEdit();
     const at = opened();
@@ -242,6 +248,12 @@
     const work = pointing.map((g) => g.register).find((list) => handFor(REGISTERS[list]) !== null && viaOf(REGISTERS[list], register) !== null);
     const via = work ? viaOf(REGISTERS[work], register) : null;
     figures ??= figureReader(apiBase());
+    if (isProject(REGISTERS[register]) && name !== '') {
+      const f = figures;
+      void Promise.all([f.scalar('project-in-month', name), f.scalar('project-out-month', name), f.scalar('project-owed', name)]).then(([i, o, w]) => {
+        if (askedFor === key) pjMoney = { in: i, out: o, owed: w };
+      });
+    }
     const [m, w] = await Promise.all([
       earns ? figures.moneyIn(name) : Promise.resolve(null),
       work && via ? figures.openWork(work, via, `${register}#${n}`, localDay(Date.now())) : Promise.resolve(null),
@@ -746,7 +758,7 @@
    */
   const rankOf = (g: Backlink): number =>
     meetsOf(REGISTERS[g.register]) ? 0 : isProjects(g.register) ? 1 : REGISTERS[g.register]?.fields.some((f) => f.type === 'money') ? 2 : 3;
-  const related = $derived(orgRole ? [...incoming].sort((a, b) => rankOf(a) - rankOf(b)) : incoming);
+  const related = $derived((orgRole ? [...incoming].sort((a, b) => rankOf(a) - rankOf(b)) : incoming).filter((g) => !projectPage || blockOf(REGISTERS[g.register]) === null));
 
   /**
    * A RUN'S PAGE LEADS WITH ITS HANDOFF: what it is doing, where, the next step, what it already tried and its
@@ -756,6 +768,35 @@
    * said only where the record named it beside the row. What was tried is appended as it happens, so it is turned
    * round to lead with the newest, which is the one the next session is most likely to repeat.
    */
+  /* A PROJECT'S PAGE TAKES ONE SHAPE (`project.ts`); every other list keeps the page it has. */
+  const projectPage = $derived(isProject(decl));
+  const pj = $derived.by(() => {
+    if (!projectPage || !row || !decl) return null;
+    const name = String(row.fields[decl.title] ?? '').trim();
+    const placed = incoming.map((g) => ({ block: blockOf(REGISTERS[g.register]), rows: g.rows }));
+    const rows = (b: Exclude<Block, 'brief'>) => rowsOf(b, placed);
+    const tasks = rows('next');
+    const text = String(row.fields.next ?? '').trim();
+    const facts = {
+      brief: briefOf(row.fields, history),
+      next: text || tasks[0]?.title || null,
+      money: moneyLines(pjMoney),
+      people: rows('crew'),
+      agents: agentsOf(name, workingNow(), rows('workers')),
+      runsOn: rows('runs-on'),
+    };
+    const changed: DataRow[] = history.map((l, i) => ({ key: `h${i}`, title: l.note, detail: `${l.by}, ${l.at}`, href: null }));
+    const data: Partial<Record<Block, readonly DataRow[]>> = {
+      brief: facts.brief.length > 0 ? changed : [],
+      next: tasks,
+      money: rows('money'),
+      crew: facts.people,
+      workers: facts.agents.runs,
+      'runs-on': facts.runsOn,
+    };
+    return { facts, data, nextHref: text ? null : (tasks[0]?.href ?? null) };
+  });
+
   const handoff = $derived.by(() => {
     if (id !== 'session' || !row) return null;
     const f = row.fields;
@@ -1124,6 +1165,11 @@
 
     <div class="board">
       <div class="main">
+        <!-- THE PROJECT'S ONE SHAPE leads, then the fields and whatever else the page holds. -->
+        {#if pj && blocksOf(pj.facts).length > 0}
+          <ProjectBlocks facts={pj.facts} data={pj.data} nextHref={pj.nextHref} format={moneySaid} />
+        {/if}
+
         <!-- A RUN READS AS ITS HANDOFF, led by its face, what it is doing and where it is, then what the next
              session needs: the next step, what was already tried, newest first, and the notes it left. The one place
              `live` is used on this page, in the face's ring. -->
@@ -1219,7 +1265,7 @@
         </Tile>
 
         <!-- THE TILES, ONLY WHERE THERE IS A FIGURE: each a figure, its chart, and one line saying what it means. -->
-        {#if moneyIn || openWork}
+        {#if !projectPage && (moneyIn || openWork)}
           <div class="tiles">
             {#if moneyIn}
               <Tile icon="money" title={rowWords.moneyIn} href={moneyAll ?? undefined} hrefLabel={moneyAll ? rowWords.all : undefined}>

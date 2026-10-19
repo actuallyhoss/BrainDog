@@ -212,7 +212,17 @@ export function openWorkSaid(w: OpenWork): string {
 
 /* ── the reads ───────────────────────────────────────────────────────────── */
 
+/** A scalar reading as an amount in minor units and its currency, or nothing when it is not money or is no more than zero. */
+export function scalarOf(reading: unknown): { value: number; currency: string } | null {
+  if (typeof reading !== 'object' || reading === null) return null;
+  const r = reading as { value?: unknown; unit?: unknown };
+  if (typeof r.value !== 'number' || !Number.isFinite(r.value) || r.value <= 0) return null;
+  return typeof r.unit === 'string' && /^[A-Z]{3}$/u.test(r.unit) ? { value: Math.round(r.value), currency: r.unit } : null;
+}
+
 export type FigureReader = {
+  /** One of a project's money figures (`project-in-month`, `project-out-month`, `project-owed`), or nothing. */
+  scalar(figure: string, name: string): Promise<{ value: number; currency: string } | null>;
   /** What came in for the project of this name, month by month, or nothing. */
   moneyIn(name: string): Promise<MoneyIn | null>;
   /** The open rows of the work list `register` pointing at the row spoken as `spoken`, or nothing. */
@@ -230,6 +240,10 @@ export type FigureReader = {
 export function figureReader(base: string, io?: Fetch): FigureReader {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   return {
+    async scalar(figure, name) {
+      const out = await client.metric(`${figure}:${name}`).catch(() => null);
+      return out?.ok ? scalarOf(out.value) : null;
+    },
     async moneyIn(name) {
       const out = await client.metric(`${MONEY_IN}:${name}`).catch(() => null);
       return out?.ok ? monthsOf(out.value) : null;

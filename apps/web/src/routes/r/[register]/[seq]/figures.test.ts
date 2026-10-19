@@ -20,6 +20,7 @@ import {
   openWhere,
   openWorkOf,
   openWorkSaid,
+  scalarOf,
   viaOf,
   type Fetch,
   type Via,
@@ -198,4 +199,11 @@ test("A FIGURE IS ABOUT THE LIST ITS PARAMETER'S FIELD POINTS AT, read off its d
   assert.equal(aboutOf({ source: 'cash.now', where: 'thing is {{it}}' }), null, 'a figure the record computes reads no list');
   assert.equal(aboutOf({ source: 'register.transactions', where: 'state is cleared' }), null, 'a figure with no parameter is about no row');
   assert.equal(aboutOf(undefined), null);
+});
+
+test('A SCALAR MONEY READING IS DRAWN ONLY WHEN IT IS MONEY AND MORE THAN NOTHING', () => {
+  assert.deepEqual(scalarOf({ value: 1250.4, unit: 'GBP' }), { value: 1250, currency: 'GBP' });
+  assert.equal(scalarOf({ value: 0, unit: 'GBP' }), null);
+  assert.equal(scalarOf({ value: 4, unit: null }), null);
+  assert.equal(scalarOf(null), null);
 });
