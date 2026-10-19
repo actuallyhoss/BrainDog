@@ -405,7 +405,7 @@
    * it, `+layout.svelte`), and the names fade in over the same step, so a word is never drawn half cut over a column
    * still narrow. They go at once as it narrows. Nothing runs on the first draw or for a reader who asked for less motion.
    */
-  const WORDS = '.item-name, .tally, .pen-action, .record-name, .brand-name, .ask-words, .ask-key, .me-name, .me-face, .sub';
+  const WORDS = '.item-name, .tally, .pen-action, .record-name, .ask-words, .ask-key, .me-name, .me-face, .sub';
   let card = $state<HTMLElement>();
   let drawn: boolean | undefined;
   let fades: Animation[] = [];
@@ -452,9 +452,9 @@
       {#snippet trigger()}
         <span class="record" data-label={recordName}>
           <Mark height={20} />
-          <span class="titles">
-            <span class="brand-name">{words.brand}</span>
-            {#if recordName.toLowerCase() !== words.brand.toLowerCase()}<span class="record-name">{recordName}</span>{/if}
+          <span class="record-name">
+            {words.brand}
+            {#if recordName.toLowerCase() !== words.brand.toLowerCase()}<small>{recordName}</small>{/if}
           </span>
           <Icon name="chevronDown" size="s" />
         </span>
@@ -884,25 +884,17 @@
     line-height: 1;
   }
 
-  .titles {
-    display: grid;
-    flex: 1;
-    min-inline-size: 0;
-    line-height: 1.2;
-  }
-
-  .brand-name {
+  .record-name {
     font-family: var(--font-display);
   }
 
-  .titles .record-name {
+  .record-name small {
+    display: block;
     color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 500;
+    font: 500 var(--t-xs) var(--font-ui);
   }
 
   .mi-name,
-  .brand-name,
   .record-name {
     flex: 1;
     min-inline-size: 0;
@@ -1544,7 +1536,6 @@
   .rail[data-icons] .item-name,
   .rail[data-icons] .pen-action,
   .rail[data-icons] .record-name,
-  .rail[data-icons] .brand-name,
   .rail[data-icons] .ask-words,
   .rail[data-icons] .me-name,
   .rail[data-icons] .item .tally:not([data-waiting]) {
