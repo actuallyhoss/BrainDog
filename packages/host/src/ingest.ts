@@ -1235,5 +1235,9 @@ async function away(door: IngestDoor, ask: IngestTurnedAway): Promise<Response> 
  */
 async function store(door: IngestDoor, arrival: IngestArrival): Promise<Response> {
   const out = await door.arrive(arrival);
-  return out.ok ? nothing(202) : refusal(503, UNAVAILABLE);
+  if (out.ok) return nothing(202);
+  /* A RECORD'S HOUR SPENT IS A WAIT AND NOT A FAULT: the sender is told how long (`Retry-After`) and sends it again then. */
+  if ('refusal' in out && out.refusal.code === 'RATE_LIMITED' && typeof out.refusal.retry_after === 'number')
+    return refusal(429, out.refusal, [['retry-after', String(out.refusal.retry_after)]]);
+  return refusal(503, UNAVAILABLE);
 }

@@ -36,7 +36,7 @@ export { serveSlash, servesSlash, slashAskDoor, slashReply, type SlashAskDoor, t
    that holds the record's press and first plan in Slash's ledger and exported it from `slash-ask.ts` alone, which no
    app imports, so both hosts built the record without it and every press stayed unmetered.
    `apps/worker/test/slash-press-metered.test.ts` is the press on the Worker that shows it wired. */
-export { slashRecordMeter, type SlashLedgerDeps, type SlashRecordMeter } from './slash-ask.ts';
+export { slashDayStop, slashRecordMeter, type SlashLedgerDeps, type SlashRecordMeter } from './slash-ask.ts';
 /* THE ENGINE'S HEALTH, for the same reason: both hosts build the read and hand it to the record (ENG-A02). */
 export { engineHealthRead, type EngineFacts, type EngineHealth, type EngineHealthDeps, type EngineHealthFns, type EngineHealthRead, type EngineSaid } from './engine-health.ts';
 export { engineProbeOf, probeWireOf, NO_MODEL as ENGINE_PROBE_NO_MODEL, type EngineProbe, type EngineProbeCandidate, type EngineProbeDeps } from './engine-probe.ts';

@@ -61,7 +61,7 @@ import {
 import type { OpenKey } from '@braindog/host/actions';
 import { PURPOSES, routeFor, type Candidate, type RouteFacts } from '@braindog/host/infer';
 import { SLASH_MENTIONS_INSTRUCTIONS, SLASH_RESOLVE_INSTRUCTIONS, type UnderstandModel } from '@braindog/host/understand';
-import { slashAskDoor, type SlashAskDoor } from '@braindog/host';
+import { slashAskDoor, slashDayStop, type SlashAskDoor } from '@braindog/host';
 import type { SlashAnswer } from '@braindog/host/slash-answers';
 import { no, ok, type Clock, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { CallContext, RecordApi, SlashModel } from '@braindog/record';
@@ -1268,7 +1268,9 @@ export function workerSlashDoor(
     return 'refusal' in gate ? gate.refusal : { code: 'FORBIDDEN', fix: 'The vault could not be asked about your key. Try again.' };
   };
   const samples = (ids: readonly string[], ctx: CallContext) => slashSamplesOf(api(), ids, ctx);
-  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { vault, samples });
+  /* THE DAY'S CEILING, from the same ledger the month's count is read from (`slashDayStop`). */
+  const day = async (): Promise<Refusal | null> => slashDayStop(deps.sql, Date.now());
+  return slashAskDoor(origins, () => workerSlashEngine(env, api, deps), byok, { vault, samples, day });
 }
 
 /* ── the daily look, and what it heard go wrong ───────────────────────────────────────────────────────────────────── */

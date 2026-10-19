@@ -77,6 +77,7 @@ import { ulids } from '@braindog/kernel';
 import { codeOf, fixOf, type Refusal, type Result, type Sql } from '@braindog/ports';
 import type { SlashBackground, SlashMeter } from '@braindog/record';
 
+import { ABUSE, tooManyLine } from './abuse.ts';
 import { httpStatus } from './index.ts';
 import { mayThink, sendable, type Reads } from './infer.ts';
 import { backgroundMeter, BACKGROUND_JOBS_MONTH, HEADLINE_ASK, UNDERSTAND_ASK, type AskPurpose, type AskSpends } from './model-jobs.ts';
@@ -146,10 +147,12 @@ export type SlashAskDoor<C> = {
    * host wired no engine, since `off` is an answer too; absent, the door answers `NOT_IN_THIS_BUILD`.
    */
   health?: (() => Promise<unknown>) | undefined;
+  /** The day's ceiling on asks that spend the person's allowance (`slashDayStop`): a refusal to answer 429, or `null` to go on. */
+  day?: (() => Promise<Refusal | null>) | undefined;
 };
 
-/** What a host hands `slashAskDoor` beside the builder: the vault's gate and the inbox's reader (`SlashAskDoor`). */
-export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'vault' | 'samples' | 'health'>;
+/** What a host hands `slashAskDoor` beside the builder: the vault's gate, the inbox's reader and the day's ceiling (`SlashAskDoor`). */
+export type SlashDoorReads<C> = Pick<SlashAskDoor<C>, 'vault' | 'samples' | 'health' | 'day'>;
 
 /**
  * A door over a builder that is asked once, which is what each host's `slash.ts` hands this file.
@@ -189,6 +192,7 @@ export function slashAskDoor<C>(
     ...(reads.vault === undefined ? {} : { vault: reads.vault }),
     ...(reads.samples === undefined ? {} : { samples: reads.samples }),
     ...(reads.health === undefined ? {} : { health: reads.health }),
+    ...(reads.day === undefined ? {} : { day: reads.day }),
   };
 }
 
@@ -257,6 +261,27 @@ const refusal = (status: number, refused: Refusal, extra: readonly Header[] = []
 
 /** A result as the door answers it, with the status every other route gives it. */
 export const slashReply = (out: Result<unknown>): Response => reply(httpStatus(out), out);
+
+/**
+ * THE DAY'S CEILING ON ASKS THAT SPEND THE PERSON'S ALLOWANCE (`ABUSE.slashDay`), counted from Slash's own ledger.
+ *
+ * ON TOP OF THE PLAN'S MONTH AND NEVER IN ITS PLACE: `ask_cap` stays the plan's, and this only stops one UTC day from
+ * spending a whole month at a loop's speed. An ask on his own key spends nothing of ours (`spends` is not `person`) and
+ * is not counted. A ledger that cannot be read goes on, since the month's cap still holds behind it.
+ */
+export function slashDayStop(sql: Sql, now: number): Refusal | null {
+  const midnight = new Date(now);
+  midnight.setUTCHours(0, 0, 0, 0);
+  let used = 0;
+  try {
+    used = Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM slash_call WHERE purpose = 'ask' AND spends = 'person' AND ts >= ?", midnight.toISOString())?.n ?? 0);
+  } catch {
+    return null;
+  }
+  if (used < ABUSE.slashDay.most) return null;
+  const wait = Math.max(1, Math.ceil((midnight.getTime() + 86_400_000 - now) / 1000));
+  return { code: 'RATE_LIMITED', fix: tooManyLine(wait), retry_after: wait };
+}
 
 /** The one sentence every bearer gets here. `46 §5.2`: every bearer at a cookie route is 403 `NEEDS_BROWSER_SESSION`. */
 const NO_BEARER: Refusal = {
@@ -427,6 +452,8 @@ export async function serveSlash<C>(request: Request, door: SlashAskDoor<C>, ctx
   /* HIS OWN KEY, OPENED FOR THIS ASKER, IS THE MODEL FOR BOTH PASSES. After the build and not before, because the settings
      row `slashOwnKeyOf` reads is created by the build. A refused opening is the answer and the engine is not asked: handed
      nothing instead, pass one would draft on another model before the package found the key closed. */
+  const day = await door.day?.();
+  if (day) return slashReply({ ok: false, refusal: day });
   const own = await opened(door, ctx);
   if (own instanceof Response) return own;
   if (route === 'read') return answer(() => engine.read(question, ctx, own));
@@ -467,6 +494,8 @@ async function pattern<C>(body: Record<string, unknown>, door: SlashAskDoor<C>, 
   const draft = engine.proposePattern?.bind(engine);
   if (draft === undefined) return refusal(501, NO_MODEL);
 
+  const day = await door.day?.();
+  if (day) return slashReply({ ok: false, refusal: day });
   const own = await opened(door, ctx);
   if (own instanceof Response) return own;
   const asks = (engine.status() as { asks?: { used?: unknown; cap?: unknown; resets?: unknown; capped?: unknown } } | undefined)?.asks;

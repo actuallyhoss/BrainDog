@@ -185,6 +185,8 @@ export type FileDeps = {
   session: Deps;
   bearer: BearerDeps;
   limit: (who: LimitDoor, cls: LimitClass) => Promise<Response | null>;
+  /** A day's bytes for one record (`ABUSE.uploadDay`): `null` to go on, or the 429. Absent, and nothing is counted. */
+  bytes?: ((record: string, bytes: number) => Promise<Response | null>) | undefined;
 };
 
 const answer = (status: number, body: unknown, extra: Record<string, string> = {}): Response =>
@@ -245,7 +247,7 @@ export async function serveFiles(request: Request, deps: FileDeps): Promise<Resp
   const over = await deps.limit({ door: door.door, ctx }, reading ? 'read' : 'write');
   if (over !== null) return withCookie(over, cookie);
 
-  const out = reading ? await give(request, deps.blobs, record, ctx, asked.sha256!) : await keep(request, deps.blobs, record, ctx, asked.sha256);
+  const out = reading ? await give(request, deps.blobs, record, ctx, asked.sha256!) : await keep(request, deps.blobs, record, ctx, asked.sha256, deps.bytes);
   return withCookie(out, cookie);
 }
 
@@ -256,7 +258,7 @@ export async function serveFiles(request: Request, deps: FileDeps): Promise<Resp
  * not the ones the client hashed are not the file it meant, so what they look like says nothing. A name that is not a
  * hash at all is the same refusal, because no bytes could hash to it.
  */
-async function keep(request: Request, blobs: FileBucket | undefined, record: string, ctx: CallContext, at: string | null): Promise<Response> {
+async function keep(request: Request, blobs: FileBucket | undefined, record: string, ctx: CallContext, at: string | null, spend?: FileDeps['bytes']): Promise<Response> {
   if (!writesFiles(ctx)) return refuse(403, CANNOT_WRITE);
   if (blobs === undefined) return refuse(501, NO_STORE);
   if (at !== null && !SHA256.test(at)) return refuse(422, MISMATCH);
@@ -274,7 +276,12 @@ async function keep(request: Request, blobs: FileBucket | undefined, record: str
   if (!agrees(said, mime)) return refuse(415, MISLABELLED(said, mime));
   /* THE SAME BYTES ARE ALREADY THE SAME FILE, so a second put finds them and writes nothing; the answer is the first's. */
   const key = fileKey(record, sha256);
-  if ((await blobs.head(key)) === null) await blobs.put(key, bytes, { httpMetadata: { contentType: mime } });
+  if ((await blobs.head(key)) === null) {
+    /* ONLY NEW BYTES ARE COUNTED against the day (`ABUSE.uploadDay`); the same file put again costs nothing and writes nothing. */
+    const over = spend === undefined ? null : await spend(record, bytes.byteLength);
+    if (over !== null) return over;
+    await blobs.put(key, bytes, { httpMetadata: { contentType: mime } });
+  }
   return answer(200, { sha256, mime, bytes: bytes.byteLength });
 }
 
