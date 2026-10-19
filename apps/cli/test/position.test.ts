@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BUILD, authorsOf, cliBuild, hostSessionOf, sessionHeaders, type Position } from '../src/position.ts';
+import { BUILD, authorsOf, cliBuild, hostSessionOf, sessionHeaders, withCommits, type Position } from '../src/position.ts';
 import { helloOf } from '../src/stdio.ts';
 
 const AT: Position = { cwd: '/Users/ada/kiln', repo: 'kiln', remote: 'github.com/ada/kiln', host: 'box', branch: 'main', head: 'abc1234' };
@@ -79,6 +79,13 @@ test('THE AUTHORS OF RECENT COMMITS ARE READ ONCE EACH, newest first, with a rea
   assert.equal(authorsOf('Ada Lin <ada@example.com>\nBo <bo@kiln.example>\nada lin <ADA@example.com>'), 'Ada Lin <ada@example.com>, Bo <bo@kiln.example>');
   assert.equal(authorsOf('Dee <>\nNo address'), null);
   assert.equal(authorsOf(Array.from({ length: 9 }, (_, i) => `P${i} <p${i}@x.example>`).join('\n'))?.split(', ').length, 5);
+});
+
+test('THE LAST COMMITS RIDE AFTER THE AUTHORS, a hash and its subject each, and one that would not fit is left off', () => {
+  assert.equal(withCommits(null, null), null);
+  assert.equal(withCommits('Ada <ada@example.com>', 'abc1234 Wire the kerning pass\nnot a commit\ndef5678 Fix a || b'), 'Ada <ada@example.com> || abc1234 Wire the kerning pass || def5678 Fix a | b');
+  assert.equal(withCommits(null, 'abc1234 Wire it'), '|| abc1234 Wire it');
+  assert.equal(withCommits('Ada <ada@example.com>', `abc1234 ${'x'.repeat(1100)}`), 'Ada <ada@example.com>');
 });
 
 test('THE AUTHORS TRAVEL AS A HEADER FROM THE REPOSITORY ITSELF', () => {

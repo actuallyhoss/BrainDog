@@ -44,7 +44,9 @@ export async function positionOf(cwd: string): Promise<Position> {
           git(cwd, 'remote', 'get-url', 'origin'),
         ]);
   /* Only with a remote: the record meets these as people seen in that project's commits. */
-  const authors = top === null || origin === null ? null : authorsOf(await git(cwd, 'log', '-n', '50', '--format=%an <%ae>'));
+  const [log, subjects] =
+    top === null || origin === null ? [null, null] : await Promise.all([git(cwd, 'log', '-n', '50', '--format=%an <%ae>'), git(cwd, 'log', '-n', '5', '--format=%h %s')]);
+  const authors = withCommits(authorsOf(log), subjects);
   return {
     cwd,
     repo: top === null ? null : basename(top),
@@ -55,6 +57,22 @@ export async function positionOf(cwd: string): Promise<Position> {
     head,
     ...(authors === null ? {} : { authors }),
   };
+}
+
+/**
+ * The authors line with the last commits after it, `Name <email> || abc1234 Subject || ...`, in at most 1024 printable
+ * characters: a commit that would not fit is left off, never cut, and a bar pair inside a subject is written as one bar.
+ */
+export function withCommits(authors: string | null, log: string | null): string | null {
+  let out = authors ?? '';
+  for (const line of (log ?? '').split('\n')) {
+    const l = line.trim().replace(/\|\|/gu, '|');
+    if (!/^[0-9a-f]{7,40} \S/u.test(l) || !/^[\x20-\x7e]+$/u.test(l)) continue;
+    if (`${out} || ${l}`.length > 1024) break;
+    out = `${out} || ${l}`;
+  }
+  out = out.trim();
+  return out === '' ? null : out;
 }
 
 /** The distinct authors of a commit log, newest first, as one header value of at most 512 printable characters; `null` for none. */
@@ -135,7 +153,7 @@ const GRAMMAR: Record<string, RegExp> = {
   'x-braindog-client-version': printable(64),
   'x-braindog-cli': BUILD,
   'x-braindog-ahead': /^(?:0|[1-9][0-9]{0,3})$/,
-  'x-braindog-authors': printable(512),
+  'x-braindog-authors': printable(1024),
 };
 
 type Env = Record<string, string | undefined>;

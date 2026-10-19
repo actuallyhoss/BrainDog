@@ -55,6 +55,7 @@ import {
   type PlannedRecord,
 } from './declare.ts';
 import { commitAuthors } from './commit-authors.ts';
+import { commitSubjects, cutLine, mayRefreshNext, readNames, type Named, type Open } from './work-reads.ts';
 import { DRAFT_FIELD, firstProjectFields, firstProjectName, formsOnRepeat, nobodysPlace } from './first-project.ts';
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
 import { withDerived, type DeriveResolve } from './derive-rows.ts';
@@ -209,6 +210,7 @@ import { runway, type Horizon, type Leg, type Runway } from './forecast.ts';
 import { WALK_SOURCE } from './money-figures.ts';
 import { referencedBy } from './referenced.ts';
 import { createJob, sweepJobs } from './jobs.ts';
+import { openRowset, unfile } from './ingest.ts';
 import { answerAsked, arrive, day, exponentOf, fileAsSecond, offerAgain, patternReport, propose, rerunHeld, shapeOf, type Arrival, type Arrived, type IngestDecl, type IngestDeps, type NumberReaders, type PatternReport } from './ingest.ts';
 import { analyse, observe, type Analysis, type Observation } from './observe.ts';
 import { applyPull, firePull, type PullDecl, type PullDeps } from './pull.ts';
@@ -262,7 +264,7 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { slashMayWrite } from './slash.ts';
-import { readMailArrival, type MailOutcome } from './mail-arrival.ts';
+import { readMailArrival, tasksList, type MailOutcome } from './mail-arrival.ts';
 import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyLists, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
@@ -4776,6 +4778,113 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     }
   }
 
+  /**
+   * WHAT A RUN SAYS IT FINISHED, AND WHERE ITS PROJECT STANDS (`work-reads.ts`). Read when a run opens, hands off and
+   * ends: its own words and the last commit subjects it reported are matched to its project's open tasks. A task the
+   * words clearly name is closed by BrainDog with a mark and an undo (Handled); a weaker match asks in To review; and the
+   * project's `next` follows the newest step a run left, unless a person wrote it last. A task written is what moves the
+   * project's Last worked, which reads the tasks' own stamps. A failure here never stops the run's own write.
+   */
+  function readRunWork(w: Pick<WriteContext, 'actor' | 'principal' | 'session'>, runId: string): void {
+    if (w.principal?.kind !== 'token') return;
+    try {
+      transaction(() => readRunWorkIn(w, runId));
+    } catch {
+      /* the run's write stands without it */
+    }
+  }
+
+  function readRunWorkIn(w: Pick<WriteContext, 'actor' | 'principal' | 'session'>, runId: string): void {
+    const run = byId(runId);
+    const spokenProject = typeof run?.fields.project === 'string' ? run.fields.project : '';
+    const project = run && spokenProject !== '' ? get(spokenProject) : null;
+    if (!run || !project) return;
+    const asText = (v: Json | undefined): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined);
+    const listText = (v: Json | undefined): string[] => (Array.isArray(v) ? v.filter((t): t is string => typeof t === 'string') : []);
+    const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
+    const spoken = `${prefix}${String(run.seq)}`;
+    const lists = [...registers.values()] as unknown as Parameters<typeof tasksList>[0];
+    const tasks = tasksList(lists);
+    const at = instant(clock.now());
+    const deps = ingestDeps();
+
+    if (tasks) {
+      const schema = registers.get(tasks.id) as unknown as { state?: string; done?: readonly string[]; fields: { id: string; values?: readonly string[] }[] } | undefined;
+      const stateField = schema?.fields.find((f) => f.id === schema.state);
+      const finished = schema?.done ?? ['done', 'dropped'];
+      if (stateField?.values?.includes('done')) {
+        const stateId = stateField.id;
+        const rows = sql.all<{ id: string; version: number; state: string | null; fields: string }>(
+          'SELECT id, version, state, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, ?) = ?',
+          tasks.id,
+          `$.${tasks.thing}`,
+          project.id,
+        );
+        const openRows = rows.filter((r) => !finished.includes(r.state ?? ''));
+        const byTask = new Map(openRows.map((r) => [r.id, r]));
+        const open: Open[] = openRows
+          .map((r) => ({ id: r.id, title: String((JSON.parse(r.fields) as Record<string, unknown>)[tasks.title] ?? '').trim() }))
+          .filter((o) => o.title !== '');
+        if (open.length > 0) {
+          const texts = [asText(run.fields.doing), ...listText(run.fields.tried), ...listText(run.fields.notes)].filter((t): t is string => t !== undefined && t.trim() !== '');
+          const who = runAgentOf({ agent: asText(run.fields.agent), client: asText(run.fields.client) }).name;
+          const host = asText(run.fields.host);
+          const device = host ? ` on ${host}` : '';
+          const done = new Set<string>();
+          const settle = (n: Named, sure: boolean, mark: string, why: string): void => {
+            const row = byTask.get(n.task.id);
+            if (!row || done.has(n.task.id)) return;
+            done.add(n.task.id);
+            const asked = `Mark ${n.task.title} done?`;
+            const sureNow = sure && handledOn(sql);
+            const id = openRowset(deps, at, {
+              ingest: 'session',
+              register: tasks.id,
+              rows: [{ at: row.id, version: row.version, patch: { [stateId]: 'done' } }],
+              question: cutLine(sureNow ? mark : asked),
+              context: why,
+              ...(sureNow ? {} : { review: true }),
+            });
+            if (!sureNow) return;
+            const settled = deps.settle?.(id);
+            if (!settled?.ok) unfile(deps, id, { question: cutLine(asked), context: why });
+          };
+          const fromRun = readNames(texts, open, true);
+          for (const n of fromRun.sure)
+            settle(n, true, `Closed by BrainDog: ${who} said it finished this${device}`, `${spoken} wrote "${cutLine(n.said, 120)}", which names ${n.task.title}.`);
+          for (const n of fromRun.weak) settle(n, false, '', `${spoken} wrote "${cutLine(n.said, 120)}", which may be ${n.task.title}.`);
+          for (const c of commitSubjects(w.session?.authors)) {
+            const fromCommit = readNames([c.subject], open, false);
+            for (const n of fromCommit.sure)
+              settle(n, true, `Closed by BrainDog: a commit${device} says it finished this`, `Commit ${c.hash} "${cutLine(c.subject, 120)}" names ${n.task.title}.`);
+            for (const n of fromCommit.weak) settle(n, false, '', `Commit ${c.hash} "${cutLine(c.subject, 120)}" may be ${n.task.title}.`);
+          }
+        }
+      }
+    }
+
+    /* THE PROJECT'S NEXT FOLLOWS THE NEWEST STEP A RUN LEFT THERE, unless a person wrote `next` last: the row's own
+       history says who did, and a value with no history of its own was set by whoever made the row, so it stays. */
+    const projects = lists.find((l) => l.scopes !== undefined);
+    if (!projects || !projects.fields.some((f) => f.id === 'next' && !f.retired)) return;
+    const newest = sql.one<{ id: string; seq: number; next: string }>(
+      `SELECT id, seq, json_extract(fields, '$.next') AS next FROM entry
+        WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '$.project') = ?
+          AND trim(coalesce(json_extract(fields, '$.next'), '')) <> '' AND coalesce(json_extract(fields, '$.closed_as'), '') = ''
+          AND coalesce(json_extract(fields, '$.parent'), '') = ''
+        ORDER BY julianday(coalesce(json_extract(fields, '$.next_at'), json_extract(fields, '$.last_seen'), updated_at)) DESC, seq DESC LIMIT 1`,
+      SESSION,
+      spokenProject,
+    );
+    if (!newest) return;
+    const now = byId(project.id);
+    const text = newest.next.trim();
+    if (!now || now.register !== projects.id || now.fields.next === text) return;
+    const last = sql.one<{ actor: string }>("SELECT actor FROM event WHERE target = ? AND field = 'next' ORDER BY rowid DESC LIMIT 1", `entry:${project.id}`);
+    if (!mayRefreshNext(now.fields.next, last?.actor ?? null, prefix)) return;
+    writing(projects.id, project.id, { next: text }, { actor: `${prefix}${String(newest.seq)}`, cascade: false, note: 'Followed the newest next step a run left here.' });
+  }
+
   function attribute(w: WriteContext, at: Located, target: string | null, now: string): { actor: string; own: boolean } {
     const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
     const batch = w.batch === undefined ? {} : { batch: w.batch };
@@ -4812,6 +4921,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     const opened = openRun(w, project ?? formFirstProject(w), now, 'opened: auto', true);
     if (opened.ok) meetCommitters(w);
+    if (opened.ok) readRunWork(w, opened.value.id);
     if (opened.ok) return { actor: `${prefix}${String(opened.value.seq)}`, own: false };
     /* A RUN THAT CANNOT BE OPENED IS A DEFECT, NOT A REFUSAL. The write it serves has passed every
        check and still goes in, under the caller's own name, and this observation is how anybody finds
@@ -5193,6 +5303,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const done = writing(SESSION, h.id, { state: 'done' }, { ...opts, stamp: {}, note: 'Ended with the session it worked for.' });
         if (!done.ok) return done as Result<never>;
       }
+      readRunWork(w, run.id);
       return ok({ run: spoken, state: to, changed: true });
     });
   }
@@ -10968,6 +11079,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     inScope,
     runFor,
     endRun,
+    /** A run's words and commits read against its project's open tasks, and the project's next step followed (`work-reads.ts`). */
+    readRunWork,
     /** A token's own run told it is still working, its `last_seen` moved in place with no event (AGT-C03). Never opens one. */
     heartbeat,
     /**

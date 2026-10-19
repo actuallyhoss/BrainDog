@@ -10447,6 +10447,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             patch.next = null;
           const written = kernel.update(SESSION, now.id, patch, by);
           if (!written.ok) throw new Unwind(written as Result<never>);
+          /* WHAT THE RUN SAYS IT FINISHED is read against its project's open tasks, after its own write has gone in. */
+          kernel.readRunWork(by, run.id);
           return written;
         }),
       ));
