@@ -815,3 +815,14 @@ export function figureSplit(
         : words.largest(top.label, pct);
   return { items, reading };
 }
+
+/** The pages with one row's private mark set or cleared, after a good answer from the record; every other row is untouched. */
+export function withPrivate<T extends { seq: number; private?: true }>(pages: readonly (readonly T[])[], seq: number, on: boolean): T[][] {
+  return pages.map((page) =>
+    page.map((e) => {
+      if (e.seq !== seq) return e;
+      const { private: _was, ...rest } = e;
+      return (on ? { ...rest, private: true as const } : rest) as T;
+    }),
+  );
+}

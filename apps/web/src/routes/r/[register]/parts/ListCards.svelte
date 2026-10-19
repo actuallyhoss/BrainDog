@@ -57,6 +57,8 @@
          each item still prints the key that replaces it. -->
     <!-- NAMED BY THE ROW'S TITLE, as the grid's own "…" is, and never by its number: "Actions for this
          row #12" was the one "#" left on a phone card once the card stopped printing it. -->
+    <!-- A LOCK ON A ROW ITS MAKER KEPT PRIVATE, as the grid draws one: only they are reading this. -->
+    {#if e.private}<span class="card-lock" title={copy.rowPrivateLock} role="img" aria-label={copy.rowPrivateLock}><Icon name="lock" size="s" /></span>{/if}
     <button
       type="button"
       class="card-more"
@@ -143,6 +145,13 @@
       cursor: pointer;
     }
 
+    .card-lock {
+      display: flex;
+      align-items: center;
+      flex: none;
+      color: var(--ink2);
+    }
+
     .card-more {
       display: flex;
       align-items: center;
@@ -170,6 +179,7 @@
   }
 
   @media (width >= 640px) {
+    .card-lock,
     .card-more {
       display: none;
     }

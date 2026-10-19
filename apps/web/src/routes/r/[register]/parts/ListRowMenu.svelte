@@ -32,6 +32,7 @@
     copyId,
     copyLink,
     archive,
+    keepPrivate,
     onhanded,
   }: {
     open: boolean;
@@ -52,6 +53,11 @@
     copyLink: (seq: number) => void;
     /** Absent for a caller whose level cannot change the list, and Archive is then not in the menu. */
     archive?: ((seq: number) => void) | undefined;
+    /**
+     * Keep the row to its maker, or share it again. A list read carries `private` only on a row its reader made, so a row not
+     * marked is offered the verb too and the record refuses anybody but the maker, in its own sentence.
+     */
+    keepPrivate?: ((seq: number, on: boolean) => void) | undefined;
     /** How the row a hand leaves lands back on the grid (`landRow`), on a live record only. */
     onhanded?: ((entry: Entry) => void) | undefined;
   } = $props();
@@ -110,6 +116,12 @@
       <Icon name="link" size="s" />
       <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
     </button>
+    {#if keepPrivate}
+      <button class="mi" role="menuitem" type="button" onclick={() => keepPrivate?.(seq, row.private !== true)}>
+        <Icon name="lock" size="s" />
+        <span class="mi-name">{row.private === true ? copy.rowShareAgain : copy.rowKeepPrivate}</span>
+      </button>
+    {/if}
     {#if archive}
       <hr class="mi-rule" />
       <button class="mi" role="menuitem" type="button" onclick={() => archive?.(seq)}>

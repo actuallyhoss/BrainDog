@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { RegisterDecl } from '../../../../lib/record/schema.ts';
-import { deadlineOf, withoutGood } from './list.ts';
+import { deadlineOf, withPrivate, withoutGood } from './list.ts';
 
 const bills = {
   id: 'bills',
@@ -53,4 +53,10 @@ test('a finished row loses its colour, and a late or close one keeps it', () => 
   /* A row with nothing to take off is handed back as it came. */
   assert.equal(drawn[1], late);
   assert.equal(drawn[3], plain);
+});
+
+test('A PRIVATE MARK IS SET ON ONE ROW AND CLEARED AGAIN, AND NO OTHER ROW MOVES', () => {
+  const pages = [[{ seq: 1 }, { seq: 2, private: true as const }]] as { seq: number; private?: true }[][];
+  assert.deepEqual(withPrivate(pages, 1, true)[0], [{ seq: 1, private: true }, { seq: 2, private: true }]);
+  assert.deepEqual(withPrivate(pages, 2, false)[0], [{ seq: 1 }, { seq: 2 }]);
 });

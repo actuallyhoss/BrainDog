@@ -158,6 +158,8 @@
       <span class="bcard-title" dir="auto">
         {#if fresh.has(e.seq)}<span class="fresh" data-fresh={e.seq} aria-hidden="true"></span>{/if}
         {#if faced}<span class="bcard-face"><Face name={title ?? ''} kind="person" size="s" /></span>{/if}
+        <!-- A LOCK ON A ROW ITS MAKER KEPT PRIVATE, as the grid draws one. -->
+        {#if e.private}<span class="bcard-lock" title={copy.rowPrivateLock} role="img" aria-label={copy.rowPrivateLock}><Icon name="lock" size="s" /></span>{/if}
         {#if title === null}<span class="bcard-missing">{words.unset}</span>{:else}{title}{/if}
       </span>
       {#if value !== undefined && value !== null && value !== ''}
@@ -433,6 +435,13 @@
   }
 
   /* A PERSON'S FACE ON ONE NEUTRAL TINT, as on every list of people (DIRECTION 39). */
+  .bcard-lock {
+    display: inline-flex;
+    margin-inline-end: var(--sp-2);
+    vertical-align: middle;
+    color: var(--ink2);
+  }
+
   .bcard-face {
     display: inline-flex;
     margin-inline-end: var(--sp-2);

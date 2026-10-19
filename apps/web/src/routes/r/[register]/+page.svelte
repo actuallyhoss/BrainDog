@@ -77,6 +77,7 @@
     lateFirst,
     weighed,
     wholeMoney,
+    withPrivate,
     writeDefault,
     type Keep,
     type ListDefault,
@@ -96,6 +97,7 @@
   import ViewSwitch from './parts/ViewSwitch.svelte';
   import ListTable from './parts/ListTable.svelte';
   import ListRowMenu from './parts/ListRowMenu.svelte';
+  import { keepPrivate } from '$lib/record/privacy-write.ts';
   import { listHost, type Walked } from '$lib/page/row-host.svelte.ts';
   import RowPanel from '$lib/page/RowPanel.svelte';
   import RowVerbMenu from '$lib/page/RowVerbMenu.svelte';
@@ -1280,6 +1282,19 @@
    */
   function archive(seq: number) {
     void archiveOnRecord([seq], `${id}#${seq}`);
+  }
+
+  /**
+   * Keep a row to its maker, or share it again, from the row's menu. The record refuses anybody but the maker (the same
+   * write the row's own page sends), so a refusal is said and the row is left as it was; a good answer flips its mark here.
+   */
+  async function setRowPrivate(seq: number, on: boolean) {
+    const out = await keepPrivate(apiBase(), `${id}#${seq}`, on);
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    pages = withPrivate(pages, seq, on);
   }
 
   /* ── capture: one line, first on the page, with no decisions attached ────── */
@@ -2968,6 +2983,7 @@
     {copyId}
     {copyLink}
     archive={changes ? archive : undefined}
+    keepPrivate={changes ? setRowPrivate : undefined}
     onhanded={landRow}
   />
 
