@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dog.brain/braindog",
+  "title": "BrainDog",
+  "description": "One record of your projects, money and people, shared by you and every AI agent you use.",
+  "version": "0.1.0",
+  "websiteUrl": "https://brain.dog",
+  "repository": {
+    "url": "https://github.com/actuallyhoss/braindog",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://brain.dog/mcp"
+    }
+  ]
+}
