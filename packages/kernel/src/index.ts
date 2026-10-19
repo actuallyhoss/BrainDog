@@ -54,6 +54,7 @@ import {
   type PackToggle,
   type PlannedRecord,
 } from './declare.ts';
+import { DRAFT_FIELD, firstProjectFields, firstProjectName } from './first-project.ts';
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
 import { withDerived, type DeriveResolve } from './derive-rows.ts';
 import { runsDataSteps } from './migrations/0028_runs.ts';
@@ -335,6 +336,7 @@ export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statemen
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
 export { SHAPE_MARK, Scrambler, isShape, shapeBrainl, type Published, type ShapeOptions } from './shape.ts';
 export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
+export { DRAFT_FIELD, cleanName, firstProjectFields, firstProjectName } from './first-project.ts';
 export { KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* A FIELD WORKED OUT FROM OTHER FIELDS (SHL-B18): its shapes and refusals, and the rows filled at read. `shapeOf` is the
    ingest's name here, so the derive's is exported as `deriveShapeOf`. */
@@ -4689,6 +4691,26 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       .filter((t): t is string => t !== null);
   }
 
+  /**
+   * THE FIRST PROJECT, FORMED AS A DRAFT: an agent's first run on a record that has never had a project, from a place
+   * no project holds. Only a record with no project row at all (a deleted one counts), so the owner's record is never
+   * touched; the person keeps it with one press or says it is not a project. Its spoken id, or `null` for none.
+   */
+  function formFirstProject(w: WriteContext): string | null {
+    const hints = w.session ?? {};
+    if (w.principal?.kind !== 'token' || hints.parent !== undefined) return null;
+    const list = [...registers.values()].find((r) => r.scopes !== undefined);
+    if (!list || !list.fields.some((f) => f.id === DRAFT_FIELD && !f.retired)) return null;
+    if (sql.one('SELECT 1 AS n FROM entry WHERE register = ? LIMIT 1', list.id)) return null;
+    const name = firstProjectName(hints);
+    if (name === null) return null;
+    const has = (field: string) => list.fields.some((f) => f.id === field && !f.retired);
+    const made = writing(list.id, null, firstProjectFields(hints, name, has), { actor: 'system', note: 'formed from the first agent session', cascade: false });
+    if (!made.ok || made.value.seq === null) return null;
+    const said = list.seq_prefix && list.seq_prefix !== '#' ? list.seq_prefix : `${list.id}#`;
+    return `${said}${made.value.seq}`;
+  }
+
   function attribute(w: WriteContext, at: Located, target: string | null, now: string): { actor: string; own: boolean } {
     const prefix = registers.get(SESSION)?.seq_prefix ?? 'S';
     const batch = w.batch === undefined ? {} : { batch: w.batch };
@@ -4723,7 +4745,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       return { actor, own: false };
     }
 
-    const opened = openRun(w, project, now, 'opened: auto', true);
+    const opened = openRun(w, project ?? formFirstProject(w), now, 'opened: auto', true);
     if (opened.ok) return { actor: `${prefix}${String(opened.value.seq)}`, own: false };
     /* A RUN THAT CANNOT BE OPENED IS A DEFECT, NOT A REFUSAL. The write it serves has passed every
        check and still goes in, under the caller's own name, and this observation is how anybody finds
