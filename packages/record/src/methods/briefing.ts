@@ -35,12 +35,13 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { SLASH, localDays, openHandoffs, readableZone, sessionDeclaration, spoken, whereFor } from '@braindog/kernel';
+import { SLASH, agentOf, localDays, openHandoffs, readableZone, sessionDeclaration, spoken, whereFor } from '@braindog/kernel';
 import type { Entry, HandoffPlace, Json } from '@braindog/kernel';
 
 import { BRIEF_KEPT, keptBrief } from '../brief-write.ts';
 import { markFirst } from '../firsts.ts';
-import { BRIEF_RANK, briefFrom, type Brief, type BriefFact } from '../briefing.ts';
+import { BRIEF_RANK, briefFrom, type Brief, type BriefCard, type BriefFact } from '../briefing.ts';
+import { firstSessionCards } from '../first-session.ts';
 import { hashOf } from '../headlines.ts';
 import type { CallContext } from '../index.ts';
 import { scrubbed } from '../scrub.ts';
@@ -241,6 +242,35 @@ export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
   ];
 }
 
+/**
+ * The cards the agent's first session gives a new record: found by what the projects list declares (`scopes`), never by
+ * its id, as the one project still marked `draft`, and the run placed in it. None where either is missing or unreadable.
+ */
+function firstCards(deps: RecordDeps, ctx: CallContext): BriefCard[] {
+  const { kernel, readable } = deps;
+  const projects = [...kernel.registers().values()].find((r) => r.scopes !== undefined);
+  if (!projects || readable(ctx, projects.id) !== null || readable(ctx, SESSION) !== null) return [];
+  const drafts = kernel.list({ register: projects.id, where: { field: 'draft', is: true }, limit: 1 }, whereFor(ctx.wheres, projects.id));
+  const project = drafts.ok ? drafts.value.rows[0] : undefined;
+  const name = project ? said(project.fields[projects.title]) : null;
+  if (!project || project.seq === null || name === null) return [];
+  const runs = kernel.list({ register: SESSION, limit: READ_MOST }, whereFor(ctx.wheres, SESSION));
+  if (!runs.ok) return [];
+  const mine = runs.value.rows
+    .filter((r) => typeof r.fields.project === 'string' && kernel.get(r.fields.project)?.id === project.id)
+    .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))[0];
+  if (!mine) return [];
+  const app = agentOf({ agent: said(mine.fields.agent) ?? undefined, client: said(mine.fields.client) ?? undefined });
+  return firstSessionCards({
+    agent: app.name,
+    project: name,
+    device: said(mine.fields.host),
+    doing: said(project.fields.about),
+    next: said(mine.fields.next),
+    row: spoken(project.register, project.seq),
+  });
+}
+
 export function methods(deps: RecordDeps) {
   const { kernel, scoped, clock } = deps;
 
@@ -262,6 +292,8 @@ export function methods(deps: RecordDeps) {
          only for the basis it was written from: a moved basis, or another caller's, is answered by the rules. */
       const kept = keptBrief(kernel.prefsOf(SLASH)[BRIEF_KEPT], facts);
       const brief = briefFrom(kept === null ? null : { cards: kept.cards }, facts, new Date(nowMs).toISOString(), kept?.said ?? null);
+      /* A NEW RECORD'S FIRST LINES COME FROM THE AGENT'S FIRST SESSION, while no briefing was written and its draft project stands. */
+      if (kept === null) brief.cards = [...firstCards(deps, ctx), ...brief.cards];
       if (brief.cards.length > 0 && ctx.principal.kind !== 'system') markFirst(kernel, 'first.brief', nowMs);
       return { ok: true, value: { ...brief, said: brief.said ?? null } };
     },
