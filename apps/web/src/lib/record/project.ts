@@ -47,17 +47,37 @@ export function blockOf(decl: Decl | undefined): Pointed | null {
  */
 export const repeatOf = (source: unknown): Pointed | null => (source === 'runs_on' ? 'runs-on' : null);
 
-type Declared = { kind: string; drawn?: boolean | undefined; why?: string | undefined; source?: unknown; area?: unknown; panel?: unknown };
+type Declared = { kind: string; drawn?: boolean | undefined; why?: string | undefined; source?: unknown; area?: unknown; panel?: unknown; columns?: unknown };
+
+/* A number or a flag is a value too; only nothing, a blank and an empty list are not. */
+const unset = (v: unknown): boolean => v === null || v === undefined || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0);
+
+/**
+ * WHETHER A DECLARED BLOCK SAYS THE ROW'S NEXT STEP AND NOTHING ELSE, read off the row field it declares (`next`), never
+ * its title: every other column it declares is empty on the row, so what it would draw is the line the shape already says.
+ */
+export function saysNext(b: Declared, row: Readonly<Record<string, unknown>>): boolean {
+  const cols = Array.isArray(b.columns) ? (b.columns as { field?: unknown }[]) : [];
+  if (said(row.next) === '' || !cols.some((c) => c.field === 'next')) return false;
+  return cols.every((c) => typeof c.field !== 'string' || c.field === 'next' || unset(row[c.field]));
+}
 
 /**
  * THE PAGE'S DECLARED BLOCKS WITHOUT WHAT THE SHAPE SAYS (`drew` is the shape's blocks): a block that repeats one is left
  * out, and so is a section left heading only such blocks, unless it holds the scheduled actions the host counted, or has
  * not yet counted them. Each stays at its place, marked as left out for being empty, so arranging draws it again.
  */
-export function withoutRepeats<T extends Declared>(blocks: readonly T[], drew: readonly Block[], actions: number | null): T[] {
+export function withoutRepeats<T extends Declared>(
+  blocks: readonly T[],
+  drew: readonly Block[],
+  actions: number | null,
+  row: Readonly<Record<string, unknown>> | null = null,
+): T[] {
   const gone = blocks.map((b) => {
     const again = repeatOf(b.source);
-    return b.drawn !== false && again !== null && drew.includes(again);
+    if (b.drawn === false) return false;
+    if (again !== null && drew.includes(again)) return true;
+    return row !== null && drew.includes('next') && b.kind !== 'section' && saysNext(b, row);
   });
   return blocks.map((b, n) => {
     let out = gone[n]!;
@@ -77,9 +97,9 @@ export function withoutRepeats<T extends Declared>(blocks: readonly T[], drew: r
 }
 
 /** One row behind a block: a name, one quiet detail, and where it opens. Never a secret, never an id. */
-export type DataRow = { key: string; title: string; detail: string; href: string | null };
+export type DataRow = { key: string; title: string; detail: string; href: string | null; kind?: string };
 
-type Pointing = { block: Pointed | null; rows: readonly { key: string; cells: readonly unknown[]; href?: string | null | undefined }[] };
+type Pointing = { block: Pointed | null; name?: string | undefined; rows: readonly { key: string; cells: readonly unknown[]; href?: string | null | undefined }[] };
 
 const said = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -92,10 +112,36 @@ export function rowsOf(block: Pointed, groups: readonly Pointing[]): DataRow[] {
       const title = said(r.cells[0]);
       if (title === '') continue;
       /* BY NAME ONLY on what a project runs on: the detail of a key or a tool could be where it is kept. */
-      out.push({ key: `${block}#${r.key}`, title, detail: block === 'runs-on' ? '' : said(r.cells[1]), href: r.href ?? null });
+      const row: DataRow = { key: `${block}#${r.key}`, title, detail: block === 'runs-on' ? '' : said(r.cells[1]), href: r.href ?? null };
+      /* THE KIND IS THE SOURCE LIST'S OWN NAME, as its declaration says it, so what it runs on can be grouped without naming a list. */
+      if (block === 'runs-on' && g.name) row.kind = g.name;
+      out.push(row);
     }
   }
   return out;
+}
+
+/** What it runs on at a glance: the first few names grouped by their list's name, then how many more are behind. */
+export function runsOnSet(rows: readonly DataRow[], max = 8): { groups: { kind: string; names: string[] }[]; more: number } {
+  const groups: { kind: string; names: string[] }[] = [];
+  for (const r of rows) {
+    const kind = r.kind ?? '';
+    let g = groups.find((x) => x.kind === kind);
+    if (!g) groups.push((g = { kind, names: [] }));
+    g.names.push(r.title);
+  }
+  /* ONE FROM EACH KIND IN TURN, so a long list of keys does not push the services and tools out of the few shown. */
+  const shown = groups.map((g) => ({ kind: g.kind, names: [] as string[] }));
+  for (let taken = 0, round = 0; taken < Math.min(max, rows.length); round++) {
+    for (const [i, g] of groups.entries()) {
+      const name = g.names[round];
+      if (name !== undefined && taken < max) {
+        shown[i]!.names.push(name);
+        taken++;
+      }
+    }
+  }
+  return { groups: shown.filter((g) => g.names.length > 0), more: Math.max(0, rows.length - max) };
 }
 
 /** A figure the record answered for this project, in minor units. */
@@ -179,7 +225,7 @@ export type Source = {
   fields: Readonly<Record<string, unknown>>;
   title: string;
   /** Each list that points at the row: its declaration and its rows. */
-  incoming: readonly { decl: Decl | undefined; rows: Pointing['rows'] }[];
+  incoming: readonly { decl: Decl | undefined; name?: string | undefined; rows: Pointing['rows'] }[];
   history: readonly { note: string; by: string; at: string }[];
   money: { in?: Figure | null; out?: Figure | null; owed?: Figure | null };
   working: readonly Working[];
@@ -188,7 +234,7 @@ export type Source = {
 /** The facts, the rows behind each block and where the next step opens: one place both routes work them out. */
 export function shapeOf(s: Source): { facts: Facts; data: Partial<Record<Block, readonly DataRow[]>>; nextHref: string | null } {
   const name = String(s.fields[s.title] ?? '').trim();
-  const placed = s.incoming.map((g) => ({ block: blockOf(g.decl), rows: g.rows }));
+  const placed = s.incoming.map((g) => ({ block: blockOf(g.decl), name: g.name, rows: g.rows }));
   const rows = (b: Pointed) => rowsOf(b, placed);
   const tasks = rows('next');
   const text = String(s.fields.next ?? '').trim();

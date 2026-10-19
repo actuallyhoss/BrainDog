@@ -12,7 +12,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import NextStep from '$lib/page/NextStep.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
-  import { blocksOf, spans, type Block, type DataRow, type Facts } from '$lib/record/project.ts';
+  import { blocksOf, runsOnSet, spans, type Block, type DataRow, type Facts } from '$lib/record/project.ts';
 
   let {
     facts,
@@ -102,7 +102,16 @@
           {/each}
           {#if facts.agents.runs.length > 0}<p class="quiet">{facts.agents.runs.length === 1 ? '1 run on it' : `${facts.agents.runs.length} runs on it`}</p>{/if}
         {:else}
-          <p class="said">{facts.runsOn.map((s) => s.title).join(', ')}</p>
+          {@const set = runsOnSet(facts.runsOn)}
+          {#each set.groups as g (g.kind)}
+            <div class="kind">
+              {#if g.kind}<span class="kind-name">{g.kind}</span>{/if}
+              <ul class="names" aria-label={g.kind || WORDS[b].title}>
+                {#each g.names as n (n)}<li dir="auto">{n}</li>{/each}
+              </ul>
+            </div>
+          {/each}
+          {#if set.more > 0}<p class="quiet">and {set.more} more</p>{/if}
         {/if}
         {@render disclosure(b)}
       </Tile>
@@ -160,6 +169,46 @@
     block-size: 8px;
     border-radius: 50%;
     background: var(--ink);
+  }
+
+  /* WHAT IT RUNS ON: a small label for each kind, its names wrapped beside it, a few and then "and N more". */
+  .kind {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+    margin-block-end: var(--sp-2);
+  }
+
+  .kind:last-of-type {
+    margin-block-end: 0;
+  }
+
+  .kind-name {
+    flex: none;
+    min-inline-size: 64px;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .names {
+    display: flex;
+    flex: 1 1 260px;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .names li {
+    padding: 2px var(--sp-2);
+    border-radius: 6px;
+    background: var(--s1);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    overflow-wrap: anywhere;
   }
 
   .money {

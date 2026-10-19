@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, repeatOf, rowsOf, withoutRepeats, shapeOf, spans, type Facts } from './project.ts';
+import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, repeatOf, rowsOf, runsOnSet, saysNext, withoutRepeats, shapeOf, spans, type Facts } from './project.ts';
 
 const none: Facts = { brief: [], next: null, money: [], people: [], agents: { now: [], runs: [] }, runsOn: [] };
 const row = { key: '1', title: 'Kiln', detail: '', href: null };
@@ -97,4 +97,29 @@ test('A SECTION LEFT HEADING ONLY WHAT THE SHAPE SAYS GOES WITH IT, unless it ho
   assert.deepEqual(drawn(2), [true, false, true]);
   assert.deepEqual(drawn(null), [true, false, true]);
   assert.deepEqual(withoutRepeats(page, [], 0), page);
+});
+
+test('WHAT IT RUNS ON IS A FEW NAMES GROUPED BY KIND, one of each in turn, and then how many more', () => {
+  const row = (kind: string, n: number) => ({ key: `${kind}${n}`, title: `${kind}-${n}`, detail: '', href: null, kind });
+  const rows = [...[1, 2, 3, 4, 5, 6].map((n) => row('Keys', n)), ...[1, 2, 3].map((n) => row('Tools', n)), row('Services', 1)];
+  const set = runsOnSet(rows, 8);
+  assert.deepEqual(set.groups.map((g) => [g.kind, g.names.length]), [['Keys', 3], ['Tools', 3], ['Services', 1]].map(([k, n]) => [k, k === 'Keys' ? 4 : n]));
+  assert.equal(set.more, 2);
+  assert.deepEqual(runsOnSet([row('Keys', 1)]), { groups: [{ kind: 'Keys', names: ['Keys-1'] }], more: 0 });
+});
+
+test('A DECLARED BLOCK THAT SAYS THE NEXT STEP ALONE IS LEFT OUT, by its field and not its title', () => {
+  const stands = { kind: 'cards', heading: 'Anything', columns: [{ field: 'next' }, { field: 'progress' }] };
+  const other = { kind: 'cards', columns: [{ field: 'health' }] };
+  assert.equal(saysNext(stands, { next: 'Ship it', progress: '' }), true);
+  assert.equal(saysNext(stands, { next: 'Ship it', progress: 40 }), false);
+  assert.equal(saysNext(other, { next: 'Ship it' }), false);
+  const out = withoutRepeats([stands, other], ['next'], null, { next: 'Ship it' });
+  assert.deepEqual(out.map((b) => (b as { drawn?: boolean }).drawn !== false), [false, true]);
+  assert.deepEqual(withoutRepeats([stands], ['brief'], null, { next: 'Ship it' }), [stands]);
+});
+
+test('A SECTION HEADING ONLY A LEFT-OUT NEXT STEP GOES WITH IT', () => {
+  const page = [{ kind: 'section', area: 'rail' }, { kind: 'cards', columns: [{ field: 'next' }], area: 'rail' }];
+  assert.deepEqual(withoutRepeats(page, ['next'], null, { next: 'Ship it' }).map((b) => (b as { drawn?: boolean }).drawn !== false), [false, false]);
 });

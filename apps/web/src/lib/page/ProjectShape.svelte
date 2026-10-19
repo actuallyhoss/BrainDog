@@ -22,7 +22,7 @@
   import { money } from 'braindog-render';
   import ProjectBlocks from './ProjectBlocks.svelte';
 
-  let { register, seq, onshape }: { register: string; seq: number; onshape: (blocks: readonly Block[]) => void } = $props();
+  let { register, seq, onshape }: { register: string; seq: number; onshape: (blocks: readonly Block[], row: Readonly<Record<string, unknown>> | null) => void } = $props();
 
   type Read = {
     key: string;
@@ -62,7 +62,7 @@
       if (key !== `${register}#${seq}` || row.from !== 'live' || !row.entry || !isProject(REGISTERS[r])) return;
       const decl = REGISTERS[r]!;
       const name = String(row.entry.fields[decl.title] ?? '').trim();
-      const incoming = links?.from === 'live' ? links.groups.map((g) => ({ decl: REGISTERS[g.register], rows: g.rows })) : [];
+      const incoming = links?.from === 'live' ? links.groups.map((g) => ({ decl: REGISTERS[g.register], name: g.name, rows: g.rows })) : [];
       /* AN ID IS NOT A NAME: a line by someone the page has not named is shown without its byline. */
       const history = (told?.from === 'live' ? told.lines : []).map((l) => ({ note: l.note, by: /^p_/u.test(l.by) ? '' : l.by, at: l.at }));
       figures ??= figureReader(base);
@@ -85,7 +85,7 @@
   );
   const said = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
   /* WHAT THE SHAPE DRAWS, said to the page so a declared block that repeats one is left out (`repeatOf`). */
-  $effect(() => onshape(shape ? blocksOf(shape.facts) : []));
+  $effect(() => onshape(shape ? blocksOf(shape.facts) : [], shape && read ? read.fields : null));
   /* A PROJECTS LIST KNOWN BEFORE ITS ROW ANSWERS holds a little height, so the declared blocks wait where they will be. */
   const holds = $derived(read === null && settled !== `${register}#${seq}` && isProject(REGISTERS[register]));
 </script>
