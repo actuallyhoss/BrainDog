@@ -369,6 +369,16 @@ CREATE TABLE IF NOT EXISTS dir_seen (
   PRIMARY KEY (day, page, came)
 ) WITHOUT ROWID;
 
+-- THE FIRST-RUN FUNNEL (step.mark): one row per record and step, the day it first happened, so a step counts once a
+-- record. The step is a name from STEPS and the key is the record's own id, which this table never gives out; no
+-- content, address or time finer than a day is kept. Created on the next open, DIRECTORY_VERSION unmoved.
+CREATE TABLE IF NOT EXISTS dir_step (
+  record TEXT NOT NULL,                     -- rec_...
+  step   TEXT NOT NULL,                     -- one of STEPS
+  day    TEXT NOT NULL,                     -- YYYY-MM-DD, UTC, the first time
+  PRIMARY KEY (record, step)
+) WITHOUT ROWID;
+
 -- One row per record somebody pays for. A record with no row is not billed and never lapses: every record the
 -- operator provisioned has none, and a row is written only when a Stripe checkout for that record completes.
 CREATE TABLE IF NOT EXISTS dir_billing (
@@ -791,6 +801,8 @@ export const CARRIED = [
   /* THE SITE'S VISITS A DAY. Counts and no visitor, so nothing here opens anything, and a restore that lost them would
      leave the funnel's first step empty for every week before it. */
   'dir_seen',
+  /* THE FUNNEL'S STEPS A RECORD HAS TAKEN: a restore that lost them would count every step again. */
+  'dir_step',
   'dir_inbound',
 ] as const;
 
@@ -831,10 +843,11 @@ const COPY_ORDER: Record<Carried, string> = {
   dir_credit: 'rowid',
   dir_apply: 'rowid',
   dir_seen: 'day, page, came',
+  dir_step: 'record, step',
 };
 
 /** The carried tables a copy written before they existed does not name (new tables at the same Directory version). */
-const ADDED_LATER: readonly Carried[] = ['dir_apply', 'dir_seen'];
+const ADDED_LATER: readonly Carried[] = ['dir_apply', 'dir_seen', 'dir_step'];
 
 /** A copy's first line, then its version: `#dogdir 4`. Not `#dogl`, so `checkBrainl` and `verify` never take one for a record. */
 const COPY_HEAD = '#dogdir';
@@ -1219,6 +1232,13 @@ export type SeenPage = (typeof SEEN_PAGES)[number];
 export const SEEN_CAME = ['direct', 'site', 'search', 'github', 'x', 'linkedin', 'reddit', 'hacker-news', 'other'] as const;
 export type SeenCame = (typeof SEEN_CAME)[number];
 
+/**
+ * The first-run steps counted once a record, in the order a new person takes them. `came_back` is kept only when the
+ * mark falls on a later UTC day than the record was made. Closed, and checked again in the Directory.
+ */
+export const STEPS = ['signed_up', 'saw_connect', 'copied_line', 'agent_connected', 'project_kept', 'needs_answered', 'came_back'] as const;
+export type Step = (typeof STEPS)[number];
+
 /** The most weeks `funnel.read` answers: a year. */
 export const FUNNEL_WEEKS_MOST = 53;
 
@@ -1226,7 +1246,10 @@ export const FUNNEL_WEEKS_MOST = 53;
  * A visit counted, and the operator's funnel. `seen.count` is the Worker's `/api/seen` door's, after its own checks;
  * `funnel.read` is the operator's, behind the provision key. `since` is epoch ms, read as the ISO week it falls in.
  */
-export type SeenCall = { flow: 'seen.count'; page: string; came: string } | { flow: 'funnel.read'; since: number };
+export type SeenCall =
+  | { flow: 'seen.count'; page: string; came: string }
+  | { flow: 'step.mark'; record: string; step: string }
+  | { flow: 'funnel.read'; since: number };
 
 /**
  * One ISO week of the funnel, Monday to Sunday in UTC: visits counted, people who signed up, records made,
@@ -1236,6 +1259,7 @@ export type FunnelWeek = { week: string; seen: number; signed_up: number; record
 
 export type SeenAnswers = {
   'seen.count': { counted: boolean };
+  'step.mark': { counted: boolean };
   'funnel.read': Result<{ weeks: FunnelWeek[] }>;
 };
 
@@ -2951,6 +2975,18 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           'INSERT INTO dir_seen (day, page, came, n) VALUES (?, ?, ?, 1) ON CONFLICT (day, page, came) DO UPDATE SET n = n + 1',
           dayOf(now), page, came,
         );
+        return { counted: true } as A;
+      }
+      if (call.flow === 'step.mark') {
+        const { record, step } = call as Extract<SeenCall, { flow: 'step.mark' }>;
+        if (!(STEPS as readonly unknown[]).includes(step) || typeof record !== 'string') return { counted: false } as A;
+        const made = sql.one<{ created_at: string }>('SELECT created_at FROM dir_record WHERE id = ?', record);
+        if (made === undefined || made === null) return { counted: false } as A;
+        /* A RETURN IS A LATER DAY THAN THE RECORD WAS MADE; the same day is still the first visit. */
+        if (step === 'came_back' && dayOf(Date.parse(made.created_at)) >= dayOf(now)) return { counted: false } as A;
+        const before = sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_step WHERE record = ? AND step = ?', record, step);
+        if (Number(before?.n ?? 0) > 0) return { counted: false } as A;
+        sql.exec('INSERT OR IGNORE INTO dir_step (record, step, day) VALUES (?, ?, ?)', record, step, dayOf(now));
         return { counted: true } as A;
       }
       const since = (call as Extract<SeenCall, { flow: 'funnel.read' }>).since;
