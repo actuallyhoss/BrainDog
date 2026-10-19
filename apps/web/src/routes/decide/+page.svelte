@@ -311,7 +311,7 @@
 
     {#if cleared}
       {#if improving === 0}
-        <Empty kind="cleared" title={said('no_questions')}>
+        <Empty kind="cleared" title={said('no_questions')} body={copy.noQuestionsWhy}>
           {#snippet actions()}
             {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
           {/snippet}

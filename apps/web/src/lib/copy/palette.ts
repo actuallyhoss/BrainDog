@@ -17,7 +17,7 @@ export const palette = {
   /* `/search?q=` — `19 §2`'s spine screen, which the route directory did not have. `search` is
      already declared above, as the nav's own word for the same place. */
   searchRecord: 'Search the record',
-  searchWaiting: 'Find anything in the record',
+  searchWaiting: 'Find anything you keep',
   /* NOT `noneMatching`, which counts the rows a LIST holds and reads "0 rows, none matching" here —
      a search is over every list at once, so there is no single total to count against. */
   searchNone: (q: string) => `Nothing matches “${q}”`,
@@ -26,7 +26,7 @@ export const palette = {
   searchNoneNext: 'Check the spelling or try fewer words. Anything archived or changed still shows in History.',
   searchClear: 'Clear the search',
   searchInHistory: 'Open History',
-  searchWhere: 'Everything you keep, every decision, and every page, by the words in them.',
+  searchWhere: 'Type a word to search your projects, people and money.',
   allMatches: (n: number, q: string) => `All ${n.toLocaleString('en')} matches for “${q}”`,
   showingOf: (shown: number, total: number) => (shown >= total ? `${shown}` : `${shown} of ${total}`),
   /* `Stopped.` IS THE ASSISTANT'S, NOT THE TRANSPORT'S, whatever its position in this block says.

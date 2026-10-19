@@ -137,6 +137,6 @@ export function nothingEver(
 /** The one tile's words: what the inbox is for, by the ways in a person has, and the press that adds one. */
 export const quietWords = {
   title: 'Nothing has come in yet',
-  why: 'Mail, texts, other apps and your agents can all send things here. What a rule files goes straight to its list, and the rest waits here for you.',
+  why: 'Forward mail or texts to your address and they land here.',
   add: 'Add a way in',
 } as const;

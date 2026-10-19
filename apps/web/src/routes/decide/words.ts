@@ -14,9 +14,9 @@ export const words = {
   /* ── the page ── */
 
   /** The page's calm line, lifted into the head while nothing waits. */
-  nothingWaiting: 'Nothing waits on you.',
+  nothingWaiting: 'Nothing needs you.',
   /** The calm line once something has been decided, with how long ago the last one was. */
-  lastDecided: (when: string) => `Nothing waits on you. The last one was decided ${when}.`,
+  lastDecided: (when: string) => `Nothing needs you. The last one was decided ${when}.`,
   /* WITH SOMETHING IN THE INBOX "NOTHING WAITS" WOULD BE FALSE (EXP-E07): the calm line then says no question waits. */
   noQuestion: 'No question waits on you.',
   noQuestionDecided: (when: string) => `No question waits on you. The last one was decided ${when}.`,

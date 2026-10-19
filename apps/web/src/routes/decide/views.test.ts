@@ -250,7 +250,7 @@ test('nothing waiting says the calm line, with when the last one was decided, an
   assert.deepEqual(decided.rows[0]?.cells.slice(0, 2), ['Pay the bill?', 'Accept']);
   const shaped = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0), decided], CLOCK);
   assert.equal(shaped.open, 0);
-  assert.match(shaped.sentence.text, /^Nothing waits on you\. The last one was decided .+\.$/u);
+  assert.match(shaped.sentence.text, /^Nothing needs you\. The last one was decided .+\.$/u);
   assert.deepEqual(shaped.blocks.map((b) => b.drawn), [false, false, false, true]);
 
   const empty = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0)], CLOCK);

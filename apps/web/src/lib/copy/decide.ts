@@ -51,7 +51,8 @@ export const decide = {
   commit: 'Record the decision',
   decidedBy: 'Decided by',
   immutable: 'A decision cannot be edited once it is made.',
-  noQuestions: 'Nothing waits on you',
+  noQuestions: 'Nothing needs you',
+  noQuestionsWhy: 'When your agent needs a choice from you, it shows up here.',
   lastDecided: 'The last one was decided',
   /* THE QUESTION IS NOT SAID. Its callers used to pass the question's id, `SG2`, and an id is never a word a person
      reads; the toast stands over the question it answers, so the option alone is the whole sentence. */
@@ -67,8 +68,8 @@ export const decide = {
      an email. Naming it after the mechanism that carried it is naming it after the plumbing. */
   archiveArrival: 'Archive this',
   inboxConnect: 'Set up a connector',
-  inboxClear: 'Nothing waits in the inbox',
-  inboxClearWhy: 'Anything that comes in without a rule to file it waits here.',
+  inboxClear: 'The inbox is clear',
+  inboxClearWhy: 'Mail and texts you forward land here until they are filed.',
   /* THE AIM FOR THE DECIDE QUEUE, SAID WITH WHAT IT COUNTS. `/decide` printed the metric's note by itself at the end
      of its heading row: a fragment with no subject, beside a count of 4 it was failing. The target is said as every
      target is (`targetLine`, "Limit 3"), and this names what the limit is on. The tone and its glyph come from the
