@@ -444,6 +444,8 @@
   type StalePart = typeof import('./Stale.svelte').default;
   type FaultsPart = typeof import('./TextFaults.svelte').default;
   type FaultsFound = import('./text-faults.ts').TextFaults;
+  type HandledPart = typeof import('./Handled.svelte').default;
+  type HandledFound = import('./handled.ts').Handled;
   type LearnedPart = typeof import('./Learned.svelte').default;
   type LearnedFound = import('./learned.ts').Learned;
   type ToldPart = typeof import('./Told.svelte').default;
@@ -461,6 +463,8 @@
   let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
   /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES, kept only when there is something: nought draws nothing. */
   let faults = $state.raw<{ found: FaultsFound; Part: FaultsPart } | null>(null);
+  /* WHAT BRAINDOG ARRANGED BY ITSELF TODAY, kept only when there is something: nought draws nothing. */
+  let handled = $state.raw<{ found: HandledFound; Part: HandledPart } | null>(null);
   /* WHAT THE ANSWERS TAUGHT, kept only when there is something: nought draws nothing. */
   let learned = $state.raw<{ found: LearnedFound; Part: LearnedPart } | null>(null);
   /* WHAT EVERY AGENT IS TOLD, kept only when there is something: nought draws nothing. */
@@ -557,6 +561,11 @@
     tiles.push(() => Promise.all([import('./text-faults.ts'), import('./TextFaults.svelte')]).then(async ([m, part]) => {
       const found = await m.textFaultsOnce(base, io);
       if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
+    }, () => undefined));
+    /* AND WHAT BRAINDOG ARRANGED BY ITSELF TODAY, with an Undo each, out of the bracket the same way. */
+    tiles.push(() => Promise.all([import('./handled.ts'), import('./Handled.svelte')]).then(async ([m, part]) => {
+      const found = await m.loadHandled(base, io);
+      if (here) handled = found && found.rows.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND AFTER IT, WHAT THE ANSWERS TAUGHT, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
@@ -799,6 +808,8 @@
       nothing at nought.
     -->
     {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
+    <!-- WHAT BRAINDOG ARRANGED BY ITSELF TODAY, with an Undo each. Nothing at nought. -->
+    {#if handled}<handled.Part found={handled.found} />{/if}
     <!-- WHAT THE ANSWERS TAUGHT, after the faults: what the record will not ask again. Nothing at nought. -->
     {#if learned}<learned.Part found={learned.found} />{/if}
     <!-- WHAT EVERY AGENT IS TOLD, after what the answers taught, below the fold. Nothing at nought. -->
