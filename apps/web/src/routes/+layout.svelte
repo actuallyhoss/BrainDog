@@ -20,7 +20,8 @@
 -->
 <script lang="ts">
   import { BASE, apiBase, at, here } from '$lib/at.ts';
-  import { appPath, applyInset, onShell } from '$lib/shell.ts';
+  import { appPath, applyInset, macNotifications, notify, onShell, setBadge, windowFocused } from '$lib/shell.ts';
+  import { handoffAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* Title-bar room for the Mac app: sets --shell-inset once, 0 in a browser. */
   applyInset();
   /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
@@ -196,6 +197,18 @@
      the badge moves with the record and says the number Today's header and the sentence in Needs you say. */
   $effect.pre(() => heardWaits({ waits: data.waits ?? null, working: data.working ?? [] }));
   const open = $derived(waitsNow()?.questions ?? data.open);
+  /* THE DOCK BADGE FOLLOWS THE NEEDS YOU COUNT (the PWA badge in a browser that has one); 0 clears it. */
+  $effect(() => setBadge(open));
+  /* A NEW QUESTION OR HANDOFF RINGS ONCE (`alerts.ts` dedups by id and seeds on the first hearing), never while this
+     window is in front, and only with the Settings switch on. A click goes to the item through the shell's `goto`. */
+  let rung: Set<string> | null = null;
+  const hear = (items: Alert[]): void => {
+    rung = ring(rung, items, { on: macNotifications, focused: windowFocused, send: notify });
+  };
+  $effect.pre(() => {
+    const asked = (data.questions ?? []).map((q) => questionAlert({ id: q.id, question: q.title }));
+    untrack(() => hear(asked));
+  });
   const inbox = $derived(waitsNow()?.inbox ?? data.inbox);
   /* THE SPINE'S RULE FOR INBOX (`spine.ts`): it is a row under More once anything has arrived. A shell no record answered
      has no `counts`, and is read from the two numbers it does carry. */
@@ -639,7 +652,14 @@
     void import('$lib/record/boot-live.ts')
       .then(async (m) => {
         const got = await m.rereadBoot(base);
-        if (!gone && got.from === 'live') heardWaits({ waits: m.waitsOf(got.boot), working: m.workingOf(got.boot) });
+        if (!gone && got.from === 'live') {
+          heardWaits({ waits: m.waitsOf(got.boot), working: m.workingOf(got.boot) });
+          hear([
+            ...(got.boot.waiting ?? []).map(questionAlert),
+            /* ONLY RECENT HANDOFFS: the feed holds old ones, and the first poll would otherwise ring for all of them. */
+            ...(got.boot.whatsNew?.events ?? []).filter((e) => Date.now() - Date.parse(e.ts) < 120_000).flatMap((e) => handoffAlert(e) ?? []),
+          ]);
+        }
       })
       .catch(() => undefined);
     return () => {

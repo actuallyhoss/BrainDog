@@ -13,7 +13,8 @@
   window.__BRAINDOG_SHELL__ = {
     inset: 78,
     open: (url) => void call('open_outside', { url: String(url) }),
-    notify: (title, body) => void call('notify', { title: String(title), body: String(body) }),
+    notify: (title, body, goto) =>
+      void call('notify', { title: String(title), body: String(body), goto: typeof goto === 'string' ? goto : null }),
     badge: (n) => void call('set_badge', { count: Math.max(0, Math.floor(Number(n)) || 0) }),
     on(event, fn) {
       const set = subs[event];

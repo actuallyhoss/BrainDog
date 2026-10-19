@@ -1,7 +1,13 @@
-use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
-    AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex,
 };
+use std::time::{Duration, Instant};
+use tauri::{
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu},
+    AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_notification::NotificationExt;
@@ -9,6 +15,14 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 
 const HOME: &str = "https://brain.dog/app";
+/// Set once Cmd+Q (or any exit) starts, so a close that arrives during quitting is not turned into a hide.
+static QUITTING: AtomicBool = AtomicBool::new(false);
+
+/// Where a clicked notification should land. macOS gives no click callback here, so the next time the window comes
+/// forward within this long of the notification, the app goes to its item.
+const CLICK_WINDOW: Duration = Duration::from_secs(60);
+struct Pending(Mutex<Option<(String, Instant)>>);
+
 const BRIDGE: &str = include_str!("bridge.js");
 
 /// The Go menu: menu id, label, shortcut and the /app path the web is sent. The web ignores anything outside /app.
@@ -61,7 +75,10 @@ fn open_outside(app: AppHandle, url: String) {
 }
 
 #[tauri::command]
-fn notify(app: AppHandle, title: String, body: String) {
+fn notify(app: AppHandle, title: String, body: String, goto: Option<String>) {
+    if let Some(to) = goto {
+        *app.state::<Pending>().0.lock().unwrap() = Some((to, Instant::now()));
+    }
     let _ = app.notification().builder().title(title).body(body).show();
 }
 
@@ -112,6 +129,14 @@ async fn check_update(app: AppHandle) {
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let settings = MenuItem::with_id(app, "settings", "Settings...", true, Some("CmdOrCtrl+,"))?;
+    let login = CheckMenuItem::with_id(
+        app,
+        "autostart",
+        "Open at login",
+        true,
+        app.autolaunch().is_enabled().unwrap_or(false),
+        None::<&str>,
+    )?;
     let slash = MenuItem::with_id(app, "slash", "Slash", true, Some("CmdOrCtrl+K"))?;
     let about = PredefinedMenuItem::about(app, Some("About BrainDog"), None)?;
     let hide = PredefinedMenuItem::hide(app, None)?;
@@ -124,7 +149,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         PredefinedMenuItem::separator(app)?,
     );
     let app_menu =
-        Submenu::with_items(app, "BrainDog", true, &[&about, &s1, &settings, &s2, &hide, &hide_others, &s3, &quit])?;
+        Submenu::with_items(app, "BrainDog", true, &[&about, &s1, &settings, &login, &s2, &hide, &hide_others, &s3, &quit])?;
 
     let undo = PredefinedMenuItem::undo(app, None)?;
     let redo = PredefinedMenuItem::redo(app, None)?;
@@ -160,6 +185,8 @@ pub fn run() {
         // A second launch (or a braindog:// click while running) brings the first window forward.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| focus(app)))
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        // Off until the menu's "Open at login" is ticked; nothing registers a login item before that.
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
@@ -187,6 +214,18 @@ pub fn run() {
                 focus(app);
                 emit(app, "slash", None);
             }
+            "autostart" => {
+                let login = app.autolaunch();
+                let on = login.is_enabled().unwrap_or(false);
+                let _ = if on { login.disable() } else { login.enable() };
+                // Show what is true now, not what the click assumed, if the system refused.
+                let now = login.is_enabled().unwrap_or(on);
+                if let Some(item) = app.menu().and_then(|m| m.get("autostart")) {
+                    if let Some(c) = item.as_check_menuitem() {
+                        let _ = c.set_checked(now);
+                    }
+                }
+            }
             id => {
                 if let Some((_, _, _, path)) = GO.iter().find(|g| g.0 == id) {
                     focus(app);
@@ -194,7 +233,25 @@ pub fn run() {
                 }
             }
         })
+        // Closing (the red button, Cmd+W) hides the window and the app keeps running, as Discord does.
+        .on_window_event(|window, event| match event {
+            WindowEvent::CloseRequested { api, .. } if !QUITTING.load(Ordering::SeqCst) => {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+            WindowEvent::Focused(true) => {
+                let app = window.app_handle();
+                let to = app.state::<Pending>().0.lock().unwrap().take();
+                if let Some((to, at)) = to {
+                    if at.elapsed() < CLICK_WINDOW {
+                        emit(app, "goto", Some(&to));
+                    }
+                }
+            }
+            _ => {}
+        })
         .setup(|app| {
+            app.manage(Pending(Mutex::new(None)));
             let handle = app.handle().clone();
             let start = home();
             let origin = origin_of(&start);
@@ -240,6 +297,13 @@ pub fn run() {
             });
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("BrainDog failed to start");
+        .build(tauri::generate_context!())
+        .expect("BrainDog failed to start")
+        .run(|app, event| match event {
+            // Cmd+Q: let the close through from here on.
+            RunEvent::ExitRequested { .. } => QUITTING.store(true, Ordering::SeqCst),
+            // A Dock click with the window hidden brings it back.
+            RunEvent::Reopen { .. } => focus(app),
+            _ => {}
+        });
 }

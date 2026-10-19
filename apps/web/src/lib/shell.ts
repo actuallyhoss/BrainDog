@@ -8,7 +8,7 @@ export type ShellEvent = 'slash' | 'goto';
 /** What the Mac app puts on `window`; every part is optional so a partial shell still works. */
 interface Shell {
   open?(url: string): void;
-  notify?(title: string, body: string): void;
+  notify?(title: string, body: string, goto?: string): void;
   badge?(n: number): void;
   inset?: number;
   on?(event: ShellEvent, fn: (arg?: string) => void): () => void;
@@ -30,12 +30,52 @@ export function openOutside(url: string, opts: { here?: boolean } = {}): void {
   globalThis.open?.(url, '_blank', 'noopener,noreferrer');
 }
 
-/** A notification: the shell's, else a web one only if already granted (never asks here). */
-export function notify(title: string, body: string): void {
+/** Hear things locally where there is no shell (a browser notification's click), so `goto` works in both. */
+const local: Record<ShellEvent, Set<(arg?: string) => void>> = { slash: new Set(), goto: new Set() };
+
+/**
+ * A notification: the shell's, else a web one only if already granted (never asks here). `goto` is the /app address a
+ * click takes the window to; the shell focuses the window first.
+ */
+export function notify(title: string, body: string, goto?: string): void {
   const s = shell();
-  if (s?.notify) return s.notify(title, body);
+  if (s?.notify) return s.notify(title, body, goto);
   const N = (globalThis as { Notification?: typeof Notification }).Notification;
-  if (N && N.permission === 'granted') new N(title, { body });
+  if (N && N.permission === 'granted') {
+    const n = new N(title, { body });
+    n.onclick = () => {
+      globalThis.focus?.();
+      if (goto) local.goto.forEach((fn) => fn(goto));
+    };
+  }
+}
+
+const KEY = 'braindog.macNotifications';
+
+/** The "Mac notifications" switch: on by default in the app, off in a browser, until the person sets it. */
+export function macNotifications(): boolean {
+  try {
+    const v = globalThis.localStorage?.getItem(KEY);
+    if (v === 'on') return true;
+    if (v === 'off') return false;
+  } catch {
+    /* Storage can be blocked; the default stands. */
+  }
+  return isApp;
+}
+
+export function setMacNotifications(on: boolean): void {
+  try {
+    globalThis.localStorage?.setItem(KEY, on ? 'on' : 'off');
+  } catch {
+    /* Not kept this time; the switch still reads its default. */
+  }
+}
+
+/** True while this window is the one in front, where a notification would only repeat what is on screen. */
+export function windowFocused(): boolean {
+  const d = (globalThis as { document?: Document }).document;
+  return !!d && d.visibilityState === 'visible' && d.hasFocus();
 }
 
 /** The app badge count; nothing where the browser has no badge. */
@@ -48,7 +88,10 @@ export function setBadge(n: number): void {
 
 /** Hear the shell ("slash", "goto"); a browser never sends either, so this is a no-op there. Returns the stopper. */
 export function onShell(event: ShellEvent, fn: (arg?: string) => void): () => void {
-  return shell()?.on?.(event, fn) ?? (() => {});
+  const s = shell();
+  if (s?.on) return s.on(event, fn);
+  local[event].add(fn);
+  return () => void local[event].delete(fn);
 }
 
 /** Room for the window's title bar, read by the page head as `--shell-inset`; 0 in a browser. */

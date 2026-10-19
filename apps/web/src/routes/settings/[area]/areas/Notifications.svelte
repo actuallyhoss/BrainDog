@@ -7,6 +7,7 @@
   import { sendTest, testWords } from '$lib/ui/push.ts';
   import type { Call } from '$lib/ui/webhook-doors.ts';
   import { copy } from '$lib/copy.ts';
+  import { macNotifications, setMacNotifications } from '$lib/shell.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
@@ -67,6 +68,13 @@
   const on = $derived(hours !== null && hours !== 'off');
   const from = $derived(hours !== null && hours !== 'off' ? hours.from : '');
   const to = $derived(hours !== null && hours !== 'off' ? hours.to : '');
+
+  /* THE "MAC NOTIFICATIONS" SWITCH: on by default in the app, off in a browser, kept on this device (`shell.ts`). */
+  let mac = $state(macNotifications());
+  const flipMac = (): void => {
+    mac = !mac;
+    setMacNotifications(mac);
+  };
 
   /* ONE WRITE AT A TIME, so a double press or two quick picker changes send one change each and never race. */
   let busy = $state(false);
@@ -279,6 +287,13 @@
      something interrupts. It draws nothing until the host hands it a key, so on a host without one it is not here.
      THE TILE IS THIS WRAPPER, so the toggle's section lies flat inside it and the test sits under the switch in the same
      tile; a wrapper the toggle drew nothing into is not drawn. -->
+<div class="push tile">
+  <label class="mac">
+    <input type="checkbox" role="switch" checked={mac} onchange={flipMac} />
+    <span>Mac notifications</span>
+  </label>
+  <p class="hint">A new question or handoff rings once, and not while this window is in front.</p>
+</div>
 <div class="push tile">
   <div class="push-switch"><PushToggle host={props.shell.host} onchange={turned} /></div>
   {#if rung}

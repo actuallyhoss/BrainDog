@@ -55,3 +55,22 @@ test('goto takes only an address under /app', async () => {
   for (const bad of [undefined, '', '/', '/apple', 'https://evil.example/app/x', '//evil.example', '/app/../etc', '/app\\evil', 'javascript:alert(1)'])
     assert.equal(appPath(bad), null, String(bad));
 });
+
+test('the Mac notifications switch defaults off in a browser and keeps what is set', async () => {
+  const kept = new Map<string, string>();
+  g.localStorage = { getItem: (k: string) => kept.get(k) ?? null, setItem: (k: string, v: string) => void kept.set(k, v) };
+  const { macNotifications, setMacNotifications } = await import('./shell.ts');
+  assert.equal(macNotifications(), false);
+  setMacNotifications(true);
+  assert.equal(macNotifications(), true);
+  setMacNotifications(false);
+  assert.equal(macNotifications(), false);
+  delete g.localStorage;
+});
+
+test('a browser with no shell still hears goto locally', async () => {
+  const { onShell } = await import('./shell.ts');
+  const stop = onShell('goto', () => {});
+  assert.equal(typeof stop, 'function');
+  stop();
+});
