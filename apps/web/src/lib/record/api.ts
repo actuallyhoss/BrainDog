@@ -1221,6 +1221,8 @@ export type Backlink = {
   rows: TableRow[];
   columns: Column[];
   href: string;
+  /** The same rows as the record stores them, for a drawing that needs a day or an amount and not its words. */
+  raw?: readonly Readonly<Record<string, unknown>>[];
 };
 
 /* ── metrics ─────────────────────────────────────────────────────────────

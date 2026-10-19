@@ -83,6 +83,8 @@ export function comparedSaid(c: Compared): string {
  * declaration's (`aboutOf`), so this page never writes either down.
  */
 export const MONEY_IN = 'project-in-by-month';
+/** The same reading for what went out, named `project-out-by-month:<name>`. */
+export const MONEY_OUT = 'project-out-by-month';
 /** How many months the tile draws: a year, and the month the clock is in. */
 export const MONTHS_SHOWN = 12;
 
@@ -225,6 +227,8 @@ export type FigureReader = {
   scalar(figure: string, name: string): Promise<{ value: number; currency: string } | null>;
   /** What came in for the project of this name, month by month, or nothing. */
   moneyIn(name: string): Promise<MoneyIn | null>;
+  /** What went out for the project of this name, month by month, or nothing. */
+  moneyOut(name: string): Promise<MoneyIn | null>;
   /** The open rows of the work list `register` pointing at the row spoken as `spoken`, or nothing. */
   openWork(register: string, via: Via, spoken: string, today: string): Promise<OpenWork | null>;
 };
@@ -246,6 +250,10 @@ export function figureReader(base: string, io?: Fetch): FigureReader {
     },
     async moneyIn(name) {
       const out = await client.metric(`${MONEY_IN}:${name}`).catch(() => null);
+      return out?.ok ? monthsOf(out.value) : null;
+    },
+    async moneyOut(name) {
+      const out = await client.metric(`${MONEY_OUT}:${name}`).catch(() => null);
       return out?.ok ? monthsOf(out.value) : null;
     },
     async openWork(register, via, spoken, today) {

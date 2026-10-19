@@ -21,6 +21,8 @@
   import { rowReader } from '$lib/record/row-live.ts';
   import { money } from 'braindog-render';
   import ProjectBlocks from './ProjectBlocks.svelte';
+  import ProjectVisuals from './ProjectVisuals.svelte';
+  import type { Listing, Months } from '$lib/record/visuals.ts';
 
   let { register, seq, onshape }: { register: string; seq: number; onshape: (blocks: readonly Block[], row: Readonly<Record<string, unknown>> | null) => void } = $props();
 
@@ -30,6 +32,9 @@
     incoming: Parameters<typeof shapeOf>[0]['incoming'];
     history: Parameters<typeof shapeOf>[0]['history'];
     money: { in: Figure | null; out: Figure | null; owed: Figure | null };
+    inByMonth: Months | null;
+    outByMonth: Months | null;
+    listings: Listing[];
   };
   let read = $state.raw<Read | null>(null);
   /* THE KEY WHOSE READ HAS ENDED, however it ended: the hold lasts only while its own read is out, never past it. */
@@ -71,8 +76,11 @@
         name === ''
           ? [null, null, null]
           : await Promise.all(['project-in-month', 'project-out-month', 'project-owed'].map((m) => quiet(f.scalar(m, name), null)));
+      /* THE MONTH-BY-MONTH SERIES AND THE STORED ROWS, for the visuals; a read that says nothing leaves its visual out. */
+      const [inByMonth, outByMonth] = name === '' ? [null, null] : await Promise.all([quiet(f.moneyIn(name), null), quiet(f.moneyOut(name), null)]);
+      const listings = links?.from === 'live' ? links.groups.map((g) => ({ decl: REGISTERS[g.register], rows: g.raw ?? [] })) : [];
       if (key !== `${register}#${seq}`) return;
-      read = { key, fields: row.entry.fields, incoming, history, money: { in: i ?? null, out: o ?? null, owed: w ?? null } };
+      read = { key, fields: row.entry.fields, incoming, history, money: { in: i ?? null, out: o ?? null, owed: w ?? null }, inByMonth, outByMonth, listings };
     } catch {
       /* Nothing to draw: the page goes on without the shape, and the hold is let go by the caller. */
     }
@@ -92,7 +100,11 @@
 
 {#if shape && blocksOf(shape.facts).length > 0}
   <div><ProjectBlocks facts={shape.facts} data={shape.data} nextHref={shape.nextHref} format={said} /></div>
-{:else if holds}
+{/if}
+{#if read}
+  <ProjectVisuals fields={read.fields} decl={REGISTERS[register]} inByMonth={read.inByMonth} outByMonth={read.outByMonth} listings={read.listings} format={said} />
+{/if}
+{#if !(shape && blocksOf(shape.facts).length > 0) && holds}
   <div class="held" aria-hidden="true"></div>
 {/if}
 

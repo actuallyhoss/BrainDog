@@ -117,6 +117,7 @@ export function linkReader(base: string, io?: Fetch): LinkReader {
           rows: toRows(g.register, rows, columns, now, namesOf(refs)),
           columns,
           href: `/r/${g.register}?f=${g.field}:is:${seq}`,
+          raw: (g.rows as RecordRow[]).map((row) => row.fields),
         });
       }
       return { from: 'live', groups, cursor: out.value.cursor };
