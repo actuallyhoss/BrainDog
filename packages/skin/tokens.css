@@ -304,6 +304,8 @@
        the layout gate has to draw either side of. */
     --gutter: clamp(16px, 2.4vw, 40px);
     --sticky: 52px;
+    /* Room for the Mac app's title bar; shell.ts sets it, 0 in a browser. */
+    --shell-inset: 0px;
     /* The rail, 240 wide (DIRECTION §39: the board's own left column, flat); the shell adds `--inset` round it. `--inset` is the window inset of the rail and the
        docked panel, and the gap between tiles; the panel is 440. */
     --rail: 240px;

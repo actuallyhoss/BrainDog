@@ -20,6 +20,9 @@
 -->
 <script lang="ts">
   import { BASE, apiBase, at, here } from '$lib/at.ts';
+  import { applyInset } from '$lib/shell.ts';
+  /* Title-bar room for the Mac app: sets --shell-inset once, 0 in a browser. */
+  applyInset();
   /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
      with it the rule that no installed theme can reach the a11y layer — is established before any
      other stylesheet is parsed. */

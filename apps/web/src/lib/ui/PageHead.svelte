@@ -276,12 +276,13 @@
     inset-block-start: 0;
     z-index: var(--z-sheet);
     box-sizing: border-box;
-    padding: 20px var(--gutter) 0;
+    /* The Mac app's title bar sits above the head; --shell-inset is 0 in a browser. */
+    padding: calc(20px + var(--shell-inset, 0px)) var(--gutter) 0;
   }
 
   /* A kicker already stands between the row and the top of the work. */
   .page-head[data-kicked] {
-    padding-block-start: 2px;
+    padding-block-start: calc(2px + var(--shell-inset, 0px));
   }
 
   /* THE COMPACT BAR: the board's own colour behind the row and a hairline under it, there at rest, invisible, and
