@@ -4,7 +4,7 @@
  * FREE STARTED AT CLOUD'S ASKS. `ASK_CAP_FREE` was named and held to the site's Free card, but a free record was made at
  * `ASK_CAP_DEFAULT`, and its owner could type any number up to the operator's ceiling. Now the record is lowered to it when
  * it is put on Free or when its engine is first built there, a save above it is refused in a sentence that names the plan,
- * and paying raises it back once.
+ * and paying raises it to the plan's own credits once (`PLAN_TABLE`), which then hold a save as Free's do.
  *
  * THE FIRST RUN'S TWO ASKS WENT AROUND BOTH WRAPPERS. `keyOnly` and `operatorCeiling` named every other ask, so a setup on
  * a keyless Worker or past the operator's ceiling reached the engine through the prototype.
@@ -75,17 +75,25 @@ test('A RECORD ON FREE STARTS AT FREE\'S ASKS, and a save above them is refused 
   done();
 });
 
-test('PAID FOR, THE ASKS GO BACK UP ONCE, and the plan no longer holds a save', async () => {
+test("PAID FOR, THE ASKS GO UP TO THE PLAN'S CREDITS ONCE, and the plan still holds a save", async () => {
   const { engine, own, cap, held, done } = await built('free');
   await slashPlanMoved(own, 'hosted');
   assert.equal(cap(), ASK_CAP_DEFAULT);
-  assert.equal(held(), undefined);
-  assert.ok((engine.configure({ ask_cap: 200 }, OWNER) as Refused).ok);
+  assert.equal(held(), String(ASK_CAP_DEFAULT));
+  const over = engine.configure({ ask_cap: 200 }, OWNER) as Refused;
+  assert.equal(over.ok, false);
+  assert.match(over.refusal?.fix ?? '', /^Cloud comes with 80 Slash asks a month, so the monthly ask limit is 80 or lower\. Cloud Plus comes with more\.$/u);
 
   /* A RENEWAL MOVES NOTHING: an owner's own number on Cloud stays his. */
   assert.ok((engine.configure({ ask_cap: 30 }, OWNER) as Refused).ok);
   await slashPlanMoved(own, 'hosted');
   assert.equal(cap(), 30);
+
+  /* CLOUD PLUS IS ITS OWN 400, raised once and held. */
+  await slashPlanMoved(own, 'plus');
+  assert.equal(cap(), 400);
+  assert.equal(held(), '400');
+  assert.equal((engine.configure({ ask_cap: 401 }, OWNER) as Refused).ok, false);
   done();
 });
 
@@ -97,12 +105,12 @@ test('AN OWNER WHO TURNED SLASH OFF ON FREE IS LEFT OFF WHEN HE PAYS', async () 
   done();
 });
 
-test('CLOUD, OR A PLAN NOBODY COULD ASK FOR, KEEPS CLOUD\'S ASKS', async () => {
+test("CLOUD HOLDS CLOUD'S ASKS, AND A PLAN NOBODY COULD ASK FOR HOLDS NONE", async () => {
   for (const plan of ['hosted', null]) {
     const { engine, cap, held, done } = await built(plan);
     assert.equal(cap(), ASK_CAP_DEFAULT);
-    assert.equal(held(), undefined);
-    assert.ok((engine.configure({ ask_cap: 100 }, OWNER) as Refused).ok);
+    assert.equal(held(), plan === null ? undefined : String(ASK_CAP_DEFAULT));
+    assert.equal((engine.configure({ ask_cap: 100 }, OWNER) as Refused).ok, plan === null);
     done();
   }
 });

@@ -751,7 +751,7 @@ export async function workerSlashEngine(env: SlashEnv, api: () => RecordApi, dep
 /* ── the plan's asks ─────────────────────────────────────────────────────────────────────────────────────────────── */
 
 /**
- * Where Slash's store keeps the plan's ceiling on `ask_cap` while the record is on a plan that has one, which is Free.
+ * Where Slash's store keeps the plan's ceiling on `ask_cap` while the record is on a plan that has one: its credits.
  * A key of this host's in `slash_meta`, beside the package's own (`version`, `own.provider`, `own.base_url`), which the
  * package never reads.
  */
@@ -784,18 +784,18 @@ const planMoved = (slash: Pick<typeof import('@braindog/slash'), 'ASK_CAP_FREE' 
   planAgents(sql, plan);
   if (!slashStored(sql)) return;
   const held = planCapOf(sql);
+  /* EVERY PLAN'S CREDITS ARE ITS CEILING (`PLAN_TABLE`), not Free's alone: Cloud's 80 held nothing and Plus never had its 400. */
+  const known = (PLANS as readonly string[]).includes(plan) ? (plan as Plan) : null;
+  const most = known === null ? null : PLAN_TABLE[known].credits;
   sql.transactionSync(() => {
-    if (plan === 'free') {
-      sql.exec('UPDATE slash_settings SET ask_cap = MIN(ask_cap, ?) WHERE singleton = 1', slash.ASK_CAP_FREE);
-      sql.exec(
-        'INSERT INTO slash_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
-        PLAN_ASK_CAP,
-        String(slash.ASK_CAP_FREE),
-      );
-    } else if (held !== null) {
-      sql.exec('UPDATE slash_settings SET ask_cap = ? WHERE singleton = 1 AND ask_cap > 0 AND ask_cap < ?', slash.ASK_CAP_DEFAULT, slash.ASK_CAP_DEFAULT);
-      sql.exec('DELETE FROM slash_meta WHERE key = ?', PLAN_ASK_CAP);
+    if (most === null) {
+      if (held !== null) sql.exec('DELETE FROM slash_meta WHERE key = ?', PLAN_ASK_CAP);
+      return;
     }
+    /* A MOVE UP RAISES A CAP UNDER THE NEW CREDITS, as Free to Cloud always did; zero stays off and a renewal moves nothing. */
+    if (most > (held ?? slash.ASK_CAP_DEFAULT)) sql.exec('UPDATE slash_settings SET ask_cap = ? WHERE singleton = 1 AND ask_cap > 0 AND ask_cap < ?', most, most);
+    sql.exec('UPDATE slash_settings SET ask_cap = MIN(ask_cap, ?) WHERE singleton = 1', most);
+    sql.exec('INSERT INTO slash_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', PLAN_ASK_CAP, String(most));
   });
 };
 
@@ -859,10 +859,17 @@ function planCeiling(engine: Slash, sql: Sql): Slash {
   held.configure = (patch, ctx) => {
     const owner = ctx.principal.kind === 'person' && ctx.principal.level === 'owner';
     const most = owner && typeof patch.ask_cap === 'number' ? planCapOf(sql) : null;
-    if (most !== null && typeof patch.ask_cap === 'number' && patch.ask_cap > most)
-      return no('VALUE_MALFORMED', `Free comes with ${most} Slash asks a month, so the monthly ask limit is ${most} or lower. Cloud comes with more.`, {
-        at: 'ask_cap',
-      });
+    if (most !== null && typeof patch.ask_cap === 'number' && patch.ask_cap > most) {
+      /* THE PLAN IS NAMED BY ITS CREDITS, the one figure the store keeps, and the plan above it is the way up. */
+      const on = PLANS.find((p) => PLAN_TABLE[p].credits === most);
+      const up = on === undefined ? null : NEXT_PLAN[on];
+      const name = on === undefined ? 'This plan' : PLAN_TABLE[on].name;
+      return no(
+        'VALUE_MALFORMED',
+        `${name} comes with ${most} Slash asks a month, so the monthly ask limit is ${most} or lower.${up === null ? '' : ` ${PLAN_TABLE[up].name} comes with more.`}`,
+        { at: 'ask_cap' },
+      );
+    }
     return engine.configure(patch, ctx);
   };
   return held;
