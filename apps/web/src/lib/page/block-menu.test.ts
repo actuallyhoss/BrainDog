@@ -184,7 +184,7 @@ const kindName = (k: string) => NAMES[k] ?? k;
 
 test('CHANGE TO ON HIS PAGE: the kinds by name after the widths, then Hide, then Remove', () => {
   const rows = actionsFor(BILLS, { ...owner, change: { mine: true, kinds: TABLE_KINDS, kindName } });
-  assert.deepEqual(rows.map((a) => a.id).slice(-4), ['kind-cards', 'kind-todo', 'hide', 'remove']);
+  assert.deepEqual(rows.map((a) => a.id).slice(-5), ['kind-cards', 'kind-todo', 'this', 'hide', 'remove']);
   assert.deepEqual(rows.filter((a) => a.kind).map((a) => a.label), ['Cards', 'To-do list']);
   assert.ok(!rows.some((a) => a.kind === 'table'), 'never the kind it is');
   assert.deepEqual(editOf(rows.find((a) => a.id === 'kind-cards')!, BILLS, { laid: laid('bills') }), { kind: 'cards' });

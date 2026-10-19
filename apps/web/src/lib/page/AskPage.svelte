@@ -26,6 +26,7 @@
   let {
     page: about,
     model,
+    ask,
     onsource,
     onkept,
   }: {
@@ -33,6 +34,8 @@
     page?: string | undefined;
     /** Whether this host has a model for Slash to draft with; without one the field is not offered at all. */
     model: boolean;
+    /** A line already typed (a block's "Change this" the rules could not read), sent once on opening. */
+    ask?: string | undefined;
     /** Opens how the page is built, the other way to change it, offered when Slash cannot draft. */
     onsource?: (() => void) | undefined;
     /** Called once a draft is kept, so the page behind reads itself again. */
@@ -43,6 +46,7 @@
   type Shown = { key: number; draft: Drafted; drawn: Rehearsed | null; kept: Kept | null; said: string | null; busy: boolean };
 
   let asked = $state('');
+  let started = false;
   let sending = $state(false);
   /** The record's sentence for a description it would not draft from. */
   let fix = $state<string | null>(null);
@@ -52,6 +56,14 @@
   let dropped = $state.raw<string[]>([]);
   let shown = $state.raw<Shown[]>([]);
   let chosen = $state(0);
+
+  /* A LINE HANDED IN IS SENT ONCE, as if typed, so the model reads it only after the rules would not. */
+  $effect(() => {
+    if (started || !model || !ask) return;
+    started = true;
+    asked = ask;
+    void send();
+  });
 
   /* EACH SEND IS NUMBERED, so drafts and drawings that arrive after a newer send are not drawn under its words. */
   let sends = 0;

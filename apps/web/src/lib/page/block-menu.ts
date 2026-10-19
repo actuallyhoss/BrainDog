@@ -43,7 +43,7 @@ export type MenuAt = { owner: boolean; area: Area | null; first: boolean; last: 
  */
 export type ChangeAt = { mine?: boolean | undefined; kinds?: readonly string[] | undefined; kindName?: ((kind: string) => string) | undefined };
 
-export type ActionId = 'up' | 'down' | 'rail' | 'main' | `width-${number}` | 'hide' | 'show' | `kind-${string}` | 'change' | 'remove';
+export type ActionId = 'up' | 'down' | 'rail' | 'main' | `width-${number}` | 'hide' | 'show' | `kind-${string}` | 'change' | 'this' | 'remove';
 
 /**
  * One row of the menu. A width carries its `span`, and the width the block has now is `current`. A kind to change to
@@ -69,6 +69,7 @@ export const words = {
   hide: 'Hide',
   show: 'Show',
   change: 'Change to',
+  changeThis: 'Change this',
   remove: 'Remove',
   changeElsewhere: 'Change to is on pages you made',
   tooNarrow: (kind: string) => `Too narrow for this ${kind}`,
@@ -125,6 +126,8 @@ export function actionsFor(block: MenuBlock, at: MenuAt): Action[] {
     out.push(row);
   }
   out.push(...changesFor(block, at.change));
+  /* ONE LINE ASKED ABOUT THIS BLOCK, on a page he wrote: it edits the page's own source (`change-this.ts`). */
+  if (at.change?.mine === true) out.push({ id: 'this', label: words.changeThis });
   out.push(at.hidden ? { id: 'show', label: words.show } : { id: 'hide', label: words.hide });
   if (at.change?.mine === true) out.push({ id: 'remove', label: words.remove });
   return out;
@@ -165,7 +168,7 @@ export function editOf(action: Action, block: MenuBlock, page: { laid: readonly 
   if (action.id === 'rail' || action.id === 'main') return (page.laid[at]!.area ?? 'main') === action.id ? null : { area: action.id };
   if (action.id === 'hide' || action.id === 'show') return { hide: action.id === 'hide' };
   if (action.id === 'remove') return { remove: true };
-  if (action.id === 'change') return null;
+  if (action.id === 'change' || action.id === 'this') return null;
   if (action.kind !== undefined) return action.kind === block.kind ? null : { kind: action.kind };
   if (action.span === undefined || action.current || page.laid[at]!.span === action.span) return null;
   return { span: action.span };

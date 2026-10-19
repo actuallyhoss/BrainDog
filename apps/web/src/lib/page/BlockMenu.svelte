@@ -122,7 +122,7 @@
       change,
     }),
   );
-  const LAST: readonly string[] = ['hide', 'show', 'remove'];
+  const LAST: readonly string[] = ['this', 'hide', 'show', 'remove'];
   const isKindRow = (a: Action): boolean => a.kind !== undefined || a.id === 'change';
   const moves = $derived(rows.filter((a) => a.span === undefined && !isKindRow(a) && !LAST.includes(a.id)));
   const widths = $derived(rows.filter((a) => a.span !== undefined));
@@ -206,10 +206,22 @@
 
   let busy = false;
 
+  /* "CHANGE THIS": the sheet is loaded when it is asked for, with the kinds and pins read as the menu was reached. */
+  let asking = $state(false);
+  /* LOADED ON THE FIRST ASK AND KEPT, so a close that leaves a change unanswered can still push its Undo. */
+  let askLoaded = $state(false);
+  let pins = $state.raw<readonly string[]>([]);
+
   /** A press: the next look written, the page read again, and the line that says so with its way back. */
   async function press(action: Action) {
     open = false;
     if (busy || action.disabled) return;
+    if (action.id === 'this') {
+      pins = (await laid())?.live?.pinned ?? [];
+      askLoaded = true;
+      asking = true;
+      return;
+    }
     busy = true;
     try {
       const now = await laid();
@@ -300,6 +312,12 @@
     {#each last as a (a.id)}{@render item(a, 'menuitem')}{/each}
   </Menu>
 </span>
+
+{#if askLoaded}
+  {#await import('./ChangeThis.svelte') then { default: ChangeThis }}
+    <ChangeThis bind:open={asking} {block} {slug} {name} kinds={change?.kinds ?? []} kindNames={copy.kindNames} pinned={pins} {reread} />
+  {/await}
+{/if}
 
 <style>
   /* THE LAST THING IN THE HEAD, at its right end: after the source link where there is one, which holds the end. */
