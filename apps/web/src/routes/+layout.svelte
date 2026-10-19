@@ -465,6 +465,8 @@
   let crossing: ViewTransition | null = null;
   onNavigate((nav) => {
     if (typeof document.startViewTransition !== 'function') return;
+    /* Asked for less motion: the page just changes, no fade stands in for it. */
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (nav.from === null || nav.to === null || nav.from.url.pathname === nav.to.url.pathname) return;
     const root = document.documentElement;
     return new Promise<void>((done) => {

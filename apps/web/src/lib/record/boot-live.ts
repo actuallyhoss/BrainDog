@@ -29,6 +29,7 @@ import { learnPages, REGISTERS } from './held.ts';
 import { learnRowPages } from './row-href.ts';
 import { copy } from '../copy.ts';
 import { forgetKept } from '../data/kept.ts';
+import { dropCopy } from './boot-copy.ts';
 import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
@@ -219,6 +220,8 @@ export type Shell = ShellBase & {
   waits: Waits | null;
   /** How many days a question waits before it is late, as the record says it; `null` where it did not say. */
   lateDays: number | null;
+  /** SET ON A SHELL DRAWN FROM THE LAST COPY (`boot-copy.ts`) before `boot` answers: it only draws, and holds no level to write by. */
+  stale?: true | undefined;
   /** The agents working now, as `boot` said it (`workingOf`). Empty on a shell no record answered. */
   working: Working[];
   now: number;
@@ -485,6 +488,7 @@ export function forget(): void {
   refusal = null;
   forgetSchemas();
   forgetKept();
+  dropCopy();
 }
 
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. The reader's own

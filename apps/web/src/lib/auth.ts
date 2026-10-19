@@ -446,7 +446,11 @@ export async function renamePasskey(id: string, label: string, io: Io = live()):
  */
 export async function signOutAndLeave(to: string, go: (href: string) => void = (href) => globalThis.location.assign(href), io: Io = live()): Promise<Said<null>> {
   const out = await signOut(io);
-  if (out.ok) go(to);
+  if (out.ok) {
+    /* The kept shell belongs to the person who just left: gone before the full load can draw it. */
+    await import('./record/boot-copy.ts').then((c) => c.dropCopy(), () => undefined);
+    go(to);
+  }
   return out;
 }
 

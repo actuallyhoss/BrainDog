@@ -50,8 +50,13 @@ const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boole
       () => ((modelHere = null), false),
     );
 
-export async function load({ url, fetch }: Pick<LoadEvent, 'url' | 'fetch'>): Promise<Shell & { slash: boolean }> {
+/* THE TAB'S FIRST LOAD ONLY draws from the last copy; every later load waits for `boot` as before. */
+let opened = false;
+
+export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fetch'> & Partial<Pick<LoadEvent, 'depends'>>): Promise<Shell & { slash: boolean }> {
   const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
+  depends?.('braindog:boot');
+  const copies = await import('$lib/record/boot-copy.ts');
   /* THE RECORD THE ADDRESS NAMES. `url` and not `location`: a load runs for the address being opened, and `location`
      is the page being left until the navigation lands, so a move from acme to kiln would read acme's `boot`. */
   const api = apiBase(url);
@@ -60,7 +65,18 @@ export async function load({ url, fetch }: Pick<LoadEvent, 'url' | 'fetch'>): Pr
   /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway. */
   const spared =
     inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner === '/s' || inner.startsWith('/s/');
+  /* ON A COLD OPEN THE SHELL IS DRAWN FROM THE LAST COPY AT ONCE, then `boot` is read behind it and this load runs again
+     with the live answer (redirects and refusals included). Not on the screens that must see the record's own answer. */
+  if (!opened) {
+    opened = true;
+    const copy = depends && !spared ? copies.readCopy(api) : null;
+    if (copy) {
+      void live.readBoot(api).then(() => import('$app/navigation').then((n) => n.invalidate('braindog:boot')));
+      return { ...copy, slash: false };
+    }
+  }
   const booted = await live.readBoot(api);
+  if (booted.from === 'refused') copies.dropCopy();
 
   /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as
      `/app/acme/`, and `/start` with them: it is spared the redirect below and not this one. The bare address drew the
@@ -146,5 +162,6 @@ export async function load({ url, fetch }: Pick<LoadEvent, 'url' | 'fetch'>): Pr
   const sent = booted.from === 'live' ? booted.boot.slash : false;
   const slash = typeof sent === 'boolean' ? sent : ((modelHere ??= askModel(api, fetch)), modelSaid === true);
 
+  if (booted.from === 'live') copies.saveCopy(api, shell);
   return { ...shell, slash };
 }
