@@ -142,6 +142,8 @@
   /** The words the rail says itself, kept beside the one component that says them. */
   const words = {
     unnamed: 'My BrainDog',
+    /* The rail's head says the product; the record it opens is the smaller line under it. */
+    brand: 'BrainDog',
     ask: 'Ask, add or find',
     moreLists: (n: number) => `Show ${n} more`,
     fewerLists: 'Show fewer',
@@ -403,7 +405,7 @@
    * it, `+layout.svelte`), and the names fade in over the same step, so a word is never drawn half cut over a column
    * still narrow. They go at once as it narrows. Nothing runs on the first draw or for a reader who asked for less motion.
    */
-  const WORDS = '.item-name, .tally, .pen-action, .record-name, .ask-words, .ask-key, .me-name, .me-face, .sub';
+  const WORDS = '.item-name, .tally, .pen-action, .record-name, .brand-name, .ask-words, .ask-key, .me-name, .me-face, .sub';
   let card = $state<HTMLElement>();
   let drawn: boolean | undefined;
   let fades: Animation[] = [];
@@ -450,7 +452,10 @@
       {#snippet trigger()}
         <span class="record" data-label={recordName}>
           <Mark height={20} />
-          <span class="record-name">{recordName}</span>
+          <span class="titles">
+            <span class="brand-name">{words.brand}</span>
+            {#if recordName.toLowerCase() !== words.brand.toLowerCase()}<span class="record-name">{recordName}</span>{/if}
+          </span>
           <Icon name="chevronDown" size="s" />
         </span>
       {/snippet}
@@ -877,6 +882,27 @@
     font-size: var(--t-xs);
     font-weight: 600;
     line-height: 1;
+  }
+
+  .titles {
+    display: grid;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .brand-name {
+    overflow: hidden;
+    font-family: var(--font-display);
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .titles .record-name {
+    color: var(--dim);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1.2;
   }
 
   .mi-name,
@@ -1521,6 +1547,7 @@
   .rail[data-icons] .item-name,
   .rail[data-icons] .pen-action,
   .rail[data-icons] .record-name,
+  .rail[data-icons] .brand-name,
   .rail[data-icons] .ask-words,
   .rail[data-icons] .me-name,
   .rail[data-icons] .item .tally:not([data-waiting]) {
