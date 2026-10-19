@@ -498,13 +498,19 @@
   });
 
   /**
-   * THE DESK UNDER THE PAGE: who is working, the live projects as cards, and what landed (`Desk.svelte`). Fetched with its
-   * reader once the page has answered, so the front door loads nothing more. A read that fails draws no cards, and the
-   * desk then draws what it still has.
+   * THE DESK ABOVE THE PAGE: who is working, the live projects as cards, and what landed (`Desk.svelte`). Fetched with its
+   * reader beside the page's own read and not after it, since it is what Today opens on. A read that fails draws no
+   * cards, and the desk then draws what it still has.
    */
   let desk = $state.raw<{ cards: DeskCards | null; Part: DeskPart } | null>(null);
+  /* A PROJECTS LIST THE TAB HAS LEARNT, so a little height is held for the desk until it lands and the page below does not
+     jump. Nothing is held for a record with no projects list, or before its lists are known. */
+  const deskExpected = $derived.by(() => {
+    void learnt;
+    return desk === null && data.lists.some((l) => (REGISTERS[l.id] as { scopes?: unknown } | undefined)?.scopes !== undefined);
+  });
   $effect(() => {
-    if (data.refused || !settled) return;
+    if (data.refused) return;
     void moving.version;
     const base = apiBase();
     let here = true;
@@ -751,14 +757,8 @@
           <Empty kind="cleared" title={waitsLine?.text ?? nothing} body={said('fills_with')} />
         {/if}
 
-        <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
-        {#if reader}
-          <div class="body">
-            <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} opens={paged && brief && brief.cards.length > 0 ? briefed : undefined} />
-          </div>
-        {/if}
-
-        <!-- THE DESK: who is working, the live projects as cards and what landed, each left out where it has nothing. -->
+        <!-- THE DESK OPENS TODAY, above the page: who is working, the live projects as cards and what landed, each left out
+             where it has nothing. Height is held while it is on its way where the record has projects. -->
         {#if desk}
           {@const Desk = desk.Part}
           <Desk
@@ -770,6 +770,15 @@
             me={data.me?.person ?? null}
             now={data.now}
           />
+        {:else if deskExpected}
+          <div class="desk-held" aria-hidden="true"></div>
+        {/if}
+
+        <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
+        {#if reader}
+          <div class="body">
+            <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} opens={paged && brief && brief.cards.length > 0 ? briefed : undefined} />
+          </div>
         {/if}
 
         <!-- AND UNDER TODAY'S BLOCKS, THE NEXT STEPS, until they are hidden. -->
@@ -796,6 +805,11 @@
 </div>
 
 <style>
+  /* THE DESK'S PLACE WHILE IT IS ON ITS WAY: about one row of cards, so the page under it stays where it is drawn. */
+  .desk-held {
+    min-block-size: 180px;
+  }
+
   /* ── the head ─────────────────────────────────────────────────────────── */
 
   /* THE LINE IS ITS SENTENCE'S ONE CHILD, so a block of its own changes nothing it draws; it holds who said it. */

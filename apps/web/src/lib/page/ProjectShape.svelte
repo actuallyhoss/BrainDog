@@ -13,7 +13,7 @@
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { homeCurrency } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
-  import { figureReader, type FigureReader } from '$lib/record/figures.ts';
+  import { figureReader, type FigureReader } from '../../routes/r/[register]/[seq]/figures.ts';
   import { readHistory } from '$lib/record/history-live.ts';
   import { linkReader } from '$lib/record/links-live.ts';
   import { symbolText } from '$lib/record/money.ts';

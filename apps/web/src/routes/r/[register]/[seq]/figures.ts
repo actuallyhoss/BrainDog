@@ -19,7 +19,7 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 
-import { valueSaid } from '../voice.ts';
+import { valueSaid } from '../../../../lib/voice.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 

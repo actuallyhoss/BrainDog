@@ -92,7 +92,7 @@
     type FigureReader,
     type MoneyIn,
     type OpenWork,
-  } from '$lib/record/figures.ts';
+  } from './figures.ts';
   import { METRICS } from '$lib/record/declared.ts';
   import { handFor } from '$lib/record/hand.ts';
   import type { Backlink } from '$lib/record/api.ts';
