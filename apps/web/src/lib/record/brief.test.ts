@@ -12,7 +12,7 @@ const IMPORTED = [
   'users | 12 | Fans | info',
   '```',
   '',
-  '# Encore',
+  '# Lanternfish',
   '',
   '## Notes',
   'Launch is set for spring. Mateo leads the build.',
@@ -22,7 +22,7 @@ const IMPORTED = [
 ].join('\n');
 
 test('THE IMPORTED SHAPE LEAVES ONLY ITS REAL FIRST SENTENCES', () => {
-  assert.deepEqual(briefFromNote(IMPORTED, 'Encore'), ['Fan pages that pay their makers.', 'Launch is set for spring.']);
+  assert.deepEqual(briefFromNote(IMPORTED, 'Lanternfish'), ['Fan pages that pay their makers.', 'Launch is set for spring.']);
 });
 
 test('A NOTE THAT IS ONLY LEFTOVERS GIVES NOTHING', () => {
@@ -32,9 +32,9 @@ test('A NOTE THAT IS ONLY LEFTOVERS GIVES NOTHING', () => {
 });
 
 test('A LINE WITH AN UNFILLED SLOT, A TAG OR AN ID IS DROPPED, A PLAIN ONE KEPT', () => {
-  assert.deepEqual(briefFromNote('Earns {{revenue.monthly}} a month.\nTagged oldtool:project:encore.\nSee kiln#12.\nA quiet shop.', ''), ['A quiet shop.']);
+  assert.deepEqual(briefFromNote('Earns {{revenue.monthly}} a month.\nTagged oldtool:project:lanternfish.\nSee kiln#12.\nA quiet shop.', ''), ['A quiet shop.']);
 });
 
 test('MARKDOWN MARKS GO, THE NAME ALONE ON A LINE GOES, AN UNCLOSED FENCE DROPS ITS REST', () => {
-  assert.deepEqual(briefFromNote('Encore\n- **Bold** plan with [a link](http://x).\n```chips\nnever shown', 'encore'), ['Bold plan with a link.']);
+  assert.deepEqual(briefFromNote('Lanternfish\n- **Bold** plan with [a link](http://x).\n```chips\nnever shown', 'lanternfish'), ['Bold plan with a link.']);
 });
