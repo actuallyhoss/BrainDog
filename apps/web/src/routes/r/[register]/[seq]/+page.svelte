@@ -778,7 +778,7 @@
     const tasks = rows('next');
     const text = String(row.fields.next ?? '').trim();
     const facts = {
-      brief: briefOf(row.fields, history),
+      brief: briefOf(row.fields, history, name),
       next: text || tasks[0]?.title || null,
       money: moneyLines(pjMoney),
       people: rows('crew'),

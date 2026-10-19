@@ -6,6 +6,8 @@
  * relative-imported so `project.test.ts` can hold the rules without a component.
  */
 
+import { briefFromNote } from '../../../../lib/record/brief.ts';
+
 /** What of a list's declaration decides its part; the record says all of it, so no list is named here. */
 export type Decl = {
   seq_prefix?: unknown;
@@ -82,18 +84,12 @@ export function moneyLines(f: { in?: Figure | null; out?: Figure | null; owed?: 
 }
 
 /** The brief: what the row says it is, or failing that the first lines of what changed. */
-export function briefOf(fields: Readonly<Record<string, unknown>>, changes: readonly { note: string }[]): string[] {
+export function briefOf(fields: Readonly<Record<string, unknown>>, changes: readonly { note: string }[], name = ''): string[] {
   const about = said(fields.about);
   if (about !== '') return [about];
-  const note = said(fields.note);
-  if (note !== '') {
-    const first = note
-      .split(/\n+/u)
-      .map((l) => l.replace(/^[#>*\-\s]+/u, '').trim())
-      .filter(Boolean)
-      .slice(0, 3);
-    if (first.length > 0) return first;
-  }
+  /* The note is cleaned of what an import left in it; nothing real left falls through to what changed. */
+  const first = briefFromNote(said(fields.note), name);
+  if (first.length > 0) return first;
   return changes
     .map((c) => said(c.note))
     .filter(Boolean)

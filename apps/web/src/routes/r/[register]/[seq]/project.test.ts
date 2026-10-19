@@ -43,9 +43,10 @@ test('MONEY DRAWS ONLY WHAT IS MORE THAN NOTHING, IN ONE CURRENCY, AS A SHARE OF
 
 test("THE BRIEF IS THE ROW'S OWN WORDS, THEN ITS NOTE, THEN WHAT CHANGED", () => {
   assert.deepEqual(briefOf({ about: ' A shop ', note: 'x' }, [{ note: 'n' }]), ['A shop']);
-  assert.deepEqual(briefOf({ note: '# Heading\n\nSecond line' }, []), ['Heading', 'Second line']);
+  assert.deepEqual(briefOf({ note: '# Heading\n\nSecond line' }, []), ['Second line']);
   assert.deepEqual(briefOf({}, [{ note: 'one' }, { note: '' }, { note: 'two' }, { note: 'three' }]), ['one', 'two']);
   assert.deepEqual(briefOf({}, []), []);
+  assert.deepEqual(briefOf({ note: 'Status in Old Tool: live. Kind: work.\n# Kiln' }, [{ note: 'Moved the date' }], 'Kiln'), ['Moved the date']);
 });
 
 test('WHAT IT RUNS ON IS BY NAME ONLY, AND A BLOCK TAKES ONLY ITS OWN LISTS', () => {
