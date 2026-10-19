@@ -1796,6 +1796,8 @@ export function createClient(options: ClientOptions) {
      */
     undo: (args: ({ batch: string; row?: { register: string; seq: number } } | { decision: string }) & { dry?: boolean; hash?: string }) =>
       call<Answer<'undo'>>('undo', args as Record<string, unknown>),
+    /** Take back one write of the caller's own run by its receipt's batch (the agent door's `undo` tool). */
+    undoOwn: (args: { batch: string; dry?: boolean }) => call<Answer<'undoOwn'>>('undoOwn', args as Record<string, unknown>),
     /** Put back every change one agent run made. */
     undoRun: (args: { run: string; dry?: boolean; hash?: string }) => call<Answer<'undoRun'>>('undoRun', args as Record<string, unknown>),
     /* UNDERSTANDING, ON ASK (DIRECTION §38): ADMIN, so a browser session, and no token reaches it. The nightly walk over

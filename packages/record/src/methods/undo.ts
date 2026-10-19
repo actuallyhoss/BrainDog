@@ -101,7 +101,7 @@ export function methods(deps: RecordDeps) {
    * The plan, or the undo applied, for one scope. Shared by both methods, which differ only in what they name.
    * `reads` leaves out a list the caller cannot read, which for an owner is none.
    */
-  const run = async (scope: UndoScope, args: { dry?: unknown; hash?: unknown }, ctx: CallContext, row?: UndoRow): Promise<Result<UndoPlan | Undone>> => {
+  const run = async (scope: UndoScope, args: { dry?: unknown; hash?: unknown }, ctx: CallContext, row?: UndoRow, self = false): Promise<Result<UndoPlan | Undone>> => {
     if (args.dry !== undefined && typeof args.dry !== 'boolean') return no('VALUE_MALFORMED', 'dry is true to see what would be put back, and false or left out to put it back.', { at: 'dry' });
     const opts = { reads: (register: string) => readable(ctx, register) === null };
     const walk = 'batch' in scope && walked(scope.batch) ? scope.batch : null;
@@ -144,7 +144,8 @@ export function methods(deps: RecordDeps) {
     try {
       out = kernel.transaction(() => {
         const applied = kernel.undoApply(scope, args.hash as string, actorOf(ctx), opts, declared.value);
-        if (applied.ok)
+        /* AN AGENT TAKING BACK ITS OWN WRITE IS NOT DEMOTED FOR IT: the ladder drops for an owner's undo, not a correction. */
+        if (applied.ok && !self)
           for (const mark of applied.value.undone) {
             /* A QUESTION THE LADDER LANDED (Slash's attach) is signed by the ladder, so who asked is read from the question. */
             const by = mark.agent !== null ? { agent: mark.agent, kinds: mark.kinds } : trust.landed(mark.batch);
@@ -462,6 +463,35 @@ export function methods(deps: RecordDeps) {
       const given = said(a.decision) ? a.decision.trim() : null;
       const decision = given !== null && isHandle(given) ? (spokenOf(sql, given) ?? given) : given;
       return run(decision === null ? { batch: String(a.batch).trim() } : { decision }, a, ctx, row);
+    },
+
+    /**
+     * Take back one write the caller's own run made, by the batch its receipt gave: the agent door's `undo` tool. Plans
+     * and applies in one call (the plan is read and its hash sent back inside it). `{ dry: true }` only answers the plan.
+     *
+     * OWN WRITES ONLY, AND THE OWNER'S UNDO STAYS THE OWNER'S (ADR-060). Every actor on the batch must be the caller's run
+     * or a rule its write started; one line by anybody else, or by the nightly walk, refuses the whole batch.
+     */
+    async undoOwn(args: { batch?: unknown; dry?: unknown } | undefined, ctx: CallContext): Promise<Result<UndoPlan | Undone>> {
+      const a = args ?? {};
+      if (!said(a.batch)) return no('REQUIRED_MISSING', 'Say which write to take back, by the batch its receipt gave.', { at: 'batch' });
+      const batch = a.batch.trim();
+      const mine = new Set<string>();
+      if (ctx.principal.kind === 'token') {
+        const found = kernel.findRun(ctx.session ?? {}, ctx.principal.id);
+        if (found !== null) [found.id, kernel.nameOf(found.id)].forEach((x) => typeof x === 'string' && mine.add(x));
+      } else mine.add(actorOf(ctx));
+      const actors = sql.all<{ actor: string | null }>('SELECT DISTINCT actor FROM event WHERE batch = ? OR (batch IS NULL AND id = ?)', batch, batch).map((e) => e.actor);
+      if (actors.length === 0) return no('ROW_UNKNOWN', 'No write was made under that batch, so there is nothing to take back.', { at: 'batch' });
+      const own = actors.some((x) => x !== null && mine.has(x));
+      const foreign = actors.some((x) => x === null || (!mine.has(x) && !x.startsWith('rule:')));
+      if (!own || foreign)
+        return no('FORBIDDEN', 'That change was not made by your run, so only the owner can put it back, from the app. You can take back only the writes your own receipts name.', { at: 'batch' });
+      const plan = await run({ batch }, { dry: true }, ctx, undefined, true);
+      if (!plan.ok || a.dry === true) return plan;
+      const seen = plan.value as UndoPlan;
+      if (seen.already) return ok({ batch, put: 0, say: 'Nothing was put back: it was undone already.', lines: [], skipped: [] });
+      return run({ batch }, { hash: seen.hash }, ctx, undefined, true);
     },
 
     /**

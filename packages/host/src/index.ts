@@ -388,6 +388,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
   { name: 'attach', group: 'DATA', writes: true, what: 'Say which run this agent is and where it stands. A token only: a person is never a run.' },
   { name: 'handoff', group: 'DATA', writes: true, what: "Keep a run's handoff true: the next step, what was tried, a note, its state." },
+  { name: 'undoOwn', group: 'DATA', writes: true, what: "Take back one of your own writes by the batch its receipt gave. Only your own run's writes; anything else is refused." },
   { name: 'meet', group: 'DATA', writes: true, what: 'Someone or some organisation met in the work: matched by a key (email, handle, domain), or added; a name alone is only noted.' },
   /* THE SAVED VIEWS. Reading one is READ+ and held to the list it belongs to, because a view names
      that list's fields and the values somebody filtered on; saving and retiring one change what the
@@ -669,6 +670,7 @@ export type RecordSurface = {
   sessionsLive(args: never, ctx: never): Promise<Result<unknown>>;
   context(args: never, ctx: never): Promise<Result<unknown>>;
   meet(args: never, ctx: never): Promise<Result<unknown>>;
+  undoOwn(args: never, ctx: never): Promise<Result<unknown>>;
   views(args: never, ctx: never): Promise<Result<unknown>>;
   view(args: never, ctx: never): Promise<Result<unknown>>;
   saveView(args: never, ctx: never): Promise<Result<unknown>>;
@@ -798,6 +800,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     sessionsLive: (a, ctx) => api.sessionsLive(a as never, ctx as never),
     context: (a, ctx) => api.context(a as never, ctx as never),
     meet: (a, ctx) => api.meet(a as never, ctx as never),
+    undoOwn: (a, ctx) => api.undoOwn(a as never, ctx as never),
     views: (a, ctx) => api.views(a as never, ctx as never),
     view: (a, ctx) => api.view(a as never, ctx as never),
     saveView: (a, ctx) => api.saveView(a as never, ctx as never),
