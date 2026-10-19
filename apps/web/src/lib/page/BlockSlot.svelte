@@ -24,6 +24,8 @@
   import { EMPTY_KEEP, inline, text } from 'braindog-render';
   import QueueAnswer from './QueueAnswer.svelte';
   import { compactOf, queueWords } from './queue-answer.ts';
+  import { alikeOf, type QueueEntry } from './alike.ts';
+  import AlikeCard from './AlikeCard.svelte';
   import { doorOf } from './door.ts';
   import { queueMore } from 'braindog-render';
   import { page as route } from '$app/state';
@@ -513,7 +515,7 @@
   </header>
 {:else}
   <!-- A BLOCK WITH NO AUTHORED `heading:` DRAWS NO HEADING. It printed its kind's name, and where the kind had none its
-       dialect id, so Decide's lead question sat under "queue" and Today's dates under "deadlines": the system's word
+       dialect id, so Needs you's lead question sat under "queue" and Today's dates under "deadlines": the system's word
        where the page has nothing to say. The region still has a name, for a screen reader only, in the kind's words. -->
   <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-unnamed" id="{ids}h-{i + 1}"
     >{copy.kindNames[block.kind] ?? blockWords.kindNames[block.kind] ?? words.unnamed}</svelte:element
@@ -552,9 +554,11 @@
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <!-- COMPACT, AT MOST THREE (`queue-answer.ts` `compactOf`): the question and its answers, and the rest a count on Decide. -->
   {@const asked = compact ? compactOf(block.queue, block.total) : { shown: block.queue, more: block.total - block.queue.length }}
+  {@const entries = compact ? asked.shown.map((q): QueueEntry => ({ kind: 'one', q })) : alikeOf(asked.shown)}
   <div class="queue" data-compact={compact ? '' : undefined}>
     <!-- THE LEAD QUESTION IS DRAWN WHOLE when the block says `lead:`, with what accepting it would put on the screen. -->
-    {#each asked.shown as question, n (question.id)}<QueueAnswer
+    <!-- QUESTIONS OF ONE CAUSE ARE ONE CARD outside a compact queue (`alike.ts`). -->
+    {#each entries as entry, n (entry.kind === 'one' ? entry.q.id : entry.lead.id)}{#if entry.kind === 'many'}<AlikeCard lead={entry.lead} rest={entry.rest} onanswered={() => {}} />{:else}{@const question = entry.q}<QueueAnswer
         {question}
         file={opts.file}
         onanswered={() => {}}
@@ -562,7 +566,7 @@
         lead={(block as { lead?: unknown }).lead === true && n === 0}
         {n}
         {compact}
-      />{/each}
+      />{/if}{/each}
     {#if asked.more > 0}<a class="queue-more" href={inApp('/decide')}>{compact ? queueWords.moreOnDecide(asked.more) : queueMore(asked.more)}</a>{/if}
   </div>
 {:else}
