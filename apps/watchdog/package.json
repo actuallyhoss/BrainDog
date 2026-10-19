@@ -1,0 +1,15 @@
+{
+  "name": "@braindog/watchdog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "The uptime check: its own small Worker, so it is still up when brain.dog's Workers are not.",
+  "scripts": {
+    "deploy:production": "wrangler deploy",
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "wrangler": "4.129.0"
+  }
+}

@@ -388,13 +388,13 @@ ones also reach the ops record, where the walk writes its summary as a note once
   in the log. At most one per kind in 15 minutes, held per isolate and across isolates by one
   storage key per kind in the Directory (`alertDue`); if the Directory cannot be asked, the isolate's
   own window is the cap.
-- **Uptime.** The site Worker's cron (`apps/site/wrangler.jsonc`, `env.production`) fetches the app's
-  `/healthz` through the `APP` binding every minute and wants 200 and `"ok":true`
-  (`apps/worker/src/health.ts`). The second failure in a row mails "BrainDog is down" once, and the
-  first success after it mails "BrainDog is up again" (`watch` in `apps/site/src/worker.ts`). The
-  count is per isolate, because the site binds no storage: a cron run on a fresh isolate starts from
-  zero, so a mail can come later than two minutes in, and a recovery a fresh isolate sees is not
-  mailed. It cannot see the site itself down, only the app behind it.
+- **Uptime.** `apps/watchdog` is a Worker of its own (cron every five minutes, no route, no binding to the app), so it
+  still runs when brain.dog's Workers do not. It asks the public name for `/`, `/app`, `/healthz` (200 and `"ok":true`),
+  `/mcp` with no token (the 401 carrying the OAuth `resource_metadata`) and `/app/signin`. The second failing run in a row
+  mails "BrainDog is down" once, naming the probes, and the first clean run after it mails "BrainDog is up again". The
+  count is kept in KV. Each probe's latency goes to the `braindog_probes` Analytics Engine dataset (name, ok, status,
+  milliseconds) and to the log, with `slow` set over three seconds. Not deployed until its KV id is filled in
+  (`apps/watchdog/wrangler.jsonc`).
 
 Also set up in Notifications: "BrainDog: Cloudflare incident", major and critical incidents, to
 admin@brain.dog. No Worker has a Workers Builds trigger; deploys go through the pipeline or by hand.

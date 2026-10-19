@@ -32,8 +32,7 @@
      that both environments are bound, and it was in `env.alpha` alone for one push because a
      top-level `main` is inherited: alpha rehearsed the token, the binding and a version rollback
      while production still uploaded its assets-only `no-op-worker.js`.
-     Its one other job is production's cron, the uptime watchdog (`env.production` below), which runs on
-     its own clock and never on a request.
+     The uptime watchdog used to be its cron; it is `apps/watchdog` now, a Worker that does not share this one's fate.
 
      Cloudflare Pages was the other candidate and is the wrong one:
      it is a second deployment system with its own build settings, its own preview semantics and
@@ -111,15 +110,7 @@
        redirect is a single dashboard Redirect Rule. */
     "production": {
       "routes": [{ "pattern": "brain.dog", "custom_domain": true }],
-      "services": [{ "binding": "APP", "service": "braindog-production" }],
-
-      /* THE UPTIME WATCHDOG (`watch` in `src/worker.ts`): every minute, the app's `/healthz` through `APP`, and a mail to
-         `OPS_ALERT_TO` on the second failure in a row and again on the recovery. Production only, like everything
-         here: `triggers`, `vars` and `send_email` would otherwise reach alpha, whose app does not exist. The binding is
-         the app Worker's own `EMAIL`, sending from the address its sign-in mail comes from. */
-      "triggers": { "crons": ["* * * * *"] },
-      "vars": { "OPS_ALERT_TO": "admin@brain.dog", "MAIL_FROM": "hello@brain.dog" },
-      "send_email": [{ "name": "EMAIL" }]
+      "services": [{ "binding": "APP", "service": "braindog-production" }]
     },
 
     /* EACH ENVIRONMENT HANDS ITS APP'S DOORS TO ITS OWN APP. A service binding in place of

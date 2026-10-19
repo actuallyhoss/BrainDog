@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+
+  /* THE UPTIME CHECK, IN A WORKER OF ITS OWN. It used to be a cron in the site Worker, which is the Worker in front of
+     brain.dog, so a site that was down could not say so. This one holds no route and no binding to either app Worker:
+     it asks brain.dog over the public internet, as a visitor does, every five minutes (`src/index.ts`).
+
+     TODO(deploy, his word): NOT DEPLOYED. Before `pnpm --filter @braindog/watchdog deploy:production`:
+       1. `wrangler kv namespace create braindog-watchdog`, and put its id where STATE_KV_ID_TODO is below.
+       2. Email Sending on the account must allow `hello@brain.dog` (the same sender the app Worker uses).
+       3. Deploy the site Worker (its old cron is gone from this branch) at the same time, or both mail for a while. */
+  "name": "braindog-watchdog",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": { "OPS_ALERT_TO": "admin@brain.dog", "MAIL_FROM": "hello@brain.dog", "WATCH_HOST": "brain.dog" },
+  "send_email": [{ "name": "EMAIL" }],
+  "kv_namespaces": [{ "binding": "STATE", "id": "STATE_KV_ID_TODO" }],
+  /* One data point per probe per run: name, ok, status and milliseconds. A slow day is a query over this dataset. */
+  "analytics_engine_datasets": [{ "binding": "PROBES", "dataset": "braindog_probes" }]
+}

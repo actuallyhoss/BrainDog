@@ -31,49 +31,8 @@ test('the site script passes the request itself to the app and returns what the 
   assert.equal(out, answer, "the site answered something other than the app's own response");
 });
 
-test('THE WATCHDOG MAILS ON THE SECOND FAILURE IN A ROW, ONCE, AND ONCE MORE ON THE RECOVERY', async () => {
-  const { watch } = (await import(script)) as { watch: (env: unknown, now?: Date) => Promise<void> };
-  const sent: { subject: string; text: string; to: string }[] = [];
-  let up = true;
-  const env = {
-    APP: { fetch: async () => (up ? Response.json({ ok: true, app: 'x' }) : new Response('down', { status: 503 })) },
-    EMAIL: { send: async (m: { subject: string; text: string; to: string }) => void sent.push(m) },
-    OPS_ALERT_TO: 'ops@example.test',
-    MAIL_FROM: 'hello@brain.dog',
-  };
-  const quiet = console.error;
-  console.error = () => {};
-  try {
-    await watch(env);
-    up = false;
-    await watch(env);
-    assert.equal(sent.length, 0, 'one failure is a blip and mails nobody');
-    await watch(env);
-    await watch(env);
-    await watch(env);
-    assert.deepEqual(sent.map((m) => m.subject), ['BrainDog is down']);
-    assert.ok(sent[0]?.text.includes('status 503'));
-    up = true;
-    await watch(env);
-    await watch(env);
-    assert.deepEqual(sent.map((m) => m.subject), ['BrainDog is down', 'BrainDog is up again']);
-    assert.equal(sent[1]?.to, 'ops@example.test');
-  } finally {
-    console.error = quiet;
-  }
-});
-
-test('THE WATCHDOG READS THE BODY: a 200 without "ok":true is a failure', async () => {
-  const { watch } = (await import(script)) as { watch: (env: unknown) => Promise<void> };
-  const sent: unknown[] = [];
-  const env = { APP: { fetch: async () => Response.json({ ok: false }) }, EMAIL: { send: async (m: unknown) => void sent.push(m) }, OPS_ALERT_TO: 'o@example.test', MAIL_FROM: 'h@brain.dog' };
-  const quiet = console.error;
-  console.error = () => {};
-  try {
-    await watch(env);
-    await watch(env);
-  } finally {
-    console.error = quiet;
-  }
-  assert.equal(sent.length, 1);
+test('the site script no longer carries the watchdog, which is apps/watchdog', async () => {
+  const mod = (await import(script)) as { watch?: unknown; default: { scheduled?: unknown } };
+  assert.equal(mod.watch, undefined);
+  assert.equal(mod.default.scheduled, undefined);
 });
