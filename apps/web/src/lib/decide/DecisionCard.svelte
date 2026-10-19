@@ -53,6 +53,7 @@
   import './form.css';
   import OptionVisual from './OptionVisual.svelte';
   import { visualOf as optionVisualOf, type VisualContext } from './option-visual.ts';
+  import { groundNow, want } from './ground.svelte.ts';
   import { getContext, tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { invalidateAll } from '$app/navigation';
@@ -93,6 +94,7 @@
     onpress,
     idOf,
     compact = false,
+    ground,
   }: {
     question: QueueQuestion;
     /** Once the answer is written: the host lowers its count. */
@@ -131,6 +133,10 @@
   );
 
   const uid = `dc-${(made += 1)}`;
+
+  /* THE HOST'S GROUND WINS; else the screen's one batched read of it (`ground.svelte.ts`). */
+  untrack(() => want(question));
+  const grounded = $derived(ground ?? groundNow(question.id));
 
   /* THE SHELL THE LAYOUT DREW, read as partial because a page drawn outside the signed-in shell carries no `me`. */
   const shell = $derived(route.data as unknown as Partial<Shell>);
@@ -474,7 +480,7 @@
     <span class="queue-label dc-choice-name" dir="auto">{way.label}</span>
     {#if way.because}<span class="dc-choice-does" dir="auto">{way.because}</span>{/if}
     <!-- WHAT IT WOULD CHANGE, drawn small; an option with a swatch, figure or picture of its own keeps that. -->
-    {#if !way.shows}<OptionVisual visual={optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...ground, now: Date.now(), home: ground?.home })} />{/if}
+    {#if !way.shows}<OptionVisual visual={optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...grounded, now: Date.now(), home: grounded?.home })} />{/if}
   </span>
 {/snippet}
 
