@@ -1192,6 +1192,7 @@
     min-inline-size: 0;
     overflow-wrap: anywhere;
     color: var(--ink);
+    font-family: var(--font-display);
     font-size: var(--t-figure);
     font-weight: 600;
     line-height: calc(34 / 30);

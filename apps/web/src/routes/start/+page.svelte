@@ -1825,6 +1825,7 @@
 
   @media (width < 900px) {
     .question {
+      font-family: var(--font-display);
       font-size: var(--t-figure);
       line-height: 36px;
     }

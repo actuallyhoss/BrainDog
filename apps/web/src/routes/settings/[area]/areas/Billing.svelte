@@ -270,6 +270,7 @@
   .figure {
     margin: 0;
     color: var(--ink);
+    font-family: var(--font-display);
     font-size: var(--t-figure);
     font-weight: 600;
     letter-spacing: -0.02em;

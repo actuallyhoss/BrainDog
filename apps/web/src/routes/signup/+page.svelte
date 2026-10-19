@@ -1903,6 +1903,7 @@
 
   @media (width < 900px) {
     .title {
+      font-family: var(--font-display);
       font-size: var(--t-figure);
       line-height: 36px;
     }

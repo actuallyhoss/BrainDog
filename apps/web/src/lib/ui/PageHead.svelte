@@ -326,7 +326,8 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-family: var(--font-ui);
+    /* Look B: page names wear Lexend, text stays Geist. */
+    font-family: var(--font-display);
     font-size: var(--fs-page);
     font-weight: var(--fw-semi);
     line-height: calc(34 / 28);

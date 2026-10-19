@@ -880,6 +880,7 @@
 
   @media (width < 900px) {
     .slogan {
+      font-family: var(--font-display);
       font-size: var(--t-figure);
       line-height: 36px;
     }

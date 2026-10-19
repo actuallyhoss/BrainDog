@@ -735,6 +735,7 @@
     gap: var(--sp-2);
     margin: 0;
     color: var(--ink);
+    font-family: var(--font-display);
     font-size: var(--t-figure);
     font-weight: 600;
     line-height: 34px;

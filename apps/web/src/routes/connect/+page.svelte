@@ -380,6 +380,7 @@
 
   @media (width < 900px) {
     .title {
+      font-family: var(--font-display);
       font-size: var(--t-figure);
       line-height: calc(36 / 30);
     }
