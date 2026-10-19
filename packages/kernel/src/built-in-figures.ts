@@ -79,6 +79,7 @@
  */
 
 import type { Result, Sql } from '@braindog/ports';
+import { unprivate, unprivateLine } from '@braindog/where';
 import { no, ok } from '@braindog/ports';
 
 import { DOOR_KEPT_DAYS, DOOR_WINDOW_DAYS, doorMarks } from './door.ts';
@@ -225,18 +226,19 @@ export function stepSaid(next: string): string {
  * THE WHOLE RECORD IS EACH PLACE IN TURN, because whether a step was passed over is asked of the runs in its own place:
  * every place a waiting run was left in is read once, a project first and its repository only for a run in none.
  */
-export function openSteps(sql: Sql, nowMs: number, project?: string | null): OpenStep[] {
-  if (typeof project === 'string' && project !== '' && project !== PARAM) return clientsOf(sql, openHandoffs(sql, { project }, null, nowMs).map((h) => ({ ...h, project, repo: null })));
+export function openSteps(sql: Sql, nowMs: number, project?: string | null, viewer?: string): OpenStep[] {
+  if (typeof project === 'string' && project !== '' && project !== PARAM) return clientsOf(sql, openHandoffs(sql, { project }, null, nowMs, viewer).map((h) => ({ ...h, project, repo: null })));
   const places = sql.all<{ project: string | null; repo: string | null }>(
     `SELECT DISTINCT nullif(json_extract(fields, '$.project'), '') AS project,
        CASE WHEN coalesce(json_extract(fields, '$.project'), '') = '' THEN nullif(json_extract(fields, '$.repo'), '') END AS repo
-     FROM entry WHERE register = ? AND deleted_at IS NULL AND state = 'handoff'`,
+     FROM entry WHERE register = ? AND deleted_at IS NULL AND state = 'handoff'${viewer === undefined ? '' : ` AND ${unprivate()}`}`,
     SESSION,
+    ...(viewer === undefined ? [] : [viewer]),
   );
   const seen = new Set<string>();
   const out: Omit<OpenStep, 'client' | 'next_said'>[] = [];
   for (const place of places)
-    for (const h of openHandoffs(sql, place.project ? { project: place.project } : { repo: place.repo }, null, nowMs))
+    for (const h of openHandoffs(sql, place.project ? { project: place.project } : { repo: place.repo }, null, nowMs, viewer))
       if (!seen.has(h.id)) {
         seen.add(h.id);
         out.push({ ...h, project: place.project, repo: place.project ? null : place.repo });
@@ -257,9 +259,9 @@ function clientsOf(sql: Sql, steps: Omit<OpenStep, 'client' | 'next_said'>[]): O
 }
 
 /** How many next steps wait, on the record or in the one project `about` names. Always now, as the briefing reads them. */
-export function readHandoffsOpen(sql: Sql, ctx: Pick<EvalContext, 'nowMs'>, decl?: MetricDecl): Result<Reading> {
+export function readHandoffsOpen(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'viewer'>, decl?: MetricDecl): Result<Reading> {
   const about = (decl as HandoffsDecl | undefined)?.about;
-  const n = openSteps(sql, ctx.nowMs, typeof about === 'string' ? about : null).length;
+  const n = openSteps(sql, ctx.nowMs, typeof about === 'string' ? about : null, ctx.viewer).length;
   return ok({ value: n, unit: null, rows: n, held: n, delta: null, why: 'no comparison asked for', met: null, refusals: [] });
 }
 
@@ -560,7 +562,7 @@ const activityBy = (actor: string): keyof typeof WHO_SAID => {
  * COUNTED IN THE DATABASE, a quarter of an hour at a time, never line by line: his record wrote thousands of lines a
  * month. Only a run's edits of an instant field are read one by one, to tell a stamp from a change.
  */
-export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz'>, decl: MetricDecl): Result<Reading> {
+export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs' | 'tz' | 'viewer'>, decl: MetricDecl): Result<Reading> {
   const cut = (decl as ActivityDecl).activity;
   if (!(ACTIVITY_BY as readonly unknown[]).includes(cut))
     return no<Reading>('VALUE_MALFORMED', `${decl.metric}: activity names how the log is cut, one of ${ACTIVITY_BY.join(', ')}.`, {
@@ -599,11 +601,15 @@ export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'
     hours[slot.hour]! += n;
     total += n;
   };
+  /* LINES ABOUT A ROW SOMEBODY ELSE KEPT PRIVATE ARE NOT COUNTED for this viewer, as the feed leaves them out. */
+  const kept = ctx.viewer === undefined ? '' : ` AND ${unprivateLine('e.target')}`;
+  const keptWho = ctx.viewer === undefined ? [] : [ctx.viewer];
   const counted = sql.all<{ quarter: number; actor: string; kind: string; n: number }>(
     `SELECT CAST(strftime('%s', e.ts) AS INTEGER) / 900 AS quarter, e.actor AS actor, e.kind AS kind, COUNT(*) AS n
-       FROM event e WHERE e.ts >= ? AND e.ts <= ? AND ${ACTIVITY_SHOWN} GROUP BY 1, 2, 3`,
+       FROM event e WHERE e.ts >= ? AND e.ts <= ? AND ${ACTIVITY_SHOWN}${kept} GROUP BY 1, 2, 3`,
     since,
     until,
+    ...keptWho,
   );
   for (const c of counted) count(Number(c.quarter), c.actor, c.kind, Number(c.n));
 
@@ -630,10 +636,11 @@ export function readActivity(sql: Sql, ctx: Pick<EvalContext, 'nowMs' | 'asOfMs'
          FROM event e JOIN entry r ON r.id = substr(e.target, 7)
         WHERE e.ts >= ? AND e.ts <= ? AND e.kind = 'edit' AND substr(e.target, 1, 6) = 'entry:'
           AND COALESCE(e.target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
-          AND e.field IN (SELECT value FROM json_each(?))`,
+          AND e.field IN (SELECT value FROM json_each(?))${kept}`,
       since,
       until,
       JSON.stringify([...stamped]),
+      ...keptWho,
     );
     for (const e of edits) {
       if (!isRunName(e.actor) || !instants.has(`${e.list}\n${e.field}`)) continue;

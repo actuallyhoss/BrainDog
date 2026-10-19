@@ -20,6 +20,7 @@
  * `last_seen`, which `endRun` stamps, is when a run that ended was last heard from.
  */
 
+import { unprivate } from '@braindog/where';
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
@@ -121,7 +122,7 @@ const leftAt = (t: string): string =>
  * own, or written off), that wrote at least once and works for no other run. Times are compared through `julianday`, so an instant written with milliseconds and
  * one written without order as the moments they are and not as strings.
  */
-export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null, nowMs: number): OpenHandoff[] {
+export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null, nowMs: number, viewer?: string): OpenHandoff[] {
   const h = placeSql('h', place);
   const l = placeSql('l', place);
   if (!h || !l) return [];
@@ -135,13 +136,14 @@ export function openHandoffs(sql: Sql, place: HandoffPlace, self: string | null,
          AND julianday(json_extract(l.fields, '$.last_seen')) > julianday(${leftAt('h')})
          AND ${l.where}) AS passed
      FROM entry h WHERE h.register = ? AND h.deleted_at IS NULL AND h.state = 'handoff' AND h.id <> ?
-       AND trim(coalesce(json_extract(h.fields, '$.next'), '')) <> '' AND ${h.where}
+       AND trim(coalesce(json_extract(h.fields, '$.next'), '')) <> '' AND ${h.where}${viewer === undefined ? '' : ` AND ${unprivate('h.id')}`}
      ORDER BY julianday(left_at) DESC, h.seq DESC`,
     SESSION,
     ...l.params,
     SESSION,
     self ?? '',
     ...h.params,
+    ...(viewer === undefined ? [] : [viewer]),
   );
   return rows.map((row) => {
     const fields = JSON.parse(row.fields) as Record<string, Json>;

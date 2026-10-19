@@ -17,6 +17,7 @@
  * reaches `metrics.ts`, so the figures' words live in `built-in-figures.ts` and come in from there.
  */
 
+import { unprivate } from '@braindog/where';
 import type { Sql } from '@braindog/ports';
 
 import { DEAD_PATHS_SERIES, countsSeries } from './built-in-figures.ts';
@@ -72,7 +73,9 @@ export function countLists(sql: Sql, at: number, tz?: string): ListCounts {
   ))
     if (typeof r.list === 'string' && r.list !== '') out[r.list] = { live: 0, deleted: 0 };
   for (const r of sql.all<{ register: string; live: number; deleted: number }>(
-    'SELECT register, SUM(deleted_at IS NULL) AS live, SUM(deleted_at IS NOT NULL) AS deleted FROM entry GROUP BY register',
+    /* A STORED SERIES IS SHARED, so it counts as nobody (`''`): a row its maker kept private is in no point. */
+    `SELECT register, SUM(deleted_at IS NULL) AS live, SUM(deleted_at IS NOT NULL) AS deleted FROM entry WHERE ${unprivate()} GROUP BY register`,
+    '',
   ))
     out[r.register] = { live: Number(r.live ?? 0), deleted: Number(r.deleted ?? 0) };
   const day = dayIn(at, tz);

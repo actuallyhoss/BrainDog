@@ -1044,3 +1044,19 @@ test('A FILE WRITTEN BEFORE MIGRATION 22 LANDS WITH THE REGISTER THAT KEEPS A RU
   source.sql.close();
   sql.close();
 });
+
+test('A PRIVATE MARK TRAVELS IN THE EXPORT WITH ITS ROW, AND THE IMPORT PUTS IT BACK', async () => {
+  const { k } = await record();
+  const made = k.create('obligations', { what: 'Ada hidden' }, { actor: 'p_ada' });
+  assert.ok(made.ok);
+  const id = (made as { value: { id: string } }).value.id;
+  assert.ok(k.setPrivate('p_ada', id, true).ok);
+  const lines = value<string[]>(await k.export());
+  assert.ok(lines.some((l) => l.startsWith('#table entry_private ')), 'the mark was left out of the file');
+
+  const sql = openSqlite();
+  const again = await openRecord(sql, fixedClock(NOW), { sign: SIGNER });
+  value(await again.import(lines));
+  assert.equal(again.hiddenFrom(id, 'p_bo'), true);
+  assert.equal(again.hiddenFrom(id, 'p_ada'), false);
+});

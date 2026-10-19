@@ -166,6 +166,7 @@ const runsEmpty: Finder = {
  *
  * THE SAME PLACE, with no caller to stand in: the step's own project, or with none on either run its repository.
  */
+/* THE TIDY COUNTS RUNS AND STEPS, THE RECORD'S OWN BOOKKEEPING, AND ACTS ON ALL OF THEM: owner-level by design, no private-row clause. */
 const stepsOld: Finder = {
   id: 'steps-old',
   name: 'Steps passed over or left too long',

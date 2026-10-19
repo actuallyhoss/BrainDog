@@ -18,6 +18,7 @@
  * NO NEW COLUMN: every day read here is one the vault already keeps.
  */
 
+import { unprivate } from '@braindog/where';
 import type { Sql } from '@braindog/ports';
 
 import type { Finder, TidyAsk } from './tidy.ts';
@@ -57,9 +58,10 @@ const unopened = (g: string): string =>
 
 /** The WHERE for one list's unopened keys, and its parameters after the list's id and finished states. */
 function whereOf(l: SealedList, since: string): { where: string; params: string[] } {
+  /* A KEY ROW ITS MAKER KEPT PRIVATE IS NOT COUNTED OR NAMED: this answer is shared, so it reads as nobody (`''`). */
   const where = `register = ? AND deleted_at IS NULL AND coalesce(state, '') NOT IN (SELECT value FROM json_each(?))
-    AND (${l.sealed.map((f) => unopened(fieldOf(f))).join(' OR ')})`;
-  return { where, params: [l.list, JSON.stringify(l.done), ...l.sealed.flatMap(() => [since, since])] };
+    AND (${l.sealed.map((f) => unopened(fieldOf(f))).join(' OR ')}) AND ${unprivate()}`;
+  return { where, params: [l.list, JSON.stringify(l.done), ...l.sealed.flatMap(() => [since, since]), ''] };
 }
 
 /**

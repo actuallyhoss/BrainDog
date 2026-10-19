@@ -782,8 +782,19 @@ const elementSql = (value: unknown, put: (v: string | number) => string): string
 export function compile(where: Predicate | undefined, schema: Schema): Compiled {
   const c = compileAt(where, schema, 1);
   if (schema.except === undefined || c.bad.length || schema.subject === 'inbox_raw') return c;
-  return { sql: `(${c.sql}) AND id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)`, params: [...c.params, schema.except], bad: [] };
+  return { sql: `(${c.sql}) AND ${unprivate()}`, params: [...c.params, schema.except], bad: [] };
 }
+
+/**
+ * THE ONE SQL CLAUSE THAT LEAVES OUT A ROW ITS MAKER KEPT PRIVATE (migration 40) for everybody but that maker; binds one
+ * parameter, the viewer. Every raw-SQL reader that bypasses `compile` uses this and never writes it again. A reader with
+ * no one in particular (a stored figure, a sweep) binds `''`, which is nobody, so no private row is in it.
+ */
+export const unprivate = (col = 'id'): string => `${col} NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)`;
+
+/** The same clause for a line of the log: one about a row its maker kept private is left out for anybody else. Binds the viewer once. */
+export const unprivateLine = (col = 'target'): string =>
+  `NOT (${col} LIKE 'entry:%' AND substr(${col}, 7) IN (SELECT entry_id FROM entry_private WHERE person_id <> ?))`;
 
 /* THE SAME COMPILE, STARTED PART WAY DOWN, which is how a `pointed` hop asks its question of the other
    register: the inner predicate counts toward `MAX_DEPTH` from where the hop sits, so a hop inside a hop

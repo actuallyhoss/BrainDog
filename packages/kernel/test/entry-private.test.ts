@@ -88,3 +88,17 @@ test('ONLY THE MAKER MAY KEEP A ROW PRIVATE OR SHARE IT AGAIN', async () => {
   assert.ok(k.setPrivate('p_ada', mine, false).ok);
   assert.equal(k.hiddenFrom(mine, 'p_bo'), false);
 });
+
+test('THE ACTIVITY FIGURE AND THE MONEY CURRENCIES LEAVE OUT A ROW KEPT PRIVATE FROM ANOTHER VIEWER', async () => {
+  const { k, mine } = await jotter();
+  assert.ok(k.setPrivate('p_ada', mine, true).ok);
+  const how = { metric: 'moves', name: 'Moves', activity: 'kind', window: '7d' } as unknown as MetricDecl;
+  const total = (viewer?: string) => {
+    const out = k.metric(how, viewer === undefined ? {} : { viewer });
+    assert.ok(out.ok, JSON.stringify(out));
+    return out.value.value;
+  };
+  assert.ok(Number(total('p_bo')) < Number(total('p_ada')));
+  assert.equal(total('p_ada'), total());
+  assert.deepEqual(k.moneyCurrencies(() => true, 2, 'p_bo'), []);
+});

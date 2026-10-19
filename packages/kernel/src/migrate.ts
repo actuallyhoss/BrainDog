@@ -60,6 +60,7 @@ import causeAnswered0037 from './migrations/0037_cause_answered.ts';
 import packWaiting0038 from './migrations/0038_pack_waiting.ts';
 import entryMadeIndex0039 from './migrations/0039_entry_made_index.ts';
 import entryPrivate0040 from './migrations/0040_entry_private.ts';
+import entryPrivateTravels0041 from './migrations/0041_entry_private_travels.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -105,6 +106,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 38, slug: 'pack_waiting', sql: packWaiting0038 },
   { version: 39, slug: 'entry_made_index', sql: entryMadeIndex0039 },
   { version: 40, slug: 'entry_private', sql: entryPrivate0040 },
+  { version: 41, slug: 'entry_private_travels', sql: entryPrivateTravels0041 },
 ];
 
 /**
@@ -160,7 +162,8 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 38 rebuilds `pack` with one more nullable column, which an older file imports without and reads as NULL,
  * an add-on with nothing waiting, which is what every add-on was before `when`, so the format is still 1.
  * Migration 39 adds `entry_made`, an index no file carries, so the format is still 1.
- * Migration 40 adds `entry_private`, `local` as `device_grant` is, so no file carries it and the format is still 1.
+ * Migration 40 adds `entry_private`, which no file carried until migration 41 put it in `data`: an older reader skips a table it has no shape for, so the format is still 1.
+ * Migration 41 adds no table: it lists `entry_private` in `dog_section`, so a file carries the private marks with the rows.
  */
 export const FORMAT_VERSION = 1 as const;
 

@@ -7452,7 +7452,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      was answered two and the preset quoted one of USD or GBP. 21 is the pack's `RATES_CURRENCIES_MOST` (20,
      `packs/rates-poll/fill.ts`) and one over it, so a record past it is told so; `currency` still reads only one. */
   const drawnIn = (ctx: CallContext): { currency: string | null; money: string[] } => {
-    const money = kernel.moneyCurrencies((register) => readable(ctx, register) === null && kernel.scope(ctx, register) === undefined, DRAWN_CURRENCIES_MOST);
+    const money = kernel.moneyCurrencies((register) => readable(ctx, register) === null && !Object.hasOwn(ctx.wheres ?? {}, register), DRAWN_CURRENCIES_MOST, viewerOf(ctx));
     return { currency: kernel.homeCurrency() ?? (money.length === 1 ? money[0]! : null), money };
   };
 

@@ -26,7 +26,7 @@ import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { renameDeclarations } from './migrations/0016_slash.ts';
-import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, unprivateLine, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
   enablePack as enableDeclaredPack,
@@ -6290,7 +6290,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   const withViewer = (viewer: string | undefined, c: EvalContext): EvalContext => {
     if (viewer === undefined || !anyHiddenFrom(viewer)) return c;
     const inner = c.schemaOf;
-    return { ...c, schemaOf: (register) => {
+    return { ...c, viewer, schemaOf: (register) => {
       const s = inner(register);
       return s === null ? null : { ...s, except: viewer };
     } };
@@ -6701,10 +6701,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     signs: () => everySign(),
     /* THE STEPS RUNS LEFT AND NOBODY TOOK, in one project or on the whole record (`openSteps`, AGT-C05), so a
        `handoffs.open` block draws them on Agents. Without this line the block refuses as not in this build. */
-    handoffs: (project) => openSteps(sql, clock.now(), project),
+    handoffs: (project) => openSteps(sql, clock.now(), project, viewer),
     /* WHAT WENT QUIET (`openExceptions`, ENG-B13), over every list this record declares but the kernel's own list of
        runs, so an `exceptions` block draws them. Without this line the block refuses as not in this build. */
     exceptions: () => openExceptions(sql, clock.now(), watchedLists().filter((l) => !anyHiddenFrom(viewer, l.id))),
+    /* BLOCKING READS DECLARED ACTIONS AND THEIR SCHEDULE, NOT ROWS: owner-level bookkeeping by design, so no private-row clause. */
     blocking: (project) => actionsBlocking(sql, clock.now(), project, recordTz()),
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
@@ -7065,7 +7066,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       type Raw = { rowid: number; ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null };
       const lines: Raw[] = [];
       /* A LINE ABOUT A ROW SOMEBODY ELSE KEPT PRIVATE IS NOT IN THE FEED (migration 40), whoever the feed is drawn for. */
-      const kept = viewer === undefined ? '' : " AND NOT (target LIKE 'entry:%' AND substr(target, 7) IN (SELECT entry_id FROM entry_private WHERE person_id <> ?))";
+      const kept = viewer === undefined ? '' : ` AND ${unprivateLine()}`;
       let before = Number.MAX_SAFE_INTEGER;
       for (let walked = 0; lines.length < limit && walked < FEED_WALK; ) {
         const batch = sql.all<Raw>(
@@ -7852,6 +7853,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * A RUN WRITTEN OFF KEEPS ITS LINE IN ITS HISTORY AND IN THE LOG, and no feed shows it (`bookkeeping`): the sweep is
    * the record keeping its books, and its lines were three quarters of the owner's Activity.
    */
+  /* THE SWEEP IS THE SYSTEM'S HOUSEKEEPING OVER EVERY ROW, private ones included (it deletes and closes, it shows no one a figure): owner-level by design. */
   function sweepRecord(cutoffMs = clock.now() - 30 * 86_400_000, limit?: number) {
     const out = purge(sql, cutoffMs, clock.now(), transaction, mint, limit);
     /* MIGRATION 28'S DATA STEPS, 200 runs an hour until every run has had them (`runsDataSteps`): the runs the sweep

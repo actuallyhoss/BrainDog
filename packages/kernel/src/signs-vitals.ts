@@ -29,6 +29,7 @@
  * wired nowhere), so the sign does not say anybody is (audit 65, claim 3).
  */
 
+import { unprivate } from '@braindog/where';
 import type { Sql } from '@braindog/ports';
 
 import { isCurrencyCode } from './coerce.ts';
@@ -216,7 +217,8 @@ function readAmounts(sql: Sql): SignReading {
   let held = 0;
   const broken: { list: string; what: string | null; why: Fault }[] = [];
   for (const l of holding)
-    for (const row of sql.all<{ fields: string }>('SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL', l.id)) {
+    /* A SIGN IS STORED AND SHARED, so it reads as nobody (`''`): a row its maker kept private is not counted or named. */
+    for (const row of sql.all<{ fields: string }>(`SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL AND ${unprivate()}`, l.id, '')) {
       const fields = parsed(row.fields) ?? {};
       for (const f of l.money) {
         const v = fields[f];

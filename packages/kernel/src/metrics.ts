@@ -30,7 +30,7 @@
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
 import { fixOf, no, ok } from '@braindog/ports';
-import { KERNEL_FIELDS, compile, evaluate, jsonPath, lookupRef, parseWhere, resolveDay, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
+import { KERNEL_FIELDS, compile, evaluate, jsonPath, lookupRef, parseWhere, resolveDay, unprivate, type Predicate, type Schema, type SentenceDeps } from '@braindog/where';
 
 import { GROUP_CAP, bucketOf, bucketRun, bucketStart, isBucket, nextBucket, type Bucket } from './buckets.ts';
 import {
@@ -867,6 +867,8 @@ function localInstants(where: Predicate | undefined, schema: Schema, tz: string 
 
 export type EvalContext = {
   nowMs: number;
+  /** Who is reading, when rows somebody else kept private must be left out of a raw-SQL figure (`unprivate`); unset reads the whole record. */
+  viewer?: string | undefined;
   /**
    * Read the record as it was at this instant instead of now.
    *
@@ -3670,10 +3672,11 @@ function readMade(sql: Sql, decl: MetricDecl, ctx: EvalContext, shift: number, l
   const signed = sql.all<{ actor: string | null; n: number }>(
     `SELECT (SELECT c.actor FROM event c WHERE c.target = 'entry:' || r.id AND c.kind = 'create' AND c.field IS NULL ORDER BY c.rowid LIMIT 1) AS actor,
             COUNT(*) AS n
-       FROM entry r WHERE r.register = ? AND r.deleted_at IS NULL AND r.created_at >= ? AND r.created_at < ? GROUP BY 1`,
+       FROM entry r WHERE r.register = ? AND r.deleted_at IS NULL AND r.created_at >= ? AND r.created_at < ?${ctx.viewer === undefined ? '' : ` AND ${unprivate('r.id')}`} GROUP BY 1`,
     list,
     starts(first),
     starts(dayAfter(today)),
+    ...(ctx.viewer === undefined ? [] : [ctx.viewer]),
   );
   const schema = madeSchema(list);
   const parts = new Map<string, Group>();

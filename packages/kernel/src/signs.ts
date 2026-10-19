@@ -26,7 +26,7 @@
 
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
-import { jsonPath } from '@braindog/where';
+import { jsonPath, unprivate } from '@braindog/where';
 
 import { BUILT_IN_FIGURES, readRatesAge } from './built-in-figures.ts';
 import { homeCurrency } from './declare.ts';
@@ -517,6 +517,7 @@ function readOldest(sql: Sql, nowMs: number, tz: string): SignReading {
 
 /* ── runs-true ─────────────────────────────────────────────────────────── */
 
+/* RUNS ARE THE RECORD'S OWN BOOKKEEPING (agents' sessions, counted for health): owner-level by design, no private-row clause. */
 function readRuns(sql: Sql, nowMs: number): SignReading {
   const since = new Date(nowMs - RUNS_WINDOW_DAYS * DAY).toISOString();
   const HEARD = "coalesce(json_extract(fields, '$.last_seen'), updated_at)";
@@ -582,7 +583,7 @@ function currenciesHeld(sql: Sql): string[] {
     for (const f of fields) {
       if (f?.type !== 'money' || typeof f.id !== 'string') continue;
       const at = `json_extract(fields, '${jsonPath(f.id)}.currency')`;
-      for (const r of sql.all<{ c: unknown }>(`SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL LIMIT 2`, list.id))
+      for (const r of sql.all<{ c: unknown }>(`SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL AND ${unprivate()} LIMIT 2`, list.id, ''))
         if (typeof r.c === 'string' && /^[A-Z]{3}$/u.test(r.c)) found.add(r.c);
       if (found.size >= 2) return [...found].sort();
     }

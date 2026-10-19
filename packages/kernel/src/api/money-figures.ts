@@ -22,7 +22,7 @@
  * `money-figures.ts` `figureLists`, the one `pages.ts` holds a block back by, so a figure and a page cannot disagree.
  */
 
-import { jsonPath } from '@braindog/where';
+import { jsonPath, unprivate } from '@braindog/where';
 
 import { homeCurrency } from '../declare.ts';
 import type { MetricDecl } from '../metrics.ts';
@@ -44,9 +44,9 @@ export function extension(parts: KernelParts) {
      * The currencies the money on the lists `reads` admits is in, sorted, stopping at `most` (the second by default): a
      * record in two is answered two and no more, because one currency is the only answer `boot`'s home draws with. A
      * caller that quotes them all (the rates preset, up to `RATES_CURRENCIES_MOST`) asks for one more than it can quote.
-     * Every list when `reads` is absent; a list the caller may not open adds nothing, so its money says nothing about it.
+     * Every list when `reads` is absent; a list the caller may not open adds nothing, so its money says nothing about it. With a `viewer`, a row kept private to somebody else adds nothing either.
      */
-    moneyCurrencies(reads: (register: string) => boolean = () => true, most = 2): string[] {
+    moneyCurrencies(reads: (register: string) => boolean = () => true, most = 2, viewer?: string): string[] {
       const found = new Set<string>();
       for (const d of parts.declarations()) {
         if (d.kind !== 'register' || !d.id.startsWith('register.')) continue;
@@ -56,8 +56,9 @@ export function extension(parts: KernelParts) {
           if (f.type !== 'money') continue;
           const at = `json_extract(fields, '${jsonPath(f.id)}.currency')`;
           const held = parts.sql.all<{ c: unknown }>(
-            `SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL LIMIT ?`,
+            `SELECT DISTINCT ${at} AS c FROM entry WHERE register = ? AND deleted_at IS NULL AND ${at} IS NOT NULL${viewer === undefined ? '' : ` AND ${unprivate()}`} LIMIT ?`,
             list.id,
+            ...(viewer === undefined ? [] : [viewer]),
             most,
           );
           for (const r of held) if (typeof r.c === 'string' && /^[A-Z]{3}$/u.test(r.c)) found.add(r.c);

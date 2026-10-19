@@ -320,12 +320,15 @@ export function readRolled(sql: Sql, decl: MetricDecl, ctx: EvalContext): Result
   const day = (col: string): string => `substr(json_extract(fields, '${jsonPath(col)}'), 1, 10)`;
 
   /* ONE STATEMENT FROM A CHECK LIST: the newest on or before the day, or the earliest after it. */
-  const statedIn = ({ check }: { check: RolledCheck }, account: string, on: string, after: boolean): { day: string; money: { amount: number; currency: string } } | null => {
+  const statedIn = ({ check, schema }: { check: RolledCheck; schema: Schema }, account: string, on: string, after: boolean): { day: string; money: { amount: number; currency: string } } | null => {
+    /* THE CHECK LIST'S OWN SCHEMA CARRIES THE VIEWER (`except`), so `compile` leaves out a statement somebody kept private. */
+    const kept = compile(undefined, schema);
     const row = sql.one<{ fields: string }>(
-      `SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(check.by)}') = ?
+      `SELECT fields FROM entry WHERE register = ? AND deleted_at IS NULL AND (${kept.sql}) AND json_extract(fields, '${jsonPath(check.by)}') = ?
          AND json_extract(fields, '${jsonPath(check.balance)}.amount') IS NOT NULL AND ${day(check.on)} ${after ? '>' : '<='} ?
        ORDER BY ${day(check.on)} ${after ? 'ASC' : 'DESC'}, rowid ${after ? 'ASC' : 'DESC'} LIMIT 1`,
       check.register,
+      ...kept.params,
       account,
       on,
     );
@@ -551,11 +554,14 @@ export function readCrosscheck(sql: Sql, decl: MetricDecl, ctx: EvalContext): Re
     ok({ ...empty(decl, CROSSCHECK_TOO_MANY, ctx.fx?.().rates ?? [], new Date(clockOf(ctx)).toISOString().slice(0, 10)), met: null });
   /* ONE ACCOUNT'S ENTRIES IN A LIST, oldest written first, each read out whole. `null` past the bound. */
   const entriesOf = (list: string, by: string, account: string, admits: { sql: string; params: readonly unknown[] } | null): Record<string, unknown>[] | null => {
+    /* WITH NO RULE OF ITS OWN, THE LIST'S SCHEMA STILL HOLDS THE VIEWER, so a statement kept private is never read. */
+    const own = ctx.schemaOf(list);
+    const gate = admits ?? (own ? compile(undefined, own) : null);
     const rows = sql.all<{ id: string; fields: string }>(
-      `SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(by)}') = ?${admits ? ` AND (${admits.sql})` : ''} ORDER BY rowid LIMIT ${left + 1}`,
+      `SELECT id, fields FROM entry WHERE register = ? AND deleted_at IS NULL AND json_extract(fields, '${jsonPath(by)}') = ?${gate ? ` AND (${gate.sql})` : ''} ORDER BY rowid LIMIT ${left + 1}`,
       list,
       account,
-      ...((admits?.params ?? []) as never[]),
+      ...((gate?.params ?? []) as never[]),
     );
     if (rows.length > left) return null;
     left -= rows.length;
