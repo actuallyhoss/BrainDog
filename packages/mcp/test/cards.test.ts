@@ -6,23 +6,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { cardHtml, cardMeta, cardOf, cardResource, decisionCard, moneyLine, projectCard } from '../src/cards.ts';
+import { cardHtml, cardMeta, cardOf, cardResource, decisionCard, moneyLine, projectCard, ruleCard } from '../src/cards.ts';
 
-test('a projects row becomes a project card with its hue, brief, next step and one figure', () => {
+test('a projects row becomes a project card from the fields the list declares', () => {
   const card = projectCard(
-    { spoken: 'projects#4', hue: 210, fields: { name: 'Nook', brief: 'Rooms for friends.', next: 'Ship the iOS build', budget: { amount: 120000, currency: 'GBP' }, working: 'Claude' } },
+    { spoken: 'projects#4', fields: { name: 'Nook', about: 'Rooms for friends.', next: 'Ship the iOS build', hue: 210, lane: 'building', revenue: { amount: 120000, currency: 'GBP' }, agent: 'Claude' } },
     'https://brain.dog/',
+    'sam',
   );
   assert.deepEqual(card, {
     kind: 'project',
     name: 'Nook',
     hue: 210,
+    lane: 'Building',
     brief: 'Rooms for friends.',
     next: 'Ship the iOS build',
     money: 'GBP 1,200',
     working: 'Claude',
-    href: 'https://brain.dog/app',
+    href: 'https://brain.dog/app/sam',
   });
+});
+
+test('the brief is the clean first lines of the note when there is no about, and the link falls back to /app', () => {
+  const card = projectCard({ spoken: 'projects#5', fields: { name: 'Quartz', note: '# Quartz\nStatus: building · Lane: ship\nA tool for sites. It builds them nightly.\nMore later.' } }, 'https://brain.dog');
+  assert.equal(card?.brief, 'A tool for sites. It builds them nightly.');
+  assert.equal(card?.href, 'https://brain.dog/app');
+  assert.equal(card?.hue, null);
 });
 
 test('only a projects row is a project card', () => {
@@ -70,7 +79,7 @@ test('each tool names its card for both conventions', () => {
 });
 
 test('the page is self-contained, answers on a press only, and carries no fetched file', () => {
-  for (const kind of ['project', 'decision'] as const) {
+  for (const kind of ['project', 'decision', 'rule'] as const) {
     const html = cardHtml(kind);
     assert.ok(html.includes('prefers-color-scheme:dark'));
     assert.ok(html.includes('window.openai'));
@@ -78,4 +87,41 @@ test('the page is self-contained, answers on a press only, and carries no fetche
     assert.ok(!/<link |src=|@import|https?:\/\/fonts/.test(html));
     assert.ok(!html.includes('—'));
   }
+});
+
+test('a rule proposal draws a rule card: what it would do, what it was tried against, and the decision buttons', () => {
+  const rows = {
+    rows: [
+      {
+        id: 'SG7',
+        question: 'File invoices by sender?',
+        status: 'open',
+        body_kind: 'change',
+        body: { to: { kind: 'rule', id: 'rule.invoices', body: { name: 'Invoices', about: 'Files an emailed invoice in Money. It reads the sender.' } } },
+        dry_run: { matches: 12, won: 9 },
+        options: [{ id: 'yes', label: 'Turn it on' }, { id: 'no', label: 'Leave it' }],
+      },
+    ],
+  };
+  const card = ruleCard(rows, 'https://brain.dog', 'sam');
+  assert.equal(card?.does, 'Files an emailed invoice in Money.');
+  assert.equal(card?.tried, 'Tried against a sample: 12 matched, and it would take 9 of them.');
+  assert.equal(card?.options[0]?.suggested, true);
+  assert.equal(card?.answerTool, null);
+  assert.equal(card?.href, 'https://brain.dog/app/sam');
+  assert.equal(cardOf('governance', { id: 'SG7' }, rows)?.kind, 'rule');
+});
+
+test('a pattern proposal is a rule, and an options question is not', () => {
+  const pattern = { rows: [{ id: 'SG8', question: 'Read these emails as invoices?', body_kind: 'pattern', body: { ingest: { id: 'ingest.x', kind: 'ingest', body: {} }, samples: ['a', 'b'] } }] };
+  const card = ruleCard(pattern);
+  assert.equal(card?.does, 'Read these emails as invoices?');
+  assert.equal(card?.tried, 'Tried against 2 sample arrivals.');
+  assert.equal(ruleCard({ rows: [{ question: 'Ship?', body_kind: 'options', body: { options: [] } }] }), null);
+  assert.equal(ruleCard({ rows: [{ question: 'A', body_kind: 'pattern', body: {} }, { question: 'B' }] }), null);
+});
+
+test('the rule card has its own addresses for both conventions', () => {
+  assert.equal(cardResource('ui://braindog/rule.html')?.mimeType, 'text/html;profile=mcp-app');
+  assert.equal(cardResource('ui://braindog/rule.skybridge.html')?.mimeType, 'text/html+skybridge');
 });

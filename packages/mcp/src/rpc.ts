@@ -212,6 +212,19 @@ function hear<C>(surface: McpSurface<C>, ctx: C, mark: Mark): void {
   }
 }
 
+/** The slug of the record this server serves (`boot`'s `record.slug`), or null when it names none or cannot be read. */
+async function slugOf<C>(surface: McpSurface<C>, ctx: C): Promise<string | null> {
+  try {
+    const boot = await surface.boot(ctx);
+    const value: unknown = boot.ok ? boot.value : undefined;
+    const record = isObject(value) ? value.record : undefined;
+    return isObject(record) && typeof record.slug === 'string' && record.slug !== '' ? record.slug : null;
+  } catch {
+    /* A card links to the app's front door rather than fail the answer it rides on. */
+    return null;
+  }
+}
+
 /** How often a caller's calls are marked after its first: the count since the last mark rides on the next. */
 const CALLED_EVERY = MINUTE;
 /** The most callers one surface remembers between marks; the oldest goes first. */
@@ -390,9 +403,13 @@ async function dispatch<C>(
       const out = await mcp.answer(params.name, args, ctx);
       if (refused(out.result) && out.result.refusal.code === 'INTERNAL') hear(surface, ctx, { kind: 'internal' });
       /* THE CARD'S DATA RIDES BESIDE THE ANSWER, only when this answer is one the card can draw. */
-      const drawn = out.result.ok ? cardOf(params.name, args, out.structured, origin) : null;
+      let drawn = out.result.ok ? cardOf(params.name, args, out.structured, origin) : null;
+      /* THE RECORD'S SLUG IS ASKED ONLY FOR AN ANSWER A CARD DRAWS, so the link lands on this record and not the app's front door. */
+      if (drawn !== null && origin !== undefined) drawn = cardOf(params.name, args, out.structured, origin, await slugOf(surface, ctx)) ?? drawn;
       const shown = render(out);
-      return said(drawn === null ? shown : { ...shown, structuredContent: { ...out.structured, card: drawn } });
+      /* A RULE IS ANSWERED BY `governance`, WHICH LISTS THE DECISION CARD, so the answer names its own template beside it. */
+      const meta = drawn?.kind === 'rule' ? { _meta: cardMeta('rule') } : {};
+      return said(drawn === null ? shown : { ...shown, ...meta, structuredContent: { ...out.structured, card: drawn } });
     }
 
     /* A minute, not an hour: the list names pages, and a page appears when its row does. */

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": { ".": "./src/index.ts", "./rpc": "./src/rpc.ts", "./http": "./src/http.ts", "./build": "./src/build.ts" },
   "dependencies": {
+    "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
     "@braindog/record": "workspace:*"
   },

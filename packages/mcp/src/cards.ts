@@ -1,5 +1,7 @@
+import { briefFromNote } from '@braindog/kernel';
+
 /**
- * The cards BrainDog draws inside an agent's app (DIRECTION §45 decision 7): a project and a decision, as MCP Apps UI
+ * The cards BrainDog draws inside an agent's app (DIRECTION §45 decision 7): a project, a decision and a rule, as MCP Apps UI
  * resources, with the same facts always in the tool's text lines for hosts that draw nothing (Claude Code).
  *
  * TWO CONVENTIONS, ONE PAGE. MCP Apps hosts (Claude, VS Code, Cursor) read `_meta.ui.resourceUri` and hand the widget
@@ -14,12 +16,13 @@
 export const MCP_APP_TYPE = 'text/html;profile=mcp-app';
 export const SKYBRIDGE_TYPE = 'text/html+skybridge';
 
-export type CardKind = 'project' | 'decision';
+export type CardKind = 'project' | 'decision' | 'rule';
 
 /** Each card's addresses: the MCP Apps one, then the ChatGPT one, which needs the skybridge type under its own address. */
 export const CARD_URIS: Record<CardKind, { app: string; openai: string }> = {
   project: { app: 'ui://braindog/project.html', openai: 'ui://braindog/project.skybridge.html' },
   decision: { app: 'ui://braindog/decision.html', openai: 'ui://braindog/decision.skybridge.html' },
+  rule: { app: 'ui://braindog/rule.html', openai: 'ui://braindog/rule.skybridge.html' },
 };
 
 /** The tool-list `_meta` that attaches a card to a tool, for both conventions. */
@@ -36,34 +39,39 @@ export type ProjectCard = {
   kind: 'project';
   name: string;
   hue: number | null;
+  /** The projects list's `lane` said in its own words ("Building"), or null. */
+  lane: string | null;
   brief: string | null;
   next: string | null;
   money: string | null;
   working: string | null;
   href: string | null;
 };
+type CardOption = { id: string; label: string; because: string | null; suggested: boolean };
 export type DecisionCard = {
   kind: 'decision';
   question: string;
-  options: { id: string; label: string; because: string | null; suggested: boolean }[];
+  options: CardOption[];
   /** The tool a button calls through the host bridge. Null today: no tool answers for the person, so buttons link. */
   answerTool: string | null;
   spoken: string;
   href: string | null;
 };
-export type Card = ProjectCard | DecisionCard;
+export type RuleCard = {
+  kind: 'rule';
+  /** What the rule would do, in one sentence. */
+  does: string;
+  /** What it was tried against, from the sample result the proposal carries, or null when it carries none. */
+  tried: string | null;
+  options: CardOption[];
+  answerTool: null;
+  spoken: string;
+  href: string | null;
+};
+export type Card = ProjectCard | DecisionCard | RuleCard;
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 const text = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x.trim() : null);
-
-/** The first of `keys` that holds words, since a list names its own fields. */
-const firstText = (from: Record<string, unknown>, keys: string[]): string | null => {
-  for (const k of keys) {
-    const v = text(from[k]);
-    if (v !== null) return v;
-  }
-  return null;
-};
 
 /** An amount in minor units and its currency, said as a person reads it: "GBP 1,200", "JPY 5,000". */
 export function moneyLine(amount: number, currency: string): string {
@@ -77,7 +85,8 @@ export function moneyLine(amount: number, currency: string): string {
   return `${currency} ${major.toLocaleString('en', { maximumFractionDigits: digits })}`;
 }
 
-const MONEY_KEYS = ['budget', 'spend', 'revenue', 'income', 'cost', 'money', 'value', 'price'];
+/* The projects list declares `revenue` (money) and no other figure; the rest are for lists that name theirs differently. */
+const MONEY_KEYS = ['revenue', 'budget', 'spend', 'income', 'cost', 'money', 'value', 'price'];
 
 /** One money figure if the row has one: a field that is `{ amount, currency }`, or a number beside a currency. */
 function moneyOf(fields: Record<string, unknown>): string | null {
@@ -90,47 +99,51 @@ function moneyOf(fields: Record<string, unknown>): string | null {
 }
 
 const hueOf = (row: Record<string, unknown>, fields: Record<string, unknown>): number | null => {
-  for (const v of [row.hue, fields.hue, fields.accent]) if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 360) return v;
+  for (const v of [fields.hue, row.hue]) if (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 360) return v;
   return null;
 };
 
-/** The app's address for the card's link, or null when the host did not say where it serves the app. */
-const appLink = (origin: string | undefined): string | null => (origin === undefined ? null : `${origin.replace(/\/+$/, '')}/app`);
+/* The portfolio pack's `lane` values and the labels it shows for them. */
+const LANES: Record<string, string> = { building: 'Building', earning: 'Earning', parked: 'Parked', retired: 'Finished' };
+
+/**
+ * The app's address for the card's link: the record's own page when the server knows the record's slug (`boot`'s
+ * `record.slug`), else the app's front door, or null when the host did not say where it serves the app.
+ */
+const appLink = (origin: string | undefined, slug?: string | null): string | null =>
+  origin === undefined ? null : `${origin.replace(/\/+$/, '')}/app${slug ? `/${encodeURIComponent(slug)}` : ''}`;
 
 /**
  * A `get` answer for a projects row as a project card, or null for anything else (a figure, another list's row, a
- * refusal), so only a project is drawn as one.
+ * refusal), so only a project is drawn as one. It reads the fields the portfolio pack declares for that list (name,
+ * about, next, hue, lane, note, agent, revenue); the brief is `about`, else the clean first lines of `note`.
  */
-export function projectCard(structured: Record<string, unknown>, origin?: string): ProjectCard | null {
+export function projectCard(structured: Record<string, unknown>, origin?: string, slug?: string | null): ProjectCard | null {
   const spoken = text(structured.spoken);
   if (spoken === null || !/^projects#\d+$/i.test(spoken)) return null;
   const fields = isObject(structured.fields) ? structured.fields : {};
-  const name = firstText(fields, ['name', 'title']);
+  const name = text(fields.name);
   if (name === null) return null;
+  const note = text(fields.note);
+  const lane = text(fields.lane);
   return {
     kind: 'project',
     name,
     hue: hueOf(structured, fields),
-    brief: firstText(fields, ['brief', 'summary', 'about', 'description']),
-    next: firstText(fields, ['next', 'next_step', 'nextstep']),
+    lane: lane === null ? null : (LANES[lane] ?? null),
+    brief: text(fields.about) ?? (note === null ? null : briefFromNote(note, name).join(' ') || null),
+    next: text(fields.next),
     money: moneyOf(fields),
-    working: firstText(fields, ['working', 'working_now', 'who', 'agent']),
-    href: appLink(origin),
+    working: text(fields.agent),
+    href: appLink(origin, slug),
   };
 }
 
-/**
- * A `governance` answer for one question (called with `id`) as a decision card, or null when it is not exactly one
- * open question. The suggested option leads and is the primary button; the rest follow as they came.
- */
-export function decisionCard(structured: Record<string, unknown>, origin?: string): DecisionCard | null {
-  const rows = Array.isArray(structured.rows) ? structured.rows : [];
-  const row = rows.length === 1 && isObject(rows[0]) ? rows[0] : null;
-  if (row === null) return null;
-  const question = text(row.question);
-  if (question === null || (row.status !== undefined && row.status !== 'open')) return null;
+/** A question's options, from the row or its body, the suggested one leading and marked (the first when none is). */
+function optionsOf(row: Record<string, unknown>): CardOption[] {
+  const body = isObject(row.body) ? row.body : {};
   const suggested = text(row.suggested);
-  const raw = Array.isArray(row.options) ? row.options : [];
+  const raw = Array.isArray(row.options) ? row.options : Array.isArray(body.options) ? body.options : [];
   const options = raw
     .filter(isObject)
     .map((o) => ({ id: text(o.id), label: text(o.label), because: text(o.because) ?? text(o.does) }))
@@ -138,21 +151,105 @@ export function decisionCard(structured: Record<string, unknown>, origin?: strin
     .map((o) => ({ ...o, suggested: suggested === null ? false : o.id === suggested }));
   options.sort((a, b) => Number(b.suggested) - Number(a.suggested));
   if (options.length > 0 && !options.some((o) => o.suggested)) options[0] = { ...options[0]!, suggested: true };
+  return options;
+}
+
+/** The one open question a `governance` answer holds, or null when it holds none or several. */
+function openQuestion(structured: Record<string, unknown>): { row: Record<string, unknown>; question: string } | null {
+  const rows = Array.isArray(structured.rows) ? structured.rows : [];
+  const row = rows.length === 1 && isObject(rows[0]) ? rows[0] : null;
+  if (row === null) return null;
+  const question = text(row.question);
+  if (question === null || (row.status !== undefined && row.status !== 'open')) return null;
+  return { row, question };
+}
+
+/**
+ * A `governance` answer for one question (called with `id`) as a decision card, or null when it is not exactly one
+ * open question. The suggested option leads and is the primary button; the rest follow as they came.
+ */
+export function decisionCard(structured: Record<string, unknown>, origin?: string, slug?: string | null): DecisionCard | null {
+  const one = openQuestion(structured);
+  if (one === null) return null;
   return {
     kind: 'decision',
-    question,
-    options,
+    question: one.question,
+    options: optionsOf(one.row),
     answerTool: null,
-    spoken: text(row.spoken) ?? text(row.id) ?? '',
-    href: appLink(origin),
+    spoken: text(one.row.spoken) ?? text(one.row.id) ?? '',
+    href: appLink(origin, slug),
+  };
+}
+
+/** The rule a proposal would install: a change whose `to` is a rule, or a drafted pattern's ingest. Null for any other body. */
+function ruleOf(row: Record<string, unknown>): Record<string, unknown> | null {
+  const body = isObject(row.body) ? row.body : null;
+  if (body === null) return null;
+  const kind = text(row.body_kind);
+  if (kind === 'pattern') return isObject(body.ingest) && isObject(body.ingest.body) ? body.ingest.body : {};
+  if (kind === 'automation' || kind === 'rule') return isObject(body.body) ? body.body : body;
+  const to = body.to;
+  if (kind === 'change' && isObject(to) && (to.kind === 'rule' || (typeof to.id === 'string' && to.id.startsWith('rule.')))) return isObject(to.body) ? to.body : {};
+  return null;
+}
+
+/** The first sentence of some words, held to a card line. */
+const oneSentence = (words: string): string => {
+  const first = words.replace(/\s+/g, ' ').split(/(?<=[.!?])\s/u)[0] ?? words;
+  return first.length > 200 ? `${first.slice(0, 197).trimEnd()}...` : first;
+};
+
+/** What the proposal's sample result says, as a person reads it, or null when it carries none. */
+function triedOf(row: Record<string, unknown>): string | null {
+  const body = isObject(row.body) ? row.body : {};
+  const got = [row.dry_run, body.dry_run, row.sample, body.sample].find((v) => v !== undefined && v !== null);
+  if (typeof got === 'string') return text(got);
+  if (isObject(got)) {
+    const said = text(got.said) ?? text(got.summary);
+    if (said !== null) return said;
+    if (typeof got.matches === 'number') {
+      const won = typeof got.won === 'number' ? `, and it would take ${got.won} of them` : '';
+      return `Tried against a sample: ${got.matches} matched${won}.`;
+    }
+  }
+  const samples = Array.isArray(body.samples) ? body.samples.length : 0;
+  return samples > 0 ? `Tried against ${samples} sample ${samples === 1 ? 'arrival' : 'arrivals'}.` : null;
+}
+
+/**
+ * A `governance` answer for one open question whose body is a rule (an automation or pattern proposal) as a rule card:
+ * what it would do, what it was tried against, and the decision's buttons as links. Null for any other question.
+ */
+export function ruleCard(structured: Record<string, unknown>, origin?: string, slug?: string | null): RuleCard | null {
+  const one = openQuestion(structured);
+  if (one === null) return null;
+  const rule = ruleOf(one.row);
+  if (rule === null) return null;
+  /* The rule's own words first, else the question the proposal asked, which already says it in a sentence. */
+  const says = text(rule.does) ?? text(rule.about) ?? text(rule.summary) ?? text(rule.name) ?? one.question;
+  return {
+    kind: 'rule',
+    does: oneSentence(says),
+    tried: triedOf(one.row),
+    options: optionsOf(one.row),
+    answerTool: null,
+    spoken: text(one.row.spoken) ?? text(one.row.id) ?? '',
+    href: appLink(origin, slug),
   };
 }
 
 /** The card a tool's answer draws, or null: the tool carries none, or this answer is not one the card can draw. */
-export function cardOf(tool: string, args: Record<string, unknown>, structured: Record<string, unknown>, origin?: string): Card | null {
+export function cardOf(
+  tool: string,
+  args: Record<string, unknown>,
+  structured: Record<string, unknown>,
+  origin?: string,
+  slug?: string | null,
+): Card | null {
   const kind = CARD_OF_TOOL[tool];
-  if (kind === 'project') return projectCard(structured, origin);
-  if (kind === 'decision') return args.id === undefined ? null : decisionCard(structured, origin);
+  if (kind === 'project') return projectCard(structured, origin, slug);
+  /* A RULE IS A DECISION WITH A RULE IN IT: asked first, so the one question draws as the card that says what it would do. */
+  if (kind === 'decision') return args.id === undefined ? null : (ruleCard(structured, origin, slug) ?? decisionCard(structured, origin, slug));
   return null;
 }
 
@@ -162,13 +259,15 @@ export function cardOf(tool: string, args: Record<string, unknown>, structured: 
  */
 const CSS = `
 :root{--page:#FFFFFF;--ink:#101114;--ink2:#3B4048;--muted:#686E77;--rule:#E3E5E9;--soft:#F5F6F8;--red:#CF413A;--red-fill:#CF413A;--red-press:#B3322C;--on-red:#FFFFFF;--live:#2E9E5B;--tile:#FFFFFF;
---head:"Lexend","Geist",ui-sans-serif,system-ui,sans-serif;--ui:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;--hue:hsl(var(--h,0) 55% 38%);color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--page:#0A0B0D;--ink:#ECEEF1;--ink2:#C3C8CF;--muted:#8F96A0;--rule:#242A31;--soft:#1A1F26;--red:#E05148;--red-fill:#C2362F;--red-press:#EA6A61;--tile:#161A20;--hue:hsl(var(--h,0) 70% 68%);color-scheme:dark}}
+--head:"Lexend","Geist",ui-sans-serif,system-ui,sans-serif;--ui:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;--mark-l:0.55;--mark-c:0.09;--hue:oklch(var(--mark-l) var(--mark-c) var(--h,0));color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--page:#0A0B0D;--ink:#ECEEF1;--ink2:#C3C8CF;--muted:#8F96A0;--rule:#242A31;--soft:#1A1F26;--red:#E05148;--red-fill:#C2362F;--red-press:#EA6A61;--tile:#161A20;--mark-l:0.72;--mark-c:0.12;color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:transparent;color:var(--ink);font:14px/1.45 var(--ui)}
 .card{background:var(--tile);border:1px solid var(--rule);border-radius:12px;padding:16px;max-width:480px}
-h1{margin:0 0 6px;font:600 20px/1.2 var(--head);color:var(--hue)}
-h1.q{color:var(--ink);font-size:18px}
+h1{margin:0 0 6px;font:600 20px/1.2 var(--head);color:var(--ink)}
+h1.tint{color:var(--hue)}
+.lane{display:inline-block;margin:0 0 8px;font-weight:500;color:var(--muted)}
+h1.q{font-size:18px}
 p{margin:0 0 10px;color:var(--ink2)}
 .row{display:flex;gap:8px;margin:0 0 6px;color:var(--ink2)}
 .row b{flex:none;width:72px;font-weight:500;color:var(--muted)}
@@ -205,16 +304,27 @@ function call(name,args){
 function size(){post({jsonrpc:'2.0',method:'ui/notifications/size-changed',params:{height:document.body.scrollHeight}})}
 function project(c){
   var box=el('div','card');
-  if(c.hue!=null)document.documentElement.style.setProperty('--h',String(c.hue));
-  box.appendChild(el('h1',null,c.name));
+  var h=el('h1',null,c.name);
+  /* The hue tints the name only when the row has one, in the web's own lightness and chroma. */
+  if(c.hue!=null){document.documentElement.style.setProperty('--h',String(c.hue));h.className='tint'}
+  box.appendChild(h);
+  if(c.lane)box.appendChild(el('div','lane',c.lane));
   if(c.brief)box.appendChild(el('p',null,c.brief));
   if(c.next)box.appendChild(row('Next',c.next));
   if(c.money){var m=row('Money',c.money);m.lastChild.className='fig';box.appendChild(m)}
   if(c.working){var w=row('Working','');w.lastChild.appendChild(el('i','live'));w.lastChild.appendChild(document.createTextNode(c.working));box.appendChild(w)}
   var a=link(c);if(a)box.appendChild(a);return box;
 }
+function rule(c){
+  var box=el('div','card');box.appendChild(el('h1','q',c.does));
+  if(c.tried)box.appendChild(row('Tried',c.tried));
+  buttons(c,box);return box;
+}
 function decision(c){
   var box=el('div','card');box.appendChild(el('h1','q',c.question));
+  buttons(c,box);return box;
+}
+function buttons(c,box){
   var opts=el('div','opts');
   c.options.forEach(function(o){
     var b;
@@ -234,12 +344,13 @@ function decision(c){
     opts.appendChild(b);
   });
   if(c.options.length)box.appendChild(opts);else box.appendChild(el('p','note','Answer this in BrainDog.'));
-  var a=link(c);if(a)box.appendChild(a);return box;
+  var a=link(c);if(a)box.appendChild(a);
 }
 function draw(out){
   var c=out&&(out.card||(out.structuredContent&&out.structuredContent.card));
-  if(!c||c.kind!==KIND)return;
-  root.replaceChildren(KIND==='project'?project(c):decision(c));size();
+  /* The decision page also draws a rule, for a host that attached the decision template to the tool and cannot swap it per answer. */
+  if(!c||(c.kind!==KIND&&!(KIND==='decision'&&c.kind==='rule')))return;
+  root.replaceChildren(c.kind==='project'?project(c):c.kind==='rule'?rule(c):decision(c));size();
 }
 window.addEventListener('message',function(e){
   var m=e.data;if(!m||m.jsonrpc!=='2.0')return;
@@ -259,7 +370,7 @@ export const cardHtml = (kind: CardKind): string =>
 
 /** The resources the server lists and reads for the cards. */
 export const cardResources = (): { uri: string; name: string; description: string; mimeType: string; kind: CardKind }[] =>
-  (['project', 'decision'] as const).flatMap((kind) => [
+  (['project', 'decision', 'rule'] as const).flatMap((kind) => [
     { uri: CARD_URIS[kind].app, name: `${kind} card`, description: `A ${kind} drawn as a card.`, mimeType: MCP_APP_TYPE, kind },
     { uri: CARD_URIS[kind].openai, name: `${kind} card for ChatGPT`, description: `The same ${kind} card for ChatGPT.`, mimeType: SKYBRIDGE_TYPE, kind },
   ]);
