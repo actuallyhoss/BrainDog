@@ -161,7 +161,7 @@ test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, last, a
   }
   assert.match(home, /import\('\.\/named-twice\.ts'\)/u);
   assert.match(home, /import\('\.\/NamedTwice\.svelte'\)/u);
-  assert.match(home, /const found = await m\.loadNamedTwice\(base\);\s*if \(here\) named = found && found\.lines\.length > 0 \? \{ found, Part: part\.default \} : null;/u);
+  assert.match(home, /const found = await m\.loadNamedTwice\(base, io\);\s*if \(here\) named = found && found\.lines\.length > 0 \? \{ found, Part: part\.default \} : null;/u);
   assert.equal(home.split('<named.Part').length - 1, 1, 'the tile is drawn once');
   assert.ok(home.indexOf('<named.Part') > home.indexOf('<learned.Part'), 'it comes after what the answers taught');
 });

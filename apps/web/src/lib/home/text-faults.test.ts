@@ -222,7 +222,7 @@ test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, after t
   }
   assert.match(home, /import\('\.\/text-faults\.ts'\)/u);
   assert.match(home, /import\('\.\/TextFaults\.svelte'\)/u);
-  assert.match(home, /const found = await m\.textFaultsOnce\(base\);\s*if \(here\) faults = found && found\.count > 0 \? \{ found, Part: part\.default \} : null;/u);
+  assert.match(home, /const found = await m\.textFaultsOnce\(base, io\);\s*if \(here\) faults = found && found\.count > 0 \? \{ found, Part: part\.default \} : null;/u);
   assert.equal(home.split('<faults.Part').length - 1, 1, 'the tile is drawn once');
   assert.match(home, /\{#if faults\}<faults\.Part found=\{faults\.found\} lists=\{data\.lists\} \/>\{\/if\}/u);
   /* AFTER THE BOARD'S READS: past the each that draws the briefing, the page, what went stale and who was matched. */
@@ -232,10 +232,10 @@ test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, after t
 
 test('THE BOARD\'S LAST TILES ARE ASKED ONCE THE PAGE HAS ANSWERED, never beside the page read or in the bracket', () => {
   const effects = home.split('$effect(').slice(1);
-  const late = effects.filter((e) => e.includes('textFaultsOnce(base)'));
+  const late = effects.filter((e) => e.includes('textFaultsOnce(base, io)'));
   assert.equal(late.length, 1, 'one effect asks for the walk');
   assert.match(late[0]!, /^\(\) => \{\s*if \(data\.refused \|\| !settled\) return;/u);
-  for (const tile of ['loadLearned(base)', 'loadNamedTwice(base)']) assert.ok(late[0]!.includes(tile), `${tile} waits for the page too`);
+  for (const tile of ['loadLearned(base, io)', 'loadNamedTwice(base, io)']) assert.ok(late[0]!.includes(tile), `${tile} waits for the page too`);
   assert.doesNotMatch(late[0]!.slice(0, late[0]!.indexOf('return () =>')), /opened|closed\(/u);
   assert.doesNotMatch(home, /loadTextFaults\(/u);
 });
@@ -252,9 +252,9 @@ test('THE TILE IS FLAT, NAMES ITS MARK BESIDE ITS WORDS, AND IS 44 UNDER A THUMB
 });
 
 test('THE LAST TILES ARE ASKED ONE AT A TIME, each when the tab is idle, so none queues ahead of the next screen', () => {
-  const late = home.split('$effect(').slice(1).find((e) => e.includes('textFaultsOnce(base)'))!;
+  const late = home.split('$effect(').slice(1).find((e) => e.includes('textFaultsOnce(base, io)'))!;
   const body = late.slice(0, late.indexOf('return () =>'));
   assert.equal(body.match(/tiles\.push\(\(\) => Promise\.all\(/gu)?.length, 6, 'every tile waits its turn');
   assert.doesNotMatch(body, /void Promise\.all\(/u, 'a tile asked at once beside the others');
-  assert.match(body, /for \(const tile of tiles\) \{\s*await idle\(\);\s*if \(!here\) return;/u);
+  assert.match(body, /for \(const tile of tiles\) \{\s*await idle\(\);\s*if \(!here \|\| leaving\.signal\.aborted\) break;/u);
 });

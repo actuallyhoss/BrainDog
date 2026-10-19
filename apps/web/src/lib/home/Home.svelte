@@ -52,7 +52,7 @@
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
   import { apiBase } from '$lib/at.ts';
-  import { onAppendOnly, type Shell } from '$lib/record/boot-live.ts';
+  import { onAppendOnly, type Fetch, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { heard, homePage, said } from '$lib/voice.svelte.ts';
@@ -544,50 +544,58 @@
     void moving.version;
     const base = apiBase();
     let here = true;
+    /* A TAB BEING LEFT ASKS NOTHING MORE: WebKit refuses every call begun once a navigation starts and prints each as an
+       error, and a failed tile walks on to the next. `beforeunload` is the last event before that, so it stops the walk. */
+    const leaving = new AbortController();
+    const leave = () => leaving.abort();
+    addEventListener('beforeunload', leave);
+    const io: Fetch = (url, init) => fetch(url, { ...init, signal: leaving.signal });
     /* ONE TILE AT A TIME, EACH WHEN THE TAB IS IDLE (`loop/research-104.md` 2.1). The record answers one call at a time,
        so six asked at once were six places in its queue ahead of the next screen, and of the poll. */
     const tiles: (() => Promise<unknown>)[] = [];
     /* THE BOARD'S LAST TILE: what the record found wrong in its own pages and notes. */
     tiles.push(() => Promise.all([import('./text-faults.ts'), import('./TextFaults.svelte')]).then(async ([m, part]) => {
-      const found = await m.textFaultsOnce(base);
+      const found = await m.textFaultsOnce(base, io);
       if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND AFTER IT, WHAT THE ANSWERS TAUGHT, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadLearned(base);
+      const found = await m.loadLearned(base, io);
       if (here) learned = found && found.rows.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND AFTER IT, WHAT EVERY AGENT IS TOLD, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./told.ts'), import('./Told.svelte')]).then(async ([m, part]) => {
-      const tile = m.lessonsTile(await m.loadLessons(base));
+      const tile = m.lessonsTile(await m.loadLessons(base, io));
       if (here) agentsTold = tile ? { tile, Part: part.default } : null;
     }, () => undefined));
     /* AND THEN WHAT MAY BE ONE, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadNamedTwice(base);
+      const found = await m.loadNamedTwice(base, io);
       if (here) named = found && found.lines.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND WHAT HAS NO COLOUR OF ITS OWN, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./hues.ts'), import('./Hues.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadHues(base);
+      const found = await m.loadHues(base, io);
       if (here) hues = found && found.lists.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND THE IMPORTED AUTOMATIONS TO KEEP AS FILING RULES. Never set back to null on a reload: after the press the
        automations are off and the reload finds none, and the tile must keep its Undo. */
     tiles.push(() => Promise.all([import('./imported-rules.ts'), import('./ImportedRules.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadImported(base);
+      const found = await m.loadImported(base, io);
       if (here && found && found.rules.length > 0) imported = { found, Part: part.default };
     }, () => undefined));
     void (async () => {
       for (const tile of tiles) {
         await idle();
-        if (!here) return;
+        if (!here || leaving.signal.aborted) break;
         /* A TILE THAT FAILS IS NOT DRAWN, and the next is still asked. */
         await tile().catch(() => undefined);
       }
+      removeEventListener('beforeunload', leave);
     })();
     return () => {
       here = false;
+      removeEventListener('beforeunload', leave);
     };
   });
 
