@@ -501,8 +501,8 @@ export type MethodsBody = {
 export const COOKIE = { secure: '__Host-bd_s', local: 'bd_s' } as const;
 export type CookieMode = keyof typeof COOKIE;
 
-/** Thirty days, the session's own life (`12 §3` row 49). The row expires on the server whatever the browser keeps. */
-const MAX_AGE = 2_592_000;
+/** Ninety days, the session's own life, renewed by each daily rotation (`12 §3` row 49). The row expires on the server whatever the browser keeps. */
+const MAX_AGE = 7_776_000;
 
 const LOOPBACK = (host: string): boolean => host === 'localhost' || host.endsWith('.localhost') || host === '127.0.0.1' || host === '[::1]';
 

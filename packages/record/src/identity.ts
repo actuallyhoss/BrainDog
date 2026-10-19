@@ -74,15 +74,15 @@ export type AuthConfig = {
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 
-/** Thirty days, and a rotation after every day of use extends it: `12 §3` row 49. */
-const LIFE = 30 * DAY;
+/** Ninety days, and a rotation after every day of use extends it, so a browser used monthly never asks again: `12 §3` row 49. */
+const LIFE = 90 * DAY;
 const ROTATE_AFTER = DAY;
 /**
  * NINETY DAYS FROM THE LAST PROOF, AND NO ROTATION MOVES IT. Rotation extends `LIFE` on every day of use, so without
  * this a cookie used once a month lived for ever on one passkey tap; a stolen one would too. `authed_at` moves only
  * when somebody proves who they are again, so this is the longest a copied cookie is any use.
  */
-const PROOF_LIFE = 90 * DAY;
+const PROOF_LIFE = 180 * DAY;
 /**
  * SIXTY SECONDS FOR THE ID A ROTATION REPLACED. The app sends `boot`, `version` and a route's calls in parallel,
  * all carrying the same cookie; the first to arrive rotates it, and the rest would be 401s if the old id died on

@@ -50,7 +50,7 @@ test('A LIVE COOKIE IS THE PERSON, on the record their session names, with the p
     door: 'session',
     record: MINE,
     ctx: { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true, provedAt: NOW },
-    cookie: `__Host-bd_s=${'R'.repeat(43)}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax`,
+    cookie: `__Host-bd_s=${'R'.repeat(43)}; Path=/; Max-Age=7776000; HttpOnly; Secure; SameSite=Lax`,
   });
   assert.deepEqual(asked, ['session', `access ${MINE}`]);
 });

@@ -101,8 +101,8 @@ test('every flow has one route, named by the rule, and only reads are GETs', () 
 /* ── the cookie ───────────────────────────────────────────────────────── */
 
 test('THE COOKIE, EXACTLY: __Host- on https, bd_s on loopback http, and the clears', () => {
-  assert.equal(sessionCookie(SID, 'secure'), `__Host-bd_s=${SID}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax`);
-  assert.equal(sessionCookie(SID, 'local'), `bd_s=${SID}; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax`);
+  assert.equal(sessionCookie(SID, 'secure'), `__Host-bd_s=${SID}; Path=/; Max-Age=7776000; HttpOnly; Secure; SameSite=Lax`);
+  assert.equal(sessionCookie(SID, 'local'), `bd_s=${SID}; Path=/; Max-Age=7776000; HttpOnly; SameSite=Lax`);
   assert.equal(clearCookie('secure'), '__Host-bd_s=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax');
   assert.equal(clearCookie('local'), 'bd_s=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax');
 });
@@ -287,7 +287,7 @@ test('THE SERVER KEY FOR A SESSION: the exact cookie, the person in the body, an
   assert.equal(out.status, 200);
   const cookie = out.headers.getSetCookie();
   assert.equal(cookie.length, 1);
-  assert.match(cookie[0] ?? '', /^__Host-bd_s=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax$/);
+  assert.match(cookie[0] ?? '', /^__Host-bd_s=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=7776000; HttpOnly; Secure; SameSite=Lax$/);
   assert.equal(out.body.value?.person, id);
   const sid = /=([^;]+)/.exec(cookie[0] ?? '')?.[1] ?? '';
   assert.ok(!out.raw.includes(sid), 'the session id is in the body');

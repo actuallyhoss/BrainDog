@@ -106,7 +106,7 @@ async function stack(o: { token?: string | null } = {}) {
     return { status: res.status, raw, body: (raw ? JSON.parse(raw) : null) as Body, cookies, headers: res.headers };
   };
   const sidOf = (cookies: string[]): string => {
-    const sid = /^bd_s=([A-Za-z0-9_-]{43}); Path=\/; Max-Age=2592000; HttpOnly; SameSite=Lax$/.exec(cookies[0] ?? '')?.[1];
+    const sid = /^bd_s=([A-Za-z0-9_-]{43}); Path=\/; Max-Age=7776000; HttpOnly; SameSite=Lax$/.exec(cookies[0] ?? '')?.[1];
     return sid ?? assert.fail(`no session cookie in ${JSON.stringify(cookies)}`);
   };
   const keyIn = async (sid?: string) => {
