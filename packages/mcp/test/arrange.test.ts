@@ -90,6 +90,19 @@ test('THE KINDS OF BLOCK ARE A RESOURCE, short and listed, and one kind whole is
   sql.close();
 });
 
+test('THE DESIGN BOOK IS A RESOURCE: every kind with its example, the tokens and the layout rules', async () => {
+  const sql = openSqlite();
+  const mcp = tools(await createRecordApi({ sql, clock: fixedClock(NOW), catalogue: CATALOGUE }));
+  assert.ok((await mcp.resources(agent)).some((r) => r.uri === 'braindog:design'));
+  const book = value<{ kinds: { kind: string; example: string | null }[]; tokens: { colours: { name: string }[]; type: unknown[] }; layout: Record<string, string> }>(
+    await mcp.read('braindog:design', agent),
+  );
+  assert.ok(book.kinds.some((k) => k.kind === 'stat' && (k.example ?? '').startsWith('```stat')));
+  assert.ok(book.tokens.colours.some((c) => c.name === '--board') && book.tokens.type.length > 5);
+  assert.ok(book.layout.reserved_slot && book.layout.phone_stacking);
+  sql.close();
+});
+
 test('WHAT IS ON OFFER COMES TWELVE AT A TIME, with how many more and a word to search them by', async () => {
   const sql = openSqlite();
   const many: CatalogueEntry[] = Array.from({ length: 30 }, (_, i) => ({

@@ -22,6 +22,9 @@ import { VOICE_KEYS } from '@braindog/declare';
 import { AGGREGATIONS, CAPABILITIES, FIELD_TYPES } from '@braindog/kernel';
 import * as kernel from '@braindog/kernel';
 import * as render from 'braindog-render';
+import { designBook } from 'braindog-render';
+import { LOOK_B_CSS } from '@braindog/theme/look-b.ts';
+import { SCALE_CSS } from '@braindog/theme/scale.ts';
 
 import { REACHES_OUT } from './slash.ts';
 
@@ -557,6 +560,8 @@ const SERVED: Readonly<Record<(typeof GRAMMARS)[number], unknown>> = {
 };
 
 export function grammarOf(name: string): Result<unknown> {
+  /* THE DESIGN BOOK (`braindog:design`) is read through here as the other grammars are, but is no grammar to install by. */
+  if (name === 'design') return ok(designBook({ look: LOOK_B_CSS, scale: SCALE_CSS }));
   if ((GRAMMARS as readonly string[]).includes(name)) return ok(SERVED[name as (typeof GRAMMARS)[number]]);
   if (name.startsWith('kind/')) {
     const kind = name.slice('kind/'.length);

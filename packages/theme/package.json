@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./look-b.css": "./look-b.css",
-    "./look-b.ts": "./src/look-b.ts"
+    "./look-b.ts": "./src/look-b.ts",
+    "./scale.ts": "./src/scale.ts"
   },
   "scripts": {
     "test": "node --test src/*.test.ts",
