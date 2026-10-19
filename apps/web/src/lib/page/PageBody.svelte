@@ -47,6 +47,7 @@
   import { asksAside } from './asks.ts';
   import { judgedWith } from './panels.ts';
   import NextStep from './NextStep.svelte';
+  import { frameResizeObserver } from '$lib/ui/resize.ts';
 
   let {
     mode,
@@ -407,7 +408,7 @@
     const s = getComputedStyle(el);
     /* UNTRACKED, or the width this writes would be one this effect reads, and every measure would set the watch up again. */
     untrack(() => take(el.clientWidth - (Number.parseFloat(s.paddingInlineStart) || 0) - (Number.parseFloat(s.paddingInlineEnd) || 0)));
-    const watch = new ResizeObserver((seen) => {
+    const watch = frameResizeObserver((seen) => {
       const box = seen.at(-1)?.contentRect;
       if (box) take(box.width);
     });
@@ -539,7 +540,7 @@
       room = scroller.clientHeight - px('--sticky') - 2 * px('--sp-4');
     };
     measure();
-    const watch = new ResizeObserver(measure);
+    const watch = frameResizeObserver(measure);
     watch.observe(scroller);
     return () => watch.disconnect();
   });
@@ -595,7 +596,7 @@
       const next = at > 0 ? { on, at } : null;
       if (next?.at !== was?.at || next?.on !== was?.on) flowAt = next;
     };
-    const watch = new ResizeObserver(measure);
+    const watch = frameResizeObserver(measure);
     watch.observe(main);
     watch.observe(rail);
     if (under) watch.observe(under);

@@ -29,7 +29,7 @@
   let watcher: ResizeObserver | null = null;
 
   function watch(block: Element, check: () => void): () => void {
-    const seer = (watcher ??= new ResizeObserver((seen) => {
+    const seer = (watcher ??= frameResizeObserver((seen) => {
       for (const entry of seen) for (const again of inBlock.get(entry.target) ?? []) again();
     }));
     const checks = inBlock.get(block) ?? new Set<() => void>();
@@ -67,6 +67,7 @@
   import { integer, money } from 'braindog-render';
   import { homeCurrency } from '$lib/record/api.ts';
   import { drawn } from '$lib/record/money.ts';
+  import { frameResizeObserver } from './resize.ts';
 
   let {
     minor,
