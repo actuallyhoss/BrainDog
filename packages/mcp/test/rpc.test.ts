@@ -175,14 +175,14 @@ test('EVERY RESULT SAYS IT IS WHOLE TO A 2026-07-28 CLIENT, which refuses a list
   );
 });
 
-type Hints = { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean };
+type Hints = { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
 
-test('tools/list is the sixteen, each with its title and every hint said, and no second copy of the instructions', async () => {
+test('tools/list is the seventeen, each with its title and every hint said, and no second copy of the instructions', async () => {
   const { surface, calls } = stub();
   const r = result<{ tools: { name: string; title: string; inputSchema: { type: string }; annotations: Hints }[]; instructions?: string; ttlMs: number }>(
     await handle(req('tools/list'), surface, ctx),
   );
-  assert.equal(r.tools.length, 16);
+  assert.equal(r.tools.length, 17);
   assert.deepEqual(r.tools.map((t) => t.name), TOOLS.map((t) => t.name));
   assert.equal(r.instructions, undefined, 'the instructions went out a second time');
   assert.equal(r.ttlMs, 3_600_000);
@@ -196,12 +196,16 @@ test('tools/list is the sixteen, each with its title and every hint said, and no
   for (const name of ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'])
     assert.equal(hints[name]?.readOnlyHint, true, `${name} reads and does not say so`);
   /* THE ADDITIVE WRITES TAKE NOTHING AWAY, so a host need not ask a person before each one as it would a delete. */
-  for (const name of ['create', 'propose', 'log', 'meet', 'triage', 'handoff']) {
-    assert.equal(hints[name]?.readOnlyHint, undefined, name);
+  for (const name of ['create', 'propose', 'log', 'meet', 'triage', 'handoff', 'undo']) {
+    assert.equal(hints[name]?.readOnlyHint, false, name);
     assert.equal(hints[name]?.destructiveHint, false, `${name} adds and is marked as if it overwrote`);
   }
   /* AND `update` OVERWRITES A VALUE, which undo does not make safe (OpenAI's review rule). */
   assert.equal(hints.update?.destructiveHint, true);
+  /* A DIRECTORY READS A MISSING readOnlyHint AS A WRITE IT CANNOT VOUCH FOR, so every listed tool says it, true or false. */
+  for (const t of r.tools) assert.equal(typeof t.annotations.readOnlyHint, 'boolean', `${t.name} leaves readOnlyHint unsaid`);
+  assert.equal(hints.update?.idempotentHint, true);
+  assert.equal(hints.create?.idempotentHint, false);
   assert.equal(calls.length, 0, 'the tool list read the record, and it must always arrive');
 });
 

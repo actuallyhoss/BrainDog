@@ -87,7 +87,7 @@ test('THE LIST HOLDS THE FOUR READS, and about stays an address because a sevent
   /* What stands is asked every time: a step dropped a moment ago is not stale any more. */
   assert.equal(ttlOf('braindog:stale'), 0);
 
-  assert.equal(TOOLS.length, 16);
+  assert.equal(TOOLS.length, 17);
   assert.ok(!TOOLS.some((t) => t.name === 'about'));
   /* A CALL TO IT AS A TOOL IS TOLD THE ADDRESS, never the nearest tool. */
   const called = (await tools(surface).call('about', { name: 'North Bank' }, who)) as Refused;

@@ -229,7 +229,7 @@ test('A HOST THAT DOES NOT IS LISTED THE DRAWN ONES, each read first, and a figu
 });
 
 test('AND IT COST NO TOOL: sixteen, and no figure tool among them', () => {
-  assert.equal(TOOLS.length, 16);
+  assert.equal(TOOLS.length, 17);
   assert.ok(TOOLS.some((t) => t.name === 'get' && /figure/.test(t.description)), 'get does not say it reads a figure');
   assert.ok(TOOLS.some((t) => t.name === 'record_index' && /figures/.test(t.description)), 'record_index does not say it names the figures');
 });

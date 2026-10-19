@@ -63,9 +63,11 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
     const result = reply.result as { isError?: boolean; content: { text: string }[]; structuredContent: Record<string, unknown> };
     const text = result.content.map((c) => c.text).join('\n');
     const where = `${name} ${JSON.stringify(args)}`;
+    /* A RECEIPT'S LINE CARRIES THE BATCH, the one opaque handle `undo` takes; what it says changed is held to the rules above it. */
+    const said = text.split('\n').filter((l) => !l.startsWith('Receipt: ')).join('\n');
     for (const [pattern, what] of NEVER) {
-      const hit = pattern.exec(text);
-      if (hit) found.push(`${where} said ${what}, "${hit[0]}", in: ${text.slice(Math.max(0, hit.index - 60), hit.index + 60)}`);
+      const hit = pattern.exec(said);
+      if (hit) found.push(`${where} said ${what}, "${hit[0]}", in: ${said.slice(Math.max(0, hit.index - 60), hit.index + 60)}`);
     }
     for (const path of nullKeys(result.structuredContent)) found.push(`${where} answered a null at ${path}`);
     answered.add(name);

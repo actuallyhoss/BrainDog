@@ -134,15 +134,18 @@ const render = (said: Said) => ({
  * nothing are destructive and open to the world, so every write here inherited both: Claude prompts for a destructive
  * tool every time, and ChatGPT treats any tool lacking `readOnlyHint` as a write and shows the person its raw JSON.
  * Reads are read-only; `create`, `propose`, `log`, `meet`, `triage` and `handoff` add and take nothing away; `update`
- * overwrites a value and says so, by OpenAI's rule that being able to undo a change does not make it safe. And none
- * reaches past the record, so `openWorldHint` is false on all sixteen.
+ * overwrites a value and says so, by OpenAI's rule that being able to undo a change does not make it safe. `undo` puts
+ * back only the caller's own write and deletes nothing else. None reaches past the record, so `openWorldHint` is false.
  */
 export const listedTool = (t: Tool) => ({
   name: t.name,
   title: t.title,
   description: t.description,
   inputSchema: t.input,
-  annotations: t.writes ? { destructiveHint: t.destructive === true, openWorldHint: false } : { readOnlyHint: true, openWorldHint: false },
+  /* readOnlyHint IS SAID ON EVERY TOOL, false for a write, because a directory reads a missing one as a write it cannot vouch for. */
+  annotations: t.writes
+    ? { readOnlyHint: false, destructiveHint: t.destructive === true, idempotentHint: t.idempotent === true, openWorldHint: false }
+    : { readOnlyHint: true, openWorldHint: false },
 });
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);

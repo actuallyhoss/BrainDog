@@ -177,6 +177,8 @@ export type McpSurface<C> = {
   context?(args: Record<string, never>, ctx: C): Answer;
   handoff?(args: Args, ctx: C): Answer;
   meet?(args: Args, ctx: C): Answer;
+  /** Take back one write of the caller's own run by its receipt's batch; the record refuses anyone else's. Optional like `meet`. */
+  undoOwn?(args: { batch: string; dry?: boolean }, ctx: C): Answer;
   sessionsLive?(args: Record<string, never>, ctx: C): Answer;
   /**
    * The record's whole log, newest first, a page at a time, held to what the caller may see. READ+.
@@ -389,6 +391,8 @@ export type Tool = {
    * to undo an action does not, by itself, justify setting destructiveHint to false", so it says so.
    */
   destructive?: true;
+  /** A write that, sent again with the same arguments, leaves the record as the first call did (the spec's `idempotentHint`). */
+  idempotent?: true;
 };
 
 const str = (description: string) => ({ type: 'string', description });
@@ -644,6 +648,7 @@ export const TOOLS: readonly Tool[] = [
     ),
     writes: true,
     destructive: true,
+    idempotent: true,
   },
   {
     name: 'log',
@@ -717,6 +722,7 @@ export const TOOLS: readonly Tool[] = [
       ['where'],
     ),
     writes: true,
+    idempotent: true,
   },
   {
     name: 'triage',
@@ -741,6 +747,18 @@ export const TOOLS: readonly Tool[] = [
       ['arrival'],
     ),
     writes: true,
+    idempotent: true,
+  },
+  {
+    name: 'undo',
+    title: 'Take back my change',
+    /* THE LAST ONE, FOR THE RECEIPTS: every write answers a batch and this takes it back. Only the caller's own run's
+       writes go back; the owner's Undo in the app stays the owner's. It deletes nothing it did not make, so it is not
+       destructive in the spec's sense. */
+    description: 'Put back one of your own writes, by the batch its receipt gave. Refused for anyone else\'s.',
+    input: obj({ batch: str('The batch in the receipt.'), dry: { type: 'boolean' } }, ['batch']),
+    writes: true,
+    idempotent: true,
   },
 ];
 
@@ -938,6 +956,13 @@ const compacted = (value: unknown, prefixOf: PrefixOf = unprefixed): unknown => 
   if (isObject(value) && Array.isArray(value.events))
     return { ...value, events: value.events.map((e) => (isObject(e) ? spoke(e, prefixOf) : e)) };
   return value;
+};
+
+/** The batch a write's answer carries, on the answer or on the row it made, which a receipt hands to `undo`. */
+const batchIn = (v: unknown): string | undefined => {
+  if (!isObject(v)) return undefined;
+  for (const x of [v, v.row, v.entry]) if (isObject(x) && typeof x.batch === 'string' && x.batch !== '') return x.batch;
+  return undefined;
 };
 
 const badSpoken = (fix: string): Result<never> => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix, at: 'spoken' } });
@@ -1265,7 +1290,14 @@ export const TEMPLATES = [
  * PER ANSWER AND NEVER PER CALLER, for the reason `namesIn` gives below: a name kept past the answer is a name a
  * caller with less reach could be told next.
  */
-type Turn = { text: boolean; titles: Map<string, string>; boot?: Promise<Result<unknown>> };
+type Turn = {
+  text: boolean;
+  titles: Map<string, string>;
+  boot?: Promise<Result<unknown>>;
+  /** The batch a write landed under, which its receipt hands to `undo`; or the question a `propose` filed, which `withdraw` takes back. */
+  batch?: string;
+  asks?: string;
+};
 
 /**
  * What a tool hands `answer`: the record's answer shaped as the full JSON, and how to say it.
@@ -2620,6 +2652,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         value = { ...value, dry_run: dry.ok ? dry.value : { refused: 'refusal' in dry ? dry.refusal : dry } };
       }
       const out = bare(value) as Record<string, unknown>;
+      if (typeof out.id === 'string' && /^SG[1-9][0-9]*$/u.test(out.id)) turn.asks = out.id;
       /* A PROPOSAL THE AGENT'S RUNG LET THROUGH IS DONE, NOT ASKED: the record answered it as the ladder (`rule:ladder`)
          and says so with `landed: true` (or `rung`), so "Asked" would send the agent to wait on a question nobody will see. */
       const ruled = ruledOf(out);
@@ -2715,6 +2748,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         out = await surface.update({ ...at.value, patch: {}, note }, ctx);
       }
       if (!out.ok) return { result: await failed(out, ctx, turn) };
+      turn.batch = batchIn(out.value);
       const ruled = ruledOf(out.value);
       if (!isEntry(out.value)) {
         if (ruled !== null && 'filed' in ruled) return filedOut(ruled.filed, ctx, turn);
@@ -2747,6 +2781,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!out.ok && 'refusal' in out && out.refusal.at === 'left' && (args.take !== undefined || args.drop !== undefined))
         return { result: await failed({ ...out, refusal: { ...out.refusal, at: args.take !== undefined ? 'take' : 'drop' } }, ctx, turn) };
       if (!out.ok) return { result: await failed(out, ctx, turn) };
+      turn.batch = batchIn(out.value);
       /* A STEP TAKEN OR DROPPED (AGT-C05) answers the run that left it and its words, not a run's row: said as what now
          happens to it. The second of two sessions racing for one step was refused above, in the record's sentence. */
       if (isObject(out.value) && typeof out.value.left === 'string' && typeof out.value.next === 'string' && !isEntry(out.value)) {
@@ -2774,6 +2809,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!surface.meet) return { result: unbuilt('meet', 'If there is a people register, add the person there with create.') };
       const out = await surface.meet(args, ctx);
       if (!out.ok || !isObject(out.value)) return { result: out };
+      turn.batch = batchIn(out.value);
       const raw = bare(out.value) as Record<string, unknown>;
       const row = isObject(raw.row) ? raw.row : null;
       let spoken: string | null =
@@ -2851,6 +2887,20 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     },
 
     /**
+     * A WRITE TAKEN BACK BY THE RECEIPT IT GAVE. The record plans and applies in one call and refuses a batch that is
+     * not the caller's run's (`FORBIDDEN`), so what is said here is only what went back, in the record's own lines.
+     */
+    undo: async (args, ctx, turn) => {
+      if (!surface.undoOwn) return { result: unbuilt('undo', 'Ask the owner to put it back from the app.') };
+      const out = await surface.undoOwn({ batch: String(args.batch ?? ''), ...(args.dry === true ? { dry: true } : {}) }, ctx);
+      if (!out.ok) return { result: await failed(out, ctx, turn) };
+      const v = bare(out.value) as Record<string, unknown>;
+      const lines = (Array.isArray(v.lines) ? v.lines : []).filter((l): l is string => typeof l === 'string').slice(0, 12);
+      const value = { ...v, ...(args.dry === true ? {} : { undone: true }) };
+      return { result: { ok: true, value }, say: () => [typeof v.say === 'string' ? v.say : 'Done.', ...lines].join('\n') };
+    },
+
+    /**
      * THE ARGUMENTS GO TO THE RECORD AS SENT, and who may triage is the record's to say: a token without the `inbox` reach
      * is refused there in one sentence naming what it lacks, and a field it does not take is named in `FIELD_UNKNOWN`.
      *
@@ -2862,6 +2912,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       if (!surface.triage) return { result: unbuilt('triage', 'Read braindog:inbox, and tell the person what is waiting there.') };
       const settled = await surface.triage(args as never, ctx);
       if (!settled.ok || !isObject(settled.value)) return { result: settled };
+      turn.batch = batchIn(settled.value);
       const filed = settled.value.entry;
       if (!isEntry(filed)) {
         const value = bare(settled.value) as Record<string, unknown>;
@@ -2888,6 +2939,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       return filedOut(ruled.filed, ctx, turn);
     }
     const entry = r.value;
+    turn.batch = batchIn(entry);
     /* A REPLAY ANSWERS THE FIRST ANSWER AND SAYS SO (AGT-B05): a call sent again with an `op_id` already used for that
        write is the write that landed, not a second one, and the agent is told it wrote nothing new. The record marks it. */
     const again = (entry as { replayed?: unknown }).replayed === true;
@@ -3110,8 +3162,13 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     }
     const value = result.ok ? result.value : undefined;
     /* THE LOOK'S OWN READS, a `boot` for the people and one of the runs, are made only for an answer said in words. */
-    if (full || !done.say) return said(result);
-    return said(result, done.say(await lookOf(ctx, turn, done.names)));
+    /* EVERY WRITE ENDS WITH ITS RECEIPT: what changed in names, and the one call that takes it back. */
+    const receipted = (s: Said, line: string | null, inText: boolean): Said =>
+      line === null ? s : { ...s, ...(inText ? { text: `${s.text}\n${line}` } : {}), structured: { ...s.structured, receipt: line } };
+    const receiptOn = (line: string): string | null => (RECEIPTED.has(name) ? line : null);
+    if (full || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), false);
+    const body = done.say(await lookOf(ctx, turn, done.names));
+    return receipted(said(result, body), receiptOn(receiptOf(name, body, turn, value)), true);
   };
 
   /** The register a conflict's row is in, from the call that met it: the one `update` named, else the one `create` did. */
@@ -3633,6 +3690,24 @@ export function stepSaid(step: { left: string; next: string; agent?: string | nu
   return took
     ? `You took the step ${whose} left: ${words}. It is yours now; call handoff with your own next step before you stop.`
     : `Dropped the step ${whose} left: ${words}. Nobody is handed it now.`;
+}
+
+/** The writes whose answers end in a receipt. `undo` is itself the way back, so it has none. */
+const RECEIPTED: ReadonlySet<string> = new Set(['create', 'update', 'log', 'triage', 'handoff', 'propose', 'meet']);
+
+/**
+ * A write's receipt: its first line as it was said in names, then the call that takes it back.
+ *
+ * NO CREDENTIAL CAN BE IN IT, because it quotes only the answer's own line, which says names and never a stored value,
+ * and the batch, an opaque handle. A write with no batch says so rather than offering an undo that would fail.
+ */
+function receiptOf(name: string, said: string, turn: Turn, value: unknown): string {
+  const first = (said.split('\n')[0] ?? '').trim().replace(/[.\s]+$/u, '');
+  const did = first === '' ? `Done with ${name}` : first.length > 110 ? `${first.slice(0, 109)}…` : first;
+  if (turn.batch !== undefined) return `Receipt: ${did}. To undo, call undo with batch "${turn.batch}".`;
+  if (turn.asks !== undefined) return `Receipt: ${did}. To take it back, call propose with withdraw "${turn.asks}".`;
+  if (name === 'propose' || (isObject(value) && 'filed' in value)) return `Receipt: ${did}. Nothing was written, so there is nothing to undo.`;
+  return `Receipt: ${did}. No undo handle came back for this one; the owner can put it back from the app.`;
 }
 
 /** The tools whose arguments go to the record whole, which names a key its method does not take in its own sentence. */

@@ -78,7 +78,7 @@ test('THE LIST NAMES braindog:learnings, and its description is the four-part te
   assert.ok(said.length <= 240, `described in ${String(said.length)} characters`);
   assert.doesNotMatch(said, /\b(?:row|rows|entity|register)\b|—/iu);
   /* A RESOURCE AND NOT A SEVENTEENTH TOOL, as `about` is: the tool list is in every turn. */
-  assert.equal(TOOLS.length, 16);
+  assert.equal(TOOLS.length, 17);
   assert.ok(!TOOLS.some((t) => t.name === 'learnings'));
   assert.ok(ttlOf('braindog:learnings') <= 60_000);
 });
