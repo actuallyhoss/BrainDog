@@ -10,21 +10,21 @@ edge needs 3. Words that only ever sit on a fill (the label of a red button) say
 
 | Role | What it is for | Value | On the board | On a tile |
 |---|---|---|---|---|
-| sunk | below the board | `#080A0E` | 1.04 | 1.13 |
-| bg | the page behind a sheet | `#12161D` | 1.05 | 1.04 |
-| s1 | a raised step | `#191E26` | 1.14 | 1.04 |
-| s2 | a second raised step | `#1E232C` | 1.21 | 1.11 |
-| s3 | a third raised step | `#222831` | 1.29 | 1.18 |
+| sunk | below the board | `#030405` | 1.08 | 1.18 |
+| bg | the page behind a sheet | `#141619` | 1.05 | 1.04 |
+| s1 | a raised step | `#1A1E25` | 1.14 | 1.04 |
+| s2 | a second raised step | `#1F232A` | 1.21 | 1.11 |
+| s3 | a third raised step | `#24282F` | 1.29 | 1.18 |
 | board | the board | `#0D1014` | 1.00 | 1.09 |
 | tile | a tile | `#161A20` | 1.09 | 1.00 |
-| field | a control on a tile | `#222831` | 1.29 | 1.18 |
-| ink | body text | `#F1F3F6` | 17.15 | 15.71 |
-| ink2 | second text | `#B4BAC4` | 9.77 | 8.95 |
-| dim | quiet text | `#8C939E` | 6.16 | 5.64 |
-| faint | the quietest text | `#8C939E` | 6.16 | 5.64 |
-| line | a hairline | `#262C36` | 1.36 | 1.24 |
+| field | a control on a tile | `#24282F` | 1.29 | 1.18 |
+| ink | body text | `#EEF1F4` | 16.82 | 15.40 |
+| ink2 | second text | `#C3C8CF` | 11.33 | 10.38 |
+| dim | quiet text | `#8F96A0` | 6.39 | 5.85 |
+| faint | the quietest text | `#8F96A0` | 6.39 | 5.85 |
+| line | a hairline | `#242A31` | 1.32 | 1.21 |
 | edge | an edge that must be seen | `#6C7177` | 3.87 | 3.55 |
-| earn | money in, done | `#5AD096` | 9.89 | 9.06 |
+| earn | money in, done | `#72C08F` | 8.76 | 8.03 |
 | warn | at risk | `#FAAA55` | 9.94 | 9.10 |
 | danger | late and needs you, as a mark | `#FF5A55` | 6.22 | 5.69 |
 | danger-text | late and needs you, as words | `#FF5A55` | 6.22 | 5.69 |
@@ -33,11 +33,11 @@ edge needs 3. Words that only ever sit on a fill (the label of a red button) say
 | warn-fill | at risk, as a fill | `#B47900` | 5.15 | 4.72 |
 | danger-fill | late, as a fill | `#F42A2C` | 4.73 | 4.34 |
 | info-fill | information, as a fill | `#457DFF` | 5.11 | 4.68 |
-| live | arrived just now | `#8E8CFF` | 6.67 | 6.11 |
-| live-fill | arrived just now, as a fill | `#8E8CFF` | 6.67 | 6.11 |
+| live | arrived just now | `#31A15E` | 5.80 | 5.31 |
+| live-fill | arrived just now, as a fill | `#2E9E5B` | 5.59 | 5.12 |
 | accent | the brand red | `#DB2527` | 3.91 | 3.58 |
-| accent-edge | the brand red as an edge | `#DA2326` | 3.86 | 3.53 |
-| accent-text | the brand red as words | `#FF9589` | 9.00 | 8.24 |
+| accent-edge | the brand red as an edge | `#DA2426` | 3.87 | 3.54 |
+| accent-text | the brand red as words | `#FF968A` | 9.06 | 8.30 |
 | accent-ink | words on the brand red, 4.88 on it | `#FFFFFF` | 19.07 | 17.46 |
 | accent-hover | the brand red, hovered | `#C80015` | 3.15 | 2.88 |
 | accent-press | the brand red, pressed | `#AF0011` | 2.57 | 2.35 |
@@ -47,5 +47,5 @@ edge needs 3. Words that only ever sit on a fill (the label of a red button) say
 | action-tint-2 | a chosen place, hovered | `#422629` | 1.40 | 1.28 |
 | action-text | the working red as words | `#F6665B` | 6.33 | 5.80 |
 | on-action | words on the working red, 4.52 on it | `#161A20` | 1.09 | 1.00 |
-| focus-in | the focus ring, inside | `#F1F3F6` | 17.15 | 15.71 |
-| focus-out | the focus ring, outside | `#12161D` | 1.05 | 1.04 |
+| focus-in | the focus ring, inside | `#EEF1F4` | 16.82 | 15.40 |
+| focus-out | the focus ring, outside | `#141619` | 1.05 | 1.04 |
