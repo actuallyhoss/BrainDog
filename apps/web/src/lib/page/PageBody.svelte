@@ -648,7 +648,16 @@
       const was = foldSeen.get(at);
       if (!was || was.lines !== lines || was.clip !== clip) seeFold(at, { lines, clip });
     };
-    const watch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    /* NEXT FRAME: the cut this sets resizes what is watched, and WebKit throws that second round in the same frame as an
+       uncaught "ResizeObserver loop" error. */
+    let frame = 0;
+    const watch =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(measure);
+          });
     const observe = () => {
       watch?.observe(el);
       for (const child of el.children) watch?.observe(child);
@@ -660,6 +669,7 @@
         measure();
       },
       destroy() {
+        cancelAnimationFrame(frame);
         watch?.disconnect();
       },
     };
