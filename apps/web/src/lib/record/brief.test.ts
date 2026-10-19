@@ -46,3 +46,11 @@ test('A LINE WITH AN UNFILLED SLOT, A TAG OR AN ID IS DROPPED, A PLAIN ONE KEPT'
 test('MARKDOWN MARKS GO, THE NAME ALONE ON A LINE GOES, AN UNCLOSED FENCE DROPS ITS REST', () => {
   assert.deepEqual(briefFromNote('Lanternfish\n- **Bold** plan with [a link](http://x).\n```chips\nnever shown', 'lanternfish'), ['Bold plan with a link.']);
 });
+
+test('A LINE OF KEY: VALUE PAIRS IS METADATA AND GOES, BOLD OR NOT, WHILE ONE LABEL IN A SENTENCE STAYS', () => {
+  const name = 'Lanternfish';
+  const bold = `**Status:** building · **Lane:** ship · **Repo:** ${name}-app (v2) · **Domain:** ${name}.example`;
+  assert.deepEqual(briefFromNote(`${bold}\n\nA small game about fish.`, name), ['A small game about fish.']);
+  assert.deepEqual(briefFromNote(`Status: building | Lane: ship\nA small game about fish.`, name), ['A small game about fish.']);
+  assert.deepEqual(briefFromNote('Note: this one is a sentence.', name), ['Note: this one is a sentence.']);
+});

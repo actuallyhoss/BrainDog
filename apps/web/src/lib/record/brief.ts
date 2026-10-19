@@ -9,6 +9,9 @@ const SLOT = /\{\{|\}\}/u;
 /* Imported words and ids that mean nothing to a reader: a "Status in <tool>" line, an import tag, a `register#12` pointer. */
 const LEFTOVER = /^status in [^:]{1,40}:|\b[a-z]+:[a-z]+:[\w-]+|\b[a-z][\w-]*#\d+\b/iu;
 
+/* A metadata line, "Status: building · Lane: ship · Repo: x": two or more "Key:" labels split by a dot or a bar. */
+const isMeta = (line: string): boolean => line.split(/\s+[·|]\s+/u).filter((part) => /^[A-Za-z][\w ]{0,24}:(?:\s|$)/u.test(part)).length >= 2;
+
 /** Plain words out of a line of markdown: no list or quote mark, no emphasis, a link as its text. */
 const plain = (line: string): string =>
   line
@@ -30,7 +33,7 @@ export function briefFromNote(note: string, name = '', most = 2): string[] {
     }
     if (fenced || /^\s*#{1,6}\s/u.test(raw) || SLOT.test(raw)) continue;
     const line = plain(raw);
-    if (line === '' || line.toLowerCase() === own || LEFTOVER.test(line)) continue;
+    if (line === '' || line.toLowerCase() === own || LEFTOVER.test(line) || isMeta(line)) continue;
     for (const s of line.split(/(?<=[.!?])\s+/u)) {
       if (s !== '' && !SLOT.test(s) && !LEFTOVER.test(s)) out.push(s);
     }
