@@ -7,7 +7,8 @@
  * Document), and sends the person's browser to `/oauth/authorize`. That request is held ten minutes while the person
  * reads the consent screen; Allow mints an ordinary agent token through the record's own `createToken`, seals it under
  * a one-time code and sends the browser back to the app with the code; the app trades the code and its PKCE verifier
- * at `/oauth/token` for the bearer. There is no refresh token: after ninety days the app signs in again.
+ * at `/oauth/token` for the bearer. The app also gets a refresh token, good ninety days from its last use, so it signs in again only after three
+ * unused months or when the person removes it.
  *
  * PURE, OVER PORTS, SO BOTH HOSTS SERVE THE SAME PROTOCOL. The store is `OAuthStore` (the Directory's SQL through
  * `@braindog/record/oauth`), the person is `Approver` (the host's own browser session and record), and reading an
@@ -39,10 +40,13 @@ import { sameOrigin } from './auth.ts';
 export const OAUTH_SCOPES = ['read', 'propose', 'write'] as const;
 export type OAuthScope = (typeof OAUTH_SCOPES)[number];
 
-/** How long a token OAuth mints lasts, in days. The kernel's own default, said here because the token answer counts it. */
+/** How many days an app may sit unused before it must sign in again: the refresh token's sliding life. */
 export const TOKEN_DAYS = 90;
-/** The same ninety days in seconds, which is what `expires_in` is written in: 7,776,000. */
-const EXPIRES_IN = TOKEN_DAYS * 86_400;
+/** The bearer lives as long as the kernel allows, so a refresh can hand it back; revoking it in Settings still ends it. */
+const BEARER_DAYS = 365;
+const DAY_MS = 86_400_000;
+/** A refresh token that was just replaced still works this long, for a client that never saw our answer and retries. */
+const REFRESH_GRACE = 2 * 60_000;
 
 /** How long a sign-in waits for the person, and how long its code lives once they allow it. */
 const REQUEST_LIFE = 10 * 60_000;
@@ -106,6 +110,8 @@ export type OAuthDeps = {
   /** Where the browser goes to answer a held request: the app's consent route, or a host's own page until it exists. */
   consent: (request: string) => string;
   approver: (request: Request, record: string) => Promise<Approver>;
+  /** Whether a bearer still works (not revoked), so a refresh for a removed app ends at once. Absent: the bearer's own 401 does it. */
+  alive?: ((bearer: string) => Promise<boolean>) | undefined;
   /** The text of a metadata document at an `https:` client id, at most `DOCUMENT_MOST_BYTES`, or `null`. Absent: no documents. */
   fetchDocument?: ((url: string) => Promise<string | null>) | undefined;
   /**
@@ -251,7 +257,7 @@ const digest = async (text: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 /** What a PKCE verifier hashes to under S256 (RFC 7636 §4.2). */
-const challengeOf = async (verifier: string): Promise<string> => b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+export const challengeOf = async (verifier: string): Promise<string> => b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
 
 /** The AES-GCM key a code seals its bearer under, by HKDF-SHA-256 from the code's own characters. */
 const codeKey = async (code: string) => {
@@ -529,7 +535,7 @@ export const authorizationServer = (issuer: string, documents: boolean) => ({
   token_endpoint: `${issuer}/oauth/token`,
   registration_endpoint: `${issuer}/oauth/register`,
   response_types_supported: ['code'],
-  grant_types_supported: ['authorization_code'],
+  grant_types_supported: ['authorization_code', 'refresh_token'],
   code_challenge_methods_supported: ['S256'],
   token_endpoint_auth_methods_supported: ['none'],
   client_id_metadata_document_supported: documents,
@@ -581,7 +587,7 @@ async function register(request: Request, deps: OAuthDeps): Promise<Response> {
     client_name: client.name,
     redirect_uris: client.redirect_uris,
     token_endpoint_auth_method: 'none',
-    grant_types: ['authorization_code'],
+    grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'],
   });
 }
@@ -758,7 +764,7 @@ async function approve(request: Request, deps: OAuthDeps): Promise<Response> {
 
   /* THE STAMP IS WHAT THE DOOR PROVED, never what the app said of itself: its client id, how it came, and its host. */
   const { kind, host } = sourceOf(client, taken.redirect_uri);
-  const minted = await who.mint({ scope, label: client.name, days: TOKEN_DAYS, client: { id: client.client_id, kind, host } });
+  const minted = await who.mint({ scope, label: client.name, days: BEARER_DAYS, client: { id: client.client_id, kind, host } });
   if (!minted.ok) return say(minted.status, 'access_denied', minted.say, cookie(who.cookie));
   const code = b64url(random(32));
   const answers: CodeRequest = { client_id: taken.client_id, redirect_uri: taken.redirect_uri, challenge: taken.challenge, scope };
@@ -810,8 +816,9 @@ async function token(request: Request, deps: OAuthDeps): Promise<Response> {
   const body = await bodyOf(request);
   if (body === null) return oauthError(400, 'invalid_request', `The token endpoint takes a form of at most ${BODY_MOST_BYTES} bytes.`);
   const f = body.fields;
+  if (f.grant_type === 'refresh_token') return refreshed(f, deps);
   if (f.grant_type !== 'authorization_code')
-    return oauthError(400, 'unsupported_grant_type', 'BrainDog answers grant_type=authorization_code only. There is no refresh token: after ninety days the app signs in again.');
+    return oauthError(400, 'unsupported_grant_type', 'BrainDog answers grant_type=authorization_code and refresh_token.');
   const code = textField(f.code);
   const verifier = textField(f.code_verifier);
   if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier)) return oauthError(400, 'invalid_request', 'PKCE: code_verifier is 43 to 128 letters, digits and - . _ ~.');
@@ -825,7 +832,70 @@ async function token(request: Request, deps: OAuthDeps): Promise<Response> {
   if ((await challengeOf(verifier)) !== row.request.challenge) return oauthError(400, 'invalid_grant', 'The code_verifier does not match the code_challenge this sign-in began with.');
   const bearer = await openBearer(row.bearer_sealed, code);
   if (bearer === null) return oauthError(400, 'invalid_grant', spent);
-  return json(200, { access_token: bearer, token_type: 'Bearer', expires_in: EXPIRES_IN, scope: ladder(row.request.scope) }, [['pragma', 'no-cache']]);
+  /* A refresh family is started with the bearer, so the app can come back without asking the person again. Unmade when
+     the table is full: the app still has its bearer, and signs in again at the end of it as it always did. */
+  const now = deps.now();
+  const ends = now + (BEARER_DAYS - 1) * DAY_MS;
+  const refresh = b64url(random(32));
+  const made = await deps.store({
+    op: 'family',
+    row: {
+      id: b64url(random(18)), client_id: row.request.client_id, record: row.record, scope: row.request.scope,
+      cur_hash: await digest(refresh), cur_sealed: await sealBearer(bearer, refresh), prev_hash: null, prev_sealed: null, prev_until: 0,
+      expires: Math.min(ends, now + TOKEN_DAYS * DAY_MS), ends,
+    },
+  });
+  return json(200, {
+    access_token: bearer, token_type: 'Bearer', expires_in: Math.floor((ends - now) / 1000), scope: ladder(row.request.scope),
+    ...(made === 'ok' ? { refresh_token: refresh } : {}),
+  }, [['pragma', 'no-cache']]);
+}
+
+/**
+ * `grant_type=refresh_token`: the refresh token for the bearer and a new refresh token, the old one kept for a short
+ * grace. Sliding: every use moves the family's end ninety days on, never past the bearer's own.
+ *
+ * REVOKING THE TOKEN IN SETTINGS STILL ENDS THE APP, because the bearer is the kernel's own token row and a revoked one
+ * answers 401 whatever refresh hands back; `deps.alive`, when the host gives it, also ends the family at once.
+ */
+async function refreshed(f: Record<string, unknown>, deps: OAuthDeps): Promise<Response> {
+  const gone = 'This refresh token is not one BrainDog gave, was replaced, or has not been used for ninety days. Sign in again.';
+  const presented = textField(f.refresh_token);
+  if (presented === '' || presented.length > 128) return oauthError(400, 'invalid_grant', gone);
+  const hash = await digest(presented);
+  /* TWICE: a retry racing the rotation loses the compare-and-set once and then finds the new row. */
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const row = await deps.store({ op: 'refresh_get', hash });
+    if (row === null) return oauthError(400, 'invalid_grant', gone);
+    if (f.client_id !== undefined && textField(f.client_id) !== row.client_id) return oauthError(400, 'invalid_grant', 'This refresh token was given to another app.');
+    if (f.resource !== undefined && !isResource(textField(f.resource), deps)) return oauthError(400, 'invalid_target', `This server issues tokens for ${deps.issuer}/mcp and nothing else.`);
+    const sealed = row.which === 'current' ? row.cur_sealed : row.prev_sealed;
+    const bearer = sealed === null ? null : await openBearer(sealed, presented);
+    if (bearer === null) return oauthError(400, 'invalid_grant', gone);
+    if (deps.alive !== undefined && !(await deps.alive(bearer))) {
+      await deps.store({ op: 'refresh_drop', id: row.id });
+      return oauthError(400, 'invalid_grant', 'This app was removed. Sign in again.');
+    }
+    const now = deps.now();
+    const next = b64url(random(32));
+    const retried = row.which === 'previous';
+    const ok = await deps.store({
+      op: 'refresh_rotate',
+      id: row.id,
+      expect_cur: row.cur_hash,
+      next: {
+        cur_hash: await digest(next), cur_sealed: await sealBearer(bearer, next),
+        /* The one just presented stays good for the grace; a retry of an older one does not get a longer grace. */
+        prev_hash: hash, prev_sealed: await sealBearer(bearer, presented), prev_until: retried ? row.prev_until : now + REFRESH_GRACE,
+        expires: now + TOKEN_DAYS * DAY_MS,
+      },
+    });
+    if (!ok) continue;
+    return json(200, {
+      access_token: bearer, token_type: 'Bearer', expires_in: Math.max(60, Math.floor((row.ends - now) / 1000)), scope: ladder(row.scope), refresh_token: next,
+    }, [['pragma', 'no-cache']]);
+  }
+  return oauthError(400, 'invalid_grant', gone);
 }
 
 /**

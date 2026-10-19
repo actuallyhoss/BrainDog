@@ -44,6 +44,14 @@ function memoryStore(): OAuthStore {
         return null;
       case 'count':
         return null;
+      case 'family':
+        return 'ok';
+      case 'refresh_get':
+        return null;
+      case 'refresh_rotate':
+        return false;
+      case 'refresh_drop':
+        return 'ok';
     }
   };
   return (async (call: OAuthCall) => answer(call)) as OAuthStore;
@@ -103,7 +111,7 @@ test('an app that came by its metadata document is minted with cimd and the host
   const res = await d.post('/oauth/approve', { request, record: 'rec_invented', scope: 'read' });
   assert.equal(res.status, 200, await res.clone().text());
   assert.equal(d.mints.length, 1);
-  assert.deepEqual(d.mints[0], { scope: 'read', label: APP, days: 90, client: { id, kind: 'cimd', host: SITE } });
+  assert.deepEqual(d.mints[0], { scope: 'read', label: APP, days: 365, client: { id, kind: 'cimd', host: SITE } });
 });
 
 test('an app that registered itself is minted with dcr and the host it asked to be answered at', async () => {

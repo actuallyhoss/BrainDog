@@ -80,7 +80,7 @@ it is the one a client reached.
   client `access_denied`.
 - `POST /oauth/token` trades the code and its verifier for `{ access_token, token_type: 'Bearer',
   expires_in, scope }`. A code is spent by being asked for, so a second use fails. Every redirect
-  carries `iss` (RFC 9207). There is no refresh token: after ninety days the client signs in again.
+  carries `iss` (RFC 9207). The app also gets a refresh token, good ninety days from its last use.
 - Errors at `/oauth/*` are OAuth's own `{ error, error_description }`. `/oauth/register` and
   `/oauth/authorize` are counted per address in the Directory's lockout table and answer 429 with
   `Retry-After` past the limit.

@@ -34,7 +34,31 @@ export type CodeRequest = { client_id: string; redirect_uri: string; challenge: 
 /** A one-time code, kept by its SHA-256 and never as itself, with the bearer sealed under the code. */
 export type CodeRow = { code_hash: string; request: CodeRequest; record: string; bearer_sealed: string; expires: number };
 
+/**
+ * One refresh family: the app's long-lived way back to a bearer. Only hashes of the refresh tokens are kept, and the
+ * bearer is sealed under each token that may open it, so this table alone opens nothing.
+ */
+export type RefreshRow = {
+  id: string;
+  client_id: string;
+  record: string;
+  scope: string;
+  cur_hash: string;
+  cur_sealed: string;
+  prev_hash: string | null;
+  prev_sealed: string | null;
+  prev_until: number;
+  /** When the family dies unless it is used: moved forward on every use, never past `ends`. */
+  expires: number;
+  /** When the bearer itself ends, which no refresh can move. */
+  ends: number;
+};
+
 export type OAuthCall =
+  | { op: 'family'; row: RefreshRow }
+  | { op: 'refresh_get'; hash: string }
+  | { op: 'refresh_rotate'; id: string; expect_cur: string; next: Pick<RefreshRow, 'cur_hash' | 'cur_sealed' | 'prev_hash' | 'prev_sealed' | 'prev_until' | 'expires'> }
+  | { op: 'refresh_drop'; id: string }
   | { op: 'client'; client_id: string }
   | { op: 'register'; client: OAuthClient }
   | { op: 'hold'; request: HeldRequest }
@@ -46,6 +70,10 @@ export type OAuthCall =
 
 /** What each `op` answers. `full` is a table at its ceiling, and nothing was written. `count` answers the seconds to wait, or `null`. */
 export type OAuthAnswers = {
+  family: 'ok' | 'full';
+  refresh_get: (RefreshRow & { which: 'current' | 'previous' }) | null;
+  refresh_rotate: boolean;
+  refresh_drop: 'ok';
   client: OAuthClient | null;
   register: 'ok' | 'full';
   hold: 'ok' | 'full';
@@ -68,6 +96,7 @@ export type OAuthAnswer = OAuthAnswers[OAuthCall['op']];
 const CLIENTS_MOST = 50_000;
 const REQUESTS_MOST = 10_000;
 const CODES_MOST = 10_000;
+const FAMILIES_MOST = 50_000;
 
 /**
  * What one address may ask of `/oauth/register` or `/oauth/authorize` in a window, as device starts are counted, and
@@ -90,6 +119,10 @@ const SCHEMA = [
   'CREATE INDEX IF NOT EXISTS oauth_request_expires ON oauth_request(expires)',
   'CREATE TABLE IF NOT EXISTS oauth_code (code_hash TEXT PRIMARY KEY, request TEXT NOT NULL, record TEXT NOT NULL, bearer_sealed TEXT NOT NULL, expires INTEGER NOT NULL)',
   'CREATE INDEX IF NOT EXISTS oauth_code_expires ON oauth_code(expires)',
+  'CREATE TABLE IF NOT EXISTS oauth_refresh (id TEXT PRIMARY KEY, client_id TEXT NOT NULL, record TEXT NOT NULL, scope TEXT NOT NULL, cur_hash TEXT NOT NULL, cur_sealed TEXT NOT NULL, prev_hash TEXT, prev_sealed TEXT, prev_until INTEGER NOT NULL, expires INTEGER NOT NULL, ends INTEGER NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS oauth_refresh_cur ON oauth_refresh(cur_hash)',
+  'CREATE INDEX IF NOT EXISTS oauth_refresh_prev ON oauth_refresh(prev_hash)',
+  'CREATE INDEX IF NOT EXISTS oauth_refresh_expires ON oauth_refresh(expires)',
 ];
 
 /**
@@ -152,6 +185,40 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
   for (const statement of SCHEMA) sql.exec(statement);
   const now = clock.now();
   switch (call.op) {
+    case 'family': {
+      const r = call.row;
+      return sql.transactionSync(() => {
+        sql.exec('DELETE FROM oauth_refresh WHERE expires <= ?', now);
+        if (Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM oauth_refresh')?.n ?? 0) >= FAMILIES_MOST) return 'full' as const;
+        sql.exec(
+          'INSERT INTO oauth_refresh (id, client_id, record, scope, cur_hash, cur_sealed, prev_hash, prev_sealed, prev_until, expires, ends) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          r.id, r.client_id, r.record, r.scope, r.cur_hash, r.cur_sealed, r.prev_hash, r.prev_sealed, r.prev_until, r.expires, r.ends,
+        );
+        return 'ok' as const;
+      });
+    }
+    case 'refresh_get': {
+      const row = sql.one<RefreshRow>('SELECT id, client_id, record, scope, cur_hash, cur_sealed, prev_hash, prev_sealed, prev_until, expires, ends FROM oauth_refresh WHERE (cur_hash = ?1 OR prev_hash = ?1) AND expires > ?2 AND ends > ?2', call.hash, now);
+      if (row === undefined) return null;
+      if (row.cur_hash === call.hash) return { ...row, which: 'current' as const };
+      /* THE PREVIOUS TOKEN AFTER ITS GRACE IS A REPLAY, so the whole family goes: whoever holds a copy loses it, and the
+         app signs in again. Inside the grace it is a client that never saw our answer and is retrying. */
+      if (row.prev_until > now) return { ...row, which: 'previous' as const };
+      sql.exec('DELETE FROM oauth_refresh WHERE id = ?', row.id);
+      return null;
+    }
+    case 'refresh_rotate': {
+      const n = call.next;
+      /* COMPARE-AND-SET ON THE CURRENT HASH, so two retries racing make one new token and the loser looks again. */
+      const moved = sql.one<{ id: string }>(
+        'UPDATE oauth_refresh SET cur_hash = ?, cur_sealed = ?, prev_hash = ?, prev_sealed = ?, prev_until = ?, expires = MIN(?, ends) WHERE id = ? AND cur_hash = ? RETURNING id',
+        n.cur_hash, n.cur_sealed, n.prev_hash, n.prev_sealed, n.prev_until, n.expires, call.id, call.expect_cur,
+      );
+      return moved !== undefined;
+    }
+    case 'refresh_drop':
+      sql.exec('DELETE FROM oauth_refresh WHERE id = ?', call.id);
+      return 'ok';
     case 'client':
       return clientOf(sql.one<ClientRow>('SELECT client_id, name, redirect_uris, source, created_at FROM oauth_client WHERE client_id = ?', call.client_id));
     case 'register': {

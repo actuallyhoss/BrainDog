@@ -245,7 +245,7 @@ async function consentPage(request: Request, wired: { session: SessionDeps; dire
   const records = choices('record', 'Which record', owned.map((r) => ({ value: r.slug, label: r.name })), owned[0]?.slug ?? '');
   const reach = choices('scope', 'What it may do', consent.offers.map((s) => ({ value: s, label: scopeSentence(s) })), consent.suggested);
   const html = `${asking}
-<p>If you allow it, it can reach the record you choose for ${TOKEN_DAYS} days. It is listed under Settings, Agents, by this app's name, and removing it there stops the app at once.</p>
+<p>If you allow it, it can reach the record you choose until it goes ${TOKEN_DAYS} days unused. It is listed under Settings, Agents, by this app's name, and removing it there stops the app at once.</p>
 <form method="post" action="/oauth/approve" id="allow">
 <input type="hidden" name="request" value="${escapeHtml(consent.request)}">
 ${records}
