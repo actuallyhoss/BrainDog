@@ -1,0 +1,11 @@
+{
+  "name": "@braindog/pack-team-board",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "node --test team-board.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
