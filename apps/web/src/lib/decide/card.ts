@@ -417,6 +417,11 @@ function arrangementOf(q: QueueQuestion, kind: string, body: unknown): string {
   return `${spoken(`${line} ·`) === line ? line : spoken(line)}.`;
 }
 
+/** The suggested option first, the rest in the record's order. Stable, so the keys follow what is drawn. */
+export function leadFirst<T extends { recommended: boolean }>(ways: readonly T[]): T[] {
+  return [...ways.filter((w) => w.recommended), ...ways.filter((w) => !w.recommended)];
+}
+
 /** `YYYY-MM-DD` where it is a day on the calendar, or `null`: `2026-02-30` and `2026-13-01` are no day. */
 export function realDay(v: unknown): string | null {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(v)) return null;
@@ -462,7 +467,8 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
   /* THE AMOUNT IN THE RECORD'S OWN CURRENCY, which `labelOf` reads from the shell: here it is the host's, when handed. */
   const labelled = (w: Way): string =>
     w.key === 'accept' && said !== '' && twoWords(keyed) ? decideWords.acceptFor(said) : labelOf({ key: w.key, title: w.label }, keyed, moves);
-  const ways = plain.map((w) => ({ ...w, label: labelled(w) }));
+  /* THE SUGGESTED OPTION LEADS (§45); every key and number follows `ways`, so they follow what is drawn. */
+  const ways = leadFirst(plain.map((w) => ({ ...w, label: labelled(w) })));
   const merge = queueMergeOf(q, plain.map((w) => w.key));
   const filed = typeof q.body_kind === 'string' ? q.body_kind : q.kind;
   const arranged = arrangementOf(q, filed, ctx.body);

@@ -51,6 +51,8 @@
 <script lang="ts">
   import '@braindog/skin/kinds/queue.css';
   import './form.css';
+  import OptionVisual from './OptionVisual.svelte';
+  import { visualOf as optionVisualOf, type VisualContext } from './option-visual.ts';
   import { getContext, tick, untrack } from 'svelte';
   import { page as route } from '$app/state';
   import { invalidateAll } from '$app/navigation';
@@ -115,6 +117,8 @@
     idOf?: ((key: string) => string) | undefined;
     /** A question shown outside Decide (Home, a declared page): the question and its answers as buttons, nothing else. */
     compact?: boolean;
+    /** What the host knows to draw an option against: the balance, the month's spend, the list a filing goes into. */
+    ground?: Omit<VisualContext, 'now'> | undefined;
   } = $props();
 
   /* WHO DECIDES THIS ONE, said on the card of a reader it is not named for (USE-A13); nothing for nobody or for her. */
@@ -469,6 +473,8 @@
       >{:else if way.shows}<span class="queue-visual" data-shows="figure"><span class="queue-figure num">{way.shows.figure}</span></span>{/if}
     <span class="queue-label dc-choice-name" dir="auto">{way.label}</span>
     {#if way.because}<span class="dc-choice-does" dir="auto">{way.because}</span>{/if}
+    <!-- WHAT IT WOULD CHANGE, drawn small; an option with a swatch, figure or picture of its own keeps that. -->
+    {#if !way.shows}<OptionVisual visual={optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...ground, now: Date.now(), home: ground?.home })} />{/if}
   </span>
 {/snippet}
 

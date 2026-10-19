@@ -1,0 +1,20 @@
+/* An option's small picture, in tokens only so both themes follow; it sits under the option's words and wraps at 390 px. */
+.ov { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-block-start: var(--sp-2); font-size: var(--fs-meta); color: var(--ink); min-inline-size: 0; max-inline-size: 100%; }
+.ov-dim { color: var(--dim); }
+.ov-money, .ov-date { flex-direction: column; align-items: stretch; gap: var(--sp-1); }
+.ov-bar { display: block; block-size: 6px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--ink) 8%, var(--tile)); overflow: hidden; }
+.ov-fill { display: block; block-size: 100%; border-radius: var(--r-pill); background: var(--ink); }
+.ov-fill[data-over] { background: var(--chart-late, var(--ink)); }
+.ov-cap { display: flex; justify-content: space-between; gap: var(--sp-3); }
+.ov-line { position: relative; display: block; block-size: 12px; }
+.ov-line::before { content: ''; position: absolute; inset-inline: 0; inset-block-start: 5px; block-size: 2px; background: color-mix(in srgb, var(--ink) 14%, var(--tile)); }
+.ov-dot { position: absolute; inset-block-start: 1px; inline-size: 10px; block-size: 10px; margin-inline-start: -5px; box-sizing: border-box; border-radius: var(--r-round); background: var(--ink); }
+.ov-dot[data-today] { background: var(--tile); border: 2px solid var(--ink); }
+.ov-dot[data-was] { background: var(--tile); border: 1px dashed var(--dim); }
+.ov-dot[data-late] { background: var(--chart-late, var(--ink)); }
+.ov-names { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.ov-was { color: var(--dim); text-decoration: line-through; overflow-wrap: anywhere; }
+.ov-merge .ov-was { text-decoration: none; }
+.ov-now, .ov-list { font-weight: 600; overflow-wrap: anywhere; }
+.ov-arrow { color: var(--dim); }
+@media (prefers-reduced-motion: no-preference) { .ov-fill { transition: inline-size var(--d-state) var(--ease-out); } }
