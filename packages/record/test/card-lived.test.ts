@@ -66,7 +66,8 @@ function holds(c: Context, where: string): string {
   const signs = card.split('\n').find((l) => l.startsWith('Signs '));
   if (signs) {
     const red = valueOf<{ signs: { state: string }[] }>(lived.kernel.signs()).signs.filter((s) => s.state === 'red').length;
-    assert.match(signs, new RegExp(`\\b${red} read red\\b`, 'u'), `${where}: the card counts red signs the record does not: ${signs}`);
+    const said = Number(/\b(\d+) read red here\b/u.exec(signs)?.[1] ?? Number.NaN);
+    assert.ok(said >= 1 && said <= red, `${where}: the card counts red signs the record does not: ${signs}`);
   }
   return card;
 }
@@ -111,9 +112,9 @@ test('AFTER A RUN HANDS OFF: the fresh session\'s Next line is the step that run
   assert.equal(c.handoff?.from, left);
   assert.equal(c.handoff?.next, 'Match the card ending 4817 to its account');
   assert.ok(line.includes('Match the card ending 4817 to its account'), line);
-  assert.ok(line.includes(`Left by Claude (${left})`), line);
+  assert.ok(line.includes('Left by Claude') && !line.includes(left), line);
   /* ANOTHER RUN LEFT IT, so the line says to check it before acting on it. */
   assert.match(line, /Check before acting\./u);
-  /* A COMPACTION PRINTS THIS LINE ALONE, so it is the same line. */
-  assert.equal(c.card_next, line);
+  /* A COMPACTION PRINTS THE WHOLE LINE ALONE, with the run's handle a tool needs. */
+  assert.ok(c.card_next?.startsWith('Next ') && c.card_next.includes(`Left by Claude (${left})`), String(c.card_next));
 });

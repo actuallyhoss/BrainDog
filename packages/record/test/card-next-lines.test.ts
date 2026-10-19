@@ -4,7 +4,8 @@
  * The record works out `next_lines`, `also_here` and `handoff.earlier`, and the card read none of them: it printed its
  * own wording of the step with "N dead ends" in More, so a session was never told "Nothing was handed over", who took
  * the step, what was tried, who else is here by name, or that older steps wait. Here each is handed in by hand, as
- * `briefing` sends it, and the card is held to print the record's lines first, whole, and still at most 150 words.
+ * `briefing` sends them, and the card is held to print the first of the record's lines as one short line with no run id,
+ * `card_next` the whole of them, and the card at most 130 words.
  * Every name is made up.
  */
 
@@ -54,10 +55,11 @@ const slot = (said: string, label: string): string | null => {
   return line === undefined ? null : line.slice(9);
 };
 
-test("THE RECORD'S NEXT LINES REPLACE THE CARD'S OWN WORDING of the step, each whole, on the one Next line", () => {
+test("THE RECORD'S FIRST NEXT LINE IS THE BRIEF'S, with no run id and 'Left by' whole, and `card_next` keeps them all", () => {
   const c = ctx({ handoff: handoff({ tried: ['a cooler kiln'] }), next_lines: [LEFT, 'Tried: a cooler kiln'] });
   const drawn = draw(c);
-  assert.equal(slot(drawn.card, 'Next'), `${LEFT} · Tried: a cooler kiln`);
+  assert.match(slot(drawn.card, 'Next') ?? '', /^Fire the test tiles .* Left by Claude 1h ago\. Check before acting\.$/u);
+  assert.doesNotMatch(drawn.card, /S5/u);
   /* NOT THE OLD WORDING beside it, and the compaction line is the same line. */
   assert.doesNotMatch(drawn.card, /\(S5, /u);
   assert.equal(drawn.next, `Next     ${LEFT} · Tried: a cooler kiln`);
@@ -67,10 +69,10 @@ test("THE RECORD'S NEXT LINES REPLACE THE CARD'S OWN WORDING of the step, each w
 
 test('NO STEP: the record says nothing was handed over and who was last here; a taken step is said as taken, never offered', () => {
   const last = 'Nothing was handed over. Last here: Claude (S4), 2h ago, at 5a57ba2.';
-  assert.equal(slot(draw(ctx({ next_lines: [last] })).card, 'Next'), last);
+  assert.equal(slot(draw(ctx({ next_lines: [last] })).card, 'Next'), 'Nothing was handed over. Last here: Claude, 2h ago, at 5a57ba2.');
   const took = `Codex (S8) took this 3 min ago: ${STEP}`;
   const drawn = draw(ctx({ next_lines: [took] })).card;
-  assert.equal(slot(drawn, 'Next'), took);
+  assert.equal(slot(drawn, 'Next'), `Codex took this 3 min ago: ${STEP}`);
   assert.doesNotMatch(drawn, /Left by|check before acting/iu);
 });
 
@@ -82,19 +84,20 @@ test('NOTHING TRUE TO SAY, NO NEXT LINE: no lines and no step leave Next out, as
   }
 });
 
-test('A CONTEXT DRAWN WITH A STEP AND NO LINES still reads, with "Tried:" in Next cut to its size and no dead ends in More', () => {
+test('A CONTEXT DRAWN WITH A STEP AND NO LINES still reads: the brief says app and age, `card_next` keeps "Tried:" cut to its size', () => {
   const long = Array.from({ length: 12 }, (_, i) => `a kiln schedule number ${String(i + 1)}.`);
   const drawn = draw(ctx({ handoff: handoff({ tried: ['a cooler kiln', 'a longer soak.'] }) })).card;
-  assert.match(slot(drawn, 'Next') ?? '', /^Fire the test tiles .*\(S5, Claude Code, 1h ago, check before acting\) · Tried: a cooler kiln; a longer soak$/u);
+  assert.match(slot(drawn, 'Next') ?? '', /^Fire the test tiles .*\(Claude Code, 1h ago, check before acting\)$/u);
+  assert.match(draw(ctx({ handoff: handoff({ tried: ['a cooler kiln', 'a longer soak.'] }) })).next ?? '', /\(S5, Claude Code, 1h ago, check before acting\) · Tried: a cooler kiln; a longer soak$/u);
   assert.doesNotMatch(drawn, /dead end/u);
-  const cut = (slot(draw(ctx({ handoff: handoff({ tried: long }) })).card, 'Next') ?? '').split(' · ').at(-1)!;
+  const cut = (draw(ctx({ handoff: handoff({ tried: long }) })).next ?? '').split(' · ').at(-1)!;
   assert.ok(cut.startsWith('Tried: a kiln schedule number 1;') && cut.endsWith('…'), cut);
   assert.ok([...cut].length <= TRIED_MOST, `${String([...cut].length)} characters: ${cut}`);
 });
 
-test('OLDER STEPS LEFT HERE ARE COUNTED IN NEXT, with the read that lists them', () => {
-  assert.equal(slot(draw(ctx({ handoff: handoff({ earlier: 2 }), next_lines: [LEFT] })).card, 'Next'), `${LEFT} · 2 older steps were left here: read braindog:handoffs`);
-  assert.match(slot(draw(ctx({ handoff: handoff({ earlier: 1 }) })).card, 'Next') ?? '', / · 1 older step was left here: read braindog:handoffs$/u);
+test('OLDER STEPS LEFT HERE ARE COUNTED IN `card_next`, with the read that lists them', () => {
+  assert.equal(draw(ctx({ handoff: handoff({ earlier: 2 }), next_lines: [LEFT] })).next, `Next     ${LEFT} · 2 older steps were left here: read braindog:handoffs`);
+  assert.match(draw(ctx({ handoff: handoff({ earlier: 1 }) })).next ?? '', / · 1 older step was left here: read braindog:handoffs$/u);
   for (const earlier of [0, -1, 1.5]) assert.doesNotMatch(draw(ctx({ handoff: handoff({ earlier }), next_lines: [LEFT] })).card, /older step/u);
 });
 
@@ -108,7 +111,7 @@ test('WHO ELSE IS HERE IS SAID AFTER THE WARNING, by name, three at most and the
   assert.match(slot(draw(ctx({ live: { same_repo: [working('S9')], elsewhere: [] } })).card, 'Also') ?? '', /working in this repository too/u);
 });
 
-test('WITH ALL OF IT ON A FULL RECORD the card stays at 150 words, and line one, the warning and the step lines are never cut', () => {
+test('WITH ALL OF IT ON A FULL RECORD the card stays at 130 words, and line one and the warning are never cut', () => {
   const long = 'Read the whole firing log before changing a schedule, because one short cone reading says nothing about the batch.';
   const lines = [LEFT, 'Tried: a cooler kiln; a longer soak; a second thermocouple'];
   const c = ctx({
@@ -125,9 +128,9 @@ test('WITH ALL OF IT ON A FULL RECORD the card stays at 150 words, and line one,
   const drawn = draw(c, { agent: 'claude', device: 'MacBook Pro', branch: 'main' });
   assert.ok(drawn.words <= CARD_MOST, `the card is ${String(drawn.words)} words:\n${drawn.card}`);
   assert.equal(drawn.words, wordCount(drawn.card));
-  assert.equal(drawn.card.split('\n')[0], 'BrainDog · run S6 · Claude Code on MacBook Pro · project Kiln · branch main');
+  assert.equal(drawn.card.split('\n')[0], 'Claude Code on MacBook Pro, working on Kiln');
   assert.ok((slot(drawn.card, 'Also') ?? '').startsWith(`${TWO_SESSIONS} Also here: Claude (S4)`), drawn.card);
-  const next = slot(drawn.card, 'Next') ?? '';
-  assert.ok(next.endsWith(`${lines.join(' · ')} · 3 older steps were left here: read braindog:handoffs`), drawn.card);
+  assert.match(slot(drawn.card, 'Next') ?? '', /^Fire the test tiles .* Left by Claude 1h ago\. Check before acting\.$/u);
+  assert.ok((drawn.next ?? '').endsWith(`${lines.join(' · ')} · 3 older steps were left here: read braindog:handoffs`), String(drawn.next));
   assert.doesNotMatch(drawn.card, /dead end/u);
 });

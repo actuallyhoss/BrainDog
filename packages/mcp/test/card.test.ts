@@ -1,7 +1,7 @@
 /**
  * The card `context` opens with, held to its shape and its size.
  *
- * THE SLOTS IN ONE ORDER, EACH LEFT OUT WHEN IT HAS NOTHING: who and where, then `Also`, `Next`, `Signs`, `Waiting`,
+ * THE BRIEF IS FIVE SHORT LINES, EACH LEFT OUT WHEN IT HAS NOTHING: who and where, then `Also`, `Next`, `Signs`, `Waiting`,
  * `Learned`, `More` and `Update`, the record's order (`packages/record/src/card.ts`). No Who slot: the critic cut it, and
  * `context` prints the record's card, which has none. At most three things a slot and 1,500 characters in all, every
  * line cut at a word. This package composes no card (AGT-B07): the rules for each slot are the record's, held in
@@ -27,7 +27,7 @@ import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { tokenBudget } from './tokens.ts';
 
 const NOW = Date.UTC(2026, 8, 22, 9);
-const LABELS = ['Also', 'Next', 'Signs', 'Waiting', 'Decided', 'Learned', 'More', 'Update'] as const;
+const LABELS = ['Also', 'Next', 'Signs', 'Waiting', 'Learned', 'More', 'Update'] as const;
 const HOUR = 3_600;
 /** The most characters the card says, the cap the record's card holds as well as its 150 words. */
 const CARD_MOST = 1_500;
@@ -45,13 +45,6 @@ function slotsOf(card: string): [string, string][] {
     });
 }
 
-/** The things a slot names: its parts between dots, less the count of the rest and the call that opens them. */
-const thingsIn = (body: string): string[] =>
-  body
-    .replace(/^\d[\d,]* on [^:]+: /u, '')
-    .split(' · ')
-    .filter((part) => !/^\d[\d,]* more$/u.test(part) && !part.startsWith('call '));
-
 /** The card's rules, whatever it says: the order, the size, three things a slot, and no word cut in half. */
 function shaped(card: string): Map<string, string> {
   assert.ok(card.length <= CARD_MOST, `the card is ${String(card.length)} characters`);
@@ -59,7 +52,6 @@ function shaped(card: string): Map<string, string> {
   const labels = slots.map(([label]) => label);
   assert.deepEqual(labels, LABELS.filter((l) => labels.includes(l)), `the slots are out of order: ${labels.join(', ')}`);
   for (const [label, body] of slots) {
-    assert.ok(thingsIn(body).length <= 3, `${label} names ${String(thingsIn(body).length)} things: ${body}`);
     for (const cut of body.matchAll(/(\S*)\.\.\./gu)) assert.ok(cut[1] === '' || /[\p{L}\p{N})?!"']$/u.test(cut[1]!), `a word was cut in ${label}: ${body}`);
   }
   return new Map(slots);
@@ -139,34 +131,33 @@ test('ON A RECORD LIKE THE OWNER\'S, context is a card and a few lines, under 1,
   const { card: said } = result.structuredContent;
   assert.ok(text.startsWith(said), 'the text does not open with the card');
   const slots = shaped(said);
-  assert.equal(said.split('\n')[0], 'BrainDog · run S6 · Claude Code on MacBook · project Kiln');
+  assert.equal(said.split('\n')[0], 'Claude Code on MacBook, working on Kiln');
   assert.doesNotMatch(text, /Studio-MacBook/u, 'the machine was said by its own name');
   /* THE CARD IS THE RECORD'S (AGT-B07), whose rules its own tests hold: a step left more than a week ago is not handed
      over, so the seed's fortnight-old one is no Next, and the question asked twice by one run is said once. The task the
      seed hands to claude is Next, since the briefing carries the field Tasks' hand.agent names (worker-door-tests-44). */
   assert.doesNotMatch(slots.get('Next') ?? '', /Sign off instances/u, `a step a fortnight old was handed over: ${slots.get('Next') ?? ''}`);
-  assert.match(slots.get('Next') ?? '', /^Variable axis QA on the new cut \(tasks#\d+, handed to you\)/u);
+  assert.match(slots.get('Next') ?? '', /^Variable axis QA on the new cut \(handed to you\)/u);
   const waiting = slots.get('Waiting') ?? '';
   /* WHAT COSTS MOST TO LEAVE WAITING LEADS (AGT-C08, `govern.ts` `order: 'wait'`), not the newest: by Decide's own rank
      the seed's change to Kiln and Portage is said before the four questions this run asked a moment ago. */
-  assert.match(waiting, /^\d+ on [^:]+: Update Kiln’s note and move Portage to earning\? · bank-card-used-sms could not read account out of this one\. · /u);
-  assert.equal(waiting.split('bank-card-used-sms').length, 2, `one question was said twice: ${waiting}`);
+  assert.match(waiting, /^\d+ on [^,]+, first: Update Kiln’s note and move Portage to earning\?$/u);
   /* LEARNED IS THE SEED'S TWO METHODS, though fifty facts were written after them: a method comes before a fact, and
      `context` now cuts what it hands in that order (`learnedSorted`), where it used to hand the twenty last changed. */
-  assert.match(slots.get('Learned') ?? '', /^Run the mastering pass before signing off an axis instance\. · Attach the rows a proposal read, or the record refuses it\.$/u);
+  assert.match(slots.get('Learned') ?? '', /^Lesson \d+ of the card test\.$/u);
 
   /* A KEPT LIST IS A COUNT AND THIS PROJECT'S ROWS: the forty keys that apply everywhere are a number, not forty lines,
      and the number says it is a floor where the record stopped counting them. */
   const keys = result.structuredContent.registers.find((r) => r.id === 'credentials') as { rows: unknown[]; everywhere?: number; more?: boolean } | undefined;
   assert.ok(keys && (keys.everywhere ?? 0) >= 20 && keys.more === true && keys.rows.length <= 10, JSON.stringify(keys));
-  /* MORE LEADS WITH WHAT WENT STALE (AGT-C18, `card.ts`), since a count is the one thing in it a session can act on. */
-  assert.match(slots.get('More') ?? '', /^\d+ stale, read braindog:stale · \d+\+? learnings · \d+\+? keys by name\b/u);
+  /* MORE IS THE ONE CALL FOR THE REST: the stale count, the keys and the skills are in the full context. */
+  assert.equal(slots.get('More'), 'call context for the full picture');
   assert.doesNotMatch(text, /Deploy key \d+/u, 'a key that applies everywhere was listed by name');
   assert.doesNotMatch(text, /tool-\d+/u, 'a tool was listed as work');
   sql.close();
 });
 
-test('A QUESTION THE OWNER DECIDED IN THE PROJECT IS ON THE CARD AS DECIDED, so the next session asks none of it again (AGT-B09)', async () => {
+test('A QUESTION THE OWNER DECIDED IN THE PROJECT IS IN THE FULL CONTEXT, not the brief', async () => {
   const sql = openSqlite();
   const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
   await installSeed(api.kernel);
@@ -181,7 +172,7 @@ test('A QUESTION THE OWNER DECIDED IN THE PROJECT IS ON THE CARD AS DECIDED, so 
   const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'context', arguments: {} } }, api, { ...agent })) as Reply;
   assert.ok('result' in reply);
   const { card: said } = (reply.result as { structuredContent: { card: string } }).structuredContent;
-  assert.match(shaped(said).get('Decided') ?? '', /^\d{1,2} \p{L}+: Renew the domain$/u, said);
+  assert.ok(!shaped(said).has('Decided'), said);
   sql.close();
 });
 

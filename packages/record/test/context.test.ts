@@ -235,7 +235,7 @@ test('CONTEXT OVER THE SEED: the run, Kiln, the last handoff, who is live, what 
   assert.match(here.next_lines?.[0] ?? '', new RegExp(`^Kern the lowercase pairs\\. Left by Claude \\(${before.spoken}\\) 10 min ago\\. Check before acting\\.$`));
   assert.equal(here.next_lines?.[1], 'Tried: Auto-kerning read as uneven');
   const card = here.card ?? assert.fail('context sent no card');
-  assert.match(card.split('\n')[0]!, new RegExp(`^BrainDog · run ${attached.spoken} · .+ · project Kiln`));
+  assert.match(card.split('\n')[0]!, /^.+, working on Kiln$/u);
   assert.ok(card.includes('Two sessions in one working tree overwrite each other.'), card);
   assert.ok(here.card_next?.startsWith('Next') && here.card_next.includes('Kern the lowercase pairs'), String(here.card_next));
   assert.ok(card.split(/\s+/u).length <= 150, card);

@@ -305,15 +305,15 @@ test('THE START HOOK AND context PRINT ONE CARD: line one names the run, the app
   assert.ok(told.mcp.text.startsWith(`${told.hook}\n`) || told.mcp.text === told.hook, `context's text does not lead with the card:\n${told.mcp.text}`);
 
   const lines = told.hook.split('\n');
-  assert.equal(lines[0], `BrainDog · run ${told.attached.spoken} · Claude Code on MacBook · project Kiln · branch main`);
-  /* NEXT STEP FIRST: the first slot after line one is the step the last run left, said as another run's. */
+  assert.equal(lines[0], 'Claude Code on MacBook, working on Kiln');
+  /* NEXT STEP FIRST: the first slot after line one is the step the last run left, said as another run's, with no run id. */
   assert.match(lines[1]!, /^Next\s/u, told.hook);
-  assert.ok(lines[1]!.includes(STEP) && lines[1]!.includes(`Left by Claude (${before}) `) && lines[1]!.endsWith('Check before acting.'), lines[1]);
-  /* AND A COMPACTION PRINTS THAT LINE ALONE, from the record's `card_next`. */
-  assert.equal(told.mcp.card_next, lines[1]);
-  assert.equal(nextLine(told.attached, undefined), lines[1]);
+  assert.ok(lines[1]!.includes(STEP.slice(0, 30)) && lines[1]!.includes('Left by Claude') && !lines[1]!.includes(before) && lines[1]!.endsWith('Check before acting.'), lines[1]);
+  /* AND A COMPACTION PRINTS THE WHOLE LINE ALONE, from the record's `card_next`, with the handle a tool needs. */
+  assert.ok(told.mcp.card_next?.startsWith('Next') && told.mcp.card_next.includes(STEP) && told.mcp.card_next.includes(`Left by Claude (${before}) `), String(told.mcp.card_next));
+  assert.equal(nextLine(told.attached, undefined), told.mcp.card_next);
 
-  assert.ok(wordCount(told.hook) <= 150, `${String(wordCount(told.hook))} words:\n${told.hook}`);
+  assert.ok(wordCount(told.hook) <= 130, `${String(wordCount(told.hook))} words:\n${told.hook}`);
   /* NAMES, NEVER IDS: no row's id, no machine's network name, no folder's path. */
   assert.doesNotMatch(told.hook, ULID);
   assert.ok(!told.hook.includes('Sams-MacBook-Pro') && !told.hook.includes('/Users/'), told.hook);
@@ -338,11 +338,11 @@ test('A STEP MORE THAN SEVEN DAYS OLD IS NO NEXT LINE, and one six days old stil
   const told = await starts(run(h, 'run-d'), 'run-d');
   assert.equal(told.mcp.card, told.hook);
   const next = told.hook.split('\n').find((line) => /^Next\s/u.test(line));
-  assert.ok(next?.includes(fresher) && next.includes(`Left by Claude (${by}) 6 days ago. Check before acting.`), told.hook);
+  assert.ok(next?.includes(fresher) && next.endsWith('Left by Claude 6 days ago. Check before acting.') && !next.includes(by), told.hook);
   assert.ok(!told.hook.includes(STEP), `the eight-day step came back beside the six-day one:\n${told.hook}`);
 });
 
-test('A CARD THAT WOULD RUN PAST 150 WORDS IS CUT TO 150, and line one and the step stay', async () => {
+test('A LONG STEP AND THREE QUESTIONS STILL MAKE A BRIEF OF FIVE SHORT LINES, one question said and the step cut to a line', async () => {
   const h = await record(shipped!);
   /* SHORT WORDS, so each slot's character cut leaves as many words as it can: three questions, and a long step. */
   const asks = [
@@ -360,20 +360,15 @@ test('A CARD THAT WOULD RUN PAST 150 WORDS IS CUT TO 150, and line one and the s
   const told = await starts(run(h, 'run-b'), 'run-b');
   assert.equal(told.mcp.card, told.hook, 'context over /mcp said another card than the start hook printed');
   assert.equal(told.api.card, told.hook, '/api/context said another card than the start hook printed');
-  assert.ok(wordCount(told.hook) <= 150, `${String(wordCount(told.hook))} words:\n${told.hook}`);
-
-  /* AND THE CAP WAS WHAT CUT IT: the 120-word aim keeps two questions, so a question left off is one the 150 cap took,
-     and with it back the card would be past 150. Without this the case would hold for a card that never neared 150.
-     The fresh record's red sign (see the header) is about 17 of those words: once it reads green, this says so, and the
-     case wants a longer load, not a looser check. */
-  const off = asks.filter((q) => !told.hook.includes(q.slice(0, 40)));
-  assert.ok(off.length >= 2, `the cap cut no question:\n${told.hook}`);
-  assert.ok(wordCount(told.hook) + wordCount(off[0]!) > 150, `the card never neared 150 words:\n${told.hook}`);
+  assert.ok(wordCount(told.hook) <= 130, `${String(wordCount(told.hook))} words:\n${told.hook}`);
 
   const lines = told.hook.split('\n');
-  assert.equal(lines[0], `BrainDog · run ${told.attached.spoken} · Claude Code on MacBook · project Kiln · branch main`);
+  assert.equal(lines[0], 'Claude Code on MacBook, working on Kiln');
   const next = lines.find((line) => /^Next\s/u.test(line));
-  assert.ok(next?.includes(long) && next.endsWith('Check before acting.'), told.hook);
+  assert.ok(next && next.length <= 100 && next.endsWith('Check before acting.') && next.includes('Go to the box by the door'), told.hook);
+  const waiting = lines.find((line) => /^Waiting\s/u.test(line));
+  assert.match(waiting ?? '', /^Waiting\s+\d+ on .+, first: /u, told.hook);
+  assert.ok(lines.at(-1)!.endsWith('call context for the full picture') || lines.some((l) => l.startsWith('Update ')), told.hook);
 });
 
 /*

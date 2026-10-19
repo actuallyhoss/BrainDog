@@ -17,7 +17,7 @@ import { card, CARD_MOST, learnedFirst, wordCount } from '../src/card.ts';
 import type { Brief, Context } from '../src/index.ts';
 
 const NOW = Date.UTC(2026, 9, 9, 9);
-const STALE = '4 stale, read braindog:stale';
+const MORE = 'call context for the full picture';
 
 const ctx = (over: Partial<Context> = {}): Context => ({
   session: { spoken: 'S6', state: 'active' },
@@ -51,21 +51,21 @@ const lesson = (spoken: string, said: string, kind: string | undefined, created_
 
 /* ── the one number ────────────────────────────────────────────────────── */
 
-test('MORE SAYS HOW MANY THINGS WENT STALE HERE, first, with the read that names them', () => {
-  assert.equal(draw(ctx({ stale: 4 })), `BrainDog · run S6 · project Kiln\nMore     ${STALE} · call context`);
-  assert.equal(slot(draw(ctx({ stale: 1 })), 'More'), '1 stale, read braindog:stale · call context');
+test('THE STALE COUNT IS IN THE FULL CONTEXT, not the brief: More is the one call', () => {
+  assert.equal(draw(ctx({ stale: 4 })), `This session, working on Kiln\nMore     ${MORE}`);
+  assert.equal(slot(draw(ctx({ stale: 1 })), 'More'), MORE);
 });
 
-test('THE NUMBER LEADS THE OTHER COUNTS, and More still names three things at most', () => {
+test('THE OTHER COUNTS ARE NOT IN THE BRIEF EITHER: More names no key and no skill', () => {
   const keys = reg('credentials', [row('credentials#1', { label: 'Kiln deploy' }), row('credentials#2', { label: 'Kiln mail' })]);
   const skills = reg('skills', [row('skills#1', { name: 'glaze' })]);
   const handoff = { from: 'S6', next: 'Fire the test tiles.', age_s: 600, tried: ['a cooler kiln', 'a longer soak'], head: null };
   const more = slot(draw(ctx({ stale: 4, handoff, registers: [keys, skills] })), 'More');
-  assert.equal(more, `${STALE} · 2 keys by name · 1 skill · call context`);
+  assert.equal(more, MORE);
 });
 
 test('NOTHING IS SAID OF IT at zero, with no count, or with a count that is not a whole number above zero', () => {
-  const bare = 'BrainDog · run S6 · project Kiln\nMore     call context';
+  const bare = `This session, working on Kiln\nMore     ${MORE}`;
   assert.equal(draw(ctx({ stale: 0 })), bare);
   assert.equal(draw(ctx()), bare);
   for (const odd of [-2, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) assert.equal(draw(ctx({ stale: odd })), bare, `stale ${String(odd)} was printed`);
@@ -100,7 +100,7 @@ test('A METHOD OUTRANKS A FACT, however new the fact: one from last month leads 
   const method = lesson('learnings#1', 'Read the firing log before changing a schedule.', 'method', DAY('2026-09-09'));
   assert.ok(learnedFirst(method, fact) < 0);
   assert.ok(learnedFirst(fact, method) > 0);
-  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [fact, method])] })), 'Learned'), 'Read the firing log before changing a schedule. · The kiln room is on the second floor.');
+  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [fact, method])] })), 'Learned'), 'The kiln room is on the second floor.');
 });
 
 test("AMONG TWO METHODS THE PROJECT'S WINS over the one that applies everywhere, however new that one is", () => {
@@ -112,8 +112,8 @@ test("AMONG TWO METHODS THE PROJECT'S WINS over the one that applies everywhere,
   const hereFact = lesson('learnings#4', 'The glaze room has no scale.', 'fact', DAY('2026-10-09'));
   assert.ok(learnedFirst(everywhere, hereFact) < 0);
   const drawn = draw(ctx({ registers: [reg('learnings', [hereFact], [everywhere])] }));
-  assert.equal(slot(drawn, 'Learned'), 'Money is minor units plus a currency. · The glaze room has no scale.');
-  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [hereFact, here], [everywhere])] })), 'Learned'), 'Weigh glaze dry, never wet. · Money is minor units plus a currency.');
+  assert.equal(slot(drawn, 'Learned'), 'The glaze room has no scale.');
+  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [hereFact, here], [everywhere])] })), 'Learned'), 'Weigh glaze dry, never wet.');
 });
 
 test('THEN THE NEWEST FIRST, and two the record gives no day for stay as it sent them', () => {
@@ -122,14 +122,14 @@ test('THEN THE NEWEST FIRST, and two the record gives no day for stay as it sent
   assert.ok(learnedFirst(newer, older) < 0);
   assert.ok(learnedFirst(older, newer) > 0);
   assert.equal(learnedFirst(older, older), 0);
-  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [older, newer])] })), 'Learned'), 'Log every cone. · Fire test tiles first.');
+  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [older, newer])] })), 'Learned'), 'Log every cone.');
   const a = lesson('learnings#3', 'First as sent.', 'method', undefined);
   const b = lesson('learnings#4', 'Second as sent.', 'method', undefined);
   assert.equal(learnedFirst(a, b), 0);
   /* One with no day beside one with a day is the older, so the order holds whatever the mix. */
   assert.ok(learnedFirst(a, newer) > 0);
   assert.ok(learnedFirst(newer, a) < 0);
-  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [a, b])] })), 'Learned'), 'First as sent. · Second as sent.');
+  assert.equal(slot(draw(ctx({ registers: [reg('learnings', [a, b])] })), 'Learned'), 'First as sent.');
 });
 
 test('A LEARNING WITH NO KIND SORTS AS A FACT, and so does one whose kind is no kind the list keeps', () => {
@@ -145,11 +145,11 @@ test('A LEARNING WITH NO KIND SORTS AS A FACT, and so does one whose kind is no 
   assert.deepEqual([fact, odd, method, bare].sort(learnedFirst).map((r) => r.spoken), ['learnings#4', 'learnings#1', 'learnings#2', 'learnings#3']);
 });
 
-test('LEARNED STILL LEAVES OUT A LESSON THAT NO LONGER STANDS, and More counts the ones it did not say', () => {
+test('LEARNED STILL LEAVES OUT A LESSON THAT NO LONGER STANDS', () => {
   const gone = { ...lesson('learnings#1', 'Soak for an hour.', 'method', DAY('2026-10-09')), state: 'superseded' };
   const facts = [1, 2, 3].map((n) => lesson(`learnings#${String(n + 1)}`, `Fact ${String(n)}.`, 'fact', DAY(`2026-10-0${String(n)}`)));
   const drawn = draw(ctx({ stale: 4, registers: [reg('learnings', [gone, ...facts])] }));
-  assert.equal(slot(drawn, 'Learned'), 'Fact 3. · Fact 2.');
-  assert.equal(slot(drawn, 'More'), `${STALE} · 3 learnings · call context`);
+  assert.equal(slot(drawn, 'Learned'), 'Fact 3.');
+  assert.equal(slot(drawn, 'More'), MORE);
   assert.doesNotMatch(drawn, /Soak/u);
 });

@@ -66,7 +66,7 @@ test('context teaches where a note about nothing goes, what a lane is, and how t
   /* BEFORE THE FIRST WRITE THERE IS NO SESSION ROW, so the sentence says what opens one rather than
      naming an id that does not exist yet. */
   assert.equal(first.session, undefined);
-  assert.match(first.card ?? '', /^BrainDog · no run yet · project Kiln/u, 'the card does not say where the caller stands');
+  assert.match(first.card ?? '', /^.+, working on Kiln/u, 'the card does not say where the caller stands');
   const note = lines.find((l) => /\blog\b/.test(l) && /session/.test(l));
   assert.ok(note, `nothing says where a note about nothing goes: ${JSON.stringify(lines)}`);
   assert.match(note!, /handoff/);

@@ -108,15 +108,15 @@ const OLD = { learnings: 'learnings', skills: 'skills', keys: 'credentials', too
 const NEW = { learnings: 'lessons', skills: 'abilities', keys: 'keyring', tools: 'gear' };
 
 /** The card as it read before this job, on the add-on's own ids: More by count, and with a lesson on a skill's topic. */
-const BEFORE_MORE = 'More     4 learnings · 2 keys by name · 1 skill · call context';
-const BEFORE_BEARING = 'More     1 learning for a skill · 4 learnings · 2 keys by name · call context';
-const BEFORE_NEXT = 'Next     Sign off the mastering pass. (tasks#1, handed to you)';
+const BEFORE_MORE = 'More     call context for the full picture';
+const BEFORE_BEARING = BEFORE_MORE;
+const BEFORE_NEXT = 'Next     Sign off the mastering pass. (handed to you)';
 
 test('THE CARD ON THE OLD IDS READS AS BEFORE, and the same lists under other ids with their roles read the same', () => {
   const before = card(ctx(agentsIn(OLD, false)), at, NOW).card;
   const lines = before.split('\n');
   assert.ok(lines.includes(BEFORE_MORE) && lines.includes(BEFORE_NEXT), before);
-  assert.match(before, /Learned  Tag the Lanternfish release before the deploy starts\./u);
+  assert.match(before, /Learned  Proofs are read on paper, never on screen\./u);
   assert.ok(!/Deploy key|SK1|KY1/u.test(before), 'a key and a skill handed to the agent are not work it is handed');
   assert.equal(card(ctx(agentsIn(NEW, true)), at, NOW).card, before, 'by role, under other ids');
   assert.equal(card(ctx(agentsIn(OLD, true)), at, NOW).card, before, 'the old ids declaring their roles');
