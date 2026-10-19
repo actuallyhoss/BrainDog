@@ -37,7 +37,8 @@
   import { apiBase, at } from '$lib/at.ts';
   import { onMount, type Component } from 'svelte';
   import { page } from '$app/state';
-  import { createClient, type EngineHealth } from '@braindog/client';
+  import { createClient, type EngineHealth, type SlashStatus } from '@braindog/client';
+  import { engineLine } from '$lib/ui/engine-line.ts';
   import { copy } from '$lib/copy.ts';
   import { drawProposal, drawReading, pass2Refused, secondPass, slashWords, type Drawn, type DrawnProposal } from '$lib/palette/slash.ts';
   import { askedLately, askWords, ASKS_FETCHED, type AskedLine } from '$lib/palette/slash-ask.ts';
@@ -149,23 +150,19 @@
   let lately = $state<AskedLine[] | null>(null);
   let answerAt = $state<HTMLElement | null>(null);
   let engine = $state<EngineHealth | null>(null);
+  let engineMonth = $state<SlashStatus | null>(null);
 
-  /** The not-answering sentence cut into what is wrong (marked) and the rest, or `null` while the model answers. */
-  const engineDown = $derived.by(() => {
-    if (engine === null || (engine.health.state !== 'not_answering' && engine.health.state !== 'key_closed')) return null;
-    const text = engine.said.text.trim();
-    if (text === '') return null;
-    const cut = text.indexOf('. ');
-    return cut < 0 ? { lead: text, rest: '' } : { lead: text.slice(0, cut + 1), rest: text.slice(cut + 1) };
-  });
+  /** The one line Today says too: not answering, his key closed, or the month spent (`engine-line.ts`). Healthy is nothing. */
+  const engineDown = $derived(engineLine(engine, engineMonth));
 
-  /** Whether the engine answers, from its own ledger. A refusal or a build without the read is nothing said. */
+  /** Whether the engine answers, from its own ledger, and what the month has left. A refusal or an old build is nothing said. */
   async function loadEngine() {
     if (!door || !modelHere) return;
     try {
-      const out = await door.engineHealth();
+      const [out, month] = await Promise.all([door.engineHealth(), door.slashStatus().catch(() => null)]);
       const v = out.ok ? (out.value as EngineHealth | null) : null;
       engine = v !== null && typeof v === 'object' && 'health' in v ? v : null;
+      engineMonth = month?.ok ? month.value : null;
     } catch {
       /* Nothing to say. */
     }

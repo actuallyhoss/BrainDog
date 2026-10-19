@@ -95,7 +95,9 @@
   import { madeSteps } from '$lib/start/made.ts';
   import { playedBy } from '$lib/start/parts.ts';
   import type { TellOptions } from '$lib/tell/read.ts';
-  import { createClient, type Cursor, type EventLine } from '@braindog/client';
+  import { createClient, type Cursor, type EngineHealth, type EventLine } from '@braindog/client';
+  import { engineLine, type EngineLine } from '$lib/ui/engine-line.ts';
+  import { page } from '$app/state';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { words } from '$lib/home/words.ts';
@@ -502,6 +504,26 @@
   });
 
   /**
+   * WHETHER SLASH'S MODEL HAS STOPPED, said once under the head (`engine-line.ts`): not answering, his key closed, or the
+   * month spent. Asked only where a model is behind Slash; healthy, a refusal or an old host draw nothing.
+   */
+  let engineDown = $state.raw<EngineLine | null>(null);
+  $effect(() => {
+    if (data.refused || page.data.slash !== true) return;
+    void moving.version;
+    let here = true;
+    const client = createClient({ base: apiBase() });
+    void Promise.all([client.engineHealth().catch(() => null), client.slashStatus().catch(() => null)]).then(([out, month]) => {
+      const v = out?.ok ? (out.value as EngineHealth | null) : null;
+      const health = v !== null && typeof v === 'object' && 'health' in v ? v : null;
+      if (here) engineDown = engineLine(health, month?.ok ? month.value : null);
+    });
+    return () => {
+      here = false;
+    };
+  });
+
+  /**
    * THE DESK ABOVE THE PAGE: who is working, the live projects as cards, and what landed (`Desk.svelte`). Fetched with its
    * reader beside the page's own read and not after it, since it is what Today opens on. A read that fails draws no
    * cards, and the desk then draws what it still has.
@@ -680,6 +702,11 @@
   actions={capture && wide.current ? headCapture : undefined}
   below={capture && !wide.current ? headCapture : undefined}
 />
+
+<!-- SLASH'S MODEL HAS STOPPED: one line under the head, the same one Slash shows, and nothing while it answers. -->
+{#if engineDown}
+  <p class="home-engine" role="status"><span data-needs>{engineDown.lead}</span>{engineDown.rest}</p>
+{/if}
 
 <!-- THE LINE A TASK IS TYPED INTO, at the right of the name (one line of its own under the sentence on a phone). -->
 {#snippet headCapture()}
@@ -864,6 +891,19 @@
     .home-by {
       transition: none;
     }
+  }
+
+  /* THE ENGINE'S LINE, set as the Slash page sets it: body type, what is wrong in the danger ink. */
+  .home-engine {
+    margin: 0 0 var(--sp-3);
+    max-inline-size: var(--measure);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  .home-engine [data-needs] {
+    color: var(--danger-text);
   }
 
   /* ── the page ─────────────────────────────────────────────────────────── */
