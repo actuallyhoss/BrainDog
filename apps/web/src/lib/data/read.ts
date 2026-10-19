@@ -47,6 +47,8 @@ export type Resource<T> = {
   readonly state: Phase;
   readonly value: T | null;
   readonly refusal: string | null;
+  /** Drawn from the local copy and not yet confirmed by the record (`local.ts`). Absent where a read has no copy. */
+  readonly stale?: boolean;
   reread(): Promise<void>;
 };
 

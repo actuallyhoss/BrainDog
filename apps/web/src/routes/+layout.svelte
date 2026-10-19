@@ -53,6 +53,7 @@
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { follow, live } from '$lib/data/live.svelte.ts';
+  import { claimLocal } from '$lib/data/local-tab.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette carries its commands, its search and Slash's drawing, so importing them
      here put all of that in front of the first screen and in the entry's preload list. They are
@@ -606,6 +607,15 @@
      nothing. `page.url` and not `location`, so a move from one
      record to another follows the address being opened. */
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
+
+  /* THE LOCAL COPY IS CLAIMED BY THE READER A LIVE BOOT NAMES, never by a drawn copy: another person, record or scope
+     wipes it before it is drawn from again (`lib/data/local.ts`). */
+  $effect(() => {
+    if (data.live !== true || data.refused || data.stale) return;
+    const base = apiBase(page.url);
+    const me = data.me;
+    untrack(() => claimLocal(base, me));
+  });
 
   /**
    * WHO IS WORKING AND WHAT WAITS, READ AGAIN WITH `boot` WHENEVER THE POLL HEARS THE RECORD MOVE (EXP-D03), so a run that

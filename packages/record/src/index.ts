@@ -7263,10 +7263,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * AND LESS THE RECORD'S OWN BOOKKEEPING, which is news to nobody: the sweep writing quiet runs off and an agent's
    * stamp of when it last saw a tool (`kernel.bookkeeping`). Each run's history still holds its lines.
    */
-  const newsFor = (ctx: CallContext, cursor?: number): WhatsNew => {
+  const newsFor = (ctx: CallContext, cursor?: number, everything = false): WhatsNew => {
     const reader = readerOf(ctx);
     const muted = mutesOf(ctx);
-    const skip = (e: LogLine): boolean => kernel.bookkeeping(e) || (muted.size > 0 && mutedFor(e, muted));
+    /* `everything` IS THE BROWSER'S LOCAL COPY ASKING WHAT CHANGED: a stamp the sweep or a mute hides is still a row that moved. */
+    const skip = everything ? undefined : (e: LogLine): boolean => kernel.bookkeeping(e) || (muted.size > 0 && mutedFor(e, muted));
     const { lines, next } = walk(ctx, null, cursor ?? kernel.unreadFrom(reader), NEWS + 1, true, skip, true);
     const events = lines.slice(0, NEWS);
     return {
@@ -12589,13 +12590,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * NEWEST FIRST AND CAPPED, because it is what a first screen draws under "since you were away", and the oldest sixty
      * lines of a month away are the wrong sixty. The whole of it, in order, is `recentHistory`.
      */
-    async whatsNew(args: { cursor?: Cursor } | undefined, ctx: CallContext): Promise<Result<WhatsNew>> {
+    async whatsNew(args: { cursor?: Cursor; everything?: unknown } | undefined, ctx: CallContext): Promise<Result<WhatsNew>> {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      if (args?.cursor === undefined) return ok(newsFor(ctx));
+      /* `true` OR ITS WORD, as `recentHistory` takes it: a query string carries the word and a JSON body the boolean. */
+      const all: unknown = args?.everything;
+      if (all !== undefined && all !== true && all !== false && all !== 'true' && all !== 'false')
+        return no('VALUE_MALFORMED', "everything is true or false. True also returns the runs the sweep closed, agents' last-seen stamps and muted notes.", { at: 'everything' });
+      const everything = all === true || all === 'true';
+      if (args?.cursor === undefined) return ok(newsFor(ctx, undefined, everything));
       const cursor = await cursorOf(ctx, args.cursor, 'cursor');
       if (typeof cursor !== 'number') return { ok: false, refusal: cursor };
-      return ok(newsFor(ctx, cursor));
+      return ok(newsFor(ctx, cursor, everything));
     },
 
     /**

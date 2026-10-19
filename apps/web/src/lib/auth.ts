@@ -452,6 +452,8 @@ export async function signOutAndLeave(to: string, go: (href: string) => void = (
   if (out.ok) {
     /* The kept shell belongs to the person who just left: gone before the full load can draw it. */
     await import('./record/boot-copy.ts').then((c) => c.dropCopy(), () => undefined);
+    /* And the local copy of the rows they could read, before the full load. */
+    await import('./data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined);
     go(to);
   }
   return out;

@@ -211,7 +211,8 @@
   const work = read<Work>(
     () => (data.refused ? null : apiBase()),
     () => readWork(apiBase()),
-    { kept: 'WorkClassic' },
+    /* AND THE LOCAL COPY, which holds the tasks and the names of the projects and people they point at. */
+    { kept: 'WorkClassic', local: { base: () => apiBase(), lists: (w) => [TASKS, ...(w.shape.project ? [w.shape.project.to] : []), ...(w.shape.owner ? [w.shape.owner.to] : [])] } },
   );
 
   /* WHILE A ROW IS BEING RE-DATED IN PLACE THE ANSWER IS HELD, so a read that lands meanwhile cannot move the row the

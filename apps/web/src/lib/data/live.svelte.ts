@@ -19,6 +19,7 @@ import { dev } from '$app/environment';
 import { tick } from 'svelte';
 
 import { poller, Wait, type LiveState, type Visibility } from './live.ts';
+import { heardLocal, stampLocal, wipeLocal } from './local-tab.ts';
 import { forget, hear, keep } from './offline.ts';
 
 /**
@@ -77,11 +78,16 @@ function asker(base: string): () => Promise<number> {
     if (!out.ok) {
       /* A SESSION THAT ENDED TAKES THE READ COPY WITH IT. The worker deletes it on any 401 it sees, and this covers a
          page the worker does not control yet (the first visit, before it claims the tab). */
-      if ('refusal' in out && out.refusal.code === 'UNAUTHORIZED') void forget().catch(() => undefined);
+      if ('refusal' in out && out.refusal.code === 'UNAUTHORIZED') {
+        void forget().catch(() => undefined);
+        void wipeLocal();
+      }
       /* A RATE LIMIT SAYS HOW LONG TO WAIT, and the poll waits that long without calling the tab offline. */
       if ('refusal' in out && out.refusal.code === 'RATE_LIMITED') throw new Wait(Number(out.refusal.retry_after) || 60);
       throw new Error('the record did not answer its version');
     }
+    /* A RECORD WHOSE FORMAT MOVED UNDER THE LOCAL COPY wipes what it kept (`local.ts`). */
+    stampLocal(out.value);
     return out.value.version;
   };
 }
@@ -112,7 +118,11 @@ export function follow(base: string | null): void {
       ask: asker(base),
       timers,
       visible: tab,
-      onChange: (version) => (live.version = version),
+      onChange: (version) => {
+        /* THE LOCAL COPY ASKS THE LOG WHAT CHANGED, beside the screens asking their own questions again. */
+        heardLocal();
+        live.version = version;
+      },
       onState: (state) => {
         live.state = state;
         /* BACK ONLINE WITH A COPY ON SCREEN, THE SCREEN READS AGAIN. The poll's first answer is its baseline and says no

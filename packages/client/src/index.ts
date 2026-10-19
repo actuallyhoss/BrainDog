@@ -1567,7 +1567,8 @@ export function createClient(options: ClientOptions) {
     backlinks: (args: { register: string; seq: number; limit?: number; cursor?: string }) =>
       call<BacklinksAnswer>('backlinks', args as Record<string, unknown>),
     /** What changed since the caller's read mark, or since `cursor`, one the record answered with, when one is given. */
-    whatsNew: (cursor?: Cursor) => call<WhatsNew>('whatsNew', cursor === undefined ? {} : { cursor }),
+    whatsNew: (cursor?: Cursor, opts: { everything?: boolean } = {}) =>
+      call<WhatsNew>('whatsNew', { ...(cursor === undefined ? {} : { cursor }), ...(opts.everything ? { everything: true } : {}) }),
     /**
      * The record's log, newest first. `cursor` is the one the page above answered with. Changes only, unless `everything`
      * asks for the record's own bookkeeping too: the sweep writing quiet runs off, and an agent's stamps of when it saw

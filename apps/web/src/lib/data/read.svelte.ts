@@ -19,6 +19,7 @@ import { untrack } from 'svelte';
 import { closed, drew, opened, undrew } from '../ui/screen.svelte.ts';
 import { keep, keptAnswer } from './kept.ts';
 import { live } from './live.svelte.ts';
+import { keepLocal, localTicket, nearLocal } from './local-tab.ts';
 import { reader, type Resource, type Result, type Snapshot } from './read.ts';
 
 export type { Phase, Resource, Result } from './read.ts';
@@ -33,12 +34,14 @@ export type { Phase, Resource, Result } from './read.ts';
 export function read<T>(
   key: () => string | null,
   fn: () => Promise<Result<T>>,
-  opts: { empty?: (value: T) => boolean; kept?: string } = {},
+  opts: { empty?: (value: T) => boolean; kept?: string; local?: { base: () => string; lists: (value: T) => readonly string[] } } = {},
 ): Resource<T> {
   const m = reader<T>(opts.empty, untrack(() => live.version));
   /* RAW, because an answer is drawn and never edited in place: a deep proxy over every row of a list would cost a
      walk of the whole answer on each read and change the identity of every object in it. */
   let now = $state.raw<Snapshot<T>>(m.now());
+  /* Drawn from the local copy, and the record has not answered since. */
+  let stale = $state(false);
   const asking = $derived(key());
 
   /** `opened()` tokens for the calls still out, by ticket, so a screen that goes away can close what it opened. */
@@ -55,7 +58,23 @@ export function read<T>(
       now = m.now();
       if (was.fresh) return;
       quiet = true;
+    } else if (opts.local !== undefined && opts.kept !== undefined && k !== null && !quiet) {
+      /* NOTHING IN MEMORY: THE LOCAL COPY, drawn at once. Current, nothing is asked; else it is asked quietly behind it. */
+      const near = await nearLocal<T>(opts.kept, k, opts.local.base());
+      if (gone || untrack(() => asking) !== k) return;
+      if (near !== null) {
+        const drawn = m.ask(k, false);
+        if (drawn !== null) m.answer(drawn, { ok: true, value: near.value });
+        now = m.now();
+        stale = !near.current;
+        if (near.current) {
+          keep(opts.kept, k, version, { ok: true, value: near.value });
+          return;
+        }
+        quiet = true;
+      }
     }
+    const mark = opts.local !== undefined ? localTicket() : 0;
     const ticket = m.ask(k, quiet);
     now = m.now();
     if (ticket === null || gone) return;
@@ -66,6 +85,10 @@ export function read<T>(
       const got = await fn();
       took = m.answer(ticket, got);
       if (took && opts.kept !== undefined && k !== null) keep(opts.kept, k, version, got);
+      if (took && got.ok) {
+        stale = false;
+        if (opts.local !== undefined && opts.kept !== undefined && k !== null) keepLocal(opts.kept, k, opts.local.lists(got.value), got.value, mark);
+      }
     } catch (e) {
       took = m.failed(ticket, e instanceof Error ? e.message : String(e));
     }
@@ -125,6 +148,9 @@ export function read<T>(
     },
     get refusal() {
       return now.refusal;
+    },
+    get stale() {
+      return stale;
     },
     reread: () => ask(untrack(() => asking)),
   };

@@ -76,7 +76,11 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
     }
   }
   const booted = await live.readBoot(api);
-  if (booted.from === 'refused') copies.dropCopy();
+  if (booted.from === 'refused') {
+    copies.dropCopy();
+    /* A REFUSED BOOT TAKES THE LOCAL COPY TOO, except a host nobody reached: offline is when the copy earns its keep. */
+    if (booted.code !== 'UNREACHABLE') void import('$lib/data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined);
+  }
 
   /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as
      `/app/acme/`, and `/start` with them: it is spared the redirect below and not this one. The bare address drew the

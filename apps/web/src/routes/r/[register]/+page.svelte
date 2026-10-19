@@ -31,6 +31,8 @@
   import { joinNames, rowsHeldTwice, type Names } from '$lib/record/remote.ts';
   import { open, read, tally, type Boot, type Refusal, type Tally } from '$lib/data/record.ts';
   import { live } from '$lib/data/live.svelte.ts';
+  import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { keptOf, listsOf, namesOf, type KeptList } from './kept-list.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
@@ -613,7 +615,21 @@
    */
   async function ask(said: string, register: string, typed: Filter[], text: string, order: typeof sort, joined: typeof join, wantsTwice = false): Promise<void> {
     busy = true;
+    const mark = localTicket();
     await read(async () => {
+      /* NOTHING DRAWN YET: THE LOCAL COPY'S FIRST PAGE AT ONCE, marked `fromCopy` and with no cursor to page from, and
+         the record is asked behind it as ever (`lib/data/local.ts`). */
+      if (pages.length === 0) {
+        const near = await nearLocal<KeptList>(LIST_COPY, said, apiBase());
+        if (near !== null && asked === said && pages.length === 0) {
+          declared = { register, decl: near.value.decl };
+          pages = [near.value.entries];
+          named = namesOf(near.value);
+          cursor = null;
+          matched = near.value.matched;
+          fromCopy = true;
+        }
+      }
       const src = await open();
       const [b, s] = await Promise.all([src.boot(), src.schema(register)]);
       if (asked !== said) return true;
@@ -656,6 +672,8 @@
       matched = answer.value.matched;
       counted = facets.counts;
       uncounted = facets.withheld;
+      fromCopy = false;
+      keepLocal(LIST_COPY, said, listsOf(register, s.value), keptOf(s.value, answer.value.entries, answer.value.matched, answer.value.names), mark, { [register]: s.value });
       return true;
     });
     if (asked === said) busy = false;
@@ -688,6 +706,8 @@
    * hairline's to say, so a failed re-ask here says nothing and the next change tries again.
    */
   let stale = $state(false);
+  /** The rows on screen came from the local copy and the record has not answered yet. */
+  let fromCopy = $state(false);
   /* The version this list was drawn at. A plain `let`, because it is compared and never drawn. */
   let drawnAt = untrack(() => live.version);
 
@@ -937,6 +957,9 @@
    * this list big enough to act on in bulk" was drawn and half was not.
    */
   const ENOUGH_TO_SIFT = 8;
+
+  /** The name this screen's answers are kept under in the local copy, keyed by the question (`asked`). */
+  const LIST_COPY = 'RegisterList';
 
   /** The moment `19 §6` describes: the register, with their one row in it. */
   const arriving = $derived(page.url.searchParams.has('first'));
@@ -2649,7 +2672,7 @@
   </PageHead>
   {#if proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />{/if}
 
-  <div class="page" aria-busy={busy ? 'true' : undefined}>
+  <div class="page" aria-busy={busy ? 'true' : undefined} data-from-copy={fromCopy ? '' : undefined}>
     <!-- THE LIST HAS MOVED ON AND MORE THAN ONE PAGE OF IT IS IN HAND, so it says so rather than splicing a new head
          onto old pages (`recheck` above). `role="status"` because it arrives without the reader doing anything, and a
          screen reader should hear it once, politely. -->
