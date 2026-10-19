@@ -93,6 +93,7 @@ import { withSignedIn } from './signed-in.ts';
 import { isAdminHost, serveAdmin } from './admin.ts';
 import { applyDoor, opsApplications, opsInvite, type OpsApplyDeps } from './apply.ts';
 import { seenDoor, servesSeen } from './seen.ts';
+import { stepDoor, servesStep } from './step.ts';
 import { opsFunnel } from './funnel.ts';
 import { NO_MINT_SESSION, serveInbound, servesInbound } from './inbound.ts';
 import { appEntry, bearerOf, doorOf, withCookie, type BearerDeps } from './session.ts';
@@ -3348,6 +3349,17 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
       const over = await overLimit(env, { door: 'session', ctx: door.ctx }, request, classAt(url.pathname));
       if (over !== null) return withCookie(over, door.cookie);
     }
+    /* A FIRST-RUN STEP (`step.ts`): a signed-in browser's, counted once a record, on the same `COUNT_VISITS` switch as the
+       visit counter. Always 204. */
+    if (servesStep(url.pathname))
+      return withCookie(
+        await stepDoor(request, {
+          on: (env.COUNT_VISITS ?? '').trim() === 'yes',
+          record: door.door === 'session' ? door.record : null,
+          mark: (call) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).seen(call),
+        }),
+        door.door === 'session' ? door.cookie : undefined,
+      );
 
     /* THE APP'S OWN KEY DOORS ARE A BROWSER SESSION'S AND NOBODY ELSE'S. `/api/keys/*` is not a record method, so
        it is answered here rather than forwarded; every other door reaching it is refused with the record's own
