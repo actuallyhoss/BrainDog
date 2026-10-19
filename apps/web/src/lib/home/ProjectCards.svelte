@@ -14,32 +14,79 @@
   import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Money from '$lib/ui/Money.svelte';
-  import type { ProjectCard } from './project-cards.ts';
+  import { apiBase } from '$lib/at.ts';
+  import { rowWriter } from '$lib/record/rows-write.ts';
+  import Button from '$lib/ui/Button.svelte';
+  import { takenBackFree, type ProjectCard } from './project-cards.ts';
 
   let { cards, more, list, name }: { cards: readonly ProjectCard[]; more: number; list: string; name: string } = $props();
 
   const words = {
+    formed: "Formed from your agent's first session.",
+    keep: 'Keep it',
+    notOne: 'Not a project',
     next: 'Next step',
     all: (n: number) => `${n} more`,
   } as const;
 
   /* The lane as a word: its first letter up, since a list keeps it lower case. */
   const laneSaid = (lane: string): string => (lane === '' ? '' : lane.charAt(0).toUpperCase() + lane.slice(1));
+
+  /* THE TWO PRESSES ON A DRAFT. Keep clears the mark and the card is an ordinary one from then on. "Not a project" takes
+     back a row the record made a few minutes ago with no question; an older draft opens its page, where deleting asks
+     as it does for any row. The desk reads again when the record moves, so a local note hides the card at once. */
+  let gone = $state<ReadonlySet<number>>(new Set());
+  let failed = $state<string | null>(null);
+  const writer = $derived(rowWriter(apiBase()));
+  const hide = (seq: number) => (gone = new Set([...gone, seq]));
+  async function keep(c: ProjectCard) {
+    failed = null;
+    const out = await writer.update(list, c.seq, { draft: false });
+    if (out.ok) hide(c.seq);
+    else failed = out.fix;
+  }
+  async function notOne(c: ProjectCard) {
+    failed = null;
+    const out = await writer.archive(list, c.seq);
+    if (out.ok) hide(c.seq);
+    else failed = out.fix;
+  }
+  const shown = $derived(cards.filter((c) => !gone.has(c.seq) || !c.draft));
   const label = (c: ProjectCard): string => {
     const f = c.figure ? decl(list, c.figure.field) : undefined;
     return f ? labelOf(f) : '';
   };
 </script>
 
-{#if cards.length > 0}
+{#if shown.length > 0}
   <section class="projects" aria-labelledby="desk-projects">
     <header class="p-head">
       <h2 id="desk-projects" class="p-title">{name}</h2>
       {#if more > 0}<a class="p-more tap" href={at(`/r/${list}`)}>{words.all(more)}<Icon name="arrow" size="s" /></a>{/if}
     </header>
     <ul class="cards">
-      {#each cards as c (c.key)}
+      {#each shown as c (c.key)}
         <li>
+          {#if c.draft}
+            <div class="card draft" data-hued={c.hue === null ? undefined : ''} style={c.hue === null ? undefined : `--hue:${c.hue}`}>
+              <a class="d-open" href={at(c.href)}>
+                <span class="c-top">
+                  <IdentityMark identity={{ mark: c.mark, hue: c.hue ?? 0, name: c.name, retired: c.hue === null }} size="md" />
+                </span>
+                <span class="d-said">{words.formed}</span>
+                {#if c.brief}<span class="c-brief" dir="auto">{c.brief}</span>{/if}
+              </a>
+              <span class="d-acts">
+                <Button onclick={() => keep(c)}>{words.keep}</Button>
+                {#if takenBackFree(c, Date.now())}
+                  <button type="button" class="d-quiet tap" onclick={() => notOne(c)}>{words.notOne}</button>
+                {:else}
+                  <a class="d-quiet tap" href={at(c.href)}>{words.notOne}</a>
+                {/if}
+              </span>
+              {#if failed}<span class="d-fail" role="alert">{failed}</span>{/if}
+            </div>
+          {:else}
           <a class="card" href={at(c.href)} data-hued={c.hue === null ? undefined : ''} style={c.hue === null ? undefined : `--hue:${c.hue}`}>
             <span class="c-top">
               <IdentityMark identity={{ mark: c.mark, hue: c.hue ?? 0, name: c.name, retired: c.hue === null }} size="md" />
@@ -56,6 +103,7 @@
               <span class="c-next"><Icon name="arrow" size="s" /><span class="sr">{words.next}: </span><span dir="auto">{c.next}</span></span>
             {/if}
           </a>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -63,6 +111,46 @@
 {/if}
 
 <style>
+  .draft {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .d-open {
+    display: grid;
+    gap: var(--sp-2);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .d-said {
+    color: var(--ink-2, inherit);
+    font-size: var(--fs-s, 0.875rem);
+  }
+
+  .d-acts {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+  }
+
+  .d-quiet {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--ink-2, inherit);
+    font: inherit;
+    font-size: var(--fs-s, 0.875rem);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .d-fail {
+    color: var(--bad, inherit);
+    font-size: var(--fs-s, 0.875rem);
+  }
+
   .projects {
     display: grid;
     gap: var(--sp-3);

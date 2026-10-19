@@ -18,7 +18,7 @@ export type CardDecl = {
   fields: readonly { id: string; type: string }[];
 };
 
-export type CardRow = { seq: number; fields: Readonly<Record<string, unknown>> };
+export type CardRow = { seq: number; fields: Readonly<Record<string, unknown>>; created_at?: string | undefined };
 
 /** One project as a card: its name, mark, hue, one line, next step and, if it has money, one figure. */
 export type ProjectCard = {
@@ -32,6 +32,21 @@ export type ProjectCard = {
   next: string | null;
   figure: { minor: number; currency: string; field: string } | null;
   href: string;
+  /** The row's number in its list, which the two presses on a draft write by. */
+  seq: number;
+  /** The record formed this from the agent's first session and the person has not kept it (`draft` on the row). */
+  draft: boolean;
+  /** When the row was made, so a draft just formed can be taken back without a question. */
+  made: string | null;
+};
+
+/** How long a draft the record just formed can be said "not a project" without a question: the first run. */
+export const FRESH_DRAFT_MS = 10 * 60_000;
+
+/** Whether this card is a draft the record made inside the first run, so removing it asks nothing. */
+export const takenBackFree = (card: Pick<ProjectCard, 'draft' | 'made'>, nowMs: number): boolean => {
+  const at = card.made === null ? Number.NaN : Date.parse(card.made);
+  return card.draft && Number.isFinite(at) && nowMs - at >= 0 && nowMs - at <= FRESH_DRAFT_MS;
 };
 
 /** The lanes that are not on the desk. */
@@ -75,7 +90,9 @@ export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MO
     const lane = decl.state ? said(r.fields[decl.state]) : '';
     return name === '' || OFF_DESK.has(lane) ? [] : [{ r, name, lane }];
   });
-  live.sort((a, b) => (RANK[a.lane] ?? 2) - (RANK[b.lane] ?? 2) || a.r.seq - b.r.seq);
+  /* A DRAFT COMES FIRST: it is the one thing on the desk waiting for a press. */
+  const drafty = (r: CardRow): number => (r.fields.draft === true ? 0 : 1);
+  live.sort((a, b) => drafty(a.r) - drafty(b.r) || (RANK[a.lane] ?? 2) - (RANK[b.lane] ?? 2) || a.r.seq - b.r.seq);
   const cards = live.slice(0, most).map(({ r, name, lane }): ProjectCard => {
     const f = r.fields;
     const about = said(f.about);
@@ -89,6 +106,9 @@ export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MO
       next: said(f.next) || null,
       figure: moneyOf(decl, f),
       href: `/r/${decl.id}/${r.seq}`,
+      seq: r.seq,
+      draft: f.draft === true,
+      made: typeof r.created_at === 'string' ? r.created_at : null,
     };
   });
   return { cards, more: Math.max(0, live.length - cards.length) };
