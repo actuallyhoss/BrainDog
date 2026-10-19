@@ -43,6 +43,8 @@ export type PlanFigures = {
   agents: number | null;
   /** How many people may hold a record. `null` is no limit. */
   people: number | null;
+  /** Whether a second person may join the record (teams). Plus and a self-host only; the gate also waits for billing to be on. */
+  teams: boolean;
   /** What usage past the allowance costs, each meter, under a cap the owner sets. `null`: none is sold. */
   extra: { runs: ExtraPrice; requests: ExtraPrice; bytes: ExtraPrice; ms: ExtraPrice } | null;
 };
@@ -77,6 +79,7 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
     credits: 20,
     agents: 3,
     people: 1,
+    teams: false,
     extra: null,
   }),
   /* Twenty hourly actions are 14,600 runs, so 15,000 is Cloud's. */
@@ -87,6 +90,7 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
     credits: 80,
     agents: 15,
     people: null,
+    teams: false,
     extra: EXTRA,
   }),
   /* Five times Cloud on every figure, as its card says. */
@@ -97,6 +101,7 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
     credits: 400,
     agents: 75,
     people: null,
+    teams: true,
     extra: EXTRA,
   }),
   /* Counted and never limited: a self-host bills nobody, and its own `ask_cap` holds its asks. */
@@ -107,9 +112,13 @@ export const PLAN_TABLE: Readonly<Record<Plan, PlanFigures>> = {
     credits: null,
     agents: null,
     people: null,
+    teams: true,
     extra: null,
   }),
 };
+
+/** Whether a plan takes a second person. A plan nobody could name (`null`, or one this build does not know) is let through. */
+export const teamsOn = (plan: string | null): boolean => plan === null || !(plan in PLAN_TABLE) || PLAN_TABLE[plan as Plan].teams;
 
 /** A pack of Slash credits: `credits` for `cents` of `CURRENCY`, on top of a plan's month. */
 export type Pack = { id: string; credits: number; cents: number };

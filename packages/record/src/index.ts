@@ -2361,6 +2361,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const readable = (ctx: CallContext, register: string): Refusal | null => guard(ctx, 'read', register);
 
+  /** Who is looking, for the rows their makers kept private: a person, or the person an agent's token acts for. Nobody else has one. */
+  const viewerOf = (ctx: CallContext): string | undefined =>
+    ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : undefined;
+
   /**
    * Whether a row this caller can already read on the register is one their own narrowed grant still admits
    * `list` and register counts hand `whereFor(ctx.wheres, register)` straight to the kernel, which narrows
@@ -2371,6 +2375,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const rowAdmitted = (ctx: CallContext, register: string, seq: number | null): boolean => {
     if (seq === null) return true;
+    /* A ROW ITS MAKER KEPT PRIVATE is absent to everybody else, whatever their grant (migration 40). */
+    const held = kernel.get({ register, seq }, { includeDeleted: true });
+    if (held && kernel.hiddenFrom(held.id, viewerOf(ctx))) return false;
     const rule = whereFor(ctx.wheres, register);
     if (rule === undefined) return true;
     const found = kernel.list({ register, where: { field: 'seq', is: seq }, includeDeleted: true, limit: 1 }, rule);
@@ -2429,6 +2436,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         at: 'principal',
       };
     return allows(ctx, 'owner', listName);
+  };
+
+  /**
+   * The TEAM gate: who is on the record and what they hold. An owner, or an Admin (the `decide` level, a person in a
+   * browser), and never a token. An Admin may not reach the owner's rung: `teamKeeps` below refuses that.
+   */
+  const team = (ctx: CallContext, reads?: string): Refusal | null =>
+    ctx.operation === undefined && ctx.principal.kind === 'person' && ctx.principal.level === 'decide' ? null : admin(ctx, reads);
+
+  /** An Admin can neither hand out the owner's rung nor touch somebody who holds it. Owners are the only ones who do. */
+  const teamKeeps = (ctx: CallContext, args: { person?: string; level?: Level; registers?: Record<string, Level> }): Refusal | null => {
+    if (ctx.principal.kind !== 'person' || ctx.principal.level === 'owner') return null;
+    const grants = args.level === 'owner' || Object.values(args.registers ?? {}).includes('owner');
+    const holds = args.person !== undefined && kernel.members().some((m) => m.person_id === args.person && m.level === 'owner');
+    return grants || holds ? { code: 'FORBIDDEN', fix: 'Only an owner can make an owner, or change one.', at: 'level' } : null;
   };
 
   /**
@@ -8525,7 +8547,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (readable(ctx, id)) continue;
           /* THE GLYPH THE LIST DECLARES, as `icon` is checked at install (`declare.ts`): one the rail can draw by name. */
           const icon = (decl as { icon?: unknown }).icon;
-          out.push({ id, name: decl.name, count: kernel.count(id, whereFor(ctx.wheres, id)), icon: typeof icon === 'string' && icon !== '' ? icon : null });
+          out.push({ id, name: decl.name, count: kernel.count(id, whereFor(ctx.wheres, id), viewerOf(ctx)), icon: typeof icon === 'string' && icon !== '' ? icon : null });
         }
         const shell = shellFor(ctx);
         const waits = waitsFor(ctx);
@@ -8726,9 +8748,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               hops: (register) => readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined,
             },
             whereFor(ctx.wheres, args.register),
+            viewerOf(ctx),
           ),
         ),
       );
+    },
+
+    /**
+     * Keep a row to the person who made it, or share it with the record again.
+     *
+     * A WRITE BY WHOEVER MADE THE ROW AND NOBODY ELSE (`kernel.setPrivate`): not an owner, not an admin. A member needs
+     * write on the list to have made the row at all, and an agent's token acts for the person who minted it.
+     */
+    async makePrivate(args: { ref: string; on?: boolean }, ctx: CallContext) {
+      if (!args?.ref) return no('REQUIRED_MISSING', 'Which row?', { at: 'ref' });
+      const row = kernel.get(args.ref);
+      if (!row) return no('REF_UNKNOWN', `There is no row called ${args.ref}.`, { at: 'ref' });
+      const stop = guard(ctx, 'write', row.register);
+      if (stop) return { ok: false as const, refusal: stop };
+      const who = viewerOf(ctx);
+      if (who === undefined) return no('FORBIDDEN', 'A row is kept private by a person, signed in.', { at: 'principal' });
+      return tail(kernel.setPrivate(who, args.ref, args.on !== false));
     },
 
     /**
@@ -11447,7 +11487,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * `guards` gate does now, which is the repair that survives the next method somebody adds.
      */
     async members(ctx: CallContext) {
-      const stop = admin(ctx, 'see who is on this record');
+      const stop = team(ctx, 'see who is on this record');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.members());
     },
@@ -11462,7 +11502,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * is a register taken away, revoked out loud rather than left standing.
      */
     async invite(args: { person?: string; email?: string; name?: string; level?: Level; registers?: Record<string, Level>; why?: string }, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = team(ctx) ?? teamKeeps(ctx, args ?? {});
       if (stop) return { ok: false as const, refusal: stop };
       /* A SIGN-IN IN THE LAST FIFTEEN MINUTES, as deleting the record asks. Inviting somebody or changing what they hold
          is who can reach everything here, so a browser left signed in for a month, or a cookie copied off it, must not
@@ -11499,14 +11539,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** Every invitation still waiting to be used, newest first. Never a link: those exist once, when minted. */
     async invitations(ctx: CallContext): Promise<Result<InvitationRow[]>> {
-      const stop = admin(ctx, 'see the invitations waiting');
+      const stop = team(ctx, 'see the invitations waiting');
       if (stop) return { ok: false as const, refusal: stop };
       return ok(kernel.listInvitations());
     },
 
     /** Withdraw one. The link stops working at once, and a second call answers as the first did. */
     async revokeInvite(args: { id: string }, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = team(ctx);
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.id) return no('REQUIRED_MISSING', 'Which invitation?', { at: 'id' });
       return tail(kernel.revokeInvitation(args.id));
@@ -11555,7 +11595,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** Take somebody off. Never the last owner, and every register they held is revoked out loud. */
     async removeMember(args: { person: string; why?: string }, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = team(ctx) ?? teamKeeps(ctx, { person: args?.person });
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.person) return no('REQUIRED_MISSING', 'Who?', { at: 'person' });
       return tail(kernel.removeMember(actorOf(ctx), args.person, args.why));
@@ -11575,7 +11615,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * the shape of half-measure that makes people distrust the whole mechanism.
      */
     async suspendMember(args: { person: string; suspended: boolean }, ctx: CallContext) {
-      const stop = admin(ctx);
+      const stop = team(ctx) ?? teamKeeps(ctx, { person: args?.person });
       if (stop) return { ok: false as const, refusal: stop };
       if (!args?.person) return no('REQUIRED_MISSING', 'Who?', { at: 'person' });
       /* ONE VERB BOTH WAYS, AND THE WAY IS SAID. A missing `suspended` meant stop, so a page

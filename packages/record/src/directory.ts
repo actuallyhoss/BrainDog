@@ -705,14 +705,14 @@ const planOf = (value: string | undefined): Plan => ((PLANS as readonly string[]
  *
  * THE COUNT AND THE NAMES ARE THE TABLE'S (`PLAN_TABLE.free.people`), so the sentence moves with the figure.
  */
-const peopleWords = (n: number | null): string => (n === 1 ? 'one person' : n === null ? 'anyone' : `${n} people`);
-const FREE = PLAN_TABLE.free;
-const CLOUD = PLAN_TABLE.hosted.name;
-export const FREE_ONE_PERSON = `${FREE.name} is for ${peopleWords(FREE.people)}, so nobody else can join this record. Move it to ${CLOUD} in Settings to invite colleagues.`;
-export const FREE_JOIN_REFUSED = `This record is on ${FREE.name}, which is for ${peopleWords(FREE.people)}, so nobody else can join it. Ask its owner to move it to ${CLOUD}, then open this link again.`;
+const PLUS = PLAN_TABLE.plus.name;
+/* TEAMS ARE A PLUS FEATURE (DIRECTION §42): the plain line an owner reads when an invitation is refused, and the one the
+   person holding the link reads. Each says why and offers the way on. The gate is off while the host sells no plan. */
+export const FREE_ONE_PERSON = `Teams are part of ${PLUS}, so nobody else can join this record yet. Move it to ${PLUS} in Settings to invite colleagues.`;
+export const FREE_JOIN_REFUSED = `This record is not on ${PLUS}, so nobody else can join it yet. Ask its owner to move it to ${PLUS}, then open this link again.`;
 /* THE SAME TWO ON A HOST THAT SELLS NO PLAN, where naming a plan to move to names a door that is not there. */
-export const FREE_ONE_PERSON_SHORT = `${FREE.name} is for ${peopleWords(FREE.people)}, so nobody else can join this record.`;
-export const FREE_JOIN_REFUSED_SHORT = `This record is on ${FREE.name}, which is for ${peopleWords(FREE.people)}, so nobody else can join it.`;
+export const FREE_ONE_PERSON_SHORT = `Teams are part of ${PLUS}, so nobody else can join this record.`;
+export const FREE_JOIN_REFUSED_SHORT = `This record is not on ${PLUS}, so nobody else can join it.`;
 
 /**
  * The Directory's own schema revision. `49 §5.1` step 4.
@@ -1350,15 +1350,16 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
   const at = (): string => new Date(clock.now()).toISOString();
 
   /**
-   * Whether this person may join this record, as its plan has it: `null` is yes. Free is one person (DIRECTION §35), so a
-   * free record takes nobody who is not on it already, and every other plan takes anybody.
+   * Whether this person may join this record, as its plan has it: `null` is yes. Teams are a Plus feature (DIRECTION §42), so a
+   * record on Free or Cloud takes nobody who is not on it already, and Plus and a self-host take anybody.
    *
    * ASKED BY `join` AND BY THE HOST BEFORE AN INVITATION IS SPENT, so a link to a free record is refused before the record
    * writes its own member row, and the two tables never disagree about who joined.
    */
   const joinable = (record: string, person: string): Refusal | null => {
     const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
-    if (row === undefined || planOf(row.plan) !== 'free') return null;
+    /* OFF WHILE THE HOST SELLS NOTHING (LAUNCH: Free only until charging starts), so teams can be built and tried. */
+    if (row === undefined || host.sells === false || PLAN_TABLE[planOf(row.plan)].teams) return null;
     if (sql.one('SELECT 1 AS x FROM dir_member WHERE record = ? AND person = ?', record, person)) return null;
     return { code: 'FORBIDDEN', fix: host.sells === false ? FREE_JOIN_REFUSED_SHORT : FREE_JOIN_REFUSED, at: 'plan' };
   };

@@ -74,6 +74,10 @@
     append: 'Adds only',
     read: 'Reads',
   };
+  /* THE FOUR ROLES OF A TEAM ON THE WHOLE RECORD, over the same levels: Viewer reads, Member reads and writes rows and
+     proposes, Admin also settles who is on the record, Owner keeps the rest. A list's own level keeps the words above. */
+  const ROLE_SAID: Record<string, string> = { owner: 'Owner', decide: 'Admin', write: 'Member', read: 'Viewer', append: 'Adds only' };
+  const roleSaid = (level: string | null) => (level === null ? copy.noRecordLevel : (ROLE_SAID[level] ?? level));
   const levelSaid = (level: string | null) => (level === null ? copy.noRecordLevel : (LEVEL_SAID[level] ?? level));
 
   /**
@@ -99,7 +103,7 @@
      * Pressing the level somebody already holds changes nothing, so nothing is what it says.
      */
     if (to === who.level) return;
-    if (peopleFrom === 'live') void settle(() => moveLevel(apiBase(), who, to), copy.levelMoved(who.name, levelSaid(to)));
+    if (peopleFrom === 'live') void settle(() => moveLevel(apiBase(), who, to), copy.levelMoved(who.name, roleSaid(to)));
     else cannotWrite();
   };
 
@@ -161,7 +165,7 @@
    */
   const inviteGives = (inv: Invitation): string =>
     inv.level !== null
-      ? levelSaid(inv.level)
+      ? roleSaid(inv.level)
       : Object.keys(inv.registers).length > 0
         ? Object.entries(inv.registers).map(([id, level]) => `${listName(id)}: ${levelSaid(level)}`).join(', ')
         : levelSaid(null);
@@ -496,7 +500,7 @@
             <span class="mate-name" dir="auto">{said(p)}</span>
             <span class="mate-detail">{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}</span>
           </span>
-          <span class="mate-level">{levelSaid(p.level)}</span>
+          <span class="mate-level">{roleSaid(p.level)}</span>
         </li>
       {/each}
     </ul>
@@ -589,7 +593,7 @@
                       ? 'own-level'
                       : undefined}
                   onclick={() => levelChange(p, level)}
-                >{levelSaid(level)}</button>
+                >{roleSaid(level)}</button>
               {/each}
             </Segmented>
             <!-- BELOW 520PX THE LADDER IS A SELECT. Six segments wrap to three lines on a phone and the chosen one lands
@@ -609,7 +613,7 @@
                 e.currentTarget.value = p.level ?? '';
               }}
             >
-              {#each [null, ...LEVELS] as level}<option value={level ?? ''}>{levelSaid(level)}</option>{/each}
+              {#each [null, ...LEVELS] as level}<option value={level ?? ''}>{roleSaid(level)}</option>{/each}
             </select>
             <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
                  sets it. Five ladder words with nothing explaining them is the schema's
@@ -795,7 +799,7 @@
       <label class="ex-field">
         <span class="ex-label">{copy.inviteLevelLabel}</span>
         <select class="ex-select" bind:value={inviteLevel}>
-          {#each LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+          {#each LEVELS as level}<option value={level}>{roleSaid(level)}</option>{/each}
         </select>
       </label>
       <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`, D4): the record keeps an

@@ -26,7 +26,7 @@ import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { renameDeclarations } from './migrations/0016_slash.ts';
-import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, type Compiled, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
   enablePack as enableDeclaredPack,
@@ -1827,10 +1827,38 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /** The oldest removal a reinstall still puts back (`REMOVED_WINDOW_DAYS`). */
   const removedSince = (): string => instant(clock.now() - REMOVED_WINDOW_DAYS * 86_400_000);
 
+  /* A ROW ITS MAKER KEPT PRIVATE (migration 40) IS LEFT OUT OF EVERY READ HANDED THE VIEWER, for anybody but that maker.
+     No viewer is a read of the whole record (a rule, an import, the system), which is how every reader behaved before. */
+  const privately = (c: Compiled, viewer?: string): Compiled =>
+    viewer === undefined || c.bad.length
+      ? c
+      : { sql: `(${c.sql}) AND id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)`, params: [...c.params, viewer], bad: [] };
+
+  /** Whether a row is private to somebody other than the viewer: then it is theirs alone and reads as absent. */
+  const hiddenFrom = (id: string, viewer: string | undefined): boolean =>
+    viewer !== undefined && sql.one('SELECT 1 AS y FROM entry_private WHERE entry_id = ? AND person_id <> ?', id, viewer) !== undefined;
+
+  /**
+   * Keep a row to its maker, or give it back to the record. Only the person who made it may (`madeByIn`), because a
+   * private row an admin could unmark would be a promise nobody could keep. Signed as a note, so history says who did it.
+   */
+  function setPrivate(actor: string, ref: string, on: boolean): Result<{ id: string; private: boolean }> {
+    const row = get(ref);
+    if (!row) return no('REF_UNKNOWN', `There is no row called ${ref}.`, { at: 'ref' });
+    if (madeByIn(sql, row.id) !== actor)
+      return no('FORBIDDEN', 'Only the person who made a row can keep it private or share it again.', { at: 'ref' });
+    return transaction(() => {
+      if (on) sql.exec('INSERT OR REPLACE INTO entry_private (entry_id, person_id) VALUES (?, ?)', row.id, actor);
+      else sql.exec('DELETE FROM entry_private WHERE entry_id = ?', row.id);
+      noteEvent(sql, mint, clock.now(), actor, `${on ? 'Kept private' : 'Shared again'}: ${row.register}#${row.seq ?? row.id}`);
+      return ok({ id: row.id, private: on });
+    });
+  }
+
   /* `grant` IS THE CALLER'S RULE ON THIS LIST (`whereFor(ctx.wheres, register)`), so a narrowed member counts only the
      rows they reach; one that cannot be read counts none (`narrowed` in `members.ts`). Absent, every live row. */
-  const count = (register: string, grant?: Json): number => {
-    const c = narrowed({ sql: '(1)', params: [], bad: [] }, grant === undefined ? null : ruleOf(grant, schemaOf(register), evalContext()));
+  const count = (register: string, grant?: Json, viewer?: string): number => {
+    const c = privately(narrowed({ sql: '(1)', params: [], bad: [] }, grant === undefined ? null : ruleOf(grant, schemaOf(register), evalContext())), viewer);
     return Number(
       sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`, register, ...c.params)?.n ?? 0,
     );
@@ -3296,7 +3324,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /* THE QUESTION'S SHAPE IS `ListQuery` IN `parts.ts`, with the reasons for each of its keys, so an extension handed
      `list` and this function read one type. */
-  function list(q: ListQuery, grant?: Json): Result<Listed> {
+  function list(q: ListQuery, grant?: Json, viewer?: string): Result<Listed> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
     if (!registers.has(q.register))
@@ -3319,7 +3347,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND THE CALLER'S GRANT, when theirs is narrowed to the rows matching one `where` (`CallContext.wheres`): the page,
        its cursor and `matched` all come from the one clause, so a narrowed member is never told how many rows they
        cannot see. */
-    const c = narrowed(compile(said.predicate, schema), grant === undefined ? null : ruleOf(grant, schema, evalContext()));
+    const c = privately(narrowed(compile(said.predicate, schema), grant === undefined ? null : ruleOf(grant, schema, evalContext())), viewer);
     if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
 
     /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote: `cursor=5` is a number
@@ -10900,6 +10928,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /** What points at one row, from the `to:` every `ref` field already declares. */
     backlinks,
     count,
+    /** Rows a maker kept private (migration 40): `hiddenFrom` for a reader that answers one row, `setPrivate` to mark one. */
+    hiddenFrom,
+    setPrivate,
     version,
     history,
     /** Which project a run in this place belongs to, and how it was told (`scope.ts`). Reads only. */

@@ -386,6 +386,7 @@ const CORE_ROUTES: readonly Route[] = [
   { name: 'create', group: 'DATA', writes: true, what: 'Add a row. The record allocates its number.' },
   { name: 'report', group: 'DATA', writes: true, what: 'Rows a project sends with its report key, one or up to a hundred, into the list the key is bound to. A report key reaches this and nothing else.' },
   { name: 'update', group: 'DATA', writes: true, what: 'Change a row, against the version you read.' },
+  { name: 'makePrivate', group: 'DATA', writes: true, what: 'Keep a row you made to yourself, or share it with the record again. Only its maker can.' },
   { name: 'attach', group: 'DATA', writes: true, what: 'Say which run this agent is and where it stands. A token only: a person is never a run.' },
   { name: 'handoff', group: 'DATA', writes: true, what: "Keep a run's handoff true: the next step, what was tried, a note, its state." },
   { name: 'undoOwn', group: 'DATA', writes: true, what: "Take back one of your own writes by the batch its receipt gave. Only your own run's writes; anything else is refused." },
@@ -665,6 +666,7 @@ export type RecordSurface = {
   create(args: never, ctx: never): Promise<Result<unknown>>;
   report(args: never, ctx: never): Promise<Result<unknown>>;
   update(args: never, ctx: never): Promise<Result<unknown>>;
+  makePrivate(args: never, ctx: never): Promise<Result<unknown>>;
   attach(args: never, ctx: never): Promise<Result<unknown>>;
   handoff(args: never, ctx: never): Promise<Result<unknown>>;
   sessionsLive(args: never, ctx: never): Promise<Result<unknown>>;
@@ -795,6 +797,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     create: (a, ctx) => api.create(a as never, ctx as never),
     report: (a, ctx) => api.report(a as never, ctx as never),
     update: (a, ctx) => api.update(a as never, ctx as never),
+    makePrivate: (a, ctx) => api.makePrivate(a as never, ctx as never),
     attach: (a, ctx) => api.attach(a as never, ctx as never),
     handoff: (a, ctx) => api.handoff(a as never, ctx as never),
     sessionsLive: (a, ctx) => api.sessionsLive(a as never, ctx as never),

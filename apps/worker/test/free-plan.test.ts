@@ -83,36 +83,17 @@ test('A LINK TO A RECORD NOW ON FREE IS REFUSED WHEN IT IS OPENED, before a proo
   assert.equal(dir.joinRecord(REC, bo.value.id).refusal?.fix, FREE_JOIN_REFUSED);
 });
 
-test('ON A HOST THAT SELLS NO PLAN THE SAME THREE REFUSALS NAME NO DOOR: no Cloud, no Settings, no link to open again', async () => {
+test('WHILE THE HOST SELLS NO PLAN THE TEAMS GATE IS OFF: a record on Free takes an invitation and its link is spent', async () => {
   const c = await studio({});
-  const minted = await c.invite('bo@example.test');
-  const token = minted.body.value?.['token'] as string;
-  assert.equal(typeof token, 'string', JSON.stringify(minted.body));
   await c.plan('free');
-
-  const out = await c.invite('cy@example.test');
-  assert.equal(out.status, 403, JSON.stringify(out.body));
-  assert.equal(out.body.refusal?.fix, FREE_ONE_PERSON_SHORT);
-  assert.equal(FREE_ONE_PERSON_SHORT, 'Free is for one person, so nobody else can join this record.');
-
-  const res = await c.ask('/auth/invite', { method: 'POST', body: JSON.stringify({ inviteToken: token, accept: true }) });
-  const opened = (await res.json()) as Out;
-  assert.equal(res.status, 403, JSON.stringify(opened));
-  assert.equal(opened.refusal?.fix, FREE_JOIN_REFUSED_SHORT);
-
+  const minted = await c.invite('bo@example.test');
+  assert.equal(minted.status, 200, JSON.stringify(minted.body));
   const dir = c.directory as unknown as { invitee(e: string): { ok: boolean; value: { id: string } }; joinRecord(r: string, p: string): Out };
   const bo = dir.invitee('bo@example.test');
   assert.ok(bo.ok);
-  assert.equal(dir.joinRecord(REC, bo.value.id).refusal?.fix, FREE_JOIN_REFUSED_SHORT);
-});
-
-test('READ FROM THE DIRECTORY ON A HOST THAT SELLS NO PLAN, the owner is told the short sentence too', async () => {
-  const c = await studio({});
-  assert.equal((c.directory as unknown as { setPlan(r: string, p: string): unknown }).setPlan(REC, 'free'), null);
-  const out = await c.invite('bo@example.test');
-  assert.equal(out.status, 403, JSON.stringify(out.body));
-  assert.equal(out.body.refusal?.fix, FREE_ONE_PERSON_SHORT);
-  for (const short of [FREE_ONE_PERSON_SHORT, FREE_JOIN_REFUSED_SHORT]) assert.doesNotMatch(short, /Cloud|Settings|link/u);
+  assert.equal(dir.joinRecord(REC, bo.value.id).ok, true);
+  assert.match(FREE_ONE_PERSON_SHORT, /^Teams are part of Cloud Plus/u);
+  for (const short of [FREE_ONE_PERSON_SHORT, FREE_JOIN_REFUSED_SHORT]) assert.doesNotMatch(short, /Settings|link/u);
 });
 
 test('SIGN-UP IS OPEN WHERE SIGNUP SAYS open, with billing off', async () => {

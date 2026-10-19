@@ -145,7 +145,7 @@ const SCOPED = ['guard', 'scoped'];
  * admits the runner principal every other guard refuses.
  */
 const IMPLIES = {
-  ADMIN: ['admin'],
+  ADMIN: ['admin', 'team'],
   VAULT: ['vault'],
   JOBS: ['vault', 'admin', 'runner'],
   'READ+': SCOPED,
@@ -266,7 +266,7 @@ export default function guards(
   /** The first authorisation call in a body, ignoring the comments that explain why it is that one. */
   const guardOf = (body) => {
     const stripped = body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-    return /\b(admin|vault|guard|scoped|runner)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
+    return /\b(admin|team|vault|guard|scoped|runner)\(\s*ctx\b/.exec(stripped)?.[1] ?? null;
   };
 
   /* ONE SENTENCE FOR AN ABSENT SURFACE, NOT EIGHTY-TWO. Without the file every route would land on

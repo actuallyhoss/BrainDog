@@ -38,6 +38,7 @@ import { createRecordApi, type CallContext, type Deposited, type IngestVerificat
 import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
+import { teamsOn } from '@braindog/record/plans';
 import { FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SeenAnswers, SeenCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
@@ -718,7 +719,7 @@ export class Record$ extends DurableObject<Env> {
     const invite = api.invite.bind(api);
     api.invite = async (args, ctx) => {
       const member = typeof args?.person === 'string' && api.kernel.members().some((m) => m.person_id === args.person);
-      if (!member && (await this.#planOf(api)) === 'free') return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: sells(this.env) ? FREE_ONE_PERSON : FREE_ONE_PERSON_SHORT, at: 'plan' } };
+      if (!member && sells(this.env) && !teamsOn(await this.#planOf(api))) return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: sells(this.env) ? FREE_ONE_PERSON : FREE_ONE_PERSON_SHORT, at: 'plan' } };
       return invite(args, ctx);
     };
   }
@@ -4584,7 +4585,7 @@ function invites(env: Env): InviteDoor {
       const found = await recordOf(inviteToken);
       if (!found) return gone;
       /* A FREE RECORD IS ONE PERSON, SAID WHEN THE LINK IS OPENED, before a new address is sent a proof it cannot use. */
-      if ((await directory.planFor(found.id)) === 'free') return { ok: false, refusal: { code: 'FORBIDDEN', fix: sells(env) ? FREE_JOIN_REFUSED : FREE_JOIN_REFUSED_SHORT, at: 'plan' } };
+      if (sells(env) && !teamsOn(await directory.planFor(found.id))) return { ok: false, refusal: { code: 'FORBIDDEN', fix: sells(env) ? FREE_JOIN_REFUSED : FREE_JOIN_REFUSED_SHORT, at: 'plan' } };
       return (await found.stub.acceptInvite({ token: inviteToken })) as unknown as Awaited<ReturnType<InviteDoor['look']>>;
     },
     accept: async (inviteToken, person) => {

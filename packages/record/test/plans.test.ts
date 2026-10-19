@@ -24,6 +24,7 @@ const EXPECTED: Record<string, PlanFigures> = {
     credits: 20,
     agents: 3,
     people: 1,
+    teams: false,
     extra: null,
   },
   hosted: {
@@ -34,6 +35,7 @@ const EXPECTED: Record<string, PlanFigures> = {
     credits: 80,
     agents: 15,
     people: null,
+    teams: false,
     extra: EXTRA,
   },
   plus: {
@@ -44,6 +46,7 @@ const EXPECTED: Record<string, PlanFigures> = {
     credits: 400,
     agents: 75,
     people: null,
+    teams: true,
     extra: EXTRA,
   },
   selfhost: {
@@ -54,6 +57,7 @@ const EXPECTED: Record<string, PlanFigures> = {
     credits: null,
     agents: null,
     people: null,
+    teams: true,
     extra: null,
   },
 };
@@ -110,10 +114,10 @@ test("the Directory's plans and allowance are the table's", () => {
 test("Free's sentences read the table's count of people and the plans' names", () => {
   assert.equal(
     directory.FREE_ONE_PERSON,
-    'Free is for one person, so nobody else can join this record. Move it to Cloud in Settings to invite colleagues.',
+    'Teams are part of Cloud Plus, so nobody else can join this record yet. Move it to Cloud Plus in Settings to invite colleagues.',
   );
   assert.equal(
     directory.FREE_JOIN_REFUSED,
-    'This record is on Free, which is for one person, so nobody else can join it. Ask its owner to move it to Cloud, then open this link again.',
+    'This record is not on Cloud Plus, so nobody else can join it yet. Ask its owner to move it to Cloud Plus, then open this link again.',
   );
 });

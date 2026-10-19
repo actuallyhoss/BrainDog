@@ -62,8 +62,8 @@ test('A RECORD CAN BE MADE ON FREE in the one provision', () => {
   sql.close();
 });
 
-test('A JOIN TO A FREE RECORD IS REFUSED IN THE SENTENCE THE HOST CAN KEEP: it names Cloud where a plan is sold, and no door where none is', () => {
-  for (const [host, fix] of [[undefined, FREE_JOIN_REFUSED], [{ sells: true }, FREE_JOIN_REFUSED], [{ sells: false }, FREE_JOIN_REFUSED_SHORT]] as const) {
+test('A JOIN TO A RECORD NOT ON PLUS IS REFUSED where a plan is sold, and let through where none is', () => {
+  for (const [host, fix] of [[undefined, FREE_JOIN_REFUSED], [{ sells: true }, FREE_JOIN_REFUSED]] as const) {
     const sql = openSqlite();
     const d = createDirectory(sql, { now: () => SEPT }, undefined, host);
     value(d.person$('ada@example.com', 'Ada'));
@@ -75,6 +75,16 @@ test('A JOIN TO A FREE RECORD IS REFUSED IN THE SENTENCE THE HOST CAN KEEP: it n
     assert.equal(out.refusal?.fix, fix);
     sql.close();
   }
-  assert.equal(FREE_JOIN_REFUSED_SHORT, 'This record is on Free, which is for one person, so nobody else can join it.');
-  assert.doesNotMatch(FREE_JOIN_REFUSED_SHORT, /Cloud|Settings|link/u);
+  assert.equal(FREE_JOIN_REFUSED_SHORT, 'This record is not on Cloud Plus, so nobody else can join it.');
+  assert.doesNotMatch(FREE_JOIN_REFUSED_SHORT, /Settings|link/u);
+});
+
+test('A HOST THAT SELLS NO PLAN HAS NO TEAMS GATE, so the join is a yes', () => {
+  const sql = openSqlite();
+  const d = createDirectory(sql, { now: () => SEPT }, undefined, { sells: false });
+  value(d.person$('ada@example.com', 'Ada'));
+  const made = value<Named>(d.provision({ slug: 'ada', email: 'ada@example.com', plan: 'free' }));
+  const bo = value<{ id: string }>(d.person$('bo@example.com', 'Bo'));
+  assert.equal(d.joinable(made.record, bo.id), null);
+  sql.close();
 });
