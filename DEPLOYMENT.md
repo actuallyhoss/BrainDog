@@ -211,6 +211,11 @@ required but the data directory.
 | `BRAINDOG_HOST` | `127.0.0.1` without a token, `0.0.0.0` with one | the interface to listen on |
 | `BRAINDOG_TRUST_PROXY` | the socket's address is the caller's | `1`: the last `X-Forwarded-For` entry is, behind a proxy you run |
 | `PORT` | `8080` | |
+| `BRAINDOG_OWNER` | first start with an empty data directory refuses, naming `init` | the owner's email: that start makes the record (`BRAINDOG_RECORD`, default `home`) and prints a one-time sign-in link |
+
+`.env.example` at the repository root lists every name the self-host reads, each with a line on why, and
+`apps/selfhost/README.md` is the stranger's walk from zero. `braindog backup <folder>` and `braindog restore <folder>`
+are the self-host's carry-off copy and its way back.
 
 ## Resources the deploy needs to already exist
 

@@ -66,3 +66,6 @@ apps/site/static/cli/braindog.mjs*
 # A gate's private word lists: words a machine guards and the repository does not publish
 # (tools/gates/shell-words.mjs and clean-room.mjs read them when they are there).
 tools/gates/*.local.json
+
+# Self-host settings with values in them
+.env

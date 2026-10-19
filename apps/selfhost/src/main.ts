@@ -45,6 +45,8 @@ import { ulids } from '@braindog/kernel';
 import { fixOf } from '@braindog/ports';
 
 import { NIGHTLY_AT, nightlyBackups } from './backup.ts';
+import { backupData, restoreData } from './cold.ts';
+import { degradeLines, setupLine } from './first-run.ts';
 import { lockDown, openKeyStore, recordKeys } from './keys.ts';
 import { nameChange, reachLine, reachOf } from './reach.ts';
 import { initFrom } from './restore.ts';
@@ -591,6 +593,12 @@ async function serve(): Promise<void> {
 
   if (!file) {
     const dirFile = join(data, 'directory.sqlite');
+    /* AN EMPTY DATA DIRECTORY WITH AN OWNER NAMED IS A FIRST RUN: make the record here, so `docker compose up` is the
+       whole of the setup. Without BRAINDOG_OWNER it is the refusal below, as before. */
+    if (!existsSync(dirFile) && (env.BRAINDOG_OWNER ?? '').trim() !== '') {
+      await init([env.BRAINDOG_RECORD?.trim() || 'home']);
+      say(`braindog · first run: made the record in ${data} for ${env.BRAINDOG_OWNER!.trim()}`);
+    }
     if (!existsSync(dirFile))
       return refuse(`There is no record in ${data}. Create one with: braindog init <slug> --owner <email>`);
     const dirSql = openSqlite(dirFile);
@@ -712,8 +720,15 @@ async function serve(): Promise<void> {
      somebody who expected the server on their LAN needs to know why it is not, and somebody who set a
      token needs to know where to sign in. It names ways, never a key. */
   say(bootLine(running.signIn));
+  /* AND THE ONE-TIME LINK THAT MAKES THE OWNER'S SIGN-IN, until they have a passkey. It is a terminal line, so it is
+     a day's single use and printed only while nobody has one. */
+  if (existsSync(dirFile)) {
+    const first = await setupLine({ dir: running.directorySql, auth: running.directory.auth as never, origin: running.signIn.origin, signInOff: running.signIn.off });
+    if (first) say(first);
+  }
   /* AND WHERE MAIL GOES, by host and port and never with what password. */
   if (smtp) say(`  ${smtpLine(smtp)}`);
+  for (const line of degradeLines(env, smtp !== undefined)) say(line);
   /* AND WHETHER ADD-ONS MAY CALL OUT, with the registry's own switch named apart, because an operator who turns one off
      should not believe the other went with it. */
   say(
@@ -782,7 +797,18 @@ const [, , command = 'serve', ...rest] = argv;
 try {
   if (command === 'init') await init(rest);
   else if (command === 'serve') await serve();
-  else refuse(`braindog has no ${command}. It has serve and init.`);
+  else if (command === 'backup') {
+    const dest = rest[0];
+    if (!dest) refuse('braindog backup needs a folder to write into: backup <folder>');
+    const kekFile = env.BRAINDOG_KEK_FILE ?? join(dataDir(), 'kek');
+    const { out, said } = backupData({ data: dataDir(), kekFile, dest, now: Date.now() });
+    say(`backup written to ${out} (${said.join(', ')}). It holds the key file, so keep it as private as the key.`);
+  } else if (command === 'restore') {
+    const from = rest[0];
+    if (!from) refuse('braindog restore needs the backup folder: restore <folder>');
+    restoreData({ data: dataDir(), from });
+    say(`restored into ${dataDir()}. Start the server as usual.`);
+  } else refuse(`braindog has no ${command}. It has serve, init, backup and restore.`);
 } catch (e) {
   refuse(e instanceof Error ? e.message : String(e));
 }

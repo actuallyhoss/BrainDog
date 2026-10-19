@@ -1,8 +1,9 @@
 # The self-host as an image: the record server and the app it serves, from the workspace at the repository root.
 #
 #   docker build -f apps/selfhost/Dockerfile -t braindog .
-#   docker run --rm -v braindog:/data braindog node apps/selfhost/src/main.ts init <name> --owner <email>
-#   docker run -d -v braindog:/data -p 8080:8080 --env-file /srv/braindog.env braindog
+#   docker run -d -v braindog:/data -p 8080:8080 --env-file .env braindog
+#
+# Or `docker compose up -d` at the repository root. With BRAINDOG_OWNER in the env file, the first start makes the record.
 #
 # NOTHING THAT OPENS THE RECORD IS IN THE IMAGE OR ITS BUILD ARGUMENTS: no server key, no key file, and no address to
 # listen on. Without a server key the server treats every request as the owner's, so it binds 127.0.0.1 and nothing
@@ -37,6 +38,6 @@ USER node
 VOLUME /data
 EXPOSE 8080
 
-HEALTHCHECK CMD node -e "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 CMD node -e "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 
 CMD ["node", "apps/selfhost/src/main.ts", "serve"]
