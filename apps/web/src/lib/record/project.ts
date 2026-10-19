@@ -41,6 +41,41 @@ export function blockOf(decl: Decl | undefined): Pointed | null {
   return null;
 }
 
+/**
+ * WHICH SHAPE BLOCK A DECLARED BLOCK SAYS AGAIN, read off the source it declares and never its title: what a project
+ * runs on (`runs_on`: its keys, tools and skills) is the shape's runs-on block. `null` for a block that says its own thing.
+ */
+export const repeatOf = (source: unknown): Pointed | null => (source === 'runs_on' ? 'runs-on' : null);
+
+type Declared = { kind: string; drawn?: boolean | undefined; why?: string | undefined; source?: unknown; area?: unknown; panel?: unknown };
+
+/**
+ * THE PAGE'S DECLARED BLOCKS WITHOUT WHAT THE SHAPE SAYS (`drew` is the shape's blocks): a block that repeats one is left
+ * out, and so is a section left heading only such blocks, unless it holds the scheduled actions the host counted, or has
+ * not yet counted them. Each stays at its place, marked as left out for being empty, so arranging draws it again.
+ */
+export function withoutRepeats<T extends Declared>(blocks: readonly T[], drew: readonly Block[], actions: number | null): T[] {
+  const gone = blocks.map((b) => {
+    const again = repeatOf(b.source);
+    return b.drawn !== false && again !== null && drew.includes(again);
+  });
+  return blocks.map((b, n) => {
+    let out = gone[n]!;
+    if (!out && b.kind === 'section' && b.drawn !== false && (b.panel === undefined || (b.panel === 'actions' && actions === 0))) {
+      const area = b.area === 'rail' ? 'rail' : 'main';
+      const under: number[] = [];
+      for (let at = n + 1; at < blocks.length; at++) {
+        const next = blocks[at]!;
+        if ((next.area === 'rail' ? 'rail' : 'main') !== area) continue;
+        if (next.kind === 'section') break;
+        under.push(at);
+      }
+      out = under.length > 0 && under.every((at) => gone[at] === true || blocks[at]!.drawn === false);
+    }
+    return out ? ({ ...b, drawn: false, why: 'empty' } as T) : b;
+  });
+}
+
 /** One row behind a block: a name, one quiet detail, and where it opens. Never a secret, never an id. */
 export type DataRow = { key: string; title: string; detail: string; href: string | null };
 

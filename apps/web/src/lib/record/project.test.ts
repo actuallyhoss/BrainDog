@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, rowsOf, shapeOf, spans, type Facts } from './project.ts';
+import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, repeatOf, rowsOf, withoutRepeats, shapeOf, spans, type Facts } from './project.ts';
 
 const none: Facts = { brief: [], next: null, money: [], people: [], agents: { now: [], runs: [] }, runsOn: [] };
 const row = { key: '1', title: 'Kiln', detail: '', href: null };
@@ -78,4 +78,23 @@ test('THE SHAPE IS WORKED OUT ONCE FOR BOTH PAGES: facts, the rows behind them, 
 test('A BLOCK WHOSE PARTNER IS LEFT OUT TAKES THE WHOLE ROW', () => {
   assert.deepEqual(spans(['brief', 'next', 'money', 'crew', 'workers']), { brief: 2, next: 2, money: 1, crew: 1, workers: 2 });
   assert.deepEqual(spans(['crew', 'runs-on']), { crew: 2, 'runs-on': 2 });
+});
+
+test('A DECLARED BLOCK REPEATS THE SHAPE BY THE SOURCE IT DECLARES, never by its title', () => {
+  assert.equal(repeatOf('runs_on'), 'runs-on');
+  assert.equal(repeatOf('register.tasks'), null);
+  assert.equal(repeatOf(undefined), null);
+});
+
+test('A SECTION LEFT HEADING ONLY WHAT THE SHAPE SAYS GOES WITH IT, unless it holds actions or they are not counted yet', () => {
+  const page = [
+    { kind: 'section', panel: 'actions', area: 'rail' },
+    { kind: 'cards', source: 'runs_on', area: 'rail' },
+    { kind: 'cards', source: 'register.things', area: 'main' },
+  ];
+  const drawn = (a: number | null) => withoutRepeats(page, ['runs-on'], a).map((b) => (b as { drawn?: boolean }).drawn !== false);
+  assert.deepEqual(drawn(0), [false, false, true]);
+  assert.deepEqual(drawn(2), [true, false, true]);
+  assert.deepEqual(drawn(null), [true, false, true]);
+  assert.deepEqual(withoutRepeats(page, [], 0), page);
 });

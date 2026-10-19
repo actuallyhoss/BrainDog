@@ -51,6 +51,7 @@
   import ChangePage from './ChangePage.svelte';
   import PageBody from './PageBody.svelte';
   import ProjectShape from './ProjectShape.svelte';
+  import { withoutRepeats, type Block } from '$lib/record/project.ts';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { arranged, emptyHidden } from './home.ts';
@@ -172,9 +173,13 @@
      counts them first (`panels.ts`): ONE READ A PAGE, for the row it is drawn for, and only where a section waits on
      it. `null` until the read is back, and for good where nothing asks or the record refused. Read again for another
      row, never for the same page read again after a write. */
+  /* What the project's shape draws on this page, said by `ProjectShape` once its reads are back. */
+  let shapeDrew = $state.raw<readonly Block[]>([]);
   const about = $derived(mode === 'page' ? (live?.page.page.param ?? null) : null);
   const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
-  const asks = $derived(spoken !== null && asksActions(live?.page.blocks ?? []));
+  /* AN UNBOXED ACTIONS SECTION IS COUNTED TOO, for the one case that asks: it is left out when the shape took what it heads. */
+  const asking = (bs: readonly LiveBlock[]) => bs.map((b) => (b.kind === 'section' && (b as { panel?: unknown }).panel === 'actions' ? ({ ...b, box: true } as LiveBlock) : b));
+  const asks = $derived(spoken !== null && asksActions(asking(live?.page.blocks ?? [])));
   let tally = $state.raw<{ of: string; rows: ActionRow[] | null } | null>(null);
   $effect(() => {
     const of = asks ? spoken : null;
@@ -182,7 +187,7 @@
     /* BY THE ROW AND WHETHER ANYTHING ASKS, and by nothing else: the page read again is a new answer naming the same row. */
     untrack(() => {
       if (!live || !about) return;
-      void readHeld((url, init) => fetch(url, init), apiBase(), live.page.blocks, { spoken: of, title: about.title }).then((rows) => {
+      void readHeld((url, init) => fetch(url, init), apiBase(), asking(live.page.blocks), { spoken: of, title: about.title }).then((rows) => {
         tally = { of, rows };
       });
     });
@@ -421,7 +426,9 @@
     const blocks = declaredOnly(toArrange ? toArrange.blocks : (live?.page.blocks ?? []));
     if (mode === 'preview') return blocks;
     /* A SCREEN WHOSE SHELL NAMES NO READER keeps every line, as it drew them before, and the record answers a press. */
-    return heldTo(inVoice(blocks, said), (list) => !shell?.me || may(shell, 'append', list));
+    const drawn = heldTo(inVoice(blocks, said), (list) => !shell?.me || may(shell, 'append', list));
+    /* A BLOCK THE PROJECT'S SHAPE SAYS ALREADY IS LEFT OUT, by the source it declares (`repeatOf`), once the shape has it. */
+    return about && shapeDrew.length > 0 ? withoutRepeats(drawn, shapeDrew, counted?.length ?? null) : drawn;
   });
 
   /** Declared, then added. One list, so ordering and spans do not care which is which. This is what Arrange moves. */
@@ -679,9 +686,10 @@
     <SourceView {slug} title={live.page.page.title} />
   {:else}
     <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, as the row's own page does; its blocks follow. -->
-    {#if about}<ProjectShape register={about.register} seq={about.seq} />{/if}
+    {#snippet shapeAt()}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b) => (shapeDrew = b)} />{/snippet}
     <PageBody
       mode="page"
+      opens={about ? shapeAt : null}
       page={live.page.page}
       blocks={all}
       held={counted}

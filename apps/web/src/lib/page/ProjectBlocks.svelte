@@ -80,7 +80,8 @@
     <div class="block" data-block={b} data-span={span[b]}>
       <Tile icon={WORDS[b].icon} title={WORDS[b].title}>
         {#if b === 'brief'}
-          {#each facts.brief as line, i (i)}<p class="said">{line}</p>{/each}
+          <!-- ONE PARAGRAPH: the brief's sentences are one thought, not a stack of lines. -->
+          <p class="said">{facts.brief.join(' ')}</p>
         {:else if b === 'next'}
           <NextStep next={{ text: facts.next ?? '', row: null, href: nextHref }} />
         {:else if b === 'money'}
@@ -117,7 +118,9 @@
     gap: var(--inset);
   }
 
+  /* NO MARGIN: the renderer's global `.block` adds 24px under it, and the grid's gap is the only space between two. */
   .block {
+    margin: 0;
     min-inline-size: 0;
   }
 

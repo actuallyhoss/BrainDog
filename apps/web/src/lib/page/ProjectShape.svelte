@@ -17,12 +17,12 @@
   import { readHistory } from '$lib/record/history-live.ts';
   import { linkReader } from '$lib/record/links-live.ts';
   import { symbolText } from '$lib/record/money.ts';
-  import { blocksOf, isProject, shapeOf, type Figure } from '$lib/record/project.ts';
+  import { blocksOf, isProject, shapeOf, type Block, type Figure } from '$lib/record/project.ts';
   import { rowReader } from '$lib/record/row-live.ts';
   import { money } from 'braindog-render';
   import ProjectBlocks from './ProjectBlocks.svelte';
 
-  let { register, seq }: { register: string; seq: number } = $props();
+  let { register, seq, onshape }: { register: string; seq: number; onshape: (blocks: readonly Block[]) => void } = $props();
 
   type Read = {
     key: string;
@@ -84,21 +84,19 @@
       : null,
   );
   const said = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
+  /* WHAT THE SHAPE DRAWS, said to the page so a declared block that repeats one is left out (`repeatOf`). */
+  $effect(() => onshape(shape ? blocksOf(shape.facts) : []));
   /* A PROJECTS LIST KNOWN BEFORE ITS ROW ANSWERS holds a little height, so the declared blocks wait where they will be. */
   const holds = $derived(read === null && settled !== `${register}#${seq}` && isProject(REGISTERS[register]));
 </script>
 
 {#if shape && blocksOf(shape.facts).length > 0}
-  <div class="shape"><ProjectBlocks facts={shape.facts} data={shape.data} nextHref={shape.nextHref} format={said} /></div>
+  <div><ProjectBlocks facts={shape.facts} data={shape.data} nextHref={shape.nextHref} format={said} /></div>
 {:else if holds}
-  <div class="shape held" aria-hidden="true"></div>
+  <div class="held" aria-hidden="true"></div>
 {/if}
 
 <style>
-  .shape {
-    margin-block-end: var(--inset);
-  }
-
   .held {
     min-block-size: 160px;
   }

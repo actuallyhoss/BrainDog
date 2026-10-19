@@ -1559,6 +1559,11 @@
     min-inline-size: 0;
   }
 
+  /* A STRIP THAT DREW NOTHING TAKES NO ROW, so the page's gap is not spent twice over nothing. */
+  .page-strip[data-opens]:empty {
+    display: none;
+  }
+
   /* ── a section on the board ───────────────────────────────────────────────
      A SECTION IS A TILE TOO, its heading row the same as every tile's: the icon in its well, the name at 15 and 600,
      its count, and Show or Hide at the end as a quiet rectangle (DIRECTION §39: buttons are rectangles). The blocks it
