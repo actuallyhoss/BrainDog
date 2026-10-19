@@ -332,6 +332,8 @@ export function oauthHere(here: OAuthHereOptions): OAuthHere {
        only from a page on the issuer (`sameOrigin`). */
     consent: (id) => `${here.origin}${CONSENT_AT}?request=${encodeURIComponent(id)}`,
     approver,
+    /* A REVOKED OR EXPIRED TOKEN ENDS ITS REFRESH FAMILY AT ONCE, asked of the record's own token table. */
+    alive: async (bearer) => (await here.api.kernel.verifyToken(bearer, 'oauth')).ok,
     fetchDocument: (url) => readDocument(url, send, pin),
     resources,
   });

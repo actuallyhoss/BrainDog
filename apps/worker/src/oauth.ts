@@ -184,6 +184,12 @@ function wiring<I>(request: Request, env: OAuthEnv<I>, host: string) {
        page drawn on the old name would be one whose Allow always failed. */
     consent: (id) => `${origin}${CONSENT_AT}?request=${encodeURIComponent(id)}`,
     approver,
+    /* A REVOKED OR EXPIRED TOKEN ENDS ITS REFRESH FAMILY AT ONCE: the bearer's first half names the record that holds it. */
+    alive: async (bearer) => {
+      const id = bearer.split('.')[0] ?? '';
+      if (id === '' || id.length > RECORD_NAME_MOST) return false;
+      return (await (record(id) as RecordCalls & { verify(b: string, surface: string): Promise<unknown> }).verify(bearer, 'oauth')) !== null;
+    },
     fetchDocument: readDocument,
   };
   return { deps, session, directory };
