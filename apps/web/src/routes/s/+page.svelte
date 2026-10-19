@@ -30,6 +30,12 @@
   import Waiting from '$lib/ui/Waiting.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import { openOutside } from '$lib/shell.ts';
+  /* The href stays for the context menu and screen readers; the click goes through the one door. */
+  const outside = (e: MouseEvent) => {
+    e.preventDefault();
+    openOutside('https://brain.dog');
+  };
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { cellSaid, figureSaid, headOf, plainSaid, takeShared, type Said, type Where } from './reading.ts';
 
@@ -165,7 +171,7 @@
          where it came from, the product, rather than an empty end. -->
     <div class="gone">
       <Empty kind="no-permission" heading glyph="link" title={head.title} body={head.line}>
-        {#snippet actions()}<Button href="https://brain.dog">{shareWords.whatItIs}</Button>{/snippet}
+        {#snippet actions()}<Button href="https://brain.dog" onclick={outside}>{shareWords.whatItIs}</Button>{/snippet}
       </Empty>
     </div>
   {:else if got.from === 'unreached'}
@@ -199,7 +205,7 @@
   {/if}
 
   <footer class="made">
-    <a class="made-link" href="https://brain.dog" rel="noreferrer"><Mark height={14} />{words.sharedMade}</a>
+    <a class="made-link" href="https://brain.dog" rel="noreferrer" onclick={outside}><Mark height={14} />{words.sharedMade}</a>
   </footer>
 </div>
 
