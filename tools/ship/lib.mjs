@@ -257,17 +257,22 @@ export function baseEnv(extra = {}, drop = []) {
  * own process group so a ceiling can stop all of it. Output goes to `log`, and to this terminal when `echo` is set,
  * with every value in `hide` replaced line by line before either sees it.
  */
-export function runShell(script, { env, log, echo = false, quiet = null, timeoutMs = 45 * 60_000, hide = [], tmp }) {
+/* Steps may run side by side, so each has its own script file and `runShell.current` stops all that are running. */
+let stepNo = 0;
+const live = new Set();
+export function runShell(script, { env, log, echo = false, quiet = null, timeoutMs = 45 * 60_000, hide = [], tmp, nice = false }) {
   mkdirSync(tmp, { recursive: true });
   mkdirSync(dirname(log), { recursive: true });
-  const file = join(tmp, `step-${process.pid}-${Date.now()}.sh`);
+  const file = join(tmp, `step-${process.pid}-${Date.now()}-${++stepNo}.sh`);
   writeFileSync(file, `${script}\n`);
   const out = createWriteStream(log, { flags: 'a' });
   const secrets = hide.filter((s) => typeof s === 'string' && s.length >= 6);
   const scrub = (line) => secrets.reduce((acc, s) => acc.split(s).join('***'), line);
   const t0 = Date.now();
   return new Promise((resolve) => {
-    const child = spawn('bash', ['--noprofile', '--norc', '-eo', 'pipefail', file], { cwd: ROOT, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const shell = ['--noprofile', '--norc', '-eo', 'pipefail', file];
+    /* `nice` lowers the whole group's priority, so a step that is timed keeps the cores when the rest compete for them. */
+    const child = spawn(nice ? 'nice' : 'bash', nice ? ['-n', '10', 'bash', ...shell] : shell, { cwd: ROOT, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
@@ -303,13 +308,13 @@ export function runShell(script, { env, log, echo = false, quiet = null, timeout
         process.kill(-child.pid, 'SIGTERM');
       } catch {}
     };
-    runShell.current = stop;
+    live.add(stop);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
-      runShell.current = null;
+      live.delete(stop);
       if (timedOut) out.write(`\nstopped at its ceiling of ${Math.round(timeoutMs / 60_000)} minutes\n`);
       out.end(() => resolve({ status: timedOut ? 124 : (code ?? (signal ? 128 : 1)), ms: Date.now() - t0, timedOut }));
     });
   });
 }
-runShell.current = null;
+Object.defineProperty(runShell, 'current', { get: () => (live.size > 0 ? () => live.forEach((stop) => stop()) : null) });

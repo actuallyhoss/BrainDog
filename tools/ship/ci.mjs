@@ -21,6 +21,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
 import { MARKER, ROOT, SHIP, baseEnv, evaluate, git, readWorkflow, runShell, secs, setupRuns, short, stamp } from './lib.mjs';
@@ -51,7 +52,8 @@ for (let i = 0; i < argv.length; i++) {
 
 const RUN_ID = `ci-${QUICK ? 'quick-' : ''}${stamp()}`;
 const LOGS = join(SHIP, 'logs', RUN_ID);
-const TMP = join(SHIP, 'tmp', RUN_ID);
+/* OUTSIDE THE CHECKOUT, as a runner's temp is: a clean clone made there would otherwise sit in the tree a test is scanning. */
+const TMP = join(tmpdir(), `braindog-${RUN_ID}`);
 
 const HEAD = git('rev-parse', 'HEAD').out;
 const dirtyAtStart = git('status', '--porcelain').out;
@@ -249,54 +251,130 @@ console.log(`  run here by name: ${QUICK ? 'run.mjs --unbuilt' : 'every gate run
 for (const [what, why] of notRun) console.log(`  ----  not run here: ${what}: ${why}`);
 console.log('');
 
-/* THE TWO SLOW BROWSER GATES RUN SIDE BY SIDE (his yes, 18 Oct): each serves its build on its own random port, so they
-   share nothing, and together they were 21 of the run's 44 minutes. Started when the loop reaches the first of them. */
-const TOGETHER = new Set(['layout', 'a11y']);
-const early = new Map();
 const logOf = (n, entry) => join(LOGS, `${String(n + 1).padStart(width, '0')}-${entry.title.replace(/[^\w.-]+/g, '-').slice(0, 60)}.log`);
-const start = (n, entry) =>
-  runShell(entry.script, { env: baseEnv({ RUNNER_TEMP: TMP, ...entry.env }), log: logOf(n, entry), timeoutMs: (entry.timeoutMin ?? 45) * 60_000, tmp: TMP });
+
+/* THE STEPS RUN IN A POOL, NOT ONE AFTER ANOTHER (his yes, 19 Oct): the run was 35 minutes of steps that share nothing. A
+   step starts when every step it reads from is done and no step it would trample is running; the lines still print in
+   plan order. TIMED STEPS (the tests, and the gates that measure milliseconds) RUN ONE AT A TIME AND AT FULL PRIORITY, everything
+   else at a lower one, because a p99 ceiling is a fact about a quiet machine. What reads what: everything waits for the setup; a built gate, the build job's own tests and the deploy
+   dry-runs wait for the three builds; the `git diff` check waits for every test and build, as it ran after them. */
+const JOBS = Number(process.env.CI_JOBS) || 12;
+/* `layout` is cut into its `slices` parts side by side (a part is `--shard k/n`, the union is the whole gate). */
+const SHARDS = { layout: 2 };
+/* The longest first, so the run's last minutes are not one slow gate started late. */
+const FIRST = new Set(['layout', 'a11y', 'self-test']);
+const TIMED_GATES = new Set(['graph', 'slash-actor']);
+const unbuilt = new Set(
+  QUICK
+    ? listed.stdout.split('\n').map((s) => s.trim()).filter(Boolean)
+    : spawnSync(process.execPath, [join(ROOT, 'tools/gates/run.mjs'), '--unbuilt', '--list'], { cwd: ROOT, encoding: 'utf8' }).stdout.split('\n').map((s) => s.trim()).filter(Boolean),
+);
+const where = (test) => plan.flatMap((p, n) => (test(p) ? [n] : []));
+const setups = where((p) => /^setup:/.test(p.title));
+const builds = where((p) => /^pnpm --filter \S+ build$/.test(p.script ?? ''));
+for (const [n, p] of plan.entries()) {
+  p.after = new Set();
+  p.locks = [];
+  if (setups.includes(n)) for (const m of setups) m < n && p.after.add(m);
+  else for (const m of setups) p.after.add(m);
+  if (p.gate && (!unbuilt.has(p.gate) || p.gate === 'self-test')) for (const m of builds) p.after.add(m);
+  if (/^build:/.test(p.title) && !builds.includes(n)) for (const m of builds) p.after.add(m);
+  if (/^git diff --exit-code$/.test(p.script?.trim() ?? '')) for (const m of where((q) => /^(test |build:)/.test(q.title))) m < n && p.after.add(m);
+  p.timed = /run test\b|^node --test|^pnpm --filter \S+ test$/.test(p.script ?? '') || TIMED_GATES.has(p.gate);
+  /* A BENCH WITH A p99 CEILING HAS THE MACHINE TO ITSELF, before anything else starts (it is 36 s). */
+  p.exclusive = p.timed && /run test\b/.test(p.script) && [...p.script.matchAll(/--filter \.\/(\S+)/g)].some(([, d]) => existsSync(join(ROOT, d, 'test/bench.test.ts')));
+  if (p.timed) p.locks.push('timed');
+  if (p.timed && !p.exclusive) for (const m of builds) p.after.add(m);
+  if (/^selfhost /.test(p.title)) p.locks.push('selfhost');
+  /* `svelte-kit sync` writes the same `.svelte-kit` for a typecheck as for a build. */
+  if (/^test (web|apps): typecheck$/.test(p.title) || builds.includes(n) || p.gate === 'typecheck') p.locks.push('sveltekit');
+  p.shards = p.script && !QUICK ? SHARDS[p.gate] : undefined;
+  p.weight = p.note || p.fail || p.diff || !p.script ? 0 : (p.shards ?? 1);
+}
 
 const results = [];
 const t0 = Date.now();
-for (const [n, entry] of plan.entries()) {
-  if (interrupted) break;
-  const num = String(n + 1).padStart(width, '0');
+const state = plan.map(() => ({ started: false, done: false }));
+const running = new Set();
+const held = new Set();
+let used = 0;
+let printed = 0;
+
+const execute = async (n) => {
+  const entry = plan[n];
   const log = logOf(n, entry);
-  let status;
-  let ms = 0;
-  if (entry.gate && TOGETHER.has(entry.gate) && entry.script && !early.has(n))
-    for (const [m, other] of plan.entries()) if (other.gate && TOGETHER.has(other.gate) && other.script && !early.has(m)) early.set(m, start(m, other));
-  if (early.has(n)) {
-    const r = await early.get(n);
-    status = r.status;
-    ms = r.ms;
-  } else if (entry.note) {
+  const run = (script, to) => runShell(script, { nice: !entry.timed && !builds.includes(n) && !['layout', 'a11y'].includes(entry.gate), env: baseEnv({ RUNNER_TEMP: TMP, ...entry.env }), log: to, timeoutMs: (entry.timeoutMin ?? 45) * 60_000, tmp: TMP });
+  if (entry.note) {
     writeFileSync(log, `${entry.note}\n`);
-    status = 0;
-  } else if (entry.fail) {
+    return { status: 0, ms: 0 };
+  }
+  if (entry.fail) {
     writeFileSync(log, `${entry.fail}\n`);
-    status = 1;
-  } else if (entry.diff) {
+    return { status: 1, ms: 0 };
+  }
+  if (entry.diff) {
     /* THE TREE HAD CHANGES BEFORE THE RUN, so `git diff --exit-code` would be red on them and say nothing about the
        build. The question is the same: did the build change a tracked file? So the diff is compared with the one taken
        at the start. On a clean tree this branch is never taken, and the line runs as written. */
     const now = git('diff').out;
     writeFileSync(log, now === diffAtStart ? 'the tracked diff is the one the run started with\n' : `the build changed tracked files:\n${git('diff', '--stat').out}\n`);
-    status = now === diffAtStart ? 0 : 1;
-  } else {
-    const r = await runShell(entry.script, { env: baseEnv({ RUNNER_TEMP: TMP, ...entry.env }), log, timeoutMs: (entry.timeoutMin ?? 45) * 60_000, tmp: TMP });
-    status = r.status;
-    ms = r.ms;
+    return { status: now === diffAtStart ? 0 : 1, ms: 0 };
   }
+  if (!entry.shards) return run(entry.script, log);
+  /* ONE LOG FOR THE GATE: the parts' logs, one after the other, so what reads a gate's log still finds it whole. */
+  const t = Date.now();
+  const parts = await Promise.all(Array.from({ length: entry.shards }, (_, k) => run(entry.script.replace(`--only ${entry.gate}`, `--only ${entry.gate} --shard ${k + 1}/${entry.shards}`), `${log}.part${k + 1}`)));
+  writeFileSync(log, parts.map((_, k) => `── part ${k + 1} of ${entry.shards}\n${readFileSync(`${log}.part${k + 1}`, 'utf8')}`).join(''));
+  for (let k = 1; k <= entry.shards; k++) rmSync(`${log}.part${k}`, { force: true });
+  return { status: parts.find((r) => r.status !== 0)?.status ?? 0, ms: Date.now() - t };
+};
+
+const report = (n) => {
+  const entry = plan[n];
+  const { status, ms, log } = state[n];
   const red = status !== 0;
   const excused = red && entry.gate && allowed.includes(entry.gate);
   /* A gate the runner could not run and the workflow's `--allow-skip` accepts is green there too, and said as a skip. */
   const skipped = !red && entry.gate && (Boolean(entry.note) || /\b1 could not run\b/.test(readFileSync(log, 'utf8')));
   const mark = !red ? (skipped ? 'skip ok' : 'pass') : excused ? 'EXCUSED' : 'FAIL';
   results.push({ ...entry, status, ms, log, red, excused, skipped });
-  console.log(`  ${mark.padEnd(7)} ${secs(ms).padStart(8)}  [${num}] ${entry.title}${entry.diff ? ' (against the diff at the start)' : ''}`);
-}
+  console.log(`  ${mark.padEnd(7)} ${secs(ms).padStart(8)}  [${String(n + 1).padStart(width, '0')}] ${entry.title}${entry.diff ? ' (against the diff at the start)' : ''}`);
+};
+const flush = () => {
+  while (printed < plan.length && state[printed].done) report(printed++);
+};
+
+await new Promise((resolve) => {
+  const pump = () => {
+    for (;;) {
+      if (interrupted) break;
+      const ready = plan
+        .map((p, n) => [p, n])
+        .filter(([p, n]) => !state[n].started && [...p.after].every((m) => state[m].done) && p.locks.every((l) => !held.has(l)) && (used === 0 || used + p.weight <= JOBS) && !held.has('exclusive') && (!p.exclusive || running.size === 0))
+        .sort(([a, i], [b, j]) => Number(!(a.exclusive || FIRST.has(a.gate) || builds.includes(i))) - Number(!(b.exclusive || FIRST.has(b.gate) || builds.includes(j))) || i - j);
+      if (ready.length === 0) break;
+      const [p, n] = ready[0];
+      state[n].started = true;
+      running.add(n);
+      used += p.weight;
+      for (const l of p.locks) held.add(l);
+      if (p.exclusive) held.add('exclusive');
+      execute(n).then((r) => {
+        Object.assign(state[n], r, { done: true, log: logOf(n, p) });
+        running.delete(n);
+        used -= p.weight;
+        for (const l of p.locks) held.delete(l);
+        held.delete('exclusive');
+        flush();
+        pump();
+      });
+    }
+    if (running.size > 0) return;
+    if (!interrupted && state.some((s) => !s.started)) throw new Error('ci.mjs: steps wait on each other and none can start');
+    resolve();
+  };
+  pump();
+});
 
 /* ── THE SUMMARY ────────────────────────────────────────────────────────────────────────────────────────────────── */
 
