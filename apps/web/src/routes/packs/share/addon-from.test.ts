@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { addonHref, addonId, argsOf, fileName, groupsOf, modeOf, offeredOf, picked, previewLines, quietOf, words, writtenOf } from './addon-from.ts';
+import { addonHref, addonId, argsOf, asksOf, fileName, SUMMARY_MOST, summaryOf, groupsOf, modeOf, offeredOf, picked, previewLines, quietOf, words, writtenOf } from './addon-from.ts';
 
 const ULID = '01J9ZQ4K7V3T8W2M5N6P0R1S2T';
 
@@ -53,6 +53,27 @@ test('the call carries ids and a title, never rows', () => {
   const args = argsOf(offered, ['page:seedlings'], '  ');
   assert.deepEqual(args, { declarations: ['page:seedlings'], title: words.untitledAddon, version: '1.0.0' });
   assert.equal('rows' in args, false);
+});
+
+test('the one line goes with the call only when it is a line, tidied, and never past its length', () => {
+  assert.deepEqual(argsOf(offered, ['page:seedlings'], 'Kit', '1.0.0', '  Waters the  seedlings\non a round. '), {
+    declarations: ['page:seedlings'],
+    title: 'Kit',
+    version: '1.0.0',
+    summary: 'Waters the seedlings on a round.',
+  });
+  assert.equal('summary' in argsOf(offered, ['page:seedlings'], 'Kit', '1.0.0', 'x'.repeat(SUMMARY_MOST + 1)), false);
+  assert.equal(summaryOf('x'.repeat(SUMMARY_MOST)), 'x'.repeat(SUMMARY_MOST));
+  assert.equal(summaryOf('   '), '');
+});
+
+test('what it asks permission for is the calls it makes out, or one plain line saying none', () => {
+  assert.deepEqual(asksOf({ calls_out: [] }), [words.asksNothing]);
+  assert.deepEqual(asksOf(null), [words.asksNothing]);
+  assert.deepEqual(asksOf({ calls_out: [{ host: 'weather.example.test', line: 'Fetches the forecast every morning', key: null }, { host: 'feeds.example.test', line: '' }, 3] }), [
+    'Calls out: Fetches the forecast every morning',
+    'Calls out: feeds.example.test',
+  ]);
 });
 
 test('the file is called <id>-<version>.pack.json', () => {

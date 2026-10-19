@@ -16,7 +16,8 @@
  * the declare package or IndexedDB until then. The store is injectable for tests, and IndexedDB is opened only when called.
  */
 
-import { fileChecksum, keyIdOf, readCatalogueFile, signedText, verifySignature, type Signature } from '@braindog/declare/catalogue';
+import { fileChecksum, keyIdOf, readCatalogueFile, signedText, verifySignature, type EntryKind, type Signature } from '@braindog/declare/catalogue';
+import { verifyYank, yankText } from '@braindog/declare/kennel';
 
 /** One key as a store keeps it: the private half as the browser's own non-extractable object, and what is public. */
 export type KeptKey = { privateKey: CryptoKey; public_key: string; key_id: string; created_at: string };
@@ -33,6 +34,8 @@ export type AuthorKeyHandle = {
   public_key: string;
   created_at: string;
   sign(kind: string, id: string, version: string, checksum: string): Promise<Signature | null>;
+  /** The key's signature over taking a version back, with the reason it is read with. */
+  signYank(kind: EntryKind, id: string, version: string, reason: string): Promise<Signature | null>;
 };
 
 const ALG = { name: 'Ed25519' } as const;
@@ -147,6 +150,15 @@ async function made(store: KeyStore, now: () => Date): Promise<AuthorKeyHandle |
           return null;
         }
       },
+      signYank: async (kind, id, version, reason) => {
+        try {
+          const sig = toB64(await sc.sign(ALG, privateKey, new TextEncoder().encode(yankText(kind, id, version, reason))));
+          const signature: Signature = { alg: 'ed25519', key_id, public_key, sig, signed_at: now().toISOString() };
+          return (await verifyYank(signature, kind, id, version, reason)) ? signature : null;
+        } catch {
+          return null;
+        }
+      },
     };
   } catch {
     /* No Ed25519 in this browser, or no room to keep the key: it publishes unsigned, and says so. */
@@ -168,6 +180,12 @@ export function authorKey(store: KeyStore | null = theStore(), now: () => Date =
     void out.then((k) => (k === null ? making.delete(store) : undefined));
   }
   return out;
+}
+
+/** The publisher's signature over taking a version back, or `null` when this browser holds no key. */
+export async function yankSignatureFor(kind: EntryKind, id: string, version: string, reason: string, store?: KeyStore | null): Promise<Signature | null> {
+  const key = await authorKey(store === undefined ? theStore() : store);
+  return key === null ? null : key.signYank(kind, id, version, reason);
 }
 
 /** A signature over one version, by the publisher's key, or `null` when this browser cannot sign. */

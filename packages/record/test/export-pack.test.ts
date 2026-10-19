@@ -173,6 +173,15 @@ test('THE FILE, PLANNED AND INSTALLED ON A SECOND FRESH RECORD, DRAWS THE PAGE',
   assert.equal(every?.rows?.[0]?.fields.kind, 'paper');
 });
 
+test('THE AUTHOR ONE LINE IS THE FILE SUMMARY, kept to one short line, and no line is the plain default', async () => {
+  const { exportPack } = await first();
+  const said = value<ExportedPack>(await exportPack({ declarations: ['page.jobs-board'], title: 'Jobs board', summary: '  A board of  every job,\nby client. ' }, owner));
+  assert.equal((JSON.parse(said.text) as { summary: string }).summary, 'A board of every job, by client.');
+  const plain = value<ExportedPack>(await exportPack({ declarations: ['page.jobs-board'], title: 'Jobs board' }, owner));
+  assert.match((JSON.parse(plain.text) as { summary: string }).summary, /^Jobs board, made on one BrainDog/u);
+  for (const summary of ['', '   ', 'x'.repeat(141)]) assert.equal(refusal(await exportPack({ declarations: ['page.jobs-board'], summary }, owner)).at, 'summary');
+});
+
 test('A TICK OF SOMETHING NOT ITS OWN, A STRAY KEY AND A MEMBER WHO READS ONE LIST ARE REFUSED BY NAME', async () => {
   const { exportPack } = await first();
   const theirs = refusal(await exportPack({ declarations: ['register.things'] }, owner));

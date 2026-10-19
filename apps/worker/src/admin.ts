@@ -36,6 +36,9 @@ export const ADMIN_HEADERS: Readonly<Record<string, string>> = {
 /** The operator doors, which the normal router answers on this host as on any other. */
 const OPS = /^\/+account\/+ops(\/|$)/;
 
+/** The Kennel's review door, which the queue on this page lists and decides through; its own bearer check is the gate. */
+const REVIEW = /^\/+api\/+kennel\/+v1\/+review\/*$/;
+
 const PAGES: Readonly<Record<string, { type: string; body: string }>> = {
   '/': { type: 'text/html; charset=utf-8', body: ADMIN_HTML },
   '/admin.js': { type: 'text/javascript; charset=utf-8', body: ADMIN_JS },
@@ -67,7 +70,7 @@ const answer = (status: number, body: string | null, type: string, extra: Record
  */
 export function serveAdmin(request: Request): Response | null {
   const path = new URL(request.url).pathname;
-  if (OPS.test(path)) return null;
+  if (OPS.test(path) || REVIEW.test(path)) return null;
   const head = request.method === 'HEAD';
   if (request.method !== 'GET' && !head) return answer(405, 'This page is only read.', 'text/plain; charset=utf-8', { allow: 'GET, HEAD' });
   const page = PAGES[path];

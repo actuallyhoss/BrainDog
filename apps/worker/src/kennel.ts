@@ -34,7 +34,7 @@
 import { httpStatus } from '@braindog/host';
 import { clearCookie, readSid, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
 import { emptyCatalogue, readCatalogue, type CatalogueEntry, type CatalogueIndex, type CatalogueVersion, type EntryKind } from '@braindog/declare/catalogue';
-import { catalogueFile, fileChecksum, installedIdOf, listedEntries, offeredVersion, readCatalogueFile } from '@braindog/declare/catalogue';
+import { catalogueFile, fileChecksum, installedIdOf, listedEntries, offeredVersion, PREVIEW_FORMAT, readCatalogueFile, readPreview, type Preview } from '@braindog/declare/catalogue';
 import {
   acceptSubmission,
   emptyPublishers,
@@ -846,6 +846,32 @@ async function yank(request: Request, deps: KennelDeps, now: () => Date): Promis
   return withCookie(settled(out), cookie);
 }
 
+/** The picture of a waiting file's pages, drawn in a scratch record, or `undefined` when none can be drawn (the listing goes without). */
+export async function drawnPreview(deps: Pick<KennelDeps, 'blobs' | 'scratch'>, which: { kind: EntryKind; id: string; version: string }, now: Date): Promise<Preview | undefined> {
+  if (deps.blobs === undefined || deps.scratch === undefined) return undefined;
+  try {
+    const review = (await stored(deps.blobs, REVIEW, readReview, emptyReview)).value;
+    const found = waitingFile(review, which.kind, which.id, which.version);
+    const kept = found === null ? null : await deps.blobs.get(PREFIX + found.path);
+    if (kept === null) return undefined;
+    const read = await readCatalogueFile(await kept.text(), { kind: 'kennel' });
+    if (!read.ok) return undefined;
+    const pages: unknown[] = [];
+    const refused =
+      read.value.kind === 'pack'
+        ? await scratchInstall(read.value.file.doc, deps.scratch, [], pages)
+        : read.value.shared.doc === null
+          ? null
+          : await scratchInstall(read.value.shared.doc, deps.scratch, read.value.shared.usecase.modules, pages);
+    if (refused !== null || pages.length === 0) return undefined;
+    const made = readPreview({ format: PREVIEW_FORMAT, made_at: now.toISOString(), pages });
+    return made.ok ? made.value : undefined;
+  } catch (e) {
+    op({ op: 'kennel', ask: 'verdict', picture: 'none', error: e instanceof Error ? e.message : String(e) }, 'error');
+    return undefined;
+  }
+}
+
 /** The operator's doors: what waits, one waiting file whole, a verdict on one, and whether a publisher lists at once. */
 async function operated(request: Request, deps: KennelDeps, ask: 'review' | 'verdict' | 'publisher', now: () => Date): Promise<Response> {
   if (deps.operator === undefined || deps.operator === '') return refusedWith(501, NO_OPERATOR);
@@ -873,7 +899,12 @@ async function operated(request: Request, deps: KennelDeps, ask: 'review' | 'ver
     if (!body.ok) return settled(body);
     const verdict = readVerdict(body.value);
     if (!verdict.ok) return settled(verdict);
-    return settled(await changed(blobs, (state) => reviewVerdict(state, verdict.value, now())));
+    /* A LISTING WITH NO PICTURE GETS ONE DRAWN FROM THE PACK'S OWN PAGES in a scratch record, so a stranger's pack is never
+       shown by anything the operator or the author supplied; a pack that draws nothing is listed without one. */
+    const wanted = verdict.value.verdict === 'list' && verdict.value.preview === undefined;
+    const preview = wanted ? await drawnPreview(deps, verdict.value, now()) : undefined;
+    const given = preview === undefined ? verdict.value : { ...verdict.value, preview };
+    return settled(await changed(blobs, (state) => reviewVerdict(state, given, now())));
   }
   const body = await bodyOf(request, SMALL_BODY_MOST, 'publisher');
   if (!body.ok) return settled(body);

@@ -57,7 +57,10 @@ export type ExportedPack = {
 };
 
 /** What the call takes, and nothing else. */
-const TAKES = ['declarations', 'rows', 'title', 'id', 'version'] as const;
+const TAKES = ['declarations', 'rows', 'title', 'id', 'version', 'summary'] as const;
+
+/** The one line a store card says, at most this many characters. */
+export const SUMMARY_MOST = 140;
 
 /** The kinds an add-on carries. A look is how one person arranges a page, and a job is approved for one machine. */
 const CARRIED = new Set(['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script']);
@@ -190,7 +193,7 @@ export function methods(deps: RecordDeps) {
      * somebody who reads the whole record, and it writes nothing.
      */
     async exportPack(
-      args: { declarations?: unknown; rows?: unknown; title?: unknown; id?: unknown; version?: unknown } | undefined,
+      args: { declarations?: unknown; rows?: unknown; title?: unknown; id?: unknown; version?: unknown; summary?: unknown } | undefined,
       ctx: CallContext,
     ): Promise<Result<ExportOffer | ExportedPack>> {
       const stop = guard(ctx, 'read');
@@ -218,6 +221,10 @@ export function methods(deps: RecordDeps) {
       for (const key of ['title', 'id', 'version'] as const)
         if (said[key] !== undefined && (typeof said[key] !== 'string' || (said[key] as string).trim() === ''))
           return no('VALUE_MALFORMED', `${key} is a line of text.`, { at: key });
+      /* THE LINE A STORE CARD SAYS, in the author's words; left out, the file keeps the plain line it always had. */
+      const line = typeof said.summary === 'string' ? said.summary.trim().replace(/\s+/gu, ' ') : undefined;
+      if (said.summary !== undefined && (line === undefined || line === '' || [...line].length > SUMMARY_MOST))
+        return no('VALUE_MALFORMED', `summary is one line of at most ${SUMMARY_MOST} characters.`, { at: 'summary' });
       const rows = said.rows;
       if (rows !== undefined && (!isMap(rows) || !Object.values(rows).every((v) => Array.isArray(v) && v.every((n) => Number.isInteger(n) && (n as number) > 0))))
         return no('VALUE_MALFORMED', 'rows names example rows by list and number, such as {"jobs":[1,2]}.', { at: 'rows' });
@@ -298,7 +305,7 @@ export function methods(deps: RecordDeps) {
         pack: id,
         version,
         title,
-        summary: `${title}, made on one BrainDog and shared as an add-on.`,
+        summary: line ?? `${title}, made on one BrainDog and shared as an add-on.`,
         changes: 'The first version.',
         author: 'a BrainDog owner',
         license: 'MIT',

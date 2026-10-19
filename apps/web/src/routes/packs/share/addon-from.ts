@@ -30,7 +30,41 @@ export const words = {
   downloaded: (file: string): string => `Saved as ${file}.`,
   untitledAddon: 'My add-on',
   needed: 'one more thing it needs',
+  /* THE STORE: what a stranger sees of it before it is listed, and what it asks of the one who installs it. */
+  oneLine: 'One line about it',
+  oneLineHint: 'What it does, in a sentence. Shown on its card in the store.',
+  oneLineNeeded: 'Write the one line before publishing.',
+  asks: 'What it asks permission for',
+  asksNothing: 'Nothing. It reads and writes only the record it is installed in.',
+  asksCalls: (line: string): string => `Calls out: ${line}`,
+  picture: 'Its picture is drawn from its own pages when BrainDog approves it, from made-up examples. Nothing of yours is in it.',
+  publish: 'Publish to the store',
+  publishing: 'Publishing',
+  keeps: 'Rows, keys and anything you keep in it never go. A person who installs it is asked first, and sees what it will add.',
 } as const;
+
+/** The most characters of the one line, as the record holds it to. */
+export const SUMMARY_MOST = 140;
+
+/** The one line as it goes: spaces tidied, or `''` when it is empty or too long to be a line. */
+export function summaryOf(raw: string): string {
+  const line = raw.trim().replaceAll(/\s+/gu, ' ');
+  return [...line].length > SUMMARY_MOST ? '' : line;
+}
+
+/**
+ * What the file asks permission for, said one line each, from the store's own reading of it (`reach.calls_out`). An
+ * add-on that calls out to nothing says so, so the person publishing and the stranger installing read the same thing.
+ */
+export function asksOf(reach: { calls_out?: unknown } | null | undefined): string[] {
+  const calls = Array.isArray(reach?.calls_out) ? (reach.calls_out as unknown[]) : [];
+  const lines = calls.flatMap((c) => {
+    if (!isMap(c)) return [];
+    const said = text(c.line) || text(c.host);
+    return said === '' ? [] : [words.asksCalls(said)];
+  });
+  return lines.length === 0 ? [words.asksNothing] : lines;
+}
 
 /** The groups the ticks are drawn in, in this order; a kind the record names that is not here goes last. */
 export const KINDS = ['lists', 'pages', 'figures', 'automations'] as const;
@@ -115,8 +149,9 @@ export function addonId(title: string): string {
 export const fileName = (id: string, version = '1.0.0'): string => `${id}-${version}.pack.json`;
 
 /** What the screen sends `exportPack`: the ticked ids and a title. Never rows. */
-export function argsOf(offered: readonly Offered[], ticks: Iterable<string>, title: string, version = '1.0.0') {
-  return { declarations: picked(offered, ticks), title: title.trim() || words.untitledAddon, version };
+export function argsOf(offered: readonly Offered[], ticks: Iterable<string>, title: string, version = '1.0.0', summary = '') {
+  const line = summaryOf(summary);
+  return { declarations: picked(offered, ticks), title: title.trim() || words.untitledAddon, version, ...(line === '' ? {} : { summary: line }) };
 }
 
 /** The record's answer once ticks are sent, or null when it is not one. */

@@ -42,6 +42,12 @@ export const ADMIN_HTML = `<!doctype html>
 <p class="said" id="key-said" role="status" aria-live="polite"></p>
 </section>
 <div class="grid" id="desk" hidden>
+<section class="tile wide" id="addons" aria-labelledby="addons-title">
+<h2 id="addons-title">Add-ons waiting for review</h2>
+<p class="what">Packs people published to the store. Approve lists one for everybody; decline says why to the person who made it.</p>
+<p class="said" id="addons-said" role="status" aria-live="polite"></p>
+<ul class="things" id="addons-list"></ul>
+</section>
 <section class="tile wide" id="applications" aria-labelledby="applications-title">
 <h2 id="applications-title">Applications</h2>
 <p class="said" id="applications-said" role="status" aria-live="polite"></p>
@@ -204,6 +210,7 @@ export const ADMIN_JS = String.raw`'use strict';
     $('forget').hidden = true;
     $('applications-list').textContent = '';
     $('invites-list').textContent = '';
+    $('addons-list').textContent = '';
     $('funnel-weeks').textContent = '';
     $('funnel-scroll').hidden = true;
     say('funnel-note', '');
@@ -331,6 +338,77 @@ export const ADMIN_JS = String.raw`'use strict';
     }, failed('invites-said'));
   }
 
+  var REVIEW = '/api/kennel/v1/review';
+
+  function plural(n, one, many) { return String(n) + ' ' + (n === 1 ? one : many); }
+
+  /* What a waiting pack adds and what it asks, said from the Kennel's own reading of the file, as text. */
+  function addsOf(reach) {
+    var r = reach || {};
+    var parts = [];
+    var count = function (list, one, many) { if (Array.isArray(list) && list.length > 0) parts.push(plural(list.length, one, many)); };
+    count(r.lists, 'list', 'lists');
+    count(r.pages, 'page', 'pages');
+    count(r.rules, 'automation', 'automations');
+    count(r.skills, 'skill', 'skills');
+    return parts.length === 0 ? 'Adds nothing of its own' : 'Adds ' + parts.join(', ');
+  }
+
+  function asksOf(reach) {
+    var calls = reach && Array.isArray(reach.calls_out) ? reach.calls_out : [];
+    if (calls.length === 0) return 'Asks for nothing outside the record';
+    return 'Calls out: ' + calls.map(function (c) { return c.line || c.host || 'somewhere'; }).join('; ');
+  }
+
+  function addon(item) {
+    var entry = item.entry || {};
+    var version = item.version || {};
+    var who = entry.publisher && entry.publisher.name ? entry.publisher.name : 'Someone';
+    var li = el('li');
+    li.appendChild(el('span', 'name', String(entry.title || entry.id) + ' ' + String(version.version || '')));
+    li.appendChild(el('span', 'meta', 'By ' + who));
+    if (entry.summary) li.appendChild(el('span', 'what', entry.summary));
+    li.appendChild(el('span', 'what', addsOf(version.reach)));
+    li.appendChild(el('span', 'what', asksOf(version.reach)));
+    li.appendChild(el('span', 'state waiting', 'Waiting for review'));
+    var why = el('input');
+    why.type = 'text';
+    why.maxLength = 300;
+    why.autocomplete = 'off';
+    why.setAttribute('aria-label', 'Why you decline it');
+    why.placeholder = 'Why, if you decline it';
+    li.appendChild(why);
+    var said = el('div', 'said');
+    var acts = el('div', 'actions');
+    var decide = function (verdict, button) {
+      var reason = why.value.trim();
+      if (verdict === 'refuse' && reason === '') { say(said, 'Say why in a line, so the person can fix it.', true); return; }
+      button.disabled = true;
+      ask(REVIEW, { kind: entry.kind, id: entry.id, version: version.version, verdict: verdict, reason: reason }).then(loadAddons, failed(said)).then(function () { button.disabled = false; });
+    };
+    var approve = el('button', 'primary', 'Approve');
+    approve.type = 'button';
+    approve.addEventListener('click', function () { decide('list', approve); });
+    var decline = el('button', '', 'Decline');
+    decline.type = 'button';
+    decline.addEventListener('click', function () { decide('refuse', decline); });
+    acts.appendChild(approve);
+    acts.appendChild(decline);
+    li.appendChild(acts);
+    li.appendChild(said);
+    return li;
+  }
+
+  function loadAddons() {
+    return ask(REVIEW).then(function (value) {
+      var items = Array.isArray(value.pending) ? value.pending : [];
+      var list = $('addons-list');
+      list.textContent = '';
+      say('addons-said', items.length === 0 ? 'Nothing is waiting.' : '');
+      items.forEach(function (item) { list.appendChild(addon(item)); });
+    }, failed('addons-said'));
+  }
+
   var STEPS = ['seen', 'applied', 'invites_used', 'signed_up', 'agent', 'brief'];
 
   function weekOf(day, last) {
@@ -367,6 +445,7 @@ export const ADMIN_JS = String.raw`'use strict';
     say('key-said', '');
     $('desk').hidden = false;
     $('forget').hidden = false;
+    loadAddons();
     loadApplications();
     loadInvites();
     loadFunnel();

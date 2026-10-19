@@ -152,3 +152,10 @@ test('the style is Look B in light and dark and draws nothing from elsewhere', (
   assert.match(ADMIN_CSS, /"Lexend"/);
   assert.doesNotMatch(ADMIN_CSS, /url\(|@import|gradient|box-shadow|backdrop-filter/);
 });
+
+test('the add-on queue reads and decides through the Kennel review door, which the router answers', () => {
+  for (const method of ['GET', 'POST']) assert.equal(serveAdmin(at('/api/kennel/v1/review', method)), null, method);
+  assert.equal(served(at('/api/kennel/v1/index.json')).status, 404, 'only the review door is passed on');
+  assert.match(ADMIN_HTML, /<section class="tile wide" id="addons" aria-labelledby="addons-title">/);
+  for (const words of ['Add-ons waiting for review', 'Approve', 'Decline', 'verdict: verdict', "'/api/kennel/v1/review'", 'Say why in a line']) assert.ok(ADMIN_HTML.includes(words) || ADMIN_JS.includes(words), words);
+});

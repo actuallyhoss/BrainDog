@@ -15,7 +15,7 @@ import { methods } from '../../record/src/methods/export-pack.ts';
 
 test('EXPORT PACK IS ONE READ+ READ, written once in its file, taking what the method takes, with a plain sentence', () => {
   assert.deepEqual(OWN.map((r) => [r.name, r.group, r.writes]), [['exportPack', 'READ+', false]]);
-  assert.deepEqual(OWN[0]!.takes, { declarations: 'json', rows: 'json', title: 'text', id: 'text', version: 'text' });
+  assert.deepEqual(OWN[0]!.takes, { declarations: 'json', rows: 'json', title: 'text', id: 'text', version: 'text', summary: 'text' });
   assert.equal(OWN[0]!.postRead, undefined, 'an ordinary read');
   const what = OWN[0]!.what;
   assert.match(what, /changes nothing/u);

@@ -165,7 +165,7 @@ function undrawn(slug: string, title: string, blocks: readonly ScratchBlock[]): 
  * said it, since that sentence already says what is wrong with the file; a page that does not draw says which page, by
  * the title it gives itself, because a page's refusal is about a list or a field and not about where it sits.
  */
-export async function scratchInstall(doc: Doc, deps: ScratchDeps, modules: readonly string[] = []): Promise<Refusal | null> {
+export async function scratchInstall(doc: Doc, deps: ScratchDeps, modules: readonly string[] = [], drawn?: unknown[]): Promise<Refusal | null> {
   const needed = await modulesFor(doc, modules, deps.required);
   if (!needed.ok) return 'refusal' in needed ? needed.refusal : null;
   const record = await deps.open();
@@ -191,6 +191,8 @@ export async function scratchInstall(doc: Doc, deps: ScratchDeps, modules: reado
       }
       const part = undrawn(p.slug, title, read.value.blocks);
       if (part !== null) return part;
+      /* THE ADD-ON'S OWN NEW PAGES AS THEY DREW, for a listing's picture: drawn here from its example rows, never from a person's record. */
+      if (drawn !== undefined && !had.has(p.slug)) drawn.push(read.value);
     }
     return null;
   } finally {

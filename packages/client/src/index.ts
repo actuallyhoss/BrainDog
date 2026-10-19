@@ -1703,7 +1703,7 @@ export function createClient(options: ClientOptions) {
      * What a person made on this record that can be shared as an add-on, or, with ticks, the add-on file made from them
      * (SHL-B09). Reads, and changes nothing.
      */
-    exportPack: (args: { declarations?: string[]; rows?: Record<string, number[]>; title?: string; id?: string; version?: string } = {}) =>
+    exportPack: (args: { declarations?: string[]; rows?: Record<string, number[]>; title?: string; id?: string; version?: string; summary?: string } = {}) =>
       call<unknown>('exportPack', args as Record<string, unknown>),
 
     /* THE ADMIN WRITES A SETTINGS SCREEN MAKES, SO A BROWSER SESSION FOR EACH. They were reachable through

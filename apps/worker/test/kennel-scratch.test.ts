@@ -198,6 +198,7 @@ const depsOf = (blobs: KennelBucket, scratch: ScratchDeps | undefined): KennelDe
   now: () => new Date(NOW),
 });
 
+const get = (path: string): Request => new Request(`${HOST}/api/kennel/v1/${path}`);
 const post = (path: string, body: unknown, headers: Record<string, string> = {}): Request =>
   new Request(`${HOST}/api/kennel/v1/${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 
@@ -319,4 +320,36 @@ test('what a scratch requires is read from BrainDog\'s own modules and from what
   const leaning: Doc = { ...LIBRARY, pack: 'shelf-friends', title: 'Shelf friends', requires: { format: 1, primitives: 1, packs: { people: `^${String(found[0]!.version)}` } } };
   assert.equal(await scratchInstall(leaning, real), null, 'an add-on over BrainDog\'s own module installs it first');
   assert.ok(dropped(opened));
+});
+
+test('a scratch hands back the pages the add-on brought, as they drew', async () => {
+  const { deps, opened } = scratchOf();
+  const drawn: unknown[] = [];
+  assert.equal(await scratchInstall(LIBRARY, deps, [], drawn), null);
+  assert.equal(drawn.length, 1);
+  assert.equal((drawn[0] as { page?: string }).page, 'shelf');
+  assert.ok(dropped(opened));
+});
+
+test('approving a waiting add-on with no picture draws one from its own pages, and a pageless add-on lists without one', async () => {
+  const { blobs } = bucket();
+  const { deps: scratch } = scratchOf();
+  const deps = depsOf(blobs, scratch);
+  const key = await newAuthorKey('Halden');
+  const waiting = await (await serveKennel(post('submit', await signed(LIBRARY, key)), deps)).json();
+  assert.equal((waiting as Envelope).value?.state, 'review');
+  const listed = await serveKennel(post('review', { kind: 'pack', id: 'bookshelf', version: '1.0.0', verdict: 'list', reason: '' }, operator), deps);
+  assert.equal(listed.status, 200);
+  const picture = await serveKennel(get('packs/bookshelf/1.0.0.preview.json'), deps);
+  assert.equal(picture.status, 200);
+  const preview = (await picture.json()) as { pages: { page: string }[] };
+  assert.deepEqual(
+    preview.pages.map((p) => p.page),
+    ['shelf'],
+  );
+
+  const bare: Doc = { ...LIBRARY, pack: 'only-lists', title: 'Only lists', declarations: [BOOKS] };
+  await serveKennel(post('submit', await signed(bare, key)), deps);
+  assert.equal((await serveKennel(post('review', { kind: 'pack', id: 'only-lists', version: '1.0.0', verdict: 'list', reason: '' }, operator), deps)).status, 200);
+  assert.equal((await serveKennel(get('packs/only-lists/1.0.0.preview.json'), deps)).status, 404);
 });

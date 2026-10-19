@@ -17,5 +17,5 @@ import type { Route } from '../index.ts';
 
 export const ROUTES: readonly Route[] = [
   { name: 'exportPack', group: 'READ+', writes: false, what: 'What you made on this record that you can share, or the add-on file made from the ones you ticked, with what it brings along and why. It carries none of your own entries, names or keys, and it changes nothing.',
-    takes: { declarations: 'json', rows: 'json', title: 'text', id: 'text', version: 'text' } },
+    takes: { declarations: 'json', rows: 'json', title: 'text', id: 'text', version: 'text', summary: 'text' } },
 ];
