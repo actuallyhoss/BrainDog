@@ -187,4 +187,6 @@ test('A PAUSED WRITTEN BRIEF LEAVES THE RULES LINES AND ONE QUIET LINE, and no l
   assert.equal(read.rows[0]!.parts, undefined);
   assert.equal(footOf(read), paused);
   assert.equal(footOf(briefingRead({ ok: true, value: { cards: [], paused } })), null);
+  /* Today draws the engine line when the model is down, and drops this foot then (Home.svelte): one line, never two. */
+  assert.equal(read.paused, paused);
 });

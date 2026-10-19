@@ -460,7 +460,7 @@
   type ImportedFound = import('./imported-rules.ts').ImportedFound;
   type DeskPart = typeof import('./Desk.svelte').default;
   type DeskCards = import('./desk-read.ts').Cards;
-  let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; Part: BriefingPart } | null>(null);
+  let brief = $state.raw<{ cards: readonly BriefingRow[]; foot: string | null; paused: string | null; Part: BriefingPart } | null>(null);
   let matched = $state.raw<{ rows: readonly MatchedRow[]; Part: MatchedPart } | null>(null);
   let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
   /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES, kept only when there is something: nought draws nothing. */
@@ -487,7 +487,7 @@
     const at = untrack(opened);
     const briefing = Promise.all([import('./briefing.ts'), import('./Briefing.svelte')]).then(async ([m, part]) => {
       const out = await m.readBriefingSaid(base);
-      if (here) brief = { cards: out.value.rows, foot: m.footOf(out.value), Part: part.default };
+      if (here) brief = { cards: out.value.rows, foot: m.footOf(out.value), paused: out.value.paused, Part: part.default };
     });
     const matches = Promise.all([import('./matched.ts'), import('./Matched.svelte')]).then(async ([m, part]) => {
       const out = await m.readMatched(base);
@@ -729,7 +729,7 @@
 
 <!-- WHAT MATTERS TODAY, with who wrote it, drawn once: by the page's reader, or here where none draws the blocks. -->
 {#snippet briefed()}
-  {#if brief}<brief.Part cards={brief.cards} foot={brief.foot} />{/if}
+  {#if brief}<brief.Part cards={brief.cards} foot={engineDown !== null && brief.foot === brief.paused ? null : brief.foot} />{/if}
 {/snippet}
 
 <div class="page">
