@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "remote",
+  "description": "Only brain.dog may call the shell, and only these four commands.",
+  "windows": ["main"],
+  "remote": { "urls": ["https://brain.dog", "https://brain.dog/*"] },
+  "permissions": ["allow-open-outside", "allow-notify", "allow-set-badge", "allow-start-drag"]
+}
