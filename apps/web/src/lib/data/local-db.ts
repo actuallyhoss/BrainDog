@@ -104,6 +104,29 @@ export function idbStore(idb: IDBFactory | null = here()): Store | null {
       }
       await finished(t);
     },
+    async rewrite(lists, fn) {
+      /* ONE TRANSACTION, so a screen never reads an answer half patched. `fn` is pure and never awaits, which an open
+         IndexedDB transaction requires. */
+      const t = await tx([ANSWERS], 'readwrite');
+      const req = t.objectStore(ANSWERS).openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) return;
+        const row = c.value as Stored;
+        if (row.lists.some((l) => lists.has(l))) {
+          let next: Stored | null = null;
+          try {
+            next = fn(row);
+          } catch {
+            next = null;
+          }
+          if (next === null) c.delete();
+          else c.update(next);
+        }
+        c.continue();
+      };
+      await finished(t);
+    },
     async prune(most) {
       const t = await tx([ANSWERS], 'readwrite');
       const s = t.objectStore(ANSWERS);
@@ -127,6 +150,38 @@ export function idbStore(idb: IDBFactory | null = here()): Store | null {
       t.objectStore(ANSWERS).clear();
       await finished(t);
     },
+  };
+}
+
+/**
+ * THE LAST READER'S SIGNING KEY (`local-mark.ts`), in the `meta` store beside the owner, so the copy's `clear` takes it
+ * too. A `CryptoKey` goes into IndexedDB whole and comes back still unable to be read out.
+ */
+export function idbKey(subtle: SubtleCrypto | null, idb: IDBFactory | null = here()): (make: boolean) => Promise<CryptoKey | null> {
+  let db: Promise<IDBDatabase> | null = null;
+  const open = (): Promise<IDBDatabase> => {
+    if (idb === null) return Promise.reject(new Error('no IndexedDB'));
+    db ??= opened(idb).catch((e: unknown) => {
+      db = null;
+      throw e;
+    });
+    return db;
+  };
+  return async (make) => {
+    if (subtle === null) return null;
+    try {
+      const t = (await open()).transaction([META], 'readonly');
+      const held = (await done(t.objectStore(META).get('mark-key'))) as CryptoKey | undefined;
+      if (held) return held;
+      if (!make) return null;
+      const key = (await subtle.generateKey({ name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify'])) as CryptoKey;
+      const w = (await open()).transaction([META], 'readwrite');
+      w.objectStore(META).put(key, 'mark-key');
+      await finished(w);
+      return key;
+    } catch {
+      return null;
+    }
   };
 }
 

@@ -209,10 +209,27 @@
   /* ── the read ───────────────────────────────────────────────────────────── */
 
   const work = read<Work>(
-    () => (data.refused ? null : apiBase()),
+    /* OFFLINE THE SCREEN STILL ASKS, so the local copy is drawn; the record's refusal of a host nobody reached keeps it. */
+    () => (data.refused && !data.offline ? null : apiBase()),
     () => readWork(apiBase()),
-    /* AND THE LOCAL COPY, which holds the tasks and the names of the projects and people they point at. */
-    { kept: 'WorkClassic', local: { base: () => apiBase(), lists: (w) => [TASKS, ...(w.shape.project ? [w.shape.project.to] : []), ...(w.shape.owner ? [w.shape.owner.to] : [])] } },
+    /* AND THE LOCAL COPY, which holds the tasks and the names of the projects and people they point at. A change to a
+       task is placed on its row unless it moves the task in or out of what Work reads (its state, its finished day). */
+    {
+      kept: 'WorkClassic',
+      local: {
+        base: () => apiBase(),
+        lists: (w) => [TASKS, ...(w.shape.project ? [w.shape.project.to] : []), ...(w.shape.owner ? [w.shape.owner.to] : [])],
+        spots: (w) => [
+          {
+            list: TASKS,
+            at: ['rows'],
+            by: [w.shape.state, w.shape.finished].filter((f): f is string => f !== null),
+            /* Only stamps the record gave: an older host's are the day each was added, which a change does not move. */
+            ...(w.movedFrom === 'updated' ? { moved: ['moved'] } : {}),
+          },
+        ],
+      },
+    },
   );
 
   /* WHILE A ROW IS BEING RE-DATED IN PLACE THE ANSWER IS HELD, so a read that lands meanwhile cannot move the row the

@@ -39,6 +39,11 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { isDay } from '$lib/record/day-href.ts';
+  import { pageKey } from '$lib/record/kept-pages.ts';
+  import { pageLists } from '$lib/record/page-lists.ts';
+  import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { live } from '$lib/data/live.svelte.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
@@ -112,13 +117,41 @@
    */
   const view = $derived(leaving(answer, { slug, got, reading }, waited));
 
+  /**
+   * THE PAGE AS THE LOCAL COPY LAST HELD IT, for a page this tab has not drawn yet (`lib/data/local.ts`): drawn while
+   * the read is out, marked, and never written from, since a page's figures are not a thing a change line can place.
+   * `copied` is the slug it was drawn for, until the record answers.
+   */
+  const PAGE_COPY = 'Page';
+  let copied = $state<string | null>(null);
+  $effect(() => {
+    if (copied === null) return;
+    return untrack(() => holdCopyMark());
+  });
+  function fromLocal(asked: string, choice: Record<string, string>) {
+    void nearLocal<Opened>(PAGE_COPY, pageKey(apiBase(), asked, choice), apiBase()).then((near) => {
+      if (near === null || near.value.from !== 'live' || (route.params.slug ?? '') !== asked || got !== null) return;
+      answered(asked, near.value);
+      copied = asked;
+    });
+  }
+  /** Keep a live answer in the local copy, `always`, so it is only ever drawn while the page asks again. */
+  function keepPage(asked: string, choice: Record<string, string>, out: Opened, mark: number) {
+    if (out.from !== 'live') return;
+    keepLocal(PAGE_COPY, pageKey(apiBase(), asked, choice), pageLists(out.page.blocks), out, mark, {}, { always: true });
+  }
+
   async function readLive(asked: string) {
     const at = opened();
     reader ??= pageReader(apiBase());
+    copied = null;
     /* THE PAGE BEING LEFT IS KEPT, not let go: what this tab kept of the next page replaces it at once, and where it
-       kept nothing the old page stands until the hold runs out. */
+       kept nothing the old page stands until the hold runs out, or the local copy's page takes its place. */
     const keptCopy = reader.kept(asked, filtered);
+    const choice = filtered;
+    const mark = localTicket();
     if (keptCopy) answered(asked, keptCopy);
+    else fromLocal(asked, choice);
     waited = 0;
     clearTimeout(holdTimer);
     holdTimer = setTimeout(() => (waited = HOLD_MS), HOLD_MS);
@@ -128,7 +161,14 @@
     /* An answer for a page somebody has already left draws nothing, and nor does one a later read, with a choice made
        while this was out, has already drawn over. */
     if ((route.params.slug ?? '') !== asked || (mine !== started && got !== null)) return closed(true, at);
+    /* OFFLINE OVER THE COPY'S PAGE, IT STAYS, until the record answers again. */
+    if (out.from === 'refused' && copied === asked && ((route.data as unknown as Shell).offline === true || live.state === 'offline')) {
+      reading = false;
+      return closed(true, at);
+    }
     answered(asked, out);
+    copied = null;
+    keepPage(asked, choice, out, mark);
     reading = false;
     closed(out.from !== 'refused', at);
   }
@@ -157,11 +197,17 @@
     if (!reader) return;
     own += 1;
     const mine = ++started;
+    const choice = filtered;
+    const mark = localTicket();
     try {
-      const out = await reader.read(asked, filtered);
+      const out = await reader.read(asked, choice);
       if (mine === started && (route.params.slug ?? '') === asked) {
         reading = false;
-        if (out.from === 'live') answered(asked, out);
+        if (out.from === 'live') {
+          answered(asked, out);
+          copied = null;
+          keepPage(asked, choice, out, mark);
+        }
       }
     } finally {
       own -= 1;

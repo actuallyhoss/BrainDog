@@ -78,6 +78,10 @@
   import { dayHref } from '$lib/record/day-href.ts';
   import Hole from '$lib/page/Hole.svelte';
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
+  import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { live as poll } from '$lib/data/live.svelte.ts';
+  import { keptRowOf, rowFrom, rowLists, type KeptRow } from './kept-row.ts';
   import type { Entry, FieldDecl, Fields } from '$lib/record/schema.ts';
   import { closed, drew, opened } from '../../../../lib/ui/screen.svelte.ts';
   import { choicesOf, finishOf, stateSaid } from './lead.ts';
@@ -132,7 +136,13 @@
      once `addField` returns, and `REGISTERS` is a plain table, so the press hands `got` back as a new object and both
      of these read again: the field is on the row with no second read of the row. */
   const readable = $derived.by(() => (void got, readableFields(id)));
-  const live = $derived(got?.from === 'live');
+  /* DRAWN FROM THE LOCAL COPY, the page only reads: every control that writes waits for the record's own answer. */
+  let fromCopy = $state(false);
+  $effect(() => {
+    if (!fromCopy) return;
+    return untrack(() => holdCopyMark());
+  });
+  const live = $derived(got?.from === 'live' && !fromCopy);
   /**
    * WHAT THE CALLER'S LEVEL ON THIS ROW'S LIST REACHES, asked of `may()` and never worked out here.
    *
@@ -200,10 +210,21 @@
     workAll = null;
     pjMoney = { in: null, out: null, owed: null };
     archived = false;
+    fromCopy = false;
     stopEdit();
     const at = opened();
     reader ??= rowReader(apiBase());
     links ??= linkReader(apiBase());
+    /* THE LOCAL COPY'S PAGE AT ONCE, the three reads together, while the record is asked as ever (`kept-row.ts`). */
+    const mark = localTicket();
+    void nearLocal<KeptRow>(ROW_COPY, key, apiBase()).then((near) => {
+      if (near === null || askedFor !== key || got !== null) return;
+      const drawn = rowFrom(near.value);
+      got = drawn.got;
+      told = drawn.told;
+      linked = drawn.linked;
+      fromCopy = true;
+    });
     /* THREE READS IN ONE BRACKET, for the reason the two were: `data-screen` must not appear between
        them, and what points at a row is part of the row's screen rather than a thing that arrives
        after it. */
@@ -213,8 +234,10 @@
       links.read(register, n),
     ]);
     const current = askedFor === key;
-    closed(!current || (r.from !== 'refused' && h.from !== 'refused'), at);
-    if (!current) return;
+    /* OFFLINE OVER THE COPY, THE COPY STAYS, read-only, until the record answers again. */
+    const unreached = fromCopy && (r.from === 'refused' || h.from === 'refused') && ((page.data as unknown as Shell).offline === true || poll.state === 'offline');
+    closed(!current || unreached || (r.from !== 'refused' && h.from !== 'refused'), at);
+    if (!current || unreached) return;
     clock = Date.now();
     /* A NUMBER MERGED INTO ANOTHER ROW IS NEVER THE ADDRESS: the answer is the kept row, and the page moves to its number,
        in place of this entry in the history, so Back does not land on the folded one again. */
@@ -226,8 +249,15 @@
     got = r;
     told = h;
     linked = l;
+    fromCopy = false;
+    const kept = keptRowOf(r, h, l);
+    /* `always`: the history is the log itself, so this copy is only ever drawn while the page asks again. */
+    if (kept) keepLocal(ROW_COPY, key, rowLists(register, REGISTERS[register], kept.linked), kept, mark, {}, { always: true });
     if (r.from === 'live' && r.entry) void readFigures(register, n, r.entry, l.from === 'live' ? l.groups : []);
   }
+
+  /** The name a row's page is kept under in the local copy, by `register#n`. */
+  const ROW_COPY = 'RowPage';
 
   /**
    * THE FIGURES, ASKED ONLY WHERE THE RECORD HOLDS WHAT THEY READ, and found from what the record declares rather than

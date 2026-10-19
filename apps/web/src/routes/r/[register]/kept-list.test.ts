@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { keptOf, listsOf, namesOf } from './kept-list.ts';
+import { countsOf, keptOf, listsOf, namesOf, servedWhole, spotOf } from './kept-list.ts';
 import type { RegisterDecl } from '../../../lib/record/schema.ts';
 
 const decl = {
@@ -32,4 +32,23 @@ test('THE NAMES GO AS PAIRS AND COME BACK AS A MAP, marks and all', () => {
   assert.equal(back.get('projects#1'), 'Kiln');
   assert.deepEqual(back.marks?.get('projects#1'), { mark: 'K' });
   assert.equal(namesOf({ names: [], marks: null }).marks, undefined);
+});
+
+test('THE CURSOR AND THE COUNTS ARE KEPT, and only a copy holding both is drawn without asking', () => {
+  const counted = new Map([['state', new Map([['open', 3]])]]);
+  const kept = keptOf(decl, [], 3, new Map() as never, { cursor: 'c1', counted });
+  assert.deepEqual(kept.counted, [['state', [['open', 3]]]]);
+  assert.deepEqual(countsOf(kept.counted!).get('state')?.get('open'), 3);
+  assert.equal(servedWhole(kept, true), true);
+  assert.equal(servedWhole(keptOf(decl, [], 3, new Map() as never, { cursor: 'c1', counted: null }), true), false, 'counts the record withheld');
+  assert.equal(servedWhole(keptOf(decl, [], 3, new Map() as never, { cursor: null, counted: null }), false), true, 'no bar, no counts needed');
+  assert.equal(servedWhole(keptOf(decl, [], 3, new Map() as never), false), false, 'a copy kept before the cursor was');
+});
+
+test("THE PAGE'S SPOT: asked by its chips, its sort and its counted pills; a search is every field; no sort is the record's order", () => {
+  const ask = { filters: [{ field: 'state', op: 'in', values: ['open'] }], q: '', sort: { field: 'due' }, twice: false };
+  assert.deepEqual(spotOf('tasks', ask, ['priority']), { list: 'tasks', at: ['entries'], by: ['state', 'due', 'priority'] });
+  assert.equal(spotOf('tasks', { ...ask, q: 'bank' }, []).by, null);
+  assert.equal(spotOf('tasks', { ...ask, twice: true }, []).by, null);
+  assert.equal(spotOf('tasks', { ...ask, sort: undefined }, []).newest, true);
 });

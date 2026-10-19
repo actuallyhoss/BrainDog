@@ -57,6 +57,10 @@
   import Waffle from '$lib/viz/Waffle.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
+  import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { QUESTIONS } from '$lib/data/local.ts';
+  import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { live as poll } from '$lib/data/live.svelte.ts';
   import { blocksMineFirst, callsRead, dayWord, decideDrawn, mineFirst, readCalls, readDecide, WORDS, type Call, type DecideBody } from './views.ts';
   import { words } from './words.ts';
   import { waitsNow } from '$lib/home/waits.svelte.ts';
@@ -100,18 +104,47 @@
     return one.from === 'live' ? (one.page.body as unknown as DecideBody) : undefined;
   }
 
+  /**
+   * THE QUEUE AS THE LOCAL COPY LAST HELD IT, drawn while the first read is out and only to read: no card answers, by
+   * press or by key, until the record's own answer replaces it (`lib/data/local.ts`). Kept `always`, so it is never
+   * drawn without being asked again.
+   */
+  const DECIDE_COPY = 'Decide';
+  type KeptDecide = { got: Opened; calls: Call[] };
+  let fromCopy = $state(false);
+  $effect(() => {
+    if (!fromCopy) return;
+    return untrack(() => holdCopyMark());
+  });
+  const offlineNow = () => shell.offline === true || poll.state === 'offline';
+
   async function read(): Promise<boolean> {
     reading = true;
     client ??= createClient({ base: apiBase() });
+    const mark = localTicket();
+    if (got === null)
+      void nearLocal<KeptDecide>(DECIDE_COPY, apiBase(), apiBase()).then((near) => {
+        if (near === null || got !== null || near.value.got.from !== 'live') return;
+        got = near.value.got;
+        calls = near.value.calls;
+        fromCopy = true;
+      });
     try {
       const [out, called] = await Promise.all([storedDecide().then((body) => readDecide(apiBase(), body)), readCalls(client)]);
       /* THE CALLS ARE THE PAGE'S COMPANY, NOT ITS CONDITION: a refusal of them keeps what was drawn before. */
       if (called.from === 'live') calls = called.value;
       /* A HOST TOO OLD TO DRAW THE BODY IS TOLD FROM THE FIRST ANSWER, and a later read that is refused keeps the page
-         as it was drawn rather than blanking it for one sentence. */
-      if (out === null) unserved = got === null;
-      else if (out.from === 'live' || got === null) got = out;
-      return out?.from === 'live';
+         as it was drawn rather than blanking it for one sentence. The copy's page is not one drawn by the record: a
+         refusal replaces it, unless nobody was reached. */
+      if (out === null) {
+        unserved = got === null || fromCopy;
+        fromCopy = false;
+      } else if (out.from === 'live' || got === null || (fromCopy && !offlineNow())) {
+        got = out;
+        fromCopy = false;
+      }
+      if (out?.from === 'live') keepLocal(DECIDE_COPY, apiBase(), [QUESTIONS], { got: out, calls: called.from === 'live' ? called.value : calls }, mark, {}, { always: true });
+      return out?.from === 'live' || (fromCopy && offlineNow());
     } finally {
       reading = false;
     }
@@ -187,6 +220,8 @@
    * focus moved on to Ask, a fold or BrainDog's own card, Backspace declined a question the reader was no longer on.
    */
   function questionUnder(): HTMLElement | null {
+    /* A queue drawn from the copy answers nothing. */
+    if (fromCopy) return null;
     const on = document.activeElement;
     const held = on instanceof HTMLElement ? on.closest<HTMLElement>('.qa[data-row^="q:"]') : null;
     if (held) return held;
@@ -303,7 +338,7 @@
     {/snippet}
   </PageHead>
 
-  <div class="page">
+  <div class="page" inert={fromCopy}>
     {#if !answerable && (shaped?.open ?? 0) > 0}
       <!-- WHY THE CARDS OFFER THEIR OPTIONS AS WORDS, above them and not after a press. -->
       <p class="cannot" id="cannot-decide">{whyNot}</p>

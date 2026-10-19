@@ -220,6 +220,12 @@ export type Shell = ShellBase & {
   waits: Waits | null;
   /** How many days a question waits before it is late, as the record says it; `null` where it did not say. */
   lateDays: number | null;
+  /**
+   * SET WHEN `boot` REACHED NOBODY and the last reader was found (`local-mark.ts`): the screens draw what the local copy
+   * holds for them, to read only, and the layout says the offline line. Over the last copy when there is one, else
+   * beside the refusal.
+   */
+  offline?: true | undefined;
   /** SET ON A SHELL DRAWN FROM THE LAST COPY (`boot-copy.ts`) before `boot` answers: it only draws, and holds no level to write by. */
   stale?: true | undefined;
   /** The agents working now, as `boot` said it (`workingOf`). Empty on a shell no record answered. */

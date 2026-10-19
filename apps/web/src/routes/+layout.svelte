@@ -55,6 +55,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { follow, live } from '$lib/data/live.svelte.ts';
   import { claimLocal } from '$lib/data/local-tab.ts';
+  import { copyMark } from '$lib/data/copy-mark.svelte.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette carries its commands, its search and Slash's drawing, so importing them
      here put all of that in front of the first screen and in the entry's preload list. They are
@@ -80,7 +81,7 @@
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import Pull from '$lib/ui/Pull.svelte';
   import { untrack } from 'svelte';
-  import { beforeNavigate, goto, onNavigate } from '$app/navigation';
+  import { beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
   import { page } from '$app/state';
   /* The Mac app's Go menu and braindog://goto: only an address under /app moves the window (`appPath`). */
   $effect(() => onShell('goto', (to) => {
@@ -621,6 +622,19 @@
      record to another follows the address being opened. */
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 
+  /* OFFLINE, THE SHELL ASKS AGAIN when the browser says it is back and every twenty seconds, since a boot nobody
+     reached is never kept: the load that answers draws the record's own shell, and its screens read again. */
+  $effect(() => {
+    if (data.offline !== true) return;
+    const again = () => void invalidate('braindog:boot');
+    addEventListener('online', again);
+    const timer = setInterval(again, 20_000);
+    return () => {
+      removeEventListener('online', again);
+      clearInterval(timer);
+    };
+  });
+
   /* THE LOCAL COPY IS CLAIMED BY THE READER A LIVE BOOT NAMES, never by a drawn copy: another person, record or scope
      wipes it before it is drawn from again (`lib/data/local.ts`). */
   $effect(() => {
@@ -899,7 +913,14 @@
     -->
     {#key page.url.pathname}
     <main id="main" class="body" data-screen={shape === 'bar' && TopBar === null ? undefined : settled()}>
+      <!-- THE QUIET MARK: something on this screen was drawn from the local copy and the record is being asked again.
+           Sticky and no taller than nothing, so it moves no row; it fades out once every answer has landed. -->
+      <div class="copy-mark" aria-hidden="true" data-on={copyMark.on ? '' : undefined}></div>
       <Pull />
+      {#if data.offline}
+        <!-- OFFLINE, THE ERROR PAGE'S OWN WORDS, as one line over what the local copy drew. -->
+        <p class="offline-line" role="status">{copy.errorPage.offline.title}. {copy.errorPage.offline.body}</p>
+      {/if}
       <LapseBanner shell={data} />
       {@render children()}
     </main>
@@ -1308,6 +1329,37 @@
    */
   :global(html[data-moving]) .body {
     view-transition-name: page;
+  }
+
+  /* A HAIRLINE OVER THE WORK, NOT ITS OWN ROW: a sticky box of no height, and its line drawn out of it. */
+  .copy-mark {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: var(--z-hint);
+    block-size: 0;
+    pointer-events: none;
+  }
+
+  .copy-mark::after {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 0;
+    block-size: 2px;
+    content: '';
+    background: var(--line);
+    opacity: 0;
+    transition: opacity var(--d-move) var(--ease-out);
+  }
+
+  .copy-mark[data-on]::after {
+    opacity: 1;
+  }
+
+  /* The offline line: the page's gutter, muted words, the measure of a sentence. */
+  .offline-line {
+    margin: 0;
+    padding: var(--sp-3) var(--gutter) 0;
+    color: var(--faint);
   }
 
   .body {

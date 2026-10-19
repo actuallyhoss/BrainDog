@@ -40,6 +40,7 @@
   import { step } from '$lib/funnel.ts';
   import { copy } from '$lib/copy.ts';
   import { read } from '$lib/data/read.svelte.ts';
+  import { QUESTIONS } from '$lib/data/local.ts';
   import { openPaletteWith } from '$lib/palette/open.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
@@ -133,10 +134,25 @@
     priority: { urgent: 'urgent', high: 'high', low: 'low' } as Record<string, string>,
   } as const;
 
-  /* ONE READ FOR THE SCREEN, keyed on the record, asked again when its version moves. A refused shell asks nothing. */
+  /* A REFUSAL THE RECORD GAVE. A host nobody reached is not one when the local copy holds this reader's Today. */
+  const shut = $derived(data.refused && !data.offline ? data.refused : null);
+
+  /* ONE READ FOR THE SCREEN, keyed on the record, asked again when its version moves. A refused shell asks nothing.
+     THE LOCAL COPY DRAWS IT AT ONCE ON OPEN, and is never current: Today holds figures and runs no change line names,
+     so it is always asked behind. Who is working and what changed since the mark are not kept at all: a run drawn as
+     working from yesterday, or yesterday's news under today's mark, would be the wrong thing to see first. */
   const today = read<Extract<TodayRead, { ok: true }>['value']>(
-    () => (data.refused ? null : apiBase()),
+    () => (shut ? null : apiBase()),
     () => import('$lib/record/today-live.ts').then((m) => m.readToday(apiBase())),
+    {
+      local: {
+        name: 'Today',
+        base: () => apiBase(),
+        lists: () => [TASKS, QUESTIONS],
+        always: true,
+        shrink: (v) => ({ ...v, runs: [], sessions: null, host: null, since: { rows: [], total: 0, capped: false }, upTo: null }),
+      },
+    },
   );
   const t = $derived(today.value);
   const day = $derived(t ? dayOf(t.now) : dayOf(data.now));
@@ -284,7 +300,8 @@
   let stamped = false;
   function stamp() {
     const held = untrack(() => today.value);
-    if (stamped || data.refused || held === null) return;
+    /* NEVER FROM THE COPY: what it drew was never read against this mark, and its newest line is not kept. */
+    if (stamped || data.refused || held === null || today.stale) return;
     stamped = true;
     const upTo = held.upTo;
     /* Imported with the screen, never inside the leave: a closing tab does not wait for a module. */
@@ -567,10 +584,10 @@
 </PageHead>
 
 <div class="page">
-  {#if data.refused}
+  {#if shut}
     <!-- A REFUSAL AS EVERY SCREEN DRAWS ONE, which is also what settles the screen: a bare sentence said nothing to the
          readiness count, so an address naming no record never finished drawing. -->
-    <ReadState state="refused" refusal={data.refused.fix} />
+    <ReadState state="refused" refusal={shut.fix} />
   {:else if today.state !== 'ready' && today.state !== 'empty'}
     <ReadState state={today.state} refusal={today.refusal} onretry={() => void today.reread()} />
   {:else if t}

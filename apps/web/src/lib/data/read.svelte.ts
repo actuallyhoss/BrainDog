@@ -19,10 +19,26 @@ import { untrack } from 'svelte';
 import { closed, drew, opened, undrew } from '../ui/screen.svelte.ts';
 import { keep, keptAnswer } from './kept.ts';
 import { live } from './live.svelte.ts';
+import { holdCopyMark } from './copy-mark.svelte.ts';
 import { keepLocal, localTicket, nearLocal } from './local-tab.ts';
+import type { Spot } from './local.ts';
 import { reader, type Resource, type Result, type Snapshot } from './read.ts';
 
 export type { Phase, Resource, Result } from './read.ts';
+
+/**
+ * A read's local copy (`local.ts`). `name` defaults to `kept`; `lists` are the lists the answer was read from; `spots`
+ * where its rows are, so a change is patched in rather than dropping it; `always` keeps it never current, for an answer
+ * holding reads no line names; `shrink` is what is stored of it, where part of an answer must never be drawn old.
+ */
+export type LocalRead<T> = {
+  name?: string;
+  base: () => string;
+  lists: (value: T) => readonly string[];
+  spots?: (value: T) => readonly Spot[];
+  always?: boolean;
+  shrink?: (value: T) => T;
+};
 
 /**
  * Read `fn` for the key `key` answers, and again whenever that key changes or the record does.
@@ -34,7 +50,7 @@ export type { Phase, Resource, Result } from './read.ts';
 export function read<T>(
   key: () => string | null,
   fn: () => Promise<Result<T>>,
-  opts: { empty?: (value: T) => boolean; kept?: string; local?: { base: () => string; lists: (value: T) => readonly string[] } } = {},
+  opts: { empty?: (value: T) => boolean; kept?: string; local?: LocalRead<T> } = {},
 ): Resource<T> {
   const m = reader<T>(opts.empty, untrack(() => live.version));
   /* RAW, because an answer is drawn and never edited in place: a deep proxy over every row of a list would cost a
@@ -43,6 +59,8 @@ export function read<T>(
   /* Drawn from the local copy, and the record has not answered since. */
   let stale = $state(false);
   const asking = $derived(key());
+  /* The name the local copy keeps this read's answers under. */
+  const localName = opts.local ? (opts.local.name ?? opts.kept) : undefined;
 
   /** `opened()` tokens for the calls still out, by ticket, so a screen that goes away can close what it opened. */
   const out = new Map<number, number>();
@@ -51,6 +69,8 @@ export function read<T>(
   async function ask(k: string | null, quiet = false): Promise<void> {
     /* A KEPT ANSWER IS DRAWN AT ONCE (`kept.ts`): at this version nothing is asked, at another it is asked quietly. */
     const version = untrack(() => live.version);
+    /* A NEW QUESTION, or the same one asked out loud, starts unmarked: only drawing it from the copy marks it. */
+    if (!quiet) stale = false;
     const was = opts.kept !== undefined && k !== null && !quiet ? keptAnswer<T>(opts.kept, k, version) : null;
     if (was !== null) {
       const drawn = m.ask(k, false);
@@ -58,9 +78,9 @@ export function read<T>(
       now = m.now();
       if (was.fresh) return;
       quiet = true;
-    } else if (opts.local !== undefined && opts.kept !== undefined && k !== null && !quiet) {
+    } else if (opts.local !== undefined && localName !== undefined && k !== null && !quiet) {
       /* NOTHING IN MEMORY: THE LOCAL COPY, drawn at once. Current, nothing is asked; else it is asked quietly behind it. */
-      const near = await nearLocal<T>(opts.kept, k, opts.local.base());
+      const near = await nearLocal<T>(localName, k, opts.local.base());
       if (gone || untrack(() => asking) !== k) return;
       if (near !== null) {
         const drawn = m.ask(k, false);
@@ -68,7 +88,7 @@ export function read<T>(
         now = m.now();
         stale = !near.current;
         if (near.current) {
-          keep(opts.kept, k, version, { ok: true, value: near.value });
+          if (opts.kept !== undefined) keep(opts.kept, k, version, { ok: true, value: near.value });
           return;
         }
         quiet = true;
@@ -87,7 +107,9 @@ export function read<T>(
       if (took && opts.kept !== undefined && k !== null) keep(opts.kept, k, version, got);
       if (took && got.ok) {
         stale = false;
-        if (opts.local !== undefined && opts.kept !== undefined && k !== null) keepLocal(opts.kept, k, opts.local.lists(got.value), got.value, mark);
+        const l = opts.local;
+        if (l !== undefined && localName !== undefined && k !== null)
+          keepLocal(localName, k, l.lists(got.value), l.shrink ? l.shrink(got.value) : got.value, mark, {}, { ...(l.spots ? { spots: l.spots(got.value) } : {}), ...(l.always ? { always: true } : {}) });
       }
     } catch (e) {
       took = m.failed(ticket, e instanceof Error ? e.message : String(e));
@@ -105,6 +127,12 @@ export function read<T>(
   $effect(() => {
     const k = asking;
     untrack(() => void ask(k));
+  });
+
+  /* THE QUIET MARK OVER THE WORK (`copy-mark.svelte.ts`), up while this answer is the copy's and the record is asked. */
+  $effect(() => {
+    if (!stale) return;
+    return untrack(() => holdCopyMark());
   });
 
   /* THE RECORD MOVED. `live.version` changes only when the poll hears a different version from the last one, so this

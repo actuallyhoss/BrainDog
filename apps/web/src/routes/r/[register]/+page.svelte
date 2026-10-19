@@ -32,7 +32,9 @@
   import { open, read, tally, type Boot, type Refusal, type Tally } from '$lib/data/record.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
-  import { keptOf, listsOf, namesOf, type KeptList } from './kept-list.ts';
+  import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { countsOf, keptOf, listsOf, namesOf, servedWhole, spotOf, type KeptList } from './kept-list.ts';
+  import type { Near } from '$lib/data/local.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
@@ -621,8 +623,9 @@
     await read(async () => {
       /* NOTHING DRAWN YET: THE LOCAL COPY'S FIRST PAGE AT ONCE, marked `fromCopy` and with no cursor to page from, and
          the record is asked behind it as ever (`lib/data/local.ts`). */
+      let near: Near<KeptList> | null = null;
       if (pages.length === 0) {
-        const near = await nearLocal<KeptList>(LIST_COPY, said, apiBase());
+        near = await nearLocal<KeptList>(LIST_COPY, said, apiBase());
         if (near !== null && asked === said && pages.length === 0) {
           declared = { register, decl: near.value.decl };
           pages = [near.value.entries];
@@ -630,14 +633,32 @@
           cursor = null;
           matched = near.value.matched;
           fromCopy = true;
-        }
+        } else near = null;
       }
       const src = await open();
       const [b, s] = await Promise.all([src.boot(), src.schema(register)]);
       if (asked !== said) return true;
-      if (!b.ok) return refuse(b.refusal);
+      /* OFFLINE OVER THE COPY, THE COPY STAYS: a host nobody reached refuses nothing the copy drew. */
+      if (!b.ok) return fromCopy && b.refusal.code === 'UNREACHABLE' ? true : refuse(b.refusal);
       booted = b.value;
-      if (!s.ok) return refuse(s.refusal);
+      if (!s.ok) return fromCopy && s.refusal.code === 'UNREACHABLE' ? true : refuse(s.refusal);
+      /* CURRENT AND WHOLE, NOTHING IS ASKED, as Work does: the copy has caught up to every change heard and holds the
+         page's cursor and the pills' counts. Not for the people held twice or a list that says `same:`, whose own
+         reads are not kept. Boot and the declaration above are the tab's kept answers, and cost no call. */
+      if (near?.current && !wantsTwice && sameOf(s.value) === null) {
+        const size = b.value.registers.find((r) => r.id === register)?.count ?? 0;
+        const counts = size >= ENOUGH_TO_SIFT || text !== '' || typed.length > 0;
+        if (servedWhole(near.value, counts)) {
+          declared = { register, decl: s.value };
+          twiceHeld = null;
+          twiceMany = null;
+          cursor = near.value.cursor ?? null;
+          counted = counts && near.value.counted ? countsOf(near.value.counted) : new Map();
+          uncounted = null;
+          fromCopy = false;
+          return true;
+        }
+      }
       /* WHO MAY BE HELD TWICE, ASKED ONCE A QUESTION and only of a list of people (`heldTwiceOn` reads the role the
          list declares). The answer narrows the list, its counts and every later page of it. A refusal is drawn as one:
          everyone, under a line saying these are the people held twice, is the one wrong answer nobody could see. */
@@ -664,7 +685,7 @@
         thingsTwice,
       ]);
       if (asked !== said) return true;
-      if (!answer.ok) return refuse(answer.refusal);
+      if (!answer.ok) return fromCopy && answer.refusal.code === 'UNREACHABLE' ? true : refuse(answer.refusal);
       declared = { register, decl: s.value };
       twiceHeld = rows ? { register, rows } : null;
       twiceMany = many === null ? null : { register, n: many };
@@ -675,10 +696,30 @@
       counted = facets.counts;
       uncounted = facets.withheld;
       fromCopy = false;
-      keepLocal(LIST_COPY, said, listsOf(register, s.value), keptOf(s.value, answer.value.entries, answer.value.matched, answer.value.names), mark, { [register]: s.value });
+      keepList(said, register, s.value, answer.value, { filters: chips, q: text, sort: order, twice: rows !== null }, bar ? facets : null, mark);
       return true;
     });
     if (asked === said) busy = false;
+  }
+
+  /**
+   * THE PAGE AS THE LOCAL COPY KEEPS IT: its rows, cursor and counts, and where its rows are so a change can be placed
+   * on them (`kept-list.ts`). Counts the record withheld are kept as none, so that copy is always asked behind.
+   */
+  function keepList(
+    said: string,
+    register: string,
+    d: RegisterDecl,
+    got: { entries: Entry[]; matched: number; names: Names; cursor: string | null },
+    ask: { filters: Filter[]; q: string; sort: typeof sort; twice: boolean },
+    facets: Tally | null,
+    mark: number,
+  ) {
+    const counts = facets === null ? null : facets.withheld ? null : facets.counts;
+    const pills = facets === null ? [] : filterableOf(d.fields).filter((f) => f.type === 'enum').map((f) => f.id);
+    keepLocal(LIST_COPY, said, listsOf(register, d), keptOf(d, got.entries, got.matched, got.names, { cursor: got.cursor, counted: counts }), mark, { [register]: d }, {
+      spots: [spotOf(register, ask, pills)],
+    });
   }
 
   /** A refusal, drawn instead of the list. `false`, because that is what `read` records. */
@@ -710,6 +751,11 @@
   let stale = $state(false);
   /** The rows on screen came from the local copy and the record has not answered yet. */
   let fromCopy = $state(false);
+  /* The quiet mark over the work while they are (`copy-mark.svelte.ts`). */
+  $effect(() => {
+    if (!fromCopy) return;
+    return untrack(() => holdCopyMark());
+  });
   /* The version this list was drawn at. A plain `let`, because it is compared and never drawn. */
   let drawnAt = untrack(() => live.version);
 
@@ -762,6 +808,7 @@
       return;
     }
     const mine = ++rechecks;
+    const mark = localTicket();
     const said = asked;
     const register = id;
     const chips = asking;
@@ -795,6 +842,9 @@
     matched = answer.value.matched;
     counted = facets.counts;
     uncounted = facets.withheld;
+    fromCopy = false;
+    /* AND KEPT AGAIN, so the next open draws the list as it now is. */
+    keepList(said, register, decl, answer.value, { filters: chips, q: text, sort: order, twice: chips.some(isRows) }, counted.size > 0 || uncounted ? facets : null, mark);
   }
 
   /** The stale mark's control: the question asked again from the top, as a question the reader chose to ask. */

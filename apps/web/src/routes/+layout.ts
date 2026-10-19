@@ -69,6 +69,8 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
      with the live answer (redirects and refusals included). Not on the screens that must see the record's own answer. */
   if (!opened) {
     opened = true;
+    /* THE LOCAL COPY IS OPENED NOW, and its last reader verified, so the first screen's ask finds it ready. */
+    if (depends && !spared) void import('$lib/data/local-tab.ts').then((c) => c.warmLocal(api), () => undefined);
     const copy = depends && !spared ? copies.readCopy(api) : null;
     if (copy) {
       void live.readBoot(api).then(() => import('$app/navigation').then((n) => n.invalidate('braindog:boot')));
@@ -76,11 +78,17 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
     }
   }
   const booted = await live.readBoot(api);
-  if (booted.from === 'refused') {
+  /* A HOST NOBODY REACHED IS NO REFUSAL: the last copy and the local copy stay, since offline is when they earn their
+     keep. Any refusal the record gave takes both. */
+  const unreached = booted.from === 'refused' && booted.code === 'UNREACHABLE';
+  if (booted.from === 'refused' && !unreached) {
     copies.dropCopy();
-    /* A REFUSED BOOT TAKES THE LOCAL COPY TOO, except a host nobody reached: offline is when the copy earns its keep. */
-    if (booted.code !== 'UNREACHABLE') void import('$lib/data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined);
+    void import('$lib/data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined);
   }
+  /* OFFLINE, THE LAST READER THIS BROWSER SIGNED IS WHO THE COPY IS DRAWN FOR, or nobody (`local-mark.ts`). */
+  const tabCopy = unreached && !spared ? await import('$lib/data/local-tab.ts').catch(() => null) : null;
+  const reader = tabCopy ? await tabCopy.lastReader(api).catch(() => null) : null;
+  void import('$lib/data/local-tab.ts').then((c) => c.offlineLocal(reader !== null), () => undefined);
 
   /* AN ADDRESS THAT WILL NOT OPEN FOR A STRANGER ASKS FOR SIGN-IN (`signInFirst`), the bare `/app/` as much as
      `/app/acme/`, and `/start` with them: it is spared the redirect below and not this one. The bare address drew the
@@ -97,10 +105,17 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
 
   /* ANY OTHER REFUSAL IS THE RECORD'S ANSWER, a host nobody reached among them (a static host's fallback page, a
      preview with no record behind it): the shell draws nothing and the screen says what it said. */
-  const shell =
+  /* AND A HOST NOBODY REACHED, WITH A READER THIS BROWSER KNOWS, draws the last copy of the shell, to read only, or the
+     refusal marked offline where none is kept: the screens draw what the local copy holds for that reader. */
+  const kept = reader !== null ? copies.readCopy(api) : null;
+  const shell: Shell =
     booted.from === 'live'
       ? live.layoutOf(booted.boot)
-      : /* THE REFUSAL IS HANDED OVER RATHER THAN REMEMBERED. `refusedShell` keeps the last one as a
+      : reader !== null
+        ? kept !== null && kept.me.person === reader
+          ? { ...kept, offline: true as const }
+          : { ...live.refusedShell({ code: booted.code, fix: booted.fix }), offline: true as const }
+        : /* THE REFUSAL IS HANDED OVER RATHER THAN REMEMBERED. `refusedShell` keeps the last one as a
            module fallback, and this call sits one `await` after `readBoot`: any `forget()` landing
            in that window (`decide-write.ts`, `inbox-write.ts`, `news-live.ts`, which Home's own
            mark reaches) nulls it, and a colleague who may not read the record would be told the
