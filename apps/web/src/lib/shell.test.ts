@@ -32,3 +32,17 @@ test('notify and badge do nothing without permission or support', async () => {
   setBadge(3);
   assert.equal(isApp, false);
 });
+
+test('a payment page leaves this tab in a browser and goes to the shell in the app', async () => {
+  const went: string[] = [];
+  g.location = { assign: (u: string) => went.push(u) };
+  const { openOutside } = await import('./shell.ts');
+  openOutside('https://checkout.stripe.com/c/pay/x', { here: true });
+  assert.deepEqual(went, ['https://checkout.stripe.com/c/pay/x']);
+  const seen: string[] = [];
+  g.__BRAINDOG_SHELL__ = { open: (u: string) => seen.push(u) };
+  openOutside('https://billing.stripe.com/p/session/y', { here: true });
+  assert.deepEqual(seen, ['https://billing.stripe.com/p/session/y']);
+  assert.equal(went.length, 1);
+  delete g.location;
+});

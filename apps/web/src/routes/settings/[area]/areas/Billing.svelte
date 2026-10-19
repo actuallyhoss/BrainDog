@@ -6,7 +6,8 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
-  import { apiBase, at } from '$lib/at.ts';
+  import { apiBase } from '$lib/at.ts';
+  import { openOutside } from '$lib/shell.ts';
   import { readUsage, words as actionWords, type Meter, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import {
@@ -109,9 +110,9 @@
     going = r.record;
     const out = await paymentPage(kind, r.record, undefined, plan);
     if (out.ok) {
-      /* LEAVING FOR STRIPE, and `going` stays set, so the button keeps saying so until the page is gone. Stripe's
-         own host, so `at()` hands it back unchanged; the argument still starts with `at(`. */
-      location.assign(at(out.value));
+      /* LEAVING FOR STRIPE, and `going` stays set, so the button keeps saying so until the page is gone. The shell
+         opens it in the browser in the Mac app. */
+      openOutside(out.value, { here: true });
       return;
     }
     going = null;
@@ -125,7 +126,7 @@
     going = `${r.record} ${pack}`;
     const out = await packPage(r.record, pack);
     if (out.ok) {
-      location.assign(at(out.value));
+      openOutside(out.value, { here: true });
       return;
     }
     going = null;

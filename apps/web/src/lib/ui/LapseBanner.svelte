@@ -22,7 +22,7 @@
 
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
-  import { at } from '$lib/at.ts';
+  import { openOutside } from '$lib/shell.ts';
   /* Type only, so the client's route table stays out of this chunk. */
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere, lapseLines, paymentPage, thisRecord } from '../../routes/settings/billing.ts';
@@ -58,8 +58,8 @@
     going = true;
     const out = await paymentPage('checkout', here.record);
     if (out.ok) {
-      /* Stripe's own host, so `at()` hands it back unchanged; the argument still starts with `at(`. */
-      location.assign(at(out.value));
+      /* Stripe's page opens through the shell, so the Mac app sends it to the browser. */
+      openOutside(out.value, { here: true });
       return;
     }
     going = false;

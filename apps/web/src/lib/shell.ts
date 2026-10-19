@@ -19,10 +19,14 @@ const shell = (): Shell | undefined => (globalThis as { __BRAINDOG_SHELL__?: She
 /** False unless the Mac app has put its shell on the window. */
 export const isApp: boolean = shell() !== undefined;
 
-/** An outside link: the shell's browser in the app, a new tab with noopener in a browser. */
-export function openOutside(url: string): void {
+/**
+ * An outside link: the shell's browser in the app, a new tab with noopener in a browser. `here` leaves this tab
+ * instead (a payment page opened after a wait, which a popup blocker would drop as a new tab).
+ */
+export function openOutside(url: string, opts: { here?: boolean } = {}): void {
   const s = shell();
   if (s?.open) return s.open(url);
+  if (opts.here === true && globalThis.location) return globalThis.location.assign(url);
   globalThis.open?.(url, '_blank', 'noopener,noreferrer');
 }
 
