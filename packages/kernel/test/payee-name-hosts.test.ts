@@ -1,10 +1,6 @@
 /**
  * A payee's name where the bank's text holds a web address, a card or terminal reference, or a cash machine: the five
- * texts a ledger read badly. ONE OF THE FIVE READS RIGHT WITH NO KEY MOVED (`ATM CASH WITHDRAWAL`). The other four
- * want a name whose key is not the key their text has today (`Talabat` is `bank:talabat` and `WWW.TALABAT.COM` is
- * `bank:wwwtalabat`), and a name never joins another payee than its text, so each waits on the key being cut at the
- * same words. Those four are written here as they are wanted and marked as waiting, and what holds today is held
- * beside them: no key moved, and every name still folds to the key its text had.
+ * texts a ledger read badly. The key is cut at the same words (`bankKey`), so a name joins no other payee than its text.
  */
 
 import { test } from 'node:test';
@@ -21,8 +17,6 @@ const WANTED: [string, string][] = [
   ['SPOTIFY P1234 STOCKHOLM', 'Spotify'],
 ];
 
-/** Why four of them wait: the cut has to be made in the key first, and a key that moves is his to rule. */
-const WAITS = 'the key is cut at the same words first (bankKey), which moves keys already stored';
 
 test('A CASH MACHINE IS INITIALS: ATM stays capitals wherever it stands in a bank text', () => {
   assert.equal(payeeName('ATM CASH WITHDRAWAL'), 'ATM Cash Withdrawal');
@@ -39,19 +33,19 @@ test('A CASH MACHINE IS INITIALS: ATM stays capitals wherever it stands in a ban
   assert.equal(payeeName('ATMOSPHERE CAFE'), 'Atmosphere Cafe');
 });
 
-test('A LEADING www. AND THE WEB SUFFIX ARE CUT: WWW.TALABAT.COM reads Talabat', { todo: WAITS }, () => {
+test('A LEADING www. AND THE WEB SUFFIX ARE CUT: WWW.TALABAT.COM reads Talabat', () => {
   assert.equal(payeeName('WWW.TALABAT.COM'), 'Talabat');
 });
 
-test('A PAGE AFTER THE ADDRESS IS CUT WITH IT: APPLE.COM/BILL reads Apple', { todo: WAITS }, () => {
+test('A PAGE AFTER THE ADDRESS IS CUT WITH IT: APPLE.COM/BILL reads Apple', () => {
   assert.equal(payeeName('APPLE.COM/BILL'), 'Apple');
 });
 
-test('THE CARD AND THE TERMINAL BEFORE THE NAME ARE CUT: HSBC CARD 7731 POS 55 KFC reads KFC', { todo: WAITS }, () => {
+test('THE CARD AND THE TERMINAL BEFORE THE NAME ARE CUT: HSBC CARD 7731 POS 55 KFC reads KFC', () => {
   assert.equal(payeeName('HSBC CARD 7731 POS 55 KFC'), 'KFC');
 });
 
-test('A REFERENCE IN THE MIDDLE IS CUT, and the place after it: SPOTIFY P1234 STOCKHOLM reads Spotify', { todo: WAITS }, () => {
+test('A REFERENCE IN THE MIDDLE IS CUT, and the place after it: SPOTIFY P1234 STOCKHOLM reads Spotify', () => {
   assert.equal(payeeName('SPOTIFY P1234 STOCKHOLM'), 'Spotify');
 });
 
@@ -64,13 +58,13 @@ test('THE KEY OF EACH NAME IS THE KEY ITS TEXT HAS, so no payee joins another', 
     assert.equal(bankKey(payeeName(said)), bankKey(said), `${said} read as ${payeeName(said)}`);
 });
 
-test('NO KEY MOVED: the five texts hold the keys they held before this file', () => {
+test('THE FOUR WEB AND CARD TEXTS HAVE THE KEY OF THE NAME THEY READ AS', () => {
   const held: [string, string][] = [
-    ['WWW.TALABAT.COM', 'bank:wwwtalabat'],
-    ['APPLE.COM/BILL', 'bank:applecombill'],
+    ['WWW.TALABAT.COM', 'bank:talabat'],
+    ['APPLE.COM/BILL', 'bank:apple'],
     ['ATM CASH WITHDRAWAL', 'bank:atmcashwithdrawal'],
-    ['HSBC CARD 7731 POS 55 KFC', 'bank:hsbccard7731pos55kfc'],
-    ['SPOTIFY P1234 STOCKHOLM', 'bank:spotifyp1234stockholm'],
+    ['HSBC CARD 7731 POS 55 KFC', 'bank:kfc'],
+    ['SPOTIFY P1234 STOCKHOLM', 'bank:spotify'],
     ['TALABAT', 'bank:talabat'],
     ['KFC', 'bank:kfc'],
     ['SPOTIFY', 'bank:spotify'],
@@ -78,7 +72,7 @@ test('NO KEY MOVED: the five texts hold the keys they held before this file', ()
   for (const [said, key] of held) assert.equal(bankKey(said), key, said);
 });
 
-test('A WANTED NAME THAT WOULD JOIN ANOTHER PAYEE IS NOT SHOWN YET: the four that wait read as a name, never empty', () => {
+test('EVERY WANTED NAME IS SHOWN, never empty', () => {
   for (const [said, wanted] of WANTED) {
     const name = payeeName(said);
     assert.match(name, /\p{L}/u, said);

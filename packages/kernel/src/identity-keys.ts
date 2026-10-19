@@ -451,6 +451,26 @@ function phoneKey(raw: string): string | null {
   return /^[1-9][0-9]{7,14}$/.test(digits) ? `phone:+${digits}` : null;
 }
 
+/** The bank's own card line before a name: `HSBC CARD 7731 POS 55 KFC`, its issuer, card tail and terminal. */
+const CARD_PREFIX = /^(?:[a-z]{2,8}\s+)?card\s+\d{3,}\s+(?:pos\s+\d+\s+)?(?=\S)/i;
+/** A page after a web address (`APPLE.COM/BILL`), cut so the address alone is read. */
+const ADDRESS_PAGE = new RegExp(`(\\S+\\.(?:${WEB_SUFFIX.source.slice(2, -1)}))/\\S*`, 'gi');
+/** A processor's reference in the middle of a text, a letter then three digits or more (`P1234`): the place after it goes too. */
+const REFERENCE_WORD = /^[a-z]\d{3,}$/i;
+
+/**
+ * The cuts that need no list of places: a leading `www.`, a card line before the name, a page after an address, and a
+ * reference with the words after it. Each leaves a word of the name, so a text is never emptied (and `payeeName`
+ * checks its name against the key).
+ */
+function trimmedText(text: string): string {
+  let said = text.replace(CARD_PREFIX, '').replace(/^www\.(?=\S)/i, '').replace(ADDRESS_PAGE, '$1');
+  const words = said.split(/\s+/);
+  const at = words.findIndex((w, i) => i > 0 && REFERENCE_WORD.test(w));
+  if (at > 0) said = words.slice(0, at).join(' ');
+  return said;
+}
+
 /**
  * A payee as a bank text writes it, folded so its spellings are one: the processor's prefix gone, then a place, a web
  * address and any word holding a digit from the end, a web suffix, punctuation, and the spaces, all lower case.
@@ -467,6 +487,7 @@ function phoneKey(raw: string): string | null {
 function payeeWords(raw: string): { words: string[]; shown: string[] } {
   let said = raw.trim();
   for (let i = 0; i < 3 && PROCESSORS.test(said); i++) said = said.replace(PROCESSORS, '');
+  said = trimmedText(said);
   const words = lower(said).replace(/[*#]/g, ' ').split(/\s+/).filter(Boolean);
   const written = said.trim().replace(/[*#]/g, ' ').split(/\s+/).filter(Boolean);
   /* LOWER CASE NEVER MOVES A SPACE, so the two lists are word for word; were they not, the folded words are shown. */
