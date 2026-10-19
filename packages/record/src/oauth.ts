@@ -42,7 +42,7 @@ export type OAuthCall =
   | { op: 'take'; id: string }
   | { op: 'code'; row: CodeRow }
   | { op: 'redeem'; code_hash: string }
-  | { op: 'count'; key: string };
+  | { op: 'count'; key: string; most?: number };
 
 /** What each `op` answers. `full` is a table at its ceiling, and nothing was written. `count` answers the seconds to wait, or `null`. */
 export type OAuthAnswers = {
@@ -211,10 +211,10 @@ export function answerOAuth(sql: Sql, clock: Clock, call: OAuthCall): OAuthAnswe
     case 'count': {
       const key = `${COUNTED_PREFIX}${call.key}`;
       sql.exec(`DELETE FROM dir_fail WHERE key LIKE '${COUNTED_PREFIX}%' AND until IS NULL AND first <= ?`, now - COUNTED_WINDOW);
-      const row = sql.one<{ n: number; first: number }>(COUNT, key, now, now - COUNTED_WINDOW, COUNTED_MOST);
+      const row = sql.one<{ n: number; first: number }>(COUNT, key, now, now - COUNTED_WINDOW, call.most ?? COUNTED_MOST);
       /* FAIL CLOSED: a count that could not be read is a wait of the whole window, as the record's `counted` answers. */
       if (row === undefined) return Math.ceil(COUNTED_WINDOW / 1000);
-      return row.n > COUNTED_MOST ? Math.max(1, Math.ceil((row.first + COUNTED_WINDOW - now) / 1000)) : null;
+      return row.n > (call.most ?? COUNTED_MOST) ? Math.max(1, Math.ceil((row.first + COUNTED_WINDOW - now) / 1000)) : null;
     }
   }
 }

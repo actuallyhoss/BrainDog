@@ -30,6 +30,7 @@
 
 import type { TokenClient } from '@braindog/kernel';
 import { FRESH } from '@braindog/record';
+import { ABUSE, tooManyLine } from './abuse.ts';
 import type { CodeRequest, HeldRequest, OAuthAnswers, OAuthCall, OAuthClient } from '@braindog/record/oauth';
 
 import { sameOrigin } from './auth.ts';
@@ -147,6 +148,10 @@ const json = (status: number, body: unknown, extra: Header[] = []): Response =>
 export const oauthError = (status: number, error: string, description: string, extra: Header[] = []): Response =>
   json(status, { error, error_description: description }, extra);
 
+/** A 429 in OAuth's body with the plain line and `retry_after`, so an app and a person read the same wait. */
+const tooMany = (wait: number): Response =>
+  json(429, { error: 'temporarily_unavailable', error_description: tooManyLine(wait), retry_after: wait }, [['retry-after', String(wait)]]);
+
 /** The browser goes on: 302 from a GET, 303 after a form's POST, so the next request is a GET whatever the browser. */
 const goTo = (status: 302 | 303, location: string, extra: Header[] = []): Response =>
   new Response(null, { status, headers: [['location', location], ['cache-control', 'no-store'], ['referrer-policy', 'no-referrer'], ...extra] });
@@ -213,12 +218,6 @@ ${html}
 /** A page of sentences: each one escaped here and set as its own paragraph. */
 const sentences = (status: number, title: string, lines: string[], extra: Header[] = []): Response =>
   oauthPage(status, title, lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('\n'), extra);
-
-/** A wait in whole minutes, as a person reads it. */
-const minutes = (seconds: number): string => {
-  const m = Math.max(1, Math.ceil(seconds / 60));
-  return m === 1 ? 'a minute' : `${m} minutes`;
-};
 
 /** An answer the method does not take: 405, with the one it does. */
 const onlyMethods = (request: Request, methods: readonly string[]): Response | null =>
@@ -551,7 +550,7 @@ export const authorizationServer = (issuer: string, documents: boolean) => ({
  */
 async function register(request: Request, deps: OAuthDeps): Promise<Response> {
   const wait = await deps.store({ op: 'count', key: `register:${deps.address ?? 'unknown'}` });
-  if (wait !== null) return oauthError(429, 'temporarily_unavailable', `Too many apps registered from this address. Try again in ${minutes(wait)}.`, [['retry-after', String(wait)]]);
+  if (wait !== null) return tooMany(wait);
   const body = await bodyOf(request);
   if (body === null || body.form) return oauthError(400, 'invalid_client_metadata', `Registration takes a JSON object of at most ${BODY_MOST_BYTES} bytes.`);
   const f = body.fields;
@@ -638,7 +637,7 @@ export const REQUEST_GONE = 'This sign-in has expired or was already answered. G
 async function authorize(request: Request, deps: OAuthDeps): Promise<Response> {
   const title = 'BrainDog could not connect this app';
   const wait = await deps.store({ op: 'count', key: `authorize:${deps.address ?? 'unknown'}` });
-  if (wait !== null) return sentences(429, title, [`Too many apps asked to connect from this address. Try again in ${minutes(wait)}.`], [['retry-after', String(wait)]]);
+  if (wait !== null) return sentences(429, title, [tooManyLine(wait)], [['retry-after', String(wait)]]);
   const q = new URL(request.url).searchParams;
   const id = q.get('client_id');
   if (id === null) return sentences(400, title, ['The app that sent you here did not say which app it is. Go back to it and connect again.']);
@@ -790,6 +789,9 @@ async function deny(request: Request, deps: OAuthDeps): Promise<Response> {
  * address, the verifier that hashes to the challenge it began with, and the one resource.
  */
 async function token(request: Request, deps: OAuthDeps): Promise<Response> {
+  /* PER ADDRESS BEFORE THE BODY IS READ (`ABUSE.oauthToken`): a code is single use, so a guesser needs many tries. */
+  const wait = await deps.store({ op: 'count', key: `token:${deps.address ?? 'unknown'}`, most: ABUSE.oauthToken.most });
+  if (wait !== null) return tooMany(wait);
   const body = await bodyOf(request);
   if (body === null) return oauthError(400, 'invalid_request', `The token endpoint takes a form of at most ${BODY_MOST_BYTES} bytes.`);
   const f = body.fields;
