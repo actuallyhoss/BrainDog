@@ -2,29 +2,19 @@
  * THE CARD AN AGENT STARTS FROM, composed in the record (AGT-B07), so the start hook, `context` and `braindog context`
  * print one text made by one set of rules, whatever build of the command sits on the machine.
  *
- *   BrainDog · run S731 · Claude Code on MacBook · project BrainDog · branch main
- *   Next     Cut page answers to block summaries. Left by Claude (S729) 5h ago. Check before acting. · Tried: ...
- *   Waiting  2 on Mara: Change how copperleaf starts? · ...
+ * THE BRIEF COMES FIRST AND IS FIVE SHORT TRUE LINES, NAMES FIRST (LAUNCH 108, DIRECTION 45), each under about 100
+ * characters and none of them an id:
+ *
+ *   Claude Code on MacBook, working on BrainDog
+ *   Next     Cut page answers to block summaries. (Claude Code, 5h ago, check before acting)
+ *   Waiting  2 on Mara, first: Change how copperleaf starts?
  *   Learned  Money is minor units plus currency. Never add two currencies.
- *   More     4 stale, read braindog:stale · 5 learnings · call context
+ *   More     call context for the full picture
  *
- * NEXT SAYS WHAT IS TRUE ABOUT THE STEP (AGT-B08 job 4, AGT-C05): the record's own lines (`next_lines`, `nextLines` in
- * `same-tree.ts`) when the context carries them, so a session is told "Nothing was handed over. Last here: ...", or
- * who took the step and when, never a step that was taken; what its writer tried; and how many older steps wait. A
- * context drawn by hand with only a `handoff` still reads, through the card's own wording of it. Likewise the
- * same-tree line reads the record's `also_here` when it is sent, the warning and then "Also here:" by name.
- *
- * LINE ONE SAYS WHO AND WHERE: the run, the app on the machine as a person names it, the project, the branch. Then the
- * line about another run working in the same tree, only when it is true. Then the slots in this order, each left out
- * when it has nothing true to say: `Next`, `Signs`, `Waiting`, `Decided`, `Learned`, `More`. At most three things a
- * slot. No Who slot: the people of a project are a call away, and the card is for what a session would otherwise get
- * wrong.
- *
- * ABOUT 120 WORDS, NEVER MORE THAN 150. Past 120 it cuts what `More` names, then the second learning, then the third
- * question, then the runs named after the first on the same-tree line. Past 150 it keeps cutting, in the order of what
- * matters least, and never cuts line one, the same-tree warning, the step's lines in `Next` or the line saying the
- * command is older than the record. A word count, not characters, because the card is read and a name in Arabic letters
- * is no longer to read than one in Latin ones.
+ * Next, Waiting and Learned are left out when they have nothing true to say. A `Signs` line comes only when a red sign
+ * names this project. Two lines are added only when true and are never cut: the warning about another run in the same
+ * tree, and the line saying the command is older than the record. Ids stay in `context`'s `format: "full"` answer and in
+ * `card_next`, the whole Next line kept for a session that just compacted; the brief itself never leans on one.
  *
  * NAMES PRINT AS WRITTEN, accents and other scripts kept. Every control and format character is removed (`oneLine`, the
  * command's own scrub copied here), since a terminal obeys what it is handed. A machine's network name, a path and a
@@ -38,20 +28,17 @@ import { RULE, rulesOf, type Rules } from './context-caps.ts';
 import type { Brief, Context } from './index.ts';
 import { ALSO_HERE_MOST, TRIED_MOST } from './same-tree.ts';
 
-/** About this many words. Past it, the first cuts are made. */
-export const CARD_AIM = 120;
+/** About this many words: five lines of about a dozen, with room for the two lines that are added when true. */
+export const CARD_AIM = 80;
 
 /** Never more words than this. */
-export const CARD_MOST = 150;
+export const CARD_MOST = 130;
+
+/** The longest a brief line runs, label included. */
+const LINE = 100;
 
 /** The most things one slot names. */
 const PER_SLOT = 3;
-
-/** Learnings are the first two by `learnedFirst`: the card is for what a session would otherwise get wrong, not for all of them. */
-const LEARNED = 2;
-
-/** The read that says, one by one, what the card's stale count added up, with the call that clears each. */
-const STALE_READ = 'braindog:stale';
 
 /** The read that lists every step left here and not taken, newest first, which Next names when older ones wait. */
 const HANDOFFS_READ = 'braindog:handoffs';
@@ -241,19 +228,6 @@ const lineOf = (from: unknown, key: string): string | null => {
 
 /* ── the first line ────────────────────────────────────────────────────── */
 
-/**
- * The project as a person reads its name: never its folder, an address or a machine's network name. A name that is
- * nothing but those is no name, and the line says the project has none rather than print an id.
- */
-function projectOf(c: Context): string {
-  if (c.project) {
-    const name = words(plainly(c.project.name.replace(ADDRESS, ' '), c, true), 40);
-    return name ? `project ${name}` : 'a project with no name';
-  }
-  if (c.ambiguous.length > 0) return `${String(c.ambiguous.length)} projects match this folder`;
-  return 'no project';
-}
-
 /** The app and the machine: "Claude Code on MacBook Pro", "on MacBook", or nothing when neither is known. */
 function machineLine(at: CardAt): string | null {
   const device = (at.device ? words(at.device, 40) : '') || (at.host ? machineOf(at.host) : '');
@@ -262,11 +236,19 @@ function machineLine(at: CardAt): string | null {
   return app ? `${app} on ${device}` : `on ${device}`;
 }
 
-/** Line one: BrainDog, the run, the app and machine, the project, the branch, with nothing between left empty. */
-function firstLine(c: Context, at: CardAt, own: string | null): string {
-  const run = own ? `run ${clip(own, 16)}` : 'no run yet';
-  const branch = at.branch ? words(at.branch, 40) : '';
-  return ['BrainDog', run, machineLine(at), projectOf(c), branch ? `branch ${branch}` : null].filter(Boolean).join(' · ');
+/**
+ * Line one: who and where, by name. The project as a person reads it, never its folder, an address or a machine's
+ * network name; with none, the one thing to do about it.
+ */
+function whoLine(c: Context, at: CardAt): string {
+  const where = machineLine(at);
+  const app = where === null ? 'This session' : where.startsWith('on ') ? `This session ${where}` : where;
+  if (c.project) {
+    const name = words(plainly(c.project.name.replace(ADDRESS, ' '), c, true), 40);
+    return name ? `${app}, working on ${name}` : `${app}, working in a project with no name`;
+  }
+  if (c.ambiguous.length > 0) return `${app}, no project yet: ${String(c.ambiguous.length)} match this folder, say which with handoff`;
+  return `${app}, no project yet: say which with handoff`;
 }
 
 /* ── the slots ─────────────────────────────────────────────────────────── */
@@ -398,19 +380,45 @@ function nextSlot(c: Context, at: CardAt, own: string | null): { slot: Slot | nu
   return { slot: { label: 'Next', lead: '', items, tail: none, least: 1, stays: step.length, kept: true }, handedLeft: handed.length - shown.length };
 }
 
-/** The red signs, by name, and the one sentence when only one is red. Said only to a caller the record sent them to. */
-function signsSlot(c: Context): Slot | null {
-  const red = (c.signs ?? []).filter((s) => oneLine(s.name) !== '');
+/** A run's id as a step's words carry it, "(S729)" or "(S729, " ahead of more notes: a name stands in its place. */
+const tidy = (said: string): string => said.replace(/\(([A-Z]{1,3}\d+),\s*/gu, '(').replace(/\s*\([A-Z]{1,3}\d+\)/gu, '');
+
+/** Room for the words of a brief line once its label is on. */
+const ROOM = LINE - LABEL;
+
+/** A brief line: the label padded as every slot's is, then its words. */
+const labeled = (label: string, said: string): string => `${label.padEnd(LABEL - 1)} ${said}`;
+
+/**
+ * Next as one short line: the first thing a person handed to this agent, else the record's first Next line, else the
+ * handoff with who left it (by app, not by run) and when. The whole of it is `card_next`.
+ */
+function nextBrief(c: Context, at: CardAt, own: string | null): string | null {
+  const handed = handedTo(c, at.agent ?? null)[0];
+  if (handed) return `${words(tidy(plainly(wordsOf(handed), c, true, at)), ROOM - 16)} (handed to you)`;
+  const told = (Array.isArray(c.next_lines) ? c.next_lines : []).map((l) => (typeof l === 'string' ? tidy(plainly(l, c, true, at)) : '')).find((l) => oneLine(l) !== '');
+  if (told) {
+    /* "LEFT BY CLAUDE 1h ago. Check before acting." IS THE PART THAT KEEPS A STEP TRUE: it stays whole and the step gives way. */
+    const left = told.indexOf(' Left by ');
+    if (left <= 0) return words(told, ROOM);
+    const tail = words(told.slice(left + 1), 60);
+    return `${words(told.slice(0, left), ROOM - [...tail].length - 1)} ${tail}`;
+  }
+  const h = c.handoff;
+  if (!h || !h.next.trim()) return null;
+  const by = agentName(lineOf(h, 'agent') ?? [...c.live.same_repo, ...c.live.elsewhere].find((r) => r.spoken === h.from)?.agent ?? null);
+  const check = !(h.age_s <= DAY_S) || own === null || h.from !== own;
+  const notes = [...(by === null ? [] : [by]), since(h.age_s), ...(check ? ['check before acting'] : [])].join(', ');
+  return `${stopped(words(tidy(plainly(h.next, c, true, at)), ROOM - notes.length - 3))} (${notes})`;
+}
+
+/** The red signs that name this project, and only those: a sign about the whole record is in `context`, not the brief. */
+function signsBrief(c: Context): string | null {
+  const here = c.project ? oneLine(c.project.name).toLowerCase() : '';
+  if (!here) return null;
+  const red = (c.signs ?? []).filter((s) => oneLine(s.name) !== '' && `${s.name} ${s.said}`.toLowerCase().includes(here));
   if (red.length === 0) return null;
-  const items = red.slice(0, PER_SLOT).map((s) => words(s.name, 48));
-  if (red.length === 1 && oneLine(red[0]!.said)) items[0] = `${items[0]!}. ${stopped(words(red[0]!.said, 120))}`;
-  return {
-    label: 'Signs',
-    lead: `${String(red.length)} read red: `,
-    items,
-    tail: (shown) => (red.length > shown ? ` · ${String(red.length - shown)} more` : ''),
-    least: 1,
-  };
+  return words(`${String(red.length)} read red here: ${red.slice(0, 2).map((s) => words(s.name, 40)).join(' · ')}`, ROOM);
 }
 
 /** A question with its ids, handles and case set aside, which is how two of them are compared. */
@@ -440,9 +448,6 @@ export function asked(waiting: Context['waiting']): { question: string; count: n
   return [...out.values()];
 }
 
-/** The most a question says on the card. */
-const ASKED = 90;
-
 /** A question's first sentence, which is the question. A stop too early to end one, as in "Dr.", is not its end. */
 function questionOf(said: string): string {
   const line = oneLine(said);
@@ -450,53 +455,18 @@ function questionOf(said: string): string {
   return line;
 }
 
-/** A question whole when it fits, and its first sentence when it does not: the record's own say the fact, then ask. */
-function askedAs(said: string): string {
-  const whole = words(said, Number.POSITIVE_INFINITY);
-  return [...whole].length <= ASKED ? whole : words(questionOf(said), ASKED);
-}
-
-function waitingSlot(c: Context, at: CardAt): Slot | null {
+/**
+ * Waiting as a count and the top one in plain words. The count is this project's when the record gave it (the questions
+ * this agent can act on), else all of them; the questions come project first, so the top one is the nearest.
+ */
+function waitingBrief(c: Context, at: CardAt): string | null {
   const asks = asked(c.waiting);
   if (asks.length === 0) return null;
-  /* HOW MANY WAIT IS THE RECORD'S COUNT WHEN IT GAVE ONE: `context` sends only the newest. */
   const total = asks.length + Math.max(0, (at.waiting ?? 0) - c.waiting.length);
-  return {
-    label: 'Waiting',
-    lead: `${String(total)} on ${at.decider && oneLine(at.decider) ? words(at.decider, 40) : 'the owner'}: `,
-    items: asks.slice(0, PER_SLOT).map((a) => `${askedAs(plainly(a.question, c, true, at))}${a.count > 1 ? ` (${String(a.count)} like this)` : ''}`),
-    tail: none,
-    least: 1,
-  };
-}
-
-/** What a person already decided here (Context.decided, AGT-B09), so the session asks none of it again. */
-function decidedSlot(c: Context): Slot | null {
-  const lines = (c.decided ?? []).slice(0, PER_SLOT);
-  if (lines.length === 0) return null;
-  return { label: 'Decided', lead: '', items: lines.map((l) => l.replace(/^Decided /u, '')), tail: none, least: 1 };
-}
-
-/** The skills a standing learning bears on (its `topic` is the skill's name) that the skill's `because` does not carry. */
-function bearing(c: Context): { skill: string; learnings: number } | null {
-  const byTopic = new Map<string, string[]>();
-  for (const row of rowsOf(c, 'learnings')) {
-    if (row.state !== null && row.state !== 'active') continue;
-    const topic = typeof row.topic === 'string' ? row.topic.trim().toLowerCase() : '';
-    if (topic) byTopic.set(topic, [...(byTopic.get(topic) ?? []), row.spoken]);
-  }
-  if (byTopic.size === 0) return null;
-  const seen = new Set<string>();
-  for (const row of rowsOf(c, 'skills')) {
-    const name = typeof row.name === 'string' ? row.name.trim() : '';
-    if (!name || seen.has(name.toLowerCase())) continue;
-    seen.add(name.toLowerCase());
-    if (row.state !== null && row.state !== 'active') continue;
-    const carried = new Set(Array.isArray(row.because) ? row.because.filter((id): id is string => typeof id === 'string') : []);
-    const fresh = (byTopic.get(name.toLowerCase()) ?? []).filter((id) => !carried.has(id));
-    if (fresh.length > 0) return { skill: words(name, 60), learnings: fresh.length };
-  }
-  return null;
+  const n = typeof c.waiting_here === 'number' && c.waiting_here > 0 ? c.waiting_here : total;
+  const who = at.decider && oneLine(at.decider) ? words(at.decider, 24) : 'the owner';
+  const lead = `${String(n)} on ${who}, first: `;
+  return `${lead}${words(questionOf(tidy(plainly(asks[0]!.question, c, true, at))), ROOM - lead.length)}`;
 }
 
 /** The day the record wrote a row, when the row carries it; '' when it does not, which sorts as the oldest. */
@@ -516,20 +486,6 @@ export function learnedFirst(a: Brief, z: Brief): number {
   return fact(a) - fact(z) || far(a) - far(z) || (on === zon ? 0 : on > zon ? -1 : 1);
 }
 
-/** The most of a rule the card says: a rule is a line a session keeps in mind, not a paragraph. */
-const RULE_CHARS = 60;
-
-/**
- * How many rows a list has where the session stands: what `context` counted when it capped the list (`capRegister`'s
- * `here` and `everywhere`), else the rows it sent, with a `+` when it said there were more.
- */
-function countedOf(c: Context, role: AgentRole): { n: number; plus: string } {
-  const r = register(c, role) as (Context['registers'][number] & { here?: unknown; everywhere?: unknown }) | undefined;
-  const whole = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0;
-  if (r && whole(r.here) && whole(r.everywhere)) return { n: r.here + r.everywhere, plus: '' };
-  return { n: rowsOf(c, role).length, plus: r?.truncated ? '+' : '' };
-}
-
 /**
  * The rules the card leads Learned with: the ones `context` read from every learning (`rulesOf`, so a rule older than
  * the newest lessons is still here), else the ones among the learnings it sent.
@@ -541,48 +497,20 @@ function rulesFor(c: Context): Rules<Brief> {
 }
 
 /**
- * Learned and More. Learned leads with the record's own rules (AGT-B09), each cut at sixty characters, "and 2 more
- * rules" when there are more, then the lessons still standing that matter most (`learnedFirst`), three things at most.
- * More is what is there on demand, three at most, by count, then the Home page and the call: it names no key and no
- * skill. It leads with how many things went stale where the session stands (AGT-C18) and the read that names them,
- * said only for a whole number above zero: the count is the one thing in More a session can act on at once.
+ * Learned: the one learning that applies here, the shortest of the record's rules and the standing lessons `context`
+ * sent (they are already this project's first), cut to a line. Nothing when there is none.
  */
-function learnedAndMore(c: Context, at: CardAt, handedLeft: number): Slot[] {
+function learnedBrief(c: Context, at: CardAt): string | null {
   const rules = rulesFor(c);
-  const ruled = rules.rows.map((row) => words(plainly(wordsOf(row, 'lesson'), c, true, at), RULE_CHARS)).filter(Boolean);
   const isRule = new Set(rules.rows.map((row) => row.spoken));
+  /* SORTED BY `learnedFirst`, so of two the same length the method, this project's, the newest comes first. */
   const lessons = rowsOf(c, 'learnings').filter((row) => row.state === null || row.state === 'active').sort(learnedFirst);
-  const learned = lessons
-    .filter((row) => row.kind !== RULE && !isRule.has(row.spoken))
-    .map((row) => words(plainly(wordsOf(row, 'lesson'), c, true, at), 120))
-    .filter(Boolean)
-    .slice(0, Math.max(0, Math.min(LEARNED, PER_SLOT - ruled.length)));
-  const more: string[] = [];
-  if (typeof c.stale === 'number' && Number.isInteger(c.stale) && c.stale > 0) more.push(`${String(c.stale)} stale, read ${STALE_READ}`);
-  /* WHAT WAS TRIED IS SAID IN NEXT, in its writer's words, so More no longer counts it as dead ends. */
-  if (handedLeft > 0) more.push(`${String(handedLeft)} more handed to you`);
-  const grow = bearing(c);
-  if (grow) more.push(`${count(grow.learnings, 'learning')} for a skill`);
-  /* COUNTED BY `context` WHEN IT CAPPED THE LIST, and otherwise the standing lessons it sent, never one that was superseded. */
-  const learnt = countedOf(c, 'learnings');
-  const lessonsIn = learnt.n > rowsOf(c, 'learnings').length ? learnt.n : lessons.length;
-  if (lessonsIn > learned.length + ruled.length) more.push(`${String(lessonsIn)}${learnt.plus} learnings`);
-  const keys = countedOf(c, 'keys-index');
-  if (keys.n > 0) more.push(`${String(keys.n)}${keys.plus} ${keys.n === 1 && !keys.plus ? 'key' : 'keys'} by name`);
-  const skills = countedOf(c, 'skills');
-  if (skills.n > 0) more.push(`${String(skills.n)}${skills.plus} ${skills.n === 1 && !skills.plus ? 'skill' : 'skills'}`);
-  more.push(...(at.more ?? []).map((m) => words(m, 60)).filter(Boolean));
-  const home = at.home ? words(at.home, 40) : '';
-  /* "AND 2 MORE RULES" IS COUNTED FROM WHAT THE CUT LEFT: the lessons go first, so a rule cut is still said to be there. */
-  const rulesLeft = (shown: number): string => {
-    const left = rules.more + ruled.length - Math.min(shown, ruled.length);
-    return left > 0 ? ` · and ${count(left, 'more rule', 'more rules')}` : '';
-  };
-  const items = [...ruled, ...learned];
-  return [
-    ...(items.length > 0 ? [{ label: 'Learned', lead: '', items, tail: rulesLeft, least: 0 }] : []),
-    { label: 'More', lead: '', items: more.slice(0, PER_SLOT), tail: (shown: number) => `${shown > 0 ? ' · ' : ''}${home ? `Home page ${home}, read braindog:page/home · ` : ''}call context`, least: 0 },
-  ];
+  const all = [...rules.rows, ...lessons.filter((row) => row.kind !== RULE && !isRule.has(row.spoken))]
+    .map((row) => words(tidy(plainly(wordsOf(row, 'lesson'), c, true, at)), 400))
+    .filter(Boolean);
+  if (all.length === 0) return null;
+  const shortest = all.reduce((a, z) => ([...z].length < [...a].length ? z : a));
+  return words(shortest, ROOM);
 }
 
 /* ── an older command ──────────────────────────────────────────────────── */
@@ -609,36 +537,8 @@ function olderSlot(at: CardAt, now: number): Slot | null {
 
 /* ── the card ──────────────────────────────────────────────────────────── */
 
-/** What is cut past 120 words, in this order, each down to the number beside it: the brief's order. */
-const AIM_CUTS: [string, number][] = [['More', 0], ['Learned', 1], ['Decided', 1], ['Waiting', 2], ['Also', 1]];
-/** What is cut past 150 as well, after those. `More` at -1 is the line itself. */
-const MOST_CUTS: [string, number][] = [['Waiting', 1], ['Learned', 0], ['Signs', 1], ['Next', 1], ['More', -1]];
-
-/** The card's lines, every slot with nothing to say left out, and `More` while it stands. */
-const render = (head: string, slots: Slot[]): string[] => [head, ...slots.filter((s) => s.items.length > 0 || (s.label === 'More' && s.least >= 0)).map(lineOfSlot)];
-
-/** One cut from the first rule that still has something to cut; false when none has. */
-function cutOnce(slots: Slot[], rules: [string, number][]): boolean {
-  for (const [label, floor] of rules) {
-    const slot = slots.find((s) => s.label === label);
-    if (slot === undefined) continue;
-    if (floor < 0) {
-      if (slot.least < 0) continue;
-      slot.items = [];
-      slot.least = -1;
-      return true;
-    }
-    const stays = slot.stays ?? 0;
-    if (slot.items.length <= floor || slot.items.length <= stays) continue;
-    /* The step is Next's last things and its reason for being, so a row handed over goes before any of them does. */
-    slot.items.splice(slot.items.length - stays - 1, 1);
-    return true;
-  }
-  return false;
-}
-
 /** The lines that lose words first in the last resort: none of them is line one, the same-tree warning, Next or Update. */
-const SOFT = new Set(['Signs', 'Waiting', 'Decided', 'Learned', 'More']);
+const SOFT = new Set(['Signs', 'Waiting', 'Learned', 'More']);
 const labelOf = (line: string): string => line.slice(0, LABEL).trim();
 
 /**
@@ -668,18 +568,25 @@ function cutWords(lines: string[]): string[] {
 /**
  * The card for a context, drawn for who and where the session is (`at`) at the instant `now`.
  *
- * `next` is the Next line alone, as it stood before any cut, for a session that just compacted: the step it is on
- * without what it already read. `words` is the card's size as the sign `agent-card-words` reads it.
+ * `next` is the Next line alone, whole and as it stood, for a session that just compacted: the step it is on without
+ * what it already read. `words` is the card's size as the sign `agent-card-words` reads it.
  */
 export function card(c: Context, at: CardAt, now: number): Card {
   const own = at.run === undefined ? (c.session?.spoken ?? null) : at.run;
-  const head = firstLine(c, at, own);
   const next = nextSlot(c, at, own);
   const nextLine = next.slot === null ? null : lineOfSlot(next.slot);
-  const slots = [alsoSlot(c, own, at), next.slot, signsSlot(c), waitingSlot(c, at), decidedSlot(c), ...learnedAndMore(c, at, next.handedLeft), olderSlot(at, now)].filter((s): s is Slot => s !== null);
-  const size = () => wordCount(render(head, slots).join('\n'));
-  while (size() > CARD_AIM && cutOnce(slots, AIM_CUTS));
-  while (size() > CARD_MOST && cutOnce(slots, [...AIM_CUTS, ...MOST_CUTS]));
-  const said = cutWords(render(head, slots)).join('\n');
+  const extra = (slot: Slot | null): string[] => (slot === null ? [] : [lineOfSlot(slot)]);
+  const brief = (label: string, said: string | null): string[] => (said === null || oneLine(said) === '' ? [] : [labeled(label, said)]);
+  const lines = [
+    whoLine(c, at),
+    ...extra(alsoSlot(c, own, at)),
+    ...brief('Next', nextBrief(c, at, own)),
+    ...brief('Signs', signsBrief(c)),
+    ...brief('Waiting', waitingBrief(c, at)),
+    ...brief('Learned', learnedBrief(c, at)),
+    labeled('More', 'call context for the full picture'),
+    ...extra(olderSlot(at, now)),
+  ];
+  const said = cutWords(lines).join('\n');
   return { card: said, next: nextLine, words: wordCount(said) };
 }
