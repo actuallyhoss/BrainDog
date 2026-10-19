@@ -1,7 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { briefFromNote } from './brief.ts';
+import { briefFromNote, noteWithoutLeftovers } from './brief.ts';
+
+test('THE FULL NOTE LOSES ITS STATUS LINE AND A HEADING REPEATING THE NAME, AND NOTHING ELSE', () => {
+  const full = '# Lanternfish\n\nStatus in Old Tool: live. Kind: work.\n\n```chips\nusers | 12 | Fans | info\n```\n\n## Notes\nLaunch is set for spring.';
+  assert.equal(noteWithoutLeftovers(full, 'Lanternfish'), '```chips\nusers | 12 | Fans | info\n```\n\n## Notes\nLaunch is set for spring.');
+  assert.equal(noteWithoutLeftovers('# Other name\nBody', 'Lanternfish'), '# Other name\nBody');
+  assert.equal(noteWithoutLeftovers('Body\n# Lanternfish\nMore', 'Lanternfish'), 'Body\n# Lanternfish\nMore');
+  assert.equal(noteWithoutLeftovers('Status in plans: we are ahead.', 'Lanternfish'), 'Status in plans: we are ahead.');
+});
 
 const IMPORTED = [
   'Fan pages that pay their makers.',

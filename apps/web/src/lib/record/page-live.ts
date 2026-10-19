@@ -61,6 +61,7 @@ import { compile } from './where.ts';
 import { drawerOf } from '../page/kinds/index.ts';
 import { liveOf } from '../ui/face.ts';
 import { sourceRows } from './source-rows.ts';
+import { noteWithoutLeftovers } from './brief.ts';
 import { pathOf } from '../ui/icons.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
@@ -2314,7 +2315,13 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
       const refs = new Map<string, RefMap>();
       for (const [target, map] of mapped) if (map) refs.set(target, map);
       const drawn = blocks.map((b, i) => {
-        const block = blockOf(b, refs, now, me, names, runs);
+        const made = blockOf(b, refs, now, me, names, runs);
+        /* A PROJECT'S WHOLE NOTE LOSES WHAT AN IMPORT LEFT IN IT (`noteWithoutLeftovers`), its status line and a heading
+           repeating the page's own name; the page was given its title, so only a page about a row does it. */
+        const block =
+          made.kind === 'note' && made.document && typeof made.body === 'string' && page.param
+            ? { ...made, body: noteWithoutLeftovers(made.body, page.param.title) }
+            : made;
         const lent = linked.get(i);
         return lent && !block.cannot ? { ...block, linked: lent } : block;
       });

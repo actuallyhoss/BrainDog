@@ -38,3 +38,31 @@ export function briefFromNote(note: string, name = '', most = 2): string[] {
   }
   return out.slice(0, most);
 }
+
+/* An import's status line: "Status in <tool>: ... Kind: ...". Both halves, so a real sentence that starts alike stays. */
+const STATUS_LINE = /^\s*status in [^:]{1,40}:.*\bkind:/iu;
+
+/**
+ * A project's whole note without the two things an import left in it: its status line, and a leading "# <name>" heading
+ * that repeats the page's own title. Nothing else is touched, so chips fences and real prose draw as written.
+ */
+export function noteWithoutLeftovers(note: string, name: string): string {
+  const own = name.trim().toLowerCase();
+  let fenced = false;
+  let first = true;
+  const kept: string[] = [];
+  for (const raw of note.split(/\r?\n/u)) {
+    if (FENCE.test(raw)) fenced = !fenced;
+    else if (!fenced) {
+      if (STATUS_LINE.test(raw)) continue;
+      const head = /^\s*#\s+(.+?)\s*#*\s*$/u.exec(raw);
+      if (first && head && own !== '' && head[1]!.trim().toLowerCase() === own) {
+        first = false;
+        continue;
+      }
+    }
+    if (raw.trim() !== '') first = false;
+    kept.push(raw);
+  }
+  return kept.join('\n').replace(/^(?:[ \t]*\n)+/u, '');
+}
