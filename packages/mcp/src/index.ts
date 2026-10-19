@@ -2573,7 +2573,13 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
         /* ONE MORE THAN THE PAGE, and a limit under 1 as sent, so the record refuses it rather than answering one. */
         const got = await surface.governance({ ...args, limit: typeof n === 'number' && Number.isInteger(n) && n >= 1 ? n + 1 : n } as never, ctx);
         if (!got.ok || !Array.isArray(got.value)) return got as Result<{ rows: unknown[] }>;
-        const all = got.value.map((row: unknown) => (isObject(row) ? bare(Object.fromEntries(Object.entries(row).filter(([k]) => k !== 'body'))) : row));
+        /* ONE QUESTION ASKED BY ID KEEPS ITS OPTIONS (never the rest of the body), so the decision card can draw its buttons. */
+        const all = got.value.map((row: unknown) => {
+          if (!isObject(row)) return row;
+          const kept = bare(Object.fromEntries(Object.entries(row).filter(([k]) => k !== 'body'))) as Record<string, unknown>;
+          const options = args.id !== undefined && isObject(row.body) && Array.isArray(row.body.options) ? row.body.options : undefined;
+          return options === undefined ? kept : { ...kept, options };
+        });
         const rows = all.slice(0, n);
         const last = rows.at(-1);
         const cursor = all.length > n && isObject(last) && typeof last.id === 'string' ? last.id : undefined;

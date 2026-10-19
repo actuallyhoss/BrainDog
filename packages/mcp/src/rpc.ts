@@ -17,6 +17,7 @@ import { refused, type Result } from '@braindog/ports';
 import { INSTRUCTIONS } from './instructions.ts';
 
 export { INSTRUCTIONS };
+import { CARD_OF_TOOL, cardHtml, cardMeta, cardOf, cardResource, cardResources } from './cards.ts';
 import { HOUR, MINUTE, TEMPLATES, TOOLS, tools, ttlOf, type McpSurface, type Said, type Tool } from './index.ts';
 import { refusalBrief } from './brief.ts';
 
@@ -146,6 +147,8 @@ export const listedTool = (t: Tool) => ({
   annotations: t.writes
     ? { readOnlyHint: false, destructiveHint: t.destructive === true, idempotentHint: t.idempotent === true, openWorldHint: false }
     : { readOnlyHint: true, openWorldHint: false },
+  /* A CARD IS ATTACHED BY `_meta`; a host that does not know the key ignores it and shows the text lines. */
+  ...(CARD_OF_TOOL[t.name] === undefined ? {} : { _meta: cardMeta(CARD_OF_TOOL[t.name]!) }),
 });
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -386,7 +389,10 @@ async function dispatch<C>(
         return said(render({ result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }));
       const out = await mcp.answer(params.name, args, ctx);
       if (refused(out.result) && out.result.refusal.code === 'INTERNAL') hear(surface, ctx, { kind: 'internal' });
-      return said(render(out));
+      /* THE CARD'S DATA RIDES BESIDE THE ANSWER, only when this answer is one the card can draw. */
+      const drawn = out.result.ok ? cardOf(params.name, args, out.structured, origin) : null;
+      const shown = render(out);
+      return said(drawn === null ? shown : { ...shown, structuredContent: { ...out.structured, card: drawn } });
     }
 
     /* A minute, not an hour: the list names pages, and a page appears when its row does. */
@@ -395,7 +401,11 @@ async function dispatch<C>(
       if (wrong) return wrong;
       const listing = await mcp.resources(ctx);
       return said({
-        resources: listing.map(({ uri, name, description }) => ({ uri, name, description, mimeType: JSON_TYPE })),
+        resources: [
+          /* THE CARDS LEAD, each under its own type: MCP Apps hosts and ChatGPT name different ones for the same page. */
+          ...cardResources().map(({ uri, name, description, mimeType }) => ({ uri, name, description, mimeType })),
+          ...listing.map(({ uri, name, description }) => ({ uri, name, description, mimeType: JSON_TYPE })),
+        ],
         ttlMs: MINUTE,
         cacheScope: 'private',
       });
@@ -406,6 +416,9 @@ async function dispatch<C>(
 
     case 'resources/read': {
       if (typeof params.uri !== 'string') return fail(id, RPC.params, 'resources/read needs a uri.');
+      const card = cardResource(params.uri);
+      if (card !== undefined)
+        return said({ contents: [{ uri: card.uri, mimeType: card.mimeType, text: cardHtml(card.kind), _meta: { ui: { prefersBorder: false } } }], ttlMs: HOUR, cacheScope: 'public' });
       const r = await mcp.read(params.uri, ctx);
       if (!r.ok)
         return refused(r)
