@@ -68,6 +68,8 @@ export type RuleCard = {
   spoken: string;
   href: string | null;
 };
+/* NO OPTION PICTURES YET: the web's (apps/web option-visual.ts) need the account balance and month's spend, which the
+   governance answer does not carry, and a text-free picture of a change says nothing. Add them when the answer holds a ground. */
 export type Card = ProjectCard | DecisionCard | RuleCard;
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
