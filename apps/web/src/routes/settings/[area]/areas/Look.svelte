@@ -1,5 +1,5 @@
 <!--
-  Settings > Look: the two sheets the product's look is judged by (EXP-C01).
+  Settings > Look: the two sheets the product's look is judged by (EXP-C01), and the design book beside them (DIRECTION §45).
 
   "Controls and rows" and "Charts and marks", each drawn by the product's own parts from the record this is opened on.
   Any record opens them. A sheet is looked at by a person and said yes to once; a later build is judged beside the
@@ -14,6 +14,7 @@
 -->
 <script lang="ts">
   import SheetCharts from '$lib/design/SheetCharts.svelte';
+  import DesignBook from '$lib/design/DesignBook.svelte';
   import SheetControls from '$lib/design/SheetControls.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import type { AreaProps } from '../settings-state.svelte.ts';
@@ -21,7 +22,7 @@
   /* EVERY AREA TAKES THE SAME PROPS. The charts sheet reads the record's pages through the shell; the controls sheet reads nothing. */
   let props: AreaProps = $props();
 
-  const SHEETS = ['controls', 'charts'] as const;
+  const SHEETS = ['controls', 'charts', 'design'] as const;
   type Sheet = (typeof SHEETS)[number];
 
   const words = {
@@ -29,14 +30,15 @@
     which: 'Which sheet',
     controls: 'Controls and rows',
     charts: 'Charts and marks',
+    design: 'Design book',
   } as const;
 
-  const named = (): Sheet => (location.hash === '#charts' ? 'charts' : 'controls');
+  const named = (): Sheet => (location.hash === '#charts' ? 'charts' : location.hash === '#design' ? 'design' : 'controls');
   let sheet = $state<Sheet>(named());
 
   function choose(next: Sheet): void {
     sheet = next;
-    history.replaceState(history.state, '', `${location.pathname}${location.search}${next === 'charts' ? '#charts' : ''}`);
+    history.replaceState(history.state, '', `${location.pathname}${location.search}${next === 'controls' ? '' : `#${next}`}`);
   }
 </script>
 
@@ -53,6 +55,8 @@
 
   {#if sheet === 'charts'}
     <SheetCharts shell={props.shell} />
+  {:else if sheet === 'design'}
+    <DesignBook />
   {:else}
     <SheetControls />
   {/if}

@@ -109,3 +109,11 @@ test('neither sheet draws glass, a gradient or a shadow of its own', () => {
     assert.doesNotMatch(style, /#[0-9a-f]{3,8}\b|rgb\(/iu, `${name} names a colour outside the tokens`);
   }
 });
+
+test('the design book is generated from the renderer and the skin, and sits in the Look area', () => {
+  const book = read('./DesignBook.svelte');
+  for (const name of ['designBook', 'LOOK_B_CSS', 'SCALE_CSS', 'SHEET_NOW']) assert.match(book, new RegExp(`\\b${name}\\b`, 'u'), name);
+  assert.doesNotMatch(book.slice(book.indexOf('<style>')), /#[0-9a-f]{3,8}\b|rgb\(|gradient\(|box-shadow:(?! none)/iu, 'the book names no colour of its own');
+  assert.match(look, /import DesignBook from '\$lib\/design\/DesignBook\.svelte'/u);
+  assert.match(look, /design: 'Design book'/u);
+});
