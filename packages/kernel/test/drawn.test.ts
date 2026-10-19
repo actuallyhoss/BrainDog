@@ -253,3 +253,14 @@ test('A BOXED ACTIONS SECTION IS KEPT BY DEFAULT: a project with one scheduled a
   const odd = sketchpad().map((b, n) => (n === 3 ? ({ ...b, actions: null } as unknown as BlockResult) : b));
   assert.equal(whys(markDrawn(odd))[3], 'drawn');
 });
+
+test('A SERIES OF GAPS HOLDS NOTHING, a spec with no value on any row is unsaid', () => {
+  const lead = block({ kind: 'table', rows: [row({ title: 'a' })], matched: 1 });
+  const bars = (values: (number | null)[][]) => ({ bucket: 'month', current: '2026-10', keys: values[0]!.map((_, i) => `k${i}`), states: [], values, unit: null });
+  const gaps = block({ kind: 'series', bars: bars([[], []]) } as never);
+  const some = block({ kind: 'series', bars: bars([[null, 4], [null, null]]) } as never);
+  assert.deepEqual(whys(markDrawn([lead, gaps, some])), ['drawn', 'empty', 'drawn']);
+  const spec = (fields: PageRow['fields']) => block({ kind: 'spec', source: 'register.services', columns: [{ field: 'name' }, { field: 'cost' }], rows: [row(fields)], matched: 1 } as never);
+  assert.equal(unsaid(spec({ name: 'Kiln host' })), true);
+  assert.equal(unsaid(spec({ name: 'Kiln host', cost: '12' })), false);
+});

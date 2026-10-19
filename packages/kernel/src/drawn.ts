@@ -106,6 +106,9 @@ const saysEmpty = (b: Drawable): boolean => typeof b.empty === 'string' && b.emp
 /** A value somebody wrote: not nothing, not an empty string and not an empty list. Nought is a value. */
 const isSet = (v: unknown): boolean => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
 
+/** A series whose every bucket is a gap holds nothing: the record trims the run to where a value starts, and none did. */
+const barsNone = (b: Drawable): boolean => b.bars == null || (isObj(b.bars) && list(b.bars.values).every((line) => list(line).every((v) => v === null)));
+
 /** How many rows the block matched: the app's rows, or the record's count. */
 const matchedCount = (b: Drawable): number => (Array.isArray(b.matched) ? b.matched.length : typeof b.matched === 'number' ? b.matched : 0);
 
@@ -194,7 +197,7 @@ export function holdsNothing(b: Drawable): boolean {
     none(b.history) &&
     none(b.walks) &&
     b.walk == null &&
-    b.bars == null &&
+    barsNone(b) &&
     /* A FIGURE THAT READ NO ROW, no part and no whole, holds nothing as a list of none does. */
     (parts === null || (parts.groups.length === 0 && !parts.value))
   );
@@ -264,6 +267,18 @@ function cardsUnsaid(b: Drawable): boolean {
 }
 
 /**
+ * WHETHER A `spec` SAYS NOTHING: it read rows, and not one holds a value in the column that is its value (the second),
+ * so every row is a name over a dash and the renderer draws no row of it (`unvalued`, `drawnRows`).
+ */
+function valuesUnsaid(b: Drawable): boolean {
+  const rows = matchedRows(b);
+  const field = columnField(b, 1);
+  /* ONLY A LIST'S ROWS: a spec over deadlines or another computed source takes its cells from the read, not from fields. */
+  if (typeof b.source !== 'string' || !b.source.startsWith('register.')) return false;
+  return rows.length > 0 && field !== null && !rows.some((r) => isSet(held(r, field)) && String(held(r, field)).trim() !== '');
+}
+
+/**
  * WHETHER A BLOCK READS WHAT NO ROW HAS SAID: a chart over rows of which not one holds a column the chart is made of, a
  * figure's parts when no row the figure read sits in any part, a row of figures every one of which adds up a field
  * nobody filled in, or cards of which not one says anything (`cardsUnsaid`). Each draws only that a field is empty on
@@ -285,6 +300,7 @@ export function unsaid(b: Drawable): boolean {
   const figures = figuresOf(b);
   if (figures.length > 0) return figures.every(unsaidFigure);
   if (b.kind === 'cards') return cardsUnsaid(b);
+  if (b.kind === 'spec' || b.kind === 'params') return valuesUnsaid(b);
   const at = b.kind === 'progress' && b.range === true ? BANDS : PICTURED[b.kind];
   const rows = matchedRows(b);
   if (!at || rows.length === 0) return false;
