@@ -55,6 +55,9 @@ const folded = (said: string): string => said.toLowerCase().replace(/[^a-z0-9]+/
  */
 const notReached = 'The record could not be reached, so nothing was saved. Try again in a moment.';
 
+/** Where a person writes when retrying will not fix it. The same address the site and the Worker's mail footer name. */
+export const SUPPORT_EMAIL = 'support@brain.dog';
+
 export const shell = {
   /* the product */
   product: 'BrainDog',
@@ -123,7 +126,21 @@ export const shell = {
      about the record rather than an apology: nothing was written, because this screen never got as
      far as writing. */
   screenFailed: 'This screen did not load',
-  screenFailedBody: 'Nothing was changed. Try again, and if it happens twice, quote the request below.',
+  screenFailedBody: 'Nothing was changed. Load it again.',
+  /* THE ERROR PAGE, ONE LINE OF WHAT HAPPENED AND ONE BUTTON FOR WHAT TO DO. No request id and no status word: a person
+     cannot act on either. Support is named only on the last one, where waiting and retrying are not going to fix it. */
+  errorPage: {
+    offline: { title: 'You are offline', body: 'Check your connection and this loads again.', action: 'Load it again' },
+    wait: (seconds: number) => ({
+      title: 'Too many requests',
+      body: `Try again in ${seconds} ${seconds === 1 ? 'second' : 'seconds'}.`,
+      action: 'Try again',
+    }),
+    rolling: { title: 'BrainDog is updating', body: 'It will be back in a minute. Load it again then.', action: 'Load it again' },
+    broken: { title: 'This screen did not load', body: 'Nothing was changed. Load it again.', action: 'Load it again' },
+    stuck: (address: string) => `Still not working? Write to ${address}.`,
+    home: 'Back to Home',
+  },
   /* WHAT A FIGURE SAYS WHEN THE LIST UNDER IT IS EMPTY. Not a verdict — there is nothing to judge —
      and not silence either, because a bare `GBP 0.00` with no note beside it is the same tile a
      working figure draws. It names the list, so it points at what to do next. */

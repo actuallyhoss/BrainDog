@@ -18,16 +18,14 @@
 -->
 <script lang="ts">
   import { copy } from '../copy.ts';
-  import { openPalette } from '../palette/open.svelte.ts';
 
   import Button from './Button.svelte';
   import Empty from './Empty.svelte';
-  import Icon from './Icon.svelte';
 
   /* This screen's own words, in a `words` object in the module that draws them. */
   const words = {
     title: 'Nothing is at this address',
-    body: 'It may have moved, or a letter may be out of place. Search for what you were after, or start again from Home.',
+    body: 'The address may be mistyped, or the page has moved. Go back to Home.',
   } as const;
 
   let {
@@ -43,7 +41,6 @@
 
 <Empty kind="no-results" heading glyph="globe" {title} {body}>
   {#snippet actions()}
-    <Button weight="primary" onclick={openPalette}><Icon name="search" size="s" />{copy.search}</Button>
-    <Button href="/">{copy.home}</Button>
+    <Button weight="primary" href="/">{copy.errorPage.home}</Button>
   {/snippet}
 </Empty>

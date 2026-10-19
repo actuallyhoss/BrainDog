@@ -1,15 +1,20 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { copy } from '$lib/copy.ts';
+  import { SUPPORT_EMAIL } from '$lib/copy/shell.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Button from '$lib/ui/Button.svelte';
   import NotFound from '$lib/ui/NotFound.svelte';
-  import { rid } from '$lib/data/call.ts';
 
-  /* MINTED ONCE, WHEN THIS SCREEN EXISTS, and not on every render. The id names one failure; a
-     `$derived` would hand a person a different string each time something on the page changed,
-     which is the one way to make a quotable id worse than none. */
-  const requestId = rid();
+  /* WHICH FAILURE THIS IS decides the one line and the one button. A failed fetch has no status of its own, so the
+     browser saying it is offline outranks it; a 429 may carry the seconds to wait as `retry_after`. */
+  const words = copy.errorPage;
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const wait = Math.max(1, Math.ceil(Number((page.error as { retry_after?: unknown } | null)?.retry_after) || 30));
+  const said = $derived(
+    offline ? words.offline : page.status === 429 ? words.wait(wait) : page.status === 503 ? words.rolling : words.broken,
+  );
+  const stuck = $derived(said === words.broken);
 </script>
 
 <div class="page">
@@ -30,22 +35,16 @@
     every call and the host echoes and logs it (19 §6); there is nothing to look up for a path
     that was never a route.
   -->
-  {#if page.status === 404}
+  {#if page.status === 404 && !offline}
     <NotFound />
   {:else}
-    <!-- AND THE ONE ID IN THE PRODUCT THAT IS REAL. `50 §2.5` mints it client-side — ten base32
-         characters from `crypto.getRandomValues` — and sends it as `X-Request-Id` so both hosts can
-         echo and log it. It was the literal `r7k2m9qd4x` at eight call sites, identical on every
-         screen that could fail: two different failures quoting one id, and an id that identifies
-         nothing is the worst thing to put on an error screen, because it is the one string there
-         that has to mean something. Seven of those eight sites were not failures at all and no
-         longer offer one. -->
-    <Empty kind="error" heading title={copy.screenFailed} body={copy.screenFailedBody} rid={requestId}>
+    <!-- NO REQUEST ID HERE: it was a ten-character string a person could do nothing with. The Worker still logs one per call. -->
+    <Empty kind="error" heading title={said.title} body={said.body}>
       {#snippet actions()}
-        <Button weight="primary" onclick={() => location.reload()}>{copy.tryAgain}</Button>
-        <Button href="/">{copy.home}</Button>
+        <Button weight="primary" onclick={() => location.reload()}>{said.action}</Button>
       {/snippet}
     </Empty>
+    {#if stuck}<p class="stuck">{words.stuck(SUPPORT_EMAIL)}</p>{/if}
   {/if}
 </div>
 
@@ -55,5 +54,12 @@
      tile: a failure is a sentence, its request id and the two ways on, not a card. */
   .page {
     padding: var(--inset) var(--gutter) var(--sp-8);
+  }
+  /* Support, only under the failure a retry cannot mend; the muted text token and the page's own measure. */
+  .stuck {
+    margin: var(--sp-4) 0 0;
+    color: var(--ink2);
+    font-size: var(--t-sm);
+    max-width: 40ch;
   }
 </style>
