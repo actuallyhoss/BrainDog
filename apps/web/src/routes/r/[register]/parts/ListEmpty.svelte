@@ -27,6 +27,7 @@
   import type { RegisterDecl } from '$lib/record/schema.ts';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import NextStep from '$lib/ui/NextStep.svelte';
 
   let {
     kind,
@@ -63,7 +64,7 @@
       : `Nothing in ${decl.name} yet.`}
   query={kind === 'no-results' ? [q, saidPlainly(register, whereOf(filters))].filter(Boolean).join(' · ') : undefined}
   body={kind === 'no-data-yet'
-    ? decl.holds ? `${decl.name} holds ${decl.holds}.` : undefined
+    ? 'Your agent fills this as it works.'
     : kind === 'no-results' && q
       ? copy.searchesOnly(searched)
       : undefined}
@@ -74,6 +75,8 @@
          so the example offer went too. -->
     {#if kind === 'no-results'}
       <Button href="/r/{register}">{copy.clearFilters}</Button>
+    {:else if kind === 'no-data-yet'}
+      <NextStep />
     {/if}
   {/snippet}
 </Empty>

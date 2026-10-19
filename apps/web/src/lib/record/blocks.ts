@@ -1759,7 +1759,7 @@ export function draw(
         ...(block.where || !block.empty ? {} : { authored: true as const }),
         /* BE SPECIFIC ABOUT WHAT WILL BE HERE (19 §6). The register declares the sentence; every
            register does, and one screen was reading it. */
-        ...(held.holds ? { body: `${held.name} holds ${held.holds}.` } : {}),
+        body: 'Your agent fills this as it works.',
         /* AND ONE THING TO DO, when the surface knows where. A shared page does not: it is read-only
            and there is no list to open, so it gets the sentence and no button rather than a button
            that goes nowhere.
