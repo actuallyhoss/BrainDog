@@ -20,7 +20,7 @@
 -->
 <script lang="ts">
   import { BASE, apiBase, at, here } from '$lib/at.ts';
-  import { applyInset } from '$lib/shell.ts';
+  import { appPath, applyInset, onShell } from '$lib/shell.ts';
   /* Title-bar room for the Mac app: sets --shell-inset once, 0 in a browser. */
   applyInset();
   /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
@@ -80,6 +80,11 @@
   import { untrack } from 'svelte';
   import { beforeNavigate, goto, onNavigate } from '$app/navigation';
   import { page } from '$app/state';
+  /* The Mac app's Go menu and braindog://goto: only an address under /app moves the window (`appPath`). */
+  $effect(() => onShell('goto', (to) => {
+    const path = appPath(to);
+    if (path !== null) void goto(path);
+  }));
 
   let { data, children } = $props();
 

@@ -6,9 +6,19 @@ use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_updater::UpdaterExt;
 
 const HOME: &str = "https://brain.dog/app";
 const BRIDGE: &str = include_str!("bridge.js");
+
+/// The Go menu: menu id, label, shortcut and the /app path the web is sent. The web ignores anything outside /app.
+const GO: [(&str, &str, &str, &str); 5] = [
+    ("go-today", "Today", "CmdOrCtrl+1", "/app/"),
+    ("go-needs", "Needs you", "CmdOrCtrl+2", "/app/decide"),
+    ("go-projects", "Projects", "CmdOrCtrl+3", "/app/p/projects"),
+    ("go-money", "Money", "CmdOrCtrl+4", "/app/p/money"),
+    ("go-agents", "Agents", "CmdOrCtrl+5", "/app/p/agents"),
+];
 
 /// Where the window opens. A debug build may point at a local web app with BRAINDOG_URL; a release never does.
 fn home() -> Url {
@@ -74,9 +84,7 @@ fn handle_link(app: &AppHandle, raw: &str) {
     match u.host_str() {
         Some("auth") => {
             if let Some((_, code)) = u.query_pairs().find(|(k, _)| k == "code") {
-                // TODO(server): this route does not exist yet. The worker must (1) start Google sign-in when the
-                // browser asks for the desktop flavour, (2) end it by redirecting to braindog://auth?code=<one-time>,
-                // and (3) serve this page, which swaps the code for the usual session cookie in this window.
+                // The worker ends the desktop flavour of Google sign-in here; this page swaps the code for the cookie.
                 let mut to = home();
                 to.set_path("/app/signin/desktop");
                 to.query_pairs_mut().append_pair("code", &code);
@@ -89,6 +97,17 @@ fn handle_link(app: &AppHandle, raw: &str) {
         _ => {}
     }
     focus(app);
+}
+
+/// Ask the update feed (tauri.conf.json, plugins.updater) and install what is signed. Any failure is silent: no feed
+/// yet, offline and a bad signature all mean "no update", and the app keeps running.
+async fn check_update(app: AppHandle) {
+    let Ok(updater) = app.updater() else { return };
+    if let Ok(Some(update)) = updater.check().await {
+        if update.download_and_install(|_, _| {}, || {}).await.is_ok() {
+            let _ = app.notification().builder().title("BrainDog").body("An update is ready. Quit and reopen to use it.").show();
+        }
+    }
 }
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
@@ -115,7 +134,18 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let all = PredefinedMenuItem::select_all(app, None)?;
     let edit = Submenu::with_items(app, "Edit", true, &[&undo, &redo, &s4, &cut, &copy, &paste, &all])?;
 
-    let go = Submenu::with_items(app, "Go", true, &[&slash])?;
+    let mut go_items: Vec<MenuItem<tauri::Wry>> = Vec::new();
+    for (id, label, key, _) in GO {
+        go_items.push(MenuItem::with_id(app, id, label, true, Some(key))?);
+    }
+    // Settings keeps Cmd+, in the app menu; the Go copy has no shortcut so the two never clash.
+    let go_settings = MenuItem::with_id(app, "go-settings", "Settings", true, None::<&str>)?;
+    let go_sep = PredefinedMenuItem::separator(app)?;
+    let mut go_refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = go_items.iter().map(|i| i as _).collect();
+    go_refs.push(&go_settings);
+    go_refs.push(&go_sep);
+    go_refs.push(&slash);
+    let go = Submenu::with_items(app, "Go", true, &go_refs)?;
 
     let minimize = PredefinedMenuItem::minimize(app, None)?;
     let maximize = PredefinedMenuItem::maximize(app, None)?;
@@ -133,6 +163,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -148,7 +179,7 @@ pub fn run() {
         .menu(|app| build_menu(app))
         .on_menu_event(|app, event| match event.id().as_ref() {
             // The web decides what "goto" means; /app/settings is the path it is sent.
-            "settings" => {
+            "settings" | "go-settings" => {
                 focus(app);
                 emit(app, "goto", Some("/app/settings"));
             }
@@ -156,7 +187,12 @@ pub fn run() {
                 focus(app);
                 emit(app, "slash", None);
             }
-            _ => {}
+            id => {
+                if let Some((_, _, _, path)) = GO.iter().find(|g| g.0 == id) {
+                    focus(app);
+                    emit(app, "goto", Some(path));
+                }
+            }
         })
         .setup(|app| {
             let handle = app.handle().clone();
@@ -191,6 +227,10 @@ pub fn run() {
 
             let _ = handle.notification().request_permission();
             let _ = handle.global_shortcut().register("Alt+Space");
+
+            // Look for a signed update at launch; it installs and says so, and applies at the next start.
+            let updating = handle.clone();
+            tauri::async_runtime::spawn(async move { check_update(updating).await });
 
             let links = handle.clone();
             handle.deep_link().on_open_url(move |event| {

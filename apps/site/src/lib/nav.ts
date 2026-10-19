@@ -55,6 +55,7 @@ export const PLACES: readonly Place[] = [
   place('/changelog', 'changelog', true),
   place(SUPPORT, 'support', false),
   place(SECURITY, 'security', false),
+  place('/download', 'download', false),
   place('/legal', 'legal', false),
 ];
 

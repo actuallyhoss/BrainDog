@@ -52,7 +52,7 @@ const pageStatus = (launch: { public: boolean }): number => {
 test('the flag is off until the owner flips it, and it holds the page and its feed', () => {
   assert.equal(LAUNCH.public, false, 'LAUNCH.public is on: that is his word to give (LCH-A20), not a build');
   assert.equal(held(), true);
-  assert.deepEqual([...HELD], ['/changelog', '/changelog.xml', '/packs', '/pricing']);
+  assert.deepEqual([...HELD], ['/changelog', '/changelog.xml', '/packs', '/pricing', '/download']);
 });
 
 test('with the flag off the header, the footer, the 404 and the sitemap hold no changelog place', () => {
@@ -63,7 +63,7 @@ test('with the flag off the header, the footer, the 404 and the sitemap hold no 
   assert.ok(!LIVE.some((p) => p.path === '/changelog'), 'LIVE names the changelog while it is held');
   assert.ok(!PAGES.some((p) => p.path === '/changelog'), 'PAGES, which the 404 and the sitemap read, names the changelog');
   /* Nothing else is held: every other place stays. */
-  assert.deepEqual(off, PLACES.map((p) => p.path).filter((path) => path !== '/changelog' && path !== '/packs' && path !== '/pricing'));
+  assert.deepEqual(off, PLACES.map((p) => p.path).filter((path) => path !== '/changelog' && path !== '/packs' && path !== '/pricing' && path !== '/download'));
 });
 
 test('with a copy of the flag on the changelog is back in the header, in its old place', () => {

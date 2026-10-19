@@ -56,3 +56,13 @@ export function applyInset(): void {
   const root = (globalThis as { document?: Document }).document?.documentElement;
   if (root) root.style.setProperty('--shell-inset', `${isApp ? (shell()?.inset ?? 78) : 0}px`);
 }
+
+/**
+ * Where a shell `goto` may take the window: an address under /app and nothing else. Anything with a scheme, a host,
+ * a backslash or a `..` is ignored, so a link from outside cannot steer the app off itself. Null means ignore.
+ */
+export function appPath(arg: string | undefined, base = '/app'): string | null {
+  if (typeof arg !== 'string' || arg.length > 512 || /[\\\u0000-\u001f]|\.\./.test(arg)) return null;
+  if (arg !== base && !arg.startsWith(`${base}/`) && !arg.startsWith(`${base}?`)) return null;
+  return arg;
+}

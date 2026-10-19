@@ -39,15 +39,22 @@ An unsigned build runs on the Mac that made it. To give it to anyone else it mus
 password). Export the real values in the shell that runs `cargo tauri build`; the certificate stays in the keychain.
 `tauri.conf.json` has `signingIdentity: null` on purpose; nothing real is written in this folder.
 
+## Sign-in, menu and updates (batch 2)
+
+- **Google sign-in.** The sign-in page, inside the app, opens `/auth/google/start?desktop=1&challenge=` in the default
+  browser (the window keeps the PKCE verifier). The worker ends on `braindog://auth?code=`, a sealed one-time code
+  (two minutes, the unspent sign-in link inside it); the shell loads `/app/signin/desktop?code=`, which posts the code and
+  verifier to `/auth/google/desktop` and gets the session cookie in the window. Passkey and email link are unchanged.
+- **Go menu.** Today, Needs you, Projects, Money, Agents (Cmd+1 to 5), Settings (Cmd+,) and Slash (Cmd+K) send `goto`
+  with an `/app/...` path; the web layout follows it and ignores any other address. Projects, Money and Agents use
+  `/app/p/projects`, `/app/p/money` and `/app/p/agents`; change `GO` in `lib.rs` if those pages are named otherwise.
+- **Updater.** `tauri-plugin-updater` reads `https://brain.dog/desktop/latest.json` at launch and installs a signed
+  update. `plugins.updater.pubkey` in `tauri.conf.json` is a placeholder until the key is made (see
+  `signing.example.env`). The download page `/download` on the site is held until `LAUNCH.public`.
+
 ## Not done yet
 
-- **Google sign-in return.** The shell opens Google in the browser and handles `braindog://auth?code=...` by loading
-  `/app/signin/desktop?code=...` in the window. The server side does not exist: the worker must start the flow in a
-  desktop flavour, redirect to `braindog://auth?code=<one-time code>` at the end, and serve that page to swap the code
-  for a session. See the TODO(server) in `src-tauri/src/lib.rs`.
-- **Menu paths.** Settings sends `goto` with `/app/settings`, and `braindog://goto/<path>` sends the path; the web does
-  not listen for `goto` yet (`onShell('goto', ...)` has no caller) and must map them. Go menu has Slash only; the
-  Today, Projects, Needs you and Agents items wait on those routes.
-- **Updater and the DMG download** (batch B): signed updates need an updater key; the DMG goes to `brain.dog/download`.
+- **The signing sitting.** Generate the updater key, put its public half in `tauri.conf.json`, build signed and notarised,
+  publish the DMG and `latest.json` under `brain.dog/desktop/`, and fill the real file name into the site's download page.
 - **Deep link in dev.** macOS registers `braindog://` only for a built, installed app, not `cargo tauri dev`.
 - Nothing here has been compiled yet: the first `cargo tauri dev` may need small fixes.

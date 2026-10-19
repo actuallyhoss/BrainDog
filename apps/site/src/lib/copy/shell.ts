@@ -39,6 +39,10 @@ export const shell = {
       title: 'Legal · BrainDog',
       description: 'The licence BrainDog is published under, and its Terms of Service and Privacy Policy.',
     },
+    download: {
+      title: 'BrainDog for Mac',
+      description: 'The BrainDog app for Mac: the same record in its own window, with a shortcut to Slash from anywhere.',
+    },
     changelog: {
       title: 'Changelog · BrainDog',
       description: "What shipped in BrainDog and when, in the repository's own words.",
@@ -52,6 +56,7 @@ export const shell = {
     agents: 'Agents',
     packs: 'Packs',
     pricing: 'Pricing',
+    download: 'Download',
     docs: 'Docs',
     changelog: 'Changelog',
     support: 'Support',

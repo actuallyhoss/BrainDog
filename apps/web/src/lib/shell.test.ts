@@ -46,3 +46,12 @@ test('a payment page leaves this tab in a browser and goes to the shell in the a
   assert.equal(went.length, 1);
   delete g.location;
 });
+
+test('goto takes only an address under /app', async () => {
+  const { appPath } = await import('./shell.ts');
+  assert.equal(appPath('/app'), '/app');
+  assert.equal(appPath('/app/decide'), '/app/decide');
+  assert.equal(appPath('/app?x=1'), '/app?x=1');
+  for (const bad of [undefined, '', '/', '/apple', 'https://evil.example/app/x', '//evil.example', '/app/../etc', '/app\\evil', 'javascript:alert(1)'])
+    assert.equal(appPath(bad), null, String(bad));
+});

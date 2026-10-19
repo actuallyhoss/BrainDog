@@ -167,3 +167,73 @@ test('A NEW ADDRESS THROUGH GOOGLE MAKES NOBODY, against a real Directory: sign-
   assert.ok(!res.headers.getSetCookie().some((c) => c.startsWith('__Host-bd_s=')), 'a session was set');
   assert.equal(people(), 0, 'Google made a person');
 });
+
+/* THE MAC APP'S FLAVOUR: the callback hands a sealed code to braindog:// and sets no cookie; the window swaps it. */
+import { createHash } from 'node:crypto';
+
+const SECRET = 'k'.repeat(40);
+const VERIFIER = 'v'.repeat(43);
+const CHALLENGE = createHash('sha256').update(VERIFIER).digest('base64url');
+
+async function desktopStart(d: GoogleDoor) {
+  const res = await serveGoogle(new Request(`${ORIGIN}/auth/google/start?desktop=1&challenge=${CHALLENGE}`), '/auth/google/start', d);
+  const to = new URL(res.headers.get('location') ?? '');
+  return { res, cookie: (res.headers.get('set-cookie') ?? '').split(';')[0] ?? '', state: to.searchParams.get('state') ?? '', nonce: to.searchParams.get('nonce') ?? '' };
+}
+
+const swap = (d: GoogleDoor, body: unknown, origin = ORIGIN) =>
+  serveGoogle(
+    new Request(`${ORIGIN}/auth/google/desktop`, { method: 'POST', headers: { 'content-type': 'application/json', origin }, body: JSON.stringify(body) }),
+    '/auth/google/desktop',
+    d,
+  );
+
+async function handedCode() {
+  const { d: first } = door();
+  first.secret = SECRET;
+  const s = await desktopStart(first);
+  const { d, asked } = door({ claims: { nonce: s.nonce } });
+  d.secret = SECRET;
+  const res = await back(d, `code=abc&state=${s.state}`, s.cookie);
+  return { res, asked, d, code: new URL(res.headers.get('location') ?? 'x:').searchParams.get('code') ?? '' };
+}
+
+test('THE DESKTOP CALLBACK SENDS A CODE TO THE APP AND SPENDS NOTHING', async () => {
+  const { res, asked } = await handedCode();
+  assert.match(res.headers.get('location') ?? '', /^braindog:\/\/auth\?code=[^.]+\.[^.]+\.\d+\.[^.]+$/);
+  assert.ok(!res.headers.getSetCookie().some((c) => c.startsWith('__Host-bd_s=')), 'a session cookie was set in the browser');
+  assert.ok(!(res.headers.get('location') ?? '').includes(SID), 'a session token is in the address');
+  assert.deepEqual(asked.map((c) => c.flow), ['magic.start'], 'the link was spent in the browser');
+});
+
+test('THE WINDOW SWAPS THE CODE FOR THE COOKIE, with the verifier that made the challenge', async () => {
+  const { d, code, asked } = await handedCode();
+  const ok = await swap(d, { code, verifier: VERIFIER });
+  assert.equal(ok.status, 200);
+  assert.ok(ok.headers.getSetCookie().some((c) => c.startsWith(`__Host-bd_s=${SID}; `)));
+  assert.deepEqual(asked.at(-1), { flow: 'magic.redeem', linkToken: LINK, ip: '203.0.113.9' });
+});
+
+test('A CODE IS REFUSED with another verifier, another origin, a forged seal or after two minutes', async () => {
+  const { d, code } = await handedCode();
+  const refused = async (res: Response) => {
+    assert.notEqual(res.status, 200);
+    assert.equal(res.headers.getSetCookie().length, 0);
+  };
+  await refused(await swap(d, { code, verifier: 'w'.repeat(43) }));
+  await refused(await swap(d, { code, verifier: VERIFIER }, 'https://evil.example'));
+  const [link, , exp] = code.split('.');
+  await refused(await swap(d, { code: `${link}.${createHash('sha256').update('w'.repeat(43)).digest('base64url')}.${exp}.${code.split('.')[3]}`, verifier: 'w'.repeat(43) }));
+  d.now = () => NOW + 121_000;
+  await refused(await swap(d, { code, verifier: VERIFIER }));
+});
+
+test('THE DESKTOP START NEEDS A CHALLENGE and a secret to seal with', async () => {
+  const { d } = door();
+  d.secret = SECRET;
+  const bad = await serveGoogle(new Request(`${ORIGIN}/auth/google/start?desktop=1&challenge=short`), '/auth/google/start', d);
+  assert.equal(new URL(bad.headers.get('location') ?? '').searchParams.get('google'), 'failed');
+  d.secret = '';
+  const none = await serveGoogle(new Request(`${ORIGIN}/auth/google/start?desktop=1&challenge=${CHALLENGE}`), '/auth/google/start', d);
+  assert.equal(new URL(none.headers.get('location') ?? '').searchParams.get('google'), 'failed');
+});

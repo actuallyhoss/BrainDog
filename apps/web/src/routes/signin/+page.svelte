@@ -38,6 +38,8 @@
     type Who,
   } from '$lib/auth.ts';
   import { at, BASE } from '$lib/at.ts';
+  import { desktopStart, keepVerifier, pkce } from '$lib/desktop-signin.ts';
+  import { isApp, openOutside } from '$lib/shell.ts';
   import { copy } from '$lib/copy.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { googleStart, googleWhy, onwardOf, stateOf, type GoogleWhy, type How, type Shelf, type Step, type Ways } from '$lib/signin.ts';
@@ -53,6 +55,13 @@
   import { words } from './words.ts';
 
   const here = support();
+
+  /* IN THE MAC APP GOOGLE RUNS IN THE DEFAULT BROWSER (it refuses an app window) and comes back as a one-time code. */
+  async function openGoogleInBrowser(e: MouseEvent): Promise<void> {
+    e.preventDefault();
+    const { verifier, challenge } = await pkce();
+    if (keepVerifier(verifier)) openOutside(desktopStart(goTo, origin, challenge));
+  }
 
   let asked = $state<Said<Methods> | null>(null);
   let entered = $state<{ who: Who; via: 'passkey' | 'key' | 'link' } | null>(null);
@@ -534,7 +543,7 @@
           <!-- A LINK AND NOT A PRESS: the host sends the browser to Google and back, and the page is loaded again signed
                in. The mark is drawn in the ink, as every glyph here is. -->
           {#if doors.google}
-            <Button href={googleStart(goTo, origin)} data-sveltekit-reload>
+            <Button href={googleStart(goTo, origin)} data-sveltekit-reload onclick={isApp ? openGoogleInBrowser : undefined}>
               <svg class="g" viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"

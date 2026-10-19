@@ -406,9 +406,9 @@ const SIGNUP: ReadonlySet<string> = new Set<SignupFlow>(['signup.start', 'signup
  * for a sign-in link and has it spent, through the two `magic` flows it already has. A self-host has no Google
  * client, so `serveAuth` answers each row as a way in this host does not offer.
  */
-export type GoogleFlow = 'google.start' | 'google.callback';
+export type GoogleFlow = 'google.start' | 'google.callback' | 'google.desktop';
 
-const GOOGLE: ReadonlySet<string> = new Set<GoogleFlow>(['google.start', 'google.callback']);
+const GOOGLE: ReadonlySet<string> = new Set<GoogleFlow>(['google.start', 'google.callback', 'google.desktop']);
 
 
 /** One sign-in route: where it is, who serves it, and what it needs. */
@@ -460,6 +460,7 @@ export const AUTH_ROUTES: readonly AuthRoute[] = [
   { path: '/auth/signup/name', method: 'GET', flow: 'signup.name', on: 'worker', needs: 'nothing', what: 'Whether a name for a new record is free, `?slug=`, and why not when it is not.' },
   { path: '/auth/google/start', method: 'GET', flow: 'google.start', on: 'worker', needs: 'nothing', what: 'Send the browser to Google to say which address it is signed in as. `?next=` is where to land afterwards.' },
   { path: '/auth/google/callback', method: 'GET', flow: 'google.callback', on: 'worker', needs: 'nothing', what: 'Back from Google: an address somebody here has is signed in, and any other is sent to the sign-in page told why.' },
+  { path: '/auth/google/desktop', method: 'POST', flow: 'google.desktop', on: 'worker', needs: 'nothing', what: 'The Mac app swaps the one-time code from `braindog://auth` and its PKCE verifier for the session cookie. `?desktop=1&challenge=` on the start asks for that flavour.' },
   { path: '/auth/claim/mint', method: 'POST', flow: 'claim.mint', on: 'worker', needs: 'operator', what: 'A new 24-hour claim link for somebody already provisioned.' },
   { path: '/auth/provision', method: 'POST', flow: 'provision', on: 'worker', needs: 'operator', what: 'A record, its Directory rows and a 24-hour claim link, handed to the operator.' },
   { path: '/auth/suspend', method: 'POST', flow: 'suspend', on: 'worker', needs: 'operator', what: 'Stop somebody signing in, `{ email }`, ending every session they hold, or let them in again, `{ email, suspended: false }`.' },

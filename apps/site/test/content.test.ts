@@ -43,6 +43,7 @@ const REQUIRED: readonly string[] = shown([
   'agents.html',
   /* `shown` drops what launch.ts holds (pricing, the changelog), which the build does not write. */
   'pricing.html',
+  'download.html',
   'docs.html',
   'changelog.html',
   'support.html',

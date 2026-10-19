@@ -4296,6 +4296,7 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
       mode,
       clientId: (env.GOOGLE_CLIENT_ID ?? '').trim(),
       clientSecret: (env.GOOGLE_CLIENT_SECRET ?? '').trim(),
+      secret: env.SESSION_SECRET ?? '',
       ip: request.headers.get('cf-connecting-ip') ?? '',
       ask: (call) => directory.auth(call) as unknown as Promise<AuthResult>,
     });
