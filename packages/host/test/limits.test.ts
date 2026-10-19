@@ -100,7 +100,7 @@ test('A NEW MINUTE STARTS AT ZERO, AND THE KEYS OF THE MINUTE THAT CLOSED ARE GO
   assert.deepEqual(await l.limit('token:t_a', 'write'), { ok: false, retryAfter: 1 });
   /* The one wait whose sentence differs, and the first draft said "after 1 seconds" to whoever read it. */
   const last = (await limits.refusedFor(1).json()) as { refusal: { fix: string } };
-  assert.match(last.refusal.fix, /after 1 second\.$/);
+  assert.match(last.refusal.fix, /in 1 second\.$/);
 
   c.at = MINUTE_START + 60_000;
   await spend(l, 'token:t_a', 'write', 120);

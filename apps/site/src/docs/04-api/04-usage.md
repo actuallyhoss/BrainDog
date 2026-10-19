@@ -18,7 +18,7 @@ An MCP call counts as a read, whichever tool it calls, because the host counts i
 Past a budget, the answer is 429:
 
 ```code | json
-{"ok": false, "refusal": {"code": "RATE_LIMITED", "fix": "This caller has sent as many requests as a minute allows. The same request is answered again after 60 seconds.", "retry_after": 60}}
+{"ok": false, "refusal": {"code": "RATE_LIMITED", "fix": "Too many requests just now. Try again in 60 seconds.", "retry_after": 60}}
 ```
 
 The same number is in the `Retry-After` header. Wait that long and send the same request; nothing else needs to change. The window is a fixed minute, so a caller can see up to twice the budget go through across the moment one minute ends and the next begins.

@@ -17,6 +17,7 @@
 
 import type { Refusal } from '@braindog/ports';
 
+import { MCP_PER_MINUTE, tooManyLine } from './abuse.ts';
 import { ROUTES } from './index.ts';
 
 /**
@@ -42,7 +43,7 @@ export const WRITE_PER_MINUTE = 120;
 export const POLL_PER_MINUTE = 240;
 
 /** Which budget a request spends. Separate budgets, so a burst of writes never starves reads, and not the reverse. */
-export type LimitClass = 'read' | 'write' | 'poll';
+export type LimitClass = 'read' | 'write' | 'poll' | 'mcp';
 
 /** A limiter's answer: go on, or wait this many whole seconds. */
 export type Verdict = { ok: true } | { ok: false; retryAfter: number };
@@ -107,7 +108,7 @@ export function classOf(route: string | undefined): LimitClass {
 }
 
 const WINDOW_MS = 60_000;
-const PER_MINUTE: Readonly<Record<LimitClass, number>> = { read: READ_PER_MINUTE, write: WRITE_PER_MINUTE, poll: POLL_PER_MINUTE };
+const PER_MINUTE: Readonly<Record<LimitClass, number>> = { read: READ_PER_MINUTE, write: WRITE_PER_MINUTE, poll: POLL_PER_MINUTE, mcp: MCP_PER_MINUTE };
 
 /**
  * A fixed sixty-second window per key, for a host with no binding to ask.
@@ -168,10 +169,11 @@ export type RateLimitBinding = { limit(options: { key: string }): Promise<{ succ
  * A POLL WITH NO `RL_POLL` SPENDS THE READ BUDGET, as it did before it had one, so a deployment that has not bound the
  * new binding yet limits the poll exactly as it always has rather than not at all.
  */
-export function bindingLimiter(bindings: { read?: RateLimitBinding | undefined; write?: RateLimitBinding | undefined; poll?: RateLimitBinding | undefined }): Limiter {
+/* AN UNBOUND `mcp` SPENDS THE READ BUDGET, as an unbound poll does, so a deployment without `RL_MCP` limits /mcp as it always did. */
+export function bindingLimiter(bindings: { read?: RateLimitBinding | undefined; write?: RateLimitBinding | undefined; poll?: RateLimitBinding | undefined; mcp?: RateLimitBinding | undefined }): Limiter {
   return {
     async limit(key, cls) {
-      const binding = cls === 'poll' ? (bindings.poll ?? bindings.read) : bindings[cls];
+      const binding = cls === 'poll' ? (bindings.poll ?? bindings.read) : cls === 'mcp' ? (bindings.mcp ?? bindings.read) : bindings[cls];
       if (binding === undefined) return { ok: true };
       const { success } = await binding.limit({ key });
       return success ? { ok: true } : { ok: false, retryAfter: WINDOW_MS / 1000 };
@@ -192,7 +194,7 @@ export function refusedFor(retryAfter: number): Response {
   const wait = Number.isFinite(retryAfter) ? Math.max(1, Math.ceil(retryAfter)) : WINDOW_MS / 1000;
   const refusal: Refusal = {
     code: 'RATE_LIMITED',
-    fix: `Too many requests just now. Try again in ${wait} ${wait === 1 ? 'second' : 'seconds'}.`,
+    fix: tooManyLine(wait),
     retry_after: wait,
   };
   return new Response(JSON.stringify({ ok: false, refusal }), {
