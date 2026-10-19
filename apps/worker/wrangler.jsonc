@@ -725,7 +725,10 @@
         /* THE VERSION POLL'S OWN MINUTE (`POLL_PER_MINUTE`): an open tab asks `/api/version` every 1.5 s while it has
            focus, and that must never be refused because the same person's screens spent the read budget. Unbound, the
            poll spends `RL_READ` as it did before (`bindingLimiter`). */
-        { "name": "RL_POLL", "namespace_id": "1003", "simple": { "limit": 240, "period": 60 } }
+        { "name": "RL_POLL", "namespace_id": "1003", "simple": { "limit": 240, "period": 60 } },
+        /* THE MCP DOOR'S OWN MINUTE FOR ONE TOKEN (`MCP_PER_MINUTE`, 300), so an agent loop is stopped without spending the
+           reads a person's screens share. Unbound, /mcp spends `RL_READ` as it did before. The namespace is made by the deploy. */
+        { "name": "RL_MCP", "namespace_id": "1004", "simple": { "limit": 300, "period": 60 } }
       ]
 
       /* The same drafted blocks as alpha, without the suffix, less `ratelimits`, which is bound above. `TELEMETRY` waits

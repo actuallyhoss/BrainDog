@@ -2604,6 +2604,32 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     },
 
     /**
+     * One more hit under `key` in a fixed window of `seconds`, `cost` at a time (a file's bytes cost its length), and
+     * whether the window's total is still within `most`. The table is `ABUSE` in `@braindog/host/abuse`.
+     *
+     * KEPT IN `dir_fail` UNDER `rl:`, with `until` always set, so the sign-in prune keeps the row to the window's end and
+     * no lockout reads it. Past the window the next hit starts a new one. The total is capped at `most + cost` so a flood
+     * stores one small number, and a refusal does not extend the wait. Rows past their window are swept on each call.
+     */
+    abuseHit: (key: string, seconds: number, most: number, cost: number): { ok: boolean; retryAfter: number } => {
+      const bad = (n: number) => !Number.isSafeInteger(n) || n < 1;
+      if (key.length === 0 || key.length > 200 || bad(seconds) || bad(most) || bad(cost)) return { ok: false, retryAfter: 60 };
+      const now = clock.now();
+      sql.exec("DELETE FROM dir_fail WHERE key LIKE 'rl:%' AND until <= ?", now);
+      const row = sql.one<{ n: number; until: number }>(
+        `INSERT INTO dir_fail (key, n, first, until) VALUES (?1, ?5, ?2, ?3)
+         ON CONFLICT (key) DO UPDATE SET
+           n     = CASE WHEN until <= ?2 THEN ?5 ELSE MIN(n + ?5, ?4 + ?5) END,
+           first = CASE WHEN until <= ?2 THEN ?2 ELSE first END,
+           until = CASE WHEN until <= ?2 THEN ?3 ELSE until END
+         RETURNING n, until`,
+        key, now, now + seconds * 1000, most, cost,
+      );
+      if (row === undefined) return { ok: false, retryAfter: 60 };
+      return { ok: row.n <= most, retryAfter: Math.max(1, Math.ceil((Number(row.until) - now) / 1000)) };
+    },
+
+    /**
      * How many trials agents have run on this record since midnight UTC of `at` (`script-try-cap.ts`): every metered
      * trial writes its `try_agent_` event to `dir_usage_run`, so the ledger already holds the count.
      */

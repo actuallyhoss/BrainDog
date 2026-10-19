@@ -122,6 +122,8 @@ import type { Verified } from '@braindog/kernel';
    statement, and the JSON lines. */
 import { crashed } from '@braindog/host';
 import { bindingLimiter, classOf, limitKey, refusedFor, type LimitClass, type LimitDoor, type RateLimitBinding } from '@braindog/host/limits';
+import { ABUSE, tooManyLine, type AbuseName } from '@braindog/host/abuse';
+import { guardBody } from './body-cap.ts';
 import { codeOf, guarded } from '@braindog/ports';
 import { KERNEL_MIGRATION, type Ack } from '@braindog/kernel';
 import { doorPath, op, outboxFields, type AckedRow } from './oplog.ts';
@@ -326,6 +328,8 @@ type Env = {
   RL_WRITE?: RateLimitBinding;
   /** The version poll's own budget, 240 a minute (`POLL_PER_MINUTE`). Unbound, the poll spends `RL_READ`. */
   RL_POLL?: RateLimitBinding;
+  /** The MCP door's own minute for one token, 300 (`MCP_PER_MINUTE`). Unbound, /mcp spends `RL_READ` as it always did. */
+  RL_MCP?: RateLimitBinding;
   /**
    * Who may make an account here (`launch.ts`): `open`, `invite` (a new address needs a code from `/account/ops/invite`),
    * and anything else, unset included, is closed. A var in each environment, beside `BILLING`.
@@ -2282,6 +2286,11 @@ export class Directory$ extends DurableObject<Env> {
     return this.#directory().firstReadHit(key, day, most);
   }
 
+  /** One more hit in a counted window, and whether it is within `most` (`abuseHit` in the Directory; the table is `@braindog/host/abuse`). */
+  abuseHit(key: string, seconds: number, most: number, cost: number): { ok: boolean; retryAfter: number } {
+    return this.#directory().abuseHit(key, seconds, most, cost);
+  }
+
   /** How many trials agents ran on `record` since midnight UTC of `at`: the record's daily cap of twenty (`script-try-cap.ts`). */
   trialsToday(record: string, at: number): number {
     return this.#directory().trialsToday(record, at);
@@ -2959,12 +2968,50 @@ const classAt = (pathname: string): LimitClass => classOf(/^\/+api\/+([^/]+)\/*$
 async function overLimit(env: Env, door: LimitDoor | null, request: Request, cls: LimitClass): Promise<Response | null> {
   const key = limitKey(door, request.headers.get('cf-connecting-ip') ?? '');
   try {
-    const said = await bindingLimiter({ read: env.RL_READ, write: env.RL_WRITE, poll: env.RL_POLL }).limit(key, cls);
+    const said = await bindingLimiter({ read: env.RL_READ, write: env.RL_WRITE, poll: env.RL_POLL, mcp: env.RL_MCP }).limit(key, cls);
     return said.ok ? null : refusedFor(said.retryAfter);
   } catch (e) {
     op({ op: 'limit', ok: false, class: cls, error: e instanceof Error ? e.message : String(e) }, 'error');
     return null;
   }
+}
+
+/**
+ * One hit against a named abuse limit (`ABUSE`), counted in the Directory: `null` to go on, or the 429 with `retry_after`
+ * and the plain line. `who` is the address or the record id the rule counts (`by`). `cost` is how much this hit weighs
+ * (a file's bytes). A Directory that throws opens the door and writes an `op: 'limit'` line, as `overLimit` does: a counter
+ * that is down is no reason to turn every stranger and every record away.
+ */
+async function abusive(env: Env, name: AbuseName, who: string, cost = 1): Promise<Response | null> {
+  const wait = await abuseWait(env, name, who, cost);
+  return wait === null ? null : refusedFor(wait);
+}
+
+/** The same count as the seconds to wait, or `null` to go on, for a door that answers in its own shape. */
+async function abuseWait(env: Env, name: AbuseName, who: string, cost = 1): Promise<number | null> {
+  const rule = ABUSE[name];
+  try {
+    const said = await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).abuseHit(`rl:${name}:${who}`, rule.seconds, rule.most, cost);
+    return said.ok ? null : said.retryAfter;
+  } catch (e) {
+    op({ op: 'limit', ok: false, class: name, error: e instanceof Error ? e.message : String(e) }, 'error');
+    return null;
+  }
+}
+
+/** The address Cloudflare wrote, which a caller cannot choose. */
+const addressOf = (request: Request): string => request.headers.get('cf-connecting-ip') ?? '';
+
+/**
+ * The `/auth/*` doors a stranger can spend mail or a bot check on, by address, on top of the write budget and the
+ * Directory's own lockouts. Only a POST is counted; a GET of the sign-up form is the read budget's.
+ */
+async function authAbuse(env: Env, request: Request, pathname: string): Promise<Response | null> {
+  if (request.method !== 'POST') return null;
+  const path = pathname.replace(/\/+/g, '/').replace(/(.)\/+$/, '$1');
+  const name: AbuseName | null =
+    path === '/auth/magic/start' ? 'signinLink' : path === '/auth/apply' ? 'apply' : path === '/auth/signup/start' || path === '/auth/signup/verify' ? 'signup' : null;
+  return name === null ? null : abusive(env, name, addressOf(request));
 }
 
 /**
@@ -3195,6 +3242,11 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        on `PUBLIC_HOST` and a 308 to `/app/healthz` on a legacy host for a caller sending `accept: text/html`, so a monitor
        either read the Worker as down or followed the redirect to the app shell and read somebody else's 200. */
     if (HEALTHZ.test(url.pathname)) return healthz(request, env.BRAINDOG_BUILD, launchState(env), request.method === 'GET' ? await nightOf(env) : undefined);
+    /* NO POST BODY OVER ITS DOOR'S CEILING IS READ BY ANYTHING BELOW (`body-cap.ts`): a 413 with the plain line, here, before
+       sign-in, a record or a model is asked. A door with a tighter cap of its own keeps it. */
+    const sized = await guardBody(request);
+    if (sized instanceof Response) return sized;
+    request = sized;
     if (isAdminHost(request, env.PUBLIC_HOST)) {
       const page = serveAdmin(request);
       if (page) return page;
@@ -3210,7 +3262,8 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     /* SIGN-IN FIRST, AND IT IS THE DIRECTORY'S: nothing under `/auth/` reaches a record. LIMITED BY ADDRESS BEFORE THE
        DIRECTORY IS ASKED, on top of its own lockouts, because nobody at this door has proved who they are yet: the
        address is the one thing a caller cannot choose here (`cf-connecting-ip`). */
-    if (servesAuth(url.pathname)) return (await overLimit(env, null, request, SAFE_METHODS.has(request.method) ? 'read' : 'write')) ?? signIn(request, env, ctx);
+    if (servesAuth(url.pathname))
+      return (await authAbuse(env, request, url.pathname)) ?? (await overLimit(env, null, request, SAFE_METHODS.has(request.method) ? 'read' : 'write')) ?? signIn(request, env, ctx);
     if (servesAccount(url.pathname)) return account(request, env, ctx);
     /* OAUTH 2.1, WITH BRAINDOG AS ITS OWN AUTHORIZATION SERVER: the metadata an MCP client
        discovers from `/mcp`'s 401, and the endpoints it signs in by. Before `/mcp` and every record door, because none
@@ -3274,6 +3327,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
         },
         bearer: bearerDeps(env),
         limit: (who, cls) => overLimit(env, who, request, cls),
+        bytes: (record, n) => abusive(env, 'uploadDay', record, n),
       });
     /* `/app` IS THE APP, AND `/app/<slug>/api/*` IS THAT RECORD'S API (§2.4). The slug is stripped here, because no
        route pattern can pick it out, and handed to the door, which has the Directory check it before anything is
@@ -3318,7 +3372,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
       return seenDoor(request, {
         on: (env.COUNT_VISITS ?? '').trim() === 'yes',
         host: env.PUBLIC_HOST ?? '',
-        limit: (r) => overLimit(env, null, r, 'write'),
+        limit: async (r) => (await overLimit(env, null, r, 'write')) ?? (await abusive(env, 'seen', addressOf(r))),
         count: (call) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).seen(call),
       });
     /* THE KEY DOORS NAME THEIR RECORD BY THE GRANT, AND ONLY AT THE ROOT. A grant under a slug would be a second way to
@@ -3703,6 +3757,10 @@ function arrivals(env: Env): CloudIngestDeps {
        record offered a verified webhook to every webhook pattern in declaration order
        (test/arrive-ingest.test.ts). Mail names none. */
     arrives: async (rec, arrival) => {
+      /* AN HOUR OF ARRIVALS PER RECORD (`ABUSE.inboxHour`), counted here and not at the door because only a verified path
+         reaches this line: a stranger who knows a record id cannot spend its hour with guesses. */
+      const held = await abuseWait(env, 'inboxHour', rec);
+      if (held !== null) return { ok: false, refusal: { code: 'RATE_LIMITED', fix: tooManyLine(held), retry_after: held } };
       const out = await env.RECORD.get(env.RECORD.idFromName(rec)).arrive({
         channel: arrival.channel,
         headers: arrival.headers,
@@ -3858,9 +3916,9 @@ async function agent(request: Request, env: Env): Promise<Response> {
      Without a public host there is no address to name, and the 401 is as it was. */
   const metadata = env.PUBLIC_HOST ? `https://${env.PUBLIC_HOST}/.well-known/oauth-protected-resource` : undefined;
   if ('status' in found) return found.status === 403 ? json({ ok: false, refusal: found.refusal }, 403) : unknownAgent(metadata);
-  /* THE TOKEN'S MINUTE BEFORE THE RECORD READS THE BODY, and always the read budget: which tool is called is inside a
+  /* THE TOKEN'S MINUTE BEFORE THE RECORD READS THE BODY, and always the MCP budget (`RL_MCP`, else the read one): which tool is called is inside a
      body nobody has parsed yet (`classOf`), and the record still decides whether a write is allowed. */
-  const over = await overLimit(env, { door: 'bearer', ctx: found.ctx }, request, 'read');
+  const over = await overLimit(env, { door: 'bearer', ctx: found.ctx }, request, 'mcp');
   if (over !== null) return over;
   return env.RECORD.get(env.RECORD.idFromName(found.record)).fetch(inward(request, found.ctx));
 }
