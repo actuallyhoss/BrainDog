@@ -105,6 +105,15 @@
     text-decoration: none;
   }
 
+  /* A finger needs the full target the layout gate measures. */
+  @media (pointer: coarse) {
+    .l-name {
+      display: inline-flex;
+      align-items: center;
+      min-block-size: var(--tap);
+    }
+  }
+
   .l-note,
   .l-who {
     color: var(--dim);

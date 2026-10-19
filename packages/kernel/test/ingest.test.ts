@@ -1227,7 +1227,7 @@ test('THE MINOR UNIT IS ISO 4217’S, AND ONE TABLE SAYS IT', async () => {
  * somebody remembered. The skipped names are outputs and caches, never authored.
  */
 function* sources(dir: string): Generator<string> {
-  const SKIP = new Set(['node_modules', '.git', '.svelte-kit', '.wrangler', '.scratch', 'dist', 'coverage', 'shots']);
+  const SKIP = new Set(['node_modules', '.git', '.svelte-kit', '.wrangler', '.scratch', '.claude', 'dist', 'coverage', 'shots']);
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {

@@ -225,6 +225,13 @@
     cursor: pointer;
   }
 
+  /* A finger needs the full target the layout gate measures. */
+  @media (pointer: coarse) {
+    .more {
+      min-block-size: var(--tap);
+    }
+  }
+
   .more :global(svg) {
     transition: transform var(--d-state) var(--ease-out);
   }
