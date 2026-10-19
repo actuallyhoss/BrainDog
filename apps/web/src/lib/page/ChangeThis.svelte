@@ -31,6 +31,7 @@
     kinds,
     kindNames,
     pinned,
+    start = '',
     reread,
   }: {
     open?: boolean | undefined;
@@ -42,6 +43,8 @@
     kindNames: Readonly<Record<string, string>>;
     /** The keys he pinned on this page. */
     pinned: readonly string[];
+    /** A line to change by on opening, from Slash; empty opens blank. */
+    start?: string | undefined;
     reread: () => Promise<void>;
   } = $props();
 
@@ -123,8 +126,9 @@
   $effect(() => {
     if (!open) return;
     phase = 'ask';
-    text = '';
+    text = start;
     fix = '';
+    if (start.trim() !== '') queueMicrotask(() => void run(false));
   });
 
   /* CLOSED WITH THE CHANGE STILL UNANSWERED KEEPS IT, and leaves the way back in a toast. */

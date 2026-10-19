@@ -44,6 +44,7 @@
 
 <script lang="ts">
   import { tick } from 'svelte';
+  import { goto } from '$app/navigation';
   import { apiBase } from '../at.ts';
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
@@ -67,6 +68,7 @@
   import BlockEditor from './BlockEditor.svelte';
   import { composeWords, type Composed } from './compose.ts';
   import MakeComponent from './MakeComponent.svelte';
+  import { askedIn, CHANGE_EVENT, holdLine, keyInFocus, slashEntryWords, withoutEntry } from './slash-entry.ts';
   import { listOf, shelfWords, type Declared, type Shelved } from './shelf.ts';
   import type { LookUndo } from '$lib/record/arrange-look.ts';
   import { layoutOf, slotOf } from './layout.ts';
@@ -202,6 +204,27 @@
   /* MAKE A COMPONENT AND THE SHELF (DIRECTION §45). A composed block is added like a picked one, so it is drawn on the
      page at once and written only by Done; `draft` is the one added block still awaiting Keep, Shelf or Throw away. */
   let making = $state(false);
+  /* A "Make ..." LINE FROM SLASH (the palette): the composer opens on it and draws it at once. */
+  let startLine = $state('');
+
+  /* THE LINE IS READ ONCE AND TAKEN OUT OF THE ADDRESS, so Back and a reload never repeat it. A make goes to the composer;
+     a change goes to the block in focus, or is held until the person opens the menu of the block they mean. */
+  let entered = '';
+  $effect(() => {
+    const got = askedIn(route.url.search);
+    if (!got || entered === route.url.href || !mayChange) return;
+    entered = route.url.href;
+    void goto(withoutEntry(route.url), { replaceState: true, noScroll: true, keepFocus: true });
+    if (got.verb === 'make') {
+      startLine = got.line;
+      making = true;
+      return;
+    }
+    const key = keyInFocus(document.activeElement);
+    if (key !== null) return void window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { key, line: got.line } }));
+    holdLine(got.line);
+    toasts.push(slashEntryWords.which);
+  });
   let draft = $state<{ i: number; name: string; said: string; block: Declared } | null>(null);
 
   function drawn(c: Composed) {
@@ -490,7 +513,12 @@
     bind:open={making}
     {slug}
     current={bindTo}
-    ondraft={drawn}
+    start={startLine}
+    ondraft={(c) => {
+      /* A DRAFT FROM SLASH ARRIVES OUTSIDE EDIT LAYOUT, so the mode begins first and the block is added once it is on. */
+      if (!arranging) beginArrange();
+      void tick().then(() => drawn(c));
+    }}
     onmodel={async () => {
       arrangement.cancel();
       await reread();

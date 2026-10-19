@@ -70,6 +70,7 @@
   import { tokensOf as lineTokens, untoken, type Chip } from './tokens.ts';
   import { homeSlugOf, labels as heardLabels, relabel, singularOf } from '../voice.ts';
   import type { Shell } from '../record/boot-live.ts';
+  import { entryHref, slashEntryWords, slashLine } from '../page/slash-entry.ts';
   import { customise, type Change, type Look, type Place } from './customise.ts';
   import { FILL, asked as pageAsked, maker as pageMaker, paging, pressed as pagePressed, rowTitle as pageRow, whoOf, type Paging } from './new-page.ts';
   import { apply as applyChange, keptNow, lookNow, pageMenu } from './customise-apply.ts';
@@ -921,6 +922,11 @@
     const plainAt = plainMade ? commands({ ...live, creation: plainMade }).find((c) => c.act === 'add') : undefined;
     if (plainMade && plainAt && into)
       kept.push({ id: 'c-add-plain', title: createWords.plain(into.one ?? into.name), detail: plainMade.title, href: null, group: createWords.plainGroup, icon: plainAt.icon, act: plainAt.act, creation: plainMade, plain: true });
+    /* "MAKE ..." AND "CHANGE ..." GO TO THE PAGE (DIRECTION §45): the first row, since a person who typed the verb means it. */
+    const entry = parsed.prefix === null ? slashLine(parsed.text) : null;
+    const toPage = entry ? entryHref(entry, pageHere ? page.url.pathname : null) : null;
+    if (entry && toPage)
+      kept.unshift({ id: `c-${entry.verb}`, title: slashEntryWords[entry.verb](entry.line), href: toPage, group: '', icon: entry.verb === 'make' ? 'plus' : 'edit' });
     const question = offersSlash({ slash: slashHere, prefix, text, pending, places: kept.filter((r) => r.group !== copy.commands && r.plain !== true).length });
     if (question !== null) kept.push({ id: 'slash', title: copy.askSlash(question), href: null, group: '', icon: 'search', ask: question });
     return kept;

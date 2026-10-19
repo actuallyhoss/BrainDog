@@ -21,6 +21,7 @@
     open = $bindable(false),
     slug,
     current,
+    start = '',
     ondraft,
     onmodel,
   }: {
@@ -28,6 +29,8 @@
     slug: string;
     /** The list the page is about, for a line that names none. */
     current: string | null;
+    /** A line to draw on opening, from Slash; empty opens blank. */
+    start?: string | undefined;
     /** A composed block, to be drawn on the page as a draft. */
     ondraft: (composed: Composed) => void;
     /** The model's draft was kept, so the page behind reads itself again. */
@@ -65,9 +68,10 @@
   /* EACH OPENING STARTS BLANK. */
   $effect(() => {
     if (!open) return;
-    text = '';
+    text = start;
     fix = '';
     phase = 'ask';
+    if (start.trim() !== '') queueMicrotask(run);
   });
 </script>
 

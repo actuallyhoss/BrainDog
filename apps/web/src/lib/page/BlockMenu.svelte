@@ -75,6 +75,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { actionsFor, editOf, hideBody, laidAfter, laidOf, placeOf, saidOf, words, type Action, type ChangeAt, type Edit, type Laid, type MenuBlock } from './block-menu.ts';
   import { layoutOf } from './layout.ts';
+  import { CHANGE_EVENT, takeLine } from './slash-entry.ts';
   import { retireLook, writeLook } from './look.ts';
 
   let {
@@ -211,16 +212,32 @@
   /* LOADED ON THE FIRST ASK AND KEPT, so a close that leaves a change unanswered can still push its Undo. */
   let askLoaded = $state(false);
   let pins = $state.raw<readonly string[]>([]);
+  /* A LINE FROM SLASH: the sheet opens on it and makes the change at once. */
+  let startLine = $state('');
+
+  async function openChange(line: string) {
+    pins = (await laid())?.live?.pinned ?? [];
+    startLine = line;
+    askLoaded = true;
+    asking = true;
+  }
+
+  /* "Change ..." IN SLASH NAMES THE BLOCK IN FOCUS by its key; only that block's menu answers. */
+  $effect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ key: string; line: string }>).detail;
+      if (d.key === block.key) void openChange(d.line);
+    };
+    window.addEventListener(CHANGE_EVENT, on);
+    return () => window.removeEventListener(CHANGE_EVENT, on);
+  });
 
   /** A press: the next look written, the page read again, and the line that says so with its way back. */
   async function press(action: Action) {
     open = false;
     if (busy || action.disabled) return;
     if (action.id === 'this') {
-      pins = (await laid())?.live?.pinned ?? [];
-      askLoaded = true;
-      asking = true;
-      return;
+      return void (await openChange(takeLine()));
     }
     busy = true;
     try {
@@ -315,7 +332,7 @@
 
 {#if askLoaded}
   {#await import('./ChangeThis.svelte') then { default: ChangeThis }}
-    <ChangeThis bind:open={asking} {block} {slug} {name} kinds={change?.kinds ?? []} kindNames={copy.kindNames} pinned={pins} {reread} />
+    <ChangeThis bind:open={asking} {block} {slug} {name} kinds={change?.kinds ?? []} kindNames={copy.kindNames} pinned={pins} start={startLine} {reread} />
   {/await}
 {/if}
 
