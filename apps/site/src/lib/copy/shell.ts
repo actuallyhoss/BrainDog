@@ -68,7 +68,7 @@ export const shell = {
   /** The page a mistyped address lands on. Its list of pages is `nav.ts`'s, so it cannot leave one out. */
   notFound: {
     title: 'There is no page here',
-    lede: 'The address may be mistyped, or the page may have moved. These are the pages brain.dog has.',
+    lede: 'The address may be mistyped, or the page has moved. Pick where you meant to go.',
   },
 
   /** The dark footer: the brand and its line, three groups (`lib/site/footer.ts`) and the company's name. */
