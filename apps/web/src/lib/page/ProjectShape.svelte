@@ -32,6 +32,8 @@
     money: { in: Figure | null; out: Figure | null; owed: Figure | null };
   };
   let read = $state.raw<Read | null>(null);
+  /* THE KEY WHOSE READ HAS ENDED, however it ended: the hold lasts only while its own read is out, never past it. */
+  let settled = $state('');
   let figures: FigureReader | null = null;
 
   $effect(() => {
@@ -40,25 +42,40 @@
     const key = `${r}#${n}`;
     untrack(() => {
       read = null;
-      void load(r, n, key);
+      void load(r, n, key).finally(() => {
+        settled = key;
+      });
     });
   });
 
+  /* A read that fails is a read that said nothing: the blocks it feeds go without it and the others still draw. */
+  const quiet = <T,>(p: Promise<T>, none: T): Promise<T> => p.catch(() => none);
+
   async function load(r: string, n: number, key: string) {
-    const base = apiBase();
-    const [row, told, links] = await Promise.all([rowReader(base).read(r, n), readHistory(base, r, n), linkReader(base).read(r, n)]);
-    if (key !== `${register}#${seq}` || row.from !== 'live' || !row.entry || !isProject(REGISTERS[r])) return;
-    const decl = REGISTERS[r]!;
-    const name = String(row.entry.fields[decl.title] ?? '').trim();
-    const incoming = links.from === 'live' ? links.groups.map((g) => ({ decl: REGISTERS[g.register], rows: g.rows })) : [];
-    /* AN ID IS NOT A NAME: a line by someone the page has not named is shown without its byline. */
-    const history = (told.from === 'live' ? told.lines : []).map((l) => ({ note: l.note, by: /^p_/u.test(l.by) ? '' : l.by, at: l.at }));
-    figures ??= figureReader(base);
-    const f = figures;
-    const [i, o, w] =
-      name === '' ? [null, null, null] : await Promise.all([f.scalar('project-in-month', name), f.scalar('project-out-month', name), f.scalar('project-owed', name)]);
-    if (key !== `${register}#${seq}`) return;
-    read = { key, fields: row.entry.fields, incoming, history, money: { in: i, out: o, owed: w } };
+    try {
+      const base = apiBase();
+      const [row, told, links] = await Promise.all([
+        rowReader(base).read(r, n),
+        quiet<Awaited<ReturnType<typeof readHistory>> | null>(readHistory(base, r, n), null),
+        quiet<Awaited<ReturnType<ReturnType<typeof linkReader>['read']>> | null>(linkReader(base).read(r, n), null),
+      ]);
+      if (key !== `${register}#${seq}` || row.from !== 'live' || !row.entry || !isProject(REGISTERS[r])) return;
+      const decl = REGISTERS[r]!;
+      const name = String(row.entry.fields[decl.title] ?? '').trim();
+      const incoming = links?.from === 'live' ? links.groups.map((g) => ({ decl: REGISTERS[g.register], rows: g.rows })) : [];
+      /* AN ID IS NOT A NAME: a line by someone the page has not named is shown without its byline. */
+      const history = (told?.from === 'live' ? told.lines : []).map((l) => ({ note: l.note, by: /^p_/u.test(l.by) ? '' : l.by, at: l.at }));
+      figures ??= figureReader(base);
+      const f = figures;
+      const [i, o, w] =
+        name === ''
+          ? [null, null, null]
+          : await Promise.all(['project-in-month', 'project-out-month', 'project-owed'].map((m) => quiet(f.scalar(m, name), null)));
+      if (key !== `${register}#${seq}`) return;
+      read = { key, fields: row.entry.fields, incoming, history, money: { in: i ?? null, out: o ?? null, owed: w ?? null } };
+    } catch {
+      /* Nothing to draw: the page goes on without the shape, and the hold is let go by the caller. */
+    }
   }
 
   const shape = $derived(
@@ -68,7 +85,7 @@
   );
   const said = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
   /* A PROJECTS LIST KNOWN BEFORE ITS ROW ANSWERS holds a little height, so the declared blocks wait where they will be. */
-  const holds = $derived(read === null && isProject(REGISTERS[register]));
+  const holds = $derived(read === null && settled !== `${register}#${seq}` && isProject(REGISTERS[register]));
 </script>
 
 {#if shape && blocksOf(shape.facts).length > 0}
