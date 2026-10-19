@@ -102,6 +102,19 @@ export type CashLine = { label: string | null; amount: string; value?: number | 
 /** A bill or an invoice coming up, with its amount signed by which way the money goes. */
 export type DueRow = { seq: number; what: string; amount: string | null; out: boolean; due: string | null; late: boolean };
 
+/** One reminder line an automation put on Today. */
+export type ReminderLine = { text: string; at: string };
+
+/** The reminders as the record answers them, newest first; anything that is not a line is left out. */
+export function remindersOf(raw: unknown): ReminderLine[] {
+  const lines = typeof raw === 'object' && raw !== null ? (raw as { lines?: unknown }).lines : undefined;
+  if (!Array.isArray(lines)) return [];
+  return lines.flatMap((l): ReminderLine[] => {
+    const x = l as { text?: unknown; at?: unknown } | null;
+    return x && typeof x.text === 'string' && x.text.trim() !== '' && typeof x.at === 'string' ? [{ text: x.text, at: x.at }] : [];
+  });
+}
+
 export type Today = {
   now: number;
   /** `null` when the record holds no tasks list. */
@@ -128,6 +141,8 @@ export type Today = {
   host?: string | null;
   /** Added: the reader's midnight, epoch ms, which the day's spans are drawn from. */
   dayStart?: number;
+  /** Added: the lines automations put on Today. Empty when there are none or the record cannot say. */
+  reminders?: ReminderLine[];
 };
 
 export type TodayRead = { ok: true; value: Today } | { ok: false; refusal: { code: string; fix: string } };
@@ -622,12 +637,14 @@ export async function readToday(base: string, io?: Fetch, at?: number): Promise<
   const books = b.registers.find((r) => r.id === 'books')?.count ?? 0;
   const today = dayOf(now);
   const dayStart = midnightOf(now);
-  const [queue, work, cash, sessions, walks] = await Promise.all([
+  const [queue, work, cash, sessions, walks, reminded] = await Promise.all([
     drawn(client).catch(() => ({ questions: [], runs: [] })),
     tasksFor(client, held, today).catch(() => null),
     moneyFor(client, held, books, today).catch(() => null),
     sessionsFor(client, held, dayStart, now).catch(() => null),
     held.has('accounts') ? walkFor(client, base, b).catch(() => []) : Promise.resolve([]),
+    /* A RECORD THAT CANNOT SAY, or a reader who may not, has no reminders: the tile is simply not drawn. */
+    client.call<unknown>('todayReminders').then((out) => (out.ok ? remindersOf(out.value) : [])).catch(() => []),
   ]);
   /* THE WALK OF THE CURRENCY THE CASH FIGURE IS IN, so the line under the figure is about that figure. */
   const forecast = cash && cash.cash.length > 0 ? forecastOf(walks, today, 13, cash.cash[0]?.currency ?? null) : null;
@@ -657,6 +674,7 @@ export async function readToday(base: string, io?: Fetch, at?: number): Promise<
       sessions,
       host,
       dayStart,
+      reminders: reminded,
     },
   };
 }

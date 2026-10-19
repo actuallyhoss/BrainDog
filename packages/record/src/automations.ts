@@ -468,6 +468,8 @@ export type AutomationRow = {
   last_at: string | null;
   /** One sentence on why it has not fired, when `fired` is 0, and `null` otherwise (`idleSaid`). */
   why_idle: string | null;
+  /** How many times it ran or landed its work in the last seven days, counted as `fired` is. */
+  week: number;
   /**
    * The same key for every rule that does the same thing to the same list: the list, the path, and each action with
    * the field it acts on (`familyOf`). The page draws "Category by payee, 57 rules" as one line by it. A handle, never
@@ -608,11 +610,12 @@ const runsOf = (sql: Sql, bare: string): number => sql.one<{ n: number }>('SELEC
  * How many times an inline rule's work landed, from the log: a line it signed on an entry, outside a note, once per entry
  * per triggering write, since one patch writes a line per field. The same sum migration 34 back-filled `rule_stat` by.
  */
-const writesOf = (sql: Sql, bare: string): number =>
+const writesOf = (sql: Sql, bare: string, since = ''): number =>
   sql.one<{ n: number }>(
-    `SELECT count(*) AS n FROM (SELECT 1 FROM event WHERE actor = ? AND target_kind = 'entry' AND target LIKE 'entry:%' AND kind <> 'note'
+    `SELECT count(*) AS n FROM (SELECT 1 FROM event WHERE actor = ? AND target_kind = 'entry' AND target LIKE 'entry:%' AND kind <> 'note' AND ts >= ?
      GROUP BY coalesce(batch, id), target)`,
     `rule:${bare}`,
+    since,
   )?.n ?? 0;
 
 function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: Body } {
@@ -657,6 +660,12 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
     month.runs += r.n;
     if (r.state === 'done' || r.state === 'failed' || r.state === 'cancelled') month[r.state] += r.n;
   }
+  /* THE LAST SEVEN DAYS, counted the way the whole count is: an inline rule by its writes, any other by its runs. */
+  const weekFrom = new Date(nowMs - 7 * 86_400_000).toISOString();
+  const week =
+    pathOf(body) === 'inline'
+      ? writesOf(sql, bare, weekFrom)
+      : (sql.one<{ n: number }>('SELECT count(*) AS n FROM automation_run WHERE rule = ? AND started_at >= ?', bare, weekFrom)?.n ?? 0);
   return {
     body,
     row: {
@@ -678,6 +687,7 @@ function row(sql: Sql, d: Declared, nowMs: number): { row: AutomationRow; body: 
       fired,
       last_at,
       why_idle: fired > 0 ? null : idleSaid(sql, d.id, body),
+      week,
       family: familyOf(body),
     },
   };

@@ -128,6 +128,7 @@ export const hubWords = {
   /* WHAT A RULE HAS DONE, from the record's whole count: how often and the day it last did, or never. */
   ranCount: (n: number, when: string) => `Ran ${times(n)}${when ? `${n === 1 ? ', ' : ', last '}${when}` : ''}.`,
   neverRan: 'Never ran.',
+  thisWeek: (n: number) => (n === 0 ? 'None this week.' : `${n.toLocaleString('en')} this week.`),
 
   /* ── the tiles above the lists, each a chart and the one line saying what it means ────────────── */
   runsMonth: 'Runs this month',
@@ -247,6 +248,8 @@ export type Counted = AutomationRow & {
   last_at?: string | null | undefined;
   why_idle?: string | null | undefined;
   family?: string | null | undefined;
+  /** Runs in the last seven days, when the record counts them. */
+  week?: number | undefined;
 };
 
 /** When a count's last firing was, as a person says a day: today, yesterday, "on 3 Oct", and the year when not this one. */
@@ -273,7 +276,8 @@ export function countSaid(row: Counted, now: number): string {
   if (typeof row.fired !== 'number') return '';
   if (row.fired <= 0) return [hubWords.neverRan, row.why_idle?.trim() ?? ''].filter(Boolean).join(' ');
   const when = row.last_at ? onDay(row.last_at, now) : '';
-  return hubWords.ranCount(row.fired, when);
+  /* THE WEEK FOLLOWS THE WHOLE COUNT, so a busy rule and a quiet one read differently at a glance. */
+  return typeof row.week === 'number' ? `${hubWords.ranCount(row.fired, when)} ${hubWords.thisWeek(row.week)}` : hubWords.ranCount(row.fired, when);
 }
 
 /**

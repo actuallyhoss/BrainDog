@@ -732,6 +732,8 @@ export type AutomationRow = {
   last_at?: string | null;
   /** One sentence on why it has not fired, when `fired` is 0, and `null` otherwise. */
   why_idle?: string | null;
+  /** Times it ran or landed its work in the last seven days. Absent from a host older than the count. */
+  week?: number;
   /** The key rules of one shape share (same trigger, list and kinds of action), so a page can draw them as one line. A handle, never shown. */
   family?: string | null;
 };
@@ -1949,6 +1951,8 @@ export function createClient(options: ClientOptions) {
     cancelRun: (run: string) => call<RunCancelled>('cancelRun', { run }),
     /** Whether an automation's body would install, without installing it: where it is wrong, if it is. READ+. */
     checkAutomation: (args: { body: unknown }) => call<Answer<'checkAutomation'>>('checkAutomation', args as Record<string, unknown>),
+    /** The reminder lines automations put on Today. READ+. */
+    todayReminders: () => call<Answer<'todayReminders'>>('todayReminders'),
     automationSentence: (args: { sentence: string; rule?: string }) => call<Answer<'automationSentence'>>('automationSentence', args as Record<string, unknown>),
     /** What an automation's body would do to one sample, step by step, writing nothing. READ+. */
     tryAutomation: (args: { body: unknown; sample: unknown }) =>

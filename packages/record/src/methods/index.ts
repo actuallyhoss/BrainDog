@@ -27,6 +27,7 @@ import { methods as agents } from './agents.ts';
 import { methods as keys } from './keys.ts';
 import { methods as automations } from './automations.ts';
 import { methods as automationSentence } from './automation-sentence.ts';
+import { methods as todayReminders } from './today-reminders.ts';
 import { methods as slashDraft } from './slash-draft.ts';
 import { methods as comments } from './comments.ts';
 import { methods as vaultPassphrase } from './vault-passphrase.ts';
@@ -174,6 +175,7 @@ export function methods(deps: RecordDeps) {
     ...keys(deps),
     ...automations(deps),
     ...automationSentence(deps),
+    ...todayReminders(deps),
     ...slashDraft(deps),
     ...comments(deps),
     ...vaultPassphrase(deps),

@@ -39,7 +39,18 @@ export type Replay =
   | { kind: 'time'; register: string; field: string; within: number; where: string }
   | { kind: 'arrival'; where: string };
 
-export type Sentenced = { ok: true; body: FlowDecl & Record<string, unknown>; said: string; replay: Replay; notes: string[] } | { ok: false; why: string };
+/** One alternative for a part of the trigger: its words, and the text to put in each part (by index) when it is picked. */
+export type TriggerOption = { label: string; set: Readonly<Record<number, string>> };
+/** A piece of the trigger sentence. The chips are the pressable kinds; `text` is the glue between them. */
+export type Part = { kind: 'text' | 'thing' | 'list' | 'door' | 'timing' | 'condition'; text: string; options?: TriggerOption[] | undefined };
+export type ActionOption = { label: string; text: string };
+/**
+ * The sentence in pieces, so each can be pressed: join the trigger parts' text after "When ", then a comma, then the
+ * actions joined by " and ". Picking an option changes the text, and the caller reads the new sentence again.
+ */
+export type SentenceParts = { trigger: Part[]; actions: string[]; options: ActionOption[] };
+
+export type Sentenced = { ok: true; body: FlowDecl & Record<string, unknown>; said: string; replay: Replay; notes: string[]; parts: SentenceParts } | { ok: false; why: string };
 
 /** The fields of an arrival a `where` may name (`INBOX_RAW` in `@braindog/where`), in the words a person says them. */
 const ARRIVAL_FIELDS: readonly SentenceField[] = [
@@ -106,6 +117,11 @@ function fieldFor(fields: readonly SentenceField[], word: string, types?: readon
 
 const DATES = ['day', 'instant'] as const;
 
+const labelOf = (f: SentenceField): string => f.label ?? f.id.replace(/_/gu, ' ');
+const joined = (parts: readonly Part[]): string => `When ${parts.map((p) => p.text).join('')}`;
+/** Lists a picker offers, so a record with hundreds of them does not draw a wall. */
+const MOST_OPTIONS = 30;
+
 /** The date a bare "due" means: a field called so, else the list's only date. */
 function dueField(list: SentenceList, word: string): SentenceField | null {
   return fieldFor(list.fields, word, DATES) ?? (() => {
@@ -116,7 +132,7 @@ function dueField(list: SentenceList, word: string): SentenceField | null {
 
 /* ── where ─────────────────────────────────────────────────────────── */
 
-type Where = { when: string; said: string };
+type Where = { when: string; said: string; or: boolean; clauses: { field: SentenceField; said: string }[] };
 
 const OPS: [RegExp, string][] = [
   [/^is not empty\b/iu, 'is set'],
@@ -154,6 +170,7 @@ function whereOf(text: string, fields: readonly SentenceField[]): Where | { why:
   if (new Set(joiners).size > 1) return { why: 'Use only "and" or only "or" between the conditions, not both.' };
   const out: string[] = [];
   const said: string[] = [];
+  const read: { field: SentenceField; said: string }[] = [];
   for (const clause of clauses) {
     const body = clause.trim();
     const f = [...fields].sort((a, b) => Math.max(...fieldWords(b).map((n) => n.length)) - Math.max(...fieldWords(a).map((n) => n.length))).find((x) => fieldWords(x).some((n) => lower(body).startsWith(`${n} `) || lower(body) === n));
@@ -167,10 +184,39 @@ function whereOf(text: string, fields: readonly SentenceField[]): Where | { why:
     if (!bare && value === '') return { why: `"${body}" needs a value after ${op[1]}.` };
     const typed = op[1] === 'contains' && /\s/u.test(value) ? `"${value}"` : value;
     out.push(bare ? `${f.id} ${op[1]}` : `${f.id} ${op[1]} ${typed}`);
-    said.push(bare ? `${f.label ?? f.id.replace(/_/gu, ' ')} ${op[1]}` : `${f.label ?? f.id.replace(/_/gu, ' ')} ${op[1]} ${value}`);
+    said.push(bare ? `${labelOf(f)} ${op[1]}` : `${labelOf(f)} ${op[1]} ${value}`);
+    read.push({ field: f, said: said.at(-1)! });
   }
   const or = joiners[0] === 'or';
-  return { when: out.join(or ? ', or ' : ', '), said: said.join(or ? ' or ' : ' and ') };
+  return { when: out.join(or ? ', or ' : ', '), said: said.join(or ? ' or ' : ' and '), or, clauses: read };
+}
+
+/** The conditions as chips: each swaps its closed word, or its field, and a lone one can go. */
+function conditionParts(parts: Part[], w: Where | null, fields: readonly SentenceField[]): void {
+  if (w === null) return;
+  w.clauses.forEach((c, i) => {
+    const join = parts.length;
+    parts.push({ kind: 'text', text: i === 0 ? ' where ' : w.or ? ' or ' : ' and ' });
+    const at = parts.length;
+    const label = labelOf(c.field);
+    const options: TriggerOption[] = [];
+    if (c.field.type === 'enum') for (const v of c.field.values ?? []) options.push({ label: `${label} is ${c.field.labels?.[v] ?? v}`, set: { [at]: `${label} is ${v}` } });
+    options.push({ label: `${label} is set`, set: { [at]: `${label} is set` } }, { label: `${label} is empty`, set: { [at]: `${label} is empty` } });
+    for (const other of fields.filter((x) => x.id !== c.field.id).slice(0, 8)) options.push({ label: `${labelOf(other)} is set`, set: { [at]: `${labelOf(other)} is set` } });
+    if (w.clauses.length === 1) options.push({ label: 'No condition', set: { [join]: '', [at]: '' } });
+    parts.push({ kind: 'condition', text: c.said, options });
+  });
+}
+
+/** The lists a thing or a list chip can swap to: its noun and its name travel together. */
+function listOptions(world: SentenceWorld, at: { thing: number; list: number; article?: { at: number; text: string } }, only?: (l: SentenceList) => boolean): TriggerOption[] {
+  return world.lists
+    .filter((l) => only === undefined || only(l))
+    .slice(0, MOST_OPTIONS)
+    .map((l) => ({
+      label: l.name,
+      set: { [at.thing]: l.one ?? one(l.name), [at.list]: l.name, ...(at.article ? { [at.article.at]: at.article.text } : {}) },
+    }));
 }
 
 /* ── the trigger ───────────────────────────────────────────────────── */
@@ -187,6 +233,8 @@ type Trig = {
   noun: string;
   replay: Replay;
   inline: boolean;
+  /** The trigger in pieces, which `said` is the join of. */
+  parts: Part[];
 };
 
 const EVENT = {
@@ -198,6 +246,15 @@ const ARRIVES = /^(.+?)\s+(?:arrives|arrived|comes in|comes through|lands|is rec
 const SPAN = /^(.+?)\s+(?:is\s+|are\s+)?(?:coming up\s+)?(?:in|within)\s+(\d{1,3})\s*(days?|weeks?|d|w)$/iu;
 const DUE = /^(.+?)\s+(?:is\s+|are\s+|gets?\s+)?(due|overdue|late)(?:\s+(?:in|within|by)\s+(\d{1,3})\s*(days?|weeks?|d|w)|\s+(today|tomorrow))?$/iu;
 
+const EVENT_WORDS = { create: 'added to', update: 'changed in', delete: 'deleted from' } as const;
+const isDue = (name: string): boolean => lower(name) === 'due' || lower(name) === 'due date';
+/** What a date's turn is called: "is due in 3 days" for a due date, "renews is in 3 days" for any other. */
+function phraseOf(name: string, late: boolean, within: number): string {
+  if (late) return isDue(name) ? 'is overdue' : `${lower(name)} has passed`;
+  if (within === 0) return isDue(name) ? 'is due today' : `${lower(name)} is today`;
+  return isDue(name) ? `is due in ${within} day${within === 1 ? '' : 's'}` : `${lower(name)} is in ${within} day${within === 1 ? '' : 's'}`;
+}
+
 function listOf(noun: string, named: string | undefined, world: SentenceWorld): SentenceList | { why: string } {
   for (const word of [named, noun]) {
     if (word === undefined || word.trim() === '' || (word === noun && GENERIC.test(one(noun)))) continue;
@@ -208,7 +265,7 @@ function listOf(noun: string, named: string | undefined, world: SentenceWorld): 
   return { why: `I could not tell which list "${(named ?? noun).trim()}" is. Name it as it is called in the sidebar.` };
 }
 
-function triggerOf(text: string, world: SentenceWorld): Trig | { why: string } {
+function triggerOf(text: string, world: SentenceWorld, implied: SentenceDoor | null): Trig | { why: string } {
   let t = text;
   let whereText = '';
   const w = /\s+(?:where|whose|with|that has|which has)\s+(.+)$/iu.exec(t);
@@ -240,16 +297,36 @@ function triggerOf(text: string, world: SentenceWorld): Trig | { why: string } {
     if ('why' in list) return list;
     const f = dueField(list, timed.fieldWord);
     if (!f) return { why: `${list.name} has no date I can read "${timed.fieldWord}" as. Name the date field, such as "${list.name === '' ? 'Due' : 'due'}".` };
-    const name = f.label ?? f.id.replace(/_/gu, ' ');
+    const name = labelOf(f);
     const extra = whereText === '' ? null : whereOf(whereText, list.fields);
     if (extra !== null && 'why' in extra) return extra;
     if (extra !== null && /, or /u.test(extra.when)) return { why: 'A date condition can only be joined to others with "and".' };
     const window = timed.late ? `${f.id} before today` : `${f.id} after yesterday, ${f.id} before +${(timed.within ?? 0) + 1}d`;
     const noun = list.one ?? one(list.name);
-    const phrase = timed.late ? `${lower(name) === 'due' || lower(name) === 'due date' ? 'is overdue' : `${lower(name)} has passed`}` : timed.within === 0 ? `${lower(name) === 'due' || lower(name) === 'due date' ? 'is due' : `${lower(name)} is`} today` : `${lower(name) === 'due' || lower(name) === 'due date' ? 'is due' : `${lower(name)} is`} in ${timed.within} day${timed.within === 1 ? '' : 's'}`;
+    const phrase = phraseOf(name, timed.late, timed.within ?? 0);
+    const parts: Part[] = [{ kind: 'text', text: 'a ' }];
+    const thing = parts.length;
+    parts.push({ kind: 'thing', text: noun });
+    parts.push({ kind: 'text', text: ' ' });
+    const timing = parts.length;
+    /* THE WORDS A DATE CAN BE SAID IN: due today, in 1 to 14 days, overdue, and each other date the list holds. */
+    const dueName = isDue(name);
+    const others = list.fields.filter((d) => (DATES as readonly string[]).includes(d.type) && d.id !== f.id).slice(0, 6);
+    const when: TriggerOption[] = [
+      ...(dueName ? [{ label: 'is due today', set: { [timing]: phraseOf(name, false, 0) } }, { label: 'is overdue', set: { [timing]: phraseOf(name, true, 0) } }] : []),
+      ...[1, 3, 7, 14].map((n) => ({ label: dueName ? `is due in ${n} day${n === 1 ? '' : 's'}` : `${lower(name)} is in ${n} day${n === 1 ? '' : 's'}`, set: { [timing]: phraseOf(name, false, n) } })),
+      ...others.flatMap((d) => [3, 7].map((n) => ({ label: `${lower(labelOf(d))} is in ${n} days`, set: { [timing]: phraseOf(labelOf(d), false, n) } }))),
+    ];
+    parts.push({ kind: 'timing', text: phrase, options: when });
+    parts[thing] = {
+      kind: 'thing',
+      text: noun,
+      options: world.lists.filter((l) => dueField(l, 'due') !== null).slice(0, MOST_OPTIONS).map((l) => ({ label: l.name, set: { [thing]: l.one ?? one(l.name) } })),
+    };
+    conditionParts(parts, extra, list.fields);
     return {
       kind: 'time', list, door: null, on: null, when: extra ? `${window}, ${extra.when}` : window, once: ['entry', f.id], noun,
-      said: `When a ${noun} ${phrase}${extra ? ` and ${extra.said}` : ''}`, inline: true,
+      said: joined(parts), inline: true, parts,
       replay: { kind: 'time', register: list.id, field: f.id, within: timed.late ? 0 : (timed.within ?? 0), where: extra?.when ?? '' },
     };
   }
@@ -263,10 +340,27 @@ function triggerOf(text: string, world: SentenceWorld): Trig | { why: string } {
     const extra = whereText === '' ? null : whereOf(whereText, list.fields);
     if (extra !== null && 'why' in extra) return extra;
     const noun = list.one ?? one(list.name);
-    const verb = op === 'create' ? `a new ${noun} is added to ${list.name}` : op === 'update' ? `a ${noun} is changed in ${list.name}` : `a ${noun} is deleted from ${list.name}`;
+    const lead = op === 'create' ? 'a new ' : 'a ';
+    const parts: Part[] = [{ kind: 'text', text: lead }];
+    const thing = parts.length;
+    parts.push({ kind: 'thing', text: noun }, { kind: 'text', text: ' is ' });
+    const timing = parts.length;
+    parts.push({ kind: 'timing', text: EVENT_WORDS[op] }, { kind: 'text', text: ' ' });
+    const named = parts.length;
+    parts.push({ kind: 'list', text: list.name });
+    const swap = listOptions(world, { thing, list: named });
+    parts[thing] = { kind: 'thing', text: noun, options: swap };
+    parts[named] = { kind: 'list', text: list.name, options: swap };
+    /* THE ARTICLE FOLLOWS THE WORD: "a new" only for a row made. */
+    parts[timing] = {
+      kind: 'timing',
+      text: EVENT_WORDS[op],
+      options: (['create', 'update', 'delete'] as const).map((o) => ({ label: EVENT_WORDS[o], set: { 0: o === 'create' ? 'a new ' : 'a ', [timing]: EVENT_WORDS[o] } })),
+    };
+    conditionParts(parts, extra, list.fields);
     return {
       kind: op, list, door: null, on: { written: { register: list.id, op: [op] } }, when: extra?.when ?? '', once: ['entry'], noun,
-      said: `When ${verb}${extra ? ` and ${extra.said}` : ''}`, inline: false,
+      said: joined(parts), inline: false, parts,
       replay: { kind: 'written', register: list.id, op, where: extra?.when ?? '' },
     };
   }
@@ -283,16 +377,27 @@ function triggerOf(text: string, world: SentenceWorld): Trig | { why: string } {
     }
     const doorWords = [arrival[2], subject].filter((x): x is string => x !== undefined).map((x) => x.replace(ARTICLE, ''));
     const doors = world.doors.filter((d) => doorWords.some((word) => one(d.name) === one(word) || one(d.id) === one(word)));
-    const door = doors.length === 1 ? doors[0]! : null;
+    const door = doors.length === 1 ? doors[0]! : implied;
     if (sender !== '' && whereText !== '') return { why: 'Say who it is from, or what it contains, but not both in one sentence.' };
     const extra = whereText === '' ? null : whereOf(whereText, ARRIVAL_FIELDS);
     if (extra !== null && 'why' in extra) return extra;
     const when = sender !== '' ? [`from contains ${/\s/u.test(sender) ? `"${sender}"` : sender}`, `subject contains ${/\s/u.test(sender) ? `"${sender}"` : sender}`, `body contains ${/\s/u.test(sender) ? `"${sender}"` : sender}`].join(', or ') : (extra?.when ?? '');
     const list = door?.register ? (world.lists.find((l) => l.id === door.register) ?? null) : null;
     const noun = subject.replace(ARTICLE, '').trim() || 'message';
+    const parts: Part[] = [{ kind: 'text', text: `a ${noun}` }];
+    if (sender !== '') {
+      parts.push({ kind: 'text', text: ' from ' });
+      parts.push({ kind: 'condition', text: sender, options: [{ label: 'Anyone', set: { [parts.length - 1]: '', [parts.length]: '' } }] });
+    }
+    parts.push({ kind: 'text', text: ' arrives' });
+    if (door) {
+      const at = parts.length + 1;
+      parts.push({ kind: 'text', text: ' at ' }, { kind: 'door', text: door.name, options: world.doors.slice(0, MOST_OPTIONS).map((d) => ({ label: d.name, set: { [at]: d.name } })) });
+    }
+    conditionParts(parts, extra, ARRIVAL_FIELDS);
     return {
       kind: 'arrival', list, door, on: { arrival: door ? { ingest: door.id } : {} }, when, once: [], noun,
-      said: `When a ${noun}${sender ? ` from ${sender}` : ''} arrives${door ? ` at ${door.name}` : ''}${extra ? ` and ${extra.said}` : ''}`, inline: false,
+      said: joined(parts), inline: false, parts,
       replay: { kind: 'arrival', where: when },
     };
   }
@@ -303,6 +408,9 @@ function triggerOf(text: string, world: SentenceWorld): Trig | { why: string } {
 /* ── the action ────────────────────────────────────────────────────── */
 
 type Act = { steps: Record<string, unknown>[]; said: string; row: boolean; loud: boolean; note?: string };
+
+/** The tone of a notice that is a reminder on Today (`todayReminders` reads by it). */
+export const TODAY_TONE = 'today';
 
 const MARK_FIELDS = ['category', 'type', 'kind', 'label', 'bucket', 'folder', 'group', 'lane', 'status'];
 
@@ -344,6 +452,9 @@ function actionOf(text: string, trig: Trig, world: SentenceWorld): Act | { why: 
       : trig.kind === 'delete' ? `A ${trig.noun} was deleted.`
       : `A ${trig.noun} arrived.`;
     const where = remind[1];
+    /* TODAY IS A PLACE THE RECORD HAS: the notice carries a tone the Today page reads its reminders by. */
+    if (where !== undefined && /^(?:my\s+)?today(?:\s+page)?$/iu.test(where.trim()))
+      return { steps: [{ notify: { say, tone: TODAY_TONE } }], said: 'tell me on Today', row: false, loud: true };
     return {
       steps: [{ notify: { say } }], said: 'tell me', row: false, loud: true,
       ...(where ? { note: `It tells you in your notices. It cannot put a reminder on ${where} yet.` } : {}),
@@ -355,7 +466,7 @@ function actionOf(text: string, trig: Trig, world: SentenceWorld): Act | { why: 
     return { steps: [lower(tag[1]!) === 'tag' ? { tag: name } : { untag: name }], said: `${lower(tag[1]!)} it ${name}`, row: true, loud: false };
   }
   const note = /^(?:add a note|note)\s*:?\s*(.+)$/iu.exec(t);
-  if (note) return { steps: [{ note: unquote(note[1]!) }], said: `add the note "${unquote(note[1]!)}"`, row: true, loud: false };
+  if (note) return { steps: [{ note: unquote(note[1]!) }], said: `add a note: "${unquote(note[1]!)}"`, row: true, loud: false };
   const filing = /^(file|put|move|categori[sz]e|sort|label)\s+(?:it|this|them)?\s*(?:under|in|into|as|to)\s+(.+)$/iu.exec(t);
   const marking = /^mark\s+(?:it|this|them)\s+(?:as\s+)?(.+)$/iu.exec(t);
   if (filing || marking) {
@@ -404,13 +515,45 @@ function cut(text: string): [string, string] | null {
   return null;
 }
 
+/** What can be done after the comma, from what the trigger's list declares: tell, mark a state, set a closed word. */
+function actionOptions(trig: Trig): ActionOption[] {
+  const out: ActionOption[] = [
+    { label: 'Tell me', text: 'tell me' },
+    { label: 'Tell me on Today', text: 'tell me on Today' },
+  ];
+  const list = trig.list;
+  if (list === null) return out;
+  const state = list.state ? list.fields.find((f) => f.id === list.state) : undefined;
+  for (const v of state?.values ?? []) {
+    const name = state?.labels?.[v] ?? v;
+    out.push({ label: `Mark it ${name}`, text: `mark it ${name}` });
+  }
+  for (const f of list.fields) {
+    if (f.type !== 'enum' || f.id === list.state) continue;
+    for (const v of f.values ?? []) {
+      const name = f.labels?.[v] ?? v;
+      out.push({ label: `${cap(labelOf(f))}: ${name}`, text: `set ${labelOf(f)} to ${name}` });
+    }
+  }
+  return out.slice(0, 40);
+}
+
 export function parseSentence(raw: string, world: SentenceWorld, rule = 'sentence'): Sentenced {
+  /* AN ARRIVAL WITH NO DOOR NAMED USES THE RECORD'S ONE DOOR, when the sentence needs a list to file into. */
+  const lone = world.doors.length === 1 && world.doors[0]!.register !== null ? world.doors[0]! : null;
+  const first = parseWith(raw, world, rule, null);
+  if (first.ok || lone === null) return first;
+  const again = parseWith(raw, world, rule, lone);
+  return again.ok ? again : first;
+}
+
+function parseWith(raw: string, world: SentenceWorld, rule: string, implied: SentenceDoor | null): Sentenced {
   const text = clean(raw);
   const start = /^(?:when(?:ever)?|if|every time|each time|as soon as|once)\s+(.+)$/iu.exec(text);
   if (!start) return fail('Start with "When", say what happens, then a comma and what to do. For example: When a bill is due in 3 days, tell me.');
   const halves = cut(start[1]!);
   if (!halves || halves[0].trim() === '' || halves[1].trim() === '') return fail('Put a comma between what happens and what to do. For example: When a bill is due in 3 days, tell me.');
-  const trig = triggerOf(halves[0].trim(), world);
+  const trig = triggerOf(halves[0].trim(), world, implied);
   if ('why' in trig) return fail(trig.why);
 
   const acts: Act[] = [];
@@ -431,5 +574,5 @@ export function parseSentence(raw: string, world: SentenceWorld, rule = 'sentenc
     : { rule, name: said, on: trig.on as never, ...(trig.when === '' ? {} : { when: trig.when }), steps: steps as never, ...(once.length ? { once_per: once } : {}) };
   const notes = acts.flatMap((a) => (a.note ? [a.note] : []));
   if (trig.kind === 'update' || trig.kind === 'delete') notes.push(`It acts once for each ${trig.noun}, however often it changes.`);
-  return { ok: true, body, said, replay: trig.replay, notes };
+  return { ok: true, body, said, replay: trig.replay, notes, parts: { trigger: trig.parts, actions: acts.map((a) => a.said), options: actionOptions(trig) } };
 }

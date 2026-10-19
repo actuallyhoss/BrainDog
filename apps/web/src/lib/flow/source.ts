@@ -283,7 +283,7 @@ export function rowOf(r: unknown): AutomationRow | null {
     /* WHEN IT LAST FIRED, FROM THE RECORD, which answers it for every rule: an inline rule leaves no run, and one page
        of the log said "nothing lately" of a rule whose last firing sat below that page. */
     ...('lastFired' in r ? { acted: text(r.lastFired) } : {}),
-    ...(typeof r.fired === 'number' ? { fired: r.fired, last_at: text(r.last_at), why_idle: text(r.why_idle), family: text(r.family) } : {}),
+    ...(typeof r.fired === 'number' ? { fired: r.fired, last_at: text(r.last_at), why_idle: text(r.why_idle), family: text(r.family), ...(typeof r.week === 'number' ? { week: r.week } : {}) } : {}),
   };
 }
 
@@ -771,6 +771,14 @@ async function send<T>(io: Fetch, url: string, body?: Record<string, unknown>): 
   return (isAnswer(said) ? said : unreachable()) as Answer<T>;
 }
 
+/** One alternative for a piece of the trigger: its words, and the text to put in each piece (by index) when it is picked. */
+export type TriggerOption = { label: string; set: Record<string, string> };
+/** A piece of the read-back trigger. The pressable ones carry options; `text` pieces are the glue between them. */
+export type SentencePart = { kind: 'text' | 'thing' | 'list' | 'door' | 'timing' | 'condition'; text: string; options?: TriggerOption[] };
+export type ActionOption = { label: string; text: string };
+/** The sentence in pieces: "When" + the trigger's texts, a comma, then the actions joined by "and". */
+export type SentenceParts = { trigger: SentencePart[]; actions: string[]; options: ActionOption[] };
+
 /** What `automationSentence` answers: the body a sentence means, read back, and what it would have done over the last 30 days. */
 export type Sentenced = {
   rule: string;
@@ -780,7 +788,37 @@ export type Sentenced = {
   path: 'inline' | 'run';
   looked: { days: number; runs: number; atLeast: boolean; sample: string[]; line: string } | null;
   notes: string[];
+  /** The sentence in pressable pieces, or `null` for one the model wrote. */
+  parts: SentenceParts | null;
 };
+
+/** The pieces as the wire sends them, or `null` when they are not whole. */
+function partsOf(raw: unknown): SentenceParts | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const strings = (x: unknown): string[] | null => (Array.isArray(x) && x.every((y) => typeof y === 'string') ? (x as string[]) : null);
+  const actions = strings(r.actions);
+  if (!Array.isArray(r.trigger) || actions === null) return null;
+  const trigger: SentencePart[] = [];
+  for (const p of r.trigger as unknown[]) {
+    if (typeof p !== 'object' || p === null || typeof (p as { text?: unknown }).text !== 'string') return null;
+    const q = p as { kind?: unknown; text: string; options?: unknown };
+    const options = Array.isArray(q.options)
+      ? q.options.flatMap((o): TriggerOption[] => {
+          const x = o as { label?: unknown; set?: unknown } | null;
+          return x && typeof x.label === 'string' && typeof x.set === 'object' && x.set !== null ? [{ label: x.label, set: x.set as Record<string, string> }] : [];
+        })
+      : [];
+    trigger.push({ kind: (q.kind as SentencePart['kind']) ?? 'text', text: q.text, ...(options.length > 0 ? { options } : {}) });
+  }
+  const options = Array.isArray(r.options)
+    ? r.options.flatMap((o): ActionOption[] => {
+        const x = o as { label?: unknown; text?: unknown } | null;
+        return x && typeof x.label === 'string' && typeof x.text === 'string' ? [{ label: x.label, text: x.text }] : [];
+      })
+    : [];
+  return { trigger, actions, options };
+}
 
 /** `Sentenced` as the wire sends it, or `null` for an answer that is not one. */
 export function sentencedOf(raw: unknown): Sentenced | null {
@@ -800,6 +838,7 @@ export function sentencedOf(raw: unknown): Sentenced | null {
     path: r.path === 'inline' ? 'inline' : 'run',
     looked,
     notes: Array.isArray(r.notes) ? r.notes.filter((x): x is string => typeof x === 'string') : [],
+    parts: partsOf(r.parts),
   };
 }
 

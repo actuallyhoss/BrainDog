@@ -16,6 +16,7 @@ export const ROUTES: readonly Route[] = [
   { name: 'checkAutomation', group: 'READ+', writes: true, what: 'Whether an automation body would install, with the refusal and where it is in the body when it would not. It installs nothing.' },
   { name: 'tryAutomation', group: 'READ+', writes: true, what: 'Take an automation body\'s steps now over a sample row, arrival or figure, and say what each did or would do. Everything it wrote is rolled back, and nothing is sent.' },
   { name: 'automationSentence', group: 'READ+', writes: true, what: 'An automation written as a sentence, turned into the body it means and read back in BrainDog\'s words, with what it would have done over the last 30 days of real rows. It installs and runs nothing.' },
+  { name: 'todayReminders', group: 'READ+', writes: false, what: 'The reminder lines automations have put on Today in the last two days, newest first, held to the lists the caller reads.' },
   { name: 'automationVersions', group: 'READ+', writes: false, what: 'One automation\'s versions, newest first, each with its body, when it was installed and by whom.',
     takes: { rule: 'text' } },
   { name: 'setAutomation', group: 'ADMIN', writes: true, what: 'Switch one automation on or off, as a new version landed at once. A browser session only.' },

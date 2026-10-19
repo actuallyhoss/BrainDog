@@ -162,6 +162,14 @@ test('A RULE THE RECORD COUNTED SAYS HOW OFTEN IT RAN AND THE DAY IT LAST DID, n
   assert.equal(countSaid(inline, NOW), '', 'a host that sends no count says nothing from one');
 });
 
+test('THE WEEK FOLLOWS THE WHOLE COUNT WHEN THE RECORD SENT IT, and a quiet week is said as none', () => {
+  const inline = auto('Remind me of bills', { trigger: 'written', path: 'inline', register: 'parcels' });
+  const counted = { ...inline, acted: null, fired: 12, last_at: iso(NOW - 3_600_000) };
+  assert.equal(lastLine({ ...counted, week: 3 }, NOW), 'Ran 12 times, last today. 3 this week.');
+  assert.equal(lastLine({ ...counted, week: 0 }, NOW), 'Ran 12 times, last today. None this week.');
+  assert.equal(lastLine(counted, NOW), 'Ran 12 times, last today.', 'a host that sends no week says none');
+});
+
 test('A RULE THAT NEVER RAN SAYS "NEVER" AND THE RECORD\'S ONE SENTENCE ON WHY', () => {
   const idle = auto('Shelve big parcels', { trigger: 'written', path: 'inline', register: 'parcels', acted: null });
   const why = 'No entry has been added to Parcels since it was turned on.';

@@ -510,7 +510,7 @@ export {
   WORDS_MOST,
 } from './digest.ts';
 export { DIGEST_SOURCES, computedPart } from './digest-sources.ts';
-export { parseSentence, type Replay, type Sentenced, type SentenceDoor, type SentenceField, type SentenceList, type SentenceWorld } from './sentence.ts';
+export { parseSentence, TODAY_TONE, type ActionOption, type Part, type SentenceParts, type TriggerOption, type Replay, type Sentenced, type SentenceDoor, type SentenceField, type SentenceList, type SentenceWorld } from './sentence.ts';
 export { CREATE_CEILING, applyRule, dryRun, fill as fillTemplate, linkFault, linkPatternFault, marker, order as orderRules, runRules } from './rules.ts';
 export { runway } from './forecast.ts';
 export { anchorDayOf, cycleAfter, restDaysOf } from './forecast.ts';

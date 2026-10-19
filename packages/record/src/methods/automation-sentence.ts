@@ -14,7 +14,7 @@
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { evaluate, INBOX_RAW, parseWhere } from '@braindog/where';
-import { parseSentence, type Replay, type SentenceWorld } from '@braindog/kernel';
+import { parseSentence, type Replay, type SentenceParts, type SentenceWorld } from '@braindog/kernel';
 
 import { pathOf, said as saidOf } from '../automations.ts';
 import type { CallContext } from '../index.ts';
@@ -52,6 +52,8 @@ export type Sentenced = {
   looked: Looked | null;
   /** What to tell the person beside it: what the body cannot do, or why there is no look. */
   notes: string[];
+  /** The sentence in pressable pieces, or `null` for one the model wrote, which the rule parser cannot take apart. */
+  parts: SentenceParts | null;
 };
 
 const isObject = (x: unknown): x is Body => x !== null && typeof x === 'object' && !Array.isArray(x);
@@ -220,9 +222,10 @@ export function methods(deps: RecordDeps) {
       let said: string;
       let replay: Replay | null;
       let notes: string[] = [];
+      let parts: SentenceParts | null = null;
       const parsed = parseSentence(given.sentence, worldOf(ctx), rule);
       if (parsed.ok) {
-        ({ body, said, replay, notes } = parsed);
+        ({ body, said, replay, notes, parts } = parsed);
         if (asked === null) rule = fresh(said);
         body = { ...body, rule };
       } else {
@@ -247,7 +250,7 @@ export function methods(deps: RecordDeps) {
       if (fault) return { ok: false, refusal: fault };
       const look = replay === null ? null : lookAt(replay, ctx);
       if (look?.note !== undefined) notes = [...notes, look.note];
-      return ok({ rule, said, by, body, path: pathOf(body), looked: look?.looked ?? null, notes });
+      return ok({ rule, said, by, body, path: pathOf(body), looked: look?.looked ?? null, notes, parts });
     },
   };
 }

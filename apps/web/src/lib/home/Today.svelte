@@ -45,6 +45,7 @@
   import ReadState from '$lib/ui/ReadState.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import RemindersTile from './RemindersTile.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -431,7 +432,8 @@
   const agentsShown = $derived(Boolean(t && (t.runs.length > 0 || sessions.length > 0)));
   const sinceShown = $derived(Boolean(t && t.since.total > 0));
   const cashShown = $derived(Boolean(money && ((lead && cashTile) || money.cash.length > 0)));
-  const sideShown = $derived(agentsShown || sinceShown || cashShown);
+  const remindersShown = $derived(Boolean(t && (t.reminders?.length ?? 0) > 0));
+  const sideShown = $derived(remindersShown || agentsShown || sinceShown || cashShown);
 
   /* ── the keyboard ──────────────────────────────────────────────────────────── */
 
@@ -683,6 +685,7 @@
       <!-- ══ BESIDE IT: the tiles, each only when it has something to show ══ -->
       {#if sideShown}
         <div class="t-side">
+          {#if t && remindersShown}<RemindersTile lines={t.reminders ?? []} />{/if}
           {#if agentsShown}
             <Tile class="t-agents" icon="session" title={words.agentsTile} count={t.runs.length}>
               {#if t.runs.length > 0}

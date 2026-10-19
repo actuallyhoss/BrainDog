@@ -56,7 +56,7 @@ context, sessionsLive | The briefing, and who else is working now
 pages, page, metric, figures | Pages with every block worked out, and figures
 governance, comments | Questions, decisions and predictions, and the comments on a row
 packs, packConfig, arrangement | How the record is arranged
-actions, automations, scripts | What runs on its own, and how its runs went
+actions, automations, todayReminders, scripts | What runs on its own, and how its runs went
 views, view | A list's saved views
 usedBy | Which sessions used one key or one tool
 inbox | The inbox, for a token given the inbox reach

@@ -3,6 +3,10 @@
   (`automationSentence`: the rule parser first, the model only if the parser cannot), and it is shown back as the sentence
   BrainDog understood, with what it would have done over the last 30 days of real rows. Nothing runs until Keep it.
 
+  EVERY PART OF THE READ-BACK CAN BE PRESSED (`SentenceRead`) and the steps of one that does several things can be put in
+  another order (`SentenceSteps`). Either returns a new sentence, which is read again by the record, so the 30-day look
+  always belongs to the sentence on the screen.
+
   KEEP IT IS THE CANVAS'S SAVE: the same change, filed for anybody and accepted in the same press for an owner. A kept
   automation is listed by its sentence, which is its name.
 -->
@@ -10,7 +14,9 @@
   import type { Source, Sentenced } from '$lib/flow/source.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
-  import { askable, keepOf, sentenceWords as w, underSentence } from './sentence.ts';
+  import SentenceRead from './SentenceRead.svelte';
+  import SentenceSteps from './SentenceSteps.svelte';
+  import { askable, composeSentence, keepOf, sentenceWords as w, underSentence } from './sentence.ts';
 
   let {
     source,
@@ -39,6 +45,24 @@
     if (out.ok) read = out.value;
     else fix = out.refusal.fix;
   }
+
+  /* A PART PRESSED OR A STEP MOVED: the sentence it makes is read again, and the old reading stays up until the new one
+     comes, so the page does not blank under the pointer. A refusal leaves the old reading and says why. */
+  async function reread(next: string) {
+    if (!source || busy !== '') return;
+    busy = 'reading';
+    fix = '';
+    const out = await source.sentence(next, read?.rule);
+    busy = '';
+    if (out.ok) {
+      read = out.value;
+      text = next;
+    } else fix = out.refusal.fix;
+  }
+
+  const restep = (steps: string[]) => {
+    if (read?.parts) void reread(composeSentence(read.parts.trigger.map((p) => p.text), steps));
+  };
 
   async function keep() {
     if (!source || !read || busy !== '') return;
@@ -87,7 +111,12 @@
   {#if read}
     <div class="read">
       <p class="lead">{w.asRead}</p>
-      <p class="said">{read.said}</p>
+      {#if read.parts}
+        <SentenceRead parts={read.parts} disabled={busy !== ''} onchange={(next) => void reread(next)} />
+        <SentenceSteps steps={read.parts.actions} options={read.parts.options} disabled={busy !== ''} onchange={restep} />
+      {:else}
+        <p class="said">{read.said}</p>
+      {/if}
       {#each underSentence(read) as line, i (i)}
         <p class="under">{line}</p>
       {/each}
