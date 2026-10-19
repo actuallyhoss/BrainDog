@@ -1,6 +1,6 @@
 <!--
   The bar a page's chosen questions are answered from: how many are chosen, one reason for all of them, and the one
-  press that answers each with what it suggests (`picked.svelte.ts`, `batch.ts`). Needs you's bar, on any page with a queue.
+  press that answers each with what it suggests (`picked.svelte.ts`, `batch.ts`). Needs you has this bar, and so does any page with a queue.
 
   GLASS CHROME FLOATING AT THE FOOT OF THE VIEW, drawn only while something is chosen, after the page so opening it
   moves nothing above it. An arrangement chosen with the rest is said to be left out, never answered in bulk.

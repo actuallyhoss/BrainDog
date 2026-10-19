@@ -25,7 +25,7 @@
   on its own page. "Fold into one" is on the bar of the list that keeps people, for two to twelve picked: it asks on
   Decide whether they are the same one and opens that question, and folds nobody itself. On a list that says what makes
   two of its things the same (a skill, a key, a learning), it is there for two or more picked: one question folds just
-  the ones picked with what they are here twice with, and Needs you's answer has one Undo.
+  the ones picked with what they are here twice with, and the answer in Needs you has one Undo.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';

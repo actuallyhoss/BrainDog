@@ -154,7 +154,7 @@ test('A ROW IS DRAWN BY ITS TITLE, never by the spoken id the host puts in front
   assert.equal(drawn.rows[0]?.title, 'Invoice Acme');
 });
 
-test('A PROPOSAL IS DRAWN WITH ITS MODEL IN THE FOOTER, ALWAYS, and with a way to Needs you what it filed', () => {
+test('A PROPOSAL IS DRAWN WITH ITS MODEL IN THE FOOTER, ALWAYS, and with a way to see what it filed in Needs you', () => {
   const drawn = drawProposal(PROPOSAL);
   assert.equal(drawn.text, PROPOSAL.text);
   /* THE FIGURES TRAVEL WITH THE SENTENCE, so `Cited` draws the brace as the row it names. */

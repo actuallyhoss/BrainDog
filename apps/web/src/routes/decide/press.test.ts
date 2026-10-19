@@ -23,14 +23,14 @@ const options = (suggested: string | null, band = 'call') => ({
   options: ['Flat', 'Per seat', 'Usage'].map((t) => ({ key: t.toLowerCase(), title: t, body: '', ...(t.toLowerCase() === suggested ? { recommended: true } : {}) })),
 });
 
-test('Enter accepts, e edits, Backspace declines, and no other key is Needs you’s', () => {
+test('Enter accepts, e edits, Backspace declines, and no other key belongs to Needs you', () => {
   assert.equal(keyAct('Enter'), 'accept');
   assert.equal(keyAct('e'), 'edit');
   assert.equal(keyAct('Backspace'), 'decline');
   for (const key of ['j', 'k', 'E', 'Delete', ' ', 'a', '1']) assert.equal(keyAct(key), null, key);
 });
 
-test('a key that starts inside a field, a box or anything editable is never Needs you’s', () => {
+test('a key that starts inside a field, a box or anything editable is ever taken by Needs you', () => {
   /* WHAT `closest` WOULD FIND, as the DOM answers it: the element itself when it is one, else an ancestor that is. */
   const el = (inside: boolean, editable = false) => ({ closest: (s: string) => (inside && /input/u.test(s) ? {} : null), isContentEditable: editable });
   assert.equal(fromInput(el(true)), true, 'Backspace on a tick declined the question under it');
@@ -203,7 +203,7 @@ test('Accept names the amount when money moves, and the record’s Reject is Dec
   assert.equal(labelOf(o.options[0]!, o, [{ amount: 1298, currency: 'GBP' }]), 'Flat');
 });
 
-test('Needs you’s words are plain: no em dash, and none of the system’s words', () => {
+test('The words in Needs you are plain: no em dash, and none of the system’s words', () => {
   const said: string[] = [];
   for (const value of Object.values(words)) {
     if (typeof value === 'string') said.push(value);
@@ -230,7 +230,7 @@ const rulesOf = (css: string): { on: string; says: string }[] =>
   [...css.replace(/\/\*[\s\S]*?\*\//gu, '').matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map((m) => ({ on: m[1]!.trim().replace(/\s+/gu, ' '), says: m[2]! }));
 
 test('on the queue a key presses the card’s own button, and Enter answers only a card that costs nothing', () => {
-  assert.match(queue, /window\.addEventListener\('keydown', onkey, \{ capture: true \}\)/u, 'Needs you’s keys no longer come before the page reader’s Enter');
+  assert.match(queue, /window\.addEventListener\('keydown', onkey, \{ capture: true \}\)/u, 'The keys of Needs you no longer come before the page reader’s Enter');
   const at = queue.indexOf('function onkey(e: KeyboardEvent) {');
   const onkey = queue.slice(at, queue.indexOf('\n  }\n', at));
   assert.ok(at >= 0, 'the queue’s key handler no longer reads the way this test assumes');
@@ -266,7 +266,7 @@ test('the suggested answer is the accent’s tint, and not marked where the choi
   /* THE SKIN MARKS THE SUGGESTION IN A ROW OF ANSWERS THE RENDERER DRAWS with the accent's first tint and the accent's
      words (DIRECTION §39), only where the choice can be taken back; the one decision card draws its choices with
      `lib/decide/form.css` over the same classes, says "Suggested" in the accent's words in its list, and fills the
-     suggested button of its row with the accent. Needs you's page draws no copy of its own. */
+     suggested button of its row with the accent. the Needs you page draws no copy of its own. */
   const rules = rulesOf(skin);
   const SUGGESTED = '.queue-option[data-recommended] > .queue-act:not([data-on])';
   const UNDOABLE = ".queue-card:not(:has(.queue-cost[data-cost='undo']))";

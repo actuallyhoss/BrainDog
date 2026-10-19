@@ -1,5 +1,5 @@
 <!--
-  What accepting a queue's lead question would put on the screen, drawn under it whole: Needs you's own preview
+  What accepting a queue's lead question would put on the screen, drawn under it whole: the preview Needs you has of its own
   (`routes/decide/[id]/Proposed.svelte`), each page, list, rule or look by its name, and a page drawn as it will be.
 
   ONLY FOR A PROPOSAL THAT CHANGES WHAT IS ON THE SCREEN, a `change` or a `pattern`; a choice between the answers

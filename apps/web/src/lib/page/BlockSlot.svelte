@@ -515,7 +515,7 @@
   </header>
 {:else}
   <!-- A BLOCK WITH NO AUTHORED `heading:` DRAWS NO HEADING. It printed its kind's name, and where the kind had none its
-       dialect id, so Needs you's lead question sat under "queue" and Today's dates under "deadlines": the system's word
+       dialect id, so the lead question in Needs you sat under "queue" and Today's dates under "deadlines": the system's word
        where the page has nothing to say. The region still has a name, for a screen reader only, in the kind's words. -->
   <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-unnamed" id="{ids}h-{i + 1}"
     >{copy.kindNames[block.kind] ?? blockWords.kindNames[block.kind] ?? words.unnamed}</svelte:element

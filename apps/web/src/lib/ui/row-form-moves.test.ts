@@ -127,9 +127,9 @@ test('THE WORD A PERSON READS: a reason by its name, any other field by its labe
   assert.equal(moves.moveWord({ value: 'open' }, label), '');
   assert.equal(moves.moveWord({ value: 'open', needs: ['why'] }, label), 'needs a reason');
   assert.equal(moves.moveWord({ value: 'open', needs: ['note'] }, label), 'needs note');
-  assert.equal(moves.moveWord({ value: 'open', byDecision: true }, label), 'asks Needs you');
+  assert.equal(moves.moveWord({ value: 'open', byDecision: true }, label), 'goes to Needs you');
   /* A move that wants both is only made by the decision, and the proposal is where the reason goes. */
-  assert.equal(moves.moveWord({ value: 'open', needs: ['why'], byDecision: true }, label), 'asks Needs you');
+  assert.equal(moves.moveWord({ value: 'open', needs: ['why'], byDecision: true }, label), 'goes to Needs you');
 });
 
 /* ── a move that asks for more than one field ──
@@ -172,7 +172,7 @@ test('A FIELD ALREADY FILLED IS NOT ASKED FOR AGAIN, and the word goes when all 
   assert.equal(moves.moveWord(m, label, () => true), '');
   assert.equal(moves.moveWord(m, label, () => false), 'needs a reason and date');
   /* A decision is asked for whatever is filled: the move is not made here. */
-  assert.equal(moves.moveWord({ ...m, byDecision: true }, label, () => true), 'asks Needs you');
+  assert.equal(moves.moveWord({ ...m, byDecision: true }, label, () => true), 'goes to Needs you');
 });
 
 test('TWO FIELDS THE FORM GIVES ONE LABEL ARE SAID ONCE, so the word never repeats itself', () => {

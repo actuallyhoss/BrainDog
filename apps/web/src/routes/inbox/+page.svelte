@@ -496,7 +496,7 @@
   /* ── a selection ─────────────────────────────────────────────────────────── */
   let picked = $state(new Set<string>());
   /* SELECTING, ON A PHONE: nothing hovers there to reveal the checks, so `Select` shows them at a thumb's size, as
-     Needs you's does. At a desk the checks are always drawn and `x` picks the cursor's row. */
+     Needs you does. At a desk the checks are always drawn and `x` picks the cursor's row. */
   let selecting = $state(false);
   const picking = $derived(picked.size > 0 || selecting);
   function toggle(id: string) {

@@ -1532,7 +1532,7 @@
   }
 
   /* CLIPPED, NEVER REMOVED: the name is the row's accessible name at both widths, and the flyout is a copy for the eye.
-     A count other than Needs you's goes the same way, so it stays in its row's name without a figure on every list. */
+     A count other than the Needs you one goes the same way, so it stays in its row's name without a figure on every list. */
   .rail[data-icons] .item-name,
   .rail[data-icons] .pen-action,
   .rail[data-icons] .record-name,
