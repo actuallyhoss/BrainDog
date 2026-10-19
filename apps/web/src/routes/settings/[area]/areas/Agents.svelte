@@ -397,7 +397,9 @@
     {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
       <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
     {:else if rows.length === 0}
-      <Empty kind="no-data-yet" compact title={copy.connectedNone} body={copy.connectedNoneWhy} />
+      <Empty kind="no-data-yet" compact title={copy.connectedNone} body={copy.connectedNoneWhy}>
+        {#snippet actions()}<Button weight="primary" onclick={() => void openSheet()}>{copy.connectYourAgent}</Button>{/snippet}
+      </Empty>
     {:else}
       {@const nowMs = Date.now()}
       <ul class="whos">

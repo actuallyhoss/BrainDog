@@ -34,9 +34,10 @@ export const agents = {
 
   /* WHAT IS CONNECTED: every machine, key and app on one list (`record/device.ts` `connected`). */
   connectedTitle: 'Connected',
-  connectedNone: 'Nothing is connected yet',
+  connectedNone: 'No agent is connected yet',
+  connectYourAgent: 'Connect your agent',
   /* IT NAMES WHAT FILLS THE LIST, not where on the screen the ways to fill it are. */
-  connectedNoneWhy: 'The machines, keys and apps you let into this record, each with what it can do and when it last worked.',
+  connectedNoneWhy: 'Connect one and it shows here with what it did.',
   agentOn: (agent: string, machine: string) => `${agent} on ${machine}`,
   canAndInbox: (can: string) => `${can}, and may read the inbox`,
   unnamedKey: 'A key with no name',
