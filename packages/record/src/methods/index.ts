@@ -26,6 +26,7 @@ import type { SlashDrafted, SlashPreviewer } from '../slash.ts';
 import { methods as agents } from './agents.ts';
 import { methods as keys } from './keys.ts';
 import { methods as automations } from './automations.ts';
+import { methods as automationSentence } from './automation-sentence.ts';
 import { methods as slashDraft } from './slash-draft.ts';
 import { methods as comments } from './comments.ts';
 import { methods as vaultPassphrase } from './vault-passphrase.ts';
@@ -172,6 +173,7 @@ export function methods(deps: RecordDeps) {
     ...agents(deps),
     ...keys(deps),
     ...automations(deps),
+    ...automationSentence(deps),
     ...slashDraft(deps),
     ...comments(deps),
     ...vaultPassphrase(deps),

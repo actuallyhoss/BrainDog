@@ -594,7 +594,7 @@ export const TOOLS: readonly Tool[] = [
         body: {
           type: 'object',
           description:
-            'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change adds fields: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or to is a whole declaration of that id with the from_version you read. Others: braindog:grammar/proposals.',
+            'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change adds fields: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or to is a whole declaration of that id with the from_version you read. automation, as a change: {"sentence":"When a bill is due in 3 days, tell me."}. Others: braindog:grammar/proposals.',
         },
         cause: str('A short key for what this is about, so it is asked once.'),
         again: str('One sentence on what changed since the person declined this or picked an option. Only then is it asked again, with this under it.'),

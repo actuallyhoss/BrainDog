@@ -41,6 +41,7 @@
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { words } from '$lib/flow/flow.ts';
   import { editWords, openAutomations, rowTrigger, type AutomationRow, type Source } from '$lib/flow/source.ts';
+  import AutomationSentence from './AutomationSentence.svelte';
   import HubRows from './HubRows.svelte';
   import {
     endedReading,
@@ -158,6 +159,11 @@
   const bars = $derived(monthBars(rows));
   const split = $derived(endedSplit(rows));
 </script>
+
+{#if from === 'ready'}
+  <!-- SAID AS A SENTENCE FIRST: the box is above the list, empty or not, and a kept one lists by its sentence. -->
+  <AutomationSentence {source} {owner} onkept={() => void load()} />
+{/if}
 
 {#if from === 'refused'}
   <Empty kind="error" heading title={fix} />

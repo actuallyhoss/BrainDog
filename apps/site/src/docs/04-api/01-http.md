@@ -72,7 +72,7 @@ comment, resolveComment | Say something about a row, and resolve a comment
 triage | File or set aside an arrival, for a token given the inbox reach
 report | Send rows with a report key, and nothing else
 previewPage, previewChange | Draw a page or a change nobody has installed. Nothing is written
-checkAutomation, tryAutomation, scriptTry | Try an automation or a script before proposing it. Nothing is written, and a script's try counts as a run
+checkAutomation, tryAutomation, automationSentence, scriptTry | Try an automation or a script before proposing it. Nothing is written, and a script's try counts as a run
 ```
 
 The rest (members and invitations, tokens, packs, exports, the vault) takes a person signed in to the app. [Scopes](/docs/agents/scopes) lists it.

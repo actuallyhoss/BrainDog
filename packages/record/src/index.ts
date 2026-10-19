@@ -10565,6 +10565,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const named = args?.body_kind === 'rowset' ? (args.body as { register?: unknown })?.register : undefined;
       const stop = guard(ctx, 'propose', typeof named === 'string' ? named : undefined);
       if (stop) return { ok: false as const, refusal: stop };
+      /* AN AUTOMATION IN A SENTENCE: a `change` whose whole body is `{ sentence }` is turned into the rule it means by the
+         same parser the app uses, and filed as the ordinary change, so the person decides it in Decide as any other. */
+      const sentence = args?.body_kind === 'change' && args.body !== null && typeof args.body === 'object' && Object.keys(args.body).join() === 'sentence' ? (args.body as { sentence?: unknown }).sentence : undefined;
+      if (typeof sentence === 'string') {
+        const made = await (this as unknown as { automationSentence: (a: { sentence: string }, c: CallContext) => Promise<Result<{ rule: string; body: Record<string, unknown> }>> }).automationSentence({ sentence }, ctx);
+        if (!made.ok) return made;
+        const id = `rule.${made.value.rule}`;
+        args = { ...args, body: { declaration_id: id, to: { id, kind: 'rule', body: made.value.body }, from_version: 0 } as never };
+      }
       /* AN ARRANGEMENT IS FILED WITH WHAT IT WOULD DO, worked out here from the catalogue and the record, so the
          owner reads the packs, pages, calls out and settings it would change, and nothing the proposer said about them. */
       if (args?.body_kind === 'pack' || args?.body_kind === 'settings' || args?.body_kind === 'arrange') {

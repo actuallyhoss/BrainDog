@@ -771,6 +771,38 @@ async function send<T>(io: Fetch, url: string, body?: Record<string, unknown>): 
   return (isAnswer(said) ? said : unreachable()) as Answer<T>;
 }
 
+/** What `automationSentence` answers: the body a sentence means, read back, and what it would have done over the last 30 days. */
+export type Sentenced = {
+  rule: string;
+  said: string;
+  by: 'rules' | 'model';
+  body: Body;
+  path: 'inline' | 'run';
+  looked: { days: number; runs: number; atLeast: boolean; sample: string[]; line: string } | null;
+  notes: string[];
+};
+
+/** `Sentenced` as the wire sends it, or `null` for an answer that is not one. */
+export function sentencedOf(raw: unknown): Sentenced | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.rule !== 'string' || typeof r.said !== 'string' || typeof r.body !== 'object' || r.body === null) return null;
+  const l = r.looked as Record<string, unknown> | null | undefined;
+  const looked =
+    l && typeof l === 'object' && typeof l.runs === 'number' && typeof l.line === 'string'
+      ? { days: typeof l.days === 'number' ? l.days : 30, runs: l.runs, atLeast: l.atLeast === true, sample: Array.isArray(l.sample) ? l.sample.filter((x): x is string => typeof x === 'string') : [], line: l.line }
+      : null;
+  return {
+    rule: r.rule,
+    said: r.said,
+    by: r.by === 'model' ? 'model' : 'rules',
+    body: r.body as Body,
+    path: r.path === 'inline' ? 'inline' : 'run',
+    looked,
+    notes: Array.isArray(r.notes) ? r.notes.filter((x): x is string => typeof x === 'string') : [],
+  };
+}
+
 export type Proposal = { question: string; body_kind: 'change'; body: Record<string, unknown> };
 
 export type Source = {
@@ -781,6 +813,8 @@ export type Source = {
   run(rule: string): Promise<Answer<{ run: string }>>;
   cancel(run: string): Promise<Answer<{ run: string }>>;
   propose(p: Proposal): Promise<Answer<Filed>>;
+  /** A sentence turned into the automation it means, read back, with a look over the last 30 days. Writes nothing. */
+  sentence(sentence: string, rule?: string): Promise<Answer<Sentenced>>;
   /** What an inline body would do, before it is sent anywhere. It writes nothing, on the record or here. */
   dryRun(body: Body): Promise<Answer<Tried>>;
   /** Whether a body would install, or the install's own refusal with where in the body it is. Installs nothing. */
@@ -836,6 +870,12 @@ export function live(io: Fetch, base = ''): Source {
     propose: async (p) => {
       const out = await send<{ id?: unknown }>(io, `${base}/api/propose`, p);
       return out.ok ? { ok: true, value: { id: typeof out.value?.id === 'string' ? out.value.id : null } } : out;
+    },
+    sentence: async (sentence, rule) => {
+      const out = await send<unknown>(io, `${base}/api/automationSentence`, { sentence, ...(rule === undefined ? {} : { rule }) });
+      if (!out.ok) return out;
+      const got = sentencedOf(out.value);
+      return got ? { ok: true, value: got } : unreachable();
     },
     /* A GET WITH THE BODY AS JSON IN `rule`. The route is `writes: false`, and its table types `rule` as `json`, so the
        GET branch of `serveApi` (`packages/host/src/index.ts`) `JSON.parse`s that one value and hands every other query

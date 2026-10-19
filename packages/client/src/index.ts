@@ -1948,6 +1948,7 @@ export function createClient(options: ClientOptions) {
     cancelRun: (run: string) => call<RunCancelled>('cancelRun', { run }),
     /** Whether an automation's body would install, without installing it: where it is wrong, if it is. READ+. */
     checkAutomation: (args: { body: unknown }) => call<Answer<'checkAutomation'>>('checkAutomation', args as Record<string, unknown>),
+    automationSentence: (args: { sentence: string; rule?: string }) => call<Answer<'automationSentence'>>('automationSentence', args as Record<string, unknown>),
     /** What an automation's body would do to one sample, step by step, writing nothing. READ+. */
     tryAutomation: (args: { body: unknown; sample: unknown }) =>
       call<Answer<'tryAutomation'>>('tryAutomation', args as Record<string, unknown>),
