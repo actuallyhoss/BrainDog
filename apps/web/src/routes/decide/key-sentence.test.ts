@@ -57,7 +57,7 @@ test('a question that sends nothing adds no line: no calls, calls already approv
   assert.equal(doesOf('install', { install: 'stripe', calls_out: [call({ change: 'same' })] }), '');
 });
 
-test('Decide’s does list asks the kernel for the sentence, from the question’s own body', () => {
+test('Needs you’s does list asks the kernel for the sentence, from the question’s own body', () => {
   assert.ok(screen.includes("import { doesOf as sendsSaid } from '@braindog/kernel';"), 'the screen does not import the kernel’s doesOf');
   const body = local();
   assert.match(body, /aboutFor\(q\)/u, 'the does list never reads the question’s body');

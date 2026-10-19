@@ -62,7 +62,7 @@ A change, line by line. Each row starts with `- ` for a line taken out, `+ ` for
 ```
 ~~~
 
-A row that starts any other way refuses the block, since a line with no mark would be dropped from the drawing. On a record, Decide draws a proposed change to a document with this same kind.
+A row that starts any other way refuses the block, since a line with no mark would be dropped from the drawing. On a record, Needs you draws a proposed change to a document with this same kind.
 
 ## `gallery`
 

@@ -46,7 +46,7 @@ export const pageWords = {
   blank: 'Give the page a name first.',
   long: 'That name is too long for a page. Keep it to 80 characters or fewer.',
   made: (title: string) => `${title} is ready.`,
-  suggested: (title: string) => `${title} is waiting on Decide. It appears once it is accepted there.`,
+  suggested: (title: string) => `${title} is waiting in Needs you. It appears once it is accepted there.`,
   question: (title: string) => `Add a page called ${title}?`,
   undone: (title: string) => `${title} was taken back out.`,
   raced: 'A page of that name was made a moment ago. Try again.',

@@ -87,7 +87,7 @@ test("A SHARED ORDER GOES FIRST, AND WHAT THE READER HAD ARRANGED STAYS BEHIND I
 
 type Page = { title: string; href: string; icon: string; row?: boolean };
 const page = (title: string, href: string, row = false): Page => ({ title, href, icon: 'doc', ...(row ? { row: true } : {}) });
-const WORDS = { today: 'Today', activity: 'Activity', decide: 'Decide' };
+const WORDS = { today: 'Today', activity: 'Activity', decide: 'Needs you' };
 
 /** The founder's sections as the record declares them, a project's own page and a book's own page among them. */
 const FOUNDER: [string, Page[]][] = [
@@ -121,7 +121,7 @@ test('THE FOUNDER`S NAV IS ONE FLAT LIST OF SEVEN AT MOST: Today, the three sect
 test('DECIDE IS A ROW ONLY WHILE SOMETHING WAITS, with its count, and what no longer fits folds under More', () => {
   const flat = flatNav(FOUNDER, 3, WORDS);
   assert.equal(flat.main.length, 7);
-  assert.deepEqual(flat.main.map((i) => i.label), ['Today', 'Work', 'Projects', 'Money', 'Activity', 'Decide', 'People']);
+  assert.deepEqual(flat.main.map((i) => i.label), ['Today', 'Work', 'Projects', 'Money', 'Activity', 'Needs you', 'People']);
   assert.equal(flat.main.find((i) => i.key === 'decide')?.count, 3);
   assert.deepEqual(flat.more.map((i) => i.label), ['Services', 'Dashboard']);
 });
@@ -155,7 +155,7 @@ test('A RECORD WITH TASKS AND NO WORK SECTION STILL GETS THE ROW', () => {
   assert.deepEqual(flat.pages, []);
 });
 
-test('THE PHONE`S TABS ARE THE FIRST FIVE, with Decide beside Today while something waits on it', () => {
+test('THE PHONE`S TABS ARE THE FIRST FIVE, with Needs you beside Today while something waits on it', () => {
   assert.deepEqual(tabsOf(flatNav(FOUNDER, 0, WORDS).main).map((i) => i.label), ['Today', 'Work', 'Projects', 'Money', 'Activity']);
-  assert.deepEqual(tabsOf(flatNav(FOUNDER, 2, WORDS).main).map((i) => i.label), ['Today', 'Decide', 'Work', 'Projects', 'Money']);
+  assert.deepEqual(tabsOf(flatNav(FOUNDER, 2, WORDS).main).map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money']);
 });

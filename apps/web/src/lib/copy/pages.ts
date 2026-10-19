@@ -159,7 +159,7 @@ export const pages = {
      proposal, because a poll calls out on a clock and the owner approves the address once, on Decide. */
   pollHeading: 'Or let BrainDog fetch them',
   pollWhy:
-    'If the project answers its numbers as JSON at an https address, BrainDog can fetch them on a clock. You approve the address and how often once, on Decide, and nothing is fetched before that.',
+    'If the project answers its numbers as JSON at an https address, BrainDog can fetch them on a clock. You approve the address and how often once, in Needs you, and nothing is fetched before that.',
   pollEvery: 'How often',
   pollEveryLabels: { '15m': 'Every 15 minutes', '1h': 'Every hour', '6h': 'Every 6 hours', '1d': 'Every day' } as Record<string, string>,
   pollKey: 'Key in the vault, only if the address needs one',

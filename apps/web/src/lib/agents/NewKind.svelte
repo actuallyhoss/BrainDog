@@ -1,5 +1,5 @@
 <!--
-  The "New kind" form: a job kind written in plain fields and filed for Decide.
+  The "New kind" form: a job kind written in plain fields and filed for Needs you.
 
   ONE FIELD A ROW, IN THE ORDER A PERSON THINKS IT: what it is called, what to do (with the words a run fills in under
   it), where, with which tools, for how long, and how it may ask. The record's tools and the file tools are pickers, so
@@ -8,7 +8,7 @@
   THE KERNEL'S CHECK, DRAWN WHERE IT IS ABOUT. `kindFaultAt` runs the record's own `jobBody` on the body, and after the
   first press its sentence sits under the field it names. Nothing is sent while there is one.
 
-  ONE PRIMARY, "Send to Decide", AND IT ONLY FILES. A kind is approved once by the owner in Decide, so the press opens
+  ONE PRIMARY, "Send to Needs you", AND IT ONLY FILES. A kind is approved once by the owner in Needs you, so the press opens
   that question and the line after it links there; it is not offered twice.
 -->
 <script lang="ts">

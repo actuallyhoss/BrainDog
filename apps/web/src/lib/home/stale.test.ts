@@ -37,7 +37,7 @@ const RUNS = { kind: 'runs-empty', said: 'Runs that never did anything: 2', coun
 const answer = (lines: unknown, count: unknown = 0) => ({ ok: true as const, value: { lines, count } });
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-test('A LINE IS ITS SENTENCE, ITS COUNT AND WHERE IT IS CLEARED: steps on the Agents page, questions in Decide', () => {
+test('A LINE IS ITS SENTENCE, ITS COUNT AND WHERE IT IS CLEARED: steps on the Agents page, questions in Needs you', () => {
   assert.deepEqual(staleRows(answer([STEPS, ASKED, RUNS], 6)), [
     { key: 'steps', said: STEPS.said, count: 3, href: '/p/agents' },
     { key: 'questions', said: ASKED.said, count: 1, href: '/decide' },

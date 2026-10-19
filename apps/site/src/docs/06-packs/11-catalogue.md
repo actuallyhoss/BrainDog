@@ -26,7 +26,7 @@ The Kennel is a convenience and never a gate: a pack you trust installs from a f
 
 ## Installing
 
-In the app, Browse lists what the catalogue offers, each with its title, summary, version notes and what it would reach. Installing asks the record's owner on Decide, with the plan: what the pack adds and changes, the example rows it writes, and every host it calls out to. Nothing is installed until the owner accepts it.
+In the app, Browse lists what the catalogue offers, each with its title, summary, version notes and what it would reach. Installing asks the record's owner in Needs you, with the plan: what the pack adds and changes, the example rows it writes, and every host it calls out to. Nothing is installed until the owner accepts it.
 
 From the command line:
 
@@ -36,7 +36,7 @@ braindog pack install ./reading-list/reading-list.pack.json
 braindog pack install reading-list --from https://example.com/catalogue/
 ```
 
-Each files a proposal for the owner rather than installing, and prints where to answer it on Decide. An agent with a key installs the same way, so no agent can add lists or pages to a record without its owner saying yes.
+Each files a proposal for the owner rather than installing, and prints where to answer it in Needs you. An agent with a key installs the same way, so no agent can add lists or pages to a record without its owner saying yes.
 
 A record holds the version it installed to that file's checksum, and a catalogue that later served different bytes under the same version would be refused.
 

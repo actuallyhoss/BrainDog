@@ -19,7 +19,7 @@ export const words = {
   answeredTitle: 'What you answered',
   allAnswered: 'You have answered everything Slash suggested. What it notices next is drafted here.',
   /* The title row's red phrase. */
-  waitOn: (n: number) => (n === 1 ? 'One suggestion waits for you on Decide' : `${counted(n)} suggestions wait for you on Decide`),
+  waitOn: (n: number) => (n === 1 ? 'One suggestion waits for you in Needs you' : `${counted(n)} suggestions wait for you in Needs you`),
   /* The title row with nothing waiting: what is new, else that everything was answered, else that there is nothing. */
   fresh: (n: number) => (n === 1 ? 'Slash has one new suggestion.' : `Slash has ${counted(n).toLowerCase()} new suggestions.`),
   allSettled: 'You have answered everything Slash suggested.',
@@ -29,7 +29,7 @@ export const words = {
   tileTitle: 'Suggestions',
   tileMeta: 'Nothing changes until you say yes',
   unit: (n: number) => (n === 1 ? 'suggestion' : 'suggestions'),
-  partWaiting: 'On Decide',
+  partWaiting: 'In Needs you',
   partNew: 'New',
   partAnswered: 'Answered',
   /* The answer, in the Ask tile. */
@@ -37,7 +37,7 @@ export const words = {
   /* How many it read, said without the system's word for them. */
   rowsRead: (n: number) => (n === 1 ? 'one found' : `${n.toLocaleString('en')} found`),
   /* The hint under "What Slash suggests". */
-  press: 'Put these on Decide and each waits there for your yes. Nothing changes until then.',
+  press: 'Put these in Needs you and each waits there for your yes. Nothing changes until then.',
   /* Who drafted a suggestion: Slash's own rules, or the model it names. */
   byRules: 'From how you use BrainDog',
   byModel: (name: string) => `Drafted by ${name}`,
@@ -108,12 +108,12 @@ export function tallyOf(suggestions: readonly Suggestion[], onDecide: number, ca
     { label: words.partAnswered, value: answered, tone: 'earn' as const },
   ].filter((p) => p.value > 0);
   const clauses = [
-    ...(waiting > 0 ? [`${waiting} ${waiting === 1 ? 'waits' : 'wait'} for you on Decide`] : []),
+    ...(waiting > 0 ? [`${waiting} ${waiting === 1 ? 'waits' : 'wait'} for you in Needs you`] : []),
     ...(fresh > 0 ? [`${fresh} ${fresh === 1 ? 'is' : 'are'} not asked yet`] : []),
     ...(answered > 0 ? [`you answered ${answered}`] : []),
   ];
   const head = listed(clauses);
-  const full = fresh > 0 && cap > 0 && onDecide >= cap ? ` Slash keeps at most ${cap} on Decide at once, so the new ones wait their turn.` : '';
+  const full = fresh > 0 && cap > 0 && onDecide >= cap ? ` Slash keeps at most ${cap} in Needs you at once, so the new ones wait their turn.` : '';
   return { total: suggestions.length, parts, reading: `${head.charAt(0).toUpperCase()}${head.slice(1)}.${full}` };
 }
 

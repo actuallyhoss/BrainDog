@@ -1074,7 +1074,7 @@ export function search(q: string, limit = 24): SearchResult {
        the ninth is a query nobody can reason about — so the words are split and prefix-matched the
        same way, over the one piece of text a question has. The id still resolves whole. */
     if (want.every((w) => tokensOf(q2.title).some((t) => t.startsWith(w))) || q2.id.toLowerCase() === needle)
-      questions.push({ title: q2.title, detail: q2.decided ? 'Decided' : 'Open question', href: `/decide/${q2.id}`, kind: 'Decide', icon: 'decide', spoken: q2.id });
+      questions.push({ title: q2.title, detail: q2.decided ? 'Decided' : 'Open question', href: `/decide/${q2.id}`, kind: 'Needs you', icon: 'decide', spoken: q2.id });
   /**
    * AND THE PAGES, because the screen's own sentence promised them.
    *

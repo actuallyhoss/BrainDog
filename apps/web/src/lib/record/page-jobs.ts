@@ -35,7 +35,7 @@ export const pageWords = {
   /** While it waits for a machine to take it. */
   waiting: (page: string): string => `Waiting for your machine: composing ${page}`,
   pick: 'Page',
-  started: 'Started. It waits for your machine, and what it would change comes to Decide.',
+  started: 'Started. It waits for your machine, and what it would change comes to Needs you.',
   unreached: 'The record could not be reached. Try again in a moment.',
   conflict: 'The record changed while this was asked. Try again.',
 } as const;

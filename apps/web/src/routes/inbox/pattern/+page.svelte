@@ -11,11 +11,11 @@
   conditions); point at it (select the words in a sample and pick a way to find them again, scored against every
   sample by `anchorsFor`, or add another way, a fallback, or a condition); try and save (`tryPattern`, then the save).
 
-  AN OWNER'S SAVE INSTALLS THE RULE AT `proposed`, so what it reads waits on Decide as rowsets, the holding tray the
+  AN OWNER'S SAVE INSTALLS THE RULE AT `proposed`, so what it reads waits in Needs you as rowsets, the holding tray the
   kernel already has, until she presses "Trust it now". Anybody else's save files a `pattern` proposal.
 
   OPENED FROM TWO PLACES, both by address: an Inbox group ("Make a rule from these", its arrivals as `samples`) and a
-  `pattern` proposal on Decide ("Open in the builder", its samples and the ingest it proposes).
+  `pattern` proposal in Needs you ("Open in the builder", its samples and the ingest it proposes).
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';

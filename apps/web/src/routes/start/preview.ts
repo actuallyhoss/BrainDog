@@ -295,7 +295,7 @@ export const words = {
   /** A drafted change that could not be made, as the list of what was not made says it. */
   notDrafted: 'The lists and pages Slash drafted were not made.',
   /** A drafted change filed on Decide and not kept, for somebody who may not decide there. */
-  draftWaits: 'The lists and pages Slash drafted are waiting on Decide.',
+  draftWaits: 'The lists and pages Slash drafted are waiting in Needs you.',
   /** The button a page's card is, for a screen reader. */
   openPage: (title: string) => `Open ${title} as it would look`,
   /** The button that closes a page opened from its card. */

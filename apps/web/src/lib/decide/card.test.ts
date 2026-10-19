@@ -235,10 +235,10 @@ test('A FORM STARTS ON THE SUGGESTION ONLY WHERE A KEY MAY GIVE IT, and a hard a
   assert.equal(startsOn(cardOf(ask({ kind: 'rowset', options: [] }), { now })), null);
 
   const hard = cardOf(ask({ cost: 'undo' }), { now, home: 'GBP' });
-  assert.equal(pressSaid(hard, 'Decide'), 'Decide, can’t be undone easily');
+  assert.equal(pressSaid(hard, 'Needs you'), 'Needs you, can’t be undone easily');
   assert.equal(pressSaid(hard, 'Accept £12.98'), 'Accept £12.98, can’t be undone easily');
-  assert.equal(pressSaid(cardOf(ask({ cost: 'shape' }), { now }), 'Decide'), 'Decide', 'a band that only warns adds nothing to the words');
-  assert.doesNotMatch(pressSaid(hard, 'Decide'), /—/u);
+  assert.equal(pressSaid(cardOf(ask({ cost: 'shape' }), { now }), 'Needs you'), 'Needs you', 'a band that only warns adds nothing to the words');
+  assert.doesNotMatch(pressSaid(hard, 'Needs you'), /—/u);
 });
 
 test('A CHOICE IS CHOSEN AND DECIDE GIVES IT; a number key and Enter on a choice still answer; Enter only where cheap', () => {
@@ -249,7 +249,7 @@ test('A CHOICE IS CHOSEN AND DECIDE GIVES IT; a number key and Enter on a choice
   assert.match(card, /if \(e\.key === 'Enter'\) \{\n\s+e\.preventDefault\(\);\n\s+e\.stopPropagation\(\);\n\s+if \(chooses\) selectWay\(way\);\n\s+press\(way\);/u);
   /* DECIDE CARRIES THE KEY'S MARK ONLY ON A CARD THAT COSTS NOTHING, with an answer chosen. */
   assert.match(card, /data-enter=\{card\.enter !== null && selected !== null \? '' : undefined\}/u);
-  assert.match(card, /onclick=\{commit\}>\{pressSaid\(card, queueWords\.decide, card\.ways\.find\(\(w\) => w\.key === selected\)\)\}/u, 'Decide does not say the care a hard answer asks for');
+  assert.match(card, /onclick=\{commit\}>\{pressSaid\(card, queueWords\.decide, card\.ways\.find\(\(w\) => w\.key === selected\)\)\}/u, 'Needs you does not say the care a hard answer asks for');
   /* NO CHIP SAYS THE BAND: it is kept for the keys and the ranking, hidden, and said in the button. */
   assert.match(card, /<span class="queue-cost" data-cost=\{card\.cost\} hidden>/u);
   assert.match(card, /import '\.\/form\.css';/u, 'the card draws its choices its own way again');
@@ -272,9 +272,9 @@ test('ONE HARD ANSWER BESIDE A SAFE ONE: the question is a call, and only the ha
   assert.equal(hardOf(card), false);
   assert.equal(hardOf(card, keep), false);
   assert.equal(hardOf(card, take), true);
-  assert.equal(pressSaid(card, 'Decide', keep), 'Decide');
-  assert.equal(pressSaid(card, 'Decide', take), 'Decide, can’t be undone easily');
-  assert.equal(pressSaid(card, 'Decide', undefined), 'Decide', 'with nothing chosen Decide says nothing it does not know');
+  assert.equal(pressSaid(card, 'Needs you', keep), 'Needs you');
+  assert.equal(pressSaid(card, 'Needs you', take), 'Needs you, can’t be undone easily');
+  assert.equal(pressSaid(card, 'Needs you', undefined), 'Needs you', 'with nothing chosen Needs you says nothing it does not know');
   assert.equal(wayTail(card, keep, primaryOf(card)), '', 'the filled safe answer was worded as hard');
   assert.equal(wayTail(card, take, primaryOf(card)), ', can’t be undone easily', 'the hard answer says nothing on its own button');
   /* A QUESTION HARD AS A WHOLE STILL SAYS IT ON THE FILLED BUTTON, as it always did, and not on the others. */
@@ -336,9 +336,9 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
       options: ['Retire it', 'Park it another year', 'Sell it', 'Give it away'].slice(0, n).map((label, i) => ({ key: `k${i}`, label, because: `What answer ${i + 1} does.`, recommended: false })),
       ...over,
     });
-  assert.equal(pressOf(cardOf(described(2), { now })), true, 'two answers with nothing suggested still waited on Decide');
+  assert.equal(pressOf(cardOf(described(2), { now })), true, 'two answers with nothing suggested still waited in Needs you');
   assert.equal(pressOf(cardOf(described(3), { now })), true);
-  assert.equal(pressOf(cardOf(ask(), { now })), true, 'a suggestion does not bring Decide back');
+  assert.equal(pressOf(cardOf(ask(), { now })), true, 'a suggestion does not bring Needs you back');
   assert.equal(pressOf(cardOf(described(4), { now })), false, 'a fourth answer is a list to weigh, chosen and then given');
   assert.equal(pressOf(cardOf(described(2, { cost: 'undo' }), { now })), false, 'an answer that is hard to undo is two presses');
   assert.equal(pressOf(cardOf(described(2, { cost: 'shape' }), { now })), true, 'a band that only warns does not ask for two');
@@ -379,7 +379,7 @@ test('WHO ASKED IS ONE LINE OVER THE QUESTION AT EVERY WIDTH, and the side is dr
   assert.match(card, /\.queue-by \{\n\s+align-items: center;\n\s+flex-wrap: wrap;\n\s+column-gap: var\(--sp-2\);\n\s+font-size: var\(--fs-meta\);/u, 'the meta line is not 13');
 });
 
-test('COMPACT, OUTSIDE DECIDE: the question and its buttons only, and at most three before a count that opens Decide', () => {
+test('COMPACT, OUTSIDE DECIDE: the question and its buttons only, and at most three before a count that opens Needs you', () => {
   const card = src('./DecisionCard.svelte');
   assert.match(card, /const inline = \$derived\(inlineOf\(card, compact\)\);/u);
   assert.match(card, /\{#if !compact\}\n\s+<!-- WHO ASKED[^]*?-->\n\s+<p class="queue-by">/u, 'a compact card still says who asked');

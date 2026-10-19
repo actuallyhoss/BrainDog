@@ -34,7 +34,7 @@
   record checks a condition when the automation is sent.
 
   EVERY TRIGGER AND STEP THE RECORD RUNS HAS ITS FIELDS HERE. A figure crossing a line and a decision taken on
-  Decide are offered beside the four that were (`flow.ts` `TRIGGER_KINDS`, read from the kernel's capability table); a
+  Needs you are offered beside the four that were (`flow.ts` `TRIGGER_KINDS`, read from the kernel's capability table); a
   clock says how late a turn may still be taken; a script is picked from the installed ones, a person asked from the
   record's members, and a call from the declared ones with the way to declare another. A template's references are
   pills (`Tokens.svelte`) and a condition is the query builder over the record's `where` tree (`Condition.svelte`).
@@ -229,7 +229,7 @@
   });
 
   /* THE DECLARED CALLS A RULE MAY START: `callFault` in `packages/kernel/src/flow-lint.ts` refuses anything that is not
-     channel `call`, so a fetch or a watch is not offered only to be refused on Decide. Read once per sheet. */
+     channel `call`, so a fetch or a watch is not offered only to be refused in Needs you. Read once per sheet. */
   let calls = $state<ActionRow[] | null>(null);
   $effect(() => {
     if (!open || calls !== null || (verb !== 'call' && verb !== 'run')) return;

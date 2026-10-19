@@ -12,7 +12,7 @@
   code beneath it.
 
   THE OWNER IN A BROWSER INSTALLS FROM THE SHEET. Anybody else is refused by the record, and the same file is then filed
-  on Decide as a `pack` proposal, where the owner reads the same plan. After a use case's install, the two steps
+  in Needs you as a `pack` proposal, where the owner reads the same plan. After a use case's install, the two steps
   onboarding takes: the example rows linked, and the rail order the file carries kept.
 -->
 <script lang="ts">

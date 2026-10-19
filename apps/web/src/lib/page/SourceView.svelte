@@ -27,8 +27,8 @@
   refused in a sentence and the box is left as it was.
 
   AND A READER WHO MAY NOT APPLY PROPOSES. `setDeclaration` is the owner's, so for anybody else the primary button reads
-  "Propose this change" and files the whole declaration as one change on Decide (`lib/dog/propose.ts`). After the press
-  it is a link to that question, reading "On Decide", until the text is changed again; a refusal is the record's own
+  "Propose this change" and files the whole declaration as one change in Needs you (`lib/dog/propose.ts`). After the press
+  it is a link to that question, reading "In Needs you", until the text is changed again; a refusal is the record's own
   sentence, said where Apply's would be.
 -->
 <script lang="ts">

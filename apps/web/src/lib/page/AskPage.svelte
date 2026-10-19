@@ -4,7 +4,7 @@
   NOTHING IS FILED BY ASKING. The press calls the record's `slashDraft`, which drafts, checks and draws each change and
   keeps none of it. What the owner sees is the page as each draft would make it, beside the page as it is, through the
   same reader every declared page goes through (`PageView mode="preview"`). Only then does a press file it: "Keep it"
-  files it and accepts it in one go, "Ask on Decide" files it for later, and "Not this" drops it unfiled.
+  files it and accepts it in one go, "Ask in Needs you" files it for later, and "Not this" drops it unfiled.
 
   ONE COMPONENT FOR BOTH PLACES A DESCRIPTION IS TYPED. With `page` it is the sheet a page's head opens, about that
   page; without it it is the Slash screen's describe field, about the whole BrainDog. The drafts are drawn the same

@@ -120,8 +120,8 @@ test('A QUEUE OUTSIDE DECIDE SHOWS AT MOST THREE, and says how many more wait th
   /* THE BLOCK'S COUNT OF WHAT IS OPEN may be more than it was handed, and is never read as less. */
   assert.deepEqual(compactOf(['a', 'b', 'c', 'd'], 9), { shown: ['a', 'b', 'c'], more: 6 });
   assert.deepEqual(compactOf(['a', 'b', 'c', 'd'], 1), { shown: ['a', 'b', 'c'], more: 1 });
-  assert.equal(queueWords.moreOnDecide(5), '5 more on Decide');
-  assert.equal(queueWords.moreOnDecide(1200), '1,200 more on Decide');
+  assert.equal(queueWords.moreOnDecide(5), '5 more in Needs you');
+  assert.equal(queueWords.moreOnDecide(1200), '1,200 more in Needs you');
   for (const line of [queueWords.choose, queueWords.moreOnDecide(2), queueWords.hard('Chase it'), queueWords.suggestedSaid]) assert.doesNotMatch(line, /—|\b(row|rows|entity|list item)\b/iu);
 });
 

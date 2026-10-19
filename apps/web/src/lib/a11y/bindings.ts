@@ -85,7 +85,7 @@ export const BINDINGS: Binding[] = [
      AND THESE ARE TODAY'S WORDS ONLY UNTIL THE LAYOUT HANDS THE RAIL OVER: the letters are read from the rail now
      (`goto.ts`), and `sayGoto` writes `chordOf` of that list into this row before the sheet is drawn, so the sheet
      prints every place's letter. The seven here lead that list and keep their letters. */
-  { id: 'goto', scope: 'document', key: 'g then h d i s v p ,', label: 'Go to Home, Decide, Inbox, Search, Vault, Add-ons, Settings', bare: true },
+  { id: 'goto', scope: 'document', key: 'g then h d i s v p ,', label: 'Go to Home, Needs you, Inbox, Search, Vault, Add-ons, Settings', bare: true },
   { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'The nth item of your nav, in your order', bare: true },
   { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Toggle the sidebar', bare: false },
   { id: 'undo', scope: 'document', key: '⌘Z', label: 'Undo the last change', bare: false },

@@ -145,11 +145,11 @@ test('an undo the record refuses says the record\'s sentence and leaves the read
   assert.deepEqual(at.toasts[1], { text: 'This needs owner access.', intent: 'warn', undo: undefined });
 });
 
-test('a suggestion opens nothing and offers no undo: there is no page until Decide accepts it', async () => {
-  const at = desk(async () => ({ ok: true, slug: 'wedding', as: 'suggested', said: 'Wedding is waiting on Decide.' }));
+test('a suggestion opens nothing and offers no undo: there is no page until Needs you accepts it', async () => {
+  const at = desk(async () => ({ ok: true, slug: 'wedding', as: 'suggested', said: 'Wedding is waiting in Needs you.' }));
   await pressed({ title: 'Wedding', suggest: true }, at.desk);
   assert.deepEqual(at.did, ['make Wedding', 'refresh', 'toast']);
-  assert.deepEqual(at.toasts, [{ text: 'Wedding is waiting on Decide.', intent: 'good', undo: undefined }]);
+  assert.deepEqual(at.toasts, [{ text: 'Wedding is waiting in Needs you.', intent: 'good', undo: undefined }]);
 });
 
 test('a made page with no way back still opens on Describe it, with a receipt and no Undo', async () => {

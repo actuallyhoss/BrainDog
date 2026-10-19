@@ -27,7 +27,7 @@ The briefing hands each session the learnings for its project and the ones that 
 
 A skill has a name, a line saying when to use it, and its text. It can belong to one project or apply everywhere; where both exist, the one nearer the work wins.
 
-An agent reads one at `braindog:skill/{name}`, and the briefing lists the ones that apply. A skill's text and its version change only through Decide: an agent that wants to improve one proposes the new text, and you accept it or not. Which learnings led to it can be named on the skill, so its reasons travel with it.
+An agent reads one at `braindog:skill/{name}`, and the briefing lists the ones that apply. A skill's text and its version change only through Needs you: an agent that wants to improve one proposes the new text, and you accept it or not. Which learnings led to it can be named on the skill, so its reasons travel with it.
 
 ## Skills on your machine
 

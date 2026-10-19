@@ -40,7 +40,7 @@ test('an update that keeps nothing says nothing about keeping', () => {
 });
 
 /* WHAT A KEPT PAGE GOES WITHOUT (declare-edited-page-60). The record files `brings` and the sentence for the whole update
-   (`brings_line`), and Decide says it once in place of "is not taken", with the choice that follows the update. */
+   (`brings_line`), and Needs you says it once in place of "is not taken", with the choice that follows the update. */
 test('an update that adds to a page the owner changed says what the page goes without, once', () => {
   const line = 'Solo founder 2.6.0 adds the Late table and the title Today to your Overview page, which you changed. Your page is kept as you left it.';
   const body = {

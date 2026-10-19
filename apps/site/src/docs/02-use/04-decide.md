@@ -1,15 +1,15 @@
-# Decide
+# Needs you
 
-Decide is where every open question in your record waits for an answer, and where every change somebody proposes waits for your yes. Nothing an agent, Slash or a colleague proposes goes in until it is answered here.
+Needs you is where every open question in your record waits for an answer, and where every change somebody proposes waits for your yes. Nothing an agent, Slash or a colleague proposes goes in until it is answered here.
 
-## What arrives on Decide
+## What arrives in Needs you
 
 - **Questions a rule asks**, such as whether to chase an invoice that is past due, with the options it offers: Chase it, or Not yet.
 - **Changes an agent proposes**: rows to add or change, a new list, a page, a rule.
 - **What Slash drafts**: a page, a pattern for the inbox, a way to fit the record to how you use it.
 - **An automation you drew**, and changes to one. It runs once you accept it.
 - **A look a colleague proposes** for the record, which the owner accepts.
-- **Questions an automation asks** with its Ask a person or Suggest on Decide steps.
+- **Questions an automation asks** with its Ask a person or Suggest in Needs you steps.
 
 ## The order
 
@@ -20,7 +20,7 @@ Questions are ranked by the cost of being wrong, never by age. Each one says wha
 The options on a card are the answer. One press picks one, and the reason is asked for after it.
 
 ```steps
-Pick an option | Press it on the card, or its number key. a picks the suggested one | On Decide
+Pick an option | Press it on the card, or its number key. a picks the suggested one | In Needs you
 Say why | Write a sentence somebody can read in six weeks | In the reason box
 Record the decision | Ctrl+Enter (⌘Enter on a Mac) sends it. Esc goes back to the list | In the reason box
 ```
@@ -44,7 +44,7 @@ A proposal that rearranges the record is always answered on its own, so it is ne
 A proposed change shows what it will do before you accept it. For a page, what will appear, what it reads from, and where it goes in the sidebar. For a new list, its fields and any example rows. For something that reaches outside the record, each service it will call, the key it will use and what it sends. Accepting approves those calls.
 
 ```comparison | What you see before you accept
-If it | Decide shows
+If it | Needs you shows
 Adds rows | Each row, and that nothing is added until you accept
 Adds a page | The page drawn, what it reads from, and where it sits
 Installs an add-on | What it adds, its example rows, and the rows of yours it touches
@@ -55,7 +55,7 @@ Takes something away | What goes, and that the rows stay
 
 If a row the change would touch has changed since it was proposed, nothing is written. The question is read again so you can look at it with the new row.
 
-If only part of a change could be applied, Decide says what was done and kept, what was not done, and what stopped it. The question opens again, so you can accept once the cause is put right, or reject it.
+If only part of a change could be applied, Needs you says what was done and kept, what was not done, and what stopped it. The question opens again, so you can accept once the cause is put right, or reject it.
 
 ## Who can answer
 
@@ -65,9 +65,9 @@ The owner answers everything. A colleague at the Decides level can answer questi
 
 Every decision is in History and in the feed on Home, with the question and its reason. Search finds decided questions too, under Decided.
 
-## Keys on Decide
+## Keys in Needs you
 
-```comparison | Keys on Decide
+```comparison | Keys in Needs you
 Key | What it does
 j and k | The next or the previous question
 Enter | Open it, with every option and its reasoning

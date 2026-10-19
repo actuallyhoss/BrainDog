@@ -187,7 +187,7 @@
     return navPrefs.relabel(data.nav.filter((n) => !n.cut && !placed.has(n.href)));
   });
   /* WHAT WAITS, AS THE NEWEST `boot` SAID IT (`waits.svelte.ts`): the shell's, and then the poll's re-read of `boot`, so
-     the badge moves with the record and says the number Today's header and Decide's sentence say. */
+     the badge moves with the record and says the number Today's header and Needs you's sentence say. */
   $effect.pre(() => heardWaits({ waits: data.waits ?? null, working: data.working ?? [] }));
   const open = $derived(waitsNow()?.questions ?? data.open);
   const inbox = $derived(waitsNow()?.inbox ?? data.inbox);

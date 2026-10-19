@@ -84,7 +84,7 @@ export const hubWords = {
   scheduledWhy: 'A scheduled action fetches from, calls or watches a web address on a clock, and files what it gets in your record.',
   scheduledPrompt: 'read my record, then propose a scheduled action that fetches a figure from api.example.com every hour and files it in my record',
   scheduledAbsent: 'This record does not list its scheduled actions yet',
-  scheduledAbsentHow: 'Updating the host brings them. You can still make one here and send it to Decide.',
+  scheduledAbsentHow: 'Updating the host brings them. You can still make one here and send it to Needs you.',
   scriptsPrompt: 'read my record, then write a script that runs every morning, reads my open tasks and writes a one-line summary to my notes, and propose it',
   scriptsMore: 'Logs, versions and what each script may read, write and fetch are on the scripts screen.',
   scriptsOpen: 'Open the scripts screen',

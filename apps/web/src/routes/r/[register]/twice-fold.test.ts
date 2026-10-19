@@ -23,7 +23,7 @@ const PEOPLE = { ...REGISTERS.people!, meets: { name: 'name' } } as RegisterDecl
 
 type Called = { ok: true; value: unknown } | { ok: false; refusal?: { code: string; fix: string } };
 
-test('the press asks the record once and opens the question it answers on Decide', async () => {
+test('the press asks the record once and opens the question it answers in Needs you', async () => {
   const calls: unknown[][] = [];
   const call = async (name: string, args: Record<string, unknown>): Promise<Called> => {
     calls.push([name, args]);
@@ -53,7 +53,7 @@ test('the bar folds the picked of a `same:` list through this file, with the sha
   assert.match(bar, /import \{ foldAsk, sameOf \} from '\.\.\/twice-fold\.ts'/);
   assert.match(bar, /sameOf\(decl\) !== null/, 'the button is not on a list that says what makes two the same');
   assert.match(bar, /foldAsk\(\(name, args\) => createClient\(\{ base: apiBase\(\) \}\)\.call\(name, args\), id, picked\.map\(\(r\) => r\.seq\)\)/);
-  assert.match(bar, /goto\(at\(asked\.href\)\)/, 'the press does not open the question on Decide');
+  assert.match(bar, /goto\(at\(asked\.href\)\)/, 'the press does not open the question in Needs you');
   assert.match(bar, /<Button weight="quiet" disabled=\{folding\} onclick=\{\(\) => void fold\(\)\}>\s*<Icon name="link" size="s" \/>\{words\.foldMany\}/);
 });
 
@@ -129,7 +129,7 @@ test('the list screen draws the line, the link to the word and the one button', 
   assert.match(route, /p\.set\(TWICE, '1'\)/);
   assert.match(route, /data-held-twice-fold/, 'no button that folds them');
   assert.match(route, /foldAsk\(/);
-  assert.match(route, /goto\(at\(out\.href\)\)/, 'the press does not open the question on Decide');
+  assert.match(route, /goto\(at\(out\.href\)\)/, 'the press does not open the question in Needs you');
   /* The people's own words are still what a list of people reads. */
   for (const key of ['showing', 'clear', 'none', 'unsaved']) assert.match(route, new RegExp(`thingSaid\\?\\.${key} \\?\\? twiceWords\\.${key}`), key);
 });

@@ -105,4 +105,4 @@ The kinds on the earlier pages work on a page too, over a list, as `calendar` do
 
 ## Where a page comes from
 
-A page is written by a person, by Slash from a description of what you want to see, by an agent through its key, or by a pack that ships it. Each one lands through the same door, and a page an agent or Slash writes arrives on Decide first, for you to keep or refuse. To change a page's text directly, see [.dog files](/docs/dialect/dog-files).
+A page is written by a person, by Slash from a description of what you want to see, by an agent through its key, or by a pack that ships it. Each one lands through the same door, and a page an agent or Slash writes arrives in Needs you first, for you to keep or refuse. To change a page's text directly, see [.dog files](/docs/dialect/dog-files).

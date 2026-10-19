@@ -1,5 +1,5 @@
 <!--
-  A pattern question's messages as its rule reads them (`pattern-reads.ts`), drawn under the rule on Decide: at most
+  A pattern question's messages as its rule reads them (`pattern-reads.ts`), drawn under the rule in Needs you: at most
   three short blocks, one a message, each saying who it is from and then every field the rule fills with its value;
   then how many more like them wait, and what all that waits comes to when the record could read all of it.
 

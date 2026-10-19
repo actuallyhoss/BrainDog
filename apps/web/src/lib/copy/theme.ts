@@ -26,7 +26,7 @@ export const theme = {
   lookClose: 'Close the editor',
   lookHouse: 'Use the house look',
   lookHouseBack: 'The record is back in the house look.',
-  lookMember: 'Your look goes to the owner on Decide, and the record takes it when they accept.',
+  lookMember: 'Your look goes to the owner in Needs you, and the record takes it when they accept.',
   /** The title the editor wears when a theme refused at install opened it with its fixes staged. */
   lookFixAndInstall: 'Fix and install',
   lookStaged: 'The colours that could not be read are selected, and a fix is ready for each. Check them, then install.',
@@ -124,7 +124,7 @@ export const theme = {
   lookInstall: 'Install the fixed look',
   lookSaving: 'Saving',
   lookSaved: 'The record is in its new look.',
-  lookProposed: 'Your look is on Decide, waiting for the owner.',
+  lookProposed: 'Your look is in Needs you, waiting for the owner.',
   /** The question a member's look is filed under, which the owner reads on Decide. */
   lookProposeQuestion: 'Change how this record looks?',
 

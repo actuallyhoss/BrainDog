@@ -1,6 +1,6 @@
 # Slash
 
-Slash is the assistant built into every record. Ask it what you owe this month and it shows the bills; ask it for a page and it drafts one. It reads your record to answer, shows what it read, and nothing it writes goes in until you say yes on Decide.
+Slash is the assistant built into every record. Ask it what you owe this month and it shows the bills; ask it for a page and it drafts one. It reads your record to answer, shows what it read, and nothing it writes goes in until you say yes in Needs you.
 
 ## Ask
 
@@ -19,11 +19,11 @@ The **Slash** page in the sidebar is a home for asking: an Ask field at the top,
 
 ## Ask for something to be made
 
-Ask for a page, a list, a rule or a change to how the record looks, and Slash drafts it as a proposal on Decide. It shows what will appear, what it reads from and where it goes, and **From Slash** marks it. Accept it and it is made; reject it and nothing changes. See [Decide](/docs/use/decide).
+Ask for a page, a list, a rule or a change to how the record looks, and Slash drafts it as a proposal in Needs you. It shows what will appear, what it reads from and where it goes, and **From Slash** marks it. Accept it and it is made; reject it and nothing changes. See [Needs you](/docs/use/decide).
 
 ## What Slash notices
 
-Slash reads how your record is used and says what it noticed, such as a list that keeps growing or a question you keep asking. Under that are its suggestions, each marked as new, waiting on Decide, or answered. One press puts the new ones on Decide and changes nothing else. Accepting them is Decide's, and only the owner's.
+Slash reads how your record is used and says what it noticed, such as a list that keeps growing or a question you keep asking. Under that are its suggestions, each marked as new, waiting in Needs you, or answered. One press puts the new ones in Needs you and changes nothing else. Only the owner can accept them.
 
 Slash also does quieter work in the background: the inbox's patterns, a digest's summary, the question an automation asks it. That work has its own allowance and never spends your asks.
 
@@ -47,7 +47,7 @@ In Settings, under Agents, the owner can give Slash a key from a model provider 
 Question | Slash | Your agents
 Where it lives | In every record. Press / | Claude, Codex, Cursor and any MCP client you connect
 What it reads | Your record | What the key or sign-in you gave it allows
-What it writes | Nothing directly. Every change is a proposal on Decide | Proposals for you to decide, or rows directly, as you allowed
+What it writes | Nothing directly. Every change is a proposal in Needs you | Proposals for you to decide, or rows directly, as you allowed
 Who pays for it | Your plan's asks, or your own key | Your agent's own provider
 ```
 

@@ -36,7 +36,7 @@ const spokenDay = (day: string): string => (/^\d{4}-\d{2}-\d{2}$/u.test(day) ? `
 
 export const words = {
   title: 'Slash',
-  lede: 'Slash looks at how you use this BrainDog and suggests ways to fit it better. Nothing changes until you say yes on Decide.',
+  lede: 'Slash looks at how you use this BrainDog and suggests ways to fit it better. Nothing changes until you say yes in Needs you.',
   /* WHO DRAFTS IS NEVER THE HEADLINE: the line under the title is the state (`emptyTitle` and `routes/slash/lines.ts`),
      and these are the one dim line at the foot, linked to the setting that adds a model. */
   byRules: 'Drafting uses rules on this host.',
@@ -47,23 +47,23 @@ export const words = {
   suggests: 'What Slash suggests',
   suggestsNone: 'No suggestions right now. This BrainDog fits the way you use it.',
   emptyTitle: 'Nothing to suggest yet.',
-  emptyBody: 'As you use this BrainDog, Slash notices what you add to, which pages you open and what agents do, and suggests ways to fit it to how you work. Nothing changes until you say yes on Decide.',
-  ask: 'Put these on Decide',
-  asking: 'Putting them on Decide',
-  waiting: 'Waiting on Decide',
+  emptyBody: 'As you use this BrainDog, Slash notices what you add to, which pages you open and what agents do, and suggests ways to fit it to how you work. Nothing changes until you say yes in Needs you.',
+  ask: 'Put these in Needs you',
+  asking: 'Putting them in Needs you',
+  waiting: 'Waiting in Needs you',
   answered: 'You answered this',
   fresh: 'Not asked yet',
-  open: 'Open on Decide',
-  filed: (n: number) => (n === 1 ? 'One suggestion is on Decide.' : `${n} suggestions are on Decide.`),
-  filedNone: 'Nothing new to put on Decide.',
+  open: 'Open in Needs you',
+  filed: (n: number) => (n === 1 ? 'One suggestion is in Needs you.' : `${n} suggestions are in Needs you.`),
+  filedNone: 'Nothing new to put in Needs you.',
   sample: 'Slash reads a real BrainDog',
   sampleBody: 'This is the sample. In your own BrainDog, Slash says what it notices about how you use it and what it would change.',
   notOwner: 'Only the owner of this BrainDog can see what Slash noticed.',
-  skipped: 'Not put on Decide',
+  skipped: 'Not put in Needs you',
   dailyTitle: 'Slash on its own',
   dailySwitch: 'Let Slash look once a day',
-  dailyOn: 'Once a day, Slash looks at how you use this BrainDog and puts anything new on Decide, never more than three at a time and never a question you already answered.',
-  dailyOff: 'Slash waits for you. It looks only when you open Slash and press to put its suggestions on Decide.',
+  dailyOn: 'Once a day, Slash looks at how you use this BrainDog and puts anything new in Needs you, never more than three at a time and never a question you already answered.',
+  dailyOff: 'Slash waits for you. It looks only when you open Slash and press to put its suggestions in Needs you.',
   dailyLast: (day: string) => `It last looked on ${spokenDay(day)}.`,
   dailySaidOn: 'Slash will look once a day.',
   dailySaidOff: 'Slash will wait for you to ask.',
@@ -118,7 +118,7 @@ export async function askSlash(client: SlashClient, asked?: string): Promise<{ o
   const out = await client.call<Asked>('slashPropose', asked === undefined ? {} : { asked });
   if (!out.ok) return { ok: false, fix: fixOf(out) };
   /* THE TOAST SAYS HOW MANY AND NOT WHY THE RULES DREW THEM. The why is the record's dropped line, which the screen draws
-     under "Not put on Decide"; repeating it here put the same too-large sentence on one screen twice after one press. */
+     under "Not put in Needs you"; repeating it here put the same too-large sentence on one screen twice after one press. */
   return { ok: true, asked: out.value, said: out.value.filed.length === 0 ? words.filedNone : words.filed(out.value.filed.length) };
 }
 
@@ -142,16 +142,16 @@ export const changeWords = {
   drawing: 'Drawing the draft',
   keep: 'Keep it',
   keeping: 'Keeping',
-  file: 'Ask on Decide',
+  file: 'Ask in Needs you',
   drop: 'Not this',
   /** Which of several drafts is drawn, for a screen reader. */
   which: 'Which draft to show',
   kept: 'Kept. This is how it stands now.',
-  filed: 'This is waiting on Decide.',
-  open: 'Open on Decide',
+  filed: 'This is waiting in Needs you.',
+  open: 'Open in Needs you',
   none: 'Slash drafted nothing from that.',
   noPage: 'This draft changes no page, so there is nothing to draw. What it changes is in its question.',
-  unDrawn: 'This draft could not be drawn here. You can still ask about it on Decide, where it is drawn again.',
+  unDrawn: 'This draft could not be drawn here. You can still ask about it in Needs you, where it is drawn again.',
   unreached: 'BrainDog could not reach this record.',
   noModel: 'Slash changes a page from a description only when this BrainDog has a model set up. You can still change how the page is built yourself.',
   source: 'Change how this is built',

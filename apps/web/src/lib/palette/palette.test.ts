@@ -187,7 +187,7 @@ test('THE SURFACE REACHES ROWS, PAGES AND DECISIONS, not only the screens they l
      of the four kinds would prove the reach is missing when it is the query that is. */
   const found = search('re', 9_999);
   const kinds = new Set(found.groups.map((g) => g.kind));
-  assert.ok(kinds.has('Decide'), 'no decision is reachable by typing');
+  assert.ok(kinds.has('Needs you'), 'no decision is reachable by typing');
   assert.ok(kinds.has(copy.pages), 'no page is reachable by typing');
   const registers = new Set(Object.values(REGISTERS).map((r) => r.name));
   assert.ok([...kinds].some((k) => registers.has(k)), 'no register row is reachable by typing');
@@ -303,7 +303,7 @@ const fresh: Here = {
   look: {},
   places: [
     place('/', 'Today', { hide: false, rename: false }),
-    place('/decide', 'Decide', { hide: false, rename: false }),
+    place('/decide', 'Needs you', { hide: false, rename: false }),
     place('/inbox', 'Inbox', { rename: false }),
     place('/p/money', 'Money'),
     place('/p/money-flow', 'Money flow'),

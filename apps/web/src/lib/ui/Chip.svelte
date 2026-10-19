@@ -29,7 +29,7 @@
 <style>
   /* A STATUS IS A 6px DOT AND ITS WORD, and nothing round them. The pill on the hold wash is gone:
      the only filled badge in the product is the red square count (`Count.svelte`), and a row of washed capsules beside
-     a page's one primary was the loudest thing on Decide, a thread and a run.
+     a page's one primary was the loudest thing in Needs you, a thread and a run.
 
      THE WORD IS `--ink2` AND THE DOT CARRIES THE HUE. `blocks.css` draws every `.glyph` as the dot in `--tone-fill`,
      with its character indented out of sight and the intent's name kept for a screen reader (`13 §2.3`): colour is the

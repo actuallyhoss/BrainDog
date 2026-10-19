@@ -67,7 +67,7 @@
     const out = await addField(apiBase(), register, asked.field, owner);
     busy = false;
     /* A REFUSAL KEEPS WHAT WAS TYPED, under the record's own sentence. An owner's accept that did not land is still on
-       Decide, which is said in the record's words too, so the form closes: pressing again would file it twice. */
+       Needs you, which is said in the record's words too, so the form closes: pressing again would file it twice. */
     if (out.from === 'refused') {
       problem = out.fix;
       return;

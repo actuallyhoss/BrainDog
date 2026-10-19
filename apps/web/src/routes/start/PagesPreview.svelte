@@ -8,7 +8,7 @@
 
   THE RECORD DRAWS THEM, IN A REHEARSAL. Each call is `previewChange`, which installs its lists and pages with those
   rows inside a transaction it throws away, and each page it answers
-  goes through Decide's own conversion (`previewOf`) into the one page reader, in its inert `preview` mode. Nothing is
+  goes through Needs you's own conversion (`previewOf`) into the one page reader, in its inert `preview` mode. Nothing is
   kept, and nothing is written before the press beside the preview.
 
   A TILE WITH A FIGURE HOLDS A CHART: the count of pages, a stacked bar of where they sit on the side of the

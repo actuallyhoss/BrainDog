@@ -4,7 +4,7 @@
   drawn by `BlockSlot.svelte`; while the page is arranged, each carries its bar and takes a drag.
 
   ONE LAYOUT WHEREVER A DECLARED PAGE IS DRAWN. `/p/<slug>`, Home's body and a preview all lay their blocks out here, so
-  a page Slash proposes with a rail is judged on Decide with its rail, and a use case's Home keeps its columns. It was
+  a page Slash proposes with a rail is judged in Needs you with its rail, and a use case's Home keeps its columns. It was
   `/p/` alone, and the other two drew a flat stack of blocks.
 
   A PAGE IS A ROW, NOT A FILE, which is what makes "the Money page" something a freelancer never sees and a studio does

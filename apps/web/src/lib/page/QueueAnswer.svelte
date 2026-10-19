@@ -5,10 +5,10 @@
   THE CARD IS THE ONE DECISION CARD (`lib/decide/DecisionCard.svelte`, DIRECTION §37): why first, who asked with the app
   and the run, what it moves, the suggestion as an outline with a small dot, and one press with Undo. This is the row it
   sits in on a page: a row of the page by the question's id, so a home's cursor walks to it, its number keys press the
-  card's own buttons (`PageBody.svelte`), and Enter opens it on Decide.
+  card's own buttons (`PageBody.svelte`), and Enter opens it in Needs you.
 
   COMPACT OUTSIDE DECIDE (`compact`): Home and a declared page show the question and its answers as buttons only, and
-  at most three of them (`queue-answer.ts` `compactOf`), then "N more on Decide". Decide draws the whole form.
+  at most three of them (`queue-answer.ts` `compactOf`), then "N more in Needs you". Needs you draws the whole form.
 
   A PICTURE OPTION IS DRAWN FROM THE PAGE'S OWN ADDRESS FOR IT (`file`, his D28.33): the page that holds the file says
   where it is served, and the card under this row reads that way to it by name (`queue-answer.ts` `QUEUE_FILE`) and

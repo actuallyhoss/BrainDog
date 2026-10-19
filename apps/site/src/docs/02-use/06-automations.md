@@ -1,6 +1,6 @@
 # Automations
 
-An automation starts on a change, an arrival, a clock, a figure, a decision or a button, and then does its steps in order. You draw it on a canvas, send it to Decide, and it runs once you accept it.
+An automation starts on a change, an arrival, a clock, a figure, a decision or a button, and then does its steps in order. You draw it on a canvas, send it to Needs you, and it runs once you accept it.
 
 ## Everything that runs by itself
 
@@ -24,7 +24,7 @@ Press New automation | A new canvas opens. Give it a name | On the Automations t
 Choose what starts it | A change, an arrival, a clock, a figure, a decision or a button | Under Starts
 Narrow it if you need to | Only when a condition holds, such as a field's value | Under Only when
 Add steps | Pick each from the step menu, in the order they should happen | Under Steps
-Send to Decide | It runs once it is accepted there | At the foot of the canvas
+Send to Needs you | It runs once it is accepted there | At the foot of the canvas
 ```
 
 ## What starts it
@@ -35,7 +35,7 @@ A change | A row in one list is added, changed or deleted
 An arrival | Something arrives at a door: a webhook, an email, a paste
 A clock | On a clock, every fifteen minutes or longer
 A figure | A figure crosses a line. Figures are read every hour
-A decision | A question on Decide is answered, with any answer or one you name
+A decision | A question in Needs you is answered, with any answer or one you name
 A button | Only when somebody presses Run now
 ```
 
@@ -47,7 +47,7 @@ The step menu groups what a step can do:
 
 - **Check**: If, Remember a value, Stop here.
 - **Change**: Add a tag, Take a tag off, Set a field, Move to a state, Link to a row, Add a note, Add rows.
-- **Ask**: Tell you, Suggest on Decide, Ask a person, and Ask Slash.
+- **Ask**: Tell you, Suggest in Needs you, Ask a person, and Ask Slash.
 - **Call out**: Call a service, Run a call on this row, Run a script.
 - **Wait**: Wait, Come back later.
 
@@ -57,7 +57,7 @@ Drag a step to move it, or use Move up, Move down, Move into the branch and Move
 
 ## Before it can be sent
 
-The canvas checks the automation as you draw it. Anything that holds it back is said on the card it is about, and **Send to Decide** waits until each is put right. If you change nothing, there is nothing to send.
+The canvas checks the automation as you draw it. Anything that holds it back is said on the card it is about, and **Send to Needs you** waits until each is put right. If you change nothing, there is nothing to send.
 
 Some automations run inside the change that starts them, and some run after it, one step at a time. The canvas says which, and says so again if an edit would move it from one to the other.
 
@@ -82,4 +82,4 @@ Runs of automations, scheduled actions and scripts count against the month's run
 
 ## Agents can draw them too
 
-An agent you connect can propose an automation, and it arrives on Decide like anything else. Accepting it is yours.
+An agent you connect can propose an automation, and it arrives in Needs you like anything else. Accepting it is yours.

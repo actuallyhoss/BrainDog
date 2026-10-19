@@ -172,7 +172,7 @@ export const slashWords = {
   drawnBy: (model: string) => `Drawn by ${model}`,
   noModel: 'Drawn by a model this host did not name',
   /* THE VERB AND WHAT IT OPENS, AND NO ID: `Decide SG14` read an address aloud. */
-  decide: 'Open the proposal in Decide',
+  decide: 'Open the proposal in Needs you',
   without: 'Everything above this line was drawn without it.',
   figuresLine: (n: number) => (n === 1 ? 'figures: 1 read' : `figures: ${n.toLocaleString('en')} read`),
   capLine: (used: number, cap: number, resets: string) =>

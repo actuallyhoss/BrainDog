@@ -113,7 +113,7 @@ test('THE PRESS FILES ONE QUESTION AND ANSWERS ITS HANDLE, or carries the record
     { ok: true, question: 'q-41' },
   );
   assert.deepEqual(sent, [['askNamedSame', { pair: 'p-marrow' }]]);
-  const fix = 'That pair was already put to you on Decide.';
+  const fix = 'That pair was already put to you in Needs you.';
   assert.deepEqual(await askSame(async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix } }), 'p-marrow'), { ok: false, fix });
   /* NO SENTENCE, ANOTHER SHAPE OR A THROW: the plain one that nothing was saved. */
   assert.deepEqual(await askSame(async () => ({ ok: false, refusal: {} }), 'p'), { ok: false, fix: copy.recordNotReached });
@@ -147,8 +147,8 @@ test('THE TILE IS FLAT, HAS NO BORDER OR SHADOW, ITS WORDS ARE 15 OR MORE, AND I
   assert.doesNotMatch(style.replace(/@media \(forced-colors: active\)[\s\S]*$/u, ''), /\bborder:/u);
   for (const size of style.matchAll(/font-size: ([^;]+);/gu)) assert.match(size[1]!, /^var\(--t-(row|base)(, 15px)?\)$/u);
   assert.doesNotMatch(bare(part), /—/u);
-  assert.match(part, /'Ask me on Decide'/u);
-  assert.match(part, /'On Decide'/u);
+  assert.match(part, /'Ask me in Needs you'/u);
+  assert.match(part, /'In Needs you'/u);
   assert.match(part, /href=\{at\(`\/decide\/\$\{encodeURIComponent\(question\)\}`\)\}/u);
   assert.match(part, /class="n-on tap"/u, 'the link has the 44 hit box');
 });

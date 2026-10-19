@@ -186,12 +186,12 @@ const DECIDED_COLUMNS = [
 export function decideHome(): DecideBody {
   return {
     page: 'decide',
-    title: 'Decide',
+    title: 'Needs you',
     blocks: [
       /* THE PAGE'S LINE. Its words are the calm one; the head says the line worked out from the queue (`decideDrawn`). */
       { kind: 'note', lead: true, body: words.nothingWaiting },
       /* THE FIRST QUESTION, WHOLE. One question, so it is never chosen with others: it is the one being answered.
-         IT SITS UNDER THE HEAD'S OWN LINE, so Decide draws no name over it (`+page.svelte`); the heading is what a
+         IT SITS UNDER THE HEAD'S OWN LINE, so Needs you draws no name over it (`+page.svelte`); the heading is what a
          screen reader names the region, and what a reader with no such rule reads in place of the kind's bare name. */
       { kind: 'queue', heading: LEAD.waiting, icon: 'decide', source: 'governance.open', limit: 1, lead: true },
       /* THE REST, AFTER IT. The record answers the same ranked queue, and `decideDrawn` leaves out the one drawn above. */

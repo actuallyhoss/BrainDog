@@ -44,7 +44,7 @@ export const words = {
   /* A list the record did not name. */
   unnamed: 'entries',
   /* A press the record never answered. */
-  failed: 'Could not put the move on Decide. Try again.',
+  failed: 'Could not put the move in Needs you. Try again.',
   /* A press the record answered with no question: there was nothing left to move. */
   nothing: 'Nothing is left to move.',
 } as const;

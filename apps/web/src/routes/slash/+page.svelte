@@ -17,12 +17,12 @@
   the model's name.
 
   WHAT SLASH SUGGESTS, THEN ONE PRESS. Each suggestion says whether it is new, waiting on Decide or answered, and links
-  there once asked. The press puts the new ones on Decide and changes nothing else: accepting is Decide's, and only the
-  owner's. What the press left off Decide is said under the list it pressed.
+  there once asked. The press puts the new ones in Needs you and changes nothing else: accepting is Needs you's, and only the
+  owner's. What the press left off Needs you is said under the list it pressed.
 
   THE ASK TILE: the field, and under it the answer with its sources, what it read drawn by code, then Slash's sentence
   beside its face with the model named. An answer that proposes a change draws the one decision card under it, where he
-  asked (`in-place.ts`): Enter accepts, a six-second Undo follows, and Decide is only its second action. Left
+  asked (`in-place.ts`): Enter accepts, a six-second Undo follows, and Needs you is only its second action. Left
   unanswered, it waits on Decide, where the record filed it.
 
   A MODEL THAT DOES NOT ANSWER IS SAID ABOVE THE ASK TILE (ENG-A02): the record's `engineHealth` sentence, "Slash's

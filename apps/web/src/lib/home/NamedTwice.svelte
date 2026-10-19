@@ -5,8 +5,8 @@
   A DOUBTFUL PAIR WAS NEVER SEEN. The record could find two organisations or two projects with one name, and no screen
   said so. Here it does, and a doubtful merge goes to Decide as one question (D38.56).
 
-  AN OFFER AND NEVER A FOLD. "Ask me on Decide" only files the question; his yes there folds the pair, with one Undo.
-  After the press the line reads "On Decide", a link to that question. A press the record refuses says the record's
+  AN OFFER AND NEVER A FOLD. "Ask me in Needs you" only files the question; his yes there folds the pair, with one Undo.
+  After the press the line reads "In Needs you", a link to that question. A press the record refuses says the record's
   own sentence beside the line, and the button stays for another try.
 
   NO BUTTON WHERE THE RECORD CANNOT ASK (`can` false): the pair is still said. Nothing at nought.
@@ -21,8 +21,8 @@
   let { found }: { found: NamedTile } = $props();
 
   const words = {
-    ask: 'Ask me on Decide',
-    on: 'On Decide',
+    ask: 'Ask me in Needs you',
+    on: 'In Needs you',
   } as const;
 
   /* WHAT EACH PRESS ANSWERED, by the pair's handle: the question it filed, or the record's sentence for why not. */

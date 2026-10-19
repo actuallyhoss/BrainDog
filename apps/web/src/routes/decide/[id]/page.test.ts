@@ -255,14 +255,14 @@ test('one press is the answer, and a reason is asked for only when the record as
   assert.match(page, /\{#if asked\}\n\s+<form class="line-form" onsubmit=\{sendReason\}>/u, 'the reason line is drawn without the record asking');
 
   /* THE SUGGESTION IS SAID, NEVER FILLED: of the record's two answers only Accept is the primary, whichever is suggested,
-     and the press is the reader's. A question of options is chosen first and given by Decide. */
+     and the press is the reader's. A question of options is chosen first and given by Needs you. */
   const snippetAt = page.indexOf('{#snippet answer(');
   const snippet = page.slice(snippetAt, page.indexOf('{/snippet}', snippetAt));
   assert.ok(snippetAt >= 0, 'the one answer button is no longer one snippet');
   assert.deepEqual(snippet.match(/weight=\{[^}]*\}/gu), ["weight={option.key === 'accept' ? 'primary' : undefined}"], 'an answer is drawn heavier for being suggested');
   const pickAt = page.indexOf('function pick(key: string) {');
-  assert.doesNotMatch(page.slice(pickAt, page.indexOf('\n  }\n', pickAt)), /send\(/u, 'a choice sends its answer before Decide');
-  assert.match(page, /function commit\(\) \{[^]*?choose\(selectedKey\);/u, 'Decide does not give the answer chosen');
+  assert.doesNotMatch(page.slice(pickAt, page.indexOf('\n  }\n', pickAt)), /send\(/u, 'a choice sends its answer before Needs you');
+  assert.match(page, /function commit\(\) \{[^]*?choose\(selectedKey\);/u, 'Needs you does not give the answer chosen');
   assert.match(snippet, /data-suggested=\{marked \? '' : undefined\}/u, 'the suggestion is no longer marked on its button');
   assert.match(snippet, /labelOf\(option, q, moves\)/u, 'an answer no longer says what it does');
 });

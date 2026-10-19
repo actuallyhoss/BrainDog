@@ -72,7 +72,7 @@ test('a refusal, an unknown method, a throw and another shape all answer null', 
   assert.equal((await readScopeNote(record({ scopeProposals: { ok: true, value: { lists: [proposal()] } } }).call))?.count, 52);
 });
 
-test('askMove files the question for the keys list and answers its Decide address', async () => {
+test('askMove files the question for the keys list and answers its Needs you address', async () => {
   const { call, calls } = record({ proposeScopes: { ok: true, value: { asked: [{ list: 'tools', question: 'Q2', rows: 3 }, { list: KEYS_LIST, question: ULID, rows: 52 }] } } });
   assert.deepEqual(await askMove(call), { ok: true, href: `/decide/${ULID}` });
   assert.deepEqual(calls, [{ name: 'proposeScopes', args: { register: KEYS_LIST } }]);

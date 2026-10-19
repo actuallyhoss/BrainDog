@@ -60,8 +60,8 @@ export const understandWords = {
   nothing: 'Nothing new to link: what you have is read already.',
   nothingDone: 'Nothing new was linked.',
   more: (n: number) => (n === 1 ? 'and 1 more' : `and ${fmt(n)} more`),
-  wouldAsk: (n: number) => (n === 1 ? '1 it is not sure of goes to Decide as a question.' : `${fmt(n)} it is not sure of go to Decide as questions.`),
-  asked: (n: number) => (n === 1 ? '1 question is on Decide.' : `${fmt(n)} questions are on Decide.`),
+  wouldAsk: (n: number) => (n === 1 ? '1 it is not sure of goes to Needs you as a question.' : `${fmt(n)} it is not sure of go to Needs you as questions.`),
+  asked: (n: number) => (n === 1 ? '1 question is in Needs you.' : `${fmt(n)} questions are in Needs you.`),
   nextPart: 'There is more after this part.',
   /** A record whose answer this build cannot read. */
   unread: 'BrainDog answered in a way this page cannot read. Nothing was changed.',

@@ -34,7 +34,7 @@ untriaged | No rule filed it, and it waits on a person
 review | A rule knew its shape but could not read all of it, and it waits on a person
 skipped | A skip rule set it aside. A skip rule that is too wide shows here
 matched | Filed as a row
-proposed | A rule filed it, and waits for you to confirm that once on Decide
+proposed | A rule filed it, and waits for you to confirm that once in Needs you
 ignored | Set aside by hand. Its bytes are kept
 all | Every state
 ```
@@ -77,7 +77,7 @@ A token without the reach is told: Triage needs a token its owner gave the inbox
 
 ## When the same kind keeps arriving
 
-After three arrivals of the same shape, Slash suggests how to file them. Say yes on Decide and the rest go in on their own. An agent with the reach can tidy what is left, and propose a rule with `propose` when it sees a pattern.
+After three arrivals of the same shape, Slash suggests how to file them. Say yes in Needs you and the rest go in on their own. An agent with the reach can tidy what is left, and propose a rule with `propose` when it sees a pattern.
 
 ## Set up a machine
 

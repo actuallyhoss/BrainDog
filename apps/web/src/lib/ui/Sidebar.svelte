@@ -7,7 +7,7 @@
   are on is the one thing on it drawn as a tile: the tile's own white (or the dark tile), so "here" is the same surface
   as the work it opens.
 
-  THE PLACES ARE SEVEN (`railOf` in `lib/nav/rail.ts`): Today, Decide, Work, Projects, Money, People and Agents on a
+  THE PLACES ARE SEVEN (`railOf` in `lib/nav/rail.ts`): Today, Needs you, Work, Projects, Money, People and Agents on a
   record that has them, every other section after them, and what does not fit under More. Under them, each section's
   own things (a project per row under Projects), each folding on its own and remembered per device (`railShut`). Work's
   other pages are views of Work, which the Work screen switches between, so they are not places here too.
@@ -1532,7 +1532,7 @@
   }
 
   /* CLIPPED, NEVER REMOVED: the name is the row's accessible name at both widths, and the flyout is a copy for the eye.
-     A count other than Decide's goes the same way, so it stays in its row's name without a figure on every list. */
+     A count other than Needs you's goes the same way, so it stays in its row's name without a figure on every list. */
   .rail[data-icons] .item-name,
   .rail[data-icons] .pen-action,
   .rail[data-icons] .record-name,

@@ -140,10 +140,10 @@ test('the run goes through installInTurn, ends on the sentence that names who we
   /* Good news only inside the branch that went through. */
   assert.ok(run.indexOf('toasts.push(') > run.indexOf('if (out.ok) {') && run.indexOf('toasts.push(') < run.indexOf('return true;'));
   assert.equal(run.match(/toasts\.push\(/gu)?.length, 1);
-  assert.match(run, /if \(notOwner\(out\.code\)\) \{\s*await askOwner\(stopped, read\);/u, 'a refusal for not being the owner is not filed on Decide');
+  assert.match(run, /if \(notOwner\(out\.code\)\) \{\s*await askOwner\(stopped, read\);/u, 'a refusal for not being the owner is not filed in Needs you');
 });
 
-test('a stop after a holder went in names the holder on the row pressed, in a refusal and beside one filed on Decide', () => {
+test('a stop after a holder went in names the holder on the row pressed, in a refusal and beside one filed in Needs you', () => {
   const run = body('installTurn');
   assert.match(run, /const went = out\.first \?\? \[\];/u, 'the refusal is not asked who went in');
   assert.match(

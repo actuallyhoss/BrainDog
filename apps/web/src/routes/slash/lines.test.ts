@@ -22,10 +22,10 @@ const READING: Reading = {
   cap: 3,
 };
 
-test('THE LINE IS THE STATE: what waits on Decide leads, in red, and who drafts is never the headline', () => {
+test('THE LINE IS THE STATE: what waits in Needs you leads, in red, and who drafts is never the headline', () => {
   const s = sentenceOf(1, 2, 4, slash.emptyTitle);
-  assert.deepEqual(s, { text: 'One suggestion waits for you on Decide.', needs: 'One suggestion waits for you on Decide' });
-  assert.equal(sentenceOf(3, 0, 3, slash.emptyTitle).needs, 'Three suggestions wait for you on Decide');
+  assert.deepEqual(s, { text: 'One suggestion waits for you in Needs you.', needs: 'One suggestion waits for you in Needs you' });
+  assert.equal(sentenceOf(3, 0, 3, slash.emptyTitle).needs, 'Three suggestions wait for you in Needs you');
   assert.ok(!s.text.includes(slash.byRules));
 });
 
@@ -48,7 +48,7 @@ test('THE TILE COUNTS WHERE EACH SUGGESTION STANDS, and leaves out a part with n
       [words.partAnswered, 1, 'earn'],
     ],
   );
-  assert.equal(t.reading, '1 waits for you on Decide, 2 are not asked yet and you answered 1.');
+  assert.equal(t.reading, '1 waits for you in Needs you, 2 are not asked yet and you answered 1.');
   const none = tallyOf(suggestionsOf({ ...READING, drafts: READING.drafts.slice(2) }), 0, 3);
   assert.deepEqual(
     none?.parts.map((p) => p.label),
@@ -58,7 +58,7 @@ test('THE TILE COUNTS WHERE EACH SUGGESTION STANDS, and leaves out a part with n
 
 test('A FULL DECIDE IS SAID, with the record’s own cap, when new ones are held back by it', () => {
   const t = tallyOf(suggestionsOf(READING), 3, 3);
-  assert.match(t?.reading ?? '', /Slash keeps at most 3 on Decide at once/u);
+  assert.match(t?.reading ?? '', /Slash keeps at most 3 in Needs you at once/u);
   assert.doesNotMatch(tallyOf(suggestionsOf(READING), 1, 3)?.reading ?? '', /at most/u);
 });
 

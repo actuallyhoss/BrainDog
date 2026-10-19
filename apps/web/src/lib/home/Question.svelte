@@ -1,5 +1,5 @@
 <!--
-  One open question on Today's classic list (`/?classic`), answered where it is shown: the 32px well with the Decide glyph
+  One open question on Today's classic list (`/?classic`), answered where it is shown: the 32px well with the Needs you glyph
   in the list's lead column, and beside it the one decision card (`lib/decide/DecisionCard.svelte`, DIRECTION §37), the
   same card every page and Decide draw: why first, who asked, what it moves, the suggestion as an outline with a small
   dot, and one press with Undo.

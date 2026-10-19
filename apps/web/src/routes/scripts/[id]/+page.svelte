@@ -4,7 +4,7 @@
   THE INSTALLED VERSION IS WHAT THE FORM STARTS FROM, AND IT IS HELD. The read asks again whenever the record moves, and
   a form rebuilt from each answer would throw away what somebody was typing. So the first answer is held, the form
   starts from it, and its version is the one the change is filed against: a version accepted by somebody else in the
-  meantime makes this change a conflict in Decide, never a silent replacement. After the owner's own accept the held
+  meantime makes this change a conflict in Needs you, never a silent replacement. After the owner's own accept the held
   version is let go and the form starts again from the one now installed.
 
   THE SOURCE MAY NOT BE FOUND. No read answers a script's source; it is looked for in the change that installed it

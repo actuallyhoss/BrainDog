@@ -93,7 +93,7 @@
     learnWhy: 'Messages alike from one sender are learned once, as a rule, and the rest are filed as they arrive.',
     alikeFrom: (n: number, from: string) => `${n} alike from ${from}`,
     newest: (subject: string, when: string) => `Newest: ${subject} · ${when}`,
-    patternWhy: 'Drafted by Slash, waiting on Decide',
+    patternWhy: 'Drafted by Slash, waiting in Needs you',
     file: 'File',
     archive: 'Archive',
     fileNamed: (subject: string) => `File “${subject}”`,
@@ -496,7 +496,7 @@
   /* ── a selection ─────────────────────────────────────────────────────────── */
   let picked = $state(new Set<string>());
   /* SELECTING, ON A PHONE: nothing hovers there to reveal the checks, so `Select` shows them at a thumb's size, as
-     Decide's does. At a desk the checks are always drawn and `x` picks the cursor's row. */
+     Needs you's does. At a desk the checks are always drawn and `x` picks the cursor's row. */
   let selecting = $state(false);
   const picking = $derived(picked.size > 0 || selecting);
   function toggle(id: string) {

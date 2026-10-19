@@ -7,7 +7,7 @@ The commands for building with `braindog`: pages as files you can edit, and use 
 ```comparison | Pages
 Command | What it does
 braindog page pull <slug> | Fetch a page's declaration and write it as a .dog file: one page, one file. --out names the file
-braindog page push <file> | Read a .dog file and send it as the page. An owner's session applies it; a key asks on Decide and it waits there for an answer
+braindog page push <file> | Read a .dog file and send it as the page. An owner's session applies it; a key asks in Needs you and it waits there for an answer
 braindog page check <file> | Check a .dog file against the page grammar, on this machine. Nothing is sent
 ```
 
@@ -22,7 +22,7 @@ braindog usecase export | Save this record's arrangement as a use-case file, wit
 braindog usecase check <file> | Read a use-case file the way a record will, on this machine: its size, any key in it, its shape and its blocks
 braindog usecase new <id> | Write a starting use-case file, one list and a page over it, that already reads the way a record will
 braindog usecase diff <earlier> <later> | Say what moved between two versions, and the least version bump that needs
-braindog usecase install <id, file or address> | Ask the owner to install one: files a proposal and prints its link on Decide. Nothing is installed until they accept
+braindog usecase install <id, file or address> | Ask the owner to install one: files a proposal and prints its link in Needs you. Nothing is installed until they accept
 braindog usecase publish <file> --to <folder> | Add a version to a catalogue folder: never one already there, never an earlier one, and a major when it takes something away
 braindog usecase publish <file> --kennel | Submit it to the Kennel, the public catalogue. --sign names the author key
 braindog usecase yank <id> <version> --reason <why> | Take a version back on the Kennel. A record holding it is told why

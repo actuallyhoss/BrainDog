@@ -476,7 +476,7 @@ export const NOT_OFFERED: Readonly<Record<string, string>> = {
   section: 'A section heading shows nothing of its own: it names the blocks after it on the page.',
   diff: 'Before and after shows how one text changed, so it belongs where a change is read, not over a list.',
   agents: 'What agents did is the record’s own account of its agents, not something a list holds.',
-  queue: 'The questions waiting on you are the record’s, and they wait on Decide.',
+  queue: 'The questions waiting on you are the record’s, and they wait in Needs you.',
   capture: 'A form adds to this list from the page, with a question for each of its fields.',
   inputs: 'Boxes to type into change one item, so they belong on that item’s own page.',
 };

@@ -86,7 +86,7 @@ export async function foldAsk(
   if (!out.ok) {
     const code = out.refusal?.code ?? '';
     if (ABSENT.has(code)) return { ok: false, said: 'This BrainDog cannot fold these yet.', gone: true };
-    return { ok: false, said: out.refusal?.fix ?? 'Could not put the question on Decide. Try again.', gone: false };
+    return { ok: false, said: out.refusal?.fix ?? 'Could not put the question in Needs you. Try again.', gone: false };
   }
   const question = (out.value as { question?: unknown } | null)?.question;
   if (typeof question !== 'string' || question === '') return { ok: false, said: 'Nothing on this list is here twice now.', gone: true };

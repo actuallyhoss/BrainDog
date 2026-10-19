@@ -86,7 +86,7 @@ test('the sheet prints the same list, and the `g` row takes it', () => {
   const rows = [{ href: '/s/money', name: 'Money' }];
   const line = chordOf(gotoOf(rows));
   assert.equal(line.key, 'g then h d i s v p , m');
-  assert.equal(line.label, 'Go to Home, Decide, Inbox, Search, Vault, Add-ons, Settings, Money');
+  assert.equal(line.label, 'Go to Home, Needs you, Inbox, Search, Vault, Add-ons, Settings, Money');
   const row = BINDINGS.find((b) => b.id === 'goto')!;
   const was = { key: row.key, label: row.label };
   assert.equal(was.key, 'g then h d i s v p ,', 'before the layout hands a list, the row says the seven');
@@ -105,7 +105,7 @@ test('the layout holds no table of letters, and reaches this file only by a dyna
 test('a rail drawn in the places order gives each place its letter, and `g m` opens Money', () => {
   const rail = [
     { href: '/', name: 'Today' },
-    { href: '/decide', name: 'Decide' },
+    { href: '/decide', name: 'Needs you' },
     { href: '/p/work', name: 'Work' },
     { href: '/p/projects', name: 'Projects' },
     { href: '/p/money', name: 'Money' },

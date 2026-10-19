@@ -19,9 +19,9 @@ import { filedCard } from '../../lib/palette/slash.ts';
 
 export const words = {
   /** Said once he leaves a card unanswered, by asking again or leaving the page: where it is now. */
-  waits: 'Slash’s suggestion waits for you on Decide.',
+  waits: 'Slash’s suggestion waits for you in Needs you.',
   /** The card's second action: the same question, on Decide. */
-  open: 'Open it on Decide',
+  open: 'Open it in Needs you',
 };
 
 /** The card drawn under the Ask field: the question as Decide files it, where it is on Decide, and whether he answered. */

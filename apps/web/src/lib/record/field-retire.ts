@@ -30,9 +30,9 @@ import { REGISTERS } from './held.ts';
 export const retireWords = {
   retire: 'Retire',
   /** The one line beside the control, so nobody presses it expecting the field gone this second. */
-  note: 'Every item keeps its value. The field waits on Decide before it goes.',
+  note: 'Every item keeps its value. The field waits in Needs you before it goes.',
   question: (label: string, list: string) => `Retire ${label} on ${list}?`,
-  filed: (label: string) => `Retiring ${label} is waiting on Decide. Nothing changes until it is accepted there.`,
+  filed: (label: string) => `Retiring ${label} is waiting in Needs you. Nothing changes until it is accepted there.`,
   unknown: (label: string, list: string) => `${list} has no field called ${label}.`,
   already: (label: string) => `${label} is already retired.`,
   /* THE KERNEL REFUSES THESE THREE TOO (`retireIn`); said here first, because a sentence under the control beats a round

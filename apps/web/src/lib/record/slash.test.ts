@@ -21,7 +21,7 @@ const client = (answers: Record<string, unknown>): SlashClient & { called: strin
   return { called, call: async (name) => (called.push(name), answers[name] as never) };
 };
 
-test('each suggestion says where it stands, new first, and links into Decide once asked', () => {
+test('each suggestion says where it stands, new first, and links into Needs you once asked', () => {
   assert.deepEqual(suggestionsOf(READING), [
     { question: 'Give Logbook a page of its own?', state: 'new', href: null, said: words.fresh },
     { question: 'Add Watch?', state: 'waiting', href: '/decide/SG3', said: words.waiting },
@@ -50,7 +50,7 @@ test('reading and asking go to the two record methods, and a refusal is said in 
   assert.deepEqual(await readSlash(c), { ok: true, reading: READING });
   const asked = await askSlash(c);
   assert.ok(asked.ok);
-  assert.equal(asked.said, 'One suggestion is on Decide.');
+  assert.equal(asked.said, 'One suggestion is in Needs you.');
   assert.deepEqual(c.called, ['slash', 'slashPropose']);
 
   const member = client({ slash: { ok: false, refusal: { code: 'FORBIDDEN', fix: 'This needs owner.' } } });
@@ -65,13 +65,13 @@ test('reading and asking go to the two record methods, and a refusal is said in 
 test('a record too large for the included model is said plainly, under the title and once in the press, with no fix he cannot apply', async () => {
   const included: Reading = { ...READING, model: 'included' };
   /* THE RECORD'S OWN ANSWER, DROPPED LINE AND ALL. A mock with `dropped: []` beside `large: true` is a press no record
-     returns, and it hid that the screen already draws `asked.dropped` under "Not put on Decide": with the sentence added
+     returns, and it hid that the screen already draws `asked.dropped` under "Not put in Needs you": with the sentence added
      to the toast as well, one press said it verbatim twice on one screen, and a third time under the title. */
   const why = "This BrainDog is too large for the included model to read, so Slash's own rules drafted these.";
   const large = client({ slashPropose: { ok: true, value: { by: 'rules', filed: [{ id: 'SG5', question: 'x', by: 'rules' }], skipped: [], dropped: [why], large: true } } });
   const out = await askSlash(large);
   assert.ok(out.ok);
-  assert.equal(out.said, 'One suggestion is on Decide.');
+  assert.equal(out.said, 'One suggestion is in Needs you.');
   assert.ok(!out.asked.dropped.some((d) => out.said.includes(d)), out.said);
   assert.equal(draftedBy(included, out.asked), words.byLarge);
   assert.match(words.byLarge, /too large for the included model/u);
@@ -134,7 +134,7 @@ test('a description goes to the same press as asked, and is said in the same sen
   };
   const out = await askSlash(c, 'A desk for my launch');
   assert.ok(out.ok);
-  assert.equal(out.said, 'One suggestion is on Decide.');
+  assert.equal(out.said, 'One suggestion is in Needs you.');
   await askSlash(c);
   assert.deepEqual(sent, [{ asked: 'A desk for my launch' }, {}]);
   const refused: SlashClient = { call: async () => ({ ok: false, refusal: { code: 'VALUE_MALFORMED', fix: 'asked: is at most 1000 characters.' } }) as never };

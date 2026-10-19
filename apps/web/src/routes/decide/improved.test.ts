@@ -109,7 +109,7 @@ test('a plan names a list by the name the record gives it, and a pack by the cal
 
 const source = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 
-test('Decide and Add-ons read what waits from one place', () => {
+test('Needs you and Add-ons read what waits from one place', () => {
   const addons = source('../packs/+page.svelte');
   assert.match(addons, /import \{ declarationName, firstPartyUpdates \} from '\.\.\/decide\/improved\.ts';/u, 'Add-ons reads its own list of what waits again');
   const from = addons.indexOf('async function updatesOf(');
@@ -120,8 +120,8 @@ test('Decide and Add-ons read what waits from one place', () => {
   assert.doesNotMatch(updatesOf, /listingsOf\(/u, 'the Updates tab keeps a second spelling of what waits');
 
   const decide = source('./+page.svelte');
-  assert.match(decide, /import\('\.\/improved\.ts'\)/u, 'Decide does not read what waits');
-  assert.match(decide, /import\('\.\/Improved\.svelte'\)/u, 'Decide does not draw the card');
+  assert.match(decide, /import\('\.\/improved\.ts'\)/u, 'Needs you does not read what waits');
+  assert.match(decide, /import\('\.\/Improved\.svelte'\)/u, 'Needs you does not draw the card');
 });
 
 /* ── one update waits on another (`lib/market/update-order.ts`) ───────────── */

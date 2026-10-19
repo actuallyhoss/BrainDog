@@ -357,7 +357,7 @@ test('OPEN QUESTIONS PAST BOOT’S TWENTY: the queue reads every one, a page at 
   assert.deepEqual(pages, [null, 'SG801', 'SG601']);
 });
 
-test('DECISIONS PAST THE NEWEST TWO HUNDRED: Decide reads a page, says how many there are, and loads the rest in order', async () => {
+test('DECISIONS PAST THE NEWEST TWO HUNDRED: Needs you reads a page, says how many there are, and loads the rest in order', async () => {
   const suggestions = Array.from({ length: 260 }, (_, i) => ({
     id: `SG${260 - i}`,
     body_kind: 'options',

@@ -441,7 +441,7 @@ export const words = {
   cancelled: 'Stopped',
   /* Starting one. */
   pick: 'Which job',
-  noKinds: 'No job kinds are approved yet. An agent proposes one, with its prompt and the tools it may use, and you approve it in Decide.',
+  noKinds: 'No job kinds are approved yet. An agent proposes one, with its prompt and the tools it may use, and you approve it in Needs you.',
   start: (title: string) => `Run ${title}`,
   startAny: 'Run',
   inRepo: (repo: string) => `Runs in ${repo}`,

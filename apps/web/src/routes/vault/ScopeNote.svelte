@@ -1,6 +1,6 @@
 <!--
   One quiet line inside the Keys tile: how many keys look like they belong to a project, and one button that puts the
-  move on Decide and opens it there (`scope-note.ts`). No tile of its own, no border, no shadow: the board's own text
+  move in Needs you and opens it there (`scope-note.ts`). No tile of its own, no border, no shadow: the board's own text
   colours, the line at body size, and a rectangle button.
 
   NOTHING DRAWN AT NOUGHT OR ON A REFUSAL. The screen hands this the record's answer only when there is one; `noteOf`

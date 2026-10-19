@@ -37,7 +37,7 @@ function host(answer: (path: string, body: Record<string, unknown> | null) => Re
   return { io, sent };
 }
 
-test('Today is kept as the page Home reads first, and Decide as itself', () => {
+test('Today is kept as the page Home reads first, and Needs you as itself', () => {
   assert.deepEqual(keptAs('today', []), { id: 'home', installed: false });
   assert.deepEqual(keptAs('today', ['home']), { id: 'home', installed: true });
   assert.deepEqual(keptAs('decide', ['money']), { id: 'decide', installed: false });

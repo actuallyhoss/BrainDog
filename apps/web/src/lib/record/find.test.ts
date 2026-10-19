@@ -348,7 +348,7 @@ test('THE QUESTIONS GROUP ANSWERS THE SAME QUERY THE SAME WAY', () => {
   );
   assert.ok(mid.length > 0, 'no question title has a word long enough to have a middle');
   for (const q of mid.slice(0, 12)) {
-    const decide = search(q, 9_999).groups.find((g) => g.kind === 'Decide');
+    const decide = search(q, 9_999).groups.find((g) => g.kind === 'Needs you');
     for (const h of decide?.hits ?? [])
       assert.ok(
         tokensOf(h.title).some((tok) => tok.startsWith(q)),
@@ -359,7 +359,7 @@ test('THE QUESTIONS GROUP ANSWERS THE SAME QUERY THE SAME WAY', () => {
   /* AND A QUESTION IS STILL FOUND BY ITS SPOKEN ID, whole, which is the one thing about that group
      that is not a text match — and was untested. */
   const one = [...QUESTIONS, ...DECIDED][0]!;
-  const byId = search(one.id, 9_999).groups.find((g) => g.kind === 'Decide');
+  const byId = search(one.id, 9_999).groups.find((g) => g.kind === 'Needs you');
   assert.ok(byId?.hits.some((h) => h.spoken === one.id), `${one.id} does not resolve as a spoken id`);
 });
 

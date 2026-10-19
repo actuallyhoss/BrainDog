@@ -69,4 +69,4 @@ If the record refuses the text, its sentence is shown at the line it is about, a
 
 ## From the command line
 
-`braindog page push launch.dog` sends a file as the page. Changing what a page is takes the owner in the app, and a key held by the command line or an agent is never enough, by design. So with a key the push is filed as one question on Decide and prints its number, and nothing changes until you accept it there. The same file pushed twice is still one question. Pull and check are how a `.dog` file is written and tested outside the app; applying is yours.
+`braindog page push launch.dog` sends a file as the page. Changing what a page is takes the owner in the app, and a key held by the command line or an agent is never enough, by design. So with a key the push is filed as one question in Needs you and prints its number, and nothing changes until you accept it there. The same file pushed twice is still one question. Pull and check are how a `.dog` file is written and tested outside the app; applying is yours.

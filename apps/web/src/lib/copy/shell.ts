@@ -61,7 +61,7 @@ export const shell = {
 
   /* the spine */
   home: 'Home',
-  decide: 'Decide',
+  decide: 'Needs you',
   inbox: 'Inbox',
   /* The rail's heading for the registers, hard-coded there and needed by the phone nav too. `Your things` AND IT WAS
      `Lists`: what sits under it is the person's invoices and tasks, and "list" is how the record stores them (§35). */
@@ -149,8 +149,8 @@ export const shell = {
   pollAddressHint: 'https://api.example.com/numbers.json',
   pollPath: 'Where it is',
   pollPathHint: 'data.mrr',
-  pollFiled: 'Proposed. Approve it on Decide and the numbers start arriving.',
-  pollOpenDecide: 'Open it on Decide',
+  pollFiled: 'Proposed. Approve it in Needs you and the numbers start arriving.',
+  pollOpenDecide: 'Open it in Needs you',
   pollFaultUrl: 'Write the whole https:// address the numbers are at.',
   pollFaultMost: (n: number) => `One address fills ${n} numbers at most.`,
   pollFaultPath: (path: string) => `${path} is not a path. Write it as data.mrr or plans[0].count.`,
@@ -389,7 +389,7 @@ export const shell = {
   scopeBoard: 'On a board',
   scopePage: 'On a page',
   scopeGate: 'At the gate',
-  scopeDecide: 'In Decide',
+  scopeDecide: 'In Needs you',
   scopeInbox: 'In the inbox',
   scopePalette: 'In the palette',
   scopeNav: 'In the sidebar',

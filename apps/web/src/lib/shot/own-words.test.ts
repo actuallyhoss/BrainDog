@@ -18,8 +18,8 @@ import { ownWordsOf } from './own-words.ts';
 const words = (...sources: unknown[]) => [...ownWordsOf(sources)].sort();
 
 test('every string literal is a member, in either quote', () => {
-  const source = `export const shell = { accept: 'Accept', decide: "Decide", needs: 'Needs you' };`;
-  assert.deepEqual(words(source), ['Accept', 'Decide', 'Needs you']);
+  const source = `export const shell = { accept: 'Accept', decide: "Needs you", needs: 'Needs you' };`;
+  assert.deepEqual(words(source), ['Accept', 'Needs you', 'Needs you']);
 });
 
 test('a template with no hole is a sentence like any other', () => {

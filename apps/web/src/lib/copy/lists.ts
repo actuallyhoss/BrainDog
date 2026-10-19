@@ -122,7 +122,7 @@ export const lists = {
   /* The few words beside a move a row's panel offers, said before it is pressed (`ui/row-form-moves.ts`). */
   moveNeedsReason: 'needs a reason',
   moveNeeds: (label: string): string => `needs ${label.toLowerCase()}`,
-  moveAsksDecide: 'asks Decide',
+  moveAsksDecide: 'asks Needs you',
   /* A field the form does not draw has no label there, and an id is never the word. */
   anotherField: 'another field',
   /* THE SAME ANSWER `/decide` GIVES TO THE SAME QUESTION. A disabled control says why it is

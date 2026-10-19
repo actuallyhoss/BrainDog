@@ -84,8 +84,8 @@ export const words = {
   installed: 'Installed',
   turnedOn: (title: string): string => `${title} is on.`,
   planning: 'Reading the plan…',
-  asked: 'Asked on Decide.',
-  openDecide: 'Open it on Decide',
+  asked: 'Asked in Needs you.',
+  openDecide: 'Open it in Needs you',
   missing: 'Nothing here by that name',
   missingBody: 'It may have been taken back, or the link is wrong.',
   /* A CARD'S ONE CUE. The whole card opens the detail page, where the plan is read before anything installs, so the cue

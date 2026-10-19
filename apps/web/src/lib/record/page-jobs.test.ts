@@ -89,7 +89,7 @@ test('the press starts one run and answers its id; a refusal is said in its own 
   assert.deepEqual(yes, { ok: true, id: 'j_9' });
   assert.deepEqual(sent, [{ kind: KIND, args: { page: 'kilns' } }]);
 
-  const fix = 'job.loom-desk is not a kind of job this record has approved. A kind is approved once, in Decide.';
+  const fix = 'job.loom-desk is not a kind of job this record has approved. A kind is approved once, in Needs you.';
   const no = await startPageJob({ createJob: async () => ({ ok: false, refusal: { code: 'DECLARATION_UNKNOWN', fix } }) }, KIND, 'kilns');
   assert.deepEqual(no, { ok: false, fix });
 
@@ -110,7 +110,7 @@ test("an add-on's document gives its kinds as the change its install approved", 
   assert.deepEqual(installedRows([]), []);
 });
 
-test('the kinds read: accepted in Decide, and carried by an add-on this record holds on, fetched only when the catalogue lists it', async () => {
+test('the kinds read: accepted in Needs you, and carried by an add-on this record holds on, fetched only when the catalogue lists it', async () => {
   const asked: string[] = [];
   const doc = { declarations: [{ job: 'loom-desk', title: 'Compose a page', prompt: '%page%', args: [{ id: 'page', label: 'Page', max: 64 }], tools: ['mcp__braindog__get'], turns: 5, permission: 'dontAsk' }] };
   const reply = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });

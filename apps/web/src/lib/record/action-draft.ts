@@ -135,7 +135,7 @@ export const actionWords = {
   nameTaken: 'That name is already used by a door or a scheduled action. Pick another, or the one filed under it is replaced.',
   question: (name: string, door: boolean) => (door ? `Make a door called ${name}?` : `Add the scheduled action ${name}?`),
   reason: 'Made on the new-action sheet.',
-  filed: 'It is waiting on Decide. Nothing changes until it is accepted there.',
+  filed: 'It is waiting in Needs you. Nothing changes until it is accepted there.',
   saved: (name: string) => `${name} is saved. It runs on its clock from now on.`,
   doorMade: (name: string) => `${name} is ready. Give the address below to whatever posts to it.`,
   changed: 'Something changed while this was open. Try again.',

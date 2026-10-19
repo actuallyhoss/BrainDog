@@ -85,7 +85,7 @@ export const PATHS = {
 
   /* Intents and states. `alert` is late; `ban`, `info` and `ask` complete the toast's four, so colour
      never carries meaning on its own (13 §2.3). `ask` is a row asking something of the reader, not
-     the Decide screen's fork. */
+     the Needs you screen's fork. */
   alert: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.75v5"/><path d="M12 16.25h.01"/>',
   ban: '<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
   info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.25"/><path d="M12 7.75h.01"/>',

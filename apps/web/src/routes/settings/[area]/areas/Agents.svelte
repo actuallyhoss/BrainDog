@@ -162,7 +162,7 @@
     allAtWork: 'all at work now',
     atWork: (n: number) => `${n} at work now`,
     proposeOnly: (names: string, one: boolean) =>
-      `${names} can only propose, so anything ${one ? 'it' : 'they'} would change waits for you in Decide.`,
+      `${names} can only propose, so anything ${one ? 'it' : 'they'} would change waits for you in Needs you.`,
     readOnly: (names: string, one: boolean) => `${names} can only read, so ${one ? 'it changes' : 'they change'} nothing.`,
   };
 

@@ -9,7 +9,7 @@ A level says what somebody can do. The owner sets it in Settings, under People &
 ```comparison | The five levels
 Level | What it means
 Owner | Can change everything, and invite people
-Decides | Can change rows, and answer questions on Decide
+Decides | Can change rows, and answer questions in Needs you
 Edits | Can add and change rows
 Adds only | Can add rows, and read nothing
 Reads | Can read, cannot change

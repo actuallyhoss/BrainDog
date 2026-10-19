@@ -132,7 +132,7 @@ export const decide = {
   decideToLeave: 'goes back',
   decideNext: 'Next question',
   decideOpenInbox: 'Open the inbox',
-  inboxOpenDecide: 'Open Decide',
+  inboxOpenDecide: 'Open Needs you',
   inboxSelected: (n: number) => `${n} selected`,
   inboxFileSelected: (n: number) => `File ${n}`,
   inboxArchiveSelected: (n: number) => `Archive ${n}`,

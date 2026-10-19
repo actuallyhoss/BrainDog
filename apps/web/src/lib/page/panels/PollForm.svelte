@@ -2,7 +2,7 @@
   Or let BrainDog fetch them: a poll of one address, set up on a project's or an organisation's page.
 
   IT FILES A PROPOSAL AND INSTALLS NOTHING. A poll calls out on a clock, so the pack this makes goes in front of the
-  owner on Decide, with the host and how often printed, and runs only once it is approved (`lib/record/poll-form.ts`).
+  owner in Needs you, with the host and how often printed, and runs only once it is approved (`lib/record/poll-form.ts`).
   One address is one request an interval however many numbers it names, and a key is sent only when one is named.
 
   EACH NUMBER SAYS WHEN IT IS DATED AND WHETHER IT IS MONEY. Dated when it arrives unless the answer carries the date,

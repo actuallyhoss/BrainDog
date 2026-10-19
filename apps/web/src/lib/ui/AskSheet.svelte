@@ -41,7 +41,7 @@
 
   const words = {
     title: 'Ask yourself a question',
-    subtitle: 'It waits on Decide until you answer it with a reason.',
+    subtitle: 'It waits in Needs you until you answer it with a reason.',
     question: 'The question',
     questionHint: 'Which lining for the autumn coat?',
     why: 'Why it is asked',

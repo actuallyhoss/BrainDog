@@ -25,8 +25,8 @@ export const stillWaiting = (open: readonly string[], id: string): number => ope
  * answered, and "nothing waits" read under it sounds like the answer was lost.
  */
 export const words = {
-  where: 'It no longer waits on anybody, and Decide keeps it under Decided.',
+  where: 'It no longer waits on anybody, and Needs you keeps it under Decided.',
   left: (n: number): string =>
-    n === 0 ? 'Nothing else waits on you.' : n === 1 ? 'One more question waits on Decide.' : `${String(n)} more questions wait on Decide.`,
-  back: 'Back to Decide',
+    n === 0 ? 'Nothing else waits on you.' : n === 1 ? 'One more question waits in Needs you.' : `${String(n)} more questions wait in Needs you.`,
+  back: 'Back to Needs you',
 };

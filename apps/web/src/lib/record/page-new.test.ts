@@ -150,7 +150,7 @@ test('UNDO RETIRES THE PAGE, and its name is free again', async () => {
   assert.deepEqual(slugsOf(k), []);
 });
 
-test('A MEMBER SUGGESTS THE SAME BODY AND WRITES NOTHING: it waits on Decide until the owner accepts it', async () => {
+test('A MEMBER SUGGESTS THE SAME BODY AND WRITES NOTHING: it waits in Needs you until the owner accepts it', async () => {
   const k = await record();
   const { client, asked } = served(k);
   const out = await newPage('Wedding', { client, pages: slugsOf(k), owner: false });
@@ -165,7 +165,7 @@ test('A MEMBER SUGGESTS THE SAME BODY AND WRITES NOTHING: it waits on Decide unt
       },
     },
   ]);
-  assert.deepEqual(slugsOf(k), [], 'a suggestion made the page with no press on Decide');
+  assert.deepEqual(slugsOf(k), [], 'a suggestion made the page with no press in Needs you');
 
   /* AND THE QUESTION IT LEFT IS ONE DECIDE CAN ANSWER: accepted there, the page exists as an owner's would. */
   const pressed = k.decide('SG1', { decide: { option: 'accept', reason: 'yes' } } as never, 'p_owner');

@@ -421,7 +421,7 @@ export const words = {
   /* The empty screen, and the machines. */
   whatTitle: 'What a job is',
   whatSteps: [
-    'You approve a kind of job once, in Decide: what it does and where it works.',
+    'You approve a kind of job once, in Needs you: what it does and where it works.',
     'A machine you enrolled takes each run and works on it with Claude.',
     'You watch it here as it works, and stop it at any time.',
   ],

@@ -8,7 +8,7 @@
 
   BESIDE THE EDITOR AND NOT INSIDE IT, because the editor is a form and a form cannot hold another. An owner's press
   lands at once and the new value is chosen in the editor above, so the save that follows is the ordinary one, with its
-  own Put back. Anybody else's waits on Decide, as a field does (`AddField.svelte`). Retiring a value is not offered:
+  own Put back. Anybody else's waits in Needs you, as a field does (`AddField.svelte`). Retiring a value is not offered:
   an addition only adds, and the record says to propose the whole list for anything else. The rules and the calls are
   `field-write.ts`, which the tests hold; this file draws them.
 

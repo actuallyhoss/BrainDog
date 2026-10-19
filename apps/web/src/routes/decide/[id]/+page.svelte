@@ -1051,7 +1051,7 @@
                 </div>
               {:else}
                 <!-- THE ANSWERS AS CHOICES: each a full-width rectangle with its name and what it does, the suggested one
-                     saying so in the accent's words, the one chosen ringed (`form.css`). A press chooses; Decide gives it. -->
+                     saying so in the accent's words, the one chosen ringed (`form.css`). A press chooses; Needs you gives it. -->
                 <ul class="dc-choices" role="radiogroup" aria-label={copy.theOptions}>
                   {#each question.options as option}
                     <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list; where the body

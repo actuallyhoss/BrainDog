@@ -56,7 +56,7 @@ export const FIRST_DRAW: readonly FirstRead[] = [
  * made only after a person does something is not one either.
  */
 export const AFTER_DRAW: Readonly<Record<string, string>> = {
-  previewChange: 'Decide, when a proposed change is opened, never the front door',
+  previewChange: 'Needs you, when a proposed change is opened, never the front door',
 };
 
 /**

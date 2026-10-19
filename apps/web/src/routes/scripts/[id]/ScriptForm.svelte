@@ -8,7 +8,7 @@
   and under it on a phone, full width. A field inside a tile is a field (the tile's inner fill), never a tile.
 
   ONE PRIMARY. The owner's is "Save and turn on", which files the change and accepts it in one press; anyone else's is
-  "Send to Decide", which files it for the owner. "Try it" runs the draft once and writes nothing.
+  "Send to Needs you", which files it for the owner. "Try it" runs the draft once and writes nothing.
 
   CHECKED HERE ONLY FOR WHAT A PERSON MISTYPES. The record checks the body again on filing (`scriptBody`), and its
   sentence is drawn as it said it. The form's own faults show after the first press, beside the field they are about.

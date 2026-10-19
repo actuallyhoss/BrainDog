@@ -55,8 +55,8 @@ export const words = {
     if (passed.length === 0) return done > 1 ? this.updated(done) : null;
     return done > 0 ? `${this.updated(done)} ${this.alreadyIn(passed)}` : this.alreadyIn(passed);
   },
-  asked: 'Asked on Decide. The owner reads the same plan there.',
-  openDecide: 'Open it on Decide',
+  asked: 'Asked in Needs you. The owner reads the same plan there.',
+  openDecide: 'Open it in Needs you',
   fromTo: (from: string, to: string) => `${from} to ${to}`,
   /* WHAT AN UPDATE'S ROW SAYS: the versions it moves between are in its tooltip, for whoever wants them. */
   updateAvailable: 'Update available',

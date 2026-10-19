@@ -147,7 +147,7 @@ test('readBoot ASKS ONLY WHERE THE RECORD NAMED NO CURRENCY, and the shell over 
 
 test('A RECORD NOBODY NAMED STILL DRAWS ITS SHELL IN ITS HOME CURRENCY, which its boot says beside `record: null`', () => {
   /* THE GATES' RECORD, AND ANY SELF-HOST BEFORE ITS FIRST RUN: `record` is `null` there, and the shell read that as no
-     currency, so every sentence on Money, Decide and Today said "£39 GBP". */
+     currency, so every sentence on Money, Needs you and Today said "£39 GBP". */
   try {
     assert.equal(layoutOf({ registers: [], home: null, now: NOW, record: null, currency: 'GBP', money: ['GBP'] }).index.currency, 'GBP');
     assert.equal(homeCurrency(), 'GBP');

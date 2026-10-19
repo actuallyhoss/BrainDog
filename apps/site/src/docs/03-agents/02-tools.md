@@ -45,7 +45,7 @@ update {"spoken": "tasks#41", "patch": {"state": "done"}, "version": 3}
 log {"spoken": "tasks#41", "note": "Waiting on the client's reply."}
 ```
 
-`propose` puts a question in front of you with what the agent would do about it. It changes nothing until you answer on Decide. The body is options, a set of row changes, a change to a list's shape, or a pack, settings or arrangement change.
+`propose` puts a question in front of you with what the agent would do about it. It changes nothing until you answer in Needs you. The body is options, a set of row changes, a change to a list's shape, or a pack, settings or arrangement change.
 
 ```code | text
 propose {"question": "Which client should we chase first?", "body_kind": "options", "body": {"options": [{"id": "a", "label": "Northwind", "because": "Two invoices are overdue."}, {"id": "b", "label": "Contoso", "because": "The larger balance."}]}}

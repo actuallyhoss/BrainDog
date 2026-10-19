@@ -30,12 +30,12 @@ export const proposeWords = {
   question: (title: string) => `Change the page ${title} as written?`,
   propose: 'Propose this change',
   proposing: 'Proposing…',
-  onDecide: 'On Decide',
+  onDecide: 'In Needs you',
   /** Said beside the link, for a screen reader and for whoever wonders what the link is. */
   onDecideNote: 'Nothing is changed until it is accepted.',
   unreached: 'The record could not be reached, so nothing was sent. Try again.',
   conflict: 'The record changed while this was sent. Try again.',
-  unnamed: 'The record did not say which question it filed. Look for it on Decide.',
+  unnamed: 'The record did not say which question it filed. Look for it in Needs you.',
 } as const;
 
 const isMap = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);

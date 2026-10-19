@@ -28,7 +28,7 @@ Press Edit the look | Each colour is listed by what it is for: the page, the pan
 Change a colour | Nudge it darker, lighter, duller, richer, warmer or cooler, pick it from a grid, or enter a colour code | In the editor
 Read the checks | Every pair of colours that meet is marked Fails, Tight or Fine, in light and in dark | Under the colours
 Fix what fails | Each failing pair offers a fix, such as Darken quiet text | Under the colours
-Save the look | The owner saves it. A colleague sends it to the owner on Decide | At the foot of the editor
+Save the look | The owner saves it. A colleague sends it to the owner in Needs you | At the foot of the editor
 ```
 
 The editor also sets the corners: Square, Soft or Round. **Use the house look** puts the record back in the house look at any time.

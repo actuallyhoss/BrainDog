@@ -558,7 +558,7 @@ export const ROWSETS: Record<string, RowsetBody> = {
    arrangement with its reasons. Each body is as `prepare` files it, the plan and the calls worked out by the record.
 
    DECIDE'S OWN, NOT THE GATE'S. They are not in `QUESTIONS`, because the seed files those on the gates' record
-   (`remote.test.ts` holds the two to each other) and these belong to no seeded record yet. Decide draws them after
+   (`remote.test.ts` holds the two to each other) and these belong to no seeded record yet. Needs you draws them after
    the sample's questions; Home and the palette do not. */
 
 export type Proposal = { kind: 'pack' | 'settings' | 'arrange'; body: Record<string, unknown>; by: string; pagesNow?: Record<string, Record<string, unknown>> };

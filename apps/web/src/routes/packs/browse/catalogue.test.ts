@@ -177,7 +177,7 @@ test('trust on first use: kept when asked for, said loudly for a different key, 
   assert.equal(await keepFirstKey(null, 'Halden', first), false);
 });
 
-test('asking on Decide files an add-on as its id and document, a use case as its text, and nothing for a file that does not verify', async () => {
+test('asking in Needs you files an add-on as its id and document, a use case as its text, and nothing for a file that does not verify', async () => {
   const key = await newAuthorKey('Halden');
   const { entry, fetcher } = await servedAddon(key);
   const filed: Record<string, unknown>[] = [];
@@ -251,7 +251,7 @@ test('browse is named for both kinds it lists, and /packs names a catalogue entr
   assert.match(at('../+page.svelte'), /catalogueNames\.get\(id\)/u);
 });
 
-test('a listing page installs through the plan sheet, and a Kennel entry is asked for on Decide by somebody who may not install', async () => {
+test('a listing page installs through the plan sheet, and a Kennel entry is asked for in Needs you by somebody who may not install', async () => {
   const { readFileSync } = await import('node:fs');
   const detail = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
   const offer = readFileSync(new URL('./[id]/offer.ts', import.meta.url), 'utf8');

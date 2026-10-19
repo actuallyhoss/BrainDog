@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { describeRing, ring } from './ring.ts';
 
-test('a 140px ring, as on Decide: 8px stroke, radius 66, and 53 of 58 as its dash', () => {
+test('a 140px ring, as in Needs you: 8px stroke, radius 66, and 53 of 58 as its dash', () => {
   const g = ring(53, 58, 140);
   assert.equal(g.stroke, 8);
   assert.equal(g.r, 66);

@@ -154,7 +154,7 @@ test('A ROW IS DRAWN BY ITS TITLE, never by the spoken id the host puts in front
   assert.equal(drawn.rows[0]?.title, 'Invoice Acme');
 });
 
-test('A PROPOSAL IS DRAWN WITH ITS MODEL IN THE FOOTER, ALWAYS, and with a way to Decide what it filed', () => {
+test('A PROPOSAL IS DRAWN WITH ITS MODEL IN THE FOOTER, ALWAYS, and with a way to Needs you what it filed', () => {
   const drawn = drawProposal(PROPOSAL);
   assert.equal(drawn.text, PROPOSAL.text);
   /* THE FIGURES TRAVEL WITH THE SENTENCE, so `Cited` draws the brace as the row it names. */
@@ -176,7 +176,7 @@ test('A PROPOSAL WHOSE MODEL IS MISSING STILL HAS A FOOTER, and the footer says 
   }
 });
 
-test('A QUERY FILES NOTHING, so there is nothing to Decide and no link to it', () => {
+test('A QUERY FILES NOTHING, so there is nothing to Needs you and no link to it', () => {
   assert.equal(drawProposal({ ...PROPOSAL, body_kind: 'query', verbs: ['edit', 'save', 'open'], filed: null }).decide, null);
 });
 

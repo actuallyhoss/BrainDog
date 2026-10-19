@@ -1,6 +1,6 @@
 <!--
   Where a row applies, as one chip: the project's mark in its hue and its name, or the globe and "Everywhere".
-  Every row of a list with a `scope` field wears it, on its list, on its page and in Decide, so the
+  Every row of a list with a `scope` field wears it, on its list, on its page and in Needs you, so the
   answer to "which project is this for" reads the same wherever the row is.
 
   "EVERYWHERE" IS A PLACE AND NOT A GAP. An empty scope field was drawn as an unset chip, "+ Where it applies", which

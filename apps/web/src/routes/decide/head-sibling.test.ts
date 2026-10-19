@@ -21,7 +21,7 @@ const markup = bare.slice(bare.indexOf('</script>') + '</script>'.length, bare.i
 const styles = bare.slice(bare.indexOf('<style>'));
 
 test('the head is drawn once, with no element of its own round it', () => {
-  assert.equal(markup.match(/<PageHead\b/gu)?.length, 1, 'Decide draws one head');
+  assert.equal(markup.match(/<PageHead\b/gu)?.length, 1, 'Needs you draws one head');
   assert.doesNotMatch(source, /decide-head/u, 'the wrapper round the head is back');
   const before = markup.slice(0, markup.indexOf('<PageHead'));
   const opened = (before.match(/<[a-z][^>]*[^/]>/gu) ?? []).length;

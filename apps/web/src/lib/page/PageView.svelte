@@ -2,9 +2,9 @@
   A declared page, drawn: the one reader every declared page goes through, wherever it is drawn.
 
   ONE READER, THREE MODES. `page` is `/p/<slug>`: the head, the source,
-  Edit layout, the writes and the keys. `home` is Home's and Decide's body: no head and no source, the writes stay on,
+  Edit layout, the writes and the keys. `home` is Home's and Needs you's body: no head and no source, the writes stay on,
   and the page menu waits at the body's top end until the pointer or focus is on the page (`home-arrange.ts`). `preview` is a page not yet installed, drawn as it would be: inert, with no writes, no arranging and no source,
-  and with `was` it is drawn beside the page as it is now, one at a time on a phone. Home and Decide each drew a
+  and with `was` it is drawn beside the page as it is now, one at a time on a phone. Home and Needs you each drew a
   declared page a second and a third way, as a flat stack of blocks with no layout; they draw it through this now.
 
   THIS FILE IS THE FRAME. It was 1,752 lines holding six jobs, and every change to a page needed the one file, so it
@@ -829,7 +829,7 @@
      AT THE BODY'S TOP END, raised into the space over it, where a page at its own address has its ⋯ in the head. Not
      drawn at rest: it comes in while the pointer is anywhere on the page or focus is in it, and stays while its menu is
      open. ONE STEP UNDER THE CHROME (`--z-sheet`, the sticky head's and the tab bar's), over the content: scrolled up
-     under the head it goes under the head's glass with the blocks, and never sits over the head's own buttons (Decide's
+     under the head it goes under the head's glass with the blocks, and never sits over the head's own buttons (Needs you's
      Ask a question) where a press meant for them would land on it.
 
      A FINGER CANNOT HOVER, so on a touch screen the ⋯ is not waiting to be found: it is a quiet row of its own at the

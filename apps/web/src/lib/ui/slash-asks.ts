@@ -330,7 +330,7 @@ export const words = {
   workElse: 'Other background work',
   forWhat: 'What they were for',
   free: 'Cost nothing',
-  filed: 'Open on Decide',
+  filed: 'Open in Needs you',
   refused: 'not answered',
   out: (resets: string) => `Slash is out of asks until ${resets}.`,
   outKey: 'Use your own key',

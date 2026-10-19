@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { plate, platedOf, watch } from './plate.ts';
 
 /** The words a developer typed. `Due in ${n} days` has a hole, so it is not here in any form. */
-const OWN: ReadonlySet<string> = new Set(['Accept', 'Decide', 'Money', 'Needs you', 'Search', 'Close']);
+const OWN: ReadonlySet<string> = new Set(['Accept', 'Needs you', 'Money', 'Needs you', 'Search', 'Close']);
 
 class Txt {
   readonly nodeType = 3;
@@ -77,7 +77,7 @@ test('a balance, a name and a title are plated', () => {
 });
 
 test('a button and a heading from the set still read', () => {
-  assert.deepEqual(platedOf(['Accept', 'Decide', 'Money'], OWN), [false, false, false]);
+  assert.deepEqual(platedOf(['Accept', 'Needs you', 'Money'], OWN), [false, false, false]);
 });
 
 test('a sentence made from a template with a hole is plated, because the set never held it', () => {
@@ -110,7 +110,7 @@ function fragment() {
   const balance = el('span', {}, '\n  1,204.50\n');
   const due = el('p', {}, 'Due in 3 days');
   const accept = el('button', {}, 'Accept');
-  const decide = el('button', {}, el('svg', { 'aria-hidden': 'true' }, el('path')), 'Decide');
+  const decide = el('button', {}, el('svg', { 'aria-hidden': 'true' }, el('path')), 'Needs you');
   const frame = el('main', {}, heading, el('li', {}, name, ' · ', balance, due, accept, decide));
   return { frame, heading, name, balance, due, accept, decide };
 }

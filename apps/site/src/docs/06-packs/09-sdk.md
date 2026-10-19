@@ -79,7 +79,7 @@ It reads the pack, JSON or YAML, warns on any manifest key a record does not tak
 
 - `braindog pack diff <earlier> <later>`: what moved between two versions, and the least version bump that needs.
 - `braindog pack search [words]`: what the Kennel holds, or a catalogue named with `--from`.
-- `braindog pack install <id|file>`: ask a record's owner to install a pack. It files a proposal, and nothing is installed until they accept it on Decide.
+- `braindog pack install <id|file>`: ask a record's owner to install a pack. It files a proposal, and nothing is installed until they accept it in Needs you.
 - `braindog pack publish <file> --to <folder>`: add a version to a catalogue folder of your own.
 - `braindog pack publish <file> --kennel`: submit it to the Kennel, described in [publishing and review](/docs/packs/publishing).
 - `braindog pack yank <id> <version> --reason <why>`: take a published version back.

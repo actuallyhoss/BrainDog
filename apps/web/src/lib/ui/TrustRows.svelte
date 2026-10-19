@@ -8,7 +8,7 @@
 
   ONE CONTROL, "ASK AGAIN", beside each kind an agent does on its own: the owner's own way down (`trustTakeBack`, "undo"
   D37.167). It puts that kind back to asking and reads the ladder again, so the line says "Put back" and why. Nothing
-  here climbs a rung: that is the owner's answer to an offer, on Decide. Under the lines, two say what no rung reaches.
+  here climbs a rung: that is the owner's answer to an offer, in Needs you. Under the lines, two say what no rung reaches.
 
   ONLY THE OWNER SEES IT. For anyone the record refuses, on the sample, and on a host built before the call, nothing is
   drawn. With no agent connected the tile says so in one sentence.

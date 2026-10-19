@@ -115,7 +115,7 @@ export const packs = {
   catalogueTrustUnsigned: 'Nobody signed this version, so nothing but the catalogue says who published it.',
   catalogueTrustStripped: (author: string, before: string[]) =>
     `Nobody signed this version, and ${author}'s earlier versions were signed by key ${before.join(', ')}. A catalogue does not publish an unsigned version after a signed one, so this may not be from ${author}. It cannot be asked for.`,
-  catalogueTrustFirst: (author: string) => `This browser has not seen a key for ${author} before. It keeps this one when you ask on Decide, and will say so if a later version is signed by a different key.`,
+  catalogueTrustFirst: (author: string) => `This browser has not seen a key for ${author} before. It keeps this one when you ask in Needs you, and will say so if a later version is signed by a different key.`,
   catalogueTrustKnown: (author: string) => `This browser has seen this key for ${author} before.`,
   catalogueTrustChanged: (author: string, before: string[]) =>
     `This is not the key this browser has seen for ${author} before (${list(before)}). Somebody other than ${author} may have signed it. Check with ${author} before you ask for it.`,

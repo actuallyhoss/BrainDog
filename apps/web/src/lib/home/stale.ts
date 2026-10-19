@@ -201,7 +201,7 @@ export async function keepOnce(call: Call): Promise<Kept> {
     if (ABSENT.has(code)) return { ok: false, said: 'This BrainDog cannot keep these once yet.', gone: true };
     if (code === 'VALUE_MALFORMED') return { ok: false, said: 'These two lessons no longer say the same thing.', gone: true };
     if (code === 'NEEDS_BROWSER_SESSION') return { ok: false, said: 'Only a person signed in here can ask this.', gone: false };
-    return { ok: false, said: 'Could not put this on Decide. Try again.', gone: false };
+    return { ok: false, said: 'Could not put this in Needs you. Try again.', gone: false };
   }
   const got = out.value as { asked?: unknown; open?: unknown } | null;
   const asked = Array.isArray(got?.asked) ? got.asked.length : 0;

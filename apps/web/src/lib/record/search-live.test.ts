@@ -146,7 +146,7 @@ test('a live search finds the record\'s questions and pages too, asked once for 
   assert.deepEqual(
     out.value.groups.map((g) => [g.kind, g.hits.map((h) => [h.title, h.href, h.detail])]),
     [
-      ['Decide', [['Renew the studio rent?', '/decide/SG4', 'Open question'], ['Pay the rent early?', '/decide/D2', 'Decided']]],
+      ['Needs you', [['Renew the studio rent?', '/decide/SG4', 'Open question'], ['Pay the rent early?', '/decide/D2', 'Decided']]],
       [REGISTERS.obligations!.name, [['Rent for the studio', '/r/obligations/9', '']]],
       ['Pages', [['Rent watch', '/p/rent-watch', 'Views']]],
     ],

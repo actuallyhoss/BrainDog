@@ -6,7 +6,7 @@ Home is the page your record opens on. It answers four questions without a filte
 
 Home is drawn from your use case's own Home where it has one, and from the house Home otherwise. Either way it holds the same kinds of thing:
 
-- **What needs you**: questions waiting on Decide, bills falling due, anything a rule raised. Answer a question or tick a row where it is drawn, without leaving Home.
+- **What needs you**: questions waiting in Needs you, bills falling due, anything a rule raised. Answer a question or tick a row where it is drawn, without leaving Home.
 - **Right now**: the few figures that matter most, such as cash now or open work.
 - **Since you were away**: what you, your colleagues, your agents and your rules changed since you last looked. Home counts "since" from when you last left it, not from when you opened it, so nothing slips past while you are reading.
 
@@ -55,7 +55,7 @@ On any list, filter it down to what you want to watch, then choose **Put this on
 
 ## Ask Slash for a page
 
-Press / and describe what you want to see. Slash drafts the page and puts it on Decide, showing what will appear, what each block reads from and where it goes in the sidebar. Nothing is placed until you accept. See [Slash](/docs/use/slash).
+Press / and describe what you want to see. Slash drafts the page and puts it in Needs you, showing what will appear, what each block reads from and where it goes in the sidebar. Nothing is placed until you accept. See [Slash](/docs/use/slash).
 
 ## Pages the record suggests
 

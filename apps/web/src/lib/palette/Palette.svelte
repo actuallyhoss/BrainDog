@@ -193,7 +193,7 @@
   );
   /* PASS 2 THROUGH ITS OWN `latest`, so a proposal written for an older question is dropped exactly as pass 1's rows are.
      THE REQUEST ITSELF IS NEVER ABORTED, which is `46 §5.5` step 11: Escape during pass 2 goes back to the list, and the
-     proposal the engine was already writing is still filed on Decide. `latest` only decides whether the answer is drawn. */
+     proposal the engine was already writing is still filed in Needs you. `latest` only decides whether the answer is drawn. */
   const slashPropose = latest((a: { question: string; askId: string }) =>
     client()
       .then((c) => c.slashAnswer(a.question, a.askId))

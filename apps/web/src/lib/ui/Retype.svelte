@@ -9,7 +9,7 @@
   only when every card has its answer.
 
   EVERY WRITE IS `retype-write.ts`'s, which reads the field fresh from the record and files the change; this file draws
-  it and keeps the in-flight guards. An owner's lands at once and anybody else's waits on Decide, and the line above the
+  it and keeps the in-flight guards. An owner's lands at once and anybody else's waits in Needs you, and the line above the
   button says which before the press.
 
   AT 390 IT IS A BOTTOM SHEET: one card per failing row, the sample below them, and the button full width in the footer.

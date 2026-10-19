@@ -425,13 +425,13 @@ export const valueWords = {
   saving: 'Adding',
   cancel: 'Cancel',
   ownerNote: 'Everything in the list can hold it from now on.',
-  memberNote: 'The owner is asked first, on Decide.',
+  memberNote: 'The owner is asked first, in Needs you.',
   empty: 'Type the value to add.',
   held: (said: string, field: string) => `${field} already has ${said}. Pick it from the list.`,
   notClosed: (field: string) => `${field} is not a closed list, so it takes any value.`,
   question: (value: string, field: string, list: string) => `Add ${value} to ${field} on ${list}?`,
   added: (value: string, field: string) => `${value} is one of ${field}'s values now.`,
-  filed: (value: string) => `${value} is waiting on Decide for the owner.`,
+  filed: (value: string) => `${value} is waiting in Needs you for the owner.`,
   putBack: (field: string) => `${field} is back to what it was.`,
 } as const;
 

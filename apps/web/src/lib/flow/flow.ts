@@ -670,7 +670,7 @@ export const VERB_LABELS = {
   create: 'Add items',
   meet: 'Meet a person',
   notify: 'Tell you',
-  suggest: 'Suggest on Decide',
+  suggest: 'Suggest in Needs you',
   ask_person: 'Ask a person',
   ask_slash: 'Ask Slash',
   call: 'Call a service',
@@ -773,7 +773,7 @@ export const STEP_HELP: Partial<Record<Verb, string>> = {
   create: 'Add new items to a list.',
   meet: 'Add someone to People, or say where you met someone already there.',
   notify: 'Send you a message.',
-  suggest: 'Put a question on Decide for you to answer.',
+  suggest: 'Put a question in Needs you for you to answer.',
   ask_person: 'Ask someone on this record and wait for the answer.',
   ask_slash: 'Ask Slash a question and keep its answer.',
   call: 'Fetch from a service you declared, and keep what it answers.',
@@ -870,7 +870,7 @@ const ARG_WORDS: Partial<Record<Verb, Record<string, ArgWords>>> = {
   },
   notify: { say: { label: 'Say', kind: 'long', missing: 'Say what to tell you.', template: true } },
   suggest: {
-    question: { label: 'Question', kind: 'long', missing: 'Write the question to put on Decide.', template: true },
+    question: { label: 'Question', kind: 'long', missing: 'Write the question to put in Needs you.', template: true },
     options: { label: 'Answers', kind: 'list', missing: 'Give at least one answer to choose from.', start: ['Yes', 'No'] },
   },
   ask_person: {
@@ -1063,7 +1063,7 @@ export const words = {
   none: 'Nothing runs on its own yet',
   noneWhy: 'An automation starts on a change, an arrival, a clock or a button, and then does its steps in order.',
   absent: 'This record does not list its automations yet',
-  absentHow: 'You can still draw one and send it to Decide.',
+  absentHow: 'You can still draw one and send it to Needs you.',
   steps: 'Steps',
   runs: 'Runs',
   written: 'As written',
@@ -1084,7 +1084,7 @@ export const words = {
   moveOut: 'Move out of the branch',
   drag: (said: string) => `Drag to move: ${said}`,
   moreFor: (said: string) => `More for: ${said}`,
-  save: 'Send to Decide',
+  save: 'Send to Needs you',
   saving: 'Sending',
   discard: 'Discard changes',
   runNow: 'Run now',
@@ -1103,8 +1103,8 @@ export const words = {
     inline: 'Once sent, it runs inside the change that starts it, rather than one step at a time after it.',
     run: 'Once sent, it runs after what starts it, one step at a time, rather than inside the change.',
   } as Record<'inline' | 'run', string>,
-  filed: 'Sent to Decide. It runs once you accept it there.',
-  openDecide: 'Open it on Decide',
+  filed: 'Sent to Needs you. It runs once you accept it there.',
+  openDecide: 'Open it in Needs you',
   nothingChanged: 'Nothing has changed since it was opened.',
   faults: 'Before it can be sent',
   insideItself: 'A branch cannot go inside itself.',
@@ -1150,7 +1150,7 @@ export const words = {
     arrival: 'Something arrives at a door: a webhook, an email, a paste.',
     every: 'On a clock, every fifteen minutes or longer.',
     metric: 'A figure crosses a line. It is read every hour.',
-    decided: 'A question on Decide is answered.',
+    decided: 'A question in Needs you is answered.',
     manual: 'Only when somebody presses Run now.',
   } as Record<string, string>,
   /* THE INSPECTOR'S OWN WORDS for the triggers and pickers the inspector adds, beside the ones above so the sheet reads one
@@ -1335,7 +1335,7 @@ export function sayTrigger(t: Trigger, listSaid: (id: string) => string = (id) =
   if ('decided' in t) {
     const about = t.decided.about ? ` from ${t.decided.about.replace(/^[a-z]+\./u, '').replace(/[-_]/gu, ' ')}` : '';
     const option = t.decided.option ? `, when the answer is "${t.decided.option}"` : '';
-    return `When a question${about} is decided on Decide${option}`;
+    return `When a question${about} is decided in Needs you${option}`;
   }
   return 'When you press Run now';
 }
@@ -1415,9 +1415,9 @@ function saying(step: Step): string {
     case 'notify':
       return withText('Tell you', at('say'));
     case 'suggest':
-      return withText('Suggest on Decide', at('question'));
+      return withText('Suggest in Needs you', at('question'));
     /* "THE OWNER", NOT "YOU". The card is read by whoever opens the canvas, a member among them, and the runner opens the
-       question as a suggestion on Decide (`packages/kernel/src/flow.ts`), which is the owner's to answer. */
+       question as a suggestion in Needs you (`packages/kernel/src/flow.ts`), which is the owner's to answer. */
     case 'ask_person':
       return withText(`Ask ${at('to') || 'the owner'}`, at('question'));
     case 'ask_slash':

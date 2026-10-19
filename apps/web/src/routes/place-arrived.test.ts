@@ -40,7 +40,7 @@ const item = (key: string, label: string, also: readonly string[] = []): Item =>
   return { key, href, label, near: [href, ...also] };
 };
 const TODAY = item('today', 'Today');
-const DECIDE = item('decide', 'Decide');
+const DECIDE = item('decide', 'Needs you');
 const ACTIVITY = item('activity', 'Activity');
 const WORK = item('work', 'Work');
 const MONEY = item('section:money', 'Money');
@@ -74,7 +74,7 @@ test('it is told by the place and not by its name, so a place somebody renamed h
   assert.deepEqual(arrivedIn(drawn(before), [TODAY, DECIDE, { ...MONEY, label: 'Finance' }]), []);
 });
 
-test('Today, Decide and Activity are never said to have come', () => {
+test('Today, Needs you and Activity are never said to have come', () => {
   const arrivedIn = ruleOf();
   assert.deepEqual(arrivedIn(drawn([TODAY]), [TODAY, DECIDE, ACTIVITY]), []);
 });

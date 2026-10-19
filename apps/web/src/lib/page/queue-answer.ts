@@ -42,9 +42,9 @@ export const queueWords = {
   /** Said with the suggested answer's name to a screen reader, where the eye reads the accent's fill. */
   suggestedSaid: ', suggested',
   /** A question shown outside Decide whose answers are too many for a row: its own page, where they are chosen. */
-  choose: 'Choose on Decide',
+  choose: 'Choose in Needs you',
   /** The last line of a compact queue: how many more wait, and the door to them. */
-  moreOnDecide: (n: number) => `${n.toLocaleString('en-GB')} more on Decide`,
+  moreOnDecide: (n: number) => `${n.toLocaleString('en-GB')} more in Needs you`,
   /** The choices' name for a screen reader: the question's answers, one of them chosen. */
   choices: 'The answers',
   /** What a proposal that changes something links to, where its whole change is laid out before anybody accepts it. */

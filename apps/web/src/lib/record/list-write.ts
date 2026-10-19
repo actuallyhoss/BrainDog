@@ -37,11 +37,11 @@ export const listWords = {
   noHolds: 'Say in one line what the list holds, so everybody reading it knows.',
   ownerNote: 'The list is made at once.',
   /** WHY A MEMBER'S LIST WAITS, said before the press as well as after it. */
-  memberNote: 'A new list is the owner’s call, so it waits on Decide until the owner answers.',
+  memberNote: 'A new list is the owner’s call, so it waits in Needs you until the owner answers.',
   question: (name: string) => `Make a new list called ${name}?`,
   reason: 'Made by the owner from the app.',
   made: (name: string) => `${name} is ready.`,
-  filed: (name: string) => `${name} is waiting on Decide, because a new list is the owner’s call.`,
+  filed: (name: string) => `${name} is waiting in Needs you, because a new list is the owner’s call.`,
   /* THE LIST AN ADDRESS NAMED AND THE RECORD DOES NOT HAVE, said in words, with what it does have offered beside it. */
   missingTitle: 'There is no list here yet',
   missing: (said: string) => `This record has no list called ${said}. Open one it has, or make this one.`,

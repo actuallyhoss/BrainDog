@@ -22,20 +22,20 @@ const SECTIONS: [string, Entry[]][] = [
   ['Services', [page('Services', '/p/estate')]],
 ];
 
-const WORDS = { today: 'Today', activity: 'Activity', decide: 'Decide' };
+const WORDS = { today: 'Today', activity: 'Activity', decide: 'Needs you' };
 
-test('the places are Today, Decide, Work, Projects, Money, People and Agents, in that order', () => {
-  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Decide');
+test('the places are Today, Needs you, Work, Projects, Money, People and Agents, in that order', () => {
+  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Needs you');
   assert.deepEqual(
     rail.places.map((i) => i.label),
-    ['Today', 'Decide', 'Work', 'Projects', 'Money', 'People', 'Agents'],
+    ['Today', 'Needs you', 'Work', 'Projects', 'Money', 'People', 'Agents'],
   );
   assert.equal(rail.places.length, RAIL_MOST);
   assert.equal(rail.places[1]?.count, 3);
 });
 
-test('Decide is a place while nothing waits, with no count', () => {
-  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Decide');
+test('Needs you is a place while nothing waits, with no count', () => {
+  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Needs you');
   const decide = rail.places.find((i) => i.key === 'decide');
   assert.ok(decide);
   assert.equal(decide.count, undefined);
@@ -43,7 +43,7 @@ test('Decide is a place while nothing waits, with no count', () => {
 });
 
 test('each project is under Projects, and Work page and Board are not in the rail at all', () => {
-  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Decide');
+  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Needs you');
   assert.deepEqual(
     rail.things.map(([section, list]) => [section, list.map((e) => e.title)]),
     [['Projects', ['Kiln', 'Portage']]],
@@ -54,7 +54,7 @@ test('each project is under Projects, and Work page and Board are not in the rai
 });
 
 test("on a project's page the project is here, and Projects is not here as well", () => {
-  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Decide');
+  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Needs you');
   const projects = rail.places.find((i) => i.label === 'Projects');
   assert.ok(projects);
   assert.ok(!isHere(projects, '/p/kiln'));
@@ -62,7 +62,7 @@ test("on a project's page the project is here, and Projects is not here as well"
 });
 
 test('on Board, Work is here', () => {
-  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Decide');
+  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Needs you');
   const work = rail.places.find((i) => i.label === 'Work');
   assert.ok(work);
   assert.ok(isHere(work, '/p/work-board'));
@@ -70,7 +70,7 @@ test('on Board, Work is here', () => {
 });
 
 test('a place past seven and Activity are under More', () => {
-  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Decide');
+  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Needs you');
   assert.deepEqual(
     rail.more.map((i) => i.label),
     ['Services', 'Activity'],
@@ -78,16 +78,16 @@ test('a place past seven and Activity are under More', () => {
 });
 
 test('a record with fewer sections draws what it has, and an unnamed section follows the named ones', () => {
-  const rail = railOf(flatNav([['Coursework', [page('Coursework', '/p/coursework')]], ['Money', [page('Money', '/p/money')]]], 0, WORDS), 'Decide');
+  const rail = railOf(flatNav([['Coursework', [page('Coursework', '/p/coursework')]], ['Money', [page('Money', '/p/money')]]], 0, WORDS), 'Needs you');
   assert.deepEqual(
     rail.places.map((i) => i.label),
-    ['Today', 'Decide', 'Money', 'Coursework'],
+    ['Today', 'Needs you', 'Money', 'Coursework'],
   );
   assert.deepEqual(rail.more.map((i) => i.label), ['Activity']);
 });
 
 test("Board is a view under Work, and the Work screen's own page is not a view of it", () => {
-  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Decide');
+  const rail = railOf(flatNav(SECTIONS, 0, WORDS, { work: WORK }), 'Needs you');
   assert.deepEqual(
     Object.entries(rail.views).map(([key, list]) => [key, list.map((e) => e.title)]),
     [['work', ['Board']]],
@@ -100,7 +100,7 @@ test("a section's second page is a view under its place, and a tabbed section's 
     ['Team', [page('Cycles', '/p/cycles'), page('Agent work', '/p/agent-work')]],
     ['Guide', [{ ...page('Guide', '/p/guide'), tabs: true }, { ...page('Steps', '/p/steps'), tabs: true }]],
   ];
-  const rail = railOf(flatNav(team, 0, WORDS), 'Decide');
+  const rail = railOf(flatNav(team, 0, WORDS), 'Needs you');
   assert.deepEqual(
     Object.entries(rail.views).map(([key, list]) => [key, list.map((e) => e.title)]),
     [['section:Team', ['Agent work']]],
@@ -110,7 +110,7 @@ test("a section's second page is a view under its place, and a tabbed section's 
 });
 
 test('"2 working" opens the Agents place, wherever the rail put it, and the agents page on a record without one', () => {
-  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Decide');
+  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Needs you');
   assert.equal(agentsHref([...rail.places, ...rail.more]), '/p/agents');
   const renamed = [{ key: 'section:Agents', href: '/p/crew', label: 'Agents', icon: 'session', near: ['/p/crew'] }];
   assert.equal(agentsHref(renamed), '/p/crew', 'the Agents place was passed over for the pack\'s page');
@@ -122,22 +122,22 @@ test('"2 working" opens the Agents place, wherever the rail put it, and the agen
 const shopOf = (name: string): [string, Entry[]] => [name, [page('Orders', '/p/orders'), page('Products', '/p/products')]];
 const mariam = (name: string): [string, Entry[]][] => [['Money', [page('Money', '/p/money')]], ['People', [page('People', '/p/people')]], shopOf(name)];
 
-test("a shop's orders come straight after Decide, so the phone's bar is Today, Decide, Orders, Money and People", () => {
+test("a shop's orders come straight after Needs you, so the phone's bar is Today, Needs you, Orders, Money and People", () => {
   for (const name of ['Orders', 'Shop']) {
-    const rail = railOf(flatNav(mariam(name), 0, WORDS), 'Decide');
-    assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Decide', name, 'Money', 'People']);
+    const rail = railOf(flatNav(mariam(name), 0, WORDS), 'Needs you');
+    assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Needs you', name, 'Money', 'People']);
     const orders = rail.places[2];
     assert.ok(orders);
     assert.equal(orders.href, '/p/orders', 'the place opens the Orders page, where the week offer is drawn');
-    assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Decide', name, 'Money', 'People']);
+    assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Needs you', name, 'Money', 'People']);
     assert.deepEqual(rail.more.map((i) => i.label), ['Activity']);
   }
 });
 
 test('a record without a shop keeps its rail and its bar exactly as they were', () => {
-  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Decide');
-  assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Decide', 'Work', 'Projects', 'Money']);
-  assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Decide', 'Work', 'Projects', 'Money', 'People', 'Agents']);
+  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Needs you');
+  assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money']);
+  assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money', 'People', 'Agents']);
   assert.deepEqual(rail.more.map((i) => i.label), ['Services', 'Activity']);
 });
 
@@ -152,12 +152,12 @@ const sam = (services: boolean): [string, Entry[]][] => [
 ];
 
 test('a section the shell left out is no place in the rail or under More, and it is a place again once it is handed in', () => {
-  const before = railOf(flatNav(sam(false), 0, WORDS), 'Decide');
+  const before = railOf(flatNav(sam(false), 0, WORDS), 'Needs you');
   const drawn = [...before.places, ...before.more];
-  assert.deepEqual(drawn.map((i) => i.label), ['Today', 'Decide', 'Money', 'People', 'Dashboard', 'Activity']);
+  assert.deepEqual(drawn.map((i) => i.label), ['Today', 'Needs you', 'Money', 'People', 'Dashboard', 'Activity']);
   assert.ok(!drawn.some((i) => i.href === '/p/estate'), 'the rail drew a place nobody handed it');
   assert.deepEqual(Object.keys(before.views), []);
-  const after = railOf(flatNav(sam(true), 0, WORDS), 'Decide');
-  assert.deepEqual([...after.places, ...after.more].map((i) => i.label), ['Today', 'Decide', 'Money', 'People', 'Services', 'Dashboard', 'Activity']);
+  const after = railOf(flatNav(sam(true), 0, WORDS), 'Needs you');
+  assert.deepEqual([...after.places, ...after.more].map((i) => i.label), ['Today', 'Needs you', 'Money', 'People', 'Services', 'Dashboard', 'Activity']);
   assert.equal(after.places.find((i) => i.label === 'Services')?.href, '/p/estate');
 });

@@ -721,7 +721,7 @@ test('A RULE STARTED BY A DECISION ROUND-TRIPS, `about` and `option` and all, an
   const d = draftOf('chased', chased);
   assert.deepEqual(d.trigger, { decided: { about: 'rule.chase', option: 'Chase it' } });
   assert.deepEqual(bodyOf(d), chased);
-  assert.equal(sayTrigger(d.trigger), 'When a question from chase is decided on Decide, when the answer is "Chase it"');
+  assert.equal(sayTrigger(d.trigger), 'When a question from chase is decided in Needs you, when the answer is "Chase it"');
   const any = { rule: 'any', on: { decided: {} }, steps: [{ notify: { say: 'x' } }] };
   assert.deepEqual(bodyOf(draftOf('any', any)), any, 'a decision with nothing narrowing it is still a decision, not a button');
 });

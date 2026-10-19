@@ -8,7 +8,7 @@
   whole body and the version it was opened at (`flow.ts` `proposalOf`), the proposal `packages/mcp` documents for an
   agent, and a canvas edit and an agent's edit are the same thing to review. FOR THE OWNER IT IS ONE PRESS: "Save and
   turn on" files the change and accepts it at once (`decide`), as `record/field-write.ts` does for a new field, so the
-  owner never walks to Decide to approve what they drew a second ago. Anybody else's save waits there for the owner.
+  owner never walks to Needs you to approve what they drew a second ago. Anybody else's save waits there for the owner.
 
   WHAT IS WRONG IS SAID BEFORE THE BUTTON, on the card it is about: the builder's own reading first (`faultsOf`), and
   once that is clear, the record's (`checkAutomation`), which is the install's own lint and names the step by its place

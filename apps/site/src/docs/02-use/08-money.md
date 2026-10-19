@@ -1,6 +1,6 @@
 # Money
 
-Money is a finance page, not a ledger of who owes whom. It leads with the money you have, then how long it lasts, then what comes in and goes out, and it keeps the past so you can see where the money went. Agents and rules do the filing and the chasing in view, and every question they raise waits for you on Decide.
+Money is a finance page, not a ledger of who owes whom. It leads with the money you have, then how long it lasts, then what comes in and goes out, and it keeps the past so you can see where the money went. Agents and rules do the filing and the chasing in view, and every question they raise waits for you in Needs you.
 
 ## The Money page
 

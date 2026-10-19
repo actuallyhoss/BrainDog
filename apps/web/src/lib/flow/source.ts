@@ -354,7 +354,7 @@ export const editWords = {
   saveChanges: 'Save changes',
   savedOn: 'Saved. It is on.',
   saved: 'Saved.',
-  filedOnly: 'Saved to Decide, and not accepted yet.',
+  filedOnly: 'Saved to Needs you, and not accepted yet.',
   more: (title: string) => `More for ${title}`,
   turnOff: 'Turn off',
   turnOn: 'Turn on',

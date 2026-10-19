@@ -298,7 +298,7 @@ test('AN UPDATE THAT BRINGS ONLY ITS VERSION SAYS NOTHING ELSE CHANGES, and one 
 
 /* THE RECORD TAKES A HANDED LIST OUT OF `retires` AND FILES IT UNDER `hands` (`@braindog/record` `usecase.ts`), and this
    screen read `retires` alone, so a list an update passed to another pack was on no line at all: not taken away, and not
-   said as moving either. Decide says it in `arranged.ts`, and the shared plan says it in the same words. */
+   said as moving either. Needs you says it in `arranged.ts`, and the shared plan says it in the same words. */
 test('A LIST AN UPDATE HANDS TO ANOTHER PACK IS SAID AS MOVING THERE, on a line of its own and not among what it takes away', () => {
   const doc = { pack: 'usecase-study', version: '1.0.2', declarations: [{ page: 'studies', title: 'Studies' }] };
   const handing = {

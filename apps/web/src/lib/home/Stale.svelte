@@ -6,7 +6,7 @@
   record it is was told nowhere. Here it is on the first screen: what went stale, how many, and where each is cleared.
 
   A LINE WITH A PLACE IS A LINK TO IT: steps nobody took open where the agents' work is read, a question that waited
-  opens Decide. A kind with no place of its own is words, and the record's tidy looks at those again by itself.
+  opens Needs you. A kind with no place of its own is words, and the record's tidy looks at those again by itself.
 
   NOTHING HERE IS A CALL. The record says how an agent clears each line; none of that is read by `stale.ts`, so none
   can be drawn.

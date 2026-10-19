@@ -165,7 +165,7 @@ const decided = (answer: string, more: Record<string, unknown> = {}): Event & Su
   ...more,
 });
 
-test('A SUGGESTION OF SLASH’S THAT A PERSON SETTLED SAYS BOTH NAMES, in the words the Decide card says', () => {
+test('A SUGGESTION OF SLASH’S THAT A PERSON SETTLED SAYS BOTH NAMES, in the words the Needs you card says', () => {
   assert.equal(settledBy(decided('accept'), SAY), 'Slash suggested · Mara accepted');
   /* THE SAME SENTENCE THE ANSWERED CARD SAYS, made by the card's own function. */
   assert.equal(settledBy(decided('accept'), SAY), answeredLine({ slash: true }, { key: 'accept', label: 'Accept', recommended: true }, 'Mara', 'now'));

@@ -28,7 +28,7 @@ Making or stopping an address needs a sign-in from the last fifteen minutes, bec
 
 ## Web addresses that take things in
 
-A door is a web address a phone, a script or another service posts to, and what arrives is written to the list the door names. To add one, ask an agent to set it up and approve the change it proposes on Decide. Then make its address:
+A door is a web address a phone, a script or another service posts to, and what arrives is written to the list the door names. To add one, ask an agent to set it up and approve the change it proposes in Needs you. Then make its address:
 
 - **Make the address** shows it once. Copy it before you leave the screen.
 - Send each item as the body of a POST to the address. The address is the whole of the check, so nothing else needs setting up.
@@ -54,10 +54,10 @@ The top of the Inbox counts what the rules filed this week and what still waits.
 
 Arrivals that are alike are drawn together. Once three or more alike are waiting, the group offers two ways to make a rule:
 
-- **Ask Slash for a pattern**. Slash drafts a rule from them and puts it on Decide. Drafting a pattern is Slash's background work, so it does not spend your asks.
+- **Ask Slash for a pattern**. Slash drafts a rule from them and puts it in Needs you. Drafting a pattern is Slash's background work, so it does not spend your asks.
 - **Make a rule from these** opens the pattern builder. Select the words in a sample that give the amount, the date or the name, and the builder finds them again in every sample, showing how many it matched. Try it, then save it.
 
-When the owner saves a rule, what it reads waits on Decide until they press **Trust it now**. A colleague's rule is sent to the owner as a proposal. Once a rule is trusted, arrivals like those are filed as they come in, with no Slash and no asks.
+When the owner saves a rule, what it reads waits in Needs you until they press **Trust it now**. A colleague's rule is sent to the owner as a proposal. Once a rule is trusted, arrivals like those are filed as they come in, with no Slash and no asks.
 
 ## Connectors
 

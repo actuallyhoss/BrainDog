@@ -101,7 +101,7 @@ test('THE BODY NAMES THE FIELD AND THE LIST, and nothing that could add or take 
   });
 });
 
-test('THE OWNER RETIRING A FIELD FILES IT AND NEVER SENDS decide: the list is unchanged until Decide answers', async () => {
+test('THE OWNER RETIRING A FIELD FILES IT AND NEVER SENDS decide: the list is unchanged until Needs you answers', async () => {
   fresh();
   const k = await projects();
   const { io, asked } = served(k);
@@ -109,7 +109,7 @@ test('THE OWNER RETIRING A FIELD FILES IT AND NEVER SENDS decide: the list is un
   assert.equal(out.from, 'filed', JSON.stringify(out));
   assert.deepEqual(asked, ['propose'], 'the app answered its own retire on the owner\'s behalf');
   assert.equal(out.from === 'filed' ? out.said : '', retireWords.filed(labelOf(BUNDLED.fields.find((f) => f.id === 'next')!)));
-  assert.equal(nextOf(k)?.retired, undefined, 'the field was retired with no press on Decide');
+  assert.equal(nextOf(k)?.retired, undefined, 'the field was retired with no press in Needs you');
 
   /* AND THE QUESTION IT LEFT IS ONE DECIDE CAN ANSWER: accepted there, the field is retired and the row keeps its value. */
   const id = out.from === 'filed' ? out.id : '';

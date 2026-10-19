@@ -23,7 +23,7 @@ A list the token cannot read stays out of its answers: a search does not reach i
 
 There is no admin scope, and there never will be one. These need somebody signed in to the app:
 
-- answering a question on Decide, which no token reaches;
+- answering a question in Needs you, which no token reaches;
 - inviting or removing people;
 - making, listing and revoking tokens, report keys and door addresses;
 - installing, removing and turning off packs;

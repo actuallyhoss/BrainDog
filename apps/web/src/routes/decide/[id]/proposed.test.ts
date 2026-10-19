@@ -65,7 +65,7 @@ test('a pattern is the rule it would install, with how many arrivals it was draw
 
 /* THE CANVAS'S OWN SENTENCES, called here and not typed out, because the promise is that Decide and the canvas say one
    rule in one set of words. It was typed out at first, and while this was being written the canvas renamed its branch
-   from "Only if" with arms "Then" and "Otherwise" to "If" with "If so" and "If not": the literal failed, and Decide,
+   from "Only if" with arms "Then" and "Otherwise" to "If" with "If so" and "If not": the literal failed, and Needs you,
    which imports the words, had already followed. */
 test('a rule is what starts it and each step as a sentence, with a branch read as its two arms', () => {
   const steps = [
@@ -95,7 +95,7 @@ test('a rule is what starts it and each step as a sentence, with a branch read a
     /* A SCRIPT STEP RUNS SINCE `e6010208`, and this screen still ended it "Not in this build: a run stops here", as it
        once ended a call, where the record's dry run says the run goes on. Measured red first on that sentence. What the owner
        reads instead is the dry run's: the run does not wait, and the things that stop it.
-       WHAT `as:` KEEPS IS SAID ONCE, BY THE CANVAS. Decide carried a second sentence, "What is kept as queued is the id
+       WHAT `as:` KEEPS IS SAID ONCE, BY THE CANVAS. Needs you carried a second sentence, "What is kept as queued is the id
        of its queued run, not what the script answers", because the canvas's line before it said "keeping the answer
        as queued". The canvas says the id now (`flow-script-as.test.ts`), and the line read both. */
     {

@@ -26,7 +26,7 @@ export const docsWords = {
      what the product does. */
   sections: {
     start: { label: 'Start here', blurb: 'What BrainDog is, and where to go next.', glyph: 'rocket' },
-    use: { label: 'Using BrainDog', blurb: 'Home, pages, lists, Decide, Slash, automations, the inbox and sharing.', glyph: 'home' },
+    use: { label: 'Using BrainDog', blurb: 'Home, pages, lists, Needs you, Slash, automations, the inbox and sharing.', glyph: 'home' },
     agents: { label: 'Agents', blurb: 'Connecting an agent, its tools, keys and grants, and the command line.', glyph: 'plug' },
     api: { label: 'The API', blurb: 'The HTTP calls a key may make, doors and webhooks, and their limits.', glyph: 'terminal' },
     dialect: { label: 'The page dialect', blurb: 'Every block a page can draw, each shown beside the text that draws it.', glyph: 'layers' },
