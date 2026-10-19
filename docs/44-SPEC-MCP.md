@@ -239,7 +239,7 @@ itself. In order:
 | `-32601` | step 8 | `There is no method called <m>.`, then `{ allowed }` |
 | `-32602` | step 7; `tools/call` with no `name`, or with `arguments` that is not an object; `resources/read` with no `uri`; `initialize` naming a version older than every one in `VERSIONS`; any list sent a `cursor` (§5.5) | a sentence, then `{ allowed }` for a missing tool name, `{ supported, requested }` for the version, or `{ cursor }` |
 | `-32603` | step 9 | `internal`, then `{ ref }` |
-| `-32002` | `resources/read` of an address that is not there, or that the record refuses | the refusal's sentence, then `{ refusal }` |
+| `-32602` (`-32002` before 2026-07-28) | `resources/read` of an address that is not there, or that the record refuses | the refusal's sentence, then `{ refusal }` |
 
 **Versions.** `initialize` echoes `params.protocolVersion` when it is one of `VERSIONS` (`2026-07-28`, `2025-11-25`,
 `2025-06-18`, `2025-03-26`). A date it does not know is answered with the newest of `VERSIONS` at or below it, because

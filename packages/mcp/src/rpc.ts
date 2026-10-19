@@ -56,7 +56,7 @@ export type Reply =
   | { jsonrpc: '2.0'; id: Id; result: unknown }
   | { jsonrpc: '2.0'; id: Id | null; error: RpcError };
 
-/** JSON-RPC's own numbers, and MCP's for a resource that is not there. */
+/** JSON-RPC's own numbers, and MCP's before 2026-07-28 for a resource that is not there (that revision uses params). */
 const RPC = { invalid: -32600, method: -32601, params: -32602, internal: -32603, resource: -32002 } as const;
 
 const answer = (id: Id, result: unknown): Reply => ({ jsonrpc: '2.0', id, result });
@@ -437,10 +437,12 @@ async function dispatch<C>(
       if (card !== undefined)
         return said({ contents: [{ uri: card.uri, mimeType: card.mimeType, text: cardHtml(card.kind), _meta: { ui: { prefersBorder: false } } }], ttlMs: HOUR, cacheScope: 'public' });
       const r = await mcp.read(params.uri, ctx);
+      const missingCode = stateless(version) ? RPC.params : RPC.resource;
       if (!r.ok)
+        /* 2026-07-28 moved resource-not-found from -32002 to -32602; older clients still expect -32002. */
         return refused(r)
-          ? fail(id, RPC.resource, r.refusal.fix, { refusal: r.refusal })
-          : fail(id, RPC.resource, 'This resource did not answer. Read it again.');
+          ? fail(id, missingCode, r.refusal.fix, { refusal: r.refusal })
+          : fail(id, missingCode, 'This resource did not answer. Read it again.');
       return said({
         contents: [{ uri: params.uri, mimeType: JSON_TYPE, text: JSON.stringify(r.value ?? null) }],
         ttlMs: ttlOf(params.uri),

@@ -454,13 +454,21 @@ test('EVERY LIST IS ONE PAGE: it carries no nextCursor, and a cursor the server 
   assert.equal(calls.length, before, 'a refused cursor read the record');
 });
 
-test('a resource that is not there, or is refused, is -32002 with the sentence', async () => {
+test('a resource that is not there is -32602 under 2026-07-28 and -32002 under an older revision', async () => {
+  const { surface } = stub();
+  const now = error(await handle(req('resources/read', { uri: 'braindog:nothing' }), surface, ctx, undefined, '2026-07-28'));
+  assert.equal(now.code, -32602);
+  const old = error(await handle(req('resources/read', { uri: 'braindog:nothing' }), surface, ctx, undefined, '2025-06-18'));
+  assert.equal(old.code, -32002);
+});
+
+test('a resource that is not there, or is refused, is -32002 with the sentence under an older revision', async () => {
   const { surface } = stub({ whoami: async () => ({ ok: false, refusal: { code: 'FORBIDDEN', fix: 'Not for this token.' } }) });
-  const missing = error(await handle(req('resources/read', { uri: 'braindog:nothing' }), surface, ctx));
+  const missing = error(await handle(req('resources/read', { uri: 'braindog:nothing' }), surface, ctx, undefined, '2025-06-18'));
   assert.equal(missing.code, -32002);
   assert.match(missing.message, /There is nothing at braindog:nothing/);
 
-  const refused = error(await handle(req('resources/read', { uri: 'braindog:whoami' }), surface, ctx));
+  const refused = error(await handle(req('resources/read', { uri: 'braindog:whoami' }), surface, ctx, undefined, '2025-06-18'));
   assert.equal(refused.code, -32002);
   assert.equal(refused.message, 'Not for this token.');
   assert.equal((refused.data as { refusal: { code: string } }).refusal.code, 'FORBIDDEN');
