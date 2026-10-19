@@ -251,3 +251,34 @@ test('counts, a missing file, a wrong method, a host with no bucket or no operat
   assert.equal((await serveKennel(post('submit', { text: addon('1.0.0') }), spent)).status, 429);
   assert.equal((await serveKennel(get('index.json'), spent)).status, 200);
 });
+
+test('a key asking for its own submissions is told waiting, then declined with the operator\'s words, and nobody else is', async () => {
+  const { blobs } = bucket();
+  const deps = depsOf(blobs);
+  const key = await newAuthorKey('Halden');
+  const stranger = await newAuthorKey('Other');
+  const asked = async (as: Awaited<ReturnType<typeof newAuthorKey>>): Promise<Record<string, unknown>[]> => {
+    const signed = await signYank(as, 'pack', 'mine', '0.0.0', 'mine', NOW);
+    assert.ok(signed.ok);
+    const out = await read(await serveKennel(post('mine', { signature: signed.value }), deps));
+    assert.equal(out.ok, true, JSON.stringify(out));
+    return out.value?.rows as Record<string, unknown>[];
+  };
+
+  assert.equal((await read(await serveKennel(post('mine', {}), deps))).refusal?.code, 'UNAUTHORIZED', 'nobody signed is nobody');
+  assert.equal((await serveKennel(post('mine', { signature: { alg: 'ed25519' } }), deps)).status, 401);
+
+  assert.equal((await serveKennel(post('submit', await signedSubmission(addon('1.0.0'), key)), deps)).status, 200);
+  assert.deepEqual((await asked(key)).map((r) => [r.id, r.version, r.state]), [['bookshelf', '1.0.0', 'waiting']]);
+  assert.deepEqual(await asked(stranger), []);
+
+  const reason = 'The shelf page shows rows nobody asked for.';
+  assert.equal((await serveKennel(post('review', { kind: 'pack', id: 'bookshelf', version: '1.0.0', verdict: 'refuse', reason }, operator), deps)).status, 200);
+  const declined = await asked(key);
+  assert.deepEqual(declined.map((r) => [r.version, r.state, r.reason]), [['1.0.0', 'declined', reason]]);
+  assert.deepEqual(await asked(stranger), []);
+
+  /* THE FIX SENT AS A LATER VERSION REPLACES THE DECLINE IN WHAT THE PUBLISHER READS. */
+  assert.equal((await serveKennel(post('submit', await signedSubmission(addon('1.0.1'), key)), deps)).status, 200);
+  assert.deepEqual((await asked(key)).map((r) => [r.version, r.state]), [['1.0.1', 'waiting']]);
+});

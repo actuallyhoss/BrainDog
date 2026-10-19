@@ -687,7 +687,7 @@ export const roundCount = (n: number): number | null => (Number.isFinite(n) ? (C
 
 /** What a request under `KENNEL_BASE` asks for, one reading for every host. */
 export type KennelAsk =
-  | { ask: 'index' | 'counts' | 'submit' | 'yank' | 'review' | 'verdict' | 'publisher' }
+  | { ask: 'index' | 'counts' | 'submit' | 'yank' | 'mine' | 'review' | 'verdict' | 'publisher' }
   /** `path` is the file's path inside a catalogue, safe to join: every part was matched whole. */
   | { ask: 'file' | 'preview'; path: string; kind: EntryKind; id: string; version: string };
 
@@ -707,9 +707,76 @@ export function kennelAsk(method: string, pathname: string): KennelAsk | { wrong
     if (id === undefined || version === undefined || (shape !== 'preview' && shape !== kind)) return { wrong: 'path' };
     return read ? { ask: shape === 'preview' ? 'preview' : 'file', path: rest, kind, id, version } : { wrong: 'method', allow: 'GET, HEAD' };
   }
-  if (rest === 'submit' || rest === 'yank' || rest === 'publisher') return method === 'POST' ? { ask: rest } : { wrong: 'method', allow: 'POST' };
+  if (rest === 'submit' || rest === 'yank' || rest === 'mine' || rest === 'publisher') return method === 'POST' ? { ask: rest } : { wrong: 'method', allow: 'POST' };
   if (rest === 'review') return read ? { ask: 'review' } : method === 'POST' ? { ask: 'verdict' } : { wrong: 'method', allow: 'GET, HEAD, POST' };
   return { wrong: 'path' };
+}
+
+/* ── what a publisher sees of their own ─────────────────────────────────── */
+
+/**
+ * The text a key signs to ask for its own submissions (`POST mine`), through the same signature as a yank so no second
+ * signing scheme exists. It names nothing real: a yank of this kind, id and version would find no entry to act on.
+ */
+export const MINE_ASKED = { kind: 'pack', id: 'mine', version: '0.0.0', reason: 'mine' } as const;
+
+/** Who is asking: the keys whose signature verified, and the person the host signed in, either or both. */
+export type Whose = { keys: readonly string[]; person: string | null };
+
+/** One submission of the asker's, in the state the publisher reads it in. */
+export type MineRow = {
+  kind: EntryKind;
+  id: string;
+  title: string;
+  version: string;
+  /** `waiting` for the operator, `listed` to everyone, `declined` with the operator's reason, `unpublished` by the publisher. */
+  state: 'waiting' | 'listed' | 'declined' | 'unpublished';
+  /** The operator's reason for a decline, or the publisher's for taking it back. Absent for waiting and listed. */
+  reason?: string;
+  at: string;
+};
+
+const theirs = (p: Pick<Publisher, 'kind' | 'id'> | undefined | null, who: Whose): boolean =>
+  p !== undefined && p !== null && ((p.kind === 'key' && who.keys.includes(p.id)) || (p.kind === 'person' && who.person !== null && p.id === who.person));
+
+/**
+ * Every submission of one publisher and where it stands: waiting for review, listed, declined with the reason the
+ * operator gave, or taken back. A declined version that a later one of the same id has since replaced (waiting, listed
+ * or the same number sent again) is left out, so a fix sent in is not shown beside the decline it answered. Newest
+ * first, then by id.
+ */
+export function mineIn(state: Pick<KennelState, 'index' | 'review'>, who: Whose): MineRow[] {
+  const rows: MineRow[] = [];
+  for (const e of state.index.entries) {
+    if (!theirs(e.publisher, who)) continue;
+    for (const v of e.versions) {
+      const base = { kind: e.kind, id: e.id, title: e.title, version: v.version };
+      if (v.yanked) rows.push({ ...base, state: 'unpublished', reason: v.yanked.reason, at: v.yanked.at });
+      else rows.push({ ...base, state: 'listed', at: v.reviewed ?? v.published_at ?? '' });
+    }
+  }
+  for (const p of state.review.pending) {
+    if (!theirs(p.entry.publisher, who) || listedAt(state.index, p.entry.kind, p.entry.id, p.version.version)) continue;
+    rows.push({ kind: p.entry.kind, id: p.entry.id, title: p.entry.title, version: p.version.version, state: 'waiting', at: p.submitted_at });
+  }
+  const titleOf = (kind: EntryKind, id: string): string => rows.find((r) => r.kind === kind && r.id === id)?.title ?? id;
+  for (const r of state.review.refused) {
+    if (!theirs(r.publisher, who)) continue;
+    const replaced = rows.some((o) => o.kind === r.kind && o.id === r.id && o.state !== 'declined' && compareVersions(o.version, r.version) >= 0);
+    const again = rows.some((o) => o.kind === r.kind && o.id === r.id && o.state === 'declined' && o.version === r.version);
+    if (replaced || again) continue;
+    rows.push({ kind: r.kind, id: r.id, title: titleOf(r.kind, r.id), version: r.version, state: 'declined', reason: r.reason, at: r.at });
+  }
+  return rows.sort((a, b) => b.at.localeCompare(a.at) || a.id.localeCompare(b.id) || compareVersions(b.version, a.version));
+}
+
+/** `POST mine`'s body: `{ signature? }`, the signature a key makes over `MINE_ASKED`. A body with none asks as the signed-in person. */
+export function readMine(body: unknown): Result<{ signature: Signature | null }> {
+  if (body === undefined || body === null) return ok({ signature: null });
+  if (!isMap(body)) return notObject('mine', '{ signature? }');
+  const sig = body.signature;
+  if (sig !== undefined && sig !== null && !isSignature(sig)) return no('SIGNATURE_INVALID', 'signature is not an author signature over this ask.', { at: 'signature' });
+  return ok({ signature: isSignature(sig) ? sig : null });
 }
 
 /* ── the bodies the writes take ─────────────────────────────────────────── */

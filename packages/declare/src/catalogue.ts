@@ -194,7 +194,7 @@ export type CatalogueEntry = {
  * The closed list of keys an add-on's manifest may say, which the SDK and the Kennel hold a file to. The record itself
  * stays lenient and reads what it knows. `unlisted` flags a pack named for one person or one bank.
  */
-export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted'] as const;
+export const MANIFEST_KEYS = ['pack', 'version', 'title', 'summary', 'changes', 'author', 'license', 'requires', 'provides', 'declarations', 'seeds', 'config', 'words', 'extends', 'hands', 'adds', 'note', 'unlisted', 'skills'] as const;
 
 export const PREVIEW_FORMAT = 1;
 
@@ -369,7 +369,7 @@ const subjectOf = (x: Shared | PackFile | CatalogueFile): Subject => {
     return { id: s.usecase.usecase, version: s.usecase.version, pack: s.pack, modules: s.usecase.modules, skills: s.usecase.skills.map((k) => k.name), words: words as Json };
   }
   const { version: _v, provides: _p, requires: _r, changes: _c, ...words } = s.pack.manifest as unknown as Record<string, unknown>;
-  return { id: s.pack.manifest.pack, version: s.pack.manifest.version, pack: s.pack, modules: Object.keys(s.pack.manifest.requires.packs), skills: [], words: { ...words, title: s.title } as Json };
+  return { id: s.pack.manifest.pack, version: s.pack.manifest.version, pack: s.pack, modules: Object.keys(s.pack.manifest.requires.packs), skills: (s.pack.manifest.skills ?? []).map((k) => k.name), words: { ...words, title: s.title } as Json };
 };
 
 /**

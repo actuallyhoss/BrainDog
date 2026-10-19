@@ -41,6 +41,22 @@ export const words = {
   publish: 'Publish to the store',
   publishing: 'Publishing',
   keeps: 'Rows, keys and anything you keep in it never go. A person who installs it is asked first, and sees what it will add.',
+  /* SKILLS: the text of a skill goes with the add-on when ticked, is read by whoever reviews it, and is shown by name to
+     whoever installs it, who is asked first. */
+  skillsHeading: 'Skills for agents',
+  skillsHint: 'A skill goes out with its steps. They are read when the add-on is reviewed, and whoever installs it is asked before their agents get it. Keep emails, links and keys out of it.',
+  skillLine: (name: string, trigger: string): string => `${name}: ${trigger}`,
+  givesSkill: (name: string): string => `Gives agents the skill ${name}`,
+  /* A FIX OR AN UPDATE: the same form, sent as a later version of the same add-on. */
+  changes: 'What changed',
+  changesHint: 'A line or two. Anyone who installed it sees this when they are offered the update.',
+  changesNeeded: 'Say what changed before sending an update.',
+  sendingAgain: (title: string, version: string): string => `Sending ${title} again as version ${version}`,
+  newInstead: 'Start a new add-on instead',
+  fixAndSend: 'Fix it and send it again',
+  publishUpdate: 'Publish an update',
+  sendUpdate: 'Send the update',
+  sendFix: 'Send the fix',
 } as const;
 
 /** The most characters of the one line, as the record holds it to. */
@@ -148,20 +164,58 @@ export function addonId(title: string): string {
 /** The file an add-on is saved as: `<id>-<version>.pack.json`. */
 export const fileName = (id: string, version = '1.0.0'): string => `${id}-${version}.pack.json`;
 
+/** A skill the record keeps, as it is offered: its row number, name and the moment to reach for it. */
+export type OfferedSkill = { seq: number; name: string; trigger: string };
+
+/** The record's skills, each row number once, and nothing without a name and a moment. */
+export function skillsOffered(value: unknown): OfferedSkill[] {
+  const raw = isMap(value) && Array.isArray(value.skills) ? value.skills : [];
+  const seen = new Set<number>();
+  const out: OfferedSkill[] = [];
+  for (const s of raw) {
+    if (!isMap(s) || typeof s.seq !== 'number' || !Number.isInteger(s.seq) || seen.has(s.seq)) continue;
+    const name = text(s.name);
+    const trigger = text(s.trigger);
+    if (name === '' || trigger === '') continue;
+    seen.add(s.seq);
+    out.push({ seq: s.seq, name, trigger });
+  }
+  return out;
+}
+
+/** The ticked skills as the record is asked for them: offered row numbers only, in the offer's order. */
+export const skillsPicked = (offered: readonly OfferedSkill[], ticks: Iterable<number>): number[] => {
+  const on = new Set(ticks);
+  return offered.filter((s) => on.has(s.seq)).map((s) => s.seq);
+};
+
+/** What a fix or an update adds to the ask: the id it keeps, the note on what changed and the skills ticked. */
+export type More = { id?: string | null; changes?: string; skills?: readonly number[] };
+
 /** What the screen sends `exportPack`: the ticked ids and a title. Never rows. */
-export function argsOf(offered: readonly Offered[], ticks: Iterable<string>, title: string, version = '1.0.0', summary = '') {
+export function argsOf(offered: readonly Offered[], ticks: Iterable<string>, title: string, version = '1.0.0', summary = '', more: More = {}) {
   const line = summaryOf(summary);
-  return { declarations: picked(offered, ticks), title: title.trim() || words.untitledAddon, version, ...(line === '' ? {} : { summary: line }) };
+  const note = (more.changes ?? '').trim().replaceAll(/\s+/gu, ' ');
+  return {
+    declarations: picked(offered, ticks),
+    title: title.trim() || words.untitledAddon,
+    version,
+    ...(line === '' ? {} : { summary: line }),
+    ...(more.id ? { id: more.id } : {}),
+    ...(note === '' ? {} : { changes: note }),
+    ...(more.skills && more.skills.length > 0 ? { skills: [...more.skills] } : {}),
+  };
 }
 
 /** The record's answer once ticks are sent, or null when it is not one. */
-export type Written = { file: string; text: string; adds: unknown[]; brings: { id: string; why: string; title?: string }[] };
+export type Written = { file: string; text: string; adds: unknown[]; brings: { id: string; why: string; title?: string }[]; skills?: string[] };
 export function writtenOf(value: unknown, fallbackFile: string): Written | null {
   if (!isMap(value) || typeof value.text !== 'string') return null;
   const brings = (Array.isArray(value.brings) ? value.brings : []).flatMap((b) =>
     isMap(b) && text(b.id) !== '' ? [{ id: text(b.id), why: text(b.why), ...(text(b.title) ? { title: text(b.title) } : {}) }] : [],
   );
-  return { file: text(value.file) || fallbackFile, text: value.text, adds: Array.isArray(value.adds) ? value.adds : [], brings };
+  const skills = (Array.isArray(value.skills) ? value.skills : []).flatMap((s) => (typeof s === 'string' && s !== '' ? [s] : []));
+  return { file: text(value.file) || fallbackFile, text: value.text, adds: Array.isArray(value.adds) ? value.adds : [], brings, ...(skills.length > 0 ? { skills } : {}) };
 }
 
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/iu;
@@ -186,7 +240,7 @@ export type Line = { text: string; detail?: string };
  * The preview's lines: each thing it adds ("Adds the page Rent"), then each thing it brings because a ticked one needs
  * it ("Also brings Rent reminder", with the record's reason under it). A thing both added and brought is said once.
  */
-export function previewLines(written: Pick<Written, 'adds' | 'brings'>, offered: readonly Offered[]): Line[] {
+export function previewLines(written: Pick<Written, 'adds' | 'brings'> & { skills?: readonly string[] | undefined }, offered: readonly Offered[]): Line[] {
   const said = new Set<string>();
   const lines: Line[] = [];
   for (const a of written.adds) {
@@ -203,6 +257,7 @@ export function previewLines(written: Pick<Written, 'adds' | 'brings'>, offered:
     said.add(b.id);
     lines.push({ text: `Also brings ${nameOf(b.id, offered, b.title)}`, ...(b.why ? { detail: b.why } : {}) });
   }
+  for (const s of written.skills ?? []) lines.push({ text: words.givesSkill(s.replaceAll('-', ' ')) });
   return lines;
 }
 

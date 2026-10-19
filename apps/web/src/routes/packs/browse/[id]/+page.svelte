@@ -55,6 +55,7 @@
   import { actionOf, entryOf, latestOf, listingKey, listingsOf, type ListingKind } from '$lib/market/listing.ts';
   import { readVersionPreview, type PreviewRead } from '$lib/market/preview.ts';
   import { words } from '$lib/market/words.ts';
+  import { readyFor, readyWords, type Ready } from '$lib/market/update-ready.ts';
   import { drew } from '../../../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../../../settings/billing.ts';
   import { listWords, moduleTitle, oneOf } from '../../sharing.ts';
@@ -273,6 +274,27 @@
     if (again.first.ok) states = again.first.value;
   }
 
+  /* ── an update that is ready ────────────────────────────────────────────── */
+
+  /* WHAT THE NEW VERSION CHANGES, for a record that holds an earlier one of an add-on from outside: read from the two
+     files the store holds (`update-ready.ts`), once per listing and pair of versions, and never for a built-in, whose
+     update the plan sheet already describes. */
+  let ready = $state.raw<Ready | null>(null);
+  const readyKey = $derived(listing && listing.source === 'kennel' && action?.kind === 'update' ? `${listing.key}:${action.from}:${action.to}` : null);
+
+  $effect(() => {
+    const k = readyKey;
+    untrack(() => void loadReady(k));
+  });
+
+  async function loadReady(k: string | null) {
+    ready = null;
+    if (k === null || !listing || action?.kind !== 'update') return;
+    const [l, from, to, note] = [listing, action.from, action.to, latest?.notes];
+    const out = await readyFor(fetch, l.id, from, to, note, (m) => moduleTitle(m));
+    if (readyKey === k) ready = out;
+  }
+
   /* ── the one button ─────────────────────────────────────────────────────── */
 
   let busy = $state(false);
@@ -420,7 +442,7 @@
           <p class="summary">{listing.summary}</p>
           <p class="byline with-icon">
             <Icon name={listing.source === 'bundled' || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}
-            {#if listing.count !== null}<span class="num quiet-part">{words.installs(listing.count)}</span>{/if}
+            {#if words.held(listing.count, listing.source)}<span class="num quiet-part">{words.held(listing.count, listing.source)}</span>{/if}
           </p>
           {#if said && trustTone}
             <!-- A TONE IS ITS INTENT AND ITS GLYPH, never colour alone: a key its author revoked, or a version that lost its
@@ -428,6 +450,28 @@
             <p class="trust" data-intent={trustTone} data-loud={said.loud ? '' : undefined} role={said.loud ? 'alert' : undefined}>
               <span class="glyph" role="img" aria-label={TONES[trustTone].label}>{TONES[trustTone].glyph}</span><span>{said.text}</span>
             </p>
+          {/if}
+          {#if ready}
+            <!-- AN UPDATE IS READY: what it changes, said before the press. The press opens the plan, which keeps the
+                 owner's own edits or shows them as a conflict; nothing here installs. -->
+            <div class="ready" role="status">
+              <p class="ready-h">{readyWords.heading}</p>
+              <p class="quiet">{readyWords.from(ready.from, ready.to)}</p>
+              {#if ready.note}<p class="quiet"><span class="ready-k">{readyWords.author}</span> {ready.note}</p>{/if}
+              {#if ready.read}
+                {#if ready.lines.length > 0}
+                  <ul class="ready-lines" aria-label={readyWords.changes}>
+                    {#each ready.lines as line, i (i)}<li>{line}</li>{/each}
+                  </ul>
+                {:else}
+                  <p class="quiet">{readyWords.nothing}</p>
+                {/if}
+              {:else}
+                <p class="quiet">{readyWords.unread}</p>
+              {/if}
+              <p class="quiet">{readyWords.kept}</p>
+              <p class="quiet">{readyWords.asks}</p>
+            </div>
           {/if}
           <div class="act wide-only">{@render act()}</div>
           {#if refused}
@@ -669,6 +713,34 @@
      signature lost in the danger ink as well, since it is the one thing on the page that needs him first. */
   .trust {
     color: var(--ink2);
+  }
+
+  /* AN UPDATE IS READY: a plain block in the ink, the changes as a short list under the author's note. */
+  .ready {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .ready-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+    line-height: 20px;
+  }
+
+  .ready-k {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .ready-lines {
+    margin: 0;
+    padding-inline-start: var(--sp-4);
+    color: var(--ink);
+    font-size: var(--t-sm);
+    line-height: 18px;
   }
 
   .trust[data-loud] {

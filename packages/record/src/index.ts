@@ -2707,6 +2707,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         pack: true,
         ...(note === undefined ? {} : { note }),
       } as never),
+    /* A SKILL THE ADD-ON GIVES THE AGENTS, as the record writes one it manages (`slash.ts`): only when Skills exists, and
+       never over a skill the record already holds by that name, whoever wrote it. The plan named it before this ran. */
+    giveSkill: (skill, pack) => {
+      if (!kernel.register('skills')) return false;
+      const held = sql.all<{ name: string | null }>("SELECT json_extract(fields, '$.name') AS name FROM entry WHERE register = 'skills' AND deleted_at IS NULL");
+      if (held.some((h) => h.name === skill.name)) return false;
+      const made = kernel.create(
+        'skills',
+        { name: skill.name, trigger: skill.trigger, what: skill.what ?? `A skill the ${pack} add-on gives agents working here.`, kind: 'skill', body: skill.body, rev: 1, managed: true },
+        { actor: actorOf(ctx), cascade: false, pack: true } as never,
+      );
+      return made.ok;
+    },
     /* WHAT THE LAST INSTALL REMEMBERED PLANTING, AND AN UPDATE GOING OVER ONE OF THOSE ROWS (SHL-A09): the add-on's own
        write again, so a field its list says is written once stays as the row holds it. A row a person deleted is left. */
     planted: (pack) => kernel.packPlanted(pack),

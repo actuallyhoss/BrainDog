@@ -52,7 +52,11 @@ import {
   reviewVerdict,
   roundCount,
   SUBMIT_MOST_BYTES,
+  MINE_ASKED,
+  mineIn,
+  readMine,
   trustIn,
+  verifyYank,
   waitingFile,
   yankIn,
   type Change,
@@ -162,7 +166,7 @@ function settled(out: Result<unknown>): Response {
 
 const WHAT: Refusal = {
   code: 'ROUTE_UNKNOWN',
-  fix: 'The Kennel answers index.json, counts.json, packs/<id>/<version>.pack.json, usecases/<id>/<version>.usecase.json and their .preview.json, and takes submit and yank.',
+  fix: 'The Kennel answers index.json, counts.json, packs/<id>/<version>.pack.json, usecases/<id>/<version>.usecase.json and their .preview.json, and takes submit, yank and mine.',
 };
 const NO_BUCKET: Refusal = { code: 'NOT_IN_THIS_BUILD', fix: 'This BrainDog keeps no Kennel of its own: it has no BLOBS bucket, so it takes no submissions, yanks or verdicts.' };
 const NOBODY: Refusal = { code: 'UNAUTHORIZED', fix: 'Sign the file with your author key, or sign in to BrainDog here and send it from this site.' };
@@ -211,6 +215,8 @@ export async function serveKennel(request: Request, deps: KennelDeps): Promise<R
         return await submit(request, deps, now);
       case 'yank':
         return await yank(request, deps, now);
+      case 'mine':
+        return await mine(request, deps);
       case 'review':
       case 'verdict':
       case 'publisher':
@@ -844,6 +850,35 @@ async function yank(request: Request, deps: KennelDeps, now: () => Date): Promis
   }
   const out = await changed(blobs, (state) => yankIn(state.index, { ...which, by }, now()));
   return withCookie(settled(out), cookie);
+}
+
+/**
+ * A publisher's own submissions and where each stands (`mineIn`): waiting, listed, declined with the operator's reason,
+ * or taken back. Asked by the signed-in person, by a key whose signature over `MINE_ASKED` verifies, or both; a body
+ * naming neither gets the 401 every unsigned write gets. NOTHING OF ANOTHER PUBLISHER'S IS EVER IN THE ANSWER, and a
+ * reason is shown only to whoever it was written for.
+ */
+async function mine(request: Request, deps: KennelDeps): Promise<Response> {
+  const blobs = deps.blobs;
+  if (blobs === undefined) return refusedWith(501, NO_BUCKET);
+  const body = await bodyOf(request, SMALL_BODY_MOST, 'mine');
+  if (!body.ok) return settled(body);
+  const asked = readMine(body.value);
+  if (!asked.ok) return settled(asked);
+  const { signature } = asked.value;
+  const keys: string[] = [];
+  if (signature !== null) {
+    if (!(await verifyYank(signature, MINE_ASKED.kind, MINE_ASKED.id, MINE_ASKED.version, MINE_ASKED.reason)))
+      return refusedWith(401, { code: 'SIGNATURE_INVALID', fix: 'The signature on this ask does not verify. Sign it with your author key.', at: 'signature' });
+    keys.push(signature.key_id);
+  }
+  /* THE SESSION IS READ BESIDE A KEY, never in its place, as a submission reads it: a person may see what they published unsigned. */
+  const who = await personOf(request, deps);
+  if ('refused' in who && keys.length === 0) return who.refused;
+  const person = 'refused' in who ? null : who.person;
+  const state = await loaded(blobs);
+  const rows = mineIn({ index: state.index.value, review: state.review.value }, { keys, person });
+  return withCookie(answer(200, JSON.stringify({ ok: true, value: { rows } })), 'refused' in who ? undefined : who.cookie);
 }
 
 /** The picture of a waiting file's pages, drawn in a scratch record, or `undefined` when none can be drawn (the listing goes without). */

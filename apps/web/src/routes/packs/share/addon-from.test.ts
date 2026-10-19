@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { addonHref, addonId, argsOf, asksOf, fileName, SUMMARY_MOST, summaryOf, groupsOf, modeOf, offeredOf, picked, previewLines, quietOf, words, writtenOf } from './addon-from.ts';
+import { addonHref, addonId, argsOf, asksOf, fileName, SUMMARY_MOST, summaryOf, groupsOf, modeOf, offeredOf, picked, previewLines, quietOf, skillsOffered, skillsPicked, words, writtenOf } from './addon-from.ts';
 
 const ULID = '01J9ZQ4K7V3T8W2M5N6P0R1S2T';
 
@@ -123,6 +123,34 @@ test('a host without exportPack says one quiet line', () => {
 test('the Add-ons screen links straight to this mode', () => {
   assert.equal(modeOf(new URL(`https://example.test${addonHref}`).searchParams), 'addon');
   assert.equal(modeOf(new URLSearchParams('')), 'usecase');
+});
+
+test('the skills the record keeps are offered once each, and only offered ones are ticked', () => {
+  const skills = skillsOffered({
+    skills: [
+      { seq: 3, name: 'Weekly tidy', trigger: 'On a Friday.' },
+      { seq: 3, name: 'Weekly tidy again', trigger: 'On a Friday.' },
+      { seq: 5, name: 'No moment', trigger: ' ' },
+      { seq: 7, name: 'Mail the client', trigger: 'When a job is done.' },
+      { seq: 'x', name: 'Odd', trigger: 'Odd.' },
+    ],
+  });
+  assert.deepEqual(skills.map((s) => s.seq), [3, 7]);
+  assert.deepEqual(skillsPicked(skills, [7, 9, 3]), [3, 7]);
+  assert.deepEqual(skillsOffered({}), []);
+});
+
+test('a fix or an update is asked for under the same id, with its note and the ticked skills, and a plain ask carries none of them', () => {
+  const plain = argsOf(offered, ['list:greenhouse'], 'Greenhouse', '1.0.0', '');
+  assert.deepEqual(Object.keys(plain).sort(), ['declarations', 'title', 'version']);
+  const more = argsOf(offered, ['list:greenhouse'], 'Greenhouse', '1.0.1', 'Keeps a greenhouse.', { id: 'greenhouse', changes: '  Fixes the\n watering round. ', skills: [3] });
+  assert.deepEqual(more, { declarations: ['list:greenhouse'], title: 'Greenhouse', version: '1.0.1', summary: 'Keeps a greenhouse.', id: 'greenhouse', changes: 'Fixes the watering round.', skills: [3] });
+});
+
+test('a skill that goes out is said in the preview by its name', () => {
+  const lines = previewLines({ adds: ['list:greenhouse'], brings: [], skills: ['weekly-tidy'] }, offered);
+  assert.deepEqual(lines.map((l) => l.text), ['Adds the list Greenhouse', 'Gives agents the skill weekly tidy']);
+  assert.deepEqual(writtenOf({ text: '{}', skills: ['weekly-tidy', 4, ''] }, 'x.pack.json')?.skills, ['weekly-tidy']);
 });
 
 test('no em dash in anything a person reads', () => {

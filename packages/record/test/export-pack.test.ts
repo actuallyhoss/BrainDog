@@ -207,3 +207,34 @@ test('AN ENTRY GOES ONLY WHEN rows NAMES IT, as an example, with no link to anot
   const missing = refusal(await exportPack({ declarations: ['register.jobs'], rows: { jobs: [9] } }, owner));
   assert.deepEqual([missing.code, missing.at], ['ROW_UNKNOWN', 'rows.jobs']);
 });
+
+test('A NEW VERSION CARRIES THE NOTE ON WHAT IT CHANGED, and the version and id it is sent as', async () => {
+  const { exportPack } = await first();
+  const out = value<ExportedPack>(await exportPack({ declarations: ['page.jobs-board'], title: 'Jobs board', id: 'jobs-board', version: '1.0.1', changes: '  Fixes the\nfilter on the board. ' }, owner));
+  const doc = JSON.parse(out.text) as { pack: string; version: string; changes: string };
+  assert.deepEqual([doc.pack, doc.version, doc.changes], ['jobs-board', '1.0.1', 'Fixes the filter on the board.']);
+  const plain = JSON.parse(value<ExportedPack>(await exportPack({ declarations: ['page.jobs-board'], title: 'Jobs board' }, owner)).text) as { changes: string };
+  assert.equal(plain.changes, 'The first version.');
+  for (const changes of ['', '   ', 'x'.repeat(501)]) assert.equal(refusal(await exportPack({ declarations: ['page.jobs-board'], changes }, owner)).at, 'changes');
+});
+
+test('SKILLS ARE OFFERED ONLY WHEN THE RECORD KEEPS THEM, and one ticked goes out with its steps, named as a pack names one', async () => {
+  const { exportPack, api } = await first();
+  assert.equal(value<ExportOffer>(await exportPack(undefined, owner)).skills, undefined, 'no Skills list, no skills offered');
+  assert.equal(refusal(await exportPack({ declarations: ['page.jobs-board'], skills: [1] }, owner)).code, 'ROW_UNKNOWN');
+
+  const { agentsPackDocument } = await import('../../seed/src/index.ts');
+  await put(api, agentsPackDocument());
+  value(await api.create({ register: 'skills', fields: { name: 'Weekly tidy', trigger: 'On a Friday, when the week is done.', what: 'Closes out the week.', body: '1. List what is open.\n2. Ask which to carry over.' } } as never, owner));
+  value(await api.create({ register: 'skills', fields: { name: 'Mail the client', trigger: 'When a job is done.', body: 'Write to ada.client@example.org with the result.' } } as never, owner));
+  const offered = value<ExportOffer>(await exportPack(undefined, owner)).skills;
+  assert.deepEqual(offered?.map((s) => [s.name, s.trigger]), [['Weekly tidy', 'On a Friday, when the week is done.'], ['Mail the client', 'When a job is done.']]);
+
+  const out = value<ExportedPack>(await exportPack({ declarations: ['page.jobs-board'], skills: [offered![0]!.seq] }, owner));
+  const doc = JSON.parse(out.text) as { skills: { name: string; trigger: string; what: string; body: string }[] };
+  assert.deepEqual(doc.skills, [{ name: 'weekly-tidy', trigger: 'On a Friday, when the week is done.', what: 'Closes out the week.', body: '1. List what is open.\n2. Ask which to carry over.' }]);
+
+  const withAddress = refusal(await exportPack({ declarations: ['page.jobs-board'], skills: [offered![1]!.seq] }, owner));
+  assert.deepEqual([withAddress.code, withAddress.at], ['VALUE_MALFORMED', 'skills']);
+  assert.match(withAddress.fix, /Mail the client/u);
+});

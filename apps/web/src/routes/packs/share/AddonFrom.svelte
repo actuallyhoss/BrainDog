@@ -23,11 +23,11 @@
   import Tile from '$lib/ui/Tile.svelte';
   import { kennelFetch, publishedHref, publishedLink, publishedSaid, submitToKennel, type Submitted } from '$lib/market/publish.ts';
   import { minesOf, personOf, readIndex, unpublish, unpublishWords, type Mine } from '$lib/market/unpublish.ts';
-  import { addonId, argsOf, asksOf, fileName, groupsOf, offeredOf, previewLines, quietOf, summaryOf, words, writtenOf, type Line, type Offered, type Written } from './addon-from.ts';
+  import { readSubmissions, stateLine, stateWords, versionAfter, type Submission } from '$lib/market/submissions.ts';
+  import { addonId, argsOf, asksOf, fileName, groupsOf, offeredOf, previewLines, quietOf, skillsOffered, skillsPicked, summaryOf, words, writtenOf, type Line, type Offered, type OfferedSkill, type Written } from './addon-from.ts';
 
   /** How long the ticks and the title rest before the record is asked again: one ask per pause, never one per key. */
   const DRAFT_WAIT_MS = 600;
-  const VERSION = '1.0.0';
 
   type Answer = { ok: true; value: unknown } | { ok: false; refusal?: { code: string; fix: string } };
   type Asks = { exportPack?: (args: Record<string, unknown>) => Promise<Answer>; call: (name: string, args: Record<string, unknown>) => Promise<Answer> };
@@ -39,6 +39,15 @@
   let ticks = $state.raw<ReadonlySet<string>>(new Set());
   let title = $state('');
   let summary = $state('');
+  /* THE SKILLS THE RECORD KEEPS AND WHICH ARE TICKED, by row number. */
+  let skillOffer = $state.raw<OfferedSkill[]>([]);
+  let skillTicks = $state.raw<ReadonlySet<number>>(new Set());
+  /* A FIX OR AN UPDATE: the same form, sent as a later version of an add-on already sent. `forId` keeps its id. */
+  let forId = $state<string | null>(null);
+  let version = $state('1.0.0');
+  let changes = $state('');
+  /** Everything this publisher sent and where each stands, `null` until the store answers. */
+  let subs = $state.raw<Submission[] | null>(null);
   let publishing = $state(false);
   let sent = $state.raw<(Submitted & { title: string }) | null>(null);
   /** What the file asks permission for, read as the store reads it, once a draft is ready. */
@@ -51,7 +60,10 @@
   let draft = $state.raw<{ state: 'reading' } | { state: 'ready'; written: Written; lines: Line[] } | { state: 'refused'; fix: string } | null>(null);
 
   const groups = $derived(offered ? groupsOf(offered) : []);
-  const fallbackFile = $derived(fileName(addonId(title || words.untitledAddon), VERSION));
+  const fallbackFile = $derived(fileName(forId ?? addonId(title || words.untitledAddon), version));
+  const more = $derived({ id: forId, changes, skills: skillsPicked(skillOffer, skillTicks) });
+  /* A VERSION AFTER THE FIRST SAYS WHAT CHANGED, so whoever installed an earlier one is told. */
+  const needsNote = $derived(forId !== null && changes.trim() === '');
 
   /* THE SAME CALL AS `exportUseCase` ON THE USE CASE MODE, by its name on the client; a client built before the name
      was added asks for it by name, and a host that has none answers ROUTE_UNKNOWN, which is the quiet line. */
@@ -68,10 +80,34 @@
         return false;
       }
       offered = offeredOf(out.value);
+      skillOffer = skillsOffered(out.value);
       void loadMine(c);
       return true;
     });
   });
+
+  function tickSkill(seq: number, on: boolean) {
+    const next = new Set(skillTicks);
+    if (on) next.add(seq);
+    else next.delete(seq);
+    skillTicks = next;
+  }
+
+  /** Start a fix or an update of something already sent: its id and title kept, the next version after every one sent. */
+  function reuse(row: Submission) {
+    forId = row.id;
+    title = row.title;
+    version = versionAfter(subs ?? [], row.id);
+    changes = '';
+    sent = null;
+    wrong = null;
+  }
+
+  function startOver() {
+    forId = null;
+    version = '1.0.0';
+    changes = '';
+  }
 
   function tick(id: string, on: boolean) {
     const next = new Set(ticks);
@@ -116,13 +152,19 @@
     } catch {
       mine = [];
     }
+    try {
+      const { yankSignatureFor } = await import('$lib/market/author-key.ts');
+      subs = await readSubmissions(kennelFetch, () => yankSignatureFor('pack', 'mine', '0.0.0', 'mine'));
+    } catch {
+      subs = null;
+    }
   }
 
   /* ASKED AGAIN ONCE THE TICKS AND THE TITLE REST: a change to either restarts the wait, and leaving clears it. */
   $effect(() => {
     if (!client || !offered) return;
     const c = client;
-    const args = argsOf(offered, ticks, title, VERSION, summary);
+    const args = argsOf(offered, ticks, title, version, summary, more);
     const timer = setTimeout(() => void redraft(c, args), DRAFT_WAIT_MS);
     return () => clearTimeout(timer);
   });
@@ -132,7 +174,7 @@
     busy = true;
     wrong = null;
     try {
-      const args = argsOf(offered, ticks, title, VERSION, summary);
+      const args = argsOf(offered, ticks, title, version, summary, more);
       const out = await ask(client, args);
       const written = out.ok ? writtenOf(out.value, fallbackFile) : null;
       if (!written) {
@@ -146,7 +188,7 @@
     }
   }
 
-  const ready = $derived(ticks.size > 0 && title.trim() !== '' && summaryOf(summary) !== '');
+  const ready = $derived(ticks.size > 0 && title.trim() !== '' && summaryOf(summary) !== '' && !needsNote);
 
   /* ONE PRESS, ONE SEND OF THE FILE THE RECORD WRITES NOW, never of a draft shown earlier. The store answers waiting for
      review; its own refusal sentence is said as it is written. */
@@ -156,7 +198,7 @@
     wrong = null;
     sent = null;
     try {
-      const out = await ask(client, argsOf(offered, ticks, title, VERSION, summary));
+      const out = await ask(client, argsOf(offered, ticks, title, version, summary, more));
       const written = out.ok ? writtenOf(out.value, fallbackFile) : null;
       if (!written) {
         wrong = fixOf(out);
@@ -168,6 +210,7 @@
         return;
       }
       sent = { ...result.value, title: title.trim() };
+      if (forId !== null) startOver();
       if (client) void loadMine(client);
     } finally {
       publishing = false;
@@ -225,6 +268,32 @@
         {/each}
       </Section>
 
+      {#if skillOffer.length > 0}
+        <Section title={words.skillsHeading} count={skillTicks.size}>
+          <p class="quiet">{words.skillsHint}</p>
+          <fieldset class="group">
+            {#each skillOffer as skill (skill.seq)}
+              <label class="pick">
+                <input type="checkbox" checked={skillTicks.has(skill.seq)} onchange={(e) => tickSkill(skill.seq, e.currentTarget.checked)} />
+                <span>{words.skillLine(skill.name, skill.trigger)}</span>
+              </label>
+            {/each}
+          </fieldset>
+        </Section>
+      {/if}
+
+      {#if forId !== null}
+        <p class="quiet" role="status">
+          {words.sendingAgain(title, version)}.
+          <button type="button" class="linklike" onclick={startOver}>{words.newInstead}</button>
+        </p>
+        <div class="pair">
+          <label class="field-label" for="addon-changes">{words.changes}</label>
+          <div class="field"><input class="field-input" id="addon-changes" type="text" autocomplete="off" maxlength="500" aria-describedby="addon-changes-hint" bind:value={changes} /></div>
+          <p class="quiet" id="addon-changes-hint">{words.changesHint}</p>
+        </div>
+      {/if}
+
       <div class="pair">
         <label class="field-label" for="addon-title">{words.title}</label>
         <div class="field"><input class="field-input" id="addon-title" type="text" autocomplete="off" placeholder={words.untitledAddon} bind:value={title} /></div>
@@ -267,17 +336,42 @@
       {#if wrong}<p class="quiet" role="alert">{wrong}</p>{/if}
       {#if sent}<p class="quiet" role="status">{publishedSaid(sent)} <a href={at(publishedHref(sent))}>{publishedLink(sent)}</a></p>{/if}
       {#if ticks.size > 0 && summaryOf(summary) === ''}<p class="quiet">{words.oneLineNeeded}</p>{/if}
+      {#if needsNote}<p class="quiet">{words.changesNeeded}</p>{/if}
       <div class="actions">
         <Button weight="primary" type="submit" disabled={busy || ticks.size === 0}>{words.download}</Button>
         <Button disabled={publishing || !ready} aria-busy={publishing ? 'true' : undefined} onclick={() => void publish()}>
-          {publishing ? words.publishing : words.publish}
+          {publishing ? words.publishing : forId !== null ? words.sendUpdate : words.publish}
         </Button>
       </div>
     </form>
 
-    <Section title={unpublishWords.heading} count={mine.length}>
+    <Section title={stateWords.heading} count={subs === null ? mine.length : subs.length}>
       {#if took}<p class="quiet" role="status">{took}</p>{/if}
-      {#if mine.length === 0}
+      {#if subs !== null && subs.length > 0}
+        <!-- EACH SUBMISSION IN ITS STATE, as the store tells it: waiting, listed, declined with the operator's reason, or
+             taken out. A declined one is fixed and sent again as a later version; a listed one gets an update. -->
+        <ul class="lines">
+          {#each subs as row (`${row.id}@${row.version}`)}
+            {@const own = mine.find((m) => m.id === row.id)}
+            <li>
+              <span>{row.title}</span>
+              <span class="detail">{stateWords.version(row.version)}. {stateLine(row)}</span>
+              <div class="actions">
+                {#if row.state === 'declined'}
+                  <Button onclick={() => reuse(row)}>{words.fixAndSend}</Button>
+                {:else if row.state === 'listed'}
+                  <Button onclick={() => reuse(row)}>{words.publishUpdate}</Button>
+                  {#if own}
+                    <Button disabled={taking !== null} aria-busy={taking === own.id ? 'true' : undefined} onclick={() => void takeOut(own)}>
+                      {taking === own.id ? unpublishWords.working : unpublishWords.unpublish}
+                    </Button>
+                  {/if}
+                {/if}
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {:else if mine.length === 0}
         <p class="quiet">{unpublishWords.none}</p>
       {:else}
         <ul class="lines">
@@ -382,6 +476,16 @@
   .detail {
     color: var(--dim);
     font-size: var(--t-base);
+  }
+
+  .linklike {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   .actions {

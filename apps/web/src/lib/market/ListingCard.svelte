@@ -143,7 +143,7 @@
         <span>{words.by(listing.publisher?.name ?? listing.author)}</span>
         <span>{words.kinds[listing.kind]}</span>
         {#if verified && verified !== 'braindog'}<span class="with-icon"><Icon name="check" size="s" />{verified === 'reviewed' ? words.reviewed : words.verified}</span>{/if}
-        {#if listing.count !== null}<span class="num">{words.installs(listing.count)}</span>{/if}
+        {#if words.held(listing.count, listing.source)}<span class="num">{words.held(listing.count, listing.source)}</span>{/if}
       </p>
       <!-- THE ONE CUE, AT THE FOOT'S END: what the detail page's button will say, as a quiet pill. "Installed" is words
            and no pill: it is what the record holds, not a press. -->

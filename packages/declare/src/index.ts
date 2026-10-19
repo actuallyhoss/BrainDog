@@ -25,7 +25,7 @@
 
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { no, ok, refused } from '@braindog/ports';
-import { credentialKey as credential, credentialValue, NESTED_MOST, nestedPast } from './credentials.ts';
+import { credentialKey as credential, credentialValue, looksLikeCredential, NESTED_MOST, nestedPast } from './credentials.ts';
 import { FIRST_PARTY_LISTS, readChanges, type ListWords } from './usecase.ts';
 import { cardsFault } from './cards.ts';
 import { addressFault } from './address.ts';
@@ -94,6 +94,42 @@ export type PackDeclaration = { kind: DeclKind; id: string; body: Record<string,
  */
 export type Seed = { register: string; fields: Record<string, Json>; note?: string; key?: string };
 
+/** One skill a pack gives the record's agents. */
+export type PackSkill = { name: string; trigger: string; what?: string; body: string };
+
+/** The most skills one pack gives, and the most characters of a skill's steps. */
+export const PACK_SKILLS_MOST = 8;
+export const PACK_SKILL_BODY_MOST = 8000;
+const SKILL_NAME = /^[a-z][a-z0-9-]{0,62}$/u;
+
+/**
+ * A pack's `skills`, read: each a lower-case name with hyphens, the moment to reach for it, an optional line on what it
+ * is, and its steps. A string in the steps that reads as a key is refused whole, because a skill is text an agent will
+ * follow and a key in it would travel with the file.
+ */
+export function readPackSkills(raw: unknown): Result<PackSkill[]> {
+  if (raw === undefined) return ok([]);
+  const at = 'skills';
+  const bad = (fix: string, where = at): Result<PackSkill[]> => no('VALUE_MALFORMED', fix, { at: where });
+  if (!Array.isArray(raw) || raw.length > PACK_SKILLS_MOST) return bad(`skills is a list of at most ${PACK_SKILLS_MOST} skills.`);
+  const out: PackSkill[] = [];
+  for (const [i, s] of raw.entries()) {
+    const here = `skills.${i}`;
+    if (!isObject(s) || Object.keys(s).some((k) => !['name', 'trigger', 'what', 'body'].includes(k)))
+      return bad('A skill is { name, trigger, what?, body } and nothing else.', here);
+    const { name, trigger, what, body } = s as Record<string, unknown>;
+    if (typeof name !== 'string' || !SKILL_NAME.test(name)) return bad('A skill is named in lower case with hyphens, as in weekly-review.', `${here}.name`);
+    if (out.some((o) => o.name === name)) return bad(`Two skills are both called ${name}.`, `${here}.name`);
+    if (typeof trigger !== 'string' || trigger.trim() === '' || [...trigger].length > 400) return bad('A skill says the moment to reach for it, in at most 400 characters.', `${here}.trigger`);
+    if (what !== undefined && (typeof what !== 'string' || what.trim() === '' || [...what].length > 200)) return bad('A skill says what it is in a line of at most 200 characters.', `${here}.what`);
+    if (typeof body !== 'string' || body.trim() === '' || [...body].length > PACK_SKILL_BODY_MOST) return bad(`A skill's steps are text of at most ${PACK_SKILL_BODY_MOST} characters.`, `${here}.body`);
+    if (`${trigger}\n${body}`.split(/\s+/u).some((w) => looksLikeCredential(w)))
+      return bad('A skill holds something that reads as a key, and a key never travels in an add-on. Take it out.', `${here}.body`);
+    out.push({ name, trigger: trigger.trim(), ...(typeof what === 'string' ? { what: what.trim() } : {}), body });
+  }
+  return ok(out);
+}
+
 export type Manifest = {
   pack: string;
   version: string;
@@ -131,6 +167,15 @@ export type Manifest = {
    * Kept out of the checksum, as `title` is: a note about the pack is not the pack.
    */
   changes?: string;
+  /**
+   * The skills this pack gives the agents of the record it is installed in, each with its text: a name, the moment to
+   * reach for it, a line on what it is, and the steps (`body`). Absent when it gives none.
+   *
+   * THE TEXT IS REVIEWED LIKE EVERYTHING ELSE IN THE FILE (the Kennel's operator reads a waiting file whole), and
+   * INSTALLING ASKS: the plan names each skill and what it is for before anything is written, and one the record already
+   * holds by that name is left as it is. In the checksum, because a skill's steps are what an agent will do.
+   */
+  skills?: PackSkill[];
   /**
    * The declarations this version stops declaring and gives to another pack, by id: `{ 'register.holdings': 'holdings' }`.
    * Absent when it hands nothing.
@@ -512,6 +557,12 @@ export type Diff = {
    */
   page_adds?: { page: string; kind: string; heading?: string; after?: string; line: string; unresolved?: true; refusal?: Refusal }[];
   seeds: { count: number; registers: { register: string; rows: number }[] };
+  /**
+   * The skills this version gives the record's agents, each by name with the moment to reach for it and what it is,
+   * so installing asks before an agent is handed steps (the text itself is in the file, which the plan links). Absent
+   * when it gives none. One the record already holds by that name is left as it is.
+   */
+  skills?: { name: string; trigger: string; what: string | null }[];
   /** Every rule that would generate rows, with the ceiling it declares. */
   spawns: { rule: string; register: string; bound: number; when: string }[];
   /**
@@ -641,7 +692,7 @@ export type Diff = {
  * What an install did. `rows_kept` is each list it retired over rows on his press (`InstallOptions.retireWithRows`) and
  * how many rows stay in it, as `Retired` says it for an uninstall; absent when it retired none.
  */
-export type Applied = { pack: string; version: string; declarations: number; seeds: number; retired: number; handed?: number; refreshed?: number; rows_kept?: Record<string, number> };
+export type Applied = { pack: string; version: string; declarations: number; seeds: number; skills?: number; retired: number; handed?: number; refreshed?: number; rows_kept?: Record<string, number> };
 /** One kept page and what this version adds that it lacks (`Diff.brings`): a block by its kind and its heading. */
 export type Brought = { id: string; title?: string; blocks: { kind: string; heading?: string }[] };
 
@@ -678,6 +729,12 @@ export type Host = {
    */
   retire: (ids: readonly string[], by?: { actor: string; suggestion?: string }) => Result<unknown>;
   seed: (register: string, fields: Record<string, Json>, note: string | undefined) => Result<unknown>;
+  /**
+   * One of the skills the add-on gives the record's agents, written into Skills as a row the record manages, or `false`
+   * when the record keeps no Skills or already holds a skill by that name (it is left as it is). OPTIONAL: a host
+   * without it gives no skill, and the add-on installs all the same.
+   */
+  giveSkill?: (skill: PackSkill, pack: string) => boolean;
   /**
    * What this add-on remembers planting: `planted` of its stored manifest, as it was written (`plantedOf` reads it).
    *
@@ -801,6 +858,9 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
   /* WHAT THIS VERSION CHANGED, read where the file is read (SHL-A09), so the note is on the manifest a record keeps. */
   const changes = readChanges(doc.changes);
   if (!changes.ok) return changes as Result<Pack>;
+  /* SKILLS THE PACK GIVES ITS AGENTS, with their text: read here so the checksum holds them and the plan names them. */
+  const skills = readPackSkills(doc.skills);
+  if (!skills.ok) return skills as Result<Pack>;
   const manifest: Manifest = {
     pack: id,
     version,
@@ -818,6 +878,7 @@ export async function normalise(doc: unknown, source: PackSource = { kind: 'loca
     /* ONLY WHEN THERE ARE SETTINGS, so a pack written before `config:` existed keeps its checksum. */
     ...(Object.keys(settings.value).length > 0 ? { config: settings.value } : {}),
     ...(changes.value === null ? {} : { changes: changes.value }),
+    ...(skills.value.length === 0 ? {} : { skills: skills.value }),
   };
 
   /* A PACK WHOSE ONLY CONTENT IS `extends` OR `adds` CHANGES SOMETHING, so it has no declarations to list and is not
@@ -2134,6 +2195,7 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
     extends: extensions,
     ...(pageAdds === undefined ? {} : { page_adds: pageAdds }),
     seeds: { count: seedsFor(pack, adds).length, registers: seedRows(seedsFor(pack, adds)) },
+    ...(pack.manifest.skills === undefined ? {} : { skills: pack.manifest.skills.map((s) => ({ name: s.name, trigger: s.trigger, what: s.what ?? null })) }),
     spawns: spawnsOf(pack),
     calls_out: calls,
     scripts,
@@ -3923,6 +3985,11 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         remembered.set(seed.key, { list: seed.register, row: id, fields: seed.fields });
       }
 
+      /* THE SKILLS IT GIVES, after the plan named them: each into Skills unless the record holds one by that name. A host
+         that cannot write one skips it, and the install goes on. */
+      let skillsGiven = 0;
+      for (const skill of filled.manifest.skills ?? []) if (host.giveSkill?.(skill, pack.manifest.pack) === true) skillsGiven += 1;
+
       /* AN UPDATE GOES OVER THE ROWS IT PLANTED BEFORE, AND WRITES ONLY WHAT THE FILE CHANGED (`seedChanges`). The write
          is the add-on's own (`Host.reseed`, the kernel's update with `pack: true`), so a field the list says is written
          `once` stays as the row holds it: a category a person renamed keeps their name through every update (SHL-A09).
@@ -3967,6 +4034,7 @@ export async function install(pack: Pack, diff: Diff, host: Host, planHash: stri
         version: pack.manifest.version,
         declarations: pack.declarations.length - keep.size,
         seeds: planted.length,
+        ...(skillsGiven > 0 ? { skills: skillsGiven } : {}),
         retired: retiring.length,
         ...(handing > 0 ? { handed: handing } : {}),
         ...(refreshed > 0 ? { refreshed } : {}),

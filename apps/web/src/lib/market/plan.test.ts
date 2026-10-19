@@ -86,3 +86,27 @@ test('a conflict nobody marked stops the install as it did', () => {
   /* The owner's own is never waited out, whatever a mark says. */
   assert.deepEqual(sheetOf(money({ changed: true, waits: 'after' }), pack)?.stops, ['Budgets set is one you changed, and this version changes it too']);
 });
+
+test('the skills an add-on gives the agents are named before it installs, by name and the moment each is for', () => {
+  const plain = { pack: { id: 'tidy-week', version: '1.0.0', summary: '' }, planHash: 'h', direction: 'install' };
+  const sheet = sheetOf(
+    {
+      ...plain,
+      skills: [
+        { name: 'weekly-tidy', trigger: 'On a Friday.', what: 'Closes out the week.' },
+        { name: 'plain', trigger: '', what: null },
+      ],
+    },
+    pack,
+  );
+  const section = sheet?.parts[0]?.sections.find((s) => s.key === 'skills');
+  assert.equal(section?.title, 'Skills it gives your agents');
+  assert.deepEqual(
+    section?.rows.map((r) => [r.text, r.detail]),
+    [
+      ['weekly tidy', 'Closes out the week. For: On a Friday.'],
+      ['plain', 'A skill your agents can use'],
+    ],
+  );
+  assert.equal(sheetOf(plain, pack)?.parts[0]?.sections.some((s) => s.key === 'skills'), false);
+});

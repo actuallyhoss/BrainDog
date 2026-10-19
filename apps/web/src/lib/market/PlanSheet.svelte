@@ -66,6 +66,7 @@
     'page-adds': 'doc',
     settings: 'settings',
     examples: 'rows',
+    skills: 'skill',
     spawns: 'skill',
     interrupts: 'bell',
     worth: 'info',

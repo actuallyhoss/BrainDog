@@ -42,7 +42,11 @@ type Body = Record<string, unknown>;
 export type Offered = { id: string; kind: string; title: string };
 
 /** What `exportPack` answers when nothing is ticked. */
-export type ExportOffer = { offered: Offered[] };
+export type ExportOffer = {
+  offered: Offered[];
+  /** The skills the record keeps, each by its row number, name and the moment to reach for it. Absent when it keeps none. */
+  skills?: { seq: number; name: string; trigger: string }[];
+};
 
 /** What `exportPack` answers for ticks: the file's name and text, every declaration it adds, and what came along and why. */
 export type ExportedPack = {
@@ -50,6 +54,8 @@ export type ExportedPack = {
   text: string;
   adds: string[];
   brings: { id: string; why: string }[];
+  /** The skills it gives the agents of a record that installs it, by name. Absent when it gives none. */
+  skills?: string[];
   /** Each literal made a setting, by its key and what it was about, never the literal itself. */
   settings: { key: string; label: string }[];
   /** What the scrub left out, and why, in its own words. */
@@ -57,7 +63,12 @@ export type ExportedPack = {
 };
 
 /** What the call takes, and nothing else. */
-const TAKES = ['declarations', 'rows', 'title', 'id', 'version', 'summary'] as const;
+const TAKES = ['declarations', 'rows', 'title', 'id', 'version', 'summary', 'changes', 'skills'] as const;
+
+/** The most characters of the note on what a version changed, as the pack file holds it (`CHANGES_MOST` in `declare`). */
+const CHANGES_NOTE_MOST = 500;
+/** The most skills one add-on carries (`readPackSkills` in `declare`). */
+const SKILLS_MOST = 8;
 
 /** The one line a store card says, at most this many characters. */
 export const SUMMARY_MOST = 140;
@@ -193,7 +204,7 @@ export function methods(deps: RecordDeps) {
      * somebody who reads the whole record, and it writes nothing.
      */
     async exportPack(
-      args: { declarations?: unknown; rows?: unknown; title?: unknown; id?: unknown; version?: unknown; summary?: unknown } | undefined,
+      args: { declarations?: unknown; rows?: unknown; title?: unknown; id?: unknown; version?: unknown; summary?: unknown; changes?: unknown; skills?: unknown } | undefined,
       ctx: CallContext,
     ): Promise<Result<ExportOffer | ExportedPack>> {
       const stop = guard(ctx, 'read');
@@ -207,11 +218,30 @@ export function methods(deps: RecordDeps) {
 
       const own = ownOf();
       const ticks = said.declarations;
-      if (ticks === undefined)
+      /* THE SKILLS THE RECORD KEEPS, by row number, offered beside the rest and sent back by number. A skill's text is
+         the author's own and is carried only when ticked; the store's reviewer reads it with everything else. */
+      const skillRows = (): { seq: number; name: string; trigger: string; what: string | null; body: string }[] => {
+        if (!kernel.register('skills') || readable(ctx, 'skills')) return [];
+        const read = kernel.list({ register: 'skills', limit: 200 } as never);
+        if (!read.ok) return [];
+        const listed = (read.value as { rows: { seq: number | null; fields: Body }[] }).rows;
+        return listed.flatMap((r) => {
+          const { name, trigger, body, what } = r.fields;
+          return r.seq !== null && typeof name === 'string' && name.trim() !== '' && typeof trigger === 'string' && trigger.trim() !== ''
+            ? [{ seq: r.seq, name: name.trim(), trigger: trigger.trim(), what: typeof what === 'string' && what.trim() !== '' ? what.trim() : null, body: typeof body === 'string' ? body : '' }]
+            : [];
+        });
+      };
+      if (ticks === undefined) {
+        const kept = skillRows();
         return {
           ok: true,
-          value: { offered: [...own].map(([id, d]) => ({ id, kind: d.kind, title: titleOf(id, d.body) })).sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)) },
+          value: {
+            offered: [...own].map(([id, d]) => ({ id, kind: d.kind, title: titleOf(id, d.body) })).sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)),
+            ...(kept.length === 0 ? {} : { skills: kept.map(({ seq, name, trigger }) => ({ seq, name, trigger })) }),
+          },
         };
+      }
 
       if (!Array.isArray(ticks) || ticks.length === 0 || ticks.length > TICKS_MOST || !ticks.every((t) => typeof t === 'string' && t !== ''))
         return no('VALUE_MALFORMED', `declarations is a list of one to ${TICKS_MOST} of the ids this answers as offered.`, { at: 'declarations' });
@@ -225,6 +255,13 @@ export function methods(deps: RecordDeps) {
       const line = typeof said.summary === 'string' ? said.summary.trim().replace(/\s+/gu, ' ') : undefined;
       if (said.summary !== undefined && (line === undefined || line === '' || [...line].length > SUMMARY_MOST))
         return no('VALUE_MALFORMED', `summary is one line of at most ${SUMMARY_MOST} characters.`, { at: 'summary' });
+      /* WHAT THIS VERSION CHANGED, in the author's words: shown to whoever installed an earlier one when they are offered this. */
+      const note = typeof said.changes === 'string' ? said.changes.trim().replace(/\s+/gu, ' ') : undefined;
+      if (said.changes !== undefined && (note === undefined || note === '' || [...note].length > CHANGES_NOTE_MOST))
+        return no('VALUE_MALFORMED', `changes is a line or two on what this version changes, of at most ${CHANGES_NOTE_MOST} characters.`, { at: 'changes' });
+      const skillTicks = said.skills;
+      if (skillTicks !== undefined && (!Array.isArray(skillTicks) || skillTicks.length === 0 || skillTicks.length > SKILLS_MOST || !skillTicks.every((n) => Number.isInteger(n) && (n as number) > 0)))
+        return no('VALUE_MALFORMED', `skills is a list of one to ${SKILLS_MOST} skill row numbers, as the offer names them.`, { at: 'skills' });
       const rows = said.rows;
       if (rows !== undefined && (!isMap(rows) || !Object.values(rows).every((v) => Array.isArray(v) && v.every((n) => Number.isInteger(n) && (n as number) > 0))))
         return no('VALUE_MALFORMED', 'rows names example rows by list and number, such as {"jobs":[1,2]}.', { at: 'rows' });
@@ -301,17 +338,34 @@ export function methods(deps: RecordDeps) {
       for (const [key, setting] of Object.entries(clean.config))
         config[key] = { ...((isMap(setting) ? setting : {}) as Body), default: standIns.get(key) ?? 'example', note: STAND_IN_NOTE };
 
+      /* A TICKED SKILL GOES OUT WITH ITS STEPS, named the way a pack names one. A skill with no steps, or with an address or a
+         link in them, is refused here by name rather than sent: the store would read the same and say the same. */
+      const skills: Body[] = [];
+      if (Array.isArray(skillTicks)) {
+        const kept = skillRows();
+        for (const seq of new Set(skillTicks as number[])) {
+          const row = kept.find((k) => k.seq === seq);
+          if (row === undefined) return no('ROW_UNKNOWN', `Skills has no row ${seq}. Ask with nothing ticked to see what is offered.`, { at: 'skills' });
+          if (row.body.trim() === '') return no('VALUE_MALFORMED', `The skill ${row.name} has no steps written, so there is nothing to share. Write them in Skills first.`, { at: 'skills' });
+          const text = `${row.trigger}\n${row.body}`;
+          if (/[^\s@<>()"']+@[^\s@<>()"']+\.[a-z]{2,}/iu.test(text) || /https?:\/\/\S+/iu.test(text))
+            return no('VALUE_MALFORMED', `The skill ${row.name} holds an email address or a link, and those stay in the record. Take it out of the skill, or leave this skill out.`, { at: 'skills' });
+          skills.push({ name: skillNameOf(row.name), trigger: row.trigger, ...(row.what === null ? {} : { what: [...row.what].slice(0, 200).join('') }), body: row.body });
+        }
+      }
+
       const doc: Body = {
         pack: id,
         version,
         title,
         summary: line ?? `${title}, made on one BrainDog and shared as an add-on.`,
-        changes: 'The first version.',
+        changes: note ?? (version === '1.0.0' ? 'The first version.' : 'A new version.'),
         author: 'a BrainDog owner',
         license: 'MIT',
         requires: { format: FORMAT_VERSION, primitives: PRIMITIVES_VERSION, packs },
         ...(Object.keys(config).length > 0 ? { config } : {}),
         declarations: clean.declarations,
+        ...(skills.length > 0 ? { skills } : {}),
         ...(seeds.length > 0 ? { seeds } : {}),
       };
       const stray = Object.keys(doc).find((k) => !(MANIFEST_KEYS as readonly string[]).includes(k));
@@ -327,6 +381,7 @@ export function methods(deps: RecordDeps) {
           text: `${JSON.stringify(doc, null, 2)}\n`,
           adds: back.value.declarations.map((d) => d.id),
           brings,
+          ...(skills.length > 0 ? { skills: skills.map((s) => String(s.name)) } : {}),
           settings: clean.settings.map((s) => ({ key: s.key, label: s.label })),
           dropped: clean.dropped,
         },
@@ -359,6 +414,9 @@ const NOBODY = `p_${'0'.repeat(26)}`;
 
 /** A sentence's first word with its capital. */
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** A skill's name as a pack file writes one: "Weekly tidy" is `weekly-tidy`. */
+export const skillNameOf = (name: string): string => packIdFrom(name);
 
 /** An add-on's id from its title: "Jobs board" is `jobs-board`. */
 export function packIdFrom(title: string): string {

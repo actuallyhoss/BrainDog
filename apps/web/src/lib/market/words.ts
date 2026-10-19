@@ -29,6 +29,16 @@ export const words = {
   nothingFoundBody: 'Try fewer words, or pick All.',
   results: (n: number): string => (n === 1 ? '1 result' : `${n} results`),
   installs: (n: number): string => `On ${n}+ BrainDogs`,
+  /* UNDER TEN INSTALLS THE STORE SAYS NO NUMBER (`roundCount`), so an add-on from outside that nobody much holds yet is "New". */
+  newOne: 'New',
+  /**
+   * HOW MANY HOLD IT, AS A CARD AND A PAGE SAY IT: "On 50+ BrainDogs" from ten up (the count is already rounded, and a
+   * count under ten is never sent), "New" for an add-on from outside with no count yet, and nothing for a built-in.
+   */
+  held(count: number | null, source: 'bundled' | 'kennel'): string | null {
+    if (count !== null) return this.installs(count);
+    return source === 'kennel' ? this.newOne : null;
+  },
   by: (name: string): string => `By ${name}`,
   verified: 'Verified',
   reviewed: 'Reviewed by BrainDog',
