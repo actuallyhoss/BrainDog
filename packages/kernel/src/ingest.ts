@@ -496,6 +496,11 @@ export type IngestDeps = {
    * read for as long as it has existed.
    */
   normalise?: ((text: string) => string) | undefined;
+  /**
+   * Answers a question the moment it is filed when BrainDog may file it itself (`handledFault`). Without it a confident
+   * arrival asks like any other.
+   */
+  settle?: (id: string) => Result<unknown>;
   mint: () => string;
   /** `SG<n>` for the suggestion an unwritten extraction opens. */
   allocate: (name: string) => number;
@@ -1163,6 +1168,18 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
       missed.length ? 'needs-review' : soft.length || pending.length ? 'proposed' : 'exact',
       lid,
     );
+    /* A CARD TEXT THAT IS SURE IS FILED WITH A MARK, not asked about (`arrivalSure`). */
+    const sure =
+      deps.settle !== undefined && confidence === 'proposed' && pending.length > 0
+        ? arrivalSure({
+            ruleTrusted: lid === 'exact',
+            missed: missed.length + invalid.length,
+            soft: soft.length,
+            tails: pending.length,
+            amount: amountRead(deps.schemaOf(register), extracted),
+            payee: printed !== '',
+          })
+        : null;
 
     /* A FAILURE DOWNGRADES RATHER THAN DISCARDS. The bytes stay, the reason is on them, and the
        extraction goes in front of a person as a `rowset` they can accept — which is the only thing
@@ -1261,15 +1278,27 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
         rows: [extracted],
         raw,
         ...(lookupMissed ? { joins: JSON.stringify(['door', doorOf, ...[...missed].sort()]) } : {}),
-        ...heldAsked(deps, words, {
-          absent,
-          invalid,
-          soft,
-          tails: pending,
-          waits: lid !== 'exact',
-        }),
+        ...(sure?.sure
+          ? {
+              question: fit(words, [(_s, _l, n) => `Filed by BrainDog: matched ${n} by its last digits`], rowNamed(deps.sql, pending[0]!)),
+              context: `A text from a sender you set up, with its amount and shop read clearly and the account matched by its last digits ${pending[0]!.digits}.`,
+              confident: true,
+            }
+          : heldAsked(deps, words, {
+              absent,
+              invalid,
+              soft,
+              tails: pending,
+              waits: lid !== 'exact',
+            })),
         ...(pending.length ? { tails: pending } : {}),
       });
+      /* FILED NOW, signed by BrainDog so it shows in Handled with its Undo. A refusal leaves it a question, in the words
+         a question has (`heldAsked`), not the words of a filing that did not happen. */
+      if (sure?.sure) {
+        const done = deps.settle!(suggestion);
+        if (!done.ok) unfile(deps, suggestion, heldAsked(deps, words, { absent, invalid, soft, tails: pending, waits: lid !== 'exact' }));
+      }
       return ok<Arrived>({ raw, ingest: matched.ingest, state, wrote: [], reason, confidence, suggestion });
     }
 
@@ -1455,6 +1484,8 @@ function openRowset(
     tails?: Tail[];
     raw?: string;
     joins?: string;
+    /** BrainDog files it itself: the body says so, and `handledFault` lets an ingest's add through on it. */
+    confident?: boolean;
   },
 ): string {
   const context = item.context ?? '';
@@ -1517,6 +1548,7 @@ function openRowset(
       /* THE TAILS THIS ONE WAITS ON, so accepting it is the confirmation `confirmedTail` reads, with no table beside it. */
       ...(item.tails === undefined ? {} : { tails: item.tails }),
       ...(item.raw === undefined ? {} : { raws: [item.raw] }),
+      ...(item.confident ? { confident: true, why: [context] } : {}),
     }),
     `ingest:${item.ingest}`,
     at,
@@ -3675,6 +3707,43 @@ function fit(words: Words, says: readonly Say[], name = ''): string {
 
 /** A sentence's first letter in capitals, for a label phrase that opens one. */
 const opening = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** What `arrivalSure` is told about one arrival: counts and truths, never the text. */
+export type SureFacts = { ruleTrusted: boolean; missed: number; soft: number; tails: number; amount: boolean; payee: boolean };
+
+/**
+ * HOW SURE A CARD TEXT IS (DIRECTION §45): four things, each worth a quarter. The sender's rule is trusted and read
+ * everything it was asked to, the account was found by its last digits, the amount was read (not chosen or defaulted),
+ * and the shop is named. Only all four file it by itself; any less and a person is asked, and money that did not read
+ * cleanly always is.
+ */
+export function arrivalSure(f: SureFacts): { sure: boolean; score: number } {
+  const checks = [f.ruleTrusted && f.missed === 0 && f.soft === 0, f.tails > 0, f.amount, f.payee];
+  const score = checks.filter(Boolean).length / checks.length;
+  return { sure: score === 1, score };
+}
+
+/** Whether the list's money field was read: there is one, and the extraction holds an amount in it. */
+function amountRead(schema: Schema | null, extracted: Record<string, unknown>): boolean {
+  const money = Object.entries(schema?.fields ?? {}).filter(([, d]) => d.type === 'money').map(([id]) => id);
+  return money.length > 0 && money.some((id) => extracted[id] !== undefined && extracted[id] !== null);
+}
+
+/** A question that was to be filed by BrainDog and could not be stays a question, in the words of one. */
+function unfile(deps: IngestDeps, suggestion: string, asked: { question: string; context: string }): void {
+  const row = deps.sql.one<{ body: string; status: string }>('SELECT body, status FROM suggestion WHERE id = ?', suggestion);
+  if (row === undefined || row.status !== 'open') return;
+  try {
+    const body = JSON.parse(row.body) as Record<string, unknown>;
+    delete body.confident;
+    delete body.why;
+    body.context = asked.context;
+    deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(body), suggestion);
+    deps.sql.exec("UPDATE event SET note = ?, to_v = NULL WHERE target = ? AND kind = 'suggest' AND field IS NULL", asked.question.slice(0, 280), `suggestion:${suggestion}`);
+  } catch {
+    /* left as it was: still open, and a person answers it */
+  }
+}
 
 /**
  * What an arrival held for a person asks, and the detail under it.

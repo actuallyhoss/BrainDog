@@ -1761,16 +1761,19 @@ export function handledFault(sql: Sql, row: { body_kind: string; body: string; o
   const body = parse(row.body);
   if (!body) return 'The question cannot be read.';
   const rows = (body.rows ?? []) as Record<string, unknown>[];
-  if (rows.length === 0 || rows.some((r) => typeof r?.at !== 'string' || !isMap(r.patch))) return 'It adds rows, and a new row asks.';
+  /* A CONFIDENT ARRIVAL IS THE ONE ADD BRAINDOG FILES ITSELF (DIRECTION §45): an ingest says so in the body
+     (`arrivalSure`), and only new rows of that ingest's own list count; money is read cleanly by then, every other floor stands. */
+  const confident = body.confident === true && by.startsWith('ingest:') && rows.every((r) => typeof r?.at !== 'string');
+  if (rows.length === 0 || (!confident && rows.some((r) => typeof r?.at !== 'string' || !isMap(r.patch)))) return 'It adds rows, and a new row asks.';
   /* AS SLASH READS THEM, so an owner's row is the owner's own and a member's is still somebody else's. */
   const kinds = kindsOfProposal('rowset', body, recordReader(sql, SLASH));
-  const floor = kinds.find((k) => k.floor !== null);
+  const floor = kinds.find((k) => k.floor !== null && !(confident && k.floor === 'money'));
   if (floor) return `It is ${floor.key}, which always asks (${String(floor.floor)}).`;
-  const other = kinds.find((k) => !ARRANGES(k.verb));
+  const other = kinds.find((k) => !(confident ? k.verb === 'add' || ARRANGES(k.verb) : ARRANGES(k.verb)));
   if (other) return `It is ${other.key}, which is more than arranging.`;
   const shape = shapeIn(sql, String(body.register));
   const fields = new Map((shape?.fields ?? []).map((f) => [f.id, f]));
-  const held = rows.flatMap((r) => Object.entries(r.patch as Record<string, unknown>)).find(([k]) => fields.get(k)?.by === 'decide')?.[0];
+  const held = rows.flatMap((r) => Object.entries((isMap(r.patch) ? r.patch : r) as Record<string, unknown>)).find(([k]) => fields.get(k)?.by === 'decide')?.[0];
   return held === undefined ? null : `${held} changes only when a person accepts it.`;
 }
 

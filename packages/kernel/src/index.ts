@@ -7283,6 +7283,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   const ingestDeps = (only?: IngestDecl): IngestDeps => ({
     sql,
+    settle: (id) => governDeps().settle!(id),
     /* `only` IS A SCHEDULED ACTION'S ANSWER, offered to the declaration that fetched it and to no other. */
     ingests: () =>
       only
