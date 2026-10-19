@@ -391,6 +391,7 @@ export type { Resolved, ScopeDecl, ScopesDecl, Whereabouts } from './scope.ts';
 export { placeOnce, projectSuggestions, suggestProjects, remoteKey, SUGGEST_AFTER, type ProjectSuggestion, type SeenRun, type Candidate } from './scope.ts';
 export { coerce, FIELD_TYPES, instant, isAbsent, isJsonQuoted, hasEscapedNewline, isRealDay, looksLikeCredential, parseSpoken, spoken } from './coerce.ts';
 export type { FieldDecl, FieldType, Json } from './coerce.ts';
+export { briefFromNote, cleanImportedNote, noteWithoutLeftovers, type NoteFields } from './note-clean.ts';
 export { misread, sentencesOver, widens, type TypeShape } from './widen.ts';
 /* FOR `declare`'s PLAN, which asks a widening's readers as `stranded` does and has to place an arrival's rule the same way. */
 export { rowRegisterOf } from './flow-lint.ts';
