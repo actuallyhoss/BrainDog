@@ -20,6 +20,7 @@
  */
 
 import * as pref from './pref.ts';
+import { shelve, shelvedOf, unshelve, shelfId, type Declared, type Shelved } from './page/shelf.ts';
 
 const HIDDEN = 'bd_nav_hidden';
 /* THE DEVICE'S COPY OF THE PHONE BAR, so a reload draws it before `boot` answers. */
@@ -70,6 +71,8 @@ export type Prefs = {
   'look.contrast'?: boolean;
   'look.shot'?: boolean;
   'look.accent'?: string;
+  /** THE COMPONENTS THIS PERSON KEPT ON THEIR SHELF, each a name and a block's declaration, never rows (`page/shelf.ts`). */
+  'shelf.items'?: Shelved[];
 };
 
 /** What a change came to: kept by the record, kept on this device, or refused with the record's sentence. */
@@ -171,7 +174,7 @@ function takeLegacy(): string[] {
 /** The newest `DISMISSED_MOST`, each once, in the order they were dismissed. */
 const capped = (list: readonly string[]): string[] => [...new Set(list)].slice(-DISMISSED_MOST);
 
-type Value = string[] | string | boolean | Record<string, string> | null;
+type Value = string[] | string | boolean | Record<string, string> | Shelved[] | null;
 type Send = (key: keyof Prefs, value: Value) => Promise<Saved>;
 
 /** The record's `setPref`, through the client. A refusal is the record's own sentence. */
@@ -265,6 +268,8 @@ export class NavPrefs {
   home = $state<string | null>(null);
   /** The names this person gave pages in their nav, address to name. */
   labels = $state<Record<string, string>>({});
+  /** The drawn components this person kept; placed onto any page from the add menu. */
+  shelf = $state<Shelved[]>([]);
   #send: Send | null = null;
   #adopted = false;
   /* ONE CHANGE AT A TIME, so two quick moves arrive in the order they were made. */
@@ -331,6 +336,7 @@ export class NavPrefs {
       this.home = address(prefs['home.page']);
       keepKept(HOME, this.home);
     }
+    if ('shelf.items' in prefs) this.shelf = shelvedOf(prefs['shelf.items']);
     if ('nav.labels' in prefs) {
       this.labels = names(prefs['nav.labels']);
       keepKept(LABELS, this.labels);
@@ -472,6 +478,26 @@ export class NavPrefs {
     return this.#commit('nav.tabs', kept, () => {
       this.tabs = before;
       keepList(TABS, before);
+    });
+  }
+
+  /** A drawn component put on the shelf under a name, or refused when the shelf is full. */
+  shelve(name: string, block: Declared): Promise<Saved> {
+    const next = shelve(this.shelf, name, block, shelfId(Date.now()));
+    if (next === null) return Promise.resolve({ from: 'refused', fix: 'The shelf is full, or the name is empty.' });
+    return this.#setShelf(next);
+  }
+
+  /** One component taken off the shelf. */
+  unshelve(id: string): Promise<Saved> {
+    return this.#setShelf(unshelve(this.shelf, id));
+  }
+
+  #setShelf(next: Shelved[]): Promise<Saved> {
+    const before = this.shelf;
+    this.shelf = next;
+    return this.#commit('shelf.items', next, () => {
+      this.shelf = before;
     });
   }
 

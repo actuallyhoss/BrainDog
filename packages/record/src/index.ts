@@ -40,7 +40,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { admitHostSources, costRows, rememberedLine, type Remembered } from '@braindog/kernel';
+import { BLOCK_INSTALLS, admitHostSources, costRows, rememberedLine, type Remembered } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
@@ -967,6 +967,7 @@ export const PREF_KEYS = [
   'look.theme',
   'look.shot',
   'packs.known_keys',
+  'shelf.items',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -1010,6 +1011,8 @@ export type Prefs = {
   'look.theme'?: string;
   'look.shot'?: boolean;
   'packs.known_keys'?: Record<string, string[]>;
+  /** The person's shelf: drawn components they kept, each a name and a block declaration (`shelfFault`). */
+  'shelf.items'?: { id: string; name: string; block: Record<string, unknown> }[];
 };
 
 /** The words each `look.*` key takes. `look.accent` takes `LOOK_ACCENTS`, which follows the suggested accents. */
@@ -1022,6 +1025,35 @@ export type LookDensity = (typeof LOOK_DENSITIES)[number];
 /* THE SWATCHES BY NAME, READ FROM `ACCENTS` and not written again here, so a swatch added or taken out in
    `@braindog/theme` is one the record takes or refuses the same day. `House` is the control beside them. */
 export const LOOK_ACCENTS: readonly string[] = ['House', ...ACCENTS.map((a) => a.name)];
+
+/** The most components on one shelf, the longest name, and the most a kept declaration may weigh written out. */
+const SHELF_MOST = 50;
+const SHELF_NAME_MOST = 60;
+const SHELF_BLOCK_MOST = 4000;
+
+/**
+ * WHAT A SHELF MAY HOLD: a name and a block's declaration, never data. Only keys a block may declare are kept, and
+ * `authored` (rows written into the block) is refused, so a shelf item draws whatever its list holds today and carries
+ * no rows of its own. Returns the sentence that refuses it, or `null`.
+ */
+function shelfFault(value: unknown): string | null {
+  const say = `shelf.items is a list of at most ${SHELF_MOST} components, each an id, a name of 1 to ${SHELF_NAME_MOST} characters and a block declaration, or null to take it away.`;
+  if (!Array.isArray(value) || value.length > SHELF_MOST) return say;
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return say;
+    const { id, name, block, ...rest } = item as Record<string, unknown>;
+    if (Object.keys(rest).length > 0) return say;
+    if (typeof id !== 'string' || !/^[a-z0-9_-]{1,40}$/iu.test(id) || seen.has(id)) return say;
+    seen.add(id);
+    if (typeof name !== 'string' || name.trim() === '' || name.length > SHELF_NAME_MOST) return say;
+    if (!block || typeof block !== 'object' || Array.isArray(block) || typeof (block as { kind?: unknown }).kind !== 'string') return say;
+    const stray = Object.keys(block).find((k) => !BLOCK_INSTALLS.has(k) || k === 'authored');
+    if (stray !== undefined) return `A shelf keeps how a block is built, not data: ${stray} is not kept.`;
+    if (JSON.stringify(block).length > SHELF_BLOCK_MOST) return `A shelf item is at most ${SHELF_BLOCK_MOST} characters written out.`;
+  }
+  return null;
+}
 
 /** How many rules one person may mute: more than any record declares, and few enough that the list stays a list. */
 const MUTED_MOST = 200;
@@ -10070,6 +10102,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         );
         if (fault) return no(fault.code, fault.fix, { ...(fault.at === undefined ? {} : { at: fault.at }), ...(fault.allowed ? { allowed: [...fault.allowed] } : {}) });
         kept = value as string;
+      } else if (value !== null && key === 'shelf.items') {
+        const fault = shelfFault(value);
+        if (fault) return no('VALUE_MALFORMED', fault, { at: 'value' });
+        kept = (value as { id: string; name: string; block: Record<string, unknown> }[]).map((i) => ({ id: i.id, name: i.name.trim(), block: i.block }));
       } else if (value !== null && key === 'packs.known_keys') {
         const entries = typeof value === 'object' && !Array.isArray(value) ? Object.entries(value as Record<string, unknown>) : null;
         if (!entries || entries.length > 200 || !entries.every(([k, v]) => k.length > 0 && k.length <= 300 && texts(v, 8, (s) => /^[0-9a-f]{16}$/u.test(s))))

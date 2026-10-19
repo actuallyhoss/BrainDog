@@ -105,11 +105,11 @@ function article(kind: string): string {
   return /s$/u.test(k) ? k : `${/^[aeiou]/u.test(k) ? 'an' : 'a'} ${k}`;
 }
 
-const norm = (s: string): string => s.toLowerCase().replace(/[_-]+/gu, ' ').replace(/[^a-z0-9. ]+/gu, ' ').replace(/\s+/gu, ' ').trim();
+export const norm = (s: string): string => s.toLowerCase().replace(/[_-]+/gu, ' ').replace(/[^a-z0-9. ]+/gu, ' ').replace(/\s+/gu, ' ').trim();
 const nameOf = (f: AskField): string => norm(f.label ?? f.id);
 
 /** The field a phrase names: by its id or its label, the longest that fits, or `null`. */
-function fieldIn(phrase: string, fields: readonly AskField[], want?: (f: AskField) => boolean): AskField | null {
+export function fieldIn(phrase: string, fields: readonly AskField[], want?: (f: AskField) => boolean): AskField | null {
   const p = ` ${norm(phrase)} `;
   let best: AskField | null = null;
   let size = 0;
@@ -126,7 +126,7 @@ function fieldIn(phrase: string, fields: readonly AskField[], want?: (f: AskFiel
 }
 
 /** A choice's word as the phrase says it, "paid" for `Paid` or `paid_out`, or `null` where no field takes it. */
-function choiceIn(phrase: string, fields: readonly AskField[]): { field: AskField; value: string } | null {
+export function choiceIn(phrase: string, fields: readonly AskField[]): { field: AskField; value: string } | null {
   const p = norm(phrase).replace(/^(the|all|any)\s+/u, '');
   if (p === '') return null;
   for (const f of fields) {
@@ -136,7 +136,7 @@ function choiceIn(phrase: string, fields: readonly AskField[]): { field: AskFiel
   return null;
 }
 
-const queryFields = (fields: readonly AskField[]): QueryField[] =>
+export const queryFields = (fields: readonly AskField[]): QueryField[] =>
   fields.map((f) => ({ id: f.id, type: f.type ?? (f.values ? 'enum' : 'text'), ...(f.label ? { label: f.label } : {}), ...(f.values ? { values: f.values } : {}) }));
 
 /** The `where` that joins a new sentence to what the block already filters by, or `null` where the two cannot be joined. */
@@ -161,7 +161,7 @@ const PERIODS: readonly { say: RegExp; from: string; to: string; what: string }[
   { say: /\btoday\b/u, from: 'today', to: 'today', what: 'today' },
 ];
 
-function periodOf(t: string): { from: string; to: string; what: string } | null {
+export function periodOf(t: string): { from: string; to: string; what: string } | null {
   const days = /\b(last|past|next)\s+(\d{1,3})\s+days?\b/u.exec(t);
   if (days) {
     const n = Number(days[2]);

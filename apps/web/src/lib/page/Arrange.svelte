@@ -50,6 +50,8 @@
   import type { Area } from '$lib/record/arrange.ts';
   import type { Arrangement } from '$lib/record/arrange.svelte.ts';
   import { blockWords, readList } from '$lib/record/block-edit.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import type { InstalledKind } from '$lib/record/kinds.ts';
   import { may } from '$lib/record/may.ts';
@@ -63,6 +65,9 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import BlockEditor from './BlockEditor.svelte';
+  import { composeWords, type Composed } from './compose.ts';
+  import MakeComponent from './MakeComponent.svelte';
+  import { listOf, shelfWords, type Declared, type Shelved } from './shelf.ts';
   import type { LookUndo } from '$lib/record/arrange-look.ts';
   import { layoutOf, slotOf } from './layout.ts';
   import { retireLook, writeLook } from './look.ts';
@@ -183,15 +188,66 @@
     adding = true;
   }
 
-  function add(block: PageBlock) {
+  function add(block: PageBlock, quiet = false) {
     extra = [...extra, block];
     arrangement.slots = [
       ...(arrangement.slots ?? declared.map((b, i) => slotOf(b, i, layout))),
       { i: declared.length + extra.length - 1, span: block.span ?? 12 },
     ];
+    if (quiet) return;
     const named = copy.kindNames[block.kind] ?? blockWords.kindNames[block.kind] ?? block.kind;
     toasts.push(copy.blockAddedLive(named));
   }
+
+  /* MAKE A COMPONENT AND THE SHELF (DIRECTION §45). A composed block is added like a picked one, so it is drawn on the
+     page at once and written only by Done; `draft` is the one added block still awaiting Keep, Shelf or Throw away. */
+  let making = $state(false);
+  let draft = $state<{ i: number; name: string; said: string; block: Declared } | null>(null);
+
+  function drawn(c: Composed) {
+    add(c.block as unknown as PageBlock, true);
+    draft = { i: declared.length + extra.length - 1, name: c.name, said: c.said, block: c.block };
+  }
+
+  function keepDraft() {
+    draft = null;
+    toasts.push(composeWords.kept);
+  }
+
+  /* THROWN AWAY LEAVES NOTHING: the block and its place go, and the ones added after it close up. */
+  function throwDraft() {
+    const d = draft;
+    if (!d) return;
+    draft = null;
+    extra = extra.filter((_, k) => k !== d.i - declared.length);
+    arrangement.slots = (arrangement.slots ?? []).filter((s) => s.i !== d.i).map((s) => (s.i > d.i ? { ...s, i: s.i - 1 } : s));
+    toasts.push(composeWords.thrown);
+  }
+
+  async function shelveDraft() {
+    const d = draft;
+    if (!d) return;
+    const out = await navPrefs.shelve(d.name, d.block);
+    toasts.push(out.from === 'refused' ? out.fix : shelfWords.saved(d.name), out.from === 'refused' ? { intent: 'warn' } : undefined);
+  }
+
+  /* A SHELF ITEM IS PLACED AS A COPY, over the list it names, which may be gone from this record. */
+  function place(item: Shelved) {
+    const list = listOf(item.block);
+    if (list !== null && !REGISTERS[list]) return void toasts.push(shelfWords.gone, { intent: 'warn' });
+    add($state.snapshot(item.block) as unknown as PageBlock, true);
+    toasts.push(shelfWords.placed(item.name));
+  }
+
+  async function unshelve(item: Shelved) {
+    await navPrefs.unshelve(item.id);
+    toasts.push(shelfWords.removed(item.name));
+  }
+
+  /* LEAVING THE MODE ENDS THE DRAFT: Cancel and Done both settle what was added. */
+  $effect(() => {
+    if (!arranging) draft = null;
+  });
 
   /**
    * ONE write, one event batch, one undo, even for four moves.
@@ -405,12 +461,41 @@
     <Icon name="plus" size="s" />
     {copy.addBlock}
   </Button>
+  {#if draft}
+    <span class="arrange-draft" role="status">{draft.said} {composeWords.draft}</span>
+    <Button weight="primary" onclick={keepDraft}>{composeWords.keep}</Button>
+    <Button weight="quiet" onclick={() => void shelveDraft()}>{shelfWords.save}</Button>
+    <Button weight="bare" onclick={throwDraft}>{composeWords.away}</Button>
+  {/if}
   <Button weight="bare" onclick={() => arrangement.cancel()}><Icon name="close" size="s" />{copy.arrangeCancel}</Button>
   <Button weight="primary" onclick={commitArrange}><Icon name="check" size="s" />{copy.arrangeDone}</Button>
 {/if}
 
 {#if bindTo && mayChange}
-  <AddBlock bind:open={adding} blocks={declared} register={bindTo} onadd={add} {installed} />
+  <AddBlock
+    bind:open={adding}
+    blocks={declared}
+    register={bindTo}
+    onadd={add}
+    {installed}
+    shelf={navPrefs.shelf}
+    onmake={() => (making = true)}
+    onplace={place}
+    onremove={(item) => void unshelve(item)}
+  />
+{/if}
+
+{#if mayChange}
+  <MakeComponent
+    bind:open={making}
+    {slug}
+    current={bindTo}
+    ondraft={drawn}
+    onmodel={async () => {
+      arrangement.cancel();
+      await reread();
+    }}
+  />
 {/if}
 
 {#if editing && mayChange}
@@ -448,6 +533,13 @@
   .arrange-every {
     align-self: center;
     color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  /* THE DRAFT'S ONE LINE, quiet beside its three buttons. */
+  .arrange-draft {
+    align-self: center;
+    color: var(--ink2);
     font-size: var(--t-sm);
   }
 

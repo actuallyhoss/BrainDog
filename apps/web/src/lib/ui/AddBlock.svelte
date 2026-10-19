@@ -46,6 +46,9 @@
   import { blockWords } from '../record/block-edit.ts';
   import type { InstalledKind } from '../record/kinds.ts';
   import type { PageBlock } from '../record/schema.ts';
+  import { composeWords } from '../page/compose.ts';
+  import { shelfWords, type Shelved } from '../page/shelf.ts';
+  import Button from './Button.svelte';
   import Define from './Define.svelte';
   import Sheet from './Sheet.svelte';
 
@@ -55,6 +58,10 @@
     register,
     onadd,
     installed = {},
+    shelf = [],
+    onmake,
+    onplace,
+    onremove,
   }: {
     open?: boolean;
     /**
@@ -71,6 +78,12 @@
     blocks: readonly LiveBlock[];
     register: string;
     onadd: (block: PageBlock) => void;
+    /** THE PERSON'S SHELF, drawn components they kept, placed from here like a block (`page/shelf.ts`). */
+    shelf?: readonly Shelved[] | undefined;
+    /** Opens "Make a component", which composes a block from a line. Absent where it cannot be made. */
+    onmake?: (() => void) | undefined;
+    onplace?: ((item: Shelved) => void) | undefined;
+    onremove?: ((item: Shelved) => void) | undefined;
   } = $props();
 
   /* A `{{path}}` IS THE RECORD'S, answered on the block that carries it, and the first block that can answer it answers. */
@@ -252,6 +265,24 @@
   <!-- AND THE TILES BEHIND THE SAME GUARD: each is a block drawn as a picture of itself, so a closed sheet held every
        kind's sample (a code block's `pre` among them) on every page, built for nobody and found by a page's own keys. -->
   {#if open}
+  {#if onmake}
+    <section class="group">
+      <Button weight="quiet" onclick={() => { open = false; onmake(); }}>{composeWords.make}</Button>
+    </section>
+  {/if}
+  {#if shelf.length > 0}
+    <section class="group">
+      <h3 class="group-name">{shelfWords.title}</h3>
+      <ul class="shelf">
+        {#each shelf as item (item.id)}
+          <li>
+            <Button weight="quiet" onclick={() => { onplace?.(item); open = false; }}>{item.name}</Button>
+            {#if onremove}<Button weight="bare" onclick={() => onremove(item)}>{shelfWords.remove}</Button>{/if}
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
   {#each PURPOSES as purpose}
     {@const group = allTiles.filter((t) => t.spec?.purpose === purpose)}
     {#if group.length}
@@ -311,6 +342,23 @@
 
   .sheet-define {
     margin: 0 0 var(--sp-3);
+  }
+
+  /* THE SHELF'S ITEMS AS ROWS: a name to place and a quiet way to take it off. */
+  .shelf {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .shelf li {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: center;
+    flex-wrap: wrap;
   }
 
   .group + .group {

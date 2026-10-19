@@ -472,7 +472,7 @@ export { censusOf, type Census, type CensusAlso, type Held } from './census.ts';
 export { KEEP, WHY, arranged, bare, emptyHidden, gone, holdsNothing, keeps, leadOf, markDrawn, says, unsaid, type Drawable, type Why } from './drawn.ts';
 /* WHAT A READ ANSWERS ON A BLOCK, which the record takes off a block it holds from a reader (`packages/record` `DRAWN`). */
 export { flowGrammar, type FlowGrammar, type GrammarStep, type Arg as FlowGrammarArg } from './flow-grammar.ts';
-export { ANSWER_KEYS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
+export { ANSWER_KEYS, BLOCK_INSTALLS, BLOCK_KEY, blockKeyOf, defaultBlockKey, keyedBlocks } from './block-keys.ts';
 export { WHEN_READERS, actionsFault, declaredActions, type WhenReader } from './block-keys.ts';
 /* THE LOOK OVERLAY (DIRECTION §38, `compose.ts`): what Slash and the owner write over a page, and the rules' own look. */
 export { applyLook, composeLook, drewNothing, lookOf, lookPlacesFault, mergeLook, questionsLead, queuesKept, LOOK_AREAS, LOOK_BY, LOOK_SPANS, RANK, type ComposeInput, type LookBody, type LookBy, type LookNext } from './compose.ts';
