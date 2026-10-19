@@ -16,6 +16,7 @@
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import * as clipboard from '$lib/clipboard.ts';
+  import { step } from '$lib/funnel.ts';
   import { OSES, osOf, type Os } from '$lib/device.ts';
   import { LABEL_MAX, TOKEN_DAYS, headerLine, type ConnectLines } from '$lib/record/device.ts';
   import { mintAgent } from '$lib/record/settings-write.ts';
@@ -115,7 +116,18 @@
   const mark = $derived(row?.state === 'connected' ? TONES.good : TONES.info);
 
   /* A LINE IS COPIED WITH ITS OWN SENTENCE, and the line is never quoted in the toast: the key is one of them. */
-  const put = (line: string, said: string): void => void clipboard.put(line, line, said);
+  const put = (line: string, said: string): void => {
+    step('copied_line');
+    void clipboard.put(line, line, said);
+  };
+
+  /* THE FUNNEL: the sheet was seen, and the first call heard (the live row turning "Connected"). Each told once. */
+  $effect(() => {
+    if (open) step('saw_connect');
+  });
+  $effect(() => {
+    if (row?.state === 'connected') step('agent_connected');
+  });
 </script>
 
 <!-- A LINE TO COPY: the text in the code face, breaking anywhere so a long line never pushes the sheet sideways. -->

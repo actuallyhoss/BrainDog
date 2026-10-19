@@ -37,6 +37,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
+  import { step } from '$lib/funnel.ts';
   import { copy } from '$lib/copy.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { openPaletteWith } from '$lib/palette/open.svelte.ts';
@@ -88,6 +89,9 @@
   } from './today-tiles.ts';
 
   let { data }: { data: Shell } = $props();
+
+  /* A RETURN: Today opening is the app opening; the Worker keeps it only on a later day than the record was made. */
+  $effect(() => step('came_back'));
 
   /* THE PLAIN WORDS THIS SCREEN SAYS, kept beside it. */
   const words = {

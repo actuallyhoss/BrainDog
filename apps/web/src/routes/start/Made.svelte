@@ -22,13 +22,18 @@
   import { appLines, firstWords, signOf } from '$lib/agents/first-connect.ts';
   import { listenFor } from '$lib/agents/listen.ts';
   import { connectLines } from '$lib/record/device.ts';
+  import { step } from '$lib/funnel.ts';
   import Button from '$lib/ui/Button.svelte';
 
   let made: { modules?: readonly string[] | null | undefined } = $props();
   void made;
 
   let heading = $state<HTMLHeadingElement | undefined>(undefined);
-  onMount(() => void tick().then(() => heading?.focus()));
+  onMount(() => {
+    step('signed_up');
+    step('saw_connect');
+    void tick().then(() => heading?.focus());
+  });
 
   /* THIS RECORD'S LINES: the bare host, and the record's own address where the shell names it. */
   const slug = $derived(page.data.live === true ? (page.data.index?.slug ?? null) : null);
@@ -46,6 +51,7 @@
     const said = await listen(false);
     asking = false;
     if (said) heard = heardOf(said.rows);
+    if (signOf(heard).connected) step('agent_connected');
   }
   $effect(() => {
     if (sign.connected) return;
@@ -71,7 +77,10 @@
           <span class="what">{a.what}</span>
           <code class="line mono">{a.line}</code>
         </div>
-        <Button size="sm" onclick={() => void clipboard.put(a.line, a.line, copy.lineCopied)}>{a.button}</Button>
+        <Button size="sm" onclick={() => {
+            step('copied_line');
+            void clipboard.put(a.line, a.line, copy.lineCopied);
+          }}>{a.button}</Button>
       </li>
     {/each}
   </ul>

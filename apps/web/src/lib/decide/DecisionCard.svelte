@@ -75,6 +75,7 @@
   import MergeCard from '../../routes/decide/MergeCard.svelte';
   import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
   import { footprint, settle } from './settle.ts';
+  import { step } from '$lib/funnel.ts';
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
 
   let {
@@ -252,6 +253,7 @@
       const out = await answerQuestion(apiBase(), question.id, way.key, said);
       if (out.from === 'written') {
         phase = 'answered';
+        step('needs_answered');
         onanswered();
         /* AND THE RAIL'S COUNT FOLLOWS: the write dropped the kept `boot` (`decide-write.ts`), and the layout reads it
            again. `/p/<slug>` reads its body by its slug and not from the layout, so there this does not read the card away. */

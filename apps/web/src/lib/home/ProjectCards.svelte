@@ -18,6 +18,7 @@
   import { rowWriter } from '$lib/record/rows-write.ts';
   import Button from '$lib/ui/Button.svelte';
   import { takenBackFree, type ProjectCard } from './project-cards.ts';
+  import { projectKept } from '$lib/funnel.ts';
 
   let { cards, more, list, name }: { cards: readonly ProjectCard[]; more: number; list: string; name: string } = $props();
 
@@ -42,8 +43,10 @@
   async function keep(c: ProjectCard) {
     failed = null;
     const out = await writer.update(list, c.seq, { draft: false });
-    if (out.ok) hide(c.seq);
-    else failed = out.fix;
+    if (out.ok) {
+      hide(c.seq);
+      projectKept();
+    } else failed = out.fix;
   }
   async function notOne(c: ProjectCard) {
     failed = null;
