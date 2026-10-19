@@ -364,3 +364,9 @@ function unquoted(data: string): string {
   }
   return out;
 }
+
+/** Whether a message's recipient is the support address, ignoring case. */
+export function isSupportMail(to: string, support: string | undefined): boolean {
+  const s = support?.trim().toLowerCase() ?? '';
+  return s !== '' && to.trim().toLowerCase() === s;
+}

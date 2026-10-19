@@ -394,6 +394,8 @@
         "MAIL_FROM": "",
         /* EMPTY FALLS BACK TO THE GENERIC FOOTER: mail.ts reads it for the address a reader is told to write to. */
         "SUPPORT_ADDRESS": "support@brain.dog",
+        /* SUPPORT_FORWARD (where that address is forwarded) IS NOT HERE: it is his own inbox, set with
+           `wrangler secret put SUPPORT_FORWARD`, and the address must be verified under Email Routing > Destination addresses. */
         /* AND THE ONE WORD THAT LETS A KEYLESS RECORD BE MADE ON PURPOSE. Empty is the default and
            the default is a refusal: with no `KEK` bound, `/auth/provision` answers
            `NOT_IN_THIS_BUILD` rather than making a record that can never seal a grant, because a

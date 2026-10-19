@@ -69,7 +69,7 @@ import { workerCatalogueOffers, workerCatalogueShelf } from './catalogue.ts';
 import { kennelRequired, kennelVitals, serveKennel, servesKennel, writeCounts } from './kennel.ts';
 import { recordScratch } from './kennel-scratch.ts';
 /* MAIL ON THE CLOUD: Email Routing's messages into the same door as a forwarder's post. */
-import { fileKeeper, takeMail } from './email.ts';
+import { fileKeeper, isSupportMail, takeMail } from './email.ts';
 import { fileKey, serveFiles, servesFiles } from './files.ts';
 import { cloudSnapshots, type Pitr } from './copies.ts';
 import { readAsk as readRestorePoint, restorePoint, sayTally, type PointAnswer } from './restore-point.ts';
@@ -267,6 +267,8 @@ type Env = {
   MAIL_FROM?: string;
   /** Where a reader of any mail may write with a question, named in its footer. Empty, and the footer names none. */
   SUPPORT_ADDRESS?: string;
+  /** Where mail to `SUPPORT_ADDRESS` is forwarded; a destination verified in Email Routing. */
+  SUPPORT_FORWARD?: string;
   /** Where a `crash`, `refuse`, `model` or `night` line is mailed, at most once a kind in 15 minutes (`opsAlert`). Unset, and none is. */
   OPS_ALERT_TO?: string;
   /** The app's host name: the cookie's origin, the passkeys' relying party, and what a cookie write must come from. */
@@ -3087,6 +3089,13 @@ export default {
    * this until his Email Routing rule sends a domain's mail here; until then it is an export nothing calls.
    */
   async email(message: ForwardableEmailMessage, env: Env, _ctx: ExecutionContext): Promise<void> {
+    /* THE SUPPORT ADDRESS GOES TO A PERSON, NOT TO A RECORD. Forwarded to `SUPPORT_FORWARD` (his own inbox, from config,
+       never in code) when both are set; with no forward target the message is refused so the sender is told. */
+    if (isSupportMail(message.to, env.SUPPORT_ADDRESS)) {
+      const target = env.SUPPORT_FORWARD?.trim() ?? '';
+      if (target === '') return message.setReject('support mail is not set up yet');
+      return message.forward(target);
+    }
     await takeMail(message, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS) });
   },
 };

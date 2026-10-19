@@ -115,6 +115,7 @@ const CASES: Record<string, Case> = {
   },
   MAIL_FROM: { kind: 'quiet', door: HEALTH, why: 'empty falls back to AUTH_MAIL_FROM' },
   SUPPORT_ADDRESS: { kind: 'quiet', door: HEALTH, why: 'empty is the generic footer, naming no address' },
+  SUPPORT_FORWARD: { kind: 'quiet', door: HEALTH, why: 'unset, mail to the support address is refused at the door' },
   OPS_ALERT_TO: { kind: 'quiet', door: HEALTH, why: 'unset, no alert line is mailed' },
   OPS_RECORD: { kind: 'quiet', door: HEALTH, why: 'empty on purpose until the canary sitting: the nightly walk writes its summary nowhere' },
   PROVISION_WITHOUT_KEYS: { kind: 'refuses', door: PROVISION, env: { PROVISION_KEY: OPERATOR } },
