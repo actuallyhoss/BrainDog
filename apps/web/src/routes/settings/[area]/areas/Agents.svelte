@@ -42,6 +42,7 @@
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
   import { createClient } from '@braindog/client';
   import { listenFor } from '$lib/agents/listen.ts';
+  import { leavingFetch } from '$lib/ui/leaving.ts';
   import { TONES, relative, since } from 'braindog-render';
   import { isQuiet } from '@braindog/kernel';
   import { liveOf, type RunLive } from '$lib/ui/face.ts';
@@ -73,7 +74,9 @@
   const SLUG = $derived(shell.index.slug);
 
   let client: ReturnType<typeof createClient> | null = null;
-  const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase() }));
+  const leaving = leavingFetch();
+  $effect(() => leaving.stop);
+  const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase(), fetch: leaving.io }));
 
   /**
    * What the record answered: its machines, its standing keys, the newest runs, which name who used each, and whether
