@@ -253,33 +253,33 @@ const SYSTEM_AIM: Record<Scheme, Partial<Record<AimRole, Aim>>> = {
   light: {
     board: { L: 0.967, C: 0.0029, H: 264.5 }, //  #F3F4F6
     tile: { L: 1, C: 0 }, //                      #FFFFFF
-    ink: { L: 0.1858, C: 0.0113 }, //    #101318
-    ink2: { L: 0.425, C: 0.0198 }, //    #484F5A
-    dim: { L: 0.495, C: 0.019 }, //      #5C626D
-    faint: { L: 0.495, C: 0.019 },
-    line: { L: 0.9259, C: 0.0085 }, //  #E3E7EC
+    ink: { L: 0.1779, C: 0.0064, H: 271 }, //    #101114, Look B's ink
+    ink2: { L: 0.3699, C: 0.0153, H: 259.8 }, // #3B4048, Look B's ink2
+    dim: { L: 0.5362, C: 0.0159, H: 258.4 }, //  #686E77, Look B's muted
+    faint: { L: 0.5362, C: 0.0159, H: 258.4 },
+    line: { L: 0.9215, C: 0.0058, H: 264.5 }, // #E3E5E9, Look B's rule
     danger: { L: 0.5137, C: 0.1667, H: 27.4 }, //    #B3322C, the deeper red (DIRECTION §42)
     'danger-text': { L: 0.5137, C: 0.1667, H: 27.4 }, // #B3322C
-    earn: { L: 0.49, C: 0.1182, H: 155.4 }, //     #067342
+    earn: { L: 0.5285, C: 0.1061, H: 154.6 }, //   #2E7D4F, Look B's good
     warn: { L: 0.5198, C: 0.133, H: 52.4 }, //     #A24E00
-    live: { L: 0.5131, C: 0.204, H: 276.5 }, //    #4F4FD8
-    'live-fill': { L: 0.5131, C: 0.204, H: 276.5 },
+    live: { L: 0.6206, C: 0.1415, H: 152.7 }, //   #2E9E5B, Look B's live
+    'live-fill': { L: 0.6206, C: 0.1415, H: 152.7 },
     arrive: { L: 0.958, C: 0.0202, H: 279.9 }, //  #EEF0FF
   },
   dark: {
     board: { L: 0.1716, C: 0.0097, H: 255.7 }, // #0D1014
     tile: { L: 0.2163, C: 0.0133, H: 258.4 }, //  #161A20
-    ink: { L: 0.9635, C: 0.0045 }, //    #F1F3F6
-    ink2: { L: 0.7872, C: 0.0157 }, //   #B4BAC4
-    dim: { L: 0.6611, C: 0.0182 }, //    #8C939E
-    faint: { L: 0.6611, C: 0.0182 },
-    line: { L: 0.2916, C: 0.0202 }, //   #262C36
+    ink: { L: 0.9484, C: 0.0046, H: 258.3 }, //  #ECEEF1, Look B's ink
+    ink2: { L: 0.831, C: 0.0112, H: 256.7 }, //  #C3C8CF, Look B's ink2
+    dim: { L: 0.6706, C: 0.0168, H: 257.2 }, //  #8F96A0, Look B's muted
+    faint: { L: 0.6706, C: 0.0168, H: 257.2 },
+    line: { L: 0.2821, C: 0.0155, H: 252.4 }, // #242A31, Look B's rule
     danger: { L: 0.6876, C: 0.2015, H: 25.7 }, //  #FF5A55
     'danger-text': { L: 0.6876, C: 0.2015, H: 25.7 },
-    earn: { L: 0.735, C: 0.1362, H: 159.3 }, //    #4CC38A
+    earn: { L: 0.7439, C: 0.1056, H: 155.3 }, //   #72C08F, Look B's good
     warn: { L: 0.7698, C: 0.1376, H: 64.7 }, //    #F0A04B
-    live: { L: 0.6934, C: 0.1655, H: 282 }, //     #8E8CFF
-    'live-fill': { L: 0.6934, C: 0.1655, H: 282 },
+    live: { L: 0.6206, C: 0.1415, H: 152.7 }, //   #2E9E5B, Look B's live
+    'live-fill': { L: 0.6206, C: 0.1415, H: 152.7 },
     arrive: { L: 0.281, C: 0.0687, H: 279.9 }, //  #23244A
   },
 };
@@ -356,18 +356,18 @@ export const HOUSE_PROFILE: Profile = {
    */
   ladder: {
     dark: {
-      sunk: { L: 0.145, C: 0.0103 }, // #080A0E
-      bg: { L: 0.2, C: 0.0142 }, //     #12161D
-      s1: { L: 0.235, C: 0.0167 }, //   #191E26
-      s2: { L: 0.255, C: 0.0181 }, //   #1E232C
-      s3: { L: 0.275, C: 0.0195 }, //   #222831
+      sunk: { L: 0.105, C: 0.0045 }, //  #030405, under Look B's page; ground to paper must be 4 delta-E
+      bg: { L: 0.1983, C: 0.0076 }, //   #131619, Look B's paper
+      s1: { L: 0.2335, C: 0.0152 }, //   #181D24, Look B's soft within two code values
+      s2: { L: 0.2543, C: 0.0146 }, //   #1F242B, a step on toward Look B's rule
+      s3: { L: 0.275, C: 0.0140 }, //    #232930, the ceiling; Look B's rule is a hair above it
     },
     light: {
-      sunk: { L: 0.925, C: 0.0065 }, //  #E4E6EB
-      bg: { L: 1, C: 0 }, //             #FFFFFF
-      s1: { L: 0.9665, C: 0.0045 }, //   #F2F4F7
-      s2: { L: 0.9465, C: 0.0055 }, //   #EBEDF1
-      s3: { L: 0.9265, C: 0.0062 }, //   #E4E7EB
+      sunk: { L: 0.925, C: 0.0065 }, //  #E4E6EB, Look B's rule within a code value
+      bg: { L: 1, C: 0 }, //             #FFFFFF, Look B's page
+      s1: { L: 0.9665, C: 0.0045 }, //   #F2F4F7, Look B's paper; the well floor is 2.5 delta-E, soft is 2.1
+      s2: { L: 0.9465, C: 0.0055 }, //   #EBEDF1, Look B's rule2 within two code values
+      s3: { L: 0.9265, C: 0.0062 }, //   #E4E7EB, Look B's rule within a code value
     },
   },
   /* The cap for a rung that gives no chroma of its own, and the inks' default lean (`Cink`). */

@@ -777,28 +777,28 @@ test('THE DESIGN SYSTEM LANDS EXACTLY WHEREVER THE FLOORS ALLOW IT', () => {
       s1: '#F2F4F7',
       s2: '#EBEDF1',
       s3: '#E4E7EB',
-      ink: '#101318',
-      ink2: '#484F5A',
-      dim: '#5C626D',
-      line: '#E3E7EC',
-      earn: '#067342',
+      ink: '#101114',
+      ink2: '#3B4048',
+      dim: '#626870',
+      line: '#E3E5E9',
+      earn: '#257548',
       'danger-text': '#B3322C',
       danger: '#B3322C',
-      live: '#4F4FD8',
+      live: '#00773D',
     },
     dark: {
-      sunk: '#080A0E',
-      bg: '#12161D',
-      s1: '#191E26',
-      s2: '#1E232C',
-      s3: '#222831',
-      ink: '#F1F3F6',
-      ink2: '#B4BAC4',
-      dim: '#8C939E',
-      line: '#262C36',
+      sunk: '#030405',
+      bg: '#141619',
+      s1: '#1A1E25',
+      s2: '#1F232A',
+      s3: '#24282F',
+      ink: '#EEF1F4',
+      ink2: '#C3C8CF',
+      dim: '#8F96A0',
+      line: '#242A31',
       'danger-text': '#FF5A55',
       danger: '#FF5A55',
-      live: '#8E8CFF',
+      live: '#31A15E',
     },
   };
   for (const scheme of ['light', 'dark'] as const)
@@ -921,7 +921,7 @@ test('THE BOARD (DIRECTION §39): exact colours, no glass, no light, a flat tile
     }
   /* The brand stays red: the working accent is beside the mark, never instead of it. */
   assert.equal(HOUSE.schemes.light.accent, '#DB2527');
-  assert.equal(HOUSE.chrome.light['hover-wash'], 'rgb(16 19 24 / 0.05)');
+  assert.equal(HOUSE.chrome.light['hover-wash'], 'rgb(16 17 20 / 0.05)');
   assert.equal(HOUSE.chrome.light.selected, HOUSE.schemes.light['action-tint-1']);
   assert.equal(HOUSE.chrome.light['arrived-wash'], '#EEF0FF');
   for (const scheme of ['light', 'dark'] as const) {
