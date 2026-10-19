@@ -119,8 +119,8 @@ export const firstRun = {
   openHome: 'Open my BrainDog',
 
   /**
-   * AND ONCE IT IS MADE, ONE LINE, THEN TODAY (`/start#made`, signup-build-46). The agent and the source it once
-   * offered here are Today's own next steps now (`WantMore`), each saying what it would find in this BrainDog.
+   * AND ONCE IT IS MADE, "Connect your agent" (`/start#made`, `Made.svelte`, words in `agents/first-connect.ts`), then
+   * Today. The source it once offered is Today's own next step (`WantMore`).
    */
   madeTitle: 'Your BrainDog is ready',
   /**
