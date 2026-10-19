@@ -507,8 +507,6 @@ export async function forward(req, res, base, { bearer = true } = {}) {
     res.end(JSON.stringify(recordsAnswer()));
     return;
   }
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
   const headers = {};
   for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k) && v !== undefined) headers[k] = Array.isArray(v) ? v.join(', ') : v;
   const url = new URL(req.url ?? '/', base);
@@ -516,6 +514,9 @@ export async function forward(req, res, base, { bearer = true } = {}) {
   if (bearer && key !== undefined && /^\/+api(?:\/|$)/.test(url.pathname) && headers.authorization === undefined) headers.authorization = `Bearer ${key}`;
   if (bearer && cookie !== undefined) headers.cookie = headers.cookie === undefined ? cookie : `${headers.cookie}; ${cookie}`;
   try {
+    /* INSIDE THE TRY: a request the browser drops mid-flight (a page being left) rejects this read, and nothing awaits that. */
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
     const out = await fetch(url, {
       method: req.method ?? 'GET',
       headers,
