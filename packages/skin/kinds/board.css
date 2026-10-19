@@ -164,6 +164,8 @@
 
   @media (pointer: coarse) {
     .board-move {
+      /* WebKit draws a native select at its own height unless the appearance is set; this keeps the arrow and the height. */
+      appearance: menulist-button;
       min-block-size: var(--tap);
       min-inline-size: var(--tap);
     }
