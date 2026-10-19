@@ -49,6 +49,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from './Entry.svelte';
+  import Human from './Human.svelte';
   import { words } from './words.ts';
 
   const here = support();
@@ -68,6 +69,10 @@
   let shown = $state(false);
   /** The email field, when the link is not the lead way in and somebody asked for it. */
   let mailing = $state(false);
+  /* CLOUDFLARE'S CHECK on the link request, only where `/auth/methods` hands a site key. */
+  const siteKey = $derived(asked?.ok === true ? (asked.value.turnstile ?? null) : null);
+  let human = $state<string | null>(null);
+  let humanBox = $state<{ reset: () => void } | null>(null);
   /**
    * WHETHER THE SERVER-KEY BLOCK IS OPEN IS THE READER'S, ONCE IT IS DRAWN. The first run opens it, and
    * nothing a press does closes it again: bound to the derived state, a wrong key shut the block the
@@ -317,7 +322,10 @@
 
   /** `when` starts the sent screen's minute, after which it says what fixes a letter that did not come (`SENT_LATE`). */
   const sendTo = (to: string) =>
-    void run('send', () => requestLink(to, goTo === `${BASE}/` ? null : goTo), () => (step = { at: 'sent', email: to, when: Date.now() }));
+    void run('send', () => requestLink(to, goTo === `${BASE}/` ? null : goTo, undefined, human), () => (step = { at: 'sent', email: to, when: Date.now() })).then(() => {
+      /* THE ANSWER IS GOOD ONCE, so the check is asked again whatever came back. */
+      humanBox?.reset();
+    });
 
   function spend() {
     const l = link;
@@ -451,7 +459,7 @@
         <div class="doors">
           {#if view.late}
             {@const to = view.email}
-            <Button weight="primary" onclick={() => sendTo(to)} aria-busy={asking === 'send'}>{copy.sendAgain}</Button>
+            <Button weight="primary" onclick={() => (siteKey === null ? sendTo(to) : void mail())} aria-busy={asking === 'send'}>{copy.sendAgain}</Button>
           {/if}
           <Button onclick={mail}>{copy.useAnotherEmail}</Button>
         </div>
@@ -554,6 +562,7 @@
                     bind:this={emailField}
                   />
                 </span>
+                {#if siteKey !== null}<Human {siteKey} bind:answer={human} bind:this={humanBox} />{/if}
                 <Button weight={doors.lead === 'magic' ? 'primary' : 'quiet'} type="submit" aria-busy={asking === 'send'}>
                   {asking === 'send' ? copy.sendingLink : copy.sendLink}
                 </Button>

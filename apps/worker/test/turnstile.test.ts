@@ -129,3 +129,34 @@ test('CLOUDFLARE UNREACHABLE IS A FAILED CHECK, never a pass', async () => {
     await c.close();
   }
 });
+
+/* THE SIGN-IN LINK REQUEST: checked when the secret and the site key are both set, not otherwise. */
+test('SIGN-IN LINK: REFUSED WITHOUT A GOOD ANSWER WHEN KEYED, METHODS HANDS THE SITE KEY, NOTHING ASKED WHEN NOT KEYED', async () => {
+  const site = fakeSiteverify();
+  const keyed = await startCloud({ env: { TURNSTILE_SECRET: SECRET, TURNSTILE_SITE_KEY: SITE_KEY } });
+  try {
+    const methods = (await (await keyed.ask('/auth/methods')).json()) as Out;
+    assert.equal(methods.value?.['turnstile'], SITE_KEY);
+    const send = (body: Record<string, unknown>) =>
+      keyed.ask('/auth/magic/start', { method: 'POST', body: JSON.stringify({ email: 'wren@example.test', ...body }), headers: { 'cf-connecting-ip': '198.51.100.9' } });
+    const bad = await send({});
+    assert.equal(bad.status, 403);
+    assert.equal(((await bad.json()) as Out).refusal?.at, 'turnstile');
+    assert.ok((await send({ turnstile: GOOD })).status < 400);
+    assert.deepEqual(site.asked, [{ secret: SECRET, response: GOOD, remoteip: '198.51.100.9' }]);
+  } finally {
+    await keyed.close();
+  }
+  const open = await startCloud({ env: {} });
+  try {
+    const methods = (await (await open.ask('/auth/methods')).json()) as Out;
+    assert.equal(methods.value?.['turnstile'], undefined);
+    const before = site.asked.length;
+    const res = await open.ask('/auth/magic/start', { method: 'POST', body: JSON.stringify({ email: 'wren@example.test' }) });
+    assert.ok(res.status < 400);
+    assert.equal(site.asked.length, before);
+  } finally {
+    site.restore();
+    await open.close();
+  }
+});

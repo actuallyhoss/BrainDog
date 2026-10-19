@@ -137,17 +137,18 @@ test('AN API PATH UNDER A WORD THAT IS NOT A NAME IS THE ROUTER’S 404 JSON, an
 
 /* THE HEADER IS THE PAGE'S OWN META POLICY, so the hashes in it are the build's own: a header `script-src`
    that lacked them would refuse the shell's inline scripts and draw an empty screen (`apps/site/test/one-origin.test.mjs`
-   measured exactly that on the site). Turnstile stays on `/app/signup` alone. */
-test('A PAGE IS SENT THE POLICY IN ITS OWN META WITH FRAME-ANCESTORS, AND TURNSTILE ONLY ON /app/signup', async () => {
+   measured exactly that on the site). Turnstile stays on `/app/signup` and `/app/signin` alone. */
+test('A PAGE IS SENT THE POLICY IN ITS OWN META WITH FRAME-ANCESTORS, AND TURNSTILE ONLY ON /app/signup AND /app/signin', async () => {
   const meta = "default-src 'self'; script-src 'self' 'sha256-abc=' https://challenges.cloudflare.com; style-src-attr 'unsafe-inline'; frame-src https://www.loom.com https://challenges.cloudflare.com";
   const shell = `<!doctype html><head><meta http-equiv="content-security-policy" content="${meta}"></head>`;
   const answer = (body: string | null) => immutable(new Response(body, { headers: { 'content-type': 'text/html' } }));
   const policy = async (path: string | undefined, body: string | null = shell) => (await asPage(answer(body), path)).headers.get('content-security-policy');
 
   assert.equal(await policy('/app/signup'), `${meta}; frame-ancestors 'none'`);
+  assert.equal(await policy('/app/signin'), `${meta}; frame-ancestors 'none'`);
   assert.equal(await policy(undefined), `${meta}; frame-ancestors 'none'`, 'an answer with no address keeps the page policy whole');
   const narrowed = "default-src 'self'; script-src 'self' 'sha256-abc='; style-src-attr 'unsafe-inline'; frame-src https://www.loom.com; frame-ancestors 'none'";
-  for (const path of ['/app/signin', '/app/', '/app/acme/r/tasks', '/app/signup/extra']) assert.equal(await policy(path), narrowed, path);
+  for (const path of ['/app/', '/app/acme/r/tasks', '/app/signup/extra']) assert.equal(await policy(path), narrowed, path);
 
   /* A HEAD OR A 304 HAS NO BODY TO READ, and a policy without the hashes would blank the page a browser kept. */
   assert.equal(await policy('/app/signin', null), "frame-ancestors 'none'");

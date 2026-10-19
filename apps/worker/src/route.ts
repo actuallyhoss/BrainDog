@@ -370,8 +370,8 @@ export async function asPage(out: Response, path?: string): Promise<Response> {
 /** Cloudflare Turnstile's origin, for its script and its frame, which only the sign-up page loads. */
 const TURNSTILE = 'https://challenges.cloudflare.com';
 
-/** The one page that may keep Turnstile: sign-up takes no record name, so it has no slug in front. */
-const SIGNUP = /^\/app\/signup\/?$/;
+/** The pages that may keep Turnstile: sign-up and sign-in take no record name, so they have no slug in front. */
+const SIGNUP = /^\/app\/(signup|signin)\/?$/;
 
 /**
  * The policy on a file beside the pages: a script, a stylesheet, a font or an image. Nothing inline runs in any of

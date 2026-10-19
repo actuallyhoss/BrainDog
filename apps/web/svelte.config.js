@@ -20,7 +20,7 @@ const inlineHashes = (tag) =>
 
 /* EVERY FRAME A PAGE MAY HOLD. The embeds are the origins of `EMBED_PROVIDERS` in `packages/render/src/embed.ts`,
    which the kernel copies and refuses any other against, and `test/csp.test.ts` holds this list equal to that one.
-   Turnstile's origin is here for its script and its frame, and the hosts take it out of every page but `/app/signup`
+   Turnstile's origin is here for its script and its frame, and the hosts take it out of every page but `/app/signup` and `/app/signin`
    (`asPage` in `apps/worker/src/route.ts`); the self-host has no sign-up, so it takes it out everywhere. */
 const TURNSTILE = 'https://challenges.cloudflare.com';
 const EMBEDS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://www.google.com'];

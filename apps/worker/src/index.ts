@@ -4297,7 +4297,15 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
      a JSON object, so an unauthenticated POST never has its copy read. When `operated()` forwards `tz` itself, this
      copy and `askedZone` go. */
   const copy = request.method === 'POST' && url.pathname.replace(/\/+$/, '') === '/auth/provision' ? request.clone() : null;
-  return serveAuth(request, {
+  /* SIGN-IN LINK REQUESTS ARE CHECKED TOO, when the secret and the site key are both set; either missing and they are not,
+     so a half-keyed host never locks its own sign-in. The same fail-closed check sign-up uses. */
+  const ip = request.headers.get('cf-connecting-ip') ?? '';
+  if (signinCheckOn(env) && request.method === 'POST' && signupPath === '/auth/magic/start') {
+    const body = (await request.clone().json().catch(() => null)) as Record<string, unknown> | null;
+    if (!(await turnstilePassed(env, body?.['turnstile'], ip)))
+      return signupRefused(403, { code: 'FORBIDDEN', fix: 'The check that you are a person did not pass. Try it again, then send the form.', at: 'turnstile' });
+  }
+  const served = await serveAuth(request, {
     on: 'worker',
     origin,
     google,
@@ -4324,7 +4332,20 @@ async function signIn(request: Request, env: Env, ctx: ExecutionContext): Promis
     reached: url.host,
     ...((env.SESSION_SECRET ?? '').length >= 32 ? { device: devices(env), invite: invites(env) } : {}),
   });
+  /* THE SIGN-IN PAGE LEARNS THE SITE KEY FROM `/auth/methods`, which it already asks, and only when the check is on. */
+  if (signinCheckOn(env) && request.method === 'GET' && signupPath === '/auth/methods' && served.status === 200) {
+    const out = (await served.clone().json().catch(() => null)) as { ok?: unknown; value?: object } | null;
+    if (out?.ok === true && out.value) {
+      const headers = new Headers(served.headers);
+      headers.delete('content-length');
+      return new Response(JSON.stringify({ ...out, value: { ...out.value, turnstile: (env.TURNSTILE_SITE_KEY ?? '').trim() } }), { status: 200, headers });
+    }
+  }
+  return served;
 }
+
+/** Whether sign-in link requests carry the bot check: the secret and the public site key are both set. */
+const signinCheckOn = (env: Env): boolean => botCheckKeyed(env) && (env.TURNSTILE_SITE_KEY ?? '').trim() !== '';
 
 /**
  * A letter a person waits on at sign-in or sign-up, sent, and whether it went told to the Directory (LCH-A04), so

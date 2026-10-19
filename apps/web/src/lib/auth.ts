@@ -37,6 +37,8 @@ export type Methods = {
   firstRun?: boolean | undefined;
   /** The host signs people in with Google. Absent is no, so a host older than the button draws none. */
   google?: true | undefined;
+  /** The Turnstile site key, only where the host checks sign-in link requests (secret and key both set). Absent is no check. */
+  turnstile?: string | undefined;
 };
 
 /** A passkey as Settings lists it. */
@@ -192,6 +194,7 @@ function methodsOf(v: unknown): Methods | null {
     ...(v.why === 'not-configured' || v.why === 'insecure' ? { why: v.why } : {}),
     ...(typeof v.firstRun === 'boolean' ? { firstRun: v.firstRun } : {}),
     ...(v.google === true ? { google: true as const } : {}),
+    ...(typeof v.turnstile === 'string' && v.turnstile !== '' ? { turnstile: v.turnstile } : {}),
   };
 }
 
@@ -400,8 +403,8 @@ export async function exchangeKey(serverKey: string, io: Io = live()): Promise<S
  * `next` IS THE PAGE HE WAS SENT FROM, so the link in the mail brings him back to it. The host holds it to a path
  * under the app and drops anything else (`packages/host/src/auth.ts`), so this sends it as it is.
  */
-export async function requestLink(email: string, next: string | null = null, io: Io = live()): Promise<Said<null>> {
-  return done(call(io, '/auth/magic/start', { email: email.trim(), ...(next ? { next } : {}) }));
+export async function requestLink(email: string, next: string | null = null, io: Io = live(), turnstile: string | null = null): Promise<Said<null>> {
+  return done(call(io, '/auth/magic/start', { email: email.trim(), ...(next ? { next } : {}), ...(turnstile ? { turnstile } : {}) }));
 }
 
 /** Spend a link that arrived in the address. */

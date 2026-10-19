@@ -243,6 +243,12 @@ test('a link is asked for by email and spent by its own name, magic or claim', a
   assert.deepEqual(seen.map((r) => r.body), [{ email: 'ada@example.com' }, { linkToken: 'tok-1' }, { claimToken: 'tok-2' }]);
 });
 
+test('the bot check answer rides the link request, and the site key is read from the methods', async () => {
+  const { io, seen } = host({ '/auth/magic/start': () => ok({}) });
+  await requestLink('ada@example.com', null, io, 'answer-1');
+  assert.deepEqual(seen.map((r) => r.body), [{ email: 'ada@example.com', turnstile: 'answer-1' }]);
+});
+
 test('signing out, listing and removing passkeys', async () => {
   const { io, seen } = host({
     '/auth/logout': () => ok({}),
