@@ -10491,7 +10491,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * one register — and one that the person who has to answer it cannot see is a proposal that was
      * never made.
      */
-    async governance(args: { register?: string; id?: string; status?: string; limit?: number; cursor?: string }, ctx: CallContext) {
+    async governance(args: { register?: string; id?: string; status?: string; limit?: number; cursor?: string; review?: 'only' }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
       const register = (args?.register ?? 'suggestion') as GovernRegister;
@@ -10525,6 +10525,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...(args?.status === undefined ? {} : { status: String(args.status) }),
         ...(args?.limit === undefined ? {} : { limit: Number(args.limit) }),
         ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}),
+        ...(args?.review === 'only' ? { review: 'only' as const } : {}),
         ...after,
       });
       if (!rows.ok) return rows;
@@ -10543,7 +10544,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* AND THE PAGE IS FILLED FROM WHAT IS LEFT. Trimmed to the limit and then filtered, a token
          scoped to one register was handed an empty page whenever the newest fifty were about
          another, with its own questions still open behind them. */
-      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}), every: true, ...after });
+      const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}), ...(args?.review === 'only' ? { review: 'only' as const } : {}), every: true, ...after });
       if (!every.ok) return every;
       return ok(shownRows(every.value).slice(0, rows.value.length));
     },

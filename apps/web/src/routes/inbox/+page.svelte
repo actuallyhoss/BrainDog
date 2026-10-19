@@ -72,6 +72,7 @@
   import { daysOf, figureOf, sentenceOf, whoFiledOf } from './days.ts';
   import { SOURCE_DAYS, countSaid, drawsLine, lastSaid, lineSaid, nothingEver, quietWords, sourcesOf } from './sources.ts';
   import { panelOf, type PatternReport } from './patterns.ts';
+  import type { Review } from './review.ts';
 
   /**
    * THIS UNIT'S OWN WORDS, beside the one screen that says them. The press's cost is not named: the door meters it, and a
@@ -123,6 +124,14 @@
     secondNamed: (subject: string) => `File “${subject}” as a second one`,
     secondFiled: 'Filed as a second one.',
     secondWaits: 'Taken as a second one. It waits for you in the inbox.',
+    toReview: 'To review',
+    toReviewWhy: 'BrainDog read these and was not sure enough to file them. Nothing is written until you say.',
+    fileIn: (list: string) => `File in ${list}`,
+    somethingElse: 'Something else',
+    ignore: 'Ignore',
+    reviewFiled: 'Filed.',
+    reviewIgnored: 'Ignored.',
+    reviewElse: 'Pick where it goes below.',
   };
 
   /**
@@ -134,6 +143,41 @@
    * `unrouted` IS A HOST OLDER THAN THIS READ: there is a record, and no list to draw from it.
    */
   let live = $state<{ items: InboxItem[]; cursor: number | null } | null>(null);
+  /* THE DOUBTFUL ARRIVALS WITH A SUGGESTED FILING (To review), and the arrivals they hold, which the plain list leaves out. */
+  let reviews = $state.raw<readonly Review[]>([]);
+  const heldHere = $derived(new Set(reviews.flatMap((r) => r.raws)));
+  let reviewing = $state<string | null>(null);
+  async function rereadReviews() {
+    const m = await import('./review.ts');
+    reviews = await m.readToReview(apiBase());
+  }
+  /** The suggestion answered; a record that wants a sentence with a No or a Yes is given the plain one. */
+  async function answerReview(r: Review, option: 'accept' | 'reject', reason: string) {
+    const m = await import('$lib/record/decide-write.ts');
+    const first = await m.answerQuestion(apiBase(), r.id, option);
+    return first.from === 'refused' && first.wants === 'reason' ? m.answerQuestion(apiBase(), r.id, option, reason) : first;
+  }
+  /** The main button files it as suggested; Something else sets the suggestion aside and opens the arrival; Ignore archives it. */
+  async function settleReview(r: Review, how: 'file' | 'else' | 'ignore') {
+    if (reviewing !== null) return;
+    reviewing = r.id;
+    try {
+      const out = await answerReview(r, how === 'file' ? 'accept' : 'reject', how === 'file' ? 'Filed from To review.' : 'Not what it is.');
+      if (out.from !== 'written') return void toasts.push(out.fix, { intent: 'warn' });
+      if (how === 'ignore') {
+        const w = await import('$lib/record/inbox-write.ts');
+        for (const raw of r.raws) await w.archiveArrival(apiBase(), raw);
+      }
+      reviews = reviews.filter((x) => x.id !== r.id);
+      if (how === 'else') open = r.raws[0] ?? null;
+      toasts.push(how === 'file' ? words.reviewFiled : how === 'ignore' ? words.reviewIgnored : words.reviewElse);
+      await rereadWaiting();
+      void retally();
+      void invalidateAll();
+    } finally {
+      reviewing = null;
+    }
+  }
   let refused = $state<string | null>(null);
   let unrouted = $state(false);
   const INBOX = $derived(live?.items ?? []);
@@ -142,7 +186,7 @@
   const groups = $derived(groupsOf(INBOX.slice(0, DOM_CAP), shapes));
   /* THE ROWS BY DAY, and the alike groups that could be learned once. `shown` is the rows in the order the days draw
      them, which is the order the cursor walks and the next row opens in. */
-  const days = $derived(daysOf(INBOX.slice(0, DOM_CAP), Date.now()));
+  const days = $derived(daysOf(INBOX.filter((i) => !heldHere.has(i.id)).slice(0, DOM_CAP), Date.now()));
   const alike = $derived(groups.filter((g) => g.items.length > 1));
   const shown = $derived(days.flatMap((d) => d.items));
   const place = $derived(new Map(shown.map((item, i) => [item.id, i])));
@@ -189,6 +233,7 @@
           open = out.items[0]?.id ?? null;
           ok = true;
           askHints(out.items);
+          void rereadReviews();
         } else if (out.from === 'unrouted') {
           unrouted = true;
           ok = true;
@@ -887,6 +932,28 @@
       </Empty>
     </div>
   {:else}
+    {#if reviews.length > 0}
+      <!-- TO REVIEW: what BrainDog read and would file, one line each. The suggested filing is the one primary. -->
+      <Section title={words.toReview} count={reviews.length}>
+        <p class="why">{words.toReviewWhy}</p>
+        <ul class="ledger ledger-lead">
+          {#each reviews as r (r.id)}
+            <li>
+              <div class="line line-tall alike-line">
+                <span class="line-main">
+                  <span class="line-title">{r.line}</span>
+                </span>
+                <span class="alike-verbs">
+                  <Button size="sm" weight="primary" disabled={reviewing !== null} onclick={() => settleReview(r, 'file')}>{words.fileIn(listOf(r.register))}</Button>
+                  <Button size="sm" disabled={reviewing !== null} onclick={() => settleReview(r, 'else')}>{words.somethingElse}</Button>
+                  <Button size="sm" weight="bare" disabled={reviewing !== null} onclick={() => settleReview(r, 'ignore')}>{words.ignore}</Button>
+                </span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </Section>
+    {/if}
     {#if alike.length > 0}
       <!-- LEARNED ONCE. Each sender with two or more alike is one row: how many, from whom, and the newest of them.
            Asking Slash waits for the record's threshold for a pattern, since it spends a model call; making the rule by

@@ -62,3 +62,27 @@ export function firstProjectFields(
   put(DRAFT_FIELD, true);
   return out;
 }
+
+/** Folders that are nobody's project even inside a repository: another session's worktree, a scratch copy, a temp folder. */
+const NOBODYS = /(?:^|[\\/])(?:\.claude[\\/]worktrees|tmp|temp|scratch|var[\\/]folders|private[\\/]tmp)(?:[\\/]|$)|(?:^|[\\/])wt-[^\\/]*|-wt(?:[\\/]|$)/iu;
+
+/** Home itself: `/Users/sam`, `/home/sam`, `C:\Users\sam`. A session opened there is in no project. */
+const HOME = /^(?:\/(?:Users|home)\/[^\\/]+|[A-Za-z]:[\\/]Users[\\/][^\\/]+)[\\/]?$/u;
+
+/** Whether a session's place can never become a project: home, /tmp, scratch, or a worktree of another session. */
+export function nobodysPlace(hints: Pick<SessionHints, 'repo' | 'cwd'>): boolean {
+  const cwd = (hints.cwd ?? '').trim();
+  const repo = (hints.repo ?? '').trim();
+  return HOME.test(cwd) || NOBODYS.test(cwd) || /^wt-/iu.test(repo) || /-wt$/iu.test(repo);
+}
+
+/**
+ * Whether a later session from a place that no project holds should form a draft: the place can be a project at all,
+ * and a session from the same repository was seen before (one-off folders never spawn projects). `earlier` is how many
+ * sessions the record already holds from that same repository or remote.
+ */
+export function formsOnRepeat(hints: Pick<SessionHints, 'repo' | 'remote' | 'cwd'>, earlier: number): boolean {
+  if (nobodysPlace(hints)) return false;
+  if ((hints.repo ?? '').trim() === '' && (hints.remote ?? '').trim() === '') return false;
+  return earlier >= 1;
+}

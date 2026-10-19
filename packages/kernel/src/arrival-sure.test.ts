@@ -142,3 +142,43 @@ test('A TEXT WITH NO AMOUNT IN IT STILL ASKS, because money that did not read is
   assert.ok(r.value.suggestion, 'a person is asked');
   sql.close();
 });
+
+/** A door whose rule is not trusted yet: what it reads files only as a proposal. */
+const careful = (): Declaration => {
+  const d = door('careful-door');
+  return { ...d, body: { ...d.body, writes: { register: 'ledger', confidence: 'proposed' } } } as never;
+};
+
+const carefulText = (k: Kernel, what: string): void => {
+  sent += 1;
+  const r = k.arrive({
+    channel: 'email',
+    headers: { From: 'alerts@bank.example', Subject: 'careful-door' },
+    body: `careful-door Card ***${CARD_TAILS[0]} was used to Orchard Prints for ${what} today.`,
+    sha256: `arrival-sure-${String(sent)}`,
+  }) as { ok: boolean };
+  assert.ok(r.ok, JSON.stringify(r));
+};
+
+test('A DOUBTFUL TEXT WAITS IN TO REVIEW and Needs you does not count it', async () => {
+  const { k, sql } = await record();
+  assert.ok((await k.install([careful()])).ok);
+  carefulText(k, 'EGP 12.00');
+  assert.equal(k.count('ledger'), 0);
+  const open = k.openSuggestions();
+  assert.ok(open.ok && open.value.length === 0, 'nothing is asked in Needs you');
+  const review = k.governance('suggestion', { status: 'open', review: 'only' });
+  assert.ok(review.ok && review.value.length === 1, 'one waits in To review');
+  sql.close();
+});
+
+test('MONEY NOT READ CLEANLY STILL ASKS IN NEEDS YOU, even from a door that is not trusted', async () => {
+  const { k, sql } = await record();
+  assert.ok((await k.install([careful()])).ok);
+  carefulText(k, 'a purchase');
+  const open = k.openSuggestions();
+  assert.ok(open.ok && open.value.length === 1, 'the amount question is in Needs you');
+  const review = k.governance('suggestion', { status: 'open', review: 'only' });
+  assert.ok(review.ok && review.value.length === 0);
+  sql.close();
+});

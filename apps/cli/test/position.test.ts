@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { BUILD, cliBuild, hostSessionOf, sessionHeaders, type Position } from '../src/position.ts';
+import { BUILD, authorsOf, cliBuild, hostSessionOf, sessionHeaders, type Position } from '../src/position.ts';
 import { helloOf } from '../src/stdio.ts';
 
 const AT: Position = { cwd: '/Users/ada/kiln', repo: 'kiln', remote: 'github.com/ada/kiln', host: 'box', branch: 'main', head: 'abc1234' };
@@ -72,4 +72,17 @@ test('A HELLO IS initialize WITH clientInfo, read for its strings and nothing el
   assert.equal(hello({ protocolVersion: '2025-06-18' }), null);
   assert.equal(helloOf({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { clientInfo: { name: 'not a hello' } } }), null);
   assert.equal(helloOf('initialize'), null);
+});
+
+test('THE AUTHORS OF RECENT COMMITS ARE READ ONCE EACH, newest first, with a real address', () => {
+  assert.equal(authorsOf(null), null);
+  assert.equal(authorsOf('Ada Lin <ada@example.com>\nBo <bo@kiln.example>\nada lin <ADA@example.com>'), 'Ada Lin <ada@example.com>, Bo <bo@kiln.example>');
+  assert.equal(authorsOf('Dee <>\nNo address'), null);
+  assert.equal(authorsOf(Array.from({ length: 9 }, (_, i) => `P${i} <p${i}@x.example>`).join('\n'))?.split(', ').length, 5);
+});
+
+test('THE AUTHORS TRAVEL AS A HEADER FROM THE REPOSITORY ITSELF', () => {
+  const at: Position = { ...AT, authors: 'Ada Lin <ada@example.com>' };
+  assert.equal(sessionHeaders(at, 'claude')['x-braindog-authors'], 'Ada Lin <ada@example.com>');
+  assert.equal(sessionHeaders(AT, 'claude')['x-braindog-authors'], undefined);
 });

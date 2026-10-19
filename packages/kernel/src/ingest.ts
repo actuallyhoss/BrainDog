@@ -1292,6 +1292,8 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
               waits: lid !== 'exact',
             })),
         ...(pending.length ? { tails: pending } : {}),
+        /* A DOUBTFUL ARRIVAL GOES TO TO REVIEW; money not read cleanly still asks in Needs you (DIRECTION §45, d3). */
+        ...(!sure?.sure && moneyClean(deps.schemaOf(register), extracted, [...missed, ...invalid, ...soft]) ? { review: true } : {}),
       });
       /* FILED NOW, signed by BrainDog so it shows in Handled with its Undo. A refusal leaves it a question, in the words
          a question has (`heldAsked`), not the words of a filing that did not happen. */
@@ -1486,6 +1488,8 @@ function openRowset(
     joins?: string;
     /** BrainDog files it itself: the body says so, and `handledFault` lets an ingest's add through on it. */
     confident?: boolean;
+    /** A doubtful arrival waits in To review and not in Needs you; the body says so (`review`) and the queue reads stop at it. */
+    review?: boolean;
   },
 ): string {
   const context = item.context ?? '';
@@ -1496,6 +1500,7 @@ function openRowset(
         AND coalesce(e.to_v, e.note) = ? AND coalesce(json_extract(s.body, '$.context'), '') = ?
         AND coalesce(json_extract(s.body, '$.resembles'), '') = ? AND coalesce(json_extract(s.body, '$.joins_on'), '') = ?
         AND coalesce(json_array_length(s.body, '$.rows'), 0) + ? <= ?
+        AND coalesce(json_extract(s.body, '$.review'), 0) = ?
       ORDER BY s.rowid LIMIT 1`,
     `ingest:${item.ingest}`,
     item.register,
@@ -1505,6 +1510,7 @@ function openRowset(
     joins,
     item.rows.length,
     ROWS_ASKED_MOST,
+    item.review ? 1 : 0,
   );
   const held = asked ? heldBody(asked.body) : null;
   if (asked && held) {
@@ -1549,6 +1555,7 @@ function openRowset(
       ...(item.tails === undefined ? {} : { tails: item.tails }),
       ...(item.raw === undefined ? {} : { raws: [item.raw] }),
       ...(item.confident ? { confident: true, why: [context] } : {}),
+      ...(item.review ? { review: true } : {}),
     }),
     `ingest:${item.ingest}`,
     at,
@@ -3727,6 +3734,13 @@ export function arrivalSure(f: SureFacts): { sure: boolean; score: number } {
 function amountRead(schema: Schema | null, extracted: Record<string, unknown>): boolean {
   const money = Object.entries(schema?.fields ?? {}).filter(([, d]) => d.type === 'money').map(([id]) => id);
   return money.length > 0 && money.some((id) => extracted[id] !== undefined && extracted[id] !== null);
+}
+
+/** Whether the list's money was read cleanly: no money field was missed, unreadable or chosen, and one holds an amount. A list with none is clean. */
+export function moneyClean(schema: Schema | null, extracted: Record<string, unknown>, doubts: readonly string[]): boolean {
+  const money = Object.entries(schema?.fields ?? {}).filter(([, d]) => d.type === 'money').map(([id]) => id);
+  if (money.length === 0) return true;
+  return !money.some((id) => doubts.includes(id)) && money.some((id) => extracted[id] !== undefined && extracted[id] !== null);
 }
 
 /** A question that was to be filed by BrainDog and could not be stays a question, in the words of one. */

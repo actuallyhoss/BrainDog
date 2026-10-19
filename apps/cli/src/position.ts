@@ -22,6 +22,8 @@ export type Position = {
   host: string;
   branch: string | null;
   head: string | null;
+  /** Recent commit authors as `Name <email>, ...`; left out when none are read. */
+  authors?: string;
 };
 
 /* Three seconds each, because a hung git (a network drive, a held lock) must not hold the first call. */
@@ -41,6 +43,8 @@ export async function positionOf(cwd: string): Promise<Position> {
           git(cwd, 'rev-parse', '--short', 'HEAD'),
           git(cwd, 'remote', 'get-url', 'origin'),
         ]);
+  /* Only with a remote: the record meets these as people seen in that project's commits. */
+  const authors = top === null || origin === null ? null : authorsOf(await git(cwd, 'log', '-n', '50', '--format=%an <%ae>'));
   return {
     cwd,
     repo: top === null ? null : basename(top),
@@ -49,7 +53,23 @@ export async function positionOf(cwd: string): Promise<Position> {
     /* `HEAD` is what git says for a detached head, which is no branch at all. */
     branch: branch === 'HEAD' ? null : branch,
     head,
+    ...(authors === null ? {} : { authors }),
   };
+}
+
+/** The distinct authors of a commit log, newest first, as one header value of at most 512 printable characters; `null` for none. */
+export function authorsOf(log: string | null): string | null {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of (log ?? '').split('\n')) {
+    const l = line.trim();
+    const key = l.toLowerCase();
+    if (!/^[\x20-\x7e]+$/.test(l) || !/<[^<>\s]+@[^<>\s]+>$/.test(l) || seen.has(key)) continue;
+    seen.add(key);
+    if (out.length === 5 || [...out, l].join(', ').length > 512) break;
+    out.push(l);
+  }
+  return out.length === 0 ? null : out.join(', ');
 }
 
 /**
@@ -115,6 +135,7 @@ const GRAMMAR: Record<string, RegExp> = {
   'x-braindog-client-version': printable(64),
   'x-braindog-cli': BUILD,
   'x-braindog-ahead': /^(?:0|[1-9][0-9]{0,3})$/,
+  'x-braindog-authors': printable(512),
 };
 
 type Env = Record<string, string | undefined>;
@@ -179,6 +200,7 @@ export function sessionHeaders(p: Position, agent?: Agent, run?: { spoken?: stri
     'x-braindog-client-version': said.client?.version?.trim(),
     'x-braindog-cli': said.build ?? cliBuild(),
     'x-braindog-ahead': aheadHeader(said.ahead),
+    'x-braindog-authors': from ? undefined : p.authors,
   };
   const out: Record<string, string> = {};
   for (const [name, value] of Object.entries(values)) if (value && GRAMMAR[name]!.test(value)) out[name] = value;

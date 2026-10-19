@@ -237,7 +237,15 @@ const WAIT_ORDER = `(CASE WHEN status = 'open' THEN ${WAIT_RANK_SQL} ELSE ${WAIT
 export function listGovernance(
   deps: Pick<GovernDeps, 'sql' | 'nowMs'>,
   register: GovernRegister,
-  opts: { status?: string | undefined; limit?: number | undefined; every?: boolean | undefined; cursor?: string | undefined; order?: 'wait' | undefined } = {},
+  opts: {
+    status?: string | undefined;
+    limit?: number | undefined;
+    every?: boolean | undefined;
+    cursor?: string | undefined;
+    order?: 'wait' | undefined;
+    /** `only`: just the doubtful arrivals waiting in To review. Left out, an open list leaves them out (they are not Needs you). */
+    review?: 'only' | undefined;
+  } = {},
 ): Result<Record<string, unknown>[]> {
   if (!(GOVERNANCE as readonly string[]).includes(register))
     return no('REGISTER_UNKNOWN', `${register} is not a governance register.`, { at: 'register', allowed: GOVERNANCE });
@@ -252,6 +260,10 @@ export function listGovernance(
     if ((opts.status ?? 'open') === 'open') {
       where.push('(defer_until IS NULL OR defer_until <= ?)');
       params.push(instant(deps.nowMs));
+      /* A DOUBTFUL ARRIVAL WAITS IN TO REVIEW, NOT IN NEEDS YOU (DIRECTION §45): its body says `review`, and the open
+         questions every count and queue reads stop at it. `review: 'only'` is the To review list's own read. */
+      const marked = "(CASE WHEN json_valid(body) THEN COALESCE(json_extract(body, '$.review'), 0) = 1 ELSE 0 END)";
+      where.push(opts.review === 'only' ? marked : `NOT ${marked}`);
     }
   }
 

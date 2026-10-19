@@ -31,6 +31,8 @@ export type SessionHints = {
    * to 9,999, kept as the text it was sent and read as a number by the briefing's card (`card.ts` `CardAt.ahead`).
    */
   ahead?: string | undefined;
+  /** Who the recent commits here were by, `Name <email>, ...`, so the record can meet people it has not met. */
+  authors?: string | undefined;
 };
 
 type Key = keyof SessionHints;
@@ -63,6 +65,8 @@ export const HINTS: Readonly<Record<Key, { header: string; grammar: RegExp }>> =
   /* COMMITS SINCE THE HANDOFF, so the card can say "12 commits since" beside a step left before them. No leading zero,
      so one count has one spelling. */
   ahead: { header: 'x-braindog-ahead', grammar: /^(?:0|[1-9][0-9]{0,3})$/ },
+  /* The authors of the last commits, as written there; the record meets each as a person seen in the commits. */
+  authors: { header: 'x-braindog-authors', grammar: printable(512) },
 };
 
 const KEYS = Object.keys(HINTS) as Key[];

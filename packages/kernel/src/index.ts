@@ -54,7 +54,8 @@ import {
   type PackToggle,
   type PlannedRecord,
 } from './declare.ts';
-import { DRAFT_FIELD, firstProjectFields, firstProjectName } from './first-project.ts';
+import { commitAuthors } from './commit-authors.ts';
+import { DRAFT_FIELD, firstProjectFields, firstProjectName, formsOnRepeat, nobodysPlace } from './first-project.ts';
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
 import { withDerived, type DeriveResolve } from './derive-rows.ts';
 import { runsDataSteps } from './migrations/0028_runs.ts';
@@ -4701,14 +4702,48 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (w.principal?.kind !== 'token' || hints.parent !== undefined) return null;
     const list = [...registers.values()].find((r) => r.scopes !== undefined);
     if (!list || !list.fields.some((f) => f.id === DRAFT_FIELD && !f.retired)) return null;
-    if (sql.one('SELECT 1 AS n FROM entry WHERE register = ? LIMIT 1', list.id)) return null;
     const name = firstProjectName(hints);
-    if (name === null) return null;
+    if (name === null || nobodysPlace(hints)) return null;
+    /* A RECORD WITH PROJECTS FORMS A DRAFT ONLY FROM A REPOSITORY SEEN BEFORE: the second session out of it, so a one-off
+       folder spawns nothing. A name the record has ever held (a draft the person turned away included) is not formed again. */
+    if (sql.one('SELECT 1 AS n FROM entry WHERE register = ? LIMIT 1', list.id)) {
+      const earlier =
+        sql.one<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM entry WHERE register = ? AND ((? <> '' AND json_extract(fields, '$.remote') = ?) OR (? <> '' AND json_extract(fields, '$.repo') = ?))",
+          SESSION,
+          hints.remote ?? '',
+          hints.remote ?? '',
+          hints.repo ?? '',
+          hints.repo ?? '',
+        )?.n ?? 0;
+      if (!formsOnRepeat(hints, Number(earlier))) return null;
+      if (sql.one("SELECT 1 AS n FROM entry WHERE register = ? AND lower(json_extract(fields, '$.name')) = lower(?) LIMIT 1", list.id, name)) return null;
+    }
     const has = (field: string) => list.fields.some((f) => f.id === field && !f.retired);
-    const made = writing(list.id, null, firstProjectFields(hints, name, has), { actor: 'system', note: 'formed from the first agent session', cascade: false });
+    const made = writing(list.id, null, firstProjectFields(hints, name, has), { actor: 'system', note: 'formed from an agent session', cascade: false });
     if (!made.ok || made.value.seq === null) return null;
     const said = list.seq_prefix && list.seq_prefix !== '#' ? list.seq_prefix : `${list.id}#`;
     return `${said}${made.value.seq}`;
+  }
+
+  /**
+   * WHO THE REPOSITORY'S RECENT COMMITS WERE BY, met once when a run opens: each author whose address no person holds is
+   * met as somebody seen in that project's commits, which `meet` holds to a commit's word. Only with a remote reported,
+   * and only the address git printed. In a transaction only.
+   */
+  function meetCommitters(w: WriteContext): void {
+    const hints = w.session ?? {};
+    if (w.principal?.kind !== 'token' || !hints.remote || !hints.authors) return;
+    const people = meetsRole(registers.values());
+    if (people === null) return;
+    const where = hints.repo ?? (hints.remote.replace(/\/+$/u, '').split('/').pop() ?? hints.remote);
+    for (const a of commitAuthors(hints.authors)) {
+      if (sql.one('SELECT 1 AS n FROM entry WHERE register = ? AND instr(lower(fields), ?) > 0 LIMIT 1', people.register, a.email)) continue;
+      meetPerson(
+        peopleDeps({ actor: w.actor }, () => locateRun(w).project?.id ?? null, (p) => openSuggestion(governDeps(), w.actor, p)),
+        { email: a.email, ...(a.name === undefined ? {} : { name: a.name }), source: `commit in ${where}`, untrusted: true },
+      );
+    }
   }
 
   function attribute(w: WriteContext, at: Located, target: string | null, now: string): { actor: string; own: boolean } {
@@ -4746,6 +4781,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     }
 
     const opened = openRun(w, project ?? formFirstProject(w), now, 'opened: auto', true);
+    if (opened.ok) meetCommitters(w);
     if (opened.ok) return { actor: `${prefix}${String(opened.value.seq)}`, own: false };
     /* A RUN THAT CANNOT BE OPENED IS A DEFECT, NOT A REFUSAL. The write it serves has passed every
        check and still goes in, under the caller's own name, and this observation is how anybody finds
@@ -9513,7 +9549,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * THE RECORD OPENS SUGGESTIONS FROM THREE PLACES and until this existed nothing could read one.
      * A proposal nobody can see is a proposal that was never made.
      */
-    governance: (register: GovernRegister, opts: { status?: string; limit?: number; every?: boolean; cursor?: string; order?: 'wait' } = {}) =>
+    governance: (register: GovernRegister, opts: { status?: string; limit?: number; every?: boolean; cursor?: string; order?: 'wait'; review?: 'only' } = {}) =>
       listGovernance({ sql, nowMs: clock.now() }, register, opts),
 
     /** How many rows a governance register holds, all of them. */

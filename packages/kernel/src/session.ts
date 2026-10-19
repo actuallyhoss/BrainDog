@@ -179,6 +179,8 @@ export type SessionHints = {
   parent?: string | undefined;
   /** Commits HEAD moved since the last handoff here, `12`, for the briefing's card. The run register declares no such field. */
   ahead?: string | undefined;
+  /** Who the recent commits were by, `Name <email>, ...`: read to meet people, never stored on the run. */
+  authors?: string | undefined;
 };
 
 /**

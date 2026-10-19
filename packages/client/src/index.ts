@@ -1654,7 +1654,7 @@ export function createClient(options: ClientOptions) {
     /* ADMIN, SO A BROWSER SESSION. Nothing cascades: `alsoDisable` names what a `PACK_REQUIRED` listed. */
     disablePack: (args: { id: string; alsoDisable?: string[] }) => call<PackToggle>('disablePack', args as Record<string, unknown>),
     enablePack: (args: { id: string }) => call<PackToggle>('enablePack', args as Record<string, unknown>),
-    governance: (args: { register?: string; id?: string; status?: string; limit?: number; cursor?: string } = {}) =>
+    governance: (args: { register?: string; id?: string; status?: string; limit?: number; cursor?: string; review?: 'only' } = {}) =>
       call<unknown>('governance', args as Record<string, unknown>),
     members: () => call<unknown[]>('members'),
     listTokens: () => call<unknown[]>('listTokens'),
