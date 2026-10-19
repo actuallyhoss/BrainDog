@@ -137,6 +137,8 @@ import {
   countGovernance,
   countOpenQuestions,
   propose as openSuggestion,
+  handledOn,
+  HANDLED_RULE,
   reopen,
   withdraw as withdrawSuggestion,
   keepApplied,
@@ -512,7 +514,7 @@ export { SETUP_KIND, setupCollapser, type FeedLine } from './feed.ts';
 export type { Bars, SeriesLine } from './series.ts';
 export { LIST_PAGE_COLUMNS, LIST_PAGE_ROWS, listPage, type ListPage, type ListPageBlock, type ListPageColumn, type ListPageFilter, type ListPageSaid, type ListPageShape, type ListPageField } from './default-pages.ts';
 /* An arrangement's parts (govern-parts-43), by their ids and needs; `partsOf` is fx.ts's name here, so it goes out as arrangePartsOf. */
-export { ARRANGING, BODY_KINDS, GOVERNANCE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
+export { ARRANGING, BODY_KINDS, GOVERNANCE, HANDLED_PREF, HANDLED_RULE, LADDER_RULE, OPEN_ARRANGEMENTS, PACK_VERBS, handledFault, handledOn, ladderFault, partsOf as arrangePartsOf, pressedOnly, rememberedLine, uniteArrangements } from './govern.ts';
 /* THE LADDER OF TRUST'S NAMES (`change-kind.ts`): what kind of change a write or a question is, and which rung an agent
    stands on for it, so the record, the web and the CLI read one table of kinds rather than each keeping a copy. Its
    `agentOf` goes out as `ladderAgentOf`, since `session.ts`'s `agentOf` (the kind of agent a run is) already has the name. */
@@ -7396,6 +7398,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     nowMs: clock.now(),
     mint,
     allocate,
+    /* BRAINDOG'S OWN ARRANGING (d3): answered as it is filed, in a savepoint so a refusal leaves the question open. */
+    settle: (id) =>
+      handledOn(sql) ? attempt(sql, transaction, () => decide(governDeps(), id, { rule: 'handled' }, HANDLED_RULE)) : no('TRANSITION_ILLEGAL', 'BrainDog is not arranging for itself.', { at: 'rule' }),
     hasRegister: (register) => registers.has(register),
     /* WHAT A CHANGE SENDS OUT, read from its declarations and nothing the proposer wrote about them. Only an action that
        is new, or whose host, key or fields differ from the one installed, needs the owner's press. */
@@ -9526,7 +9531,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         if (out.ok && !out.value.joined && out.value.answered === undefined) {
           nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
           /* AND A RUN'S NEW QUESTION TELLS THE PERSON, once (`tellAsked`). Joined or answered from memory, nothing new was asked. */
-          tellAsked(out.value.id);
+          if (!out.value.handled) tellAsked(out.value.id);
         }
         return out;
       }),

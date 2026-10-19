@@ -104,6 +104,11 @@ export type Decision = {
 export type GovernDeps = {
   sql: Sql;
   nowMs: number;
+  /**
+   * Answers a question the moment it is filed, in a savepoint, when BrainDog may handle it itself (`handledFault`).
+   * Left out, every question waits as it always did.
+   */
+  settle?: (id: string) => Result<unknown>;
   mint: () => string;
   allocate: (name: string) => number;
   /** Whether a register exists, so a `rowset` cannot name one that does not. */
@@ -394,7 +399,7 @@ export type Remembered = { said: string; reason: string; at: string };
  * `widened` when the open one was a rowset or an arrangement and this one's further rows or parts were added to it.
  * `answered` when the person already answered this cause and nothing was filed: `id` is then the question they answered.
  */
-export type Filed = { id: string; joined?: true; widened?: number; answered?: Remembered };
+export type Filed = { id: string; joined?: true; widened?: number; answered?: Remembered; handled?: true };
 
 /** The one sentence a rowset that would change nothing is refused with. */
 export const NOTHING_TO_DECIDE = 'Everything this asks for is already so. Nothing to decide.';
@@ -580,6 +585,12 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
   if (memory !== null && p.again !== undefined) event(deps, at, by, 'note', `suggestion:${id}`, 'suggestion', AGAIN, p.again.trim());
   /* AND WHO DECIDES IT, written as `handQuestion` writes it, so an agent's question that names Ada arrives already hers. */
   if (p.decider !== undefined) handEvent(deps, at, by, id, p.decider);
+  /* BRAINDOG'S OWN ARRANGING NEEDS NO PRESS (DIRECTION d3): a question that only moves the owner's own rows and can be
+     undone is answered now, marked, with its Undo. Anything else, or a refusal, stays the open question it was. */
+  if (p.body_kind === 'rowset' && deps.settle && handledFault(deps.sql, { body_kind: p.body_kind, body: JSON.stringify(body), opened_by: by }) === null) {
+    const done = deps.settle(id);
+    if (done.ok) return ok({ id, handled: true });
+  }
   return ok({ id });
 }
 
@@ -1716,6 +1727,53 @@ export function ladderFault(sql: Sql, row: { body_kind: string; body: string; op
   return null;
 }
 
+/**
+ * Who answers a question BrainDog settles itself: reversible arranging of the owner's own rows (DIRECTION d3). Its rows
+ * are signed by this name, so the byline reads BrainDog and one Undo on the decision puts the whole batch back.
+ */
+export const HANDLED_RULE = 'rule:handled';
+
+/** The one setting behind it: a pref of the record under this holder and key. Absent means on; `false` turns it off. */
+export const HANDLED_PREF = { holder: 'record:handled', key: 'on' } as const;
+
+/** Whether BrainDog arranges for itself. On for every record until the owner says otherwise. */
+export function handledOn(sql: Sql): boolean {
+  const v = sql.one<{ value: string }>('SELECT value FROM pref WHERE person_id = ? AND key = ?', HANDLED_PREF.holder, HANDLED_PREF.key)?.value;
+  return v === undefined ? true : v.trim() !== 'false';
+}
+
+/** The words a handled change is shown with when the question carried no reason of its own. */
+const HANDLED_REASON = 'It only arranges your own rows, and every change can be undone.';
+
+/** The verbs that only arrange a row: an edit, a tag, a move to another state. Adding, deleting, notes and installs are not. */
+const ARRANGES = (verb: string): boolean => verb === 'edit' || verb === 'tag' || verb.startsWith('move:');
+
+/**
+ * Why BrainDog may not answer this question itself, or `null` when it may. Only what BrainDog files itself (an ingest, a
+ * rule, Slash) and only rows that already exist: every write an edit, a tag or a move, none on the floor (money, keys,
+ * sharing, who someone is, deletes, add-ons, outside the record, another person's row). Rows the owner made count as the
+ * owner's own, as they do for Slash. The kinds are worked out now, as `ladderFault` works them, never from the stamp.
+ */
+export function handledFault(sql: Sql, row: { body_kind: string; body: string; opened_by: string }): string | null {
+  if (row.body_kind !== 'rowset') return `A ${row.body_kind} is never settled by BrainDog.`;
+  const by = row.opened_by;
+  if (!(by === SLASH || by.startsWith('ingest:') || by.startsWith('rule:'))) return 'Only what BrainDog files itself is settled by it.';
+  const body = parse(row.body);
+  if (!body) return 'The question cannot be read.';
+  const rows = (body.rows ?? []) as Record<string, unknown>[];
+  if (rows.length === 0 || rows.some((r) => typeof r?.at !== 'string' || !isMap(r.patch))) return 'It adds rows, and a new row asks.';
+  /* AS SLASH READS THEM, so an owner's row is the owner's own and a member's is still somebody else's. */
+  const kinds = kindsOfProposal('rowset', body, recordReader(sql, SLASH));
+  const floor = kinds.find((k) => k.floor !== null);
+  if (floor) return `It is ${floor.key}, which always asks (${String(floor.floor)}).`;
+  const other = kinds.find((k) => !ARRANGES(k.verb));
+  if (other) return `It is ${other.key}, which is more than arranging.`;
+  const shape = shapeIn(sql, String(body.register));
+  const fields = new Map((shape?.fields ?? []).map((f) => [f.id, f]));
+  const held = rows.flatMap((r) => Object.entries(r.patch as Record<string, unknown>)).find(([k]) => fields.get(k)?.by === 'decide')?.[0];
+  return held === undefined ? null : `${held} changes only when a person accepts it.`;
+}
+
 /** What the decision says when the rule answered, in the words the owner reads it by in Decide. */
 const ADDITIVE_REASON = 'It only adds optional fields or values, and those land without a press. Taking away, retyping or requiring anything still asks.';
 
@@ -2667,7 +2725,7 @@ export type Verdict =
    * (`ladderFault`), answered as `LADDER_RULE`. Its rows are signed by the run that filed them, since they are that
    * agent's changes and its byline is what Undo finds; a question Slash filed has its rows signed by the ladder.
    */
-  | { rule: 'additive' | 'ladder' };
+  | { rule: 'additive' | 'ladder' | 'handled' };
 
 /** One approved line as a suggestion holds it: what accept reads of it before anything is armed. */
 type SentLine = { key?: unknown; paged?: unknown; channel?: unknown; ingest?: unknown };
@@ -2811,13 +2869,23 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
      will not land must come back to the queue exactly as a pressed one does. */
   let signer: string | null = null;
   if ('rule' in verdict) {
-    if (verdict.rule !== 'additive' && verdict.rule !== 'ladder')
-      return no<Decided>('ENUM_VALUE_UNKNOWN', `${String(verdict.rule)} is not a rule that answers questions.`, { at: 'rule', allowed: ['additive', 'ladder'] });
+    if (verdict.rule !== 'additive' && verdict.rule !== 'ladder' && verdict.rule !== 'handled')
+      return no<Decided>('ENUM_VALUE_UNKNOWN', `${String(verdict.rule)} is not a rule that answers questions.`, { at: 'rule', allowed: ['additive', 'ladder', 'handled'] });
     const ladder = verdict.rule === 'ladder';
-    const why = ladder ? ladderFault(deps.sql, row, deps.nowMs) : row.body_kind === 'change' ? additiveFault(parse(row.body)) : `A ${row.body_kind} is never answered by rule.`;
+    const handled = verdict.rule === 'handled';
+    const why = handled
+      ? handledFault(deps.sql, row)
+      : ladder
+        ? ladderFault(deps.sql, row, deps.nowMs)
+        : row.body_kind === 'change'
+          ? additiveFault(parse(row.body))
+          : `A ${row.body_kind} is never answered by rule.`;
     if (why !== null) return no<Decided>('TRANSITION_ILLEGAL', `${id} waits for the owner. ${why}`, { at: 'rule' });
-    verdict = { decide: { option: 'accept', reason: ladder ? LADDER_REASON : ADDITIVE_REASON } };
-    actor = ladder ? LADDER_RULE : ADDITIVE_RULE;
+    /* A HANDLED CHANGE SAYS WHY: the question's own first reason when it carried one, else the rule's plain sentence. */
+    const own = handled ? parse(row.body)?.why : undefined;
+    const said = Array.isArray(own) && typeof own[0] === 'string' && own[0].trim() !== '' ? own[0].trim() : typeof own === 'string' && own.trim() !== '' ? own.trim() : HANDLED_REASON;
+    verdict = { decide: { option: 'accept', reason: handled ? said : ladder ? LADDER_REASON : ADDITIVE_REASON } };
+    actor = handled ? HANDLED_RULE : ladder ? LADDER_RULE : ADDITIVE_RULE;
     /* SLASH'S ROWS ARE THE LADDER'S. A model writes only suggest, propose and predict (`slash.ts`), so the rows of a
        question Slash filed are signed by the rule that let them land, and Slash stays on the question as its filer. */
     if (ladder && row.opened_by !== SLASH) signer = row.opened_by;

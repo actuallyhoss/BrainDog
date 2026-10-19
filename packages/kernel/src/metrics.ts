@@ -3554,7 +3554,7 @@ const IMPORT_CLIENT = 'braindog-import-';
 export type Maker = (typeof MAKERS)[number];
 
 /** The kernel's own rules, which are the record acting and nobody's declared rule (`undo.ts` `whoOf` says the same three). */
-const OWN_RULES: ReadonlySet<string> = new Set(['rule:ladder', 'rule:additive', 'rule:update']);
+const OWN_RULES: ReadonlySet<string> = new Set(['rule:ladder', 'rule:additive', 'rule:update', 'rule:handled']);
 
 /** An id written with hyphens or underscores, as words: `tidy-ledger` is "Tidy ledger". */
 const idWords = (id: string): string => wordsOf(id.replace(/-/gu, '_'));

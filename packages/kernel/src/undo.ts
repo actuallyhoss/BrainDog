@@ -422,7 +422,7 @@ function whoOf(sql: Sql, actor: string): string {
     return typeof agent === 'string' && agent !== 'other' && agent !== '' ? spaced(agent) : 'An agent';
   }
   if (actor === SLASH) return 'Slash';
-  if (actor === 'rule:ladder' || actor === 'rule:additive' || actor === 'rule:update' || actor === 'system') return 'BrainDog';
+  if (actor === 'rule:ladder' || actor === 'rule:additive' || actor === 'rule:update' || actor === 'rule:handled' || actor === 'system') return 'BrainDog';
   if (actor.startsWith('rule:')) return 'A rule';
   if (actor.startsWith('ingest:')) return 'An import';
   return 'Someone';
