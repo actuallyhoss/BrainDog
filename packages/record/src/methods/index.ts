@@ -63,6 +63,7 @@ import { methods as stale } from './stale.ts';
 import { methods as learnings } from './learnings.ts';
 import { methods as textFaults } from './text-faults.ts';
 import { methods as learned } from './learned.ts';
+import { methods as handled } from './handled.ts';
 import { methods as inboxHints } from './inbox-hints.ts';
 import { methods as skillsBehindMethods } from './skills-behind.ts';
 import { methods as toolsSeenMethods } from './tools-seen.ts';
@@ -208,6 +209,7 @@ export function methods(deps: RecordDeps) {
     ...learnings(deps),
     ...textFaults(deps),
     ...learned(deps),
+    ...handled(deps),
     ...inboxHints(deps),
     ...skillsBehindMethods(deps),
     ...toolsSeenMethods(deps),
