@@ -259,7 +259,11 @@ export function isHere(item: Pick<FlatItem, 'near' | 'exact'>, path: string): bo
  * The phone's tab bar: the flat list's first five rows, with Decide moved up beside Today while something waits on it.
  * The rest are behind More with everything else.
  */
-export function tabsOf(main: readonly FlatItem[], most = 5): FlatItem[] {
+export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly string[] = []): FlatItem[] {
+  /* HIS FIVE WIN: Today first, then the pages he put on the bar in his order. A pick that is gone from the rail is
+     skipped, and none left at all is the default below. */
+  const picked = chosen.flatMap((href) => main.filter((i) => i.href === href && i !== main[0]));
+  if (picked.length > 0 && main[0]) return [main[0], ...picked].slice(0, most);
   const decide = main.find((i) => i.key === 'decide');
   const rest = main.filter((i) => i !== decide);
   const [lead, ...tail] = rest;

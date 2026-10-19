@@ -22,6 +22,10 @@
 import * as pref from './pref.ts';
 
 const HIDDEN = 'bd_nav_hidden';
+/* THE DEVICE'S COPY OF THE PHONE BAR, so a reload draws it before `boot` answers. */
+const TABS = 'bd_nav_tabs';
+/** Pages on the phone bar besides Today, the record's own cap. */
+export const TABS_MOST = 4;
 /* THE DEVICE'S COPIES OF THE HOME PAGE AND THE NAMES, for a tab with no record, kept beside the hidden list for its
    reason: `pref.ts`'s cookie is read before first paint, and neither of these is needed before `boot` answers. */
 const HOME = 'bd_nav_home';
@@ -43,6 +47,7 @@ export type NavShape = 'rail' | 'bar' | 'menu';
 export type Prefs = {
   'nav.order'?: string[];
   'nav.hidden'?: string[];
+  'nav.tabs'?: string[];
   'nav.shape'?: NavShape | 'side';
   'pen.suggest'?: boolean;
   'pen.dismissed'?: string[];
@@ -189,6 +194,7 @@ const sendTo =
 export type Start = {
   order?: string[];
   hidden?: string[];
+  tabs?: string[];
   shape?: NavShape | undefined;
   suggest?: boolean | undefined;
   dismissed?: string[];
@@ -201,6 +207,7 @@ const fromDevice = (): Start => {
   return {
     order: held.nav ?? [],
     hidden: readList(HIDDEN),
+    tabs: readList(TABS),
     shape: held.shape,
     suggest: held.suggestPages,
     dismissed: readList(DISMISSED),
@@ -240,6 +247,8 @@ export function moved(groups: Arranged, href: string, step: -1 | 1, skip: (href:
 export class NavPrefs {
   order = $state<string[]>([]);
   hidden = $state<string[]>([]);
+  /** The pages the person put on the phone bar after Today; empty is the rail's first four. */
+  tabs = $state<string[]>([]);
   /**
    * The shape somebody chose, on a record or on this device, or `undefined` while nobody has. The design agent's
    * recommendation reads this one (`design/nav-shape.ts`), so it can tell a rail somebody picked from the default.
@@ -269,6 +278,7 @@ export class NavPrefs {
   constructor(start: Start = fromDevice()) {
     this.order = start.order ?? [];
     this.hidden = start.hidden ?? [];
+    this.tabs = start.tabs ?? [];
     this.chosen = start.shape;
     this.suggest = start.suggest ?? true;
     this.dismissed = start.dismissed ?? [];
@@ -297,6 +307,8 @@ export class NavPrefs {
     }
     this.hidden = strings(prefs['nav.hidden']);
     keepList(HIDDEN, this.hidden);
+    this.tabs = strings(prefs['nav.tabs']);
+    keepList(TABS, this.tabs);
 
     const held = pref.read();
     /* A LEGACY `rail` GOES STRAIGHT TO THE DEFAULT, past the cookie: the cookie's copy was written from that same `rail`. */
@@ -448,6 +460,18 @@ export class NavPrefs {
     return this.#commit('pen.dismissed', next, () => {
       this.dismissed = before;
       keepList(DISMISSED, before);
+    });
+  }
+
+  /** The phone bar's pages after Today, set: at most `TABS_MOST`, and empty to go back to the rail's first. */
+  setTabs(next: string[]): Promise<Saved> {
+    const before = this.tabs;
+    const kept = [...new Set(next)].slice(0, TABS_MOST);
+    this.tabs = kept;
+    keepList(TABS, kept);
+    return this.#commit('nav.tabs', kept, () => {
+      this.tabs = before;
+      keepList(TABS, before);
     });
   }
 

@@ -209,3 +209,13 @@ test("THE PUBLISHER KEYS A PERSON HAS SEEN FOLLOW THEM: packs.known_keys is kept
   assert.deepEqual(await prefsOf(api, ada), {});
   sql.close();
 });
+
+test('THE PHONE BAR IS KEPT FOR THE PERSON, at most four addresses', async () => {
+  const { api, sql } = await record();
+  const code = (r: { ok: boolean }) => (r.ok ? 'ok' : (r as unknown as { refusal: { code: string } }).refusal.code);
+  assert.equal(code(await api.setPref({ key: 'nav.tabs', value: ['/p/money', '/p/money', '/p/kiln'] }, ada)), 'ok');
+  assert.deepEqual((await prefsOf(api, ada))?.['nav.tabs'], ['/p/money', '/p/kiln']);
+  assert.equal(code(await api.setPref({ key: 'nav.tabs', value: ['/a', '/b', '/c', '/d', '/e'] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'nav.tabs', value: ['money'] }, ada)), 'VALUE_MALFORMED');
+  sql.close();
+});

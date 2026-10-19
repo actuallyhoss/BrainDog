@@ -20,7 +20,7 @@
   import { forget } from '$lib/record/boot-live.ts';
   import type { Rehearsed } from '../../../decide/[id]/proposed.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { navPrefs, type Saved } from '$lib/nav-prefs.svelte.ts';
+  import { navPrefs, TABS_MOST, type Saved } from '$lib/nav-prefs.svelte.ts';
   import { arrange } from '$lib/nav.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Section from '$lib/ui/Section.svelte';
@@ -46,6 +46,11 @@
     hide: 'Hide',
     hideOne: (title: string) => `Hide ${title}`,
     hidden: (title: string) => `${title} is hidden from your nav.`,
+    bar: 'Phone bar',
+    barHint: 'Today is always first. Pick up to four pages for the rest of the bar; none picked uses the first four.',
+    barOn: (title: string) => `${title} on the phone bar`,
+    barFull: 'The bar is full. Take one off first.',
+    barReset: 'Use the default bar',
     none: 'No pages in your nav yet',
     noneWhy: 'Pages arrive with the add-ons you turn on, and with the pages you make.',
   };
@@ -79,6 +84,14 @@
     const at = list.findIndex((e) => e.href === href);
     return step === -1 ? at <= 0 : at >= list.length - 1;
   };
+
+  /* THE PHONE BAR: a page is on it or off it, at most `TABS_MOST`, and Today is not one of the pick. */
+  const barFull = $derived(navPrefs.tabs.length >= TABS_MOST);
+  const onBar = (href: string): boolean => navPrefs.tabs.includes(href);
+  function flipBar(href: string) {
+    const next = onBar(href) ? navPrefs.tabs.filter((h) => h !== href) : [...navPrefs.tabs, href];
+    void navPrefs.setTabs(next).then((saved) => said(saved));
+  }
 
   function move(href: string, step: -1 | 1) {
     void navPrefs.move(arranged, href, step)?.then((saved) => said(saved));
@@ -296,6 +309,35 @@
     </div>
   </div>
   <p class="hint phone-only">{copy.navShapeOnPhone}</p>
+</Section>
+
+<!-- THE PHONE BAR, one plain switch for each page: his pick wins over the rail's first four. -->
+<Section title={words.bar}>
+  <p class="hint">{words.barHint}</p>
+  <ul class="ledger ledger-lead">
+    {#each shown.flatMap(([, list]) => list) as p (p.href)}
+      <li>
+        <div class="line">
+          <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
+          <span class="line-main"><span class="line-title">{p.title}</span></span>
+          <span class="line-amount"></span>
+          <span class="line-when">
+            <button
+              type="button"
+              class="switch"
+              role="switch"
+              aria-checked={onBar(p.href)}
+              aria-label={words.barOn(p.title)}
+              title={!onBar(p.href) && barFull ? words.barFull : undefined}
+              disabled={!onBar(p.href) && barFull}
+              onclick={() => flipBar(p.href)}><span class="switch-track"></span></button
+            >
+          </span>
+        </div>
+      </li>
+    {/each}
+  </ul>
+  {#if navPrefs.tabs.length > 0}<Button weight="quiet" onclick={() => void navPrefs.setTabs([]).then((saved) => said(saved))}>{words.barReset}</Button>{/if}
 </Section>
 
 <!--

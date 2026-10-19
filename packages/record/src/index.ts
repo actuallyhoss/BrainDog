@@ -953,6 +953,7 @@ export const PREF_KEYS = [
   'nav.order',
   'nav.hidden',
   'nav.shape',
+  'nav.tabs',
   'pen.suggest',
   'pen.dismissed',
   'home.page',
@@ -994,6 +995,8 @@ export type Prefs = {
   'nav.order'?: string[];
   'nav.hidden'?: string[];
   'nav.shape'?: 'side' | 'rail' | 'bar' | 'menu';
+  /** The pages on the phone's bar after Today, at most four, in order (absent is the rail's first). */
+  'nav.tabs'?: string[];
   'pen.suggest'?: boolean;
   'pen.dismissed'?: string[];
   'home.page'?: string;
@@ -10009,6 +10012,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (value !== null && (key === 'nav.order' || key === 'nav.hidden')) {
         if (!texts(value, 500, (s) => s.startsWith('/')))
           return no('VALUE_MALFORMED', `${key} is a list of at most 500 addresses, each starting with /, or null to take it away.`, { at: 'value' });
+        kept = [...new Set(value)];
+      } else if (value !== null && key === 'nav.tabs') {
+        if (!texts(value, 4, (s) => s.startsWith('/')))
+          return no('VALUE_MALFORMED', 'nav.tabs is a list of at most 4 addresses, each starting with /, or null to take it away.', { at: 'value' });
         kept = [...new Set(value)];
       } else if (value !== null && key === 'nav.shape') {
         if (value !== 'side' && value !== 'rail' && value !== 'bar' && value !== 'menu')

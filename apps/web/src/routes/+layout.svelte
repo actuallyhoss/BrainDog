@@ -266,7 +266,7 @@
    * rest under More. One reading for the rail, the tab bar and the More sheet, so a place is in the same spot on each.
    */
   const rail = $derived(railOf(flat, said('decide')));
-  const tabs = $derived(tabsOf(rail.places));
+  const tabs = $derived(tabsOf(rail.places, 5, navPrefs.tabs));
 
   /**
    * A PLACE THAT COMES INTO THE RAIL IS SAID ONCE (USE-B02): a place is drawn when it has something to show, so the day

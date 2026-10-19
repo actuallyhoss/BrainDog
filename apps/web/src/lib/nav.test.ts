@@ -159,3 +159,11 @@ test('THE PHONE`S TABS ARE THE FIRST FIVE, with Needs you beside Today while som
   assert.deepEqual(tabsOf(flatNav(FOUNDER, 0, WORDS).main).map((i) => i.label), ['Today', 'Work', 'Projects', 'Money', 'Activity']);
   assert.deepEqual(tabsOf(flatNav(FOUNDER, 2, WORDS).main).map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money']);
 });
+
+test('HIS PHONE BAR WINS: Today, then the pages he put on it in his order, and a gone page is skipped', () => {
+  const main = flatNav(FOUNDER, 2, WORDS).main;
+  const money = main.find((i) => i.label === 'Money')!;
+  const projects = main.find((i) => i.label === 'Projects')!;
+  assert.deepEqual(tabsOf(main, 5, [money.href, '/p/gone', projects.href]).map((i) => i.label), ['Today', 'Money', 'Projects']);
+  assert.deepEqual(tabsOf(main, 5, ['/p/gone']).map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money']);
+});
