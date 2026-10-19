@@ -161,7 +161,7 @@ export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
       "SELECT coalesce(to_v, note) AS said FROM event WHERE kind = 'suggest' AND target = ? AND field IS NULL ORDER BY rowid LIMIT 1",
       `suggestion:${id}`,
     );
-    return typeof line?.said === 'string' ? scrubbed(line.said) : null;
+    return typeof line?.said === 'string' ? scrubbed(kernel.nameSpoken(line.said)) : null;
   };
 
   /**

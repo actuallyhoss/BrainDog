@@ -19,6 +19,7 @@
 import type { Clock, Param, Refusal, Result, Scheduler, Sql } from '@braindog/ports';
 import { clash, fixOf, no, ok, refused } from '@braindog/ports';
 
+import { nameSpokenIn } from './spoken-names.ts';
 import { coerce, currencyFixed, isAbsent, instant, measure, parseSpoken, range, type FieldDecl, type Json } from './coerce.ts';
 import { attempt } from './tx.ts';
 import { misread, sentencesOver, widens } from './widen.ts';
@@ -1651,6 +1652,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const said = row && field ? row.fields[field] : undefined;
     return typeof said === 'string' && said.trim() !== '' ? said.trim() : null;
   }
+
+  /** A sentence with the spoken ids in it said as the rows' names; one nothing answers to stays as written. */
+  const nameSpoken = (text: string): string => nameSpokenIn(text, titleOfRow);
 
   /** What a vault label's live entry says it opens, for a script's line to name beside the key (`scriptEgress`). */
   function opensOf(label: string): string | null {
@@ -6277,7 +6281,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       who: String(r.opened_by ?? ''),
       at: String(r.opened_at ?? ''),
       kind,
-      question: questionOf(sql, String(r.id)) ?? '',
+      question: nameSpoken(questionOf(sql, String(r.id)) ?? ''),
       why: typeof body.context === 'string' ? body.context : '',
       /* MONEY IS ALWAYS HARD TO UNDO, so a card that moves it is never accepted with Enter (`BAND_SQL` ranks it so, as
          `costOf` does). The floor is asked as well, since it reads a money field cleared, which no body spells. */
@@ -6843,7 +6847,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const sg = target?.startsWith('suggestion:') ? target.slice('suggestion:'.length) : null;
         const d = target?.startsWith('decision:') ? target.slice('decision:'.length) : null;
         const said = sg !== null ? questionOf(sql, sg) : d !== null ? (sql.one<{ q: string }>('SELECT question AS q FROM decision WHERE id = ?', d)?.q ?? null) : null;
-        return said === null || said.trim() === '' || said === '--erased--' ? null : said.trim();
+        return said === null || said.trim() === '' || said === '--erased--' ? null : nameSpoken(said.trim());
       };
       /* A RECORD SETTING ITSELF UP IS ONE ROW OF A FEED BLOCK TOO, as it is one line of `whatsNew` (`feed.ts`). */
       const setup = setupCollapser<Line>((line) => {
@@ -9513,7 +9517,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const theirs = typeof w === 'string' ? null : foreignRun<{ id: string }>(w);
         if (theirs) return theirs;
         /* THE TITLE IS THE RUN'S, NOT THE QUESTION'S: taken off before the body is checked, and kept nowhere else. */
-        const { title, ...asked } = p;
+        const { title, ...given } = p;
+        /* A QUESTION IS WRITTEN WITH NAMES: an agent's ids are turned into the rows' names as it is filed. */
+        const asked = typeof given.question === 'string' ? { ...given, question: nameSpoken(given.question) } : given;
         const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), asked, drafted);
         /* A JOINING RUN IS NOT TITLED after somebody else's question. */
         if (out.ok && !out.value.joined && out.value.answered === undefined) {
@@ -9525,7 +9531,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       }),
 
     /** A suggestion's question, which is its `suggest` event and no column: what a person reads it by. */
-    question: (id: string): string | null => questionOf(sql, id),
+    question: (id: string): string | null => {
+      const said = questionOf(sql, id);
+      return said === null ? null : nameSpoken(said);
+    },
+
+    /** A sentence with its spoken ids said as names, for a surface that draws a record sentence. */
+    nameSpoken,
 
     /**
      * WHAT THE DECISION CARD SAYS BESIDE ONE SUGGESTION, open or answered: the facts a page's queue puts on its question
