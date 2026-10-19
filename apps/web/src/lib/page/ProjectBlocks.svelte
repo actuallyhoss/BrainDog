@@ -12,7 +12,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import NextStep from '$lib/page/NextStep.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
-  import { blocksOf, spans, type Block, type DataRow, type Facts } from './project.ts';
+  import { blocksOf, spans, type Block, type DataRow, type Facts } from '$lib/record/project.ts';
 
   let {
     facts,

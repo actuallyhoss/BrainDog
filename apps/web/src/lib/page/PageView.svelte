@@ -50,6 +50,7 @@
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
   import PageBody from './PageBody.svelte';
+  import ProjectShape from './ProjectShape.svelte';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { arranged, emptyHidden } from './home.ts';
@@ -677,6 +678,8 @@
     <!-- The declaration as text. A page is a row, so this is the row (19 §2). -->
     <SourceView {slug} title={live.page.page.title} />
   {:else}
+    <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, as the row's own page does; its blocks follow. -->
+    {#if about}<ProjectShape register={about.register} seq={about.seq} />{/if}
     <PageBody
       mode="page"
       page={live.page.page}

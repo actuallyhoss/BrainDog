@@ -59,8 +59,8 @@
   import { Sparkline, Stacked } from '$lib/viz/index.ts';
   import { fieldWords } from '$lib/record/field-words.ts';
   import AddValue from './AddValue.svelte';
-  import ProjectBlocks from './ProjectBlocks.svelte';
-  import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, rowsOf, type Block, type DataRow, type Figure } from './project.ts';
+  import ProjectBlocks from '$lib/page/ProjectBlocks.svelte';
+  import { blockOf, blocksOf, isProject, shapeOf, type Figure } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
   import { putBackOf, valueWords } from '$lib/record/field-write.ts';
   import { draftOf, editable, isFile, isJson, isQuantity, patchOf, unitOf, unitsOf, wrongValue } from '$lib/record/field-draft.ts';
@@ -92,7 +92,7 @@
     type FigureReader,
     type MoneyIn,
     type OpenWork,
-  } from './figures.ts';
+  } from '$lib/record/figures.ts';
   import { METRICS } from '$lib/record/declared.ts';
   import { handFor } from '$lib/record/hand.ts';
   import type { Backlink } from '$lib/record/api.ts';
@@ -772,29 +772,14 @@
   const projectPage = $derived(isProject(decl));
   const pj = $derived.by(() => {
     if (!projectPage || !row || !decl) return null;
-    const name = String(row.fields[decl.title] ?? '').trim();
-    const placed = incoming.map((g) => ({ block: blockOf(REGISTERS[g.register]), rows: g.rows }));
-    const rows = (b: Exclude<Block, 'brief'>) => rowsOf(b, placed);
-    const tasks = rows('next');
-    const text = String(row.fields.next ?? '').trim();
-    const facts = {
-      brief: briefOf(row.fields, history, name),
-      next: text || tasks[0]?.title || null,
-      money: moneyLines(pjMoney),
-      people: rows('crew'),
-      agents: agentsOf(name, workingNow(), rows('workers')),
-      runsOn: rows('runs-on'),
-    };
-    const changed: DataRow[] = history.map((l, i) => ({ key: `h${i}`, title: l.note, detail: `${l.by}, ${l.at}`, href: null }));
-    const data: Partial<Record<Block, readonly DataRow[]>> = {
-      brief: facts.brief.length > 0 ? changed : [],
-      next: tasks,
-      money: rows('money'),
-      crew: facts.people,
-      workers: facts.agents.runs,
-      'runs-on': facts.runsOn,
-    };
-    return { facts, data, nextHref: text ? null : (tasks[0]?.href ?? null) };
+    return shapeOf({
+      fields: row.fields,
+      title: decl.title,
+      incoming: incoming.map((g) => ({ decl: REGISTERS[g.register], rows: g.rows })),
+      history,
+      money: pjMoney,
+      working: workingNow(),
+    });
   });
 
   const handoff = $derived.by(() => {

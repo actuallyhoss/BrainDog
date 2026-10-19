@@ -6,7 +6,7 @@
  * relative-imported so `project.test.ts` can hold the rules without a component.
  */
 
-import { briefFromNote } from '../../../../lib/record/brief.ts';
+import { briefFromNote } from './brief.ts';
 
 /** What of a list's declaration decides its part; the record says all of it, so no list is named here. */
 export type Decl = {
@@ -136,4 +136,43 @@ export function spans(blocks: readonly Block[]): Record<string, 1 | 2> {
     out[b] = partner && blocks.includes(partner) ? 1 : 2;
   }
   return out;
+}
+
+/** What a project's shape is made from, as the row's page and a declared page scoped to the row both hold it. */
+export type Source = {
+  /** The project row's fields, and the title field its list declares. */
+  fields: Readonly<Record<string, unknown>>;
+  title: string;
+  /** Each list that points at the row: its declaration and its rows. */
+  incoming: readonly { decl: Decl | undefined; rows: Pointing['rows'] }[];
+  history: readonly { note: string; by: string; at: string }[];
+  money: { in?: Figure | null; out?: Figure | null; owed?: Figure | null };
+  working: readonly Working[];
+};
+
+/** The facts, the rows behind each block and where the next step opens: one place both routes work them out. */
+export function shapeOf(s: Source): { facts: Facts; data: Partial<Record<Block, readonly DataRow[]>>; nextHref: string | null } {
+  const name = String(s.fields[s.title] ?? '').trim();
+  const placed = s.incoming.map((g) => ({ block: blockOf(g.decl), rows: g.rows }));
+  const rows = (b: Pointed) => rowsOf(b, placed);
+  const tasks = rows('next');
+  const text = String(s.fields.next ?? '').trim();
+  const facts: Facts = {
+    brief: briefOf(s.fields, s.history, name),
+    next: text || tasks[0]?.title || null,
+    money: moneyLines(s.money),
+    people: rows('crew'),
+    agents: agentsOf(name, s.working, rows('workers')),
+    runsOn: rows('runs-on'),
+  };
+  const changed: DataRow[] = s.history.map((l, i) => ({ key: `h${i}`, title: l.note, detail: `${l.by}, ${l.at}`, href: null }));
+  const data: Partial<Record<Block, readonly DataRow[]>> = {
+    brief: facts.brief.length > 0 ? changed : [],
+    next: tasks,
+    money: rows('money'),
+    crew: facts.people,
+    workers: facts.agents.runs,
+    'runs-on': facts.runsOn,
+  };
+  return { facts, data, nextHref: text ? null : (tasks[0]?.href ?? null) };
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, rowsOf, spans, type Facts } from './project.ts';
+import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, rowsOf, shapeOf, spans, type Facts } from './project.ts';
 
 const none: Facts = { brief: [], next: null, money: [], people: [], agents: { now: [], runs: [] }, runsOn: [] };
 const row = { key: '1', title: 'Kiln', detail: '', href: null };
@@ -57,6 +57,22 @@ test('WHAT IT RUNS ON IS BY NAME ONLY, AND A BLOCK TAKES ONLY ITS OWN LISTS', ()
   assert.deepEqual(rowsOf('runs-on', groups), [{ key: 'runs-on#3', title: 'Stripe key', detail: '', href: '/r/k/3' }]);
   assert.deepEqual(rowsOf('crew', groups).map((r) => [r.title, r.detail]), [['Mara', 'Designer']]);
   assert.deepEqual(rowsOf('workers', groups), []);
+});
+
+test('THE SHAPE IS WORKED OUT ONCE FOR BOTH PAGES: facts, the rows behind them, and where the next step opens', () => {
+  const out = shapeOf({
+    fields: { name: 'Lanternfish', about: 'Fan pages.', next: '' },
+    title: 'name',
+    incoming: [{ decl: { hand: 'owner', state: 'state', fields: [] }, rows: [{ key: '4', cells: ['Draft the launch'], href: '/r/task/4' }] }],
+    history: [{ note: 'Moved the date', by: 'Mara', at: '3 Sep' }],
+    money: {},
+    working: [{ agent: 'Builder', project: 'Lanternfish', doing: 'the page' }],
+  });
+  assert.deepEqual(out.facts.brief, ['Fan pages.']);
+  assert.equal(out.facts.next, 'Draft the launch');
+  assert.equal(out.nextHref, '/r/task/4');
+  assert.deepEqual(out.facts.agents.now.map((w) => w.agent), ['Builder']);
+  assert.equal(out.data.brief?.[0]?.detail, 'Mara, 3 Sep');
 });
 
 test('A BLOCK WHOSE PARTNER IS LEFT OUT TAKES THE WHOLE ROW', () => {
