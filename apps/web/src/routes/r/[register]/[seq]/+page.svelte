@@ -100,6 +100,7 @@
   import { movable, scopeFieldOf } from '$lib/record/scope-move.ts';
   import ScopeMove from './ScopeMove.svelte';
   import Timeline from './Timeline.svelte';
+  import TaskEffects from '$lib/record/TaskEffects.svelte';
   import { timelineWords } from './timeline.ts';
   import HandSheet from '$lib/ui/HandSheet.svelte';
   import UsedBy from '$lib/page/panels/UsedBy.svelte';
@@ -1380,6 +1381,9 @@
         <Tile title={timelineWords.heading}>
           {#if told?.from === 'refused'}
             <Empty kind="error" compact title={told.fix} />
+          {/if}
+          {#if live && row.seq !== null && decl?.state}
+            <TaskEffects register={id} seq={row.seq} stateField={decl?.state ?? null} done={decl?.done ?? []} finished={decl?.done?.includes(stateValue) ?? false} description={row.fields.description ?? row.fields.notes ?? row.fields.details ?? null} />
           {/if}
           {#if live}
             <Timeline on="{id}#{row.seq}" {history} now={clock} me={me || null} {people} onnames={askNames} />
