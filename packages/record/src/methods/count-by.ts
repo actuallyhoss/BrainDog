@@ -22,7 +22,7 @@
  * in it, so nothing is dropped without being said. `matched` is always the list's own, also when the walk stopped early.
  */
 
-import { whereFor, type Json } from '@braindog/kernel';
+import type { Json } from '@braindog/kernel';
 import type { Result } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
@@ -99,7 +99,7 @@ export function methods(deps: RecordDeps, limits: Limits = {}) {
           { at: 'by', allowed: countable },
         );
 
-      const rule = whereFor(ctx.wheres, args.register);
+      const rule = kernel.scope(ctx, args.register);
       const fast = tallied();
       const read =
         fast !== undefined && rule === undefined && readsEveryList?.(ctx) === true

@@ -33,7 +33,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { aboutOfRow, candidatesFor, entityLists, ftsQuery, nameWords, whereFor, type About, type AboutDeps, type AboutKind, type AboutSeen } from '@braindog/kernel';
+import { aboutOfRow, candidatesFor, entityLists, ftsQuery, nameWords, type About, type AboutDeps, type AboutKind, type AboutSeen } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import { scrubbed } from '../scrub.ts';
@@ -74,7 +74,7 @@ export function methods(deps: RecordDeps) {
   /** Whether a narrowed grant still admits one row, read again by its own number as `heldTwice` reads a person. */
   const admitted = (ctx: CallContext, register: string, seq: number | null): boolean => {
     if (seq === null) return true;
-    const rule = whereFor(ctx.wheres, register);
+    const rule = kernel.scope(ctx, register);
     if (rule === undefined) return true;
     const found = kernel.list({ register, where: { field: 'seq', is: seq }, limit: 1 }, rule);
     return found.ok && found.value.rows.length > 0;

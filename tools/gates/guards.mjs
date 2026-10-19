@@ -323,6 +323,16 @@ export default function guards(
     if (!/\breportBudget\(/.test(body)) findings.push('report is routed and its body spends no reportBudget(), so a report key has no limit');
   }
 
+  /**
+   * A READER THAT NARROWS BY THE GRANT ALONE CANNOT SEE A ROW ITS MAKER KEPT PRIVATE. `kernel.scope(ctx, list)` is the
+   * one read-scope helper (the grant and the private rows together), so a record reader that asks `whereFor(ctx.wheres, ...)`
+   * itself has forgotten the second half; a new reader cannot, because this finds it.
+   */
+  for (const file of [{ file: 'packages/record/src/index.ts', text: surface ?? '' }, ...folder(root, 'packages', 'record', 'src', 'methods'), ...folder(root, 'packages', 'record', 'src', 'sources')]) {
+    const code = file.text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    if (/\bwhereFor\(\s*ctx\.wheres\b/.test(code)) findings.push(`${file.file} reads a list through whereFor(ctx.wheres, ...), which leaves out no private row: ask kernel.scope(ctx, list)`);
+  }
+
   if (findings.length === 0) {
     const shape = Object.keys(IMPLIES)
       .map((g) => [g, routes.filter((r) => r.group === g).length])

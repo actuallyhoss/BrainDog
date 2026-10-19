@@ -301,6 +301,13 @@ export const lists = {
   editNoChange: 'Nothing was changed.',
   /* Archive and put back, on the row itself, in the words the list already uses for the same verb. */
   rowArchive: 'Archive',
+  /* A ROW ITS MAKER KEEPS TO THEMSELVES: the menu's two verbs, the lock's label and the line that says who can see it. */
+  rowKeepPrivate: 'Private to me',
+  rowShareAgain: 'Share with everyone',
+  rowPrivateLock: 'Private',
+  rowSeenByOnlyYou: 'Only you can see this. Nobody else on the record, and nothing sent out of it, includes it.',
+  rowSeenByAll: (list: string): string => `Everyone who can open ${list} can see this.`,
+  rowPrivateNotDone: 'That did not save. Try again.',
   rowRestore: 'Put back',
   rowRestored: (what: string) => `${what} is back.`,
   /* The row is archived: said on the row, because every list leaves it out and nothing else here would. */

@@ -64,6 +64,9 @@ export type RecordRow = {
   created_at: string;
   /** A page's answer cut a long text in it short (the kernel's `leanRows`); `get` answers the same row whole. */
   clipped?: true;
+  /** Kept private by its maker, who is the one reading it; and, on `get`, whether the reader made it. */
+  private?: true;
+  mine?: true;
 };
 
 /**
@@ -505,7 +508,7 @@ export function entryOf(register: string, row: RecordRow, refs: Refs): Entry {
     else fields[key] = ((map && typeof value === 'string' ? map.seqOf.get(value) : undefined) ?? value) as Fields[string];
   }
   const id = typeof row.id === 'string' && row.id !== '' ? { id: row.id } : {};
-  return { ...id, seq: row.seq ?? 0, fields, version: row.version, created: row.created_at, by: '', ...(row.clipped === true ? { clipped: true as const } : {}) };
+  return { ...id, seq: row.seq ?? 0, fields, version: row.version, created: row.created_at, by: '', ...(row.clipped === true ? { clipped: true as const } : {}), ...(row.private === true ? { private: true as const } : {}), ...(row.mine === true ? { mine: true as const } : {}) };
 }
 
 /** The sort in the address, as the record's `order`. */

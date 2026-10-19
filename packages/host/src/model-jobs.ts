@@ -97,7 +97,8 @@ const SHAPE_SAMPLES_MOST = 5;
 const SHAPE_PAGES = 5;
 
 /** The record reading its own inbox for its own job: nobody asked, so nobody's reach decides, as `SLASH_CTX` is read. */
-const RECORD_CTX: CallContext = { principal: { kind: 'system', id: 'slash' } };
+/* `outbound`: what Slash reads goes to a model, so no row anyone kept private goes with it. */
+const RECORD_CTX: CallContext = { principal: { kind: 'system', id: 'slash' }, outbound: true };
 
 /**
  * The refusals a retry can change: a model not reached, and a month spent under a cap the engine holds as well as this

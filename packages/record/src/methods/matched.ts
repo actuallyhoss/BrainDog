@@ -34,7 +34,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { LADDER_RULE, MET_CAP, SLASH, foldFill, identityFloor, shapeIn, whereFor } from '@braindog/kernel';
+import { LADDER_RULE, MET_CAP, SLASH, foldFill, identityFloor, shapeIn } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -228,7 +228,7 @@ export function methods(deps: RecordDeps) {
       };
       /* SOMEBODY A NARROWED GRANT LEAVES OUT IS NOT THERE FOR THIS CALLER, read as `heldTwice` reads it: the one kept,
          again by their own number under the grant's rule. A grant that is whole admits everybody. */
-      const rule = whereFor(ctx.wheres, register);
+      const rule = kernel.scope(ctx, register);
       const admitted = (seq: number | null): boolean => {
         if (rule === undefined) return true;
         if (seq === null) return false;

@@ -192,6 +192,11 @@ const parsed = (text: string): Json => {
  * sentence or a tree is a rule; `null`, a number or a list is one the record could not read.
  */
 export function ruleOf(where: Json, schema: Schema, ctx: EvalContext): Compiled {
+  /* A READ SCOPE (`scopeFor`): the grant's rule, if any, and the private rows left out for this viewer. */
+  if (isScope(where)) {
+    const inner = Object.hasOwn(where, 'rule') ? ruleOf(where.rule as Json, schema, ctx) : null;
+    return exceptPrivate(narrowed({ sql: '(1)', params: [], bad: [] }, inner), where[SCOPE]);
+  }
   if (typeof where !== 'string' && (where === null || typeof where !== 'object' || Array.isArray(where)))
     return { sql: '', params: [], bad: [{ code: 'VALUE_MALFORMED', fix: 'A rule is a where: a sentence, or the conditions a filter holds.' }] };
   const said = predicateOf(where as Parameters<typeof predicateOf>[0], schema, ctx);
@@ -211,6 +216,46 @@ export function narrowed(asked: Compiled, rule: Compiled | null): Compiled {
   if (rule.bad.length) return { sql: `(${asked.sql}) AND 0`, params: asked.params, bad: [] };
   return { sql: `(${asked.sql}) AND (${rule.sql})`, params: [...asked.params, ...rule.params], bad: [] };
 }
+
+/* THE KEY A READ SCOPE CARRIES ITS VIEWER UNDER. A list id never starts with a dollar sign, so it cannot be mistaken for a rule. */
+const SCOPE = '$scope';
+type Scope = { [SCOPE]: string; rule?: Json };
+const isScope = (where: unknown): where is Scope =>
+  typeof where === 'object' && where !== null && !Array.isArray(where) && typeof (where as Record<string, unknown>)[SCOPE] === 'string';
+
+/**
+ * A ROW ITS MAKER KEPT PRIVATE (migration 40) LEFT OUT for anybody but that maker. The one clause every scoped read ends
+ * in, so a reader that is handed a scope cannot forget it. A rule that cannot be read stays as `narrowed` made it.
+ */
+export function exceptPrivate(c: Compiled, viewer: string): Compiled {
+  return c.bad.length ? c : { sql: `(${c.sql}) AND id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)`, params: [...c.params, viewer], bad: [] };
+}
+
+/**
+ * THE ONE READ-SCOPE HELPER: what a reader hands the kernel for one list. The caller's grant rule (`whereFor`), and, when
+ * somebody else has kept a row private, the viewer too, so `list`, `count` and every reader built on them leave it out.
+ * `undefined` is still "every row", which is the answer while nothing is private, so the fast whole-list paths stand
+ * until a private row exists. `hidden` is whether any row is private to somebody other than the viewer.
+ */
+export function scopeFor(wheres: Readonly<Wheres> | undefined, register: string, viewer: string | undefined, hidden: boolean): Json | undefined {
+  const rule = whereFor(wheres, register);
+  if (viewer === undefined || !hidden) return rule;
+  return (rule === undefined ? { [SCOPE]: viewer } : { [SCOPE]: viewer, rule }) as Json;
+}
+
+/**
+ * A VIEWER WHO IS NOBODY, for a read that leaves the record (a mail, a push, the written brief, what a model is sent):
+ * every private row is left out of it, whoever made it, because the person it goes to is not the maker.
+ */
+export const NOBODY = '';
+
+/** Who is looking, for the rows their makers kept private: a person, or the person an agent's token acts for. A share link is nobody, so it sees no private row. The system has none and reads the whole record. */
+export const viewerOfPrincipal = (p: { kind: string; id: string; person?: string }): string | undefined =>
+  p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : p.kind === 'share' ? NOBODY : undefined;
+
+/** Who a read is for: the person looking, or `NOBODY` when it leaves the record (`outbound`), else no one in particular. */
+export const viewerOfRead = (ctx: { principal: { kind: string; id: string; person?: string }; outbound?: boolean | undefined }): string | undefined =>
+  ctx.outbound === true ? NOBODY : viewerOfPrincipal(ctx.principal);
 
 /** The rule a caller's grant holds on one list, or `undefined` when that list is every row to them. */
 export const whereFor = (wheres: Readonly<Wheres> | undefined, register: string): Json | undefined =>

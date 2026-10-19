@@ -18,7 +18,7 @@
  * three times it runs are job b's (`index.ts`), which reads this same walk.
  */
 
-import { whereFor, type BlockResult, type Entry, type PageBlock, type PageResult } from '@braindog/kernel';
+import { viewerOfRead, type BlockResult, type Entry, type PageBlock, type PageResult } from '@braindog/kernel';
 import type { Result } from '@braindog/ports';
 import { TYPED } from 'braindog-render';
 
@@ -126,7 +126,7 @@ export function methods(deps: RecordDeps) {
       if (docs.length === 0) continue;
       const own = list.fields.filter((f) => !f.retired).map((f) => f.id);
       const ownLists = list.fields.filter((f) => f.type === 'list').map((f) => f.id);
-      const rule = whereFor(ctx.wheres, id);
+      const rule = kernel.scope(ctx, id);
       let read = 0;
       for (let cursor: string | null | undefined; cursor !== null && read < TEXT_ROWS_MOST && clock.now() - start <= ASK_MS; ) {
         const got = kernel.list({ register: id, limit: 500, reads: (other: string) => readable(ctx, other) === null, ...(cursor ? { cursor } : {}) }, rule);
@@ -263,7 +263,7 @@ export function methods(deps: RecordDeps) {
       if (was !== undefined && was.stamp === stamp && start - was.at < KEPT_MS && start >= was.at) return { ok: true, value: was.value };
       /* ONE WALK FOR THE WHOLE CALL (`pageWalk`): a figure two pages read is read once, and so is every declaration the
          lists of a block are named from. It writes nothing, so nothing it kept can change under it. */
-      const walk = kernel.pageWalk({ hostSources: hostSourcesOf({ kernel, ctx, readable }) });
+      const walk = kernel.pageWalk({ hostSources: hostSourcesOf({ kernel, ctx, readable }), viewer: viewerOfRead(ctx) });
       const docs = documents(ctx, start, walk);
       const pages = pagesFor(ctx, docs, start, walk);
       const names = namesFor(ctx, [...docs.map((d) => d.text), ...pages.flatMap((p) => p.parts.map((x) => x.text))], walk);

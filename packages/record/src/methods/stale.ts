@@ -32,7 +32,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { BODY_KINDS, causeOfFinder, finders, openHandoffs, sessionDeclaration, tokenOfRun, whereFor } from '@braindog/kernel';
+import { BODY_KINDS, causeOfFinder, finders, openHandoffs, sessionDeclaration, tokenOfRun } from '@braindog/kernel';
 import type { BodyKind, Entry, Finder, HandoffPlace, Json, OpenHandoff } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
@@ -137,7 +137,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
      waits. Each run is read under the caller's own grant, so a run they may not read leaves no step here. */
   const runsOpen = readable(ctx, SESSION) === null;
   if (runsOpen) {
-    const got = kernel.list({ register: SESSION, where: { field: 'state', is: 'handoff' }, limit: READ_MOST }, whereFor(ctx.wheres, SESSION));
+    const got = kernel.list({ register: SESSION, where: { field: 'state', is: 'handoff' }, limit: READ_MOST }, kernel.scope(ctx, SESSION));
     const placed = (v: Json | undefined): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
     const here = token === null ? null : placed(ctx.session?.repo as Json | undefined);
     const runs = new Set<string>();
@@ -225,7 +225,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
     };
     const got = kernel.list(
       { register: id, where: { all: [...held, unconfirmed] } as never, order: [{ field: 'created_at', dir: 'asc' }], limit: READ_MOST },
-      whereFor(ctx.wheres, id),
+      kernel.scope(ctx, id),
     );
     if (!got.ok || got.value.rows.length === 0) continue;
     const aged = got.value.rows
@@ -262,7 +262,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
   const unnamed = everyBehind.length - behind.length;
   const skillsIn = behind[0] === undefined ? null : (kernel.get(behind[0].at)?.register ?? null);
   const lessonsIn = behind[0]?.learnings[0] === undefined ? null : (kernel.get(behind[0].learnings[0].id)?.register ?? null);
-  const readsWhole = (list: string): boolean => readable(ctx, list) === null && whereFor(ctx.wheres, list) === undefined;
+  const readsWhole = (list: string): boolean => readable(ctx, list) === null && kernel.scope(ctx, list) === undefined;
   const skillsAre = skillsIn === null ? undefined : kernel.register(skillsIn);
   const lessonsAre = lessonsIn === null ? undefined : kernel.register(lessonsIn);
   if (skillsIn !== null && lessonsIn !== null && skillsAre && lessonsAre && readsWhole(skillsIn) && readsWhole(lessonsIn)) {
@@ -443,7 +443,7 @@ function scopeGather(deps: RecordDeps, ctx: CallContext, nowMs: number, only: st
     const out: Entry[] = [];
     let cursor: string | null = null;
     do {
-      const got = kernel.list({ register: list, limit: SCOPE_PAGE, ...(cursor === null ? {} : { cursor }) }, whereFor(ctx.wheres, list));
+      const got = kernel.list({ register: list, limit: SCOPE_PAGE, ...(cursor === null ? {} : { cursor }) }, kernel.scope(ctx, list));
       if (!got.ok) break;
       out.push(...got.value.rows);
       cursor = got.value.cursor;

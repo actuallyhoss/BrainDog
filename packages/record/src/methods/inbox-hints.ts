@@ -28,7 +28,7 @@
  */
 
 import { scanMoney, type CurrencyTable } from '@braindog/extract';
-import { candidatesFor, entityLists, exponentOf, moneyText, senderOf, whereFor, type AboutDeps } from '@braindog/kernel';
+import { candidatesFor, entityLists, exponentOf, moneyText, senderOf, type AboutDeps } from '@braindog/kernel';
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
@@ -95,7 +95,7 @@ export function methods(deps: RecordDeps) {
 
   /** Whether a narrowed grant still admits one row, read again by its own number, as `about` reads it. */
   const admitted = (ctx: CallContext, register: string, id: string): boolean => {
-    const rule = whereFor(ctx.wheres, register);
+    const rule = kernel.scope(ctx, register);
     if (rule === undefined) return true;
     const seq = kernel.get(id)?.seq ?? null;
     if (seq === null) return false;

@@ -18,7 +18,7 @@
  */
 
 import type { Refusal, Result, Sql } from '@braindog/ports';
-import { ulids, whereFor } from '@braindog/kernel';
+import { ulids } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -59,7 +59,7 @@ export function methods(deps: RecordDeps & { nudgeAction?: NudgeAction | undefin
     if (row === null) return guard(ctx, 'write');
     const stop = guard(ctx, 'write', row.register);
     if (stop) return stop;
-    const rule = whereFor(ctx.wheres, row.register);
+    const rule = kernel.scope(ctx, row.register);
     if (rule === undefined || row.seq === null) return null;
     const found = kernel.list({ register: row.register, where: { field: 'seq', is: row.seq }, includeDeleted: true, limit: 1 }, rule);
     return found.ok && found.value.rows.length > 0

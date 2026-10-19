@@ -26,7 +26,7 @@ import { misread, sentencesOver, widens } from './widen.ts';
 import { ulids, type Mint } from './ids.ts';
 import { FORMAT_VERSION, applyMigrations, schemaRefusal, type SchemaState } from './migrate.ts';
 import { renameDeclarations } from './migrations/0016_slash.ts';
-import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, type Compiled, type Predicate, type Schema } from '@braindog/where';
+import { jsonPath, compile, derivedFault, fieldSqlIn, addressable, isColumn, type Predicate, type Schema } from '@braindog/where';
 import {
   disablePack as disableDeclaredPack,
   enablePack as enableDeclaredPack,
@@ -101,7 +101,7 @@ import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
-import { narrowed, ruleOf, type Wheres } from './members.ts';
+import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, type Wheres } from './members.ts';
 import { stopped as stoppedOf, type Suspended } from './members.ts';
 import {
   GONE as INVITE_GONE,
@@ -572,7 +572,7 @@ export { AGENTS_KEY, agentCap, agentsFull, liveAgents, type AgentCap } from './t
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member } from './members.ts';
-export { whereFor, WHERE_MAX_CHARS, type Wheres } from './members.ts';
+export { whereFor, scopeFor, NOBODY, viewerOfPrincipal, viewerOfRead, WHERE_MAX_CHARS, type Wheres } from './members.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
@@ -904,6 +904,10 @@ export type Entry = {
   batch?: string;
   /** On a write's answer only: true when an op_id replayed a write already made, so nothing new was written. */
   replayed?: true;
+  /** On a row `list` or `get` answers a viewer: its maker kept it to themselves (migration 40), so only they are reading it. */
+  private?: true;
+  /** On a row `get` answers: the viewer made it, so the viewer may keep it private or share it again. */
+  mine?: true;
 };
 
 export type Patch = Record<string, unknown>;
@@ -1832,10 +1836,27 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /* A ROW ITS MAKER KEPT PRIVATE (migration 40) IS LEFT OUT OF EVERY READ HANDED THE VIEWER, for anybody but that maker.
      No viewer is a read of the whole record (a rule, an import, the system), which is how every reader behaved before. */
-  const privately = (c: Compiled, viewer?: string): Compiled =>
-    viewer === undefined || c.bad.length
-      ? c
-      : { sql: `(${c.sql}) AND id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)`, params: [...c.params, viewer], bad: [] };
+  /* `scope` BELOW IS THE ONE READ-SCOPE HELPER; the private clause is part of the rule it hands `list` and `count` (`ruleOf`). */
+
+  /** Whether any row (of one list, when named) is private to somebody other than the viewer, which is when a scope has anything to leave out. */
+  const anyHiddenFrom = (viewer: string | undefined, register?: string): boolean =>
+    viewer !== undefined &&
+    (register === undefined
+      ? sql.one('SELECT 1 AS y FROM entry_private WHERE person_id <> ? LIMIT 1', viewer)
+      : sql.one('SELECT 1 AS y FROM entry_private p JOIN entry e ON e.id = p.entry_id WHERE p.person_id <> ? AND e.register = ? LIMIT 1', viewer, register)) !== undefined;
+
+  /**
+   * THE ONE READ-SCOPE HELPER every reader asks for a list, in place of `whereFor(ctx.wheres, register)`: the caller's
+   * grant rule and the private rows left out for them, as one value `list` and `count` understand (`scopeFor`).
+   */
+  const scope = (ctx: { wheres?: Readonly<Wheres> | undefined; principal: { kind: string; id: string; person?: string }; outbound?: boolean | undefined }, register: string): Json | undefined => {
+    const viewer = viewerOfRead(ctx);
+    return scopeFor(ctx.wheres, register, viewer, anyHiddenFrom(viewer, register));
+  };
+
+  /** Which of these rows are private, by id, so a list can mark them: a lock beside a row its viewer kept to themselves. */
+  const privateAmong = (ids: readonly string[]): Set<string> =>
+    ids.length === 0 ? new Set() : new Set(sql.all<{ entry_id: string }>(`SELECT entry_id FROM entry_private WHERE entry_id IN (${ids.map(() => '?').join(', ')})`, ...ids).map((r) => r.entry_id));
 
   /** Whether a row is private to somebody other than the viewer: then it is theirs alone and reads as absent. */
   const hiddenFrom = (id: string, viewer: string | undefined): boolean =>
@@ -1860,8 +1881,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /* `grant` IS THE CALLER'S RULE ON THIS LIST (`whereFor(ctx.wheres, register)`), so a narrowed member counts only the
      rows they reach; one that cannot be read counts none (`narrowed` in `members.ts`). Absent, every live row. */
-  const count = (register: string, grant?: Json, viewer?: string): number => {
-    const c = privately(narrowed({ sql: '(1)', params: [], bad: [] }, grant === undefined ? null : ruleOf(grant, schemaOf(register), evalContext())), viewer);
+  const count = (register: string, grant?: Json): number => {
+    const c = narrowed({ sql: '(1)', params: [], bad: [] }, grant === undefined ? null : ruleOf(grant, schemaOf(register), evalContext()));
     return Number(
       sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})`, register, ...c.params)?.n ?? 0,
     );
@@ -3327,7 +3348,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /* THE QUESTION'S SHAPE IS `ListQuery` IN `parts.ts`, with the reasons for each of its keys, so an extension handed
      `list` and this function read one type. */
-  function list(q: ListQuery, grant?: Json, viewer?: string): Result<Listed> {
+  function list(q: ListQuery, grant?: Json): Result<Listed> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
     if (!registers.has(q.register))
@@ -3350,7 +3371,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND THE CALLER'S GRANT, when theirs is narrowed to the rows matching one `where` (`CallContext.wheres`): the page,
        its cursor and `matched` all come from the one clause, so a narrowed member is never told how many rows they
        cannot see. */
-    const c = privately(narrowed(compile(said.predicate, schema), grant === undefined ? null : ruleOf(grant, schema, evalContext())), viewer);
+    const c = narrowed(compile(said.predicate, schema), grant === undefined ? null : ruleOf(grant, schema, evalContext()));
     if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
 
     /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote: `cursor=5` is a number
@@ -3605,6 +3626,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     only?: readonly string[];
     limit?: number;
     cursor?: string | null;
+    /** Who is asking, so rows kept private to somebody else are neither the row asked about nor one that points at it. */
+    viewer?: string | undefined;
   }): Result<Backlinks> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
@@ -3617,7 +3640,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* A ROW THAT IS NOT THERE HAS NOTHING POINTING AT IT, and saying so is not a refusal: `get`
        answers `null` for the same row, and two reads of one row disagreeing about whether it exists
        is worse than an empty answer. */
+    /* A PRIVATE ROW READS AS ABSENT, as `get` answers it. */
     if (!row) return ok({ to, from: [], cursor: null });
+    if (hiddenFrom(row.id, q.viewer)) return ok({ to: { register: q.register, seq: null, id: null }, from: [], cursor: null });
 
     const parts = typeof q.cursor === 'string' && q.cursor !== '' ? q.cursor.split('|') : null;
     if (parts !== null && (parts.length !== 3 || !/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(parts[0] ?? '')))
@@ -3650,7 +3675,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const resuming = at !== null;
       at = null;
 
-      const where = `register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${pair.field}') = ? AND id <> ?`;
+      const where = `register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${pair.field}') = ? AND id <> ?${q.viewer === undefined ? '' : ' AND id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)'}`;
+      const who = q.viewer === undefined ? [] : [q.viewer];
       /* ONE MORE THAN THERE IS ROOM FOR, which is how the walk learns there is a next page without
          asking a second question, and how a relation whose rows are all drawn still notices the next
          relation has some. */
@@ -3661,6 +3687,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             pair.register,
             row.id,
             row.id,
+            ...who,
             parts![1]!,
             parts![1]!,
             parts![2]!,
@@ -3671,6 +3698,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             pair.register,
             row.id,
             row.id,
+            ...who,
             want,
           );
       if (page.length === 0) continue;
@@ -3678,7 +3706,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const rows = page.slice(0, limit - taken).map(hydrate);
       if (rows.length > 0) {
         const matched = Number(
-          sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, pair.register, row.id, row.id)?.n ?? 0,
+          sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, pair.register, row.id, row.id, ...who)?.n ?? 0,
         );
         from.push({ register: pair.register, field: pair.field, matched, rows });
         taken += rows.length;
@@ -6255,7 +6283,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * against the field's `to`, so the staged registers count as registers for it, with no row in any
    * of them yet.
    */
-  const evalContext = (staged: readonly Declaration[] = []): EvalContext => ({
+  /**
+   * THE READ CONTEXT OF A VIEWER: every list it compiles is held to the rows nobody else kept private (`Schema.except`), so
+   * a figure, a forecast or a table read through it cannot count a private row. Unchanged when no row is hidden from them.
+   */
+  const withViewer = (viewer: string | undefined, c: EvalContext): EvalContext => {
+    if (viewer === undefined || !anyHiddenFrom(viewer)) return c;
+    const inner = c.schemaOf;
+    return { ...c, schemaOf: (register) => {
+      const s = inner(register);
+      return s === null ? null : { ...s, except: viewer };
+    } };
+  };
+
+  const evalContext = (staged: readonly Declaration[] = [], viewer?: string): EvalContext => withViewer(viewer, {
     nowMs: clock.now(),
     /* THE RECORD'S ZONE, SO A LIVE READ NAMES THE DAY THE NIGHT POINT WILL BE STORED UNDER. Without it
        `metric`, `list` and every page block dated `today` by UTC while `snapshot` dated it locally: in
@@ -6614,7 +6655,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     };
   };
 
-  const pageDeps = (): PageDeps => ({
+  const pageDeps = (viewer?: string): PageDeps => ({
     pages: () =>
       sql
         .all<{ body: string }>("SELECT body FROM declaration WHERE kind = 'page' AND superseded_at IS NULL AND retired = 0")
@@ -6628,7 +6669,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
          how many questions are waiting without a pack declaring the count. */
       return row ? liveTarget(sql, JSON.parse(row.body) as MetricDecl, evalContext()) : builtInFigure(id);
     },
-    read: (decl) => evaluateMetric(sql, decl, evalContext()),
+    read: (decl) => evaluateMetric(sql, decl, evalContext([], viewer)),
     list: (q) => {
       /* AND THE ORDER GOES THROUGH. It was dropped here, silently, which is the one place a
          forwarded query can be wrong without anybody seeing it: the block asked, `list` could
@@ -6639,7 +6680,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ...(q.limit ? { limit: q.limit } : {}),
         ...(q.order?.length ? { order: q.order } : {}),
         ...(q.cursor ? { cursor: q.cursor } : {}),
-      });
+      }, scopeFor(undefined, q.register, viewer, anyHiddenFrom(viewer, q.register)));
       return out.ok ? ok({ rows: out.value.rows, matched: out.value.matched, cursor: out.value.cursor }) : out;
     },
     schemaOf: (register) => (registers.has(register) ? schemaOf(register) : null),
@@ -6663,7 +6704,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     handoffs: (project) => openSteps(sql, clock.now(), project),
     /* WHAT WENT QUIET (`openExceptions`, ENG-B13), over every list this record declares but the kernel's own list of
        runs, so an `exceptions` block draws them. Without this line the block refuses as not in this build. */
-    exceptions: () => openExceptions(sql, clock.now(), watchedLists()),
+    exceptions: () => openExceptions(sql, clock.now(), watchedLists().filter((l) => !anyHiddenFrom(viewer, l.id))),
     blocking: (project) => actionsBlocking(sql, clock.now(), project, recordTz()),
     /* `into` GOES THROUGH, so a walk opened from one book walks in the book's own currency. Dropped here, the page asked
        for the book's currency and this host walked the home one, drawn once per currency instead. */
@@ -6678,13 +6719,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       );
       return out.ok ? out.value : null;
     },
-    ctx: evalContext(),
+    ctx: evalContext([], viewer),
     tz: recordIdentity(sql)?.tz ?? 'UTC',
     /* THE FOUR FIELDS A MEASURE NEEDS AND NOTHING ELSE, by the same expressions an index on them is built from, and the
        newest reading of each measure beside them so a measure that went quiet still says when it last spoke. */
     readings: (q) => {
       if (!registers.has(q.register)) return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
-      const schema = schemaOf(q.register);
+      const schema = { ...schemaOf(q.register), ...(anyHiddenFrom(viewer, q.register) ? { except: viewer } : {}) };
       const c = compile(q.where, schema);
       if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
       const at = fieldSqlIn(schema, q.when);
@@ -7023,14 +7064,17 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     activity: (limit) => {
       type Raw = { rowid: number; ts: string; actor: string; kind: string; target: string | null; target_kind: string | null; field: string | null; from_v: string | null; to_v: string | null; note: string | null };
       const lines: Raw[] = [];
+      /* A LINE ABOUT A ROW SOMEBODY ELSE KEPT PRIVATE IS NOT IN THE FEED (migration 40), whoever the feed is drawn for. */
+      const kept = viewer === undefined ? '' : " AND NOT (target LIKE 'entry:%' AND substr(target, 7) IN (SELECT entry_id FROM entry_private WHERE person_id <> ?))";
       let before = Number.MAX_SAFE_INTEGER;
       for (let walked = 0; lines.length < limit && walked < FEED_WALK; ) {
         const batch = sql.all<Raw>(
           `SELECT rowid, ts, actor, kind, target, target_kind, field, from_v, to_v, note FROM event
             WHERE rowid < ? AND kind NOT LIKE 'grant.%' AND kind NOT LIKE 'access.%' AND kind NOT LIKE 'share.%'
-              AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')
+              AND COALESCE(target_kind, '') NOT IN ('grant', 'vault_key', 'device_grant', 'member', 'person')${kept}
             ORDER BY rowid DESC LIMIT ?`,
           before,
+          ...(viewer === undefined ? [] : [viewer]),
           FEED_BATCH,
         );
         for (const e of batch) {
@@ -7115,7 +7159,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * owners are, and what time it is where the customer is.
    */
   const digestDeps = (): DigestDeps => {
-    const deps = pageDeps();
+    /* A DIGEST GOES BY MAIL AND PUSH TO THE OWNERS, so it is read as NOBODY: no private row of anyone is in it. */
+    const deps = pageDeps(NOBODY);
     return {
       metric: deps.metric,
       read: deps.read,
@@ -8311,13 +8356,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * functions for one query, so the record's own count of the searches that found nothing stays a count of
    * searches rather than of code paths.
    */
-  function searchMatched(q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}): Searched {
+  function searchMatched(q: string, opts: { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined } = {}): Searched {
     const found = ftsSearchMatched(sql, q, opts);
     if (found.hits.length === 0 && q.trim()) observe(sql, clock.now(), [{ kind: 'search.empty', subject: q.trim().toLowerCase().slice(0, 60) }]);
     return found;
   }
 
-  function search(q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}): Hit[] {
+  function search(q: string, opts: { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined } = {}): Hit[] {
     const hits = ftsSearch(sql, q, opts);
     /* A SEARCH THAT FOUND NOTHING IS THE ONE OBSERVATION WORTH MAKING ABOUT READING. It is the
        record failing at the thing it exists for, in a way nobody reports — people try one more
@@ -8496,12 +8541,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        record, so a figure filled with a hidden client's title counted that client's jobs for a member who could not
        list them, and the record's door made up for it with a second `list` and a refusal of its own
        (`test/metric-reads.test.ts`). Handed `reads`, a ref into a list she cannot read names no row, as it does there. */
-    metric: (decl: MetricDecl, o: { reads?: (register: string) => boolean } = {}): Result<Reading> =>
+    metric: (decl: MetricDecl, o: { reads?: (register: string) => boolean; viewer?: string | undefined } = {}): Result<Reading> =>
       evaluateMetric(
         sql,
-        liveTarget(sql, decl, evalContext()),
+        liveTarget(sql, decl, evalContext([], o.viewer)),
         /* AND A HOP IN IT HELD TO WHAT SHE READS (`readerSchemaOf`), as `list` holds one. */
-        o.reads === undefined ? evalContext() : { ...evalContext(), reads: o.reads, schemaOf: readerSchemaOf(o.reads) },
+        o.reads === undefined
+          ? evalContext([], o.viewer)
+          : withViewer(o.viewer, { ...evalContext(), reads: o.reads, schemaOf: readerSchemaOf(o.reads) }),
       ),
 
     /* ── pages ──────────────────────────────────────────────────── */
@@ -8562,11 +8609,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         runs?: ReadonlySet<string>;
         hostSources?: PageDeps['hostSources'];
         actorName?: PageDeps['actorName'];
+        /** Who is reading, so rows kept private to somebody else are neither drawn nor counted. */
+        viewer?: string | undefined;
       } = {},
     ): Result<PageResult> =>
       readPage(
         {
-          ...pageDeps(),
+          ...pageDeps(opts.viewer),
           /* WHAT THE RECORD READS THAT THE KERNEL CANNOT (`lists`, `pages`), and the names it holds for the people in the log. */
           ...(opts.hostSources ? { hostSources: opts.hostSources } : {}),
           ...(opts.actorName ? { actorName: opts.actorName } : {}),
@@ -8598,14 +8647,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * change under it. Each reading is handed out as a copy, so a block that reshapes one never reshapes the next's.
      */
     pageWalk: (
-      opts: { hostSources?: PageDeps['hostSources']; actorName?: PageDeps['actorName'] } = {},
+      opts: { hostSources?: PageDeps['hostSources']; actorName?: PageDeps['actorName']; viewer?: string | undefined } = {},
     ): {
       page: (slug: string, filter?: Readonly<Record<string, string>>) => Result<PageResult>;
       block: (decl: PageBlock, opts?: { here?: Entry }) => BlockResult;
       blockRegisters: (block: PageBlock) => string[];
     } => {
       const base = declaredOnce({
-        ...pageDeps(),
+        ...pageDeps(opts.viewer),
         ...(opts.hostSources ? { hostSources: opts.hostSources } : {}),
         ...(opts.actorName ? { actorName: opts.actorName } : {}),
       });
@@ -9067,11 +9116,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         one-block preview tells a `signs` block in the kernel's quiet words to a key the inbox does not reach. */
     block: (
       decl: PageBlock,
-      opts: { walk?: number | 'last'; inbox?: boolean; here?: Entry; level?: string; readerIs?: PageDeps['readerIs']; runs?: ReadonlySet<string> } = {},
+      opts: { walk?: number | 'last'; inbox?: boolean; here?: Entry; level?: string; readerIs?: PageDeps['readerIs']; runs?: ReadonlySet<string>; viewer?: string | undefined } = {},
     ): BlockResult =>
       readBlock(
         {
-          ...pageDeps(),
+          ...pageDeps(opts.viewer),
           ...(opts.walk === undefined ? {} : { walk: opts.walk }),
           ...(opts.inbox === undefined ? {} : { reader: { hold: (b: BlockResult) => b, inbox: opts.inbox } }),
           ...(opts.here === undefined ? {} : { here: opts.here }),
@@ -11069,6 +11118,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     count,
     /** Rows a maker kept private (migration 40): `hiddenFrom` for a reader that answers one row, `setPrivate` to mark one. */
     hiddenFrom,
+    anyHiddenFrom,
+    privateAmong,
+    madeBy: (id: string): string | null => madeByIn(sql, id),
+    scope,
     setPrivate,
     version,
     history,

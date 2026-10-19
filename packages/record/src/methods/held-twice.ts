@@ -27,7 +27,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { peopleTwiceIdsIn, whereFor } from '@braindog/kernel';
+import { peopleTwiceIdsIn } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -208,7 +208,7 @@ export function methods(deps: RecordDeps, readers?: SameReaders) {
   /* SOMETHING A NARROWED GRANT LEAVES OUT IS NOT THERE FOR THIS CALLER, read as `sameOne` reads it: the row again by its
      own number under the grant's rule. A grant that is whole admits everything. */
   const admittedBy = (ctx: CallContext, register: string) => {
-    const rule = whereFor(ctx.wheres, register);
+    const rule = kernel.scope(ctx, register);
     return (seq: number): boolean => {
       if (rule === undefined) return true;
       const found = kernel.list({ register, where: { field: 'seq', is: seq }, limit: 1 }, rule);

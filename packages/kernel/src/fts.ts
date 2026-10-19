@@ -119,7 +119,8 @@ export function ftsQuery(q: string): string | null {
 export type Hit = { id: string; register: string; rank: number };
 
 /** What a search is asked: the words, the registers the caller may see, and how many hits to draw. */
-type Ask = { registers?: readonly string[] | undefined; limit?: number };
+/* `viewer` LEAVES OUT THE ROWS SOMEBODY ELSE KEPT PRIVATE (migration 40), in the query, so hits and counts agree. */
+type Ask = { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined };
 
 /**
  * A search's whole answer: the page of hits, and how many rows there were to have.
@@ -186,16 +187,17 @@ export type Searched = {
  * caller who never asked to be scoped, which is the owner's own search; `[]` is a caller who asked
  * and holds nothing.
  */
-function matching(q: string, registers: readonly string[] | undefined): { from: string; args: string[] } | null {
+function matching(q: string, registers: readonly string[] | undefined, viewer?: string): { from: string; args: string[] } | null {
   const query = ftsQuery(q);
   if (!query) return null;
   if (registers !== undefined && registers.length === 0) return null;
   const scope = registers ? ` AND entry_fts.register IN (${registers.map(() => '?').join(', ')})` : '';
+  const kept = viewer === undefined ? '' : ' AND entry.id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)';
   return {
     from: `FROM entry_fts
        JOIN entry ON entry.rowid = entry_fts.rowid
-      WHERE entry_fts MATCH ?${scope} AND entry.deleted_at IS NULL`,
-    args: [query, ...(registers ?? [])],
+      WHERE entry_fts MATCH ?${scope} AND entry.deleted_at IS NULL${kept}`,
+    args: [query, ...(registers ?? []), ...(viewer === undefined ? [] : [viewer])],
   };
 }
 
@@ -209,7 +211,7 @@ function matching(q: string, registers: readonly string[] | undefined): { from: 
  * tell a full page from a whole answer.
  */
 export function search(sql: Sql, q: string, opts: Ask = {}): Hit[] {
-  const m = matching(q, opts.registers);
+  const m = matching(q, opts.registers, opts.viewer);
   if (!m) return [];
   return sql.all<Hit>(
     `SELECT entry_fts.id AS id, entry_fts.register AS register, bm25(entry_fts) AS rank
@@ -225,7 +227,7 @@ export function search(sql: Sql, q: string, opts: Ask = {}): Hit[] {
 
 /** The same hits, with the count that makes them tellable from the whole answer. See `Searched`. */
 export function searchMatched(sql: Sql, q: string, opts: Ask = {}): Searched {
-  const m = matching(q, opts.registers);
+  const m = matching(q, opts.registers, opts.viewer);
   if (!m) return { hits: [], matched: {} };
   const matched: Record<string, number> = {};
   for (const row of sql.all<{ register: string; n: number }>(

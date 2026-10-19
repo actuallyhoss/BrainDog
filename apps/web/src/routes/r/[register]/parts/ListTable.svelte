@@ -217,6 +217,8 @@
     {#if fresh.has(seq)}<span class="fresh" data-fresh={seq} aria-hidden="true"></span>{/if}
     <!-- A PERSON IS LED BY THEIR FACE, drawn from the name the title cell prints beside it; `Face` is `aria-hidden`. -->
     {#if faced}<span class="row-face"><Face name={display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? ''} kind="person" size="s" /></span>{/if}
+    <!-- A LOCK ON A ROW ITS MAKER KEPT PRIVATE: only they are reading this, so it says nothing more than it is theirs. -->
+    {#if rowAt(seq)?.private}<span class="row-lock" title={copy.rowPrivateLock}><Icon name="lock" size="s" /><span class="row-lock-word">{copy.rowPrivateLock}</span></span>{/if}
   {/snippet}
   <!-- A VALUE OF A CHOICE FIELD, in sentence case; the list's state also wears a small dot of where the row stands. -->
   {#snippet enumSaid(row: TableRow, field: string, value: string)}
@@ -624,6 +626,21 @@
     display: inline-flex;
     margin-inline-end: var(--sp-2);
     vertical-align: middle;
+  }
+
+  .row-lock {
+    display: inline-flex;
+    margin-inline-end: var(--sp-2);
+    vertical-align: middle;
+    color: var(--ink2);
+  }
+
+  .row-lock-word {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .row-face :global(.face[data-kind]) {

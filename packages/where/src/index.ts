@@ -113,6 +113,11 @@ export function derivedFault(schema: Pick<Schema, 'fields'>, field: string): Ref
 export type Schema = {
   register: string;
   /**
+   * WHO IS LOOKING, WHEN A ROW KEPT PRIVATE BY SOMEBODY ELSE MUST NOT BE READ (kernel migration 40). Every `compile`
+   * against this schema ends in that exclusion, so a figure, a forecast or a list built on it cannot count the row.
+   */
+  except?: string | undefined;
+  /**
    * WHICH BACKEND, `34 §1.11`'s own word. Absent means `entry`, which is every register.
    *
    * IT EXISTS SO THAT "EXACTLY THESE FIELDS" CAN BE TRUE. `34 §1.9` says an ingest `match:` may name
@@ -775,7 +780,9 @@ const elementSql = (value: unknown, put: (v: string | number) => string): string
  * the security boundary and not a nicety.
  */
 export function compile(where: Predicate | undefined, schema: Schema): Compiled {
-  return compileAt(where, schema, 1);
+  const c = compileAt(where, schema, 1);
+  if (schema.except === undefined || c.bad.length || schema.subject === 'inbox_raw') return c;
+  return { sql: `(${c.sql}) AND id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)`, params: [...c.params, schema.except], bad: [] };
 }
 
 /* THE SAME COMPILE, STARTED PART WAY DOWN, which is how a `pointed` hop asks its question of the other

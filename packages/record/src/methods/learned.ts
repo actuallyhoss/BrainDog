@@ -25,7 +25,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { SLASH, whereFor } from '@braindog/kernel';
+import { SLASH } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -159,7 +159,7 @@ export function methods(deps: RecordDeps) {
       const merge = held?.fields.merged_into;
       /* THE PEOPLE ARE THERE FOR HER ONLY WHEN SHE READS THEIR LIST, and each of a pair only when her grant admits them. */
       const people = held !== null && merge !== undefined && readable(ctx, held.register) === null ? held.register : null;
-      const rule = people === null ? undefined : whereFor(ctx.wheres, people);
+      const rule = people === null ? undefined : kernel.scope(ctx, people);
       const admitted = (seq: number | null): boolean => {
         if (rule === undefined) return true;
         if (seq === null || people === null) return false;

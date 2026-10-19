@@ -37,6 +37,7 @@
   import { goto } from '$app/navigation';
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
+  import { keepPrivate } from '$lib/record/privacy-write.ts';
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf } from '$lib/record/api.ts';
@@ -518,6 +519,31 @@
     stopEdit();
     toasts.push(to ? copy.writeArchived(named) : copy.rowRestored(named));
     void refreshHistory(register, n);
+  }
+
+  /* WHO CAN SEE THIS ROW. The record marks a row its maker kept private (`private`) and the row the reader made (`mine`) when
+     it reads the row; a write's answer carries neither, so what a press settled is remembered here by the row it was for. */
+  let privacy = $state<{ key: string; mine: boolean; on: boolean | null }>({ key: '', mine: false, on: null });
+  const rowKey = $derived(`${id}#${seq}`);
+  $effect(() => {
+    if (row?.mine) privacy = { key: rowKey, mine: true, on: privacy.key === rowKey ? privacy.on : null };
+  });
+  const mine = $derived(row?.mine === true || (privacy.key === rowKey && privacy.mine));
+  const isPrivate = $derived(privacy.key === rowKey && privacy.on !== null ? privacy.on : row?.private === true);
+
+  async function setPrivate(to: boolean) {
+    if (!row || saving || !live) return;
+    const key = rowKey;
+    saving = true;
+    const out = await keepPrivate(apiBase(), key, to);
+    saving = false;
+    if (key !== rowKey) return;
+    if (!out.ok) {
+      toasts.push(out.fix, { intent: 'warn' });
+      return;
+    }
+    privacy = { key, mine: true, on: to };
+    void refreshHistory(id, seq);
   }
 
   /* WHAT HAPPENED TO THE ROW, newest first, which the timeline merges with what was said about it. */
@@ -1135,6 +1161,8 @@
           {/snippet}
           {#if finish}<button type="button" class="mi" role="menuitem" onclick={editTitle}>{copy.editRow}</button>{/if}
           <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
+          <!-- ONLY THE ROW'S MAKER: the record refuses anybody else, so the verb is not offered to them. -->
+          {#if mine && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setPrivate(!isPrivate)}>{isPrivate ? copy.rowShareAgain : copy.rowKeepPrivate}</button>{/if}
           {#if changes && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</button>{/if}
         </Menu>
       {/if}
@@ -1147,6 +1175,12 @@
          screen would say why it has gone from them. -->
     {#if archived}
       <p class="archived-note"><Icon name="archive" size="s" /><span>{copy.rowArchivedNote}</span></p>
+    {/if}
+    <!-- WHO CAN SEE THIS ROW, in one plain line: the lock when its maker kept it to themselves, else everyone who opens the list. -->
+    {#if live && row}
+      <p class="archived-note seen-by">
+        {#if isPrivate}<Icon name="lock" size="s" /><span>{copy.rowSeenByOnlyYou}</span>{:else}<span>{copy.rowSeenByAll(decl?.name ?? id)}</span>{/if}
+      </p>
     {/if}
 
     <div class="board">

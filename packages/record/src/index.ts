@@ -40,7 +40,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { BLOCK_INSTALLS, admitHostSources, costRows, rememberedLine, type Remembered } from '@braindog/kernel';
+import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
@@ -139,7 +139,6 @@ import {
   ACROSS as READS_ACROSS,
   ANY_LIST,
   touches,
-  whereFor,
   type Wheres,
   REVIVED as KERNEL_REVIVED,
   whollyWithheld,
@@ -497,11 +496,17 @@ export type CallContext = {
    *
    * A ROW PREDICATE, NOT A CEILING. `registers` and `levels` say which lists exist for this caller and what they may
    * do with one; this says which ROWS of a list they may do it to, when their grant is narrowed rather than whole.
-   * Every reader honours it through `whereFor(ctx.wheres, register)` (`@braindog/kernel`), never a second copy of the
+   * Every reader honours it through `kernel.scope(ctx, register)` (`@braindog/kernel`), never a second copy of the
    * rule: `list` and register counts hand it straight to the kernel; `get`, `history`, a block or question rowset,
    * search and Slash confirm a row they already read is still one this `where` admits before answering it.
    */
   wheres?: Readonly<Wheres> | undefined;
+
+  /**
+   * This read leaves the record: to a model, a mail, a push or a file somebody else opens. Every reader then reads as
+   * nobody (`NOBODY`), so no row anyone kept private goes with it, whoever made it. Set by a host that builds the call.
+   */
+  outbound?: true | undefined;
 
   /** Which registers this caller may touch at all. `'*'` is every one the record declares. */
   registers?: readonly string[] | '*';
@@ -2361,13 +2366,30 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const readable = (ctx: CallContext, register: string): Refusal | null => guard(ctx, 'read', register);
 
-  /** Who is looking, for the rows their makers kept private: a person, or the person an agent's token acts for. Nobody else has one. */
-  const viewerOf = (ctx: CallContext): string | undefined =>
-    ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : undefined;
+  /** Who is looking, for the rows their makers kept private: a person, the person a token acts for, or `NOBODY` for a read that leaves the record. */
+  const viewerOf = (ctx: CallContext): string | undefined => viewerOfRead(ctx);
+
+  /** A page of rows with the ones the viewer kept private marked (`private`), so a list can draw a lock beside them. */
+  const marked = <T extends { rows: Entry[] }>(out: Result<T>): Result<T> => {
+    if (!out.ok || out.value.rows.length === 0) return out;
+    const held = kernel.privateAmong(out.value.rows.map((r) => r.id));
+    return held.size === 0 ? out : ok({ ...out.value, rows: out.value.rows.map((r) => (held.has(r.id) ? { ...r, private: true as const } : r)) });
+  };
+
+  /** One row marked as `marked` does, and `mine` when the viewer made it: only its maker may keep it private or share it again. */
+  const markedRow = (ctx: CallContext, row: Entry | null): Entry | null => {
+    if (row === null) return row;
+    const who = ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : undefined;
+    return {
+      ...row,
+      ...(kernel.privateAmong([row.id]).size > 0 ? { private: true as const } : {}),
+      ...(who !== undefined && kernel.madeBy(row.id) === who ? { mine: true as const } : {}),
+    };
+  };
 
   /**
    * Whether a row this caller can already read on the register is one their own narrowed grant still admits
-   * `list` and register counts hand `whereFor(ctx.wheres, register)` straight to the kernel, which narrows
+   * `list` and register counts hand `kernel.scope(ctx, register)` (the grant and the private rows) straight to the kernel, which narrows
    * there; a reader that answers one row read some other way (`get`, `history`, a block or question rowset, a search
    * hit, an MCP tool, a Slash read) has no `where` of its own to hand the kernel, so it asks this instead: the row is
    * read again, filtered on its own `seq` and the same rule, and it is admitted only if that still finds it. `seq:
@@ -2375,10 +2397,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const rowAdmitted = (ctx: CallContext, register: string, seq: number | null): boolean => {
     if (seq === null) return true;
-    /* A ROW ITS MAKER KEPT PRIVATE is absent to everybody else, whatever their grant (migration 40). */
-    const held = kernel.get({ register, seq }, { includeDeleted: true });
-    if (held && kernel.hiddenFrom(held.id, viewerOf(ctx))) return false;
-    const rule = whereFor(ctx.wheres, register);
+    /* THE SCOPE ALSO CARRIES THE PRIVATE ROWS (migration 40), so a row kept to its maker is absent here with no case of its own. */
+    const rule = kernel.scope(ctx, register);
     if (rule === undefined) return true;
     const found = kernel.list({ register, where: { field: 'seq', is: seq }, includeDeleted: true, limit: 1 }, rule);
     return found.ok && found.value.rows.length > 0;
@@ -3032,7 +3052,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...drafts,
         ...growsDrafts(deps.catalogue ?? [], (id) => packsOn.has(id), (metric) => {
           const decl = kernel.metricDecl(metric);
-          const read = decl ? kernel.metric(decl) : null;
+          const read = decl ? kernel.metric(decl, { viewer: NOBODY }) : null;
           return read?.ok && typeof read.value.value === 'number' ? read.value.value : null;
         }),
       ];
@@ -4234,7 +4254,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const pressingRead = (today: string): Pressing => {
     const drawn = (block: Record<string, unknown>): ReturnType<Kernel['block']> | null => {
       try {
-        const got = kernel.block(block as never);
+        const got = kernel.block(block as never, { viewer: NOBODY });
         return got.refusals?.length ? null : got;
       } catch {
         return null;
@@ -4356,10 +4376,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       unsaid();
       return `Slash's arrangement of ${title} was refused twice, so the page is left as it is until something on it changes.`;
     }
-    const read = kernel.page(page);
+    const read = kernel.page(page, undefined, { viewer: NOBODY });
     if (!read.ok) return `${title} could not be read, so it was left as it is.`;
     const decl = kernel.metricDecl('questions-open');
-    const open = decl ? kernel.metric(decl) : null;
+    const open = decl ? kernel.metric(decl, { viewer: NOBODY }) : null;
     const tried = rehearse(read.value, whole, { waiting: open?.ok ? open.value.value : null, typesOf: lintTypesOf, keysOf: lintKeysOf });
     if (!tried.ok) {
       kernel.setPref(SLASH, key, noteRefusal(body.basis, kept));
@@ -4398,7 +4418,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (due.length >= HEADLINE_PAGES_MOST) break;
       /* A PAGE DECLARED `home` IS NOT ASKED AS A PAGE: its pref is Home's line. */
       if (p.nav === null || p.about !== null || p.slug === HOME_PAGE) continue;
-      const read = kernel.page(p.slug);
+      const read = kernel.page(p.slug, undefined, { viewer: NOBODY });
       if (!read.ok) continue;
       const lead = leadBlockOf(read.value.blocks);
       if (lead === null) continue;
@@ -4413,7 +4433,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const changing = holes.filter((h) => !h.includes('.') && !Object.hasOwn(lead.values, `${h}.change`));
       if (changing.length > 0)
         try {
-          moved = (kernel.block({ kind: 'note', body: changing.map((h) => `{{${h}.change}}`).join(' ') } as never).values ?? {}) as Record<string, JsonValue>;
+          moved = (kernel.block({ kind: 'note', body: changing.map((h) => `{{${h}.change}}`).join(' ') } as never, { viewer: NOBODY }).values ?? {}) as Record<string, JsonValue>;
         } catch {
           moved = {};
         }
@@ -4537,7 +4557,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (again && nowMs - briefLooked < WRITTEN_LOOK_MS) return [];
       briefLooked = nowMs;
       const written = model.written.bind(model);
-      const owner = { principal: { kind: 'system', id: SLASH } } as const;
+      const owner = { principal: { kind: 'system', id: SLASH }, outbound: true } as const;
       const out = await writtenTick({
         version: kernel.version(),
         facts: () => briefFactsFor(methodDeps(), owner, nowMs),
@@ -4553,7 +4573,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (again && nowMs - briefLooked < HEADLINE_LOOK_MS) return [];
     briefLooked = nowMs;
     const brief = model.brief.bind(model);
-    const facts = briefFactsFor(methodDeps(), { principal: { kind: 'system', id: SLASH } }, nowMs);
+    const facts = briefFactsFor(methodDeps(), { principal: { kind: 'system', id: SLASH }, outbound: true }, nowMs);
     const out = await briefTick({
       facts,
       now: nowMs,
@@ -4586,7 +4606,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (named !== null) return named;
       const lists = listsRead(blocks);
       /* AND READS ALL OF EACH: a grant narrowed to some of a list's things (`wheres`) may not see the title the line names. */
-      if ([...lists].some((l) => readable(ctx, l) !== null || whereFor(ctx.wheres, l) !== undefined)) return (named = undefined);
+      if ([...lists].some((l) => readable(ctx, l) !== null || kernel.scope(ctx, l) !== undefined)) return (named = undefined);
       const read = pressingOf(pressingRead(slashDay()), lists);
       return (named = factsBasis(read.items, read.question));
     };
@@ -4819,10 +4839,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     };
   };
 
-  const pageCut = (ctx: CallContext): { level: string; readerIs?: 'owner' | 'member' | 'agent' | 'link'; runs: ReadonlySet<string> } => {
+  const pageCut = (ctx: CallContext): { level: string; readerIs?: 'owner' | 'member' | 'agent' | 'link'; runs: ReadonlySet<string>; viewer?: string } => {
     const p = ctx.principal;
-    if (p.kind === 'person') return { level: p.level ?? 'read', readerIs: p.level === 'owner' ? 'owner' : 'member', runs: RUNS };
-    if (p.kind === 'token') return { level: p.level ?? 'read', readerIs: 'agent', runs: RUNS };
+    /* THE VIEWER GOES WITH THE CUT, so every page read made for a caller leaves out the rows others kept private. */
+    const viewer = viewerOf(ctx);
+    const who = viewer === undefined ? {} : { viewer };
+    if (p.kind === 'person') return { level: p.level ?? 'read', readerIs: p.level === 'owner' ? 'owner' : 'member', runs: RUNS, ...who };
+    if (p.kind === 'token') return { level: p.level ?? 'read', readerIs: 'agent', runs: RUNS, ...who };
     if (p.kind === 'share') return { level: 'read', readerIs: 'link', runs: RUNS };
     return { level: 'read', runs: RUNS };
   };
@@ -4962,14 +4985,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** What a block worked out from a whole list says to a reader whose grant shows them part of that list. */
   const PART: Refusal = { code: 'FORBIDDEN', fix: 'This is worked out from a whole list, and you are shown only part of that list.', at: 'source' };
 
-  /** The lists a block reads that this caller's grant narrows to some of their rows (`wheres`). */
+  /** The lists a block reads that this caller's grant narrows to some of their rows (`wheres`). Private rows are left out inside the page read itself (`viewer`), so they need no redraw. */
   const narrowedLists = (ctx: CallContext, b: Parameters<Kernel['blockRegisters']>[0]): string[] =>
-    Object.keys(ctx.wheres ?? {}).length === 0 ? [] : [...new Set([...kernel.blockRegisters(b), ...alsoReads(b)])].filter((list) => whereFor(ctx.wheres, list) !== undefined);
+    Object.keys(ctx.wheres ?? {}).length === 0 ? [] : [...new Set([...kernel.blockRegisters(b), ...alsoReads(b)])].filter((list) => Object.hasOwn(ctx.wheres ?? {}, list));
 
   /** The list a block draws its rows from when this caller's grant narrows it, or `null`: `source: register.<id>`. */
   const narrowedSource = (ctx: CallContext, b: Parameters<Kernel['blockRegisters']>[0]): string | null => {
     const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
-    return source !== null && whereFor(ctx.wheres, source) !== undefined ? source : null;
+    return source !== null && Object.hasOwn(ctx.wheres ?? {}, source) ? source : null;
   };
 
   /** What a block over more of her rows than one read gathers says, in place of a drawing cut short. */
@@ -5027,7 +5050,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     /* A `where` NAMING A ROW OF A LIST SHE CANNOT READ IS ANSWERED AS `list` ANSWERS HER (`whereHeld`), before any read. */
     const stop = whereHeld(ctx, written);
     if (stop) return stop.shell ? shellOf(b, stop.refusal, false) : bare([stop.refusal]);
-    const rule = whereFor(ctx.wheres, list);
+    const rule = kernel.scope(ctx, list);
     const reads = (other: string): boolean => readable(ctx, other) === null;
     const seqs: number[] = [];
     for (let cursor: string | null | undefined; cursor !== null; ) {
@@ -5638,7 +5661,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        are above, rather than the rowset drawn with the one row missing. A row the rowset adds names no `at` and is
        not an existing row this caller could already be denied. */
     if (row.body_kind === 'rowset' && typeof named === 'string' && named !== '' && readable(ctx, named) === null) {
-      const rule = whereFor(ctx.wheres, named);
+      const rule = kernel.scope(ctx, named);
       if (rule !== undefined) {
         const rows = Array.isArray(body?.rows) ? (body.rows as { at?: unknown }[]) : [];
         for (const r of rows) {
@@ -6791,7 +6814,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (id === '') return null;
     if (kind === 'entry') {
       const row = kernel.get(id);
-      return row !== null && readable(ctx, row.register) === null ? kernel.nameOf(row.id) : null;
+      return row !== null && readable(ctx, row.register) === null && rowAdmitted(ctx, row.register, row.seq) ? kernel.nameOf(row.id) : null;
     }
     if (kind !== 'suggestion' && kind !== 'decision') return null;
     const row = kernel.governanceRow(kind, id);
@@ -7429,7 +7452,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      was answered two and the preset quoted one of USD or GBP. 21 is the pack's `RATES_CURRENCIES_MOST` (20,
      `packs/rates-poll/fill.ts`) and one over it, so a record past it is told so; `currency` still reads only one. */
   const drawnIn = (ctx: CallContext): { currency: string | null; money: string[] } => {
-    const money = kernel.moneyCurrencies((register) => readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined, DRAWN_CURRENCIES_MOST);
+    const money = kernel.moneyCurrencies((register) => readable(ctx, register) === null && kernel.scope(ctx, register) === undefined, DRAWN_CURRENCIES_MOST);
     return { currency: kernel.homeCurrency() ?? (money.length === 1 ? money[0]! : null), money };
   };
 
@@ -8215,7 +8238,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const name = title === undefined ? null : text(holder.fields[title]);
       /* SHOWN ONLY TO SOMEBODY WHO READS ALL OF THE LIST (research-audit-22 M5): a grant narrowed to some of its rows
          (`wheres`) may not be shown the name of a row outside them. */
-      const shown = readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined;
+      const shown = readable(ctx, register) === null && kernel.scope(ctx, register) === undefined;
       if (ctx.principal.kind === 'person') {
         const kind = key.slice(0, key.indexOf(':'));
         const said = key.slice(key.indexOf(':') + 1);
@@ -8561,7 +8584,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (readable(ctx, id)) continue;
           /* THE GLYPH THE LIST DECLARES, as `icon` is checked at install (`declare.ts`): one the rail can draw by name. */
           const icon = (decl as { icon?: unknown }).icon;
-          out.push({ id, name: decl.name, count: kernel.count(id, whereFor(ctx.wheres, id), viewerOf(ctx)), icon: typeof icon === 'string' && icon !== '' ? icon : null });
+          out.push({ id, name: decl.name, count: kernel.count(id, kernel.scope(ctx, id)), icon: typeof icon === 'string' && icon !== '' ? icon : null });
         }
         const shell = shellFor(ctx);
         const waits = waitsFor(ctx);
@@ -8647,13 +8670,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             );
           const owned = kernel.get(said) ?? folded(said);
           {
-            const out = readFrom(ctx, ok(owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null));
+            const out = readFrom(ctx, ok(markedRow(ctx, owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null)));
             return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
           }
         }
         const row = kernel.get(said) ?? folded(said);
         {
-          const out = readFrom(ctx, ok(row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null));
+          const out = readFrom(ctx, ok(markedRow(ctx, row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null)));
           return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
         }
       }
@@ -8663,7 +8686,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false, refusal: stop };
       const row = kernel.get({ register: args.register as string, seq: args.seq as number });
       {
-        const out = readFrom(ctx, ok(row && rowAdmitted(ctx, args.register as string, row.seq) ? row : null));
+        const out = readFrom(ctx, ok(markedRow(ctx, row && rowAdmitted(ctx, args.register as string, row.seq) ? row : null)));
         return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
       }
     },
@@ -8754,16 +8777,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         args.register,
         readFrom(
           ctx,
-          kernel.list(
+          marked(kernel.list(
             {
               ...args,
               reads: (register) => readable(ctx, register) === null,
               /* A HOP GOES ONLY INTO A LIST SHE READS WHOLE (where-hop-49): one her grant narrows would be counted whole. */
-              hops: (register) => readable(ctx, register) === null && whereFor(ctx.wheres, register) === undefined,
+              hops: (register) => readable(ctx, register) === null && kernel.scope(ctx, register) === undefined,
             },
-            whereFor(ctx.wheres, args.register),
-            viewerOf(ctx),
-          ),
+            kernel.scope(ctx, args.register),
+          )),
         ),
       );
     },
@@ -8780,7 +8802,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (!row) return no('REF_UNKNOWN', `There is no row called ${args.ref}.`, { at: 'ref' });
       const stop = guard(ctx, 'write', row.register);
       if (stop) return { ok: false as const, refusal: stop };
-      const who = viewerOf(ctx);
+      const who = ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : undefined;
       if (who === undefined) return no('FORBIDDEN', 'A row is kept private by a person, signed in.', { at: 'principal' });
       return tail(kernel.setPrivate(who, args.ref, args.on !== false));
     },
@@ -9418,7 +9440,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
          read again, so a value she was never offered narrows nothing either. */
       /* AND BY A LIST HER GRANT NARROWS TO SOME OF ITS ROWS (`wheres`): the values are counted over every row of it. */
-      const unseen = (f: PageFilter): boolean => f.reads.some((list) => whereFor(ctx.wheres, list) !== undefined || (!everyList && readable(ctx, list) !== null));
+      const unseen = (f: PageFilter): boolean => f.reads.some((list) => Object.hasOwn(ctx.wheres ?? {}, list) || (!everyList && readable(ctx, list) !== null));
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
         const kept = { ...filter };
         for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];
@@ -9598,7 +9620,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const l = leg as { register?: unknown; where?: unknown; amount?: unknown } | null;
           if (l === null || typeof l !== 'object' || typeof l.register !== 'string') continue;
           const reads = (list: string): boolean => readable(ctx, list) === null;
-          const rule = whereFor(ctx.wheres, l.register);
+          const rule = kernel.scope(ctx, l.register);
           let page = kernel.list({ register: l.register, where: l.where as never, limit: 500, reads }, rule);
           /* A LEG `list` REFUSES IS REFUSED BY THE WALK IN ITS OWN ANSWER, and reads nothing. */
           if (!page.ok) continue;
@@ -9668,7 +9690,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                 ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [plan.refused] })
                 : cost
                   ? heldBlock(ctx, { ...(block as ReturnType<Kernel['block']>), rows: [], matched: 0, refusals: [cost] })
-                  : heldBlock(ctx, kernel.block(previewed(block) as never, { inbox: allows(ctx, 'owner') === null || inboxReached(ctx) }));
+                  : heldBlock(ctx, kernel.block(previewed(block) as never, { inbox: allows(ctx, 'owner') === null || inboxReached(ctx), viewer: viewerOf(ctx) }));
         /* HER NAMES BACK, in place of the ones nobody declared, so the drawing says the figure she wrote. */
         const back = renamed[i]!.back;
         if (back.size === 0) return drawn;
@@ -9765,7 +9787,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
          ONLY A FILLED FIGURE IS ASKED: a declared `where` is the author's words, the same for every reader, and a tile
          over it is answered as `page` answers it. */
-      return param !== undefined && register !== null ? kernel.metric(filled, { reads: (list) => sees(ctx, [list]) }) : kernel.metric(filled);
+      return param !== undefined && register !== null ? kernel.metric(filled, { reads: (list) => sees(ctx, [list]), viewer: viewerOf(ctx) }) : kernel.metric(filled, { viewer: viewerOf(ctx) });
     },
 
     /**
@@ -12594,6 +12616,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         register: args.register,
         seq: args.seq,
         only,
+        viewer: viewerOf(ctx),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
         ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
       });
@@ -12874,6 +12897,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            always ran for an owner. */
         ...(registers.length === every.length ? {} : { registers }),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
+        /* PRIVATE ROWS ARE LEFT OUT IN THE QUERY, so the hits and the counts beside them agree (migration 40). */
+        viewer: viewerOf(ctx),
       });
       /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and where the words found fewer
          than five, the rows nearest the query's own meaning fused in (`near.ts`), each marked `by: 'meaning'`. Before the

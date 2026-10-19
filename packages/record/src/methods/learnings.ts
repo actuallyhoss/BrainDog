@@ -40,7 +40,6 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { whereFor } from '@braindog/kernel';
 import type { Entry } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
@@ -173,7 +172,7 @@ export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, li
   if (!got.ok) return none;
 
   /* A GRANT NARROWED TO SOME ROWS reads those and no others: each row is asked for again under the caller's own rule. */
-  const rule = whereFor(ctx.wheres, id);
+  const rule = kernel.scope(ctx, id);
   const admitted = (row: Entry): boolean => {
     if (rule === undefined || row.seq === null || row.seq === undefined) return true;
     const found = kernel.list({ register: id, where: { field: 'seq', is: row.seq }, limit: 1 }, rule);
@@ -287,7 +286,7 @@ function twiceFor(deps: RecordDeps, ctx: CallContext): { list: Listed; pairs: Pa
   /* A LEARNING THAT STANDS is one in the state its list starts a row in, which the list declares (`active`). */
   const standing = decl.fields.find((f) => f.id === decl.state)?.default;
   if (place === undefined || typeof standing !== 'string') return { list, pairs: [] };
-  const got = kernel.list({ register: id, where: { field: decl.state!, is: standing }, limit: TWICE_READ }, whereFor(ctx.wheres, id));
+  const got = kernel.list({ register: id, where: { field: decl.state!, is: standing }, limit: TWICE_READ }, kernel.scope(ctx, id));
   if (!got.ok) return { list, pairs: [] };
   const byId = new Map(got.value.rows.map((row) => [row.id, row]));
   const lessons: Lesson[] = got.value.rows.map((row) => ({

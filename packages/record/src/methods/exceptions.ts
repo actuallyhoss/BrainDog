@@ -25,7 +25,7 @@
 
 import type { Result, Sql } from '@braindog/ports';
 import * as kernelModule from '@braindog/kernel';
-import { spoken, whereFor } from '@braindog/kernel';
+import { spoken } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -126,7 +126,7 @@ export function exceptionsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
   const reader = kernelModule as unknown as Reader;
 
   /** Whether the caller reads this list whole: it is open to them, and their grant does not narrow it to some of it. */
-  const whole = (list: string): boolean => readable(ctx, list) === null && whereFor(ctx.wheres, list) === undefined;
+  const whole = (list: string): boolean => readable(ctx, list) === null && kernel.scope(ctx, list) === undefined;
 
   /** What an exception opens, by the title its list gives it, or `null` when it is gone or has none. */
   const rowOf = (id: string | null): ExceptionRow | null => {

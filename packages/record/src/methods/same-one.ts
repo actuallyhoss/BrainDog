@@ -19,7 +19,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { agentOf as kindOf, whereFor, type WriteContext } from '@braindog/kernel';
+import { agentOf as kindOf, type WriteContext } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -57,7 +57,7 @@ export function methods(deps: RecordDeps) {
    * reads it: the row again by its own number under the same rule. A grant that is whole admits everybody.
    */
   const admitted = (ctx: CallContext, register: string, seq: number | null): boolean => {
-    const rule = whereFor(ctx.wheres, register);
+    const rule = kernel.scope(ctx, register);
     if (seq === null || rule === undefined) return true;
     const found = kernel.list({ register, where: { field: 'seq', is: seq }, includeDeleted: true, limit: 1 }, rule);
     return found.ok && found.value.rows.length > 0;

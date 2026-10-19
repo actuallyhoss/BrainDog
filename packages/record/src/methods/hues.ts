@@ -28,7 +28,7 @@
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 import { nextAccentHue } from '@braindog/theme';
-import { ulids, whereFor } from '@braindog/kernel';
+import { ulids } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -100,7 +100,7 @@ export function methods(deps: RecordDeps) {
   /** Whether a narrowed grant still admits one row, read again by its own number as `about` reads one. */
   const admitted = (ctx: CallContext, list: string, seq: number | null): boolean => {
     if (seq === null) return true;
-    const rule = whereFor(ctx.wheres, list);
+    const rule = kernel.scope(ctx, list);
     if (rule === undefined) return true;
     const found = kernel.list({ register: list, where: { field: 'seq', is: seq }, limit: 1 }, rule);
     return found.ok && found.value.rows.length > 0;

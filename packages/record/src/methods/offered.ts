@@ -25,7 +25,7 @@
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { sessionDeclaration, whereFor, type MetricDecl } from '@braindog/kernel';
+import { sessionDeclaration, type MetricDecl } from '@braindog/kernel';
 
 import { listFor } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
@@ -164,7 +164,7 @@ export function methods(deps: RecordDeps) {
   const skillsFor = (ctx: CallContext): OfferedSkill[] => {
     const skillList = listFor('skills', kernel.registers());
     if (skillList === null || readable(ctx, skillList) !== null) return [];
-    const rule = whereFor(ctx.wheres, skillList);
+    const rule = kernel.scope(ctx, skillList);
     const named = new Map<string, OfferedSkill>();
     let cursor: string | null | undefined;
     do {

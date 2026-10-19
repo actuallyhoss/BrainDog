@@ -33,7 +33,6 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { whereFor } from '@braindog/kernel';
 
 import { listFor } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
@@ -144,7 +143,7 @@ export function methods(deps: RecordDeps) {
     const fields = decl.fields as readonly Field[];
     const start = decl.state === undefined ? undefined : fields.find((f) => f.id === decl.state)?.default;
     const where = decl.state !== undefined && typeof start === 'string' ? { field: decl.state, is: start } : undefined;
-    const got = kernel.list({ register: id, ...(where ? { where } : {}), order: [{ field: 'seq', dir: 'desc' }], limit: READ_MOST }, whereFor(ctx.wheres, id));
+    const got = kernel.list({ register: id, ...(where ? { where } : {}), order: [{ field: 'seq', dir: 'desc' }], limit: READ_MOST }, kernel.scope(ctx, id));
     if (!got.ok) return null;
     return { decl, fields, rows: got.value.rows.toReversed(), standing: (state: string | null | undefined) => where === undefined || state === start };
   };

@@ -21,7 +21,7 @@
  */
 
 import { GLYPH_NAMES } from 'braindog-render/glyphs/names';
-import { censusOf, pathsOf, whollyWithheld, type BlockResult, type Census, type PageBlock, type PageResult } from '@braindog/kernel';
+import { censusOf, pathsOf, viewerOfRead, whollyWithheld, type BlockResult, type Census, type PageBlock, type PageResult } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 
 import { ROUND_MS, lintAnswer } from '../page-lint.ts';
@@ -133,7 +133,7 @@ export function methods(deps: RecordDeps) {
         read += 1;
         let answer: PageResult;
         try {
-          const out = kernel.page(p.slug, undefined, { hostSources });
+          const out = kernel.page(p.slug, undefined, { hostSources, viewer: viewerOfRead(ctx) });
           if (!out.ok) {
             undrawn.push(p.title);
             continue;

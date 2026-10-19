@@ -11,7 +11,7 @@
  * count answers no rows, so one page over the census is never read a page at a time forever.
  */
 
-import { censusOf, type PageResult } from '@braindog/kernel';
+import { censusOf, viewerOfRead, type PageResult } from '@braindog/kernel';
 import type { Schema } from '@braindog/where';
 
 import { ROUND_MS, lintAnswer } from '../page-lint.ts';
@@ -36,7 +36,7 @@ const SCHEMA: Schema = {
 /** Whether a census is being read now, so a page over it, read inside the census, answers none rather than itself. */
 let reading = false;
 
-export const pages: SourceMaker = ({ kernel }) => {
+export const pages: SourceMaker = ({ kernel, ctx }) => {
   let held: ReturnType<typeof sourceRow>[] | null = null;
   const all = (): ReturnType<typeof sourceRow>[] => {
     if (held) return held;
@@ -52,7 +52,7 @@ export const pages: SourceMaker = ({ kernel }) => {
         if (held.length > 0 && Date.now() - start > ROUND_MS) break;
         let answer: PageResult;
         try {
-          const out = kernel.page(p.slug);
+          const out = kernel.page(p.slug, undefined, { viewer: viewerOfRead(ctx) });
           if (!out.ok) continue;
           answer = out.value;
         } catch {

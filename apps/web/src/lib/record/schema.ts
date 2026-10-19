@@ -253,6 +253,10 @@ export type Entry = {
    * first (`lib/page/clipped.ts`).
    */
   clipped?: true;
+  /** Its maker kept it to themselves, so only they read it here: a lock is drawn beside it. */
+  private?: true;
+  /** The reader made this row, and so is the one who may keep it private or share it again. */
+  mine?: true;
 };
 
 export type PageBlock = {

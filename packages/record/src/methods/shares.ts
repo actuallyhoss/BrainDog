@@ -30,7 +30,7 @@
  * never said is a host that cannot, so links ship switched off until somebody switches them on.
  */
 
-import { instant, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
+import { NOBODY, instant, ulids, type BlockResult, type Entry, type FieldType, type Json, type PageResult, type RegisterDecl } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { writeAmount } from 'braindog-render';
 import { ok } from '@braindog/ports';
@@ -600,7 +600,8 @@ export function methods(deps: RecordDeps) {
       if (!Number.isFinite(ends) || clock.now() >= ends) return { ok: false, refusal: SHUT };
       if (closedAt(link.id) !== null || !ownsNow(opened.actor)) return { ok: false, refusal: SHUT };
       if (!kernel.pages().some((p) => p.slug === link.slug)) return { ok: false, refusal: SHUT };
-      const out = kernel.page(link.slug);
+      /* A LINK IS NOBODY, so a row its maker kept private is not on the shared page. */
+      const out = kernel.page(link.slug, undefined, { viewer: NOBODY });
       if (!out.ok) return { ok: false, refusal: SHUT };
       const identity = kernel.identity();
       const figure = (metric: string): string | undefined => kernel.metricDecl(metric)?.name || undefined;

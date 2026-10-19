@@ -34,6 +34,9 @@ export type EmbedJob = { at: string; ids: string[]; texts: string[] };
  * `pending`, and a sweep that queued another every hour would pile up copies of the same hundred rows, each a model call
  * once the model is back. A `dead` job does not hold the next one back: its dead letter is on Decide, and the rows are
  * read afresh.
+ *
+ * A ROW ITS MAKER KEPT PRIVATE IS NEVER SENT: its text would leave the record for a model, and no one it is private from
+ * could have been shown it.
  */
 export function embedJob(sql: Pick<Sql, 'one' | 'all'>, nowMs: number): EmbedJob | null {
   if (sql.one("SELECT 1 AS x FROM outbox WHERE kind = 'infer.embed' AND state IN ('pending', 'leased', 'failed') LIMIT 1")) return null;
@@ -42,6 +45,7 @@ export function embedJob(sql: Pick<Sql, 'one' | 'all'>, nowMs: number): EmbedJob
        JOIN entry_fts f ON f.rowid = e.rowid
        LEFT JOIN entry_vec v ON v.id = e.id
       WHERE e.deleted_at IS NULL AND f.text <> '' AND (v.id IS NULL OR v.built_at < e.updated_at)
+        AND e.id NOT IN (SELECT entry_id FROM entry_private)
       LIMIT ?`,
     EMBED_ROWS_MOST,
   );

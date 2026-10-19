@@ -35,7 +35,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { SLASH, agentOf, localDays, openHandoffs, readableZone, sessionDeclaration, spoken, whereFor } from '@braindog/kernel';
+import { SLASH, agentOf, localDays, openHandoffs, readableZone, sessionDeclaration, spoken } from '@braindog/kernel';
 import type { Entry, HandoffPlace, Json } from '@braindog/kernel';
 
 import { BRIEF_KEPT, keptBrief } from '../brief-write.ts';
@@ -117,7 +117,7 @@ export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
       for (const field of days) {
         const got = kernel.list(
           { register: list.id, where: { all: [{ field, lte: last }, ...open] }, limit: READ_MOST, order: [{ field, dir: 'desc' }] },
-          whereFor(ctx.wheres, list.id),
+          kernel.scope(ctx, list.id),
         );
         /* A LIST THAT CANNOT BE READ SAYS NOTHING, and the others are still said. */
         if (!got.ok) continue;
@@ -217,7 +217,7 @@ export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
    */
   const steps = (ctx: CallContext, nowMs: number): BriefFact[] => {
     if (readable(ctx, SESSION) !== null) return [];
-    const got = kernel.list({ register: SESSION, where: { field: 'state', is: 'handoff' }, limit: READ_MOST }, whereFor(ctx.wheres, SESSION));
+    const got = kernel.list({ register: SESSION, where: { field: 'state', is: 'handoff' }, limit: READ_MOST }, kernel.scope(ctx, SESSION));
     if (!got.ok) return [];
     const runs = new Map(got.value.rows.map((run) => [run.id, run] as const));
     const places = new Map<string, HandoffPlace>();
@@ -257,11 +257,11 @@ function firstCards(deps: RecordDeps, ctx: CallContext): BriefCard[] {
   const { kernel, readable } = deps;
   const projects = [...kernel.registers().values()].find((r) => r.scopes !== undefined);
   if (!projects || readable(ctx, projects.id) !== null || readable(ctx, SESSION) !== null) return [];
-  const drafts = kernel.list({ register: projects.id, where: { field: 'draft', is: true }, limit: 1 }, whereFor(ctx.wheres, projects.id));
+  const drafts = kernel.list({ register: projects.id, where: { field: 'draft', is: true }, limit: 1 }, kernel.scope(ctx, projects.id));
   const project = drafts.ok ? drafts.value.rows[0] : undefined;
   const name = project ? said(project.fields[projects.title]) : null;
   if (!project || project.seq === null || name === null) return [];
-  const runs = kernel.list({ register: SESSION, limit: READ_MOST }, whereFor(ctx.wheres, SESSION));
+  const runs = kernel.list({ register: SESSION, limit: READ_MOST }, kernel.scope(ctx, SESSION));
   if (!runs.ok) return [];
   const mine = runs.value.rows
     .filter((r) => typeof r.fields.project === 'string' && kernel.get(r.fields.project)?.id === project.id)

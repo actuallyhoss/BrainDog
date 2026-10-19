@@ -29,7 +29,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { PAIRS_MOST, entityLists, evidenceOf, pairsFor, whereFor, type Pair } from '@braindog/kernel';
+import { PAIRS_MOST, entityLists, evidenceOf, pairsFor, type Pair } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
@@ -127,7 +127,7 @@ export function methods(deps: RecordDeps) {
   /* SOMETHING A NARROWED GRANT LEAVES OUT IS NOT THERE FOR THIS CALLER, read as `matched` reads it: the row again by its
      own number under the grant's rule. A grant that is whole admits everything. */
   const admitted = (ctx: CallContext, register: string, seq: number): boolean => {
-    const rule = whereFor(ctx.wheres, register);
+    const rule = kernel.scope(ctx, register);
     if (rule === undefined) return true;
     const found = kernel.list({ register, where: { field: 'seq', is: seq }, limit: 1 }, rule);
     return found.ok && found.value.rows.length > 0;

@@ -10,7 +10,6 @@
  * ONE COUNT A LIST AND ONE NEWEST ROW, the two reads the rail already makes, never every row of every list.
  */
 
-import { whereFor } from '@braindog/kernel';
 import type { Schema } from '@braindog/where';
 
 import { answerRows, sourceRow, type SourceMaker } from './index.ts';
@@ -33,7 +32,7 @@ export const lists: SourceMaker = ({ kernel, ctx, readable }) => {
     held = [];
     for (const [id, decl] of kernel.registers()) {
       if (readable(ctx, id) !== null) continue;
-      const grant = whereFor(ctx.wheres, id);
+      const grant = kernel.scope(ctx, id);
       const newest = kernel.list({ register: id, limit: 1, order: [{ field: 'updated_at', dir: 'desc' }] }, grant);
       const changed = newest.ok ? (newest.value.rows[0]?.updated_at ?? null) : null;
       held.push(sourceRow('lists', id, { list: id, name: decl.name, count: kernel.count(id, grant), changed }, changed));
