@@ -1473,7 +1473,7 @@ function runArrival(deps: IngestDeps, arrival: Arrival, stored: Stored | null, h
  * say so; each row that joins writes a `suggest` event on the question with `field: 'rows'` and the count before and
  * after, and the body carries `count`, so the heading can say how many it asks about.
  */
-function openRowset(
+export function openRowset(
   deps: IngestDeps,
   at: string,
   item: {
@@ -3744,7 +3744,7 @@ export function moneyClean(schema: Schema | null, extracted: Record<string, unkn
 }
 
 /** A question that was to be filed by BrainDog and could not be stays a question, in the words of one. */
-function unfile(deps: IngestDeps, suggestion: string, asked: { question: string; context: string }): void {
+export function unfile(deps: IngestDeps, suggestion: string, asked: { question: string; context: string }): void {
   const row = deps.sql.one<{ body: string; status: string }>('SELECT body, status FROM suggestion WHERE id = ?', suggestion);
   if (row === undefined || row.status !== 'open') return;
   try {

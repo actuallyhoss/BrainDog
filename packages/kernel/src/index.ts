@@ -262,6 +262,7 @@ import {
   type VaultDeps,
 } from './vault.ts';
 import { slashMayWrite } from './slash.ts';
+import { readMailArrival, type MailOutcome } from './mail-arrival.ts';
 import { answeredOnly, askOwnRows, askSame, fileVerdicts, joinOrganisation, meet as meetPerson, resolveJob, type MeetArgs, type Met, type PeopleDeps } from './people.ts';
 import { meetsRole, orgRole, ratesRole, type MeetsFields, type OrgFields } from './roles.ts';
 import { foldChain, foldEnd, foldedCarry, holderOf, keyLists, keyedLists, mergeFieldOf, rebuildKeys, rekey, rowKeys, type KeyedList } from './entities.ts';
@@ -8638,7 +8639,34 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * pattern for is a row somebody can see rather than a silence.
      */
     arrive: (arrival: Arrival, only?: IngestDecl): Result<Arrived> => {
-      const out = arrive(ingestDeps(only), arrival, transaction);
+      const arrived = arrive(ingestDeps(only), arrival, transaction);
+
+      /* FORWARDED MAIL NO PATTERN TOOK IS READ FOR WHO AND WHAT (`mail-arrival.ts`), in a transaction of its own after the
+         bytes are stored. What it files or asks is the record's; mail it can place nothing in falls through, untriaged. */
+      const out: Result<Arrived> = (() => {
+        if (!(arrived.ok && arrival.channel === 'email' && arrival.verified !== false && arrival.ingest === undefined && arrived.value.state === 'untriaged' && !arrived.value.redelivered)) return arrived;
+        const first = arrived.value;
+        const lists = [...registers.values()];
+        const people = [meetsRole(lists)?.register, orgRole(lists)?.register].filter((r): r is string => r !== undefined);
+        /* A READING THAT FAILS LEAVES THE MAIL STORED AND UNTRIAGED, as it was: the bytes are the record's memory. */
+        let seen: MailOutcome = { handled: false };
+        try {
+          seen = transaction(() =>
+            readMailArrival(
+              {
+                ing: ingestDeps(only),
+                lists,
+                people,
+                meet: (a) => meetPerson(peopleDeps({ actor: 'ingest:mail' }, () => null, (p) => openSuggestion(governDeps(), 'ingest:mail', p)), a),
+              },
+              { raw: first.raw, headers: Object.fromEntries(Object.entries(arrival.headers ?? {}).map(([k, v]) => [k.toLowerCase(), v])), body: arrival.body ?? '' },
+            ),
+          );
+        } catch {
+          /* left stored and untriaged */
+        }
+        return seen.handled ? ok<Arrived>({ ...first, state: seen.state, reason: seen.reason, ...(seen.suggestion === undefined ? {} : { suggestion: seen.suggestion }) }) : arrived;
+      })();
 
       /* 3′ — OUTSIDE THE ARRIVAL'S TRANSACTION, and deliberately. What is queued here is a model
          call somebody will pay for; the payload is already stored, and a draft that could roll the
