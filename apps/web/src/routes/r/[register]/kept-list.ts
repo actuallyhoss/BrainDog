@@ -31,7 +31,7 @@ export type KeptList = {
   /** Where the next page starts, as the record said it; absent from a copy kept before it was kept. */
   cursor?: string | null;
   /** The pills' counts by field, or `null` when the record withheld some or they were not asked. */
-  counted?: [string, [string, number][]][] | null;
+  pills?: [string, [string, number][]][] | null;
   /** The rows a ref may point at, `<list> <id>` to the number, so a logged create's ref is drawn as one (`Lands.ids`). */
   ids?: [string, number][];
   /** Every row the list holds, walked to its end (`walkWhole`). */
@@ -49,7 +49,7 @@ export function keptOf(
   entries: Entry[],
   matched: number,
   names: Names,
-  more: { cursor?: string | null; counted?: ReadonlyMap<string, ReadonlyMap<string, number>> | null } = {},
+  more: { cursor?: string | null; pills?: ReadonlyMap<string, ReadonlyMap<string, number>> | null } = {},
 ): KeptList {
   return {
     decl,
@@ -59,7 +59,7 @@ export function keptOf(
     marks: names.marks ? [...names.marks] : null,
     ...(names.ids ? { ids: [...names.ids] } : {}),
     ...(more.cursor === undefined ? {} : { cursor: more.cursor }),
-    ...(more.counted === undefined ? {} : { counted: more.counted === null ? null : [...more.counted].map(([f, m]) => [f, [...m]] as [string, [string, number][]]) }),
+    ...(more.pills === undefined ? {} : { pills: more.pills === null ? null : [...more.pills].map(([f, m]) => [f, [...m]] as [string, [string, number][]]) }),
   };
 }
 
@@ -81,11 +81,11 @@ function joined(first: Names, next: Names): Names {
 }
 
 /** The pills' counts as the screen holds them. */
-export const countsOf = (counted: NonNullable<KeptList['counted']>): Map<string, Map<string, number>> => new Map(counted.map(([f, m]) => [f, new Map(m)]));
+export const countsOf = (counted: NonNullable<KeptList['pills']>): Map<string, Map<string, number>> => new Map(counted.map(([f, m]) => [f, new Map(m)]));
 
 /** A kept page the screen can draw whole without asking: its cursor and its counts (when the bar counts) are in it. */
 export function servedWhole(kept: KeptList, counts: boolean): boolean {
-  return kept.cursor !== undefined && (!counts || (kept.counted !== undefined && kept.counted !== null));
+  return kept.cursor !== undefined && (!counts || (kept.pills !== undefined && kept.pills !== null));
 }
 
 /**
@@ -112,7 +112,7 @@ export function spotOf(
           ...(ask.sort ? { sort: { field: ask.sort.field, dir: ask.sort.dir === 'desc' ? 'desc' : 'asc' } } : {}),
           more: ['cursor'],
           count: ['matched'],
-          tally: ['counted'],
+          tally: ['pills'],
           ids: ['ids'],
         };
   return { list: register, at: ['entries'], by, ...(ask.sort ? {} : { newest: true }), ...(lands ? { lands } : {}) };

@@ -259,7 +259,7 @@ function listOf(noun: string, named: string | undefined, world: SentenceWorld): 
   for (const word of [named, noun]) {
     if (word === undefined || word.trim() === '' || (word === noun && GENERIC.test(one(noun)))) continue;
     const got = listFor(word.replace(ARTICLE, ''), world.lists);
-    if (got === 'many') return { why: `More than one list could be "${word.trim()}". Name the list, such as "in ${world.lists[0]?.name ?? 'Tasks'}".` };
+    if (got === 'many') return { why: `More than one list could be "${word.trim()}". Name the list${world.lists[0] ? `, such as "in ${world.lists[0].name}"` : ''}.` };
     if (got !== null) return got;
   }
   return { why: `I could not tell which list "${(named ?? noun).trim()}" is. Name it as it is called in the sidebar.` };
@@ -412,7 +412,7 @@ type Act = { steps: Record<string, unknown>[]; said: string; row: boolean; loud:
 /** The tone of a notice that is a reminder on Today (`todayReminders` reads by it). */
 export const TODAY_TONE = 'today';
 
-const MARK_FIELDS = ['category', 'type', 'kind', 'label', 'bucket', 'folder', 'group', 'lane', 'status'];
+const MARK_FIELDS = ['category', 'type', 'kind', 'label', 'bucket', 'folder', 'group', 'lane'];
 
 /** The value a field takes for the words a person gave: an enum's id by its id or its label. */
 function enumValue(f: SentenceField, said: string): string | null {

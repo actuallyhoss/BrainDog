@@ -27,6 +27,9 @@ export function capFor(pathname: string): number | null {
   return null;
 }
 
+/** The methods that carry a body worth capping; a read or a preflight is handed on as it is. */
+const BODY_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 const tooLarge = (cap: number): Response => {
   const refusal: Refusal = { code: 'BODY_MALFORMED', fix: tooLargeLine(cap) };
   return new Response(JSON.stringify({ ok: false, refusal }), {
@@ -43,7 +46,7 @@ const tooLarge = (cap: number): Response => {
  * whole, so a sender cannot get past the cap by not saying how big it is.
  */
 export async function guardBody(request: Request): Promise<Request | Response> {
-  if (request.body === null || request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') return request;
+  if (request.body === null || !BODY_METHODS.has(request.method)) return request;
   const cap = capFor(new URL(request.url).pathname);
   if (cap === null) return request;
   const declared = request.headers.get('content-length');

@@ -39,12 +39,12 @@ test('THE NAMES GO AS PAIRS AND COME BACK AS A MAP, marks and all', () => {
 
 test('THE CURSOR AND THE COUNTS ARE KEPT, and only a copy holding both is drawn without asking', () => {
   const counted = new Map([['state', new Map([['open', 3]])]]);
-  const kept = keptOf(decl, [], 3, new Map() as never, { cursor: 'c1', counted });
-  assert.deepEqual(kept.counted, [['state', [['open', 3]]]]);
-  assert.deepEqual(countsOf(kept.counted!).get('state')?.get('open'), 3);
+  const kept = keptOf(decl, [], 3, new Map() as never, { cursor: 'c1', pills: counted });
+  assert.deepEqual(kept.pills, [['state', [['open', 3]]]]);
+  assert.deepEqual(countsOf(kept.pills!).get('state')?.get('open'), 3);
   assert.equal(servedWhole(kept, true), true);
-  assert.equal(servedWhole(keptOf(decl, [], 3, new Map() as never, { cursor: 'c1', counted: null }), true), false, 'counts the record withheld');
-  assert.equal(servedWhole(keptOf(decl, [], 3, new Map() as never, { cursor: null, counted: null }), false), true, 'no bar, no counts needed');
+  assert.equal(servedWhole(keptOf(decl, [], 3, new Map() as never, { cursor: 'c1', pills: null }), true), false, 'counts the record withheld');
+  assert.equal(servedWhole(keptOf(decl, [], 3, new Map() as never, { cursor: null, pills: null }), false), true, 'no bar, no counts needed');
   assert.equal(servedWhole(keptOf(decl, [], 3, new Map() as never), false), false, 'a copy kept before the cursor was');
 });
 

@@ -772,3 +772,23 @@ export const isWeakKey = (key: string): boolean => WEAK_KINDS.has(kindOfKey(key)
 
 /** The value of a key, `ada@x.com` of `email:ada@x.com`. */
 export const valueOfKey = (key: string): string => key.slice(key.indexOf(':') + 1);
+
+/**
+ * The name an organisation asked about from a domain goes by: the owner of the repository the run is in, when its name
+ * and the domain's agree and it says more (`Brightloom-Infotech` beside brightloomit.example is Brightloom Infotech),
+ * else the domain's own label (`kestrel-uni.example` is Kestrel Uni).
+ */
+export function domainOrgName(domain: string, remote: string | null): string {
+  const label = domain.split('.')[0]!;
+  const cap = (w: string): string => (w === '' ? w : `${w[0]!.toUpperCase()}${w.slice(1)}`);
+  const owner = remote === null ? undefined : /github\.com[/:]([^/\s]+)\//iu.exec(remote)?.[1];
+  if (owner !== undefined) {
+    const words = owner.replace(/([a-z])([A-Z])/g, '$1 $2').split(/[-_\s.]+/).filter((w) => w !== '');
+    const first = words[0]?.toLowerCase() ?? '';
+    const run = words.join('').toLowerCase();
+    const bare = label.replace(/-/g, '');
+    /* ONLY WHEN THE OWNER SAYS MORE THAN THE DOMAIN DOES: `lumacraft-ai` beside lumacraft.example is still Lumacraft. */
+    if (words.length > 0 && bare !== first && ((first.length >= 4 && bare.startsWith(first)) || (bare.length >= 4 && run.startsWith(bare)))) return words.map(cap).join(' ');
+  }
+  return label.split('-').filter((w) => w !== '').map(cap).join(' ');
+}

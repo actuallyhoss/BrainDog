@@ -50,8 +50,8 @@ export const NEXT_SHOWN = 3;
 const KEEP_DONE = 5;
 const KEEP_OPEN = 10;
 
-/* A task list that declares a milestone says it as a flag field; a list that does not has none, and none is drawn. */
-const milestoneField = (d: ListDecl): string | null => d.fields.find((f) => f.id === 'milestone' && (f.type === 'bool' || f.type === 'flag'))?.id ?? null;
+/* A dated list that declares a flag field marks its lines with it; a list that declares none has none, and none is drawn. */
+const milestoneField = (d: ListDecl): string | null => d.fields.find((f) => f.type === 'bool' || f.type === 'flag')?.id ?? null;
 
 /**
  * THE PROJECT'S TASKS WITH A DAY, on one line of time: finished behind, late ones, then the next few and the rest. A list

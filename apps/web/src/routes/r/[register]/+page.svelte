@@ -685,7 +685,7 @@
           twiceHeld = null;
           twiceMany = null;
           cursor = near.value.cursor ?? null;
-          counted = counts && near.value.counted ? countsOf(near.value.counted) : new Map();
+          counted = counts && near.value.pills ? countsOf(near.value.pills) : new Map();
           uncounted = null;
           fromCopy = false;
           keepWhole(register, s.value, order, null, localTicket());
@@ -758,7 +758,7 @@
     /* THE CHIPS AS THE RECORD'S TREE, so a create can be asked the same question here (`local.ts` `Lands`). No refs are
        handed over: a chip over a ref stays a number, which the copy refuses to answer and drops the page instead. */
     const where = ask.filters.length === 0 ? null : ((treeOf(register, ask.filters, '', new Map(), ask.join) as Predicate | undefined) ?? null);
-    keepLocal(LIST_COPY, said, listsOf(register, d), keptOf(d, got.entries, got.matched, got.names, { cursor: got.cursor, counted: counts }), mark, { [register]: d }, {
+    keepLocal(LIST_COPY, said, listsOf(register, d), keptOf(d, got.entries, got.matched, got.names, { cursor: got.cursor, pills: counts }), mark, { [register]: d }, {
       spots: [spotOf(register, ask, pills, where)],
     });
   }
@@ -800,7 +800,7 @@
         if (start === null) return;
         const whole = await walkWhole(start, (c) => pageAt(c), { most: LIST_ROWS_MOST, idle, gone: () => left || id !== register });
         if (whole === null) return;
-        keepLocal(LIST_WHOLE, key, listsOf(register, d), { ...keptOf(d, whole.entries, whole.matched, whole.names, { cursor: null, counted: null }), whole: true }, mark, { [register]: d }, {
+        keepLocal(LIST_WHOLE, key, listsOf(register, d), { ...keptOf(d, whole.entries, whole.matched, whole.names, { cursor: null, pills: null }), whole: true }, mark, { [register]: d }, {
           spots: [spotOf(register, { filters: [], q: '', sort: order, twice: false }, [], null)],
         });
       } finally {

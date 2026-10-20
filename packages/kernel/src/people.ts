@@ -71,7 +71,7 @@ import { FOLD_HOPS, holderOf, holders, nameKey, noteMention, sourceKeys } from '
 import type { Proposal } from './govern.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { pairsFor, type Judged, type JudgedBand, type Pair } from './resolve.ts';
-import { githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
+import { domainOrgName, githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
 import { LEGACY, PARTS, meetsRole, plays, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
 
 /**
@@ -1158,26 +1158,6 @@ const holdsAt = (list: DeclaredList<MeetsFields>, row: Row, domain: string): boo
 
 /** The fewest people vouched for at one domain that make it worth asking whether it is an organisation. */
 const DOMAIN_PEOPLE_LEAST = 2;
-
-/**
- * The name an organisation asked about from a domain goes by: the owner of the repository the run is in, when its name
- * and the domain's agree and it says more (`Brightloom-Infotech` beside brightloomit.example is Brightloom Infotech),
- * else the domain's own label (`kestrel-uni.example` is Kestrel Uni).
- */
-export function domainOrgName(domain: string, remote: string | null): string {
-  const label = domain.split('.')[0]!;
-  const cap = (w: string): string => (w === '' ? w : `${w[0]!.toUpperCase()}${w.slice(1)}`);
-  const owner = remote === null ? undefined : /github\.com[/:]([^/\s]+)\//iu.exec(remote)?.[1];
-  if (owner !== undefined) {
-    const words = owner.replace(/([a-z])([A-Z])/g, '$1 $2').split(/[-_\s.]+/).filter((w) => w !== '');
-    const first = words[0]?.toLowerCase() ?? '';
-    const run = words.join('').toLowerCase();
-    const bare = label.replace(/-/g, '');
-    /* ONLY WHEN THE OWNER SAYS MORE THAN THE DOMAIN DOES: `lumacraft-ai` beside lumacraft.example is still Lumacraft. */
-    if (words.length > 0 && bare !== first && ((first.length >= 4 && bare.startsWith(first)) || (bare.length >= 4 && run.startsWith(bare)))) return words.map(cap).join(' ');
-  }
-  return label.split('-').filter((w) => w !== '').map(cap).join(' ');
-}
 
 /**
  * ORGANISATIONS FROM MAIL DOMAINS (research-understanding-judge change 3). Two or more people the record vouches for at

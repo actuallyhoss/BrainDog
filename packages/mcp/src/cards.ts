@@ -89,7 +89,7 @@ export function moneyLine(amount: number, currency: string): string {
 }
 
 /* The projects list declares `revenue` (money) and no other figure; the rest are for lists that name theirs differently. */
-const MONEY_KEYS = ['revenue', 'budget', 'spend', 'income', 'cost', 'money', 'value', 'price'];
+const MONEY_KEYS = ['revenue', 'budget', 'spend', 'income', 'cost', 'money', 'value'];
 
 /** One money figure if the row has one: a field that is `{ amount, currency }`, or a number beside a currency. */
 function moneyOf(fields: Record<string, unknown>): string | null {
@@ -98,6 +98,8 @@ function moneyOf(fields: Record<string, unknown>): string | null {
     if (isObject(v) && typeof v.amount === 'number' && typeof v.currency === 'string') return moneyLine(v.amount, v.currency);
     if (typeof v === 'number' && typeof fields.currency === 'string') return moneyLine(v, fields.currency);
   }
+  /* A money field under any other name is known by its shape. */
+  for (const v of Object.values(fields)) if (isObject(v) && typeof v.amount === 'number' && typeof v.currency === 'string') return moneyLine(v.amount, v.currency);
   return null;
 }
 

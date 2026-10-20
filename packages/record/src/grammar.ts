@@ -185,7 +185,7 @@ const PAGE = {
     body: {
       page: 'reading',
       title: 'Reading',
-      nav: { section: 'Studies', order: 20 },
+      nav: { section: 'Library', order: 20 },
       requires: ['register.tasks'],
       blocks: [
         { kind: 'note', span: 12, body: 'What is left to read this week.' },

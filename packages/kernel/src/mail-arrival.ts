@@ -15,7 +15,8 @@ import type { Result } from '@braindog/ports';
 import { openRowset, unfile, type IngestDeps } from './ingest.ts';
 import { instant } from './migrate.ts';
 import { places, readMail, type MailRead } from './mail-read.ts';
-import { domainOrgName, type MeetArgs, type Met } from './people.ts';
+import { domainOrgName } from './identity-keys.ts';
+import type { MeetArgs, Met } from './index.ts';
 
 type MailField = { id: string; type: string; to?: string; values?: readonly string[]; retired?: boolean; deadline?: boolean };
 export type MailList = { id: string; title?: string; state?: string; scopes?: unknown; fields: readonly MailField[] };
