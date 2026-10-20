@@ -63,6 +63,7 @@
   import Sheet from '$lib/ui/Sheet.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
+  import CodeLine from '$lib/ui/CodeLine.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
   import Swimlanes from '$lib/viz/Swimlanes.svelte';
@@ -263,10 +264,11 @@
 
 <!-- THE SENTENCE IN ITS PIECES: the running clause wears the live dot, and a failure today is the one red phrase. One
      line of markup, so no space is set between a piece and its punctuation. -->
+{#snippet noneYet()}{words.none}.{/snippet}
 {#snippet sentence()}{#each told ?? [] as p, i (i)}{#if p.tone === 'live'}<span class="live-dot" aria-hidden="true"></span>{p.text}{:else if p.tone === 'needs'}<span data-needs>{p.text}</span>{:else}{p.text}{/if}{/each}{/snippet}
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's. -->
-<PageHead icon="play" title={repo ? words.headingFor(repo) : words.heading} count={jobs.state === 'ready' ? rows.length : undefined} sentence={told ? sentence : undefined}>
+<PageHead icon="play" title={repo ? words.headingFor(repo) : words.heading} count={jobs.state === 'ready' ? rows.length : undefined} sentence={told ? sentence : jobs.state === 'empty' && !repo ? noneYet : undefined}>
   {#snippet actions()}
     {#if repo && !page.data.refused}<Button href="/jobs">{words.allJobs}</Button>{/if}
     {#if !page.data.refused}<Button weight="primary" onclick={() => void openRun()}><Icon name="play" size="s" />{words.run}</Button>{/if}
@@ -283,7 +285,6 @@
     <!-- NO RUN YET: what a job is, in three steps, and the machines that could take one, side by side. -->
     <div class="first" data-pair={devices ? '' : undefined}>
       <Tile icon="play" title={said.whatTitle}>
-        <p class="lead">{words.none}.</p>
         <ol class="steps">
           {#each said.whatSteps as step, i (i)}<li><span class="step-n num" aria-hidden="true">{i + 1}</span><span>{step}</span></li>{/each}
         </ol>
@@ -358,7 +359,7 @@
       {#if enrolAt === null}
         <p class="enrol">{said.enrolNoAddress}</p>
       {:else}
-        <p class="enrol">{said.enrolHow}<code class="enrol-cmd">{said.enrolCommand(enrolAt)}</code></p>
+        <div class="enrol"><p>{said.enrolHow}</p><CodeLine text={said.enrolCommand(enrolAt)} /></div>
       {/if}
     {:else}
       <ul class="machines">
@@ -384,7 +385,8 @@
 
 <Sheet bind:open={starting} title={words.run}>
   {#if kinds === null}
-    <Waiting rows={2} />
+    <!-- ONLY WHILE THE SHEET IS OPEN: a closed sheet holding a busy block said the whole page was still loading. -->
+    {#if starting}<Waiting rows={2} />{/if}
   {:else if !kinds.ok}
     <p class="sheet-note" role="status">{'refusal' in kinds ? kinds.refusal.fix : copy.readRefused}</p>
   {:else if offered.length === 0}
@@ -460,14 +462,6 @@
     }
   }
 
-  .lead {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--fs-head);
-    font-weight: var(--fw-semi);
-    line-height: var(--lh-head);
-  }
-
   /* THREE STEPS, each a number in a small square and one line, at body size. */
   .steps {
     display: flex;
@@ -493,8 +487,8 @@
     place-items: center;
     block-size: 24px;
     border-radius: var(--r-sm);
-    background: var(--action-tint-1);
-    color: var(--action-text);
+    background: var(--tile-2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-semi);
   }
@@ -526,7 +520,7 @@
   .enrol {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: var(--sp-2);
     margin: 0;
     color: var(--ink2);
@@ -534,15 +528,8 @@
     line-height: 1.55;
   }
 
-  /* THE COMMAND IS THE ONE THING HERE TYPED AS IT IS, so it is set apart on the field's fill in the identifier face. */
-  .enrol-cmd {
-    padding: 2px var(--sp-2);
-    border-radius: var(--r-sm);
-    background: var(--field);
-    color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--fs-meta);
-    overflow-wrap: anywhere;
+  .enrol p {
+    margin: 0;
   }
 
   .machine + .machine {

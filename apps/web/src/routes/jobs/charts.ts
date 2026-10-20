@@ -427,11 +427,11 @@ export const words = {
   ],
   machinesTitle: 'Machines',
   noMachines: 'No machine is enrolled yet',
-  enrolHow: 'Enrol one from its own terminal:',
+  enrolHow: 'Add one from its own terminal:',
   /** The command takes the record's own address, which is where the runner is approved (`enrolAddress`). */
   enrolCommand: (address: string) => `braindog runner enrol ${address}`,
   /* WHEN THERE IS NO ADDRESS ANOTHER MACHINE COULD REACH, the command is said without one rather than with a wrong one. */
-  enrolNoAddress: 'Enrol one from its own terminal, with braindog runner enrol and the address you open this record at.',
+  enrolNoAddress: 'Add one from its own terminal, with braindog runner enrol and the address you open this record at.',
   askedAt: (at: string) => `asked for at ${at}`,
   turns: (n: number) => plural(n, 'turn', 'turns'),
   runs: (n: number) => plural(n, 'run', 'runs'),
