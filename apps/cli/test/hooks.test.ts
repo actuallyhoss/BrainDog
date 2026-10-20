@@ -16,7 +16,8 @@ import { hostname, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { eventOf, HOOK_MS, heldFor, hookBudget, notSignedIn, readSession, REMEMBER_MS, sessionPath, windowPath, writeSession, type SessionFile } from '../src/hooks.ts';
+import { writeDoorCache } from '../src/bridge-cache.ts';
+import { eventOf, HOOK_MS, heldFor, hookBudget, hookStart, notSignedIn, readSession, REMEMBER_MS, sessionPath, staleLine, windowPath, writeSession, type SessionFile } from '../src/hooks.ts';
 import { replaceByHand, hookCommand, installInto, serversFileOf } from '../src/install.ts';
 import { sessionHeaders } from '../src/position.ts';
 import { REPLACE, REPLACE_FILE } from './replace.ts';
@@ -408,6 +409,48 @@ test('NOT SIGNED IN is one line saying how to get a token, exit 0, and nothing i
 
   /* An empty stdin, as a person running it by hand sends, is the same startup. */
   assert.equal((await run(['hook', 'start'], envFor(config, {}), '')).code, 0);
+});
+
+/* ── a command line older than its host ────────────────────────────────── */
+
+test('THE COMMAND LINE OUT OF DATE IS ONE LINE: older than the host’s build or than the oldest it works with, said once', () => {
+  const OLD = '2026.10.07+4e712da';
+  const host = 'brain.dog';
+  const line = 'Your BrainDog command line is out of date (built 7 Oct, brain.dog is on 20 Oct). Run braindog update, then start a new session.';
+  assert.equal(staleLine(OLD, undefined, '2026.10.20+f46ccf9', host), line);
+  /* The attach's own answer says it is below the oldest the host works with, with no build of the host's known here. */
+  const behind = { ...CONTEXT, build: { cli: OLD, behind: true } } as never;
+  assert.equal(staleLine(OLD, behind, null, host), 'Your BrainDog command line is out of date (built 7 Oct). Run braindog update, then start a new session.');
+  /* The same day, a later day, no build known, or a checkout's build: nothing. */
+  assert.equal(staleLine(OLD, undefined, '2026.10.07+aaaaaaa', host), null);
+  assert.equal(staleLine('2026.10.21+1a2b3c4', undefined, '2026.10.20+f46ccf9', host), null);
+  assert.equal(staleLine(OLD, undefined, null, host), null);
+  assert.equal(staleLine('dev+0000000', behind, '2026.10.20+f46ccf9', host), null);
+  /* SAID ONCE: the record's card already says to update, or the build address's line above the card does. */
+  const carded = { ...CONTEXT, card: 'BrainDog · run S7\nUpdate   This command is older than the record. Run braindog update and restart this session.' } as never;
+  assert.equal(staleLine(OLD, carded, '2026.10.20+f46ccf9', host), null);
+  assert.equal(staleLine(OLD, undefined, '2026.10.20+f46ccf9', host, true), null);
+});
+
+test('THE START HOOK SAYS IT ABOVE THE CARD, from the host’s build the bridge last heard, with no request of its own', async (t) => {
+  const host = await stubHost(t);
+  const config = folder('config');
+  const home = folder('home');
+  const cwd = folder('kiln');
+  const env = { XDG_CONFIG_HOME: config, BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN };
+  const said: string[] = [];
+  const start = (id: string, build: string) =>
+    hookStart({ env, stdin: JSON.stringify({ cwd, session_id: id, source: 'startup' }), cwd, home, device: 'MacBook', build, write: (text) => void said.push(text) });
+
+  writeDoorCache(home, host.base, { build: '2026.10.20+f46ccf9', initialize: {} });
+  await start('claude-old', '2026.10.07+4e712da');
+  const lines = said[0]!.trimEnd().split('\n');
+  assert.equal(lines[0], `Your BrainDog command line is out of date (built 7 Oct, ${new URL(host.base).host} is on 20 Oct). Run braindog update, then start a new session.`);
+  assert.equal(lines[1], 'Connected to BrainDog. Call context.');
+  assert.deepEqual(host.seen.map((s) => s.method), ['attach', 'boot'], 'saying it cost a request');
+
+  await start('claude-new', '2026.10.20+f46ccf9');
+  assert.equal(said[1]!.trimEnd(), 'Connected to BrainDog. Call context.');
 });
 
 /* ── what a real Claude Code sends ─────────────────────────────────────── */

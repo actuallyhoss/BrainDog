@@ -12,11 +12,15 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import type { Client, Context } from '@braindog/client';
+import { buildDay } from '@braindog/mcp/build';
 import { refused } from '@braindog/ports';
 
+import { behindSaid, checkPath, hostName } from './behind.ts';
+import { readDoorCache } from './bridge-cache.ts';
 import { allowedPrograms, owedCommands, readAllowed, sentOf, usedTools, type SentCommands } from './commands-used.ts';
 import { briefing, cardOf, nextLine, words, type Moved, type Where } from './brief.ts';
 import { budgetOf, clientFor, hostsPath, readHosts, sameHost, target, type Target } from './http.ts';
@@ -32,7 +36,7 @@ type Env = Record<string, string | undefined>;
  * by, when a test gives one; otherwise it is worked out (`deviceName`). `began` is when the hook began, in epoch
  * milliseconds, for a caller that is not its own process; without it the start hook counts from its process's start.
  */
-export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string; device?: string; began?: number };
+export type Io = { env: Env; stdin: string; cwd: string; write: (text: string) => void; home?: string; device?: string; began?: number; build?: string };
 
 /** The start hook's whole budget: git, then `attach`, well inside the twenty seconds Claude Code gives it. */
 export const HOOK_MS = 8_000;
@@ -362,6 +366,68 @@ export async function whoDecides(client: Client): Promise<Decides> {
   }
 }
 
+/* ── a command older than its host ─────────────────────────────────────── */
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** `2026.10.07` as a person says it, `7 Oct`. */
+const dayName = (day: string): string => {
+  const [, m, d] = day.split('.').map(Number) as [number, number, number];
+  return `${String(d)} ${MONTHS[m - 1] ?? ''}`.trim();
+};
+
+/**
+ * THE ONE LINE THAT SAYS THIS COMMAND LINE IS OUT OF DATE (plan §6.6, audit item 5), or `null`. His machines ran the
+ * command of 7 October for thirteen days while the host was on 20 October, and nothing said so: the build address's
+ * line waits fourteen days, and the record's card says it only below `min_cli`.
+ *
+ * FROM WHAT THE START ALREADY HOLDS, SO IT COSTS NO REQUEST: the attach's own context, which says whether this command
+ * is older than the oldest the host works with (`build.behind`), and the host's build as the bridge last heard it
+ * (`hostBuild`, its door cache). A command built on a day before the host's is out of date, because each deploy
+ * publishes the command it was built with. A checkout's build has no day and is never called out of date.
+ *
+ * SAID ONCE. Not when the record's card already says to update, and not when the build address's line (`behindLine`,
+ * printed above the card by the same hook) already does (`already`).
+ */
+export function staleLine(build: string, c: Context | undefined, hostBuild: string | null, host: string, already = false): string | null {
+  const mine = buildDay(build);
+  if (mine === null || already) return null;
+  const theirs = buildDay(hostBuild);
+  const newer = theirs !== null && theirs > mine;
+  const below = (c as { build?: { behind?: unknown } | null } | undefined)?.build?.behind === true;
+  if (!newer && !below) return null;
+  if (cardOf(c)?.some((line) => /braindog update/u.test(line))) return null;
+  return `Your BrainDog command line is out of date (built ${dayName(mine)}${newer ? `, ${host} is on ${dayName(theirs)}` : ''}). Run braindog update, then start a new session.`;
+}
+
+/** The host's build as this machine last heard it: the bridge's door cache, else the build address's kept answer. */
+function hostBuildOf(home: string, key: string): string | null {
+  const door = readDoorCache(home, key)?.build;
+  if (typeof door === 'string' && door !== '') return door;
+  return checkedOf(home, key)?.app ?? null;
+}
+
+/** What `behindLine` kept for this host in `~/.braindog/update-check.json`, or `null`. */
+function checkedOf(home: string, key: string): { app: string | null; min_cli: string | null } | null {
+  try {
+    const x: unknown = JSON.parse(readFileSync(checkPath(home), 'utf8'));
+    const kept = isObject(x) && isObject(x.hosts) ? x.hosts[key] : undefined;
+    if (!isObject(kept)) return null;
+    return { app: typeof kept.app === 'string' ? kept.app : null, min_cli: typeof kept.min_cli === 'string' ? kept.min_cli : null };
+  } catch {
+    return null;
+  }
+}
+
+/** Whether `behindLine` says this command is behind, from the answer it kept today, so its line and this one are not both said. */
+function behindSaysIt(home: string, key: string, build: string): boolean {
+  const kept = checkedOf(home, key);
+  try {
+    return kept !== null && behindSaid(build, kept, hostName(key)) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** Whether a card drawn here, rather than the record's own, would say whom its questions wait on. */
 export const asksWaiting = (c: Context | undefined): boolean => c !== undefined && cardOf(c) === null && c.waiting.length > 0;
 
@@ -442,6 +508,11 @@ export async function aheadCard(c: Context | undefined, moved: Moved, read: () =
  *   - `compact`: only the Next line. The summary kept the rest, and the step is what a compaction loses.
  *   - `resume` within the hour of the same session last being heard from: nothing, because its card is still in the
  *     conversation. A resume after longer gets the whole card.
+ *
+ * ONE ROUND TRIP WHERE NOTHING MOVED (plan §4.1, his slowest start was 5.4 s). The attach answers the context, the card
+ * and whether this command is behind its host; the skills sync and the tools scan run only when what they read moved
+ * (`startTag` in `session-start.ts`); the time mark rides beside the attach; and the line saying this command line is out
+ * of date comes from what the start already holds (`staleLine`).
  *
  * WHAT EACH ONE SENDS, MEASURED on Claude Code 2.1.295 (9 October 2026; `test/fixtures/hook-events/`, and the table
  * under "The session hooks" in `docs/48-SPEC-CLI.md`). `resume` comes back here with the resumed conversation's own
@@ -548,7 +619,11 @@ export async function hookStart(io: Io): Promise<void> {
         : null,
     ]);
     const where: Where = { repo: at.repo, host: at.host, device, agent: 'Claude Code' };
-    io.write(briefing(shown, where, moved, { more, ...decides }));
+    /* FIRST, ABOVE THE CARD, as the lapse is: what to do before the work, in the words of the card's own Update line. */
+    const home = io.home ?? homedir();
+    const build = io.build ?? cliBuild();
+    const stale = staleLine(build, shown.context, hostBuildOf(home, to.key), hostName(to.key), behindSaysIt(home, to.key, build));
+    io.write(`${stale === null ? '' : `${stale}\n`}${briefing(shown, where, moved, { more, ...decides })}`);
   } finally {
     /* THE HOOK'S OWN TIME, from the process's start to the card printed, kept for the next hook of this session to send
        beside the call it makes anyway (`owedMark`). Written last, so it counts the sync, the scan and the card. */
