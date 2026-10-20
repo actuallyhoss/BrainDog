@@ -36,8 +36,8 @@ const person = (id: keyof typeof forPages.person.who): Place => ({
 /**
  * Every page a reader may be sent to, home aside. `/legal/*` stays out: those pages are unlinked until their texts arrive.
  *
- * THE HEADER'S ROW IS THE SITE DESIGN'S (DIRECTION §47): Slash, Agents, Pricing, Docs, then "Sign in" and "Start
- * free", which `+layout.svelte` draws because they are not pages of this site. Packs left the row with that design;
+ * THE HEADER'S ROW (site F12, 20 October): Slash, Agents, Pricing, Security, Docs, then "Sign in" and "Get early
+ * access", which `+layout.svelte` draws because they are not pages of this site. Packs left the row with that design;
  * it and the changelog are held until the site is public (`HELD` in `launch.ts`), and the changelog comes back to
  * the row's end the day `LAUNCH.public` is on (`reachable` below).
  */
@@ -46,15 +46,15 @@ export const PLACES: readonly Place[] = [
   place('/agents', 'agents', true),
   place(PACKS, 'packs', false),
   place('/pricing', 'pricing', true),
-  person('personal'),
-  person('student'),
+  place(SECURITY, 'security', true),
   person('founder'),
   person('team'),
+  person('personal'),
+  person('student'),
   person('project'),
   place(DOCS, 'docs', true),
   place('/changelog', 'changelog', true),
   place(SUPPORT, 'support', false),
-  place(SECURITY, 'security', false),
   place('/download', 'download', false),
   place('/legal', 'legal', false),
 ];

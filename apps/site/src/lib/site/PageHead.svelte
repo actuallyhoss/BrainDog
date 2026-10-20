@@ -26,8 +26,8 @@
   }
 
   h1 {
-    max-inline-size: 13ch;
-    font-size: clamp(3rem, 6.6vw, 6rem);
+    max-inline-size: 14ch;
+    font-size: clamp(44px, 5.6vw, 80px);
     line-height: 0.95;
     letter-spacing: -0.05em;
     text-wrap: balance;

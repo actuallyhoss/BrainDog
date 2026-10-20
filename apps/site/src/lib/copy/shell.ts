@@ -2,6 +2,8 @@
  * The words every page shares: the product's name, each page's search result, the header, the footer (which
  * carries the slogan) and the 404. Which pages the header, the footer and the 404 list is `nav.ts`'s.
  */
+import { LAUNCH } from '../launch.ts';
+
 export const shell = {
   product: 'BrainDog',
 
@@ -10,26 +12,25 @@ export const shell = {
     home: {
       title: 'BrainDog · Give your business a memory',
       description:
-        'One record of your projects, money and people, shared by you and every AI agent you use. ' +
-        'It tells you where things stand and asks only what matters.',
+        'BrainDog remembers your projects, money and people, tells you each morning what needs you, and works with ' +
+        'Claude, ChatGPT, Cursor and Codex. Free while in early access.',
     },
     slash: {
       title: 'Slash · BrainDog',
       description:
-        'Press / anywhere in BrainDog and ask in plain words. Slash answers from your record, finds ' +
-        'anything, and drafts what you ask for, with nothing added until you say yes.',
+        'Press / anywhere in BrainDog and ask in plain words. Slash answers from what you keep, finds ' +
+        'anything, and drafts what you ask for.',
     },
     pricing: {
       title: 'Pricing · BrainDog',
       description:
-        'Free for one person, with the whole app, three agents and 20 questions to Slash a month. ' +
-        'Cloud and Cloud Plus add room when you need it.',
+        'BrainDog is free while in early access, with every feature, three AI tools and 20 questions to Slash a month.',
     },
     agents: {
-      title: 'Connect your agent · BrainDog',
+      title: 'Connect your AI tools · BrainDog',
       description:
-        'Connect Claude, ChatGPT, Codex, Cursor or VS Code to your record in one line. Your agent ' +
-        'starts with your brief and leaves a note when it is done.',
+        'Connect Claude, ChatGPT, Codex, Cursor or VS Code to BrainDog in one line. Each starts from your ' +
+        "brief and leaves a note when it's done.",
     },
     notFound: {
       title: 'Page not found · BrainDog',
@@ -41,7 +42,7 @@ export const shell = {
     },
     download: {
       title: 'BrainDog for Mac',
-      description: 'The BrainDog app for Mac: the same record in its own window, with a shortcut to Slash from anywhere.',
+      description: 'The BrainDog app for Mac: your BrainDog in its own window, with a shortcut to Slash from anywhere.',
     },
     changelog: {
       title: 'Changelog · BrainDog',
@@ -63,30 +64,38 @@ export const shell = {
     security: 'Security',
     legal: 'Legal',
     source: 'GitHub',
-    /** Drawn in place of "Start free" and "Sign in" once the visitor is signed in (`lib/site/signed-in.ts`). */
+    /** Drawn in place of the start button and "Sign in" once the visitor is signed in (`lib/site/signed-in.ts`). */
     open: 'Open BrainDog',
     signin: 'Sign in',
-    start: 'Start free',
+    /* THE BUTTON THAT STARTS IT (SF13): "Get early access" while sign-up is by invite, "Start free" once it is open,
+       from `LAUNCH.invite`, so one flag turns every start button on the site. */
+    start: LAUNCH.invite ? 'Get early access' : 'Start free',
     menu: 'Menu',
   },
 
   /** The page a mistyped address lands on. Its list of pages is `nav.ts`'s, so it cannot leave one out. */
   notFound: {
-    title: 'There is no page here',
-    lede: 'The address may be mistyped, or the page has moved. Pick where you meant to go.',
+    title: "There's no page here",
+    lede: 'The address may be mistyped, or the page has moved.',
   },
 
-  /** The dark footer: the brand and its line, three groups (`lib/site/footer.ts`) and the company's name. */
+  /** The early access line: the hero's under its buttons (D1), and the strip that closes an inner page (site F11). */
+  early: {
+    strong: 'Early access, invite only.',
+    rest: "It's free while we open it up.",
+  },
+
+  /** The dark footer: the brand with no blurb, three groups of plain links (`lib/site/footer.ts`) and the owner. */
   footer: {
-    tagline: 'Give your business a memory.',
     groups: {
       product: 'Product',
-      learn: 'Learn',
-      company: 'Company',
+      who: "Who it's for",
+      help: 'Help',
     },
-    /* The links that are not a page's own label: the first doc, the connect page by what it does, and the texts. */
-    start: 'Get started',
-    connect: 'Connect an agent',
+    /* The links that are not a page's own label: who it is for, then the texts. */
+    small: 'Small businesses',
+    teams: 'Teams and agencies',
+    developers: 'Developers',
     terms: 'Terms',
     privacy: 'Privacy',
     owner: '© 2026 BrainDog',

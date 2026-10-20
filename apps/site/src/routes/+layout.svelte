@@ -1,16 +1,18 @@
 <!--
   The site shell: the night header, the page, and the dark footer (DIRECTION §47, the site design of 17 October).
 
-  THE HEADER IS ON THE NIGHT GROUND AND SCROLLS AWAY WITH THE PAGE. Every page opens on the night ground too (its own
-  head, `lib/site/PageHead.svelte`, or the home page's hero), so the band runs on from the header unbroken. It holds
-  the brand, Slash, Agents, Pricing and Docs (`nav.ts`), "Sign in", and "Start free" in red. Signed in, the last two
-  become "Open BrainDog" (`lib/site/Start.svelte`, `signed-in.ts`). At 760 and under the links go and "Start free"
-  stays at the right, with a 44px menu beside it holding the links.
+  THE HEADER IS ON THE NIGHT GROUND AND SCROLLS AWAY WITH THE PAGE, 64px tall. Every page opens on the night ground
+  too (its own head, `lib/site/PageHead.svelte`, or the home page's hero), so the band runs on from the header
+  unbroken. It holds the brand, Slash, Agents, Pricing, Security and Docs (`nav.ts`), "Sign in", and "Get early
+  access" in red (site F12). Signed in, the last two become "Open BrainDog" (`lib/site/Start.svelte`, `signed-in.ts`).
+  At 760 and under the links go and the button stays at the right, small, with a 44px menu beside it holding the links.
+
+  THE FOOTER IS PLAIN TEXT COLUMNS (site F10): the brand with nothing under it, Product, Who it's for and Help.
 
   NOTHING HERE IS NEEDED TO READ THE SITE. The nav is links, the theme follows the operating system, and every page is
-  finished HTML. Scripting adds two things: a block rising into place as it scrolls in (`reveal.ts`), and closing the
-  phone menu after a tap, on a press of Escape or on a tap outside it; without scripting it is a native disclosure that
-  opens and closes on its own 44px button, and a link inside it loads the next page anyway.
+  finished HTML. Scripting adds one thing: closing the phone menu after a tap, on a press of Escape or on a tap outside
+  it; without scripting it is a native disclosure that opens and closes on its own 44px button, and a link inside it
+  loads the next page anyway.
 
   `header .brand` is read by `scripts/product.mjs`, which draws the shared card from the built home page.
 -->
@@ -36,7 +38,6 @@
   import Mark from '$lib/Mark.svelte';
   import { site } from '$lib/copy.ts';
   import { LIVE } from '$lib/nav.ts';
-  import { reveal } from '$lib/reveal.ts';
   import { footerGroups } from '$lib/site/footer.ts';
   import SignIn from '$lib/site/SignIn.svelte';
   import Start from '$lib/site/Start.svelte';
@@ -52,12 +53,8 @@
 
   const here = (href: string) => page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
 
-  /* THE BLOCKS THAT RISE INTO PLACE are found again on every page, the first one included (`reveal.ts`). */
-  let unreveal = (): void => {};
   afterNavigate(() => {
     menuOpen = false;
-    unreveal();
-    unreveal = reveal();
   });
 
   const outside = (event: MouseEvent) => {
@@ -86,9 +83,9 @@
       <SignIn />
     </nav>
 
-    <div class="go"><Start /></div>
+    <div class="go"><Start size="sm" /></div>
 
-    <!-- THE PHONE'S HEADER IS ONE ROW: the brand, "Start free" and this 44px button, which holds the links. -->
+    <!-- THE PHONE'S HEADER IS ONE ROW: the brand, the start button and this 44px button, which holds the links. -->
     <details class="menu" bind:open={menuOpen} bind:this={menu}>
       <summary class="menu-btn" aria-label={site.nav.menu}>
         <Icon name={menuOpen ? 'close' : 'menu'} size="l" />
@@ -115,7 +112,6 @@
     <div class="foot">
       <div>
         <a class="brand" href="/" aria-label="{site.product} home"><Mark height={24} tone="inherit" />{site.product}</a>
-        <p>{site.footer.tagline}</p>
       </div>
       {#each groups as group}
         <nav aria-label={group.title}>
@@ -162,8 +158,8 @@
   .bar {
     display: flex;
     align-items: center;
-    gap: 30px;
-    block-size: 76px;
+    gap: 28px;
+    block-size: 64px;
   }
 
   /* THE BRAND: the mark in red and the name in Lexend 600, the footer's the same. */
@@ -179,13 +175,13 @@
   }
 
   .brand :global(.mark) {
-    color: var(--red);
+    color: var(--red-fill);
   }
 
   .links {
     display: flex;
     align-items: center;
-    gap: 26px;
+    gap: 24px;
     margin-inline-start: auto;
     color: var(--on-night-2);
     font-size: var(--t-site-15);
@@ -227,7 +223,8 @@
 
   .go :global(.btn) {
     block-size: 40px;
-    font-size: var(--t-site-14-5);
+    padding-inline: 16px;
+    font-size: 15px;
   }
 
   @media (pointer: coarse) {
@@ -313,6 +310,12 @@
       margin-inline-start: auto;
     }
 
+    .go :global(.btn) {
+      block-size: 34px;
+      padding-inline: 12px;
+      font-size: 14px;
+    }
+
     .menu {
       display: block;
     }
@@ -321,8 +324,9 @@
   /* ── The footer ─────────────────────────────────────────────────────────── */
 
   .site-foot {
-    padding: 64px 0 calc(40px + env(safe-area-inset-bottom, 0px));
-    font-size: var(--t-site-15);
+    padding: 48px 0 calc(28px + env(safe-area-inset-bottom, 0px));
+    border-block-start: 1px solid var(--foot-rule);
+    font-size: 15px;
   }
 
   .foot {
@@ -339,7 +343,7 @@
 
   .foot ul {
     display: grid;
-    gap: 9px;
+    gap: 8px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -355,13 +359,8 @@
     text-underline-offset: 3px;
   }
 
-  .foot p {
-    margin: 12px 0 0;
-    color: var(--on-night-2);
-  }
-
   .owner {
-    margin: 56px 0 0;
+    margin: 32px 0 0;
     padding-block-start: 20px;
     border-block-start: 1px solid var(--night-rule);
     color: var(--on-night-2);
@@ -370,7 +369,18 @@
 
   @media (max-width: 1060px) {
     .foot {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .foot > :first-child {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .foot {
+      gap: 24px 12px;
+      font-size: 14px;
     }
   }
 
