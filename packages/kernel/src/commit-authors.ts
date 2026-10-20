@@ -14,7 +14,7 @@ export type CommitAuthor = { name?: string; email: string };
 /** The authors a hint names, in order, each address once, lower-cased; bots and unreadable entries left out. */
 export function commitAuthors(said: string | undefined): CommitAuthor[] {
   const out: CommitAuthor[] = [];
-  /* The commits ride after the first ` || ` (`work-reads.ts`); only what comes before it is authors. */
+  /* The commits ride after the first ` || ` (`run-reads.ts`); only what comes before it is authors. */
   for (const part of (said ?? '').split(/\s*\|\|\s*/u)[0]!.split(',')) {
     const m = /^\s*(.*?)\s*<([^<>\s]+)>\s*$/u.exec(part);
     if (!m) continue;

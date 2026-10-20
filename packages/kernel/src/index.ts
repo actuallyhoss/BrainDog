@@ -55,7 +55,7 @@ import {
   type PlannedRecord,
 } from './declare.ts';
 import { commitAuthors } from './commit-authors.ts';
-import { commitSubjects, cutLine, mayRefreshNext, readNames, type Named, type Open } from './work-reads.ts';
+import { commitSubjects, cutLine, mayRefreshNext, readNames, type Named, type Open } from './run-reads.ts';
 import { DRAFT_FIELD, firstProjectFields, firstProjectName, formsOnRepeat, nobodysPlace } from './first-project.ts';
 import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
 import { withDerived, type DeriveResolve } from './derive-rows.ts';
@@ -4807,7 +4807,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
-   * WHAT A RUN SAYS IT FINISHED, AND WHERE ITS PROJECT STANDS (`work-reads.ts`). Read when a run opens, hands off and
+   * WHAT A RUN SAYS IT FINISHED, AND WHERE ITS PROJECT STANDS (`run-reads.ts`). Read when a run opens, hands off and
    * ends: its own words and the last commit subjects it reported are matched to its project's open tasks. A task the
    * words clearly name is closed by BrainDog with a mark and an undo (Handled); a weaker match asks in To review; and the
    * project's `next` follows the newest step a run left, unless a person wrote it last. A task written is what moves the
@@ -11134,7 +11134,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     inScope,
     runFor,
     endRun,
-    /** A run's words and commits read against its project's open tasks, and the project's next step followed (`work-reads.ts`). */
+    /** A run's words and commits read against its project's open tasks, and the project's next step followed (`run-reads.ts`). */
     readRunWork,
     /** A token's own run told it is still working, its `last_seen` moved in place with no event (AGT-C03). Never opens one. */
     heartbeat,

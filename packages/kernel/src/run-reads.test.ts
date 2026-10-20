@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { commitAuthors } from './commit-authors.ts';
-import { byMachine, commitSubjects, mayRefreshNext, nameScore, readNames } from './work-reads.ts';
+import { byMachine, commitSubjects, mayRefreshNext, nameScore, readNames } from './run-reads.ts';
 
 const open = [
   { id: 't1', title: 'Wire the kerning pass for lowercase' },
