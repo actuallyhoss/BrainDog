@@ -22,7 +22,8 @@ import { kindLines, kindWords } from '../../../lib/record/jobs.ts';
 import { readBoot } from '../../../lib/record/boot-live.ts';
 import { blockKeys } from '../../../lib/page/recompose.ts';
 import { blockOf, lookOf, type Fetch, type LiveBlock, type LiveLook, type LivePageDecl, type Opened } from '../../../lib/record/page-live.ts';
-import { learn, refMapOf, targetsOf, type RecordRow, type RefMap, type SchemaCall } from '../../../lib/record/remote.ts';
+import { learn, refMapOf, targetsOf, type RefMap, type SchemaCall } from '../../../lib/record/remote.ts';
+import { rowsOf, walkRows } from '../../../lib/data/ref-rows.ts';
 import { builderPath } from '../../../lib/pattern/draft.ts';
 
 type Row = Record<string, unknown>;
@@ -456,20 +457,21 @@ async function liveOf(
     client.schema(register).then((out) => (out.ok || !declared.has(register) ? out : { ok: true, value: { ...declared.get(register), id: register } }));
   const lists = [...new Set(runs.flat().flatMap((b) => (!b.refusals?.length && b.source?.startsWith('register.') ? [b.source.slice('register.'.length)] : [])))];
   const asked = new Map<string, Promise<void>>();
-  for (const list of lists) await learn(schema, list, asked);
+  /* THE LISTS ARE LEARNT TOGETHER, AND THEIR TARGETS WALKED TOGETHER. One after another, Today's body waited ten round
+     trips before it drew (1.7 s at 140 ms each); each target's rows are the tab's walk (`ref-rows.ts`) where this reads
+     through the browser's own fetch, so a page drawn again asks nothing that has not moved. */
+  await Promise.all(lists.map((list) => learn(schema, list, asked)));
   const refs = new Map<string, RefMap>();
-  for (const target of new Set(lists.flatMap(targetsOf))) {
-    await learn(schema, target, asked);
-    const rows: RecordRow[] = [];
-    let cursor: string | null = null;
-    do {
-      const page = await client.list({ register: target, limit: 500, ...(cursor === null ? {} : { cursor }) });
-      if (!page.ok) break;
-      rows.push(...(page.value.rows as RecordRow[]));
-      cursor = page.value.cursor;
-    } while (cursor !== null);
-    refs.set(target, refMapOf(target, rows));
-  }
+  const io = at?.io;
+  const targets = [...new Set(lists.flatMap(targetsOf))];
+  const walked = await Promise.all(
+    targets.map(async (target) => {
+      await learn(schema, target, asked);
+      const rows = at !== null && io === undefined ? await rowsOf(client, at.base, target) : await walkRows(client, target);
+      return [target, rows ?? []] as const;
+    }),
+  );
+  for (const [target, rows] of walked) refs.set(target, refMapOf(target, rows));
   /* WHO IS READING, for a feed that names the reader as You, as a live page reads it (`pageReader`): the shell's own
      `boot`, kept, so it costs no call. A boot that cannot be read leaves the feed with no reader, never undrawn. */
   const booted = at !== null && runs.some((run) => run.some((b) => b.source === 'activity')) ? await readBoot(at.base, at.io).catch(() => null) : null;

@@ -51,7 +51,13 @@ let copy: LocalCopy | null = null;
 
 function log(base: string): Log {
   let client: Promise<import('@braindog/client').Client> | null = null;
-  const c = () => (client ??= import('@braindog/client').then(({ createClient }) => createClient({ base })));
+  const c = () =>
+    (client ??= import('@braindog/client').then(({ createClient, followDeclarations }) => {
+      /* FROM THE FIRST CATCH-UP ON, A KEPT SCHEMA IS KEPT BY WHAT THE LOG SAYS OF THE DECLARATIONS (`revisionLocal`), and
+         not dropped on every move of the record's version. */
+      followDeclarations(() => revisionLocal());
+      return createClient({ base });
+    }));
   return {
     since: async (cursor) => (await c()).whatsNew(cursor, { everything: true }) as never,
     newest: async () => (await c()).recentHistory({ limit: 1, everything: true }) as never,
@@ -111,13 +117,36 @@ export function claimLocal(base: string, me: { person: string; level: string; ow
     .catch(() => undefined);
 }
 
+/* THE RECORD'S VERSION AS THE POLL LAST HEARD IT MOVE, for a read kept by version where the copy cannot vouch. */
+let version: number | null = null;
+
 /** The record moved. */
-export function heardLocal(): void {
+export function heardLocal(at: number | null = null): void {
+  version = at;
   if (copy) void copy.heard();
 }
 
 /** When the copy has caught up to every move heard so far: a screen following the log reads it after this. */
 export const settledLocal = (): Promise<void> => (copy ? copy.settled() : Promise.resolve());
+
+/**
+ * What the log says of `list`, or of the declarations with none, once the copy has caught up (`LocalCopy.revision`):
+ * a token that moves only when something the answer could hold moved. `null` where the copy cannot vouch.
+ */
+export async function revisionLocal(list?: string): Promise<string | null> {
+  if (!copy) return null;
+  await copy.settled();
+  return copy.revision(list);
+}
+
+/**
+ * The token a tab-wide read is kept under: the log's word on its lists where the copy can vouch for every one of them,
+ * else the version the poll last heard move. `''` lists asks only about the declarations.
+ */
+export async function keptToken(lists: readonly string[]): Promise<string> {
+  const said = await Promise.all((lists.length === 0 ? [undefined] : lists).map((l) => revisionLocal(l)));
+  return said.every((s) => s !== null) ? `log ${said.join(' ')}` : `v ${version}`;
+}
 
 /** The record's own format, kernel and primitives, as `version` answers them. */
 export function stampLocal(v: { format: number; kernel: number; primitives: number }): void {

@@ -20,6 +20,7 @@ import type { Entry, Filter, RegisterDecl } from '../record/schema.ts';
 import { closed, opened } from '../ui/screen.svelte.ts';
 import { labels, relabel } from '../voice.ts';
 import { apiBase } from '../at.ts';
+import { rowsSaid } from './ref-rows.ts';
 
 export type { Boot };
 
@@ -239,17 +240,9 @@ function remote(client: ReturnType<typeof createClient>, booted: Boot): Source {
     /* A LIST THIS BUILD DOES NOT SHIP IS DECLARED FIRST, or `refMapOf` finds no title to name its rows by and every ref
        into it is drawn as `club_books#2`. */
     await learn(schemaOf, register, asked);
-    const rows: RecordRow[] = [];
-    let cursor: string | null = null;
-    do {
-      const out: Said<{ rows: unknown[]; cursor: string | null }> = said(
-        await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) }),
-      );
-      if (!out.ok) return out;
-      rows.push(...(out.value.rows as RecordRow[]));
-      cursor = out.value.cursor;
-    } while (cursor !== null);
-    return { ok: true, value: refMapOf(register, rows) };
+    /* THE TAB'S WALK (`ref-rows.ts`), which every other reader shares, and the record's refusal where it would not. */
+    const out = await rowsSaid(client, apiBase(), register);
+    return out.ok ? { ok: true, value: refMapOf(register, out.rows) } : out;
   }
 
   async function refsFor(register: string): Promise<Said<Map<string, RefMap>>> {

@@ -120,7 +120,7 @@ export function follow(base: string | null): void {
       visible: tab,
       onChange: (version) => {
         /* THE LOCAL COPY ASKS THE LOG WHAT CHANGED, beside the screens asking their own questions again. */
-        heardLocal();
+        heardLocal(version);
         live.version = version;
       },
       onState: (state) => {

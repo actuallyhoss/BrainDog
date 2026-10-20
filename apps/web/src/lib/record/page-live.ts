@@ -64,6 +64,7 @@ import { liveOf } from '../ui/face.ts';
 import { sourceRows } from './source-rows.ts';
 import { noteWithoutLeftovers } from './brief.ts';
 import { pathOf } from '../ui/icons.ts';
+import { rowsOf as tabRows, walkRows } from '../data/ref-rows.ts';
 import type { BlockResult as Answer } from '@braindog/kernel';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -2178,16 +2179,11 @@ export function pageReader(base: string, io?: Fetch, clock: () => number = () =>
     }
     return out;
   }
+  /* THE TAB'S WALK (`ref-rows.ts`), shared by every reader and kept while the log says the list has not moved; a reader
+     handed a fetch of its own walks for itself. */
   async function walk(register: string): Promise<RecordRow[] | null> {
-    const rows: RecordRow[] = [];
-    let cursor: string | null = null;
-    do {
-      const out = await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
-      if (!out.ok) return null;
-      rows.push(...(out.value.rows as RecordRow[]));
-      cursor = out.value.cursor;
-    } while (cursor !== null);
-    walked.set(register, rows);
+    const rows = io ? await walkRows(client, register) : await tabRows(client, base, register);
+    if (rows) walked.set(register, rows);
     return rows;
   }
   const asked = new Map<string, Promise<void>>();

@@ -574,3 +574,27 @@ test('AN ANSWER BIGGER THAN THE BUDGET IS NOT KEPT, and a kept one says when it 
   assert.ok((kept.bytes ?? 0) > 0);
   assert.equal(await copy.put('work', 'big', ['tasks'], { tasks: DECL }, 'x'.repeat(21 * 1024 * 1024), copy.ticket()), false);
 });
+
+test('REVISION: a list moves only when the log touched it, everything moves on a declaration, and nothing is vouched for before the copy has caught up', async () => {
+  const { fake, copy } = setup();
+  assert.equal(copy.revision('tasks'), null, 'not claimed');
+  await copy.claim(ada);
+  const tasks = copy.revision('tasks');
+  const projects = copy.revision('projects');
+  const declared = copy.revision();
+  assert.notEqual(tasks, null);
+  fake.write(line('e2', 'edit', 'tasks', 2));
+  const asking = copy.heard();
+  assert.equal(copy.revision('tasks'), null, 'a move heard and not yet caught up');
+  await asking;
+  assert.notEqual(copy.revision('tasks'), tasks, 'the log touched tasks');
+  assert.equal(copy.revision('projects'), projects, 'and not projects');
+  assert.equal(copy.revision(), declared, 'and no declaration');
+  fake.write(line('e3', 'declare', null, 3));
+  await copy.heard();
+  assert.notEqual(copy.revision(), declared, 'a declaration moves the declarations');
+  assert.notEqual(copy.revision('projects'), projects, 'and every list');
+  fake.refuse('UNAVAILABLE');
+  await copy.heard();
+  assert.equal(copy.revision('projects'), null, 'a catch-up that failed vouches for nothing');
+});

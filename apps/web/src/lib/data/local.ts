@@ -1066,6 +1066,13 @@ export type LocalCopy = {
   wipe(): Promise<void>;
   /** When every catch-up asked so far has landed: a screen reads the copy after it, to draw what the log moved. */
   settled(): Promise<void>;
+  /**
+   * What the log says about `list` (or about the declarations, with no list) since this tab claimed the copy: a token
+   * that moves when a catch-up touched the list, and for every list when one dropped everything (a declaration, an access
+   * change, a line it cannot place, a capped walk, a refused cursor, a new owner, a new format). `null` while the copy
+   * cannot vouch for it: not claimed, no cursor, or not caught up to the newest move heard. Read it after `settled`.
+   */
+  revision(list?: string): string | null;
 };
 
 const atOf = (name: string, key: string) => `${name} ${key}`;
@@ -1082,6 +1089,13 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
   let asked = 0;
   let caught = -1;
   let chain: Promise<void> = Promise.resolve();
+  /* WHAT `revision` SAYS: how many times everything was dropped, and how many catch-ups touched each list since. */
+  let drops = 0;
+  const moved = new Map<string, number>();
+  const droppedAll = (): void => {
+    drops += 1;
+    moved.clear();
+  };
 
   const load = (): Promise<Meta | null> =>
     (loaded ??= store.meta().then(
@@ -1097,6 +1111,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
 
   const dropAll = async (): Promise<void> => {
     epoch += 1;
+    droppedAll();
     await store.drop(null).catch(() => undefined);
   };
 
@@ -1138,6 +1153,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
     else if (hit.lists.size > 0) {
       /* EACH ANSWER THE LINES TOUCH IS PATCHED WHERE IT CAN BE, and dropped where it cannot (`patched`). */
       epoch += 1;
+      for (const l of hit.lists) moved.set(l, (moved.get(l) ?? 0) + 1);
       const order = inOrder(events, m.cursorId);
       /* AND EVERY ANSWER THAT READS MORE THAN IT NAMES (`EVERY`), which the patch drops on a list it holds no spot for. */
       const lists = new Set([...hit.lists, EVERY]);
@@ -1158,6 +1174,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
         const m = await load();
         if (claimed !== null && sameOwner(claimed, owner) && m !== null) return;
         claimed = owner;
+        droppedAll();
         if (m === null || !sameOwner(m.owner, owner)) {
           epoch += 1;
           await store.clear().catch(() => undefined);
@@ -1207,6 +1224,10 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       return { answers: rows.length, bytes: rows.reduce((n, r) => n + JSON.stringify(r).length, 0) };
     },
     settled: () => chain,
+    revision(list) {
+      if (claimed === null || meta === null || meta.cursor === null || caught !== asked) return null;
+      return list === undefined ? `${drops}` : `${drops}.${moved.get(list) ?? 0}`;
+    },
     ticket: () => epoch,
     async put(name, key, lists, decls, value, ticket, how = {}) {
       const m = meta;
@@ -1245,6 +1266,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
     },
     wipe() {
       epoch += 1;
+      droppedAll();
       claimed = null;
       meta = null;
       loaded = Promise.resolve(null);

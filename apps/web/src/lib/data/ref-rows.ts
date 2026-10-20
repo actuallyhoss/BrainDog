@@ -1,0 +1,92 @@
+/**
+ * Every row of a list, walked once for the tab and kept while nothing it holds can have moved.
+ *
+ * A REF ARRIVES AS THE TARGET ROW'S ULID, so a screen that draws one walks the whole target list to name it. Each reader
+ * kept its own walk, and the readers are made per screen: Today, a project page and a list each walked Projects again,
+ * and on his record that is 497 KB, fetched 14 times over nine screens (`loop/audit-2026-10-20`). Here one walk serves
+ * every reader in the tab, and a walk out is shared by whoever asks while it is out.
+ *
+ * KEPT BY WHAT THE LOG SAYS OF THE LIST (`keptToken`): where the local copy has caught up with the record, the walk
+ * stays true until a catch-up touches that list or drops everything; where it cannot vouch, until the record's version
+ * moves, as before. A write this tab sends that may change a row (`wrote`) asks again, so a rename is named at once,
+ * and `forgetRows` drops every walk on a record switch and a sign-out. Never kept: a refusal, a walk older than
+ * `ROWS_KEPT_MS`.
+ *
+ * ONLY FOR THE BROWSER'S OWN FETCH. A reader handed a fetch of its own (a test, a tile that aborts on leave) walks for
+ * itself, so a stub never answers another's question.
+ */
+
+import { wrote, type Client } from '@braindog/client';
+
+import type { RecordRow } from '../record/remote.ts';
+import { keptToken } from './local-tab.ts';
+
+/** How long a walk is drawn from without asking again, whatever the log says. */
+export const ROWS_KEPT_MS = 300_000;
+
+/** A walk's answer: every row, or the refusal of the page the record would not answer. */
+export type Walked = { ok: true; rows: RecordRow[] } | { ok: false; refusal: { code: string; fix: string } };
+
+type Kept = { token: string; at: number; walked: Promise<Walked> };
+/* BY THE FETCH THE CLIENT SENDS THROUGH, as the client keeps its schemas, so a fetch swapped out (a test's) shares nothing. */
+let byFetch = new WeakMap<object, Map<string, Kept>>();
+const walksNow = (): Map<string, Kept> => {
+  const f = globalThis.fetch as object;
+  let m = byFetch.get(f);
+  if (m === undefined) byFetch.set(f, (m = new Map()));
+  return m;
+};
+
+/** Every row of `register`, a page of 500 at a time to the end of its cursor, or the refusal of one. */
+export async function walkSaid(client: Pick<Client, 'list'>, register: string): Promise<Walked> {
+  const rows: RecordRow[] = [];
+  let cursor: string | null = null;
+  do {
+    const out = await client.list({ register, limit: 500, ...(cursor === null ? {} : { cursor }) });
+    if (!out.ok)
+      return { ok: false, refusal: 'refusal' in out ? out.refusal : { code: 'VERSION_STALE', fix: 'The row changed while it was being read.' } };
+    rows.push(...(out.value.rows as RecordRow[]));
+    cursor = out.value.cursor;
+  } while (cursor !== null);
+  return { ok: true, rows };
+}
+
+/** `walkSaid`, as rows or `null`. */
+export async function walkRows(client: Pick<Client, 'list'>, register: string): Promise<RecordRow[] | null> {
+  const out = await walkSaid(client, register);
+  return out.ok ? out.rows : null;
+}
+
+/**
+ * The rows of `register` on the record at `base`, from the tab's walk where it is still true, else walked now.
+ * The rows are shared between readers: read them, never change them.
+ */
+export async function rowsSaid(client: Pick<Client, 'list'>, base: string, register: string): Promise<Walked> {
+  const token = `${await keptToken([register])} w${wrote()}`;
+  const at = `${base} ${register}`;
+  const now = Date.now();
+  const walks = walksNow();
+  const was = walks.get(at);
+  if (was !== undefined && was.token === token && now >= was.at && now - was.at < ROWS_KEPT_MS) return was.walked;
+  const walked = walkSaid(client, register);
+  const entry: Kept = { token, at: now, walked };
+  walks.set(at, entry);
+  const drop = () => {
+    if (walks.get(at) === entry) walks.delete(at);
+  };
+  void walked.then((got) => {
+    if (!got.ok) drop();
+  }, drop);
+  return walked;
+}
+
+/** `rowsSaid`, as rows or `null`. */
+export async function rowsOf(client: Pick<Client, 'list'>, base: string, register: string): Promise<RecordRow[] | null> {
+  const out = await rowsSaid(client, base, register);
+  return out.ok ? out.rows : null;
+}
+
+/** Drop every walk: a record switch, a sign-out, a forget. */
+export function forgetRows(): void {
+  byFetch = new WeakMap();
+}
