@@ -103,9 +103,11 @@
         {@const m = markOf(a.mark)}
         {@const on = a.id === chosen?.id}
         <button type="button" class="segment" data-on={on ? '' : undefined} aria-pressed={on} onclick={() => (chosenId = a.id)}>
-          <svg class="mark" data-tone={m.tone} viewBox="0 0 24 24" aria-hidden="true" focusable="false"
-            ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule} /></svg
-          >{a.name}
+          <span class="seg-label"
+            ><svg class="mark" data-tone={m.tone} viewBox="0 0 24 24" aria-hidden="true" focusable="false"
+              ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule} /></svg
+            >{a.name}</span
+          >
         </button>
       {/each}
     </Segmented>
@@ -168,8 +170,11 @@
   }
 
   /* THE APP'S MARK BEFORE ITS NAME in the segment, 16 at the label's ink, or its maker's colour. */
-  .segment {
+  .seg-label {
+    display: inline-flex;
+    align-items: center;
     gap: var(--sp-2);
+    min-inline-size: 0;
   }
 
   .mark {

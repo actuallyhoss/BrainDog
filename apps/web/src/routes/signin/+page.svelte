@@ -453,13 +453,13 @@
         </div>
       {:else if view.name === 'no-host'}
         <div class="calm">
-          <IconWell name="info" size="l" />
+          <IconWell name="info" size="card" />
           <h1 class="entry-title">{copy.noHostTitle}</h1>
           <p class="calm-body">{copy.noHostWhy}</p>
         </div>
       {:else if view.name === 'open'}
         <div class="calm">
-          <IconWell name="check" size="l" tone="earn" />
+          <IconWell name="check" size="card" tone="earn" />
           <h1 class="entry-title">{copy.openTitle}</h1>
           <p class="calm-body">{copy.openWhy}</p>
         </div>
@@ -485,7 +485,7 @@
         </div>
       {:else if view.name === 'link-sent'}
         <div class="calm" role="status">
-          <IconWell name="check" size="l" tone="earn" />
+          <IconWell name="check" size="card" tone="earn" />
           <h1 class="entry-title">{copy.linkSentTitle}</h1>
           <p class="calm-body">{copy.linkSentBody(view.email)}</p>
           <!-- THE SECOND LINE, a minute on (`SENT_LATE`): the screen cannot know a letter failed, so it says what fixes one. -->
@@ -500,7 +500,7 @@
         </div>
       {:else if view.name === 'link-landing'}
         <div class="calm">
-          <IconWell name="link" size="l" />
+          <IconWell name="link" size="card" />
           <h1 class="entry-title">{view.link.kind === 'claim' ? copy.claimLandingTitle : copy.linkLandingTitle}</h1>
         </div>
         <div class="doors">
@@ -510,7 +510,7 @@
         </div>
       {:else if view.name === 'signed-in'}
         <div class="calm">
-          <IconWell name="check" size="l" tone="earn" />
+          <IconWell name="check" size="card" tone="earn" />
           <h1 class="entry-title">{copy.signedInTitle}</h1>
           <p class="calm-who">{view.who.email}</p>
         </div>
@@ -741,7 +741,7 @@
   }
 
   .calm :global(.well) {
-    margin-block-end: var(--sp-1);
+    margin-block-end: var(--sp-2);
   }
 
   .calm-who {

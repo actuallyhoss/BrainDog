@@ -408,4 +408,9 @@
     line-height: 18px;
     overflow-wrap: anywhere;
   }
+
+  /* EMPTY, IT TAKES NO ROOM: the column's gap above it is taken back, so the sheet ends 24 under Allow. */
+  .said:empty {
+    margin-block-start: calc(-1 * var(--sp-4));
+  }
 </style>

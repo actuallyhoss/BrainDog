@@ -184,13 +184,13 @@
         <!-- A NEW ADDRESS, ASKED TO PROVE ITSELF. Nothing is made until the mailed link comes back, so this is the
              whole of what the screen can say: where the link went, and what opening it does. -->
         <div class="calm">
-          <IconWell name="link" size="l" />
+          <IconWell name="link" size="card" />
           <h1 class="entry-title">{copy.inviteCheckMail}</h1>
           <p class="calm-body" role="status">{copy.inviteMailSent(proving)}</p>
         </div>
       {:else if seen && seen.ok && !joined}
         <div class="calm">
-          <IconWell name="link" size="l" />
+          <IconWell name="link" size="card" />
           <!-- THE PAGE'S ONE LEVEL-ONE HEADING, in every state it can settle into. While this screen
                drew an error card it settled `refused`, so `a11y` skipped it and nothing ever audited
                it; the moment it settled `empty` the gate looked and found no `h1` at four widths. The
@@ -228,7 +228,7 @@
         </div>
       {:else if joined}
         <div class="calm">
-          <IconWell name="check" size="l" tone="earn" />
+          <IconWell name="check" size="card" tone="earn" />
           <h1 class="entry-title">{copy.inviteJoined(recordName)}</h1>
           {#if addsOnly}<p class="calm-body">{copy.inviteAddsOnlyNext}</p>{/if}
           {#if !keyAdded && here.webauthn && here.secure}<p class="calm-body">{copy.inviteKeepWay}</p>{/if}
@@ -308,7 +308,7 @@
   }
 
   .calm :global(.well) {
-    margin-block-end: var(--sp-1);
+    margin-block-end: var(--sp-2);
   }
 
   /* A label above its field (`.field-label` puts 6 under it), as every field in the product has, and the field the
