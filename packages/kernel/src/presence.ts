@@ -36,7 +36,10 @@ export const ABANDON_MS = 12 * 3_600_000;
  */
 export const QUIET_MS = WORKING_MS;
 
-/** The one word every run reads as. */
+/**
+ * The one word every run reads as on the board of runs. The finer words for a session open now, read with the
+ * bridge's pulse, are `LiveState` (`liveStateOf`) below.
+ */
 export type Presence = 'working' | 'quiet' | 'left' | 'ended' | 'stopped' | 'before';
 
 /** A run as `workingRuns` and `liveRuns` answer it: its row, with its fields read. */
@@ -197,4 +200,89 @@ export function unheardRuns(sql: Sql, nowMs: number, olderMs: number, states: re
 export function liveRuns(sql: Sql, nowMs: number): RunRow[] {
   const since = new Date(nowMs - STALE_MS).toISOString();
   return runsWhere(sql, `state IN ('active', 'idle') AND ${HEARD_SQL} >= ?`, since);
+}
+
+/* ── live presence: the pulse (agents and MCP plan §4.4) ─────────────────── */
+
+/**
+ * The words the Agents page and Today read a session in, from its two clocks: `last_seen`, which a tool call moves and
+ * which means working, and `pulse_at`, which the bridge moves every 15 seconds while the session is open and which
+ * means open. A finer reading than `presenceOf`, which the board of runs still reads, for the rows that are open now.
+ *
+ *   - `working`: a call inside `CALL_MS` (2 minutes).
+ *   - `thinking`: open, no call for 2 to 15 minutes (`THINKING_MS`).
+ *   - `waiting`: open, no call for more than 15 minutes: waiting on him.
+ *   - `ended`: it closed (`done`), left a step (`handoff`) or was written off (`abandoned`).
+ *   - `gone`: open by its state, with no pulse for `GONE_MS` (2 minutes) and no end.
+ *
+ * A SESSION WITH NO PULSE AT ALL is a bridge from before the pulse: it is read by its calls alone, open while the
+ * ladder would still adopt it (`STALE_MS`), so an old command line reads as thinking or waiting and not as gone.
+ */
+export type LiveState = 'working' | 'thinking' | 'waiting' | 'ended' | 'gone';
+
+/** A call this recent is working. */
+export const CALL_MS = 2 * 60_000;
+/** Open with no call for longer than this is waiting on him. */
+export const THINKING_MS = 15 * 60_000;
+/** An open run whose bridge has not pulsed in this long is gone. */
+export const GONE_MS = 2 * 60_000;
+/** The bridge pulses every 15 s; a pulse closer than this to the last moves nothing (plan §10.9: once per 10 s a run). */
+export const PULSE_MIN_MS = 10_000;
+
+/** The one live word for a run now (`LiveState`). */
+export function liveStateOf(run: { state?: string | null; fields: Record<string, Json> }, nowMs: number): LiveState {
+  const state = stateOf(run);
+  if (!OPEN.includes(state)) return 'ended';
+  const parse = (v: Json | undefined): number => (typeof v === 'string' && v !== '' ? Date.parse(v) : NaN);
+  const call = parse(run.fields.last_seen);
+  const pulse = parse(run.fields.pulse_at);
+  if (Number.isFinite(call) && nowMs - call <= CALL_MS) return 'working';
+  if (Number.isFinite(pulse)) {
+    if (nowMs - pulse > GONE_MS) return 'gone';
+  } else if (!Number.isFinite(call) || nowMs - call > STALE_MS) return 'gone';
+  return Number.isFinite(call) && nowMs - call <= THINKING_MS ? 'thinking' : 'waiting';
+}
+
+/** Whether a run is there to be told now: open, and working, thinking or waiting. */
+export const isPresent = (run: { state?: string | null; fields: Record<string, Json> }, nowMs: number): boolean => {
+  const s = liveStateOf(run, nowMs);
+  return s === 'working' || s === 'thinking' || s === 'waiting';
+};
+
+/**
+ * The bridge says the session is open: the run's `pulse_at` moves to `nowMs`, in place, and answers whether it moved
+ * (plan §4.4, `pulseRun` in §8.3).
+ *
+ * A PULSE IS NOT A WRITE, for a heartbeat's reason (`beatRun`): no version, no `updated_at`, no event, so a session
+ * open for a day leaves no line in its history. Only an open run, active or idle: a pulse revives nothing, so a run
+ * that ended stays ended and a stopped run is still told it is stopped by the answer, not woken. A pulse under
+ * `PULSE_MIN_MS` after the last moves nothing, so ten sessions pulsing every 15 s cost what the plan budgets.
+ */
+export function pulseRun(sql: Sql, id: string, nowMs: number): boolean {
+  const moved = sql.one<{ id: string }>(
+    `UPDATE entry SET fields = json_set(fields, '$.pulse_at', ?)
+     WHERE id = ? AND register = '${RUNS}' AND deleted_at IS NULL AND state IN ('active', 'idle')
+       AND (json_extract(fields, '$.pulse_at') IS NULL OR json_extract(fields, '$.pulse_at') <= ?)
+     RETURNING id`,
+    new Date(nowMs).toISOString(),
+    id,
+    new Date(nowMs - PULSE_MIN_MS).toISOString(),
+  );
+  return moved !== undefined;
+}
+
+/**
+ * The open runs that are there now, newest heard from first: the rows of `presence` (Today's "Working now", the Agents
+ * page, a project's "Working here now"). Read through the pulse index and the `last_seen` index, so the cost is the
+ * open runs and not the record's history of them; each row is held to `isPresent`, so a gone run is not a row.
+ */
+export function presentRuns(sql: Sql, nowMs: number): RunRow[] {
+  const pulsed = new Date(nowMs - GONE_MS).toISOString();
+  const called = new Date(nowMs - STALE_MS).toISOString();
+  return runsWhere(
+    sql,
+    `state IN ('active', 'idle') AND (json_extract(fields, '$.pulse_at') >= ? OR json_extract(fields, '$.last_seen') >= ?)`,
+    pulsed,
+    called,
+  ).filter((r) => isPresent(r, nowMs));
 }
