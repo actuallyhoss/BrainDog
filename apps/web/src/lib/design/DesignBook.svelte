@@ -196,7 +196,7 @@
 
   .gap {
     block-size: 8px;
-    background: var(--red);
+    background: var(--ink-2);
   }
 
   .corner {
