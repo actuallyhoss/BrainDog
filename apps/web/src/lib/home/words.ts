@@ -28,6 +28,8 @@ export const words = {
   /** Under the cash figure: the day it runs out on what is due, from the Money page's own figure. */
   lastsTo: 'Lasts to {{runs-out-on}}',
   comingIn: 'Coming in, 30 days',
+  /** The weekday on today's date block in Coming up. */
+  today: 'Today',
   goingOut: 'Going out, 30 days',
 
   /* EACH BLOCK'S OWN EMPTY LINE, for the blocks that stay drawn when they hold nothing. */

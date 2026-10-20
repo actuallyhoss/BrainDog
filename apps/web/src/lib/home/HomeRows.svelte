@@ -9,8 +9,8 @@
   TICKED IS THE PAGE'S HOLD (`done`, `page-writes.ts` `heldDone`), so a refusal or an Undo takes the tick back, and a
   ticked line the page's next read leaves out stays where it was, done, as a ticked row does in any list.
 
-  COMING UP: each day a 44px chip, the weekday over the date (today the word "Today" on ink), and beside it what falls due
-  that day, its amount at the right.
+  COMING UP: each day a 40px block, the weekday over the date (today the word "Today" in red, in a red ring), and beside it
+  what falls due that day, its amount at the right.
 
   No box round a line, no glyph before one: a hairline between lines, and the tile is the surface.
 -->
@@ -109,7 +109,7 @@
     {#each days as d (d.day)}
       <li class="hd">
         <span class="hd-chip" data-today={d.today ? '' : undefined} title={d.label}>
-          {#if d.today}<span class="hd-today" aria-hidden="true">Today</span>{:else}<span class="hd-week" aria-hidden="true">{d.weekday}</span><span class="hd-date num" aria-hidden="true">{d.date}</span>{/if}<span class="vh">{d.label}</span>
+<span class="hd-week" aria-hidden="true">{d.today ? words.today : d.weekday}</span><span class="hd-date num" aria-hidden="true">{d.date}</span><span class="vh">{d.label}</span>
         </span>
         <ul class="hd-lines">
           {#each d.lines as line (line.key)}
@@ -306,71 +306,73 @@
 
   .hd {
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr);
     column-gap: var(--sp-3);
     align-items: start;
-    padding-block: var(--sp-2);
+    padding-block: var(--sp-3);
+  }
+
+  .hd:first-child {
+    padding-block-start: 0;
   }
 
   .hd + .hd {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
-  /* THE DAY: 36 square, the control's corner, the weekday at 12 over the date at 15. Today's in the accent's tint. */
+  /* THE DAY (Today polish 6): 40 square at the control's corner on the second surface, the weekday at 11 in the quiet ink
+     over the date at 15/600. Never a filled block: it was the loudest thing on the page. */
   .hd-chip {
     position: relative;
     display: grid;
     place-content: center;
     justify-items: center;
-    inline-size: 44px;
-    block-size: 36px;
+    gap: 2px;
+    inline-size: 40px;
+    block-size: 40px;
+    box-sizing: border-box;
     background: var(--tile-2);
     border-radius: var(--r-ctl);
     color: var(--ink);
     line-height: 1;
   }
 
-  /* TODAY IS NOT LATE (today F17): the ink chip and the word, and red stays for what is late. */
+  /* TODAY IS A RING, NOT A FILL: a 1.5px inset ring and the word in the red, on the tile's own ground. */
   .hd-chip[data-today] {
-    background: var(--ink);
-    color: var(--tile);
-  }
-
-  .hd-today {
-    font-size: var(--fs-cap, 12px);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    background: none;
+    border: 1.5px solid var(--red);
   }
 
   .hd-week {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: 11px;
     font-weight: var(--fw-medium);
+    line-height: 12px;
   }
 
   .hd-chip[data-today] .hd-week {
-    color: inherit;
+    color: var(--red);
+    font-weight: var(--fw-semi);
   }
 
   .hd-date {
-    margin-block-start: 2px;
     font-size: var(--fs-body);
     font-weight: var(--fw-semi);
+    line-height: 16px;
     font-variant-numeric: tabular-nums;
   }
 
+  /* EVERY LINE OF A DAY ON ONE TEXT EDGE, the first centred on the block and the rest under it. */
   .hd-lines {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    min-block-size: 36px;
   }
 
   .hd-line {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: 36px;
+    min-block-size: 40px;
   }
 
   .hd-line .hl-title {
