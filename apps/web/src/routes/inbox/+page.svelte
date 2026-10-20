@@ -723,7 +723,7 @@
 {/snippet}
 
 <PageHead
-  icon="inbox"
+  icon="mail"
   title={said('inbox')}
   count={answered && !unrouted && !refused ? INBOX.length : undefined}
   atLeast={live !== null && live.cursor !== null}
@@ -747,7 +747,7 @@
     <!-- ONE TILE, AND THE ONE THING TO DO: nothing has reached this record's inbox by any way, so the ways in, the
          rules' figure and what waits would each say nothing, three times. -->
     <div class="clear">
-      <Empty kind="no-data-yet" glyph="inbox" title={quietWords.title} body={quietWords.why}>
+      <Empty kind="no-data-yet" glyph="mail" title={quietWords.title} body={quietWords.why}>
         {#snippet actions()}<Button weight="primary" href="/settings/ingest">{quietWords.add}</Button>{/snippet}
       </Empty>
     </div>
@@ -963,7 +963,7 @@
       so both are the quiet secondary.
     -->
     <div class="clear">
-      <Empty kind="no-data-yet" glyph="inbox" title={said('inbox_clear')} body={copy.inboxClearWhy}>
+      <Empty kind="no-data-yet" glyph="mail" title={said('inbox_clear')} body={copy.inboxClearWhy}>
         {#snippet actions()}
           {#if Number(route.data.open ?? 0) > 0}<Button href="/decide">{copy.inboxOpenDecide}</Button>{/if}
           <Button href="/settings/ingest">{copy.inboxConnect}</Button>
@@ -1414,11 +1414,10 @@
     min-inline-size: 0;
   }
 
-  /* AN EMPTY INBOX IS A TILE ON THE BOARD like everything else on it, never a sentence floating on the ground. */
+  /* AN EMPTY INBOX IS A TILE ON THE BOARD like everything else on it: `Empty`'s own, at most 640 wide on the start
+     edge (2.A.18). A second tile round it stretched it across the page and dropped its own. */
   .clear {
-    padding: var(--tile-pad);
-    background: var(--tile);
-    border-radius: var(--r-tile);
+    display: contents;
   }
 
   .main,
