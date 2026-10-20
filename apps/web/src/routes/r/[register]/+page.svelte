@@ -106,6 +106,9 @@
   import ViewSwitch from './parts/ViewSwitch.svelte';
   import ListTable from './parts/ListTable.svelte';
   import ListRowMenu from './parts/ListRowMenu.svelte';
+  import ShareSheet from '$lib/sharing/ShareSheet.svelte';
+  import { canShare, type Subject } from '$lib/sharing/share-state.ts';
+  import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import { keepPrivate } from '$lib/record/privacy-write.ts';
   import { listHost, type Walked } from '$lib/page/row-host.svelte.ts';
   import RowPanel from '$lib/page/RowPanel.svelte';
@@ -299,6 +302,32 @@
    * of the list, and a change or an archive is an `update`, which asks `write`. `proposes` is the Fields sheet's rung,
    * which files a proposal for anyone but the owner, and a `propose` names no list.
    */
+  /* SHARING IS AN OWNER'S OR AN ADMIN'S (sharing plan §3.1): the view's and a row's ways in are offered to nobody else. */
+  const shares = $derived(seeingAs() === null && canShare(shell.me));
+  let sharing = $state<Subject | null>(null);
+  let sharingOpen = $state(false);
+  function shareRow(seq: number) {
+    const row = rowAt(seq);
+    if (!decl || !row) return;
+    menuAt = null;
+    sharing = { kind: 'row', list: id, seq, id: row.id ?? null, name: String(row.fields[decl.title] ?? '') || `${decl.one} ${seq}` };
+    sharingOpen = true;
+  }
+  /* THE LIST AS A WHOLE, from the head's "⋯". */
+  function shareList() {
+    if (!decl) return;
+    sharing = { kind: 'list', list: id, name: decl.name };
+    sharingOpen = true;
+  }
+    /* THE VIEW IS ITS CHIPS, as the record's tree: a search reads the text index, which a share may not (§2.3). */
+  function shareView() {
+    if (!decl || filters.length === 0) return;
+    const where = treeOf(id, filters, '', new Map(), either ? 'any' : undefined);
+    if (where === undefined) return;
+    sharing = { kind: 'list', list: id, name: decl.name, view: { where: where as never } };
+    sharingOpen = true;
+  }
+
   const adds = $derived(may(shell, 'append', id));
   const changes = $derived(may(shell, 'write', id));
   const proposes = $derived(owner || may(shell, 'append'));
@@ -2940,7 +2969,7 @@
       {/if}
       <!-- THE REST OF WHAT A LIST OFFERS, IN THE OVERFLOW: a row started with every field in front of you, the view over
            what is handed to you, on a list that says who holds its rows, and the list's fields (`ListEditor.svelte`). -->
-      {#if handedToMe || proposes || (adds && !arriving) || rowsAsCards()}
+      {#if handedToMe || proposes || (adds && !arriving) || rowsAsCards() || shares}
         <Menu label={headWords.more(decl.name)} align="end">
           <!-- NAMED, as every "⋯" is (motion F11): the name is text inside the trigger, never a `title` on a child. On a
                phone it also holds Display, which the toolbar's own "⋯" holds from 640. -->
@@ -2948,6 +2977,8 @@
           {#if rowsAsCards()}<button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" />{copy.display}</button>{/if}
           {#if adds && !arriving}<button type="button" role="menuitem" data-new-row onclick={() => (createOpen = true)}>{headWords.whole}</button>{/if}
           {#if handedToMe}<a role="menuitem" href={at(handedToMe)}>{copy.handedToMe}</a>{/if}
+          <!-- SHARE THE LIST, with somebody here, a group or an email (sharing plan §3.1), an owner's or an Admin's. -->
+          {#if shares}<button type="button" role="menuitem" data-share-list onclick={shareList}><Icon name="user-plus" size="s" />{copy.shareSheetTitle(decl.name)}</button>{/if}
           {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}>{sheetWords.open}</button>{/if}
         </Menu>
       {/if}
@@ -3054,6 +3085,7 @@
           {dropFilter}
           {setQuery}
           saveView={() => void saveView()}
+          shareView={shares && filters.length > 0 ? shareView : undefined}
         />
         <!-- THE TOOLBAR'S END (money F7): how the list is drawn, then its "⋯" with Display (`v`) and Save as a view, then
              the one way to add, the list's primary, named with what it adds. Below 640 the head holds the "+" and the
@@ -3065,6 +3097,10 @@
             <button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" /><span class="mi-name">{copy.display}</span><Kbd keys="v" /></button>
             {#if (q !== '' || filters.length > 0) && twice === null}
               <button type="button" role="menuitem" onclick={() => void saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</button>
+            {/if}
+            <!-- "SHARE THIS VIEW" (sharing plan §3.1): the rows the filters pick, shared as their condition. -->
+            {#if shares && filters.length > 0}
+              <button type="button" role="menuitem" data-share-view onclick={shareView}><Icon name="user-plus" size="s" />{copy.shareThisView}</button>
             {/if}
           </Menu>
           {#if adds && !arriving}
@@ -3271,7 +3307,10 @@
     archive={changes ? archive : undefined}
     keepPrivate={changes ? setRowPrivate : undefined}
     onhanded={landRow}
+    share={shares ? shareRow : undefined}
   />
+  <!-- ONE SHEET FOR A ROW'S "Share" AND THE VIEW'S, opened on whichever was pressed. -->
+  {#if sharing}<ShareSheet bind:open={sharingOpen} subject={sharing} />{/if}
 
   <!-- The new-row drawer, every declared field in front of the reader. `n`, and New in the head. -->
   {#if adds}

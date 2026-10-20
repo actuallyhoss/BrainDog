@@ -77,6 +77,7 @@
     dropFilter,
     setQuery,
     saveView,
+    shareView,
   }: {
     /** Whether the list is big enough to sift, or is being sifted already. */
     shown: boolean;
@@ -102,6 +103,8 @@
     dropFilter: (at: number) => void;
     setQuery: (value: string) => void;
     saveView: () => void;
+    /** "Share this view", for an owner or an Admin; absent for anybody else. */
+    shareView?: (() => void) | undefined;
   } = $props();
 
   /* The phone's filter sheet: every enum field and Clear, behind one button beside the search box. */
@@ -248,6 +251,16 @@
   {#if filtered && !sheeted && chips.length > 1}
     <span class="bar-clear"><Button weight="bare" href="/r/{register}"><Icon name="close" size="s" />{copy.clearFilters}</Button></span>
   {/if}
+<<<<<<< HEAD
+=======
+
+  <!-- SAVE AS A VIEW, only while a filter or a search is on (`ViewsMenu` says why). It ends the
+       bar, because it is about the list as a whole. On a phone with filters it lives in the filter
+       sheet instead, beside Clear, for the reason Clear does. -->
+  {#if filtered && savable && !sheeted}
+    <span class="bar-save"><ViewsMenu {saveView} {shareView} /></span>
+  {/if}
+>>>>>>> e3931fd75 (Add the Share sheet with templates, a live preview and inline confirm)
 </div>
 {/if}
 
@@ -327,6 +340,12 @@
             filterOpen = false;
             void apply().then(saveView);
           }}
+          shareView={shareView
+            ? () => {
+                filterOpen = false;
+                void apply().then(shareView);
+              }
+            : undefined}
         />
       {/if}
     {/snippet}

@@ -46,6 +46,9 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import ShareMenu from '$lib/ui/ShareMenu.svelte';
+  import ShareSheet from '$lib/sharing/ShareSheet.svelte';
+  import type { Subject } from '$lib/sharing/share-state.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Arrange, { added } from './Arrange.svelte';
   import ChangePage from './ChangePage.svelte';
@@ -210,6 +213,15 @@
     const hue = d ? projectHue(d as Parameters<typeof projectHue>[0], shapeRow) : null;
     const more = moreSaid(laidFrom);
     return `${slotStyle(hue)};--chart-1:var(--ph);--chart-2:color-mix(in oklab, var(--ph) 55%, var(--tile));--chart-3:color-mix(in oklab, var(--ph) 28%, var(--tile))${more ? `;--more-said:${JSON.stringify(more)}` : ''}`;
+  });
+  /* WHAT THE PAGE IS ABOUT, SHARED WITH PEOPLE (sharing plan §3.1): a project's page shares the project, everything
+     that names it; a page about any other row shares that row. */
+  const sharing = $derived.by((): Subject | null => {
+    if (!about) return null;
+    const projects = (REGISTERS[about.register] as { scopes?: unknown } | undefined)?.scopes !== undefined;
+    return projects
+      ? { kind: 'project', register: about.register, seq: about.seq, id: null, name: about.title }
+      : { kind: 'row', list: about.register, seq: about.seq, id: null, name: about.title };
   });
   /* AN UNBOXED ACTIONS SECTION IS COUNTED TOO, for the one case that asks: it is left out when the shape took what it heads. */
   const asking = (bs: readonly LiveBlock[]) => bs.map((b) => (b.kind === 'section' && (b as { panel?: unknown }).panel === 'actions' ? ({ ...b, box: true } as LiveBlock) : b));

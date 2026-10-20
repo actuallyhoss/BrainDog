@@ -37,6 +37,7 @@
     archive,
     keepPrivate,
     onhanded,
+    share,
   }: {
     open: boolean;
     /** The row's viewport rect, taken when the menu opened. */
@@ -63,6 +64,8 @@
     keepPrivate?: ((seq: number, on: boolean) => void) | undefined;
     /** How the row a hand leaves lands back on the grid (`landRow`), on a live record only. */
     onhanded?: ((entry: Entry) => void) | undefined;
+    /** Share the row with somebody (sharing plan §3.1), for an owner or an Admin; absent for anybody else. */
+    share?: ((seq: number) => void) | undefined;
   } = $props();
 
   /* THE STATE THE ROW IS IN NAMES ITS FIELD ("Status: Open"), so it never reads as the menu's first verb, Open. */
@@ -142,6 +145,12 @@
       <Icon name="link" size="s" />
       <span class="mi-name">{copy.copyLink}</span><Kbd keys="⇧Y" />
     </button>
+    {#if share}
+      <button class="mi" role="menuitem" type="button" onclick={() => share?.(seq)}>
+        <Icon name="external" size="s" />
+        <span class="mi-name">{copy.shareOpen}</span>
+      </button>
+    {/if}
     {#if keepPrivate}
       <button class="mi" role="menuitem" type="button" onclick={() => keepPrivate?.(seq, row.private !== true)}>
         <Icon name="lock" size="s" />

@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  confirmInline,
   exchangeKey,
   methods,
   passkeyRegister,
@@ -139,6 +140,23 @@ test('A PASSKEY SIGN-IN turns base64url into bytes for the browser and bytes bac
     credential: { id: 'cred-1', response: { clientDataJSON: 'AQID', authenticatorData: '__4', signature: 'AA', userHandle: 'cF8wMQ' } },
   });
   assert.equal(seen[1]?.headers['content-type'], 'application/json');
+});
+
+test("THE SHARE SHEET'S CONFIRM is a passkey asked for in place, and false with nothing sent where none can be", async () => {
+  const { credentials } = authenticator(() => ({
+    id: 'cred-1',
+    type: 'public-key',
+    response: { clientDataJSON: buf(1, 2, 3), authenticatorData: buf(255, 254), signature: buf(0), userHandle: buf(112, 95, 48, 49) },
+  }));
+  const here = { isSecureContext: true, PublicKeyCredential: function () {}, navigator: { credentials } };
+  const routes = { '/auth/passkey/assert/options': () => ok({ challenge: 'AQID' }), '/auth/passkey/assert': () => ok(WHO) };
+  const proved = host(routes, credentials);
+  assert.equal(await confirmInline(proved.io, here), true);
+  assert.equal(proved.seen.length, 2);
+  const plain = host(routes, credentials);
+  assert.equal(await confirmInline(plain.io, { ...here, isSecureContext: false }), false);
+  assert.equal(await confirmInline(host(routes).io, here), false);
+  assert.equal(plain.seen.length, 0, 'a sign-in was asked for where no passkey could answer');
 });
 
 test('A CLOSED SHEET IS CANCELLED, not a failure, and nothing is sent after it', async () => {

@@ -59,6 +59,7 @@ const BARE_ORIGIN = new Map([
   ['lib/page/panels/Reporting.svelte', 'the curl line is a bearer at `/api`, which names its record by the key'],
   ['routes/settings/[area]/settings-state.svelte.ts', 'the login line, the mail door, the invite link and the move to another record are built on the bare host'],
   ['lib/ui/ShareMenu.svelte', 'a read-only page link is copied whole, so the host is written into it'],
+  ['lib/sharing/ShareSheet.svelte', 'the link an address is sent to join is built on the bare host, as Settings builds the invite link'],
   ['lib/data/offline.ts', 'the service worker scope is an absolute URL, never a record address `at()` builds'],
   ['routes/signin/+page.svelte', 'the Google button goes to `/auth/google/start`, which is the host\'s and not under the app'],
   ['routes/signin/desktop/+page.svelte', 'the one-time code is swapped at `/auth` on the host, which is not under a record'],

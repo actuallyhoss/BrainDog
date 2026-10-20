@@ -49,6 +49,7 @@ import { shell } from './copy/shell.ts';
 import { theme } from './copy/theme.ts';
 import { hand } from './copy/hand.ts';
 import { sharing } from './copy/sharing.ts';
+import { shareSheet } from './copy/share-sheet.ts';
 
 export type { Held } from './copy/shell.ts';
 export { INPUTS_SAID } from './copy/pages.ts';
@@ -72,6 +73,7 @@ export const copy = {
   ...hand,
   ...kpis,
   ...sharing,
+  ...shareSheet,
 } as const;
 
 export type Copy = typeof copy;

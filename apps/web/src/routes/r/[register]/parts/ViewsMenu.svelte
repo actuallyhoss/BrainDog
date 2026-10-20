@@ -1,5 +1,5 @@
 <!--
-  Save as a view: what is on screen, kept as a page under Views, and that page opened.
+  Save as a view: what is on screen, kept as a page under Views, and that page opened. And Share this view, beside it.
 
   SAVE AS A VIEW WAS `⌥V` AND NOTHING ELSE, which is the same hole Display had: a chord a phone
   cannot type, over a function that was written and reachable from no surface. This is the button
@@ -16,7 +16,9 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
 
-  let { saveView }: { saveView: () => void } = $props();
+  let { saveView, shareView }: { saveView: () => void; shareView?: (() => void) | undefined } = $props();
 </script>
 
 <Button weight="bare" onclick={() => saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</Button>
+<!-- "SHARE THIS VIEW" (sharing plan §3.1): the rows the chips pick, shared as their condition. An owner's or an Admin's. -->
+{#if shareView}<Button weight="bare" onclick={() => shareView?.()}><Icon name="external" size="s" />{copy.shareThisView}</Button>{/if}

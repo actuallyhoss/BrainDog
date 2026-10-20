@@ -240,6 +240,18 @@ export async function passkeySignIn(io: Io = live()): Promise<Said<Who>> {
 }
 
 /**
+ * "Confirm it's you", inside the Share sheet (sharing plan §6, default 1): a passkey asked for where the person is,
+ * which replaces the session with one proved now, as `afresh` does. NEVER A SIGN-IN PAGE: where no passkey can be asked
+ * for here this answers false and the sheet says so, because the record asks for a proof only of somebody who has a
+ * passkey to give.
+ */
+export async function confirmInline(io: Io = live(), g: unknown = globalThis): Promise<boolean> {
+  const here = support(g);
+  if (!here.webauthn || !here.secure || !io.credentials) return false;
+  return (await passkeySignIn(io)).ok;
+}
+
+/**
  * Whether this browser offers a site's passkeys in a field's autofill: conditional mediation, as WebAuthn calls it.
  * Anything that is not a plain yes, a missing function or one that throws included, is no.
  */
