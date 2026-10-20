@@ -19,7 +19,7 @@
 
 <svelte:head><title>{titleOf(words.heading)}</title></svelte:head>
 
-<PageHead icon="play" title={words.heading} kicker={words.parent} back="/jobs" sentence={words.headline} />
+<PageHead icon="session" title={words.heading} kicker={words.parent} back="/p/agents" sentence={words.headline} />
 <div class="page">
   <NewKind />
 </div>

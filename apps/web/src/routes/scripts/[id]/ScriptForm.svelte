@@ -14,6 +14,8 @@
   sentence is drawn as it said it. The form's own faults show after the first press, beside the field they are about.
 -->
 <script lang="ts">
+  /* THE FORM LAYOUT EVERY EDITOR SHARES (2.A.26): two columns from 1100, checkbox groups in 180px columns. */
+  import '$lib/ui/forms.css';
   import { tick } from 'svelte';
   import { page } from '$app/state';
   import { TONES } from 'braindog-render';
@@ -146,7 +148,10 @@
 
 <div class="form">
   <Section title={words.header}>
-    <div class="fields">
+    <!-- WHAT IT IS ON THE LEFT, WHAT IT MAY TOUCH ON THE RIGHT, from 1100 (agents F17): the fields stopped at 716 in a
+         1440 tile, and twenty checkboxes wrapped raggedly under them. -->
+    <div class="fields form-two">
+      <div class="column">
       <div class="item">
         <label class="label" for="script-title">{words.title}</label>
         <div class="field" data-wrong={faultAt('title') ? '' : undefined}>
@@ -217,7 +222,7 @@
       <fieldset class="item">
         <legend class="label">{words.keys}</legend>
         {#if keyChoices.length > 0}
-          <div class="picks">
+          <div class="picks form-checks">
             {#each keyChoices as k (k)}
               <label class="pick"><input type="checkbox" checked={draft.keys.includes(k)} onchange={() => (draft.keys = toggle(draft.keys, k))} />{k}</label>
             {/each}
@@ -225,6 +230,9 @@
         {/if}
         {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone}</p>{/if}
       </fieldset>
+      </div>
+
+      <div class="column">
 
       {#each GROUPS as group (group.which)}
         <fieldset class="item">
@@ -232,7 +240,7 @@
           {#if listChoices.length === 0}
             <p class="help">{words.listsNone}</p>
           {:else}
-            <div class="picks">
+            <div class="picks form-checks">
               {#each listChoices as l (l.id)}
                 <label class="pick">
                   <input type="checkbox" checked={draft[group.which].includes(l.id)} onchange={() => (draft[group.which] = toggle(draft[group.which], l.id))} />{l.name}
@@ -242,6 +250,7 @@
           {/if}
         </fieldset>
       {/each}
+      </div>
     </div>
   </Section>
 
@@ -309,9 +318,10 @@
     </p>
   {/if}
 
-  <div class="do">
-    <Button weight="quiet" disabled={trying} onclick={() => void tryIt()}>{trying ? words.trying : words.tryIt}</Button>
+  <!-- THE SUBMIT ROW, ON THE START EDGE, THE PRIMARY FIRST (2.A.26), the same on every editor. -->
+  <div class="do form-submit">
     <Button weight="primary" disabled={sending || (filed !== null && filed.why === null)} onclick={() => void send()}>{sending ? words.sending : owner ? words.install : words.propose}</Button>
+    <Button weight="quiet" disabled={trying} onclick={() => void tryIt()}>{trying ? words.trying : words.tryIt}</Button>
   </div>
 </div>
 
@@ -323,9 +333,7 @@
   }
 
   .fields {
-    display: grid;
     gap: var(--sp-5);
-    max-inline-size: var(--measure);
   }
 
   .item {
@@ -429,10 +437,11 @@
     outline-offset: 2px;
   }
 
-  .picks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2) var(--sp-4);
+  .column {
+    display: grid;
+    align-content: start;
+    gap: var(--sp-5);
+    min-inline-size: 0;
   }
 
   .pick {
@@ -502,10 +511,7 @@
   }
 
   .do {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: end;
-    gap: var(--sp-2);
+    margin-block-start: 0;
   }
 
   @media (pointer: coarse) {
@@ -519,10 +525,10 @@
     }
   }
 
-  /* A PHONE'S PRESS IS FULL WIDTH, the primary first where the thumb is. */
+  /* A PHONE'S PRESS IS FULL WIDTH, the primary first. */
   @media (width < 640px) {
     .do {
-      flex-direction: column-reverse;
+      flex-direction: column;
       align-items: stretch;
     }
   }

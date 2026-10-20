@@ -12,6 +12,7 @@
   that question and the line after it links there; it is not offered twice.
 -->
 <script lang="ts">
+  import '$lib/ui/forms.css';
   import { page } from '$app/state';
   import { TONES } from 'braindog-render';
   import { apiBase, at } from '$lib/at.ts';
@@ -68,7 +69,9 @@
 
 <div class="form">
   <Section title={words.heading}>
-    <div class="fields">
+    <!-- WHAT IT IS ON THE LEFT, WHAT IT MAY TOUCH ON THE RIGHT, from 1100 (agents F17). -->
+    <div class="fields form-two">
+      <div class="column">
       <div class="item">
         <label class="label" for="kind-title">{words.title}</label>
         <div class="field" data-wrong={faultAt('title') ? '' : undefined}>
@@ -108,10 +111,13 @@
         </div>
         {@render help('kind-repo-help', 'repo', words.repoHelp)}
       </div>
+      </div>
+
+      <div class="column">
 
       <fieldset class="item">
         <legend class="label">{words.recordTools}</legend>
-        <div class="picks">
+        <div class="picks form-checks">
           {#each RECORD_TOOLS as t (t)}
             <label class="pick"><input type="checkbox" checked={draft.tools.includes(t)} onchange={() => (draft.tools = toggle(draft.tools, t))} />{recordToolWords(t)}</label>
           {/each}
@@ -120,7 +126,7 @@
 
       <fieldset class="item">
         <legend class="label">{words.fileTools}</legend>
-        <div class="picks">
+        <div class="picks form-checks">
           {#each FILE_TOOLS as t (t)}
             <label class="pick"><input type="checkbox" checked={draft.tools.includes(t)} onchange={() => (draft.tools = toggle(draft.tools, t))} />{words.toolFile[t] ?? t}</label>
           {/each}
@@ -135,7 +141,7 @@
 
       <div class="item">
         <label class="label" for="kind-turns">{words.turns}</label>
-        <div class="field field-short" data-wrong={faultAt('turns') ? '' : undefined}>
+        <div class="field form-number" data-wrong={faultAt('turns') ? '' : undefined}>
           <input id="kind-turns" class="field-input" type="number" min="1" max={TURNS_MOST} step="1" inputmode="numeric" aria-describedby="kind-turns-help" value={draft.turns} oninput={(e) => (draft.turns = Number(e.currentTarget.value))} />
         </div>
         {@render help('kind-turns-help', 'turns', words.turnsHelp)}
@@ -144,7 +150,7 @@
       <!-- TWO CHOICES, AND ONLY THE KERNEL'S. A skipped permission is not among them, so it cannot be picked. -->
       <fieldset class="item" aria-describedby="kind-permission-help">
         <legend class="label">{words.permission}</legend>
-        <div class="picks">
+        <div class="picks form-checks">
           {#each PERMISSIONS as p (p)}
             <label class="pick"><input type="radio" name="kind-permission" value={p} checked={draft.permission === p} onchange={() => (draft.permission = p)} />{p === 'acceptEdits' ? words.acceptEdits : words.dontAsk}</label>
           {/each}
@@ -158,6 +164,7 @@
         </label>
         {@render help('kind-writes-help', 'writes', forced ? words.writesForced : words.writesHelp)}
       </div>
+      </div>
     </div>
   </Section>
 
@@ -169,7 +176,7 @@
     </p>
   {/if}
 
-  <div class="do">
+  <div class="do form-submit">
     <Button weight="primary" disabled={sending || filed !== null} onclick={() => void send()}>{sending ? words.busy : words.send}</Button>
   </div>
 </div>
@@ -182,9 +189,14 @@
   }
 
   .fields {
-    display: grid;
     gap: var(--sp-5);
-    max-inline-size: var(--measure);
+  }
+
+  .column {
+    display: grid;
+    align-content: start;
+    gap: var(--sp-5);
+    min-inline-size: 0;
   }
 
   .item {
@@ -228,10 +240,6 @@
     box-shadow: inset 0 0 0 1.5px var(--danger);
   }
 
-  .field-short {
-    max-inline-size: calc(var(--sp-9) * 3);
-  }
-
   /* A FIELD IS THE INNER FILL WITH NO BORDER, as on every other form. */
   .lines {
     box-sizing: border-box;
@@ -256,12 +264,6 @@
   .lines:focus-visible {
     outline: 2px solid var(--focus-in);
     outline-offset: 2px;
-  }
-
-  .picks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2) var(--sp-4);
   }
 
   .pick {
@@ -298,12 +300,6 @@
     color: var(--link);
   }
 
-  .do {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: end;
-    gap: var(--sp-2);
-  }
 
   /* A COARSE POINTER GETS 44PX: each pick and the link to Decide. */
   @media (pointer: coarse) {
