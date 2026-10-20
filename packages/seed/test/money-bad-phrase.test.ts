@@ -16,7 +16,8 @@ import { inline, text, type Inline } from '../../render/src/inline.ts';
 
 import { HEADS_UP } from '../src/modules/money/pages/parts/heads-up.ts';
 
-const LATE = 'past their due date';
+/* "LATE", THE WORD EVERY OTHER SCREEN USES (the UI pass of 20 October, money F5), where it said "past their due date". */
+const LATE = 'late';
 
 /** The one line of Heads up drawn on this figure. */
 const bodyOn = (metric: string): string => {
@@ -31,8 +32,8 @@ const bads = (nodes: readonly Inline[]) =>
   nodes.filter((n): n is Extract<Inline, { type: 'bad' }> => n.type === 'bad');
 
 for (const [metric, whole] of [
-  ['late-in', 'Invoices past their due date: 3 still to come in.'],
-  ['overdue', 'Bills past their due date: 3 still to pay.'],
+  ['late-in', 'Invoices late: 3 to come in.'],
+  ['overdue', 'Bills late: 3 to pay.'],
 ] as const) {
   test(`${metric}: the words that say it is late are a bad phrase, and the line reads the same`, () => {
     const body = bodyOn(metric);

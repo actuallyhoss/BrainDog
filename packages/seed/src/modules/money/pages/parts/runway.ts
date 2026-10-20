@@ -1,7 +1,13 @@
 /** Lasts, and Runs out: how long the money lasts, beside the walk, calm while there is cash and red once there is none. */
 
 /* THE CELL BOTH TILES DRAW: the day the money runs out on what is due, with the days left under it. */
-const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'On what is due', note: 'In {{runway-days}}' };
+const ON_WHAT_IS_DUE = { metric: 'runs-out-on', label: 'With what is due', note: 'In {{runway-days}}' };
+
+/* AND HOW LONG IT LASTS IF NOTHING COMES IN, beside it in the one tile (the UI pass of 20 October, money F3): the line
+   over the page said "19 days with no income" while this tile said "30 Oct, in 57 days", two answers to one question
+   a screen apart, neither saying what the other assumed. Now both are here, each named by what it assumes, and the
+   line says what there is. */
+const NOTHING_IN = { metric: 'lasts-no-income', label: 'If nothing comes in' };
 
 /**
  * HOW LONG THE MONEY LASTS, CALM, SINCE money-core 3.17.0 (REC-B07 step 8, "runway in info colour, danger only below
@@ -23,7 +29,7 @@ export const LASTS: Record<string, unknown>[] = [
     icon: 'calendar',
     span: 12,
     area: 'rail',
-    cells: [{ ...ON_WHAT_IS_DUE }],
+    cells: [{ ...ON_WHAT_IS_DUE }, { ...NOTHING_IN }],
     when: { all: [{ metric: 'cash-accounts', gt: 0 }, { metric: 'cash-now', gte: 0 }] },
   },
 ];

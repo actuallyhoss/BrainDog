@@ -779,7 +779,8 @@ test('MONEY IS ONE PAGE, and every block on it answers on the sample without a r
   const runs = drawn.find((b) => b.heading === 'Lasts')! as (typeof drawn)[number] & { tone?: string; cells?: { metric: string; note?: string }[] };
   assert.notEqual(runs.drawn, false, 'the sample runs out inside the year and draws no Runs out');
   assert.equal(runs.tone, undefined, 'cash above nought is drawn in the danger colour');
-  assert.deepEqual(runs.cells?.map((c) => c.metric), ['runs-out-on']);
+  /* AND HOW LONG IT LASTS WITH NOTHING COMING IN, beside the day, since the UI pass of 20 October (money F3). */
+  assert.deepEqual(runs.cells?.map((c) => c.metric), ['runs-out-on', 'lasts-no-income']);
   assert.equal(runs.cells?.[0]?.note, 'In {{runway-days}}', 'the days left are the line under the day');
   const days = reading(k, 'runway-days');
   const on = runs.readings?.[0]?.reading?.value;
@@ -937,20 +938,19 @@ test('MONEY OPENS WITH ONE LINE OF WHAT THE MONEY IS DOING, and what is paid in 
   assert.notEqual(lead.drawn, false, 'a record with one set of money reads no line about it');
   /* NO DAY COUNT IN IT SINCE money-core 3.11.0: Runs out says it, beside the walk. */
   /* AND HOW FAR CASH MOVED ON A MONTH AGO, since the sample holds its nights from the moment it is made (`cashPoints`). */
-  /* AND HOW LONG IT LASTS WITH NO INCOME, SINCE money-core 3.17.0 (money-lasts-no-income-95), said only while the walk
-     reads a value for it: past five years, or over two currencies with no rate, its clause drops. */
-  const lasts = reading(k, 'lasts-no-income');
-  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'cash-now.change', ...(lasts === null ? [] : ['lasts-no-income'])]);
+  /* AND NOT HOW LONG IT LASTS WITH NO INCOME, which the Lasts tile says beside the day on what is due since the UI pass
+     of 20 October (money F3): the line said it from money-core 3.17.0 (money-lasts-no-income-95). */
+  assert.deepEqual(Object.keys(lead.values ?? {}).sort(), ['cash-accounts', 'cash-now', 'cash-now.change']);
   assert.equal(lead.values?.['cash-accounts'], reading(k, 'cash-accounts'));
   const monthAgo = cashSeries().find((p) => p.at === new Date(NOW - 30 * 86_400_000).toISOString().slice(0, 10))!.value;
   const moved = Math.round(((reading(k, 'cash-now')! - monthAgo) / monthAgo) * 100);
   assert.ok(moved < 0, 'the sample held less a month ago, so this proves no sign');
   assert.equal(lead.values?.['cash-now.change'], `−${-moved}%`);
   /* HOW FAR CASH MOVED IN A MONTH IS ITS OWN CLAUSE, so a record that has no night a month back to measure from loses
-     that clause and keeps the rest; and so is how long the cash lasts with no income. */
+     that clause and keeps the rest. */
   assert.deepEqual(
     lead.body?.split(/,\s+/u).map((c) => [...c.matchAll(/\{\{([a-z0-9.-]+)\}\}/gu)].map((m) => m[1])),
-    [['cash-now', 'cash-accounts'], ['cash-now.change'], ['lasts-no-income']],
+    [['cash-now', 'cash-accounts'], ['cash-now.change']],
   );
 
   /* THE LINE'S FIGURES REMEMBER THEIR NIGHTS, so Cash ahead draws how cash moved up to today and a book's tile its line. */

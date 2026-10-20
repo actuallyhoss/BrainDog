@@ -49,14 +49,14 @@ export const HEADS_UP: Record<string, unknown>[] = [
     kind: 'note',
     tone: 'warn',
     span: 12,
-    body: 'Invoices {{bad:past their due date}}: {{late-in}} still to come in.',
+    body: 'Invoices {{bad:late}}: {{late-in}} to come in.',
     when: { metric: 'late-in', gt: 0 },
   },
   {
     kind: 'note',
     tone: 'bad',
     span: 12,
-    body: 'Bills {{bad:past their due date}}: {{overdue}} still to pay.',
+    body: 'Bills {{bad:late}}: {{overdue}} to pay.',
     when: { metric: 'overdue', gt: 0 },
   },
   {

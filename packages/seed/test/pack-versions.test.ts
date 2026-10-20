@@ -1474,7 +1474,7 @@ const DECLARED: Record<string, Version> = {
       rule.payment-unsettles script.unsettle
       metric.lasts-no-income
     `,
-    declares: '432c185b62df186d',
+    declares: '66a1947e5a2f77ab',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1510,6 +1510,7 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 3.17.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 3.16.0): `page.money` says its place on the rail, `nav.place` 40, lowest first; no id added or taken away -> db5273f19a418802",
       "Inside the unreleased 3.17.0 (money-days-word): `page.money`'s first line says days after the count of how long the cash lasts with no income, `day(s)`; no id added or taken away -> ce04c1a199af2266",
       "Inside the unreleased 3.17.0 (batch 6, the look of Money): `page.money`'s Ledger line says the day's count alone, `{{filed-today}} filed today.`, where it said it beside a second count of 30 days that read as a contradiction; no id added or taken away -> 432c185b62df186d",
+      "Inside the unreleased 3.17.0 (the UI pass of 20 October, money F3 and F5): `page.money`'s Lasts tile says two cells, With what is due over `runs-out-on` and If nothing comes in over `lasts-no-income`, and the three lead notes no longer end on how long the cash lasts with no income; Heads up's two late lines say `{{bad:late}}` where they said past their due date, and drop still; no id added or taken away -> 66a1947e5a2f77ab",
     ],
   },
   'work@1.17.0': {

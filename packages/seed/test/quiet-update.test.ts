@@ -265,7 +265,7 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
   /* AND LASTS DRAWS THE DAY, over the figure the update brought with it (money-core 3.12.0). */
   const runs = (page.blocks as { heading?: string; cells?: { metric: string }[] }[]).find((b) => b.heading === 'Lasts');
-  assert.deepEqual(runs?.cells?.map((c) => c.metric), ['runs-out-on']);
+  assert.deepEqual(runs?.cells?.map((c) => c.metric), ['runs-out-on', 'lasts-no-income']);
   assert.ok(k.packClaims('money-core').includes('metric.runs-out-on'), 'the day the money runs out did not reach the record');
   sql.close();
 });
@@ -767,6 +767,18 @@ const RUNS_OUT_99: Body = {
   cells: [{ metric: 'runs-out-on', label: 'On what is due', note: 'In {{runway-days}}' }],
   when: { metric: 'runway-days', gte: 0 },
 };
+/**
+ * AND THE UI PASS OF 20 OCTOBER'S, folded into the same unreleased 3.17.0 and undone first (money F3, F5): Heads up's two
+ * late lines say "late", where they said "past their due date" and "still". The Lasts tile's second cell and its new
+ * label go with the tile itself (`withoutBatch100` puts Runs out back), and the lead lines lost only the clause batch
+ * 95 had added, which `withoutBatch95` finds nothing of.
+ */
+const LATE_WORDS_UI: readonly (readonly [string, string])[] = [
+  ['Invoices {{bad:late}}: {{late-in}} to come in.', 'Invoices {{bad:past their due date}}: {{late-in}} still to come in.'],
+  ['Bills {{bad:late}}: {{overdue}} to pay.', 'Bills {{bad:past their due date}}: {{overdue}} still to pay.'],
+];
+const withoutUiPass = (doc: Body): Body =>
+  withPage(doc, 'money', (now) => now.map((b) => (typeof b.body === 'string' ? { ...b, body: LATE_WORDS_UI.reduce((body, [is, was]) => (body === is ? was : body), b.body) } : b)));
 const WHERE_IT_WENT_100: ReadonlySet<string> = new Set(['Where it went', 'This month, by category', 'No category yet, by who was paid']);
 const noAxis = ({ axis: _axis, ...rest }: Body): Body => rest;
 const withoutBatch100 = (doc: Body): Body => {
@@ -839,7 +851,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '3.13.0',
     released: '2e09983b40aba73e',
     undo: (raw) => {
-      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(raw)))))))))))))))))))));
+      const doc = withoutPaydays(withoutAges(withoutDirection(withoutCrossCheck(withoutFiling(withoutPaid(withoutLedgerTile(withoutPlans(withoutPayee(withoutEveryday(withoutBookFill(withoutPlanLeads(withoutBatch73(withoutBatch74(withoutBatch75(withoutBatch76(withoutBatch77(withoutBatch78(withoutBatch92(withoutBatch95(withoutBatch100(withoutUiPass(raw))))))))))))))))))))));
       return {
       ...doc,
       /* AND THE SCRIPT THAT MARKS A BILL PAID, WITH THE RULE THAT STARTS IT (settle-rule-60), both newer than 3.13.0. */

@@ -44,6 +44,11 @@ export const HEADLINE: Record<string, unknown>[] = [
 ];
 
 /**
+ * HOW LONG THE CASH LASTS WITH NOTHING COMING IN IS THE LASTS TILE'S, SINCE THE UI PASS OF 20 OCTOBER (money F3): every
+ * line below ended on it, and the tile beside the chart said the day on what is due, two answers to one question a
+ * screen apart. The tile now says both, each named by what it assumes, and no line repeats either (`money.test.ts`
+ * holds that no tile beside the line says a figure the line says).
+ *
  * THE LINE THAT SAYS THE MONEY LASTS THE YEAR, DECLARED AND NOT PLACED (money-lasts-line-76, REC-B07). Money is at
  * twenty-four blocks, the most a page declares (`BLOCK_CEILING` in `packages/kernel/src/declare.ts`), and this is a
  * third lead note where `HEADLINE` holds two: placed today, Money is refused at install. It comes in when a block is
@@ -56,12 +61,14 @@ export const HEADLINE: Record<string, unknown>[] = [
  * its own after a comma, because the writer leaves out a whole clause when one of its holes reads nothing (`leadOf`):
  * past five years, or over two currencies with no rate, the clause goes and the rest of the line stands.
  */
-const NO_INCOME = 'and it lasts {{lasts-no-income}} day(s) with no income';
 export const HEADLINE_LASTS: Record<string, unknown>[] = [
   {
+    /* WHAT THERE IS, AND NOTHING OF HOW LONG (the UI pass of 20 October, money F3): while the walk goes under, the Lasts
+       tile beside the chart says both how long it lasts on what is due and with nothing coming in, so the line says
+       the cash alone and no answer stands a screen away from a second one. */
     ...HEADLINE[0],
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: false }] },
-    body: `${WHAT_THERE_IS.slice(0, -1)}, ${NO_INCOME}.`,
+    body: WHAT_THERE_IS,
   },
   {
     /* THAT IT LASTS THE YEAR IS THE LINE'S, BECAUSE NO TILE SAYS IT. The tile of when it runs out is drawn only while
@@ -74,7 +81,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
-    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year, or {{lasts-no-income}} day(s) with no income.`,
+    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year.`,
   },
-  { ...HEADLINE[1], body: `${String(HEADLINE[1]!.body).slice(0, -1)}, ${NO_INCOME}.` },
+  HEADLINE[1]!,
 ];
