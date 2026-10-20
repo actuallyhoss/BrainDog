@@ -246,7 +246,7 @@ test('GET /app WITH A SESSION ON acme IS A 302 TO /app/acme/, and one on no reco
 test('A ROTATION RIDES ON THE 302, AND A DEAD COOKIE IS THE SHELL WITH THE COOKIE CLEARED, never a redirect into a record', async () => {
   const rotated = await appEntry(bare(cookie), entry({ session: { status: 200, body: WHO, session: { sid: 'R'.repeat(43) } } }).deps);
   assert.equal(rotated.status, 302);
-  assert.deepEqual(rotated.headers.getSetCookie(), [`__Host-bd_s=${'R'.repeat(43)}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax`]);
+  assert.deepEqual(rotated.headers.getSetCookie(), [`__Host-bd_s=${'R'.repeat(43)}; Path=/; Max-Age=7776000; HttpOnly; Secure; SameSite=Lax`]);
 
   const dead = await appEntry(bare(cookie), entry({ session: { status: 401, refusal: { code: 'UNAUTHORIZED', fix: 'That did not sign you in.' }, session: 'clear' } }).deps);
   assert.equal(dead.status, 200);

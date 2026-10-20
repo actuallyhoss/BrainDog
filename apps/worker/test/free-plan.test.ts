@@ -49,8 +49,12 @@ test('AN OWNER ON FREE CANNOT INVITE ANYBODY, and is told why and how to move on
   const held = () => Number((c.storages.get(REC)?.sql.exec('SELECT count(*) AS n FROM invitation').toArray()[0] as { n: number } | undefined)?.n ?? -1);
   assert.equal(held(), 0, 'an invitation was minted on Free');
 
-  /* PAID FOR, THE SAME INVITATION GOES THROUGH. */
+  /* CLOUD IS NOT ENOUGH EITHER: teams are Cloud Plus's (DIRECTION §42). */
   await c.plan('hosted');
+  assert.equal((await c.invite('bo@example.test')).status, 403);
+
+  /* ON CLOUD PLUS, THE SAME INVITATION GOES THROUGH. */
+  await c.plan('plus');
   const paid = await c.invite('bo@example.test');
   assert.equal(paid.status, 200, JSON.stringify(paid.body));
   assert.equal(typeof paid.body.value?.['token'], 'string');
@@ -66,6 +70,7 @@ test('A FREE RECORD IS READ FROM THE DIRECTORY when billing never told the objec
 
 test('A LINK TO A RECORD NOW ON FREE IS REFUSED WHEN IT IS OPENED, before a proof is mailed, and the Directory refuses the join', async () => {
   const c = await studio();
+  await c.plan('plus');
   const minted = await c.invite('bo@example.test');
   const token = minted.body.value?.['token'] as string;
   assert.equal(typeof token, 'string', JSON.stringify(minted.body));

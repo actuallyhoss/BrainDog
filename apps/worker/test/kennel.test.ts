@@ -266,7 +266,11 @@ test('a key asking for its own submissions is told waiting, then declined with t
   };
 
   assert.equal((await read(await serveKennel(post('mine', {}), deps))).refusal?.code, 'UNAUTHORIZED', 'nobody signed is nobody');
-  assert.equal((await serveKennel(post('mine', { signature: { alg: 'ed25519' } }), deps)).status, 401);
+  /* A SIGNATURE THAT IS NOT ONE IS A MALFORMED BODY, as a submission's is; ONE MADE OVER ANOTHER ASK IS NOBODY. */
+  assert.equal((await serveKennel(post('mine', { signature: { alg: 'ed25519' } }), deps)).status, 422);
+  const other = await signYank(key, 'pack', 'someone-elses', '0.0.0', 'mine', NOW);
+  assert.ok(other.ok);
+  assert.equal((await serveKennel(post('mine', { signature: other.value }), deps)).status, 401);
 
   assert.equal((await serveKennel(post('submit', await signedSubmission(addon('1.0.0'), key)), deps)).status, 200);
   assert.deepEqual((await asked(key)).map((r) => [r.id, r.version, r.state]), [['bookshelf', '1.0.0', 'waiting']]);

@@ -392,7 +392,8 @@ test('A TASK HANDED TO THE AGENT LEADS ITS NEXT LINE, before the step', async ()
   const told = await starts(run(h, 'run-b'), 'run-b');
   assert.equal(told.mcp.card, told.hook);
   const next = told.hook.split('\n').find((line) => /^Next\s/u.test(line)) ?? '';
-  assert.match(next, /^Next\s+Proof the release notes for Kiln \([^)]*handed to you\) · Cut the release notes/u, told.hook);
+  /* THE BRIEF'S NEXT IS ONE SHORT LINE with a name and no id: what was handed over leads, and the step it left waits behind it. */
+  assert.match(next, /^Next\s+Proof the release notes for Kiln \(handed to you\)$/u, told.hook);
 });
 
 test('NOTHING THROUGH THE WORKER WAS ANSWERED 500 OR MORE', () => {
