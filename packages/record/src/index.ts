@@ -41,6 +41,11 @@ import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
 import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
+/* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
+   settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
+import { mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
+import { OWN_RUN, personNamed, stopLine, toldOf, type Told } from './methods/instructions.ts';
+import { saysOf } from './methods/agent-profile.ts';
 import type { InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
@@ -1529,6 +1534,24 @@ export type MergeCluster = {
   options: { option: string; says: string; decide: { option: string } }[];
 };
 
+/**
+ * What a token may do under his settings (plan §5.1), as `whoami` and `context` answer it, to read and never to write:
+ * the row it works under and how that matched (`null` while the record holds no row that applies, when nothing
+ * narrows), min(token scope, the row's ceiling), that as one sentence, the lists and projects it writes (`null` for
+ * all), the tools switched off, his brief for it, its context size, and what stops it.
+ */
+export type EffectiveSettings = {
+  profile: { id: string; name: string; applies: 'token' | 'name' | 'default' } | null;
+  may: 'read' | 'propose' | 'write';
+  says: string;
+  projects: string[] | null;
+  lists: string[] | null;
+  tools_off: string[];
+  brief: string | null;
+  context: { budget: number; lines: boolean };
+  stop: Stop | null;
+};
+
 /** Another run that is live now, as `context` shows it. */
 export type LiveBrief = {
   spoken: string;
@@ -2278,7 +2301,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         allowed: ['create'],
       };
     if (binding !== null && binding.register === '') return reportOnly(binding);
-    const register = binding !== null ? binding.register : asked;
+    /* A CALL ABOUT THE CALLER'S OWN RUN NAMES NO LIST (`OWN_RUN`): attach, handoff, end, beat, pulse and instructions. */
+    const register = binding !== null ? binding.register : asked === OWN_RUN ? undefined : asked;
     /* THE REGISTER'S OWN LEVEL WHEN IT HAS ONE, which is what makes a level per register a rule
        rather than a decoration. A bookkeeper with `read` on the record and `write` on one register
        is the point; so is an owner held to `read` on the one that carries the payroll. */
@@ -2298,7 +2322,113 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ? ctx
         : { ...ctx, principal: { ...ctx.principal, level: held } };
 
-    return allows(at, need, listName) ?? (register ? reaches(ctx, register) : null);
+    const refused = allows(at, need, listName) ?? (register ? reaches(ctx, register) : null);
+    if (refused !== null || ctx.principal.kind !== 'token' || need === 'read') return refused;
+    /* AND WHAT HE SET FOR THIS AGENT, AND WHETHER HE STOPPED IT (plan §5.1, §2.4), for a token's change only. The run's
+       own calls are left through both: a stopped run still answers, hands off and ends, and Read is about his rows. */
+    if (asked === OWN_RUN || asked === SESSION) return null;
+    return settingsStop(ctx) ?? runHeld(ctx);
+  };
+
+  /**
+   * The settings row a token's call works under (`profileFor`, plan §5.1): the nearest row for its key, its machine with
+   * its kind, or its kind, else Defaults. Read once a call. `null` for anybody who is no token, AND FOR A ROW THE RECORD
+   * DOES NOT HOLD: until the hourly data step has written Defaults and a row for each kind its runs used (migration 42),
+   * nothing narrows, so an agent keeps what its token gives it and a record never wakes up to every write asked.
+   *
+   * READ ON EVERY ASK AND HELD BY NOTHING: a caller may send the same context twice, a row changed between, and a held
+   * answer would be his old setting. It is one read of a table of a few rows, and only a change asks it.
+   */
+  const profileOf = (ctx: CallContext): Profile | null => {
+    if (ctx.principal.kind !== 'token') return null;
+    const hints = ctx.session ?? {};
+    const held = kernel.profileFor({ kind: kindOf(hints).agent ?? 'other', token: ctx.principal.id, host: hints.host });
+    return held.created_at === null ? null : held;
+  };
+
+  /** Whether a list is one a row's `lists_write` names, by its id or by the name the rail gives it. */
+  const listNamed = (lists: readonly string[], list: string): boolean => {
+    const name = listName(list).toLowerCase();
+    return lists.some((l) => l === list || l.toLowerCase() === name);
+  };
+
+  /** A token on a Read row changes nothing (plan §5.1): refused in the row's words, which only the owner can change. */
+  const settingsStop = (ctx: CallContext): Refusal | null => {
+    const p = profileOf(ctx);
+    if (p === null || p.ceiling !== 'read') return null;
+    return {
+      code: 'FORBIDDEN',
+      fix: `Settings › Agents › ${p.name} lets this agent read and change nothing. The owner changes that in BrainDog.`,
+      at: 'principal',
+    };
+  };
+
+  /**
+   * WHETHER HE STOPPED OR PAUSED THIS RUN (plan §2.4): the refusal every change of a stopped run meets, for every client,
+   * `RUN_STOPPED` or `RUN_PAUSED` in his words, or `null`. A helper obeys its lead's (`stopOf`), and a helper whose own
+   * run is not open yet is held by its lead's too. Read on every ask, as `profileOf` is and for its reason: a stop he
+   * pressed a moment ago holds the very next change.
+   */
+  const runHeld = (ctx: CallContext): Refusal | null => {
+    if (ctx.principal.kind !== 'token') return null;
+    const hints = ctx.session ?? {};
+    const run = kernel.findRun(hints, ctx.principal.id);
+    const ref = run !== null ? run.id : typeof hints.parent === 'string' && hints.parent !== '' ? hints.parent : null;
+    const stop = ref === null ? null : kernel.stopOf(ref);
+    if (stop === null) return null;
+    return stop.kind === 'stop' ? { code: 'RUN_STOPPED', fix: stopLine(sql, kernel, stop)! } : { code: 'RUN_PAUSED', fix: stopLine(sql, kernel, stop)! };
+  };
+
+  /**
+   * WHAT HIS SETTINGS ASK INSTEAD OF WRITE (plan §5.1, "writes outside become questions"): a write by a token whose row
+   * is at Suggest, or that names a list or a project the row does not, is filed as a question with the reason in his
+   * row's words, as a write the ladder holds back is. `null` when the row lets it through, or no row applies.
+   */
+  const settingsAsk = (ctx: CallContext, register: string, patch: Record<string, unknown>, self: Entry | null): string | null => {
+    const p = profileOf(ctx);
+    if (p === null) return null;
+    const where = `Settings › Agents › ${p.name}`;
+    if (p.ceiling === 'propose') return `${where} lets this agent suggest only, so every change is asked.`;
+    if (p.lists_write !== null && !listNamed(p.lists_write, register)) {
+      const lists = new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(p.lists_write.map((l) => kernel.register(l)?.name ?? l));
+      return `${where} lets this agent change ${lists === '' ? 'no list' : lists} only, so a change to ${listName(register)} is asked.`;
+    }
+    if (p.projects !== null) {
+      const f = kernel.register(register)?.fields.find((field) => field.scope !== undefined && !field.retired);
+      if (f !== undefined) {
+        const said = Object.hasOwn(patch, f.id) ? patch[f.id] : self?.fields[f.id];
+        const row = typeof said === 'string' && said !== '' ? kernel.get(said) : null;
+        const names = row === null ? [] : [row.id, kernel.nameOf(row.id), String(row.fields[kernel.register(row.register)?.title ?? ''] ?? '').toLowerCase()];
+        const inside = p.projects.some((q) => names.includes(q) || names.includes(q.toLowerCase()) || (kernel.get(q)?.id ?? null) === row?.id);
+        if (!inside) return `${where} lets this agent change ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(p.projects)} only, so a change ${row === null ? 'on no project' : 'outside them'} is asked.`;
+      }
+    }
+    return null;
+  };
+
+  /**
+   * What a token may do under his settings, as `whoami` and `context` say it (plan §5.1): the row and how it matched,
+   * min(token scope, the row's ceiling), the sentence, the lists and projects it writes, the tools switched off, its
+   * brief, its context size and whether it is stopped. `null` for anybody who is no token.
+   */
+  const effectiveOf = (ctx: CallContext): EffectiveSettings | null => {
+    const principal = ctx.principal;
+    if (principal.kind !== 'token') return null;
+    const p = profileOf(ctx);
+    const may = p === null ? principal.scope : mayOf(principal.scope, p.ceiling);
+    const held = runHeld(ctx);
+    const run = kernel.findRun(ctx.session ?? {}, principal.id);
+    return {
+      profile: p === null ? null : { id: p.id, name: p.name, applies: p.id === 'default' ? 'default' : p.match.token !== undefined ? 'token' : 'name' },
+      may,
+      says: saysOf({ ceiling: may, lists_write: p?.lists_write ?? null, projects: p?.projects ?? null }, listName),
+      projects: p?.projects ?? null,
+      lists: p?.lists_write ?? null,
+      tools_off: p === null ? [] : Object.entries(p.tools).flatMap(([tool, on]) => (on === false ? [tool] : [])),
+      brief: p?.brief ?? null,
+      context: p?.context ?? { budget: 700, lines: true },
+      stop: held === null || run === null ? null : kernel.stopOf(run.id),
+    };
   };
 
   /**
@@ -5932,12 +6062,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const laddered = (ctx: CallContext, register: string, op: 'create' | 'update', patch: unknown, self: Entry | null): { caller: Caller; gate: Gate } | null => {
     if (register === SESSION) return null;
+    const said = patch !== null && typeof patch === 'object' && !Array.isArray(patch) ? (patch as Record<string, unknown>) : {};
+    /* HIS SETTINGS FIRST, which only narrow (plan §5.1): a write his row does not let through is asked whatever rung the
+       agent has earned, and an instruction lifts none of it (§10.3). */
+    const asks = settingsAsk(ctx, register, said, self);
     const caller = callerOf(ctx);
-    if (caller === null) return null;
+    if (caller === null) {
+      if (asks === null || ctx.principal.kind !== 'token') return null;
+      const p = ctx.principal;
+      return { caller: { token: p.id, scope: p.scope, person: p.person, run: null, app: null }, gate: { write: false, why: asks, kinds: [] } };
+    }
     trust.clientChanged(caller, SESSION);
     trust.anomaly(caller.token, caller.run);
-    const said = patch !== null && typeof patch === 'object' && !Array.isArray(patch) ? (patch as Record<string, unknown>) : {};
-    return { caller, gate: trust.gate(caller, register, op, said, self?.id ?? null) };
+    const gate = trust.gate(caller, register, op, said, self?.id ?? null);
+    return { caller, gate: asks !== null && gate.write ? { write: false, why: asks, kinds: gate.kinds } : gate };
   };
 
   /**
@@ -7054,6 +7192,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const byLadder = (ctx: CallContext, id: string): { landed: true; decision: string; undo: { decision: string }; rung?: 'tell' | 'quiet' } | null => {
     const caller = callerOf(ctx);
     if (caller === null) return null;
+    /* A ROW HIS SETTINGS ASK STAYS A QUESTION, whatever the rung (`settingsAsk`): Suggest is Suggest for a rowset too. */
+    const asked = kernel.governanceRow('suggestion', id)?.body as { register?: unknown; rows?: unknown } | undefined;
+    if (profileOf(ctx) !== null && typeof asked?.register === 'string' && Array.isArray(asked.rows)) {
+      const list = asked.register;
+      const held = asked.rows.some((r: unknown) => {
+        const row = (r ?? {}) as Record<string, unknown>;
+        const self = typeof row.at === 'string' ? kernel.get(row.at) : null;
+        const patch = typeof row.at === 'string' ? ((row.patch ?? {}) as Record<string, unknown>) : row;
+        return settingsAsk(ctx, list, patch, self) !== null;
+      });
+      if (held) return null;
+    }
     trust.clientChanged(caller, SESSION);
     trust.anomaly(caller.token, caller.run);
     if (trust.untrusted(caller) !== null) return null;
@@ -10177,6 +10327,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            is a different answer from "none" and the two must never be one value. */
         registers: ctx.registers ?? null,
         may,
+        /* WHAT HIS SETTINGS LET THIS AGENT DO (plan §5.1, §8.2), to read and never to write: `null` for anybody who is no
+           token. */
+        effective: effectiveOf(ctx),
       });
     },
 
@@ -10448,7 +10601,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       args: { client_id?: string; doing?: string; source: (typeof SOURCES)[number]; branch?: string; head?: string },
       ctx: CallContext,
     ): Promise<Result<Attached>> {
-      const stop = guard(ctx, 'propose');
+      const stop = guard(ctx, 'propose', OWN_RUN);
       if (stop) return { ok: false, refusal: stop };
       if (ctx.principal.kind !== 'token')
         return no('FORBIDDEN', 'attach is how an agent says which run it is, and a person is never a run.', { at: 'principal' });
