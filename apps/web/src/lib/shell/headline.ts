@@ -39,3 +39,15 @@ export function partsOf(sentence: string, needs?: string): Part[] {
   if (!needs || at < 0) return figures(sentence);
   return [...figures(sentence.slice(0, at)), { text: needs, needs: true }, ...figures(sentence.slice(at + needs.length))];
 }
+
+/**
+ * THE SENTENCE ENDS WITH ITS FULL STOP, which the header adds where a caller left it off: "Ada Vine has been quiet since
+ * April" ran out under a person's name (UI pass 20 Oct, W2-D), while every other page's line ended as a sentence does.
+ * A line that already ends in a stop, a question, an ellipsis or a colon (even inside a closing quote or bracket) is
+ * left as it is.
+ */
+export function stopped(sentence: string): string {
+  const t = sentence.trimEnd();
+  if (t === '' || /[.!?…:]["”’)\]]*$/u.test(t)) return t;
+  return `${t}.`;
+}

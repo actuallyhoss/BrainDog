@@ -47,7 +47,7 @@
   import { copy } from '../copy.ts';
   import { palette } from '../palette/open.svelte.ts';
   import { openMore } from '../shell/more.svelte.ts';
-  import { partsOf } from '../shell/headline.ts';
+  import { partsOf, stopped } from '../shell/headline.ts';
   import { settled } from './screen.svelte.ts';
   import { page } from '$app/state';
   import type { Noun } from '$lib/define.svelte.ts';
@@ -174,7 +174,7 @@
   });
 
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
-  const parts = $derived(typeof sentence === 'string' ? partsOf(sentence, needs) : null);
+  const parts = $derived(typeof sentence === 'string' ? partsOf(stopped(sentence), needs) : null);
 
   /* A SENTENCE ON ITS WAY HOLDS ITS ROOM, and only while the screen is still reading: a page that settles with nothing
      to say gives the line back. */

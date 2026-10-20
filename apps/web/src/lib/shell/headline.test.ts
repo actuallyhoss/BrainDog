@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { partsOf } from './headline.ts';
+import { partsOf, stopped } from './headline.ts';
 
 const joined = (s: string, needs?: string) => partsOf(s, needs).map((p) => p.text).join('');
 
@@ -38,4 +38,11 @@ test('a phrase the sentence does not hold marks nothing red', () => {
   const parts = partsOf('Nothing needs you.', 'late');
   assert.ok(parts.every((p) => !p.needs));
   assert.equal(parts.map((p) => p.text).join(''), 'Nothing needs you.');
+});
+
+test('a header line ends with its full stop, added only where it was left off', () => {
+  assert.equal(stopped('Ada Vine has been quiet since April'), 'Ada Vine has been quiet since April.');
+  assert.equal(stopped('8 need you. £7,200 owed to you is late.'), '8 need you. £7,200 owed to you is late.');
+  assert.equal(stopped('Cash is £33,850 '), 'Cash is £33,850.');
+  for (const done of ['Ready?', 'Wait…', 'Two things:', 'He said “stop.”', '(nothing yet.)']) assert.equal(stopped(done), done);
 });
