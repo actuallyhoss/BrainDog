@@ -26,6 +26,8 @@
 <script lang="ts">
   import { rowsAsCards } from '../rows-as-cards.svelte.ts';
   import type { Snippet } from 'svelte';
+  import { flip } from 'svelte/animate';
+  import type { TransitionConfig } from 'svelte/transition';
   import { TONES, hrefFor, markOf, type RenderOptions } from '../../src/index.ts';
   import { markGlyphOf } from '../../src/cards.ts';
   import { glyphPath } from '../../src/inline.ts';
@@ -66,6 +68,10 @@
     home,
     rowActions,
     act,
+    rowin,
+    rowout,
+    settle,
+    headCells,
   }: {
     columns: readonly Column[];
     rows: readonly TableRow[];
@@ -109,7 +115,42 @@
      */
     rowActions?: readonly unknown[] | null | undefined;
     act?: OnAct | undefined;
+    /**
+     * HOW A ROW ARRIVES AND LEAVES, AND HOW THE ROWS BESIDE IT CLOSE THE GAP: the host's list motion (`lib/ui/motion.ts`
+     * in the app, which this package does not import). Absent, a row is simply there or gone, as it always was.
+     */
+    rowin?: ((node: Element) => TransitionConfig) | undefined;
+    rowout?: ((node: Element) => TransitionConfig) | undefined;
+    settle?: (() => { duration: number; easing: (t: number) => number }) | undefined;
+    /** A header cell the host draws itself, by its column's field: the select-all box over a column of pickers. */
+    headCells?: Readonly<Record<string, Snippet>> | undefined;
   } = $props();
+
+  /**
+   * ONE ROW ADDED OR TAKEN AWAY MOVES; A NEW ANSWER DOES NOT. A filter, a search or a page turned swaps most of the rows
+   * at once, and thirty rows opening and closing together is noise, so a change of more than three rows is drawn still.
+   * Read before the rows are drawn (`$effect.pre`), so the transitions of the change itself see it.
+   */
+  let still = false;
+  let shown: ReadonlySet<string> | null = null;
+  $effect.pre(() => {
+    const keys = new Set(rows.map((r) => r.key));
+    let churn = 0;
+    if (shown) {
+      for (const k of keys) if (!shown.has(k)) churn += 1;
+      for (const k of shown) if (!keys.has(k)) churn += 1;
+    }
+    still = churn > 3;
+    shown = keys;
+  });
+  const NONE: TransitionConfig = { duration: 0 };
+  const rowIn = (node: Element): TransitionConfig => (still || !rowin ? NONE : rowin(node));
+  const rowOut = (node: Element): TransitionConfig => (still || !rowout ? NONE : rowout(node));
+  const settled = () => (still || !settle ? { duration: 0 } : settle());
+  /* A line's key and its row, for the keyed body, where every line is a row (no group heads). */
+  type Line = (typeof lines)[number];
+  const keyOf = (l: Line): string => (l.kind === 'row' ? l.row.key : `\u0000${l.name}`);
+  const rowOf = (l: Line): TableRow => (l.kind === 'row' ? l.row : ({ key: keyOf(l), cells: [] } as unknown as TableRow));
 
   const acts = $derived(act !== undefined && Array.isArray(rowActions) && rowActions.length > 0);
   /* The actions' column is one past the declared ones, and in the caret's walk like any other. */
@@ -346,6 +387,80 @@
   The stylesheet rules stay as the safety net they should always have been: a host that renders this
   without the branch gets one body rather than two stacked on each other.
 -->
+{#snippet cellsOf(row: TableRow, index: number)}
+            {#each columns as column, c}
+              {@const value = row.cells[c] ?? null}
+              <!--
+                THE HANDLERS ARE THERE ONLY WHERE THERE IS SOMETHING TO ACTIVATE, and they used to be
+                unconditional. The card branch above records the same defect and fixes its own half:
+                `onactivate` is supplied by two call sites, the register grid and a saved view, and a
+                declared page passes none, so every cell of every table on `/p/*` carried a click
+                handler and an Enter handler that called nothing. A cell that answers a press by
+                doing nothing is indistinguishable from a broken one, which is the rule this whole
+                product is built on.
+
+                THE ROVING `tabindex` STAYS EITHER WAY, and that is not an inconsistency. It is what
+                makes a grid navigable for READING: a composite widget with one tab stop, arrow keys
+                inside it, and a caret a screen reader can follow along a row. A table you cannot put
+                the caret in is a table a keyboard cannot read, which is a bigger loss than a cell
+                that is focusable and has nothing to do.
+
+                THAT PARAGRAPH WAS TRUE OF ONE CALLER OUT OF SIX. The arrow keys it names were never
+                written: the only handler in this file was `Enter`, `focus` was `$bindable()` and
+                never assigned, and a keyboard user on the four callers that bring no arrows of
+                their own tabbed to cell (0,0) and tabbed out again with every other cell in the
+                table unreachable. The rover is `onkeydown` on the grid root above, and its
+                arithmetic is `moveCell` in `../types.ts`, where a caret walking off the end of a
+                row can be asserted without a DOM.
+
+                `data-acts` IS FOR THE POINTER. Without it the cursor is the only thing left saying a
+                cell can be pressed, and it was saying it everywhere.
+              -->
+              <span
+                class="td"
+                role="gridcell"
+                tabindex={tabIndex(index, c)}
+                data-align={column.align ?? 'start'}
+                data-truncate={column.truncate ?? 'end'}
+                data-glyph={c === glyphAt ? '' : undefined}
+                data-tone={column.tone ? '' : undefined}
+                data-acts={onactivate ? '' : undefined}
+                onclick={onactivate ? () => onactivate(row) : undefined}
+                onkeydown={onactivate ? (e) => e.key === 'Enter' && onactivate(row) : undefined}
+              >
+                <!-- IN THE CELL IT QUALIFIES, AND AT ITS HEAD.
+
+                     Inside a cell because the only children `role="row"` admits are cells: a glyph
+                     hung on the row itself is a stray node in the accessibility tree, which is the
+                     same mistake the cap line was making one element up.
+
+                     In the cell it qualifies because that is `List`'s rule and it says why: "a
+                     tone belongs to the thing it qualifies, and five hundred pixels away it belongs
+                     to nothing". That is the column declaring `tone` where there is one, a
+                     register's state, and the first value where there is not. At its head because
+                     the rest of that cell truncates: a glyph after the text is a glyph the ellipsis
+                     eats on exactly the narrow rows that needed it.
+
+                     THE GUTTER IS RESERVED FOR THE COLUMN, NOT FOR THE ROW. Otherwise the toned rows
+                     indent and the column's left edge goes ragged, which reads as five different
+                     columns rather than one column with five marks in it.
+
+                     AND THE CHILDREN TOUCH THE TAG, which is not a formatting preference. A line
+                     break between `>` and the first child is a space inside the cell, so every
+                     value in every table was drawn one space in from its own left edge and the
+                     static mirror, which emits no such space, drew a different tree. Found by
+                     giving `parity.test.ts` its first `comparison` shape. -->
+                {#if c === glyphAt && row.tone}<span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}{@render cellBody(row, column, value)}</span>
+            {/each}{#if acts}<span
+                class="td td-acts"
+                role="gridcell"
+                tabindex={tabIndex(index, actsAt)}
+                data-align="end"
+                onkeydown={(e) => e.key === 'Enter' && e.target === e.currentTarget && e.currentTarget.querySelector<HTMLElement>('[data-row-action]')?.click()}
+                ><Actions actions={rowActions} {row} onact={act} size="row" narrow={false} tabindex={at.row === index && at.col === actsAt ? 0 : -1} /></span
+              >{/if}
+{/snippet}
+
 {#if windowed(rows.length)}{#await import('./RowsWindow.svelte') then m}<m.default {columns} {rows} {total} {cap} {label} {sort} bind:focus {selected} {onactivate} {onsort} {onmore} {cellSnippet} {href} {scope} {icon} {home} {rowActions} {act} />{/await}{:else if rowsAsCards()}
 <ul class="table-cards">
   {#each lines as line (line.kind === 'group' ? `\u0000${line.name}` : line.row.key)}
@@ -423,7 +538,9 @@
           aria-sort={headerSort(column)}
           data-align={column.align ?? 'start'}
         >
-          {#if column.hideLabel}
+          {#if headCells?.[column.field]}
+            {@render headCells[column.field]!()}
+          {:else if column.hideLabel}
             <span class="th-name">{column.label}</span>
           {:else if onsort}
             <button type="button" class="th-sort tap" onclick={() => onsort(column.field)}>{column.label}</button>
@@ -441,6 +558,26 @@
         role="rowgroup"
         style={intrinsicRows(group.length)}
       >
+        {#if heads === 0}
+          <!-- A TABLE WITH NO GROUP HEADINGS IS KEYED BY ITS ROWS, so a row added or archived arrives and leaves with the
+               host's list motion and the rows beside it close the gap (`rowin`, `rowout`, `settle`). -->
+          {#each group as line, i (keyOf(line))}
+            {@const row = rowOf(line)}
+            {@const index = line.kind === 'row' ? line.at : -1}
+            <div
+              class="tr"
+              role="row"
+              aria-rowindex={g * grouped.step + i + 2}
+              aria-selected={selected ? selected.has(row.key) : undefined}
+              data-intent={row.tone}
+              data-focused={focus?.row === index ? '' : undefined}
+              data-arrived={row.arrived ? '' : undefined}
+              in:rowIn
+              out:rowOut
+              animate:flip={settled()}
+            >{@render cellsOf(row, index)}</div>
+          {/each}
+        {:else}
         {#each group as line, i}
           {#if line.kind === 'group'}
             <!-- A GROUP'S HEADING, ONE CELL ACROSS THE COLUMNS: its name and, where the table holds all its rows, its
@@ -466,81 +603,10 @@
             data-intent={row.tone}
             data-focused={focus?.row === index ? '' : undefined}
             data-arrived={row.arrived ? '' : undefined}
-          >
-            {#each columns as column, c}
-              {@const value = row.cells[c] ?? null}
-              <!--
-                THE HANDLERS ARE THERE ONLY WHERE THERE IS SOMETHING TO ACTIVATE, and they used to be
-                unconditional. The card branch above records the same defect and fixes its own half:
-                `onactivate` is supplied by two call sites, the register grid and a saved view, and a
-                declared page passes none, so every cell of every table on `/p/*` carried a click
-                handler and an Enter handler that called nothing. A cell that answers a press by
-                doing nothing is indistinguishable from a broken one, which is the rule this whole
-                product is built on.
-
-                THE ROVING `tabindex` STAYS EITHER WAY, and that is not an inconsistency. It is what
-                makes a grid navigable for READING: a composite widget with one tab stop, arrow keys
-                inside it, and a caret a screen reader can follow along a row. A table you cannot put
-                the caret in is a table a keyboard cannot read, which is a bigger loss than a cell
-                that is focusable and has nothing to do.
-
-                THAT PARAGRAPH WAS TRUE OF ONE CALLER OUT OF SIX. The arrow keys it names were never
-                written: the only handler in this file was `Enter`, `focus` was `$bindable()` and
-                never assigned, and a keyboard user on the four callers that bring no arrows of
-                their own tabbed to cell (0,0) and tabbed out again with every other cell in the
-                table unreachable. The rover is `onkeydown` on the grid root above, and its
-                arithmetic is `moveCell` in `../types.ts`, where a caret walking off the end of a
-                row can be asserted without a DOM.
-
-                `data-acts` IS FOR THE POINTER. Without it the cursor is the only thing left saying a
-                cell can be pressed, and it was saying it everywhere.
-              -->
-              <span
-                class="td"
-                role="gridcell"
-                tabindex={tabIndex(index, c)}
-                data-align={column.align ?? 'start'}
-                data-truncate={column.truncate ?? 'end'}
-                data-glyph={c === glyphAt ? '' : undefined}
-                data-tone={column.tone ? '' : undefined}
-                data-acts={onactivate ? '' : undefined}
-                onclick={onactivate ? () => onactivate(row) : undefined}
-                onkeydown={onactivate ? (e) => e.key === 'Enter' && onactivate(row) : undefined}
-              >
-                <!-- IN THE CELL IT QUALIFIES, AND AT ITS HEAD.
-
-                     Inside a cell because the only children `role="row"` admits are cells: a glyph
-                     hung on the row itself is a stray node in the accessibility tree, which is the
-                     same mistake the cap line was making one element up.
-
-                     In the cell it qualifies because that is `List`'s rule and it says why: "a
-                     tone belongs to the thing it qualifies, and five hundred pixels away it belongs
-                     to nothing". That is the column declaring `tone` where there is one, a
-                     register's state, and the first value where there is not. At its head because
-                     the rest of that cell truncates: a glyph after the text is a glyph the ellipsis
-                     eats on exactly the narrow rows that needed it.
-
-                     THE GUTTER IS RESERVED FOR THE COLUMN, NOT FOR THE ROW. Otherwise the toned rows
-                     indent and the column's left edge goes ragged, which reads as five different
-                     columns rather than one column with five marks in it.
-
-                     AND THE CHILDREN TOUCH THE TAG, which is not a formatting preference. A line
-                     break between `>` and the first child is a space inside the cell, so every
-                     value in every table was drawn one space in from its own left edge and the
-                     static mirror, which emits no such space, drew a different tree. Found by
-                     giving `parity.test.ts` its first `comparison` shape. -->
-                {#if c === glyphAt && row.tone}<span class="td-glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>{/if}{@render cellBody(row, column, value)}</span>
-            {/each}{#if acts}<span
-                class="td td-acts"
-                role="gridcell"
-                tabindex={tabIndex(index, actsAt)}
-                data-align="end"
-                onkeydown={(e) => e.key === 'Enter' && e.target === e.currentTarget && e.currentTarget.querySelector<HTMLElement>('[data-row-action]')?.click()}
-                ><Actions actions={rowActions} {row} onact={act} size="row" narrow={false} tabindex={at.row === index && at.col === actsAt ? 0 : -1} /></span
-              >{/if}
-          </div>
+          >{@render cellsOf(row, index)}</div>
           {/if}
         {/each}
+        {/if}
       </div>
     {/each}
 
@@ -565,6 +631,48 @@
      a sentinel to observe. -->
 
 <style>
+  /**
+   * THE KEYBOARD'S PLACE IS ONE RING, ON THE CELL (the UI pass of 20 October, 2.A.27). The row and its cell each drew a
+   * 2px ring, one inside the other, so the caret looked doubled. The focused cell takes the ring, inset so the next cell
+   * never covers it, and the caret's row takes the hover wash and nothing louder. GLOBAL, as every rule here is, so no
+   * scoping class lands on a cell `toHTML` draws too (the two renderers draw one tree, `parity.test.ts`).
+   */
+  :global(.table-region:focus-within .tr[data-focused]) {
+    /* focus-ok: the focused cell inside the row wears the ring (`.td:focus-visible` below). */
+    outline: none;
+  }
+
+  :global(.rowgroup .tr[data-focused]) {
+    background: var(--hover);
+  }
+
+  :global(.table .td:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+
+  /**
+   * A HEADER THAT SORTS SAYS SO BEFORE IT IS USED: a quiet "↕" after its name under the pointer or the keyboard, and the
+   * hover wash round it, over `--d-state`. A sorted column keeps its own arrow (`blocks.css`), so the hint is only on the
+   * others.
+   */
+  :global(.th .th-sort) {
+    margin-inline: calc(-1 * var(--sp-1));
+    padding-inline: var(--sp-1);
+    border-radius: var(--r-xs);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  :global(.th .th-sort:is(:hover, :focus-visible)) {
+    background: var(--hover);
+  }
+
+  :global(.th:not([aria-sort='ascending'], [aria-sort='descending']) .th-sort:is(:hover, :focus-visible)::after) {
+    content: ' ↕';
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
+  }
+
   /* A CARD WITH ITS ROW'S ACTIONS keeps the card's width and puts the one menu button at its end, centred on it. Global, so no scoping
      class lands on a card `toHTML` draws too. */
   :global(.table-cards > li:has(> .table-card-acts)) {
