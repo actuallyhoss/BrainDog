@@ -1361,7 +1361,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
     /* OFF WHILE THE HOST SELLS NOTHING (LAUNCH: Free only until charging starts), so teams can be built and tried. */
     if (row === undefined || host.sells === false || PLAN_TABLE[planOf(row.plan)].teams) return null;
     if (sql.one('SELECT 1 AS x FROM dir_member WHERE record = ? AND person = ?', record, person)) return null;
-    return { code: 'FORBIDDEN', fix: host.sells === false ? FREE_JOIN_REFUSED_SHORT : FREE_JOIN_REFUSED, at: 'plan' };
+    return { code: 'FORBIDDEN', fix: FREE_JOIN_REFUSED, at: 'plan' };
   };
 
   const bad = badSlug;

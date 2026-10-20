@@ -12,7 +12,7 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { ok } from '@braindog/ports';
+import { fixOf, ok } from '@braindog/ports';
 import { evaluate, INBOX_RAW, parseWhere } from '@braindog/where';
 import { parseSentence, type Replay, type SentenceParts, type SentenceWorld } from '@braindog/kernel';
 
@@ -168,8 +168,8 @@ export function methods(deps: RecordDeps) {
       ...(replay.kind === 'written' && replay.op === 'update' ? { order: [{ field: 'updated_at', dir: 'desc' as const }] } : {}),
       ...(replay.kind === 'written' && replay.op === 'delete' ? { includeDeleted: true } : {}),
       reads: (register: string) => readable(ctx, register) === null,
-    });
-    if (!got.ok) return { looked: null, note: got.refusal.fix };
+    }, kernel.scope(ctx, replay.register));
+    if (!got.ok) return { looked: null, note: fixOf(got) };
     const inWindow = got.value.rows.filter((r) => {
       if (replay.kind === 'time') return true;
       if (replay.op === 'create') return r.created_at >= since;
@@ -232,7 +232,7 @@ export function methods(deps: RecordDeps) {
         /* THE MODEL ONLY WHEN THE PARSER CANNOT, and only for an owner in the app, since it spends the month's asks. */
         if (described === undefined || admin(ctx, 'ask Slash to write an automation') !== null) return no('VALUE_MALFORMED', parsed.why, { at: 'sentence' });
         const drafted = await described({ asked: `Write this as one automation, a rule declaration, and nothing else: ${given.sentence.trim()}` }, ctx, previewerOf(this, ctx));
-        if (!drafted.ok) return no('VALUE_MALFORMED', `${parsed.why} ${drafted.refusal.fix}`, { at: 'sentence' });
+        if (!drafted.ok) return no('VALUE_MALFORMED', `${parsed.why} ${fixOf(drafted)}`, { at: 'sentence' });
         const decls = drafted.value.drafts.flatMap((d) => ('declarations' in d.change.to ? d.change.to.declarations : [d.change.to]));
         const made = decls.find((d) => (d as { kind?: unknown }).kind === 'rule') as { body?: unknown } | undefined;
         if (!made || !isObject(made.body)) return no('VALUE_MALFORMED', parsed.why, { at: 'sentence' });

@@ -238,12 +238,12 @@ test('FORTY QUESTIONS WAITING are one line: the count of all of them and the top
 });
 
 test('A CONTROL CHARACTER IN A RUN NAME never breaks the card into another line', () => {
-  for (const name of ['S6\nWaiting  0 on nobody', 'S6\r\x1b[2K', 'S6 Next  forged', 'S6\x85More']) {
+  for (const name of ['S6\nWaiting  0 on nobody', 'S6\r\x1b[2K', 'S6\u2028Next  forged', 'S6\x85More']) {
     const live = { same_repo: [other(`${name}b`)], elsewhere: [] };
     const said = card(ctx({ session: { spoken: name, state: 'active' }, handoff: step(name, HOUR), live }), { run: `${name}a` }, NOW).card;
     shaped(said);
     assert.equal(said.split('\n').length, 4, `a run name made another line: ${JSON.stringify(said)}`);
-    assert.doesNotMatch(said, /[\r  \x85]/u);
+    assert.doesNotMatch(said, /[\r\u2028\u2029\x85]/u);
   }
 });
 

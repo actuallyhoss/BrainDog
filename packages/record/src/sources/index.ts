@@ -22,7 +22,7 @@ export type HostSource = NonNullable<ReturnType<NonNullable<PageDeps['hostSource
 
 /** What a source reads with: the kernel, who is reading, and whether they may read one list, as `list` asks it. */
 export type SourceDeps = {
-  kernel: Pick<Kernel, 'registers' | 'count' | 'list' | 'pages' | 'page'>;
+  kernel: Pick<Kernel, 'registers' | 'count' | 'list' | 'pages' | 'page' | 'scope'>;
   ctx: CallContext;
   readable: (ctx: CallContext, register: string) => Refusal | null;
 };
