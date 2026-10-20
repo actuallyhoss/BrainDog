@@ -128,7 +128,7 @@
     records?: SwitcherRow[];
     /** Why the rest of the records could not be listed, when they could not: the host's own sentence. */
     refused?: string | undefined;
-    registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string; href: string }[] }[];
+    registers: { id: string; name: string; count: number; icon: IconName; views?: { key: string; name: string; href: string }[]; guessed?: true }[];
     /** The spine as `spineOf` reads it: whether Inbox has been used, which puts its row under More. */
     spine?: readonly SpineKey[] | undefined;
     inbox?: number | undefined;
@@ -643,7 +643,7 @@
             <a class="item tap" href={at(`/r/${r.id}`)} data-nav data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
               <span class="rail-glyph"><Icon name={r.icon} size="l" /></span>
               <span class="item-name">{r.name}</span>
-              <span class="tally num">{r.count}</span>
+              {#if !r.guessed}<span class="tally num">{r.count}</span>{/if}
             </a>
             <!-- A saved view is the same list with a filter, so it lives under the list, indented and without a glyph. -->
             {#each r.views ?? [] as v}

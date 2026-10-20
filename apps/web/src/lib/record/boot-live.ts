@@ -99,7 +99,8 @@ type ShellBase = {
      * the host is older than the field. `homeCurrency()` in `api.ts` answers this same value, kept as the shell is built.
      */
     currency: string | null;
-    registers: { id: string; name: string; count: number; icon: IconName; views: { key: string; name: string; href: string }[] }[];
+    /** `guessed`: drawn offline from the local copy, which kept no count for the list, so the rail draws none. */
+    registers: { id: string; name: string; count: number; icon: IconName; views: { key: string; name: string; href: string }[]; guessed?: true }[];
   };
   /**
    * The rail's pages; `tabs` when the page's declaration asked for its nav section to be drawn as tabs, and `cut` on a
@@ -1015,3 +1016,35 @@ export const refusedShell = (said: Said | null = refusal): Shell => ({
   ...layoutOf({ registers: [], now: new Date().toISOString(), home: null }),
   ...(said ? { refused: said } : {}),
 });
+
+/** The rail the local copy can draw (`railOf` in `lib/data/local.ts`), names only. */
+export type CopyRail = {
+  lists: { id: string; name: string; icon: string | null; count: number | null }[];
+  pages: { slug: string; title: string; icon: string | null; section: string | null; order: number }[];
+};
+
+/**
+ * AN OFFLINE OPEN WITH NO SHELL COPY draws the rail from what the local copy holds, so it is not an empty frame: its
+ * lists by name, a count only where one was kept (`guessed` hides the tally otherwise), and its pages where their nav
+ * put them. Only the rail is filled; the shell stays the refusal it is, marked offline, and writes nothing.
+ */
+export function railShell(shell: Shell, rail: CopyRail): Shell {
+  const registers = rail.lists.map((l) => ({
+    id: l.id,
+    name: l.name,
+    count: l.count ?? 1,
+    icon: iconFor(l.icon ?? REGISTERS[l.id]?.icon, 'rows'),
+    views: [],
+    ...(l.count === null ? { guessed: true as const } : {}),
+  }));
+  const nav = rail.pages.flatMap((p) =>
+    p.section === null ? [] : [{ id: p.slug, title: p.title, href: `/p/${p.slug}`, section: p.section, order: p.order, icon: iconFor(p.icon ?? undefined, 'doc') }],
+  );
+  return {
+    ...shell,
+    index: { ...shell.index, registers },
+    lists: rail.lists.map((l) => ({ id: l.id, name: l.name })),
+    pages: rail.pages.map((p) => p.slug),
+    nav,
+  };
+}

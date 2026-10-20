@@ -151,6 +151,8 @@ export type Store = {
   prune(most: number): Promise<void>;
   /** Everything, meta included. */
   clear(): Promise<void>;
+  /** Every answer, for the rail drawn offline and the size Settings says. */
+  list(): Promise<Stored[]>;
 };
 
 /** One line of the log as much as the copy reads of it (`EventLine` in `@braindog/client`). */
@@ -707,6 +709,10 @@ export type LocalCopy = {
     ticket: number,
     how?: { spots?: readonly Spot[]; always?: boolean },
   ): Promise<boolean>;
+  /** Every answer kept for `base` and whoever this tab is, by `answer`'s rule, still young enough to draw. */
+  held(base: string, person: string | null): Promise<Stored[]>;
+  /** How much is kept: answers, and about how many bytes they take as JSON. */
+  size(): Promise<{ answers: number; bytes: number }>;
   /** Wipe everything: a sign-out, a refusal. */
   wipe(): Promise<void>;
 };
@@ -836,6 +842,18 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       if (row === null || t < row.kept || t - row.kept >= LOCAL_MS) return null;
       return { value: row.value as T, decls: row.decls, current: claimed !== null && !row.always && caught === asked && sameDay(row.kept, t) };
     },
+    async held(base, person) {
+      const m = meta ?? (await load());
+      if (m === null || m.owner.base !== base) return [];
+      if (claimed !== null ? !sameOwner(m.owner, claimed) : person !== m.owner.person) return [];
+      const t = now();
+      const rows = await store.list().catch(() => [] as Stored[]);
+      return rows.filter((r) => t >= r.kept && t - r.kept < LOCAL_MS);
+    },
+    async size() {
+      const rows = await store.list().catch(() => [] as Stored[]);
+      return { answers: rows.length, bytes: rows.reduce((n, r) => n + JSON.stringify(r).length, 0) };
+    },
     ticket: () => epoch,
     async put(name, key, lists, decls, value, ticket, how = {}) {
       const m = meta;
@@ -906,6 +924,60 @@ export function memoryStore(): Store & { rows: Map<string, Stored>; saved: Meta 
       rows.clear();
       self.saved = null;
     },
+    list: async () => [...rows.values()].map((r) => structuredClone(r)),
   };
   return self;
+}
+
+/** The name declared pages are kept under (`/p/<slug>` and Work), with `pageKey`'s `[base, slug, choice]` as the key. */
+export const PAGE_ANSWERS = 'Page';
+
+/** The rail as the copy can draw it: names only, and a count only where an unnarrowed list said one. */
+export type Rail = {
+  lists: { id: string; name: string; icon: string | null; count: number | null }[];
+  pages: { slug: string; title: string; icon: string | null; section: string | null; order: number }[];
+};
+
+/**
+ * THE RAIL OFFLINE WITH NO SHELL COPY, from what the copy holds: every list an answer was read from, by the name its
+ * declaration gives, and every declared page kept, by its title and where its nav puts it. Nothing it does not hold.
+ */
+export function railOf(rows: readonly Stored[]): Rail {
+  const lists = new Map<string, Rail['lists'][number]>();
+  const pages = new Map<string, Rail['pages'][number]>();
+  const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
+  for (const r of rows) {
+    for (const id of r.lists) {
+      if (isPseudo(id) || NEVER_KEPT.has(id)) continue;
+      const d = r.decls[id] as { name?: unknown; icon?: unknown } | undefined;
+      if (d === undefined) continue;
+      /* A COUNT ONLY FROM AN ANSWER THAT COUNTED THE WHOLE LIST: no filter, no search. */
+      const whole = r.spots?.find((s) => s.list === id && s.by !== null && s.lands?.where === null && s.lands.count);
+      const n = whole?.lands?.count ? dig(r.value, whole.lands.count) : undefined;
+      const was = lists.get(id);
+      lists.set(id, {
+        id,
+        name: text(d.name) ?? was?.name ?? id,
+        icon: text(d.icon) ?? was?.icon ?? null,
+        count: typeof n === 'number' ? n : (was?.count ?? null),
+      });
+    }
+    if (r.name !== PAGE_ANSWERS) continue;
+    let slug: unknown = null;
+    try {
+      slug = (JSON.parse(r.key) as unknown[])[1];
+    } catch {
+      continue;
+    }
+    const decl = (r.value as { from?: unknown; page?: { page?: { title?: unknown; icon?: unknown; nav?: { section?: unknown; order?: unknown } } } } | null)?.page?.page;
+    if (typeof slug !== 'string' || slug === '' || (r.value as { from?: unknown }).from !== 'live' || !decl) continue;
+    pages.set(slug, {
+      slug,
+      title: text(decl.title) ?? slug,
+      icon: text(decl.icon),
+      section: text(decl.nav?.section),
+      order: typeof decl.nav?.order === 'number' ? decl.nav.order : 0,
+    });
+  }
+  return { lists: [...lists.values()], pages: [...pages.values()] };
 }

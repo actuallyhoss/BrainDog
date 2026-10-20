@@ -9,7 +9,9 @@ import {
   localCopy,
   localWhere,
   memoryStore,
+  PAGE_ANSWERS,
   patched,
+  railOf,
   QUESTIONS,
   REDACTED,
   scopeOf,
@@ -397,6 +399,36 @@ test('CREATE THEN EDIT IN ONE WRITE is one version', () => {
   const out = patched(row, [make('c', 2, { title: 'b', state: 'open' }, { batch: 'w' }), edit('e', 2, 'title', 'b', 'B', { batch: 'w' })]) as Listed;
   assert.equal(out.entries[0]!.fields.title, 'B');
   assert.equal(out.entries[0]!.version, 1);
+});
+
+test('RAIL: the lists by name, a count only from a whole list, and the pages kept with their nav', () => {
+  const list: Stored = { ...stored(listed([task(1, {})], { matched: 4 }), [{ ...LIST, lands: { ...LIST.lands!, where: null } }], ['tasks', 'projects']), decls: { tasks: { ...TASKS, name: 'Tasks' }, projects: PROJECTS } };
+  const page: Stored = {
+    at: 'Page x',
+    name: PAGE_ANSWERS,
+    key: JSON.stringify(['https://a', 'work', []]),
+    lists: [':page', 'tasks'],
+    decls: {},
+    value: { from: 'live', page: { page: { title: 'Work', nav: { section: 'Work', order: 1 } }, blocks: [] }, now: 0 },
+    kept: NOON,
+  };
+  const rail = railOf([list, page]);
+  assert.deepEqual(rail.lists, [
+    { id: 'tasks', name: 'Tasks', icon: null, count: 4 },
+    { id: 'projects', name: 'projects', icon: null, count: null },
+  ]);
+  assert.deepEqual(rail.pages, [{ slug: 'work', title: 'Work', icon: null, section: 'Work', order: 1 }]);
+});
+
+test('HELD AND SIZE: only the owner is handed the answers; the size counts them', async () => {
+  const { copy } = setup();
+  await copy.claim(ada);
+  await copy.put('work', 'k', ['tasks'], { tasks: DECL }, [1], copy.ticket());
+  assert.equal((await copy.held('https://a', null)).length, 1);
+  assert.equal((await copy.held('https://b', null)).length, 0);
+  const size = await copy.size();
+  assert.equal(size.answers, 1);
+  assert.ok(size.bytes > 0);
 });
 
 test('LOCAL WHERE: plain fields with literal values only', () => {

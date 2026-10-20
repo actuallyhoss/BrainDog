@@ -54,9 +54,6 @@ const askModel = (origin: string, fetch: typeof globalThis.fetch): Promise<boole
 let opened = false;
 
 export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fetch'> & Partial<Pick<LoadEvent, 'depends'>>): Promise<Shell & { slash: boolean }> {
-  const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
-  depends?.('braindog:boot');
-  const copies = await import('$lib/record/boot-copy.ts');
   /* THE RECORD THE ADDRESS NAMES. `url` and not `location`: a load runs for the address being opened, and `location`
      is the page being left until the navigation lands, so a move from acme to kiln would read acme's `boot`. */
   const api = apiBase(url);
@@ -65,12 +62,17 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   /* `/connect` too: an app's sign-in lands there, and a redirect to `/start` would strand it halfway. */
   const spared =
     inner === '/start' || inner === '/signin' || inner === '/signup' || inner === '/invite' || inner === '/connect' || inner === '/s' || inner.startsWith('/s/');
+  /* THE LOCAL COPY IS OPENED BEFORE ANYTHING HERE IS WAITED ON, beside `boot` (which `app.html` already asked) and never
+     in front of the first paint, and its last reader verified, so the first screen's ask finds it open. */
+  const first = !opened;
+  opened = true;
+  if (first && depends && !spared) void import('$lib/data/local-tab.ts').then((c) => c.warmLocal(api), () => undefined);
+  const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
+  depends?.('braindog:boot');
+  const copies = await import('$lib/record/boot-copy.ts');
   /* ON A COLD OPEN THE SHELL IS DRAWN FROM THE LAST COPY AT ONCE, then `boot` is read behind it and this load runs again
      with the live answer (redirects and refusals included). Not on the screens that must see the record's own answer. */
-  if (!opened) {
-    opened = true;
-    /* THE LOCAL COPY IS OPENED NOW, and its last reader verified, so the first screen's ask finds it ready. */
-    if (depends && !spared) void import('$lib/data/local-tab.ts').then((c) => c.warmLocal(api), () => undefined);
+  if (first) {
     const copy = depends && !spared ? copies.readCopy(api) : null;
     if (copy) {
       void live.readBoot(api).then(() => import('$app/navigation').then((n) => n.invalidate('braindog:boot')));
@@ -108,13 +110,16 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   /* AND A HOST NOBODY REACHED, WITH A READER THIS BROWSER KNOWS, draws the last copy of the shell, to read only, or the
      refusal marked offline where none is kept: the screens draw what the local copy holds for that reader. */
   const kept = reader !== null ? copies.readCopy(api) : null;
+  /* AND WITH NO SHELL COPY, THE RAIL IS DRAWN FROM THE LOCAL COPY'S LISTS AND PAGES, so an offline cold open has
+     somewhere to go. Offline only, where nothing else will answer before it. */
+  const rail = booted.from !== 'live' && reader !== null && (kept === null || kept.me.person !== reader) && tabCopy ? await tabCopy.railLocal(api, reader).catch(() => null) : null;
   const shell: Shell =
     booted.from === 'live'
       ? live.layoutOf(booted.boot)
       : reader !== null
         ? kept !== null && kept.me.person === reader
           ? { ...kept, offline: true as const }
-          : { ...live.refusedShell({ code: booted.code, fix: booted.fix }), offline: true as const }
+          : { ...live.railShell(live.refusedShell({ code: booted.code, fix: booted.fix }), rail ?? { lists: [], pages: [] }), offline: true as const }
         : /* THE REFUSAL IS HANDED OVER RATHER THAN REMEMBERED. `refusedShell` keeps the last one as a
            module fallback, and this call sits one `await` after `readBoot`: any `forget()` landing
            in that window (`decide-write.ts`, `inbox-write.ts`, `news-live.ts`, which Home's own

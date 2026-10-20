@@ -56,17 +56,39 @@ function opened(idb: IDBFactory): Promise<IDBDatabase> {
   });
 }
 
+/* ONE CONNECTION PER FACTORY, shared by the store and the marker's key, so a cold open pays for one open, not two. */
+const connections = new WeakMap<IDBFactory, Promise<IDBDatabase>>();
+function shared(idb: IDBFactory): Promise<IDBDatabase> {
+  let db = connections.get(idb);
+  if (!db) {
+    db = opened(idb).catch((e: unknown) => {
+      connections.delete(idb);
+      throw e;
+    });
+    connections.set(idb, db);
+    /* A connection let go for another tab's upgrade, or closed by the browser, is opened again on the next ask. */
+    const mine = db;
+    void db.then(
+      (d) => {
+        const forget = () => void (connections.get(idb) === mine && connections.delete(idb));
+        d.addEventListener('versionchange', forget);
+        d.addEventListener('close', forget);
+      },
+      () => undefined,
+    );
+  }
+  return db;
+}
+
+/** Start opening the copy's database now, so the first read finds it open. Never rejects. */
+export function openEarly(idb: IDBFactory | null = here()): void {
+  if (idb !== null) void shared(idb).catch(() => undefined);
+}
+
 /** The browser's store, or `null` where IndexedDB is not there to ask. */
 export function idbStore(idb: IDBFactory | null = here()): Store | null {
   if (idb === null) return null;
-  let db: Promise<IDBDatabase> | null = null;
-  const open = (): Promise<IDBDatabase> => {
-    db ??= opened(idb).catch((e: unknown) => {
-      db = null;
-      throw e;
-    });
-    return db;
-  };
+  const open = (): Promise<IDBDatabase> => shared(idb);
   const tx = async (stores: string[], mode: IDBTransactionMode): Promise<IDBTransaction> => (await open()).transaction(stores, mode);
 
   return {
@@ -150,6 +172,10 @@ export function idbStore(idb: IDBFactory | null = here()): Store | null {
       t.objectStore(ANSWERS).clear();
       await finished(t);
     },
+    async list() {
+      const t = await tx([ANSWERS], 'readonly');
+      return ((await done(t.objectStore(ANSWERS).getAll())) as Stored[] | undefined) ?? [];
+    },
   };
 }
 
@@ -158,15 +184,7 @@ export function idbStore(idb: IDBFactory | null = here()): Store | null {
  * too. A `CryptoKey` goes into IndexedDB whole and comes back still unable to be read out.
  */
 export function idbKey(subtle: SubtleCrypto | null, idb: IDBFactory | null = here()): (make: boolean) => Promise<CryptoKey | null> {
-  let db: Promise<IDBDatabase> | null = null;
-  const open = (): Promise<IDBDatabase> => {
-    if (idb === null) return Promise.reject(new Error('no IndexedDB'));
-    db ??= opened(idb).catch((e: unknown) => {
-      db = null;
-      throw e;
-    });
-    return db;
-  };
+  const open = (): Promise<IDBDatabase> => (idb === null ? Promise.reject(new Error('no IndexedDB')) : shared(idb));
   return async (make) => {
     if (subtle === null) return null;
     try {

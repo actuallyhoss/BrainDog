@@ -16,10 +16,11 @@ import { version as build } from '$app/environment';
 
 import { REGISTERS } from '../record/held.ts';
 import type { RegisterDecl } from '../record/schema.ts';
-import { readCopy } from '../record/boot-copy.ts';
-import { idbKey, idbStore } from './local-db.ts';
+import { dropCopy, readCopy } from '../record/boot-copy.ts';
+import { idbKey, idbStore, openEarly } from './local-db.ts';
 import { dropMark, memoryKey, readMark, writeMark, type MarkDeps } from './local-mark.ts';
-import { localCopy, memoryStore, scopeOf, type LocalCopy, type Log, type Near, type Spot } from './local.ts';
+import { localCopy, memoryStore, railOf, scopeOf, type LocalCopy, type Log, type Near, type Rail, type Spot } from './local.ts';
+import { forget as forgetOffline } from './offline.ts';
 
 /** How long a screen waits for the copy before it asks the record without it. */
 const NEAR_MS = 60;
@@ -32,8 +33,12 @@ export function offlineLocal(on: boolean): void {
   patient = on;
 }
 
-/** Open the copy and verify the last reader before any screen asks, so the first `nearLocal` is inside its wait. */
+/**
+ * Open the copy and verify the last reader before any screen asks, so the first `nearLocal` is inside its wait. The
+ * layout calls it before it waits on anything, so the database opens beside `boot` and never in front of a paint.
+ */
 export function warmLocal(base: string): void {
+  openEarly();
   void lastReader(base)
     .then((person) => tab().answer('', '', base, person))
     .catch(() => undefined);
@@ -138,6 +143,23 @@ export async function nearLocal<T>(name: string, key: string, base: string): Pro
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** The rail the copy can draw for `person` on `base` (`railOf`): for an offline open with no shell copy. */
+export async function railLocal(base: string, person: string): Promise<Rail> {
+  return railOf(await tab().held(base, person).catch(() => []));
+}
+
+/** How much this browser keeps of the record, for Settings. */
+export const localSize = (): Promise<{ answers: number; bytes: number }> => tab().size().catch(() => ({ answers: 0, bytes: 0 }));
+
+/**
+ * FORGET THIS DEVICE'S COPY, from Settings: the local copy and its signed marker, the last shell and the offline cache,
+ * so an offline open here draws nothing of the record until a live one keeps it again.
+ */
+export async function forgetLocal(): Promise<void> {
+  dropCopy();
+  await Promise.all([wipeLocal(), forgetOffline().catch(() => undefined)]);
 }
 
 /** The mark to ask under, taken before the call goes out. */
