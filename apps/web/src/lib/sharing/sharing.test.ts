@@ -7,7 +7,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { askSheet, SHEET_EVENT, sharingSections, stateOf, stopWords, welcomeOf, welcomed, markWelcomed, type MyShare, type SharingRow } from './sharing.ts';
+import { askedOf, SEE_AS_EVENT as SEE_AS_HEARD } from './see-as.svelte.ts';
+import { sharesOf, stateOfShare } from './share-state.ts';
+import { askSeeAs, askSheet, SEE_AS_EVENT, SHARED_EVENT, SHEET_EVENT, sharingSections, stateOf, stopWords, welcomeOf, welcomed, markWelcomed, type MyShare, type SharingRow } from './sharing.ts';
 
 const NOW = Date.UTC(2026, 9, 20, 12);
 const DAY = 86_400_000;
@@ -90,6 +92,44 @@ test('tapping a share asks the Share sheet by an event, with the share to change
   assert.equal(sent[0]?.type, SHEET_EVENT);
   assert.equal((sent[0] as CustomEvent<{ share: SharingRow }>).detail.share.id, r.id);
   assert.equal(askSheet({}, null), false, 'with no window there is nobody to ask');
+});
+
+test('See as from the page is the ask See as listens for, by the same name and the same shape', () => {
+  const sent: Event[] = [];
+  const target = { dispatchEvent: (e: Event) => (sent.push(e), true) };
+  assert.equal(SEE_AS_EVENT, SEE_AS_HEARD);
+  assert.equal(SHARED_EVENT, 'braindog:shared');
+  assert.equal(askSeeAs({ person: 'p_pri', name: 'Priya' }, target), true);
+  assert.equal(sent[0]?.type, SEE_AS_HEARD);
+  assert.deepEqual(askedOf((sent[0] as CustomEvent<unknown>).detail), { id: 'p_pri', name: 'Priya' });
+  assert.equal(askedOf({ person: '', name: 'Priya' }), null);
+  assert.equal(askedOf(undefined), null);
+});
+
+test('a share tapped opens the sheet on what it holds, and saving it sends the same share back', () => {
+  const r = {
+    ...row({ kind: 'person', id: 'p_pri' }, 'Priya'),
+    what: { lists: ['tasks'] },
+    can: 'edit' as const,
+    caps: { delete: false },
+    hide: { tasks: ['rate'] },
+    when: { until: '2099-12-01T23:59:59.000Z' },
+  };
+  const subject = { kind: 'held' as const, id: r.id, target: { lists: ['tasks'] }, name: 'Tasks' };
+  const s = stateOfShare(r, subject);
+  assert.deepEqual(s.with, { kind: 'person', id: 'p_pri', name: 'Priya' });
+  assert.equal(s.can, 'edit');
+  assert.equal(s.remove, false);
+  assert.deepEqual(s.until, { kind: 'day', day: '2099-12-01' });
+  const decls = { tasks: { name: 'Tasks', fields: [{ id: 'rate', type: 'money' }] } };
+  assert.deepEqual(sharesOf(s, subject, Date.parse('2099-01-01'), decls), [
+    { effect: 'allow', who: { kind: 'person', id: 'p_pri' }, what: { lists: ['tasks'] }, can: 'edit', caps: { delete: false }, hide: { tasks: ['rate'] }, when: { until: '2099-12-01T23:59:59.000Z' } },
+  ]);
+  /* A NEW SHARE FROM THE PAGE is of the whole record, or one list. */
+  const rec = { kind: 'record' as const, name: 'this record' };
+  const fresh = { ...stateOfShare(r, rec), what: { kind: 'all' as const } };
+  assert.deepEqual(sharesOf(fresh, rec, Date.parse('2099-01-01'), decls)[0]?.what, { record: true });
+  assert.deepEqual(sharesOf({ ...fresh, what: { kind: 'list', list: 'tasks' } }, rec, Date.parse('2099-01-01'), decls)[0]?.what, { lists: ['tasks'] });
 });
 
 test('the first-open line is shown once a share, the newest live one first', () => {

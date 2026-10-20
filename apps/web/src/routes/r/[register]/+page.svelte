@@ -106,8 +106,9 @@
   import ViewSwitch from './parts/ViewSwitch.svelte';
   import ListTable from './parts/ListTable.svelte';
   import ListRowMenu from './parts/ListRowMenu.svelte';
-  import ShareSheet from '$lib/sharing/ShareSheet.svelte';
-  import { canShare, type Subject } from '$lib/sharing/share-state.ts';
+  import ShareLazy from '$lib/sharing/ShareLazy.svelte';
+  import { canShare } from '$lib/sharing/may-share.ts';
+  import type { Subject } from '$lib/sharing/share-state.ts';
   import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import { keepPrivate } from '$lib/record/privacy-write.ts';
   import { listHost, type Walked } from '$lib/page/row-host.svelte.ts';
@@ -3310,7 +3311,7 @@
     share={shares ? shareRow : undefined}
   />
   <!-- ONE SHEET FOR A ROW'S "Share" AND THE VIEW'S, opened on whichever was pressed. -->
-  {#if sharing}<ShareSheet bind:open={sharingOpen} subject={sharing} />{/if}
+  {#if sharing}<ShareLazy bind:open={sharingOpen} subject={sharing} />{/if}
 
   <!-- The new-row drawer, every declared field in front of the reader. `n`, and New in the head. -->
   {#if adds}

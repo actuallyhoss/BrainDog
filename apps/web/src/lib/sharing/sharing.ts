@@ -170,6 +170,15 @@ export const readMine = async (c: Caller): Promise<Got<MyShare[]>> => {
   return out.ok ? { ok: true, value: listOf<MyShare>(out.value) } : out;
 };
 
+/** One line of "Seen and changed" (§2.10) as `shareActivity` says it: who, through which share, and what, in words. */
+export type ActivityLine = { who: string; via: string; said: string };
+
+/** What one person saw and changed in the last 30 days, a line for each share that let them. An owner's or an Admin's. */
+export const readActivity = async (c: Caller, person: string): Promise<Got<ActivityLine[]>> => {
+  const out = await got(c.call<{ lines: ActivityLine[] }>('shareActivity', { person }));
+  return out.ok ? { ok: true, value: listOf<ActivityLine>(out.value?.lines) } : out;
+};
+
 /** Stop one share at once, and every share made onward from it. */
 export const stopShare = (c: Caller, id: string): Promise<Got<{ ended: string[]; left: string[] }>> => got(c.call('unshare', { id }));
 

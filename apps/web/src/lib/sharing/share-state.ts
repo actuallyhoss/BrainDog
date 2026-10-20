@@ -41,7 +41,10 @@ export type Decls = Readonly<Record<string, ListDecl | undefined>>;
 export type Subject =
   | { kind: 'project'; register: string; seq: number; id: string | null; name: string }
   | { kind: 'list'; list: string; name: string; view?: { where: ShareWhere } | undefined }
-  | { kind: 'row'; list: string; seq: number; id: string | null; name: string };
+  | { kind: 'row'; list: string; seq: number; id: string | null; name: string }
+  /* FROM THE SHARING PAGE: a new share of anything on the record, or one share kept, to change, whose target stays. */
+  | { kind: 'record'; name: string }
+  | { kind: 'held'; id: string; target: ShareTarget; name: string };
 
 /** Who the share is with: somebody on the record, a group, or an address not on it yet. */
 export type With =
@@ -82,8 +85,7 @@ export const isEmail = (s: string): boolean => EMAIL.test(s.trim());
 export const guest = (w: With | null): boolean => w?.kind === 'email';
 
 /** Whether somebody may share at all: an owner, or an Admin over the whole record, as the record's `team` asks. */
-export const canShare = (me: { owner?: boolean; level?: string | null; lists?: readonly string[] | null } | undefined): boolean =>
-  me !== undefined && (me.owner === true || (me.level === 'decide' && (me.lists ?? null) === null));
+export { canShare } from './may-share.ts';
 
 /** A sheet as it opens on `subject`: View, all of it, no end, their agents on. */
 export function startOf(subject: Subject): SheetState {
@@ -126,7 +128,7 @@ export function chipPressed(s: SheetState, id: string, now: number): SheetState 
 export function fillsOf(s: SheetState, subject: Subject): Fills {
   return {
     project: subject.kind === 'project' ? subject.id : null,
-    list: subject.kind === 'project' ? null : subject.list,
+    list: subject.kind === 'list' || subject.kind === 'row' ? subject.list : null,
     where: s.what.kind === 'where' ? (s.what.where ?? undefined) : undefined,
     row: subject.kind === 'row' ? subject.id : null,
   };
@@ -137,6 +139,8 @@ export const offersOf = (subject: Subject): Offers => ({ project: subject.kind =
 
 /** The share's target, from the subject and What. `null` while the subject's id or the condition is not known yet. */
 export function targetOf(subject: Subject, what: What): ShareTarget | null {
+  if (subject.kind === 'held') return subject.target;
+  if (subject.kind === 'record') return what.kind === 'list' ? { lists: [what.list] } : { record: true };
   if (subject.kind === 'project') {
     if (subject.id === null) return null;
     return what.kind === 'list' ? { project: subject.id, lists: [what.list] } : { project: subject.id };
@@ -199,8 +203,17 @@ export function hideOf(s: SheetState, decls: Decls): ShareHide | undefined {
 /** The lists a choice reaches, as far as the browser can say: what Hide offers fields from. */
 export function listsOf(s: SheetState, subject: Subject, decls: Decls, inProject: readonly string[]): string[] {
   if (s.template !== null) return [];
+  if (subject.kind === 'held') return listsIn(subject.target).filter((l) => decls[l] !== undefined);
+  if (subject.kind === 'record') return s.what.kind === 'list' ? [s.what.list] : [];
   if (subject.kind !== 'project') return [subject.list];
   return s.what.kind === 'list' ? [s.what.list] : [...inProject].filter((l) => decls[l] !== undefined);
+}
+
+/** The lists a target names by id: one list, named lists, or a project's named lists. None for the rest. */
+function listsIn(t: ShareTarget): string[] {
+  if ('list' in t) return [t.list];
+  if ('lists' in t && Array.isArray(t.lists)) return [...t.lists];
+  return [];
 }
 
 /** Whether Hide offers Amounts: something reached holds money, or a chip's share reaches lists the browser cannot list. */
@@ -256,8 +269,10 @@ export function namesFor(s: SheetState, subject: Subject, decls: Decls): ShareNa
     person: (id) => (w?.kind === 'person' && w.id === id ? w.name : undefined),
     group: (id) => (w?.kind === 'group' && w.id === id ? { name: w.name, people: w.people } : undefined),
     list: (id) => decls[id]?.name.toLowerCase(),
-    project: (id) => (subject.kind === 'project' && subject.id === id ? subject.name : undefined),
+    project: (id) =>
+      (subject.kind === 'project' && subject.id === id) || (subject.kind === 'held' && 'project' in subject.target && subject.target.project === id) ? subject.name : undefined,
     row: (list, id) => {
+      if (subject.kind === 'held' && 'rows' in subject.target && subject.target.rows.includes(id)) return subject.name;
       if (subject.kind !== 'row' || subject.id !== id) return undefined;
       const name = decls[list]?.name;
       return name ? `${name.replace(/s$/iu, '')} ${subject.seq}` : subject.name;
@@ -278,11 +293,55 @@ const joined = (xs: readonly string[]): string => (xs.length <= 1 ? (xs[0] ?? ''
  * added." One of a list is said by the list's own word for one. `null` for a share of named rows, which gains no more.
  */
 export function countSaid(w: With, subject: Subject, lists: readonly { list: string; name: string; rows: number }[], decls: Decls): string | null {
-  if (subject.kind === 'row') return null;
+  if (subject.kind === 'row' || (subject.kind === 'held' && 'rows' in subject.target)) return null;
   const who = whoSaid(w);
   /* A PROJECT'S OWN ROW comes with it, and is not one of the things in it. */
   const held = lists.filter((l) => l.rows > 0 && !(subject.kind === 'project' && l.list === subject.register));
   if (held.length === 0) return copy.shareSeesNone(who);
   const things = held.map((l) => `${l.rows} ${l.rows === 1 ? (decls[l.list]?.one ?? l.name.toLowerCase()) : l.name.toLowerCase()}`);
   return copy.shareWillSee(who, joined(things));
+}
+
+/** A share the record keeps, as far as the sheet changes one: `SharingRow` in `sharing.ts`, read structurally. */
+export type KeptShare = {
+  who: { kind: string; id: string };
+  who_name: string | null;
+  can: ShareRung;
+  caps: { readonly agents?: boolean; readonly delete?: boolean } | null;
+  hide: unknown;
+  when: { until?: string; hours?: unknown; once?: true } | null;
+};
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * The sheet as it opens on a share kept, to change it: who it is with stays as it is, and Can, Hide, Until and More say
+ * what the share holds. A group's size is filled in once the sheet has read the groups.
+ */
+export function stateOfShare(k: KeptShare, subject: Subject): SheetState {
+  const name = k.who_name ?? k.who.id;
+  const w: With | null =
+    k.who.kind === 'person'
+      ? { kind: 'person', id: k.who.id, name }
+      : k.who.kind === 'group'
+        ? { kind: 'group', id: k.who.id, name, people: 0 }
+        : k.who.kind === 'email'
+          ? { kind: 'email', email: k.who.id }
+          : null;
+  const hide = k.hide;
+  const amounts = isObj(hide) && Array.isArray(hide['types']) && hide['types'].includes('money');
+  const fields: Record<string, string[]> = {};
+  if (isObj(hide) && !('types' in hide)) for (const [l, fs] of Object.entries(hide)) if (Array.isArray(fs)) fields[l] = fs.filter((f): f is string => typeof f === 'string');
+  const until = k.when?.until;
+  return {
+    ...startOf(subject),
+    with: w,
+    can: k.can,
+    hide: { amounts, fields },
+    until: typeof until === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(until) ? { kind: 'day', day: until.slice(0, 10) } : { kind: 'none' },
+    weekdays: k.when?.hours !== undefined,
+    once: k.when?.once === true,
+    withAgents: k.caps?.agents !== false,
+    remove: k.caps?.delete !== false,
+  };
 }

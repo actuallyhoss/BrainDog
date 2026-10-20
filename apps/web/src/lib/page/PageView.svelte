@@ -46,7 +46,7 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import ShareMenu from '$lib/ui/ShareMenu.svelte';
-  import ShareSheet from '$lib/sharing/ShareSheet.svelte';
+  import ShareLazy from '$lib/sharing/ShareLazy.svelte';
   import type { Subject } from '$lib/sharing/share-state.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';

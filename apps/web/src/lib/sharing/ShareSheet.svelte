@@ -51,25 +51,34 @@
     sentenceOf,
     sharesOf,
     startOf,
+    stateOfShare,
     UNTILS,
     withPicked,
     type Decls,
+    type KeptShare,
     type SheetState,
     type Subject,
     type With,
   } from './share-state.ts';
   import { asksConfirm, sheetApi, type Got, type Group, type Here, type Preview } from './sheet-api.ts';
   import { chipsFor } from './templates.ts';
+  import { SHARED_EVENT } from './sharing.ts';
 
   let {
     open = $bindable(false),
     subject,
     trigger,
+    change,
+    who,
   }: {
     open?: boolean | undefined;
     subject: Subject;
     /** The button's words, for a header that draws it; absent, a menu opens the sheet by binding `open`. */
     trigger?: string | undefined;
+    /** A share kept, to change: the sheet opens on what it holds, who it is with stays, and Share saves it in place. */
+    change?: (KeptShare & { id: string }) | undefined;
+    /** Somebody to share with, already picked as the sheet opens, once the record has said who is here. */
+    who?: { kind: string; id: string } | undefined;
   } = $props();
 
   const shell = $derived(page.data as unknown as Shell);
@@ -100,15 +109,35 @@
   async function opened() {
     now = Date.now();
     held = subject;
-    s = startOf(subject);
+    s = change ? stateOfShare(change, subject) : startOf(subject);
     typed = '';
     previewed = null;
     problem = null;
     confirming = false;
     link = null;
     const me = String(shell.me?.person ?? '');
-    void ask().people(me).then((got) => (people = got));
-    void ask().groups().then((got) => (groups = got));
+    const asked = who;
+    void ask()
+      .people(me)
+      .then((got) => {
+        people = got;
+        const p = asked?.kind === 'person' ? got.find((x) => x.id === asked.id) : undefined;
+        if (p && s.with === null) pick({ kind: 'person', id: p.id, name: p.name });
+      });
+    void ask()
+      .groups()
+      .then((got) => {
+        groups = got;
+        /* A GROUP'S SIZE, for the share being changed, or the group the ask named. */
+        const w = s.with;
+        if (w?.kind === 'group') {
+          const g = got.find((x) => x.id === w.id);
+          if (g) s = { ...s, with: { ...w, people: g.people } };
+        }
+        const g = asked?.kind === 'group' ? got.find((x) => x.id === asked.id) : undefined;
+        if (g && s.with === null) pick({ kind: 'group', id: g.id, name: g.name, people: g.people });
+      });
+    if (asked?.kind === 'email' && !change && isEmail(asked.id)) pick({ kind: 'email', email: asked.id });
     if ((subject.kind === 'project' || subject.kind === 'row') && subject.id === null) {
       const id = await ask().idOf(subject.kind === 'project' ? subject.register : subject.list, subject.seq);
       if (id !== null) held = { ...subject, id } as Subject;
@@ -217,7 +246,7 @@
     busy = true;
     problem = null;
     const w = s.with;
-    const out = await ask().send(shares, s.template);
+    const out = await ask().send(shares, s.template, change?.id);
     if (!out.ok) {
       busy = false;
       if (asksConfirm(out)) confirming = true;
@@ -226,6 +255,8 @@
     }
     confirming = false;
     toasts.push(out.value.sentence || sentence);
+    /* SAID ON THE WINDOW, so a screen listing shares (Settings > Sharing) reads them again. */
+    dispatchEvent(new CustomEvent(SHARED_EVENT, { detail: { ids: out.value.ids } }));
     if (w.kind === 'email') {
       const email = w.email.trim().toLowerCase();
       const made = await ask().invite(email);
@@ -265,8 +296,18 @@
     s = { ...s, [k]: !s[k] };
   }
 
-  const chips = $derived(chipsFor(offersOf(held)));
-  const title = $derived(copy.shareSheetTitle(held.name));
+  /* A SHARE BEING CHANGED KEEPS ITS TARGET, so no chip offers to write another. */
+  const chips = $derived(held.kind === 'held' ? [] : chipsFor(offersOf(held)));
+  const title = $derived(change ? copy.shareSheetChange : copy.shareSheetTitle(held.name));
+  /* EVERY LIST, for a share of the record from the Sharing page: everything, or one list. */
+  const everyList = $derived(
+    held.kind === 'record'
+      ? Object.entries(decls)
+          .filter(([, d]) => d !== undefined)
+          .map(([id, d]) => ({ id, name: d?.name ?? id }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      : [],
+  );
 </script>
 
 {#if allowed}
@@ -313,9 +354,11 @@
               <div class="share-who">
                 <Face name={whoName(s.with)} size="s" kind="person" />
                 <span class="share-who-name">{s.with.kind === 'group' ? copy.shareWithGroupSaid(s.with.name, s.with.people) : whoName(s.with)}</span>
-                <button type="button" class="share-x tap" aria-label={copy.shareWithChange(whoName(s.with))} title={copy.shareWithChange(whoName(s.with))} onclick={() => (s = { ...s, with: null })}
-                  ><Icon name="close" size="s" /></button
-                >
+                {#if !change}
+                  <button type="button" class="share-x tap" aria-label={copy.shareWithChange(whoName(s.with))} title={copy.shareWithChange(whoName(s.with))} onclick={() => (s = { ...s, with: null })}
+                    ><Icon name="close" size="s" /></button
+                  >
+                {/if}
               </div>
             {:else}
               <span class="field">
@@ -375,13 +418,16 @@
         <div class="share-row">
           <label class="share-label" for="{uid}-what">{copy.shareWhatLabel}</label>
           <div class="share-control">
-            {#if held.kind === 'row' && s.template === null}
+            {#if (held.kind === 'row' || held.kind === 'held') && s.template === null}
               <p class="share-fixed" id="{uid}-what">{held.name}</p>
             {:else}
               <select id="{uid}-what" class="share-select" value={whatPick} onchange={(e) => whatChosen(e.currentTarget.value)}>
                 {#if s.template !== null}<option value="template">{copy.shareWhatTemplate}</option>{/if}
-                {#if held.kind === 'row'}
+                {#if held.kind === 'row' || held.kind === 'held'}
                   <option value="all">{held.name}</option>
+                {:else if held.kind === 'record'}
+                  <option value="all">{copy.shareWhatEverything}</option>
+                  {#each everyList as l (l.id)}<option value="list:{l.id}">{l.name}</option>{/each}
                 {:else if held.kind === 'project'}
                   <option value="all">{copy.shareWhatAll(held.name)}</option>
                   {#each inProject as l (l)}<option value="list:{l}">{copy.shareWhatList(listName(l), held.name)}</option>{/each}
@@ -515,7 +561,7 @@
         {#if s.with?.kind === 'person'}
           <Button weight="bare" onclick={seeAs}><Icon name="eye" size="s" />{copy.shareSeeAs(s.with.name)}</Button>
         {/if}
-        <Button weight="primary" disabled={!canSend || confirming} aria-busy={busy} onclick={() => void send()}>{busy ? copy.shareSending : copy.shareSend}</Button>
+        <Button weight="primary" disabled={!canSend || confirming} aria-busy={busy} onclick={() => void send()}>{busy ? copy.shareSending : change ? copy.shareSave : copy.shareSend}</Button>
       {/if}
     {/snippet}
   </Sheet>

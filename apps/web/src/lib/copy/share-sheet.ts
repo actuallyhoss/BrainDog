@@ -15,6 +15,11 @@ export const shareSheet = {
   /* ON A PROJECT'S PAGE, beside "Share" for a read-only link (`ShareMenu.svelte`), so the two are not one word twice. */
   shareWithPeopleOpen: 'Share with people',
   shareSheetTitle: (name: string): string => `Share ${name}`,
+  /* FROM THE SHARING PAGE: a share of anything on the record, and one share kept, opened to change it. */
+  shareRecordName: 'something on this record',
+  shareWhatEverything: 'Everything here',
+  shareSheetChange: 'Change this share',
+  shareSave: 'Save',
   shareThisView: 'Share this view',
   shareTemplatesLabel: 'Start from',
   shareTemplateNames: { accountant: 'Accountant', contractor: 'Contractor', assistant: 'Assistant', reviewer: 'Reviewer' } as Record<string, string>,

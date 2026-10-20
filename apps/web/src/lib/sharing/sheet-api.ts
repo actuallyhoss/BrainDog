@@ -65,14 +65,18 @@ export function sheetApi(base: string, io?: Fetch) {
       return out.ok ? out : refused(out);
     },
 
-    /** The shares, the allow first, under one bundle when there are more than one. The record's sentence for the last kept. */
-    async send(shares: readonly Share[], template: string | null): Promise<Got<{ sentence: string; ids: string[] }>> {
-      const bundle = shares.length > 1 ? `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` : undefined;
+    /**
+     * The shares, the allow first, under one bundle when there are more than one. The record's sentence for the last kept.
+     * `id` changes that one share in place, which is only ever one share and no bundle.
+     */
+    async send(shares: readonly Share[], template: string | null, id?: string): Promise<Got<{ sentence: string; ids: string[] }>> {
+      const bundle = shares.length > 1 && id === undefined ? `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` : undefined;
       const ids: string[] = [];
       let sentence = '';
-      for (const share of shares) {
+      for (const share of id === undefined ? shares : shares.slice(0, 1)) {
         const out = await c.call<{ id: string; sentence: string }>('share', {
           share,
+          ...(id === undefined ? {} : { id }),
           ...(bundle ? { bundle } : {}),
           ...(template ? { template } : {}),
         });

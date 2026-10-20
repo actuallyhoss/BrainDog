@@ -111,7 +111,7 @@
   import { timelineWords } from './timeline.ts';
   import HandSheet from '$lib/ui/HandSheet.svelte';
   import MergeSheet from '$lib/ui/MergeSheet.svelte';
-  import ShareSheet from '$lib/sharing/ShareSheet.svelte';
+  import ShareLazy from '$lib/sharing/ShareLazy.svelte';
   import UsedBy from '$lib/page/panels/UsedBy.svelte';
   import { may } from '$lib/record/may.ts';
   import { recordNow, type Shell } from '$lib/record/boot-live.ts';
@@ -1248,7 +1248,7 @@
       {/if}
       <!-- "SHARE": this row with somebody here, a group or an email, for an owner or an Admin (sharing plan §3.1). -->
       {#if live && !archived}
-        <ShareSheet subject={{ kind: 'row', list: id, seq: row.seq, id: row.id ?? null, name: String(row.fields[decl.title] ?? '') || `${decl.one} ${row.seq}` }} trigger={copy.shareOpen} />
+        <ShareLazy subject={{ kind: 'row', list: id, seq: row.seq, id: row.id ?? null, name: String(row.fields[decl.title] ?? '') || `${decl.one} ${row.seq}` }} trigger={copy.shareOpen} />
       {/if}
       <!-- THE HEAD'S "…", LAST: the row's link, Archive, and Edit where the primary is the finishing verb. A 36px square in the buttons' shape, named for a screen reader by the
            hidden words and for a pointer by its tooltip. A new field for the list is at the foot of "Add a field". -->

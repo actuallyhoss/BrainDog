@@ -65,7 +65,6 @@
   import Appearance from './areas/Appearance.svelte';
   import SigningIn from './areas/SigningIn.svelte';
   import People from './areas/People.svelte';
-  import Sharing from './areas/Sharing.svelte';
   import Ingest from './areas/Ingest.svelte';
   import Keyboard from './areas/Keyboard.svelte';
   import Navigation from './areas/Navigation.svelte';
@@ -495,7 +494,11 @@
       <Navigation {shell} {area} />
     {:else if area === 'people'}
       <!-- PEOPLE & SHARING DRAWS THE PEOPLE AREA FIRST, as People here: roles, invites and links, then every share. -->
-      <Sharing {shell} {area}>{#snippet here()}<People {shell} {area} />{/snippet}</Sharing>
+      <!-- By `import()`, as Agents is: its lists, groups and the Share sheet's host are a chunk only somebody opening it
+           waits for. -->
+      {#await import('./areas/Sharing.svelte') then { default: Sharing }}
+        <Sharing {shell} {area}>{#snippet here()}<People {shell} {area} />{/snippet}</Sharing>
+      {/await}
     {:else if area === 'signing-in'}
       <SigningIn {shell} {area} />
     {:else if area === 'agents'}

@@ -90,14 +90,33 @@ export function seeing(f: typeof globalThis.fetch, as: () => SeenAs | null, orig
   };
 }
 
+/**
+ * The event the Sharing page asks See as by (`askSeeAs` in `sharing.ts`, which spells the same name): `{ person, name }`.
+ * The page never imports this file's way in, and this file never imports the page's.
+ */
+export const SEE_AS_EVENT = 'braindog:see-as';
+
+/** What an ask carried, as somebody to see the record as, or `null` for anything else. */
+export function askedOf(detail: unknown): SeenAs | null {
+  const d = detail as { person?: unknown; name?: unknown } | null | undefined;
+  return typeof d?.person === 'string' && d.person !== '' && typeof d.name === 'string' && d.name !== '' ? { id: d.person, name: d.name } : null;
+}
+
 let installed = false;
 
-/** Put the header on this tab's fetch, once. While seeing as somebody, the page's early `boot` is dropped unread. */
+/**
+ * Put the header on this tab's fetch, once, and listen for the Sharing page's ask. While seeing as somebody, the page's
+ * early `boot` is dropped unread.
+ */
 export function install(): void {
   if (installed || typeof globalThis.fetch !== 'function' || globalThis.location === undefined) return;
   installed = true;
   globalThis.fetch = seeing(globalThis.fetch.bind(globalThis), seeingAs, () => globalThis.location?.origin);
   if (current !== null) (globalThis as { __bdBoot?: unknown }).__bdBoot = undefined;
+  globalThis.addEventListener?.(SEE_AS_EVENT, (e) => {
+    const who = askedOf((e as CustomEvent<unknown>).detail);
+    if (who !== null) enterSeeAs(who);
+  });
 }
 
 install();
