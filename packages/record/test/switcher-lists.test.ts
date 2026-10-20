@@ -47,7 +47,7 @@ const PAYROLL = {
  */
 async function world(grant: { level: 'read' } | { registers: Record<string, 'write'> }) {
   const clock = fixedClock(NOW);
-  const d = createDirectory(openSqlite(), clock);
+  const d = createDirectory(openSqlite(), clock, undefined, { sells: false });
   value<Person>(d.person$('owner@the-studio.example'));
   const books = value<Person>(d.person$('books@books-co.example'));
   const studio = value<Named & { person: string }>(d.provision({ slug: 'the-studio', email: 'owner@the-studio.example' }));

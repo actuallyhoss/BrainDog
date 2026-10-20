@@ -40,7 +40,7 @@ function ok<B>(r: AuthResult<B>) {
 function studio(): { d: Directory; sql: NodeSql; clock: ReturnType<typeof fixedClock>; ada: string; bo: string; record: string } {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  const d = createDirectory(sql, clock, config());
+  const d = createDirectory(sql, clock, config(), { sells: false });
   const ada = value<{ id: string }>(d.person$('ada@example.com', 'Ada')).id;
   const bo = value<{ id: string }>(d.person$('bo@example.com', 'Bo')).id;
   const record = value<{ record: string }>(d.provision({ slug: 'the-studio', email: 'ada@example.com' })).record;
@@ -257,7 +257,7 @@ test('A DIRECTORY DUMPED AND LOADED KEEPS ITS BILLING ROWS AND APPLIED EVENTS, A
   const lines = from.d.dump();
   assert.ok(!lines.includes('#table dir_pending'), 'a pending mailbox travelled in the copy');
 
-  const to = createDirectory(openSqlite(), fixedClock(NOW), config());
+  const to = createDirectory(openSqlite(), fixedClock(NOW), config(), { sells: false });
   value(to.load(lines));
   assert.deepEqual(to.billing({ op: 'of', record: from.record }), from.d.billing({ op: 'of', record: from.record }));
   assert.equal(to.billing({ op: 'lapsed', record: from.record }), true);

@@ -56,7 +56,7 @@ function setup(change: (c: AuthConfig) => AuthConfig = (c) => c) {
     key: { serverKey },
     log: (line) => void lines.push(line),
   });
-  const d = createDirectory(sql, clock, config);
+  const d = createDirectory(sql, clock, config, { sells: false });
   const ada = value<{ id: string }>(d.person$('ada@example.com', 'Ada')).id;
   const record = value<{ record: string }>(d.provision({ slug: 'the-studio', email: 'ada@example.com' })).record;
   return { sql, clock, d, lines, ada, record, config };
@@ -150,16 +150,16 @@ test('NO CELL OF ANY dir_ TABLE HOLDS A VALUE THAT OPENS ANYTHING', async () => 
 
 /* ── sessions ─────────────────────────────────────────────────────────── */
 
-test('A SESSION LIVES THIRTY DAYS AND NOT A MILLISECOND MORE', async () => {
+test('A SESSION LIVES NINETY DAYS AND NOT A MILLISECOND MORE', async () => {
   const { sql, clock, d, ada, record } = setup();
   const early = sidOf(await keyIn(d));
   const late = sidOf(await keyIn(d));
 
-  clock.set(NOW + 30 * DAY - 1);
+  clock.set(NOW + 90 * DAY - 1);
   const who = ok(await d.auth({ flow: 'session', sid: early })).body;
   assert.deepEqual(who, { person: ada, email: 'ada@example.com', record, provedAt: NOW });
 
-  clock.set(NOW + 30 * DAY);
+  clock.set(NOW + 90 * DAY);
   notYou(await d.auth({ flow: 'session', sid: late }), true);
   /* And the row is gone, not merely refused, so it cannot come back if the clock does. */
   assert.equal(sql.all('SELECT 1 FROM dir_session').length, 1, 'the expired row was kept');
@@ -192,9 +192,9 @@ test('A SESSION ROTATES AFTER A DAY OF USE, and the old id is good for one more 
   notYou(await d.auth({ flow: 'session', sid }), true);
   ok(await d.auth({ flow: 'session', sid: next.sid }));
 
-  /* The expiry moved with the rotation: thirty days from it, not from sign-in. */
+  /* The expiry moved with the rotation: ninety days from it, not from sign-in. */
   const row = sql.one<{ expires: number; rotated_at: number; authed_at: number }>('SELECT expires, rotated_at, authed_at FROM dir_session');
-  assert.deepEqual({ ...row }, { expires: at + 30 * DAY, rotated_at: at, authed_at: NOW });
+  assert.deepEqual({ ...row }, { expires: at + 90 * DAY, rotated_at: at, authed_at: NOW });
 });
 
 test('TWO REQUESTS WITH ONE DAY-OLD COOKIE ROTATE IT ONCE, and both are answered', async () => {
@@ -659,7 +659,7 @@ test('THE SERVER KEY IS REFUSED WHERE THERE IS MORE THAN ONE PERSON', async () =
 
 test('THE SERVER KEY IS NOT OFFERED WHERE NOBODY IS IN THE DIRECTORY, because the exchange has nobody to sign in', async () => {
   const { config } = setup();
-  const d = createDirectory(openSqlite(), fixedClock(NOW), config);
+  const d = createDirectory(openSqlite(), fixedClock(NOW), config, { sells: false });
   assert.equal(ok(await d.auth({ flow: 'methods' })).body.key, false, 'methods offers a key nobody can sign in with');
   notYou(await keyIn(d));
 });
@@ -679,7 +679,7 @@ test('EVERY SIGN-IN FAILURE IS ONE BODY, and the log hears why without hearing w
     await passkeyIn(d, KEYS.rs256, { person: ada, signCount: 0 }),
     await d.auth({ flow: 'passkey.assert', credential: { id: KEYS.es256.id, response: { clientDataJSON: '', authenticatorData: '', signature: '' } }, ip: nextIp() }),
   ];
-  clock.set(NOW + 31 * DAY);
+  clock.set(NOW + 91 * DAY);
   failures.push(await d.auth({ flow: 'session', sid }));
   for (const r of failures) notYou(r);
   assert.deepEqual(reasons(lines), ['key', 'link', 'shape', 'count', 'unknown', 'shape', 'session']);

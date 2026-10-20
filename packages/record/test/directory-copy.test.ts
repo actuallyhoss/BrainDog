@@ -44,7 +44,7 @@ const config = (): AuthConfig => ({ mac: new Uint8Array(32).fill(7), rp: { id: R
 function fresh(): { d: Directory; sql: NodeSql; clock: ReturnType<typeof fixedClock> } {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  return { d: createDirectory(sql, clock, config()), sql, clock };
+  return { d: createDirectory(sql, clock, config(), { sells: false }), sql, clock };
 }
 
 /** The refusal a load answered, or a failed assertion when it loaded. */

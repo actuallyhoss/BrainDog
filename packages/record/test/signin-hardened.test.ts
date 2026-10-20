@@ -46,6 +46,7 @@ function setup(change: (c: AuthConfig) => AuthConfig = (c) => c) {
     sql,
     clock,
     change({ mac: new Uint8Array(32).fill(9), rp: { id: RP_ID, origin: ORIGIN }, magic: true, key: { serverKey }, log: (line) => void lines.push(line) }),
+    { sells: false },
   );
   const ada = value<{ id: string }>(d.person$('ada@example.com', 'Ada')).id;
   const record = value<{ record: string }>(d.provision({ slug: 'the-studio', email: 'ada@example.com' })).record;
@@ -148,9 +149,9 @@ test('THE MAILBOX COUNT IS OF MAILS SENT: a full one sends nothing, a link alrea
   assert.equal(count('nobody@example.com'), 0);
 });
 
-/* ── the ninety-day proof ─────────────────────────────────────────────── */
+/* ── the proof that caps a rotating session ─────────────────────────────────────────────── */
 
-test('A SESSION ENDS NINETY DAYS AFTER ITS LAST PROOF, however often it has rotated', async () => {
+test('A SESSION ENDS 180 DAYS AFTER ITS LAST PROOF, however often it has rotated, though each day of use renews its ninety', async () => {
   const { sql, clock, d } = setup();
   let sid = sidOf(await keyIn(d));
   const turn = async (at: number) => {
@@ -159,13 +160,13 @@ test('A SESSION ENDS NINETY DAYS AFTER ITS LAST PROOF, however often it has rota
     if (!next || next === 'clear') return assert.fail(`no rotation at day ${(at - NOW) / DAY}`);
     sid = next.sid;
   };
-  for (const day of [29, 58, 87]) await turn(NOW + day * DAY);
-  /* The last rotation did not reach past the proof: thirty days from it would be day 117. */
-  assert.equal(sql.one<{ expires: number }>('SELECT expires FROM dir_session')?.expires, NOW + 90 * DAY);
+  for (const day of [89, 150, 178]) await turn(NOW + day * DAY);
+  /* The last rotation did not reach past the proof: ninety days from it would be day 268. */
+  assert.equal(sql.one<{ expires: number }>('SELECT expires FROM dir_session')?.expires, NOW + 180 * DAY);
 
-  await turn(NOW + 90 * DAY - 1);
+  await turn(NOW + 180 * DAY - 1);
   assert.equal(ok(await live(d, sid)).body.provedAt, NOW, 'rotation moved the proof');
-  clock.set(NOW + 90 * DAY);
+  clock.set(NOW + 180 * DAY);
   notYou(await live(d, sid), true);
   assert.equal(sql.all('SELECT 1 FROM dir_session').length, 0, 'the row outlived its proof');
 });

@@ -29,7 +29,7 @@ const refusal = (r: unknown) => {
 
 function directory(): { d: Directory; sql: NodeSql } {
   const sql = openSqlite();
-  return { d: createDirectory(sql, fixedClock(NOW)), sql };
+  return { d: createDirectory(sql, fixedClock(NOW), undefined, { sells: false }), sql };
 }
 
 const studio = (d: Directory) => {

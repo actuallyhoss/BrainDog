@@ -33,7 +33,7 @@ function ledger(start = SEPT): { d: Directory; sql: NodeSql; clock: { now: () =>
   let now = start;
   const clock = { now: () => now, set: (ms: number) => void (now = ms) };
   const sql = openSqlite();
-  const d = createDirectory(sql, clock);
+  const d = createDirectory(sql, clock, undefined, { sells: false });
   value(d.person$('ada@example.com', 'Ada'));
   const made = value<Named>(d.provision({ slug: 'the-studio', email: 'ada@example.com' }));
   return { d, sql, clock, record: made.record };
@@ -184,7 +184,7 @@ const CALL = {
 test('THE LEDGER AGREES WITH THE RECORD’S OWN EVENTS, and a record at its limit waits with a sentence', async () => {
   const clock = fixedClock(SEPT);
   const dirSql = openSqlite();
-  const d = createDirectory(dirSql, clock);
+  const d = createDirectory(dirSql, clock, undefined, { sells: false });
   value(d.person$('ada@example.com'));
   const { record } = value<Named>(d.provision({ slug: 'the-studio', email: 'ada@example.com' }));
 

@@ -42,11 +42,15 @@ test('ITS OWNER IS ALREADY ON IT, so a join for them is still a yes', () => {
   sql.close();
 });
 
-test('PAID FOR, IT TAKES ANYBODY, and the plan is read back as it is', () => {
+test('ON CLOUD PLUS IT TAKES ANYBODY, and the plan is read back as it is', () => {
   const { d, sql, record, bo } = ledger();
   assert.equal(d.planFor(record), 'free');
+  /* TEAMS ARE PLUS'S: Cloud alone is still one person. */
   value(d.setPlan(record, 'hosted'));
   assert.equal(d.planFor(record), 'hosted');
+  assert.deepEqual(d.joinable(record, bo), { code: 'FORBIDDEN', fix: FREE_JOIN_REFUSED, at: 'plan' });
+  value(d.setPlan(record, 'plus'));
+  assert.equal(d.planFor(record), 'plus');
   assert.equal(d.joinable(record, bo), null);
   value(d.join(record, bo));
   assert.equal(d.reaches(record, bo), true);
