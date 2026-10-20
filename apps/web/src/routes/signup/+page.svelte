@@ -3,7 +3,7 @@
 
   USE CASE 6, STEPS 1 TO 4 (his word of 9 October, `loop/progress/planner-45.md`, "The onboarding target").
 
-  1. DESCRIBE. "Who are you?", one field, the first run's five chips and three promises under them. As it is typed, the
+  1. DESCRIBE. "Who are you?", one field with one example in it, and three promises under it. As it is typed, the
      rules read it on this device, a beat after each key (`proposeFirst` with no model, `lib/start/propose.ts`), and
      nothing typed leaves the device. ON THE PERSON'S PRESS OF NEXT, AND ONLY THEN (USE-B05, `readerFor` in
      `lib/signup.ts`), a model reads it once at the host's reading door (`readAsks(origin).setup`, `/auth/signup/read`),
@@ -47,8 +47,9 @@
   "MAKE IT AGAIN" IS DRAWN ONLY WHEN THE ACCOUNT SAYS A RECORD CAN BE MADE (`canMake` on `/account/billing`), so no
   control offers what checkout would refuse.
 
-  THE WHOLE WINDOW (`../start/Frame.svelte`): the words on the left and the build on the right from 900px, the words
-  first and the build under them on a phone.
+  ONE FRAME, TWO SHAPES (`../signin/Entry.svelte`): a one-column step in the 440 sheet, as sign in is; describing and
+  keeping across the whole window (`../start/Frame.svelte`), the words in a tile on the left and the build on the right
+  from 900px, the words first and the build under them on a phone. The brand stands top left in both.
 -->
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte';
@@ -133,6 +134,7 @@
   import Building from '../start/Building.svelte';
   import Currency from '../start/Currency.svelte';
   import Frame from '../start/Frame.svelte';
+  import Entry from '../signin/Entry.svelte';
   import Making from '../start/Making.svelte';
   import NoRecord from '../start/NoRecord.svelte';
   import PasskeyFirst from '../start/PasskeyFirst.svelte';
@@ -486,14 +488,6 @@
   /** The sentence cut at the very words heard, for the marks under the field. */
   const lit = $derived(litIn(sentence, read?.heard ?? []));
 
-  function chip(c: string) {
-    sentence = withChip(sentence, c);
-    void tick().then(() => {
-      field?.focus();
-      field?.setSelectionRange(sentence.length, sentence.length);
-    });
-  }
-
   /* ENTER GOES ON AND SHIFT+ENTER STARTS A NEW LINE, as a chat box does, because the field is one answer. */
   function enter(e: KeyboardEvent) {
     if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
@@ -582,6 +576,15 @@
    * QUESTION THAT THE RULES WOULD NOT ASK (what kind, what things, who for) is the person telling it more: the words gain
    * it, and this press reads them once again. Either way it was the one question, and nothing more is asked of them.
    */
+  /* CONTINUE IS NEVER GREYED FOR AN ANSWER NOT GIVEN YET (first F16): pressed with none, the first answer takes focus
+     and one line says what to do. */
+  let askBox = $state<HTMLElement | undefined>(undefined);
+  let pickWhy = $state(false);
+  function unpicked(): void {
+    pickWhy = true;
+    askBox?.querySelector<HTMLElement>('button, input')?.focus();
+  }
+
   async function answerIt(value: string | null): Promise<void> {
     const v = value === null || value.trim() === '' ? null : value.trim();
     if (asks === 'one' && q !== null && q.reply !== null) reply = { about: q.reply, value: v };
@@ -1143,13 +1146,13 @@
 
   /** Whether the build is being written into the record now, so its tiles are the whole screen (`Making.svelte`). */
   const watching = $derived(step === 'making' && watched !== null);
-  /** Whether the build stands beside the words: while describing and keeping, and while what was said is being made. */
-  const showBuild = $derived(
-    step === 'describe' ||
-      step === 'question' ||
-      step === 'keep' ||
-      ((step === 'sent' || step === 'verifying' || step === 'lock' || step === 'making' || step === 'waiting') && sentence.trim() !== '' && !watching),
-  );
+  /** Whether the build stands beside the words: while describing, asking and keeping. */
+  const showBuild = $derived(step === 'describe' || step === 'question' || step === 'keep');
+  /**
+   * Whether the step is one column, drawn in the entry sheet as sign in is (first F5): every step but the three that
+   * stand beside the build, and the build being written, which takes the whole board.
+   */
+  const sheet = $derived(!showBuild && !watching);
 
   /* THIS SCREEN'S FIRST DRAW IS ITS STEP, whichever it is, once the host has answered or the address has said. */
   $effect(() => {
@@ -1161,319 +1164,335 @@
 
 {#snippet signInLink()}
   {#if step === 'describe' || step === 'question' || step === 'keep'}
-    <a class="link" href={at('/signin')}>{words.haveOne}</a>
+    <!-- ON A PHONE A QUIET 44PX "Sign in"; FROM 640 THE SENTENCE in the second ink with only "Sign in" a link (first F9). -->
+    <span class="have-wide">{words.haveAsk} <a class="have-link" href={at('/signin')}>{copy.signIn}</a></span>
+    <span class="have-narrow"><Button href="/signin">{copy.signIn}</Button></span>
   {/if}
 {/snippet}
 
+<!-- THE SENTENCE ONCE KEPT: her words as she typed them, with no indent, and the bare way back to them on the same edge. -->
 {#snippet saidLine()}
-  <button type="button" class="said-line" disabled={busy} onclick={edit}>
-    <q class="said-text">{sentence.trim()}</q>
-    <span class="said-edit">{words.edit}</span>
-  </button>
+  <div class="said-line">
+    <p class="said-text">{sentence.trim()}</p>
+    <button type="button" class="link plain said-edit" disabled={busy} onclick={edit}>{words.edit}</button>
+  </div>
   {#if linkCut}<p class="quiet">{words.linkCut}</p>{/if}
 {/snippet}
 
-<Frame end={signedIn === null ? signInLink : undefined}>
-  <div class="board" data-paired={showBuild ? '' : undefined}>
-    {#if watching && watched}
-      <!-- THE BUILD BEING WRITTEN, tile by tile across the whole board: each part says where it is, read from the record. -->
-      <Making parts={watched.parts} states={makingStates(watched.parts, watched.held, watched.answer)} />
-    {:else}
-    <div class="talk">
-      {#if step === 'loading' || step === 'verifying'}
-        <!-- NOTHING IS ASKED BEFORE THE HOST SAYS SIGN-UP IS OPEN: the page's name, never "Who are you?", which a closed
-             host would take straight back. -->
-        <h1 class="title">{step === 'verifying' ? words.making : words.title}</h1>
-        <p class="quiet" role="status">{step === 'verifying' ? copy.signupVerifying : copy.checkingWays}</p>
-      {:else if step === 'unreachable'}
-        <Empty kind="error" title={copy.unreachableTitle} body={copy.unreachableWhy}>
-          {#snippet actions()}<Button onclick={() => void ask()}>{copy.askAgain}</Button>{/snippet}
-        </Empty>
-      {:else if step === 'closed'}
-        <h1 class="title">{copy.signupClosedTitle}</h1>
-        <p class="lede">{copy.signupClosedWhy}</p>
-        <div class="go"><Button weight="primary" href="/signin">{copy.signIn}</Button></div>
-      {:else if step === 'invite-only'}
-        <Apply {siteKey} />
-      {:else if step === 'describe'}
-        <h1 class="title" id="who-h">{firstRun.whoQuestion}</h1>
-        <p class="lede">{words.lede}</p>
-        <form
-          class="form"
-          onsubmit={(e) => {
-            e.preventDefault();
-            void next();
-          }}
-        >
-          <!-- HER WORDS LIGHT UP AS SHE TYPES: the marks sit under the field, cut where each line heard says it is. -->
-          <div class="lit-field">
-            <!-- ONE LINE OF MARKUP: any space between these tags would be drawn, and the marks would drift off the words. -->
-            <div class="lit" aria-hidden="true" bind:this={marks}>{#each lit as r, i (i)}{#if r.became}<mark>{r.text}</mark>{:else}{r.text}{/if}{/each}{'\n'}</div>
-            <textarea
-              class="prompt"
-              rows="4"
-              autocomplete="off"
-              maxlength="2000"
-              aria-labelledby="who-h"
-              placeholder={firstRun.whoPlaceholder}
-              bind:this={field}
-              bind:value={sentence}
-              onkeydown={enter}
-              onscroll={scrolled}
-            ></textarea>
+<!-- APPLY'S RAIL: what happens next, three plain lines each with its number in a quiet well (first F5). -->
+{#snippet nextSteps()}
+  <section class="next" aria-labelledby="next-h">
+    <h2 class="next-h" id="next-h">{words.nextTitle}</h2>
+    <ol class="next-list">
+      {#each words.nextLines as line, i (line)}
+        <li class="next-line"><span class="next-n" aria-hidden="true">{i + 1}</span>{line}</li>
+      {/each}
+    </ol>
+  </section>
+{/snippet}
+
+{#snippet stepNow()}
+  {#if step === 'loading' || step === 'verifying'}
+    <!-- NOTHING IS ASKED BEFORE THE HOST SAYS SIGN-UP IS OPEN: the page's name, never "Who are you?", which a closed
+         host would take straight back. -->
+    <h1 class="entry-title">{step === 'verifying' ? words.making : words.title}</h1>
+    <p class="quiet" role="status">{step === 'verifying' ? copy.signupVerifying : copy.checkingWays}</p>
+  {:else if step === 'unreachable'}
+    <Empty kind="error" heading title={copy.unreachableTitle} body={copy.unreachableWhy}>
+      {#snippet actions()}<Button weight="primary" onclick={() => void ask()}>{copy.askAgain}</Button>{/snippet}
+    </Empty>
+  {:else if step === 'closed'}
+    <h1 class="entry-title">{copy.signupClosedTitle}</h1>
+    <p class="entry-lede">{copy.signupClosedWhy}</p>
+    <div class="go"><Button weight="primary" href="/signin">{copy.signIn}</Button></div>
+  {:else if step === 'invite-only'}
+    <Apply {siteKey} />
+  {:else if step === 'describe'}
+    <h1 class="entry-title" id="who-h">{firstRun.whoQuestion}</h1>
+    <p class="entry-lede">{words.lede}</p>
+    <form
+      class="form"
+      onsubmit={(e) => {
+        e.preventDefault();
+        void next();
+      }}
+    >
+      <!-- HER WORDS LIGHT UP AS SHE TYPES: the marks sit under the field, cut where each line heard says it is. -->
+      <div class="lit-field">
+        <!-- ONE LINE OF MARKUP: any space between these tags would be drawn, and the marks would drift off the words. -->
+        <div class="lit" aria-hidden="true" bind:this={marks}>{#each lit as r, i (i)}{#if r.became}<mark>{r.text}</mark>{:else}{r.text}{/if}{/each}{'\n'}</div>
+        <textarea
+          class="prompt"
+          rows="4"
+          autocomplete="off"
+          maxlength="2000"
+          aria-labelledby="who-h"
+          placeholder={firstRun.whoPlaceholder}
+          bind:this={field}
+          bind:value={sentence}
+          onkeydown={enter}
+          onscroll={scrolled}
+        ></textarea>
+      </div>
+      <!-- WHAT THE PRESS DOES WITH THE WORDS, said before it, until the host says it has no model to read them. -->
+      {#if !readsOff}<p class="quiet" data-reads-on-press>{firstRun.readOnPress}</p>{/if}
+
+      {#if read !== null && read.heard.length > 0}
+        <section class="heard" aria-labelledby="heard-h">
+          <div class="heard-head">
+            <h2 class="heard-title" id="heard-h">{firstRun.heardTitle}</h2>
+            <span class="quiet">{words.heardTap}</span>
           </div>
-          <!-- WHAT NEXT DOES WITH THE WORDS, said before the press, until the host says it has no model to read them. -->
-          {#if !readsOff}<p class="quiet" data-reads-on-press>{firstRun.readOnPress}</p>{/if}
-
-          {#if sentence.trim() === ''}
-            <p class="quiet" id="chips-h">{words.startFrom}</p>
-            <div class="chips" role="group" aria-labelledby="chips-h">
-              {#each firstRun.whoChips as c (c)}
-                <!-- A mouse press keeps focus in the field, so the caret stays where the words are going. -->
-                <Button size="sm" onmousedown={(e: MouseEvent) => e.preventDefault()} onclick={() => chip(c)}>{c}</Button>
-              {/each}
-            </div>
-          {/if}
-
-          {#if read !== null && read.heard.length > 0}
-            <section class="tile heard" aria-labelledby="heard-h">
-              <div class="tile-head">
-                <h2 class="tile-h" id="heard-h">{firstRun.heardTitle}</h2>
-                <span class="quiet">{words.heardTap}</span>
-              </div>
-              <ul class="lines">
-                {#each read.heard as h, i (i)}
-                  <li>
-                    <button type="button" class="line" aria-expanded={opened === lineOf(h)} onclick={() => openLine(h)}>
-                      <span class="line-said">{h.you === true ? (read.name ?? h.phrase) : h.phrase}</span>
-                      <span class="line-became">{h.you === true ? words.you : h.became}</span>
-                    </button>
-                    {#if opened === lineOf(h)}
-                      <div class="line-edit">
-                        {#if h.you === true}
-                          <label class="field-label" for="up-you">{words.nameLabel}</label>
-                          <span class="field"><input id="up-you" class="field-input" type="text" autocomplete="name" maxlength="60" bind:value={nameDraft} /></span>
-                          <div class="chips">
-                            <Button weight="primary" onclick={rename}>{words.keepLine}</Button>
-                            <Button weight="quiet" onclick={() => takeOut(h)}>{words.takeOut}</Button>
-                          </div>
-                        {:else}
-                          <p class="quiet">{words.becomeInstead}</p>
-                          <div class="chips" role="group" aria-label={words.becomeInstead}>
-                            {#each insteadOf(h) as id (id)}
-                              <Button size="sm" weight="quiet" onclick={() => turnInto(h, id)}>{moduleName(id)}</Button>
-                            {/each}
-                          </div>
-                          <div class="chips"><Button weight="quiet" onclick={() => takeOut(h)}>{words.takeOut}</Button></div>
-                        {/if}
-                      </div>
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            </section>
-          {/if}
-
-          <div class="go sticky">
-            <Button weight="primary" type="submit" disabled={readingNow} kbd={sentence.trim() === '' || readingNow ? undefined : '↵'}>{readingNow ? firstRun.whoReading : words.next}</Button>
-          </div>
-        </form>
-
-        <ul class="promises">
-          {#each words.promises as line, i (line)}
-            {#if i > 0 || plan === 'free'}<li><Icon name="check" size="s" />{line}</li>{/if}
-          {/each}
-        </ul>
-      {:else if step === 'question'}
-        <button type="button" class="link plain back" onclick={edit}>{words.back}</button>
-        <h1 class="title" id="first-q" tabindex="-1">{words.questionTitle}</h1>
-        {#if asks === 'one' && q !== null}
-          <p class="lede" id="first-q-ask">{q.question}</p>
-          {#if q.reply === 'currency'}
-            <Currency bind:value={pick} {locale} choices={q.choices.map((c) => ({ code: c.value, name: c.label, why: c.means ?? '' }))} suggested={q.suggested} find={q.find} />
-          {:else if q.choices.length === 0}
-            <span class="field field-lg"><input class="field-input" type="text" autocomplete={q.about === 'name' ? 'name' : 'off'} maxlength="60" aria-labelledby="first-q-ask" bind:value={pick} /></span>
-          {:else}
-            <div class="opts" role="radiogroup" aria-labelledby="first-q-ask">
-              {#each q.choices as c (c.value)}
-                <button type="button" class="opt" role="radio" aria-checked={pick === c.value} onclick={() => (pick = c.value)}>
-                  <span class="opt-name">{#if pick === c.value}<Icon name="check" size="s" />{/if}{c.label}</span>
-                  {#if c.means}<span class="opt-means">{c.means}</span>{/if}
+          <ul class="lines">
+            {#each read.heard as h, i (i)}
+              <li>
+                <!-- `heard-line`, NEVER `line`: the ledger's global `.line` is a grid, and it took this row over (SF5). -->
+                <button type="button" class="heard-line" aria-expanded={opened === lineOf(h)} onclick={() => openLine(h)}>
+                  <span class="line-said">{h.you === true ? (read.name ?? h.phrase) : h.phrase}</span>
+                  <span class="line-became">{h.you === true ? words.you : h.became}<Icon name="chevron" size="s" /></span>
                 </button>
-              {/each}
-            </div>
-          {/if}
-          <p class="quiet">{q.only}</p>
-          <div class="go sticky">
-            <Button weight="primary" disabled={pick === null || pick.trim() === '' || readingNow} onclick={() => void answerIt(pick)}>{readingNow ? firstRun.whoReading : words.questionNext}</Button>
-            <Button weight="bare" disabled={readingNow} onclick={() => void answerIt(null)}>{words.questionSkip}</Button>
-          </div>
-        {:else}
-          <p class="lede">{words.closest}</p>
-          <p class="quiet">{words.closestWhy}</p>
-          <div class="chips" role="group" aria-label={firstRun.mineFor}>
-            {#each USE_CASES as one (one.usecase)}
-              <Button weight="quiet" aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
-            {/each}
-          </div>
-          <div class="go sticky"><Button weight="primary" disabled={chosen === null} onclick={() => void keep()}>{words.questionNext}</Button></div>
-        {/if}
-      {:else if step === 'keep'}
-        <h1 class="title" id="keep-h" tabindex="-1">{words.keepTitle}</h1>
-        {@render saidLine()}
-        {#if signedIn || plan !== 'free'}
-          <p class="lede">{signedIn ? (plan === 'free' ? words.keepSignedIn : words.keepSignedInPaid) : words.keepLedePaid}</p>
-        {/if}
-        <form class="form" onsubmit={send}>
-          <!-- THE TITLE AND ITS PLACES, as one tile: what will be kept, under the name it will have. -->
-          <section class="tile">
-            {#if nameByHand}
-              <NameField bind:value={slug} bind:free id="up-name" />
-            {:else if naming || read?.title || slug !== ''}
-              <div class="tile-head">
-                <h2 class="tile-h" aria-live="polite">{naming ? words.calledFinding : (read?.title ?? slug)}</h2>
-                {#if !naming && slug !== ''}<button type="button" class="link plain" onclick={changeName}>{words.change}</button>{/if}
-              </div>
-            {/if}
-            {#if places && places.length > 0}
-              <ul class="places">
-                {#each places as pl (`${pl.kind}:${pl.id}`)}<li>{pl.name}</li>{/each}
-              </ul>
-            {/if}
-          </section>
-
-          {#if signedIn === null}
-            <div class="row">
-              <label class="field-label" for="up-email">{copy.emailLabel}</label>
-              <span class="field field-lg">
-                <input
-                  id="up-email"
-                  class="field-input"
-                  type="email"
-                  inputmode="email"
-                  autocomplete="email"
-                  spellcheck="false"
-                  autocapitalize="none"
-                  required
-                  maxlength="254"
-                  placeholder={copy.emailLike}
-                  bind:value={email}
-                />
-              </span>
-            </div>
-            {#if siteKey !== null}
-              <!-- THE HELD BOX STAYS WHEN THE SCRIPT FAILS: its line and Try again sit in it, side by side, at its height. -->
-              <div class="human" role="group" aria-label={copy.signupHuman} bind:this={widget}>
-                {#if widgetState === 'failed'}
-                  <div class="human-failed">
-                    <p class="human-line" role="alert">{checkWords.line}</p>
-                    <span class="human-again"><Button onclick={retryTurnstile}>{checkWords.again}</Button></span>
+                {#if opened === lineOf(h)}
+                  <div class="line-edit">
+                    {#if h.you === true}
+                      <label class="field-label" for="up-you">{words.nameLabel}</label>
+                      <span class="field"><input id="up-you" class="field-input" type="text" autocomplete="name" maxlength="60" bind:value={nameDraft} /></span>
+                      <div class="chips">
+                        <Button weight="primary" onclick={rename}>{words.keepLine}</Button>
+                        <Button weight="quiet" onclick={() => takeOut(h)}>{words.takeOut}</Button>
+                      </div>
+                    {:else}
+                      <p class="quiet">{words.becomeInstead}</p>
+                      <div class="chips" role="group" aria-label={words.becomeInstead}>
+                        {#each insteadOf(h) as id (id)}
+                          <Button size="sm" weight="quiet" onclick={() => turnInto(h, id)}>{moduleName(id)}</Button>
+                        {/each}
+                      </div>
+                      <div class="chips"><Button weight="quiet" onclick={() => takeOut(h)}>{words.takeOut}</Button></div>
+                    {/if}
                   </div>
                 {/if}
-              </div>
-            {/if}
-          {/if}
-
-          {#if said}<p class="bad" role="alert">{said}</p>{/if}
-
-          <div class="go sticky">
-            <Button weight="primary" type="submit" disabled={!ready} aria-busy={busy}>
-              {signedIn ? words.makeNow : busy ? words.sending : waitsForCheck ? checkWords.send : words.send}
-            </Button>
-          </div>
-          {#if signedIn === null && plan === 'free'}<p class="quiet open-here">{onPhone ? words.openHere : words.openHereWide}</p>{/if}
-        </form>
-      {:else if step === 'lock'}
-        <h1 class="title" id="lock-h" tabindex="-1">{words.lockTitle}</h1>
-        <!-- ITS ONE PRESS IS THE STEP'S PRIMARY, and "Not now" or a passkey made goes on to the build (`ondone`). -->
-        <PasskeyFirst ondone={lockDone} />
-      {:else if step === 'sent'}
-        <h1 class="title" id="sent-h" tabindex="-1">{copy.signupCheckMail}</h1>
-        <p class="lede">{copy.signupMailSent(sentTo)}</p>
-        {#if sentence.trim() !== ''}<p class="quiet">{sentCut ? words.sentCut : words.sentWhy}</p>{/if}
-        <div class="go"><Button weight="quiet" onclick={otherAddress}>{copy.signupOtherAddress}</Button></div>
-      {:else if step === 'link-failed'}
-        <h1 class="title">{copy.signupLinkFailed}</h1>
-        <p class="lede" role="alert">{linkWhy ?? copy.signupLinkFailedWhy}</p>
-        <div class="go"><Button weight="primary" onclick={() => void ask()}>{copy.signupStartAgain}</Button></div>
-      {:else if step === 'making'}
-        <h1 class="title">{words.making}</h1>
-        <p class="lede" role="status">{stage}</p>
-      {:else if step === 'made-partly'}
-        <h1 class="title">{words.madeTitle}</h1>
-        <p class="lede" role="status">{missed.length > 0 ? words.madePartly : words.madeUnreached}</p>
-        {#if missed.length > 0}
-          <ul class="missed">
-            <!-- THE CALL'S OWN ANSWER: the part in the person's words, and under it the record's sentence for why. -->
-            {#each missed as m, i (i)}
-              <li>
-                {m.said}
-                {#if m.why.trim() !== '' && m.why !== m.said}<span class="missed-why">{m.why}</span>{/if}
               </li>
             {/each}
           </ul>
+        </section>
+      {/if}
+
+      <div class="go sticky">
+        <Button weight="primary" type="submit" disabled={readingNow} kbd={sentence.trim() === '' || readingNow ? undefined : '↵'}>{readingNow ? firstRun.whoReading : words.next}</Button>
+      </div>
+    </form>
+
+    <ul class="promises">
+      {#each words.promises as line, i (line)}
+        {#if i > 0 || plan === 'free'}<li><Icon name="check" size="s" />{line}</li>{/if}
+      {/each}
+    </ul>
+  {:else if step === 'question'}
+    <button type="button" class="link plain back" onclick={edit}>{words.back}</button>
+    <h1 class="entry-title" id="first-q" tabindex="-1">{words.questionTitle}</h1>
+    {#if asks === 'one' && q !== null}
+      <p class="entry-lede" id="first-q-ask">{q.question}</p>
+      <div class="ask-box" bind:this={askBox}>
+      {#if q.reply === 'currency'}
+        <Currency bind:value={pick} {locale} choices={q.choices.map((c) => ({ code: c.value, name: c.label, why: c.means ?? '' }))} suggested={q.suggested} find={q.find} />
+      {:else if q.choices.length === 0}
+        <span class="field field-lg"><input class="field-input" type="text" autocomplete={q.about === 'name' ? 'name' : 'off'} maxlength="60" aria-labelledby="first-q-ask" bind:value={pick} /></span>
+      {:else}
+        <div class="opts" role="radiogroup" aria-labelledby="first-q-ask">
+          {#each q.choices as c (c.value)}
+            <button type="button" class="opt" role="radio" aria-checked={pick === c.value} onclick={() => (pick = c.value)}>
+              <span class="opt-name">{#if pick === c.value}<Icon name="check" size="s" />{/if}{c.label}</span>
+              {#if c.means}<span class="opt-means">{c.means}</span>{/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
+      </div>
+      {#if pickWhy && (pick === null || pick.trim() === '')}<p class="need" role="status">{words.pickOne}</p>{/if}
+      <p class="quiet">{q.only}</p>
+      <div class="go sticky">
+        <Button weight="primary" disabled={readingNow} onclick={() => (pick === null || pick.trim() === '' ? unpicked() : void answerIt(pick))}>{readingNow ? firstRun.whoReading : words.questionNext}</Button>
+        <Button weight="bare" disabled={readingNow} onclick={() => void answerIt(null)}>{words.questionSkip}</Button>
+      </div>
+    {:else}
+      <p class="entry-lede">{words.closest}</p>
+      <p class="quiet">{words.closestWhy}</p>
+      <div class="chips" role="group" aria-label={firstRun.mineFor}>
+        {#each USE_CASES as one (one.usecase)}
+          <Button weight="quiet" aria-pressed={chosen === one.usecase} onclick={() => pickCase(one.usecase)}>{one.title}</Button>
+        {/each}
+      </div>
+      <div class="go sticky"><Button weight="primary" disabled={chosen === null} onclick={() => void keep()}>{words.questionNext}</Button></div>
+    {/if}
+  {:else if step === 'keep'}
+    <h1 class="entry-title" id="keep-h" tabindex="-1">{words.keepTitle}</h1>
+    {@render saidLine()}
+    {#if signedIn || plan !== 'free'}
+      <p class="entry-lede">{signedIn ? (plan === 'free' ? words.keepSignedIn : words.keepSignedInPaid) : words.keepLedePaid}</p>
+    {/if}
+    <form class="form" onsubmit={send}>
+      <!-- THE NAME IT WILL HAVE, with Change: the places are on the build beside, and are not said twice (first F10). -->
+      <section class="kept">
+        {#if nameByHand}
+          <NameField bind:value={slug} bind:free id="up-name" />
+        {:else if naming || read?.title || slug !== ''}
+          <div class="kept-head">
+            <h2 class="kept-name" aria-live="polite">{naming ? words.calledFinding : (read?.title ?? slug)}</h2>
+            {#if !naming && slug !== ''}<button type="button" class="link plain" onclick={changeName}>{words.change}</button>{/if}
+          </div>
         {/if}
-        <div class="go"><Button weight="primary" onclick={writeAgain} disabled={busy || again === null}>{words.tryAgain}</Button></div>
-        <p class="aside"><button class="link plain" type="button" onclick={openAsIs}>{words.openAsIs}</button></p>
-      {:else if step === 'make-failed'}
-        <h1 class="title">{words.makeRecord}</h1>
-        {#if said}<p class="lede" role="alert">{said}</p>{/if}
-        {#if paidOnly}
-          <div class="go"><Button weight="primary" onclick={payInstead}>{words.payInstead}</Button></div>
-        {:else if canMake}
-          <form class="form" onsubmit={makeAgain}>
-            <NameField bind:value={slug} bind:free id="make-name" />
-            <div class="go sticky">
-              <Button weight="primary" type="submit" disabled={busy || !free || slug === ''} aria-busy={busy}>
-                {busy ? words.makingNow : slug === '' ? words.makeRecord : words.makeFor(slug)}
-              </Button>
-            </div>
-          </form>
-          <p class="aside"><button class="link plain" type="button" onclick={payInstead}>{words.payInstead}</button></p>
-        {:else if retry}
-          <!-- THE ACCOUNT DID NOT SAY A RECORD CAN BE MADE (or did not answer): no name to change, only the same press
-               again, and only after a lock or a host that did not answer. A refusal, sign-up closed among them, is its
-               sentence alone, since pressing again would be refused the same way. -->
-          <div class="go"><Button weight="primary" disabled={busy || held === null} onclick={() => held && void makeFree(held)}>{words.tryAgain}</Button></div>
-        {/if}
-      {:else if step === 'pay'}
-        <NoRecord title={held ? copy.signupPayFor(held.slug) : copy.noRecordTitle} {held} note={cancelled ? copy.signupCancelled : null} />
-      {:else if step === 'waiting' || step === 'slow'}
-        <h1 class="title">{copy.signupWaiting}</h1>
-        <p class="lede" role="status">{step === 'slow' ? copy.signupWaitingSlow : copy.signupWaitingWhy}</p>
-        {#if step === 'slow'}
-          <div class="go"><Button weight="primary" onclick={() => void waitForRecord(held)}>{copy.signupCheckAgain}</Button></div>
+      </section>
+
+      {#if signedIn === null}
+        <!-- `email-row`, NEVER `row`: the ledger's global `.row` drew a rule under it and cut the field short (SF5). -->
+        <div class="email-row">
+          <label class="field-label" for="up-email">{copy.emailLabel}</label>
+          <span class="field field-lg">
+            <input
+              id="up-email"
+              class="field-input"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              spellcheck="false"
+              autocapitalize="none"
+              required
+              maxlength="254"
+              placeholder={copy.emailLike}
+              bind:value={email}
+            />
+          </span>
+        </div>
+        {#if siteKey !== null}
+          <!-- THE HELD BOX STAYS WHEN THE SCRIPT FAILS: its line and Try again sit in it, side by side, at its height. -->
+          <div class="human" role="group" aria-label={copy.signupHuman} bind:this={widget}>
+            {#if widgetState === 'failed'}
+              <div class="human-failed">
+                <p class="human-line" role="alert">{checkWords.line}</p>
+                <span class="human-again"><Button onclick={retryTurnstile}>{checkWords.again}</Button></span>
+              </div>
+            {/if}
+          </div>
         {/if}
       {/if}
-      {#if (step === 'describe' || step === 'question') && siteKey !== null}
-        <!-- THE READ'S OWN BOT CHECK, drawn only when Cloudflare needs the person to do something (`freshHuman`). -->
-        <div class="read-human" role="group" aria-label={copy.signupHuman} bind:this={readSlot}></div>
+
+      {#if said}<p class="bad" role="alert">{said}</p>{/if}
+
+      <div class="go sticky">
+        <Button weight="primary" type="submit" disabled={busy || naming || slug === '' || !free} aria-busy={busy}>
+          {signedIn ? words.makeNow : busy ? words.sending : waitsForCheck ? checkWords.send : words.send}
+        </Button>
+      </div>
+      {#if signedIn === null && plan === 'free'}<p class="quiet open-here">{onPhone ? words.openHere : words.openHereWide}</p>{/if}
+    </form>
+  {:else if step === 'lock'}
+    <h1 class="entry-title" id="lock-h" tabindex="-1">{words.lockTitle}</h1>
+    <!-- ITS ONE PRESS IS THE STEP'S PRIMARY, and "Not now" or a passkey made goes on to the build (`ondone`). -->
+    <PasskeyFirst ondone={lockDone} />
+  {:else if step === 'sent'}
+    <h1 class="entry-title" id="sent-h" tabindex="-1">{copy.signupCheckMail}</h1>
+    <p class="entry-lede">{copy.signupMailSent(sentTo)}</p>
+    {#if sentence.trim() !== ''}<p class="quiet">{sentCut ? words.sentCut : words.sentWhy}</p>{/if}
+    <div class="go"><Button weight="quiet" onclick={otherAddress}>{copy.signupOtherAddress}</Button></div>
+  {:else if step === 'link-failed'}
+    <h1 class="entry-title">{copy.signupLinkFailed}</h1>
+    <p class="entry-lede" role="alert">{linkWhy ?? copy.signupLinkFailedWhy}</p>
+    <div class="go"><Button weight="primary" onclick={() => void ask()}>{copy.signupStartAgain}</Button></div>
+  {:else if step === 'making'}
+    <h1 class="entry-title">{words.making}</h1>
+    <p class="entry-lede" role="status">{stage}</p>
+  {:else if step === 'made-partly'}
+    <h1 class="entry-title">{words.madeTitle}</h1>
+    <p class="entry-lede" role="status">{missed.length > 0 ? words.madePartly : words.madeUnreached}</p>
+    {#if missed.length > 0}
+      <ul class="missed">
+        <!-- THE CALL'S OWN ANSWER: the part in the person's words, and under it the record's sentence for why. -->
+        {#each missed as m, i (i)}
+          <li>
+            {m.said}
+            {#if m.why.trim() !== '' && m.why !== m.said}<span class="missed-why">{m.why}</span>{/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <div class="go"><Button weight="primary" onclick={writeAgain} disabled={busy || again === null}>{words.tryAgain}</Button></div>
+    <p class="aside"><button class="link plain" type="button" onclick={openAsIs}>{words.openAsIs}</button></p>
+  {:else if step === 'make-failed'}
+    <h1 class="entry-title">{words.makeRecord}</h1>
+    {#if said}<p class="entry-lede" role="alert">{said}</p>{/if}
+    {#if paidOnly}
+      <div class="go"><Button weight="primary" onclick={payInstead}>{words.payInstead}</Button></div>
+    {:else if canMake}
+      <form class="form" onsubmit={makeAgain}>
+        <NameField bind:value={slug} bind:free id="make-name" />
+        <div class="go sticky">
+          <Button weight="primary" type="submit" disabled={busy || !free || slug === ''} aria-busy={busy}>
+            {busy ? words.makingNow : slug === '' ? words.makeRecord : words.makeFor(slug)}
+          </Button>
+        </div>
+      </form>
+      <p class="aside"><button class="link plain" type="button" onclick={payInstead}>{words.payInstead}</button></p>
+    {:else if retry}
+      <!-- THE ACCOUNT DID NOT SAY A RECORD CAN BE MADE (or did not answer): no name to change, only the same press
+           again, and only after a lock or a host that did not answer. A refusal, sign-up closed among them, is its
+           sentence alone, since pressing again would be refused the same way. -->
+      <div class="go"><Button weight="primary" disabled={busy || held === null} onclick={() => held && void makeFree(held)}>{words.tryAgain}</Button></div>
+    {/if}
+  {:else if step === 'pay'}
+    <NoRecord title={held ? copy.signupPayFor(held.slug) : copy.noRecordTitle} {held} note={cancelled ? copy.signupCancelled : null} />
+  {:else if step === 'waiting' || step === 'slow'}
+    <h1 class="entry-title">{copy.signupWaiting}</h1>
+    <p class="entry-lede" role="status">{step === 'slow' ? copy.signupWaitingSlow : copy.signupWaitingWhy}</p>
+    {#if step === 'slow'}
+      <div class="go"><Button weight="primary" onclick={() => void waitForRecord(held)}>{copy.signupCheckAgain}</Button></div>
+    {/if}
+  {/if}
+  {#if (step === 'describe' || step === 'question') && siteKey !== null}
+    <!-- THE READ'S OWN BOT CHECK, drawn only when Cloudflare needs the person to do something (`freshHuman`). -->
+    <div class="read-human" role="group" aria-label={copy.signupHuman} bind:this={readSlot}></div>
+  {/if}
+{/snippet}
+
+<!-- ONE FRAME, TWO SHAPES (`../signin/Entry.svelte`, first F5). A step that is one column (closed, Apply, check your email,
+     the lock, made partly) stands in the 440 sheet, as sign in does; describing and keeping stand across the window, the
+     words in a tile on the left and the build beside them. The brand is in the same place either way. -->
+{#if sheet}
+  <Entry aside={step === 'invite-only' ? nextSteps : undefined}>
+    <div class="talk">{@render stepNow()}</div>
+  </Entry>
+{:else}
+  <Frame end={signedIn === null ? signInLink : undefined}>
+    <div class="board" data-paired={showBuild ? '' : undefined}>
+      {#if watching && watched}
+        <!-- THE BUILD BEING WRITTEN, tile by tile across the whole board: each part says where it is, read from the record. -->
+        <Making parts={watched.parts} states={makingStates(watched.parts, watched.held, watched.answer)} />
+      {:else}
+        <div class="talk" data-tile>{@render stepNow()}</div>
+
+        {#if showBuild}
+          <aside class="build" aria-label={firstRun.mineTitle}>
+            <Building {parts} title={read?.title ?? null} {places} {locale} readBy={read} settled={step !== 'describe'} />
+          </aside>
+        {/if}
       {/if}
     </div>
-
-    {#if showBuild}
-      <aside class="build" aria-label={firstRun.mineTitle}>
-        <Building {parts} title={read?.title ?? null} {places} {locale} readBy={read} />
-      </aside>
-    {/if}
-    {/if}
-  </div>
-</Frame>
+  </Frame>
+{/if}
 
 <style>
   /* THE WORDS AND THE BUILD, side by side from 900px across the whole window, the words first on a phone. The words keep
-     a reading measure inside their column; the build takes the rest. */
+     a reading measure inside their tile; the build takes the rest. */
   .board {
     display: grid;
     align-items: start;
-    gap: var(--sp-6);
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 
   @media (width >= 900px) {
     .board[data-paired] {
       grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      column-gap: clamp(var(--sp-6), 4vw, var(--sp-8));
+      column-gap: clamp(var(--sp-5), 3vw, var(--sp-7));
     }
 
     /* THE WORDS STAY IN VIEW while the build grows under a long answer. */
@@ -1487,8 +1506,22 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    max-inline-size: 40rem;
     min-inline-size: 0;
+  }
+
+  /* THE TALK COLUMN IS A TILE (first F5), so its fields sit on white as they do on sign in, never on the bare ground. */
+  .talk[data-tile] {
+    box-sizing: border-box;
+    max-inline-size: 40rem;
+    padding: var(--sp-5);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  @media (width < 640px) {
+    .talk[data-tile] {
+      padding: 20px;
+    }
   }
 
   .talk > :is(.form, .go, .aside, .missed) {
@@ -1497,48 +1530,32 @@
 
   .build {
     min-inline-size: 0;
-    animation: build-in var(--d-page) var(--ease-out) both;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .build {
+      animation: build-in var(--d-page) var(--ease-out) both;
+    }
   }
 
   @keyframes build-in {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(4px);
     }
   }
 
-  /* THE ENTRY SCREENS' ONE TITLE: `t-title`, 28/34 at 600 in Geist, and the phone's large title 30/36. */
-  .title {
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-title);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 34px;
-    text-wrap: balance;
-    overflow-wrap: anywhere;
-  }
-
-  .title:focus {
-    /* focus-ok: `tabindex="-1"` moves focus here for a screen reader when the step changes; it is never in the tab order. */
-    outline: none;
-  }
-
-  .lede {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
-    overflow-wrap: anywhere;
+  /* `Empty` stands in a tile or the sheet with no tile of its own. */
+  .talk :global(.empty) {
+    padding: 0;
+    background: none;
   }
 
   .quiet {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 
   .form {
@@ -1547,6 +1564,37 @@
     gap: var(--sp-4);
     min-inline-size: 0;
   }
+
+  /* ── The header's way to sign in ───────────────────────────────────────── */
+
+  .have-wide {
+    color: var(--ink-2);
+  }
+
+  .have-link {
+    color: var(--red);
+    font-weight: 500;
+  }
+
+  .have-narrow {
+    display: none;
+  }
+
+  .have-narrow :global(.btn) {
+    min-block-size: var(--tap);
+  }
+
+  @media (width < 640px) {
+    .have-wide {
+      display: none;
+    }
+
+    .have-narrow {
+      display: inline-flex;
+    }
+  }
+
+  /* ── The sentence ──────────────────────────────────────────────────────── */
 
   /* THE ONE FIELD, at the size of a sentence rather than a form row, 16px so a phone does not zoom it. */
   .prompt {
@@ -1557,11 +1605,11 @@
     padding: var(--sp-3) var(--sp-4);
     background: transparent;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
+    font-size: 16px;
+    line-height: 24px;
     /* A field takes the browser's own tracking, not the body's, and the marks under it take the body's: the same here,
        or every word drifts a little further from its mark. The gutter is kept on both, so a scrollbar wraps neither. */
     letter-spacing: inherit;
@@ -1571,15 +1619,29 @@
   }
 
   .prompt::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
+  }
+
+  /* THE FIELD DRAWS NO RING OF ITS OWN: the wrapper takes the house's one ring (first F16). */
+  .prompt:focus,
+  .prompt:focus-visible {
+    /* focus-ok: `.lit-field:focus-within` draws the 2px ring at 2px offset, as every `.field` does. */
+    outline: none;
+    box-shadow: none;
   }
 
   /* THE FIELD AND ITS MARKS: the marks are the same words in the same box under a clear field, so the words heard
-     light up where they are typed. Same padding, size, line and wrapping as the field, or the marks drift. */
+     light up where they are typed. Same padding, size, line and wrapping as the field, or the marks drift. On the
+     field's own fill, so it is a field to the eye before it is touched (first F5). */
   .lit-field {
     position: relative;
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+  }
+
+  .lit-field:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
   }
 
   .lit {
@@ -1588,30 +1650,29 @@
     overflow: hidden;
     padding: var(--sp-3) var(--sp-4);
     color: transparent;
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
+    font-size: 16px;
+    line-height: 24px;
     white-space: pre-wrap;
     overflow-wrap: break-word;
     scrollbar-gutter: stable;
     pointer-events: none;
   }
 
+  /* A WORD HEARD, IN A NEUTRAL WASH: heard is not late, so it is never red. Translucent, so it reads on the field's fill. */
   .lit mark {
-    border-radius: 4px;
-    background: var(--action-tint-1);
+    border-radius: var(--r-xs);
+    background: color-mix(in oklab, var(--ink) 12%, transparent);
     color: transparent;
   }
 
-  /* A TILE: flat, opaque, no border, no shadow, radius 16 (DIRECTION §39). */
-  .tile {
+  /* ── What I heard ──────────────────────────────────────────────────────── */
+
+  .heard {
     display: grid;
-    gap: var(--sp-3);
-    padding: var(--tile-pad);
-    border-radius: var(--tile-r);
-    background: var(--tile);
+    gap: var(--sp-2);
   }
 
-  .tile-head {
+  .heard-head {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -1619,16 +1680,15 @@
     gap: var(--sp-2);
   }
 
-  .tile-h {
+  .heard-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
 
   .lines,
-  .places,
   .promises {
     display: grid;
     gap: var(--sp-1);
@@ -1637,34 +1697,37 @@
     list-style: none;
   }
 
-  /* A LINE HEARD: her words on the left, what they became on the right, the whole line one press. */
-  .line {
+  /* A LINE HEARD: her words on the left, what they became on the right in ink with a chevron, the whole line one press. */
+  .heard-line {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--sp-1) var(--sp-3);
-    inline-size: 100%;
+    box-sizing: border-box;
+    inline-size: calc(100% + 2 * var(--sp-3));
     min-block-size: var(--tap);
+    margin-inline: calc(-1 * var(--sp-3));
     padding: var(--sp-2) var(--sp-3);
     border: 0;
-    border-radius: 8px;
+    border-radius: var(--r-ctl);
     background: none;
-    color: var(--ink);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    font-size: var(--fs-body);
+    line-height: 22px;
     text-align: start;
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .line[aria-expanded='true'] {
-    background: var(--selected);
+  .heard-line[aria-expanded='true'] {
+    background: var(--hover);
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .line:hover {
-      background: var(--selected);
+    .heard-line:hover {
+      background: var(--hover);
     }
   }
 
@@ -1674,34 +1737,36 @@
   }
 
   .line-became {
-    color: var(--action-text);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--ink);
     font-weight: 500;
+  }
+
+  .line-became :global(svg) {
+    color: var(--ink-3);
   }
 
   .line-edit {
     display: grid;
     gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3) var(--sp-3);
-  }
-
-  .places {
-    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-    color: var(--ink);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    padding: var(--sp-2) 0 var(--sp-3);
   }
 
   .promises li {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 
-  /* THE ANSWERS: full-width rectangles, each its name and what choosing it means; the chosen one in the accent's tint
-     and with a tick, never the colour alone. */
+  /* ── The one question ──────────────────────────────────────────────────── */
+
+  /* THE ANSWERS: full-width rectangles on the field's fill, each its name and what choosing it means; the chosen one in
+     the selected row's tint and with a tick, never the colour alone. */
   .opts {
     display: grid;
     gap: var(--sp-2);
@@ -1709,42 +1774,52 @@
 
   .opt {
     display: grid;
-    gap: 2px;
+    gap: var(--sp-1);
     inline-size: 100%;
     min-block-size: var(--tap);
     padding: var(--sp-3) var(--sp-4);
     border: 0;
-    border-radius: 8px;
-    background: var(--tile);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
     color: var(--ink);
     font: inherit;
     text-align: start;
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .opt[aria-checked='true'] {
-    background: var(--action-tint-1);
+    background: var(--red-tint);
   }
 
   .opt-name {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
   .opt-means {
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .back {
     align-self: flex-start;
   }
 
-  .open-here {
-    text-align: center;
+  .ask-box {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  /* WHAT TO DO WHEN CONTINUE WAS PRESSED WITH NOTHING CHOSEN: the second ink, never an alarm. */
+  .need {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .chips {
@@ -1754,53 +1829,72 @@
   }
 
   .chips :global(.btn[aria-pressed='true']) {
-    background: var(--selected);
+    background: var(--hover);
   }
 
-  /* THE SENTENCE ONCE KEPT: one line in the field's own fill, which a press opens again for editing. */
+  /* ── Keep it ───────────────────────────────────────────────────────────── */
+
+  /* THE SENTENCE ONCE KEPT: her words with no indent, quiet, and the way back to them on the same start edge. */
   .said-line {
     display: grid;
+    justify-items: start;
     gap: var(--sp-1);
-    inline-size: 100%;
-    min-block-size: var(--tap);
-    padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink);
-    font: inherit;
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
-    text-align: start;
-    cursor: text;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .said-line:hover:not(:disabled) {
-      background: var(--s2);
-    }
   }
 
   .said-text {
-    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
     overflow-wrap: anywhere;
-    quotes: none;
   }
 
-  .said-edit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+  /* THE NAME IT WILL HAVE, on the field's fill inside the talk tile: a tile never holds a tile. */
+  .kept {
+    display: grid;
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
   }
 
-  .row {
+  .kept:empty {
+    display: none;
+  }
+
+  .kept-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-2);
+  }
+
+  .kept-name {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  /* `email-row` AND NOT THE LEDGER'S `.row`: a label over a field the column's width. */
+  .email-row {
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
   }
 
-  .row .field-input {
+  .email-row .field {
+    inline-size: 100%;
+  }
+
+  .email-row .field-input {
     scroll-margin-block: var(--sp-6) calc(var(--tap) + var(--sp-7));
+  }
+
+  .open-here {
+    text-align: start;
   }
 
   .human {
@@ -1816,17 +1910,21 @@
     min-block-size: 65px;
   }
 
+  .human-line,
+  .bad {
+    margin: 0;
+    color: var(--red);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
   .human-line {
     flex: 1;
     min-inline-size: 0;
-    margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
   }
 
   .human-again :global(.btn) {
-    min-block-size: 44px;
+    min-block-size: var(--tap);
   }
 
   /* THE READ'S BOT CHECK TAKES NO ROOM until Cloudflare draws something the person must do. */
@@ -1834,22 +1932,17 @@
     inline-size: 100%;
   }
 
-  .bad {
-    margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
-  }
-
   .go {
     display: flex;
+    gap: var(--sp-2);
   }
 
   .go :global(.btn) {
     min-block-size: var(--tap);
   }
 
-  /* THE PRESS STAYS ABOVE THE PHONE'S KEYBOARD: `--kb` is the keyboard's height, written at run time. */
+  /* THE PRESS STAYS ABOVE THE PHONE'S KEYBOARD: `--kb` is the keyboard's height, written at run time. On the talk tile's
+     own fill, so no band of another colour crosses the column (first F10). */
   @media (width < 900px) {
     .go :global(.btn) {
       inline-size: 100%;
@@ -1859,22 +1952,22 @@
       position: sticky;
       inset-block-end: calc(var(--kb, 0px) + var(--sp-4));
       padding-block: var(--sp-2);
-      background: var(--bg);
+      background: var(--tile);
     }
   }
 
   .aside {
     margin: 0;
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .link {
     display: inline-flex;
     align-items: center;
     min-block-size: var(--tap);
-    color: var(--link);
-    font-size: var(--t-base);
+    color: var(--red);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -1885,8 +1978,12 @@
     background: none;
     font: inherit;
     font-weight: 500;
-    color: var(--link);
+    color: var(--red);
     cursor: pointer;
+  }
+
+  .said-edit {
+    min-block-size: var(--tap);
   }
 
   .missed {
@@ -1895,26 +1992,66 @@
     margin: 0;
     padding-inline-start: var(--sp-5);
     color: var(--ink);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 
   .missed-why {
     display: block;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .build {
-      animation: none;
-    }
+  /* ── Apply's rail ──────────────────────────────────────────────────────── */
+
+  .next {
+    display: grid;
+    gap: var(--sp-3);
+    padding-block-start: var(--sp-2);
+  }
+
+  .next-h {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    font-weight: 600;
+    line-height: 24px;
+  }
+
+  .next-list {
+    display: grid;
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .next-line {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  /* A STEP'S NUMBER IN A WELL OF THE TILE'S FILL, on the ground beside the sheet: a count of steps is not an alarm. */
+  .next-n {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    background: var(--tile);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
   @media (width < 900px) {
-    .title {
-      font-family: var(--font-display);
-      font-size: var(--t-figure);
-      line-height: 36px;
+    .next {
+      padding-inline: var(--sp-1);
     }
   }
 </style>

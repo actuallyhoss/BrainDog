@@ -16,8 +16,6 @@ export const words = {
   title: 'Start your BrainDog',
   /** Under "Who are you?": what to say. That nothing is kept yet is the second promise. */
   lede: 'Say who you are and what you want to keep track of. Your BrainDog builds as you type.',
-  /** Over the chips, which are the first run's own (`firstRun.whoChips`). */
-  startFrom: 'Or start from one of these',
   /**
    * THREE PROMISES UNDER THE FIELD (use case 6, step 1), each one the product keeps: a free record takes no card
    * (DIRECTION §35); nothing typed leaves this device until the email is sent; and Settings, Export hands every record
@@ -43,6 +41,8 @@ export const words = {
   questionTitle: 'One thing I could not guess',
   questionNext: 'Continue',
   questionSkip: 'Skip it',
+  /** Under the answers when Continue was pressed with none chosen. */
+  pickOne: 'Pick one, or skip it.',
   back: 'Back',
 
   /** The second step: the sentence kept, and one email. */
@@ -100,22 +100,33 @@ export const words = {
   /** The mailed link opened while the host could not be reached: the link is not spent, so it is not called expired. */
   linkUnreached: 'We could not reach BrainDog. Open the link again in a minute.',
   haveOne: 'Already have a BrainDog? Sign in',
+  /** The header's half of it from 640px: the question in the second ink, then only "Sign in" as the link. */
+  haveAsk: 'Already have a BrainDog?',
   /**
    * SIGN-UP BY INVITATION, REACHED WITH NO CODE (LAUNCH 103, item 10): its own screen (`Apply.svelte`), not the closed
    * page. The site says nothing about invites; only this page does, and it offers a way in: apply, and be emailed.
    */
-  inviteTitle: 'Free while in early access',
-  inviteWhy: 'Ask for an invite and we will email it when it is ready. Already have one? Open its link.',
+  inviteTitle: 'Early access, invite only',
+  inviteWhy: "BrainDog is free while in early access. Ask for an invite and we'll email you when there's room. Already invited? Open the link in your email.",
   applyName: 'Your name',
   applyEmail: 'Your email',
   applyUse: 'What would you use it for?',
+  /** One example of an answer, in the field until somebody types. */
+  applyUseLike: "My shop's orders and invoices, or the app I build with Claude",
   applyLink: 'Your website or X handle',
   /** Beside the two questions a person may leave blank. */
   optional: 'Optional',
-  applySend: 'Send my application',
+  applySend: 'Ask for an invite',
+  /** Under a field left empty when the button was pressed: why it is needed, and nothing more (first F16). */
+  applyNeedsName: 'Add your name so we know who is asking.',
+  applyNeedsEmail: 'Add your email so we can send the invite.',
   applySending: 'Sending',
   /** In place of the form once the host has it. */
-  applied: "Thanks. We'll email you when your invite is ready.",
+  applied: 'Thanks. Your invite will come to this address.',
+
+  /** Beside Apply from 900px, under it on a phone: what happens next, three plain lines (first F5). */
+  nextTitle: 'What happens next',
+  nextLines: ['We email your invite.', 'Open it and say who you are.', 'Your BrainDog is made as you type.'],
   /** Refused, in this screen's words: too many tries says when to come back, a failed check says to do it again. */
   applyLimit: (seconds: number) => `Too many tries from here. Try again in ${waitOf(seconds)}.`,
   applyCheck: 'The check that you are a person did not pass. Try the check again, then send it.',

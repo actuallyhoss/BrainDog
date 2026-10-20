@@ -18,11 +18,12 @@ const andOf = (items: readonly string[]): string =>
   items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 
 export const firstRun = {
-  /* THE PROMPT. A question, one field and five chips, the starting points of use case 6 (his word of 9 October): a
-     shop, a freelancer, a student, a founder of a few companies and a team. Each chip is a clause a person could have
-     typed, appended to what is there, never a choice made for them. Somebody starting something new says so in words. */
+  /* THE PROMPT. A question and one field, with one example of an answer in it (the UI pass of 20 October, first F6): the
+     chips that stood under it were a chip cloud, and they went. `whoChips` stays as the five starting points of use case
+     6 (his word of 9 October), a shop, a freelancer, a student, a founder of a few companies and a team, which the
+     reading's tests hold it to; nothing draws them. */
   whoQuestion: 'Who are you?',
-  whoPlaceholder: 'Your name, and what you want to keep here',
+  whoPlaceholder: "I'm Mariam. I run a candle shop and want to keep track of orders, stock and what I owe suppliers.",
   whoChips: ['I run a small shop', 'I freelance', "I'm a student", 'I run a few companies', "I'm part of a team"],
   whoChipsLabel: 'Add to your answer',
   whoGo: 'Show my BrainDog',
@@ -34,7 +35,7 @@ export const firstRun = {
      the build beside the words, so a thin reading is never taken for the most this can do. */
   readByRulesAny: 'Simple rules read this. Check what was heard, and tell it more.',
   /* BEFORE THE PRESS, UNDER THE FIELD: what Next does with the words, said while the host may have a model to read them. */
-  readOnPress: 'Pressing Next lets a model read what you wrote, once, to set this up. Nothing is kept until you keep it.',
+  readOnPress: "When you press That's me, a model reads what you wrote once, to set this up. Nothing is kept until you keep it.",
 
   /* POINT AT AN EXPORT: a file from another app, read on this device and shown before anything is saved. */
   exportPoint: 'Or bring in a file',

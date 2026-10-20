@@ -16,6 +16,9 @@
   WHO READ IT IS SAID UNDER THE PLACES (`readBy`, USE-B05): where the reading is the rules', for any cause (no model on
   this host, no press yet, a refusal, a silence), one quiet line says so, and where the month's asks are spent it says
   that instead (`firstRun.readByRules`). A model's reading says nothing more, and neither does a screen with no reading.
+
+  `settled` FROM THE KEEP STEP ON (first F9): the words are no longer being typed, so neither "builds as you type" nor
+  the line inviting her to tell it more is true, and both go.
 -->
 <script lang="ts">
   import Icon from '$lib/ui/Icon.svelte';
@@ -33,6 +36,7 @@
     readBy = null,
     meta = words.asYouType,
     empty = words.startsEmpty,
+    settled = false,
   }: {
     /** The parts as read (`partsOf`): only the entries the sentence filled are read off them, under their place. */
     parts: readonly PartOf[];
@@ -47,11 +51,13 @@
     meta?: string | undefined;
     /** The line under the places before anything is in them. */
     empty?: string | undefined;
+    /** The words are kept and no longer typed: the lines about typing and telling it more go. */
+    settled?: boolean | undefined;
   } = $props();
 
   /** The line about the rules, where they read it: the month spent has its own, and any other cause the plain one. */
   const rulesLine = $derived(
-    readBy === null || readBy === undefined || (readBy.by !== undefined && readBy.by !== 'rules')
+    settled || readBy === null || readBy === undefined || (readBy.by !== undefined && readBy.by !== 'rules')
       ? null
       : readBy.fell === 'SLASH_BUDGET_SPENT'
         ? firstRun.readByRules
@@ -90,7 +96,7 @@
 </script>
 
 <div class="building">
-  <Tile icon="home" title={title ?? words.yours} {meta} data-build>
+  <Tile icon="home" title={title ?? words.yours} meta={settled ? undefined : meta} data-build>
     <ol class="places">
       {#each shown as place (`${place.kind}:${place.id}`)}
         <li class="place" data-place={place.id} data-arrived={fresh.has(`${place.kind}:${place.id}`) ? '' : undefined}>
@@ -132,21 +138,27 @@
     gap: 2px;
     padding: var(--sp-2) var(--sp-3);
     border-radius: 8px;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
     min-inline-size: 0;
-    transition: background-color 1500ms var(--ease-out);
+  }
+
+  /* THE ARRIVAL WASH FADES OVER A SECOND AND A HALF, the one long motion, and only for a reader who has not asked for less. */
+  @media (prefers-reduced-motion: no-preference) {
+    .place {
+      transition: background-color 1500ms var(--ease-out);
+    }
   }
 
   .place:first-child {
-    background: var(--s1);
+    background: var(--tile-2);
     color: var(--ink);
     font-weight: 500;
   }
 
   .place[data-arrived] {
-    background: var(--arrived-wash);
+    background: var(--arrived);
     transition: none;
   }
 
@@ -180,7 +192,7 @@
   }
 
   .entry-detail {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .num {
@@ -190,8 +202,8 @@
 
   .reading {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 </style>

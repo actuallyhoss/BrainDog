@@ -7,7 +7,10 @@
 
   ONE FORM, FOUR QUESTIONS, two of them optional, and Cloudflare's check when the host gave a site key, drawn as the
   sign-up form draws it (`turnstile.ts`, `widgetWords`). Once the host has the application the form goes and one line
-  says what happens next. Under it, always, the way to sign in.
+  says the invite will come, with the address under it in ink. Under it, always, the way to sign in.
+
+  THE BUTTON IS NEVER GREYED FOR WHAT IS NOT TYPED YET (first F16): a greyed primary explains nothing. Pressed with a
+  question left empty, the field takes focus and one line under it says why it is needed.
 -->
 <script lang="ts">
   import { onDestroy } from 'svelte';
@@ -26,6 +29,12 @@
   let link = $state('');
   let busy = $state(false);
   let sent = $state(false);
+  /** The address the application went from, said back under the thanks. */
+  let sentFrom = $state('');
+  /** Which needed answer was empty when the button was pressed, so its field says why, until it is typed. */
+  let missing = $state<'name' | 'email' | null>(null);
+  let nameField = $state<HTMLInputElement | undefined>(undefined);
+  let emailField = $state<HTMLInputElement | undefined>(undefined);
   let said = $state<string | null>(null);
 
   /* ── Cloudflare's check, as the sign-up form draws it ────────────────────── */
@@ -86,7 +95,6 @@
 
   /* ── sending ─────────────────────────────────────────────────────────────── */
 
-  const ready = $derived(!busy && name.trim() !== '' && email.trim() !== '' && (siteKey === null || human !== null));
   const waitsForCheck = $derived(!busy && name.trim() !== '' && email.trim() !== '' && siteKey !== null && human === null);
 
   const refusal = (out: Exclude<Applied, { ok: true }>): string =>
@@ -94,33 +102,65 @@
 
   async function send(e: SubmitEvent): Promise<void> {
     e.preventDefault();
-    if (!ready) return;
+    if (busy) return;
+    if (name.trim() === '') return need('name');
+    if (email.trim() === '' || emailField?.validity.valid === false) return need('email');
+    missing = null;
+    /* THE CHECK NOT DONE YET IS SAID ON THE BUTTON ITSELF (`checkWords.send`), so a press waits for it. */
+    if (siteKey !== null && human === null) return;
     busy = true;
     said = null;
     const out = await sendApplication(liveIo, { name, email, use, link, ...(human !== null ? { turnstile: human } : {}) });
     busy = false;
     if (out.ok) {
       dropCheck();
+      sentFrom = email.trim();
       sent = true;
       return;
     }
     said = refusal(out);
     if (siteKey !== null) resetCheck();
   }
+
+  /** Point at the one empty answer: its field takes focus and its line says why. */
+  function need(which: 'name' | 'email'): void {
+    missing = which;
+    (which === 'name' ? nameField : emailField)?.focus();
+  }
+
+  /* THE LINE GOES ONCE THE ANSWER IS TYPED. */
+  $effect(() => {
+    if ((missing === 'name' && name.trim() !== '') || (missing === 'email' && email.trim() !== '')) missing = null;
+  });
 </script>
 
 <div class="apply">
-  <h1 class="title">{words.inviteTitle}</h1>
+  <h1 class="entry-title">{words.inviteTitle}</h1>
   {#if sent}
-    <p class="lede" role="status">{words.applied}</p>
+    <div class="thanks" role="status">
+      <p class="entry-lede">{words.applied}</p>
+      <p class="to">{sentFrom}</p>
+    </div>
   {:else}
-    <p class="lede">{words.inviteWhy}</p>
-    <form class="form" onsubmit={send}>
+    <p class="entry-lede">{words.inviteWhy}</p>
+    <form class="form" novalidate onsubmit={send}>
       <div class="ask">
         <label class="field-label" for="apply-name">{words.applyName}</label>
         <span class="field field-lg">
-          <input id="apply-name" class="field-input" type="text" autocomplete="name" required maxlength="120" bind:value={name} />
+          <input
+            id="apply-name"
+            class="field-input"
+            type="text"
+            autocomplete="name"
+            required
+            maxlength="120"
+            aria-invalid={missing === 'name' ? 'true' : undefined}
+            aria-describedby={missing === 'name' ? 'apply-name-need' : undefined}
+            bind:value={name}
+            bind:this={nameField}
+          />
         </span>
+        {#if missing === 'name'}<p class="need" id="apply-name-need">{words.applyNeedsName}</p>{/if}
       </div>
       <div class="ask">
         <label class="field-label" for="apply-email">{words.applyEmail}</label>
@@ -136,14 +176,18 @@
             required
             maxlength="254"
             placeholder={copy.emailLike}
+            aria-invalid={missing === 'email' ? 'true' : undefined}
+            aria-describedby={missing === 'email' ? 'apply-email-need' : undefined}
             bind:value={email}
+            bind:this={emailField}
           />
         </span>
+        {#if missing === 'email'}<p class="need" id="apply-email-need">{words.applyNeedsEmail}</p>{/if}
       </div>
       <div class="ask">
         <label class="field-label" for="apply-use">{words.applyUse} <span class="optional">{words.optional}</span></label>
         <span class="field field-lg">
-          <input id="apply-use" class="field-input" type="text" maxlength="280" bind:value={use} />
+          <textarea id="apply-use" class="field-input use-input" rows="2" maxlength="280" placeholder={words.applyUseLike} bind:value={use}></textarea>
         </span>
       </div>
       <div class="ask">
@@ -165,16 +209,17 @@
       {/if}
       {#if said}<p class="bad" role="alert">{said}</p>{/if}
       <div class="go">
-        <Button weight="primary" type="submit" disabled={!ready} aria-busy={busy}>
+        <Button weight="primary" type="submit" aria-busy={busy}>
           {busy ? words.applySending : waitsForCheck ? checkWords.send : words.applySend}
         </Button>
       </div>
     </form>
   {/if}
-  <a class="link" href={at('/signin')}>{words.haveOne}</a>
+  <p class="have">{words.haveAsk} <a class="link" href={at('/signin')}>{copy.signIn}</a></p>
 </div>
 
 <style>
+  /* THE TITLE AND THE LINE UNDER IT ARE THE ENTRY SCREENS' OWN (`../signin/Entry.svelte`); this is the column. */
   .apply {
     display: flex;
     flex-direction: column;
@@ -182,25 +227,18 @@
     min-inline-size: 0;
   }
 
-  /* THE PAGE'S NAME AT 28 AND ONE HEADLINE SENTENCE AT 17, as every entry screen opens (DIRECTION §39). */
-  .title {
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-title);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 34px;
-    text-wrap: balance;
-    overflow-wrap: anywhere;
+  .thanks {
+    display: grid;
+    gap: var(--sp-1);
   }
 
-  .lede {
+  /* THE ADDRESS THE INVITE WILL COME TO, in ink on its own line, so a mistyped one is seen at once. */
+  .to {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 22px;
     overflow-wrap: anywhere;
   }
 
@@ -218,10 +256,34 @@
     min-inline-size: 0;
   }
 
+  .ask .field {
+    inline-size: 100%;
+  }
+
+  /* TWO LINES FOR WHAT IT IS FOR, so the example in it is read whole and not cut at the field's edge. */
+  .use-input {
+    inline-size: 100%;
+    padding-block: var(--sp-2);
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    line-height: 22px;
+    resize: none;
+  }
+
   .optional {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 400;
+  }
+
+  /* WHY A NEEDED ANSWER IS NEEDED, 8 under its field, in the second ink: a missing name is not an alarm. */
+  .need {
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .human {
@@ -242,37 +304,47 @@
     flex: 1;
     min-inline-size: 0;
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    color: var(--red);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 
   .human-again :global(.btn) {
-    min-block-size: 44px;
+    min-block-size: var(--tap);
   }
 
   .go {
     display: flex;
   }
 
+  /* THE ONE PRESS IS THE COLUMN'S WIDTH, as every way in on sign in is. */
   .go :global(.btn) {
-    min-block-size: var(--tap);
+    inline-size: 100%;
+    min-block-size: max(40px, var(--ctl-h));
   }
 
-  @media (width < 900px) {
-    .go :global(.btn) {
-      inline-size: 100%;
-    }
+  /* THE WAY TO SIGN IN: the question in the second ink, and only "Sign in" the link, on a 44px line. */
+  .have {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0.3em;
+    min-block-size: var(--tap);
+    margin: var(--sp-2) 0 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 
   .link {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    min-block-size: var(--tap);
-    margin-block-start: var(--sp-3);
-    color: var(--link);
-    font-size: var(--t-base);
+    color: var(--red);
     font-weight: 500;
+  }
+
+  /* UNDER A THUMB EVERY FIELD READS AT 16, the size below which a phone's browser zooms the page in on focus. */
+  @media (pointer: coarse) {
+    .ask .field-input {
+      font-size: 16px;
+    }
   }
 </style>

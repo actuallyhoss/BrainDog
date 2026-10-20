@@ -259,12 +259,13 @@ const plain = (line: string) => {
   assert.doesNotMatch(line, /\b(row|entity|list item)\b/i, `${line} names the machinery`);
 };
 
-test('STEP 1: FIVE STARTING POINTS AND THREE PROMISES, "Yours to export or move, any time" among them', () => {
-  assert.deepEqual([...firstRun.whoChips], ['I run a small shop', 'I freelance', "I'm a student", 'I run a few companies', "I'm part of a team"]);
+test('STEP 1: ONE FIELD WITH ONE EXAMPLE IN IT, NO CHIP CLOUD, and three promises, "Yours to export or move, any time" among them', () => {
+  assert.equal(firstRun.whoPlaceholder, "I'm Mariam. I run a candle shop and want to keep track of orders, stock and what I owe suppliers.");
   assert.equal(words.promises.length, 3);
   assert.deepEqual([...words.promises], ['Free, with no card', 'Nothing is saved until you keep it', 'Yours to export or move, any time']);
-  for (const line of [...words.promises, words.lede, words.startFrom]) plain(line);
-  assert.match(PAGE, /firstRun\.whoChips/, 'the page draws chips of its own');
+  for (const line of [...words.promises, words.lede, firstRun.whoPlaceholder]) plain(line);
+  assert.doesNotMatch(PAGE, /firstRun\.whoChips/, 'the starter chips are back (first F6)');
+  assert.match(PAGE, /placeholder=\{firstRun\.whoPlaceholder\}/, 'the field holds no example');
   assert.match(PAGE, /words\.promises/, 'the page draws no promises');
 });
 
@@ -329,7 +330,7 @@ test('INVITE ONLY IS ITS OWN SCREEN: the invite-only step draws Apply with the h
   /* A CODE OR A SIGNED-IN PERSON NEVER SEES IT: the step is taken only with neither. */
   assert.match(ask, /mode === 'invite' && signedIn === null && codeKept\(tabStore\(\)\) === null\) \{\s*step = 'invite-only';/);
   const apply = readFileSync(new URL('./Apply.svelte', import.meta.url), 'utf8');
-  assert.match(apply, /words\.haveOne/, 'the way to sign in is gone');
+  assert.match(apply, /words\.haveAsk\} <a class="link" href=\{at\('\/signin'\)\}>\{copy\.signIn\}/, 'the way to sign in is gone');
   assert.match(apply, /widgetWords\(widgetState\)/, 'the check is not drawn as the sign-up form draws it');
   assert.match(apply, /\{#if siteKey !== null\}/, 'the check is drawn with no site key');
 });

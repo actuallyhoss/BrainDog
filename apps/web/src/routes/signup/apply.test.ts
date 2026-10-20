@@ -68,6 +68,11 @@ test('THE INVITE-ONLY WORDS: no dash, titles and buttons with no full stop, butt
     words.applyEmail,
     words.applyUse,
     words.applyLink,
+    words.applyUseLike,
+    words.applyNeedsName,
+    words.applyNeedsEmail,
+    words.nextTitle,
+    ...words.nextLines,
     words.optional,
     words.applySend,
     words.applySending,
@@ -83,12 +88,13 @@ test('THE INVITE-ONLY WORDS: no dash, titles and buttons with no full stop, butt
     assert.doesNotMatch(line, /[–—]/, `${line} carries a dash`);
     assert.doesNotMatch(line, /\b(row|rows|entity|list item|code)\b/i, `${line} names the machinery`);
   }
-  assert.equal(words.inviteTitle, 'Free while in early access');
-  assert.equal(words.inviteWhy, 'Ask for an invite and we will email it when it is ready. Already have one? Open its link.');
-  assert.equal(words.applied, "Thanks. We'll email you when your invite is ready.");
+  /* INVITE ONLY, SAID PLAINLY (first F4): the title says it, and the line under it says what is free and how to get in. */
+  assert.equal(words.inviteTitle, 'Early access, invite only');
+  assert.equal(words.inviteWhy, "BrainDog is free while in early access. Ask for an invite and we'll email you when there's room. Already invited? Open the link in your email.");
+  assert.equal(words.applied, 'Thanks. Your invite will come to this address.');
   for (const title of [words.inviteTitle, words.applySend, words.haveOne]) assert.doesNotMatch(title, /\.$/, `${title} ends with a full stop`);
   /* A VERB, THEN WHAT IT ACTS ON. */
-  assert.match(words.applySend, /^Send my application$/);
+  assert.match(words.applySend, /^Ask for an invite$/);
   /* WHEN TO COME BACK, said as a person says it. */
   assert.equal(words.applyLimit(30), 'Too many tries from here. Try again in a minute.');
   assert.equal(words.applyLimit(300), 'Too many tries from here. Try again in 5 minutes.');
