@@ -122,6 +122,7 @@ import type { ChildArgs, Minted as ChildMinted, Verified } from '@braindog/kerne
 /* THE FRONT DOORS: a crash answered by reference, the limiter, the guard in front of every
    statement, and the JSON lines. */
 import { crashed } from '@braindog/host';
+import { PREVIEW_READ_ONLY } from '@braindog/host';
 import { bindingLimiter, classOf, limitKey, refusedFor, type LimitClass, type LimitDoor, type RateLimitBinding } from '@braindog/host/limits';
 import { ABUSE, tooManyLine, type AbuseName } from '@braindog/host/abuse';
 import { guardBody } from './body-cap.ts';
@@ -3434,6 +3435,8 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
       session: (sid, slug) => directory.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as unknown as Promise<AuthResult<Who>>,
       access: (record, person) => held(env, record, (object) => object.access(person)),
       stopped: (record, person) => held(env, record, (object) => object.memberStopped(person)),
+      /* SEE AS (sharing plan §3.3) is this door's alone; slice 12 records it as `preview:<person>` through `seen`. */
+      seeAs: true,
     }, slug);
 
     /* A LINK TO ONE PAGE, `Authorization: Share <token>`, WHICH `doorOf` HANDS ON UNCHECKED. It opens `/api/sharedPage`
@@ -3470,6 +3473,11 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
        be a record method however much its path looks like one. It is here rather than above `doorOf` because
        a mint needs to know who is asking, which is precisely what `/in/*` three branches up does not. */
     const mintAsked = servesInbound(url.pathname) !== null;
+
+    /* SEEING AS SOMEBODY NEITHER OPENS THE KEYS NOR MINTS AN ADDRESS: both are answered here, outside the router's
+       read-only lock, so they are refused here in its sentence. */
+    if (door.door === 'session' && door.ctx.preview !== undefined && (keysAsked || mintAsked))
+      return withCookie(json({ ok: false, refusal: PREVIEW_READ_ONLY }, 403), door.cookie);
 
     /* AND THE OWNER OPENING A LINK IS THE SESSION'S DOOR WITH ONE STEP AFTER IT: the record answers inside its object,
        where the key is not, so the link is signed here (`openShare` below). A bearer asking it reaches the record through

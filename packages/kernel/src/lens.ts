@@ -579,6 +579,12 @@ function coverOf(t: Target, l: CatalogList, me: readonly string[]): Cover {
   return { cond: withMe(t.where, me) };
 }
 
+/** Whether a target reaches any row of one list at all, a condition counting as reaching it (`shares.ts`, a new list). */
+export const targetReaches = (t: Target, l: CatalogList): boolean => coverOf(t, l, [ME]).cond !== false;
+
+/** Whether a target reaches every row of one list, with no condition (an onward share may name that list whole). */
+export const targetWhole = (t: Target, l: CatalogList): boolean => coverOf(t, l, [ME]).cond === true;
+
 /** Whether a well-formed condition on this list still compiles against what the list has now. */
 function compiles(t: Target, l: CatalogList): boolean {
   if (!('where' in t) || t.list !== l.id) return true;

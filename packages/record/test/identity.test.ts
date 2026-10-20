@@ -157,7 +157,7 @@ test('A SESSION LIVES NINETY DAYS AND NOT A MILLISECOND MORE', async () => {
 
   clock.set(NOW + 90 * DAY - 1);
   const who = ok(await d.auth({ flow: 'session', sid: early })).body;
-  assert.deepEqual(who, { person: ada, email: 'ada@example.com', record, provedAt: NOW });
+  assert.deepEqual(who, { person: ada, email: 'ada@example.com', record, provedAt: NOW, passkey: false });
 
   clock.set(NOW + 90 * DAY);
   notYou(await d.auth({ flow: 'session', sid: late }), true);
@@ -818,7 +818,7 @@ test('A SESSION ASKED WITH A SLUG ANSWERS THAT RECORD FOR A MEMBER, the same 403
   writes.length = 0;
 
   const named = ok(await d.auth({ flow: 'session', sid, slug: 'the-shop' }));
-  assert.deepEqual(named.body, { person: ada, email: 'ada@example.com', record: shop, provedAt: NOW });
+  assert.deepEqual(named.body, { person: ada, email: 'ada@example.com', record: shop, provedAt: NOW, passkey: false });
   assert.equal(named.session, undefined, 'a named read minted a cookie');
   assert.deepEqual(writes, [], 'asking which record a slug names wrote the session row');
   /* THE ROW STILL SAYS WHERE THE SESSION WAS OPENED, so bare `/app` goes back there and not to the last tab read. */

@@ -1,0 +1,24 @@
+/**
+ * The route rows for sharing part of the record with somebody (`packages/record/src/methods/sharing.ts`, the sharing
+ * plan's slice 7).
+ *
+ * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
+ * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same
+ * name to the guard its group implies.
+ *
+ * DECIDING WHO SEES WHAT IS AN OWNER'S OR AN ADMIN'S, IN A BROWSER: ADMIN, guarded by `team`. A grantee's own two are
+ * DATA, because whoever holds a share may read what they hold and share on what they manage; both refuse every token
+ * `NEEDS_BROWSER_SESSION` before anything else, because agents never share (T3). `sharing` lists shares, since
+ * `shares` already lists the links to one page.
+ */
+
+import type { Route } from '../index.ts';
+
+export const ROUTES: readonly Route[] = [
+  { name: 'sharing', group: 'ADMIN', writes: false, what: 'Every share on this record, live and ended in the last 30 days, each said as one sentence.' },
+  { name: 'share', group: 'ADMIN', writes: true, what: 'Share part of the record with somebody, or change a share. Never with an owner, and never by an agent.' },
+  { name: 'unshare', group: 'ADMIN', writes: true, what: 'Stop one share at once, and every share made onward from it.' },
+  { name: 'sharePreview', group: 'ADMIN', writes: true, postRead: true, what: 'A share said as one sentence, with how many rows of each list it reaches now. It keeps nothing.' },
+  { name: 'myShares', group: 'DATA', writes: false, what: 'What has been shared with you here, each as one sentence. A person only.' },
+  { name: 'shareOnward', group: 'DATA', writes: true, what: 'Share on what you manage, with somebody on the record, at most Edit and never past your own share.' },
+];

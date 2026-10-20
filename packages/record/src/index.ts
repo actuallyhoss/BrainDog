@@ -547,6 +547,12 @@ export type CallContext = {
   preview?: string | undefined;
 
   /**
+   * Whether this person can confirm it is them with a passkey, inline (sharing plan §6, default 1): a share that widens
+   * asks for a fresh proof only then. Set only by a host, from the Directory's session answer.
+   */
+  confirmable?: boolean | undefined;
+
+  /**
    * This read leaves the record: to a model, a mail, a push or a file somebody else opens. Every reader then reads as
    * nobody (`NOBODY`), so no row anyone kept private goes with it, whoever made it. Set by a host that builds the call.
    */
@@ -869,6 +875,10 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
      this function with `operation` taken off, and only for the method the grant names. */
   if (ctx.operation !== undefined)
     return { code: 'FORBIDDEN', fix: `This bearer was approved for one ${ctx.operation} and reaches nothing else. Sign in, or start the device again for this.`, at: 'operation' };
+  /* SEEING AS SOMEBODY IS READ-ONLY, LOCKED TWICE (sharing plan T11): the router refuses every route that writes, and
+     this refuses every need above `read`, so a method reached some other way changes nothing either. */
+  if (ctx.preview !== undefined && need !== 'read')
+    return { code: 'FORBIDDEN', fix: "You're seeing the record as somebody else. Exit See as to change things.", at: 'preview' };
   const p = ctx.principal;
   if (p.kind === 'system') return null;
   /* A RUNNER REACHES NO RUNG, and this is the one place that says so for every guard: `guard`, `scoped`, `readable`,
@@ -2710,7 +2720,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * browser), and never a token. An Admin may not reach the owner's rung: `teamKeeps` below refuses that.
    */
   const team = (ctx: CallContext, reads?: string): Refusal | null =>
-    ctx.operation === undefined && ctx.principal.kind === 'person' && ctx.principal.level === 'decide' ? null : admin(ctx, reads);
+    ctx.operation === undefined && ctx.preview === undefined && ctx.principal.kind === 'person' && ctx.principal.level === 'decide' ? null : admin(ctx, reads);
 
   /** An Admin can neither hand out the owner's rung nor touch somebody who holds it. Owners are the only ones who do. */
   const teamKeeps = (ctx: CallContext, args: { person?: string; level?: Level; registers?: Record<string, Level> }): Refusal | null => {
@@ -8783,7 +8793,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up

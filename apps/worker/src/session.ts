@@ -20,7 +20,7 @@
  * is addressed, and one 403 answers every name that is not.
  */
 
-import { clearCookie, heldContext, readSid, sameOrigin, sessionContext, sessionCookie, type HeldAccess } from '@braindog/host/auth';
+import { clearCookie, heldContext, readSid, sameOrigin, seeAs, SEE_AS_HEADER, sessionContext, sessionCookie, type HeldAccess } from '@braindog/host/auth';
 import { shareOf } from '@braindog/host';
 import { OPERATION_METHOD } from '@braindog/kernel';
 import type { TokenReach } from '@braindog/kernel';
@@ -47,6 +47,13 @@ export type Deps = {
   access: (record: string, person: string) => Promise<Held | null>;
   /** Whether a person the record holds nothing for is on it and stopped, so the refusal says so. Absent, the door says its own words. */
   stopped?: (record: string, person: string) => Promise<boolean>;
+  /**
+   * Whether this door honours `x-braindog-as` (See as, the sharing plan's §3.3): the API door only, so no other door a
+   * cookie opens (a file, an OAuth consent) is ever answered as somebody else. Absent, the header is not read.
+   */
+  seeAs?: true;
+  /** The audit hook for a call seen as somebody, for slice 12's `preview:<person>`. Absent, nothing is recorded yet. */
+  seen?: (record: string, viewer: string, as: string) => void;
 };
 
 export type Door =
@@ -106,7 +113,13 @@ export async function doorOf(request: Request, deps: Deps, slug: string | null =
     }
     /* `12 §8` CSRF: a cookie write comes from a page on this origin or not at all. */
     if (!SAFE.has(request.method) && !sameOrigin(request, deps.origin)) return { door: 'refused', status: 403, refusal: CROSS, ...carried };
-    const ctx = sessionContext(out.body, held) as CallContext;
+    let ctx = sessionContext(out.body, held) as CallContext;
+    /* SEE AS SOMEBODY: an owner's or an Admin's cookie, never as an owner, read-only (`seeAs`). */
+    if (deps.seeAs === true) {
+      const as = await seeAs(request.headers.get(SEE_AS_HEADER), out.body, held, (person) => deps.access(record, person), (viewer, person) => deps.seen?.(record, viewer, person));
+      if (as !== null && 'refusal' in as) return { door: 'refused', status: 403, refusal: as.refusal, ...carried };
+      if (as !== null) ctx = as.ctx as CallContext;
+    }
     /* A LAPSED RECORD ANSWERS A PERSON AT `read`, and a write in the lapse's own sentence (`lapse.ts`). The Directory said
        so in the same answer that named the record, so nothing more is asked; a record nobody pays for has no row there
        and never carries the flag. */

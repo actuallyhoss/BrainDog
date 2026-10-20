@@ -32,6 +32,8 @@ import {
   serveAccount,
   serveAuth,
   heldContext,
+  seeAs,
+  SEE_AS_HEADER,
   sessionContext,
   sessionCookie,
   type AccountDoor,
@@ -110,6 +112,7 @@ import { refusedFor as linkRefused, windowLimiter as linkLimiter } from '@braind
 /* THE FRONT DOORS: a crash answered by reference, the limiter, and the guard in front of
    every statement. */
 import { crashed } from '@braindog/host';
+import { PREVIEW_READ_ONLY } from '@braindog/host';
 import { fileModelSign } from '@braindog/host/sign-model';
 import { classOf, limitKey, refusedFor, windowLimiter, type LimitClass, type LimitDoor, type Limiter } from '@braindog/host/limits';
 import { guarded } from '@braindog/ports';
@@ -613,7 +616,10 @@ async function contextFor(request: Request, host: string, site: Site, door?: str
     /* AND A COOKIE WRITE MUST COME FROM A PAGE ON THIS ORIGIN (`12 §8` CSRF). `SameSite=Lax` keeps the
        cookie off a cross-site POST; this is the half that does not depend on the browser. */
     if (!SAFE.has(request.method) && !sameOrigin(request, site.origin)) return { refused: CROSS, ...carried };
-    return { ctx: sessionContext(out.body, held), ...carried };
+    /* SEE AS SOMEBODY (sharing plan §3.3): an owner's or an Admin's cookie, never as an owner, read-only. */
+    const as = await seeAs(request.headers.get(SEE_AS_HEADER), out.body, held, (person) => api.kernel.access(person));
+    if (as !== null && 'refusal' in as) return { refused: as.refusal, ...carried };
+    return { ctx: as === null ? sessionContext(out.body, held) : (as.ctx as CallContext), ...carried };
   }
 
   /* THREE · OPEN MODE: no server key, one person on one machine, and the machine is the boundary. The
@@ -2489,6 +2495,8 @@ async function answer(
   /* `PUT /api/files` AND `GET /api/files/<sha256>`: the self-host half of the file store,
      `./files.ts`'s door, so a gallery or a card picture served on the self-host draws the picture and not only its
      caption. */
+  if (servesFiles(path) && 'ctx' in seen && seen.ctx.preview !== undefined && method !== 'GET' && method !== 'HEAD')
+    return write(res, json(403, { ok: false, refusal: PREVIEW_READ_ONLY }), seen.cookie);
   if (servesFiles(path) && 'ctx' in seen) return write(res, await serveFiles(request, withSession(seen.ctx, sessionOf(request.headers)), site.blobs), seen.cookie);
   /* AND THE APP'S OWN KEY DOORS, AFTER THE SESSION AND NOT BEFORE IT, which is the whole difference between them
      and `/api/vault/*` above: those take a bearer `contextFor` would not know, and these take the session it just

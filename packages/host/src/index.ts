@@ -538,6 +538,15 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
   return handlers;
 }
 
+/** The person a call is seeing the record as (`CallContext.preview`, set only by a host's See as), or `null`. */
+export const previewOf = (ctx: unknown): string | null => {
+  const as = typeof ctx === 'object' && ctx !== null ? (ctx as { preview?: unknown }).preview : undefined;
+  return typeof as === 'string' && as !== '' ? as : null;
+};
+
+/** The one answer to a change asked while seeing as somebody (sharing plan §3.3). */
+export const PREVIEW_READ_ONLY: Refusal = { code: 'FORBIDDEN', fix: "You're seeing the record as somebody else. Exit See as to change things.", at: 'preview' };
+
 /**
  * Answer one request against a set of handlers.
  *
@@ -572,6 +581,12 @@ export async function serveApi(
       ok: false,
       refusal: { code: 'FORBIDDEN', fix: `${name} changes the record, so it is a POST.` },
     });
+
+  /* SEEING AS SOMEBODY IS READ-ONLY, AND THE ROUTER IS THE FIRST LOCK (sharing plan T11): every route that writes is
+     refused before its handler runs, and the record's `allows` refuses every need above `read` as the second. A read
+     sent as a write changes nothing, so it goes on. */
+  if (route.writes && route.postRead !== true && previewOf(ctx) !== null)
+    return json(403, { ok: false, refusal: PREVIEW_READ_ONLY });
 
   /* `Object.create(null)`, FOR THE REASON `packages/record/src/index.ts:358` REACHES FOR
      `Object.hasOwn`: every key here is a word the caller chose. `?__proto__={"limit":1}` set the

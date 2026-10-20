@@ -759,11 +759,13 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
       case 'session': {
         const found = await current(call.sid, now);
         if (!found) return rejected(flow, 'session', { session: 'clear' });
-        if (!('slug' in call) || call.slug === undefined) return { status: 200, body: whoOf(found.row), ...carry(found) };
+        /* AND WHETHER THEY HAVE A PASSKEY, so a share that widens asks them to confirm inline only when they can. */
+        const passkey = sql.one('SELECT 1 AS x FROM dir_passkey WHERE person = ? LIMIT 1', found.row.person) !== undefined;
+        if (!('slug' in call) || call.slug === undefined) return { status: 200, body: { ...whoOf(found.row), passkey }, ...carry(found) };
         const slug = slugTyped(call.slug);
         const on = slug === null ? undefined : sql.one<{ record: string }>(ON_RECORD, found.row.person, slug);
         if (!on) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' }, ...carry(found) };
-        return { status: 200, body: { ...whoOf(found.row), record: on.record }, ...carry(found) };
+        return { status: 200, body: { ...whoOf(found.row), record: on.record, passkey }, ...carry(found) };
       }
 
       /**

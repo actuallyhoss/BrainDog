@@ -61,6 +61,7 @@ import { ROUTES as PUSH_TEST } from './push-test.ts';
 import { ROUTES as HUES } from './hues.ts';
 import { ROUTES as DECIDER } from './decider.ts';
 import { ROUTES as actionRun } from './action-run.ts';
+import { ROUTES as SHARING } from './sharing.ts';
 /* END ROUTES */
 
 export const EXTRA_ROUTES: readonly Route[] = [
@@ -113,5 +114,6 @@ export const EXTRA_ROUTES: readonly Route[] = [
   ...HUES,
   ...DECIDER,
   ...actionRun,
+  ...SHARING,
   /* END ROUTES */
 ];

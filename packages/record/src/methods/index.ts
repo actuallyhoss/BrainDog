@@ -81,6 +81,7 @@ import { methods as doorSwitchMethods } from './door-switch.ts';
 import { methods as actionRun } from './action-run.ts';
 import { methods as instructions } from './instructions.ts';
 import { methods as agentProfile } from './agent-profile.ts';
+import { methods as sharing } from './sharing.ts';
 /* END METHODS */
 
 /**
@@ -104,6 +105,13 @@ export type RecordDeps = {
   sightOf: (ctx: CallContext, target: string) => string | null;
   /** The sight module (`sight.ts`): which rows the caller is shown, and which they may write (`mayWrite`). */
   sight: import('../sight.ts').Sight;
+  /** An owner or an Admin in a browser, and no token of any kind (`index.ts`, `team`). Absent, an owner only. */
+  team?: ((ctx: CallContext, reads?: string) => Refusal | null) | undefined;
+  /**
+   * The Plus gate on a share to somebody not on the record yet (sharing plan §2.15): a refusal when this record's plan
+   * does not share with outsiders. Absent, nothing is held back, which is every host while it sells nothing.
+   */
+  plus?: ((ctx: CallContext, who: { kind: string; id: string }) => Refusal | null) | undefined;
   /** An owner in a browser, and no token of any kind. */
   admin: (ctx: CallContext, reads?: string, method?: string) => Refusal | null;
   /** The vault's gate: an owner in a browser, proved within `FRESH`. */
@@ -233,6 +241,7 @@ export function methods(deps: RecordDeps) {
     ...actionRun({ ...deps, nudgeAction }),
     ...instructions(deps),
     ...agentProfile(deps),
+    ...sharing(deps),
     /* END METHODS */
   };
 }

@@ -143,8 +143,11 @@ export type SignupVerified = { person: string; email: string; slug: string; name
  * `provedAt` IS WHEN THEY LAST PROVED IT, in epoch milliseconds: a passkey, a link or the server key. Rotation
  * never moves it, which is what lets the vault and the passkey flows ask for a proof in the last fifteen minutes,
  * and what ends a session ninety days after it however often it has rotated.
+ *
+ * `passkey` IS WHETHER THEY HAVE ONE, said by the session flow alone, so a share that widens can ask them to confirm it
+ * is them inline (the sharing plan's §6) only when they can. Absent is a Directory that never said.
  */
-export type Who = { person: string; email: string; record: string | null; provedAt: number };
+export type Who = { person: string; email: string; record: string | null; provedAt: number; passkey?: boolean };
 
 /** What `/auth/methods` needs from the Directory. The host adds what only it knows: open mode, and why. */
 export type Methods = {

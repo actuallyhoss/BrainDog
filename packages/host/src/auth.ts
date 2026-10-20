@@ -729,13 +729,52 @@ export function sessionContext<L extends string>(
   principal: { kind: 'person'; id: string; level: L | null };
   credentialed: true;
   provedAt: number;
+  confirmable: boolean;
 } {
   return {
     principal: { kind: 'person', id: who.person, level: held.level },
     ...heldContext(held),
     credentialed: true,
     provedAt: who.provedAt,
+    /* WHETHER THEY CAN CONFIRM IT IS THEM WITH A PASSKEY, inline, as a share that widens asks (sharing plan §6). */
+    confirmable: who.passkey === true,
   };
+}
+
+/** The header the app sends on every call while an owner or Admin is seeing the record as somebody (§3.3). */
+export const SEE_AS_HEADER = 'x-braindog-as';
+
+/** The longest person id the header is read for. Ids are short; anything longer names nobody. */
+const SEE_AS_MOST = 64;
+
+/**
+ * "See as Priya" (sharing plan §3.3, T11): a live session's context replaced by the one the named person would have,
+ * marked `preview`, or a refusal, or `null` when the request asks nothing of the kind.
+ *
+ * AN OWNER OR AN ADMIN, AND NEVER AS AN OWNER. Anybody else asking is refused, and so is asking to see as somebody who
+ * owns the record, or who is not on it. The context is the person's own (`sessionContext` over what the record holds
+ * for them), so every answer is theirs; `preview` makes it read-only twice over (the router and `allows`) and makes the
+ * viewer nobody, so no row they keep private is shown. `provedAt` stays the viewer's.
+ *
+ * `seen` IS THE AUDIT HOOK: called once per call seen as somebody, with the viewer and the person, for the sharing
+ * plan's slice 12 to record as `preview:<person>`. Absent, nothing is recorded yet.
+ */
+export async function seeAs<L extends string>(
+  asked: string | null,
+  who: Who,
+  held: HeldAccess<L>,
+  accessOf: (person: string) => Promise<HeldAccess<L> | null> | HeldAccess<L> | null,
+  seen?: (viewer: string, as: string) => void,
+): Promise<{ ctx: ReturnType<typeof sessionContext<L>> & { preview: string } } | { refusal: Refusal } | null> {
+  const as = asked?.trim() ?? '';
+  if (as === '') return null;
+  if (held.level !== 'owner' && held.level !== 'decide')
+    return { refusal: { code: 'FORBIDDEN', fix: 'Only an owner or an Admin can see the record as somebody else.', at: 'as' } };
+  const theirs = as.length > SEE_AS_MOST ? null : await accessOf(as);
+  if (theirs === null) return { refusal: { code: 'FORBIDDEN', fix: 'That person is not on this record, so there is nothing to see as them.', at: 'as' } };
+  if (theirs.level === 'owner') return { refusal: { code: 'FORBIDDEN', fix: 'An owner sees everything. See as somebody else.', at: 'as' } };
+  seen?.(who.person, as);
+  return { ctx: { ...sessionContext({ ...who, person: as }, theirs), confirmable: false, preview: as } };
 }
 
 /** What the operator's provisioning made, before the claim link is minted for it. */

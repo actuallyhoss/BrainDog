@@ -101,7 +101,7 @@ import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
-import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, LensCache, type ListLike } from './shares.ts';
+import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, LensCache, newListGrants, putShare, revokeShare, shareKept, sharesKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
 import type { Catalog } from './lens.ts';
 import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, type Wheres } from './members.ts';
 import { stopped as stoppedOf, type Suspended } from './members.ts';
@@ -670,13 +670,14 @@ export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member, Grant, Held as AccessHeld } from './members.ts';
 export { EPOCH as ACCESS_EPOCH, bumpEpoch, epochOf, LensCache, sharesFor, narrowsOf, catalogOf, gateFieldsOf } from './shares.ts';
+export { meOf as shareMeOf, type ShareInput, type ShareKept } from './shares.ts';
 export { whereFor, scopeFor, NOBODY, viewerOfPrincipal, viewerOfRead, WHERE_MAX_CHARS, type Wheres } from './members.ts';
 /* SHARING (the sharing plan, Slice 1): the lens as pure functions, and nothing wired yet. `Rung` and `Capability` are
    already names here (`change-kind.ts`, `capabilities.ts`), so the share ones go out as `ShareRung` and `LensCap`. */
 export {
   activeAt, CAPS as LENS_CAPS, checkShare, fold as foldLens, gateFields, lensOf, nextEdge as shareNextEdge, ONCE_MS as SHARE_ONCE_MS,
   PARAMS_MAX as SHARE_PARAMS_MAX, paramsOf as shareParamsOf, paramsOn as shareParamsOn, ROWS_MAX as SHARE_ROWS_MAX, RUNGS as SHARE_RUNGS,
-  schemaOf as lensSchemaOf, shareFault, WHERE_MAX_DEPTH as SHARE_WHERE_MAX_DEPTH, WHERE_MAX_LEAVES as SHARE_WHERE_MAX_LEAVES, whereFault as shareWhereFault,
+  schemaOf as lensSchemaOf, shareFault, targetReaches as shareTargetReaches, targetWhole as shareTargetWhole, WHERE_MAX_DEPTH as SHARE_WHERE_MAX_DEPTH, WHERE_MAX_LEAVES as SHARE_WHERE_MAX_LEAVES, whereFault as shareWhereFault,
 } from './lens.ts';
 export type {
   Cap as LensCap, Catalog as LensCatalog, CatalogField as LensCatalogField, CatalogList as LensCatalogList, Caps as ShareCaps,
@@ -1647,7 +1648,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   const lensCache = new LensCache<Held | null>(256);
 
   function reload(opts: { copied?: true } = {}): void {
-    const before = revision === 0 || opts.copied === true ? null : [...registers.keys()].sort().join('\u0000');
+    const had = revision === 0 || opts.copied === true ? null : new Set(registers.keys());
+    const before = had === null ? null : [...had].sort().join('\u0000');
     ({ registers, prefixes } = listsOf(
       sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0"),
     ));
@@ -1658,7 +1660,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        moves when it changes, as it does for a share, and an open tab re-boots onto the lists it now has. Never on the
        first read, which is the record opening and writes nothing, and never for a file read in (`copied`): an import
        or restore brings its own counter, and a copy that moved it would not export as the file it came from. */
-    if (before !== null && before !== [...registers.keys()].sort().join('\u0000')) transaction(() => bumpEpoch(sql));
+    /* AND A LIST THAT FALLS UNDER SOMEBODY'S WHOLE-RECORD OR MONEY SHARE IS SAID IN THE LEDGER, one grant per share, in
+       the same transaction (§2.15): the share widened without anybody touching it. */
+    if (before !== null && before !== [...registers.keys()].sort().join('\u0000'))
+      transaction(() => {
+        bumpEpoch(sql);
+        const added = [...registers.keys()].filter((id) => !had!.has(id));
+        if (added.length > 0) newListGrants({ sql, at: instant(clock.now()), mint }, catalogNow(), added);
+      });
   }
 
   /** The record's lists as the lens reads them (`lens.ts`'s `Catalog`), for this declaration revision. */
@@ -2035,7 +2044,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * THE ONE READ-SCOPE HELPER every reader asks for a list, in place of `whereFor(ctx.wheres, register)`: the caller's
    * grant rule and the private rows left out for them, as one value `list` and `count` understand (`scopeFor`).
    */
-  const scope = (ctx: { wheres?: Readonly<Wheres> | undefined; principal: { kind: string; id: string; person?: string }; outbound?: boolean | undefined }, register: string): Json | undefined => {
+  const scope = (ctx: { wheres?: Readonly<Wheres> | undefined; principal: { kind: string; id: string; person?: string }; outbound?: boolean | undefined; preview?: string | undefined }, register: string): Json | undefined => {
     const viewer = viewerOfRead(ctx);
     return scopeFor(ctx.wheres, register, viewer, anyHiddenFrom(viewer, register));
   };
@@ -10062,6 +10071,26 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** The record's lists as the lens reads them. */
     catalog: (): Catalog => catalogNow(),
+
+    /**
+     * Keep one share, new or changed (its `id`), with its `access.grant` event and the access epoch moved, in one
+     * transaction (sharing plan §2.10). The record has checked it (`checkShare`, who may target whom); this refuses only
+     * a share that is not the grammar, or a change to one that is not live.
+     */
+    shareSave: (by: string, input: ShareInput): Result<{ id: string; version: number }> =>
+      transaction(() => {
+        const out = putShare({ sql, at: instant(clock.now()), mint }, by, input);
+        return 'fault' in out ? no<{ id: string; version: number }>('REF_UNKNOWN', out.fault, { at: 'id' }) : ok(out);
+      }),
+
+    /** End one share and every share made onward from it, each with its `access.revoke`, the epoch moved once. The ids ended. */
+    shareRevoke: (by: string, id: string, why?: string | null): string[] => transaction(() => revokeShare({ sql, at: instant(clock.now()), mint }, by, id, why ?? null)),
+
+    /** One kept share by id, ended or not. */
+    shareKept: (id: string): ShareKept | null => shareKept(sql, id),
+
+    /** Every live share, newest first, and those ended since `since` when it is given. */
+    sharesKept: (since?: string): ShareKept[] => sharesKept(sql, since),
 
     /** The gate fields of one list (§2.6): what any active share condition names, and its scope field under a project share. */
     gateFields: (list: string): string[] => gateFieldsOf(sql, catalogNow(), list, clock.now(), recordTz()),

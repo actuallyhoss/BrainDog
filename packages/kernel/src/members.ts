@@ -388,8 +388,9 @@ export const viewerOfPrincipal = (p: { kind: string; id: string; person?: string
   p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : p.kind === 'share' ? NOBODY : undefined;
 
 /** Who a read is for: the person looking, or `NOBODY` when it leaves the record (`outbound`), else no one in particular. */
-export const viewerOfRead = (ctx: { principal: { kind: string; id: string; person?: string }; outbound?: boolean | undefined }): string | undefined =>
-  ctx.outbound === true ? NOBODY : viewerOfPrincipal(ctx.principal);
+export const viewerOfRead = (ctx: { principal: { kind: string; id: string; person?: string }; outbound?: boolean | undefined; preview?: string | undefined }): string | undefined =>
+  /* SEEING AS SOMEBODY READS AS NOBODY (sharing plan §3.3): the rows they keep private are theirs, not their viewer's. */
+  ctx.outbound === true || (typeof ctx.preview === 'string' && ctx.preview !== '') ? NOBODY : viewerOfPrincipal(ctx.principal);
 
 /** The rule a caller's grant holds on one list, or `undefined` when that list is every row to them. */
 export const whereFor = (wheres: Readonly<Wheres> | undefined, register: string): Json | undefined =>

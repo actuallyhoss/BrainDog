@@ -235,6 +235,7 @@ test('sessionContext is the bearer-shaped context, with the proof time and nothi
     principal: { kind: 'person', id: 'p_1', level: 'owner' },
     credentialed: true,
     provedAt: NOW,
+    confirmable: false,
   });
   assert.deepEqual(sessionContext(who, { level: null, registers: ['tasks'], levels: { tasks: 'write' } }), {
     principal: { kind: 'person', id: 'p_1', level: null },
@@ -242,6 +243,7 @@ test('sessionContext is the bearer-shaped context, with the proof time and nothi
     levels: { tasks: 'write' },
     credentialed: true,
     provedAt: NOW,
+    confirmable: false,
   });
 });
 
@@ -266,7 +268,9 @@ test('heldContext carries what the lens adds, and leaves off every key that says
     grant,
   });
   const who = { person: 'p_2', email: 'sam@example.com', record: 'rec_1', provedAt: NOW };
-  assert.deepEqual(sessionContext(who, held), { principal: { kind: 'person', id: 'p_2', level: null }, ...heldContext(held), credentialed: true, provedAt: NOW });
+  assert.deepEqual(sessionContext(who, held), { principal: { kind: 'person', id: 'p_2', level: null }, ...heldContext(held), credentialed: true, provedAt: NOW, confirmable: false });
+  /* AND A PERSON WITH A PASSKEY CAN CONFIRM INLINE, as a share that widens asks (the sharing plan's §6). */
+  assert.equal(sessionContext({ ...who, passkey: true }, held).confirmable, true);
   assert.deepEqual(heldContext({ level: 'owner', registers: null, levels: {} }), {}, 'an owner’s context gains nothing');
 });
 
