@@ -38,6 +38,6 @@
   "0037_cause_answered.ts": {"checksum":"6100f6cabd9b9b2398f29baef4eb095d8b95085399d917a9e45cb5a006b35d39","applied":true,"rehearsed":null,"waived":{"at":"2026-10-09","by":"owner","why":"Shipped on the owner's word without a rehearsal: the live build could not export a copy and the night copy needs his backup key"}},
   "0038_pack_waiting.ts": {"checksum":"6a6292768d541c8e5f90e7fd963740ade6330b5fae8d30e83c302af039325fdf","applied":false,"rehearsed":{"at":"2026-10-14T12:36:08.886Z","records":1,"rows":4476,"pass":true}},
   "0039_entry_made_index.ts": {"checksum":"9d0617ace0339a272e2fb49f0b5ee7eba678c96821915f7dfc58826be5931814","applied":false,"rehearsed":{"at":"2026-10-14T12:36:08.886Z","records":1,"rows":4476,"pass":true}},
-  "0040_entry_private.ts": {"checksum":"4bd3c2bd0ec090a5e4c00b39b66cdbc6b9038ae3d0d8507493e7846a33221732","applied":false,"rehearsed":null},
-  "0041_entry_private_travels.ts": {"checksum":"abad798381d8853a454c9a448f5a7cba70a4ae12055c24cd768c553650bc59eb","applied":false,"rehearsed":null}
+  "0040_entry_private.ts": {"checksum":"4bd3c2bd0ec090a5e4c00b39b66cdbc6b9038ae3d0d8507493e7846a33221732","applied":false,"rehearsed":{"at":"2026-10-20T09:19:33.347Z","records":1,"rows":4562,"pass":true}},
+  "0041_entry_private_travels.ts": {"checksum":"abad798381d8853a454c9a448f5a7cba70a4ae12055c24cd768c553650bc59eb","applied":false,"rehearsed":{"at":"2026-10-20T09:19:33.347Z","records":1,"rows":4562,"pass":true}}
 }
