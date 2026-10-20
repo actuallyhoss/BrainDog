@@ -360,9 +360,10 @@ test('and the two areas that report rather than offer say which deployment this 
      being deleted, because what `49 §8` requires is that the instruction is on this screen and not
      which sentence carries it. */
   const key = `${copy.theKeyIs} ${copy.theKeyWhere}`;
-  assert.match(key, /copy that file somewhere else/i);
-  assert.match(key, /cannot be opened/i);
-  assert.match(copy.theKeyWhere, /the key file you made/i, 'the screen no longer says where the key is');
+  /* SAID PLAINLY SINCE THE UI PASS OF 20 OCTOBER (agents F27): where the key is, and to keep a copy elsewhere. */
+  assert.match(key, /keep a copy somewhere else/i);
+  assert.match(key, /cannot show it to you/i);
+  assert.match(copy.theKeyWhere, /the file you made at set-up/i, 'the screen no longer says where the key is');
   /**
    * `53 §5.4`: thirty kept, and the sentence says the number rather than the word "some".
    *
@@ -500,7 +501,7 @@ test('and the delete control is the confirmation rather than a sentence about on
      explaining why the toast is gone, which is the assertion catching its own evidence. */
   assert.doesNotMatch(src, /toasts\.push\([^)]*Deleting a record asks you to type its name first/u, 'the toast still describes the safeguard');
   /* The slug is the record's own, not its display name: `deleteRecord({ slug })`. */
-  assert.match(copy.typeSlug('the-studio'), /the-studio/u);
+  assert.match(copy.typeSlug('The Studio'), /The Studio/u);
   /* AND IT SAYS WHAT IT COSTS BEFORE THE FIELD.
      `deleteWhat` ALREADY SAYS "It cannot be undone", one line above this on screen, two lines that
      would be the same sentence, in the section whose own comment condemns exactly that. This one

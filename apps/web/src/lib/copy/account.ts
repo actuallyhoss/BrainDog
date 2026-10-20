@@ -22,9 +22,6 @@ export const account = {
   perPerson: 'Kept for you on this record, on every device you sign in on.',
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
 
-  /* The chip on a row that has just been acted on. One word, in the past tense, so the row says
-     what happened to it where the row is rather than in a toast at the other end of the screen. */
-  densityPreview: 'How your things look',
   sourcesAdd: 'A new source comes with an add-on, or is set up by an agent you connect.',
   sourcesAddGo: 'Browse add-ons',
   densityPreviewRows: ['Invoice 2026-041, brand system', 'Studio insurance, annual', 'VAT quarter to 31 Aug'],
@@ -109,7 +106,6 @@ export const account = {
      SCREEN: how the other colours follow, and what a press may refuse, which the refusal says in place when it happens
      (`accentRefused`). What is left is the choice itself. */
   accentHint: "Yours alone. It wins over the record's look below, which the owner sets for everyone.",
-  accentHouse: 'House',
   /**
    * THE PALETTE THAT SHIPPED AND COULD NOT BE TURNED ON.
    *
@@ -260,7 +256,6 @@ export const account = {
   identityNameSaved: (name: string) => `You are ${name} in every record you belong to.`,
   identityPeopleRow: 'Rename yourself in People too',
   identityPeopleRowDone: 'You have the new name in People too.',
-  identitySignInWays: 'How you sign in',
   identityPasskeysWay: 'Passkeys',
   identityPasskeys: (n: number) => (n === 0 ? 'None yet' : n === 1 ? 'One passkey' : `${n} passkeys`),
 
@@ -477,7 +472,8 @@ export const account = {
      condemns *"three lines, two of them the same sentence"*, so this one does not say it twice. */
   deleteCosts:
     'The name is given up for good, and no record here can use it again. One final copy is kept for 30 days and then deleted, and it cannot be opened from here, so export a copy first if you want to keep what is in it.',
-  typeSlug: (slug: string) => `Type ${slug} to confirm`,
+  /* THE RECORD'S NAME, NOT ITS SLUG (UI pass 20 Oct, agents F15 Δ): names, never ids; compared without case. */
+  typeSlug: (name: string) => `Type ${name} to confirm`,
 
   keptCloud: (n: number) => `A backup of the whole record every night. The ${n} newest are kept, plus the latest.`,
   keptSelfHost: (n: number) => `A backup of the whole record every night, on this machine. The ${n} newest are kept.`,
@@ -503,8 +499,7 @@ export const account = {
    */
   theKeyIs:
     'These copies are sealed with a key that is not inside them, and this record cannot show it to you: it is kept outside the product on purpose.',
-  theKeyWhere:
-    'On a self-host it is the key file you made when you set the record up. Copy that file somewhere else, or these backups cannot be opened.',
+  theKeyWhere: 'If you run BrainDog yourself, the key is the file you made at set-up. Keep a copy somewhere else.',
   restore: 'Going back',
   /**
    * AND WHERE THE RECORD ITSELF REFUSED, THE SCREEN SAID IT COULD DO THE MOST DESTRUCTIVE THING ON IT.

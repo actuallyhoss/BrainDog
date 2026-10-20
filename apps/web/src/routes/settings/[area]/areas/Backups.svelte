@@ -39,7 +39,6 @@
     notHereYet: 'No backups here yet',
     exportInstead: 'Export a copy instead; it works anywhere.',
     keyOutside: 'Kept outside BrainDog',
-    keyYours: 'If you run BrainDog yourself, the key is the file you made at set-up. Keep a copy somewhere else.',
     askForIt: 'Going back to a copy',
   };
 
@@ -357,7 +356,7 @@
        purpose, so the fix is not to print it here; it is to say where it already is. -->
   <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
        both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
-  <StateRow icon="key" title={words.keyOutside} line={shell.host === 'cloud' ? copy.theKeyIs : words.keyYours} />
+  <StateRow icon="key" title={words.keyOutside} line={shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere} />
 </Section>
 
 <!--

@@ -37,7 +37,6 @@
   let field = $state<HTMLInputElement | null>(null);
 
   const words = {
-    label: (name: string) => `Type ${name} to confirm`,
     exactly: (name: string) => `Type ${name} exactly.`,
     notIt: (name: string) => `That is not ${name}.`,
     exportFirst: 'Export a copy first',
@@ -124,7 +123,7 @@
     <!-- `field-row` PUTS THE LABEL ABOVE THE FIELD. ARMED, the button is the primary with its bin (2.A.1); OFF it is
          quiet and `aria-disabled`, and a press says why. -->
     <div class="field-row">
-      <label class="field-row-label" for="delete-slug">{words.label(RECORD)}</label>
+      <label class="field-row-label" for="delete-slug">{copy.typeSlug(RECORD)}</label>
       <div class="field-row-controls">
         <div class="field field-lg" data-invalid={wrong ? '' : undefined}>
           <input
