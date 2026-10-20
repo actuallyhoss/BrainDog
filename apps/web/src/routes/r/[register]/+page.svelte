@@ -28,7 +28,8 @@
   import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, heldTwiceOn, iconFor, isRows, joinOf, labelOf, toRows, TWICE, twiceOf, twiceWords, type Filter, whereOf } from '$lib/record/api.ts';
   import { createClient } from '@braindog/client';
   /* Type only, so the client's route table stays out of this chunk. */
-  import { joinNames, rowsHeldTwice, type Names } from '$lib/record/remote.ts';
+  import { joinNames, rowsHeldTwice, treeOf, type Names } from '$lib/record/remote.ts';
+  import type { Predicate } from '@braindog/where';
   import { open, read, tally, type Boot, type Refusal, type Tally } from '$lib/data/record.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
@@ -696,7 +697,7 @@
       counted = facets.counts;
       uncounted = facets.withheld;
       fromCopy = false;
-      keepList(said, register, s.value, answer.value, { filters: chips, q: text, sort: order, twice: rows !== null }, bar ? facets : null, mark);
+      keepList(said, register, s.value, answer.value, { filters: chips, q: text, sort: order, twice: rows !== null, join: joined }, bar ? facets : null, mark);
       return true;
     });
     if (asked === said) busy = false;
@@ -711,14 +712,17 @@
     register: string,
     d: RegisterDecl,
     got: { entries: Entry[]; matched: number; names: Names; cursor: string | null },
-    ask: { filters: Filter[]; q: string; sort: typeof sort; twice: boolean },
+    ask: { filters: Filter[]; q: string; sort: typeof sort; twice: boolean; join: typeof join },
     facets: Tally | null,
     mark: number,
   ) {
     const counts = facets === null ? null : facets.withheld ? null : facets.counts;
     const pills = facets === null ? [] : filterableOf(d.fields).filter((f) => f.type === 'enum').map((f) => f.id);
+    /* THE CHIPS AS THE RECORD'S TREE, so a create can be asked the same question here (`local.ts` `Lands`). No refs are
+       handed over: a chip over a ref stays a number, which the copy refuses to answer and drops the page instead. */
+    const where = ask.filters.length === 0 ? null : ((treeOf(register, ask.filters, '', new Map(), ask.join) as Predicate | undefined) ?? null);
     keepLocal(LIST_COPY, said, listsOf(register, d), keptOf(d, got.entries, got.matched, got.names, { cursor: got.cursor, counted: counts }), mark, { [register]: d }, {
-      spots: [spotOf(register, ask, pills)],
+      spots: [spotOf(register, ask, pills, where)],
     });
   }
 
@@ -844,7 +848,7 @@
     uncounted = facets.withheld;
     fromCopy = false;
     /* AND KEPT AGAIN, so the next open draws the list as it now is. */
-    keepList(said, register, decl, answer.value, { filters: chips, q: text, sort: order, twice: chips.some(isRows) }, counted.size > 0 || uncounted ? facets : null, mark);
+    keepList(said, register, decl, answer.value, { filters: chips, q: text, sort: order, twice: chips.some(isRows), join: joined }, counted.size > 0 || uncounted ? facets : null, mark);
   }
 
   /** The stale mark's control: the question asked again from the top, as a question the reader chose to ask. */

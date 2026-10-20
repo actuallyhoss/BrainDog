@@ -7,6 +7,7 @@ import {
   inOrder,
   keepable,
   localCopy,
+  localWhere,
   memoryStore,
   patched,
   QUESTIONS,
@@ -193,7 +194,7 @@ const TASKS = {
   title: 'title',
   fields: [
     { id: 'title', type: 'text' },
-    { id: 'state', type: 'enum' },
+    { id: 'state', type: 'enum', values: ['open', 'doing', 'done'] },
     { id: 'due', type: 'day' },
     { id: 'tags', type: 'list', of: 'text' },
     { id: 'project', type: 'ref', to: 'projects' },
@@ -309,4 +310,101 @@ test('A CATCH-UP PATCHES WHAT IT CAN AND DROPS WHAT IT CANNOT; an answer kept `a
   assert.equal(work?.current, true, 'patched and caught up');
   assert.equal(await copy.answer('list', 'k', 'https://a', null), null, 'no spots: dropped as before');
   assert.equal(await copy.put('work', 'k', ['tasks'], decls, { rows: [] }, before, { spots: [WORK] }), false, 'a read from before the patch is not kept over it');
+});
+
+/* ── creates and deletes ───────────────────────────────────────────────── */
+
+const LIST: Spot = {
+  list: 'tasks',
+  at: ['entries'],
+  by: ['state'],
+  newest: true,
+  lands: { where: { field: 'state', is: 'open' }, exact: true, more: ['cursor'], count: ['matched'], tally: ['counted'] },
+};
+type Listed = { entries: { seq: number; fields: Record<string, unknown>; version: number; id?: string }[]; matched: number; cursor: string | null; counted?: unknown };
+const make = (id: string, seq: number, to: Record<string, unknown>, more: Partial<Line> = {}): Line => ({ id, kind: 'create', register: 'tasks', seq, field: null, to, target: `entry:R${seq}`, ts: '2026-10-20T12:00:00Z', ...more });
+const listed = (entries: ReturnType<typeof task>[], more: Partial<Listed> = {}) => ({ entries, matched: entries.length, cursor: null, ...more });
+
+test('CREATE: a row the filter takes lands at the head, counted, with its id and version one', () => {
+  const row = stored(listed([task(1, { title: 'a', state: 'open' })]), [LIST]);
+  const out = patched(row, [make('c', 2, { title: 'b', state: 'open', project: null })]) as Listed;
+  assert.deepEqual(out.entries.map((e) => e.seq), [2, 1]);
+  assert.equal(out.entries[0]!.id, 'R2');
+  assert.equal(out.entries[0]!.version, 1);
+  assert.deepEqual(out.entries[0]!.fields, { title: 'b', state: 'open' }, 'an empty field is left out');
+  assert.equal(out.matched, 2);
+});
+
+test('CREATE: a row the filter leaves out is not news when the filter is the question, and drops the answer when it is not', () => {
+  const row = stored(listed([task(1, { title: 'a', state: 'open' })]), [LIST]);
+  assert.deepEqual((patched(row, [make('c', 2, { title: 'b', state: 'done' })]) as Listed).entries.map((e) => e.seq), [1]);
+  const loose = stored(listed([task(1, { title: 'a', state: 'open' })]), [{ ...LIST, lands: { ...LIST.lands!, exact: false } }]);
+  assert.equal(patched(loose, [make('c', 2, { title: 'b', state: 'done' })]), undefined);
+});
+
+test('CREATE: what the browser cannot answer as the record would drops the answer', () => {
+  const row = (lands: Spot['lands']) =>
+    stored(listed([task(1, { title: 'a', state: 'open' })]), [lands ? { ...LIST, lands } : { list: LIST.list, at: LIST.at, by: LIST.by, newest: true }]);
+  assert.equal(patched(row(undefined), [make('c', 2, { title: 'b' })]), undefined, 'no lands, as before');
+  assert.equal(patched(row({ ...LIST.lands!, where: { field: 'due', before: 'today' } }), [make('c', 2, { title: 'b' })]), undefined, 'a relative day');
+  assert.equal(patched(row({ ...LIST.lands!, where: { field: 'project', is: '3' } }), [make('c', 2, { title: 'b' })]), undefined, 'a ref');
+  assert.equal(patched(row({ ...LIST.lands!, where: null }), [make('c', 2, { title: 'b', project: 'R9' })]), undefined, 'a ref value on the row');
+  assert.equal(patched(row({ ...LIST.lands!, where: null }), [make('c', 2, { title: REDACTED })]), undefined, 'a redacted value');
+  assert.equal(patched(row({ ...LIST.lands!, where: null }), [make('c', 2, { title: 'b', cost: { amount: 1, currency: 'GBP' } })]), undefined, 'a money value');
+});
+
+test('CREATE: with a sort it goes where the record puts it, empties last and the newest first among equals; past a page it is only counted', () => {
+  const spot: Spot = { list: 'tasks', at: ['entries'], by: ['due'], lands: { where: null, exact: true, sort: { field: 'due', dir: 'asc' }, more: ['cursor'], count: ['matched'] } };
+  const rows = [task(1, { due: '2026-10-01' }), task(2, { due: '2026-10-05' }), task(3, {})];
+  const seqs = (v: unknown) => (v as Listed).entries.map((e) => e.seq);
+  assert.deepEqual(seqs(patched(stored(listed(rows), [spot]), [make('c', 9, { due: '2026-10-03' })])), [1, 9, 2, 3]);
+  assert.deepEqual(seqs(patched(stored(listed(rows), [spot]), [make('c', 9, { due: '2026-10-05' })])), [1, 9, 2, 3], 'equal: the new one first');
+  assert.deepEqual(seqs(patched(stored(listed(rows), [spot]), [make('c', 9, {})])), [1, 2, 9, 3], 'empty: first of the empties');
+  const paged = listed(rows.slice(0, 2), { cursor: 'next', matched: 10 });
+  const out = patched(stored(paged, [spot]), [make('c', 9, { due: '2026-11-01' })]) as Listed;
+  assert.deepEqual(out.entries.map((e) => e.seq), [1, 2], 'on a later page');
+  assert.equal(out.matched, 11);
+  const byTitle: Spot = { ...spot, lands: { ...spot.lands!, sort: { field: 'title', dir: 'asc' } } };
+  assert.equal(patched(stored(listed(rows), [byTitle]), [make('c', 9, { title: 'x' })]), undefined, 'text order is the record collation');
+});
+
+test('CREATE: pills count it on a whole question and give up on a narrowed one; a create already in is skipped', () => {
+  const counted = [['state', [['open', 1], ['done', 0]]]];
+  const whole = stored(listed([task(1, { state: 'open' })], { counted }), [{ ...LIST, lands: { ...LIST.lands!, where: null } }]);
+  assert.deepEqual((patched(whole, [make('c', 2, { state: 'done' })]) as Listed).counted, [['state', [['open', 1], ['done', 1]]]]);
+  const narrowed = stored(listed([task(1, { state: 'open' })], { counted }), [LIST]);
+  assert.equal(patched(narrowed, [make('c', 2, { state: 'open' })]), undefined);
+  const row = stored(listed([task(2, { state: 'open' }), task(1, { state: 'open' })]), [LIST]);
+  assert.equal((patched(row, [make('c', 2, { state: 'open' })]) as Listed).matched, 2, 'kept after the create');
+});
+
+test('DELETE: a held row goes and its counts with it; one not held is news only past a page or under narrowed pills', () => {
+  const counted = [['state', [['open', 2]]]];
+  const row = stored(listed([task(1, { state: 'open' }), task(2, { state: 'open' })], { counted }), [LIST]);
+  const out = patched(row, [{ id: 'd', kind: 'delete', register: 'tasks', seq: 1 }]) as Listed;
+  assert.deepEqual(out.entries.map((e) => e.seq), [2]);
+  assert.equal(out.matched, 1);
+  assert.deepEqual(out.counted, [['state', [['open', 1]]]]);
+  const plain = stored(listed([task(1, { state: 'open' })]), [LIST]);
+  assert.notEqual(patched(plain, [{ id: 'd', kind: 'delete', register: 'tasks', seq: 7 }]), undefined, 'not held, nothing past it');
+  assert.equal(patched(stored(listed([task(1, {})], { cursor: 'n' }), [LIST]), [{ id: 'd', kind: 'delete', register: 'tasks', seq: 7 }]), undefined, 'maybe on a later page');
+  assert.equal(patched(row, [{ id: 'd', kind: 'delete', register: 'tasks', seq: 7 }]), undefined, 'maybe in a pill');
+  assert.equal(patched(row, [{ id: 'r', kind: 'restore', register: 'tasks', seq: 7 }]), undefined, 'a restore still drops it');
+});
+
+test('CREATE THEN EDIT IN ONE WRITE is one version', () => {
+  const row = stored(listed([]), [{ ...LIST, by: [] }]);
+  const out = patched(row, [make('c', 2, { title: 'b', state: 'open' }, { batch: 'w' }), edit('e', 2, 'title', 'b', 'B', { batch: 'w' })]) as Listed;
+  assert.equal(out.entries[0]!.fields.title, 'B');
+  assert.equal(out.entries[0]!.version, 1);
+});
+
+test('LOCAL WHERE: plain fields with literal values only', () => {
+  assert.equal(localWhere({ all: [{ field: 'state', in: ['open', 'doing'] }, { field: 'due', before: '2026-11-01' }] }, TASKS), true);
+  assert.equal(localWhere({ field: 'tags', has: 'bank' }, TASKS), true);
+  assert.equal(localWhere({ field: 'tags', is: 'bank' }, TASKS), false, 'a list is not asked is');
+  assert.equal(localWhere({ field: 'due', after: '+30d' }, TASKS), false);
+  assert.equal(localWhere({ field: 'title', matches: 'x' }, TASKS), false);
+  assert.equal(localWhere({ field: 'nope', is: 'x' }, TASKS), false);
+  assert.equal(localWhere({ pointed: { register: 'projects', by: 'project' } }, TASKS), false);
 });

@@ -21,10 +21,23 @@
  * the field is not one the question filtered, sorted or counted by. A `note` changes no row. Each write placed moves the
  * row's `version` on by one, as the record's compare-and-set does, so a write from the patched row is not refused.
  * A line already in the answer (the value it set is there, not the one it replaced) is skipped, and changes nothing.
- * Anything else drops the answer, as before: a create, a delete, a link, a ref or a money field, a derived field, a
- * row the answer does not hold whose change could bring it in, a write half in the answer and half not. A list the
- * answer only names rows of is patched by nothing and dropped only when a line could change a name it shows.
+ * Anything else drops the answer, as before: a link, a ref or a money field, a derived field, a row the answer does not
+ * hold whose change could bring it in, a write half in the answer and half not. A list the answer only names rows of
+ * is patched by nothing and dropped only when a line could change a name it shows.
  * The compare-and-set is the backstop: a version patched wrong is a refused write and a re-read, never a lost one.
+ *
+ * CREATES AND DELETES, ONLY WHERE THE SPOT SAYS HOW (`Lands`). A spot that carries the question's filter as the
+ * record's tree, its sort, and where its count, its pills' counts and its next page are, takes both:
+ * - A DELETE takes its row out and its counts down by one. A row it does not hold is not news when every row the
+ *   question answers is held, and drops the answer when there are more pages, or pills a filter does not narrow alike.
+ * - A CREATE lands only when the browser can answer the question about it the way the record would: `@braindog/where`'s
+ *   `evaluate` over the line's fields, and only for a filter of plain fields with literal values (no ref, no relative
+ *   day, no hop, no search). A row it takes goes where the sort puts it (empties last, the newest first among equals,
+ *   as the record breaks ties by id), or nowhere past a page boundary, and is counted either way. A row it does not
+ *   take is not news when the filter is the whole question (`exact`), else the answer goes. A field the row cannot be
+ *   drawn with as logged (a ref is a number on screen and an id in the log, a redacted value) drops it too, and so do
+ *   pills over a narrowed question, which count rows the filter leaves out.
+ * - A create already in the answer is skipped. A restore, or a create or delete with no `Lands`, drops it as before.
  *
  * THE LAST READER, SIGNED (`local-mark.ts`). A live boot leaves a marker naming who read; a cold open before the shell
  * has claimed the copy, and a boot nobody answered (offline), draws only for that person, and only to read. Offline the
@@ -44,6 +57,8 @@
  * PURE, AND NODE LOADS IT. The store is handed in (`local-db.ts` is the browser's IndexedDB, `memoryStore` a test's),
  * and so is the record's log, so `local.test.ts` drives every rule without a browser or a socket.
  */
+
+import { evaluate, type FieldSpec, type Predicate, type Schema } from '@braindog/where';
 
 /** Bump when what is stored changes shape: a copy of another format is wiped. */
 export const LOCAL_FORMAT = 1;
@@ -78,7 +93,33 @@ export type Meta = {
  * rows are in the record's own order, last changed first, so a placed write moves its row to the head. `moved` is the
  * path to a `{ [seq]: instant }` of when each row last changed, set from the line.
  */
-export type Spot = { list: string; at: readonly (string | number)[]; by: readonly string[] | null; newest?: boolean; moved?: readonly (string | number)[] };
+export type Spot = {
+  list: string;
+  at: readonly Path;
+  by: readonly string[] | null;
+  newest?: boolean;
+  moved?: readonly Path;
+  lands?: Lands;
+};
+
+type Path = (string | number)[];
+
+/**
+ * How a create or a delete is placed on a spot's rows; absent, either drops the answer.
+ *
+ * `where` is the question's filter as the record's tree, `null` when nothing narrows it. `exact`: the filter is the
+ * whole question, so a row it does not take is not in the answer. `sort` orders a new row (absent: the head when
+ * `newest`, else the end, for a screen that orders its rows itself). `more` is the path to the next page's cursor,
+ * `count` to how many rows the question matched, `tally` to the pills' counts as `[field, [value, n][]][]`.
+ */
+export type Lands = {
+  where: Predicate | null;
+  exact: boolean;
+  sort?: { field: string; dir: 'asc' | 'desc' };
+  more?: readonly Path;
+  count?: readonly Path;
+  tally?: readonly Path;
+};
 
 /**
  * One kept answer. `lists` are the lists it was read from; `decls` their declarations, for a tab that has not learnt
@@ -118,6 +159,8 @@ export type Line = {
   kind: string;
   register: string | null;
   rowid?: number;
+  /** The row a row write is about, `entry:<id>` as the log names it. */
+  target?: string | null;
   steps?: Line[];
   ts?: string;
   seq?: number | null;
@@ -326,6 +369,230 @@ function dig(v: unknown, path: readonly (string | number)[]): unknown {
   return at;
 }
 
+/* ── creates and deletes (`Lands`) ───────────────────────────────────────── */
+
+/** The declared field `id`, with the `tags` every list has whether it declares it or not (`withTags` in the kernel). */
+function fieldOf(decl: unknown, id: string): FieldLike | undefined {
+  const f = fieldsOf(decl).find((x) => x.id === id);
+  return f ?? (id === 'tags' ? { id: 'tags', type: 'list', of: 'text' } : undefined);
+}
+
+const worksOut = (decl: unknown): boolean => fieldsOf(decl).some((f) => f.derive !== undefined || f.derived === true);
+
+/** The list as `@braindog/where` reads it, from the declaration the answer was kept with (`schemaOf` in `where.ts`). */
+function schemaFrom(list: string, decl: unknown): Schema {
+  const fields: Record<string, FieldSpec> = {};
+  for (const f of fieldsOf(decl)) {
+    if (typeof f.id !== 'string' || typeof f.type !== 'string' || (f as { retired?: unknown }).retired === true) continue;
+    const values = (f as { values?: unknown }).values;
+    fields[f.id] = {
+      type: f.type,
+      ...(typeof f.of === 'string' ? { of: f.of } : {}),
+      ...(Array.isArray(values) ? { values: values.map(String) } : {}),
+    };
+  }
+  if (!Object.hasOwn(fields, 'tags')) fields['tags'] = { type: 'list', of: 'text' };
+  const state = (decl as { state?: unknown } | null)?.state;
+  return { register: list, fields, ...(typeof state === 'string' ? { state } : {}) };
+}
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}/u;
+const LEAF_OPS = new Set(['is', 'not', 'in', 'not_in', 'gt', 'gte', 'lt', 'lte', 'before', 'after', 'between', 'contains', 'starts', 'ends', 'empty', 'present', 'has', 'lacks']);
+
+/** Whether a value is one the browser compares as the record does, for a field of `type`. */
+function literal(type: string, v: unknown): boolean {
+  if (type === 'int' || type === 'decimal' || type === 'duration') return typeof v === 'number' && Number.isFinite(v);
+  if (type === 'day' || type === 'instant') return typeof v === 'string' && ISO_DAY.test(v);
+  if (type === 'bool') return typeof v === 'boolean' || v === 'true' || v === 'false';
+  return typeof v === 'string';
+}
+
+/**
+ * Whether the browser answers `where` about a row as the record would: groups of leaves over plain declared fields,
+ * each value a literal of the field's type. A relative day (`today`), a ref (an id in the log, a number on screen), a
+ * hop, a `via` or a search over the text index are the record's to answer.
+ */
+export function localWhere(where: unknown, decl: unknown): boolean {
+  const walk = (n: unknown, depth: number): boolean => {
+    if (depth > 16 || typeof n !== 'object' || n === null || Array.isArray(n)) return false;
+    const node = n as Record<string, unknown>;
+    for (const q of ['all', 'any', 'none'])
+      if (q in node) return Object.keys(node).length === 1 && Array.isArray(node[q]) && (node[q] as unknown[]).every((c) => walk(c, depth + 1));
+    if ('pointed' in node || 'via' in node || typeof node.field !== 'string') return false;
+    const f = fieldOf(decl, node.field);
+    if (!f || f.derive !== undefined || f.derived === true || typeof f.type !== 'string') return false;
+    const list = f.type === 'list';
+    const type = list ? (f.of === 'text' ? 'text' : null) : PLAIN.has(f.type) ? f.type : null;
+    if (type === null) return false;
+    const ops = Object.keys(node).filter((k) => k !== 'field');
+    if (ops.length === 0) return false;
+    return ops.every((op) => {
+      if (!LEAF_OPS.has(op)) return false;
+      /* A list is asked `has`, `lacks`, `empty` or `present`; a plain field anything but the first two. */
+      if (list ? !['has', 'lacks', 'empty', 'present'].includes(op) : op === 'has' || op === 'lacks') return false;
+      const v = node[op];
+      if (op === 'empty' || op === 'present') return v === true;
+      if (op === 'in' || op === 'not_in' || op === 'between') return Array.isArray(v) && v.length > 0 && v.every((x) => literal(type, x));
+      return literal(type, v);
+    });
+  };
+  return walk(where, 0);
+}
+
+/** Whether rows past those held answer the question: a next page's cursor is there. */
+const beyond = (value: unknown, lands: Lands): boolean => {
+  if (!lands.more) return false;
+  const c = dig(value, lands.more);
+  return c !== undefined && c !== null && c !== '';
+};
+
+/** Move the count at `path` by `by`; `false` when the answer holds something there that is not a number. */
+function recount(value: unknown, path: readonly Path | undefined, by: number): boolean {
+  if (!path || path.length === 0) return true;
+  const at = dig(value, path.slice(0, -1));
+  const k = path[path.length - 1]!;
+  if (typeof at !== 'object' || at === null) return true;
+  const n = (at as Record<string | number, unknown>)[k];
+  if (n === undefined || n === null) return true;
+  if (typeof n !== 'number') return false;
+  (at as Record<string | number, unknown>)[k] = Math.max(0, n + by);
+  return true;
+}
+
+/** Move each pill's count by `by` for the row's value; `false` when a value has no pill to move. */
+function retally(value: unknown, lands: Lands, fields: Record<string, unknown>, by: number): boolean {
+  const pills = lands.tally ? dig(value, lands.tally) : undefined;
+  if (pills === undefined || pills === null) return true;
+  if (!Array.isArray(pills)) return false;
+  for (const pill of pills) {
+    if (!Array.isArray(pill) || typeof pill[0] !== 'string' || !Array.isArray(pill[1])) return false;
+    const v = fields[pill[0]];
+    if (v === undefined || v === null || v === '') continue;
+    const bucket = (pill[1] as unknown[]).find((b) => Array.isArray(b) && b[0] === v) as [string, number] | undefined;
+    if (!bucket || typeof bucket[1] !== 'number') return false;
+    bucket[1] = Math.max(0, bucket[1] + by);
+  }
+  return true;
+}
+
+const SORTED = new Set(['int', 'decimal', 'duration', 'day', 'instant', 'enum']);
+
+/**
+ * Where a new row goes among `rows` under the record's order: its index, `rows.length` past the last, or `null` when
+ * the order is not one the browser can say. EMPTIES LAST BOTH WAYS and AMONG EQUALS THE NEWEST ID FIRST, as the
+ * kernel's `ORDER BY ... IS NULL, ..., id DESC` has it; an enum by its declared place, as the kernel's `CASE` does.
+ */
+function placeOf(rows: readonly unknown[], fields: Record<string, unknown>, sort: NonNullable<Lands['sort']>, decl: unknown): number | null {
+  const f = fieldOf(decl, sort.field);
+  if (!f || typeof f.type !== 'string' || !SORTED.has(f.type) || f.derive !== undefined || f.derived === true) return null;
+  const values = (f as { values?: unknown }).values;
+  const order = Array.isArray(values) ? values.map(String) : [];
+  const key = (v: unknown): number | string | null => {
+    if (v === undefined || v === null || v === '') return null;
+    if (f.type === 'enum') {
+      const i = order.indexOf(String(v));
+      return i === -1 ? order.length : i;
+    }
+    if (f.type === 'day' || f.type === 'instant') return typeof v === 'string' ? v : NaN;
+    return typeof v === 'number' ? v : NaN;
+  };
+  const mine = key(fields[sort.field]);
+  if (typeof mine === 'number' && Number.isNaN(mine)) return null;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!isRow(r)) return null;
+    const theirs = key(r.fields[sort.field]);
+    if (typeof theirs === 'number' && Number.isNaN(theirs)) return null;
+    /* Equal keys, the new row first: its id is the newest. An empty one goes before the first empty held. */
+    if (theirs === null) return i;
+    if (mine === null) continue;
+    if (typeof mine !== typeof theirs) return null;
+    if (mine === theirs || (sort.dir === 'asc' ? mine < theirs : mine > theirs)) return i;
+  }
+  return rows.length;
+}
+
+/** A create's fields as a row holds them, or `null` when one cannot be drawn as the log says it. */
+function createdFields(decl: unknown, to: unknown): Record<string, unknown> | null {
+  if (typeof to !== 'object' || to === null || Array.isArray(to) || worksOut(decl)) return null;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(to as Record<string, unknown>)) {
+    if (v === REDACTED) return null;
+    if (v === undefined || v === null) continue;
+    const f = fieldOf(decl, k);
+    if (!f || typeof f.type !== 'string') return null;
+    if (f.type === 'list') {
+      if (f.of !== 'text' || !Array.isArray(v) || !v.every((x) => typeof x === 'string')) return null;
+    } else if (!PLAIN.has(f.type)) return null;
+    out[k] = v;
+  }
+  return out;
+}
+
+/** Place a create on one spot of `value`; `false` drops the answer. */
+function landCreate(value: unknown, spot: Spot, decl: unknown, l: Line, writes: Map<string, 'placed' | 'in'>): boolean {
+  const lands = spot.lands;
+  if (!lands || typeof l.seq !== 'number') return false;
+  const rows = dig(value, spot.at);
+  if (!Array.isArray(rows)) return false;
+  const write = `${spot.at.join('.')} ${l.seq} ${l.batch ?? l.id}`;
+  /* KEPT AFTER THE CREATE, the row is in already. */
+  if (rows.some((r) => isRow(r) && r.seq === l.seq)) {
+    writes.set(write, writes.get(write) ?? 'in');
+    return true;
+  }
+  const fields = createdFields(decl, l.to);
+  if (fields === null) return false;
+  if (lands.where !== null) {
+    if (!localWhere(lands.where, decl)) return false;
+    let takes: boolean;
+    try {
+      takes = evaluate(lands.where, fields, schemaFrom(spot.list, decl));
+    } catch {
+      return false;
+    }
+    if (!takes) return lands.exact;
+    /* PILLS COUNT ROWS THE OTHER CHIPS TAKE, which a narrowed question cannot say from its filter whole. */
+    const pills = lands.tally ? dig(value, lands.tally) : undefined;
+    if (pills !== undefined && pills !== null) return false;
+  } else if (!retally(value, lands, fields, 1)) return false;
+  let at: number | null;
+  if (lands.sort) at = placeOf(rows, fields, lands.sort, decl);
+  else if (spot.newest) at = 0;
+  else at = beyond(value, lands) ? null : rows.length;
+  if (at === null) return false;
+  if (!recount(value, lands.count, 1)) return false;
+  /* PAST THE LAST ROW HELD, with more pages, it is on a later page: counted, not drawn. */
+  if (at < rows.length || !beyond(value, lands)) {
+    const id = typeof l.target === 'string' && l.target !== '' ? l.target.replace(/^entry:/u, '') : null;
+    rows.splice(at, 0, { ...(id ? { id } : {}), seq: l.seq, fields, version: 1, created: l.ts ?? '', by: '' });
+    const moved = spot.moved ? dig(value, spot.moved) : undefined;
+    if (typeof moved === 'object' && moved !== null && typeof l.ts === 'string') (moved as Record<number, string>)[l.seq] = l.ts;
+  }
+  /* The rest of the same write (a rule's edit of the row it made) is that one version, as an edit's lines are. */
+  writes.set(write, 'placed');
+  return true;
+}
+
+/** Take a deleted row off one spot of `value`; `false` drops the answer. */
+function landDelete(value: unknown, spot: Spot, l: Line): boolean {
+  const lands = spot.lands;
+  if (!lands || typeof l.seq !== 'number') return false;
+  const rows = dig(value, spot.at);
+  if (!Array.isArray(rows)) return false;
+  const at = rows.findIndex((r) => isRow(r) && r.seq === l.seq);
+  if (at === -1) {
+    /* NOT HELD: on a later page, or counted by a pill the chips leave it out of, it moves a number nobody can see. */
+    if (beyond(value, lands)) return false;
+    const pills = lands.tally ? dig(value, lands.tally) : undefined;
+    return lands.where === null || pills === undefined || pills === null;
+  }
+  const [gone] = rows.splice(at, 1) as Row[];
+  const moved = spot.moved ? dig(value, spot.moved) : undefined;
+  if (typeof moved === 'object' && moved !== null) delete (moved as Record<number, string>)[l.seq];
+  return recount(value, lands.count, -1) && retally(value, lands, gone!.fields, -1);
+}
+
 /**
  * `row`'s answer with `lines` (oldest first, as `inOrder` gives them) placed on it, or `undefined` when one cannot be
  * placed and the answer must go. The rules are the design note's, top of this file. Lines about lists the answer was
@@ -356,6 +623,10 @@ export function patched(row: Stored, lines: readonly Line[]): unknown {
     }
 
     if (l.kind === 'note') continue;
+    if (l.kind === 'create' || l.kind === 'delete') {
+      for (const spot of held) if (!(l.kind === 'create' ? landCreate(value, spot, decl, l, writes) : landDelete(value, spot, l))) return undefined;
+      continue;
+    }
     if (!VALUES.has(l.kind) || typeof l.seq !== 'number' || typeof l.field !== 'string') return undefined;
     const how = placing(decl, l.field);
     if (how === null) return undefined;

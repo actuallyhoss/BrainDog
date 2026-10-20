@@ -8,7 +8,9 @@
  * the screen whole, so the list draws it and asks nothing (`servedWhole`). One without them is drawn and asked behind.
  */
 
-import type { Spot } from '../../../lib/data/local.ts';
+import type { Predicate } from '@braindog/where';
+
+import type { Lands, Spot } from '../../../lib/data/local.ts';
 import type { Names } from '../../../lib/record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../../../lib/record/schema.ts';
 
@@ -68,10 +70,24 @@ export function servedWhole(kept: KeptList, counts: boolean): boolean {
  */
 export function spotOf(
   register: string,
-  ask: { filters: readonly Filter[]; q: string; sort: { field: string } | undefined; twice: boolean },
+  ask: { filters: readonly Filter[]; q: string; sort: { field: string; dir?: 'asc' | 'desc' } | undefined; twice: boolean },
   counted: readonly string[],
+  where?: Predicate | null,
 ): Spot {
   const every = ask.q !== '' || ask.twice || ask.filters.some((f) => typeof f.field !== 'string' || f.field === '');
   const by = every ? null : [...new Set([...ask.filters.map((f) => f.field), ...(ask.sort ? [ask.sort.field] : []), ...counted])];
-  return { list: register, at: ['entries'], by, ...(ask.sort ? {} : { newest: true }) };
+  /* A CREATE OR A DELETE IS PLACED only on the chips' question said as the record's tree: a search or the people held
+     twice are the record's to answer, and with no tree to hand a create drops the page as before. */
+  const lands: Lands | null =
+    every || where === undefined
+      ? null
+      : {
+          where: where ?? null,
+          exact: true,
+          ...(ask.sort ? { sort: { field: ask.sort.field, dir: ask.sort.dir === 'desc' ? 'desc' : 'asc' } } : {}),
+          more: ['cursor'],
+          count: ['matched'],
+          tally: ['counted'],
+        };
+  return { list: register, at: ['entries'], by, ...(ask.sort ? {} : { newest: true }), ...(lands ? { lands } : {}) };
 }

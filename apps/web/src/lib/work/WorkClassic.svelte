@@ -226,6 +226,9 @@
             by: [w.shape.state, w.shape.finished].filter((f): f is string => f !== null),
             /* Only stamps the record gave: an older host's are the day each was added, which a change does not move. */
             ...(w.movedFrom === 'updated' ? { moved: ['moved'] } : {}),
+            /* A NEW TASK STILL IN PLAY LANDS, and the screen orders it; one made finished drops the copy, since what
+               Work reads of the finished is the last week of them, which the browser does not answer. */
+            ...(w.shape.state && w.shape.done.length > 0 ? { lands: { where: { field: w.shape.state, not_in: [...w.shape.done] }, exact: false } } : {}),
           },
         ],
       },
