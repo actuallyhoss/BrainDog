@@ -81,7 +81,7 @@ export type Filled = { ingest: string; register: string; maps: Record<string, un
 
 /** The words of both sheets, beside the calls they describe, as `fieldWords` is in `field-write.ts`. */
 export const actionWords = {
-  newDoor: 'New door',
+  newDoor: 'New web address',
   newAction: 'New scheduled action',
   doorSub: 'An address another service posts to. What arrives lands in a list, or waits in the inbox.',
   actionSub: 'Something this record does on a clock: reads a number, sends an update or reads pages from a service.',
@@ -121,7 +121,7 @@ export const actionWords = {
   fromArrived: 'When it arrived',
   addLine: 'Add a field',
   removeLine: (field: string) => `Remove ${field}`,
-  makeDoor: 'Make the door',
+  makeDoor: 'Make the address',
   makeAction: 'Save the action',
   making: 'Saving',
   close: 'Close',
@@ -132,7 +132,7 @@ export const actionWords = {
   noKey: 'Pick the key it sends.',
   noRegister: 'Pick the list it writes to.',
   noRows: 'Say where the rows are in each answer.',
-  nameTaken: 'That name is already used by a door or a scheduled action. Pick another, or the one filed under it is replaced.',
+  nameTaken: 'That name is already used by a web address or a scheduled action. Pick another, or the one filed under it is replaced.',
   question: (name: string, door: boolean) => (door ? `Make a door called ${name}?` : `Add the scheduled action ${name}?`),
   reason: 'Made on the new-action sheet.',
   filed: 'It is waiting in Needs you. Nothing changes until it is accepted there.',

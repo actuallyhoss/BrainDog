@@ -17,7 +17,7 @@ export const automations = {
      record whose only door took a build server's results read a section about bank texts. The
      sender is whatever posts, and `webhook-doors.test.ts` fails if a use case comes back into these words. */
   doorsTitle: 'Web addresses that take things in',
-  doorsHow: 'Each door below is a web address a phone, a script or another service posts to, and what arrives is written to the list the door names. The address carries a token, made here.',
+  doorsHow: 'Each address below takes posts from a phone, a script or another service and files them in a list. The address carries a token, made here.',
   /* THE FACT THE SCREEN CANNOT HIDE, as the mail section states its own: only the digest is kept, so nothing reads the
      token back, and a blank where a value would go reads as "you have none". */
   doorsUnknown: 'This screen cannot show a token the record already has. Only a fingerprint of it is kept, so if you no longer have it, make a new one and the old one stops working.',
@@ -32,7 +32,7 @@ export const automations = {
   doorsHeld: 'An address is in use. Making a new one stops the old one working.',
   doorsNotHeld: 'No address made yet.',
   /* `ingestMint` REFUSES EVERY OTHER KIND, so the row says why it has no button rather than drawing one that fails. */
-  doorsOtherCheck: 'This door checks its senders another way, so there is no address to make here.',
+  doorsOtherCheck: 'This one checks its senders another way, so there is no address to make here.',
   doorsMint: 'Make the address',
   doorsRemint: 'Make a new address',
   doorsMinting: 'Making',
@@ -53,7 +53,7 @@ export const automations = {
   doorsNoAddress: 'This host answered the token without the path the address is built from, so no address is shown. Keep the token: it is the only copy there will be.',
   doorsMade: 'Made. Making another replaces this one, which is also how a leaked address is dealt with.',
   doorsNoToken: 'This host answered without a token in it, so nothing was shown. Try again, and if it happens twice nothing has been changed.',
-  doorsNoRead: 'This host does not list its doors yet, so none can be shown here. Updating it brings them.',
+  doorsNoRead: 'This host does not list its web addresses yet, so none can be shown here. Updating it brings them.',
   doorsFreshWhy: 'Making an address needs a sign-in from the last fifteen minutes, because whoever holds it can write into this record.',
 
   /* ── the automation editor's footer (`routes/automations/[id]`) ── */
