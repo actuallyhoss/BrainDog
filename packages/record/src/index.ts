@@ -8951,8 +8951,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (merges) return { ok: false, refusal: merges };
       const known = keyHeld(ctx, args.register, args.patch, self?.id ?? null);
       if (known) return { ok: false, refusal: known };
+      /* A NOTE AND NO FIELD IS A NOTE, AND MEETS ONLY THE FLOOR (`noteFault`), as `log` does. It went up the ladder as a
+         change, so a run that had read something from outside the record had it filed as a question that changes no
+         field, which is refused at `body.rows[0].patch`: MCP's `log` failed on every row of every list (20 Oct). */
+      const noteOnly =
+        typeof args.note === 'string' && args.note.trim() !== '' && args.patch !== null && typeof args.patch === 'object' && !Array.isArray(args.patch) && Object.keys(args.patch).length === 0;
+      if (noteOnly && self !== null && args.register !== SESSION) {
+        const caller = callerOf(ctx);
+        const held = caller === null ? null : trust.noteFault(caller, args.register, self.id);
+        if (held !== null) return no('FORBIDDEN', held, { at: 'note' });
+      }
       /* AT THE RUNG IT HAS EARNED, as `create` (`ladder.ts`). A row that is not there is left to the write's own refusal. */
-      const rung = self === null ? null : laddered(ctx, args.register, 'update', args.patch, self);
+      const rung = self === null || noteOnly ? null : laddered(ctx, args.register, 'update', args.patch, self);
       if (rung && self && !rung.gate.write) {
         const refused = wouldRefuse((w) =>
           offRegister(
