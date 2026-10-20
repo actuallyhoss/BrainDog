@@ -47,7 +47,7 @@
   .ask-lead {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
   }
 
@@ -61,9 +61,9 @@
   /* ONE CHANGE A LINE, a hairline between, as the run panel's. */
   .ask-line {
     padding-block: var(--sp-1);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
     overflow-wrap: anywhere;
   }
@@ -74,8 +74,8 @@
 
   .ask-note {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: 1.55;
   }
 

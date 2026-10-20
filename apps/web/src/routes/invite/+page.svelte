@@ -333,7 +333,7 @@
   .status {
     margin: 0;
     color: var(--ink-2);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
     overflow-wrap: anywhere;
     text-wrap: pretty;
@@ -360,7 +360,7 @@
   /* UNDER A THUMB THE FIELD READS AT 16, the phone's body size, below which a phone's browser zooms in on focus. */
   @media (pointer: coarse) {
     .doors .field-input {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 </style>

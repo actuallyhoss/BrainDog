@@ -75,14 +75,14 @@
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .one-marked {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     font-weight: 400;
   }
 
@@ -96,7 +96,7 @@
   /* THE DANGER EDGE, round the control's own corners and just outside it, so the focus ring (2px further out) still
      shows on a field that is wrong. An outline, not a border or a shadow: the tile stays flat. */
   .one-control[data-invalid] {
-    outline: 2px solid var(--danger);
+    outline: 2px solid var(--red);
     outline-offset: 0;
   }
 
@@ -107,13 +107,13 @@
     align-items: flex-start;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: 1.45;
   }
 
   .one-line[data-tone='danger'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .one-line[data-tone='danger'] :global(svg) {

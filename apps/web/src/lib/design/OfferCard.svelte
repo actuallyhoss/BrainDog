@@ -127,8 +127,8 @@
     min-block-size: 40px;
     padding: var(--sp-2) 20px;
     border: 0;
-    border-radius: var(--r-lg);
-    background: var(--bg);
+    border-radius: var(--r-tile);
+    background: var(--tile);
     color: var(--ink-3);
     font: inherit;
     font-size: var(--fs-body);

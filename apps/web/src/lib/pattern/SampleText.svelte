@@ -56,11 +56,11 @@
   .sample-text {
     margin: 0;
     padding: var(--sp-3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    background: var(--sunk);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-pop);
+    background: var(--board);
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     white-space: pre-wrap;
     overflow-wrap: anywhere;

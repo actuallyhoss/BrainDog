@@ -113,7 +113,7 @@ test('THE MAKING STEP SAYS NO COUNT AND DRAWS NO BAR, in its words and in its so
   const drawn = screen.slice(screen.indexOf('<script'));
   assert.doesNotMatch(drawn, /progressbar|<progress|aria-valuenow|\.length\}|\{[^{}]+\}\s+of\s+\{/u, 'the making step counts its tiles or draws a bar');
   assert.doesNotMatch(drawn, /border:|box-shadow|gradient|backdrop-filter/u, 'a tile is flat: no border, no shadow, no glass');
-  assert.match(drawn, /border-radius: var\(--r-lg\)/u, 'a tile is radius 16');
+  assert.match(drawn, /border-radius: var\(--r-tile\)/u, 'a tile is radius 16');
   /* A REFUSAL IS NEVER COLOUR ALONE: the words "Not made" stand beside the red. */
   assert.match(drawn, /words\.notMade/u);
 });

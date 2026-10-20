@@ -277,13 +277,13 @@
     inline-size: 100%;
     min-block-size: 40px;
     padding: 9px var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
     border-radius: 8px;
     color: var(--ink);
     font: inherit;
     /* 16px IN EVERY BOX, because a phone zooms the page when a smaller one takes focus. */
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: 22px;
     resize: none;
     field-sizing: content;
@@ -301,7 +301,7 @@
   @media (hover: hover) and (pointer: fine) {
     .composer-input:hover,
     .box-input:hover {
-      background: var(--s2);
+      background: var(--tile-2);
     }
   }
 
@@ -315,16 +315,16 @@
   }
 
   .box-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .over {
     flex: 1 1 12rem;
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .quiet-line {
@@ -336,8 +336,8 @@
 
   .quiet {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 20px;
   }
 
@@ -345,8 +345,8 @@
 
   .day {
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
@@ -372,8 +372,8 @@
     min-inline-size: 0;
     margin: 0;
     padding-block-start: 2px;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }
@@ -384,8 +384,8 @@
   }
 
   .when {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -422,14 +422,14 @@
   .head {
     margin: 0;
     padding-block-start: 2px;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 22px;
   }
 
   .words {
     margin: 2px 0 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
     overflow-wrap: anywhere;
     white-space: pre-wrap;
@@ -445,9 +445,9 @@
     padding: 0;
     background: none;
     border: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     cursor: pointer;
     transition: color var(--d-state) var(--ease-out);
@@ -471,8 +471,8 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 20px;
     cursor: pointer;
   }

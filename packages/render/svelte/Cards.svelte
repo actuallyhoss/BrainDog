@@ -299,7 +299,7 @@
     data-live={f.live}
     aria-label={RUN_OPEN}
     ><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:{f.hue}"
-      ><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg))"
+      ><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--tile))"
       ></circle>{#if f.live !== 'stopped'}<circle
           class="cards-run-ring"
           cx="18"
@@ -497,7 +497,7 @@
     padding-inline: var(--sp-1);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     color: inherit;
     font: inherit;
     letter-spacing: inherit;
@@ -505,11 +505,11 @@
   }
 
   :global(.cards-edit::placeholder) {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   :global(.cards-edit[data-armed]) {
-    background: var(--field);
+    background: var(--tile-2);
     text-overflow: clip;
   }
 
@@ -542,19 +542,19 @@
     border: 0;
     border-radius: var(--r-ctl);
     background: none;
-    color: var(--link);
-    font-size: var(--t-base);
+    color: var(--red);
+    font-size: var(--fs-body);
     font-weight: 500;
     cursor: pointer;
   }
 
   :global(.cards-all:hover) {
-    background: var(--field);
+    background: var(--tile-2);
   }
 
   :global(.cards-said) {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 </style>

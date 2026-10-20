@@ -86,7 +86,7 @@
 <style>
   .day {
     min-inline-size: 0;
-    background-color: var(--s1);
+    background-color: var(--tile-2);
     color: var(--ink);
     font: inherit;
     font-variant-numeric: tabular-nums;
@@ -101,16 +101,16 @@
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     border: 0;
-    border-radius: var(--r-md);
-    font-size: var(--t-md);
+    border-radius: var(--r-pop);
+    font-size: var(--fs-body);
   }
 
   /* THE GRID'S BOX IS THE CELL, so it grows the row by nothing while somebody types in it. */
   .day[data-fit='cell'] {
     inline-size: 100%;
     padding: 0 var(--sp-1);
-    border: 1px solid var(--ink2);
-    border-radius: var(--r-sm);
-    font-size: var(--t-ui);
+    border: 1px solid var(--ink-2);
+    border-radius: var(--r-xs);
+    font-size: var(--fs-body);
   }
 </style>

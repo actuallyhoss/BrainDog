@@ -428,7 +428,7 @@
   .sheet-sub {
     margin: 0;
     padding: 0 var(--sp-4) var(--sp-3);
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
@@ -441,10 +441,10 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--tile-2, var(--s1));
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-round);
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -453,7 +453,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .sheet-close:hover {
-      background: var(--hover, var(--hold-wash));
+      background: var(--hover, var(--tile-2));
       color: var(--ink);
     }
   }
@@ -480,7 +480,7 @@
     justify-content: flex-end;
     gap: var(--sp-2);
     padding: var(--sp-3) var(--sp-4);
-    border-block-start: 1px solid var(--rule, var(--line));
+    border-block-start: 1px solid var(--rule);
   }
 
   .sheet-foot > :global(.btn[data-weight='primary']) {
@@ -563,7 +563,7 @@
     .sheet-grab-bar {
       inline-size: 36px;
       block-size: var(--sp-1);
-      background: var(--rule-strong, var(--edge));
+      background: var(--rule-strong);
       border-radius: 2px;
     }
 
@@ -621,7 +621,7 @@
   .sheet[data-kind='menu'] .sheet-grab-bar {
     inline-size: 36px;
     block-size: var(--sp-1);
-    background: var(--rule-strong, var(--edge));
+    background: var(--rule-strong);
     border-radius: 2px;
   }
 

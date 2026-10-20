@@ -77,7 +77,7 @@
 
   .cards-item:has(.cards-title a):hover .cards-title {
     text-decoration: underline;
-    text-decoration-color: var(--edge);
+    text-decoration-color: var(--rule-strong);
     text-underline-offset: 3px;
   }
 
@@ -102,8 +102,8 @@
     place-items: center;
     inline-size: 28px;
     block-size: 28px;
-    color: var(--ink2);
-    font-size: var(--t-xs);
+    color: var(--ink-2);
+    font-size: var(--fs-cap);
     font-weight: 500;
     line-height: 1;
   }
@@ -111,7 +111,7 @@
   /* A MARK IS SQUARE AND A FACE IS ROUND, so a project and a person are told apart by shape, which
      holds in every theme and for every reader where a hue would not. */
   .cards-mark {
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
   }
 
@@ -121,7 +121,7 @@
   }
 
   .cards-face {
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-round);
   }
 
@@ -159,7 +159,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     letter-spacing: -0.005em;
     overflow-wrap: anywhere;
@@ -181,8 +181,8 @@
 
   .cards-when {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 
@@ -202,7 +202,7 @@
 
   .cards-figure .cards-value {
     color: var(--ink);
-    font-size: var(--t-xl);
+    font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 1.2;
@@ -211,12 +211,12 @@
 
   /* The code in front of a card's figure is half the figure and never under the smallest step, as a stat's is. */
   .cards-figure .amount-code {
-    font-size: max(var(--t-xs), 0.5em);
+    font-size: max(var(--fs-cap), 0.5em);
   }
 
   .cards-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* The line takes what the figure leaves, down to a width at which it is still a shape, and no wider than a
@@ -314,7 +314,7 @@
   }
 
   .cards-item[data-intent='warn'] .cards-ring-fill {
-    stroke: var(--status-waiting);
+    stroke: var(--warn);
   }
 
   /* LATE IS TOLD APART FROM THE WORKING RED BY A MARK, NOT ONLY ITS SHADE (DIRECTION 42): the TRACK breaks, the part
@@ -322,7 +322,7 @@
      here would beat it: a dash on the fill drew every late card as a full broken circle, whatever its share
      (`ring-late.test.ts` holds that no rule here ever dashes the fill). */
   .cards-item[data-intent='bad'] .cards-ring-fill {
-    stroke: var(--status-late);
+    stroke: var(--red);
   }
 
   .cards-item[data-intent='bad'] .cards-ring-track {
@@ -376,21 +376,21 @@
 
   .cards-fact {
     display: contents;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .cards-fact dt {
     min-inline-size: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
   .cards-fact dd {
     min-inline-size: 0;
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -398,13 +398,13 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .cards-empty {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE REPLY IS THE LINE UNDER THE HEAD and the next step the card's last word before who is on it.
@@ -413,8 +413,8 @@
   .cards-reply,
   .cards-next {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -442,7 +442,7 @@
   }
 
   .cards-item[data-lead] .cards-title {
-    font-size: var(--t-lg);
+    font-size: var(--fs-head);
   }
 
   /* A CARD'S `hue` IS ITS MARK'S COLOUR AND NOTHING ELSE (05 §5's one identity accent): the renderer writes
@@ -463,6 +463,6 @@
     aspect-ratio: 16 / 9;
     object-fit: cover;
     border-radius: var(--r-ctl);
-    background: var(--field);
+    background: var(--tile-2);
   }
 }

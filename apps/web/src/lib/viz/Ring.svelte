@@ -86,12 +86,12 @@
 
   .ring-figure {
     fill: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .ring-figure[data-big] {
-    font-size: var(--t-xl);
+    font-size: var(--fs-figure);
     letter-spacing: -0.02em;
   }
 

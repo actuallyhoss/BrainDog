@@ -65,7 +65,7 @@
 
   /**
    * ONE TYPE STEP DOWN, as a share of the size the caller set. `Money` is drawn at whatever step its caller chose, so the
-   * step is relative: `--t-md` is four fifths of `--t-lg`, and `--t-2xl` of `--t-3xl`.
+   * step is relative: `--fs-body` is four fifths of `--fs-head`, and `--fs-page` of `--fs-hero`.
    */
   const STEP = 0.8;
 </script>
@@ -159,7 +159,7 @@
     block-size: 0.9em;
     vertical-align: -0.1em;
     background: var(--tile-2);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   .money[data-fit='step'] {

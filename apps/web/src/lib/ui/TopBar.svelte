@@ -300,7 +300,7 @@
     min-inline-size: 20px;
     block-size: 20px;
     background: var(--tile);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     color: var(--ink-3);
     font: inherit;
     font-family: var(--font-mono);
@@ -348,7 +348,7 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: var(--r-round);
-    background: var(--live-fill);
+    background: var(--live);
   }
 
   .bar-live[data-pulse] {

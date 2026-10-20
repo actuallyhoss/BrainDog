@@ -561,8 +561,8 @@
   /* WHAT A MOVE ASKS FOR, muted beside its value: said in words, so it reads the same on the chosen segment. */
   .move-word {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
   }
 
@@ -572,12 +572,12 @@
   .row-input {
     min-block-size: max(40px, var(--ctl-h));
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .row-area {
@@ -589,8 +589,8 @@
 
   .money-unit {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .money .field-input {
@@ -601,8 +601,8 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .row-note {
@@ -610,10 +610,10 @@
     align-items: center;
     gap: var(--sp-2);
     padding: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    border-radius: var(--r-pop);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 </style>

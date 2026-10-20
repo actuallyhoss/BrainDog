@@ -95,7 +95,7 @@
   /* A NESTED GROUP IS ONE STEP IN, with a rule down its leading edge: the shape that says which rows the join governs. */
   .q-group[data-nested] {
     padding-inline-start: var(--sp-3);
-    border-inline-start: 2px solid var(--line);
+    border-inline-start: 2px solid var(--rule);
   }
 
   .q-group[data-proposed] {
@@ -113,8 +113,8 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .q-items {
@@ -146,22 +146,22 @@
     padding-inline: var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
-    color: var(--ink2);
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
     font: inherit;
     font-weight: 500;
     cursor: pointer;
   }
 
   .q-add:disabled {
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: default;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .q-add:not(:disabled):hover,
     .q-drop:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }
@@ -170,8 +170,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .q-meter meter {

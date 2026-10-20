@@ -116,7 +116,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-title);
+    font-size: var(--fs-page);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 34px;
@@ -127,7 +127,7 @@
   @media (width < 900px) {
     .own-h {
       font-family: var(--font-display);
-      font-size: var(--t-figure);
+      font-size: var(--fs-figure);
       line-height: 36px;
     }
   }
@@ -136,15 +136,15 @@
   .own-why,
   .own-price {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 24px;
   }
 
   .own-note {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -153,7 +153,7 @@
   .own-said {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
@@ -166,9 +166,9 @@
   .own-paid {
     margin: var(--sp-4) 0 0;
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    border-block-start: 1px solid var(--rule);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
@@ -184,7 +184,7 @@
   .own-go {
     position: sticky;
     inset-block-end: calc(var(--kb, 0px) + var(--sp-4));
-    background: var(--bg);
+    background: var(--tile);
     padding-block: var(--sp-2);
   }
 

@@ -179,8 +179,8 @@
     flex-direction: column;
     align-items: center;
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
     text-align: center;

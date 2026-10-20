@@ -152,7 +152,7 @@
 
   .quantity-unit {
     flex: none;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE ROW PAGE'S BOX, the shape its other editors take: 16px at every width, because a phone zooms the page when a
@@ -163,14 +163,14 @@
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
     /* THE COLOUR AND NOT THE SHORTHAND, so the menu keeps the chevron `controls.css` draws in its image. */
-    background-color: var(--s1);
+    background-color: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
-    font-size: var(--t-md);
+    border-radius: var(--r-pop);
+    font-size: var(--fs-body);
   }
 
   .quantity[data-fit='field'] .quantity-unit {
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* THE GRID'S BOX IS THE CELL, so it grows the row by nothing while somebody types in it. */
@@ -178,13 +178,13 @@
   .quantity[data-fit='cell'] .quantity-typed,
   .quantity[data-fit='cell'] .quantity-pick {
     padding: 0 var(--sp-1);
-    background-color: var(--s1);
-    border: 1px solid var(--ink2);
-    border-radius: var(--r-sm);
-    font-size: var(--t-ui);
+    background-color: var(--tile-2);
+    border: 1px solid var(--ink-2);
+    border-radius: var(--r-xs);
+    font-size: var(--fs-body);
   }
 
   .quantity[data-fit='cell'] .quantity-unit {
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 </style>

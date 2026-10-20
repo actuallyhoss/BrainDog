@@ -114,7 +114,7 @@
   /* ON A TILE, A SHEET OR A PANEL the quiet fill is a step under the surface, `--tile-2`, so it still reads as a thing
      to press on white. */
   :global(:is(.tile, .sheet, dialog, .menu, [data-surface='tile'], .block-slot)) .btn {
-    --btn-fill: var(--tile-2, var(--field));
+    --btn-fill: var(--tile-2);
   }
 
   .btn[data-size='sm'] {
@@ -139,23 +139,23 @@
 
   /* THE RED FILL, the one filled control on a screen, with white words in both schemes. */
   .btn[data-weight='primary'] {
-    --btn-fill: var(--red-fill, var(--action));
+    --btn-fill: var(--red-fill);
 
     background: var(--btn-fill);
-    color: var(--on-red, var(--on-action));
+    color: var(--on-red);
   }
 
   .btn[data-weight='primary']:active:not(:disabled) {
-    background: var(--red-fill-press, var(--action-hover));
+    background: var(--red-fill-press, var(--red-fill-hover));
   }
 
   .btn[data-weight='bare'] {
     background: none;
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
   }
 
   .btn[data-weight='bare']:active:not(:disabled) {
-    background: var(--tile-2, var(--field));
+    background: var(--tile-2);
     color: var(--ink);
   }
 
@@ -165,15 +165,15 @@
      also a hovered one. */
   @media (hover: hover) and (pointer: fine) {
     .btn:hover:not(:disabled):not(:active) {
-      background: var(--hover, var(--field-hover));
+      background: var(--hover);
     }
 
     .btn[data-weight='primary']:hover:not(:disabled):not(:active) {
-      background: var(--red-fill-hover, var(--action-hover));
+      background: var(--red-fill-hover);
     }
 
     .btn[data-weight='bare']:hover:not(:disabled):not(:active) {
-      background: var(--hover, var(--hover-wash));
+      background: var(--hover);
       color: var(--ink);
     }
   }
@@ -186,25 +186,25 @@
   }
 
   .btn[data-weight='primary'] :global(.kbd) {
-    background: color-mix(in srgb, var(--on-red, var(--on-action)) 20%, transparent);
-    color: var(--on-red, var(--on-action));
+    background: color-mix(in srgb, var(--on-red) 20%, transparent);
+    color: var(--on-red);
   }
 
   /* A DISABLED CONTROL loses the fill as well as the label, so a disabled primary does not read as live. */
   .btn:disabled {
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     cursor: not-allowed;
   }
 
   .btn[data-weight='primary']:disabled {
-    background: var(--tile-2, var(--field));
-    color: var(--ink-3, var(--dim));
+    background: var(--tile-2);
+    color: var(--ink-3);
   }
 
   /* AND ITS KEY CAP GOES QUIET WITH IT: the white cap on the grey fill was a cap nobody could see. */
   .btn[data-weight='primary']:disabled :global(.kbd) {
-    background: var(--hover, var(--hover-wash));
-    color: var(--ink-3, var(--dim));
+    background: var(--hover);
+    color: var(--ink-3);
   }
 
   .btn[data-weight='bare']:disabled {

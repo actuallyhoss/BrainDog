@@ -3392,14 +3392,14 @@
     align-items: center;
     gap: var(--sp-3);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
   }
 
   /* WHY THE FILTERS HAVE NO NUMBERS, one plain line at the body size under the bar. */
   .uncounted {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 1.4;
     overflow-wrap: anywhere;
@@ -3430,14 +3430,14 @@
   .held-none {
     margin: 0;
     padding: 24px 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
   }
 
   /* WHY THERE IS NO CAPTURE LINE, one dim sentence where the line would stand. */
   .reach {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
   }
 

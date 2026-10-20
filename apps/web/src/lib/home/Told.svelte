@@ -58,14 +58,14 @@
 
   .n-lesson {
     color: var(--ink);
-    font-size: var(--t-row, 15px);
+    font-size: var(--fs-body, 15px);
     line-height: 22px;
   }
 
   .n-because,
   .n-foot {
-    color: var(--dim);
-    font-size: var(--t-row, 15px);
+    color: var(--ink-3);
+    font-size: var(--fs-body, 15px);
     line-height: 22px;
   }
 

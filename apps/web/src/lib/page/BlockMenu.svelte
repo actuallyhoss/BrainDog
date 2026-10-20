@@ -349,7 +349,7 @@
     inline-size: var(--sp-6);
     block-size: var(--sp-6);
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink-3);
     transition:
       background var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out);
@@ -358,7 +358,7 @@
   .bm-mark:hover,
   .block-menu:has(:focus-visible) .bm-mark,
   .block-menu[data-open] .bm-mark {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -391,8 +391,8 @@
 
   .bm-group {
     margin: var(--sp-2) var(--sp-2) var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -400,7 +400,7 @@
   .bm-item {
     background: none;
     border: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
     text-align: start;
     cursor: pointer;
@@ -408,7 +408,7 @@
 
   .bm-item:hover,
   .bm-item:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -418,7 +418,7 @@
 
   /* A WIDTH TOO NARROW FOR THE BLOCK IS GREYED AND SAYS WHY, beside its name. */
   .bm-item[aria-disabled='true'] {
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: default;
   }
 
@@ -428,7 +428,7 @@
 
   .bm-why {
     margin-inline-start: auto;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* A KIND'S PICTURE, in the icon set's stroke, before its name. */

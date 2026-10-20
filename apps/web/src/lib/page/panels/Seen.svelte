@@ -72,21 +72,21 @@
     min-width: 0;
     padding-block: var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
   /* SEEN NOWHERE: one quiet line under the heading, in the board's muted text. */
   .seen-none {
     margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .seen-more,
   .seen-also {
     margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 </style>

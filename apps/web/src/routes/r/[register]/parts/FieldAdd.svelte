@@ -103,8 +103,8 @@
     /* Its own line above the buttons, not a third column beside them. */
     flex-basis: 100%;
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-xs);
+    color: var(--ink-2);
+    font-size: var(--fs-cap);
     line-height: 1.5;
   }
 </style>

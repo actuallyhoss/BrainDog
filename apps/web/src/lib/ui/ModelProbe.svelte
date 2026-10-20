@@ -62,7 +62,7 @@
   .probe-said p {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;

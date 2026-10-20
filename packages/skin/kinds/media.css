@@ -11,11 +11,11 @@
   .media {
     margin: 0;
     padding: var(--sp-3) var(--sp-4);
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     line-height: 1.6;
     overflow-x: auto;
     tab-size: 2;
@@ -25,7 +25,7 @@
     content: attr(data-lang);
     display: block;
     margin-block-end: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 }

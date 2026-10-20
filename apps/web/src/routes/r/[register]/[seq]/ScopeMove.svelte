@@ -222,7 +222,7 @@
     inset-block-start: 0;
     inset-inline: var(--sp-3);
     block-size: 1px;
-    background: var(--line);
+    background: var(--rule);
     pointer-events: none;
   }
 
@@ -237,7 +237,7 @@
     padding-inline: var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
     text-align: start;
@@ -246,12 +246,12 @@
   }
 
   .scope-place[aria-current] {
-    background: var(--selected);
+    background: var(--red-tint);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .scope-place:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -270,8 +270,8 @@
   .scope-said {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 </style>

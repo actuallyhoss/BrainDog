@@ -112,7 +112,7 @@
   .inputs-figure {
     padding-inline: var(--sp-3);
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-variant-numeric: tabular-nums;
   }
 </style>

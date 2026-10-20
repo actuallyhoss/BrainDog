@@ -66,7 +66,7 @@
       onclick={(ev) => openCardMenu(e.seq, ev.currentTarget)}
     >
       <!-- `m`, AND IT WAS `s`: a 12px box of a 24-unit path at `stroke-width: 1.6`, so each dot
-           was 0.8 CSS pixels in `--dim`, on the only touch route to a row's eight verbs. In both
+           was 0.8 CSS pixels in `--ink-3`, on the only touch route to a row's eight verbs. In both
            schemes the column read as an empty cell beside the card. -->
       <Icon name="more" size="m" />
     </button>
@@ -137,9 +137,9 @@
       padding: 0 var(--sp-2);
       background: none;
       border: 0;
-      color: var(--ink2);
+      color: var(--ink-2);
       font: inherit;
-      font-size: var(--t-sm);
+      font-size: var(--fs-meta);
       text-decoration: underline;
       text-underline-offset: 3px;
       cursor: pointer;
@@ -149,7 +149,7 @@
       display: flex;
       align-items: center;
       flex: none;
-      color: var(--ink2);
+      color: var(--ink-2);
     }
 
     .card-more {

@@ -230,7 +230,7 @@
   .arr-lead {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -246,9 +246,9 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -259,8 +259,8 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
@@ -271,15 +271,15 @@
 
   .arr-at {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
   }
 
   /* THE ONE PART THAT LEAVES THE RECORD: the warning glyph leads its heading, and the heading is in ink. */
   .arr-calls-h {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .arr-calls-h :global(.icon) {
@@ -295,12 +295,12 @@
 
   .arr-host {
     color: var(--ink);
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
     font-weight: 400;
   }
 
   .arr-detail {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* WHAT IT CHANGES: each entry's title, then its fields as a definition list, now beside what it will be. */
@@ -326,8 +326,8 @@
   }
 
   .arr-fields dt {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 1.6;
   }
 
@@ -340,7 +340,7 @@
   }
 
   .arr-was {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .arr-will {
@@ -349,14 +349,14 @@
 
   .arr-tag {
     margin-inline-end: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .arr-question {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -368,8 +368,8 @@
 
   /* THE SUGGESTED ONE IS SAID IN THE ACCENT'S TEXT, a word and not a colour alone. */
   .arr-suggested {
-    color: var(--action-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -387,7 +387,7 @@
   }
 
   .arr-take[data-off] .arr-title {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .arr-take-why {
@@ -396,8 +396,8 @@
     gap: var(--sp-1);
     margin: 0;
     padding-inline-start: var(--sp-5);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .arr-take-why :global(.icon) {
@@ -428,12 +428,12 @@
   .arr-note,
   .arr-summary {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .arr-summary {
-    font-size: var(--t-ui);
-    color: var(--ink2);
+    font-size: var(--fs-body);
+    color: var(--ink-2);
   }
 </style>

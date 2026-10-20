@@ -268,7 +268,7 @@ test('EACH MATCH THE RECORD CAN SPLIT CARRIES UNDO, a quiet rectangle, and one i
   const undo = /<Button[^>]*data-matched-undo[^>]*>/u.exec(markup)![0];
   /* NEVER THE ACCENT, never a pill: the shared rectangle at its quiet weight. */
   assert.doesNotMatch(undo, /weight=/u);
-  assert.doesNotMatch(style, /border-radius:\s*(999|50%|var\(--r-pill)/u);
+  assert.doesNotMatch(style, /border-radius:\s*(999|50%|var\(--r-ctl)/u);
   assert.doesNotMatch(markup, /<button\b/u);
   assert.match(script, /undo: 'Undo'/u);
 });

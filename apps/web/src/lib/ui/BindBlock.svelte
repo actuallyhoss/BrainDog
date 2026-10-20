@@ -232,12 +232,12 @@
   /* Plain text in the body face: the product's own words dim, the names the view brought ink. No
      chips, because a name somebody gave a list is not code. */
   .sentence {
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
   .said {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .fixed {
@@ -247,8 +247,8 @@
 
   .says {
     margin-block-start: calc(var(--sp-3) * -1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .row {
@@ -258,8 +258,8 @@
   }
 
   .row-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
@@ -270,12 +270,12 @@
     inline-size: 100%;
     min-block-size: max(40px, var(--ctl-h));
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .preview,
@@ -284,10 +284,10 @@
     align-items: start;
     gap: var(--sp-2);
     padding: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    border-radius: var(--r-pop);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 </style>

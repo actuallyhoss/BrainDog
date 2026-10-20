@@ -89,7 +89,7 @@
     box-sizing: border-box;
     inline-size: 28px;
     block-size: 28px;
-    background: var(--tile-2, var(--s1));
+    background: var(--tile-2);
     border-radius: var(--r-round);
     color: var(--ink);
     text-decoration: none;
@@ -114,7 +114,7 @@
   }
 
   .agent-face:focus-visible {
-    outline: 2px solid var(--focus, var(--focus-in));
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -164,53 +164,53 @@
     min-inline-size: 14px;
     block-size: 14px;
     padding-inline: 2px;
-    background: var(--ph-tint, var(--tile-2, var(--s2)));
-    border-radius: var(--r-xs, var(--r-sm));
+    background: var(--ph-tint, var(--tile-2));
+    border-radius: var(--r-xs);
     box-shadow: 0 0 0 1px var(--face-ground);
     color: var(--ph, var(--ink));
-    font-size: var(--fs-cap, var(--t-xs));
+    font-size: var(--fs-cap);
     font-weight: var(--fw-semi);
     line-height: 1;
   }
 
   [data-slot='blue'] {
     --ph: var(--cat-blue, var(--ink));
-    --ph-tint: var(--cat-blue-tint, var(--s1));
+    --ph-tint: var(--cat-blue-tint, var(--tile-2));
   }
 
   [data-slot='violet'] {
     --ph: var(--cat-violet, var(--ink));
-    --ph-tint: var(--cat-violet-tint, var(--s1));
+    --ph-tint: var(--cat-violet-tint, var(--tile-2));
   }
 
   [data-slot='pink'] {
     --ph: var(--cat-pink, var(--ink));
-    --ph-tint: var(--cat-pink-tint, var(--s1));
+    --ph-tint: var(--cat-pink-tint, var(--tile-2));
   }
 
   [data-slot='teal'] {
     --ph: var(--cat-teal, var(--ink));
-    --ph-tint: var(--cat-teal-tint, var(--s1));
+    --ph-tint: var(--cat-teal-tint, var(--tile-2));
   }
 
   [data-slot='sky'] {
     --ph: var(--cat-sky, var(--ink));
-    --ph-tint: var(--cat-sky-tint, var(--s1));
+    --ph-tint: var(--cat-sky-tint, var(--tile-2));
   }
 
   [data-slot='yellow'] {
     --ph: var(--cat-yellow, var(--ink));
-    --ph-tint: var(--cat-yellow-tint, var(--s1));
+    --ph-tint: var(--cat-yellow-tint, var(--tile-2));
   }
 
   [data-slot='lime'] {
     --ph: var(--cat-lime, var(--ink));
-    --ph-tint: var(--cat-lime-tint, var(--s1));
+    --ph-tint: var(--cat-lime-tint, var(--tile-2));
   }
 
   [data-slot='slate'] {
     --ph: var(--cat-slate, var(--ink));
-    --ph-tint: var(--cat-slate-tint, var(--s1));
+    --ph-tint: var(--cat-slate-tint, var(--tile-2));
   }
 
   @media (forced-colors: active) {

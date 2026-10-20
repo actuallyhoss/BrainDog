@@ -22,7 +22,7 @@
     inline-size: 100%;
     aspect-ratio: 16 / 9;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   .embed[data-aspect='4:3'] :is(.embed-frame, .embed-facade) {
@@ -40,7 +40,7 @@
 
   .embed-frame {
     display: block;
-    background: var(--s1);
+    background: var(--tile-2);
   }
 
   /* THE FACADE IS A WELL CUT INTO THE BLOCK, the words at its foot and the one button under them, so it reads as a
@@ -52,13 +52,13 @@
     align-items: start;
     gap: var(--sp-1);
     padding: var(--sp-4);
-    background: var(--s1);
+    background: var(--tile-2);
   }
 
   .embed-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: var(--lh-tight);
     overflow-wrap: anywhere;
@@ -66,8 +66,8 @@
 
   .embed-from {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A BUTTON IN THE HOUSE'S SHAPE: `--ctl-h`, which is 44px under a coarse pointer, so the press a phone makes is a
@@ -77,11 +77,11 @@
     margin-block-start: var(--sp-2);
     padding-inline: var(--sp-4);
     border: 1px solid transparent;
-    border-radius: var(--r-pill);
-    background: var(--bg);
+    border-radius: var(--r-ctl);
+    background: var(--tile);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     cursor: pointer;
     transition: border-color var(--d-state);
@@ -89,15 +89,15 @@
 
   @media (hover: hover) and (pointer: fine) {
     .embed-load:hover {
-      border-color: var(--line);
+      border-color: var(--rule);
     }
   }
 
   .embed-open {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     text-decoration: underline;
-    text-decoration-color: var(--line);
+    text-decoration-color: var(--rule);
     text-underline-offset: 3px;
     overflow-wrap: anywhere;
   }
@@ -117,7 +117,7 @@
 
   .embed-empty {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 }

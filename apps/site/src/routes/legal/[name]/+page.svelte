@@ -85,7 +85,7 @@
   .doc-h2 {
     margin: 24px 0 0;
     color: var(--ink);
-    font-size: var(--t-title);
+    font-size: var(--fs-page);
     line-height: 1.2;
     letter-spacing: -0.035em;
   }

@@ -7,9 +7,9 @@
 
 @layer components {
   /* ── section: a heading for the blocks after it ──────────────────────────
-     ON THE GROUND IT IS A GROUP'S HEADING: the title at `--t-group`, its count in the meta ink, the fold at
+     ON THE GROUND IT IS A GROUP'S HEADING: the title at `--fs-head`, its count in the meta ink, the fold at
      the end of the line, and a hairline under it, with the tiles after it. IN A BOXED SECTION IT IS THAT TILE'S HEADING
-     ROW, the glyph in its well and the name at `--t-row`, because the box is one tile. */
+     ROW, the glyph in its well and the name at `--fs-body`, because the box is one tile. */
 
   .sec {
     display: flex;
@@ -32,19 +32,19 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
 
   .box .sec-title {
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .sec-count {
     margin-inline-start: calc(var(--sp-2) - var(--sp-3));
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -62,9 +62,9 @@
     place-items: center;
     inline-size: var(--well);
     block-size: var(--well);
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .sec-glyph > svg {
@@ -81,9 +81,9 @@
     align-items: center;
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
     list-style: none;
@@ -96,12 +96,12 @@
   }
 
   .sec-toggle:hover {
-    background: var(--field-hover);
+    background: var(--hover);
     color: var(--ink);
   }
 
   .box .sec-toggle {
-    background: var(--field);
+    background: var(--tile-2);
   }
 
   /* One word at a time: the control says what pressing it does, and the other word leaves the

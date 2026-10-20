@@ -113,8 +113,8 @@
     margin: 0;
     padding: var(--sp-4) var(--gutter) var(--sp-8);
     padding-inline-end: max(var(--gutter), var(--dock-w, 0px));
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   @media (pointer: coarse) {

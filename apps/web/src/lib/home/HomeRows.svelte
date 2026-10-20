@@ -156,7 +156,7 @@
   }
 
   .hl + .hl {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .hl-mark {
@@ -170,12 +170,12 @@
   .hl-dot {
     inline-size: 8px;
     block-size: 8px;
-    background: var(--dim);
+    background: var(--ink-3);
     border-radius: var(--r-round);
   }
 
   .hl[data-late] .hl-dot {
-    background: var(--danger);
+    background: var(--red);
   }
 
   /* THE TICK BEHIND THE DOT: a bare button the dot's size, its target the house's 44 (`.tap`). */
@@ -184,7 +184,7 @@
     background: none;
     border: 0;
     border-radius: var(--r-round);
-    color: var(--ink2);
+    color: var(--ink-2);
     cursor: pointer;
   }
 
@@ -220,11 +220,11 @@
   .hl[data-done] .hl-check {
     background: var(--ink);
     border-color: var(--ink);
-    color: var(--on-ink);
+    color: var(--on-red);
   }
 
   .hl[data-done] .hl-title {
-    color: var(--dim);
+    color: var(--ink-3);
     text-decoration: line-through;
   }
 
@@ -248,7 +248,7 @@
 
   .hl-when {
     grid-column: 3;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     white-space: nowrap;
   }
@@ -268,7 +268,7 @@
   }
 
   .hl-amount[data-dir='in'] {
-    color: var(--earn);
+    color: var(--good);
   }
 
   /* ON A PHONE HOW LATE GOES UNDER THE NAME, and the amount keeps the right edge. */

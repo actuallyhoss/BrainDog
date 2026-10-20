@@ -876,7 +876,7 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     line-height: 1.4;
@@ -1002,7 +1002,7 @@
   .dc-does {
     max-inline-size: var(--measure);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
@@ -1024,7 +1024,7 @@
   .dc-from::before {
     content: '·';
     margin-inline-end: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* The question as the door to its own page, where the host has no other: ink, underlined only under the pointer. */
@@ -1055,8 +1055,8 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .dc-money {
@@ -1074,17 +1074,17 @@
   }
 
   .dc-what {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* HOW MANY MORE CHANGES WAIT ON THE QUESTION'S PAGE: the quiet ink of a field's name, under the last line. */
   .dc-more {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE DAY IT IS TAKEN BACK, under why: quiet, and at the body's size, since a person reads it whole. */
   .dc-lapses {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
@@ -1095,12 +1095,12 @@
 
   .dc-before {
     text-decoration: line-through;
-    text-decoration-color: color-mix(in srgb, var(--ink2) 50%, transparent);
+    text-decoration-color: color-mix(in srgb, var(--ink-2) 50%, transparent);
   }
 
   .dc-to {
     display: inline-flex;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* "to", for a screen reader: the arrow says it to the eye. */
@@ -1139,13 +1139,13 @@
 
   /* A CARD CHOSEN FOR A BULK ANSWER keeps an ink edge, a shape and not a shade. */
   .queue-card[data-selected] {
-    box-shadow: inset 0 0 0 1.5px var(--ink2);
+    box-shadow: inset 0 0 0 1.5px var(--ink-2);
   }
 
   /* HOW MANY THINGS A JOINED QUESTION CHANGES, quiet beside its words. */
   .qa-joined {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 400;
     white-space: nowrap;
   }
@@ -1153,8 +1153,8 @@
   /* QUIET: the day a put-off question comes back is a note under it, in the second ink and the small size. */
   .qa-later {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .qa-see {
@@ -1163,11 +1163,11 @@
     background: none;
     border: 0;
     font: inherit;
-    color: var(--action-text);
+    color: var(--red);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--action-text) 40%, transparent);
+    text-decoration-color: color-mix(in srgb, var(--red) 40%, transparent);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
     cursor: pointer;
@@ -1180,8 +1180,8 @@
   }
 
   .qa-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .qa-line {
@@ -1205,8 +1205,8 @@
   .qa-fix {
     max-inline-size: var(--measure);
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   /* ONE LINE, QUIET (today F7): what the answer did, said with its object, on the second ground at the control radius,
@@ -1362,7 +1362,7 @@
 
   /* UNDO IS THE LINE'S ONE CONTROL while the answer waits, in the ink a person presses. */
   .qa-undo {
-    color: var(--action-text);
+    color: var(--red);
     font-weight: var(--fw-medium);
   }
 

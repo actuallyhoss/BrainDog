@@ -281,7 +281,7 @@
   /* WHICH WAY, OVER ITS SUM: the meta size in the second ink, the field's own word for it ("Money in"). */
   .side-name {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
   }
 
@@ -306,7 +306,7 @@
   /* THE ONE WRITTEN LINE, in the body size and the second ink, and at the headline's size where it stands alone. */
   .reading {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
@@ -358,7 +358,7 @@
   }
 
   .sum-count {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     text-align: end;

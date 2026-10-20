@@ -802,7 +802,7 @@
   :global(.block-slot:has(> [data-seen-none])) {
     display: none;
   }
-  /* THE TILE'S HEADING ROW (`ui/Tile.svelte`'s): the well, the name at `--t-row` 600, and the source as the
+  /* THE TILE'S HEADING ROW (`ui/Tile.svelte`'s): the well, the name at `--fs-body` 600, and the source as the
      meta at the right, one well high, with the tile's 16 under it. No rule under it: the name is what says a block
      starts here. */
   .block-bar {
@@ -818,7 +818,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }
@@ -827,7 +827,7 @@
      pill and never red. */
   .block-count {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -840,8 +840,8 @@
     align-items: center;
     gap: var(--sp-1);
     margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     text-decoration: none;
     transition: color var(--d-state) var(--ease-out);
   }
@@ -933,8 +933,8 @@
 
   /* The word, quieter than the clause it introduces: it is a label and the clause is the fact. */
   .block-where-lead {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* The same weight and colour as the list grid's own cap line, because it is the same sentence about the same thing
@@ -942,24 +942,24 @@
      shape, and a centred line under a two-row `spec` block reads as a caption for it. */
   .block-cannot {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .block-slice {
     margin: 0;
     padding-block-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* THE DOOR TO THE REST IS A QUIET LINK, not the red underline the browser's link colour gave it: "Open Money for the
      rest" under the forecast read as a warning on a healthy page. The second ink with a hairline
      under it says it can be pressed, and red stays for what is wrong. */
   .block-slice > a {
-    color: var(--ink2);
+    color: var(--ink-2);
     text-decoration: underline;
-    text-decoration-color: var(--edge);
+    text-decoration-color: var(--rule-strong);
     text-underline-offset: 3px;
   }
 
@@ -975,11 +975,11 @@
     padding: var(--sp-2) 0 0;
     border: 0;
     background: none;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     text-decoration: underline;
-    text-decoration-color: var(--edge);
+    text-decoration-color: var(--rule-strong);
     text-underline-offset: 3px;
     cursor: pointer;
   }
@@ -1017,7 +1017,7 @@
   .block-said {
     margin: 0;
     padding-block-start: var(--sp-2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* THE QUERY A BLOCK WAS DRAWN FROM IS PROVENANCE, and on a phone it competes with the block's own heading. It is a

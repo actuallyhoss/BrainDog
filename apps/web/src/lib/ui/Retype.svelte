@@ -367,7 +367,7 @@
   .rt-head {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -378,38 +378,38 @@
   }
 
   .rt-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .rt-help,
   .rt-summary {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .rt-summary {
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .rt-fix {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   .rt-select {
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .rt-check {
@@ -418,7 +418,7 @@
     gap: var(--sp-2);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .rt-list {
@@ -437,13 +437,13 @@
     column-gap: var(--sp-3);
     row-gap: var(--sp-1);
     padding-block: var(--sp-1);
-    border-block-end: 1px solid var(--line-soft);
+    border-block-end: 1px solid var(--rule);
   }
 
   .rt-value {
     min-inline-size: 8ch;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
@@ -489,37 +489,37 @@
     gap: var(--sp-1);
     min-block-size: var(--row-h-2);
     padding: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   /* AN ANSWERED CARD LETS ITS FILL GO, so a scan down the list finds the ones still waiting by their fill. */
   .rt-card[data-answered='yes'] {
     background: transparent;
-    border-color: var(--line);
+    border-color: var(--rule);
   }
 
   .rt-sample {
     background: transparent;
-    border-color: var(--line);
+    border-color: var(--rule);
   }
 
   .rt-card-title {
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
 
   .rt-card-line {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
   .rt-held {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .rt-foot {

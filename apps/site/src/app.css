@@ -24,7 +24,7 @@
 
     /**
      * THE SITE'S TYPE, beside the app's steps (the design system): the hero's heading is 56/60 at a desk, every other heading
-     * is `--t-lead` (34/40), and text for reading is 17/28. The hero steps down in a straight line to 40 at 390, so a
+     * is `--fs-hero` (34/40), and text for reading is 17/28. The hero steps down in a straight line to 40 at 390, so a
      * phone's first screen still holds the slogan and the action under it.
      */
     --t-site-hero: clamp(40px, 34.06px + 1.524vw, 56px);
@@ -57,8 +57,8 @@
     /* The one stacking step the site's own pages need above the shared `--z-raise`. */
     --z-site-lift: 2;
     /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
-    --t-app-xs: var(--t-xs);
-    --t-app-sm: var(--t-sm);
+    --t-app-xs: var(--fs-cap);
+    --t-app-sm: var(--fs-meta);
   }
 
   @media (width >= 640px) {
@@ -91,18 +91,8 @@
      * smallest steps are 12 and 13, sized for a dense record read at a desk; raising them here lifts every label on a
      * page at once. It is set on `body` and not `:root` so `:root` still holds the app's values for the rule below.
      */
-    --t-xs: var(--t-site-small);
-    --t-sm: var(--t-site-small);
-    /**
-     * ONE RED IN TWO TOKENS (SPEC 0.1). The drawings are the product's own renderer, which paints a late bill or a
-     * budget run over in `--danger`, and the app's older names (`--accent`, `--accent-text`) still reach a page through
-     * `house.css`; on the site each maps to `--red` (words and marks) or `--red-fill` (a fill under white words).
-     */
-    --danger: var(--red);
-    --danger-text: var(--red);
-    --danger-fill: var(--red-fill);
-    --accent: var(--red-fill);
-    --accent-text: var(--red);
+    --fs-cap: var(--t-site-small);
+    --fs-meta: var(--t-site-small);
   }
 
   /**
@@ -111,8 +101,8 @@
    * they were drawn to fit. Each root here is one drawing, and every figure that says it is a picture with `role="img"`.
    */
   :where(.app, .phone, .decide, .palette, .flow-figure, [role='img']) {
-    --t-xs: var(--t-app-xs);
-    --t-sm: var(--t-app-sm);
+    --fs-cap: var(--t-app-xs);
+    --fs-meta: var(--t-app-sm);
   }
 
   /* TITLES ARE LEXEND 600 (DIRECTION §47, as on quartz.gg), loaded at that one weight; a page sets each one's size and
@@ -221,8 +211,8 @@
     flex-direction: column;
     gap: var(--sp-4);
     padding: 20px;
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    background: var(--tile);
+    border-radius: var(--r-tile);
     color: var(--ink);
   }
 
@@ -243,20 +233,20 @@
   .tile-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }
 
   .tile-count {
-    color: var(--dim);
-    font-size: var(--t-row);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .tile-meta {
     margin-inline-start: auto;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
     text-align: end;
   }
@@ -272,8 +262,8 @@
     place-items: center;
     inline-size: var(--well);
     block-size: var(--well);
-    background: var(--s1);
-    border-radius: var(--r-well);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
   }
 
@@ -284,14 +274,14 @@
 
   .well.ink {
     background: var(--ink);
-    color: var(--on-ink);
+    color: var(--on-red);
   }
 
   /* THE FIGURE A TILE HOLDS, and the one written line under its chart that says what the chart means. */
   .figure {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     line-height: 1.133;
     letter-spacing: -0.02em;
@@ -307,7 +297,7 @@
   }
 
   .meta {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
@@ -325,12 +315,12 @@
     text-wrap: balance;
   }
 
-  /* Every other heading on the site: `--t-lead`, 34/40, one plain sentence in one colour. */
+  /* Every other heading on the site: `--fs-hero`, 34/40, one plain sentence in one colour. */
   .h2 {
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-lead);
+    font-size: var(--fs-hero);
     font-weight: 600;
     line-height: 1.176;
     letter-spacing: -0.025em;
@@ -341,7 +331,7 @@
   .h3 {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
@@ -493,10 +483,10 @@
     min-inline-size: 18px;
     block-size: 18px;
     padding-inline: 4px;
-    background: var(--s1);
-    border-radius: var(--r-sm);
+    background: var(--tile-2);
+    border-radius: var(--r-xs);
     color: var(--ink2);
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
     font-size: var(--t-app-xs);
     font-weight: 500;
     line-height: 1;
@@ -509,8 +499,8 @@
     gap: 6px;
     min-block-size: 30px;
     padding-inline: 12px;
-    background: var(--s1);
-    border-radius: var(--r-pill);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
     font-size: var(--t-site-small);
     font-weight: 500;
@@ -537,7 +527,7 @@
   }
 
   [data-hue='earn'] {
-    --hue: var(--earn);
+    --hue: var(--good);
   }
 
   [data-hue='warn'] {

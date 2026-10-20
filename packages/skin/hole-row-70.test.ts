@@ -19,7 +19,7 @@ test('the hole row rests on the field, with no dashed line and no border', () =>
   const rules = bodies('.prop-row[data-hole]');
   assert.ok(rules.length > 0, 'the rule is still written');
   const body = rules.join('\n');
-  assert.match(body, /background:\s*var\(--field\)\s*;/);
+  assert.match(body, /background:\s*var\(--tile-2\)\s*;/);
   assert.doesNotMatch(body, /dashed/);
   for (const m of body.matchAll(/border(?:-[a-z-]+)?:\s*([^;]+);/g)) assert.equal(m[1]!.trim(), '0', `a border other than 0: ${m[0]}`);
 });

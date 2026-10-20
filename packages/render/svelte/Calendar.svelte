@@ -171,7 +171,7 @@
   :global(.calendar-cell[aria-current='date']) {
     outline: 2px solid var(--red);
     outline-offset: -2px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     scroll-margin-block: var(--sp-8);
   }
 
@@ -192,7 +192,7 @@
   :global(.calendar-strip .calendar-week-label) {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: var(--lh-tight);
   }
@@ -213,7 +213,7 @@
     min-block-size: 5.5rem;
     min-inline-size: 0;
     padding-block-start: var(--sp-1);
-    border-block-start: 2px solid var(--line);
+    border-block-start: 2px solid var(--rule);
   }
 
   :global(.calendar-strip .calendar-strip-date) {
@@ -221,12 +221,12 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   :global(.calendar-strip .calendar-strip-day[data-today]) {
-    border-block-start-color: var(--accent);
+    border-block-start-color: var(--red-fill);
   }
 
   :global(.calendar-strip .calendar-strip-day[data-today] .calendar-strip-date) {
@@ -235,7 +235,7 @@
   }
 
   :global(.calendar-strip .calendar-today) {
-    color: var(--accent);
+    color: var(--red-fill);
     font-weight: 600;
   }
 
@@ -244,7 +244,7 @@
   }
 
   :global(.calendar-strip .calendar-item) {
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   :global(.calendar-strip .calendar-title) {
@@ -257,8 +257,8 @@
   :global(.calendar-strip .calendar-week-none) {
     display: none;
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
   }
 
   /* NARROW, A WEEK IS A LIST OF ITS DAYS WITH SOMETHING ON THEM, the date in its own column and the titles whole beside

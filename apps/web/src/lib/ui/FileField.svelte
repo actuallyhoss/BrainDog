@@ -174,7 +174,7 @@
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .file-name {
@@ -182,15 +182,15 @@
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .file-size {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* NEVER WIDER THAN ITS COLUMN, and never taller than a phone can show beside the buttons. */
@@ -201,7 +201,7 @@
     inline-size: auto;
     block-size: auto;
     object-fit: contain;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   .file-actions {
@@ -217,24 +217,24 @@
     gap: var(--sp-2);
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    background-color: var(--s1);
+    background-color: var(--tile-2);
     border: 0;
     /* A PILL, because it is something you press: the quiet button's shape, not a field's. */
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     cursor: pointer;
   }
 
   .file-button:disabled {
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: default;
   }
 
   .file-remove {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* THE NATIVE PICKER IS NEVER SEEN: the button above opens it, and the browser's own control is the one on the page
@@ -251,8 +251,8 @@
 
   .file-why {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   /* FROM 640px THE NAME AND ITS BUTTONS SHARE ONE LINE when there is room; below it the buttons sit under the name. */

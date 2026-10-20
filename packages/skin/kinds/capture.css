@@ -33,14 +33,14 @@
     gap: var(--sp-2);
     min-block-size: calc(var(--ctl-h) + var(--sp-1));
     padding-inline: var(--sp-3) var(--sp-1);
-    background: var(--field);
+    background: var(--tile-2);
     border: 1px solid transparent;
     border-radius: var(--r-ctl);
     transition: border-color var(--d-state) var(--ease-out);
   }
 
   .capture-field:hover {
-    border-color: var(--line);
+    border-color: var(--rule);
   }
 
   .capture-input {
@@ -53,7 +53,7 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .capture-input:focus-visible {
@@ -65,10 +65,10 @@
   .capture-add {
     min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-3);
-    background: var(--action);
-    border: 1px solid var(--action);
+    background: var(--red-fill);
+    border: 1px solid var(--red-fill);
     border-radius: calc(var(--r-ctl) - 2px);
-    color: var(--on-action);
+    color: var(--on-red);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     cursor: pointer;
@@ -86,7 +86,7 @@
   .capture-elsewhere {
     max-inline-size: var(--measure);
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   a.capture-where {

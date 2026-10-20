@@ -89,7 +89,7 @@
     gap: var(--sp-1);
     min-inline-size: 0;
     padding-block: var(--sp-3);
-    border-block-start: 1px solid var(--field);
+    border-block-start: 1px solid var(--tile-2);
   }
 
   .need:first-child {
@@ -114,34 +114,34 @@
 
   .need-label {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 600;
     overflow-wrap: anywhere;
   }
 
   .need-state {
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .need-held {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .need-held :global(.icon) {
-    color: var(--action);
+    color: var(--red-fill);
   }
 
   /* NEEDS YOU: the deeper red, with its mark and its word. */
   .need-missing,
   .need-said {
-    color: var(--danger);
+    color: var(--red);
   }
 
   .need-line {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
@@ -158,7 +158,7 @@
     align-items: baseline;
     gap: var(--sp-2);
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .need-act {

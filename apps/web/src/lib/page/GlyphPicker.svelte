@@ -116,9 +116,9 @@
   .label,
   .heading {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -129,8 +129,8 @@
   .help,
   .picked-line {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .picked-line {
@@ -164,22 +164,22 @@
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     cursor: pointer;
   }
 
   .glyph:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
   .glyph[data-on] {
-    background: var(--selected);
-    color: var(--accent-text);
+    background: var(--red-tint);
+    color: var(--red);
   }
 
   .glyph:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
 
@@ -189,6 +189,6 @@
     inset-inline-end: 2px;
     display: grid;
     place-items: center;
-    color: var(--accent-text);
+    color: var(--red);
   }
 </style>

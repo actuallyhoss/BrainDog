@@ -108,8 +108,8 @@
 
   .mc-note {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .mc-row {
@@ -121,11 +121,11 @@
   .mc-field {
     inline-size: 100%;
     padding: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 </style>

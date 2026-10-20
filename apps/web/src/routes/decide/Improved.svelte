@@ -167,13 +167,13 @@
   .improved-said {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
   .improved-link {
-    color: var(--action-text);
+    color: var(--red);
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;

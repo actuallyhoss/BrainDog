@@ -276,7 +276,7 @@
 
   .run-part + .run-part {
     padding-block-start: var(--sp-2);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
   }
 
   .run-head {
@@ -285,14 +285,14 @@
 
   .run-meta {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .run-next {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
     overflow-wrap: anywhere;
   }
@@ -307,7 +307,7 @@
   .run-now {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 1.55;
   }
@@ -318,10 +318,10 @@
     padding-inline: var(--sp-2);
     border: 0;
     border-radius: var(--r-ctl);
-    background: var(--field);
+    background: var(--tile-2);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .run-lines {
@@ -334,9 +334,9 @@
   /* ONE CHANGE A LINE, at the body size and its line height, a hairline between, as the page's other lists. */
   .run-line {
     padding-block: var(--sp-2);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
     overflow-wrap: anywhere;
   }
@@ -347,8 +347,8 @@
 
   .run-said {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 1.55;
   }
 
@@ -365,7 +365,7 @@
     flex: 1 1 100%;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
   }
 </style>

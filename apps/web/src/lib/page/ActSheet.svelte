@@ -103,7 +103,7 @@
   .act-said,
   .act-look {
     margin: 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.5;
     color: var(--ink);
   }
@@ -117,9 +117,9 @@
     display: block;
     padding: 12px;
     border-radius: var(--r-ctl);
-    background: var(--field);
-    font-family: var(--font-id);
-    font-size: var(--t-base);
+    background: var(--tile-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
     user-select: all;
   }

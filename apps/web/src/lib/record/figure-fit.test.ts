@@ -31,7 +31,7 @@
  *
  * WHY A BROWSER AND NOT A CLASS NAME. The defect is ink wider than a box. Asserting that a rule
  * exists, or that an element carries a class, says nothing about either: the whole chain from
- * `--t-xl` through `letter-spacing: -0.02em` and `font-variant-numeric: tabular-nums` to the shipped
+ * `--fs-figure` through `letter-spacing: -0.02em` and `font-variant-numeric: tabular-nums` to the shipped
  * woff2's own digit advances decides it, and only a layout engine knows the answer. So the shipped
  * cascade is assembled in the order `+layout.svelte` imports it, the shipped Geist is handed to it
  * as the app's own `@font-face` with its `url()` pointed at the file on disk, and the markup is
@@ -297,7 +297,7 @@ function reading(): Seen[] {
  * ONE PIXEL OF SLACK, WHICH IS THE SAME PIXEL `layout.mjs:315` GRANTS AND FOR THE SAME REASON, and
  * this file would cry wolf without it. Two things are inside a pixel here and neither is a lost
  * digit. Chromium applies `letter-spacing: -0.02em` AFTER the last glyph as well as between them, so
- * 0.48px of every figure's measured ink at `--t-xl` is space rather than a digit; and a twelve-column
+ * 0.48px of every figure's measured ink at `--fs-figure` is space rather than a digit; and a twelve-column
  * page divides into thirds that land on a third of a pixel, so a cell is 122.5px or 117.328px rather
  * than a whole number.
  *
@@ -595,7 +595,7 @@ test('NO STEP ON THE PAGE RESTACKS A STAT: lifted out, the 288px money step cut 
 /**
  * A READER WHO SETS HER BROWSER'S TEXT SMALLER GETS THE SAME FIGURES, WHOLE.
  *
- * The stat figures are drawn at `--t-xl`, which is 24px at any root font size, so a step that
+ * The stat figures are drawn at `--fs-figure`, which is 24px at any root font size, so a step that
  * guards their width is a px width too. The four-across step was written `38rem`, and every
  * measurement above takes rem at a 16px root, so a reader on Chrome's "Small" (12px) or "Very small"
  * (9px) had a threshold of 456px or 342px in front of the same 123.2px figures: the 586px slot a

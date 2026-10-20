@@ -56,8 +56,8 @@
     inline-size: var(--well);
     block-size: var(--well);
     border-radius: var(--r-ctl);
-    background: var(--tile-2, var(--field));
-    color: var(--ink-2, var(--ink2));
+    background: var(--tile-2);
+    color: var(--ink-2);
     font-family: var(--font-ui);
     font-size: var(--fs-meta);
     font-weight: var(--fw-semi);
@@ -112,7 +112,7 @@
     .well[data-size='xl'] {
       inline-size: 48px;
       block-size: 48px;
-      border-radius: var(--r-pop, var(--r-md));
+      border-radius: var(--r-pop);
     }
 
     .well[data-size='xl'] :global(.icon[data-size]) {
@@ -123,17 +123,17 @@
 
   /* THE TONES: a soft tint and the meaning's own colour on it, each pair 4.5:1 in both schemes. */
   .well[data-means='late'] {
-    background: var(--red-tint, var(--action-tint-1));
-    color: var(--red, var(--action-text));
+    background: var(--red-tint);
+    color: var(--red);
   }
 
   .well[data-means='good'] {
-    background: var(--good-tint, color-mix(in srgb, var(--earn) 12%, var(--tile)));
-    color: var(--good, var(--earn));
+    background: var(--good-tint, color-mix(in srgb, var(--good) 12%, var(--tile)));
+    color: var(--good);
   }
 
   .well[data-means='warn'] {
-    background: var(--warn-tint, var(--warn-wash));
+    background: var(--warn-tint);
     color: var(--warn);
   }
 
@@ -150,42 +150,42 @@
 
   .well[data-slot='blue'] {
     --ph: var(--cat-blue, var(--info));
-    --ph-tint: var(--cat-blue-tint, var(--field));
+    --ph-tint: var(--cat-blue-tint, var(--tile-2));
   }
 
   .well[data-slot='violet'] {
     --ph: var(--cat-violet, var(--info));
-    --ph-tint: var(--cat-violet-tint, var(--field));
+    --ph-tint: var(--cat-violet-tint, var(--tile-2));
   }
 
   .well[data-slot='pink'] {
-    --ph: var(--cat-pink, var(--ink2));
-    --ph-tint: var(--cat-pink-tint, var(--field));
+    --ph: var(--cat-pink, var(--ink-2));
+    --ph-tint: var(--cat-pink-tint, var(--tile-2));
   }
 
   .well[data-slot='teal'] {
-    --ph: var(--cat-teal, var(--earn));
-    --ph-tint: var(--cat-teal-tint, var(--field));
+    --ph: var(--cat-teal, var(--good));
+    --ph-tint: var(--cat-teal-tint, var(--tile-2));
   }
 
   .well[data-slot='sky'] {
     --ph: var(--cat-sky, var(--info));
-    --ph-tint: var(--cat-sky-tint, var(--field));
+    --ph-tint: var(--cat-sky-tint, var(--tile-2));
   }
 
   .well[data-slot='yellow'] {
     --ph: var(--cat-yellow, var(--warn));
-    --ph-tint: var(--cat-yellow-tint, var(--field));
+    --ph-tint: var(--cat-yellow-tint, var(--tile-2));
   }
 
   .well[data-slot='lime'] {
-    --ph: var(--cat-lime, var(--earn));
-    --ph-tint: var(--cat-lime-tint, var(--field));
+    --ph: var(--cat-lime, var(--good));
+    --ph-tint: var(--cat-lime-tint, var(--tile-2));
   }
 
   .well[data-slot='slate'] {
-    --ph: var(--cat-slate, var(--dim));
-    --ph-tint: var(--cat-slate-tint, var(--field));
+    --ph: var(--cat-slate, var(--ink-3));
+    --ph-tint: var(--cat-slate-tint, var(--tile-2));
   }
 
   .well-letter {

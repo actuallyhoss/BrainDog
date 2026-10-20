@@ -254,10 +254,10 @@
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
+    border-radius: var(--r-pop);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     text-align: start;
     overflow-wrap: anywhere;
     cursor: pointer;
@@ -265,14 +265,14 @@
   }
 
   .tried-choice[data-on] {
-    background: var(--s1);
+    background: var(--tile-2);
     color: var(--ink);
     font-weight: 500;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .tried-choice:hover {
-      background: var(--s1);
+      background: var(--tile-2);
     }
   }
 
@@ -283,29 +283,29 @@
   }
 
   .tried-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
-  /* A FIELD FOR WHAT IS PASTED: the `--s1` well, no border, the field's corner, in Geist Mono because it is JSON, and
+  /* A FIELD FOR WHAT IS PASTED: the `--tile-2` well, no border, the field's corner, in Geist Mono because it is JSON, and
      16px in every input, so a phone does not zoom the page on focus. */
   .tried-json {
     box-sizing: border-box;
     inline-size: 100%;
     min-block-size: 6lh;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-md);
+    font-family: var(--font-mono);
+    font-size: var(--fs-body);
     resize: vertical;
   }
 
   .tried-json:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -314,12 +314,12 @@
   .tried-trigger {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .tried-trigger {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .tried-refused {
@@ -328,7 +328,7 @@
     gap: var(--sp-2);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   /* THE GLYPH CARRIES THE INTENT AND THE SENTENCE STAYS INK: red, since what it says is
@@ -337,7 +337,7 @@
     display: inline-flex;
     flex: none;
     margin-block-start: 2px;
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .tried-rows,
@@ -355,30 +355,30 @@
     align-items: baseline;
     gap: 0 var(--sp-2);
     padding: var(--sp-2) 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .tried-rows li + li {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .tried-would {
     flex: 1 1 16rem;
     min-inline-size: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     overflow-wrap: anywhere;
   }
 
   .tried-id {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
   .tried-steps {
     gap: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .tried-steps li {
@@ -388,25 +388,25 @@
 
   .tried-note {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* WHAT ONE TESTED STEP GAVE, FOLDED: the summary in the second ink as Thread's is, and the answer on the tile's inner
      fill, flat, wrapping rather than running off a phone. */
   .tried-out summary {
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     cursor: pointer;
   }
 
   .tried-out pre {
     margin: var(--sp-2) 0 0;
     padding: var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }

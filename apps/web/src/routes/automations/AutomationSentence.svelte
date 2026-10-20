@@ -186,7 +186,7 @@
     margin: 0;
     font-size: var(--fs-meta);
     line-height: 18px;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .fix {
@@ -207,7 +207,7 @@
 
   .said {
     margin: 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 22px;
     color: var(--ink);

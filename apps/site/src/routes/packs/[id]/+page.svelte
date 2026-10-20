@@ -165,7 +165,7 @@
     min-block-size: var(--tap);
     margin-block-end: var(--sp-2);
     padding-inline: var(--sp-3);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
     font-size: var(--t-site-small);
     font-weight: 500;
@@ -195,7 +195,7 @@
     flex-wrap: wrap;
     column-gap: var(--sp-3);
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
@@ -233,7 +233,7 @@
     display: grid;
     gap: 2px;
     padding-block: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .fact:first-child {
@@ -242,14 +242,14 @@
   }
 
   .fact dt {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
   .fact dd {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
@@ -266,7 +266,7 @@
     align-items: center;
     gap: 6px;
     color: var(--ink);
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
     font-size: var(--t-site-small);
   }
 
@@ -325,7 +325,7 @@
     position: absolute;
     inset-block: 14px calc(-1 * var(--sp-4));
     inset-inline-start: 4px;
-    border-inline-start: 2px solid var(--line);
+    border-inline-start: 2px solid var(--rule);
   }
 
   .dot {
@@ -334,9 +334,9 @@
     inset-inline-start: 0;
     inline-size: 10px;
     block-size: 10px;
-    border: 2px solid var(--dim);
-    border-radius: var(--r-pill);
-    background: var(--bg);
+    border: 2px solid var(--ink-3);
+    border-radius: var(--r-ctl);
+    background: var(--tile);
     box-sizing: border-box;
   }
 
@@ -355,12 +355,12 @@
 
   .version-name {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .version-day {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
@@ -382,7 +382,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .back:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }

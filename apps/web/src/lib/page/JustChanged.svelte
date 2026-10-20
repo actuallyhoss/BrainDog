@@ -67,7 +67,7 @@
     align-items: center;
     gap: var(--sp-3);
     min-block-size: var(--ctl-h);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
   }
 
   .just-line:first-child {
@@ -83,7 +83,7 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     text-align: start;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -100,14 +100,14 @@
 
   /* A DELETED ROW IS STRUCK THROUGH, a shape and not only a shade. */
   .just-line[data-gone] .just-what {
-    color: var(--dim);
+    color: var(--ink-3);
     text-decoration: line-through;
   }
 
   .just-mark {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .just-back {
@@ -117,7 +117,7 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 3px;

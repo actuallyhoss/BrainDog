@@ -1,4 +1,4 @@
 /* Chart axes and key caps at 13: the one place 12 is drawn, raised a step. */
 :root {
-  --t-xs: 13px;
+  --fs-cap: 13px;
 }

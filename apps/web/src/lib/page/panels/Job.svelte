@@ -224,20 +224,20 @@
   .job-name {
     min-width: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 600;
     overflow-wrap: anywhere;
   }
 
   .job-state {
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   /* FAILED OR REFUSED: the deeper red, and the glyph beside the word, never the colour alone. A run that needs a look
      carries its glyph in the board's text colour. */
   .job-state[data-intent='bad'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .glyph {
@@ -250,8 +250,8 @@
 
   .job-line {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
@@ -276,8 +276,8 @@
   .job-quiet,
   .job-fix {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .job-fix {

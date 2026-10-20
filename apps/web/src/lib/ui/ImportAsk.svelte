@@ -77,8 +77,8 @@
 
   .import-head {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 22px;
   }
@@ -103,7 +103,7 @@
   }
 
   .import-line + .import-line {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .import-text {
@@ -115,14 +115,14 @@
 
   .import-said {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }
 
   .import-lists {
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }

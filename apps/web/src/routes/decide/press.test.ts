@@ -273,13 +273,13 @@ test('the suggested answer is the accent’s tint, and not marked where the choi
   const marked = rules.find((r) => r.on.split(',').some((one) => one.trim().startsWith(UNDOABLE) && one.trim().endsWith(SUGGESTED)));
   assert.ok(marked, 'the skin no longer marks the suggested answer only where the choice can be taken back');
   assert.ok(marked.on.includes('.queue-options:not(:has(.queue-because))'), 'the tint reaches a choice in the form, where "Suggested" says it');
-  assert.match(marked.says, /background: var\(--action-tint-1\);/u, 'the suggested answer is not the accent’s tint');
-  assert.match(marked.says, /color: var\(--action-text\);/u, 'the suggested answer is not in the accent’s words');
+  assert.match(marked.says, /background: var\(--red-tint\);/u, 'the suggested answer is not the accent’s tint');
+  assert.match(marked.says, /color: var\(--red\);/u, 'the suggested answer is not in the accent’s words');
   const unmarked = rules.find((r) => r.on.split(',').some((one) => one.trim() === ".queue-card:has(.queue-cost[data-cost='undo']) .queue-rec"));
   assert.ok(unmarked && /display: none;/u.test(unmarked.says), 'a card that is hard to undo still says which answer is suggested');
   const form = readFileSync(fileURLToPath(new URL('../../lib/decide/form.css', import.meta.url)), 'utf8');
   const rec = rulesOf(form).find((r) => r.on === '.dc-rec');
-  assert.ok(rec && /color: var\(--action-text\);/u.test(rec.says), 'the card’s "Suggested" is not in the accent’s words');
+  assert.ok(rec && /color: var\(--red\);/u.test(rec.says), 'the card’s "Suggested" is not in the accent’s words');
   const style = queue.slice(queue.indexOf('<style>'));
   assert.doesNotMatch(style, /data-recommended|\.queue-rec\b|\.dc-rec\b/u, 'Needs you draws its own copy of the suggestion again, which can drift');
   /* NOTHING MOVES OR FADES WHEN A KEY LANDS: the by-line is always there, and nothing on the card is transitioned. */

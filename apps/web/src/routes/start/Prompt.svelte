@@ -202,12 +202,12 @@
     inline-size: 100%;
     box-sizing: border-box;
     padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: 24px;
     resize: vertical;
     /* IT SCROLLS CLEAR OF THE PHONE'S KEYBOARD with the chips and the press under it still in view. */
@@ -215,15 +215,15 @@
   }
 
   .prompt-field::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE FIELD AND ITS MARKS: the marks are the same words in the same box under a clear field, so the words heard
      light up where they are typed. Same padding, size, line and wrapping as the field, or the marks drift. */
   .lit-field {
     position: relative;
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
   }
 
   /* A field takes the browser's own tracking, not the body's, and the marks under it take the body's: the same here,
@@ -243,7 +243,7 @@
     overflow: hidden;
     padding: var(--sp-3) var(--sp-4);
     color: transparent;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     white-space: pre-wrap;
     overflow-wrap: break-word;
@@ -253,7 +253,7 @@
 
   .lit mark {
     border-radius: 4px;
-    background: var(--action-tint-1);
+    background: var(--red-tint);
     color: transparent;
   }
 
@@ -265,7 +265,7 @@
 
   /* THE CHOICES ARE `Button`'S QUIET PILLS, as every other choice on the screen is; the chosen one on the selected fill. */
   .chips :global(.btn[aria-pressed='true']) {
-    background: var(--selected);
+    background: var(--red-tint);
     color: var(--ink);
     font-weight: 600;
   }
@@ -273,8 +273,8 @@
   /* A SENTENCE IN THE QUIET INK IS STILL A SENTENCE, read at the body size (DIRECTION §36). */
   .quiet {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -284,12 +284,12 @@
     inline-size: 100%;
     min-block-size: var(--tap);
     padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     text-align: start;
     cursor: text;
@@ -298,7 +298,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .said-line:hover:not(:disabled) {
-      background: var(--s2);
+      background: var(--tile-2);
     }
   }
 
@@ -312,16 +312,16 @@
   .said-mark {
     margin-inline: -3px;
     padding: 1px 3px;
-    background: var(--bg);
-    border-radius: var(--r-sm);
+    background: var(--tile);
+    border-radius: var(--r-xs);
     color: var(--ink);
     font-weight: 500;
     box-decoration-break: clone;
   }
 
   .said-edit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* ── the questions ─────────────────────────────────────────────────────── */
@@ -331,7 +331,7 @@
     display: grid;
     gap: var(--sp-4);
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .ask {
@@ -349,21 +349,21 @@
 
   /* WAITING ON THE PERSON IS THE DEEPER RED, and always the word with it, never the colour alone. */
   .ask-word {
-    color: var(--danger-text);
-    font-size: var(--t-row);
+    color: var(--red);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .ask-meta {
     margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .ask-q {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -381,7 +381,7 @@
   }
 
   .ask-field .field-input {
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   /* EVERY PRESS HERE MEETS A THUMB: 44px on a coarse pointer. */

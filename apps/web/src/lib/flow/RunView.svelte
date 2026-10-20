@@ -160,21 +160,21 @@
     row-gap: var(--sp-1);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
   .rv-meta {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
 
   .rv-say {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
@@ -191,7 +191,7 @@
   .rv-list .rv-list {
     margin-block-start: var(--sp-1);
     padding-inline-start: var(--sp-3);
-    border-inline-start: 1px solid var(--line);
+    border-inline-start: 1px solid var(--rule);
   }
 
   /* A STEP OF THE RUN, INSIDE THE SHEET: the sheet is a tile's surface and a tile never holds a tile, so a step is the
@@ -201,20 +201,20 @@
     flex-direction: column;
     gap: 2px;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
   }
 
   /* NOT REACHED IS HOLLOW: no fill, and a hairline ring where the fill would be. */
   .rv-card[data-state='unreached'] {
     background: transparent;
-    box-shadow: inset 0 0 0 1px var(--line);
+    box-shadow: inset 0 0 0 1px var(--rule);
   }
 
   .rv-said {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
@@ -225,8 +225,8 @@
     align-items: baseline;
     gap: 0 var(--sp-2);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .rv-word {
@@ -236,8 +236,8 @@
   .rv-answer {
     margin: 0;
     min-inline-size: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -249,14 +249,14 @@
     display: flex;
     align-items: center;
     min-block-size: var(--ctl-h);
-    color: var(--ink2);
+    color: var(--ink-2);
     cursor: pointer;
   }
 
   .rv-arm {
     margin: var(--sp-1) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -268,8 +268,8 @@
     box-sizing: border-box;
     inline-size: var(--dot);
     block-size: var(--dot);
-    border-radius: var(--r-pill);
-    background: var(--dim);
+    border-radius: var(--r-ctl);
+    background: var(--ink-3);
   }
 
   .rv-dot[data-state='pending'],
@@ -278,7 +278,7 @@
   }
 
   .rv-dot[data-state='done'] {
-    background: var(--earn);
+    background: var(--good);
   }
 
   .rv-dot[data-state='waiting'] {
@@ -286,13 +286,13 @@
   }
 
   .rv-dot[data-state='failed'] {
-    background: var(--danger);
+    background: var(--red);
   }
 
   .rv-dot[data-state='skipped'],
   .rv-dot[data-state='unreached'] {
     background: transparent;
-    border: 1.5px solid var(--dim);
+    border: 1.5px solid var(--ink-3);
   }
 
   .rv-actions {

@@ -72,10 +72,10 @@
     max-inline-size: 100%;
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-2);
-    background: var(--tile-2, var(--hover-wash));
+    background: var(--tile-2, var(--hover));
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -111,7 +111,7 @@
   /* A FILL ONLY UNDER A MOUSE: a tapped chip on a phone would keep it after the finger lifted. */
   @media (hover: hover) and (pointer: fine) {
     .scope-move:hover {
-      background: var(--hover, var(--hold-wash));
+      background: var(--hover, var(--tile-2));
       color: var(--ink);
     }
   }
@@ -121,7 +121,7 @@
     flex: none;
     inline-size: 8px;
     block-size: 8px;
-    background: var(--ph, var(--ink-3, var(--dim)));
+    background: var(--ph, var(--ink-3));
     border-radius: var(--r-round);
   }
 
@@ -134,11 +134,11 @@
   }
 
   .scope-dot[data-slot='pink'] {
-    --ph: var(--cat-pink, var(--ink2));
+    --ph: var(--cat-pink, var(--ink-2));
   }
 
   .scope-dot[data-slot='teal'] {
-    --ph: var(--cat-teal, var(--earn));
+    --ph: var(--cat-teal, var(--good));
   }
 
   .scope-dot[data-slot='sky'] {
@@ -150,11 +150,11 @@
   }
 
   .scope-dot[data-slot='lime'] {
-    --ph: var(--cat-lime, var(--earn));
+    --ph: var(--cat-lime, var(--good));
   }
 
   .scope-dot[data-slot='slate'] {
-    --ph: var(--cat-slate, var(--dim));
+    --ph: var(--cat-slate, var(--ink-3));
   }
 
   .scope-name {

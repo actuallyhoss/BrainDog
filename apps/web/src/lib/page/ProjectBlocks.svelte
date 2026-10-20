@@ -153,15 +153,15 @@
   .said {
     margin: 0 0 var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
     overflow-wrap: anywhere;
   }
 
   .quiet {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .agent {
@@ -198,8 +198,8 @@
   .kind-name {
     flex: none;
     min-inline-size: 64px;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .names {
@@ -216,9 +216,9 @@
   .names li {
     padding: 2px var(--sp-2);
     border-radius: 6px;
-    background: var(--s1);
+    background: var(--tile-2);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -239,13 +239,13 @@
   }
 
   .money-name {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .money-amount {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -253,7 +253,7 @@
     grid-column: 1 / -1;
     block-size: 6px;
     border-radius: 3px;
-    background: var(--s1);
+    background: var(--tile-2);
     overflow: hidden;
   }
 
@@ -266,7 +266,7 @@
 
   .bar-fill[data-key='out'],
   .bar-fill[data-key='owed'] {
-    background: var(--dim);
+    background: var(--ink-3);
   }
 
   /* THE DISCLOSURE IS A QUIET WORD, not a button row: it sits at the foot of its block, and its chevron turns when open. */
@@ -279,9 +279,9 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     cursor: pointer;
   }
 
@@ -327,7 +327,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .item-link:hover {
-      background: var(--s1);
+      background: var(--tile-2);
     }
   }
 
@@ -339,15 +339,15 @@
 
   .item-title {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 22px;
     overflow-wrap: anywhere;
   }
 
   .item-detail {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
     overflow-wrap: anywhere;
   }

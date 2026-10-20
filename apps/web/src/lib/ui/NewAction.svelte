@@ -350,43 +350,43 @@
   .label {
     margin: 0 0 var(--sp-1);
     padding: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .help {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .bad {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* A FIELD HAS NO BORDER NOW (`controls.css`), so the one that is wrong is ringed inside its own edge, beside the line
      under it that says why. */
   .field[data-bad] {
-    box-shadow: inset 0 0 0 1px var(--danger);
+    box-shadow: inset 0 0 0 1px var(--red);
   }
 
   /* 16px TEXT IN EVERY INPUT, so a phone does not zoom the page when one is focused. */
   .field-input,
   .pick {
-    font-size: max(16px, var(--t-ui));
+    font-size: max(16px, var(--fs-body));
   }
 
-  /* A SELECT IS A FIELD: 40 tall and 44 under a thumb, the `--s1` fill with no border, radius `--r-md`, as
+  /* A SELECT IS A FIELD: 40 tall and 44 under a thumb, the `--tile-2` fill with no border, radius `--r-pop`, as
      `controls.css` draws `.field`. */
   .pick {
     min-inline-size: 0;
     min-block-size: 40px;
     padding-inline: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
   }
@@ -409,7 +409,7 @@
     align-items: center;
     gap: var(--sp-2);
     padding-block-start: var(--sp-2);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .map-line > * {
@@ -429,8 +429,8 @@
     flex-direction: column;
     gap: var(--sp-2);
     padding: var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
   }
 
   /* THE ADDRESS IS ONE LONG WORD, so without this the sheet scrolls sideways at 390. */
@@ -440,8 +440,8 @@
   }
 
   .mono {
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     letter-spacing: 0;
   }
 

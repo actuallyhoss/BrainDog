@@ -79,7 +79,7 @@
   }
 
   .te-what {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .te-will {

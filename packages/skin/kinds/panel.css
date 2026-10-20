@@ -14,11 +14,11 @@
   .panel {
     margin: 0;
     padding: var(--sp-3) var(--sp-4);
-    background: var(--field);
+    background: var(--tile-2);
     border: 1px solid transparent;
     border-radius: var(--r-ctl);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   /* A NOTE THAT IS ITS WHOLE TILE IS THE TILE'S WORDS, not a well inside the tile (no tile in a tile). */
@@ -53,7 +53,7 @@
     inset-inline-start: var(--sp-4);
     inset-block-start: var(--sp-3);
     inline-size: var(--icon-m);
-    color: var(--tone, var(--ink2));
+    color: var(--tone, var(--ink-2));
     font-variant-emoji: text;
     line-height: inherit;
     text-align: center;
@@ -66,14 +66,14 @@
     flex-direction: column;
     gap: var(--sp-2);
     max-inline-size: var(--measure);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     color: var(--ink);
   }
 
   .quote-by {
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-style: normal;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* `note lead` IS THE PAGE'S SENTENCE, said from its figures: the line under the title, 16/24 in the
@@ -83,8 +83,8 @@
     padding-block: 0;
     padding-inline-end: 0;
     background: none;
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 1.5;
   }
 
@@ -124,7 +124,7 @@
   }
 
   .box .block[data-kind='note']:not([data-form='lead']) .panel a {
-    color: var(--action);
+    color: var(--red-fill);
     text-underline-offset: 3px;
   }
 

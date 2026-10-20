@@ -286,22 +286,22 @@
     flex-direction: column;
     min-inline-size: 0;
     min-block-size: calc(var(--row-h-2) * 2);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-tile);
     transition: background var(--d-state) var(--ease-out);
   }
 
   /* THE LANE A CARD WOULD LAND IN, while one is dragged over it: the ground's wash, rounded as a tile is. */
   .lane[data-over] {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
-  /* A GROUP'S HEADING ON THE GROUND: the name at `--t-group`, its count quiet, and a hairline under it. */
+  /* A GROUP'S HEADING ON THE GROUND: the name at `--fs-head`, its count quiet, and a hairline under it. */
   .lane-head {
     display: flex;
     align-items: center;
     min-block-size: var(--ctl-h);
     margin: 0 var(--sp-1) var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   .lane-title {
@@ -311,7 +311,7 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
@@ -325,7 +325,7 @@
 
   .lane-count {
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -333,8 +333,8 @@
   .lane-empty {
     margin: 0;
     padding: var(--sp-3) var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .lane-cards,
@@ -385,7 +385,7 @@
     flex-direction: column;
     min-inline-size: 0;
     background: var(--tile);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     transition: box-shadow var(--d-state) var(--ease-out);
   }
 
@@ -413,7 +413,7 @@
   .bcard-title {
     grid-column: 1;
     min-inline-size: 0;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     overflow-wrap: anywhere;
@@ -425,7 +425,7 @@
   }
 
   .bcard-missing {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 400;
   }
 
@@ -434,7 +434,7 @@
     grid-column: 2;
     grid-row: 1;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -445,8 +445,8 @@
     grid-column: 1 / -1;
     min-inline-size: 0;
     overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
@@ -470,7 +470,7 @@
 
   /* A FINISHED ROW'S TITLE STEPS BACK to the second ink, as a done task does on Work. */
   .bcard[data-done] .bcard-title {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* A PERSON'S FACE ON ONE NEUTRAL TINT, as on every list of people (DIRECTION 39). */
@@ -478,7 +478,7 @@
     display: inline-flex;
     margin-inline-end: var(--sp-2);
     vertical-align: middle;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .bcard-face {
@@ -488,8 +488,8 @@
   }
 
   .bcard .bcard-face :global(.face[data-kind='person']) {
-    background: var(--field);
-    color: var(--ink2);
+    background: var(--tile-2);
+    color: var(--ink-2);
   }
 
   /* THE ⋯, 28 at the card's top corner, quiet until the card is pointed at, and always there under a finger. */
@@ -505,7 +505,7 @@
     background: none;
     border: 0;
     border-radius: calc(var(--r-ctl) - 2px);
-    color: var(--ink2);
+    color: var(--ink-2);
     cursor: pointer;
     transition:
       opacity var(--d-state) var(--ease-out),
@@ -519,7 +519,7 @@
     gap: var(--sp-2);
     margin: 0 var(--sp-3);
     padding: var(--sp-2) 0 var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .bcard-undo {
@@ -527,9 +527,9 @@
     background: none;
     border: 0;
     border-radius: calc(var(--r-ctl) - 2px);
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     cursor: pointer;
   }
@@ -538,11 +538,11 @@
      the quiet boundary ink, as the table's caret row is only a wash at rest; a selected card's is the accent, which is
      what selection looks like (DIRECTION 39), with its tick, and it wins when a card is both. */
   .bcard[data-cursor] {
-    box-shadow: 0 0 0 1.5px var(--edge);
+    box-shadow: 0 0 0 1.5px var(--rule-strong);
   }
 
   .bcard[data-picked] {
-    box-shadow: 0 0 0 2px var(--action);
+    box-shadow: 0 0 0 2px var(--red-fill);
   }
 
   /* THE CARET'S RING ONLY WHILE THE KEYBOARD IS ON THE BOARD. At rest it sat round the first card, which nobody chose,
@@ -558,7 +558,7 @@
 
   @keyframes bcard-arrived {
     from {
-      background-color: var(--arrived-wash);
+      background-color: var(--arrived);
     }
   }
 
@@ -569,12 +569,12 @@
     }
 
     .bcard:not([data-picked], [data-cursor]):hover {
-      box-shadow: 0 0 0 1px var(--line);
+      box-shadow: 0 0 0 1px var(--rule);
     }
 
     .bcard-more:hover,
     .bcard-undo:hover {
-      background: var(--field);
+      background: var(--tile-2);
       color: var(--ink);
     }
   }

@@ -34,7 +34,7 @@ test('THE PLATE ITSELF: clear ink over a ground in a role, and both that hide ar
   const plate = rule('[data-plated]');
   assert.match(plate, /color: transparent !important;/u);
   assert.match(plate, /text-shadow: none !important;/u);
-  assert.match(plate, /background: var\(--line\) !important;/u);
+  assert.match(plate, /background: var\(--rule\) !important;/u);
   assert.match(plate, /font-variant-numeric: tabular-nums;/u, 'a plated number is no longer as wide as it was');
 });
 

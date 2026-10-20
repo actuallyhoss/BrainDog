@@ -11,7 +11,7 @@ import { parse } from './parse.ts';
 
 const look = `@layer tokens { :root { --board: #F3F4F6; --tile: #FFFFFF; --red: #CF413A; --ink: #101114; }
   :root[data-theme="dark"] { --board: #0D1014; --tile: #161A20; --red: #E05148; --ink: #ECEEF1; } }`;
-const scale = ':root { --fs-meta: 13px; --fs-body: 15px; --t-sm: 13px; --sp-1: 4px; --r-pop: 12px; }';
+const scale = ':root { --fs-meta: 13px; --fs-body: 15px; --sp-1: 4px; --r-pop: 12px; }';
 const book = designBook({ look, scale });
 
 test('every kind the renderer draws is in the book, once', () => {

@@ -232,7 +232,7 @@
 
   .opening-said {
     margin: 0;
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-body);
     line-height: 22px;
   }

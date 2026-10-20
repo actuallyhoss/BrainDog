@@ -262,7 +262,7 @@
     gap: 6px;
     min-inline-size: 0;
     margin-inline-start: auto;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
     white-space: nowrap;
@@ -301,7 +301,7 @@
 
   .until {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-head);
     line-height: 24px;
   }
@@ -325,7 +325,7 @@
   .tile {
     padding: var(--tile-pad);
     background: var(--tile);
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
     color: var(--ink);
   }
 
@@ -341,7 +341,7 @@
   .block-body {
     margin: 0;
     max-inline-size: 68ch;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
@@ -350,7 +350,7 @@
 
   .block-note {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-body);
     line-height: 22px;
   }
@@ -372,7 +372,7 @@
   }
 
   .figure-label {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     line-height: 18px;
@@ -391,7 +391,7 @@
   /* AN AMOUNT'S FRACTION AND ITS CODE ARE QUIETER than its whole, as the app's own money is set. */
   .fraction,
   .iso {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* ── Tables: hairlines between the rows and none round the table ──────────────────────── */
@@ -405,8 +405,8 @@
 
   .head-cell {
     padding: 0 var(--sp-3) var(--sp-2);
-    border-block-end: 1px solid var(--line);
-    color: var(--dim);
+    border-block-end: 1px solid var(--rule);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     text-align: start;
@@ -420,7 +420,7 @@
   }
 
   .rows tr + tr .cell {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .head-cell:first-child,
@@ -454,7 +454,7 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--tap);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
     text-decoration: none;
@@ -481,7 +481,7 @@
     }
 
     .rows tr + tr {
-      border-block-start: 1px solid var(--line);
+      border-block-start: 1px solid var(--rule);
     }
 
     .rows tr + tr .cell {
@@ -495,7 +495,7 @@
     .cell[data-label]::before {
       content: attr(data-label);
       display: block;
-      color: var(--dim);
+      color: var(--ink-3);
       font-size: var(--fs-meta);
       line-height: 18px;
     }

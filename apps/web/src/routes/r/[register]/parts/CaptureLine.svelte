@@ -169,7 +169,7 @@
 
   @media (pointer: coarse) {
     .capture-input {
-      font-size: var(--t-md, 16px);
+      font-size: var(--fs-body, 16px);
     }
   }
 

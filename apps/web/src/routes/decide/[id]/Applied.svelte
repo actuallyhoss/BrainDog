@@ -53,7 +53,7 @@
     gap: var(--sp-2);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -64,7 +64,7 @@
 
   .did-good {
     display: inline-flex;
-    color: var(--earn);
+    color: var(--good);
   }
 
   .did-lines {
@@ -74,8 +74,8 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .did-list {
@@ -83,25 +83,25 @@
     grid-template-columns: minmax(8ch, max-content) minmax(0, 1fr);
     gap: var(--sp-1) var(--sp-3);
     margin: 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .did-list dt {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .did-list dd {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     overflow-wrap: anywhere;
   }
 
   .did-note {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   @media (width < 640px) {

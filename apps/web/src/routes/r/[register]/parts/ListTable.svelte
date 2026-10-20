@@ -590,8 +590,8 @@
 
   .cell-unit {
     flex: none;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .cell-tick {
@@ -606,12 +606,12 @@
     inline-size: 100%;
     min-inline-size: 0;
     padding: 0 2px;
-    background: var(--s1);
-    border: 1px solid var(--ink2);
-    border-radius: var(--r-sm);
+    background: var(--tile-2);
+    border: 1px solid var(--ink-2);
+    border-radius: var(--r-xs);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   /**
@@ -647,7 +647,7 @@
     display: inline-flex;
     margin-inline-end: var(--sp-2);
     vertical-align: middle;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .row-lock-word {
@@ -659,16 +659,16 @@
   }
 
   .row-face :global(.face[data-kind]) {
-    background: var(--field);
-    color: var(--ink2);
+    background: var(--tile-2);
+    color: var(--ink-2);
   }
 
   /* THE ROW'S NUMBER, QUIET, IN THE BODY FACE with tabular figures, so a column of them lines up. It was
      the identifier face, and mono is for what a person wrote as code, never for a number. */
   .row-seq {
-    color: var(--dim);
+    color: var(--ink-3);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -741,12 +741,12 @@
   .scope-at-open {
     display: inline-flex;
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .scope-at:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .scope-at:hover .scope-at-open {
@@ -756,8 +756,8 @@
 
   /* THE HEADS ARE QUIET: the meta size in the second ink, one hairline under them, and nothing else. */
   .table-slot :global(.th) {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -771,7 +771,7 @@
      (`Table` draws one at the head of the cell) stays for a screen reader and leaves the eye: beside a red date and a
      red state dot it was a third mark of one fact. */
   .table-slot :global(.tr[data-intent='bad'] .td[data-tone]) {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* HOW LATE, BEFORE THE DAY, at the cell's weight plus one, so the words read first and the days still line up at the
@@ -799,9 +799,9 @@
   }
 
   /* THE KEYBOARD'S ROW IS THE WASH, as the cursor row is on every list, and not a raised band; the focus
-     ring still marks it while the grid has focus. A selected row keeps `--selected`. */
+     ring still marks it while the grid has focus. A selected row keeps `--red-tint`. */
   .table-slot :global(.rowgroup .tr[data-focused]:not([aria-selected='true'])) {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   /* AND ONLY WHILE THE KEYBOARD IS IN THE LIST. At rest the caret sits on the first row, which nobody chose, and its
@@ -860,7 +860,7 @@
     padding: 0;
     background: none;
     border: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     opacity: 0;
     cursor: pointer;
     transition: opacity var(--d-state) var(--ease-out);
@@ -928,8 +928,8 @@
     background: none;
     border: 0;
     border-radius: calc(var(--r-ctl) - 2px);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     cursor: pointer;
     transition:
@@ -947,12 +947,12 @@
     place-items: center;
     inline-size: var(--ctl-h-sm);
     padding: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .verb:hover,
   .verb:focus-visible {
-    background: var(--hold-wash);
+    background: var(--tile-2);
     color: var(--ink);
   }
 

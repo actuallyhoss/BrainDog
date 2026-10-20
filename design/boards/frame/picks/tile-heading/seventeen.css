@@ -2,6 +2,6 @@
    outranks) and the renderer's. */
 header.block-bar > .block-name,
 .block-head {
-  font-size: var(--t-group);
+  font-size: var(--fs-head);
   font-weight: 600;
 }

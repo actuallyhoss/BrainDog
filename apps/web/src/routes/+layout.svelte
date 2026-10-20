@@ -1047,7 +1047,7 @@
       as fast. On a phone, where the tap that caused it gave no feedback either, it reads as the
       product having ignored you and then something changing on its own.
 
-      Four pixels and 240ms, which is `--d-move`, already in the token file for exactly this kind
+      Four pixels and 240ms, which is `--d-panel`, already in the token file for exactly this kind
       of distance. `backwards` so the first frame is the start of the animation rather than the
       end of it, which is the difference between a screen sliding in and a screen flickering.
 
@@ -1285,9 +1285,9 @@
     inset-inline-start: calc(max(env(safe-area-inset-left), env(safe-area-inset-right)) + var(--sp-2));
     z-index: var(--z-hint);
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    background: var(--tile-2);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-xs);
     color: var(--ink);
     transform: translateY(-200%);
   }
@@ -1311,7 +1311,7 @@
 
   .live[data-state='polling'] {
     display: block;
-    background: repeating-linear-gradient(90deg, var(--warn) 0 8px, var(--line) 8px 16px);
+    background: repeating-linear-gradient(90deg, var(--warn) 0 8px, var(--rule) 8px 16px);
   }
 
   /* WARN, NOT DANGER: a dropped connection is a condition to wait out, not a loss. Solid where
@@ -1422,7 +1422,7 @@
     border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     cursor: pointer;
   }
@@ -1437,7 +1437,7 @@
     z-index: -1;
     border-radius: inherit;
     background: var(--tile);
-    border: 1px solid var(--edge);
+    border: 1px solid var(--rule-strong);
     transition: background var(--d-state) var(--ease-out);
   }
 
@@ -1527,7 +1527,7 @@
     padding: 0;
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     cursor: pointer;
   }
@@ -1654,10 +1654,10 @@
     padding-inline: var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     text-align: start;
     text-decoration: none;
     cursor: pointer;
@@ -1670,7 +1670,7 @@
   }
 
   .more-row[aria-current='page'] {
-    background: var(--selected);
+    background: var(--red-tint);
   }
 
   .more-row[aria-current='page'] > :global(.icon) {
@@ -1688,7 +1688,7 @@
   .more-tally {
     flex: none;
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* The holding pen's line sits apart from the places under it, as the rail's sits apart at its foot. */
@@ -1714,8 +1714,8 @@
     inline-size: var(--icon-l);
     block-size: var(--icon-l);
     background: var(--ink);
-    border-radius: var(--r-sm);
-    color: var(--bg);
+    border-radius: var(--r-xs);
+    color: var(--tile);
     font-size: var(--fs-cap);
     font-weight: 600;
     line-height: 1;
@@ -1744,7 +1744,7 @@
   .more-note {
     padding: var(--sp-2);
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* The same headings the rail carries, and they are headings: a section title, not an eyebrow. */
@@ -1752,7 +1752,7 @@
     margin-block: var(--sp-4) 0;
     padding-inline: var(--sp-2);
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
@@ -1760,7 +1760,7 @@
   .more-places {
     margin-block-start: var(--sp-3);
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -1769,7 +1769,7 @@
     }
 
     .more-row[aria-current='page']:hover {
-      background: var(--selected);
+      background: var(--red-tint);
     }
   }
 

@@ -235,8 +235,8 @@
   .report-folded {
     flex: 1 1 16rem;
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     text-wrap: pretty;
   }
 
@@ -248,8 +248,8 @@
 
   .report-why {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     text-wrap: pretty;
   }
 
@@ -262,19 +262,19 @@
   .report-label {
     margin: 0;
     margin-block-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .report-code {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    background: var(--s1);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-xs);
+    background: var(--tile-2);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -286,8 +286,8 @@
 
   .report-said {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .report-keys {
@@ -302,7 +302,7 @@
     align-items: center;
     gap: var(--sp-3);
     min-block-size: var(--row-h);
-    border-block-end: 1px solid var(--line-soft);
+    border-block-end: 1px solid var(--rule);
   }
 
   .report-key-name {
@@ -316,8 +316,8 @@
   }
 
   .report-key-when {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 </style>

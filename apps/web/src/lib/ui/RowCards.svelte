@@ -451,7 +451,7 @@
 
     /* ONE HAIRLINE BETWEEN ROWS, in the soft line a row takes at every width. */
     .cards li + li {
-      border-block-start: 1px solid var(--line-soft);
+      border-block-start: 1px solid var(--rule);
     }
 
     /* THE CARD AND ITS VERB SHARE A LINE. `align-items: stretch` so the menu button is the height of
@@ -472,7 +472,7 @@
       align-items: center;
       gap: var(--sp-2);
       padding: var(--sp-2) var(--sp-3);
-      border-block-start: 1px solid var(--line-soft);
+      border-block-start: 1px solid var(--rule);
     }
 
     /* A NOTE THAT SAYS NOTHING TAKES NO ROOM. `note` is a snippet, and the register passes one for
@@ -485,7 +485,7 @@
     }
 
     .card-line[data-picked] {
-      background: var(--selected);
+      background: var(--red-tint);
     }
 
     .picked-tick {
@@ -512,7 +512,7 @@
       /* Next to no inline padding: there is no box for the text to be inset from. */
       padding: var(--sp-2) var(--sp-1);
       color: var(--ink);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
       text-decoration: none;
     }
 
@@ -573,7 +573,7 @@
     }
 
     .card-missing {
-      color: var(--dim);
+      color: var(--ink-3);
       font-weight: 400;
     }
 
@@ -601,8 +601,8 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      color: var(--dim);
-      font-size: var(--t-sm);
+      color: var(--ink-3);
+      font-size: var(--fs-meta);
       font-variant-numeric: tabular-nums;
     }
 
@@ -617,7 +617,7 @@
       align-items: center;
       justify-content: flex-end;
       gap: var(--sp-2);
-      font-size: var(--t-sm);
+      font-size: var(--fs-meta);
     }
 
     .card:has(.card-end) .card-b {
@@ -643,15 +643,15 @@
 
     /* ON ONE NEUTRAL TINT, as on every list of people (DIRECTION 39): the name beside it says who. */
     .card .card-face :global(.face[data-kind='person']) {
-      background: var(--field);
-      color: var(--ink2);
+      background: var(--tile-2);
+      color: var(--ink-2);
     }
 
     /* THE FIGURE'S NAME, quieter and smaller than the figure it names, on the figure's own line. */
     .card-figure-label {
       margin-inline-end: var(--sp-1);
-      color: var(--dim);
-      font-size: var(--t-sm);
+      color: var(--ink-3);
+      font-size: var(--fs-meta);
       font-weight: 400;
     }
 

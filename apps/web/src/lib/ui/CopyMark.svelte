@@ -27,9 +27,9 @@
     inset-inline: 0;
     block-size: 2px;
     content: '';
-    background: var(--line);
+    background: var(--rule);
     opacity: 0;
-    transition: opacity var(--d-move) var(--ease-out);
+    transition: opacity var(--d-panel) var(--ease-out);
   }
 
   .copy-mark[data-on]::after {

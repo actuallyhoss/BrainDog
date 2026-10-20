@@ -150,15 +150,15 @@
 
   .band-head {
     margin: 0 0 var(--sp-1);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
 
   /* A PERSON'S FACE IS THEIR INITIAL ON ONE NEUTRAL TINT, on every row; you keep the ink disc that says it is you. */
   .people :global(.line-mark .face[data-kind='person']) {
-    background: var(--field);
-    color: var(--ink2);
+    background: var(--tile-2);
+    color: var(--ink-2);
   }
 
   /* A GROUP'S PEOPLE SIT UNDER ITS NAME, indented to the name's edge so the organisation reads as their heading. */
@@ -169,8 +169,8 @@
   /* "YOU" IS A QUIET WORD AFTER THE NAME, no pill: the face is already the ink disc that says it. */
   .you {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
   }
 
@@ -183,17 +183,17 @@
     padding: var(--sp-1) var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
+    border-radius: var(--r-pop);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .fold:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }

@@ -72,7 +72,7 @@
   .pass-input {
     flex: 1 1 auto;
     min-inline-size: 0;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   /* THE EYE SITS IN THE FIELD'S OWN FILL, a round target flush with its trailing edge. */
@@ -86,9 +86,9 @@
     margin: 0;
     padding: 0;
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: transparent;
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: pointer;
     transition: color var(--d-state) var(--ease-out);
   }
@@ -99,7 +99,7 @@
   }
 
   .pass-show:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
 
@@ -111,8 +111,8 @@
 
   .pass-hint {
     margin: 0 0 var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 </style>

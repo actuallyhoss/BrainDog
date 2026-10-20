@@ -45,9 +45,9 @@
     block-size: 20px;
     /* 6 either side of the figure: 2 more than the grid's 4, and allowed, since it is inside the control. */
     padding-inline: calc(var(--sp-1) + 2px);
-    background: var(--red-fill, var(--action));
+    background: var(--red-fill);
     border-radius: var(--r-round);
-    color: var(--on-red, var(--on-action));
+    color: var(--on-red);
     font-family: var(--font-ui);
     font-size: var(--fs-cap);
     font-weight: var(--fw-semi);

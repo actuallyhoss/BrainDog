@@ -115,8 +115,8 @@
   }
 
   .field-row-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -152,15 +152,15 @@
      `font-variant-numeric` keeps the six from jumping about as they are typed. */
   .code-input {
     flex: 0 1 12ch;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.18em;
   }
 
   .code-said {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-meta);
   }
 
   .row-actions {

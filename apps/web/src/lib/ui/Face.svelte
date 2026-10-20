@@ -86,10 +86,10 @@
     place-items: center;
     inline-size: 24px;
     block-size: 24px;
-    background: var(--tile-2, var(--s1));
+    background: var(--tile-2);
     border-radius: var(--r-round);
-    color: var(--ink-2, var(--ink2));
-    font-size: var(--fs-cap, var(--t-xs));
+    color: var(--ink-2);
+    font-size: var(--fs-cap);
     font-weight: var(--fw-semi);
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -109,7 +109,7 @@
   /* A THING'S SQUARE: the corner a small well has at each size, so a project's face and an icon well beside it are
      one family of shape. */
   .face[data-shape='square'] {
-    border-radius: var(--r-xs, var(--r-sm));
+    border-radius: var(--r-xs);
   }
 
   .face[data-shape='square'][data-size='l'] {
@@ -125,42 +125,42 @@
 
   .face[data-slot='blue'] {
     --ph: var(--cat-blue, var(--ink));
-    --ph-tint: var(--cat-blue-tint, var(--s1));
+    --ph-tint: var(--cat-blue-tint, var(--tile-2));
   }
 
   .face[data-slot='violet'] {
     --ph: var(--cat-violet, var(--ink));
-    --ph-tint: var(--cat-violet-tint, var(--s1));
+    --ph-tint: var(--cat-violet-tint, var(--tile-2));
   }
 
   .face[data-slot='pink'] {
     --ph: var(--cat-pink, var(--ink));
-    --ph-tint: var(--cat-pink-tint, var(--s1));
+    --ph-tint: var(--cat-pink-tint, var(--tile-2));
   }
 
   .face[data-slot='teal'] {
     --ph: var(--cat-teal, var(--ink));
-    --ph-tint: var(--cat-teal-tint, var(--s1));
+    --ph-tint: var(--cat-teal-tint, var(--tile-2));
   }
 
   .face[data-slot='sky'] {
     --ph: var(--cat-sky, var(--ink));
-    --ph-tint: var(--cat-sky-tint, var(--s1));
+    --ph-tint: var(--cat-sky-tint, var(--tile-2));
   }
 
   .face[data-slot='yellow'] {
     --ph: var(--cat-yellow, var(--ink));
-    --ph-tint: var(--cat-yellow-tint, var(--s1));
+    --ph-tint: var(--cat-yellow-tint, var(--tile-2));
   }
 
   .face[data-slot='lime'] {
     --ph: var(--cat-lime, var(--ink));
-    --ph-tint: var(--cat-lime-tint, var(--s1));
+    --ph-tint: var(--cat-lime-tint, var(--tile-2));
   }
 
   .face[data-slot='slate'] {
     --ph: var(--cat-slate, var(--ink));
-    --ph-tint: var(--cat-slate-tint, var(--s1));
+    --ph-tint: var(--cat-slate-tint, var(--tile-2));
   }
 
   /* YOU ARE THE INK DISC, NOT THE RED ONE. The red is kept for the mark and "needs you", and a face repeated down a log

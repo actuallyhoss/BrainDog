@@ -142,8 +142,8 @@
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
     background: var(--tile);
-    border: 1px solid var(--rule-strong, var(--edge));
-    border-radius: var(--r-pop, var(--r-md));
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
   }

@@ -167,8 +167,8 @@
   }
   .hole-note {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-row);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 1.5;
   }
   .hole-said {
@@ -176,19 +176,19 @@
     inline-size: 100%;
     min-block-size: max(var(--ctl-h), var(--tap));
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
     border-radius: 8px;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: 1.6;
     resize: vertical;
   }
   .hole-why {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
   }
   .hole-actions {
     display: flex;

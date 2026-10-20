@@ -134,7 +134,7 @@
     inset-block-start: 0;
     inset-inline: 0;
     block-size: 2px;
-    background: var(--ink-3, var(--dim));
+    background: var(--ink-3);
     transform: scaleX(var(--pull-drag, 0));
     /* FROM THE MIDDLE, so it grows the same way in a right-to-left language. */
     transform-origin: center;

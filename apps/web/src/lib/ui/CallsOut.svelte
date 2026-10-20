@@ -37,8 +37,8 @@
      note under them in the quiet ink. A caller that heads its tile with the same words hides this one
      from sight and keeps it for a screen reader, so the list is never nameless. */
   .calls-h {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -70,18 +70,18 @@
   }
 
   .calls-line {
-    color: var(--ink2);
+    color: var(--ink-2);
     white-space: pre-line;
   }
 
   .calls-note {
     flex-basis: 100%;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .calls-estimate {
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 </style>

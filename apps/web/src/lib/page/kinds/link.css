@@ -34,7 +34,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .list[data-kind='link'] > .item:has(> a.item-title):hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -55,7 +55,7 @@
     inline-size: 16px;
     block-size: 16px;
     translate: 0 -50%;
-    color: var(--dim);
+    color: var(--ink-3);
     pointer-events: none;
     transition: color var(--d-state) var(--ease-out);
   }
@@ -77,7 +77,7 @@
 
   /* A ROW WITH A GLYPH LEADS WITH ITS WELL (`link.ts`: the row's fourth cell). The renderer draws it as the row's
      first child, `<span class="link-well" aria-hidden="true">` holding the glyph's svg, and this sheet sets it in a
-     `--well-l` square at the row's start, `--s1` with the glyph in `--ink2`, as `IconWell` draws one. The title, the
+     `--well-l` square at the row's start, `--tile-2` with the glyph in `--ink-2`, as `IconWell` draws one. The title, the
      host and the note step in past it, so the row reads well, label, line, chevron, the way Settings' rows do. */
   .list[data-kind='link'] > .item:has(> .link-well) {
     padding-inline-start: calc(var(--sp-3) + var(--well-l) + var(--sp-3));
@@ -94,9 +94,9 @@
     block-size: var(--well-l);
     padding: 7px;
     translate: 0 -50%;
-    border-radius: var(--r-well);
-    background: var(--s1);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink-2);
     pointer-events: none;
   }
 
@@ -116,14 +116,14 @@
   }
 
   .link-host {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     overflow-wrap: anywhere;
   }
 
   .link-note {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -136,7 +136,7 @@
 
   .links-empty {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 }

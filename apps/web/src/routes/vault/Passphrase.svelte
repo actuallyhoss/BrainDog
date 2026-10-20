@@ -295,14 +295,14 @@
   .reading {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .reading {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -314,8 +314,8 @@
 
   .lock-bad {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   .lock-hidden {
@@ -332,7 +332,7 @@
   .lock-table {
     inline-size: 100%;
     border-collapse: collapse;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
     font-variant-numeric: tabular-nums;
   }
@@ -341,25 +341,25 @@
   .lock-table td {
     padding-block: var(--sp-2);
     padding-inline: 0 var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink-2);
     text-align: start;
     vertical-align: top;
   }
 
   .lock-table thead th {
     padding-block-start: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
   }
 
   .lock-table tbody th {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: 500;
     white-space: nowrap;
   }
 
   .lock-table tbody tr {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .lock-table tbody tr[data-now] :is(th, td) {
@@ -367,7 +367,7 @@
   }
 
   .lock-note {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 400;
   }
 
@@ -383,7 +383,7 @@
 
   .lock-form .lock-text {
     margin-block-start: var(--sp-2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* UNDER 640PX, TWO LABELLED ROWS: each row a block, its state as the title, each cell its label above its value. */
@@ -410,7 +410,7 @@
     }
 
     .lock-table tbody th {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
       white-space: normal;
     }
 
@@ -420,8 +420,8 @@
 
     .lock-label {
       display: block;
-      color: var(--dim);
-      font-size: var(--t-sm);
+      color: var(--ink-3);
+      font-size: var(--fs-meta);
     }
   }
 

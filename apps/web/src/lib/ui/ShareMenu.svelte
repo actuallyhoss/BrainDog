@@ -263,7 +263,7 @@
   }
 
   .share-label {
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: 500;
   }
@@ -275,11 +275,11 @@
     inline-size: 100%;
     min-block-size: 40px;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--tile-2, var(--s1));
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
-    font-family: var(--font-mono, var(--font-id));
+    font-family: var(--font-mono);
     font-size: var(--fs-meta);
     overflow-wrap: anywhere;
     word-break: break-all;
@@ -300,20 +300,20 @@
 
   .share-hint {
     margin: 0;
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
   .refused {
     margin: 0;
-    color: var(--red, var(--danger-text));
+    color: var(--red);
     font-size: var(--fs-meta);
   }
 
   /* THE TEMPLATE'S FACTS: a small heading over each, and the lines under it in the sheet's one column. */
   .share-h {
     margin: var(--sp-2) 0 0;
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
   }
@@ -323,13 +323,13 @@
     gap: var(--sp-1);
     margin: 0;
     padding-inline-start: var(--sp-5);
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     font-size: var(--fs-meta);
   }
 
   .share-line {
     margin: 0;
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }

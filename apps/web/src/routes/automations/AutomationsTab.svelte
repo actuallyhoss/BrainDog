@@ -232,7 +232,7 @@
     margin: 0;
     margin-block-start: auto;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 </style>

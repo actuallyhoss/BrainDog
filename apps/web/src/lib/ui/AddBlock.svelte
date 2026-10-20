@@ -368,9 +368,9 @@
   /* A META HEADING over each group, as the palette's are, and at 500: the weights are 400 to 600. */
   .group-name {
     margin-block: 0 var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -389,9 +389,9 @@
     gap: var(--sp-2);
     inline-size: 100%;
     padding: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
     text-align: start;
@@ -399,11 +399,11 @@
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* A CHOICE ON THE SHEET, NOT A TILE IN IT (a tile never holds a tile, and a tile has no border): the `--s1`
+  /* A CHOICE ON THE SHEET, NOT A TILE IN IT (a tile never holds a tile, and a tile has no border): the `--tile-2`
      fill, and one step deeper under the pointer. */
   @media (hover: hover) and (pointer: fine) {
     .tile:hover {
-      background: var(--s2);
+      background: var(--tile-2);
     }
   }
 
@@ -425,13 +425,13 @@
      you must copy exactly rather than as a thing you can pick. */
   .tile-kind {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .tile-what {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* The drawing is a picture of itself and nothing more: no pointer, no focus, no scroll. The tile
@@ -450,16 +450,16 @@
   /* ONE LINE, AND READ: what this list cannot fill and why, under the groups, at body size. */
   .not-offered {
     margin: var(--sp-5) 0 0;
-    color: var(--dim);
-    font-size: var(--t-row);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
   }
 
   .tile-fallback {
     display: block;
     padding: var(--sp-3);
-    background: var(--bg);
-    border-radius: var(--r-sm);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    background: var(--tile);
+    border-radius: var(--r-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 </style>

@@ -231,12 +231,12 @@
   .way {
     min-inline-size: 0;
     background: var(--board);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-tile);
   }
 
   .way-head {
     margin: 0;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -248,7 +248,7 @@
     min-block-size: 44px;
     padding: var(--sp-3) var(--sp-4);
     border: 0;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-tile);
     background: none;
     color: var(--ink);
     font: inherit;
@@ -257,11 +257,11 @@
   }
 
   .way[data-on] .way-pick {
-    color: var(--accent-text);
+    color: var(--red);
   }
 
   .way-pick:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--red-fill);
     outline-offset: -2px;
   }
 
@@ -274,15 +274,15 @@
 
   .hint {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-row);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
   .step {
     margin: var(--sp-1) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-row);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   /* A LINE AND ITS COPY on one row where both fit, the button under the line where they do not. */
@@ -300,11 +300,11 @@
     min-inline-size: 0;
     padding-block: var(--sp-2);
     padding-inline: var(--sp-3);
-    background: var(--bg);
-    border-radius: var(--r-md);
+    background: var(--tile);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -323,8 +323,8 @@
 
   .said {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-meta);
   }
 
   /* THE LIVE ROW: a mark and its sentence, the mark in the accent once it is connected; the words carry it either way. */
@@ -333,8 +333,8 @@
     align-items: baseline;
     gap: var(--sp-2);
     margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-row);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .live[data-state='connected'] {
@@ -342,6 +342,6 @@
   }
 
   .live[data-state='connected'] > span {
-    color: var(--accent-text);
+    color: var(--red);
   }
 </style>

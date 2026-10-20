@@ -140,14 +140,14 @@
   h1 {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-title);
+    font-size: var(--fs-page);
     font-weight: 600;
     line-height: 1.2;
   }
   .headline {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-group);
+    color: var(--ink-2);
+    font-size: var(--fs-head);
     line-height: 1.45;
   }
   /* THE TWO STEPS SIDE BY SIDE WHERE THEY FIT, one above the other on a phone. */
@@ -175,12 +175,12 @@
   .said,
   .fix {
     margin: 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.45;
   }
   .hint,
   .step {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
   .waiting,
   .said {
@@ -200,11 +200,11 @@
     min-inline-size: 0;
     padding-block: var(--sp-2);
     padding-inline: var(--sp-3);
-    background: var(--bg);
-    border-radius: var(--r-md);
+    background: var(--tile);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-base);
+    font-family: var(--font-mono);
+    font-size: var(--fs-body);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -230,7 +230,7 @@
     min-block-size: 44px;
   }
   .fix {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
   /* THE ORDINARY START, one link away, as PostHog keeps its manual setup. */
   .by-hand {
@@ -238,7 +238,7 @@
     align-items: center;
     justify-self: start;
     min-block-size: 44px;
-    color: var(--link);
-    font-size: var(--t-base);
+    color: var(--red);
+    font-size: var(--fs-body);
   }
 </style>

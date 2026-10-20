@@ -185,7 +185,7 @@
      because `Block` draws it and a scoped class on it would split the two renderers' trees. */
   :global(.block > .block-actions) {
     margin: var(--sp-3) 0 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
   }
 
@@ -210,12 +210,12 @@
   .actions[data-size='row'] .actions-btn {
     padding: 0 var(--sp-2);
     background: none;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .actions[data-size='row'] .actions-btn:hover,
   .actions[data-size='row'] .actions-btn:focus-visible {
-    background: var(--field);
+    background: var(--tile-2);
     color: var(--ink);
   }
 
@@ -228,7 +228,7 @@
     box-sizing: border-box;
     min-block-size: var(--btn-h);
     padding: 0 var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
@@ -242,8 +242,8 @@
 
   /* THE BLOCK'S ONE PRIMARY takes the working accent's fill; every other control is the field's. */
   .actions-btn[data-primary] {
-    background: var(--action);
-    color: var(--on-action);
+    background: var(--red-fill);
+    color: var(--on-red);
   }
 
   .actions-choice {
@@ -253,7 +253,7 @@
   }
 
   .actions-choice-label {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-ctl);
   }
 
@@ -262,7 +262,7 @@
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    color: var(--danger-text);
+    color: var(--red);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
@@ -274,8 +274,8 @@
   .actions-count {
     padding: 0 6px;
     background: var(--well);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
   }
 
@@ -316,11 +316,11 @@
 
   .actions-item:focus-visible,
   .actions-item:hover {
-    background: var(--field);
+    background: var(--tile-2);
   }
 
   .actions-item[role='menuitemradio'][aria-checked='true'] {
-    color: var(--action);
+    color: var(--red-fill);
     font-weight: var(--fw-medium);
   }
 
@@ -363,7 +363,7 @@
   .actions-sheet-body > .actions-close {
     justify-content: center;
     background: none;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* EVERY CONTROL TAKES A THUMB: 44 under a coarse pointer, the label at the body size. */

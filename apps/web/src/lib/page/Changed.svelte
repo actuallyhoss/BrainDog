@@ -40,7 +40,7 @@
     gap: var(--sp-3);
     min-inline-size: 0;
     padding: var(--tile-pad, 20px);
-    background: var(--tile, var(--bg));
+    background: var(--tile);
     border-radius: var(--r-tile, 16px);
   }
 
@@ -53,7 +53,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 1.4;
   }

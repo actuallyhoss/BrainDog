@@ -116,9 +116,9 @@
   .head,
   .hint {
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   ol {
@@ -135,10 +135,10 @@
     align-items: center;
     gap: var(--sp-2);
     padding: var(--sp-1) var(--sp-2);
-    border-radius: var(--r-md);
-    background: var(--bg);
+    border-radius: var(--r-pop);
+    background: var(--tile);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   li[draggable='true'] {
@@ -147,7 +147,7 @@
 
   /* WHERE A DROP WOULD LAND is a line in the red, and the step in hand is quieter. */
   li[data-over] {
-    box-shadow: 0 -2px 0 0 var(--accent);
+    box-shadow: 0 -2px 0 0 var(--red-fill);
   }
 
   li[data-drag] {
@@ -155,7 +155,7 @@
   }
 
   .n {
-    color: var(--ink2);
+    color: var(--ink-2);
     min-inline-size: 1.5ch;
   }
 
@@ -174,7 +174,7 @@
     padding: 0;
     background: none;
     border: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     cursor: pointer;
   }
 
@@ -186,7 +186,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 </style>

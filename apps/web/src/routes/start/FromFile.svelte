@@ -70,8 +70,8 @@
 <style>
   .file-line {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
     overflow-wrap: anywhere;
   }
@@ -94,7 +94,7 @@
   .col {
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -103,8 +103,8 @@
   .to {
     margin: 0;
     overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -115,12 +115,12 @@
 
   .file-quiet {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .file-quiet[data-needs] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 </style>

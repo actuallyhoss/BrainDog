@@ -341,7 +341,7 @@
     background: var(--tile);
     /* IT FLOATS WITH NO SCRIM, SO IT TAKES THE ONE EDGE a floating layer has (the UI pass of 20 October, 1.9): 1px of
        `--rule-strong`, and no shadow. */
-    border: 1px solid var(--rule-strong, var(--edge));
+    border: 1px solid var(--rule-strong);
     border-radius: var(--r-tile);
     color: var(--ink);
     transform: var(--dock-off);
@@ -391,7 +391,7 @@
     gap: var(--sp-2);
     padding: var(--sp-3);
     background: var(--tile);
-    border-block-end: 1px solid var(--rule, var(--line));
+    border-block-end: 1px solid var(--rule);
   }
 
   .dock-close {
@@ -401,10 +401,10 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--tile-2, var(--hover-wash));
+    background: var(--tile-2, var(--hover));
     border: 0;
     border-radius: var(--r-round);
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -413,7 +413,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .dock-close:hover {
-      background: var(--hover, var(--hold-wash));
+      background: var(--hover, var(--tile-2));
       color: var(--ink);
     }
   }
@@ -509,7 +509,7 @@
       inline-size: 36px;
       block-size: var(--sp-1);
       margin-inline: auto;
-      background: var(--rule-strong, var(--edge));
+      background: var(--rule-strong);
       border-radius: 2px;
     }
 

@@ -83,7 +83,7 @@
     display: grid;
     gap: 2px;
     padding-block: var(--sp-3);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
   }
 
   .ch-line:first-child {
@@ -101,7 +101,7 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 1.55;
     text-align: start;
@@ -133,8 +133,8 @@
     align-items: center;
     gap: var(--sp-1) var(--sp-3);
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .ch-who {
@@ -157,7 +157,7 @@
     font: inherit;
     font-weight: 500;
     text-decoration: underline;
-    text-decoration-color: var(--edge);
+    text-decoration-color: var(--rule-strong);
     text-underline-offset: 3px;
     cursor: pointer;
   }
@@ -167,7 +167,7 @@
   }
 
   .ch-undo:disabled {
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: default;
   }
 </style>

@@ -129,7 +129,7 @@
   .add-field {
     margin-block-start: var(--sp-3);
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* NAME, KIND AND THE TWO BUTTONS ON ONE LINE WHERE THERE IS ROOM, each wrapping under the last where there is not. */
@@ -148,20 +148,20 @@
   }
 
   .add-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
   .add-kind {
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   /* THE CHOICES BOX TAKES THE WHOLE LINE, since a choice is typed one a line and a narrow box hides them. */
@@ -176,8 +176,8 @@
 
   .add-help {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A FINGER'S TARGET ON A PHONE: every picker and box is at least 44px tall on a coarse pointer. */
@@ -195,7 +195,7 @@
 
   .add-note {
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
   }
 </style>

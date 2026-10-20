@@ -580,21 +580,21 @@
   /* THE ONE LINE OF CONTEXT the mode carries on a template: quiet, beside the controls it is about. */
   .arrange-every {
     align-self: center;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* THE DRAFT'S ONE LINE, quiet beside its three buttons. */
   .arrange-draft {
     align-self: center;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .bind-why {
     margin: 0 0 var(--sp-3);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   /* THE LISTS AS ROWS OF CHOICES, one under another, with no box around them. */

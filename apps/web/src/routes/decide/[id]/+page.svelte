@@ -1408,7 +1408,7 @@
 
   .gate-side-h {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-family: var(--font-ui);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
@@ -1437,7 +1437,7 @@
   .gate-ev-said {
     max-inline-size: var(--measure);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
@@ -1445,7 +1445,7 @@
   .gate-link {
     display: inline-flex;
     align-items: center;
-    color: var(--link);
+    color: var(--red);
     text-decoration: underline;
     text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
     text-decoration-thickness: 1px;
@@ -1453,7 +1453,7 @@
   }
 
   .gate-links-more {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
@@ -1472,7 +1472,7 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
@@ -1482,7 +1482,7 @@
   }
 
   .gate-who {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: var(--fw-medium);
   }
 
@@ -1494,7 +1494,7 @@
   .gate-why {
     max-inline-size: var(--measure);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
     white-space: pre-line;
@@ -1511,7 +1511,7 @@
   .cannot {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
@@ -1525,14 +1525,14 @@
     min-inline-size: 0;
     margin-block-end: var(--sp-1);
     overflow: hidden;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   .card-swatch {
     flex: 1;
     block-size: 2rem;
     background: var(--swatch);
-    border: 1px solid var(--line);
+    border: 1px solid var(--rule);
     forced-color-adjust: none;
   }
 
@@ -1544,12 +1544,12 @@
     block-size: 6rem;
     aspect-ratio: 4 / 3;
     object-fit: cover;
-    background: var(--field);
+    background: var(--tile-2);
   }
 
   .card-figure {
     padding: var(--sp-2) var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     color: var(--ink);
     font-size: var(--fs-figure);
     font-weight: var(--fw-medium);
@@ -1583,7 +1583,7 @@
 
   .does-h {
     margin: 0 0 var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-family: var(--font-ui);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
@@ -1605,7 +1605,7 @@
 
   .cost-age {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
   }
 
@@ -1632,7 +1632,7 @@
 
   .pick-detail,
   .pick-hint {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
@@ -1643,7 +1643,7 @@
 
   .source-fold {
     margin-block-start: var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
   }
 
@@ -1663,10 +1663,10 @@
     padding: var(--sp-3);
     overflow: auto;
     max-block-size: 60vh;
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
-    font-family: var(--font-id);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
     font-size: var(--fs-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -1677,7 +1677,7 @@
     display: grid;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     line-height: 1.6;
   }
@@ -1702,7 +1702,7 @@
   .commit-label {
     display: block;
     margin-block-end: var(--sp-2);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
@@ -1712,7 +1712,7 @@
     align-items: center;
     gap: var(--sp-3);
     margin-block-start: var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
@@ -1721,7 +1721,7 @@
   .commit-date {
     min-block-size: var(--btn-h);
     padding: 0 var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
@@ -1744,7 +1744,7 @@
     inline-size: 100%;
     min-block-size: 40px;
     padding: 10px var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
@@ -1777,7 +1777,7 @@
   }
 
   .line-label {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
@@ -1795,7 +1795,7 @@
     min-inline-size: 0;
     min-block-size: var(--btn-h);
     padding: 0 var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
@@ -1811,7 +1811,7 @@
 
   .note-kept {
     margin: var(--sp-3) 0 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
   }
 
@@ -1828,7 +1828,7 @@
     align-items: center;
     gap: var(--sp-3);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
   }
 
@@ -1842,12 +1842,12 @@
 
   .settled-reason {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .settled-note {
     margin: var(--sp-3) 0 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
@@ -1862,7 +1862,7 @@
 
   .settled-where {
     margin: var(--sp-3) 0 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
@@ -1931,7 +1931,7 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     padding: var(--sp-4);
-    border: 1px solid var(--line);
+    border: 1px solid var(--rule);
     border-radius: var(--r-ctl);
     background: var(--tile);
   }
@@ -1955,7 +1955,7 @@
   }
 
   .dc-option > .dc-choice-does {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
   }

@@ -45,7 +45,7 @@
 
   /* A retired row reads as gone: its name in the quiet ink beside the neutral well. */
   .thing[data-retired] .name {
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
   }
 
   /* IT IS A NAME, SO IT WRAPS RATHER THAN LOSING ITS END. At 320 `Marlow & Co` came back as

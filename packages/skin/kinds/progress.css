@@ -25,7 +25,7 @@
 
   .progress[data-form='range'] .progress-range {
     grid-area: share;
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -40,8 +40,8 @@
     position: absolute;
     inset-block: 0;
     inset-inline: calc(var(--from) * 100%) calc((1 - var(--to)) * 100%);
-    border-radius: var(--r-pill);
-    background: var(--edge);
+    border-radius: var(--r-ctl);
+    background: var(--rule-strong);
   }
 
   /* The mark stands 4px proud of the track on each side, so it reads over the band as well as
@@ -60,7 +60,7 @@
   .progress[data-form='range'] > .progress-row[data-total] {
     margin-block-start: var(--sp-1);
     padding-block-start: var(--sp-2);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .progress[data-form='range'] > .progress-row[data-total] > .progress-label {

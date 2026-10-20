@@ -78,13 +78,13 @@
   }
 
   .list[data-form='path'] > .item[data-mark='done'] > .item-marker {
-    background: var(--on);
-    border-color: var(--on);
+    background: var(--red-fill);
+    border-color: var(--red-fill);
     font-variant-emoji: text;
   }
 
   .list[data-form='path'] > .item[data-mark='done'] .item-title {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .list[data-form='path'] > .item[data-mark='next'] > .item-marker {
@@ -97,10 +97,10 @@
     display: inline-block;
     padding: 1px var(--sp-2);
     border: 0;
-    border-radius: var(--r-sm);
-    background: var(--action-tint-1);
-    color: var(--action-text);
-    font-size: var(--t-sm);
+    border-radius: var(--r-xs);
+    background: var(--red-tint);
+    color: var(--red);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -113,7 +113,7 @@
     margin: 0;
     padding-block: var(--sp-1) 0;
     padding-inline: calc(var(--sp-3) + 3.5rem + var(--sp-3)) var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 }

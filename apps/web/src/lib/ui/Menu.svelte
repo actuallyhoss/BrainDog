@@ -405,8 +405,8 @@
     translate: var(--menu-shift) var(--menu-lift);
     padding: var(--sp-1);
     background: var(--tile);
-    border: 1px solid var(--rule-strong, var(--edge));
-    border-radius: var(--r-pop, var(--r-md));
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-pop);
     color: var(--ink);
     /* AT ITS ANCHOR: the corner it hangs from, at the start or the end. */
     transform-origin: var(--menu-x) var(--menu-from);
@@ -495,18 +495,18 @@
 
   .menu :global([role^='menuitem']:hover),
   .menu :global([role^='menuitem']:focus-visible) {
-    background: var(--hover, var(--field-hover));
+    background: var(--hover);
   }
 
   /* THE RING INSIDE THE ROW, so the menu's edge never clips it. */
   .menu :global([role^='menuitem']:focus-visible) {
-    outline: 2px solid var(--focus, var(--focus-in));
+    outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
 
   .menu :global([role^='menuitem'][aria-disabled='true']),
   .menu :global([role^='menuitem']:disabled) {
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     cursor: default;
   }
 
@@ -526,7 +526,7 @@
     inline-size: var(--icon-m);
     block-size: var(--icon-m);
     margin-inline: 2px;
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
   }
 
   .menu :global([role^='menuitem'] > .mi-name) {
@@ -542,7 +542,7 @@
   .menu :global(hr) {
     margin: var(--sp-1) 0;
     border: 0;
-    border-block-start: 1px solid var(--rule, var(--line));
+    border-block-start: 1px solid var(--rule);
   }
 
   /* Drawn only in the sheet. */
@@ -568,7 +568,7 @@
     display: flex;
     justify-content: center;
     margin-block-start: var(--sp-2);
-    border-block-start: 1px solid var(--rule, var(--line));
+    border-block-start: 1px solid var(--rule);
     border-radius: 0;
     font-weight: var(--fw-medium);
   }

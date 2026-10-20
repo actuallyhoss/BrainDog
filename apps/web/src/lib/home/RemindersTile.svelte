@@ -44,15 +44,15 @@
     display: flex;
     gap: var(--sp-2);
     align-items: baseline;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
     color: var(--ink);
   }
 
   .when {
     flex: none;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .text {

@@ -257,8 +257,8 @@
   .ask-hint,
   .ask-said {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   /* DECIDE'S REASON FIELD, the same box the Slash screen's field was, so a sentence typed here and one typed on Decide
@@ -266,12 +266,12 @@
   .ask-field {
     inline-size: 100%;
     padding: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     resize: vertical;
   }
 
@@ -289,18 +289,18 @@
     inline-size: 100%;
     min-block-size: var(--ctl-h);
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     text-align: start;
     cursor: pointer;
   }
 
   .ask-pick:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .ask-pick[aria-pressed='true'] {
@@ -317,7 +317,7 @@
   .ask-question {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 

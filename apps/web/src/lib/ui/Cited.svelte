@@ -48,7 +48,7 @@
   }
 
   .cite-row {
-    color: var(--link);
+    color: var(--red);
     text-decoration: underline;
     text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
     text-decoration-thickness: 1px;
@@ -61,7 +61,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--link);
+    color: var(--red);
     font: inherit;
     text-decoration: underline;
     text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
@@ -89,6 +89,6 @@
   }
 
   .cite-more {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 </style>

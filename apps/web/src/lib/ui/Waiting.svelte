@@ -68,7 +68,7 @@
     display: block;
     block-size: 10px;
     background: color-mix(in oklab, var(--ink) 9%, transparent);
-    border-radius: var(--r-xs, var(--r-sm));
+    border-radius: var(--r-xs);
   }
 
   .bar.title {

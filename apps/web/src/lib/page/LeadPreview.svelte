@@ -60,14 +60,14 @@
     gap: var(--sp-3);
     margin-block-start: var(--sp-3);
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
     min-inline-size: 0;
   }
 
   .lead-preview-name {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 </style>

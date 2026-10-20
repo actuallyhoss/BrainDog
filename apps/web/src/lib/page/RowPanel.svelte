@@ -377,18 +377,18 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--hover-wash);
+    background: var(--hover);
     border: 0;
     border-radius: var(--r-ctl);
     color: oklch(var(--mark-l) var(--mark-c) var(--hue));
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 1;
   }
 
   .p-mark[data-retired] {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   button.p-mark {
@@ -396,13 +396,13 @@
   }
 
   button.p-mark:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
   @media (hover: hover) and (pointer: fine) {
     button.p-mark:hover {
-      background: var(--hold-wash);
+      background: var(--tile-2);
     }
   }
 
@@ -423,7 +423,7 @@
   .p-picker-head {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -457,9 +457,9 @@
     gap: var(--sp-2);
     margin: auto calc(-1 * (var(--sp-4) + var(--sp-1))) calc(-1 * (var(--sp-4) + var(--sp-1)));
     padding: var(--sp-3) calc(var(--sp-4) + var(--sp-1));
-    /* THE PANEL'S OWN SURFACE: `--bg` drew a darker band across the foot in dark. */
+    /* THE PANEL'S OWN SURFACE: `--tile` drew a darker band across the foot in dark. */
     background: var(--tile);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .p-gap {
@@ -474,7 +474,7 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -485,7 +485,7 @@
     flex: 1 1 100%;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* THE BYLINE: a quiet line over the form, the meta size in the second ink, and Undo as words in ink beside it. */
@@ -495,8 +495,8 @@
     align-items: center;
     gap: var(--sp-1) var(--sp-3);
     margin: 0 0 var(--sp-4);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .p-who {
@@ -518,7 +518,7 @@
     font: inherit;
     font-weight: 500;
     text-decoration: underline;
-    text-decoration-color: var(--edge);
+    text-decoration-color: var(--rule-strong);
     text-underline-offset: 3px;
     cursor: pointer;
   }
@@ -528,7 +528,7 @@
   }
 
   .p-undo:disabled {
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: default;
   }
 
@@ -538,16 +538,16 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--hover-wash);
+    background: var(--hover);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     cursor: pointer;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .more:hover {
-      background: var(--hold-wash);
+      background: var(--tile-2);
     }
   }
 </style>

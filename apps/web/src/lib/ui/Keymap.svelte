@@ -114,9 +114,9 @@
   /* A META HEADING over each scope, as the palette's are. */
   .scope-title {
     padding-block: var(--sp-5) var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-align: start;
   }
@@ -144,7 +144,7 @@
   .does {
     padding-block: var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     vertical-align: baseline;
   }
 
@@ -185,8 +185,8 @@
      one least served by a change in opacity. */
   .silenced {
     margin: 0 0 var(--sp-4);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .key.off {
@@ -196,10 +196,10 @@
   .tag {
     margin-inline-start: var(--sp-2);
     padding: 0 var(--sp-1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    color: var(--dim);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-xs);
+    color: var(--ink-3);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 </style>

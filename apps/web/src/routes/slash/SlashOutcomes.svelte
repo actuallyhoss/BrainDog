@@ -43,7 +43,7 @@
   .outcome {
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 22px;
     font-variant-numeric: tabular-nums;
   }
@@ -51,7 +51,7 @@
   /* THE FAULT'S WORD, in the deeper red and the medium weight, before its sentence. */
   .outcome-bad {
     margin-inline-end: var(--sp-1);
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: var(--fw-medium);
   }
 </style>

@@ -595,21 +595,21 @@
     gap: var(--sp-1) var(--sp-2);
   }
 
-  /* THE BODY FACE AND NO CHIP. It was `<code>` on `--sunk` in `--font-id`: a query, set in the face
+  /* THE BODY FACE AND NO CHIP. It was `<code>` on `--board` in `--font-mono`: a query, set in the face
      this product keeps for ids, over a list a person came to read. The quote below is still right
      for `q`, which is text somebody typed and is quoted as typed. */
   .predicate-said,
   .predicate-q {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .predicate code {
     padding: 1px 6px;
-    background: var(--hover-wash);
-    border-radius: var(--r-sm);
+    background: var(--hover);
+    border-radius: var(--r-xs);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
   }
 
   @media (width < 900px) {

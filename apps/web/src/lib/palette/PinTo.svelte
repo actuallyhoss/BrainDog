@@ -152,8 +152,8 @@
   }
 
   .what {
-    color: var(--dim);
-    font-size: var(--t-md);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
@@ -166,7 +166,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    background: var(--s1);
+    background: var(--tile-2);
     border-radius: var(--r-tile);
     overflow: hidden;
   }
@@ -180,27 +180,27 @@
     border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     text-align: start;
     cursor: pointer;
   }
 
   .page:hover:not(:disabled),
   .page:focus-visible {
-    background: var(--s2);
+    background: var(--tile-2);
   }
 
   .page:disabled {
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: progress;
   }
 
   .none {
     padding: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-tile);
-    color: var(--dim);
-    font-size: var(--t-md);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
   }
 </style>

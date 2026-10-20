@@ -116,15 +116,15 @@
   .currency-q {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }
 
   .currency-offer {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -143,7 +143,7 @@
   /* THE ONE PRESSED IS ON: the selected fill with its check, never the ink of the screen's one primary. */
   .currency-choices :global(.btn[aria-pressed='true']),
   .currency-matches :global(.btn[aria-pressed='true']) {
-    background: var(--selected);
+    background: var(--red-tint);
     font-weight: 600;
   }
 
@@ -154,21 +154,21 @@
   .currency-said {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
   .currency-why {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .currency-label {
     margin-block-end: calc(var(--sp-1) - var(--sp-3));
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 

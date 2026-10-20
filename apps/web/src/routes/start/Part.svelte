@@ -115,20 +115,20 @@
 
 <style>
   .part-meta {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 
   .part-meta[data-needs] {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
   .part-why {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
     overflow-wrap: anywhere;
   }
@@ -149,17 +149,17 @@
     min-block-size: var(--row-h);
     margin-inline: calc(-1 * var(--sp-2));
     padding-inline: var(--sp-2);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     transition: background-color 1500ms var(--ease-out);
   }
 
   .entry[data-arrived] {
-    background: var(--arrived-wash);
+    background: var(--arrived);
     transition: none;
   }
 
   .entry + .entry {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .entry-main {
@@ -171,7 +171,7 @@
   .entry-title {
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     text-overflow: ellipsis;
@@ -179,22 +179,22 @@
   }
 
   .entry-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .entry-amount {
     flex: none;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
   .part-reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -207,7 +207,7 @@
     gap: var(--sp-3);
     min-block-size: var(--row-h-2);
     padding-block: var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   .keep-main {
@@ -217,14 +217,14 @@
 
   .keep-name {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
 
   .keep-blurb {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 </style>

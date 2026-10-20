@@ -262,12 +262,12 @@
     inline-size: 20px;
     block-size: 20px;
     margin: 0;
-    accent-color: var(--action);
+    accent-color: var(--red-fill);
   }
 
   /* REQUIRED IS A MARK AND A WORD, quiet beside the label, never the colour alone. */
   .form-req {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: normal;
   }
@@ -279,7 +279,7 @@
     min-inline-size: 0;
     min-block-size: var(--btn-h);
     padding: 0 var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
@@ -306,7 +306,7 @@
   /* A FIELD THE REFUSAL IS ABOUT takes the deeper red's ring, with the sentence and its mark under it. */
   .form-box[aria-invalid='true'],
   .form-tick[aria-invalid='true'] {
-    outline: 2px solid var(--danger-text);
+    outline: 2px solid var(--red);
     outline-offset: -2px;
   }
 
@@ -322,7 +322,7 @@
 
   .form-wrong {
     margin: 0;
-    color: var(--danger-text);
+    color: var(--red);
     font-size: var(--fs-body);
   }
 
@@ -332,7 +332,7 @@
 
   .form-added {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
   }
 
@@ -347,10 +347,10 @@
   .form-submit {
     min-block-size: var(--btn-h);
     padding: 0 var(--sp-4);
-    background: var(--action);
+    background: var(--red-fill);
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--on-action);
+    color: var(--on-red);
     font: inherit;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
@@ -364,7 +364,7 @@
 
   .form-empty {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
   }
 </style>

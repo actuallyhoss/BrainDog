@@ -111,7 +111,7 @@
     color: var(--ink-3);
   }
 
-  /* LARGE, IT IS DRAWN ON ITS OWN GROUND: a `--sunk` well inside the tile that holds it, the way the app's ground sits
+  /* LARGE, IT IS DRAWN ON ITS OWN GROUND: a `--board` well inside the tile that holds it, the way the app's ground sits
      under its rail and its Home, with the rail beside the Home from 640px and above it on a phone, where two columns
      would halve each. */
   .preview[data-large] {

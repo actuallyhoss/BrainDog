@@ -480,7 +480,7 @@
 
   .jump-title {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     line-height: 18px;
@@ -520,7 +520,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .place:hover {
-      background: var(--field-hover);
+      background: var(--hover);
     }
   }
 
@@ -533,7 +533,7 @@
   .place-lead {
     display: inline-grid;
     place-items: center;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .hue {
@@ -554,7 +554,7 @@
   .place-n {
     max-inline-size: 14ch;
     overflow: hidden;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
@@ -564,13 +564,13 @@
   .quiet {
     padding: var(--tile-pad);
     background: var(--tile);
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
   }
 
   /* SIXTEEN PIXELS AT EVERY WIDTH, as every input in the product is, so a phone does not zoom the page
      when the field is pressed. */
   .search-field .field-input {
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   /* The ring is not deleted, it MOVES to the box that looks like the field (`controls.css`, `.field:focus-within`). */
@@ -592,8 +592,8 @@
   /* THE ONE LINE THAT READS THE CHART, under it, and the quiet line about meaning in the same voice. */
   .reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -609,7 +609,7 @@
 
   /* A LATE ROW'S DUE CELL, in red as its list says it. */
   .line-detail[data-late] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* A HIT IS A ROW ON THE GROUND: its well, its title over its line, and the rounded wash under the pointer. The shared

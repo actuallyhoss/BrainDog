@@ -1,5 +1,5 @@
 /**
- * Emit the `linear()` stops for `--ease-spring`.
+ * Emit the `linear()` stops for `--ease-emphasis`.
  *
  * A damped spring at zeta 0.7467, omega 6.56. Analytic overshoot is e^(-pi*z/sqrt(1-z^2)) = 1.029,
  * and the LAST STOP IS FORCED TO EXACTLY 1 — a spring that overshoots and settles at 0.998 leaves a

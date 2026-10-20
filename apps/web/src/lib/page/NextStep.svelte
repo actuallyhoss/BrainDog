@@ -47,8 +47,8 @@
     gap: var(--sp-2);
     max-inline-size: 100%;
     min-block-size: var(--ctl-h);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 1.55;
     text-decoration: none;
     transition: color var(--d-state) var(--ease-out);
@@ -63,8 +63,8 @@
 
   .next-line {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 1.55;
   }
 
@@ -91,9 +91,9 @@
 
   .next-act:focus-visible {
     color: var(--ink);
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -103,7 +103,7 @@ test('THE TILE IS THE ONE TILE WITH ITS ICON, HAS NO BORDER OR SHADOW, NOTHING T
   assert.match(part, /<Tile icon="learning" title=\{tile\.heading\}/u);
   assert.doesNotMatch(style, /box-shadow|gradient|backdrop-filter/u);
   assert.doesNotMatch(style.replace(/@media \(forced-colors: active\)[\s\S]*$/u, ''), /\bborder:/u);
-  for (const size of style.matchAll(/font-size: ([^;]+);/gu)) assert.match(size[1]!, /^var\(--t-(row|base)(, 15px)?\)$/u);
+  for (const size of style.matchAll(/font-size: ([^;]+);/gu)) assert.match(size[1]!, /^var\(--fs-body(, 15px)?\)$/u);
   assert.doesNotMatch(bare(part), /—|<button|<a\b|onclick/u);
   assert.doesNotMatch(bare(part), /\bspoken\b/u, 'the spoken id is never drawn');
 });

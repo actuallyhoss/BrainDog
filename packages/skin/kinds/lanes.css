@@ -48,7 +48,7 @@
     grid-column: 1 / -1;
     margin: 0;
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .lanes-outside,
@@ -91,7 +91,7 @@
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lanes-lane);
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -285,7 +285,7 @@
     inset-block-start: 0;
     inset-inline-start: var(--at);
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     line-height: var(--lanes-head);
     white-space: nowrap;
@@ -368,7 +368,7 @@
       overflow: visible;
       clip-path: none;
       color: var(--ink-3);
-      font-size: var(--t-sm);
+      font-size: var(--fs-meta);
       font-variant-numeric: tabular-nums;
       line-height: var(--lanes-lane);
     }

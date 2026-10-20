@@ -377,14 +377,14 @@
       font-size: var(--fs-meta);
     }
 
-    /* A BUSY DAY'S DOT, drawn from the count the renderer wrote. It is `--ink2` and not a tone: a dot says "something is
+    /* A BUSY DAY'S DOT, drawn from the count the renderer wrote. It is `--ink-2` and not a tone: a dot says "something is
        on", and what it is, with its tone, is in the agenda under the days. Its absence on a free day is what the
        rows are for, so an empty cell keeps the dot's height and the numbers stay on one line. */
     .calendar-cell::after {
       content: '';
       inline-size: var(--dot);
       block-size: var(--dot);
-      border-radius: var(--r-pill);
+      border-radius: var(--r-ctl);
     }
 
     .calendar-cell[data-count]::after {

@@ -483,15 +483,15 @@
 
   .pick-label {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
   .hint {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -511,7 +511,7 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -547,7 +547,7 @@
     align-items: center;
     min-block-size: var(--ctl-h);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -576,14 +576,14 @@
   }
 
   .said-line dt {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .said-line dd {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   /* THE LISTS AS NAMES, a column of them at 390 and as many as fit at 1512, each its glyph and its name. */
@@ -627,8 +627,8 @@
     display: flex;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .refused:empty {

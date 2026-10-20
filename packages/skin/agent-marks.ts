@@ -10,7 +10,7 @@
  *
  * EACH IS ONE PATH ON A 24 GRID, from LobeHub's icon set (MIT), which traces each maker's published mark. They are the
  * makers' trademarks, drawn only to say which agent did a thing, beside its name. Claude wears its clay and Gemini its
- * blue (`--agent-claude`, `--agent-gemini`, generated beside `--brand` in `packages/theme`); the marks their makers
+ * blue (`--agent-claude`, `--agent-gemini`, generated beside `--red-fill` in `packages/theme`); the marks their makers
  * draw in black or white are drawn in `--ink`, so they turn over with the scheme.
  *
  * THE APPS' MARKS (DIRECTION §47, the owner's notes: real marks, never drawn ones) are the two the site names that are

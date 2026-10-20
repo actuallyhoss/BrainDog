@@ -72,7 +72,7 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-3);
-    background: var(--tile-2, var(--field));
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
   }
 
@@ -81,7 +81,7 @@
     min-inline-size: 0;
     padding-block: var(--sp-1);
     color: var(--ink);
-    font-family: var(--font-mono, var(--font-id));
+    font-family: var(--font-mono);
     font-size: var(--fs-meta);
     line-height: 20px;
     white-space: pre-wrap;
@@ -100,10 +100,10 @@
 
   .code-inline {
     padding: 2px 6px;
-    background: var(--tile-2, var(--field));
-    border-radius: var(--r-xs, var(--r-sm));
+    background: var(--tile-2);
+    border-radius: var(--r-xs);
     color: var(--ink);
-    font-family: var(--font-mono, var(--font-id));
+    font-family: var(--font-mono);
     font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }

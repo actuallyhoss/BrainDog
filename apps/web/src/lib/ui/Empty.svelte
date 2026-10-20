@@ -283,7 +283,7 @@
     gap: var(--sp-1);
     margin: 0;
     padding: 0;
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     list-style: none;
   }
@@ -325,7 +325,7 @@
 
   .empty.compact .empty-title,
   :global(section.section) .empty .empty-title {
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     font-family: inherit;
     font-size: var(--fs-body);
     font-weight: var(--fw-regular);
@@ -375,7 +375,7 @@
   .empty-body {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 22px;
   }
@@ -387,15 +387,15 @@
   .empty-query code,
   .empty-rid code {
     padding: 2px 6px;
-    background: var(--tile-2, var(--s1));
-    border-radius: var(--r-xs, var(--r-sm));
-    font-family: var(--font-mono, var(--font-id));
+    background: var(--tile-2);
+    border-radius: var(--r-xs);
+    font-family: var(--font-mono);
     font-size: var(--fs-meta);
   }
 
   .empty-rid {
     margin: 0;
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
@@ -419,7 +419,7 @@
 
   .empty-agent {
     margin: 0;
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
   }
@@ -428,7 +428,7 @@
      so it sits under the action in the secondary ink, and an address or a path inside it breaks
      rather than pushing the page sideways at 320. */
   .empty-details {
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 

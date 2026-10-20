@@ -39,7 +39,7 @@
     gap: var(--sp-3);
     align-items: start;
     padding: var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   .line-mark {

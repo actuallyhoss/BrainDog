@@ -46,7 +46,7 @@
   }
 
   .action-row + .action-row {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .action-head {
@@ -58,14 +58,14 @@
 
   .action-name {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .action-scope,
   .action-runs {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .action-runs {
@@ -75,16 +75,16 @@
   .action-what,
   .action-said {
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 1.5;
   }
 
   .action-what {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .action-said {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .glyph {

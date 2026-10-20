@@ -383,7 +383,7 @@
     min-inline-size: 0;
     padding: var(--tile-pad);
     background: var(--tile);
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
   }
 
   .push:not(:has(section)) {

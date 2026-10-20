@@ -9,7 +9,7 @@
   box letterboxes the drawing and throws away a fifth of its width, which is why it read as a red
   blob the first time this shipped.
 
-  Painted with `--brand` — the one colour in the product that belongs to the product rather than to
+  Painted with `--red-fill` — the one colour in the product that belongs to the product rather than to
   a meaning. Gate 3 knows it as a token, so this is the only element allowed to name it (22 §7).
 
   The negative space is the whole idea, and it is the motif the interface borrows: what matters is
@@ -47,7 +47,7 @@
 <style>
   .mark {
     display: block;
-    fill: var(--brand);
+    fill: var(--red-fill);
     flex: none;
   }
 

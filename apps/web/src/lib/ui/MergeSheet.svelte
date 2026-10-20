@@ -89,8 +89,8 @@
 <style>
   .merge-note {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .merge-find {
@@ -100,10 +100,10 @@
     padding: 0 var(--sp-3);
     background: var(--fill);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .merge-list {
@@ -121,10 +121,10 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     text-align: start;
     cursor: pointer;
@@ -133,7 +133,7 @@
 
   .merge-one:hover,
   .merge-one:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .merge-one:disabled {
@@ -145,15 +145,15 @@
   }
 
   .merge-sub {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     overflow-wrap: anywhere;
   }
 
   @media (width < 900px) {
     .merge-one {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 </style>

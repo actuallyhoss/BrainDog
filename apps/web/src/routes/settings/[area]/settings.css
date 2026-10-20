@@ -140,7 +140,7 @@
   padding: 0;
   background: none;
   border: 0;
-  border-radius: var(--r-md);
+  border-radius: var(--r-pop);
   color: var(--ink-2);
   text-align: start;
   cursor: pointer;
@@ -152,7 +152,7 @@
   container-type: inline-size;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  border-radius: var(--r-md);
+  border-radius: var(--r-pop);
   box-shadow: 0 0 0 1px var(--rule);
   transition: box-shadow var(--d-state) var(--ease-out);
   /* A DRAWING, AND IT KEEPS ITS COLOURS where the system forces its own, as a picture would. */
@@ -210,7 +210,7 @@
   }
 }
 
-/* A WELL ON THE GROUND IS THE TILE'S WHITE, as the rows of every list on the ground draw it: `--s1` is the fill of a
+/* A WELL ON THE GROUND IS THE TILE'S WHITE, as the rows of every list on the ground draw it: `--tile-2` is the fill of a
    well inside a tile, and on the grey ground it reads as a smudge rather than a shape. A toned well keeps its tone,
    and a well inside a tile, a sheet or the panel's body keeps `IconWell`'s own fill. */
 .settings-place .well:not([data-tone]):not(:is(.tile, .sheet, dialog, [data-surface='tile']) .well) {

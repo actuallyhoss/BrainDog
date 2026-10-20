@@ -1584,7 +1584,7 @@
     padding: 0;
     background: var(--tile);
     border: 1px solid var(--rule-strong);
-    border-radius: var(--r-lg);
+    border-radius: var(--r-tile);
     color: var(--ink);
     overflow: hidden;
     opacity: 1;
@@ -1658,7 +1658,7 @@
     min-block-size: 56px;
     padding-block: 0;
     padding-inline: var(--sp-4);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
     color: var(--ink-3);
     transition: border-color var(--d-state) var(--ease-out);
   }
@@ -1686,7 +1686,7 @@
     min-block-size: var(--ctl-h);
     min-inline-size: 0;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     background: none;
     color: var(--ink);
     font-size: var(--fs-head);
@@ -1718,9 +1718,9 @@
   .p-chip {
     padding: var(--sp-1) var(--sp-2);
     border-radius: var(--r-ctl);
-    background: var(--sunk);
+    background: var(--board);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   /**
@@ -1761,7 +1761,7 @@
 
   /* A ROW'S HEIGHT, 44, WITH A FINE POINTER OR A COARSE ONE, AND 56px ON A PHONE, where a result is two lines
      (`Result.svelte`) and is the phone's route to several places. What the row draws is `Result`'s; this is the box the
-     arrow keys and the pointer walk. The wash is rounded `--r-md`, a row's wash. */
+     arrow keys and the pointer walk. The wash is rounded `--r-pop`, a row's wash. */
   .p-row {
     position: relative;
     display: flex;
@@ -1791,7 +1791,7 @@
     background: var(--hover);
   }
 
-  /* AND THE QUIET LINE STEPS UP ONE INK ON IT: `--dim` is measured against the ground, and over the wash in the dark
+  /* AND THE QUIET LINE STEPS UP ONE INK ON IT: `--ink-3` is measured against the ground, and over the wash in the dark
      scheme it falls under 4.5:1. */
   .p-row[data-cursor] :global(.result-line) {
     color: var(--ink-2);
@@ -1826,7 +1826,7 @@
     margin: 0;
     padding: var(--sp-3) var(--sp-4) 0;
     color: var(--ink-2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1839,7 +1839,7 @@
   .p-slash-fold {
     padding: var(--sp-2) var(--sp-4) var(--sp-3);
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* A 44px TARGET ON A COARSE POINTER through `.tap`, whose hit box grows past the line it sits on. */
@@ -1852,7 +1852,7 @@
     margin: var(--sp-2) 0 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1862,7 +1862,7 @@
     flex-direction: column;
     gap: var(--sp-2);
     padding: var(--sp-3) var(--sp-4) 0;
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .p-slash-text,
@@ -1870,7 +1870,7 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink-2);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
@@ -1879,7 +1879,7 @@
   .p-slash-card {
     container-type: inline-size;
     padding: var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   .p-slash-card[data-armed] {
@@ -1894,7 +1894,7 @@
   /* A LINK IS INK WITH ITS UNDERLINE, never the brand's red, and a 44px target through `.tap`. */
   .p-slash-decide {
     align-self: flex-start;
-    color: var(--link);
+    color: var(--red);
     text-decoration: underline;
     text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
     text-decoration-thickness: 1px;
@@ -1905,7 +1905,7 @@
   .p-slash-model {
     margin: 0;
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1931,9 +1931,9 @@
     align-items: center;
     gap: var(--sp-1) var(--sp-2);
     padding: var(--sp-2) var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /**
@@ -1969,7 +1969,7 @@
       min-block-size: var(--tap);
       padding-inline: var(--sp-3);
       background: var(--tile-2);
-      border-radius: var(--r-md);
+      border-radius: var(--r-pop);
     }
 
     .p-input {

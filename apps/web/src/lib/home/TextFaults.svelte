@@ -72,7 +72,7 @@
     grid-column: 1 / -1;
     min-inline-size: 0;
     padding: var(--tile-pad, 20px);
-    background: var(--tile, var(--bg));
+    background: var(--tile);
     border-radius: var(--r-tile, 16px);
   }
 
@@ -89,7 +89,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 1.4;
   }
@@ -115,9 +115,9 @@
     min-block-size: var(--row-h);
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 22px;
     text-decoration: none;
   }
@@ -127,7 +127,7 @@
   }
 
   a.f-line:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .f-text {
@@ -144,20 +144,20 @@
 
   /* THE FIX, under what is wrong, in the quieter ink and at the row's own size. */
   .f-fix {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .f-go {
     display: grid;
     flex: none;
     place-items: center;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .f-more {
     margin: var(--sp-3) 0 0;
-    color: var(--dim);
-    font-size: var(--t-row);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: 22px;
   }
 

@@ -215,7 +215,7 @@
 
   /* OFF, AND STILL HERE: the name steps down to the second ink, as a turned-off add-on's does. Never red. */
   .switched[data-off] .name {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .said[data-dot]::before {
@@ -225,12 +225,12 @@
     inline-size: var(--dot);
     block-size: var(--dot);
     margin-inline-end: 6px;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     vertical-align: 0.1em;
   }
 
   .said[data-dot='bad']::before {
-    background: var(--danger);
+    background: var(--red);
   }
 
   .said[data-dot='warn']::before {
@@ -239,7 +239,7 @@
 
   /* OFF IS NOT A STATE THAT NEEDS ANYTHING, so it is a ring and not a fill, in the quiet ink. */
   .said[data-dot='off']::before {
-    border: 1.5px solid var(--dim);
+    border: 1.5px solid var(--ink-3);
   }
 
   /* A FAMILY'S ROW IS A BUTTON THAT LOOKS LIKE EVERY OTHER ROW: no face of a button's own, the whole width, and at
@@ -261,7 +261,7 @@
   .turn {
     display: grid;
     place-items: center;
-    color: var(--ink2);
+    color: var(--ink-2);
     transition: transform var(--d-state) var(--ease-out);
   }
 
@@ -282,12 +282,12 @@
 
   /* A TIME IN A FEED IS SET IN GEIST MONO; a next turn is words and keeps the UI face. */
   .aside[data-clock] {
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
   }
 
   /* THE TURNED-OFF GROUP, QUIETER AND NOT RED: the name steps down to the second ink. */
   .hub-rows[data-dim] .line:not(.switched) .name {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE LINK THAT DOES WHAT THE SENTENCE ASKS, under the row and lined up with its words, not its well. */
@@ -297,7 +297,7 @@
     min-block-size: var(--ctl-h-sm);
     margin: 0 0 var(--sp-2) calc(var(--sp-3) + var(--well-l) + var(--sp-3));
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: underline;
     text-decoration-color: var(--rule);
@@ -312,7 +312,7 @@
     /* A ROW THAT IS NOT ITSELF A LINK STILL TAKES THE WASH UNDER THE POINTER, and its hairlines step aside for it, as
        the shared rows' do. */
     .switched:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .hub-rows > li:has(> .switched:hover) > .line::after,

@@ -81,8 +81,8 @@
     flex: 1;
     min-inline-size: 0;
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-base);
+    color: var(--red);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 

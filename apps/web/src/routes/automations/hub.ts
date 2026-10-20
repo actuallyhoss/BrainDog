@@ -558,7 +558,7 @@ export function nextWeek(actions: readonly ActionRow[], now: number, days = 14):
       const i = at.get(dayKey(t));
       if (i === undefined || seen.has(i)) continue;
       seen.add(i);
-      out[i]!.items = [...out[i]!.items, { colour: 'var(--ink2)', label: humanize(a.ingest) }];
+      out[i]!.items = [...out[i]!.items, { colour: 'var(--ink-2)', label: humanize(a.ingest) }];
     }
     if (seen.size > 0) due.push(a);
   }

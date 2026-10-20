@@ -162,8 +162,8 @@ test('THE TILE DRAWS THE FOOT AS PLAIN TEXT UNDER THE CARDS: 15px, no pill, no i
   const drawn = tile.indexOf('{#if foot}<p class="b-foot" data-briefing-foot dir="auto">{foot}</p>{/if}');
   assert.ok(list > 0 && drawn > list && drawn < tile.indexOf('</Tile>'), 'the foot is not under the cards, inside the tile');
   const rule = /\.b-foot \{([^}]*)\}/u.exec(tile)?.[1] ?? '';
-  assert.match(rule, /font-size: var\(--t-row\);/u, 'the foot is not 15px');
-  assert.match(rule, /color: var\(--dim\);/u);
+  assert.match(rule, /font-size: var\(--fs-body\);/u, 'the foot is not 15px');
+  assert.match(rule, /color: var\(--ink-3\);/u);
   assert.match(rule, /overflow-wrap: anywhere;/u, 'a long sentence would push the tile wide at 390');
   assert.doesNotMatch(rule, /background|border|radius|var\(--(red|accent|late)/u, 'the foot is a pill or has a colour of its own');
 });

@@ -64,7 +64,7 @@
      the page has no chip fill to spend on every word of a sentence. */
   .said {
     margin: 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 26px;
     color: var(--ink);

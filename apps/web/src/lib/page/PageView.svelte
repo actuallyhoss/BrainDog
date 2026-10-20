@@ -1030,13 +1030,13 @@
     color: var(--warn);
   }
   .head-state[data-tone='bad'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
   .head-mark {
     display: inline-flex;
   }
   .head-back {
-    color: var(--accent-text);
+    color: var(--red);
     text-decoration: none;
   }
   @media (hover: hover) and (pointer: fine) {
@@ -1051,7 +1051,7 @@
   }
 
   .head-found {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* A PAGE THAT CANNOT BE DRAWN IS ONE SENTENCE, NOT A GRID, inside the page's own gutter, so it sits where the page
@@ -1071,7 +1071,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -1095,8 +1095,8 @@
 
   .compare-name {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 

@@ -40,7 +40,7 @@
 
   .flow-name {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     text-align: center;
   }
@@ -58,8 +58,8 @@
     display: grid;
     gap: var(--sp-1);
     padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--s1);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
   }
 
   .step + .step {
@@ -75,7 +75,7 @@
     inset-block-start: calc(-1 * var(--sp-5) - 1px);
     inset-inline-start: 50%;
     block-size: var(--sp-5);
-    border-inline-start: 1px solid var(--line);
+    border-inline-start: 1px solid var(--rule);
   }
 
   /* What starts it sits apart, as the product's trigger card does: the one card that is not a step, in ink. */
@@ -85,17 +85,17 @@
 
   .step[data-part='trigger'] .part,
   .step[data-part='trigger'] .said {
-    color: var(--on-ink);
+    color: var(--on-red);
   }
 
   .part {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     font-weight: 500;
   }
 
   .said {
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 </style>

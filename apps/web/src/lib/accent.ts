@@ -25,8 +25,8 @@
  * that is the one move the person holding the picker can make.
  *
  * 2026-10-07, THE COLOUR IS THE WORKING ACCENT, NOT ONLY THE BRAND'S. The product paints its buttons, links, selection
- * and charts in `--action` (DIRECTION §39) and kept `--accent` for the mark's red, so a picker that re-solved only
- * `--accent` changed two swatches and nothing a person uses. `recordTheme` solves `--action` and its tints, label and
+ * and charts in `--red-fill` (DIRECTION §39) and kept `--red-fill` for the mark's red, so a picker that re-solved only
+ * `--red-fill` changed two swatches and nothing a person uses. `recordTheme` solves `--red-fill` and its tints, label and
  * words from the chosen colour (`Seed.action` in `@braindog/theme`: the house's working red is pinned only beside the
  * house mark), so picking Moss turns the buttons Moss, in light exactly the swatch and in dark a lighter step of it.
  *

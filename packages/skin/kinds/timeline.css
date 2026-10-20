@@ -63,7 +63,7 @@
   /* A GROUPED TIMELINE SAYS EACH DAY ONCE, as a quiet heading over its rows (`render/src/timeline.ts`), and the rows
      under it leave their date blank. So the 11ch date track goes too, and the titles start on the list's own edge, as
      a list with no marker does: an empty column down every row is space spent on nothing. The heading, the dates and
-     every other word a person reads in a block are 13 at least (`--t-sm`, the floor in `tokens.css`). */
+     every other word a person reads in a block are 13 at least (`--fs-meta`, the floor in `tokens.css`). */
   .list > .item-day {
     padding: var(--sp-3) var(--sp-3) var(--sp-1);
     color: var(--ink-3);

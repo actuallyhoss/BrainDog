@@ -580,12 +580,12 @@
   }
 
   .who + .who {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* A FINISHED GRANT KEEPS SAYING WHAT IT SAID, quieter: it can do nothing, and the rows that can come first. */
   .who[data-done] .who-name {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE FACE SITS IN THE WELL'S COLUMN, centred, so faces and wells start every name on one edge. */
@@ -603,22 +603,22 @@
      pushing the row past the edge at 320. */
   .who-name {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     overflow-wrap: anywhere;
   }
 
   .who-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   /* WHAT IT WOULD BE ALLOWED TO DO, where two words do not say all of it: the sentence the decision is made from, so
      the second ink rather than the quiet one. */
   .who-reach {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* A CONNECTION NOBODY HAS USED FOR OVER A WEEK: worth a look, so the warn tone, with its mark. */
@@ -628,8 +628,8 @@
 
   /* WHAT IT CAN DO, IN TWO WORDS, at the end of the row where the eye runs down the list. */
   .who-scope {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -647,7 +647,7 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -676,8 +676,8 @@
   /* A whole sentence, wrapping, under the row it is about. */
   .who-why {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* THE BLOCKS BELOW THE SIX-DIGIT FIELD, which show a key once and offer an install: not field rows. The field itself
@@ -691,8 +691,8 @@
   }
 
   .code-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* WHAT THE ADD-ON WOULD ADD, as label and value on the page with nothing round them: a filled, bordered panel
@@ -702,13 +702,13 @@
     grid-template-columns: minmax(6ch, max-content) minmax(0, 1fr);
     gap: var(--sp-1) var(--sp-4);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .plan dt {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 600;
   }
 
@@ -745,8 +745,8 @@
   }
 
   .plan-detail {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
   }
 
   /* THE FACTS UNDER A NAME WRAP AS WHOLE ITEMS, with space between them and no separator to lead a line. */
@@ -758,7 +758,7 @@
 
   /* A LINK AS EVERY LINK IS DRAWN: ink, with a 1px underline at 40% ink, 3px below. */
   .run {
-    color: var(--link);
+    color: var(--red);
     text-decoration: underline;
     text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
     text-decoration-thickness: 1px;
@@ -767,8 +767,8 @@
 
   .code-said {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-meta);
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit

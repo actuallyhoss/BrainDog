@@ -60,8 +60,8 @@
   /* Support, only under the failure a retry cannot mend; the muted text token and the page's own measure. */
   .stuck {
     margin: var(--sp-4) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     max-width: 40ch;
   }
 </style>

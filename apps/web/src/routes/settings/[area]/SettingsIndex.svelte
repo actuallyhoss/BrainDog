@@ -8,7 +8,7 @@
   draw the declared page, so the index is never missing.
 
   A LIST ON THE GROUND, NOT A CARD. Each group is a group on the ground: its title at
-  `--t-group` with a hairline under it, and the rows under that with no box round them. A row is the rail's own shape
+  `--fs-head` with a hairline under it, and the rows under that with no box round them. A row is the rail's own shape
   at 1440, 36 tall with its glyph and the name at 14/500, and the current row is the rail's "here", drawn as the rail
   draws it: the tile's own fill under the row, the glyph in the working accent and the name at 600 in ink. It was a
   tinted wash under an ink well, a second way of saying "you are here" two columns from the rail's. Never the mark's
@@ -59,7 +59,7 @@
     gap: var(--sp-5);
   }
 
-  /* A GROUP ON THE GROUND: its title at `--t-group`, 17 on 24 at 600, and one hairline under it. The rows
+  /* A GROUP ON THE GROUND: its title at `--fs-head`, 17 on 24 at 600, and one hairline under it. The rows
      start a step under the line, so the wash of the first one never touches it. */
   .group-title {
     margin: 0 0 var(--sp-2);
@@ -204,7 +204,7 @@
     .index[data-beside] .area-icon :global(.well.well) {
       inline-size: 24px;
       block-size: 24px;
-      border-radius: var(--r-sm);
+      border-radius: var(--r-xs);
       background: transparent;
     }
 

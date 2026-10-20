@@ -10,7 +10,7 @@
   /* ── the plate ──────────────────────────────────────────────────────────
      THE BOX DOES NOT MOVE. The words are still laid out, only unpainted, so a plated screen has the same lines, the
      same wraps and the same heights as the real one: nothing here pads, sizes or changes how the element is displayed.
-     The ink goes and an opaque bar in `--line` takes its place, which reads on the ground and on a tile in both themes.
+     The ink goes and an opaque bar in `--rule` takes its place, which reads on the ground and on a tile in both themes.
 
      `!important` ON THE TWO THAT HIDE, AND ONLY THOSE. A plate that loses to a more specific `color` shows the words it
      was put there to cover, and a text shadow would draw them again under the bar. The corner and the figures are
@@ -23,8 +23,8 @@
      forced colours or for print either: the plate is the same rule there, and forced colours hand the palette back to
      the system as everywhere else. */
   [data-plated] {
-    background: var(--line) !important;
-    border-radius: var(--r-sm);
+    background: var(--rule) !important;
+    border-radius: var(--r-xs);
     color: transparent !important;
     text-shadow: none !important;
     font-variant-numeric: tabular-nums;
@@ -33,7 +33,7 @@
   }
 
   /* ── a field ────────────────────────────────────────────────────────────
-     A field carries the mark itself, and the rule above already gives it the `--line` ground and clears its ink. That
+     A field carries the mark itself, and the rule above already gives it the `--rule` ground and clears its ink. That
      is not enough for three things a field paints with another colour than its own `color`: a value the browser filled
      in (it is painted with the text fill colour, which a browser sets by itself), the placeholder, and the pickers of a
      date or a time. So the fill colour goes too, here and on the placeholder.
@@ -70,7 +70,7 @@
   /* ── a picture, a canvas, a video ───────────────────────────────────────
      Clear ink hides nothing here: these paint pixels, not text. THE BOX STILL DOES NOT MOVE, so what is drawn is pushed
      out of its own box instead: the element keeps its width, its height, its corner and its place in the line, and all
-     that is left to see is the `--line` ground the rule above put under it. The offset is a length on purpose, and a
+     that is left to see is the `--rule` ground the rule above put under it. The offset is a length on purpose, and a
      positive one: a percentage places a picture inside its box, and a negative length would let a picture wider than
      the offset show its far edge. No blur: a blur still shows a face from across the room.
 

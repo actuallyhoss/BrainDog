@@ -249,7 +249,7 @@
     padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
     background: var(--toast, var(--ink));
     border-radius: var(--r-ctl);
-    color: var(--on-toast, var(--bg));
+    color: var(--on-toast, var(--tile));
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     line-height: 20px;
@@ -301,7 +301,7 @@
     display: grid;
     place-items: center;
     flex: none;
-    color: var(--on-toast, var(--bg));
+    color: var(--on-toast, var(--tile));
   }
 
   .text {
@@ -321,7 +321,7 @@
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--on-toast, var(--bg));
+    color: var(--on-toast, var(--tile));
     font: inherit;
     font-weight: var(--fw-semi);
     text-decoration: underline;
@@ -332,12 +332,12 @@
   }
 
   .undo :global(.kbd) {
-    background: color-mix(in oklab, var(--on-toast, var(--bg)) 16%, transparent);
-    color: var(--on-toast, var(--bg));
+    background: color-mix(in oklab, var(--on-toast, var(--tile)) 16%, transparent);
+    color: var(--on-toast, var(--tile));
   }
 
   .undo:active {
-    background: color-mix(in oklab, var(--on-toast, var(--bg)) 16%, transparent);
+    background: color-mix(in oklab, var(--on-toast, var(--tile)) 16%, transparent);
   }
 
   /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH: a 32px close to the eye, 44 to a thumb. */
@@ -351,7 +351,7 @@
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
-    color: color-mix(in oklab, var(--on-toast, var(--bg)) 72%, transparent);
+    color: color-mix(in oklab, var(--on-toast, var(--tile)) 72%, transparent);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -362,15 +362,15 @@
   @media (hover: hover) and (pointer: fine) {
     .undo:hover,
     .close:hover {
-      background: color-mix(in oklab, var(--on-toast, var(--bg)) 12%, transparent);
-      color: var(--on-toast, var(--bg));
+      background: color-mix(in oklab, var(--on-toast, var(--tile)) 12%, transparent);
+      color: var(--on-toast, var(--tile));
     }
   }
 
   /* THE FOCUS RING IN THE BAR'S OWN COLOUR, since the page's ink ring would vanish on a dark bar. */
   .undo:focus-visible,
   .close:focus-visible {
-    outline: 2px solid var(--on-toast, var(--bg));
+    outline: 2px solid var(--on-toast, var(--tile));
     outline-offset: -2px;
   }
 

@@ -155,7 +155,7 @@
     grid-column: 1 / -1;
     min-inline-size: 0;
     padding: var(--tile-pad, 20px);
-    background: var(--tile, var(--bg));
+    background: var(--tile);
     border-radius: var(--r-tile, 16px);
   }
 
@@ -172,7 +172,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 1.4;
   }
@@ -227,7 +227,7 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }
@@ -241,7 +241,7 @@
   .m-line {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }
@@ -251,16 +251,16 @@
     flex-wrap: wrap;
     gap: var(--sp-1) var(--sp-3);
     margin: var(--sp-1) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 20px;
     overflow-wrap: anywhere;
   }
 
   .m-more {
     margin: var(--sp-3) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 20px;
   }
 

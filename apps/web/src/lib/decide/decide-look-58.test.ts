@@ -119,13 +119,13 @@ test('THE CARE OF A HARD ANSWER IS SAID ONLY ON THE BAND `undo`, and no button i
   assert.doesNotMatch(drawn, /queueWords\.hard(Tail)?\b/u, 'the card says the care without asking the band');
   assert.equal(source('./card.ts').match(/card\.cost === 'undo'/gu)?.length, 2, 'the band is read for the words in one place (`hardOf`), and for one press in `pressOf`');
 
-  /* THE COLOUR: an answering button is the working accent (`--action`) on every card, hard or not. The deeper red is
+  /* THE COLOUR: an answering button is the working accent (`--red-fill`) on every card, hard or not. The deeper red is
      for a refusal's words; no button takes it, and none is keyed on the band. */
   const css = source('./form.css');
   const buttons = [...`${css}\n${drawn}`.matchAll(/([^{}]*\.dc-btn[^{}]*)\{([^{}]*)\}/gu)];
   assert.ok(buttons.length > 0, 'the buttons’ rules were not read');
   for (const [, selector, body] of buttons) {
-    assert.doesNotMatch(body ?? '', /--danger/u, `${selector?.trim()} paints an answering button the deeper red`);
+    assert.doesNotMatch(body ?? '', /--red(?![\w-])/u, `${selector?.trim()} paints an answering button the deeper red`);
     assert.doesNotMatch(selector ?? '', /data-cost|data-hard/u, `${selector?.trim()} colours a button by its band`);
   }
 });

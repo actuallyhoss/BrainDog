@@ -137,7 +137,7 @@
     font: inherit;
     font-size: var(--fs-body);
     color: var(--ink);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
   }
@@ -179,12 +179,12 @@
   .tell-one-quiet {
     margin: 0;
     font-size: var(--fs-body);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* WHAT AN ENTRY NEEDS IS SAID IN WORDS, and only tinted: never colour alone. */
   .tell-one-needs {
     font-size: var(--fs-body);
-    color: var(--danger-text);
+    color: var(--red);
   }
 </style>

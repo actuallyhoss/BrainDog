@@ -284,8 +284,8 @@
     justify-content: center;
     inline-size: var(--ctl-h);
     min-block-size: var(--ctl-h);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     transition:
       background var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out);
@@ -293,13 +293,13 @@
 
   @media (hover: hover) and (pointer: fine) {
     .page-more :global(.menu-trigger:hover > .change-more) {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }
 
   .page-more :global(.menu-trigger[aria-expanded='true'] > .change-more) {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -307,8 +307,8 @@
   .change-history {
     margin: 0;
     padding: 0 var(--sp-3) var(--sp-2) calc(var(--sp-3) + 16px + var(--sp-2));
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 1.45;
   }
 
@@ -327,7 +327,7 @@
   .change-show {
     margin-inline-start: auto;
     padding-inline-start: var(--sp-3);
-    color: var(--link);
+    color: var(--red);
   }
 
   .change-vh {

@@ -100,6 +100,6 @@ test('THE TILE IS FLAT, HAS NO BORDER OR SHADOW, AND ITS WORDS ARE 15 OR MORE', 
   assert.match(style, /\.learned \{[^}]*border-radius: var\(--r-tile, 16px\);/u);
   assert.doesNotMatch(style, /box-shadow|gradient|backdrop-filter/u);
   assert.doesNotMatch(style.replace(/@media \(forced-colors: active\)[\s\S]*$/u, ''), /\bborder:/u);
-  for (const size of style.matchAll(/font-size: ([^;]+);/gu)) assert.match(size[1]!, /^var\(--t-(row|base)(, 15px)?\)$/u);
+  for (const size of style.matchAll(/font-size: ([^;]+);/gu)) assert.match(size[1]!, /^var\(--fs-body(, 15px)?\)$/u);
   assert.doesNotMatch(bare(part), /—/u);
 });

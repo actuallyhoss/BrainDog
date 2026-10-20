@@ -125,7 +125,7 @@
   }
 
   .pj-line a {
-    color: var(--link);
+    color: var(--red);
   }
 
   .pj-fix {
@@ -147,14 +147,14 @@
   }
 
   .pj-label {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
   }
 
   .pj-select {
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);

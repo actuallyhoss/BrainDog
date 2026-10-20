@@ -283,8 +283,8 @@
      anywhere, so a long name or host never pushes the page sideways at 320. */
   .asks {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 24px;
     overflow-wrap: anywhere;
     text-wrap: pretty;
@@ -306,8 +306,8 @@
   .fact-label {
     margin: 0;
     padding: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
@@ -315,7 +315,7 @@
   .fact {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     overflow-wrap: anywhere;
@@ -342,22 +342,22 @@
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     cursor: pointer;
   }
 
   @media (pointer: coarse) {
     .option {
       min-block-size: var(--tap);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 
   /* HOW LONG IT LASTS AND HOW TO UNDO IT, in the quiet ink: read once, and then out of the way. */
   .lasts {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     text-wrap: pretty;
   }
@@ -392,8 +392,8 @@
   /* WHAT IS PROVEN, IN ITS TONE AND ITS MARK, never the colour alone: body size, so it is read and not skimmed. */
   .proven {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-row);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 22px;
     overflow-wrap: anywhere;
@@ -403,8 +403,8 @@
      the document while it is empty, so the sentence is announced when it arrives. */
   .said {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-meta);
     line-height: 18px;
     overflow-wrap: anywhere;
   }

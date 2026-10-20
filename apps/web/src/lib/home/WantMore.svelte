@@ -223,6 +223,6 @@
 
   .want-more-does {
     font-size: var(--fs-body);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 </style>

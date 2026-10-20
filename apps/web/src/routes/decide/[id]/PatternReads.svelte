@@ -100,15 +100,15 @@
     flex-direction: column;
     gap: var(--sp-1);
     padding: var(--sp-3);
-    border-radius: var(--r-md);
-    background: var(--field);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
     min-inline-size: 0;
   }
 
   .read-from {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
@@ -119,22 +119,22 @@
     grid-template-columns: minmax(8ch, max-content) minmax(0, 1fr);
     gap: var(--sp-1) var(--sp-3);
     margin: 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
   .read-fields dt {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .read-fields dd {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     overflow-wrap: anywhere;
   }
 
   .read-fields dd.read-missed {
-    color: var(--dim);
+    color: var(--ink-3);
     font-style: italic;
   }
 
@@ -145,7 +145,7 @@
 
   /* The record's closing note is the news on a resolved question, so it reads a shade stronger than the counts. */
   .reads-note.reads-closed {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* What Accept does sits a step below the counts, as the last thing read before the press. */
@@ -155,7 +155,7 @@
 
   .reads-note {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-ui);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
   }
 </style>

@@ -153,13 +153,13 @@
   }
 
   .trust-line + .trust-line {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* A NAME MAY BE ONE LONG WORD, and it breaks rather than pushing the line past the edge at 320. */
   .trust-said {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }
@@ -168,14 +168,14 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0 var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 22px;
   }
 
   /* THE WORD CARRIES IT AND THE RED AGREES. No pill and no fill: a word in the line. */
   .trust-back {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
@@ -189,8 +189,8 @@
   .trust-floor {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 22px;
   }
 
@@ -199,16 +199,16 @@
     flex-basis: 100%;
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 22px;
   }
 
   .trust-empty {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 22px;
   }
 </style>

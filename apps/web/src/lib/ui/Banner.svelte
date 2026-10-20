@@ -46,20 +46,20 @@
     min-block-size: 48px;
     margin: var(--inset) var(--gutter) 0;
     padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-pop, var(--r-md));
+    border-radius: var(--r-pop);
     color: var(--ink);
   }
 
   .banner[data-tone='late'] {
-    --banner-glyph: var(--red, var(--danger-text));
+    --banner-glyph: var(--red);
 
-    background: var(--red-tint, var(--action-tint-1));
+    background: var(--red-tint);
   }
 
   .banner[data-tone='warn'] {
     --banner-glyph: var(--warn);
 
-    background: var(--warn-tint, var(--warn-wash));
+    background: var(--warn-tint);
   }
 
   .banner-text {

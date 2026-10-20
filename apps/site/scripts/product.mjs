@@ -66,7 +66,7 @@ if (!home) {
    it refused, reading #6c62be against #db2527. The production brand colour is read from the
    generated palette, not typed here. */
 const house = await readFile(join(import.meta.dirname, '..', '..', '..', 'packages', 'skin', 'house.css'), 'utf8');
-const BRAND = house.match(/--brand:\s*(#[0-9a-f]{6})/i)?.[1].toLowerCase();
+const BRAND = house.match(/--red-fill:\s*(#[0-9a-f]{6})/i)?.[1].toLowerCase();
 
 const browser = await chromium.launch();
 const context = await browser.newContext({
@@ -94,7 +94,7 @@ await context.route('**/*', async (route) => {
 const page = await context.newPage();
 await page.goto(`${BASE}/`, { waitUntil: 'load' });
 
-const brand = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--brand').trim().toLowerCase());
+const brand = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--red-fill').trim().toLowerCase());
 if (BRAND && brand !== BRAND) {
   console.error(`  the build's brand colour is ${brand}, and production's is ${BRAND}. \`pnpm -C apps/site build\`, without BRAINDOG_ENV, first.`);
   process.exit(1);
@@ -103,7 +103,7 @@ if (BRAND && brand !== BRAND) {
 /* THE CARD IS THE HERO, SHRUNK TO FIT: its own ground, the mark and wordmark at the top, and the
    slogan with the sentence under it across the lower half. The ground is read off the hero section
    rather than named here, so the card follows the hero whichever ground the page gives it: the
-   section says `data-ground="page"` and its own rule paints `--sunk`, and the computed colour is the
+   section says `data-ground="page"` and its own rule paints `--board`, and the computed colour is the
    one a reader sees. The accent is on the slogan's last two words and nowhere else, as on
    the page: the accent bar the old card carried along its foot is gone.
    The classes the build gave the lifted elements keep the page's rules for colour and face; the rules

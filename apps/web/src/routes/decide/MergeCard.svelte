@@ -105,8 +105,8 @@
   .merge-lead {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -140,21 +140,21 @@
     align-items: baseline;
     gap: var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
   .name-kept {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
   }
 
   .name-seen {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }

@@ -152,7 +152,7 @@
   .card-state,
   .card-fix {
     margin: 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     max-inline-size: var(--measure);
   }
@@ -167,15 +167,15 @@
   }
 
   .card-fix {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* THE ONE LINE UNDER THE CHART that says what it means. */
   .reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -193,7 +193,7 @@
     gap: var(--sp-3) var(--sp-4);
     margin: 0;
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .fact {
@@ -204,21 +204,21 @@
   }
 
   .fact dt {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .fact dd {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
   /* RUNS AND VERSIONS FOLD, each behind a chevron that turns when it opens. */
   .fold {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .fold + .fold {
@@ -247,7 +247,7 @@
   }
 
   .fold-head :global(.icon) {
-    color: var(--dim);
+    color: var(--ink-3);
     transition: rotate var(--d-state) var(--ease-out);
   }
 
@@ -258,7 +258,7 @@
   .fold-none {
     margin-block: var(--sp-1);
     margin-inline: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     max-inline-size: var(--measure);
   }
 
@@ -280,7 +280,7 @@
 
   .run + .run,
   .version + .version {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .run-line,
@@ -297,8 +297,8 @@
     flex: none;
     inline-size: 6px;
     block-size: 6px;
-    border-radius: var(--r-pill);
-    background: var(--dim);
+    border-radius: var(--r-ctl);
+    background: var(--ink-3);
   }
 
   .run[data-tone='done'] .dot {
@@ -306,7 +306,7 @@
   }
 
   .run[data-tone='bad'] .dot {
-    background: var(--danger);
+    background: var(--red);
   }
 
   .run[data-tone='warn'] .dot {
@@ -321,7 +321,7 @@
 
   .run-when,
   .version-now {
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
   }
 
@@ -329,7 +329,7 @@
   .version-detail {
     margin: 0;
     padding-inline-start: calc(6px + var(--sp-2));
-    color: var(--ink2);
+    color: var(--ink-2);
     overflow-wrap: anywhere;
     max-inline-size: var(--measure);
   }
@@ -348,11 +348,11 @@
     margin-block: var(--sp-1) 0;
     margin-inline: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
-    background: var(--s1);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     max-block-size: 20lh;

@@ -26,7 +26,7 @@
     place-items: center;
     inline-size: var(--well);
     block-size: var(--well);
-    background: var(--s1);
+    background: var(--tile-2);
     border-radius: var(--r-round);
     color: var(--ink);
   }

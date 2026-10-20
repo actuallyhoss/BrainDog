@@ -127,7 +127,7 @@
 
   :global(.lines-trend-said) {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
   }
 </style>

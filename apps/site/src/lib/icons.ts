@@ -145,7 +145,7 @@ export const isIconName = (name: string): name is IconName => Object.hasOwn(GLYP
 
 /**
  * The three hues a mark may take, each a TEXT role so it reads against the surface it sits on in
- * both schemes. `--brand` is not one of them: it paints the logo and nothing else. `--danger` is
+ * both schemes. `--red-fill` is not one of them: it paints the logo and nothing else. `--red` is
  * not one either, because on the site red is the accent, kept for what waits on you.
  */
 export type Hue = 'info' | 'earn' | 'warn';

@@ -155,7 +155,7 @@
     align-items: baseline;
     gap: var(--sp-2);
     margin: 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .change-title {
@@ -185,7 +185,7 @@
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
@@ -196,18 +196,18 @@
   .take-why,
   .take-closed,
   .row-why {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE ROW'S OWN REASON, after its chips: the question's words for why this one moves, in the tile's text. */
   .row-why {
     margin: 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
   .row-why-more {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .change-field {
@@ -225,13 +225,13 @@
     align-items: baseline;
     gap: var(--sp-3);
     margin: 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .change-label {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .plain {
@@ -244,9 +244,9 @@
   }
 
   .was {
-    color: var(--ink2);
+    color: var(--ink-2);
     text-decoration-line: line-through;
-    text-decoration-color: var(--dim);
+    text-decoration-color: var(--ink-3);
   }
 
   .now {
@@ -262,7 +262,7 @@
   }
 
   .move-to {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .vh {
@@ -293,9 +293,9 @@
   }
 
   .change-sum {
-    color: var(--ink2);
+    color: var(--ink-2);
     text-decoration: underline;
-    text-decoration-color: var(--line);
+    text-decoration-color: var(--rule);
     text-underline-offset: 3px;
   }
 

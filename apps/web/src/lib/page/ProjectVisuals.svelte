@@ -275,7 +275,7 @@
     border-color: var(--ph);
     background: var(--ph);
     color: var(--tile);
-    animation: fill-in var(--d-move) var(--ease-emphasis) both;
+    animation: fill-in var(--d-panel) var(--ease-emphasis) both;
   }
 
   .stop[data-kind='now'] .c {
@@ -284,7 +284,7 @@
   }
 
   .stop:is([data-kind='late'], [data-kind='waits']) .c {
-    border-color: var(--danger);
+    border-color: var(--red);
   }
 
   @keyframes fill-in {
@@ -331,7 +331,7 @@
   }
 
   .s[data-red] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* ON ITS SIDE ON A PHONE: a 44px row a stop, the circle, the title and the day at the right, the line down the left.
@@ -426,7 +426,7 @@
   }
 
   .change[data-tone='bad'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .periods {
@@ -439,7 +439,7 @@
     display: block;
     block-size: 8px;
     border-radius: 4px;
-    background: var(--field);
+    background: var(--tile-2);
     overflow: hidden;
   }
 

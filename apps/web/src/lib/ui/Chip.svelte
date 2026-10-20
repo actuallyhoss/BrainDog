@@ -37,9 +37,9 @@
     box-sizing: border-box;
     min-block-size: var(--btn-h-sm);
     padding-inline: var(--sp-2);
-    background: var(--tile-2, var(--field));
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink-2, var(--ink2));
+    color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     line-height: 20px;

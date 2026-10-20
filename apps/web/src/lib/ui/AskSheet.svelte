@@ -303,28 +303,28 @@
   /* THE LABEL SITS ABOVE ITS FIELD in the meta step and the second ink. */
   .ask-label {
     padding: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .ask-help {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
-  /* A FIELD: the `--s1` fill with no border, radius `--r-md`, as `controls.css` draws `.field`. */
+  /* A FIELD: the `--tile-2` fill with no border, radius `--r-pop`, as `controls.css` draws `.field`. */
   .ask-text {
     inline-size: 100%;
     min-block-size: 40px;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     resize: vertical;
   }
 
@@ -340,18 +340,18 @@
   }
 
   /* AN OPTION IS A GROUP ON THE SHEET, NOT A CARD IN IT (a tile never holds a tile), and its fields take the
-     `--s1` fill a card would have hidden them in. A hairline over each, one below the next. The one that is wrong says so
+     `--tile-2` fill a card would have hidden them in. A hairline over each, one below the next. The one that is wrong says so
      in its rule, its fields' `aria-invalid` and the alert under the form. */
   .ask-option {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .ask-option[data-wrong] {
-    border-block-start: 2px solid var(--danger);
+    border-block-start: 2px solid var(--red);
   }
 
   .ask-option-head {
@@ -364,7 +364,7 @@
   .ask-option-title {
     margin: 0;
     font-family: var(--font-ui);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -387,8 +387,8 @@
     block-size: 44px;
     padding: 0;
     background: none;
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-pop);
     cursor: pointer;
   }
 
@@ -402,13 +402,13 @@
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .ask-fault {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-ui);
+    color: var(--red);
+    font-size: var(--fs-body);
   }
 
   /* FULL SCREEN ON A PHONE. The bottom sheet is as tall as what it holds, so the form asks for the whole screen and
@@ -419,7 +419,7 @@
     }
 
     .ask-text {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 </style>

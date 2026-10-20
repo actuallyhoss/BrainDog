@@ -1,6 +1,6 @@
 <!--
   The week strip: a column a day, the weekday at 13 in `dim`, the date at 17/600, and one
-  dot a thing that day in its project's colour. Today is an ink disc with its date in `--on-ink`; a
+  dot a thing that day in its project's colour. Today is an ink disc with its date in `--on-red`; a
   thing still open past the day it was due is a red dot on that day. A hairline separates the weeks.
 
   Pass 13 or 14 consecutive days. Days before today are quieter, and weekends a step quieter than
@@ -73,26 +73,26 @@
 
 <style>
   .wk-head {
-    fill: var(--dim);
-    font-size: var(--t-sm);
+    fill: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .wk-date {
     fill: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
   }
 
   .wk-date[data-weekend] {
-    fill: var(--ink2);
+    fill: var(--ink-2);
   }
 
   .wk-date[data-past] {
-    fill: var(--dim);
+    fill: var(--ink-3);
   }
 
   .wk-date[data-today] {
-    fill: var(--on-ink);
+    fill: var(--on-red);
   }
 
   .wk-disc {

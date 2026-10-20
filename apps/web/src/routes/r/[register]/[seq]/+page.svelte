@@ -1616,7 +1616,7 @@
     gap: var(--sp-2);
     color: inherit;
     text-decoration: underline;
-    text-decoration-color: var(--line);
+    text-decoration-color: var(--rule);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
     transition: text-decoration-color var(--d-state) var(--ease-out);
@@ -1633,7 +1633,7 @@
     flex: none;
     inline-size: 8px;
     block-size: 8px;
-    background: var(--ph, var(--ink-3, var(--dim)));
+    background: var(--ph, var(--ink-3));
     border-radius: var(--r-round);
   }
 
@@ -1646,11 +1646,11 @@
   }
 
   .ref-dot[data-slot='pink'] {
-    --ph: var(--cat-pink, var(--ink2));
+    --ph: var(--cat-pink, var(--ink-2));
   }
 
   .ref-dot[data-slot='teal'] {
-    --ph: var(--cat-teal, var(--earn));
+    --ph: var(--cat-teal, var(--good));
   }
 
   .ref-dot[data-slot='sky'] {
@@ -1662,11 +1662,11 @@
   }
 
   .ref-dot[data-slot='lime'] {
-    --ph: var(--cat-lime, var(--earn));
+    --ph: var(--cat-lime, var(--good));
   }
 
   .ref-dot[data-slot='slate'] {
-    --ph: var(--cat-slate, var(--dim));
+    --ph: var(--cat-slate, var(--ink-3));
   }
 
   /* A THUMB'S TARGET round the one line of words, which stays the height of its text. */
@@ -1712,7 +1712,7 @@
   }
 
   .said-late[data-tone='bad'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .said-late[data-tone='warn'] {
@@ -1726,8 +1726,8 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -1742,8 +1742,8 @@
 
   .figure-label {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
@@ -1757,7 +1757,7 @@
   .figure-value {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-title);
+    font-size: var(--fs-page);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 1.15;
@@ -1775,8 +1775,8 @@
 
   .paid-said {
     margin: 0;
-    color: var(--ink-2, var(--ink2));
-    font-size: var(--fs-meta, var(--t-sm));
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -1784,7 +1784,7 @@
     display: block;
     overflow: hidden;
     block-size: 6px;
-    background: var(--tile-2, var(--s1));
+    background: var(--tile-2);
     border-radius: var(--r-round);
   }
 
@@ -1799,7 +1799,7 @@
      foreign amount from pushing the page sideways. */
   @container (inline-size < 20rem) {
     .figure-value {
-      font-size: var(--t-xl);
+      font-size: var(--fs-figure);
     }
   }
 
@@ -1838,8 +1838,8 @@
   .fact-label {
     grid-area: label;
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     line-height: 18px;
   }
@@ -1853,7 +1853,7 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
     overflow-wrap: anywhere;
   }
@@ -1867,7 +1867,7 @@
 
   /* A DEADLINE THAT HAS PASSED: the day in red, the words carrying the colour. */
   .fact-value[data-late] {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
@@ -1995,10 +1995,10 @@
     gap: 6px;
     min-block-size: 32px;
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border-radius: 8px;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     transition:
       background var(--d-state) var(--ease-out),
@@ -2007,15 +2007,15 @@
 
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger:hover > .add-field) {
-      background: var(--s2);
+      background: var(--tile-2);
       color: var(--ink);
     }
   }
 
   .quiet {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 20px;
   }
 
@@ -2031,7 +2031,7 @@
     background: none;
     border: 0;
     border-radius: 8px;
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -2040,7 +2040,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .edit-field:hover {
-      background: var(--s1);
+      background: var(--tile-2);
       color: var(--ink);
     }
   }
@@ -2066,14 +2066,14 @@
   .edit-caret {
     display: inline-flex;
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
     pointer-events: none;
   }
 
   .edit-input {
     font: inherit;
     /* 16px IN EVERY BOX AT EVERY WIDTH, because a phone zooms the page when a smaller one takes focus. */
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     cursor: pointer;
   }
 
@@ -2082,20 +2082,20 @@
     inline-size: 100%;
     min-block-size: max(var(--ctl-h), var(--tap));
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
     border-radius: 8px;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: 1.6;
     resize: vertical;
   }
 
   /* The currency, the unit, or the list a ref points at: printed beside the box, never typed. */
   .edit-unit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .edit-check {
@@ -2104,7 +2104,7 @@
     gap: var(--sp-2);
     min-block-size: max(var(--ctl-h), var(--tap));
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .edit-actions {
@@ -2116,8 +2116,8 @@
   /* WHAT THE RECORD SAID, under the box it was typed in, with the words still in it. */
   .edit-why {
     margin: var(--sp-1) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* AN ARCHIVED ROW SAYS SO, in one quiet line with the archive glyph, and nothing about it is red. */
@@ -2127,10 +2127,10 @@
     gap: var(--sp-2);
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--hover-wash);
+    background: var(--hover);
     border-radius: 8px;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* ── the figure tiles ──────────────────────────────────────────────── */
@@ -2155,7 +2155,7 @@
     gap: var(--sp-2);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 1.15;
@@ -2163,21 +2163,21 @@
   }
 
   .tile-figure-note {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     letter-spacing: 0;
   }
 
   .more-sign {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE ONE WRITTEN LINE UNDER A CHART, saying what it means. */
   .reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 1.55;
   }
 
@@ -2187,19 +2187,19 @@
      note's first heading was set above the group's own, so the row's prose outranked the row. */
   .document-slot {
     max-inline-size: var(--measure);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
   }
 
   .document-slot :global(.document > h1) {
     margin-block: var(--sp-5) var(--sp-2);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     letter-spacing: 0;
   }
 
   .document-slot :global(.document > h2) {
     margin-block: var(--sp-5) var(--sp-2);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     letter-spacing: 0;
   }
 
@@ -2239,7 +2239,7 @@
 
   .item-icon {
     display: inline-flex;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .item-link {
@@ -2248,7 +2248,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .item-link:hover {
-      background: var(--s1);
+      background: var(--tile-2);
     }
   }
 
@@ -2260,23 +2260,23 @@
 
   .item-title {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 22px;
     overflow-wrap: anywhere;
   }
 
   .item-detail {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
     font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
   }
 
   .item-when {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -2295,7 +2295,7 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
     overflow-wrap: anywhere;
@@ -2303,14 +2303,14 @@
 
   .handoff-live {
     flex: none;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .sub-head {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -2321,7 +2321,7 @@
     margin: 0;
     padding-inline-start: var(--sp-5);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.55;
     overflow-wrap: anywhere;
   }
@@ -2335,7 +2335,7 @@
     justify-content: center;
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
-    background: var(--hover-wash);
+    background: var(--hover);
     border-radius: 8px;
     color: var(--ink);
     transition: background var(--d-state) var(--ease-out);
@@ -2343,7 +2343,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger:hover > .head-more) {
-      background: var(--hold-wash);
+      background: var(--tile-2);
     }
   }
 

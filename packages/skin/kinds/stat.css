@@ -47,11 +47,11 @@
   }
 
   a.cell:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   a.cell:active {
-    background: var(--field);
+    background: var(--tile-2);
   }
 
   /* A LINKED FIGURE IS A TARGET, so under a thumb it is 44 tall (pages §2.5, stat lead). */
@@ -211,7 +211,7 @@
     --chars: 16;
     /* NEVER BELOW A READABLE SIZE: the floor is the body's reading size, and a figure that still does not fit wraps
        between its amounts (` · `) instead of shrinking further. The row itself goes to fewer across before that. */
-    font-size: max(var(--t-md), min(var(--t-figure), calc(100cqi / (var(--chars) * 0.64))));
+    font-size: max(var(--fs-body), min(var(--fs-figure), calc(100cqi / (var(--chars) * 0.64))));
   }
 
   /* FIGURES WRAP TO MORE ROWS BEFORE THEY SHRINK. The block is its own container, NAMED, because every cell inside it is
@@ -223,7 +223,7 @@
 
   /**
    * THE STEPS ARE THE FIGURES' OWN ARITHMETIC, IN px AND NOT rem. The widest ten-character money figure in the record
-   * draws about 160px at `--t-figure` 600, and a figure is px wide at any root size, so a rem threshold would be the
+   * draws about 160px at `--fs-figure` 600, and a figure is px wide at any root size, so a rem threshold would be the
    * only thing that moved when a reader sets her text smaller (at Chrome's "Small", a 12px root, 38rem was 456px and
    * put four cut figures back across one row). `record/figure-fit.test.ts` draws every stat a declared page has at both
    * sides of each step, in the face the run draws, and holds each figure to two per cent of room.
@@ -290,7 +290,7 @@
        borrows for its wash, so its wash is the row. That margin reached a step past the row on every side, up into the
        row above, which put the row above's hairline through this row's figure on a rounded corner. */
     .block[data-kind='stat'] .cell + .cell {
-      border-block-start: 1px solid var(--line);
+      border-block-start: 1px solid var(--rule);
     }
 
     .block[data-kind='stat'] a.cell {
@@ -316,7 +316,7 @@
 
     .block[data-kind='stat'] .cell-figure {
       justify-self: end;
-      font-size: var(--t-lg);
+      font-size: var(--fs-head);
       text-align: end;
     }
 

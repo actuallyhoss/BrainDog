@@ -105,14 +105,14 @@
     align-items: baseline;
     gap: var(--sp-2);
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     overflow-wrap: anywhere;
   }
 
   .help[data-tone] {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: 500;
   }
 
@@ -125,8 +125,8 @@
     flex: none;
     inline-size: var(--dot);
     block-size: var(--dot);
-    border-radius: var(--r-pill);
-    background: var(--ink2);
+    border-radius: var(--r-ctl);
+    background: var(--ink-2);
   }
 
   .said {
@@ -134,14 +134,14 @@
   }
 
   .help[data-tone='free'] .dot {
-    background: var(--earn);
+    background: var(--good);
   }
 
   .where {
     margin: 2px 0 0;
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     line-height: 18px;
     overflow-wrap: anywhere;
   }
@@ -149,7 +149,7 @@
   /* UNDER A THUMB THE FIELD READS AT 16, the phone's body size, below which a phone's browser zooms in on focus. */
   @media (pointer: coarse) {
     .field-input {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 

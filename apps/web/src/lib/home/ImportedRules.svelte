@@ -77,7 +77,7 @@
     grid-column: 1 / -1;
     min-inline-size: 0;
     padding: var(--tile-pad, 20px);
-    background: var(--tile, var(--bg));
+    background: var(--tile);
     border-radius: var(--r-tile, 16px);
   }
 
@@ -85,15 +85,15 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 1.4;
   }
 
   .i-why {
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-row, 15px);
+    color: var(--ink-3);
+    font-size: var(--fs-body, 15px);
     line-height: 22px;
   }
 

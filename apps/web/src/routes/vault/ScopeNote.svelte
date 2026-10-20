@@ -52,14 +52,14 @@
   .scope-line {
     flex: 1 1 16rem;
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 1.45;
   }
 
   .scope-said {
     margin: 0 0 var(--sp-3);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-body);
   }
 </style>

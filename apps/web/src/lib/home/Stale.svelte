@@ -134,7 +134,7 @@
     grid-column: 1 / -1;
     min-inline-size: 0;
     padding: var(--tile-pad, 20px);
-    background: var(--tile, var(--bg));
+    background: var(--tile);
     border-radius: var(--r-tile, 16px);
   }
 
@@ -151,7 +151,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 1.4;
   }
@@ -177,9 +177,9 @@
     min-block-size: var(--row-h);
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 22px;
     text-decoration: none;
   }
@@ -189,7 +189,7 @@
   }
 
   a.s-line:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .s-text {
@@ -203,10 +203,10 @@
     flex: none;
     min-inline-size: 24px;
     padding: 0 var(--sp-2);
-    background: var(--hover-wash);
-    border-radius: var(--r-pill);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    background: var(--hover);
+    border-radius: var(--r-ctl);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     line-height: 24px;
     text-align: center;
@@ -216,22 +216,22 @@
     display: grid;
     flex: none;
     place-items: center;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* A REFUSAL, under the line it answers, in the tile's quiet ink: it is not late and needs no red. */
   .s-no {
     margin: 0;
     padding: 0 var(--sp-3) var(--sp-2);
-    color: var(--ink2, var(--dim));
-    font-size: var(--t-sm);
+    color: var(--ink-2, var(--ink-3));
+    font-size: var(--fs-meta);
     line-height: 20px;
   }
 
   .s-more {
     margin: var(--sp-3) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 20px;
   }
 
@@ -243,8 +243,8 @@
   .s-tidy-said {
     inline-size: fit-content;
     min-block-size: var(--row-h);
-    color: var(--dim);
-    font-size: var(--t-row);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: var(--row-h);
     cursor: pointer;
   }
@@ -260,7 +260,7 @@
 
   .s-tidy-line {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }

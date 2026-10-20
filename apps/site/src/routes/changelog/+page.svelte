@@ -287,7 +287,7 @@
   }
 
   .count-all {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
@@ -300,7 +300,7 @@
 
   .filters-label {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
@@ -317,9 +317,9 @@
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
     padding-inline: 14px;
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
     font-size: var(--t-site-small);
@@ -329,16 +329,16 @@
   }
 
   .pill:hover {
-    background: var(--s2);
+    background: var(--tile-2);
   }
 
   .pill[aria-pressed='true'] {
     background: var(--ink);
-    color: var(--on-ink);
+    color: var(--on-red);
   }
 
   .pill-n {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .pill[aria-pressed='true'] .pill-n {
@@ -350,7 +350,7 @@
     inline-size: 6px;
     block-size: 6px;
     background: var(--hue);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
   }
 
   /* ── The chart ──────────────────────────────────────────────────────── */
@@ -397,7 +397,7 @@
     position: absolute;
     inset-inline: 0;
     inset-block-end: calc(var(--at) * 100%);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   .tick {
@@ -405,7 +405,7 @@
     inset-inline-start: 0;
     inset-block-end: -8px;
     inline-size: calc(var(--axis) - 8px);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-app-xs);
     line-height: 16px;
     text-align: end;
@@ -443,7 +443,7 @@
   }
 
   .x-day {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-app-xs);
     text-align: center;
     white-space: nowrap;
@@ -470,7 +470,7 @@
   }
 
   .entry + .entry {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .kind {
@@ -479,7 +479,7 @@
     align-self: start;
     gap: 6px;
     min-block-size: 24px;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
     font-weight: 500;
   }
@@ -494,7 +494,7 @@
   .entry-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 24px;
     letter-spacing: 0;
@@ -505,7 +505,7 @@
   .permalink {
     display: inline-flex;
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     vertical-align: -0.1em;
     opacity: 0.55;
     transition: opacity var(--d-state) var(--ease-out);
@@ -580,14 +580,14 @@
   }
 
   .sum-count {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
   .chev {
     display: grid;
     place-items: center;
-    color: var(--dim);
+    color: var(--ink-3);
     transition: transform var(--d-state) var(--ease-out);
   }
 
@@ -609,31 +609,31 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
     font-variant-numeric: tabular-nums;
   }
 
   .day {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* A DAY IS ONE ROW: its date, its first entry's kind and title, how many it holds, and the chevron. */
   .day-sum {
     min-block-size: var(--tap);
     padding-block: var(--sp-2);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   .day-sum:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .day-date {
     flex: none;
     inline-size: 110px;
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
     font-weight: 500;
     letter-spacing: 0;
@@ -657,14 +657,14 @@
 
   .day-n {
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
   .day .entries {
     margin-block-end: var(--sp-3);
     padding-inline-start: var(--sp-3);
-    border-inline-start: 2px solid var(--line);
+    border-inline-start: 2px solid var(--rule);
   }
 
   /* 13 §7: 44 under a thumb, on the filters and on every fold's row. */

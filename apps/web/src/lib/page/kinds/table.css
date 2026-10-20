@@ -44,9 +44,9 @@
   :is(.tr-group, .table-card-group) .group-count {
     padding-inline: var(--sp-2);
     border-radius: var(--r-round);
-    background: var(--field);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    background: var(--tile-2);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }

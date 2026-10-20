@@ -385,13 +385,13 @@
 
   .fe-add {
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .fe-head {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -402,21 +402,21 @@
   }
 
   .fe-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .fe-help {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .fe-fix {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   /* ONE FIELD PER ROW: its name, what kind it is, and the row's own controls at the end, each 44px on a coarse pointer
@@ -437,20 +437,20 @@
     row-gap: var(--sp-1);
     min-block-size: var(--tap);
     padding-block: var(--sp-2);
-    border-block-end: 1px solid var(--line-soft);
+    border-block-end: 1px solid var(--rule);
   }
 
   .fe-name {
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
 
   .fe-kind {
     flex: 1 1 8rem;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .fe-acts {
@@ -471,12 +471,12 @@
   .fe-text {
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .fe-text {

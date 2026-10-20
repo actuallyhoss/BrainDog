@@ -166,8 +166,8 @@
 
   .actions-h {
     margin: 0 0 var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -196,7 +196,7 @@
 
   .action-name {
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -204,30 +204,30 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .action-runs {
     margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .action-what,
   .action-said,
   .action-fix {
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 1.5;
   }
 
   .action-what {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .action-said {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .glyph {
@@ -237,7 +237,7 @@
   /* FAINT, NOT HIDDEN: the ones for every project are read after the project's own. */
   .action[data-faint] .action-name,
   .action[data-faint] .action-said {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
   }
 

@@ -45,8 +45,8 @@
     display: block;
     inline-size: 100%;
     aspect-ratio: 4 / 3;
-    border-radius: var(--r-md);
-    background: var(--s1);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
   }
 
   .gallery-picture {
@@ -58,8 +58,8 @@
     display: grid;
     place-items: center;
     padding: var(--sp-3);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
     text-align: center;
   }
@@ -69,15 +69,15 @@
   }
 
   .gallery-caption {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: var(--lh-tight);
     overflow-wrap: anywhere;
   }
 
   .gallery-empty {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 }

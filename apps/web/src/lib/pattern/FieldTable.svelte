@@ -151,21 +151,21 @@
   .fields {
     inline-size: 100%;
     border-collapse: collapse;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .fields th,
   .fields td {
     padding: var(--sp-2) var(--sp-3);
-    border-block-end: 1px solid var(--line-soft);
+    border-block-end: 1px solid var(--rule);
     text-align: start;
     vertical-align: top;
   }
 
   .fields thead th,
   .sample-head {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
@@ -179,19 +179,19 @@
   .how {
     display: block;
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     overflow-wrap: anywhere;
   }
 
   .unread {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .value {
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     padding: 0;
     background: none;
     color: var(--ink);
@@ -218,7 +218,7 @@
 
   .card {
     padding: var(--sp-3) 0;
-    border-block-end: 1px solid var(--line-soft);
+    border-block-end: 1px solid var(--rule);
   }
 
   .card-head {
@@ -243,14 +243,14 @@
   }
 
   .from {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
   .stacked .value {
     min-block-size: var(--tap);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .card-acts {

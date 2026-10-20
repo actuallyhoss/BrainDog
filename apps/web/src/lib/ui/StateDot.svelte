@@ -38,7 +38,7 @@
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     line-height: 18px;
@@ -52,7 +52,7 @@
   }
 
   .status:is([data-state='late'], [data-state='needs-you']) {
-    color: var(--red, var(--action-text));
+    color: var(--red);
     font-weight: var(--fw-semi);
   }
 
@@ -61,7 +61,7 @@
   }
 
   .status[data-state='good'] {
-    color: var(--good, var(--earn));
+    color: var(--good);
   }
 
   .dot {
@@ -75,25 +75,25 @@
 
   /* OPEN: a hollow ring in the second ink. */
   .dot[data-state='open'] {
-    box-shadow: inset 0 0 0 1.5px var(--ink-2, var(--ink2));
+    box-shadow: inset 0 0 0 1.5px var(--ink-2);
   }
 
   /* PART: the ring, its first half filled, a hard stop. The start is the reading start, so it flips right to left. */
   .dot[data-state='part'] {
-    background: linear-gradient(to right, var(--ink-2, var(--ink2)) 50%, transparent 50%);
-    box-shadow: inset 0 0 0 1.5px var(--ink-2, var(--ink2));
+    background: linear-gradient(to right, var(--ink-2) 50%, transparent 50%);
+    box-shadow: inset 0 0 0 1.5px var(--ink-2);
   }
 
   :global([dir='rtl']) .dot[data-state='part'] {
-    background: linear-gradient(to left, var(--ink-2, var(--ink2)) 50%, transparent 50%);
+    background: linear-gradient(to left, var(--ink-2) 50%, transparent 50%);
   }
 
   .dot[data-state='done'] {
-    background: var(--cat-slate, var(--dim));
+    background: var(--cat-slate, var(--ink-3));
   }
 
   .dot:is([data-state='late'], [data-state='needs-you']) {
-    background: var(--red, var(--danger));
+    background: var(--red);
   }
 
   .dot[data-state='warn'] {
@@ -101,7 +101,7 @@
   }
 
   .dot[data-state='good'] {
-    background: var(--good, var(--earn));
+    background: var(--good);
   }
 
   .dot[data-state='live'] {

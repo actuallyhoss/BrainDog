@@ -114,8 +114,8 @@
 <style>
   .decider-line {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .decider-pick {
@@ -126,8 +126,8 @@
   }
 
   .decider-label {
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .decider-row {
@@ -142,12 +142,12 @@
     min-inline-size: 12rem;
     max-inline-size: 100%;
     padding: 0 var(--sp-3);
-    background: var(--s3);
+    background: var(--tile-2);
     border: 0;
     border-radius: 8px;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   /* REFUSED: the deeper red, with its mark and the record's own words. */
@@ -156,8 +156,8 @@
     align-items: baseline;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--danger);
-    font-size: var(--t-ui);
+    color: var(--red);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 </style>

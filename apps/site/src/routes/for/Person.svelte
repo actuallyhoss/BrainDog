@@ -130,7 +130,7 @@
   /* The drawing sits on the paper tile, so its own raised surfaces (a rule's steps) take the page's ground, or they
      vanish into the tile. */
   .drawing {
-    --s1: var(--page);
+    --tile-2: var(--page);
     min-inline-size: 0;
   }
 
@@ -146,7 +146,7 @@
 
   .others-title {
     margin: 0;
-    font-size: var(--t-title);
+    font-size: var(--fs-page);
     line-height: 1.1;
     letter-spacing: -0.035em;
   }

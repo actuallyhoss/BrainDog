@@ -302,7 +302,7 @@
   }
 
   /**
-   * THE PASTE BOX IS A FIELD, the same `--s1` well with no border and the `--r-md` corner, full width at every size and
+   * THE PASTE BOX IS A FIELD, the same `--tile-2` well with no border and the `--r-pop` corner, full width at every size and
    * growing with what is pasted. Its focus is the field's: the 2px ink ring offset 2.
    */
   .from-text {
@@ -314,7 +314,7 @@
     border: 0;
     border-radius: var(--r-pop);
     color: var(--ink);
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
     font-size: var(--fs-meta);
     line-height: 18px;
     resize: vertical;

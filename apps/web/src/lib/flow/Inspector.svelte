@@ -778,8 +778,8 @@
 </Panel>
 
 <style>
-  /* THE PANEL'S BODY IS A TILE'S SURFACE (`Panel.svelte`), so every field here is the `--s1` well and every segmented
-     control the `--s1` track, from `controls.css`, with nothing drawn a second time here. */
+  /* THE PANEL'S BODY IS A TILE'S SURFACE (`Panel.svelte`), so every field here is the `--tile-2` well and every segmented
+     control the `--tile-2` track, from `controls.css`, with nothing drawn a second time here. */
   .inspect {
     display: flex;
     flex-direction: column;
@@ -789,8 +789,8 @@
   /* WHAT THE TRIGGER SAYS NOW, over its fields: the sentence a card would read, in the second ink. */
   .lede {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -804,8 +804,8 @@
      before it. */
   .label {
     margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
@@ -813,31 +813,31 @@
   .help,
   .path {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .path {
     margin-block-start: var(--sp-3);
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
-  /* A SELECT AND A BOX OF LINES ARE FIELDS: 40 tall and 44 under a thumb, the `--s1` fill with no border,
-     radius `--r-md`. `controls.css` draws the select's chevron. */
+  /* A SELECT AND A BOX OF LINES ARE FIELDS: 40 tall and 44 under a thumb, the `--tile-2` fill with no border,
+     radius `--r-pop`. `controls.css` draws the select's chevron. */
   .select,
   .area {
     box-sizing: border-box;
     inline-size: 100%;
     min-block-size: 40px;
     padding: var(--sp-2) var(--sp-3);
-    background-color: var(--s1);
+    background-color: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .area {
@@ -847,7 +847,7 @@
 
   /* ONE FOCUS, THE HOUSE'S: the 2px ink ring offset 2, as `.field` takes it in `controls.css`. */
   .area:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -855,7 +855,7 @@
     .select,
     .area {
       min-block-size: var(--tap);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 

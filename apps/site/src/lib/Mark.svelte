@@ -28,7 +28,7 @@
 <style>
   .mark {
     display: block;
-    fill: var(--brand);
+    fill: var(--red-fill);
     flex: none;
   }
 

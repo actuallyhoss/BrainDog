@@ -48,8 +48,8 @@
   /* Dimmer and smaller than the sentence it joins: it is an aside inside a line, and a clause that
      competes with the noun it explains has made the line harder to read rather than easier. */
   .define {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     letter-spacing: normal;
     text-transform: none;

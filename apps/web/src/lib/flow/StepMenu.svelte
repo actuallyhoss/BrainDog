@@ -152,11 +152,11 @@
     box-sizing: border-box;
     min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-3) 0 var(--sp-2);
-    background: var(--bg);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     transition:
       color var(--d-state) var(--ease-out),
@@ -170,7 +170,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .add:hover {
-      background: var(--s1);
+      background: var(--tile-2);
       color: var(--ink);
     }
   }
@@ -185,15 +185,15 @@
   /* THE RECORD'S ONE LINE, where the button would be: words at the body's size, nothing to press. */
   .older {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     text-align: center;
   }
 
   /* THE FOCUS RING FOLLOWS THE ROUND SHAPE, since the button round it is the thing focused. */
   .step-menu :global(.menu-trigger),
   .open {
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
   }
 
   /* 44 UNDER A THUMB, as every target in this app is (`13 §7`), and the circle stays a circle. */
@@ -220,8 +220,8 @@
   /* A GROUP'S HEADING IN THE MENU: sentence case at 500 in the meta size, never a letterspaced eyebrow. */
   .group {
     margin: var(--sp-2) var(--sp-2) var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -260,7 +260,7 @@
     padding: var(--sp-2) var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
     text-align: start;
@@ -270,22 +270,22 @@
 
   .pick:focus-visible,
   .pick:active {
-    background: var(--s1);
+    background: var(--tile-2);
   }
 
   .pick-label {
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
   .pick-help {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .none {
     margin: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 </style>

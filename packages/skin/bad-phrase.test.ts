@@ -4,9 +4,9 @@
  * `{{bad:...}}` is the one inline form that draws red, and the renderer draws it as `<span class="bad">`. The skin
  * owns how that reads, and three things hold it:
  *
- * IT IS THE DEEPER RED, BY ITS TOKEN. Late and needs-you are `--danger`, a step deeper than the working accent
- * (DIRECTION §42), and `--danger-text` is that red solved for words. The phrase is words, so it reads one of the two
- * and never `--action`, which says "chosen" and "go".
+ * IT IS THE DEEPER RED, BY ITS TOKEN. Late and needs-you are `--red`, a step deeper than the working accent
+ * (DIRECTION §42), and `--red` is that red solved for words. The phrase is words, so it reads one of the two
+ * and never `--red-fill`, which says "chosen" and "go".
  *
  * NO COLOUR IS SPELLED OUT. A hex, an `rgb()` or a colour word here is a red no palette can move.
  *
@@ -37,7 +37,7 @@ function bad(css: string): Map<string, string>[] {
   return out;
 }
 
-const LATE = ['--danger', '--danger-text', '--status-late'];
+const LATE = ['--red'];
 const LITERAL = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|color)\(|\b(?:red|crimson|firebrick|maroon|tomato)\b/iu;
 
 test('blocks.css holds one rule for the red phrase', () => {
@@ -58,8 +58,9 @@ test('the red phrase spells out no colour', () => {
   const [rule] = bad(read('blocks.css'));
   assert.ok(rule, 'blocks.css has no `.bad` rule');
   for (const [prop, value] of rule) {
-    assert.doesNotMatch(value, LITERAL, `.bad writes ${prop}: ${value}`);
-    assert.doesNotMatch(value, /var\(--action/u, `.bad reads the working accent in ${prop}`);
+    /* A token's own name is not a literal: `var(--red)` names the token, so it is set aside before the check. */
+    assert.doesNotMatch(value.replace(/var\(--[\w-]+\)/gu, ''), LITERAL, `.bad writes ${prop}: ${value}`);
+    assert.doesNotMatch(value, /var\(--red-fill/u, `.bad reads the working accent in ${prop}`);
   }
 });
 

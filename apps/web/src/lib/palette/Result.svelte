@@ -139,7 +139,7 @@
   /* THE STATUS AS A WORD: the red for what is wrong, the warning ink for what to watch. */
   .result-status {
     overflow: hidden;
-    color: var(--danger-text);
+    color: var(--red);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     text-overflow: ellipsis;

@@ -12,7 +12,7 @@
  * The tokens are the theme's (`tokens.css`), so one rule serves both schemes and the high-contrast theme.
  *
  * `--chart-2` AND BELOW ARE FOR FILLS. `--chart-2` is about 2.4:1 on a white tile: a bar or a part reads, a 1px rule
- * or a word does not. A line, an outline and every word here keep a colour that reads (`--viz-rule`, `--dim`, `--ink`).
+ * or a word does not. A line, an outline and every word here keep a colour that reads (`--viz-rule`, `--ink-3`, `--ink`).
  *
  * `--c` IS THE MARK'S COLOUR, `--chart-1` until a `data-tone` says otherwise. A project's own colour arrives inline
  * (`style:--c`), which beats any rule here, and that is the only way a colour the theme does not own reaches the page.
@@ -24,8 +24,8 @@
     --viz-g2: var(--chart-2);
     --viz-g3: var(--chart-3);
     --viz-g4: var(--chart-other);
-    /* A chart's track: the design system's tile-2, mixed rather than `--s1` so it still shows in the
-       high-contrast theme, where `--s1` sits a hair off the tile. */
+    /* A chart's track: the design system's tile-2, mixed rather than `--tile-2` so it still shows in the
+       high-contrast theme, where `--tile-2` sits a hair off the tile. */
     --viz-track: color-mix(in srgb, var(--ink) 6%, var(--tile));
     /* A threshold, a moment, a line drawn in a light tone: a grey that still reads as a 1px line (about 4:1). */
     --viz-rule: color-mix(in srgb, var(--ink) 48%, var(--tile));
@@ -37,7 +37,7 @@
     position: relative;
     inline-size: 100%;
     min-inline-size: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
   }
 
@@ -57,9 +57,9 @@
   .viz [data-tone='track'] { --c: var(--viz-track); }
   .viz [data-tone='h1'] { --c: var(--viz-h1); }
   /* A finished span: the status grey for done, a step darker than "other" so it still shows on its track. */
-  .viz [data-tone='done'] { --c: var(--status-done); }
+  .viz [data-tone='done'] { --c: var(--chart-other); }
   .viz [data-tone='danger'] { --c: var(--chart-late); }
-  .viz [data-tone='earn'] { --c: var(--earn); }
+  .viz [data-tone='earn'] { --c: var(--good); }
   .viz [data-tone='warn'] { --c: var(--warn); }
   .viz [data-tone='live'] { --c: var(--live); }
 
@@ -123,7 +123,7 @@
   }
 
   .viz-grid {
-    stroke: var(--line);
+    stroke: var(--rule);
     stroke-width: 1;
   }
 
@@ -145,8 +145,8 @@
   }
 
   .viz-pill-text {
-    fill: var(--on-ink);
-    font-size: var(--t-xs);
+    fill: var(--on-red);
+    font-size: var(--fs-cap);
     font-weight: 500;
   }
 
@@ -212,8 +212,8 @@
 
   /* A direct label: 12 in `dim` (the design system keeps 12 for chart labels). */
   .viz-label {
-    fill: var(--dim);
-    font-size: var(--t-xs);
+    fill: var(--ink-3);
+    font-size: var(--fs-cap);
     font-weight: 400;
   }
 
@@ -224,7 +224,7 @@
 
   .viz-value {
     fill: var(--ink);
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
     font-weight: 500;
   }
 

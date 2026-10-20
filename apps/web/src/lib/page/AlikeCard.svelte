@@ -84,18 +84,18 @@
     display: grid;
     gap: 8px;
     padding: 16px;
-    border-radius: var(--r-md);
-    background: var(--field);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
   }
   .q {
     margin: 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
   .more,
   .why {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
   .ways {
     display: flex;
@@ -109,6 +109,6 @@
   .members ul {
     margin: 8px 0 0;
     padding-inline-start: 18px;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 </style>

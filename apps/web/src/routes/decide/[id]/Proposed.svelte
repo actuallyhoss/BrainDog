@@ -164,12 +164,12 @@
     align-items: baseline;
     gap: var(--sp-2);
     margin: 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .appear-kind {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .appear-title {
@@ -183,12 +183,12 @@
     grid-template-columns: minmax(8ch, max-content) minmax(0, 1fr);
     gap: var(--sp-1) var(--sp-3);
     margin: 0;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .appear-lines dt {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -197,21 +197,21 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     overflow-wrap: anywhere;
   }
 
   /* A KIND THAT WRITES, IN RED: an agent job's line reads as a warning rather than an ordinary fact. */
   .appear-lines dd[data-intent='bad'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .swatch {
     flex: none;
     inline-size: 12px;
     block-size: 12px;
-    border-radius: var(--r-sm);
-    box-shadow: inset 0 0 0 1px var(--line);
+    border-radius: var(--r-xs);
+    box-shadow: inset 0 0 0 1px var(--rule);
   }
 
   /* THE DRAWING SITS UNDER THE LINES, RULED OFF FROM THEM, because it is the page and not a fact about it. It is the
@@ -223,7 +223,7 @@
     gap: var(--sp-3);
     margin-block-start: var(--sp-2);
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
     min-inline-size: 0;
   }
 
@@ -238,7 +238,7 @@
     gap: var(--sp-2);
     margin: var(--sp-2) 0 0;
     color: var(--warn);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -251,14 +251,14 @@
     border-radius: 50%;
     background: var(--warn);
     color: var(--tile);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 600;
     line-height: 1;
   }
 
   .appear-note {
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 </style>

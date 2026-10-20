@@ -629,7 +629,7 @@
   }
 
   .page-row[data-hidden] .page-link {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE TITLE'S LINK REACHES OVER ITS ROW, so a press anywhere on the row opens the page. On `::before`, because that is
@@ -653,13 +653,13 @@
   }
 
   .line:has(.page-link:focus-visible) {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .page-row > .line:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .page-row:has(> .line:hover) > .line::after,
@@ -683,8 +683,8 @@
     align-items: center;
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     pointer-events: none;
   }
@@ -700,7 +700,7 @@
     place-items: center;
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .vh {
@@ -724,16 +724,16 @@
   }
 
   .fold-line .line-title {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .fold-go {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .fold-line:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -746,22 +746,22 @@
     margin: var(--sp-4) 0 0;
     padding: var(--sp-3) var(--sp-2) 0;
     border-block-start: 1px solid var(--rule);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .addons-icons {
     display: inline-flex;
     gap: var(--sp-1);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .addons-dot {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .addons-manage {
-    color: var(--link);
+    color: var(--red);
     text-decoration: underline;
     text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
     text-decoration-thickness: 1px;
@@ -774,10 +774,10 @@
     padding: 0 var(--sp-3);
     background: var(--tile);
     border: 1px solid var(--switch-off);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .rename {
@@ -787,8 +787,8 @@
   }
 
   .rename-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 

@@ -72,7 +72,7 @@
   .head-capture-mark {
     display: inline-grid;
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .head-capture :global(.capture-input) {
@@ -80,7 +80,7 @@
   }
 
   .head-capture :global(.capture-input::placeholder) {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   @media (pointer: coarse) {

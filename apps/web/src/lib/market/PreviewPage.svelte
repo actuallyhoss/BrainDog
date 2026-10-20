@@ -5,7 +5,7 @@
   `PageView` with `mode: 'preview'`, which hands no block a write, arranges nothing and has no source view. So what a
   person sees here is what the installed page draws, from the same renderer.
 
-  THE PAGE'S TABS ARE THE `--s1` SEGMENTED PILL, because the preview sits inside a tile and glass never sits on content
+  THE PAGE'S TABS ARE THE `--tile-2` SEGMENTED PILL, because the preview sits inside a tile and glass never sits on content
   (`controls.css`).
 
   SMALL ON A CARD, LARGE ON THE DETAIL PAGE. A card draws the first page at half size, clipped, and hidden from a screen
@@ -76,7 +76,7 @@
     white-space: nowrap;
   }
 
-  /* THE PAGE DRAWN ON ITS OWN GROUND: a well in `--sunk`, radius `--r-md`, with no edge, so the installed page's blocks
+  /* THE PAGE DRAWN ON ITS OWN GROUND: a well in `--board`, radius `--r-pop`, with no edge, so the installed page's blocks
      sit on it as they would on the app's ground. It is a picture of the product inside the tile that holds it, not a
      second box. */
   .frame {

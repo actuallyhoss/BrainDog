@@ -103,16 +103,16 @@
      rows, because an unknown is a task somebody has to close (05 §7.5). */
   /* A QUIET FILL MARKS IT, NOT AN EDGE (DIRECTION §39): it wore a dashed border, and nothing on the board has a
      border. The field is the step a control sits on, one rung off the tile, and a hole draws no track, so nothing of
-     its own is lost against it. Its hover is the field's own, the ink washed over the field: `--hover-wash` alone is
+     its own is lost against it. Its hover is the field's own, the ink washed over the field: `--hover` alone is
      see-through and would have made the row paler under the pointer. */
   .prop-row[data-hole] {
     cursor: pointer;
-    background: var(--field);
+    background: var(--tile-2);
     transition: background var(--d-state) var(--ease-out);
   }
 
   .prop-row[data-hole]:hover {
-    background: var(--field-hover);
+    background: var(--hover);
   }
 
   /* AND IT IS 44 UNDER A THUMB. `--row-h` is 34 comfortable and 30 compact, and this is the only

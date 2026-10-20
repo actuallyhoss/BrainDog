@@ -1383,9 +1383,9 @@
 
   /* THE ROW CURSOR'S RING, drawn only once a key has moved it: the focus ink, round the row, never the brand's red. */
   .page :global([data-row-cursor]) {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   /* INSIDE ANOTHER SCREEN THE PAGE TAKES THAT SCREEN'S COLUMN: Home's body and a preview already sit inside a gutter and
@@ -1453,9 +1453,9 @@
     padding: var(--sp-3) 0 0;
     border: 0;
     background: none;
-    color: var(--link);
+    color: var(--red);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     cursor: pointer;
   }
@@ -1488,7 +1488,7 @@
     align-self: start;
     padding: var(--slot-pad);
     background: var(--tile);
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
     /* `#b-4` must not scroll underneath the sticky header. Paid once, per anchor. */
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
@@ -1503,7 +1503,7 @@
     min-inline-size: 0;
     padding: var(--slot-pad);
     background: var(--tile);
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
   }
 
   .area[data-area='rail'] .box {
@@ -1550,7 +1550,7 @@
     max-inline-size: var(--measure);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 400;
     line-height: 1.45;
     letter-spacing: 0;
@@ -1583,13 +1583,13 @@
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-title) {
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-toggle) {
     min-block-size: var(--ctl-h-sm);
-    background: var(--s1);
+    background: var(--tile-2);
     border-radius: var(--r-ctl, 8px);
   }
 
@@ -1623,18 +1623,18 @@
      cash. The row names the tone (`blocks.ts` `sectionWell`) and the renderer writes it on the well, naming no colour.
      A section that says none keeps the quiet grey. */
   .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='action']) {
-    background: var(--action-tint-1);
-    color: var(--action-text);
+    background: var(--red-tint);
+    color: var(--red);
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='danger']) {
-    background: color-mix(in srgb, var(--danger) 12%, var(--tile));
-    color: var(--danger);
+    background: color-mix(in srgb, var(--red) 12%, var(--tile));
+    color: var(--red);
   }
 
   .block-slot > :global(.block[data-kind='section'] .sec-glyph[data-tone='earn']) {
-    background: color-mix(in srgb, var(--earn) 12%, var(--tile));
-    color: var(--earn);
+    background: color-mix(in srgb, var(--good) 12%, var(--tile));
+    color: var(--good);
   }
 
   /* The figure's own bottom margin is the LIST's spacing, and the grid already provides it. */
@@ -1650,7 +1650,7 @@
 
   /* THE CURSOR IS THE FOCUS RING, round the tile it is on, in the focus ink and never the brand's red. */
   .block-slot[data-cursor] {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -1660,7 +1660,7 @@
      changed the page; a dashed edge a step outside it tells you the mode changed what you can do TO the page. The
      content keeps its contrast, so the words stay readable, which they have to be to know which block you are holding. */
   .block-slot[data-arranging] {
-    outline: 1px dashed var(--edge);
+    outline: 1px dashed var(--rule-strong);
     outline-offset: 3px;
     cursor: grab;
   }
@@ -1686,7 +1686,7 @@
     position: absolute;
     z-index: var(--z-raise);
     background: var(--ink);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     pointer-events: none;
   }
 
@@ -1777,6 +1777,6 @@
      reads past it. A shade and a tooltip, never a colour that means trouble; it goes once the row is opened or the page
      is left and come back to. */
   .page :global([data-row][data-by-new]) {
-    background-color: color-mix(in oklab, var(--arrived-wash) 60%, transparent);
+    background-color: color-mix(in oklab, var(--arrived) 60%, transparent);
   }
 </style>

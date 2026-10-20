@@ -131,15 +131,15 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     color: var(--ink);
   }
 
   .again-note,
   .again-said {
     margin: 0;
-    font-size: var(--t-base);
-    color: var(--ink2);
+    font-size: var(--fs-body);
+    color: var(--ink-2);
   }
 
   /* A REFUSAL IS INK WITH A GLYPH, never colour alone. */
@@ -152,7 +152,7 @@
 
   .again-glyph {
     display: inline-flex;
-    color: var(--danger);
+    color: var(--red);
   }
 
   .again-acts {

@@ -65,7 +65,7 @@ test('a scroller not laid out yet (every number 0, or not a number) draws nothin
 
 test('the CSS fades as far as the function clears', () => {
   assert.equal(EDGE_FADE, 24);
-  assert.match(SOURCE, /--edge: 24px;/);
+  assert.match(SOURCE, /--fade-edge: 24px;/);
 });
 
 test('a focused row below the view is scrolled up clear of the foot fade', () => {

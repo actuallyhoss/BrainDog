@@ -176,7 +176,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
@@ -202,7 +202,7 @@
     margin: 0 0 var(--sp-1);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }

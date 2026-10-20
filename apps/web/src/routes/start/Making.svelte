@@ -85,7 +85,7 @@
   .name {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-title);
+    font-size: var(--fs-page);
     font-weight: 600;
     line-height: 1.2;
   }
@@ -99,8 +99,8 @@
   .making-line {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 24px;
   }
 
@@ -120,8 +120,8 @@
     gap: var(--sp-3);
     min-inline-size: 0;
     padding: 20px;
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    background: var(--tile);
+    border-radius: var(--r-tile);
     color: var(--ink);
   }
 
@@ -137,7 +137,7 @@
     flex: 1;
     min-inline-size: 0;
     overflow: hidden;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
     text-overflow: ellipsis;
@@ -149,8 +149,8 @@
     flex: none;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -160,7 +160,7 @@
   }
 
   .tile[data-state='refused'] .state {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 600;
   }
 
@@ -168,14 +168,14 @@
     inline-size: var(--dot);
     block-size: var(--dot);
     flex: none;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: var(--live);
   }
 
   .why,
   .heard {
     margin: 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }
@@ -185,6 +185,6 @@
   }
 
   .heard {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 </style>

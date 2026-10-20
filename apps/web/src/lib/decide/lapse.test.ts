@@ -83,7 +83,7 @@ test('THE CARD DRAWS THE LINE UNDER WHY, quiet, at the body size, with its style
   const svelte = readFileSync(new URL('./DecisionCard.svelte', import.meta.url), 'utf8');
   assert.match(svelte, /\{#if card\.lapses\}<p class="dc-lapses" dir="auto">\{card\.lapses\}<\/p>\{\/if\}/u);
   const rule = /\.dc-lapses \{([^}]*)\}/u.exec(svelte)?.[1] ?? '';
-  assert.match(rule, /color: var\(--dim\)/u);
+  assert.match(rule, /color: var\(--ink-3\)/u);
   assert.match(rule, /font-size: var\(--fs-body\)/u, '15px, the body size');
   assert.doesNotMatch(rule, /border|shadow|background/u, 'a line, not a new tile');
 });

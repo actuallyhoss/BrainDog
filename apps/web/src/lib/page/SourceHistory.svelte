@@ -92,7 +92,7 @@
     min-inline-size: 0;
     padding: var(--tile-pad);
     background: var(--tile);
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
   }
 
   .history-head {
@@ -103,15 +103,15 @@
   .history-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .history-summary {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .history-lines {
@@ -133,7 +133,7 @@
   }
 
   .history-line + .history-line {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .history-said {
@@ -144,13 +144,13 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
   /* SAID IN WORDS, AND QUIET: which line is the page now is a fact, not a warning, so it takes no colour. */
   .history-state {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* UNDER THE LINE IT IS ABOUT, across the tile's width, after the name and the verbs. */
@@ -159,8 +159,8 @@
     flex-basis: 100%;
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .history-verbs {

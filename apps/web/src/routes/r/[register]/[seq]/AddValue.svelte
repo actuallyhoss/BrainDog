@@ -105,8 +105,8 @@
 
   /* A FIELD'S LABEL SITS ABOVE IT in the meta size and the second ink. */
   .add-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
@@ -120,8 +120,8 @@
   /* WHETHER IT LANDS AT ONCE OR WAITS ON DECIDE, in the meta size: 12 is for a chart's axis and nothing else. */
   .add-note {
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 </style>

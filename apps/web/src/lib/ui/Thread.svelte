@@ -271,15 +271,15 @@
 
   .thread-title {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
   .thread-quiet {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .thread-failed {
@@ -290,8 +290,8 @@
   }
 
   .thread-details summary {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     cursor: pointer;
   }
 
@@ -313,7 +313,7 @@
     gap: var(--sp-3);
     margin-block-start: var(--sp-3);
     padding-inline-start: var(--sp-3);
-    border-inline-start: 2px solid var(--line);
+    border-inline-start: 2px solid var(--rule);
   }
 
   .comment {
@@ -333,7 +333,7 @@
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -341,14 +341,14 @@
 
   .said-when {
     flex: none;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .said-body {
     margin-block: var(--sp-1) 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
     white-space: pre-wrap;
   }
@@ -365,8 +365,8 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--tap);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     cursor: pointer;
   }
 
@@ -382,8 +382,8 @@
 
   .folded-why {
     margin-block: var(--sp-2) 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -397,8 +397,8 @@
   }
 
   .box-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -414,23 +414,23 @@
     min-inline-size: 0;
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .box-input:hover {
-      background: var(--s2);
+      background: var(--tile-2);
     }
   }
 
   .box-over {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 </style>

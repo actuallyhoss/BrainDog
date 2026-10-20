@@ -147,7 +147,7 @@ test('THE TILE IS QUIET AND FLAT: no red, no border, no shadow, and a link is 44
   assert.doesNotMatch(tile, /--(accent|red|late|danger|warn|needs)/u);
   assert.doesNotMatch(tile, /box-shadow|gradient|backdrop-filter/u);
   assert.doesNotMatch(tile.replace(/@media \(forced-colors: active\) \{[\s\S]*?\n {2}\}/u, ''), /\bborder: /u);
-  assert.match(tile, /background: var\(--tile, var\(--bg\)\);/u);
+  assert.match(tile, /background: var\(--tile\);/u);
   assert.match(tile, /border-radius: var\(--r-tile, 16px\);/u);
   assert.match(tile, /@media \(pointer: coarse\) \{\s*a\.s-line \{\s*min-block-size: var\(--tap\);/u);
   /* NOTHING THE RECORD SAYS FOR A CALLER IS DRAWN. */

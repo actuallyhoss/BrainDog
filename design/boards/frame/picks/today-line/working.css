@@ -1,10 +1,10 @@
 /* Today's line in the working red, and its name in the red's words. */
 .roadmap-today {
-  color: var(--action-text);
+  color: var(--red);
 }
 .roadmap-today::before {
-  border-inline-start-color: var(--action);
+  border-inline-start-color: var(--red-fill);
 }
 .heat-day[data-today] {
-  outline-color: var(--action);
+  outline-color: var(--red-fill);
 }

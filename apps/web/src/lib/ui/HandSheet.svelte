@@ -218,21 +218,21 @@
   .hand-waiting {
     display: inline-flex;
     align-items: center;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .hand-note {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   /* A META HEADING over each group, as the palette's are. */
   .hand-head {
     margin-block: var(--sp-4) var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -256,10 +256,10 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     text-align: start;
     cursor: pointer;
@@ -268,13 +268,13 @@
 
   .hand-one:hover,
   .hand-one:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   /* SIXTEEN ON A PHONE, its row step. */
   @media (width < 900px) {
     .hand-one {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 
@@ -287,7 +287,7 @@
   }
 
   .hand-holds {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 </style>

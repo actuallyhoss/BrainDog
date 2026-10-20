@@ -1,7 +1,7 @@
 <!--
   One step's card: a handle, what the step does in one line, and a menu of the moves.
 
-  A NODE IS A TILE: the flat surface at radius `--r-lg`, no border and no shadow, sitting straight on the board with
+  A NODE IS A TILE: the flat surface at radius `--r-tile`, no border and no shadow, sitting straight on the board with
   the `--rule` connectors between it and the next. Its verb is the icon in a 28px well, the sentence is
   a row title, and the card's state is said by the well, which is the system's own language for it: the chosen card's
   well is ink (the rail's chosen place is drawn the same way), and a card with something wrong has a red well over the
@@ -278,13 +278,13 @@
     align-items: center;
     gap: var(--sp-1);
     padding: var(--sp-2);
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    background: var(--tile);
+    border-radius: var(--r-tile);
     color: var(--ink);
     transition: opacity var(--d-state) var(--ease-out);
   }
 
-  /* A FAULT IS A WORD UNDER THE CARD AND A RED WELL, NOT A TINT ON IT. The card was `--warn-wash` behind its text, and
+  /* A FAULT IS A WORD UNDER THE CARD AND A RED WELL, NOT A TINT ON IT. The card was `--warn-tint` behind its text, and
      the design system draws an intent as a word, a dot or a 16px glyph and an error as ink with a
      glyph, never as a wash; so the card stays white and each sentence under it leads with the glyph. */
 
@@ -303,7 +303,7 @@
     inset-inline: var(--sp-3);
     block-size: 3px;
     background: var(--ink);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     pointer-events: none;
   }
 
@@ -323,7 +323,7 @@
     min-block-size: var(--ctl-h);
     background: none;
     border: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font: inherit;
     transition:
       background var(--d-state) var(--ease-out),
@@ -335,7 +335,7 @@
   .more-trigger {
     justify-content: center;
     inline-size: var(--ctl-h);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
   }
 
   /* THE HANDLE ALONE TAKES THE GESTURE. `none` on the whole card would stop a thumb scrolling the column wherever it
@@ -354,9 +354,9 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     padding: var(--sp-1) var(--sp-2);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     text-align: start;
@@ -368,17 +368,17 @@
   }
 
   /* A VALUE THE STEP READS IS A CHIP IN THE SENTENCE, in the UI face and the meta size: `rate` and `what` are names a
-     person picked, not identifiers to copy, so not `--font-id`. The tile's inner fill,
+     person picked, not identifiers to copy, so not `--font-mono`. The tile's inner fill,
      a pill, and no border. */
   .ref {
     display: inline-block;
     margin-inline: 2px;
     padding: 0 var(--sp-2);
-    background: var(--s1);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 22px;
     vertical-align: baseline;
@@ -389,7 +389,7 @@
     .handle:hover,
     .say:hover,
     .more-trigger:hover {
-      background: var(--s1);
+      background: var(--tile-2);
       color: var(--ink);
     }
   }
@@ -401,8 +401,8 @@
     margin: 0;
     padding: 0 var(--sp-2) var(--sp-1) var(--lead);
     list-style: none;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -415,7 +415,7 @@
   .warn {
     display: inline-flex;
     padding-block-start: 1px;
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* UNDER THE SENTENCE, LINED UP WITH IT, as the faults are: the handle's and the well's columns are left clear. */
@@ -427,8 +427,8 @@
     gap: 0 var(--sp-2);
     margin: 0;
     padding: 0 var(--sp-2) var(--sp-1) var(--lead);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* A STATE IS A 6PX DOT AND ITS WORD, each in its meaning: done is green, what it would do out in the world
@@ -439,12 +439,12 @@
     box-sizing: border-box;
     inline-size: var(--dot);
     block-size: var(--dot);
-    border-radius: var(--r-pill);
-    background: var(--earn);
+    border-radius: var(--r-ctl);
+    background: var(--good);
   }
 
   .paint-dot[data-state='would'] {
-    background: var(--ink2);
+    background: var(--ink-2);
   }
 
   .paint-dot[data-state='waiting'] {
@@ -452,12 +452,12 @@
   }
 
   .paint-dot[data-state='failed'] {
-    background: var(--danger);
+    background: var(--red);
   }
 
   .paint-dot[data-state='skipped'] {
     background: transparent;
-    border: 1.5px solid var(--dim);
+    border: 1.5px solid var(--ink-3);
   }
 
   .paint-word {

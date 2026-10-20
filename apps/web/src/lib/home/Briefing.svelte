@@ -91,9 +91,9 @@
     min-block-size: var(--row-h);
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 22px;
     text-decoration: none;
   }
@@ -103,7 +103,7 @@
   }
 
   a.b-line:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .b-text {
@@ -130,23 +130,23 @@
 
   .b-by {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .b-go {
     display: grid;
     flex: none;
     place-items: center;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE FOOT, under the last card and in line with the cards' own words: 15px, and it wraps at any width. */
   .b-foot {
     margin: 0;
     padding: var(--sp-2) var(--sp-2) 0;
-    color: var(--dim);
-    font-size: var(--t-row);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }

@@ -9,7 +9,7 @@
   /* ── the visible fence ──────────────────────────────────────────────────
      A QUIET NOTE, NOT AN ALARM (05 §3). Nothing on it failed, so it has no border, no red
      and no warning glyph: the reason first, as the parser's plain sentence, then what was written,
-     small, in the identifier face, in `--dim` on the sunk ground. The source WRAPS inside its column
+     small, in the identifier face, in `--ink-3` on the sunk ground. The source WRAPS inside its column
      rather than scrolling like a `.media` code block, so a long line never pushes a phone page
      sideways. `Degraded.svelte` and `toHTML` write the same two classes. */
   .degraded-fix {
@@ -18,19 +18,19 @@
     align-items: center;
     gap: var(--sp-2);
     margin-block-end: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
   .degraded-source {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     line-height: 1.6;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -40,19 +40,19 @@
     margin-inline-start: auto;
     min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     cursor: pointer;
   }
 
   .needs-client {
     padding: var(--sp-3) var(--sp-4);
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 }

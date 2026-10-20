@@ -1098,18 +1098,18 @@
   .home-line {
     position: relative;
     display: block;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     outline-offset: 4px;
   }
 
-  /* WHO SAID IT: 13 in `--dim`, under the line and out of the flow, so showing it moves nothing. Not drawn at rest. */
+  /* WHO SAID IT: 13 in `--ink-3`, under the line and out of the flow, so showing it moves nothing. Not drawn at rest. */
   .home-by {
     position: absolute;
     inset-block-start: 100%;
     inset-inline-start: 0;
     margin-block-start: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     line-height: 1.4;
     letter-spacing: 0;
@@ -1139,7 +1139,7 @@
   }
 
   .home-engine [data-needs] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* ── the page ─────────────────────────────────────────────────────────── */
@@ -1630,19 +1630,19 @@
     background: none;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
     text-align: start;
     cursor: pointer;
   }
 
   .more-count {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 400;
   }
 
   .more :global(.icon) {
-    color: var(--dim);
+    color: var(--ink-3);
     transition: transform var(--d-state) var(--ease-out);
   }
 

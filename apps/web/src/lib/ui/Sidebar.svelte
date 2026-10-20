@@ -725,7 +725,7 @@
    */
   :global(:root) {
     --rail-w: var(--rail);
-    --rail-d: var(--d-move);
+    --rail-d: var(--d-panel);
     --rail-ease: var(--ease-out);
   }
 
@@ -805,9 +805,9 @@
     gap: var(--sp-3);
     min-block-size: 32px;
     padding: 0 var(--sp-3);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     color: var(--ink-2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     text-decoration: none;
     cursor: pointer;
   }
@@ -839,8 +839,8 @@
     block-size: 22px;
     flex: none;
     background: var(--ink);
-    border-radius: var(--r-sm);
-    color: var(--on-ink);
+    border-radius: var(--r-xs);
+    color: var(--on-red);
     font-size: var(--fs-cap);
     font-weight: 600;
     line-height: 1;
@@ -857,8 +857,8 @@
 
   .mi-level {
     padding: 0 var(--sp-1);
-    background: var(--s1);
-    border-radius: var(--r-sm);
+    background: var(--tile-2);
+    border-radius: var(--r-xs);
     color: var(--ink-3);
     font-size: var(--fs-cap);
     font-weight: 500;
@@ -869,13 +869,13 @@
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .mi-rule {
     margin: var(--sp-1) 0;
     border: 0;
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* THE WIDTH CONTROL, quiet until the rail is pointed at or holds the focus. A thumb has no pointing, so it stays. */
@@ -916,7 +916,7 @@
     transform: rotate(180deg);
   }
 
-  /* THE ASK FIELD: 34 tall, a field in the tile's fill, the search glyph, the words in `--dim` and the `/` cap at its end. */
+  /* THE ASK FIELD: 34 tall, a field in the tile's fill, the search glyph, the words in `--ink-3` and the `/` cap at its end. */
   .ask {
     display: flex;
     align-items: center;
@@ -928,7 +928,7 @@
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     text-align: start;
     cursor: text;
   }
@@ -965,7 +965,7 @@
      places off the rail. */
   .scroll {
     /* `EDGE_FADE`, and how much of it each edge takes: none until that edge has more past it. */
-    --edge: 24px;
+    --fade-edge: 24px;
     --edge-above: 0px;
     --edge-below: 0px;
 
@@ -981,7 +981,7 @@
     scrollbar-width: thin;
     scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent;
     /* A row scrolled to by the browser (a focus, a find) stops clear of the fades. */
-    scroll-padding-block: var(--edge);
+    scroll-padding-block: var(--fade-edge);
     /* THE LAST ROW STOPS 64 ABOVE THE FOOT, so nothing ever sits under the person's row. */
     padding-block-end: var(--sp-8);
   }
@@ -990,11 +990,11 @@
      so the board's colour shows through in both themes and nothing is drawn when everything fits or the end is
      reached. */
   .scroll[data-more-above] {
-    --edge-above: var(--edge);
+    --edge-above: var(--fade-edge);
   }
 
   .scroll[data-more-below] {
-    --edge-below: var(--edge);
+    --edge-below: var(--fade-edge);
   }
 
   .scroll[data-more-above],
@@ -1011,7 +1011,7 @@
     margin-block-start: var(--sp-4);
   }
 
-  /* A QUIET HEADING OVER A GROUP: 13/500 in `--dim`, no rule under it, and its fold mark at the end. */
+  /* A QUIET HEADING OVER A GROUP: 13/500 in `--ink-3`, no rule under it, and its fold mark at the end. */
   .sub {
     display: flex;
     align-items: center;
@@ -1019,7 +1019,7 @@
     padding-inline: var(--sp-2);
     min-block-size: 28px;
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     letter-spacing: 0;
   }
@@ -1139,7 +1139,7 @@
     font-weight: var(--fw-regular);
   }
 
-  /* THE NEW-PAGE LINE reads as an offer and not as a page already there, so it is drawn in `--dim`. */
+  /* THE NEW-PAGE LINE reads as an offer and not as a page already there, so it is drawn in `--ink-3`. */
   .item.view[data-page-line] {
     color: var(--ink-3);
   }
@@ -1162,17 +1162,17 @@
     padding: 0 var(--sp-2);
     margin-inline-start: calc(-1 * var(--sp-2));
     border: 0;
-    border-radius: var(--r-sm, 8px);
+    border-radius: var(--r-xs, 8px);
     background: var(--tile);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .tally {
     flex: none;
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
@@ -1185,7 +1185,7 @@
   .pen-action {
     flex: none;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -1240,7 +1240,7 @@
   .sep {
     margin: var(--sp-3) var(--sp-2) var(--sp-2);
     border: 0;
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /**
@@ -1352,9 +1352,9 @@
     padding: var(--sp-1) var(--sp-3);
     background: var(--tile);
     border: 1px solid var(--rule-strong);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     white-space: nowrap;
     pointer-events: none;
     translate: 0 -50%;

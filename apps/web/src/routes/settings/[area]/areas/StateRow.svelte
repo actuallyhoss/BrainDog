@@ -8,7 +8,7 @@
   the title is what somebody scans for, the line is the one sentence that matters, and the action, when
   one exists, sits at the end of the row where a thumb or a pointer expects it.
 
-  A ROW ON THE GROUND: a 28px icon well, the title at `--t-row` 500, the line in the meta size and the
+  A ROW ON THE GROUND: a 28px icon well, the title at `--fs-body` 500, the line in the meta size and the
   quiet ink, 56 tall with both. Rows stack with a hairline between them and nothing around them, so two rows written
   one after the other draw as one list; the separator is this file's own `.state-row + .state-row`, and the area
   around them writes no list of its own.

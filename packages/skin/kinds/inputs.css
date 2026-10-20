@@ -37,26 +37,26 @@
   }
 
   .inputs-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .inputs-box {
     min-inline-size: 0;
     min-block-size: calc(var(--ctl-h) + var(--sp-1));
     padding-inline: var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 1px solid transparent;
     border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     font-variant-numeric: tabular-nums;
     transition: border-color var(--d-state) var(--ease-out);
   }
 
   .inputs-box:hover {
-    border-color: var(--line);
+    border-color: var(--rule);
   }
 
   /* A CHECKBOX IS ITS OWN SIZE AT THE START OF ITS TRACK. It is drawn by `controls.css`, an ink fill
@@ -72,7 +72,7 @@
   .inputs-empty {
     max-inline-size: var(--measure);
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   @media (pointer: coarse) {

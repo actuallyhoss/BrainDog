@@ -112,7 +112,7 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: 50%;
-    background: var(--dim);
+    background: var(--ink-3);
   }
 
   .r-dot[data-hued] {
@@ -151,6 +151,6 @@
   .r-more {
     margin: 0;
     color: var(--ink-3);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 </style>

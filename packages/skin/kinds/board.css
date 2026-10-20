@@ -36,15 +36,15 @@
     align-items: baseline;
     gap: var(--sp-2);
     padding-block-end: var(--sp-1);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .board-count {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
@@ -52,7 +52,7 @@
 
   /* Scoped to the lane: `.card` is a common name, and a page's own card must not inherit a board's.
      A CARD IS A PIECE OF THE BOARD SET INTO THE TILE: the page's own ground (`--board`), no border and no shadow, so
-     fifteen of them read as one quiet surface rather than fifteen grey boxes (it wore `--field`, a control's fill, and
+     fifteen of them read as one quiet surface rather than fifteen grey boxes (it wore `--tile-2`, a control's fill, and
      the screen read as a wall of disabled buttons). The title is the body step in ink; the line under it is the quiet
      one. `position` because the lane control below is taken out of flow where a pointer can drag. */
   .board-col .card {
@@ -80,7 +80,7 @@
   /* A long word (an invoice number, an address) breaks rather than widening its lane past the others. */
   .board-col .card-title {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: var(--lh-head);
     overflow-wrap: anywhere;
@@ -112,8 +112,8 @@
    * strength of any tint, and never in the brand's red, which a block does not wear.
    */
   .board-col[data-drop] {
-    background-image: linear-gradient(var(--hover-wash), var(--hover-wash));
-    box-shadow: inset 0 0 0 1px var(--edge);
+    background-image: linear-gradient(var(--hover), var(--hover));
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
   }
 
   /* NOT SAVED, IN WORDS: the register's receipt chip, in the one place a card has room for it.
@@ -122,10 +122,10 @@
     align-self: start;
     margin-block-start: var(--sp-1);
     padding: 1px 6px;
-    background: var(--hold-wash);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    background: var(--tile-2);
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 1.35;
     white-space: nowrap;
@@ -134,8 +134,8 @@
   /* THE META LINE: whatever the row carries beside its title (what it belongs to, the day it is due, who holds it), in
      the small step and the quiet ink. A card with nothing there draws no line and no gap for one. */
   .board-col .card-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-head);
     overflow-wrap: anywhere;
   }
@@ -155,11 +155,11 @@
     margin-block-start: var(--sp-1);
     padding-inline: var(--sp-2);
     background: transparent;
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    color: var(--ink2);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   @media (pointer: coarse) {
@@ -244,7 +244,7 @@
     }
 
     .block[data-kind='board'] .board-col .card-title {
-      font-size: var(--t-base);
+      font-size: var(--fs-body);
     }
   }
 }

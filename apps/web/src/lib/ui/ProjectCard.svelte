@@ -240,7 +240,7 @@
 
   /* AT RISK IS A WAITING DOT AND DIM WORDS; OFF TRACK THE RED DOT AND THE RED WORD, the one red a card may say. */
   .pc-health[data-tone='off'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .dot {
@@ -248,11 +248,11 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: var(--r-round);
-    background: var(--status-waiting);
+    background: var(--warn);
   }
 
   .pc-health[data-tone='off'] .dot {
-    background: var(--danger);
+    background: var(--red);
   }
 
   .pc-late {

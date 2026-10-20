@@ -22,7 +22,7 @@
 
 @layer components {
   /* THE WINDOW IS THE GROUND, and `base.css` paints it on `body` with its one soft light from the top (DIRECTION 37).
-     This sheet used to paint `body` flat `--sunk` over that, from the days of the board, and so took the light away on
+     This sheet used to paint `body` flat `--board` over that, from the days of the board, and so took the light away on
      every screen. `html` carries the plain ground, for the frame before `body` has a size.
 
      And the shell's `.body` is the ONE scroll container. Without this the document scrolls too and

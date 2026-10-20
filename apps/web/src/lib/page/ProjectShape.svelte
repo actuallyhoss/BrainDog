@@ -585,15 +585,15 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: 50%;
-    background: var(--status-waiting);
+    background: var(--warn);
   }
 
   .h-health[data-tone='off'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .h-health[data-tone='off'] .dot {
-    background: var(--danger);
+    background: var(--red);
   }
 
   .h-say {
@@ -612,7 +612,7 @@
   }
 
   .late {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .h-next {
@@ -970,7 +970,7 @@
   }
 
   .w-sub[data-red] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .w-more {
@@ -1043,7 +1043,7 @@
     position: relative;
     block-size: 10px;
     border-radius: 5px;
-    background: var(--field);
+    background: var(--tile-2);
   }
 
   .d-seg {

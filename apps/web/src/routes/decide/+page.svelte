@@ -568,8 +568,8 @@
 
   /* THE COLUMNS' WELLS ARE QUIET: every question here needs you, so red is kept for the answer and for what is late. */
   .body :global(.block-slot[data-key^='decide-'] > .block-bar .well) {
-    background: var(--field);
-    color: var(--ink2);
+    background: var(--tile-2);
+    color: var(--ink-2);
   }
 
   @media (width < 900px) {
@@ -648,7 +648,7 @@
   .body :global(.block-slot > .queue > .qa) {
     padding: var(--tile-pad);
     background: var(--tile);
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
   }
 
   /* THE TILE IS THE EDGE NOW: no hairline over a question and no band of air under the lead. */
@@ -666,7 +666,7 @@
 
   /* THE CURSOR'S RING FOLLOWS THE TILE'S CORNERS, so `j` and `k` land on a question the shape it is. */
   .body :global(.block-slot > .queue > .qa[data-row-cursor]) {
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
   }
 
   /* THE FIRST QUESTION CARRIES NO NAME OVER IT: the head's line just said what waits, and a name above the card would
@@ -789,15 +789,15 @@
     place-items: center;
     inline-size: var(--btn-h);
     block-size: var(--btn-h);
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     :global(.menu-trigger):hover > .head-more {
-      background: var(--field-hover);
+      background: var(--hover);
       color: var(--ink);
     }
   }
@@ -813,15 +813,15 @@
      reader is doing exactly what they were invited to do. */
   .yours {
     margin: 0;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: var(--lh-body);
   }
   .cannot {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -842,8 +842,8 @@
   .reading {
     flex: 1 1 14rem;
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -852,8 +852,8 @@
   }
 
   .calls-fold > summary {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     cursor: pointer;
   }
 
@@ -879,13 +879,13 @@
     gap: var(--sp-3);
     min-block-size: var(--row-h, 44px);
     padding: var(--sp-2);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: inherit;
     text-decoration: none;
   }
 
   a.line:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .line-mark {
@@ -901,7 +901,7 @@
 
   .line-title {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 
@@ -909,14 +909,14 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .line-when {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
