@@ -17,7 +17,8 @@
 -->
 <script lang="ts">
   /* `at` IS THE BLOCK INDEX WHERE THE PAGE BODY LAYS BLOCKS OUT, so the address helper goes by another name here too. */
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
+  import { live as liveRecord } from '$lib/data/live.svelte.ts';
   import { apiBase, at as inApp } from '../at.ts';
   import { cardEditsOf, cardWrite, drawnWrite } from './card-writes.ts';
   import { Block, Degraded, Markdown, Table, Text } from 'braindog-render/svelte';
@@ -486,6 +487,29 @@
      draws (the plan of 20 October: one card everywhere). The list is found by what it declares (`scopes`), never by its
      name; the block's own rows, order and limit stand, and its line is read off its drawing (`trendsOf`). Not a block in
      groups, which draws its groups' heads. */
+  /* HOW MUCH OF EACH CARD'S WORK IS LATE, read as its page reads it (`card-late.ts`), again when the record moves. */
+  let lates = $state.raw<ReadonlyMap<number, number>>(new Map());
+  const cardSeqs = $derived.by(() => {
+    const list = block.register;
+    const d = list ? REGISTERS[list] : undefined;
+    if (block.kind !== 'cards' || block.group || !list || !d || !isProject(d)) return '';
+    const seqs = (block.entries ?? []).flatMap((e) => (typeof e.seq === 'number' ? [e.seq] : []));
+    return seqs.length > 0 ? `${list}:${seqs.join(',')}` : '';
+  });
+  $effect(() => {
+    const said = cardSeqs;
+    void liveRecord.version;
+    if (said === '') return;
+    untrack(() => {
+      const [list, seqs] = said.split(':') as [string, string];
+      void import('$lib/home/card-late.ts')
+        .then((m) => m.latesOf(apiBase(), list, seqs.split(',').map(Number)))
+        .then((got) => {
+          if (said === cardSeqs) lates = got;
+        })
+        .catch(() => {});
+    });
+  });
   const projectCards = $derived.by(() => {
     const list = block.register;
     const d = list ? REGISTERS[list] : undefined;
@@ -500,7 +524,7 @@
     return cards.map((c) => {
       const f = c.figure ? fieldDecl(list, c.figure.field) : undefined;
       const said = facts.get(c.seq);
-      return { card: { ...c, late: said?.late ?? 0, worked: said?.worked ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
+      return { card: { ...c, late: lates.get(c.seq) ?? said?.late ?? 0, worked: said?.worked ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
   });
 
@@ -993,13 +1017,27 @@
 
   /* THE CARDS STAND ON THE BOARD (proj F5): a slot holding them is no tile, so a card is the white card Today draws and
      never a grey one inside a white one. */
-  :global(.block-slot:has(> .project-cards)) {
+  :global(.block-slot.block-slot:has(> .project-cards)) {
     padding: 0;
     background: none;
   }
 
+  /* AS WIDE AS ITS LANES at a desk, so the bar is a control and not a rule across the page; a phone's is the page's
+     width (`Segmented`'s `full`). */
   .lane-bar {
+    display: flex;
+    min-inline-size: 0;
     margin-block-end: 12px;
+  }
+
+  .lane-bar > :global(*) {
+    min-inline-size: 0;
+  }
+
+  @media (width < 640px) {
+    .lane-bar > :global(*) {
+      flex: 1;
+    }
   }
 
   /* ONE GRID FOR THE ONE CARD (proj section 4): four across from 1280, three from 1024, two from 640, one below, gap 12.

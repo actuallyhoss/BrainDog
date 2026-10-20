@@ -216,7 +216,7 @@
     overflow: hidden;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: 17px;
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 22px;
     text-overflow: ellipsis;
@@ -238,9 +238,9 @@
     gap: 4px;
   }
 
+  /* AT RISK IS A WAITING DOT AND DIM WORDS; OFF TRACK THE RED DOT AND THE RED WORD, the one red a card may say. */
   .pc-health[data-tone='off'] {
-    color: var(--warn);
-    font-weight: 600;
+    color: var(--danger-text);
   }
 
   .dot {
@@ -248,7 +248,11 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: var(--r-round);
-    background: var(--warn);
+    background: var(--status-waiting);
+  }
+
+  .pc-health[data-tone='off'] .dot {
+    background: var(--danger);
   }
 
   .pc-late {
@@ -278,7 +282,7 @@
 
   .pc-num {
     font-family: var(--font-display);
-    font-size: 28px;
+    font-size: var(--fs-page);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.035em;
@@ -338,7 +342,7 @@
     gap: 8px;
     margin-block-start: 12px;
     color: var(--ink-2);
-    font-size: 14px;
+    font-size: var(--fs-ctl);
     line-height: 20px;
   }
 
@@ -454,7 +458,7 @@
     }
 
     .pc-num {
-      font-size: 24px;
+      font-size: calc(var(--fs-figure) + 2px);
       line-height: 30px;
     }
 

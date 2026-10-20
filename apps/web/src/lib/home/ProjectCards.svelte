@@ -26,6 +26,9 @@
   import Button from '$lib/ui/Button.svelte';
   import { agentsOn, slotStyle, takenBackFree, type ProjectCard as Card } from './project-cards.ts';
   import { projectKept } from '$lib/funnel.ts';
+  import { untrack } from 'svelte';
+  import { live } from '$lib/data/live.svelte.ts';
+  import { latesOf } from './card-late.ts';
 
   let {
     cards,
@@ -65,6 +68,21 @@
     else failed = out.fix;
   }
   const shown = $derived(cards.filter((c) => !gone.has(c.seq) || !c.draft));
+  /* HOW MUCH OF EACH CARD'S WORK IS LATE, as its page counts it (`card-late.ts`), again when the record moves. */
+  let lates = $state.raw<ReadonlyMap<number, number>>(new Map());
+  const seqs = $derived(cards.filter((c) => !c.draft).map((c) => c.seq).join(','));
+  $effect(() => {
+    const said = seqs;
+    void live.version;
+    if (said === '') return;
+    untrack(() => {
+      void latesOf(apiBase(), list, said.split(',').map(Number))
+        .then((got) => {
+          if (said === seqs) lates = got;
+        })
+        .catch(() => {});
+    });
+  });
   const label = (c: Card): string => {
     const f = c.figure ? decl(list, c.figure.field) : undefined;
     return f ? labelOf(f) : '';
@@ -82,9 +100,13 @@
     return [{ id: 'play', label: words.inPlay, count: shown.length }, ...named.map((id) => ({ id, label: state ? valueSaid(state as Parameters<typeof valueSaid>[0], id) : id, count: counts.get(id) ?? 0 }))];
   });
   const inLane = $derived(lane === 'play' ? shown : shown.filter((c) => c.lane === lane));
-
   /* WHERE ALL OF THEM ARE: the record's Projects page where it keeps one, else the list. */
-  const allHref = $derived(((page.data as { pages?: readonly { id?: string }[] } | undefined)?.pages ?? []).some((p) => p.id === 'portfolio') ? '/p/portfolio' : `/r/${list}`);
+  /* WHERE ALL OF THEM ARE: the page the rail files under the list's own name where the record keeps one, else the list. */
+  const allHref = $derived.by(() => {
+    const nav = (page.data as { nav?: readonly { id?: string; title?: string }[] } | undefined)?.nav ?? [];
+    const kept = nav.find((n) => n.title === name && typeof n.id === 'string');
+    return kept ? `/p/${kept.id}` : `/r/${list}`;
+  });
 </script>
 
 {#if shown.length > 0}
@@ -130,7 +152,7 @@
               {#if failed}<span class="d-fail" role="alert">{failed}</span>{/if}
             </div>
           {:else}
-            <ProjectCard card={c} label={label(c)} agents={agentsOn(c.name, working)} />
+            <ProjectCard card={{ ...c, late: lates.get(c.seq) ?? c.late }} label={label(c)} agents={agentsOn(c.name, working)} />
           {/if}
         </li>
       {/each}
@@ -163,7 +185,7 @@
   .p-title {
     margin: 0;
     color: var(--ink);
-    font-size: 15px;
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }
@@ -171,7 +193,7 @@
   .p-count {
     margin-inline-start: -4px;
     color: var(--ink-3);
-    font-size: 15px;
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -261,7 +283,7 @@
 
   .d-name {
     overflow: hidden;
-    font-size: 17px;
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 22px;
     text-overflow: ellipsis;
