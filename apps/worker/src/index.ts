@@ -2818,6 +2818,7 @@ const restoring = (e: unknown): boolean => e instanceof Error && e.message.inclu
  * Measured in `test/restore-armed.test.ts`: without this, each of the four answered 500 until an eviction.
  *
  * A RECORD ARMED BY A RESTORE STILL RUNNING IS LEFT ALONE, and the rejection goes up to `fetch`, which answers it 503.
+ * A REQUEST THAT LOST THE RACE TO THE RESET asks the object that came back once more, since it is no longer stranded.
  */
 async function held<T>(env: Env, id: string, call: (record: DurableObjectStub<Record$>) => Promise<T>): Promise<T> {
   const stub = () => env.RECORD.get(env.RECORD.idFromName(id));
@@ -2830,8 +2831,14 @@ async function held<T>(env: Env, id: string, call: (record: DurableObjectStub<Re
       reset: () => stub().reopen(),
       restored: async (args) => (await stub().restored(args)) as unknown as Result<unknown>,
     });
-    if (!reset) throw e;
-    return call(stub());
+    if (reset) return call(stub());
+    /* NOT STRANDED ANY MORE: a request that found it first has reset it since this one was refused, so the object that
+       came back is asked once, and a restore still running refuses this ask again and goes up as it did. */
+    try {
+      return await call(stub());
+    } catch (again) {
+      throw restoring(again) ? e : again;
+    }
   }
 }
 
@@ -3009,9 +3016,9 @@ const addressOf = (request: Request): string => request.headers.get('cf-connecti
  * The `/auth/*` doors a stranger can spend mail or a bot check on, by address, on top of the write budget and the
  * Directory's own lockouts. Only a POST is counted; a GET of the sign-up form is the read budget's.
  */
-async function authAbuse(env: Env, request: Request, pathname: string): Promise<Response | null> {
+async function authAbuse(env: Env, request: Request): Promise<Response | null> {
   if (request.method !== 'POST') return null;
-  const path = pathname.replace(/\/+/g, '/').replace(/(.)\/+$/, '$1');
+  const path = new URL(request.url).pathname.replace(/\/+/g, '/').replace(/(.)\/+$/, '$1');
   const name: AbuseName | null =
     path === '/auth/magic/start' ? 'signinLink' : path === '/auth/apply' ? 'apply' : path === '/auth/signup/start' || path === '/auth/signup/verify' ? 'signup' : null;
   return name === null ? null : abusive(env, name, addressOf(request));
@@ -3274,7 +3281,7 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
        DIRECTORY IS ASKED, on top of its own lockouts, because nobody at this door has proved who they are yet: the
        address is the one thing a caller cannot choose here (`cf-connecting-ip`). */
     if (servesAuth(url.pathname))
-      return (await authAbuse(env, request, url.pathname)) ?? (await overLimit(env, null, request, SAFE_METHODS.has(request.method) ? 'read' : 'write')) ?? signIn(request, env, ctx);
+      return (await authAbuse(env, request)) ?? (await overLimit(env, null, request, SAFE_METHODS.has(request.method) ? 'read' : 'write')) ?? signIn(request, env, ctx);
     if (servesAccount(url.pathname)) return account(request, env, ctx);
     /* OAUTH 2.1, WITH BRAINDOG AS ITS OWN AUTHORIZATION SERVER: the metadata an MCP client
        discovers from `/mcp`'s 401, and the endpoints it signs in by. Before `/mcp` and every record door, because none
