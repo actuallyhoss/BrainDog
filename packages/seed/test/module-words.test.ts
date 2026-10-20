@@ -45,8 +45,7 @@ test('EVERY MODULE LIST WITHOUT WORDS IS ONE NOBODY RENAMES, and every list with
      two more settings, and each of them a version, for a list no use case has asked to rename. */
   /* AND `filing_rules` SINCE money-core 3.17.0 (filing-list-56): a list a person keeps and no use case renames, for the same reason. */
   /* AND `plans` SINCE plans-list-66 (the unreleased money-core 3.17.0): made by Money's script from the name its parts share. */
-  /* AND `datapoints` AND `kpis` SINCE portfolio 1.19.0, which took Numbers from Founder and keeps each project's key
-     numbers: words for them would give every use case holding Projects four more settings, and each a version, for two
-     lists no use case has asked to rename. */
-  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'datapoints', 'filing_rules', 'fx', 'kpis', 'organisations', 'plans', 'snapshots']);
+  /* AND `kpis` SINCE portfolio 1.19.0, each project's key numbers: words for it would give every use case holding Projects
+     two more settings, and each a version, for a list no use case has asked to rename. */
+  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'filing_rules', 'fx', 'kpis', 'organisations', 'plans', 'snapshots']);
 });

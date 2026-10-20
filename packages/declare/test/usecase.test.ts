@@ -219,9 +219,8 @@ test('EVERY FIRST-PARTY LIST A PERSON NAMES HAS ITS WORDS, and each word table n
      a version to bump, so it keeps its own. */
   /* AND `filing_rules`, Money's since 3.17.0: a list a person keeps and no use case renames, for the same reason. */
   /* AND `plans`, Money's since plans-list-66 in the same unreleased step: made by Money's script from the name its parts share. */
-  /* AND `datapoints` AND `kpis`, Portfolio's since 1.19.0, which took Numbers from the founder and keeps each project's key
-     numbers: no use case renames either. */
-  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'datapoints', 'filing_rules', 'fx', 'kpis', 'organisations', 'plans', 'snapshots']);
+  /* AND `kpis`, Portfolio's since 1.19.0, each project's key numbers: no use case renames it. */
+  assert.deepEqual(lists.filter((l) => !Object.hasOwn(MODULE_WORDS, l)).sort(), ['balances', 'filing_rules', 'fx', 'kpis', 'organisations', 'plans', 'snapshots']);
   assert.deepEqual(Object.keys(MODULE_WORDS).filter((l) => !lists.includes(l)), []);
 });
 

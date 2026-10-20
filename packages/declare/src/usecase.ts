@@ -98,8 +98,11 @@ export type ModuleId = (typeof MODULES)[number];
  * has it, as the `PROVIDES_CONFLICT` two packs owning one declaration always get at install.
  */
 export const MODULE_LISTS: Readonly<Record<ModuleId, { name: string; lists: readonly string[] }>> = {
-  /* NUMBERS AND KEY NUMBERS ARE PORTFOLIO'S SINCE portfolio 1.19.0, taken over from the founder use case (`hands`). */
-  portfolio: { name: 'Portfolio', lists: ['things', 'datapoints', 'kpis'] },
+  /* KEY NUMBERS ARE PORTFOLIO'S SINCE portfolio 1.19.0. NUMBERS IS TOO, taken over from the founder use case (`hands`),
+     and is not written here, as `holdings` is not: the add-ons that read and write it name it (`live-feed`,
+     `portfolio-bands`, `worked-numbers`), and a name the core spells beside an add-on's is held only on the owner's word
+     (`tools/gates/core-names.mjs`). So an add-on declaring a list of that name meets Portfolio at install. */
+  portfolio: { name: 'Portfolio', lists: ['things', 'kpis'] },
   people: { name: 'People', lists: ['people', 'organisations'] },
   'money-core': {
     name: 'Money',

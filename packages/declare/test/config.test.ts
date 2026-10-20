@@ -293,7 +293,9 @@ test('THE FIRST-PARTY MAP AGREES WITH THE SEED: every list names the pack that d
      agents pack is not one of `FIRST_PARTY`, so its lists are read off its own document. */
   const agents = agentsPackDocument() as { declarations: Record<string, unknown>[] };
   for (const d of agents.declarations) if (typeof d.register === 'string' && d.rule === undefined) lists.push([d.register, 'agents']);
-  assert.deepEqual([...FIRST_PARTY_LISTS].sort(), lists.sort());
+  /* BUT NUMBERS, PORTFOLIO'S SINCE 1.19.0, is kept out of the map as `holdings` is: the add-ons that read and write it
+     name it, and the core spells an add-on's name only on the owner's word (`tools/gates/core-names.mjs`). */
+  assert.deepEqual([...FIRST_PARTY_LISTS].sort(), lists.filter(([l, id]) => !(l === 'datapoints' && id === 'portfolio')).sort());
 });
 
 /* ── where a setting reaches, and where it does not ─────────────────────── */
