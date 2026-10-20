@@ -42,6 +42,8 @@ test("/r/obligations/20: THE ROW PAGE'S DAYS LATE ARE THE LIST'S DUE CELL'S", ()
   const page = dueSaid(due as string, now);
   assert.ok(digits(cell.text) > 0, cell.text);
   assert.equal(digits(page), digits(cell.text), `the page says "${page}" and the list "${cell.text}"`);
+  /* AND IN THE SAME WORDS (money F6): "64 days late" in the cell and in the page's sentence, never "overdue by". */
+  assert.equal(page?.toLowerCase(), cell.text.toLowerCase(), `the page says "${page}" and the list "${cell.text}"`);
   forgetNow();
 });
 

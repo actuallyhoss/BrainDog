@@ -8,14 +8,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { addedSaid, daySaid, daysOf, daysTo, dueSaid, sentenceOf } from './said.ts';
+import { addedSaid, agoSaid, daySaid, daysOf, daysTo, dueSaid, sentenceOf } from './said.ts';
 
 const MORNING = Date.UTC(2026, 8, 25, 8);
 const LATE = Date.UTC(2026, 8, 25, 23, 30);
 
 test('A DEADLINE IS SAID IN CALENDAR DAYS, the unit the list dates its rows in', () => {
-  assert.equal(dueSaid('2026-08-18', MORNING), 'Overdue by 38 days');
-  assert.equal(dueSaid('2026-09-24', MORNING), 'Overdue by 1 day');
+  assert.equal(dueSaid('2026-08-18', MORNING), '38 days late');
+  assert.equal(dueSaid('2026-09-24', MORNING), '1 day late');
   assert.equal(dueSaid('2026-09-26', MORNING), 'Due tomorrow');
   assert.equal(dueSaid('2026-09-28', MORNING), 'Due in 3 days');
 });
@@ -39,8 +39,18 @@ test('A DAY INSIDE THE YEAR DROPS ITS YEAR, and one outside keeps it', () => {
 });
 
 test('THE AGE CARRIES ITS LABEL, so it is never read as the date beside it', () => {
-  assert.equal(addedSaid('2026-07-31T10:00:00.000Z', MORNING), 'added 8w ago');
+  assert.equal(addedSaid('2026-07-31T10:00:00.000Z', MORNING), 'added 7 weeks ago');
   assert.equal(addedSaid('2026-09-25T07:59:40.000Z', MORNING), 'added just now');
+});
+
+test('THE AGE SAYS ITS UNIT IN WORDS, never "7w" or "12h"', () => {
+  assert.equal(agoSaid('2026-09-25T07:55:00.000Z', MORNING), '5 minutes ago');
+  assert.equal(agoSaid('2026-09-24T20:00:00.000Z', MORNING), '12 hours ago');
+  assert.equal(agoSaid('2026-09-24T07:00:00.000Z', MORNING), 'yesterday');
+  assert.equal(agoSaid('2026-09-22T08:00:00.000Z', MORNING), '3 days ago');
+  assert.equal(agoSaid('2026-05-25T08:00:00.000Z', MORNING), '4 months ago');
+  assert.equal(agoSaid('2024-09-25T08:00:00.000Z', MORNING), '2 years ago');
+  assert.equal(agoSaid('not a time', MORNING), '');
 });
 
 test('THE TITLE ROW SAYS WHERE THE ROW STANDS, WHEN IT IS DUE AND HOW OLD IT IS, in one sentence', () => {
@@ -48,7 +58,7 @@ test('THE TITLE ROW SAYS WHERE THE ROW STANDS, WHEN IT IS DUE AND HOW OLD IT IS,
     sentenceOf({ archived: false, state: true, finished: null, late: null, due: null, added: 'added 8w ago', ...p })
       .map((x) => (x.kind === 'state' ? '<Open>' : x.kind === 'late' ? `[${x.text}]` : x.text))
       .join('');
-  assert.equal(said({ late: { text: 'Overdue by 38 days', tone: 'bad' } }), '<Open>, [overdue by 38 days], added 8w ago.');
+  assert.equal(said({ late: { text: '38 days late', tone: 'bad' } }), '<Open>, [38 days late], added 8w ago.');
   assert.equal(said({ due: { label: 'Due', day: '3 Oct' } }), '<Open>, due 3 Oct, added 8w ago.');
   assert.equal(said({ finished: '2 Sep' }), '<Open> 2 Sep, added 8w ago.');
   assert.equal(said({ state: false }), 'Added 8w ago.');

@@ -4,18 +4,20 @@
  *
  * THE LEAD SAID "Open" BESIDE A RED DOT, AND "8w ago" BESIDE A DUE DATE. The dot meant overdue while
  * the word beside it said something else, and nobody could tell whether "8w ago" was the date or the row. So the tone is
- * said in words beside its dot ("Overdue by 38 days", "Paid 2 Sep"), and the age carries its own label ("added 8w ago").
+ * said in words beside its dot ("38 days late", "Paid 2 Sep"), and the age carries its own label and its unit in
+ * words ("added 8 weeks ago"), since "8w" is a unit nobody says.
  *
  * THE TONE IS NOT DECIDED HERE. Its colour is `toneOf`'s, the list's own rule (`lib/record/api.ts`), so a row drawn late
  * in its list is drawn late on its page; this file only says in words how many days away a date is, counted in calendar
  * days as `relative()` counts them. Out of the component so `node --test` can run it, as `lead.ts` beside it is.
  */
 
-import { day, shortDay, since } from 'braindog-render';
+import { day, shortDay } from 'braindog-render';
 
 /** The row page's own words, kept beside the functions that say them. */
 export const rowWords = {
-  overdue: (days: number): string => (days === 1 ? 'Overdue by 1 day' : `Overdue by ${days} days`),
+  /* THE LIST'S WORDS FOR IT (money F6): "64 days late" in the Due cell, on the card and here, never "overdue by". */
+  overdue: (days: number): string => (days === 1 ? '1 day late' : `${days} days late`),
   dueToday: 'Due today',
   dueTomorrow: 'Due tomorrow',
   dueIn: (days: number): string => `Due in ${days} days`,
@@ -47,7 +49,7 @@ const upper = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 const lower = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1);
 
 /**
- * THE SENTENCE UNDER A ROW'S TITLE: "Open, overdue by 38 days, added 8w ago."
+ * THE SENTENCE UNDER A ROW'S TITLE: "Open, 38 days late, added 8 weeks ago."
  *
  * Where it stands, then when it is due (how late or how close when the list's tone says so, the day otherwise), then how
  * old it is, each clause present only when the row has it. It replaced the lead line of dots and words; the tone is said
@@ -75,7 +77,7 @@ export function sentenceOf(p: {
   const out: Piece[] = p.archived ? [{ kind: 'words', text: `${rowWords.archived} ` }] : [];
   clauses.forEach((clause, i) => {
     if (i > 0) out.push({ kind: 'words', text: ', ' });
-    /* A SENTENCE STARTS WITH A CAPITAL and nothing after its first word does: "Overdue by 38 days" is a whole line on
+    /* A SENTENCE STARTS WITH A CAPITAL and nothing after its first word does: "Due in 3 days" is a whole line on
        its own and the middle of one here. The state's word is set in sentence case by the page's stylesheet. */
     const [first, ...rest] = clause;
     const cased = first && first.kind !== 'state' ? { ...first, text: i === 0 ? upper(first.text) : lower(first.text) } : first;
@@ -156,5 +158,26 @@ export function daySaid(iso: string, now: number): string {
   return iso.slice(0, 4) === String(new Date(now).getUTCFullYear()) ? shortDay(iso) : day(iso);
 }
 
+/**
+ * HOW LONG AGO, IN WORDS: "just now", "5 minutes ago", "12 hours ago", "yesterday", "3 days ago", "7 weeks ago",
+ * "4 months ago", "2 years ago". The short form ("7w") is a list cell's; a sentence and a history line say the unit.
+ * A moment that does not read comes back as nothing said, never as a guess.
+ */
+export function agoSaid(at: string, now: number): string {
+  const t = Date.parse(at);
+  if (!Number.isFinite(t)) return '';
+  const s = Math.max(0, Math.floor((now - t) / 1000));
+  const unit = (n: number, one: string): string => `${n} ${one}${n === 1 ? '' : 's'} ago`;
+  if (s < 60) return 'just now';
+  if (s < 3600) return unit(Math.floor(s / 60), 'minute');
+  if (s < 86_400) return unit(Math.floor(s / 3600), 'hour');
+  const days = Math.floor(s / 86_400);
+  if (days === 1) return 'yesterday';
+  if (days < 7) return unit(days, 'day');
+  if (days < 56) return unit(Math.floor(days / 7), 'week');
+  if (days < 365) return unit(Math.max(2, Math.floor(days / 30)), 'month');
+  return unit(Math.floor(days / 365), 'year');
+}
+
 /** The row's age with its label, so it is never read as the date beside it. */
-export const addedSaid = (created: string, now: number): string => rowWords.added(since(created, now));
+export const addedSaid = (created: string, now: number): string => rowWords.added(agoSaid(created, now));
