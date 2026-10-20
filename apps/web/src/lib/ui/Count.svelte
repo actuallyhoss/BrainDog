@@ -1,30 +1,39 @@
 <!--
-  The one filled badge in the product, and the one pill (DIRECTION §39, "pills only for counts"): a red capsule with a
-  count in it, for what needs the reader.
+  The one filled badge in the product, and the one pill (DIRECTION §39, "pills only for counts"; 2.A.2): a red capsule
+  with a count in it, for what needs the reader.
 
-  EVERY OTHER COUNT IS A PLAIN NUMBER in the quiet ink, beside the word it counts. This one is filled because it is the
-  one thing on a screen allowed to shout: the open questions in Needs you, which the rail shows as a tab holding something waiting on
-  him. Red here is "needs you" and nothing else, so a count that does not need him is never drawn with this.
+  EVERY NEEDS-YOU COUNT IS THIS ONE: the top bar's, the tab bar's, the rail's and the More sheet's. It was drawn four
+  ways (a red square, a red circle with the ground's colour as its figure, a pink pill with red words, a plain grey
+  number), so one count read as four things. Every other count is a plain number in `--ink-3` beside its word.
+
+  THE FILL IS `--red-fill` AND THE FIGURE IS WHITE IN BOTH SCHEMES: the dark scheme drew a dark figure on a light red,
+  which read as a different control. 20 tall, 12/20 at 600, tabular. `size="s"` is the tab bar's: 18 tall, with a 2px
+  ring of the bar's own colour so it reads cut out of the glyph it sits on.
 
   THE NUMBER IS THE MEANING, so the name says what it counts for a screen reader where the caller knows (`label`); the
-  shape and the hue only agree with it.
+  shape and the hue only agree with it. A change rolls through `Figure`.
 -->
 <script lang="ts">
+  import Figure from './Figure.svelte';
+
   let {
     n,
     label,
+    size = 'm',
   }: {
     /** The count. Zero draws nothing: a badge that says nobody needs you is noise. */
     n: number;
     /** What the number counts, read out in place of the bare figure ("3 questions wait on you"). */
     label?: string | undefined;
+    /** `m` beside a word; `s` on the corner of a tab's glyph. */
+    size?: 'm' | 's';
   } = $props();
 
   /* PAST 99 IT SAYS 99+, so the capsule keeps its shape in a rail item and the count stays a glance. */
   const said = $derived(n > 99 ? '99+' : String(n));
 </script>
 
-{#if n > 0}<span class="badge num" role={label ? 'img' : undefined} aria-label={label}>{said}</span>{/if}
+{#if n > 0}<span class="badge num" data-size={size} role={label ? 'img' : undefined} aria-label={label}><Figure value={said} /></span>{/if}
 
 <style>
   .badge {
@@ -34,16 +43,24 @@
     box-sizing: border-box;
     min-inline-size: 20px;
     block-size: 20px;
-    padding-inline: 6px;
-    /* THE BRAND RED ITSELF, with the tile's own colour as the figure: white on the light scheme's red, the dark tile on
-       the dark scheme's lighter red, so the figure clears 4.5:1 in both. */
-    background: var(--danger);
+    /* 6 either side of the figure: 2 more than the grid's 4, and allowed, since it is inside the control. */
+    padding-inline: calc(var(--sp-1) + 2px);
+    background: var(--red-fill, var(--action));
     border-radius: var(--r-round);
-    color: var(--on-ink);
+    color: var(--on-red, var(--on-action));
+    font-family: var(--font-ui);
     font-size: var(--t-xs);
-    font-weight: 600;
+    font-weight: var(--fw-semi);
     font-variant-numeric: tabular-nums;
-    line-height: 1;
+    line-height: 20px;
+  }
+
+  .badge[data-size='s'] {
+    min-inline-size: 18px;
+    block-size: 18px;
+    padding-inline: var(--sp-1);
+    line-height: 18px;
+    box-shadow: 0 0 0 2px var(--tile);
   }
 
   @media (forced-colors: active) {

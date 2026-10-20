@@ -1,11 +1,18 @@
 <!--
-  An amount.
+  An amount (2.A.7).
 
-  The record's home currency is written the way a person writes it, `£28,320.00`, at the size and in
-  the ink of the figure. Any other currency keeps its symbol and puts its ISO code after the figure,
-  small and quiet, `$4,800.00 USD`, so two currencies never read alike in one column; a currency with
-  no symbol of its own keeps its code in front, `EGP 58,185.54`. A negative has a true minus in front
-  of the symbol, `−£39.00`. The text `money()` writes is unchanged; only the drawing is.
+  THE HOME CURRENCY NEVER PRINTS ITS CODE: `£28,320`. Any other currency keeps its symbol and puts its ISO code after
+  the figure, 13px and quiet, `$4,800 USD`, so two currencies never read alike in one column; a currency with no symbol of
+  its own keeps its code in front, `EGP 58,185.54`. A negative has a true minus in front of everything, `−£39`. Every
+  figure is written by the one writer (`braindog-render`'s `money.ts`), so a cell, a tile and the palette agree.
+
+  HOW MANY PLACES IS WHERE IT STANDS (`form`). `auto`, the default, is one amount standing alone: pence only when they
+  are not `.00`. A list, a table or a row's page hands the set's answer (`moneySet`): `exact` when any amount in the
+  column has pence, so every one shows two places, `auto` when none has. `whole` is a display figure (a tile, a hero, a
+  card, Today, the palette, a sentence), rounded to the unit: "£33,850". A ledger amount is never rounded.
+
+  UNTIL THE RECORD'S CURRENCY IS KNOWN it draws a quiet bar the figure's width and no text, rather than guessing: the
+  first paint printed "£9,190.00" and the next "£9,190.00 GBP" for one amount.
 
   ONE PIECE, NEVER BROKEN. Sign, symbol, figure and code sit on one line, so a narrow column never
   leaves a minus or a `£` at the end of one line and the digits on the next.
@@ -64,22 +71,49 @@
 </script>
 
 <script lang="ts">
-  import { integer, money } from 'braindog-render';
+  import { AMOUNT_SPACE, integer, moneySet, moneyWhole, writeAmount, type WrittenAmount } from 'braindog-render';
+  import { page } from '$app/state';
   import { homeCurrency } from '$lib/record/api.ts';
-  import { drawn } from '$lib/record/money.ts';
   import { frameResizeObserver } from './resize.ts';
 
   let {
     minor,
     currency,
     weight = 'normal',
-    home = homeCurrency(),
-  }: { minor: number; currency: string; weight?: 'normal' | 'strong'; home?: string | null } = $props();
+    form = 'auto',
+    home,
+  }: {
+    minor: number;
+    currency: string;
+    weight?: 'normal' | 'strong';
+    /** `auto`: pence only when not `.00`. `exact`: every minor unit (a set with pence). `whole`: a display figure. */
+    form?: 'auto' | 'exact' | 'whole';
+    /** The record's home currency, when the caller holds it; else the shell's. */
+    home?: string | null | undefined;
+  } = $props();
 
-  /* A VALUE WITH NO CODE PRINTS ITS DIGITS AND NO CODE, which is the honest state of a money field
-     with no currency. A figure `money()` could not state (`drawn` is null) prints as it was written. */
-  const text = $derived(currency ? money(minor, currency) : integer(minor));
-  const parts = $derived(currency ? drawn(text, home) : null);
+  /* THE SHELL SAYS THE RECORD'S CURRENCY ONCE `boot` HAS ANSWERED (`index.currency`, `null` for a record with none). Before
+     then nothing is known, and a guess is the code appearing and going between two paints. */
+  const told = $derived.by((): { known: boolean; home: string | null } => {
+    if (home !== undefined) return { known: true, home };
+    const index = (page.data as { index?: { currency?: string | null } } | undefined)?.index;
+    if (index && Object.hasOwn(index, 'currency')) return { known: true, home: index.currency ?? null };
+    const learnt = homeCurrency();
+    return { known: learnt !== null, home: learnt };
+  });
+
+  /* A VALUE WITH NO CODE PRINTS ITS DIGITS AND NO CODE, which is the honest state of a money field with no currency. */
+  const w = $derived.by((): WrittenAmount | null => {
+    if (!currency) return null;
+    const h = told.home;
+    if (form === 'whole') return moneyWhole(minor, currency, h);
+    if (form === 'exact') return writeAmount({ minor, currency }, h, 'exact');
+    return moneySet([minor], currency, h).written[0] ?? null;
+  });
+  const parts = $derived(
+    w ? { lead: `${w.minus}${w.codePlace === 'before' ? `${w.code}${AMOUNT_SPACE}` : w.sign}`, whole: w.whole, fraction: w.fraction, iso: w.codePlace === 'after' ? w.code : null } : null,
+  );
+  const text = $derived(w ? w.text : Number.isInteger(minor) ? integer(minor) : '');
   const whole = $derived(parts ? `${parts.lead}${parts.whole}${parts.fraction}${parts.iso ? ` ${parts.iso}` : ''}` : text);
 
   let node = $state<HTMLSpanElement | null>(null);
@@ -111,12 +145,21 @@
   });
 </script>
 
-<span class="money num" data-weight={weight} data-fit={fit} bind:this={node} title={fit === 'cut' ? whole : undefined}>{#if parts}<span class="amount">{parts.lead}{parts.whole}{parts.fraction}</span>{#if parts.iso}<span class="code">{parts.iso}</span>{/if}{:else}<span class="amount">{text}</span>{/if}</span>
+{#if currency && !told.known}<span class="money num money-held" aria-hidden="true" style={`inline-size: ${Math.max(3, whole.length - 3)}ch`}></span>{:else}<span class="money num" data-weight={weight} data-fit={fit} bind:this={node} title={fit === 'cut' ? whole : undefined}>{#if parts}<span class="amount">{parts.lead}{parts.whole}{parts.fraction}</span>{#if parts.iso}<span class="code">{parts.iso}</span>{/if}{:else}<span class="amount">{text}</span>{/if}</span>{/if}
 
 <style>
   .money {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+  }
+
+  /* THE CURRENCY NOT YET KNOWN: a quiet bar the figure's width, on the line where the figure will stand. */
+  .money-held {
+    display: inline-block;
+    block-size: 0.9em;
+    vertical-align: -0.1em;
+    background: var(--field);
+    border-radius: var(--r-sm);
   }
 
   .money[data-fit='step'] {
@@ -146,7 +189,7 @@
   .code {
     margin-inline-start: 0.3em;
     color: var(--dim);
-    font-size: 0.85em;
+    font-size: var(--fs-meta);
     letter-spacing: 0;
   }
 
