@@ -197,9 +197,9 @@ export const MEASURES = [
   { name: 'A rail place, height', token: '--rail-item-h', kit: /Rows are (\d+) tall/u },
   { name: 'A control, height', token: '--btn-h', kit: /A (\d+)px circle, or a capsule/u },
   { name: 'A control in a panel, height', token: '--btn-h-sm', kit: /drops to (\d+) \//u },
-  { name: 'A control, text size', token: '--t-sm', kit: /\| Control \| (\d+) medium/u },
+  { name: 'A control, text size', token: '--fs-meta', kit: /\| Control \| (\d+) medium/u },
   { name: 'A table row, height', token: '--row-h', kit: /Rows: (\d+) min height/u },
-  { name: 'A field, corner', token: '--r-md', kit: /Inputs\.\*\* Padding [\d/]+, radius (\d+)/u },
+  { name: 'A field, corner', token: '--r-pop', kit: /Inputs\.\*\* Padding [\d/]+, radius (\d+)/u },
   { name: 'A tile, corner', token: '--r-tile', kit: /The card is radius (\d+)/u },
   { name: 'The grid step', token: '--sp-1', kit: /\*\*Grid:\*\*\s*(\d+)px/u },
 ];
@@ -218,7 +218,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/gu, (c) => ({ '&': '&amp;', 
 /** The page's own colours, the live dark and light board, tile, ink, quiet text and working red, from `house.css`. */
 export function pageColours(house) {
   const role = (block, name) => new RegExp(`--${name}:\\s*([^;]+);`, 'u').exec(block)?.[1]?.trim() ?? '';
-  const of = (block) => ({ board: role(block, 'board'), tile: role(block, 'tile'), ink: role(block, 'ink'), dim: role(block, 'dim'), red: role(block, 'action'), redText: role(block, 'action-text'), onRed: role(block, 'on-action') });
+  const of = (block) => ({ board: role(block, 'board'), tile: role(block, 'tile'), ink: role(block, 'ink'), dim: role(block, 'ink-3'), red: role(block, 'red-fill'), redText: role(block, 'red'), onRed: role(block, 'on-red') });
   const darkAt = house.indexOf('prefers-color-scheme: dark');
   return { light: of(house.slice(0, darkAt === -1 ? undefined : darkAt)), dark: of(darkAt === -1 ? '' : house.slice(darkAt)) };
 }
