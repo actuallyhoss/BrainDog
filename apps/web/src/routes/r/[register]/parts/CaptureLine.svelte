@@ -1,60 +1,46 @@
 <!--
-  CAPTURE, FIRST ON THE PAGE: add a row by typing its name and pressing Enter.
+  CAPTURE: add a row by typing its name and pressing Enter. From 640 the toolbar's primary ("Add a bill or invoice")
+  opens it as a line under the toolbar, in the tile, where the row will land; below 640 the head's "+" opens it as the
+  bottom sheet. A drawer the height of the window for one field read as an empty panel.
 
-  IT WAS A MODAL BEHIND A BUTTON, asking for every declared field. The add is the most frequent
-  write a person makes to a list and it was the most expensive one on this screen: a press, a
-  dialog, a form, a submit, a dismissal. This is a press and a return key.
+  IT WAS A LINE UNDER THE TOOLBAR, and before that a modal asking for every declared field. The line was the list's
+  third row of controls over its first row of data, and the toolbar's end now holds the list's one primary (the UI pass
+  of 20 October, money F7), so the line went into the sheet that primary opens: "New bill or invoice", one field, Add,
+  and "Fill in the rest" for a row that needs more than its name.
 
-  THE SUBMIT CONTROL IS INSIDE THE FIELD AND ONLY EXISTS ONCE THERE IS SOMETHING TO ADD, which
-  is the one place a button of this kind is not clutter: it appears exactly when it can do
-  something, so it is never a control a reader has to learn to ignore.
+  IT STAYS OPEN AFTER ENTER (motion F7.4): the field empties, the caret stays, and the next name can be typed at once,
+  while the row lands in the list behind with the list's motion. It closes on Close, Esc or a pull down. A press of Add
+  with nothing typed puts the caret back in the field and adds nothing: a primary is never drawn disabled (first F16).
 
-  `form` AND `type="submit"` RATHER THAN A KEYDOWN HANDLER, because Enter in a single-field form
-  is the platform's own behaviour and a phone's keyboard prints "Go" for it without being asked.
+  `form` AND `type="submit"` RATHER THAN A KEYDOWN HANDLER, because Enter in a single-field form is the platform's own
+  behaviour and a phone's keyboard prints "Go" for it without being asked.
 
-  ABOVE THE SEARCH AND THE FILTERS, because it is the one thing here that does not act on the
-  rows below it. AND NOTHING UNDER IT: a sentence sat there on every visit saying what a new row
-  would still be missing or take from the filter. The row says what it is missing once it
-  exists, in its cells and its receipt; said in advance, over the list, it was the screen
-  explaining itself.
-
-  IT IS THE LIST TILE'S FIRST LINE, under the toolbar and over the rows (DIRECTION 39), drawn as the row a new one
-  would be: no fill until it is pointed at or typed in.
-
-  ON A PHONE IT IS A SHEET BEHIND THE HEAD'S "+". The line stood over the
-  search box and the filters, so three rows of controls came before the first card, and a phone's
-  list starts within 150px of its head. Below 640px the line is not drawn; `CapturePlus` in the
-  head's action slot opens this sheet with the field focused, "Add" as its primary, and "All fields"
-  for a row that needs more than its name, which is the page's whole form.
-
-  IT IS THE LIST'S ONE WAY TO ADD. The head held "New item" over this line's "Add an item", two controls for one act;
-  the head's went, and the whole form is `n` and the first entry of the head's overflow. So the line's plus starts on
-  the tile's edge, where the search box above it and the rows under it start, and its words are in the second ink.
-
-  THE LINE IS THE PAGE'S. `value` is bound to the page's `capture`, because the page empties it when
-  the question changes and puts the typing back when the record refuses it; `open` is the page's
-  too, since the "+" that opens the sheet is in the head; `captureRow` and `allFields` are the page's,
-  and this file only draws the line.
+  THE LINE IS THE PAGE'S. `value` is bound to the page's `capture`, because the page empties it when the question
+  changes and puts the typing back when the record refuses it; `open` is the page's too, since what opens the sheet is
+  in the head and the toolbar; `captureRow` and `allFields` are the page's, and this file only draws the sheet.
 -->
 <script lang="ts">
-  /* THE CAPTURE BLOCK'S LINE IS THIS LINE (`kinds/capture.css`), so the register draws it from the same sheet. */
-  import '@braindog/skin/kinds/capture.css';
+  import { tick } from 'svelte';
   import { copy } from '$lib/copy.ts';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
+  import { rowIn, rowOut } from '$lib/ui/motion.ts';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
 
   let {
     one,
+    example = null,
     value = $bindable(''),
     open = $bindable(false),
     captureRow,
     allFields,
   }: {
     one: string;
+    /** A name from the list itself, shown in the field as what a name here looks like. */
+    example?: string | null;
     value?: string;
-    /** The phone's sheet, which the head's "+" opens. */
+    /** The sheet, which the toolbar's primary and the phone's "+" open. */
     open?: boolean;
     captureRow: () => void;
     /** The whole form, for a row that needs more than its name. Absent, the sheet offers only Add. */
@@ -62,70 +48,99 @@
   } = $props();
 
   /* This part's own words. */
-  const words = { allFields: 'Fill in the rest' } as const;
+  const words = {
+    title: (what: string) => `New ${what}`,
+    ask: (eg: string | null) => (eg ? `What is it? e.g. ${eg}` : 'What is it?'),
+    allFields: 'Fill in the rest',
+    close: 'Close',
+  } as const;
+
+  /* THE LINE CLOSES ON ESCAPE and gives the keyboard back to the button that opened it. */
+  function closeLine() {
+    open = false;
+    void tick().then(() => document.querySelector<HTMLElement>('[data-capture-open]')?.focus());
+  }
+
+  /* The line's field takes the caret the moment it opens. */
+  const caret = (node: HTMLInputElement) => {
+    node.focus();
+  };
+
+  let input = $state<HTMLInputElement>();
+
+  async function add(e: SubmitEvent) {
+    e.preventDefault();
+    if (value.trim()) captureRow();
+    /* THE CARET STAYS FOR THE NEXT ONE, and an empty press is answered by putting it there. */
+    await tick();
+    input?.focus();
+  }
 </script>
 
-{#if rowsAsCards()}
-  <!-- THE SHEET CLOSES ON ADD, so the row lands in front of the person with its receipt on it, and a
-       refusal puts the typing back in the line for the next time it opens. -->
-  <Sheet bind:open title={copy.captureIn(one)}>
-    <form
-      id="capture-sheet"
-      class="capture"
-      onsubmit={(e) => {
-        e.preventDefault();
-        if (!value.trim()) return;
-        captureRow();
-        open = false;
-      }}
-    >
+{#if !rowsAsCards()}
+  {#if open}
+    <form class="capture capture-line" in:rowIn out:rowOut onsubmit={add} aria-label={words.title(one)}>
       <label class="capture-label" for="capture">{copy.captureIn(one)}</label>
-      <div class="capture-field">
-        <input id="capture" class="capture-input" type="text" autocomplete="off" enterkeyhint="done" bind:value placeholder={copy.captureIn(one)} />
+      <div class="field capture-box">
+        <Icon name="plus" size="s" />
+        <input
+          bind:this={input}
+          {@attach caret}
+          id="capture"
+          class="field-input capture-input"
+          type="text"
+          autocomplete="off"
+          bind:value
+          placeholder={words.ask(example)}
+          onkeydown={(e) => {
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            e.stopPropagation();
+            closeLine();
+          }}
+        />
       </div>
+      <Button weight="primary" type="submit" data-capture-go>{copy.captureAdd}</Button>
+      {#if allFields}<Button weight="quiet" onclick={() => allFields?.()}>{words.allFields}</Button>{/if}
+      <button type="button" class="capture-close tap" aria-label={words.close} onclick={closeLine}><Icon name="close" size="s" /></button>
     </form>
-    {#snippet footer()}
-      <Button weight="primary" type="submit" form="capture-sheet" disabled={!value.trim()} data-capture-go>{copy.captureAdd}</Button>
-      {#if allFields}
-        <Button
-          weight="bare"
-          onclick={() => {
-            open = false;
-            allFields?.();
-          }}>{words.allFields}</Button
-        >
-      {/if}
-    {/snippet}
-  </Sheet>
+  {/if}
 {:else}
-  <form
-    class="capture"
-    onsubmit={(e) => {
-      e.preventDefault();
-      captureRow();
-    }}
-  >
+<Sheet bind:open title={words.title(one)}>
+  <form id="capture-sheet" class="capture" onsubmit={add}>
     <label class="capture-label" for="capture">{copy.captureIn(one)}</label>
-    <div class="capture-field">
-      <Icon name="plus" size="m" />
+    <div class="field capture-box">
+      <Icon name="plus" size="s" />
       <input
+        bind:this={input}
         id="capture"
-        class="capture-input"
+        class="field-input capture-input"
         type="text"
         autocomplete="off"
+        enterkeyhint="done"
         bind:value
-        placeholder={copy.captureIn(one)}
+        placeholder={words.ask(example)}
       />
-      <!-- Present only once there is something to add. -->
-      {#if value.trim()}<button type="submit" class="capture-go">{copy.captureAdd}</button>{/if}
     </div>
   </form>
+  {#snippet footer()}
+    {#if allFields}
+      <Button
+        weight="quiet"
+        onclick={() => {
+          open = false;
+          allFields?.();
+        }}>{words.allFields}</Button
+      >
+    {/if}
+    <Button weight="primary" type="submit" form="capture-sheet" data-capture-go>{copy.captureAdd}</Button>
+  {/snippet}
+</Sheet>
 {/if}
 
 <style>
-  /* ONE LINE, AND IT LOOKS LIKE ONE. The label is for a screen reader and for nobody else: the
-     field's own placeholder says the same words, and a visible label above a single-field form
-     turns one line into three. */
+  /* ONE FIELD, AND IT LOOKS LIKE ONE. The label is for a screen reader: the field's own placeholder says what to type,
+     and a visible label above a single-field form turns one line into three. */
   .capture {
     margin: 0;
   }
@@ -139,107 +154,61 @@
     white-space: nowrap;
   }
 
-  /* THE LIST'S FIRST LINE, INSIDE ITS TILE (DIRECTION 39): a plus and "Add an item" at the rows' own edge, 40 tall and
-     44 under a thumb, with no fill until it is pointed at or typed in, when it takes the field's. It reads as the row a
-     new one would be, not as a second search box under the first. */
-  .capture-field {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-block-size: 40px;
-    margin-inline: calc(-1 * var(--sp-3));
-    padding-inline: var(--sp-3) 4px;
-    background: none;
-    border: 0;
-    border-radius: var(--r-ctl);
-    color: var(--ink2);
-    transition: background var(--d-state) var(--ease-out);
+  /* THE FIELD IS `controls.css`'s, 44 tall here at every width since it is the sheet's whole content, with the ring
+     every field wears on its box. */
+  .capture-box {
+    min-block-size: var(--tap);
   }
 
-  /* THE PLUS STARTS ON THE TILE'S EDGE, where the search box above it and the rows under it start. Its strokes sit
-     5.25 of the glyph's 24 units inside its box, so the box is drawn that far back and the ink lands on the edge. */
-  .capture-field > :global(.icon) {
-    margin-inline-start: calc(var(--icon-m) * -5.25 / 24);
-  }
-
-  .capture-field:focus-within {
-    background: var(--field);
-    color: var(--ink);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .capture-field:hover {
-      background: var(--field);
-    }
-  }
-
-  @media (pointer: coarse) {
-    .capture-field {
-      min-block-size: var(--tap);
-    }
-  }
-
-  /* THE RING IS ON THE BOX AND NOT ON THE INPUT, because the submit control is inside the box: a
-     ring around the text alone would draw a line between the field and its own button. It is the
-     same move `/search` makes for the same reason. */
-  /* The ring itself is `controls.css`'s, shared with every field. */
-
+  /* The body size under a mouse, and 16px under a thumb, so a phone never zooms into the field. */
   .capture-input {
-    flex: 1;
-    align-self: stretch;
-    min-inline-size: 0;
-    padding-block: 0;
-    background: none;
-    border: 0;
     color: var(--ink);
     font: inherit;
-    /* The body size under a mouse, and 16px under a thumb, so a phone never zooms into the field. */
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   @media (pointer: coarse) {
     .capture-input {
-      font-size: var(--t-md);
+      font-size: var(--t-md, 16px);
     }
   }
 
-  /* THE LIST'S ONE WAY TO ADD, so its words are in the second ink and not the dimmest: read, without shouting. */
   .capture-input::placeholder {
-    color: var(--ink2);
+    color: var(--ink-3);
   }
 
-  .capture-input:focus-visible {
-    /* focus-ok: the caret indicates focus, and `.capture-field:focus-within` above carries the
-       state change for the box the reader actually sees. */
-    outline: none;
-    box-shadow: none;
+  /* FROM 640, ONE LINE IN THE TILE: the field takes the room, then Add, Fill in the rest and the close. */
+  .capture-line {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
   }
 
-  /* THE ADD, THE ACCENT'S PRIMARY INSIDE THE FIELD, drawn only once there is something to add. */
-  .capture-go {
-    min-block-size: var(--btn-h-sm);
-    padding: 0 var(--sp-3);
-    background: var(--action);
+  .capture-line .capture-box {
+    flex: 1;
+    min-inline-size: 0;
+    min-block-size: 40px;
+  }
+
+  .capture-close {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
+    padding: 0;
+    background: none;
     border: 0;
-    border-radius: calc(var(--r-ctl) - 2px);
-    color: var(--on-action);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-medium);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .capture-go:hover {
-      background: var(--action-hover);
-    }
-  }
-
-  /* 48x24 MEASURED AT 390, on the primary write action of the register. It is drawn only once
-     there is something to add, which is why no gate has ever measured it: the scan runs over a
-     page at rest and this button does not exist then. */
-  @media (pointer: coarse) {
-    .capture-go {
-      min-block-size: var(--tap);
+    .capture-close:hover {
+      background: var(--hover);
+      color: var(--ink);
     }
   }
 </style>

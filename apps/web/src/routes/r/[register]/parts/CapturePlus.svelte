@@ -35,10 +35,10 @@
       inline-size: var(--tap);
       block-size: var(--tap);
       padding: 0;
-      background: var(--action);
+      background: var(--red-fill);
       border: 0;
       border-radius: var(--r-ctl);
-      color: var(--on-action);
+      color: var(--on-red);
       cursor: pointer;
     }
   }
