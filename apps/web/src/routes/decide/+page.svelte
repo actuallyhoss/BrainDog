@@ -344,7 +344,9 @@
   /* THE HEAD'S LINE IS THE RECORD'S, and there is none with no question waiting: the head is then the page's name, and
      BrainDog's own card under it says what waits in its own heading. Said in the head as well, the same sentence stood
      twice, one over the other. */
-  const headLine = $derived(cleared ? undefined : shaped?.sentence.text);
+  /* WITH NOTHING TO ASK THE LINE SAYS SO, and what BrainDog did by itself today (today F12). */
+  const handledToday = $derived(handled ? handled.rows.length + handled.more : 0);
+  const headLine = $derived(cleared ? (handledToday > 0 ? words.nothingHandled(handledToday) : undefined) : shaped?.sentence.text);
   const now = $derived(live?.now ?? 0);
   const went = $derived(callsRead(calls));
   const checked = $derived(went.met + went.missed + went.unread);
@@ -357,8 +359,15 @@
   /* WHERE EACH SITS ON A WIDE BOARD (`boardOf`): a third each, or a half, or the row, for those that hold something. */
   const board = $derived(boardOf({ money: counts.money > 0, quick: counts.quick > 0, handled: counts.handled > 0 }));
   const columns = $derived((['money', 'quick', 'handled'] as const).filter((c) => counts[c] > 0));
-  /* ON A PHONE ONE COLUMN AT A TIME, switched with the segmented control over them; the first that holds something. */
-  let chosenColumn = $state<Column | null>(null);
+  /* ON A PHONE ONE COLUMN AT A TIME, switched with the segmented control over them; the first that holds something.
+     `?show=handled` (Today's "Review") opens on Handled, and on a wide board scrolls it into view. */
+  let chosenColumn = $state<Column | null>(route.url.searchParams.get('show') === 'handled' ? 'handled' : null);
+  let shownHandled = false;
+  $effect(() => {
+    if (shownHandled || !handled || route.url.searchParams.get('show') !== 'handled') return;
+    shownHandled = true;
+    requestAnimationFrame(() => document.getElementById('handled')?.scrollIntoView({ block: 'nearest' }));
+  });
   const showing = $derived<Column | null>(chosenColumn !== null && columns.includes(chosenColumn) ? chosenColumn : (columns[0] ?? null));
 
   /* ASKING YOURSELF A QUESTION, filed through `AskSheet`; the new question is read back into the queue it joins. */
@@ -397,7 +406,7 @@
     {#snippet actions()}
       {#if answerable}
         <Menu label={WORDS.more} align="end">
-          {#snippet trigger()}<span class="head-more" title={WORDS.more}><Icon name="more" size="m" /></span>{/snippet}
+          {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="dsr">{WORDS.more}</span></span>{/snippet}
           <button type="button" role="menuitem" data-ask onclick={() => (asking = true)}>{WORDS.ask}</button>
           <button type="button" role="menuitemcheckbox" aria-checked={selecting} data-select onclick={() => (selecting = !selecting)}>{WORDS.select}</button>
         </Menu>
@@ -412,7 +421,7 @@
     {/if}
 
     {#if cleared}
-      {#if improving === 0}
+      {#if improving === 0 && !handled}
         <Empty kind="cleared" title={said('no_questions')} body={copy.noQuestionsWhy}>
           {#snippet actions()}
             {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
@@ -424,7 +433,7 @@
       <!-- ON A PHONE, ONE COLUMN AT A TIME: Money, Quick and Handled, each with how many it holds. -->
       {#if columns.length > 1}
         <div class="switch">
-          <Segmented role="group" aria-label={WORDS.columns}>
+          <Segmented role="group" aria-label={WORDS.columns} full>
             {#each columns as c (c)}
               <button type="button" class="segment" data-on={showing === c ? '' : undefined} aria-pressed={showing === c} onclick={() => (chosenColumn = c)}
                 >{GROUP_WORDS[c]} <span class="num switch-n">{counts[c]}</span></button
@@ -447,7 +456,7 @@
         <PageView slug="decide" got={drawn} mode="home" select whole {reread} opens={handled ? handledColumn : undefined} />
       </div>
     {/if}
-    {#if cleared && handled}<Handled found={handled} heading={GROUP_WORDS.handled} />{/if}
+    {#if cleared && handled}<div class="handled-alone" id="handled"><Handled found={handled} heading={GROUP_WORDS.handled} head="column" /></div>{/if}
 
     <!-- BRAINDOG'S OWN PAGE UPDATES, one card under the questions, for the owner. Loaded only when something waits. -->
     {#if improved && improving > 0}
@@ -508,7 +517,7 @@
 {/if}
 
 {#snippet handledColumn()}
-  {#if handled}<Handled found={handled} heading={GROUP_WORDS.handled} />{/if}
+  {#if handled}<div class="handled-col" id="handled"><Handled found={handled} heading={GROUP_WORDS.handled} head="column" /></div>{/if}
 {/snippet}
 
 <style>
@@ -554,7 +563,7 @@
   }
 
   .switch-n {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE COLUMNS' WELLS ARE QUIET: every question here needs you, so red is kept for the answer and for what is late. */
@@ -566,11 +575,16 @@
   @media (width < 900px) {
     .switch {
       display: flex;
-      justify-content: flex-start;
     }
 
     .switch > :global(.segmented) {
+      inline-size: 100%;
       margin-inline: 0;
+    }
+
+    .switch > :global(.segmented > .segment) {
+      flex: 1 1 0;
+      min-inline-size: 0;
     }
 
     /* THE SWITCH ALREADY NAMES THE COLUMN SHOWN, so its tile's name is said to a screen reader and not drawn again. */
@@ -688,6 +702,78 @@
 
   .page[data-selecting] :global(.qa-select) {
     opacity: 1;
+  }
+
+  /* SAID TO A SCREEN READER, NOT DRAWN: the "⋯"'s name (motion F11). */
+  .dsr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* HANDLED STANDS IN ITS COLUMN AS MONEY AND QUICK DO, from the top of the board's first row. */
+  .handled-col,
+  .handled-alone {
+    min-inline-size: 0;
+    scroll-margin-block-start: var(--sp-6);
+  }
+
+  /* "N MORE" UNDER A COLUMN IS A FULL-WIDTH QUIET PRESS (today F22), as wide as the cards it opens, a thumb tall. */
+  .body :global(.block-slot[data-key^='decide-'] > .block-more) {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: var(--tap);
+    margin-block-start: var(--tile-gap);
+    border-radius: var(--r-ctl);
+    background: none;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .body :global(.block-slot[data-key^='decide-'] > .block-more:hover) {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+
+  /* WHAT WAS PUT OFF AND WHAT WAS DECIDED ARE PLAIN DISCLOSURE LINES (today F12), not tiles that say only a heading and
+     Show: the name at 15/600 with a quiet well, and the fold's word at the end of the line. */
+  .body :global(.block-slot:has(> .block[data-kind='section'])) {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: var(--tap);
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  .body :global(.block-slot:has(> .block[data-kind='section']) > .block-bar) {
+    margin: 0;
+  }
+
+  .body :global(.block-slot:has(> .block[data-kind='section']) .well) {
+    background: var(--tile-2);
+    color: var(--ink-2);
+  }
+
+  .body :global(.block-slot:has(> .block[data-kind='section']) > .block) {
+    margin: 0;
+  }
+
+  .body :global(.block-slot:has(> .block[data-kind='section']) .sec-toggle) {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: 500;
   }
 
   /* THE "⋯" IN THE HEAD: a quiet square, a tap wide under a thumb. */

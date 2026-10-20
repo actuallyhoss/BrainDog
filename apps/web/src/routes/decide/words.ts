@@ -15,6 +15,8 @@ export const words = {
 
   /** The page's calm line, lifted into the head while nothing waits. */
   nothingWaiting: 'Nothing needs you.',
+  /** With nothing to ask and something BrainDog did itself today (today F12). */
+  nothingHandled: (n: number) => `Nothing needs you. BrainDog did ${n.toLocaleString('en-GB')} ${n === 1 ? 'thing' : 'things'} itself today.`,
   /** The calm line once something has been decided, with how long ago the last one was. */
   lastDecided: (when: string) => `Nothing needs you. The last one was decided ${when}.`,
   /* WITH SOMETHING IN THE INBOX "NOTHING WAITS" WOULD BE FALSE (EXP-E07): the calm line then says no question waits. */

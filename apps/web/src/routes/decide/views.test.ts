@@ -132,8 +132,8 @@ test('the record draws the page: the first question whole, the rest after it onc
   /* THE LINE WENT TO THE HEAD, and says how many wait and what the first suggests. */
   assert.equal(note?.drawn, false);
   assert.equal(shaped.open, 3);
-  assert.equal(shaped.sentence.text, 'Three questions wait on you. Slash suggests “Raise it” for the first.');
-  assert.equal(shaped.sentence.needs, '');
+  assert.equal(shaped.sentence.text, '3 quick ones.');
+  assert.equal(shaped.sentence.needs, '3 quick ones');
   /* EACH QUESTION ONCE, IN ITS GROUP: none of these moves money, so Money draws nothing and Quick holds all three. */
   const moneyIds = (money?.queue ?? []).map((q) => q.id);
   const quickIds = (quick?.queue ?? []).map((q) => q.id);
@@ -177,15 +177,19 @@ const queueBlock = (queue: QueueQuestion[], total: number, lead = false): LiveBl
 
 const noteBlock = (): LiveBlock => decideBlockOf({ kind: 'note', lead: true, body: words.nothingWaiting } as never, CLOCK);
 
-test('the head says the record’s count with no quota in red, and red only for questions waiting past two weeks', () => {
+test('the head says the two groups in digits (today F12): how many about money and what they come to, then the quick ones', () => {
   const qs = ['q1', 'q2', 'q3', 'q4', 'q5'].map((id, n) => question(id, 'call', n === 0));
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 5, true), queueBlock(qs, 5)], CLOCK, () => 'Claude');
-  assert.equal(shaped.sentence.text, 'Five questions wait on you. Claude suggests “Yes” for the first.');
-  assert.equal(shaped.sentence.needs, '');
-  const old = qs.map((q, n) => (n < 2 ? { ...q, at: new Date(CLOCK - 20 * DAY).toISOString() } : q));
-  const waited = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 5, true), queueBlock(old, 5)], CLOCK, () => 'Claude', null, LATE);
-  assert.equal(waited.sentence.text, 'Five questions wait on you, two of them for over two weeks. Claude suggests “Yes” for the first.');
-  assert.equal(waited.sentence.needs, 'two of them for over two weeks');
+  assert.equal(shaped.sentence.text, '5 quick ones.');
+  assert.equal(shaped.sentence.needs, '5 quick ones');
+  const bills = [
+    { ...question('m1'), question: 'Invoice 2026-041: brand system was due 38 days ago, GBP 4,800.00. Chase it?' },
+    { ...question('m2'), question: 'Invoice 2026-046: retainer, August was due 9 days ago, GBP 2,400.00. Chase it?' },
+    { ...question('m3'), question: 'Ledger Post, sending plan was due 4 days ago, GBP 39.00. Did it go through?' },
+  ];
+  const mixed = decideDrawn([noteBlock(), queueBlock([...bills, ...qs], 8, true), queueBlock([...bills, ...qs], 8)], CLOCK);
+  assert.match(mixed.sentence.text, /^3 about money, [^.]*7,239[^.]* in all\. 5 quick ones\.$/u);
+  assert.equal(mixed.sentence.needs, '3 about money');
   /* NONE MOVES MONEY, so Quick holds every one, once, and Money draws nothing. */
   assert.deepEqual(shaped.blocks[2]?.queue?.map((q) => q.id), ['q1', 'q2', 'q3', 'q4', 'q5']);
   assert.equal(shaped.blocks[2]?.total, 5);
@@ -193,36 +197,22 @@ test('the head says the record’s count with no quota in red, and red only for 
   assert.equal(shaped.open, 5);
 
   const one = decideDrawn([noteBlock(), queueBlock([question('q1', 'undo')], 1, true), queueBlock([question('q1', 'undo')], 1)], CLOCK);
-  assert.equal(one.sentence.text, 'One question waits on you. It is hard to undo.');
-  assert.equal(one.sentence.needs, '');
+  assert.equal(one.sentence.text, '1 quick one.');
   /* A GROUP THAT HOLDS NOTHING IS NOT DRAWN, the question is drawn once, and the indexes stay. */
   assert.equal(one.blocks.length, 3);
   assert.equal(one.blocks[1]?.drawn, false);
   assert.deepEqual(one.blocks[2]?.queue?.map((q) => q.id), ['q1']);
 });
 
-test('the head counts what is hard to undo and what has waited from the record, over every question and not the few drawn', () => {
+test('the head counts every open question by the record’s count, not the few drawn', () => {
   const withCounts = (b: LiveBlock, waiting: unknown): LiveBlock => ({ ...b, waiting }) as LiveBlock;
   const qs = ['q1', 'q2', 'q3'].map((id) => question(id));
-  /* THE RECORD SAYS 12 OPEN, 4 OF THEM HARD TO UNDO AND 3 PAST TWO WEEKS, though the three drawn are none of those. */
+  /* THE RECORD SAYS 12 OPEN, though three are drawn. */
   const lead = withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 3, hardToUndo: 4 });
   const rest = withCounts(queueBlock(qs, 12), { stale: 3, hardToUndo: 4 });
   const shaped = decideDrawn([noteBlock(), lead, rest], CLOCK, undefined, null, LATE);
-  assert.equal(shaped.sentence.text, '12 questions wait on you, three of them for over two weeks. Four are hard to undo.');
-  assert.equal(shaped.sentence.needs, 'three of them for over two weeks');
-
-  /* THE MOST EITHER QUEUE SAID, since both count every open question. */
-  const most = decideDrawn([noteBlock(), withCounts(queueBlock(qs.slice(0, 1), 12, true), { stale: 0, hardToUndo: 1 }), rest], CLOCK, undefined, null, LATE);
-  assert.equal(most.sentence.text, shaped.sentence.text);
-
-  /* NOUGHT FROM THE RECORD IS NOUGHT, even where the questions drawn would say otherwise. */
-  const old = qs.map((q) => ({ ...q, cost: 'undo' as const, at: new Date(CLOCK - 20 * DAY).toISOString() }));
-  const none = decideDrawn([noteBlock(), withCounts(queueBlock(old.slice(0, 1), 3, true), { stale: 0, hardToUndo: 0 }), withCounts(queueBlock(old, 3), { stale: 0, hardToUndo: 0 })], CLOCK);
-  assert.equal(none.sentence.text, 'Three questions wait on you.');
-
-  /* A RECORD OLDER THAN THE COUNTS, or one that sent them in a shape this cannot read, is counted from what was drawn. */
-  const counted = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 3, true), withCounts(queueBlock(old, 3), { stale: 'three' })], CLOCK, undefined, null, LATE);
-  assert.equal(counted.sentence.text, 'Three questions wait on you, all of them for over two weeks. All of them are hard to undo.');
+  assert.equal(shaped.sentence.text, '12 quick ones.');
+  assert.equal(shaped.open, 12);
 });
 
 test('with boot\'s waits the head says the record\'s one count, and the calm line only when nothing waits in the inbox either', () => {
@@ -230,7 +220,7 @@ test('with boot\'s waits the head says the record\'s one count, and the calm lin
   /* THE BADGE'S NUMBER (`waits`), not the three the queue drew, and its late and hard counts. */
   const waits = { questions: 25, late: 10, hard: 2, inbox: 32 };
   const shaped = decideDrawn([noteBlock(), queueBlock(qs.slice(0, 1), 3, true), queueBlock(qs, 3)], CLOCK, () => '', waits, LATE);
-  assert.equal(shaped.sentence.text, '25 questions wait on you, ten of them for over two weeks. Two are hard to undo.');
+  assert.equal(shaped.sentence.text, '25 quick ones.');
   assert.equal(shaped.open, 25);
   /* NO QUESTION BUT 32 ARRIVALS: "Nothing waits on you" would be false. */
   const inbox = decideDrawn([noteBlock(), queueBlock([], 0, true), queueBlock([], 0)], CLOCK, undefined, { questions: 0, late: 0, hard: 0, inbox: 32 }, LATE);
@@ -330,8 +320,8 @@ test('the board puts Money, Quick and Handled a third each, a half each, or the 
 
 test('the screen shows Handled as the third column and switches between the three on a phone', () => {
   assert.match(screen, /loadHandled\(apiBase\(\)\)/u);
-  assert.match(screen, /<Handled found=\{handled\} heading=\{GROUP_WORDS\.handled\} \/>/u);
-  assert.match(screen, /<Segmented role="group" aria-label=\{WORDS\.columns\}>/u);
+  assert.match(screen, /<Handled found=\{handled\} heading=\{GROUP_WORDS\.handled\} head="column" \/>/u);
+  assert.match(screen, /<Segmented role="group" aria-label=\{WORDS\.columns\} full>/u);
   assert.match(screen, /\.block-slot\[data-key='decide-money'\]/u);
   assert.match(screen, /\.block-slot\[data-key='decide-quick'\]/u);
 });

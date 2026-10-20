@@ -20,17 +20,18 @@
  * is an argument rather than a read of `Date.now()`, so a test can say what day it is.
  */
 
-import { day, relative, since } from 'braindog-render';
+import { day, exponentOf, relative, since, writeAmount } from 'braindog-render';
 import type { QueueQuestion } from '@braindog/kernel';
 import { createClient } from '@braindog/client';
 import { everyGovernance, governancePage, type Governor, type Read } from '../../lib/record/governance.ts';
 import { moneyInText, namesAmount } from '../../lib/record/money.ts';
+import { homeCurrency } from '../../lib/record/api.ts';
 import { blockOf, type Fetch, type LiveBlock, type Opened } from '../../lib/record/page-live.ts';
 import type { PageBlock } from '../../lib/record/schema.ts';
 import { emptyHidden, says } from '../../lib/page/home.ts';
 import { alikeOf } from '../../lib/page/alike.ts';
 import { copy } from '../../lib/copy.ts';
-import { ageDays, countSentence, WORDS as LEAD } from './lead.ts';
+import { ageDays, WORDS as LEAD } from './lead.ts';
 import { words } from './words.ts';
 import { othersLine, WORDS as DECIDER_WORDS, type Decided } from './[id]/decider.ts';
 
@@ -52,7 +53,9 @@ export const CALLS_READ = 50;
 
 /* THE SCREEN'S OWN WORDS, beside the only code that says them, until the Decide area has a copy file of its own. */
 export const WORDS = {
-  later: 'Coming back to you',
+  later: 'Later',
+  /** The fold of what was put off, with how many and the soonest back (today F12): "Later · 22 · next back 1 Dec". */
+  laterSaid: (n: number, back: string | null) => `Later · ${n.toLocaleString('en-GB')}${back ? ` · next back ${back}` : ''}`,
   calls: 'How the calls went',
   /** Noting a choice to make yourself, in the head's "⋯" (`AskSheet`). */
   ask: 'Note a choice to make',
@@ -306,6 +309,50 @@ export type DecideDrawn = {
  */
 export type DecideWaits = { questions: number; late: number; hard: number; inbox: number | null };
 
+/** A day as a fold says it: "1 Dec". */
+function shortDay(iso: string): string {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  return Number.isFinite(d.getTime()) ? `${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]}` : '';
+}
+
+/** The amount a money question's sentence names, as the record stored it ("GBP 4,800.00"), in minor units, or `null`. */
+function amountIn(q: QueueQuestion): { minor: number; currency: string } | null {
+  const held = Array.isArray(q.money) ? q.money[0] : undefined;
+  if (held && Number.isSafeInteger(held.amount)) return { minor: Math.abs(held.amount), currency: held.currency };
+  const m = /\b([A-Z]{3})\s?([\d,]+(?:\.(\d+))?)\b/u.exec(q.question);
+  if (!m) return null;
+  const exp = exponentOf(m[1]!);
+  const [whole = '0', frac = ''] = m[2]!.replace(/,/gu, '').split('.');
+  const minor = Number(whole) * 10 ** exp + Number((frac + '000').slice(0, exp) || 0);
+  return Number.isSafeInteger(minor) ? { minor, currency: m[1]! } : null;
+}
+
+/**
+ * NEEDS YOU'S LINE (today F12): how many are about money and what they come to, then how many quick ones; digits always.
+ * The sum is said only where every money question names its amount, and per currency, never added across.
+ */
+export function groupSentence(money: readonly QueueQuestion[], quick: readonly QueueQuestion[], quickCount = quick.length): { text: string; needs: string } {
+  const parts: string[] = [];
+  let needs = '';
+  if (money.length > 0) {
+    needs = `${money.length.toLocaleString('en-GB')} about money`;
+    const amounts = money.map(amountIn);
+    const sums = new Map<string, number>();
+    if (amounts.every((a) => a !== null)) for (const a of amounts) sums.set(a!.currency, (sums.get(a!.currency) ?? 0) + a!.minor);
+    const said = [...sums.entries()].map(([currency, minor]) => {
+      const exp = exponentOf(currency);
+      return writeAmount({ minor: Math.round(minor / 10 ** exp) * 10 ** exp, currency }, homeCurrency(), 'read')?.text ?? '';
+    });
+    parts.push(said.length > 0 && said.every((x) => x !== '') ? `${needs}, ${said.join(' and ')} in all.` : `${needs}.`);
+  }
+  if (quickCount > 0) {
+    const q = `${quickCount.toLocaleString('en-GB')} quick ${quickCount === 1 ? 'one' : 'ones'}`;
+    if (needs === '') needs = q;
+    parts.push(`${q}.`);
+  }
+  return { text: parts.join(' '), needs };
+}
+
 export function decideDrawn(
   blocks: readonly LiveBlock[],
   now: number,
@@ -326,6 +373,7 @@ export function decideDrawn(
   const hard = new Set<string>();
   const late = new Set<string>();
   let decided: string | null = null;
+  let shapedLater: { at: number; heading: string } | null = null;
   blocks.forEach((b, n) => {
     if (says(b) || !b.drawn) return;
     if (b.source === 'governance.decided' && decided === null) {
@@ -382,14 +430,19 @@ export function decideDrawn(
       ...(qs.length === 0 ? { drawn: false } : {}),
     } as LiveBlock;
   });
-  const first = pool[0];
-  const option = first?.options.find((o) => o.recommended)?.label;
-  const tally = counted as { hardToUndo: number; stale: number } | null;
-  const asker = first ? who(first) : '';
-  const waiting = waits
-    ? countSentence(waits.questions, waits.hard, option, asker, waits.late, lateDays)
-    : countSentence(open, tally?.hardToUndo ?? hard.size, option, asker, tally?.stale ?? late.size, lateDays);
+  /* THE LINE SAYS THE TWO GROUPS (today F12): "3 about money, £7,239 in all. 5 quick ones." The red is on the money. */
   if (waits) open = waits.questions;
+  /* THE QUICK ONES ARE EVERY OPEN QUESTION THAT IS NOT ABOUT MONEY, by the record's count where it says more than the
+     queue held. */
+  const waiting = pool.length > 0 ? groupSentence(money, quick, Math.max(quick.length, open - money.length)) : null;
+  /* WHAT WAS PUT OFF, BY HOW MANY AND THE SOONEST BACK, said on its fold's own line. */
+  const laterAt = blocks.findIndex((b) => b.kind === 'queue' && b.source === 'governance.later');
+  if (laterAt > 0 && blocks[laterAt - 1]?.kind === 'section') {
+    const held = blocks[laterAt]!;
+    const n = Math.max(held.total, held.queue?.length ?? 0);
+    const days = (held.queue ?? []).map((q) => q.until).filter((d): d is string => typeof d === 'string' && d !== '').sort();
+    shapedLater = { at: laterAt - 1, heading: n > 0 ? WORDS.laterSaid(n, days[0] ? shortDay(days[0]) : null) : WORDS.later };
+  }
   /* "NOTHING WAITS ON YOU" ONLY WHEN NOTHING DOES: an arrival in the inbox is something, so the line says no question does. */
   const arrived = (waits?.inbox ?? 0) > 0;
   const quiet = decided
@@ -397,7 +450,9 @@ export function decideDrawn(
     : arrived
       ? words.noQuestion
       : (calm ?? words.nothingWaiting);
-  const out = emptyHidden(shaped);
+  const later = shapedLater as { at: number; heading: string } | null;
+  const named = later ? shaped.map((b, n) => (n === later.at ? { ...b, heading: later.heading } : b)) : shaped;
+  const out = emptyHidden(named);
   return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn), groups };
 }
 
