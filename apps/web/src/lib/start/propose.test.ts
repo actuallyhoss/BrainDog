@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import type { AskSetup, SetupAsked, SetupReply } from './ask.ts';
 import { useCase } from '@braindog/seed/usecases';
 import { offerOf } from './offer.ts';
+import { currencyWord, placeCurrency } from './place-currency.ts';
 import { answer, oneQuestion } from './question.ts';
 
 import { caseBecame, currencyFor, draftBrief, fold, fromModel, heardWords, outsideCatalogue, partName, propose, proposeFirst, setupOffer } from './propose.ts';
@@ -108,9 +109,9 @@ test('THE MODEL READS WHAT THE RULES CANNOT, in any language', async () => {
   assert.deepEqual(p.heard, [{ phrase: 'mes devoirs', became: 'Student', at: [36, 47] }]);
 });
 
-test('A CURRENCY IS ONE THAT WAS TYPED, whatever the model guessed', async () => {
+test('A CURRENCY IS ONE THAT WAS TYPED OR A PLACE NAMED, whatever the model guessed', async () => {
   const p = await proposeFirst('I live in London and pay rent', CTX, fake(reply({ currency: 'GBP', modules: ['money-core'] })).ask);
-  assert.equal(p.currency, null, 'a place is not a currency');
+  assert.equal(p.currency, 'GBP', 'London, a place in the words, beats the device; the model guessing is not why (first F9)');
   const typed = await proposeFirst('I invoice Halden EGP 5,000 a month', CTX, fake(reply({ currency: 'EGP', modules: ['money-core'] })).ask);
   assert.equal(typed.currency, 'EGP');
 });
@@ -193,7 +194,7 @@ test("MARIAM'S SENTENCE: her as you, her words lit where she typed them, the sho
   assert.equal(p.places.find((x) => x.name === 'Clients')?.phrase, 'Mariam', 'People, called Clients, is there because she is');
   assert.equal(p.places.find((x) => x.name === 'Money')?.phrase, 'who owes me');
   assert.ok(p.modules.includes('portfolio'), 'Projects is still installed, since Money stands on it');
-  assert.equal(p.currency, null, 'no currency typed and none from the device');
+  assert.equal(p.currency, 'EGP', 'none typed and none from the device, so the shop in Alexandria keeps its own (first F9)');
   /* NO COUNT AND NO ENTRY SHE DID NOT TYPE: a place is its name and the words that turned it on, and nothing is filled. */
   for (const x of p.places) assert.deepEqual(Object.keys(x).sort(), ['at', 'id', 'kind', 'name', 'phrase']);
   assert.deepEqual(p.rows, []);
@@ -256,7 +257,7 @@ test('WHAT I HEARD, AS THE MOCKUP SAYS IT: Mariam is you, the shop its lists, fr
       ['a small candle shop', 'Orders and Products'],
       ['freelance as a designer', 'Clients and Invoices'],
       ['orders', 'Orders'],
-      ['who owes me', 'Money, in EGP'],
+      ['who owes me', 'Money, in Egyptian pounds'],
     ],
   );
   for (const h of p.heard) assert.equal(MARIAM.slice(...h.at!), h.phrase, `${h.phrase} is lit where she typed it`);
@@ -314,6 +315,23 @@ test('A USE CASE\'S PHRASE IS SAID AS ITS LISTS: the one it names, else all of t
   assert.equal(caseBecame(business, 'my business'), business.title, 'a use case that brings no list is said by its title');
 });
 
+test('A CITY IN THE SENTENCE BEATS THE DEVICE (first F9): a candle shop in Leeds keeps pounds on a laptop in Cairo', () => {
+  const leeds = propose("I'm Mariam and I run a small candle shop in Leeds. I want to track orders, stock and who owes me.", CAIRO);
+  assert.equal(leeds.currency, 'GBP');
+  assert.equal(leeds.currencyBy, undefined, 'a place in the words is not the device guessing');
+  assert.ok(leeds.heard.some((h) => h.became.endsWith('in pounds')), 'the line says pounds, not GBP');
+  /* A PLACE THAT AGREES WITH THE CLOCK CHANGES NOTHING: still the device's, said by its name. */
+  const cairo = propose('I run a small candle shop in Cairo and track who owes me', CAIRO);
+  assert.equal(cairo.currency, 'EGP');
+  assert.equal(cairo.currencyBy, 'device');
+  /* A WORD IS NOT A PLACE: "reading" is never Reading, and lower case names nothing. */
+  assert.equal(placeCurrency('I keep reading lists and track who owes me'), null);
+  assert.equal(placeCurrency('a studio in new york'), null);
+  assert.equal(placeCurrency('a studio in New York'), 'USD');
+  assert.equal(placeCurrency('a shop in York'), 'GBP');
+  assert.equal(currencyWord('GBP'), 'pounds');
+});
+
 test("A MODEL'S READING TAKES THE DEVICE'S CURRENCY THE SAME WAY, and the rules' Clients stand in with their lines", async () => {
   const thin = await proposeFirst(MARIAM, CAIRO, fake(reply({ usecase: 'shop', modules: ['money-core'], heard: [{ phrase: 'not in it', became: 'x' }] })).ask);
   assert.equal(thin.currency, 'EGP');
@@ -321,7 +339,7 @@ test("A MODEL'S READING TAKES THE DEVICE'S CURRENCY THE SAME WAY, and the rules'
   assert.equal(thin.heard.filter((h) => h.became.endsWith(heardWords.inCurrency('EGP'))).length, 1, 'said once, not twice');
   assert.deepEqual(thin.names, { people: 'Clients' });
   const own = await proposeFirst(MARIAM, CAIRO, fake(reply({ usecase: 'shop', modules: ['money-core'], heard: [{ phrase: 'who owes me', became: 'Money' }] })).ask);
-  assert.equal(own.heard.find((h) => h.phrase === 'who owes me')?.became, 'Money, in EGP');
+  assert.equal(own.heard.find((h) => h.phrase === 'who owes me')?.became, 'Money, in Egyptian pounds');
   assert.equal(own.names, undefined, "the model's own lines carry no rename of the rules'");
   /* A CURRENCY SHE TYPED THAT IS ALSO HER DEVICE'S IS STILL HERS, whatever the model read. */
   const typedEgp = 'I run a candle shop and invoice Halden EGP 5,000 a month';
@@ -424,7 +442,7 @@ test('A REFUSAL IS READ THROUGH WANT, NEED, TRACK, SEND, TAKE, KEEP, USE AND CHA
   assert.ok(!credit.modules.includes('money-core') && credit.also.length === 0, 'no Money, and nothing taken beside the shop');
 
   const owes = propose('no invoices, I just take orders and track who owes me', CAIRO);
-  assert.deepEqual(linesOf(owes), ['orders > Orders', 'who owes me > Money, in EGP'], 'what the person does do is kept');
+  assert.deepEqual(linesOf(owes), ['orders > Orders', 'who owes me > Money, in Egyptian pounds'], 'what the person does do is kept');
 
   /* EVERY VERB OF HAVING OR DOING BETWEEN THE REFUSAL AND THE THING, up to five small words. */
   for (const s of [
@@ -950,7 +968,7 @@ test("A SENTENCE THAT OPENS WITH A REFUSAL NAMES NOBODY: Don't need orders, I fr
   const typed = "Don't need orders, I freelance as a designer";
   const p = propose(typed, CAIRO);
   assert.equal(p.name, null, 'nobody is called "Don\'t need orders"');
-  assert.deepEqual(linesOf(p), ['freelance as a designer > Clients and Invoices, in EGP']);
+  assert.deepEqual(linesOf(p), ['freelance as a designer > Clients and Invoices, in Egyptian pounds']);
   assert.ok(p.also.length === 0 && !p.places.some((x) => x.name === 'Orders'), 'the orders are refused');
   /* THE WORDS ARE LIT WHERE THEY WERE TYPED, after a greeting and a run of spaces too. */
   for (const s of [typed, "Hi, don't need   orders, I freelance as a designer", 'Never had invoices; I run a small candle shop']) {
@@ -1001,7 +1019,7 @@ test('ONE LINE FOR ONE THING: a second phrase that became the same is folded int
     'a small candle shop > Orders and Products',
     'freelance as a designer > Clients and Invoices',
     'orders > Orders',
-    'who owes me, and taxes > Money, in EGP',
+    'who owes me, and taxes > Money, in Egyptian pounds',
   ]);
   assert.equal(p.heard.filter((h) => h.became.startsWith('Money')).length, 1, 'Money is said once');
   const money = p.heard.at(-1);

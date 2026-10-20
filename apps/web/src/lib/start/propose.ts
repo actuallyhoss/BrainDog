@@ -34,6 +34,7 @@ import { BUNDLED, closeOver, heardFor, PROJECTS, shape, toTurnOn, writable, type
 import { hear, heardAt, PEOPLE, type Span } from '../who.ts';
 import type { AskSetup, SetupOffer, SetupReply } from './ask.ts';
 import { offerOf } from './offer.ts';
+import { currencyWord, placeCurrency } from './place-currency.ts';
 import type { ArrivesBy } from './made.ts';
 import { entryOf, knownCurrency, listById, listsOf } from './lists.ts';
 
@@ -235,8 +236,9 @@ const partsOfBecame = (became: string): string[] => became.split(/,\s*|\s+and\s+
 
 /** The words a phrase reads as that no list declares: a freelancer's People are their Clients, what they bill Invoices. */
 export const heardWords = {
-  /** The currency the record will keep, said after the part that keeps money where the words named none. */
-  inCurrency: (code: string) => `in ${code}`,
+  /** The currency the record will keep, said after the part that keeps money where the words named none: by its name,
+      "in pounds", never its code (first F9). */
+  inCurrency: (code: string) => `in ${currencyWord(code)}`,
   clients: 'Clients',
   invoices: 'Invoices',
 };
@@ -891,9 +893,16 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
     if (pd && pd.missing.length === 0 && brings !== undefined && modules.includes(brings)) rows.push({ register: pd.register, fields: { ...pd.fields } });
   }
 
-  /* THE DEVICE'S CURRENCY WHERE NONE WAS TYPED, said on the line that became Money (`sayCurrency`). */
+  /* THE DEVICE'S CURRENCY WHERE NONE WAS TYPED, said on the line that became Money (`sayCurrency`). A PLACE THE SENTENCE
+     NAMES BEATS THE DEVICE (first F9): "a candle shop in Leeds" keeps pounds on a laptop that keeps Cairo time. Only
+     where the two differ, so a place that agrees with the clock changes nothing. It stands where the device would, so an
+     amount typed with no currency is still asked about, and a sentence that keeps no money takes none. */
   const typed = read.declined === null ? read.currency : null;
-  const currency = currencyFor(typed, modules, ctx, lines.some((h) => h.loose === true));
+  const placed = typed === null ? placeCurrency(said) : null;
+  const device = ctx.currency?.trim().toUpperCase() ?? null;
+  const loose = lines.some((h) => h.loose === true);
+  const there = placed !== null && placed !== device ? currencyFor(null, modules, { currency: placed }, loose) : null;
+  const currency = there ?? currencyFor(typed, modules, ctx, loose);
   const out = {
     name: name.name,
     usecase: u?.usecase ?? null,
@@ -905,7 +914,7 @@ export function propose(sentence: string, ctx: ProposeContext): Proposal {
   return {
     ...out,
     currency,
-    ...(typed === null && currency !== null ? { currencyBy: 'device' as const } : {}),
+    ...(typed === null && there === null && currency !== null ? { currencyBy: 'device' as const } : {}),
     rows,
     title: titleOf(said, name.name, rows),
     places: placesOf(out),
