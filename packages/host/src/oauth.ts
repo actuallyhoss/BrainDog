@@ -89,6 +89,8 @@ export type Approver =
       ok: true;
       record: string;
       provedAt: number;
+      /** When the account was made, in epoch milliseconds, where the host knows it: a new account counts as freshly proved (`NEW_ACCOUNT`). */
+      since?: number | undefined;
       mint: (args: { scope: OAuthScope; label: string; days: number; client: TokenClient }) => Promise<Minted>;
       cookie?: string | undefined;
     }
@@ -711,6 +713,19 @@ async function consentDoor(request: Request, deps: OAuthDeps): Promise<Response>
  * second token is made. The token is minted by the record as that person, labelled with the app's name, so it is on
  * the owner's list of tokens under that name and revocable there like any other.
  */
+/** An account this young has proved itself by being made, so Allow does not ask it to sign in a second time. */
+export const NEW_ACCOUNT = 60 * 60_000;
+
+/**
+ * Whether Allow may go ahead: a sign-in within `FRESH`, or an account made within `NEW_ACCOUNT`.
+ *
+ * AN OLDER ACCOUNT IS ASKED AS BEFORE. Only the account's age is read, never the session's, so a browser left signed in
+ * for a month on an old account still needs a sign-in in the last fifteen minutes.
+ */
+export function provedRecently(now: number, provedAt: number, since?: number): boolean {
+  return now - provedAt <= FRESH || (since !== undefined && now - since <= NEW_ACCOUNT);
+}
+
 async function approve(request: Request, deps: OAuthDeps): Promise<Response> {
   if (!sameOrigin(request, deps.issuer)) return oauthError(403, 'access_denied', 'Allowing an app is accepted only from a page on this BrainDog.');
   const body = await bodyOf(request);
@@ -735,7 +750,7 @@ async function approve(request: Request, deps: OAuthDeps): Promise<Response> {
       ...(who.retryAfter === undefined ? [] : [['retry-after', String(who.retryAfter)] as Header]),
       ...cookie(who.cookie),
     ]);
-  if (deps.now() - who.provedAt > FRESH)
+  if (!provedRecently(deps.now(), who.provedAt, who.since))
     return say(401, 'login_required', 'Sign in again, then allow this: BrainDog asks for a sign-in in the last fifteen minutes before it lets an app in.', cookie(who.cookie));
   const client = await deps.store({ op: 'client', client_id: held.client_id });
   const taken = client === null ? null : await deps.store({ op: 'take', id });

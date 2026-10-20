@@ -2218,6 +2218,12 @@ export class Directory$ extends DurableObject<Env> {
     return drill.read();
   }
 
+  /** When a person's account was made, in epoch milliseconds, or `null` for nobody: a new account may Allow without a second sign-in. */
+  madeAt(person: string): number | null {
+    const at = Date.parse(this.#directory().person(person)?.created_at ?? '');
+    return Number.isNaN(at) ? null : at;
+  }
+
   /** The live name of a record, or `null` for one with none: where `GET /app` sends a session back to. */
   slugOf(record: string): string | null {
     return this.#directory().slugOf(record);

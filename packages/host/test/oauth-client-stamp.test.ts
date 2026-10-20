@@ -52,7 +52,7 @@ function memoryStore(): OAuthStore {
 type MintArgs = Parameters<Extract<Approver, { ok: true }>['mint']>[0];
 
 /** The doors on one store, with an approver who proved a sign-in just now and a mint that keeps what it was given. */
-function doors(minted: Minted = { ok: true, bearer: 'bd_invented_bearer' }) {
+function doors(minted: Minted = { ok: true, bearer: 'bd_invented_bearer' }, proof: { provedAt?: number; since?: number } = {}) {
   const mints: MintArgs[] = [];
   const documents = new Map<string, string>();
   const deps: OAuthDeps = {
@@ -64,7 +64,8 @@ function doors(minted: Minted = { ok: true, bearer: 'bd_invented_bearer' }) {
     approver: async () => ({
       ok: true,
       record: 'rec_invented',
-      provedAt: Date.now(),
+      provedAt: proof.provedAt ?? Date.now(),
+      ...(proof.since === undefined ? {} : { since: proof.since }),
       mint: async (args) => {
         mints.push(args);
         return minted;
@@ -143,4 +144,22 @@ test('a mint the record refuses still says the record sentence, after the stamp 
   assert.equal(res.status, 401);
   assert.deepEqual(await res.json(), { error: 'access_denied', error_description: said });
   assert.equal(d.mints[0]?.client.kind, 'dcr');
+});
+
+test('an account made twenty minutes ago may allow without signing in again, and an older one may not', async () => {
+  const now = Date.now();
+  const twenty = now - 20 * 60_000;
+  const month = now - 30 * 24 * 3_600_000;
+  const redirect = `https://app.${SITE}/callback`;
+  const id = `https://${SITE}/oauth/client.json`;
+  const tries = async (proof: { provedAt: number; since?: number }) => {
+    const d = doors(undefined, proof);
+    d.documents.set(id, JSON.stringify({ client_id: id, client_name: APP, redirect_uris: [redirect] }));
+    const request = await d.hold(id, redirect);
+    return (await d.post('/oauth/approve', { request, record: 'rec_invented', scope: 'read' })).status;
+  };
+  assert.equal(await tries({ provedAt: twenty, since: twenty }), 200);
+  assert.equal(await tries({ provedAt: twenty }), 401);
+  assert.equal(await tries({ provedAt: month, since: month }), 401);
+  assert.equal(await tries({ provedAt: month, since: now - 2 * 3_600_000 }), 401);
 });

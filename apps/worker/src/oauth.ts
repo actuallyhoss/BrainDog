@@ -22,6 +22,7 @@ import {
   oauthError,
   oauthPage,
   REQUEST_GONE,
+  provedRecently,
   scopeSentence,
   serveOAuthDoor,
   TOKEN_DAYS,
@@ -33,7 +34,7 @@ import {
   type OAuthStore,
 } from '@braindog/host/oauth';
 import type { AuthResult, Who } from '@braindog/ports';
-import { FRESH, type CallContext } from '@braindog/record';
+import type { CallContext } from '@braindog/record';
 import type { SwitcherRow } from '@braindog/record/directory';
 import type { OAuthAnswers, OAuthCall } from '@braindog/record/oauth';
 
@@ -64,6 +65,7 @@ type DirectoryCalls = {
   auth(call: { flow: 'session'; sid: string; slug?: string }): Promise<AuthResult<Who>>;
   slugOf(record: string): Promise<string | null>;
   recordsFor(person: string): Promise<SwitcherRow[]>;
+  madeAt(person: string): Promise<number | null>;
 };
 
 /** A record's calls: what it says a person holds, and a request to its API, which `inward` has already given a context. */
@@ -162,7 +164,9 @@ function wiring<I>(request: Request, env: OAuthEnv<I>, host: string) {
     if (door.door === 'session') {
       const ctx = door.ctx;
       const on = record(door.record);
-      return { ok: true, record: door.record, provedAt: ctx.provedAt ?? 0, cookie: door.cookie, mint: (args) => mintOn(on, origin, ctx, args) };
+      const person = ctx.principal.kind === 'person' ? ctx.principal.id : null;
+      const since = person === null ? null : await directory().madeAt(person);
+      return { ok: true, record: door.record, provedAt: ctx.provedAt ?? 0, since: since ?? undefined, cookie: door.cookie, mint: (args) => mintOn(on, origin, ctx, args) };
     }
     if (door.door === 'refused')
       return { ok: false, status: door.status, say: door.status === 403 ? (door.refusal?.fix ?? REFUSED[403]) : REFUSED[door.status], retryAfter: door.retryAfter, cookie: door.cookie };
@@ -222,7 +226,8 @@ async function consentPage(request: Request, wired: { session: SessionDeps; dire
         : oauthPage(200, 'Connect this app', `${asking}\n<p>${escapeHtml(door.door === 'refused' ? (door.refusal?.fix ?? REFUSED[door.status]) : REFUSED[403])}</p>\n<div class="acts">${denyForm(consent)}</div>`);
     return withCookie(out, door.door === 'refused' ? door.cookie : undefined);
   }
-  if (wired.now() - (door.ctx.provedAt ?? 0) > FRESH)
+  const made = door.ctx.principal.kind === 'person' ? await wired.directory().madeAt(door.ctx.principal.id) : null;
+  if (!provedRecently(wired.now(), door.ctx.provedAt ?? 0, made ?? undefined))
     return withCookie(
       oauthPage(200, 'Sign in again to connect this app', signIn('You last signed in more than fifteen minutes ago. Sign in again in another tab, then reload this page. If BrainDog shows you as signed in, sign out and in again.')),
       door.cookie,
