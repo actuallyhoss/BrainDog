@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-20T05:20:53.220Z",
+  "made_at": "2026-10-20T05:45:12.344Z",
   "pages": [
     {
       "blocks": [
@@ -49,13 +49,13 @@
           "kind": "cards",
           "lead": true,
           "limit": 3,
-          "source": "register.ventures",
+          "source": "register.fresh_starts",
           "span": 12,
-          "key": "k02dfh99",
+          "key": "k0gxfz3d",
           "rows": [
             {
-              "id": "01M5BW2QZ44AG4H8PGPJKE4DTY",
-              "register": "ventures",
+              "id": "01M5BXF8WR3B6CMHYCTFGMBV4B",
+              "register": "fresh_starts",
               "seq": 1,
               "fields": {
                 "name": "Lanternfish",
@@ -67,8 +67,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -114,7 +114,7 @@
           "key": "k1co96st",
           "rows": [
             {
-              "id": "01M5BW2QZ44AG4H8PGPNPWCK3N",
+              "id": "01M5BXF8WR3B6CMHYCTGNRH899",
               "register": "venture_steps",
               "seq": 1,
               "fields": {
@@ -129,8 +129,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -172,7 +172,7 @@
           "key": "k0icm4n2",
           "rows": [
             {
-              "id": "01M5BW2QZ44AG4H8PGPVS706XQ",
+              "id": "01M5BXF8WR3B6CMHYCTNZFXB60",
               "register": "venture_steps",
               "seq": 2,
               "fields": {
@@ -189,12 +189,12 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             },
             {
-              "id": "01M5BW2QZ44AG4H8PGPWER7M32",
+              "id": "01M5BXF8WR3B6CMHYCTT7788A3",
               "register": "venture_steps",
               "seq": 3,
               "fields": {
@@ -208,8 +208,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -252,7 +252,7 @@
           "key": "k0kwx94a",
           "rows": [
             {
-              "id": "01M5BW2QZ44AG4H8PGPX4T68GM",
+              "id": "01M5BXF8WR3B6CMHYCTZQR83FZ",
               "register": "venture_steps",
               "seq": 4,
               "fields": {
@@ -267,8 +267,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -314,7 +314,7 @@
           "key": "k1ejsdwe",
           "rows": [
             {
-              "id": "01M5BW2QZ44AG4H8PGPZ2XDSAJ",
+              "id": "01M5BXF8WR3B6CMHYCV3QE3Q91",
               "register": "venture_choices",
               "seq": 1,
               "fields": {
@@ -327,8 +327,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -344,12 +344,12 @@
       "pack": "new-project",
       "page": "guide",
       "requires": [
-        "register.ventures",
+        "register.fresh_starts",
         "register.venture_steps",
         "register.venture_choices"
       ],
       "title": "Your project",
-      "read_at": "2026-10-20T05:20:53.220Z",
+      "read_at": "2026-10-20T05:45:12.344Z",
       "zone": "UTC",
       "look": {
         "look": "guide",
@@ -364,7 +364,7 @@
           "columns": [
             {
               "as": "title",
-              "field": "headline"
+              "field": "gist"
             },
             {
               "as": "when",
@@ -399,11 +399,11 @@
           "key": "k1qdgv7b",
           "rows": [
             {
-              "id": "01M5BW2QZ44AG4H8PGQ1MGFGBV",
+              "id": "01M5BXF8WR3B6CMHYCVA0H0AWX",
               "register": "venture_weeks",
               "seq": 1,
               "fields": {
-                "headline": "Five conversations done, three people want to try it.",
+                "gist": "Five conversations done, three people want to try it.",
                 "week_of": "2026-10-17",
                 "next": "Set up the trial for Priya and Teodor.",
                 "worry": "The import is slow.",
@@ -413,8 +413,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -535,7 +535,7 @@
           "key": "k0xi6g49",
           "rows": [
             {
-              "id": "01M5BW2QZ44AG4H8PGPVS706XQ",
+              "id": "01M5BXF8WR3B6CMHYCTNZFXB60",
               "register": "venture_steps",
               "seq": 2,
               "fields": {
@@ -552,8 +552,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -568,7 +568,7 @@
               "width": "13ch"
             },
             {
-              "field": "headline",
+              "field": "gist",
               "label": "Where it stood"
             }
           ],
@@ -588,11 +588,11 @@
           "key": "k06aylny",
           "rows": [
             {
-              "id": "01M5BW2QZ44AG4H8PGQ1MGFGBV",
+              "id": "01M5BXF8WR3B6CMHYCVA0H0AWX",
               "register": "venture_weeks",
               "seq": 1,
               "fields": {
-                "headline": "Five conversations done, three people want to try it.",
+                "gist": "Five conversations done, three people want to try it.",
                 "week_of": "2026-10-17",
                 "next": "Set up the trial for Priya and Teodor.",
                 "worry": "The import is slow.",
@@ -602,8 +602,8 @@
               },
               "state": null,
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -623,7 +623,7 @@
         "register.venture_steps"
       ],
       "title": "This week",
-      "read_at": "2026-10-20T05:20:53.220Z",
+      "read_at": "2026-10-20T05:45:12.344Z",
       "zone": "UTC",
       "look": {
         "look": "guide-week",

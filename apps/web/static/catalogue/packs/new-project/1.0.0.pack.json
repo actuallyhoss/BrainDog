@@ -13,7 +13,7 @@
   },
   "declarations": [
     {
-      "register": "ventures",
+      "register": "fresh_starts",
       "name": "Projects",
       "icon": "rocket",
       "one": "project",
@@ -92,7 +92,7 @@
           "id": "venture",
           "label": "Project",
           "type": "ref",
-          "to": "ventures",
+          "to": "fresh_starts",
           "index": true
         },
         {
@@ -183,7 +183,7 @@
           "id": "venture",
           "label": "Project",
           "type": "ref",
-          "to": "ventures",
+          "to": "fresh_starts",
           "index": true
         },
         {
@@ -205,9 +205,9 @@
       "icon": "calendar-days",
       "one": "week",
       "holds": "one note a week on where the project stands and what comes next",
-      "title": "headline",
+      "title": "gist",
       "mobile": [
-        "headline",
+        "gist",
         "week_of"
       ],
       "order": {
@@ -217,7 +217,7 @@
       "pack": "new-project",
       "fields": [
         {
-          "id": "headline",
+          "id": "gist",
           "label": "Where it stands",
           "type": "text",
           "required": true,
@@ -227,7 +227,7 @@
           "id": "venture",
           "label": "Project",
           "type": "ref",
-          "to": "ventures",
+          "to": "fresh_starts",
           "index": true
         },
         {
@@ -264,7 +264,7 @@
       "icon": "rocket",
       "pack": "new-project",
       "requires": [
-        "register.ventures",
+        "register.fresh_starts",
         "register.venture_steps",
         "register.venture_choices"
       ],
@@ -281,7 +281,7 @@
           "heading": "Where you are",
           "icon": "rocket",
           "span": 12,
-          "source": "register.ventures",
+          "source": "register.fresh_starts",
           "columns": [
             {
               "field": "name",
@@ -450,7 +450,7 @@
           "source": "register.venture_weeks",
           "columns": [
             {
-              "field": "headline",
+              "field": "gist",
               "as": "title"
             },
             {
@@ -546,7 +546,7 @@
               "width": "13ch"
             },
             {
-              "field": "headline",
+              "field": "gist",
               "label": "Where it stood"
             }
           ],
@@ -662,7 +662,7 @@
   ],
   "seeds": [
     {
-      "register": "ventures",
+      "register": "fresh_starts",
       "fields": {
         "name": "Lanternfish",
         "about": "A small tool that sorts a photographer's receipts.",
@@ -725,7 +725,7 @@
     {
       "register": "venture_weeks",
       "fields": {
-        "headline": "Five conversations done, three people want to try it.",
+        "gist": "Five conversations done, three people want to try it.",
         "week_of": {
           "day": "-3"
         },

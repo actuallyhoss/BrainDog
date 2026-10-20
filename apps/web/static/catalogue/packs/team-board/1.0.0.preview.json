@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "made_at": "2026-10-20T05:20:53.220Z",
+  "made_at": "2026-10-20T05:45:12.344Z",
   "pages": [
     {
       "blocks": [
@@ -68,7 +68,7 @@
           "key": "k1mimixe",
           "rows": [
             {
-              "id": "01M5BW2QZ47FRNCVAY96GGBCE8",
+              "id": "01M5BXF8WR15880354NPWPXFT9",
               "register": "team_tasks",
               "seq": 3,
               "fields": {
@@ -82,12 +82,12 @@
               },
               "state": "blocked",
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             },
             {
-              "id": "01M5BW2QZ47FRNCVAY935HQKY3",
+              "id": "01M5BXF8WR15880354NM2S3HTX",
               "register": "team_tasks",
               "seq": 2,
               "fields": {
@@ -100,12 +100,12 @@
               },
               "state": "review",
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             },
             {
-              "id": "01M5BW2QZ47FRNCVAY8XFHVBEB",
+              "id": "01M5BXF8WR15880354NEWY7GTR",
               "register": "team_tasks",
               "seq": 1,
               "fields": {
@@ -119,12 +119,12 @@
               },
               "state": "doing",
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             },
             {
-              "id": "01M5BW2QZ47FRNCVAY9ABHE12Z",
+              "id": "01M5BXF8WR15880354NQQHFFAT",
               "register": "team_tasks",
               "seq": 4,
               "fields": {
@@ -137,8 +137,8 @@
               },
               "state": "todo",
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -160,11 +160,11 @@
       "pack": "team-board",
       "page": "team-board",
       "requires": [
-        "register.members",
+        "register.teammates",
         "register.team_tasks"
       ],
       "title": "Board",
-      "read_at": "2026-10-20T05:20:53.220Z",
+      "read_at": "2026-10-20T05:45:12.344Z",
       "zone": "UTC",
       "look": {
         "look": "team-board",
@@ -247,7 +247,7 @@
           "key": "k1k858un",
           "rows": [
             {
-              "id": "01M5BW2QZ47FRNCVAY8XFHVBEB",
+              "id": "01M5BXF8WR15880354NEWY7GTR",
               "register": "team_tasks",
               "seq": 1,
               "fields": {
@@ -261,8 +261,8 @@
               },
               "state": "doing",
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -298,7 +298,7 @@
           "key": "k0uwoo50",
           "rows": [
             {
-              "id": "01M5BW2QZ47FRNCVAY96GGBCE8",
+              "id": "01M5BXF8WR15880354NPWPXFT9",
               "register": "team_tasks",
               "seq": 3,
               "fields": {
@@ -312,8 +312,8 @@
               },
               "state": "blocked",
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -342,7 +342,7 @@
           "key": "k0up9cu6",
           "rows": [
             {
-              "id": "01M5BW2QZ47FRNCVAY935HQKY3",
+              "id": "01M5BXF8WR15880354NM2S3HTX",
               "register": "team_tasks",
               "seq": 2,
               "fields": {
@@ -355,8 +355,8 @@
               },
               "state": "review",
               "version": 1,
-              "created_at": "2026-10-20T05:20:53.220Z",
-              "updated_at": "2026-10-20T05:20:53.220Z",
+              "created_at": "2026-10-20T05:45:12.344Z",
+              "updated_at": "2026-10-20T05:45:12.344Z",
               "deleted_at": null
             }
           ],
@@ -391,7 +391,7 @@
         "register.team_tasks"
       ],
       "title": "Who is doing what",
-      "read_at": "2026-10-20T05:20:53.220Z",
+      "read_at": "2026-10-20T05:45:12.344Z",
       "zone": "UTC",
       "look": {
         "look": "team-now",
