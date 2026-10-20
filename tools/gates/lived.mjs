@@ -169,7 +169,7 @@ function steppedClock(ms) {
  */
 export const cacheDir = () =>
   env.BRAINDOG_LIVED_CACHE ??
-  join(tmpdir(), `braindog-lived-${createHash('sha256').update(ROOT).digest('hex').slice(0, 12)}`);
+  join(tmpdir(), `braindog-lived-${createHash('sha256').update(ROOT).digest('hex')}`);
 
 /**
  * The hash a built record is kept under: the profile's file byte for byte, every document it installs (BrainDog's
