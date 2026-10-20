@@ -11,7 +11,7 @@
   in, and asks for a passkey, because that is how they come back. An address that can already sign in is sent to sign
   in first.
 
-  ONE SHEET, AS SIGN IN IS (`signin/Entry.svelte`): the mark at its top, the invitation's own title, what it opens, and
+  ONE SHEET UNDER THE BRAND, AS SIGN IN IS (`signin/Entry.svelte`): the invitation's own title, what it opens, and
   one ink button. The states are sign in's calm block: a glyph in a 32px well, the title, the lines under it.
 -->
 <script lang="ts">
@@ -53,15 +53,15 @@
    * then each list by its own name. `null` when a host older than these fields said nothing about either, and the
    * page then says only the address, as it did.
    */
-  /* A LEVEL THIS BUILD HAS NO WORDS FOR IS SAID AS "access", never printed as the host's own word for it. */
-  const does = (level: InviteLevel): string => (Object.hasOwn(copy.inviteDoes, level) ? copy.inviteDoes[level] : 'access');
-  const opens = (v: InviteSeen): string | null => {
-    const what = [
-      ...(v.level !== null ? [copy.inviteEverything(does(v.level))] : []),
-      ...v.lists.map((l) => copy.inviteListGives(l.name, does(l.level))),
-    ];
-    return what.length > 0 ? copy.inviteOpens(v.record ?? copy.inviteThisRecord, what.join(', ')) : null;
-  };
+  /* A LEVEL THIS BUILD HAS NO WORDS FOR IS SAID PLAINLY, never printed as the host's own word for it. */
+  const can = (level: InviteLevel): string => (Object.hasOwn(copy.inviteCan, level) ? copy.inviteCan[level] : copy.inviteCanOther);
+  /* ONE LINE A PART (first F14): "Bills and invoices: you can add", the whole BrainDog first when the link gives it. */
+  const opens = (v: InviteSeen): string[] => [
+    ...(v.level !== null ? [copy.inviteGives(copy.inviteEverything, can(v.level))] : []),
+    ...v.lists.map((l) => copy.inviteGives(l.name, can(l.level))),
+  ];
+  /** The BrainDog's own name, when the host said it: the title, the button and the welcome all name it. */
+  const recordName = $derived(seen?.ok ? (seen.value.record ?? null) : null);
 
   /**
    * AN INVITATION THAT GIVES "ADDS ONLY" AND NOTHING TO READ (USE-A11). Every screen of the app reads first, so the
@@ -153,7 +153,7 @@
 
 <svelte:head><title>{titleOf(copy.invitePageTitle)}</title></svelte:head>
 
-<!-- THE ENTRY FRAME EVERY WAY IN SHARES (`signin/Entry.svelte`): one sheet on the lit ground, the mark at its top. -->
+<!-- THE ENTRY FRAME EVERY WAY IN SHARES (`signin/Entry.svelte`): the brand on the ground, one sheet under it. -->
 <Entry>
   <div class="col">
     <div class="act">
@@ -177,7 +177,7 @@
           {#snippet actions()}<Button weight="primary" onclick={lookAgain}>{copy.askAgain}</Button>{/snippet}
         </Empty>
       {:else if seen && !seen.ok}
-        <Empty heading kind="error" glyph="link" title={sentence(seen)} body={copy.inviteAskNew}>
+        <Empty heading kind="error" glyph="link" title={sentence(seen)} body={copy.inviteAskAgain}>
           {#snippet actions()}<Button href="/signin">{copy.signIn}</Button>{/snippet}
         </Empty>
       {:else if proving !== null}
@@ -185,7 +185,7 @@
              whole of what the screen can say: where the link went, and what opening it does. -->
         <div class="calm">
           <IconWell name="link" size="l" />
-          <h1 class="calm-title">{copy.inviteCheckMail}</h1>
+          <h1 class="entry-title">{copy.inviteCheckMail}</h1>
           <p class="calm-body" role="status">{copy.inviteMailSent(proving)}</p>
         </div>
       {:else if seen && seen.ok && !joined}
@@ -195,8 +195,12 @@
                drew an error card it settled `refused`, so `a11y` skipped it and nothing ever audited
                it; the moment it settled `empty` the gate looked and found no `h1` at four widths. The
                branches are exclusive, so exactly one of these is ever on the page. -->
-          <h1 class="calm-title">{copy.inviteLanding}</h1>
-          {#if opens(seen.value)}<p class="calm-body opens">{opens(seen.value)}</p>{/if}
+          <h1 class="entry-title">{copy.inviteLanding(recordName)}</h1>
+          {#if opens(seen.value).length > 0}
+            <ul class="opens">
+              {#each opens(seen.value) as line (line)}<li>{line}</li>{/each}
+            </ul>
+          {/if}
           <p class="calm-body">{copy.inviteFor(seen.value.email)}</p>
           {#if seen.value.signedInAs}<p class="calm-body">{copy.inviteSignedInAs(seen.value.signedInAs)}</p>{/if}
           {#if link?.proof && !seen.value.signedInAs}<p class="calm-body">{copy.inviteFromMail}</p>{/if}
@@ -207,15 +211,15 @@
                goes nowhere, and so would asking again on the page the mail opens, whose name was kept with the
                proof. Without it People drew their address where their name goes. -->
           {#if asksName}
-            <div class="row">
-              <label class="field-label" for="in-name">{copy.inviteNameLabel}</label>
+            <div class="name-row">
+              <label class="field-label" for="in-name">{copy.inviteNameLabel} <span class="optional">{copy.inviteOptional}</span></label>
               <span class="field">
                 <input id="in-name" class="field-input" type="text" autocomplete="name" bind:value={name} />
               </span>
             </div>
           {/if}
           <Button weight="primary" onclick={accept} aria-busy={busy === 'accept'}>
-            {busy === 'accept' ? copy.inviteAccepting : copy.inviteAccept}
+            {busy === 'accept' ? copy.inviteAccepting : copy.inviteAccept(recordName)}
           </Button>
           {#if failed}
             <p class="status" role="status">{failed}</p>
@@ -225,7 +229,7 @@
       {:else if joined}
         <div class="calm">
           <IconWell name="check" size="l" tone="earn" />
-          <h1 class="calm-title">{copy.inviteJoined}</h1>
+          <h1 class="entry-title">{copy.inviteJoined(recordName)}</h1>
           {#if addsOnly}<p class="calm-body">{copy.inviteAddsOnlyNext}</p>{/if}
           {#if !keyAdded && here.webauthn && here.secure}<p class="calm-body">{copy.inviteKeepWay}</p>{/if}
         </div>
@@ -285,9 +289,11 @@
     text-align: center;
   }
 
-  /* `Empty` stands in the sheet as sign in's does: its own padding goes, because the column already spaces it. */
+  /* `Empty` stands in the sheet as sign in's does, with no tile of its own: its padding goes, because the column already
+     spaces it. */
   .act :global(.empty) {
-    padding-block: 0;
+    padding: 0;
+    background: none;
   }
 
   .act :global(.empty-actions) {
@@ -305,32 +311,28 @@
     margin-block-end: var(--sp-1);
   }
 
-  .calm-title {
-    /* THE SIZE IS STATED HERE BECAUSE THE TAG IS A HEADING. This is the page's `h1`, and a user agent draws an `h1`
-       at `2em`, so leaving the size to the default would double it. */
-    margin: 0;
-    /* AND IT IS THE ENTRY SCREENS' ONE TITLE: `t-title`, 28/34 at 600, in Geist; 30/36 on a phone. */
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-title);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 34px;
-    text-wrap: balance;
-    overflow-wrap: anywhere;
-  }
-
-  /* A label above its field (`.field-label` puts 6 under it), as every field in the product has. */
-  .row {
+  /* A label above its field (`.field-label` puts 6 under it), as every field in the product has, and the field the
+     column's width. Its own name, not the ledger's `.row` (SF5), which drew a rule under it and cut the field short. */
+  .name-row {
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
   }
 
+  .name-row .field {
+    inline-size: 100%;
+  }
+
+  .optional {
+    margin-inline-start: var(--sp-2);
+    color: var(--ink-3);
+    font-weight: 400;
+  }
+
   .calm-body,
   .status {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-base);
     line-height: 20px;
     overflow-wrap: anywhere;
@@ -342,24 +344,23 @@
     scroll-margin-block: var(--sp-6) calc(var(--tap) + var(--sp-6));
   }
 
-  /* WHAT THE LINK OPENS is the line a person decides by, so it reads in ink rather than the grey around it. */
+  /* WHAT THE LINK OPENS is what a person decides by, so it reads in ink, one part a line, rather than the grey around it. */
   .opens {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
     color: var(--ink);
-    font-weight: 500;
+    font-size: var(--fs-body);
+    line-height: 22px;
+    overflow-wrap: anywhere;
   }
 
   /* UNDER A THUMB THE FIELD READS AT 16, the phone's body size, below which a phone's browser zooms in on focus. */
   @media (pointer: coarse) {
     .doors .field-input {
       font-size: var(--t-md);
-    }
-  }
-
-  @media (width < 900px) {
-    .calm-title {
-      font-family: var(--font-display);
-      font-size: var(--t-figure);
-      line-height: 36px;
     }
   }
 </style>
