@@ -33,7 +33,7 @@
  * `webworker` library into a program that is otherwise the DOM's, where the two declare `self` differently.
  */
 
-import { CEILING, COPY, KEPT, fresh, markOf, route, words, type Route } from './lib/data/offline.ts';
+import { CEILING, COPY, KEPT, accessEnded, fresh, markOf, route, words, type Route } from './lib/data/offline.ts';
 
 type Waits = { waitUntil(p: Promise<unknown>): void };
 type Opened = { url: string; focus(): Promise<unknown> };
@@ -133,7 +133,8 @@ async function answer(kind: Exclude<Route, 'pass' | 'out'>, e: Fetched, now: num
  *
  * A 401 FROM ANYTHING DELETES THE COPY. The session this copy was read with is over, whether it was signed out on
  * another device, expired, or revoked from Settings, and a phone that can no longer read the record online must not
- * go on drawing it offline.
+ * go on drawing it offline. AND SO DOES A REFUSAL SAYING THEIR ACCESS ENDED (`x-braindog-access: ended`, a 403): a
+ * guest whose last share stopped is still signed in, and the record they can no longer read must not stay here either.
  */
 async function network(req: Request): Promise<Response | null> {
   let res: Response;
@@ -142,7 +143,7 @@ async function network(req: Request): Promise<Response | null> {
   } catch {
     return null;
   }
-  if (res.status === 401) await sw.caches.delete(COPY);
+  if (res.status === 401 || accessEnded(res.headers)) await sw.caches.delete(COPY);
   return res;
 }
 

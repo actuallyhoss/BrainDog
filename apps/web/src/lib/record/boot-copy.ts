@@ -15,6 +15,11 @@ import type { Shell } from './boot-live.ts';
 export const COPY_VERSION = 1;
 /** How long a copy may be drawn; older is dropped, since a week-old rail is more wrong than a wait. */
 export const COPY_MS = 7 * 24 * 3_600_000;
+/**
+ * How long a guest's shell may be drawn: a day, as their local copy (`GUEST_MS` in `data/local.ts`, not imported, so this
+ * module stays out of that one's chunk). A guest is somebody shares let in, with no role on the whole record.
+ */
+export const GUEST_COPY_MS = 24 * 3_600_000;
 export const COPY_KEY = 'braindog.boot-copy';
 
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -70,7 +75,11 @@ export function readCopy(base: string, now: number = Date.now(), store: Store | 
       return null;
     }
     if (e.base !== base) return null;
-    if (now < e.at || now - e.at >= COPY_MS) {
+    /* A GUEST'S SHELL IS DRAWN A DAY AT MOST, and never past their last share's end (`GUEST_COPY_MS`). */
+    const grant = e.shell.me?.grant;
+    const guest = grant !== undefined && e.shell.me.lists !== null;
+    const until = guest && grant.until !== null ? Date.parse(grant.until) : NaN;
+    if (now < e.at || now - e.at >= (guest ? GUEST_COPY_MS : COPY_MS) || now >= until) {
       dropCopy(store);
       return null;
     }

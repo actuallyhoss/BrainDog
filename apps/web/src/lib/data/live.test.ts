@@ -16,7 +16,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { delayOf, poller, Wait, type LiveState, type Timers, type Visibility } from './live.ts';
+import { delayOf, endedBy, poller, regranted, Wait, type LiveState, type Timers, type Visibility } from './live.ts';
+import { accessEnded } from './offline.ts';
 
 /**
  * A clock that only moves when told to, and fires each timer that falls due inside the time it moved.
@@ -294,4 +295,43 @@ test('the layout draws the hairline from the live store, not from a constant', (
      both ways. So the hairline's attribute and the call that starts the poll are named too. */
   assert.match(layout, /data-state=\{live\.state\}/, 'the hairline reads the state the poll sets');
   assert.match(layout, /follow\(data\.live === true \?/, 'and the poll is started, for a live record only');
+});
+
+/* ── access: a share changed, or ended (sharing plan §2.8) ── */
+
+test('an access epoch that moved boots the tab again; nobody no share let in is ever re-booted by it', () => {
+  assert.equal(regranted(4, 5), true, 'a share changed');
+  assert.equal(regranted(4, null), true, 'the last share ended while a role stayed');
+  assert.equal(regranted(null, 3), true, 'a first share for a member');
+  assert.equal(regranted(4, 4), false);
+  /* AN OWNER'S SHELL SAYS NO GRANT AND THE POLL SENDS NONE: absent and null are one answer. */
+  assert.equal(regranted(null, undefined), false);
+  assert.equal(regranted(undefined, undefined), false);
+});
+
+test('only the door\'s access refusal ends the tab: FORBIDDEN at access, and no other 403', () => {
+  assert.equal(endedBy({ code: 'FORBIDDEN', at: 'access', fix: "Your access to Ada's record ended. Ask Ada if you need it back." } as never), true);
+  assert.equal(endedBy({ code: 'FORBIDDEN', at: 'principal' }), false, 'a stopped member is told otherwise');
+  assert.equal(endedBy({ code: 'FORBIDDEN' }), false, 'a stranger at a name is not told their access ended');
+  assert.equal(endedBy({ code: 'LEVEL_REQUIRED', at: 'access' }), false);
+  assert.equal(endedBy(null), false);
+});
+
+/* THE POLL, THE LAYOUT AND THE SERVICE WORKER ARE WIRED TO IT, which a pure test cannot mount, so their text is read as the
+   hairline's is above: the ended refusal wipes the copies and is drawn, an epoch move re-boots, and the worker deletes
+   its cache on the header. */
+test('an ended refusal wipes both copies and draws the ended screen; the worker deletes its cache on the header', () => {
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const poll = read('./live.svelte.ts');
+  assert.match(poll, /endedBy\(out\.refusal\)\) end\(out\.refusal\.fix\)/, 'the poll ends the tab on the access refusal');
+  assert.match(poll, /function end\(said: string\): void \{\s*void forget\(\)[\s\S]*?void wipeLocal\(\);[\s\S]*?live\.ended = \{ said \};/, 'ending wipes the worker\'s copy and the local copy');
+  assert.match(poll, /regranted\(known, epoch\)/, 'an epoch move re-boots');
+  const layout = read('../../routes/+layout.svelte');
+  assert.match(layout, /data\.refused\?\.at === 'access'/, 'a boot refused the same way draws the same screen');
+  assert.match(layout, /<AccessEnded said=\{endedSaid\} \/>/);
+  assert.match(layout, /followGrant\(me\.grant\?\.epoch \?\? null\)/, 'the layout tells the poll the epoch it booted with');
+  const worker = read('../../service-worker.ts');
+  assert.match(worker, /res\.status === 401 \|\| accessEnded\(res\.headers\)/, 'the worker deletes its copy on the header');
+  assert.equal(accessEnded(new Headers({ 'x-braindog-access': 'ended' })), true);
+  assert.equal(accessEnded(new Headers()), false);
 });

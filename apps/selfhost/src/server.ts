@@ -34,6 +34,7 @@ import {
   heldContext,
   seeAs,
   SEE_AS_HEADER,
+  accessHeaders,
   sessionContext,
   sessionCookie,
   type AccountDoor,
@@ -104,7 +105,7 @@ import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
 import { withVaultPassphrase } from '@braindog/host';
 import { rootKeysOf } from './keys.ts';
 import { slashErasing } from './slash.ts';
-import { MEMBER_STOPPED } from '@braindog/kernel';
+import { ACCESS_ENDED_AT, accessEndedSaid, MEMBER_STOPPED } from '@braindog/kernel';
 import { deriveShareKey, serveShared, sharedNone, shareOf, withShareLinks, type SharedDoor } from '@braindog/host';
 /* NAMED APART FOR THE LINK'S DOOR, so the API door's own limiter can import the same two functions under their own
    names without this file binding one name twice. */
@@ -238,6 +239,9 @@ const OFF: Refusal = { code: 'FORBIDDEN', fix: 'This credential does not reach t
 
 /** What a person an owner has stopped reads at the session door, the Worker's words exactly (`MEMBER_STOPPED`). */
 const STOPPED: Refusal = { code: 'FORBIDDEN', fix: MEMBER_STOPPED, at: 'principal' };
+
+/** What a guest whose last share ended reads at the session door (sharing plan §2.8), the Worker's words exactly. */
+const endedOf = (ended: { owner: string | null } | null): Refusal | null => (ended === null ? null : { code: 'FORBIDDEN', fix: accessEndedSaid(ended.owner), at: ACCESS_ENDED_AT });
 
 /**
  * A record whose every owner is suspended.
@@ -612,7 +616,7 @@ async function contextFor(request: Request, host: string, site: Site, door?: str
     /* A rotation reaches the cookie whatever the answer is. */
     const carried = out.session === undefined ? {} : { cookie: out.session === 'clear' ? clear : sessionCookie(out.session.sid, site.mode) };
     const held = api.kernel.access(out.body.person);
-    if (!held) return { refused: api.kernel.memberStopped(out.body.person) ? STOPPED : OFF, ...carried };
+    if (!held) return { refused: api.kernel.memberStopped(out.body.person) ? STOPPED : endedOf(api.kernel.accessEnded(out.body.person)) ?? OFF, ...carried };
     /* AND A COOKIE WRITE MUST COME FROM A PAGE ON THIS ORIGIN (`12 §8` CSRF). `SameSite=Lax` keeps the
        cookie off a cross-site POST; this is the half that does not depend on the browser. */
     if (!SAFE.has(request.method) && !sameOrigin(request, site.origin)) return { refused: CROSS, ...carried };
@@ -2534,7 +2538,7 @@ async function answer(
      behaving differently depending on where it runs. */
   if ('refused' in seen) {
     const out = { ok: false as const, refusal: seen.refused };
-    return write(res, json(httpStatus(out), out), seen.cookie);
+    return write(res, json(httpStatus(out), out, accessHeaders(seen.refused)), seen.cookie);
   }
   /* A NAME THIS PROCESS WAS NOT REACHED BY: an empty 421, which says nothing to a page that rebound its
      own name onto this port. */

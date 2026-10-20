@@ -60,10 +60,12 @@
   /* THE FORM LAYOUT EVERY AREA'S FORMS WEAR (2.A.26): two columns from 1100px, checkbox groups, number fields, the
      submit row at the tile's foot. */
   import '$lib/ui/forms.css';
-  /* EVERY AREA TAKES `{ shell, area }` AND NOTHING ELSE, so each arm of the chain below is the same line. */
+  /* EVERY AREA TAKES `{ shell, area }`, so each arm of the chain below is the same line. Sharing alone also takes People
+     here, the People area it draws first (`here`), so it names no other area itself. */
   import Appearance from './areas/Appearance.svelte';
   import SigningIn from './areas/SigningIn.svelte';
   import People from './areas/People.svelte';
+  import Sharing from './areas/Sharing.svelte';
   import Ingest from './areas/Ingest.svelte';
   import Keyboard from './areas/Keyboard.svelte';
   import Navigation from './areas/Navigation.svelte';
@@ -492,7 +494,8 @@
     {:else if area === 'navigation'}
       <Navigation {shell} {area} />
     {:else if area === 'people'}
-      <People {shell} {area} />
+      <!-- PEOPLE & SHARING DRAWS THE PEOPLE AREA FIRST, as People here: roles, invites and links, then every share. -->
+      <Sharing {shell} {area}>{#snippet here()}<People {shell} {area} />{/snippet}</Sharing>
     {:else if area === 'signing-in'}
       <SigningIn {shell} {area} />
     {:else if area === 'agents'}

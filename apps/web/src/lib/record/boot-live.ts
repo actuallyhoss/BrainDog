@@ -156,6 +156,13 @@ export type Shell = ShellBase & {
     levels?: Readonly<Record<string, HeldLevel>>;
     /** A person's own navigation on this record, key by key (`nav-prefs.svelte.ts`). Absent for a token. */
     prefs?: Prefs;
+    /**
+     * WHERE SHARES MADE THIS PERSON'S ACCESS, as `boot` says it (`me.grant`): the access epoch the local copy is keyed on
+     * and the version poll compares, and when the last share ends. Absent for anybody who holds no share.
+     */
+    grant?: { epoch: number; until: string | null };
+    /** A fingerprint of the rows and fields their shares narrow them to (`me.lens`), for the copy's key. */
+    lens?: string;
   };
   /**
    * Why the records this person can reach could not be listed, when they could not.
@@ -1038,6 +1045,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
       lists: held,
       ...((levels) => (levels === null ? {} : { levels }))(levelsFrom((b.me as Record<string, unknown> | undefined)?.levels)),
       ...(b.me?.prefs ? { prefs: b.me.prefs as Prefs } : {}),
+      ...grantFrom(b.me),
     },
     people: [],
     /* THE FIRST SCREEN'S QUESTIONS, capped as `boot` caps them. Their options and cost are one `governance` read away. */
@@ -1082,6 +1090,20 @@ export const NO_RECORD_FIX = 'You are signed in and on no record yet.';
 
 export const onNoRecord = (said: { code: string; fix: string } | null | undefined): boolean =>
   said !== null && said !== undefined && said.code === 'FORBIDDEN' && said.fix === NO_RECORD_FIX;
+
+/**
+ * `me.grant` and `me.lens` as the shell keeps them, or nothing: the access epoch and the last share's end, and the
+ * fingerprint of what shares narrow (sharing plan slice 10). A host older than either sends neither.
+ */
+export function grantFrom(me: unknown): Pick<Shell['me'], 'grant' | 'lens'> {
+  if (typeof me !== 'object' || me === null) return {};
+  const m = me as { grant?: unknown; lens?: unknown };
+  const g = typeof m.grant === 'object' && m.grant !== null ? (m.grant as { epoch?: unknown; until?: unknown }) : null;
+  return {
+    ...(g && typeof g.epoch === 'number' ? { grant: { epoch: g.epoch, until: typeof g.until === 'string' ? g.until : null } } : {}),
+    ...(typeof m.lens === 'string' && m.lens !== '' ? { lens: m.lens } : {}),
+  };
+}
 
 export const refusedShell = (said: Said | null = refusal): Shell => ({
   ...layoutOf({ registers: [], now: new Date().toISOString(), home: null }),

@@ -24,7 +24,7 @@ import { clearCookie, heldContext, readSid, sameOrigin, seeAs, SEE_AS_HEADER, se
 import { shareOf } from '@braindog/host';
 import { OPERATION_METHOD } from '@braindog/kernel';
 import type { TokenReach } from '@braindog/kernel';
-import { MEMBER_STOPPED } from '@braindog/kernel';
+import { ACCESS_ENDED_AT, accessEndedSaid, MEMBER_STOPPED } from '@braindog/kernel';
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import { TOKEN_REACHES, type CallContext } from '@braindog/record';
 
@@ -47,6 +47,11 @@ export type Deps = {
   access: (record: string, person: string) => Promise<Held | null>;
   /** Whether a person the record holds nothing for is on it and stopped, so the refusal says so. Absent, the door says its own words. */
   stopped?: (record: string, person: string) => Promise<boolean>;
+  /**
+   * Whether a person the record holds nothing for once held a share there, and whose record it is (sharing plan §2.8),
+   * so the refusal says their access ended and the app wipes its copy. Absent, or `null`, the door says its own words.
+   */
+  ended?: (record: string, person: string) => Promise<{ owner: string | null } | null>;
   /**
    * Whether this door honours `x-braindog-as` (See as, the sharing plan's §3.3): the API door only, so no other door a
    * cookie opens (a file, an OAuth consent) is ever answered as somebody else. Absent, the header is not read.
@@ -106,7 +111,13 @@ export async function doorOf(request: Request, deps: Deps, slug: string | null =
     const held = await deps.access(record, out.body.person);
     if (!held) {
       const stopped = (await deps.stopped?.(record, out.body.person)) === true;
-      const refusal: Refusal = stopped ? { code: 'FORBIDDEN', fix: MEMBER_STOPPED, at: 'principal' } : { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+      /* A GUEST WHOSE LAST SHARE ENDED is told so, `at: 'access'`, and the answer carries `x-braindog-access: ended`. */
+      const ended = stopped ? null : ((await deps.ended?.(record, out.body.person)) ?? null);
+      const refusal: Refusal = stopped
+        ? { code: 'FORBIDDEN', fix: MEMBER_STOPPED, at: 'principal' }
+        : ended !== null
+          ? { code: 'FORBIDDEN', fix: accessEndedSaid(ended.owner), at: ACCESS_ENDED_AT }
+          : { code: 'FORBIDDEN', fix: 'You are not on this record.' };
       return { door: 'refused', status: 403, refusal, ...carried };
     }
     /* `12 §8` CSRF: a cookie write comes from a page on this origin or not at all. */

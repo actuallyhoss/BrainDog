@@ -126,13 +126,13 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
       : reader !== null
         ? kept !== null && kept.me.person === reader
           ? { ...kept, offline: true as const }
-          : { ...live.railShell(live.refusedShell({ code: booted.code, fix: booted.fix }), rail ?? { lists: [], pages: [] }), offline: true as const }
+          : { ...live.railShell(live.refusedShell({ code: booted.code, fix: booted.fix, ...(booted.at ? { at: booted.at } : {}) }), rail ?? { lists: [], pages: [] }), offline: true as const }
         : /* THE REFUSAL IS HANDED OVER RATHER THAN REMEMBERED. `refusedShell` keeps the last one as a
            module fallback, and this call sits one `await` after `readBoot`: any `forget()` landing
            in that window (`decide-write.ts`, `inbox-write.ts`, `news-live.ts`, which Home's own
            mark reaches) nulls it, and a colleague who may not read the record would be told the
            record is empty instead. The answer is right here, so it is passed. */
-        live.refusedShell({ code: booted.code, fix: booted.fix });
+        live.refusedShell({ code: booted.code, fix: booted.fix, ...(booted.at ? { at: booted.at } : {}) });
   /* THE RAIL SAYS THE RECORD'S NAME FOR EACH LIST, where its use case gives one. */
   if (booted.from === 'live') {
     const words = voice.labels();

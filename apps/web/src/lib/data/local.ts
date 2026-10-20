@@ -146,8 +146,11 @@ export const GONE_MOST = 50;
 /** Where the copy's reader stands in the log, as the record handed it: a rowid to an owner, an opaque string to others. */
 export type Cursor = number | string;
 
-/** Whose copy this is. `scope` is a fingerprint of what boot said they may read (`scopeOf`). */
-export type Owner = { base: string; person: string; scope: string };
+/**
+ * Whose copy this is. `scope` is a fingerprint of what boot said they may read (`scopeOf`). `guest` is there when shares
+ * made their access, with when the last one ends, and holds the copy to a day (`keptUntil`).
+ */
+export type Owner = { base: string; person: string; scope: string; guest?: { until: string | null } };
 
 export type Meta = {
   format: number;
@@ -159,6 +162,8 @@ export type Meta = {
   cursor: Cursor | null;
   /** The id of the line the cursor names: `whatsNew` answers it again, and it is not news. */
   cursorId: string | null;
+  /** When a live boot last claimed it, for a guest's copy, which is drawn a day past it at most (`keptUntil`). */
+  live?: number;
 };
 
 /**
@@ -359,10 +364,41 @@ export function touched(lines: readonly Line[], skip: string | null = null): { a
   return walk(lines) ? { all: true, lists } : { all: false, lists };
 }
 
-/** A fingerprint of what boot says this person may read: a change of it is a change of what the copy may hold. */
-export function scopeOf(me: { level: string; owner: boolean; lists: readonly string[] | null; levels?: Readonly<Record<string, string>> | undefined }): string {
+/**
+ * A fingerprint of what boot says this person may read: a change of it is a change of what the copy may hold.
+ *
+ * AND WHERE SHARES MADE IT, THE ACCESS EPOCH AND WHAT THEY NARROW (sharing plan slice 10). `grant.epoch` moves with every
+ * change to who holds what, and `lens` is the record's fingerprint of the rows and fields a share narrows them to
+ * (`wheres`, `writes`, `hides`), so a share changed, a rule narrowed or a field hidden is a new owner and the copy is
+ * wiped before it is drawn from. Somebody who holds no share and is narrowed by nothing keeps the fingerprint they had.
+ */
+export function scopeOf(me: {
+  level: string | null;
+  owner: boolean;
+  lists: readonly string[] | null;
+  levels?: Readonly<Record<string, string>> | undefined;
+  grant?: { epoch: number } | undefined;
+  lens?: string | undefined;
+}): string {
   const levels = me.levels ? Object.entries(me.levels).sort(([a], [b]) => a.localeCompare(b)) : null;
-  return JSON.stringify([me.level, me.owner, me.lists ? [...me.lists].sort() : null, levels]);
+  const base = [me.level, me.owner, me.lists ? [...me.lists].sort() : null, levels];
+  return JSON.stringify(me.grant === undefined && me.lens === undefined ? base : [...base, me.grant?.epoch ?? null, me.lens ?? null]);
+}
+
+/**
+ * How long a guest's copy may be drawn (sharing plan §2.8): a day after it was kept and after the last live open, and
+ * never past the end of their last share. Somebody a share let in reads it offline for a day at most.
+ */
+export const GUEST_MS = 24 * 3_600_000;
+
+/** Until when an answer kept at `kept` may be drawn for this owner, in milliseconds: a week, or a guest's day. */
+export function keptUntil(m: { owner: Owner; live?: number | undefined }, kept: number): number {
+  let end = kept + LOCAL_MS;
+  const guest = m.owner.guest;
+  if (guest === undefined) return end;
+  end = Math.min(end, kept + GUEST_MS, (m.live ?? kept) + GUEST_MS);
+  const until = guest.until === null ? NaN : Date.parse(guest.until);
+  return Number.isFinite(until) ? Math.min(end, until) : end;
 }
 
 export const sameOwner = (a: Owner, b: Owner): boolean => a.base === b.base && a.person === b.person && a.scope === b.scope;
@@ -1172,14 +1208,19 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
     claim(owner) {
       return queue(async () => {
         const m = await load();
-        if (claimed !== null && sameOwner(claimed, owner) && m !== null) return;
+        /* A GUEST'S LIVE OPEN IS WRITTEN DOWN, since their copy is drawn a day past the last one at most (`keptUntil`). */
+        const live = owner.guest === undefined ? {} : { live: now() };
+        if (claimed !== null && sameOwner(claimed, owner) && m !== null) {
+          if (owner.guest !== undefined) await write({ ...m, owner, ...live });
+          return;
+        }
         claimed = owner;
         droppedAll();
         if (m === null || !sameOwner(m.owner, owner)) {
           epoch += 1;
           await store.clear().catch(() => undefined);
-          await write({ format: LOCAL_FORMAT, build: opts.build, owner, record: null, cursor: null, cursorId: null });
-        }
+          await write({ format: LOCAL_FORMAT, build: opts.build, owner, record: null, cursor: null, cursorId: null, ...live });
+        } else if (owner.guest !== undefined) await write({ ...m, owner, ...live });
         asked += 1;
         await catchUp(asked);
       });
@@ -1206,7 +1247,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       if (claimed !== null ? !sameOwner(m.owner, claimed) : person !== m.owner.person) return null;
       const row = await store.get(atOf(name, key)).catch(() => null);
       const t = now();
-      if (row === null || t < row.kept || t - row.kept >= LOCAL_MS) return null;
+      if (row === null || t < row.kept || t >= keptUntil(m, row.kept)) return null;
       /* OPENED NOW, for eviction, written at most once an hour an answer: a read that writes on every draw costs a write. */
       if (claimed !== null && t - (row.opened ?? row.kept) >= TOUCH_MS) void store.touch(row.at, t).catch(() => undefined);
       return { value: row.value as T, decls: row.decls, current: claimed !== null && !row.always && caught === asked && sameDay(row.kept, t), kept: row.kept };
@@ -1217,7 +1258,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       if (claimed !== null ? !sameOwner(m.owner, claimed) : person !== m.owner.person) return [];
       const t = now();
       const rows = await store.list().catch(() => [] as Stored[]);
-      return rows.filter((r) => t >= r.kept && t - r.kept < LOCAL_MS);
+      return rows.filter((r) => t >= r.kept && t < keptUntil(m, r.kept));
     },
     async size() {
       const rows = await store.list().catch(() => [] as Stored[]);

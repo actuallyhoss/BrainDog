@@ -48,6 +48,7 @@ import { read } from './copy/read.ts';
 import { shell } from './copy/shell.ts';
 import { theme } from './copy/theme.ts';
 import { hand } from './copy/hand.ts';
+import { sharing } from './copy/sharing.ts';
 
 export type { Held } from './copy/shell.ts';
 export { INPUTS_SAID } from './copy/pages.ts';
@@ -70,6 +71,7 @@ export const copy = {
   ...theme,
   ...hand,
   ...kpis,
+  ...sharing,
 } as const;
 
 export type Copy = typeof copy;

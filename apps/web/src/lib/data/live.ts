@@ -172,3 +172,22 @@ export function poller({ ask, fast = 1_500, every = 15_000, most = 60_000, timer
     unwatch();
   };
 }
+
+/* ── access: a share changed, or ended ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Whether the version poll heard the access epoch move (sharing plan §2.8): `known` is the epoch the shell booted with,
+ * `heard` the one `version` answered, each absent for somebody no share let in. A move means the tab boots again onto
+ * what the person holds now, since what they could read a moment ago may not be theirs to read.
+ */
+export function regranted(known: number | null | undefined, heard: number | null | undefined): boolean {
+  return (known ?? null) !== (heard ?? null);
+}
+
+/** Where a door's refusal says a person's access ended: `FORBIDDEN` at `access`, with `x-braindog-access: ended`. */
+export const ENDED_AT = 'access';
+
+/** Whether a refusal says the person's access to the record ended, so the tab wipes its copy and says so. */
+export function endedBy(refusal: { code?: string; at?: string | undefined } | null | undefined): boolean {
+  return refusal?.code === 'FORBIDDEN' && refusal.at === ENDED_AT;
+}

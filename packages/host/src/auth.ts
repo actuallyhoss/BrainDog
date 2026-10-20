@@ -744,6 +744,15 @@ export function sessionContext<L extends string>(
 /** The header the app sends on every call while an owner or Admin is seeing the record as somebody (§3.3). */
 export const SEE_AS_HEADER = 'x-braindog-as';
 
+/**
+ * The header a door's refusal carries when a person's access to the record ended (§2.8), `ended`: the service worker
+ * deletes its read copy on it, as it does on a 401, so nothing of the record stays on the device to draw.
+ */
+export const ACCESS_HEADER = 'x-braindog-access';
+
+/** The headers a refusal is answered with: `x-braindog-access: ended` for one `at: 'access'`, and nothing else. */
+export const accessHeaders = (refusal: { at?: string | undefined } | undefined): [string, string][] => (refusal?.at === 'access' ? [[ACCESS_HEADER, 'ended']] : []);
+
 /** The longest person id the header is read for. Ids are short; anything longer names nobody. */
 const SEE_AS_MOST = 64;
 

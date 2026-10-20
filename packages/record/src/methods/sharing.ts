@@ -23,6 +23,7 @@ import {
   lensOf,
   shareMeOf,
   shareSentenceOf,
+  shareSubjectOf,
   shareTargetReaches,
   shareTargetWhole,
   sharedWithYou,
@@ -62,6 +63,10 @@ export type SharingRow = {
   sentence: string;
   effect: Share['effect'];
   who: Share['who'];
+  /** Who it is shared with, as the page heads their shares: a person's name, a group's, or the address it waits for. */
+  who_name: string | null;
+  /** What it is about, as "Stop sharing Kiln with Priya?" says it: a project by its name, else the lists or rows. */
+  subject: string;
   what: ShareTarget;
   can: ShareRung;
   caps: ShareCaps | null;
@@ -93,8 +98,23 @@ export type ShareActivityLine = { who: string; via: string; said: string };
 export const SHARE_ACTIVITY_DAYS = 30;
 export const SHARE_ACTIVITY_DAYS_MOST = 400;
 
-/** One of the caller's own shares, as "What you can see here" lists it (§3.4). */
-export type MyShare = { id: string; sentence: string; can: ShareRung; until: string | null; onward: boolean; live: boolean };
+/**
+ * One of the caller's own shares, as "What you can see here" lists it (§3.4). `by` is who shared it, by name, and
+ * `welcome` the first-open line said to the caller: "Ada shared Kiln with you. You can edit tasks in Kiln until 1 Dec."
+ */
+export type MyShare = {
+  id: string;
+  sentence: string;
+  can: ShareRung;
+  until: string | null;
+  onward: boolean;
+  live: boolean;
+  by: string | null;
+  welcome: string;
+};
+
+/** A group as the Sharing page lists it: its name, its people by name beside their ids, and how many shares it holds. */
+export type GroupRow = { id: string; name: string; people: { id: string; name: string | null }[]; shares: number };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const refuse = (code: string, fix: string, at: string): Result<never> => ({ ok: false, refusal: { code, fix, at } });
@@ -220,11 +240,20 @@ export function methods(deps: RecordDeps) {
     return { code: 'NEEDS_BROWSER_SESSION', fix: "Confirm it's you, then share again. Nothing was shared yet.", at: 'confirm' };
   };
 
-  const rowOf = (s: ShareKept, catalog: LensCatalog): SharingRow => ({
+  /** Who a share names, said as the page heads it: never an id. */
+  const whoName = (who: Share['who'], n: ShareNames): string | null => {
+    if (who.kind === 'person') return n.person?.(who.id) ?? null;
+    if (who.kind === 'group') return n.group?.(who.id)?.name ?? null;
+    return who.kind === 'email' ? who.id : null;
+  };
+
+  const rowOf = (s: ShareKept, catalog: LensCatalog, n: ShareNames = names(catalog)): SharingRow => ({
     id: s.id,
-    sentence: sentence(s, catalog),
+    sentence: shareSentenceOf(s, n, { now: clock.now() }),
     effect: s.effect,
     who: s.who,
+    who_name: whoName(s.who, n),
+    subject: shareSubjectOf(s.what, n),
     what: s.what,
     can: s.can,
     caps: s.caps ?? null,
@@ -453,7 +482,21 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       const catalog = kernel.catalog();
       const since = instant(clock.now() - SHARES_ENDED_DAYS * DAY_MS);
-      return ok(kernel.sharesKept(since).map((s) => rowOf(s, catalog)));
+      const n = names(catalog);
+      return ok(kernel.sharesKept(since).map((s) => rowOf(s, catalog, n)));
+    },
+
+    /** Every live group, by name: its people by name and how many live shares it holds (§3.2, Groups). */
+    async groups(_args: unknown, ctx: CallContext): Promise<Result<GroupRow[]>> {
+      const stop = team(ctx, 'see the groups this record shares with');
+      if (stop) return { ok: false, refusal: stop };
+      const ids = sql.all<{ id: string }>('SELECT id FROM share_group WHERE retired_at IS NULL ORDER BY name COLLATE NOCASE, id');
+      const out: GroupRow[] = [];
+      for (const { id } of ids) {
+        const g = kernel.groupKept(id);
+        if (g !== null) out.push(groupOf(g));
+      }
+      return ok(out);
     },
 
     /**
@@ -564,18 +607,30 @@ export function methods(deps: RecordDeps) {
       if (agent ?? stop) return { ok: false, refusal: (agent ?? stop)! };
       const catalog = kernel.catalog();
       const now = clock.now();
+      const n = names(catalog);
       const held = sharesFor(sql, ctx.principal.id) ?? [];
+      const denies = held.filter((s) => s.effect === 'deny');
+      /* WHO SHARED IT, BY NAME: the kept row's maker, which the lens's own copy of the share does not carry. */
+      const byOf = (id: string): string | null => {
+        const made = kernel.shareKept(id)?.made_by;
+        return made === undefined ? null : (personName(sql, made) ?? null);
+      };
       return ok(
         held
           .filter((s) => s.effect === 'allow')
-          .map((s) => ({
-            id: s.id,
-            sentence: sentence(s, catalog),
-            can: s.can,
-            until: s.when?.until ?? null,
-            onward: s.can === 'manage' && s.caps?.onward !== false && s.who.kind === 'person',
-            live: (s.when?.from === undefined || Date.parse(s.when.from) <= now) && (s.when?.until === undefined || Date.parse(s.when.until) > now),
-          })),
+          .map((s) => {
+            const by = byOf(s.id);
+            return {
+              id: s.id,
+              sentence: shareSentenceOf(s, n, { now }),
+              can: s.can,
+              until: s.when?.until ?? null,
+              onward: s.can === 'manage' && s.caps?.onward !== false && s.who.kind === 'person',
+              live: (s.when?.from === undefined || Date.parse(s.when.from) <= now) && (s.when?.until === undefined || Date.parse(s.when.until) > now),
+              by,
+              welcome: sharedWithYou([s, ...denies], by ?? undefined, n, { now }),
+            };
+          }),
       );
     },
 

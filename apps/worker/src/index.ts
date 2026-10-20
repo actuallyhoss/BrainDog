@@ -23,7 +23,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { engineHealthRead, engineLedgerRead, engineProbeOf, probeWireOf, handlersFor, mentionsAttached, hintsOf, httpStatus, serveApi, serveIngest, serveSlash, servesSlash, withSession, type EngineHealthRead, type SessionHints, type SlashAskDoor, type VaultGrantSeen } from '@braindog/host';
 import { deriveSessionKey, relyingParty, serveAccount, serveAuth, type DeviceDoor, type EmailDoor, type InviteDoor, type Provisioned } from '@braindog/host/auth';
 /* SIGN-UP: its three routes are answered in `signIn()` before `serveAuth`. */
-import { clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
+import { accessHeaders, clearCookie, cookieMode, mirrorEverywhere, readSid, renameAsked, renamedName, sameKey, sameOrigin, sessionCookie } from '@braindog/host/auth';
 import type { AccountCall, SignupCall } from '@braindog/ports';
 /* GOOGLE: its two routes are answered in `signIn()` before `serveAuth`, as sign-up's are. */
 import { GOOGLE_ROUTES, googleOn, serveGoogle } from './google.ts';
@@ -1792,6 +1792,13 @@ export class Record$ extends DurableObject<Env> {
     return api.kernel.memberStopped(person);
   }
 
+  /** Whether this person's access here ended, and whose record it is, so a door can tell them so (sharing plan §2.8). */
+  async accessEnded(person: string): Promise<{ owner: string | null } | null> {
+    if (this.#gone) return null;
+    const api = await this.#record();
+    return api.kernel.accessEnded(person);
+  }
+
   /**
    * The switcher's `ask`: what this person may do here, and what this record calls itself.
    *
@@ -3453,6 +3460,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
       session: (sid, slug) => directory.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as unknown as Promise<AuthResult<Who>>,
       access: (record, person) => held(env, record, (object) => object.access(person)),
       stopped: (record, person) => held(env, record, (object) => object.memberStopped(person)),
+      ended: (record, person) => held(env, record, (object) => object.accessEnded(person)),
       /* SEE AS (sharing plan §3.3) is this door's alone; the record counts each read made so as `preview:<person>` (`previewBy`). */
       seeAs: true,
     }, slug);
@@ -3517,7 +3525,8 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
 
     if (door.door === 'refused') {
       if (door.status === 401 && door.refusal === undefined) return unauthorized(env);
-      const extra: [string, string][] = door.retryAfter === undefined ? [] : [['retry-after', String(door.retryAfter)]];
+      /* AND A PERSON WHOSE ACCESS ENDED IS TOLD SO IN A HEADER TOO, which the service worker deletes its copy on. */
+      const extra: [string, string][] = [...(door.retryAfter === undefined ? [] : [['retry-after', String(door.retryAfter)] as [string, string]]), ...accessHeaders(door.refusal)];
       const body = door.refusal !== undefined ? { ok: false, refusal: door.refusal } : door.retryAfter === undefined ? { ok: false } : { ok: false, retryAfter: door.retryAfter };
       return withCookie(json(body, door.status, extra), door.cookie);
     }

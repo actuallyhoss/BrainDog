@@ -29,6 +29,16 @@ export const WEEK = 7 * 24 * 60 * 60 * 1000;
 export const KEPT = 'x-braindog-kept';
 
 /**
+ * THE HEADER A DOOR'S REFUSAL CARRIES WHEN A PERSON'S ACCESS ENDED, `x-braindog-access: ended` (sharing plan §2.8): their
+ * last share stopped, or they were taken off the record. The copy goes on it as on a 401, so nothing of the record is
+ * left on the device to draw offline.
+ */
+export const ACCESS = 'x-braindog-access';
+
+/** Whether an answer's headers say the person's access ended. */
+export const accessEnded = (headers: { get(name: string): string | null }): boolean => headers.get(ACCESS) === 'ended';
+
+/**
  * AT MOST THIS MANY ANSWERS ARE KEPT. Every list he opens and every page of it is one answer, and a week of use could
  * otherwise grow the cache without end; past the ceiling the oldest go first, which are the ones least likely to be
  * opened offline.

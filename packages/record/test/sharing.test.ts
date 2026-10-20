@@ -92,7 +92,7 @@ test('a token is refused NEEDS_BROWSER_SESSION on every share route, whatever it
   const { api } = await record();
   const token: CallContext = { principal: { kind: 'token', id: 'tok_1', scope: 'write', person: 'p_1', level: 'owner' } };
   const args = { share: { who: { kind: 'person', id: 'p_lee' }, what: { lists: ['tasks'] }, can: 'view' }, id: 'sh_x', from: 'sh_x', who: 'p_lee', can: 'view' };
-  assert.deepEqual(SHARING.map((r) => r.name).sort(), ['groupMember', 'groupPut', 'myShares', 'share', 'shareActivity', 'shareOnward', 'sharePreview', 'sharing', 'unshare']);
+  assert.deepEqual(SHARING.map((r) => r.name).sort(), ['groupMember', 'groupPut', 'groups', 'myShares', 'share', 'shareActivity', 'shareOnward', 'sharePreview', 'sharing', 'unshare']);
   for (const r of SHARING) refused(await call(api, r.name)(args, token), 'NEEDS_BROWSER_SESSION');
   /* AND A GRANTEE'S OWN AGENT, holding a share through its person. */
   value(await api.share({ share: { who: { kind: 'person', id: 'p_lee' }, what: { lists: ['tasks'] }, can: 'manage', when: { until } } }, owner));

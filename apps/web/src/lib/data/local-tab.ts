@@ -108,9 +108,23 @@ export function lastReader(base: string): Promise<string | null> {
 }
 
 /** The reader a live boot named. Call only with a shell the record answered, never a drawn copy or a refusal. */
-export function claimLocal(base: string, me: { person: string; level: string; owner: boolean; lists: string[] | null; levels?: Readonly<Record<string, string>> | undefined }): void {
+export function claimLocal(
+  base: string,
+  me: {
+    person: string;
+    level: string;
+    owner: boolean;
+    lists: string[] | null;
+    levels?: Readonly<Record<string, string>> | undefined;
+    grant?: { epoch: number; until: string | null } | undefined;
+    lens?: string | undefined;
+  },
+): void {
+  /* SOMEBODY ONLY SHARES LET IN (a grant, and no role on the whole record) IS A GUEST HERE, whose copy is drawn a day at
+     most and never past their last share's end. */
+  const guest = me.grant !== undefined && !me.owner && me.lists !== null ? { guest: { until: me.grant.until } } : {};
   void tab()
-    .claim({ base, person: me.person, scope: scopeOf(me) })
+    .claim({ base, person: me.person, scope: scopeOf(me), ...guest })
     /* AFTER THE CLAIM, which clears the key with the copy when the owner changed: the marker is signed with the new one. */
     .then(() => writeMark(base, me.person, markDeps()))
     .then(() => void verified.delete(base))

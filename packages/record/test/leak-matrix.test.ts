@@ -36,12 +36,9 @@ const FUZZ = Number(process.env.LEAK_FUZZ ?? 2);
 
 /**
  * The gaps §1.2 names, and the ones this matrix found that it does not (`N<n>`), by the test they hold open.
- * Each line is the todo's own sentence, so the run lists it. Slices 3 and 4 closed G1 to G6 and N1 to N3 (`sight.ts`).
+ * Each line is the todo's own sentence, so the run lists it. Slices 3 and 4 closed G1 to G6 and N1 to N3 (`sight.ts`);
+ * slice 10 closed G7 (`boot`'s `me.lens` in `scopeOf`) and G8 (the door's `at: 'access'` and `x-braindog-access`).
  */
-const GAP = {
-  G7: 'G7 the local copy\'s fingerprint (scopeOf) omits rules, so narrowing a colleague leaves the copy as it was',
-  G8: 'G8 a removed member\'s poll is answered 403, and the app and the service worker wipe the copy only on a 401',
-} as const;
 
 /** Which P1 tests are held open by a gap: the route, and the sentence. */
 const P1_OPEN: Record<string, string> = {};
@@ -388,7 +385,7 @@ test('G6 the version poll of a reader held to Kiln agrees with a fresh read afte
   assert.equal(await version(narrowed), await fresh(narrowed), 'a changed rule is answered the version cached for the old one');
 });
 
-test('G7 narrowing a colleague changes the fingerprint her local copy is kept under', { todo: GAP.G7 }, async () => {
+test('G7 narrowing a colleague changes the fingerprint her local copy is kept under', async () => {
   const f = await build({ shapes: SHAPES.filter((s) => s.id === 'kiln-reader' || s.id === 'owner') });
   const h = handlers(f);
   const me = async () => ((await ask(h, 'boot', {}, personCtx(f.api, 'p_kim'))) as { value: { me: Parameters<typeof scopeOf>[0] } }).value.me;
@@ -398,14 +395,16 @@ test('G7 narrowing a colleague changes the fingerprint her local copy is kept un
   assert.notEqual(scopeOf(await me()), before);
 });
 
-test('G8 a removed member\'s poll is answered in a way the app wipes the copy on', { todo: GAP.G8 }, async () => {
+test('G8 a removed member\'s poll is answered in a way the app wipes the copy on', async () => {
   const f = await build({ shapes: SHAPES.filter((s) => s.id === 'whole' || s.id === 'owner') });
   assert.ok(((await f.api.removeMember({ person: 'p_vera' } as never, f.owner)) as { ok: boolean }).ok);
-  /* THE DOOR ASKS `access`, finds nothing, and answers 403 (`apps/worker/src/session.ts`, `heldBy`). */
+  /* THE DOOR ASKS `access`, finds nothing, and asks `accessEnded`, which says the record knew her: the refusal is
+     `FORBIDDEN` at `access` with `x-braindog-access: ended` (`apps/worker/src/session.ts`, `doorOf`). */
   assert.equal(f.api.kernel.access('p_vera'), null);
+  assert.ok(f.api.kernel.accessEnded('p_vera'), 'the record does not say a removed member\'s access ended');
   const web = (path: string) => readFileSync(fileURLToPath(new URL(`../../../apps/web/src/${path}`, import.meta.url)), 'utf8');
-  assert.ok(/code === 'FORBIDDEN'|status === 403/u.test(web('lib/data/live.svelte.ts')), 'the poll wipes the copy only on UNAUTHORIZED, and a removed member is answered FORBIDDEN');
-  assert.ok(/status === 403/u.test(web('service-worker.ts')), 'the service worker deletes the copy only on a 401');
+  assert.ok(/endedBy\(out\.refusal\)\) end\(/u.test(web('lib/data/live.svelte.ts')), 'the poll does not wipe the copy on the access refusal');
+  assert.ok(/accessEnded\(res\.headers\)/u.test(web('service-worker.ts')), 'the service worker does not delete the copy on the access header');
 });
 
 /* ── the shapes the matrix could not build yet ──────────────────────────── */

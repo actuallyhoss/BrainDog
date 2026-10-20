@@ -18,7 +18,7 @@ import type { createClient } from '@braindog/client';
 import { dev } from '$app/environment';
 import { tick } from 'svelte';
 
-import { poller, Wait, type LiveState, type Visibility } from './live.ts';
+import { endedBy, poller, regranted, Wait, type LiveState, type Visibility } from './live.ts';
 /* THE LOCAL COPY IS ASKED FOR WHEN THE POLL HAS SOMETHING TO TELL IT, never with the shell: its reader carries the
    predicate engine, and the first paint draws nothing from it. Each of the three is fire-and-forget already. */
 const localTab = () => import('./local-tab.ts');
@@ -35,11 +35,49 @@ import { forget, hear, keep } from './offline.ts';
  * copy (`offline.ts`), and `null` when everything drawn came from the record. `Pull.svelte` says it as "Offline · from
  * 14:02".
  */
-export const live = $state<{ state: LiveState; version: number | null; from: number | null }>({
+export const live = $state<{ state: LiveState; version: number | null; from: number | null; ended: { said: string } | null }>({
   state: 'open',
   version: null,
   from: null,
+  /* THE DOOR SAID THIS PERSON'S ACCESS ENDED (sharing plan §2.8), in its own sentence with the owner's name: the layout
+     draws the ended screen over everything, and the copies are already gone. */
+  ended: null,
 });
+
+/**
+ * THE ACCESS EPOCH THE SHELL BOOTED WITH, by the layout (`followGrant`), which the poll compares with the one `version`
+ * answers. `undefined` until a live shell says it, so a poll that starts first re-boots nothing.
+ */
+let known: number | null | undefined;
+
+/** The epoch the live shell booted with, or `null` for somebody no share let in. */
+export function followGrant(epoch: number | null): void {
+  known = epoch;
+}
+
+/**
+ * THE GRANT MOVED: what this person holds changed (a share kept, changed or stopped, a group joined or left), so the tab
+ * boots again onto it. The boot copy goes first, so the shell, the rail and the local copy's key are the record's new
+ * answer and never the old one.
+ */
+async function reboot(): Promise<void> {
+  const [boot, nav] = await Promise.all([import('$lib/record/boot-live.ts'), import('$app/navigation')]);
+  boot.forget();
+  await nav.invalidate('braindog:boot');
+}
+
+/**
+ * THEIR ACCESS ENDED: every copy of the record this tab and the service worker keep goes, the poll stops, and the layout
+ * says so in the door's own sentence. A boot refused the same way draws the same screen (`+layout.svelte`).
+ */
+function end(said: string): void {
+  void forget().catch(() => undefined);
+  void localTab().then((m) => m.wipeLocal());
+  void import('$lib/record/boot-live.ts').then((m) => m.forget(), () => undefined);
+  live.ended = { said };
+  following?.stop();
+  following = null;
+}
 
 const timers = {
   after(fn: () => void, ms: number): () => void {
@@ -84,6 +122,8 @@ function asker(base: string): () => Promise<number> {
         void forget().catch(() => undefined);
         void localTab().then((m) => m.wipeLocal());
       }
+      /* A PERSON WHOSE ACCESS ENDED IS TOLD SO, within one poll of the share stopping: 1.5 s on a focused tab. */
+      if ('refusal' in out && endedBy(out.refusal)) end(out.refusal.fix);
       /* A RATE LIMIT SAYS HOW LONG TO WAIT, and the poll waits that long without calling the tab offline. */
       if ('refusal' in out && out.refusal.code === 'RATE_LIMITED') throw new Wait(Number(out.refusal.retry_after) || 60);
       throw new Error('the record did not answer its version');
@@ -91,6 +131,13 @@ function asker(base: string): () => Promise<number> {
     /* A RECORD WHOSE FORMAT MOVED UNDER THE LOCAL COPY wipes what it kept (`local.ts`). */
     const stamped = out.value;
     void localTab().then((m) => m.stampLocal(stamped));
+    /* AND AN ACCESS EPOCH THAT MOVED BOOTS THE TAB AGAIN, once: the new shell says the epoch it booted with. */
+    const heard = (out.value as { grant?: { epoch?: unknown } }).grant?.epoch;
+    const epoch = typeof heard === 'number' ? heard : null;
+    if (known !== undefined && regranted(known, epoch)) {
+      known = epoch;
+      void reboot().catch(() => undefined);
+    }
     return out.value.version;
   };
 }

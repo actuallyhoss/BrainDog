@@ -598,3 +598,48 @@ test('REVISION: a list moves only when the log touched it, everything moves on a
   await copy.heard();
   assert.equal(copy.revision('projects'), null, 'a catch-up that failed vouches for nothing');
 });
+
+test('SCOPE: the access epoch and what shares narrow are in the fingerprint, and nobody else\'s fingerprint moves', () => {
+  const member = { level: 'write', owner: false, lists: null };
+  /* SOMEBODY NO SHARE LET IN KEEPS THE FINGERPRINT THEY HAD, so an owner's copy outlives this change. */
+  assert.equal(scopeOf(member), JSON.stringify(['write', false, null, null]));
+  const guest = { level: 'read', owner: false, lists: ['tasks'], grant: { epoch: 4 }, lens: 'k1' };
+  assert.notEqual(scopeOf(guest), scopeOf({ ...guest, grant: { epoch: 5 } }), 'a share changed is a new owner');
+  assert.notEqual(scopeOf(guest), scopeOf({ ...guest, lens: 'k2' }), 'a narrowing changed is a new owner');
+  assert.notEqual(scopeOf({ ...member, lens: 'k1' }), scopeOf(member), 'a member narrowed by a rule is a new owner');
+  assert.equal(scopeOf(guest), scopeOf({ ...guest }), 'the same grant is the same owner');
+});
+
+test('A GUEST\'S COPY IS DRAWN A DAY AT MOST, after it was kept and after the last live open, and never past the share', async () => {
+  const store = memoryStore();
+  const fake = fakeLog();
+  let t = NOON;
+  const copy = localCopy(store, () => fake.log, { build: 'b1', now: () => t });
+  const scope = scopeOf({ level: 'read', owner: false, lists: ['tasks'], grant: { epoch: 2 } });
+  const priya: Owner = { base: 'https://a', person: 'p_pri', scope, guest: { until: new Date(NOON + 30 * 3_600_000).toISOString() } };
+  await copy.claim(priya);
+  assert.equal(store.saved?.live, NOON);
+  assert.equal(await copy.put('work', 'k', ['tasks'], { tasks: DECL }, [1], copy.ticket()), true);
+  t = NOON + 23 * 3_600_000;
+  assert.ok(await copy.answer('work', 'k', 'https://a', null), 'a guest\'s copy went inside the day');
+  t = NOON + 24 * 3_600_000;
+  assert.equal(await copy.answer('work', 'k', 'https://a', null), null, 'a guest\'s copy outlived the day');
+  assert.deepEqual(await copy.held('https://a', null), []);
+
+  /* AND NEVER PAST THE SHARE'S END, however fresh. */
+  const short: Owner = { ...priya, guest: { until: new Date(NOON + 2 * 3_600_000).toISOString() } };
+  const other = localCopy(memoryStore(), () => fakeLog().log, { build: 'b1', now: () => t });
+  t = NOON;
+  await other.claim(short);
+  await other.put('work', 'k', ['tasks'], { tasks: DECL }, [1], other.ticket());
+  t = NOON + 2 * 3_600_000;
+  assert.equal(await other.answer('work', 'k', 'https://a', null), null, 'a copy was drawn past the share\'s end');
+
+  /* AN OWNER'S COPY IS STILL A WEEK. */
+  const own = localCopy(memoryStore(), () => fakeLog().log, { build: 'b1', now: () => t });
+  t = NOON;
+  await own.claim(ada);
+  await own.put('work', 'k', ['tasks'], { tasks: DECL }, [1], own.ticket());
+  t = NOON + 6 * 24 * 3_600_000;
+  assert.ok(await own.answer('work', 'k', 'https://a', null));
+});

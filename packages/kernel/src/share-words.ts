@@ -143,7 +143,7 @@ export function sentenceOf(shares: Share | readonly Share[], names: ShareNames, 
 }
 
 /** What a share is about, as the thing somebody was handed: a project by its name, anything else as `whatOf` says it. */
-const subjectOf = (t: Target, n: ShareNames): string => ('project' in t ? (n.project?.(t.project) ?? 'a project') : whatOf(t, n));
+export const subjectOf = (t: Target, n: ShareNames): string => ('project' in t ? (n.project?.(t.project) ?? 'a project') : whatOf(t, n));
 
 /**
  * What is shared with somebody, said to them (§3.4): "Ada shared Pottery with you. You can edit tasks in Pottery until 1 Dec."
@@ -159,3 +159,13 @@ export function sharedWithYou(shares: readonly Share[], by: string | undefined, 
   const said = allows.map((s) => sentenceOf([{ ...s, who: { kind: 'person', id: 'you' } }, ...denies.map((d) => ({ ...d, who: { kind: 'person' as const, id: 'you' } }))], you, opts));
   return [`${by ?? 'Someone'} shared ${joined(things)} with you.`, ...said].join(' ');
 }
+
+/** Where a door's refusal says a person's access to the record ended (§2.8): the app wipes its copy and says so. */
+export const ACCESS_ENDED_AT = 'access';
+
+/**
+ * The door's sentence for a person whose access ended (§3.4), with the owner's name where the door knows it: "Your access
+ * to Ada's record ended. Ask Ada if you need it back."
+ */
+export const accessEndedSaid = (owner: string | null | undefined): string =>
+  owner ? `Your access to ${owner}'s record ended. Ask ${owner} if you need it back.` : 'Your access to this record ended. Ask its owner if you need it back.';

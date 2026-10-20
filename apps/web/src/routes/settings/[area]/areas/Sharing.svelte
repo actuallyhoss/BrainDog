@@ -1,0 +1,506 @@
+<!--
+  Settings > Sharing (sharing plan §3.2): who is here and in what role, every share as one sentence grouped by who it is
+  with, the shares still waiting for somebody to accept, the groups, and what ended in the last 30 days, with See as at
+  the top.
+
+  PEOPLE HERE IS THE PEOPLE AREA AS IT WAS, handed in by the page (`here`) and drawn first: roles, invites and the
+  links to single pages are where they were, and `/settings/people` opens this area.
+
+  EVERY SENTENCE IS THE RECORD'S. `sharing` says each share in one line with names in it, and this area only decides
+  where each is drawn (`lib/sharing/sharing.ts`, `sharingSections`). Tapping one asks the Share sheet to open on it,
+  by an event the sheet listens for; Stop asks once, in place, and ends it at once.
+
+  AN OWNER'S OR AN ADMIN'S, as the record's methods are. Anybody else here holds shares rather than giving them, so the
+  area says what they can see instead (§3.4), from `myShares`.
+-->
+<script lang="ts">
+  import { apiBase } from '$lib/at.ts';
+  import { copy } from '$lib/copy.ts';
+  import { day } from 'braindog-render';
+  import { untrack } from 'svelte';
+  import { createClient } from '@braindog/client';
+  import { may } from '$lib/record/may.ts';
+  import { closed, opened } from '$lib/ui/screen.svelte.ts';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import Section from '$lib/ui/Section.svelte';
+  import Button from '$lib/ui/Button.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import {
+    SHARED_EVENT,
+    askSeeAs,
+    askSheet,
+    endedAt,
+    groupMember,
+    makeGroup,
+    readGroups,
+    readMine,
+    readSharing,
+    retireGroup,
+    sharingSections,
+    stopShare,
+    stopWords,
+    type Bunch,
+    type GroupRow,
+    type MyShare,
+    type SharingRow,
+  } from '$lib/sharing/sharing.ts';
+  import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import type { Snippet } from 'svelte';
+
+  /* `here` IS PEOPLE HERE, the People area as the page hands it: roles, invites and links (`+page.svelte`). */
+  let { shell, here }: AreaProps & { here?: Snippet } = $props();
+
+  const s = settingsState(() => shell);
+  /* WHO MAY SHARE HERE: an owner or an Admin, as `sharing` and `share` are guarded (`team`). */
+  const team = $derived(!shell.refused && may(shell, 'decide'));
+  const client = () => createClient({ base: apiBase() });
+
+  let rows = $state<SharingRow[] | null>(null);
+  let groups = $state<GroupRow[] | null>(null);
+  let mine = $state<MyShare[] | null>(null);
+  let refused = $state<string | null>(null);
+  /* A HOST OLDER THAN SHARING HAS NOTHING TO LIST, which is not a refusal: the area keeps People and says nothing more. */
+  let unrouted = $state(false);
+
+  async function load(): Promise<void> {
+    const at = opened();
+    if (team) {
+      const [got, gs] = await Promise.all([readSharing(client()), readGroups(client())]);
+      unrouted = !got.ok && got.code === 'ROUTE_UNKNOWN';
+      closed(got.ok || unrouted, at);
+      rows = got.ok ? got.value : null;
+      groups = gs.ok ? gs.value : [];
+      refused = got.ok || unrouted ? null : got.fix;
+    } else {
+      const got = await readMine(client());
+      unrouted = !got.ok && got.code === 'ROUTE_UNKNOWN';
+      closed(got.ok || unrouted, at);
+      mine = got.ok ? got.value : null;
+      refused = got.ok || unrouted ? null : got.fix;
+    }
+  }
+
+  $effect(() => {
+    void team;
+    untrack(() => void load());
+  });
+
+  /* THE SHARE SHEET SAYS WHEN IT KEPT ONE, and the lists are read again. */
+  $effect(() => {
+    const again = () => void load();
+    addEventListener(SHARED_EVENT, again);
+    return () => removeEventListener(SHARED_EVENT, again);
+  });
+
+  const now = $derived(Date.now());
+  const sections = $derived(sharingSections(rows ?? [], now));
+  const liveCount = $derived(sections.shared.reduce((n, b) => n + b.rows.length, 0));
+
+  /* ── Stop, asked once and in place ── */
+
+  let asking = $state<string | null>(null);
+  let busy = $state(false);
+
+  async function stop(r: SharingRow): Promise<void> {
+    if (busy) return;
+    busy = true;
+    const said = stopWords(r);
+    const out = await stopShare(client(), r.id);
+    busy = false;
+    asking = null;
+    toasts.push(out.ok ? said.done : out.fix, { intent: out.ok ? 'good' : 'warn' });
+    await load();
+  }
+
+  /* ── See as: never an owner, and nobody twice ── */
+
+  const seeable = $derived.by(() => {
+    const out = new Map<string, string>();
+    for (const p of s.people) if (p.level !== 'owner' && p.id !== shell.me.person) out.set(p.id, p.name);
+    for (const r of rows ?? []) if (r.who.kind === 'person' && r.who_name && !out.has(r.who.id)) out.set(r.who.id, r.who_name);
+    return [...out].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  function seeAs(id: string): void {
+    const who = seeable.find((p) => p.id === id);
+    if (who) askSeeAs({ person: who.id, name: who.name });
+  }
+
+  /* ── groups ── */
+
+  let groupName = $state('');
+  let adding = $state<Record<string, string>>({});
+  let retiring = $state<string | null>(null);
+
+  async function newGroup(e: SubmitEvent): Promise<void> {
+    e.preventDefault();
+    const name = groupName.trim();
+    if (!name || busy) return;
+    busy = true;
+    const out = await makeGroup(client(), name);
+    busy = false;
+    toasts.push(out.ok ? copy.sharingGroupMade(out.value.name) : out.fix, { intent: out.ok ? 'good' : 'warn' });
+    if (out.ok) groupName = '';
+    await load();
+  }
+
+  async function putIn(g: GroupRow): Promise<void> {
+    const person = adding[g.id] ?? '';
+    const name = seeable.find((p) => p.id === person)?.name;
+    if (!person || !name || busy) return;
+    busy = true;
+    const out = await groupMember(client(), g.id, person, true);
+    busy = false;
+    toasts.push(out.ok ? copy.sharingGroupAdded(name, g.name) : out.fix, { intent: out.ok ? 'good' : 'warn' });
+    if (out.ok) adding = { ...adding, [g.id]: '' };
+    await load();
+  }
+
+  async function takeOut(g: GroupRow, p: { id: string; name: string | null }): Promise<void> {
+    if (busy) return;
+    busy = true;
+    const out = await groupMember(client(), g.id, p.id, false);
+    busy = false;
+    toasts.push(out.ok ? copy.sharingGroupLeft(p.name ?? copy.sharingSomeone, g.name) : out.fix, { intent: out.ok ? 'good' : 'warn' });
+    await load();
+  }
+
+  async function retire(g: GroupRow): Promise<void> {
+    if (busy) return;
+    busy = true;
+    const out = await retireGroup(client(), g.id);
+    busy = false;
+    retiring = null;
+    toasts.push(out.ok ? copy.sharingGroupRetired(g.name) : out.fix, { intent: out.ok ? 'good' : 'warn' });
+    await load();
+  }
+
+  const dayOf = (iso: string | null): string => (iso ? day(iso.slice(0, 10)) : '');
+</script>
+
+{#snippet bunchOf(b: Bunch, ended: boolean)}
+  <li class="bunch">
+    <h3 class="bunch-name" dir="auto">
+      <Icon name={b.kind === 'group' ? 'users' : 'user'} size="s" />
+      <span>{b.name}</span>
+    </h3>
+    <ul class="shares">
+      {#each b.rows as r (r.id)}
+        {@const said = stopWords(r)}
+        <li class="share" data-ended={ended ? '' : undefined}>
+          {#if ended}
+            <p class="share-said">{r.sentence}</p>
+            <p class="share-when">{copy.sharingEndedOn(dayOf(endedAt(r)))}</p>
+          {:else if asking === r.id}
+            <!-- THE ONE QUESTION, IN PLACE OF THE SENTENCE IT IS ABOUT: Stop ends it at once, Keep leaves it. -->
+            <p class="share-ask" role="alert">{said.ask}</p>
+            <div class="share-do">
+              <Button tone="bad" disabled={busy} aria-busy={busy} onclick={() => void stop(r)}>{copy.sharingStop}</Button>
+              <Button weight="quiet" disabled={busy} onclick={() => (asking = null)}>{copy.sharingKeep}</Button>
+            </div>
+          {:else}
+            <!-- THE SENTENCE IS THE CONTROL: a tap opens the Share sheet on this share. -->
+            <button type="button" class="share-open tap" aria-label={copy.sharingChange(r.sentence)} onclick={() => askSheet({ share: r })}>
+              <span class="share-said">{r.sentence}</span>
+            </button>
+            <Button weight="bare" tone="bad" aria-label={said.label} disabled={busy} onclick={() => (asking = r.id)}>{copy.sharingStop}</Button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  </li>
+{/snippet}
+
+{#if team && seeable.length > 0}
+  <!-- SEE AS, AT THE TOP: the record as one person sees it, never an owner. The sheet's partner listens for the ask. -->
+  <div class="see-as">
+    <label class="see-as-label" for="see-as">{copy.sharingSeeAs}</label>
+    <div class="field field-lg see-as-pick">
+      <select
+        class="field-input"
+        id="see-as"
+        aria-describedby="see-as-hint"
+        value=""
+        onchange={(e) => {
+          seeAs(e.currentTarget.value);
+          e.currentTarget.value = '';
+        }}
+      >
+        <option value="" disabled>{copy.sharingSeeAsPick}</option>
+        {#each seeable as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+      </select>
+    </div>
+    <p class="hint" id="see-as-hint">{copy.sharingSeeAsHint}</p>
+  </div>
+{/if}
+
+<!-- PEOPLE HERE: roles, invites and links, as the People area drew them. -->
+<h2 class="part">{copy.sharingPeopleHere}</h2>
+{@render here?.()}
+
+{#if unrouted}
+  <!-- A host with no sharing: People is the whole of it. -->
+{:else if !team}
+  {#if refused !== null}
+    <Section title={copy.sharingYouCanSee}><Empty kind="error" title={refused} /></Section>
+  {:else if mine !== null && mine.length > 0}
+    <Section title={copy.sharingYouCanSee} count={mine.length}>
+      <ul class="shares">
+        {#each mine as m (m.id)}<li class="share"><p class="share-said">{m.sentence}</p></li>{/each}
+      </ul>
+    </Section>
+  {/if}
+{:else if refused !== null}
+  <Section title={copy.sharingShared}><Empty kind="error" title={refused} /></Section>
+{:else if rows !== null}
+  <Section title={copy.sharingShared} count={liveCount}>
+    {#snippet aside()}
+      <Button weight="quiet" onclick={() => askSheet()}><Icon name="plus" size="s" />{copy.sharingShare}</Button>
+    {/snippet}
+    {#if sections.shared.length === 0}
+      <Empty kind="no-data-yet" title={copy.sharingNothing} body={copy.sharingNothingBody} />
+    {:else}
+      <ul class="bunches">{#each sections.shared as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
+    {/if}
+  </Section>
+
+  <Section title={copy.sharingWaiting} count={sections.waiting.reduce((n, b) => n + b.rows.length, 0)}>
+    <p class="hint">{copy.sharingWaitingLead}</p>
+    {#if sections.waiting.length === 0}
+      <p class="none">{copy.sharingNoneWaiting}</p>
+    {:else}
+      <ul class="bunches">{#each sections.waiting as b (b.key)}{@render bunchOf(b, false)}{/each}</ul>
+    {/if}
+  </Section>
+
+  <Section title={copy.sharingGroups} count={groups?.length ?? 0}>
+    {#if (groups ?? []).length === 0}
+      <Empty kind="no-data-yet" title={copy.sharingNoGroups} body={copy.sharingNoGroupsBody} />
+    {:else}
+      <ul class="bunches">
+        {#each groups ?? [] as g (g.id)}
+          <li class="bunch group">
+            <h3 class="bunch-name" dir="auto"><Icon name="users" size="s" /><span>{g.name}</span></h3>
+            <p class="share-when">{copy.sharingGroupSize(g.people.length)} · {copy.sharingGroupHolds(g.shares)}</p>
+            {#if g.people.length > 0}
+              <ul class="shares">
+                {#each g.people as p (p.id)}
+                  <li class="share">
+                    <span class="share-said" dir="auto">{p.name ?? copy.sharingSomeone}</span>
+                    <Button weight="bare" disabled={busy} aria-label={copy.sharingGroupOutLabel(p.name ?? copy.sharingSomeone, g.name)} onclick={() => void takeOut(g, p)}
+                      >{copy.sharingGroupOut}</Button
+                    >
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+            <form class="group-add" onsubmit={(e) => { e.preventDefault(); void putIn(g); }}>
+              <div class="field field-lg">
+                <select class="field-input" aria-label={copy.sharingGroupPersonLabel(g.name)} bind:value={() => adding[g.id] ?? '', (v) => (adding = { ...adding, [g.id]: v })}>
+                  <option value="">{copy.sharingGroupPick}</option>
+                  {#each seeable.filter((p) => !g.people.some((x) => x.id === p.id)) as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+                </select>
+              </div>
+              <Button type="submit" weight="quiet" disabled={busy || !(adding[g.id] ?? '')}>{copy.sharingGroupAdd}</Button>
+            </form>
+            {#if retiring === g.id}
+              <p class="share-ask" role="alert">{copy.sharingGroupRetireAsk(g.name)}</p>
+              <div class="share-do">
+                <Button tone="bad" disabled={busy} aria-busy={busy} onclick={() => void retire(g)}>{copy.sharingGroupRetire}</Button>
+                <Button weight="quiet" disabled={busy} onclick={() => (retiring = null)}>{copy.sharingKeep}</Button>
+              </div>
+            {:else}
+              <div class="share-do"><Button weight="bare" tone="bad" disabled={busy} onclick={() => (retiring = g.id)}>{copy.sharingGroupRetire}</Button></div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <form class="group-new" onsubmit={newGroup}>
+      <label class="see-as-label" for="group-new">{copy.sharingGroupNameLabel}</label>
+      <div class="group-add">
+        <div class="field field-lg"><input class="field-input" id="group-new" type="text" autocomplete="off" maxlength="80" bind:value={groupName} /></div>
+        <Button type="submit" weight="quiet" disabled={busy || !groupName.trim()}>{copy.sharingGroupMake}</Button>
+      </div>
+    </form>
+  </Section>
+
+  <Section title={copy.sharingEnded} count={sections.ended.reduce((n, b) => n + b.rows.length, 0)}>
+    <p class="hint">{copy.sharingEndedLead}</p>
+    {#if sections.ended.length === 0}
+      <p class="none">{copy.sharingNoneEnded}</p>
+    {:else}
+      <ul class="bunches">{#each sections.ended as b (b.key)}{@render bunchOf(b, true)}{/each}</ul>
+    {/if}
+  </Section>
+{/if}
+
+<style>
+  /* SEE AS, A LABEL OVER ONE SELECT, 44PX TALL, the width of a phone and no wider than a sentence on a desk. */
+  .see-as {
+    display: grid;
+    gap: var(--sp-2);
+    max-inline-size: var(--measure);
+  }
+
+  .see-as-label {
+    color: var(--ink);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .see-as-pick .field-input,
+  .group-add .field-input {
+    min-block-size: var(--tap);
+  }
+
+  .hint,
+  .none {
+    margin: 0 0 var(--sp-3);
+    max-inline-size: var(--measure);
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .see-as .hint {
+    margin: 0;
+  }
+
+  /* PEOPLE HERE IS A HEADING OVER THE PEOPLE AREA'S OWN TILES, which a tile may not hold. */
+  .part {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+  }
+
+  .bunches,
+  .shares {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bunches {
+    gap: var(--sp-4);
+  }
+
+  .bunch-name {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-1);
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  /* ONE SHARE A LINE: the sentence, which opens it, and Stop at the end, with a hairline between lines. Below 640px Stop
+     goes under the sentence. */
+  .share {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1) var(--sp-3);
+    min-block-size: var(--tap);
+    padding-block: var(--sp-1);
+  }
+
+  .share + .share::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 0;
+    block-size: 1px;
+    background: var(--line);
+  }
+
+  .share-open {
+    flex: 1 1 16rem;
+    min-inline-size: 0;
+    min-block-size: var(--tap);
+    padding: 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .share-said {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-row);
+    line-height: 20px;
+    overflow-wrap: anywhere;
+  }
+
+  .share-open:hover .share-said {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .share[data-ended] {
+    display: grid;
+    gap: 2px;
+  }
+
+  .share[data-ended] .share-said {
+    color: var(--ink2);
+  }
+
+  .share-when {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--t-sm);
+  }
+
+  .share-ask {
+    flex: 1 1 100%;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--t-row);
+    font-weight: 500;
+  }
+
+  .share-do {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .share :global(.btn),
+  .share-do :global(.btn),
+  .group-add :global(.btn) {
+    min-block-size: var(--tap);
+  }
+
+  .group {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .group-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    align-items: center;
+  }
+
+  .group-add .field {
+    flex: 1 1 12rem;
+    min-inline-size: 0;
+  }
+
+  .group-new {
+    display: grid;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-4);
+    max-inline-size: var(--measure);
+  }
+</style>

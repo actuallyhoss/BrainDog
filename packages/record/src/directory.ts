@@ -157,6 +157,16 @@ CREATE TABLE IF NOT EXISTS dir_member (
   PRIMARY KEY (person, record)
 );
 
+-- WHO WAS TAKEN OFF A RECORD, so a tab still open on it is told its access ended (sharing plan §2.8) rather than the
+-- one 403 a stranger gets. Written by leave, cleared by join. Nothing here opens anything, and a copy leaves it out:
+-- a restore that forgot it says "You are not on this record." to the same person, which is still true.
+CREATE TABLE IF NOT EXISTS dir_left (
+  person  TEXT NOT NULL,
+  record  TEXT NOT NULL,
+  left_at TEXT NOT NULL,
+  PRIMARY KEY (person, record)
+);
+
 -- THE SCHEMA REVISION, IN A ROW, BECAUSE A PRAGMA IS NOT AVAILABLE EVERYWHERE.
 -- This read PRAGMA user_version and wrote it, unguarded, and a Durable Object's SQLite
 -- authorizer refuses the statement: "not authorized: SQLITE_AUTH", thrown out of the first line
@@ -836,7 +846,7 @@ export const CARRIED = [
  * absent from `CARRIED`, so a table added to `SCHEMA` later has to be put in one list or the other: the test reads
  * `sqlite_master` and fails for a table in neither.
  */
-export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite'] as const;
+export const LEFT_OUT = ['dir_session', 'dir_link', 'dir_challenge', 'dir_fail', 'dir_pending', 'dir_invite', 'dir_left'] as const;
 
 type Carried = (typeof CARRIED)[number];
 
@@ -1810,6 +1820,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
       const forgotten = signInForgotten(sql, person, me.email);
       const records = Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM dir_member WHERE person = ?', person)?.n ?? 0);
       sql.exec('DELETE FROM dir_member WHERE person = ?', person);
+      sql.exec('DELETE FROM dir_left WHERE person = ?', person);
       sql.exec('DELETE FROM dir_person WHERE id = ?', person);
       return { status: 200, body: { ...forgotten, records } };
     });
@@ -2328,6 +2339,7 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
           record,
           at(),
         );
+        sql.exec('DELETE FROM dir_left WHERE person = ? AND record = ?', person, record);
         return ok(null);
       }),
 
@@ -2355,6 +2367,8 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
             { at: 'person' },
           );
         sql.exec('DELETE FROM dir_member WHERE record = ? AND person = ?', record, person);
+        /* AND REMEMBERED, so their next call under its name is told their access ended (`identity.ts`, `session`). */
+        sql.exec('INSERT INTO dir_left (person, record, left_at) VALUES (?, ?, ?) ON CONFLICT (person, record) DO UPDATE SET left_at = excluded.left_at', person, record, at());
         return ok(null);
       }),
 

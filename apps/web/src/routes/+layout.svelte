@@ -52,7 +52,7 @@
   import TabBar from '$lib/shell/TabBar.svelte';
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { follow, live } from '$lib/data/live.svelte.ts';
+  import { follow, followGrant, live } from '$lib/data/live.svelte.ts';
   import { timingOpened } from '$lib/data/timing.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette carries its commands, its search and Slash's drawing, so importing them
@@ -812,9 +812,9 @@
      record to another follows the address being opened. */
   $effect(() => follow(data.live === true ? (data.refused ? null : apiBase(page.url)) : null));
 
-  /* A SCREEN'S FIRST READ IS ASKED WHILE ITS LINK IS HOVERED, FOCUSED OR TOUCHED (`preload.ts`), on a live record only,
-     and loaded after the first paint, so the entry carries none of it. */
-  const readsAhead = $derived(data.live === true && !data.refused);
+  /* A SCREEN'S FIRST READ IS ASKED WHILE ITS LINK IS HOVERED, FOCUSED OR TOUCHED (`preload.ts`), on a live record
+     whose access has not ended, and loaded after the first paint, so the entry carries none of it. */
+  const readsAhead = $derived(data.live === true && !data.refused && live.ended === null);
   $effect(() => {
     if (!readsAhead) return;
     let stop: (() => void) | null = null;
@@ -827,6 +827,12 @@
       stop?.();
     };
   });
+
+  /**
+   * THE DOOR SAID THIS PERSON'S ACCESS ENDED (sharing plan §2.8): the poll heard it (`live.ended`) or `boot` was refused
+   * `at: 'access'`, and the window is the ended screen in the door's own sentence. `undefined` for everybody else.
+   */
+  const endedSaid = $derived(live.ended !== null ? live.ended.said : data.refused?.at === 'access' ? data.refused.fix : undefined);
 
   /* OFFLINE, THE SHELL ASKS AGAIN when the browser says it is back and every twenty seconds, since a boot nobody
      reached is never kept: the load that answers draws the record's own shell, and its screens read again. */
@@ -865,7 +871,11 @@
     const base = apiBase(page.url);
     const me = data.me;
     /* THE LOCAL COPY'S READER AND ITS PREDICATES ARRIVE AFTER THE SHELL: nothing on the first paint is drawn from here. */
-    untrack(() => void import('$lib/data/local-tab.ts').then((m) => m.claimLocal(base, me)));
+    untrack(() => {
+      void import('$lib/data/local-tab.ts').then((m) => m.claimLocal(base, me));
+      /* AND THE ACCESS EPOCH IT BOOTED WITH, which the version poll compares: a move boots the tab again (§2.8). */
+      followGrant(me.grant?.epoch ?? null);
+    });
   });
 
   /**
@@ -1063,7 +1073,13 @@
      socket to fall back from. -->
 <div class="live" data-state={live.state} aria-hidden="true"></div>
 
-{#if bare}
+{#if endedSaid !== undefined}
+  <!-- THEIR ACCESS ENDED (sharing plan §3.4): the whole window says so in the door's sentence, and nothing of the record
+       is drawn under it. Its own chunk, since nobody else ever loads it. -->
+  <main id="main" class="bare" data-screen={settled()}>
+    {#await import('$lib/sharing/AccessEnded.svelte') then { default: AccessEnded }}<AccessEnded said={endedSaid} />{/await}
+  </main>
+{:else if bare}
   <!-- ITS OWN SCROLL CONTAINER, because `html, body` are `overflow: hidden` — the shell's `.body`
        panel is the one thing that scrolls, and a bare surface has no panel. So a page taller than
        the window simply had two thirds of itself below a fold that could not be crossed: `/s/<token>`
@@ -1149,6 +1165,10 @@
         <p class="offline-line" role="status">{copy.errorPage.offline.title}. {copy.errorPage.offline.body}</p>
       {/if}
       <LapseBanner shell={data} />
+      <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
+      {#if data.me.grant !== undefined && !data.me.owner}
+        {#await import('$lib/sharing/Welcome.svelte') then { default: Welcome }}<Welcome shell={data} />{/await}
+      {/if}
       {@render children()}
     </main>
     {/key}

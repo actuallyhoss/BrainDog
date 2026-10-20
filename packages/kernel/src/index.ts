@@ -685,7 +685,7 @@ export type {
   CheckOpts as ShareCheckOpts, Expr as LensExpr, HeldShare, Hide as ShareHide, Hours as ShareHours, Lens, LensCtx, LensLevel, LensSources,
   Narrow as TokenNarrow, Pred as LensPred, Rung as ShareRung, Share, Target as ShareTarget, When as ShareWhen, Where as ShareWhere, Who as ShareWho,
 } from './lens.ts';
-export { dayOf as shareDayOf, sentenceOf as shareSentenceOf, sharedWithYou, type ShareNames, type WordsOpts as ShareWordsOpts } from './share-words.ts';
+export { ACCESS_ENDED_AT, accessEndedSaid, dayOf as shareDayOf, sentenceOf as shareSentenceOf, sharedWithYou, subjectOf as shareSubjectOf, type ShareNames, type WordsOpts as ShareWordsOpts } from './share-words.ts';
 export { SHARE_TEMPLATES, type ShareTemplate, type TemplateAsk as ShareTemplateAsk, type TemplateRow as ShareTemplateRow } from './share-templates.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { Accepted as InviteAccepted, InvitationRow, InviteArgs, Invited } from './invitations.ts';
@@ -10300,6 +10300,24 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** Whether this person is on the record and an owner has stopped them: which sentence a door turns them away with. */
     memberStopped: (person: string): boolean => stoppedOf(sql, person),
+
+    /**
+     * Whether this person's access here ended (sharing plan §2.8): they hold nothing now, and the record knew them, as a
+     * member taken off or a guest whose last share ended. The owner's name rides with it, so a door can say "Ask Ada if
+     * you need it back". `null` for anybody who still holds something, or whom the record never knew: a door says its
+     * own words to them. A stopped member is the door's to ask first (`memberStopped`).
+     */
+    accessEnded: (person: string): { owner: string | null } | null => {
+      const known =
+        sql.one('SELECT 1 AS y FROM person WHERE id = ?', person) !== undefined ||
+        sql.one("SELECT 1 AS y FROM share WHERE who_kind = 'person' AND who = ? LIMIT 1", person) !== undefined;
+      if (!known) return null;
+      if (access(sql, person, null, accessLens()) !== null) return null;
+      const owner = sql.one<{ name: string | null; email: string | null }>(
+        "SELECT p.name, p.email FROM member m JOIN person p ON p.id = m.person_id WHERE m.level = 'owner' AND m.register = '*' ORDER BY m.person_id LIMIT 1",
+      );
+      return { owner: owner?.name ?? owner?.email ?? null };
+    },
 
     removeMember: (by: string, person: string, why?: string): Result<null> => transaction(() => moved(remove(memberDeps(), by, person, why))),
 

@@ -26,7 +26,7 @@
 import type {
   AccountCall, AssertionOptions, AuthBodies, AuthCall, AuthResult, Clock, Methods, PasskeyInfo, RegistrationOptions, SignupCall, SignupName, SignupVerified, Sql, Who,
 } from '@braindog/ports';
-import { ulids } from '@braindog/kernel';
+import { ACCESS_ENDED_AT, accessEndedSaid, ulids } from '@braindog/kernel';
 
 import { badSlug } from './directory.ts';
 import { ipBucket, mailCanon } from './signup-keys.ts';
@@ -197,6 +197,17 @@ const LIVE = `SELECT s.id_hash AS id_hash, s.person AS person, s.record AS recor
 const ON_RECORD = `SELECT s.record FROM dir_slug s
      JOIN dir_record r ON r.id = s.record AND r.closed_at IS NULL
      JOIN dir_member m ON m.record = s.record AND m.person = ?1
+    WHERE s.slug = ?2 AND s.released_at IS NULL`;
+
+/**
+ * The owner of the record a live name means, when this person was taken off it (`dir_left`): `?1` the person, `?2` the
+ * slug. Asked only after `ON_RECORD` found nothing, so somebody who was on a record and is not now is told their access
+ * ended (sharing plan §2.8), and every other name keeps the one 403.
+ */
+const LEFT_RECORD = `SELECT p.name, p.email FROM dir_slug s
+     JOIN dir_record r ON r.id = s.record AND r.closed_at IS NULL
+     JOIN dir_left l ON l.record = s.record AND l.person = ?1
+     LEFT JOIN dir_person p ON p.id = r.owner
     WHERE s.slug = ?2 AND s.released_at IS NULL`;
 
 /**
@@ -764,7 +775,12 @@ export function createAuth(sql: Sql, clock: Clock, config?: AuthConfig): Directo
         if (!('slug' in call) || call.slug === undefined) return { status: 200, body: { ...whoOf(found.row), passkey }, ...carry(found) };
         const slug = slugTyped(call.slug);
         const on = slug === null ? undefined : sql.one<{ record: string }>(ON_RECORD, found.row.person, slug);
-        if (!on) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' }, ...carry(found) };
+        if (!on) {
+          /* A NAME THEY WERE TAKEN OFF SAYS THEIR ACCESS ENDED, which tells them nothing they did not know: they held it. */
+          const left = slug === null ? undefined : sql.one<{ name: string | null; email: string | null }>(LEFT_RECORD, found.row.person, slug);
+          const refusal = left ? { code: 'FORBIDDEN', fix: accessEndedSaid(left.name ?? left.email), at: ACCESS_ENDED_AT } : { code: 'FORBIDDEN', fix: 'You are not on this record.' };
+          return { status: 403, refusal, ...carry(found) };
+        }
         return { status: 200, body: { ...whoOf(found.row), record: on.record, passkey }, ...carry(found) };
       }
 

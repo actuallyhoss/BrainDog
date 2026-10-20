@@ -47,7 +47,16 @@ test('THE LAST SHARE STOPPED: the guest is refused on the next call and the reco
   assert.equal(stopped.status, 200, JSON.stringify(stopped.out));
   assert.deepEqual(stopped.out.value?.['left'], [bo.value.id]);
 
-  assert.equal((await call(guest, 'whoami', {})).status, 403);
+  /* TOLD THEIR ACCESS ENDED, IN THE OWNER'S NAME, at the root and under the record's name, with the header the service
+     worker deletes its copy on (sharing plan §2.8). */
+  for (const path of ['/api/whoami', '/app/studio/api/whoami']) {
+    const res = await c.ask(path, { method: 'POST', cookie: guest, body: '{}' });
+    assert.equal(res.status, 403, path);
+    assert.equal(res.headers.get('x-braindog-access'), 'ended', path);
+    const said = ((await res.json()) as Out).refusal;
+    assert.equal(said?.at, 'access', path);
+    assert.match(said?.fix ?? '', /^Your access to .+ ended\. Ask .+ if you need it back\.$/u, path);
+  }
   assert.deepEqual(await records(), []);
   assert.ok(!(await dir.reaches(bo.value.id)).some((r) => r.record === REC), 'the Directory still names the guest');
 });

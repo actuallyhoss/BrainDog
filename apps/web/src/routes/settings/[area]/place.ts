@@ -76,7 +76,9 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
     icon: 'archive',
     areas: [
       area('/settings/signing-in', 'Signing in', 'key', 'You, your passkeys and where you are signed in'),
-      area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and invites'),
+      /* PEOPLE & SHARING HOLDS WHAT PEOPLE DID, roles and invites, and every share beside them (sharing plan §3.2). The
+         sharing address opens it too (`MOVED`). */
+      area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and what you share'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
       area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
       /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
@@ -98,13 +100,15 @@ export const OFF_INDEX: readonly Area[] = [];
 
 /**
  * ADDRESSES THAT MOVED, each to the area that holds it now: a link somebody shared, or a menu that still says the old
- * address, lands on the area it means. Identity, Recovery and Sessions are Signing in; Pages is Navigation.
+ * address, lands on the area it means. Identity, Recovery and Sessions are Signing in; Pages is Navigation; Sharing is
+ * People & sharing.
  */
 export const MOVED: ReadonlyMap<string, string> = new Map([
   ['identity', 'signing-in'],
   ['recovery', 'signing-in'],
   ['sessions', 'signing-in'],
   ['pages', 'navigation'],
+  ['sharing', 'people'],
 ]);
 
 /** The area an id names, a moved one by where it lives now. */

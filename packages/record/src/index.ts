@@ -1200,6 +1200,12 @@ export type Boot = {
      * and when the clock alone will change it. Absent for anybody who holds no share, the owner among them.
      */
     grant?: Grant;
+    /**
+     * A short fingerprint of the rows and fields this caller's shares narrow them to (`wheres`, `writes`, `hides`), so the
+     * app keys its copy on what they may read and never on the narrowing itself (sharing plan slice 10). Absent when
+     * nothing is narrowed.
+     */
+    lens?: string;
     /** What this person arranged for themselves (`setPref`), key by key as `Prefs` says. A person only. */
     prefs?: Prefs;
   };
@@ -1798,6 +1804,18 @@ type Where = { project?: string; depth?: ContextDepth; task?: TaskInHand };
  * the lines to say ("Nothing new." when nothing did), what is pending, what stops it, and the stamp now.
  */
 export type ContextSince = { since: { stamp: string | null; changed: boolean; pending: Told[]; stop: Stop | null; lines: string[] } };
+
+/**
+ * `Boot.me.lens`: a short fingerprint (FNV-1a, base 36) of what this caller's shares narrow them to, or `null` when
+ * nothing is. Only a fingerprint, so the conditions a share holds never travel to the app to be kept.
+ */
+export function lensMark(ctx: Pick<CallContext, 'wheres' | 'writes' | 'hides'>): string | null {
+  if (ctx.wheres === undefined && ctx.writes === undefined && ctx.hides === undefined) return null;
+  const text = JSON.stringify([ctx.wheres ?? null, ctx.writes ?? null, ctx.hides ?? null]);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(36);
+}
 
 /**
  * `33 §4`, line 356, verbatim: `{ version, format, kernel, primitives, app, slash: boolean }`.
@@ -8047,6 +8065,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         level: p.kind === 'person' || p.kind === 'token' ? p.level : null,
         levels: levelsOf(ctx),
         ...(ctx.grant === undefined ? {} : { grant: { ...ctx.grant } }),
+        ...((lens) => (lens === null ? {} : { lens }))(lensMark(ctx)),
         ...(p.kind === 'person' ? { prefs } : {}),
       },
       pages,

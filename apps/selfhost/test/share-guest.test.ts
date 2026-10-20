@@ -63,7 +63,7 @@ test('SHARED WITH A NEW ADDRESS: link, mailbox proof, accept, a guest who sees o
       const res = await fetch(`http://127.0.0.1:${port}${path}`, { method, headers, ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }) });
       const raw = await res.text();
       const sid = res.headers.getSetCookie().map((c) => /^bd_s=([A-Za-z0-9_-]{43});/.exec(c)?.[1]).find(Boolean);
-      return { status: res.status, raw, body: (raw ? JSON.parse(raw) : null) as Body, sid };
+      return { status: res.status, raw, body: (raw ? JSON.parse(raw) : null) as Body, sid, access: res.headers.get('x-braindog-access') };
     };
     const value = <T>(out: { status: number; raw: string; body: Body }): T => {
       assert.equal(out.status, 200, out.raw);
@@ -135,7 +135,12 @@ test('SHARED WITH A NEW ADDRESS: link, mailbox proof, accept, a guest who sees o
     assert.equal(stopped.left.length, 1);
     /* AND THE DIRECTORY FOLLOWED: it no longer names them as reaching the record. */
     assert.equal(running.directory.reaches(REC, stopped.left[0]!), false);
-    assert.equal((await call('/api/list', { sid: priya, body: { register: 'tasks' } })).status, 403);
+    const refused = await call('/api/list', { sid: priya, body: { register: 'tasks' } });
+    assert.equal(refused.status, 403);
+    /* TOLD THEIR ACCESS ENDED, in the owner's name, with the header the service worker deletes its copy on. */
+    assert.equal(refused.access, 'ended');
+    assert.match(refused.raw, /"at":"access"/);
+    assert.match(refused.raw, /Your access to Ada's record ended\. Ask Ada if you need it back\./);
     const after = await call('/account/records', { sid: priya });
     assert.deepEqual(after.body?.value ?? [], []);
   } finally {

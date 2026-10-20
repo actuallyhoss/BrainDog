@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { sessionContext, type HeldAccess } from '../../host/src/auth.ts';
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -87,10 +88,22 @@ test('A SHARE TO AN ADDRESS WAITS, its invitation is good while it does, and acc
   assert.ok(held);
   assert.deepEqual([...(held.registers ?? [])].sort(), ['tasks', 'things']);
 
+  /* WHAT THE SHARING PAGE AND THE GUEST ARE TOLD: names, never ids, and the first-open line said to her. */
+  const rows = value<{ id: string; who_name: string | null; subject: string; sentence: string }[]>(await api.sharing(undefined, owner));
+  const row = rows.find((r) => r.id === again.id);
+  assert.deepEqual({ who: row?.who_name, subject: row?.subject }, { who: 'Priya', subject: 'Kiln' });
+  const priya = sessionContext({ person: 'p_pri', email: 'priya@studio.co', record: 'rec', provedAt: NOW }, held as HeldAccess) as CallContext;
+  const mine = value<{ id: string; by: string | null; welcome: string }[]>(await api.myShares(undefined, priya));
+  assert.deepEqual(mine.map((m) => ({ by: m.by, welcome: m.welcome })), [{ by: 'Ada', welcome: 'Ada shared Kiln with you. You can edit tasks in Kiln until 1 Dec.' }]);
+  assert.equal(api.kernel.accessEnded('p_pri'), null, 'access said ended while she holds a share');
+
   /* THE LAST SHARE ENDS: they hold nothing, and the answer says so for the host's Directory. */
   const stopped = value<{ ended: string[]; left: string[] }>(await api.unshare({ id: again.id }, owner));
   assert.deepEqual(stopped.left, ['p_pri']);
   assert.equal(api.kernel.access('p_pri'), null);
+  /* AND A DOOR CAN SAY SO, with the owner's name; somebody who never held a share is not "ended". */
+  assert.deepEqual(api.kernel.accessEnded('p_pri'), { owner: 'Ada' });
+  assert.equal(api.kernel.accessEnded('p_nobody'), null);
 });
 
 test('GROUPS: made through the API, joining and leaving said once per share, and leaving ends the shares for them', async () => {
@@ -111,6 +124,10 @@ test('GROUPS: made through the API, joining and leaving said once per share, and
   assert.ok(api.kernel.accessEpoch() > epoch);
   value(await api.groupMember({ group: g.id, person: 'p_lee', in: true }, owner));
   assert.deepEqual(events(sql, 'access.grant', 'person:p_gus').map((e) => e.note), ['joined Accountants', 'joined Accountants']);
+  /* THE SHARING PAGE'S GROUPS: by name, their people by name, and how many shares each holds. */
+  value(await api.groupPut({ name: 'Builders' }, owner));
+  const listed = value<{ name: string; people: { name: string | null }[]; shares: number }[]>(await api.groups(undefined, owner));
+  assert.deepEqual(listed.map((x) => [x.name, x.people.map((p) => p.name), x.shares]), [['Accountants', ['Gus', 'Lee'], 2], ['Builders', [], 0]]);
   assert.deepEqual([...(api.kernel.access('p_gus')?.registers ?? [])].sort(), ['money', 'tasks']);
 
   /* TAKEN OUT: one access.revoke per share for them, and a guest who held only these holds nothing now. */
@@ -127,6 +144,7 @@ test('GROUPS: made through the API, joining and leaving said once per share, and
   const retired = value<{ ended: string[]; left: string[] }>(await api.groupPut({ id: g.id, retire: true }, owner));
   assert.deepEqual([...retired.ended].sort(), [s1.id, s2.id].sort());
   assert.deepEqual(retired.left, []);
+  assert.deepEqual(value<{ name: string }[]>(await api.groups(undefined, owner)).map((x) => x.name), ['Builders'], 'a retired group was still listed');
   assert.equal(((await api.groupMember({ group: g.id, person: 'p_gus', in: true }, owner)) as R).refusal?.code, 'REF_UNKNOWN');
 });
 
