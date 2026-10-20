@@ -502,7 +502,9 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
         /* WHAT AN AGENT SAID ABOUT A PROJECT IS LEFT OUT OF THE ROW, and the agent writes it below, when it said it. */
         const said = register === 'things' ? PROJECTS_SAID.find((s) => s.things === i + 1) : undefined;
         const planted = said ? Object.fromEntries(Object.entries(entry).filter(([k]) => !said.fields.includes(k))) : entry;
-        const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, planted as Fields), { actor });
+        /* LEDGER POST'S PAYMENTS CAME IN WITH THE STATEMENT, not from a person's hand, so they are BrainDog's to file. */
+        const by = register === 'transactions' && entry.what === 'LEDGER POST' ? STATEMENT : actor;
+        const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, planted as Fields), { actor: by });
         if (!out.ok) return out;
         rows++;
       }
@@ -555,6 +557,16 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
     if (!applied.ok) return applied as unknown as Result<Seeded>;
   }
 
+  /* ONE BATCH BRAINDOG FILED ITSELF THIS MORNING (today F6), so Handled has a line on the sample: the filing rule put
+     every Ledger Post payment under Software. They came with the statement (`STATEMENT`), so the change only arranges
+     rows no person made and can be undone, and the record answers it as it is filed (`handledFault`). The rest of the
+     uncategorised stay for a person. */
+  const handled = handledBatch(kernel);
+  if (handled) {
+    const filed = kernel.backdate(HISTORY.rules + Object.keys(RULES).length * HISTORY.ruleStep, () => kernel.propose(handled, HANDLED_BY));
+    if (!filed.ok) return filed as unknown as Result<Seeded>;
+  }
+
   return {
     ok: true,
     value: {
@@ -564,6 +576,37 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
       metrics: Object.keys(METRICS).length,
       suggestions,
       decisions,
+    },
+  };
+}
+
+/** What brought the payments BrainDog files itself: the bank statement, an import and no person. */
+const STATEMENT = 'ingest:statement';
+
+/** Who files the sample's handled batch: the filing rule, which BrainDog may answer for itself. */
+const HANDLED_BY = 'rule:txn-categorise';
+
+/**
+ * The Ledger Post payments the filing rule put under Software this morning, as one rowset at the versions the rows are
+ * at now, or `null` where the sample holds none of them uncategorised or no Software. Ledger Post is one of the three
+ * merchants no category names; the other two stay for a person to file.
+ */
+export function handledBatch(kernel: Pick<Kernel, 'get'>): { question: string; body_kind: 'rowset'; body: Record<string, unknown> } | null {
+  const at = (ROWS.categories ?? []).findIndex((r) => r.name === 'Software') + 1;
+  const software = at > 0 ? kernel.get(`categories#${at}`) : null;
+  const paid = (ROWS.transactions ?? [])
+    .map((r, i) => ({ r, seq: i + 1 }))
+    .filter(({ r }) => r.what === 'LEDGER POST' && r.category === undefined)
+    .map(({ seq }) => kernel.get(`transactions#${seq}`))
+    .filter((row): row is NonNullable<typeof row> => row !== null && (row.fields.category ?? null) === null)
+  if (!software || paid.length === 0) return null;
+  return {
+    question: `Filed ${String(paid.length)} Ledger Post ${paid.length === 1 ? 'payment' : 'payments'} under Software`,
+    body_kind: 'rowset',
+    body: {
+      register: 'transactions',
+      rows: paid.map((row) => ({ at: `transactions#${row.seq}`, version: row.version, patch: { category: software.id } })),
+      why: 'Ledger Post’s sending plan is already filed under Software in what comes round.',
     },
   };
 }
@@ -628,7 +671,7 @@ export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
       body_kind: 'options',
       body: {
         options: [
-          option('retire', 'Retire it', 'Let the domain lapse, archive the repository, and take the row off every screen. Irreversible after the drop date.'),
+          option('retire', 'Retire it', 'Let the domain lapse, archive the repository, and take it off every page. Irreversible after the drop date.'),
           option('park', 'Park it another year', 'Keep the name. The only cost is the renewal and the attention.'),
         ],
       },
