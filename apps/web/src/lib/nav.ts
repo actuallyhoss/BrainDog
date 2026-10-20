@@ -256,8 +256,19 @@ export function isHere(item: Pick<FlatItem, 'near' | 'exact'>, path: string): bo
 }
 
 /**
- * The phone's tab bar: the flat list's first five rows, with Decide moved up beside Today while something waits on it.
- * The rest are behind More with everything else.
+ * THE FIVE PLACES OF 19 OCTOBER, after Today and Needs you, by the section's plain name: Projects, Money, Agents (his
+ * call 2, 20 October). Work lives in Projects and on Today, and everything else is under More. A shop's Orders come
+ * first, as on the rail (`lib/nav/rail.ts`): they are what a shop opens the app for.
+ */
+const FIVE = ['orders', 'shop', 'projects', 'money', 'agents'];
+
+/** A place's plain name, its section's or its own key's. */
+const placeName = (i: FlatItem): string => plainOf(i.key.replace(/^section:/u, ''));
+
+/**
+ * The five places, on the phone's tab bar and in the top bar: Today, Needs you, Projects, Money and Agents. A record
+ * without one of the three fills its slot with its next place in the rail's order, so the bar is never short while
+ * the record has places to show. The rest are behind More with everything else.
  */
 export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly string[] = []): FlatItem[] {
   /* HIS FIVE WIN: Today first, then the pages he put on the bar in his order. A pick that is gone from the rail is
@@ -265,8 +276,10 @@ export function tabsOf(main: readonly FlatItem[], most = 5, chosen: readonly str
   const picked = chosen.flatMap((href) => main.filter((i) => i.href === href && i !== main[0]));
   if (picked.length > 0 && main[0]) return [main[0], ...picked].slice(0, most);
   const decide = main.find((i) => i.key === 'decide');
-  const rest = main.filter((i) => i !== decide);
+  const rest = main.filter((i) => i !== decide && i.key !== 'activity');
   const [lead, ...tail] = rest;
-  const ordered = lead === undefined ? [] : decide ? [lead, decide, ...tail] : rest;
-  return ordered.slice(0, most);
+  if (lead === undefined) return [];
+  const named = FIVE.flatMap((name) => tail.filter((i) => placeName(i) === name));
+  const others = tail.filter((i) => !named.includes(i));
+  return [lead, ...(decide ? [decide] : []), ...named, ...others].slice(0, most);
 }

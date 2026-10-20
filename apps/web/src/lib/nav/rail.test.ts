@@ -134,9 +134,9 @@ test("a shop's orders come straight after Needs you, so the phone's bar is Today
   }
 });
 
-test('a record without a shop keeps its rail and its bar exactly as they were', () => {
+test('a record without a shop keeps its rail, and its bar is the five of 19 October', () => {
   const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Needs you');
-  assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money']);
+  assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Needs you', 'Projects', 'Money', 'Agents']);
   assert.deepEqual(rail.places.map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money', 'People', 'Agents']);
   assert.deepEqual(rail.more.map((i) => i.label), ['Services', 'Activity']);
 });
@@ -160,4 +160,14 @@ test('a section the shell left out is no place in the rail or under More, and it
   const after = railOf(flatNav(sam(true), 0, WORDS), 'Needs you');
   assert.deepEqual([...after.places, ...after.more].map((i) => i.label), ['Today', 'Needs you', 'Money', 'People', 'Services', 'Dashboard', 'Activity']);
   assert.equal(after.places.find((i) => i.label === 'Services')?.href, '/p/estate');
+});
+
+test('the bar fills a missing place with the next one in the rail, so it is never short', () => {
+  const rail = railOf(flatNav([['Work', [page('Work', '/p/work')]], ['Money', [page('Money', '/p/money')]], ['People', [page('People', '/p/people')]]], 0, WORDS, { work: WORK }), 'Needs you');
+  assert.deepEqual(tabsOf(rail.places).map((i) => i.label), ['Today', 'Needs you', 'Money', 'Work', 'People']);
+});
+
+test("his own pick still wins on the phone's bar, after Today", () => {
+  const rail = railOf(flatNav(SECTIONS, 3, WORDS, { work: WORK }), 'Needs you');
+  assert.deepEqual(tabsOf(rail.places, 5, ['/p/money', '/p/portfolio']).map((i) => i.label), ['Today', 'Money', 'Projects']);
 });

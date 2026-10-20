@@ -133,6 +133,12 @@
      `/[id]`'s `Search` button navigated Home instead of searching. */
   let keymapOpen = $state(false);
   let moreOpen = $state(false);
+  /* THE FACE ON A PHONE'S SCREEN ASKS FOR THE SHEET (`shell/more.svelte.ts`): it is opened here and the ask put back. */
+  $effect(() => {
+    if (!moreSheet.asked) return;
+    moreSheet.asked = false;
+    moreOpen = true;
+  });
 
   /**
    * THE MORE SHEET IS THE PHONE'S RAIL: search at its head, the record and
@@ -964,7 +970,7 @@
   </div>
 
   <div class="tab-slot">
-    <TabBar {tabs} more={moreOpen} onmore={() => (moreOpen = true)} />
+    <TabBar {tabs} />
   </div>
 
   <!--

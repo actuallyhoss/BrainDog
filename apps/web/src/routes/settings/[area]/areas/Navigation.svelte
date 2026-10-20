@@ -47,7 +47,7 @@
     hideOne: (title: string) => `Hide ${title}`,
     hidden: (title: string) => `${title} is hidden from your nav.`,
     bar: 'Phone bar',
-    barHint: 'Today is always first. Pick up to four pages for the rest of the bar; none picked uses the first four.',
+    barHint: 'Today is always first. Pick up to four pages for the rest of the bar; with none picked it holds Needs you, Projects, Money and Agents.',
     barOn: (title: string) => `${title} on the phone bar`,
     barFull: 'The bar is full. Take one off first.',
     barReset: 'Use the default bar',
@@ -311,7 +311,7 @@
   <p class="hint phone-only">{copy.navShapeOnPhone}</p>
 </Section>
 
-<!-- THE PHONE BAR, one plain switch for each page: his pick wins over the rail's first four. -->
+<!-- THE PHONE BAR, one plain switch for each page: his pick wins over the five of 19 October. -->
 <Section title={words.bar}>
   <p class="hint">{words.barHint}</p>
   <ul class="ledger ledger-lead">

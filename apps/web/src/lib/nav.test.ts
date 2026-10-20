@@ -155,9 +155,9 @@ test('A RECORD WITH TASKS AND NO WORK SECTION STILL GETS THE ROW', () => {
   assert.deepEqual(flat.pages, []);
 });
 
-test('THE PHONE`S TABS ARE THE FIRST FIVE, with Needs you beside Today while something waits on it', () => {
-  assert.deepEqual(tabsOf(flatNav(FOUNDER, 0, WORDS).main).map((i) => i.label), ['Today', 'Work', 'Projects', 'Money', 'Activity']);
-  assert.deepEqual(tabsOf(flatNav(FOUNDER, 2, WORDS).main).map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money']);
+test('THE PHONE`S TABS ARE THE FIVE OF 19 OCTOBER, Projects and Money first and the next place where Agents is missing', () => {
+  assert.deepEqual(tabsOf(flatNav(FOUNDER, 0, WORDS).main).map((i) => i.label), ['Today', 'Projects', 'Money', 'Work', 'People']);
+  assert.deepEqual(tabsOf(flatNav(FOUNDER, 2, WORDS).main).map((i) => i.label), ['Today', 'Needs you', 'Projects', 'Money', 'Work']);
 });
 
 test('HIS PHONE BAR WINS: Today, then the pages he put on it in his order, and a gone page is skipped', () => {
@@ -165,5 +165,5 @@ test('HIS PHONE BAR WINS: Today, then the pages he put on it in his order, and a
   const money = main.find((i) => i.label === 'Money')!;
   const projects = main.find((i) => i.label === 'Projects')!;
   assert.deepEqual(tabsOf(main, 5, [money.href, '/p/gone', projects.href]).map((i) => i.label), ['Today', 'Money', 'Projects']);
-  assert.deepEqual(tabsOf(main, 5, ['/p/gone']).map((i) => i.label), ['Today', 'Needs you', 'Work', 'Projects', 'Money']);
+  assert.deepEqual(tabsOf(main, 5, ['/p/gone']).map((i) => i.label), ['Today', 'Needs you', 'Projects', 'Money', 'Work']);
 });

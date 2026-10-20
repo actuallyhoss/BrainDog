@@ -20,9 +20,11 @@
   it never jumps. The sentence scrolls away with the page.
 
   Below 900px the head is a phone's. A `--sticky` (52px) bar stays at the top: the back link on a detail page, the
-  title on one line once the large one has scrolled away, and a 44px search button. Under it the name at 22 and the
-  sentence scroll away with the page. A PAGE WITH NO WAY BACK HAS NO ROW FOR THE BAR: it lies over the head's first
-  row, so the search button sits at the end of the name's row (or of the line over it) and no empty row opens the page.
+  title on one line once the large one has scrolled away, a 44px search button, and the person's face, which opens the
+  More sheet: Work, People, Settings and every other place the five tabs leave out (his call 2, 20 October). Under it
+  the name at 22 and the sentence scroll away with the page. A PAGE WITH NO WAY BACK HAS NO ROW FOR THE BAR: it lies
+  over the head's first row, so the search button and the face sit at the end of the name's row (or of the line over
+  it) and no empty row opens the page.
 
   A NAME BREAKS BETWEEN ITS WORDS, never inside one: "Invoice 2026-041" broke after the hyphen, as "2026-" and "041".
 
@@ -38,6 +40,7 @@
   import { at, here } from '../at.ts';
   import { copy } from '../copy.ts';
   import { palette } from '../palette/open.svelte.ts';
+  import { openMore } from '../shell/more.svelte.ts';
   import { partsOf } from '../shell/headline.ts';
   import { page } from '$app/state';
   import type { Noun } from '$lib/define.svelte.ts';
@@ -154,6 +157,14 @@
   const overName = $derived(!wayBack && !crumb);
   const titled = $derived(overName ? under : past);
 
+  /* THE PERSON'S FACE ON A PHONE: the first letter of the name the record told them, else of "You", as the top bar's. */
+  const face = $derived.by(() => {
+    const d = page.data as { me?: { person?: string }; names?: Record<string, string> } | undefined;
+    const id = d?.me?.person;
+    const name = id && d?.names && Object.hasOwn(d.names, id) ? (d.names[id] ?? '').trim() : '';
+    return (name || 'You').slice(0, 1).toUpperCase();
+  });
+
   /* THE SENTENCE AS WORDS, cut into its figures and the phrase that needs him (`shell/headline.ts`). */
   const parts = $derived(typeof sentence === 'string' ? partsOf(sentence, needs) : null);
 </script>
@@ -176,6 +187,9 @@
       <Icon name="search" size="l" />
     </button>
   {/if}
+  <button type="button" class="me tap" aria-haspopup="dialog" aria-label={copy.more} title={copy.more} onclick={openMore}>
+    <span class="me-face" aria-hidden="true">{face}</span>
+  </button>
 </div>
 {#if crumb}
   <!-- Over the name and scrolling with the page: the row that stays is the name's. -->
@@ -567,7 +581,7 @@
       pointer-events: none;
     }
 
-    .head-bar[data-solo] .find {
+    .head-bar[data-solo] :is(.find, .me) {
       pointer-events: auto;
     }
 
@@ -577,16 +591,17 @@
       box-sizing: border-box;
       inline-size: auto;
       min-block-size: var(--sticky);
-      padding-inline-end: calc(var(--gutter) + var(--tap));
+      padding-inline-end: calc(var(--gutter) + var(--tap) * 2);
     }
 
     .head-bar[data-solo] + .page-head .head-main {
       min-block-size: var(--sticky);
-      padding-inline-end: calc(var(--tap) + var(--sp-1));
+      padding-inline-end: calc(var(--tap) * 2 + var(--sp-1));
     }
 
     /* SEARCH, AS A PHONE HOLDS IT: a 44px square target at the top right with the glyph in it, no disc round it. */
-    .find {
+    .find,
+    .me {
       display: grid;
       place-items: center;
       flex: none;
@@ -599,6 +614,22 @@
       border-radius: var(--r-ctl);
       color: var(--ink);
       cursor: pointer;
+    }
+
+    .find + .me {
+      margin-inline-start: 0;
+    }
+
+    /* THE FACE: the person's letter in a 30px circle, the control's quiet fill. */
+    .me-face {
+      display: grid;
+      place-items: center;
+      inline-size: 30px;
+      block-size: 30px;
+      background: var(--field);
+      border-radius: var(--r-round);
+      font-size: var(--t-sm);
+      font-weight: var(--fw-semi);
     }
 
     /* THE NAME AND WHAT GOES WITH IT SCROLL AWAY WITH THE PAGE; only the bar stays. */

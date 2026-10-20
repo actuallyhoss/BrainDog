@@ -1,14 +1,15 @@
 <!--
   Below 900px the rail becomes a tab bar. Not a shrunken desktop.
 
-  THE SAME PLACES AS THE RAIL (`railOf` in `lib/nav/rail.ts`), its first five (`tabsOf`), and More for the rest: a place
-  whose glyph or word differs between the two is a place learnt twice. Decide moves up beside Today while something
-  waits on it, with its count. Search is the 44px button in each screen's head bar (`PageHead.svelte`) and the first
-  row of More, never a tab.
+  FIVE PLACES, AS ON 19 OCTOBER (his call 2, 20 October): Today, Needs you, Projects, Money, Agents (`tabsOf`), the same
+  five the top bar draws, with the rail's glyphs and words: a place whose glyph or word differs between two shapes is a
+  place learnt twice. NO MORE TAB. Work lives in Projects and on Today, and Work, People, Settings and the rest are
+  under the face at the top of each screen (`PageHead.svelte`), which opens the More sheet. Search is the 44px button
+  beside that face, never a tab.
 
   FLAT, AND DOCKED TO THE BOTTOM EDGE (DIRECTION §39). It was a glass bar floating over the work, which drew a second
-  card over every screen a phone shows. It is now the board's own colour with one hairline over it, the width of the
-  window, the home indicator inside it: equal tabs, 22px glyphs over 11px words, every target 44 or more. The tab you
+  card over every screen a phone shows. It is now the tile's white with one hairline over it, as the top bar is, the
+  width of the window, the home indicator inside it: equal tabs, 22px glyphs over 11px words, every target 44 or more. The tab you
   are on is ink, glyph and word; the rest are `--dim`. The only red is the count of what waits on you.
 
   Safe-area insets are paid exactly once, on the fixed element only. Paying twice is a real, easy bug.
@@ -22,21 +23,16 @@
 
   let {
     tabs,
-    more = false,
-    onmore,
   }: {
-    /** The tabs, as `tabsOf` reads them from the rail's places. */
+    /** The five tabs, as `tabsOf` reads them from the rail's places. */
     tabs: readonly FlatItem[];
-    /** Whether the More sheet is open, said on the tab that opens it. */
-    more?: boolean;
-    onmore?: () => void;
   } = $props();
 
   /* COMPARED INSIDE THE RECORD, the address with the base and the slug taken off (`lib/at.ts`). */
   const path = $derived(placeOf(inside(page.url.pathname), page.url.searchParams));
 </script>
 
-<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length + 1}`}>
+<nav class="tabs" aria-label="Record" style={`--tabs:${tabs.length}`}>
   {#each tabs as tab (tab.key)}
     <a class="tab tap" href={at(tab.href)} aria-current={isHere(tab, path) ? 'page' : undefined}>
       <span class="badge-slot">
@@ -46,18 +42,15 @@
       <span class="tab-name">{tab.label}</span>
     </a>
   {/each}
-  <button type="button" class="tab tap" aria-haspopup="dialog" aria-expanded={more} onclick={onmore}>
-    <Icon name="more" size="l" /><span class="tab-name">{copy.more}</span>
-  </button>
 </nav>
 
 <style>
   /**
    * THE BAR: the window's width at the bottom edge, `--tab-h` tall over the home indicator, in the board's colour with a
-   * hairline over it. Opaque, so a row passing under it is never read through it. `--tabbar` (the bar and the indicator)
+   * hairline over it, as the top bar is the tile's at the top. Opaque, so a row passing under it is never read through it. `--tabbar` (the bar and the indicator)
    * is what the shell and the toasts clear.
    *
-   * EQUAL TABS, AND SIX OF THEM FIT THE NARROWEST PHONE: 320 over six is 53 across, so every tab clears 44 on both axes
+   * EQUAL TABS, AND FIVE OF THEM FIT THE NARROWEST PHONE: 320 over five is 64 across, so every tab clears 44 on both axes
    * before a word is shortened.
    */
   .tabs {
@@ -70,7 +63,7 @@
     box-sizing: border-box;
     block-size: var(--tabbar);
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    background: var(--board);
+    background: var(--tile);
     border-block-start: 1px solid var(--line);
   }
 
@@ -112,17 +105,12 @@
     font-weight: 600;
   }
 
-  /* MORE IS INK WHILE ITS SHEET IS UP, so the tab that raised it says so. */
-  .tab[aria-expanded='true'] {
-    color: var(--ink);
-  }
-
   .badge-slot {
     position: relative;
     display: grid;
   }
 
-  /* SIX TABS ON A 320px PHONE ARE 53px EACH, so a long section name ends in an ellipsis rather than pushing its neighbours. */
+  /* FIVE TABS ON A 320px PHONE ARE 64px EACH, so a long section name ends in an ellipsis rather than pushing its neighbours. */
   .tab-name {
     max-inline-size: 100%;
     overflow: hidden;
