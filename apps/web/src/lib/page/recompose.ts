@@ -168,6 +168,11 @@ function measure(page: HTMLElement): Map<string, { el: HTMLElement; box: Box }> 
 
 const boxes = (m: Map<string, { box: Box }>): Map<string, Box> => new Map([...m].map(([k, v]) => [k, v.box]));
 
+/** The first second of a screen, in which it settles rather than moves (`recomposer`). */
+export const SETTLE = 1000;
+
+const now = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
 /** Whether this reader asked for less motion. */
 const still = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -179,6 +184,12 @@ const still = (): boolean => typeof matchMedia === 'function' && matchMedia('(pr
  * A LEAVING BLOCK IS ITS OWN ELEMENT, COPIED BEFORE IT GOES, laid over the place it held, out of the flow so nothing
  * moves under it, and taken away once it has faded. A copy and not the element itself, because the page has already
  * taken that element out of the document by the time the change plays.
+ *
+ * NOTHING MOVES IN THE FIRST SECOND OF A SCREEN (`SETTLE`). A screen opening draws its answer, then its first poll and
+ * its first measure land on top of it; played, each of those slid the tiles the reader had only just seen, and on
+ * Today the whole board did it twice before it was still. The clock starts when the recomposer is made and again each
+ * time its owner stops it, which `PageBody` does for every draw that is not this page changing: a page that is another
+ * page, its first measure, the arrange mode opening or shutting.
  */
 export function recomposer(): {
   before: (page: HTMLElement, next: ReadonlySet<string>, swap?: ReadonlySet<string>) => (() => void) | null;
@@ -186,10 +197,17 @@ export function recomposer(): {
 } {
   let running: Animation[] = [];
   let ghosts: HTMLElement[] = [];
+  let opened = now();
 
-  function stop() {
+  function halt() {
     for (const a of running.splice(0)) a.cancel();
     for (const g of ghosts.splice(0)) g.remove();
+  }
+
+  /** Ends what is playing, and starts the screen's first second again: what is drawn next is the screen settling. */
+  function stop() {
+    halt();
+    opened = now();
   }
 
   /** A copy of a block as it is drawn now, styled to stand where it stood once the page has moved on. */
@@ -204,11 +222,15 @@ export function recomposer(): {
   /**
    * Lays a copy over the place a block held and fades it out, then takes it away.
    *
-   * A BLOCK THAT LEFT FADES UNDER THE PAGE (`under`), never over it: it goes in as the page's first child, so the blocks
-   * drawn after it, which are positioned too, paint over it, and a block that moved into the place it held is read at
-   * once rather than through the old one for the length of the fade. It was appended last, at `z-index: 0`, and
-   * the old content lay over the new block, which under reduced motion does not even move out from under it.
+   * A BLOCK THAT LEFT FADES UNDER THE PAGE (`under`), never over it: it goes in as the page's first child at
+   * `z-index: 0`, so the blocks drawn after it, which are positioned too, paint over it, and a block that moved into
+   * the place it held is read at once rather than through the old one for the length of the fade. It was appended
+   * last, and the old content lay over the new block, which under reduced motion does not even move out from under it.
    * A HEADLINE'S OLD WORDS ARE OVER their new ones, which is the crossfade.
+   *
+   * IT IS PLACED AGAINST THE BOX IT IS POSITIONED IN, its `offsetParent`, which is not always the box the page was
+   * measured against: where the page has no box of its own the copy's containing block is further up, and a copy
+   * placed by the page's numbers stood off its place by the distance between the two (on Today, by the page's head).
    */
   function ghost(page: HTMLElement, copy: { node: HTMLElement; style: Partial<CSSStyleDeclaration> }, box: Box, leave: KeyframeAnimationOptions, under: boolean) {
     const g = copy.node;
@@ -236,9 +258,19 @@ export function recomposer(): {
       gridRow: 'auto',
       boxSizing: 'border-box',
       pointerEvents: 'none',
+      zIndex: under ? '0' : '',
     });
     if (under) page.prepend(g);
     else page.append(g);
+    /* THE BOX IN THE PAGE'S NUMBERS, moved into its containing block's: the page's box in the window, less the padding
+       box of the element the copy is positioned in, plus what that element has scrolled. */
+    const host = g.offsetParent;
+    if (host instanceof HTMLElement) {
+      const frame = frameOf(page).getBoundingClientRect();
+      const at = host.getBoundingClientRect();
+      g.style.left = `${box.x + frame.left - at.left - host.clientLeft + host.scrollLeft}px`;
+      g.style.top = `${box.y + frame.top - at.top - host.clientTop + host.scrollTop}px`;
+    }
     ghosts.push(g);
     const a = g.animate({ opacity: [1, 0] }, { ...leave, fill: 'forwards' });
     running.push(a);
@@ -250,7 +282,8 @@ export function recomposer(): {
 
   function before(page: HTMLElement, next: ReadonlySet<string>, swap: ReadonlySet<string> = new Set()): (() => void) | null {
     /* A CHANGE STILL PLAYING ENDS HERE, so the next one starts from the page and not from its middle. */
-    stop();
+    halt();
+    if (now() - opened < SETTLE) return null;
     if (typeof document !== 'undefined' && document.hidden) return null;
     if (typeof Element === 'undefined' || typeof Element.prototype.animate !== 'function') return null;
     const was = measure(page);
@@ -274,7 +307,8 @@ export function recomposer(): {
       const recompose = ms(style, '--d-recompose', 220);
       const move = { duration: recompose, easing: ease('--ease-standard', 'ease-in-out') };
       const enter = { duration: recompose, easing: ease('--ease-emphasis', 'ease-out') };
-      const leave = { duration: recompose, easing: ease('--ease-in', 'ease-in') };
+      /* LEAVING IS SHORTER THAN ARRIVING: the exit step, accelerating away. */
+      const leave = { duration: ms(style, '--d-exit', 90), easing: ease('--ease-in', 'ease-in') };
       const swapped = { duration: ms(style, '--d-swap', 160), easing: ease('--ease-standard', 'ease-in-out') };
       try {
         if (!less)
@@ -323,7 +357,7 @@ export function recomposer(): {
         }
       } catch {
         /* A timing a browser cannot read is a page that changes in one frame, which is what it did before. */
-        stop();
+        halt();
       }
     };
   }
