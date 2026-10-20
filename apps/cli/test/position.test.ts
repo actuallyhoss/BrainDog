@@ -8,8 +8,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { BUILD, authorsOf, cliBuild, hostSessionOf, sessionHeaders, withCommits, type Position } from '../src/position.ts';
+import { BUILD, authorsOf, cliBuild, hostSessionOf, positionOf, repoOf, sessionHeaders, withCommits, type Position } from '../src/position.ts';
 import { helloOf } from '../src/stdio.ts';
 
 const AT: Position = { cwd: '/Users/ada/kiln', repo: 'kiln', remote: 'github.com/ada/kiln', host: 'box', branch: 'main', head: 'abc1234' };
@@ -92,4 +96,48 @@ test('THE AUTHORS TRAVEL AS A HEADER FROM THE REPOSITORY ITSELF', () => {
   const at: Position = { ...AT, authors: 'Ada Lin <ada@example.com>' };
   assert.equal(sessionHeaders(at, 'claude')['x-braindog-authors'], 'Ada Lin <ada@example.com>');
   assert.equal(sessionHeaders(AT, 'claude')['x-braindog-authors'], undefined);
+});
+
+test('A WORKTREE IS THE SAME REPOSITORY: its name from the common directory, and the worktree folder apart', () => {
+  /* What `rev-parse --show-toplevel --git-dir --git-common-dir` prints, one a line. */
+  assert.deepEqual(repoOf('/w/braindog\n.git\n.git', '/w/braindog'), { top: '/w/braindog', repo: 'braindog', worktree: null });
+  assert.deepEqual(repoOf('/w/braindog/.claude/worktrees/agent-1\n/w/braindog/.git/worktrees/agent-1\n/w/braindog/.git', '/w/braindog/.claude/worktrees/agent-1'), {
+    top: '/w/braindog/.claude/worktrees/agent-1',
+    repo: 'braindog',
+    worktree: 'agent-1',
+  });
+  /* A bare repository's worktree, and a submodule, whose git directory is the common one: its own top folder's name. */
+  assert.deepEqual(repoOf('/w/kiln-main\n/w/kiln.git/worktrees/kiln-main\n/w/kiln.git', '/w/kiln-main'), { top: '/w/kiln-main', repo: 'kiln', worktree: 'kiln-main' });
+  assert.deepEqual(repoOf('/w/site/vendor/glaze\n/w/site/.git/modules/glaze\n/w/site/.git/modules/glaze', '/w/site/vendor/glaze'), {
+    top: '/w/site/vendor/glaze',
+    repo: 'glaze',
+    worktree: null,
+  });
+  assert.equal(repoOf(null, '/tmp'), null);
+  /* A git too old to say the two directories names the top folder, as before. */
+  assert.deepEqual(repoOf('/w/braindog', '/w/braindog'), { top: '/w/braindog', repo: 'braindog', worktree: null });
+});
+
+test('POSITION IN A REAL WORKTREE says the main repository and the worktree, and both travel as headers', async (t) => {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'braindog-position-')));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const main = join(dir, 'kiln');
+  const env = { ...process.env, GIT_AUTHOR_NAME: 'Ada', GIT_AUTHOR_EMAIL: 'ada@example.com', GIT_COMMITTER_NAME: 'Ada', GIT_COMMITTER_EMAIL: 'ada@example.com' };
+  const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, env, stdio: 'pipe' });
+  mkdirSync(main);
+  git(main, 'init', '-q');
+  git(main, 'commit', '-q', '--allow-empty', '-m', 'first');
+  const tree = join(main, '.claude', 'worktrees', 'agent-7');
+  git(main, 'worktree', 'add', '-q', '-b', 'kern', tree);
+
+  const inMain = await positionOf(main);
+  assert.deepEqual([inMain.repo, inMain.worktree], ['kiln', null]);
+  const inTree = await positionOf(tree);
+  assert.deepEqual([inTree.repo, inTree.worktree, inTree.branch, inTree.cwd], ['kiln', 'agent-7', 'kern', tree]);
+  const headers = sessionHeaders(inTree, 'claude');
+  assert.deepEqual([headers['x-braindog-repo'], headers['x-braindog-worktree'], headers['x-braindog-cwd']], ['kiln', 'agent-7', tree]);
+  assert.equal(sessionHeaders(inMain, 'claude')['x-braindog-worktree'], undefined);
+  /* A folder that is no repository has no worktree either. */
+  const outside = await positionOf(dir);
+  assert.deepEqual([outside.repo, outside.worktree], [null, null]);
 });

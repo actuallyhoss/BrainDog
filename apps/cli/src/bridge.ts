@@ -89,12 +89,16 @@ type Refusal = { code: string; fix: string; at?: string };
 const isObject = (x: unknown): x is Message => typeof x === 'object' && x !== null && !Array.isArray(x);
 const idOf = (m: Message): Id | null => (typeof m.id === 'string' || typeof m.id === 'number' ? m.id : null);
 
-/** The ten hints `_meta.session` carries (`packages/host/src/session.ts`), each by the header that says it. */
+/**
+ * The hints `_meta.session` carries (`packages/host/src/session.ts`), each by the header that says it. `worktree` is
+ * one the host does not read yet, and drops as it drops any key it does not name.
+ */
 const HINT_OF: Readonly<Record<string, string>> = {
   'x-braindog-session': 'spoken',
   'x-braindog-client': 'client_id',
   'x-braindog-host': 'host',
   'x-braindog-repo': 'repo',
+  'x-braindog-worktree': 'worktree',
   'x-braindog-remote': 'remote',
   'x-braindog-cwd': 'cwd',
   'x-braindog-agent': 'agent',

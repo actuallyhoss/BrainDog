@@ -5,11 +5,16 @@
  *
  * A REPOSITORY IS A GIT TOP-LEVEL FOLDER OR NOTHING. A temporary folder is not a project, so outside
  * a work tree every git field is null rather than a guess.
+ *
+ * A WORKTREE IS THE SAME REPOSITORY. The name comes from git's common directory, the one every worktree of a
+ * repository shares, and the worktree's own folder is kept apart in `worktree`. A lead session in `braindog` and its
+ * builders in `.claude/worktrees/agent-…` then say one repository, so the record can show them to each other; before
+ * this each builder was a repository called `agent-ae0ff950503720a99`.
  */
 
 import { execFile } from 'node:child_process';
 import { hostname } from 'node:os';
-import { basename } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 
 export const AGENTS = ['claude', 'codex', 'cursor', 'other'] as const;
 export type Agent = (typeof AGENTS)[number];
@@ -18,6 +23,8 @@ export const isAgent = (x: unknown): x is Agent => (AGENTS as readonly unknown[]
 export type Position = {
   cwd: string;
   repo: string | null;
+  /** The linked worktree's own folder name when the session stands in one, else `null`. */
+  worktree?: string | null;
   remote: string | null;
   host: string;
   branch: string | null;
@@ -32,9 +39,27 @@ export const git = (cwd: string, ...args: string[]) =>
     execFile('git', args, { cwd, timeout: 3_000, windowsHide: true }, (e, out) => done(e ? null : out.trim() || null)),
   );
 
+/**
+ * The repository a work tree belongs to, by name, and the linked worktree's own folder when it is one.
+ *
+ * `rev-parse` says the top folder, the git directory and the common directory, one a line. In a linked worktree the git
+ * directory is `<common>/worktrees/<name>` and differs from the common one, which is `<main>/.git`, or `<name>.git` for
+ * a bare repository. Anywhere else the two are the same, a submodule's included, and the name is the top folder's, as it
+ * always was.
+ */
+export function repoOf(said: string | null, cwd: string): { top: string; repo: string; worktree: string | null } | null {
+  const [top, gitDir, common] = (said ?? '').split('\n').map((l) => l.trim());
+  if (!top) return null;
+  if (!gitDir || !common || resolve(cwd, gitDir) === resolve(cwd, common)) return { top, repo: basename(top), worktree: null };
+  const shared = resolve(cwd, common);
+  const repo = basename(shared) === '.git' ? basename(dirname(shared)) : basename(shared).replace(/\.git$/u, '');
+  return { top, repo: repo || basename(top), worktree: basename(top) };
+}
+
 /** Never rejects: a machine without git, or a folder outside a work tree, is a position with nulls. */
 export async function positionOf(cwd: string): Promise<Position> {
-  const top = await git(cwd, 'rev-parse', '--show-toplevel');
+  const where = repoOf(await git(cwd, 'rev-parse', '--show-toplevel', '--git-dir', '--git-common-dir'), cwd);
+  const top = where?.top ?? null;
   const [branch, head, origin] =
     top === null
       ? [null, null, null]
@@ -49,7 +74,8 @@ export async function positionOf(cwd: string): Promise<Position> {
   const authors = withCommits(authorsOf(log), subjects);
   return {
     cwd,
-    repo: top === null ? null : basename(top),
+    repo: where?.repo ?? null,
+    worktree: where?.worktree ?? null,
     remote: origin === null ? null : normaliseRemote(origin),
     host: hostname(),
     /* `HEAD` is what git says for a detached head, which is no branch at all. */
@@ -146,6 +172,8 @@ const GRAMMAR: Record<string, RegExp> = {
   'x-braindog-client': CLIENT_ID,
   'x-braindog-host': /^[A-Za-z0-9._-]{1,128}$/,
   'x-braindog-repo': /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
+  /* A folder's name, held to the repository's grammar; a host that does not read it yet drops it, as it drops any header it does not name. */
+  'x-braindog-worktree': /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
   'x-braindog-remote': printable(256),
   'x-braindog-cwd': printable(512),
   'x-braindog-agent': new RegExp(`^(?:${AGENTS.join('|')})$`),
@@ -211,6 +239,7 @@ export function sessionHeaders(p: Position, agent?: Agent, run?: { spoken?: stri
     'x-braindog-client': run?.client_id ?? hostSessionOf(env),
     'x-braindog-host': p.host,
     'x-braindog-repo': from ? from.repo : p.repo,
+    'x-braindog-worktree': from ? undefined : p.worktree,
     'x-braindog-remote': from ? from.remote : p.remote,
     'x-braindog-cwd': from ? (from.cwd ?? p.cwd) : p.cwd,
     'x-braindog-agent': agent ?? (env.CLAUDECODE ? 'claude' : undefined),
