@@ -1601,6 +1601,24 @@ const DECLARED: Record<string, Version> = {
       "`register.things` declares `delete: refuse_while_referenced`; `page.portfolio` draws a note beside What each one earns, open and folded, counting `projects-earning-said` of `projects-live`; `project-said` counts a project whose health, progress, aim or agent is set -> ae8100fc45762bd5",
     ],
   },
+  /* EACH PROJECT'S KEY NUMBERS, AND NUMBERS TAKEN OVER FROM THE FOUNDER USE CASE (the KPI plan of 21 October, K1-A).
+     1.18.0 MAY BE RELEASED, so a version of its own. Two lists, a field and two figures added. */
+  'portfolio@1.19.0': {
+    holds: `
+      metric.kpi-stale metric.kpis-held metric.project-said
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-lane-earning metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked
+      metric.projects-past-aim metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.portfolio
+      register.datapoints register.kpis register.things
+      rule.project-past-aim
+    `,
+    declares: '8e3129d32576b52b',
+    history: [
+      "`register.datapoints` is Portfolio's, Numbers taken over from the founder use case under the same id, less the organisation and the service a reading is about, which the founder lays on it; `register.kpis` is added, a project's key numbers (`KPI_LIST`); `register.things` gains `kind`, business, client work, product or content; `kpis-held` and `kpi-stale` are added -> 8e3129d32576b52b",
+    ],
+  },
   /* A PROJECT THE RECORD FORMED ITSELF is marked a draft until its owner keeps it (the first project formed from a first session). 1.17.0 IS RELEASED. The same ids: a field of `things`. */
   'portfolio@1.18.0': {
     holds: `

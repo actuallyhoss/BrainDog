@@ -643,9 +643,19 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   the rail. A page added, nothing taken away. And batch 88's Activity, `page.activity` (activity-page-88): everything
  *   that changed, a day at a time with one line a run, and beside it who worked, what changed, the busy hours and
  *   what an agent asked, off the rail. A page added, nothing taken away.
+ * - portfolio 1.19.0 (the KPI plan of 21 October, K1-A): a project's key numbers are rows of its own. Portfolio takes
+ *   Numbers (`datapoints`) over from the founder use case under the same id, which founder 3.0.0 hands it (`hands`), so
+ *   every record with projects can hold readings. Its organisation and service are not Portfolio's: they point at
+ *   People's and Estate's lists, so the founder lays them (`extends`) beside the figures and blocks that read them, and
+ *   Portfolio still needs no other list. A new list `kpis`, Key numbers (`KPI_LIST` in
+ *   `modules/portfolio.ts`): which project, where its values come from, its shape, which way is good, its target and
+ *   by when, how often, who keeps it, whether it shows on Today or leads the card, a draft until kept, and live or
+ *   retired. Projects gain `kind`, business, client work, product or content. Two figures, `kpis-held` and
+ *   `kpi-stale`. PORTFOLIO 1.18.0 MAY BE RELEASED, so this is a version of its own. Two lists, a field and two figures
+ *   added, nothing taken away, so a minor step.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.18.0',
+  portfolio: '1.19.0',
   people: '3.4.0',
   'money-core': '3.17.0',
   estate: '2.2.0',

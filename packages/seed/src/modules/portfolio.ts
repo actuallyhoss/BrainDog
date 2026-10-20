@@ -144,6 +144,41 @@ export const PROJECTS_SAID: readonly { things: number; by: string; hours: number
   { things: 2, by: 'cursor', hours: -10, fields: ['next', 'progress'], note: 'set the next step on Marlow & Co to the chaser for 2026-041' },
 ];
 
+/** The kinds of project, since portfolio 1.19.0: what each one is, which picks the key numbers offered for it. */
+export const PROJECT_KINDS = ['business', 'client', 'product', 'content'] as const;
+
+/**
+ * THE KEY NUMBERS' CONTRACT, SINCE portfolio 1.19.0 (the KPI plan of 21 October, Part 2.1): the `kpis` list's id, every
+ * field it declares and every value of its enums, said once, so the kernel's ranking (`kpi-rank.ts`), the page source
+ * over it and the renderer's block spell the same words as the list does. `portfolio-kpis.test.ts` holds the list to
+ * this, field for field and value for value.
+ *
+ * A KPI IS A ROW, not a figure: a figure is a pack's, and a key number is added by its owner on a phone, suggested by
+ * an agent as a draft, and differs per project. Its history is the readings it already has, in Numbers
+ * (`readings`, matched on `measure` whole or as "measure, project"), or a figure's nightly snapshot.
+ *
+ * MONEY IS AN AMOUNT, as a reading's is: a KPI whose `unit` is a currency code keeps its target in `target_amount`,
+ * integer minor units and that currency, and leaves `target` empty; any other keeps it in `target`.
+ *
+ * AN EMPTY `kind` IS WORKED OUT from `source` and `unit` by the reader, and an empty `good` reads `up`. Stale is a
+ * newest point older than `stale.periods` times `every`, or `stale.days` with no `every` (the record's own
+ * `FEED_LATE_PERIODS`). Today shows `most.today` at most, `most.phone` on a phone, one auto KPI a project.
+ */
+export const KPI_LIST = {
+  list: 'kpis',
+  readings: 'datapoints',
+  fields: ['name', 'thing', 'measures', 'source', 'measure', 'figure', 'unit', 'kind', 'good', 'target', 'target_amount', 'target_by', 'every', 'owner', 'today', 'headline', 'order', 'draft', 'state'],
+  source: ['numbers', 'figure', 'feed', 'agent', 'typed'],
+  kind: ['level', 'flow', 'share', 'progress', 'count'],
+  good: ['up', 'down'],
+  every: ['1h', '1d', '1w', '1m'],
+  today: ['auto', 'pinned', 'hidden'],
+  state: ['live', 'retired'],
+  defaults: { source: 'numbers', good: 'up', today: 'auto', headline: false, draft: false, state: 'live' },
+  stale: { periods: 2, days: 14 },
+  most: { today: 4, phone: 2 },
+} as const;
+
 export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
   things: {
     id: 'things',
@@ -172,6 +207,18 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
          the Overview's cards, where a column of bare names said nothing to somebody who had not opened each one. Text
          and optional, so every project already written stays valid and an importer fills it where its source says. */
       { id: 'about', label: 'About', type: 'text', search: true },
+      /* WHAT KIND OF PROJECT IT IS, SINCE portfolio 1.19.0 (the KPI plan of 21 October, 2.7): a business that earns, work
+         for a client, a product being built, or content. It says which key numbers are offered as drafts when it is
+         first set, and nothing else reads it; Status stays how it is going. Optional, so every project already written
+         stays valid. */
+      {
+        id: 'kind',
+        label: 'Kind',
+        type: 'enum',
+        values: PROJECT_KINDS,
+        labels: { business: 'Business', client: 'Client work', product: 'Product', content: 'Content' },
+        index: true,
+      },
       /* SAID IN SENTENCE CASE, SINCE portfolio 1.9.0: the split under Where they are printed the stored words, "earning"
          and "building", where every other label on the page starts with a capital. `retired` reads Finished, as the fold
          of the parked and finished ones already calls it. */
@@ -237,6 +284,138 @@ export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
       { id: 'domains', label: 'Domains', type: 'list', of: 'text' },
     ],
   },
+  /**
+   * NUMBERS, PORTFOLIO'S SINCE 1.19.0, TAKEN OVER FROM THE FOUNDER USE CASE (founder 3.0.0 hands it here, `hands`), under
+   * the same id, so a founder's readings stay where they are: one number from one project at
+   * one moment, reported by the project, polled by the record or typed. Every record with projects can hold a project's
+   * key numbers now, and not only a founder's.
+   *
+   * NOT THE ORGANISATION OR THE SERVICE A READING IS ABOUT, which point at People's and Estate's lists, both installed
+   * after Projects: the founder use case lays those two (`extends` in `usecases/founder.ts`) with the figures and blocks
+   * that read them, so they are on a record exactly while what reads them is, and Portfolio still needs no other list.
+   */
+  datapoints: {
+    id: 'datapoints',
+    /* "NUMBERS" AND NOT "DATAPOINTS", which is a word from a database and not from a person. The id stays
+       `datapoints`, because every door, poll and figure already writes to it by that id. */
+    name: 'Numbers',
+    one: 'number',
+    icon: 'observe',
+    holds: 'one number from one project at one moment, reported by the project or polled by the record',
+    title: 'name',
+    mobile: ['name', 'value', 'at'],
+    pack: 'portfolio',
+    /* NEWEST FIRST BY THE MOMENT A NUMBER IS FOR (PGS-B06); the kernel breaks a tie by the row's id. */
+    order: { field: 'at', dir: 'desc' },
+    fields: [
+      { id: 'name', label: 'Measure', type: 'text', required: true, index: true, search: true },
+      /* A NUMBER OR AN AMOUNT: money is written as `amount`, integer minor units and its currency, and leaves `value`
+         empty, so a feed of revenue never has the record guess a currency from a unit of text. */
+      { id: 'value', label: 'Value', type: 'decimal' },
+      { id: 'amount', label: 'Amount', type: 'money' },
+      { id: 'unit', label: 'Unit', type: 'text' },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
+      { id: 'at', label: 'When', type: 'instant', index: true },
+      {
+        id: 'source',
+        label: 'Source',
+        type: 'enum',
+        /* `example` IS A SEED'S, so every tile and chart leaves it out while it still shows, marked, in a list. */
+        values: ['reported', 'polled', 'typed', 'example'],
+        labels: { reported: 'Reported', polled: 'Polled', typed: 'Typed', example: 'Example' },
+        index: true,
+      },
+      { id: 'tags', type: 'list', of: 'text' },
+    ],
+  },
+  /**
+   * THE KEY NUMBERS, SINCE portfolio 1.19.0: each project's KPIs as rows (`KPI_LIST` above), where it reads from, what
+   * good looks like and how often a value should arrive. A row and not a figure, so its owner adds one on a phone and an
+   * agent suggests one as a draft. Its values are the readings it already has, so nothing here holds a number but the
+   * target.
+   */
+  kpis: {
+    id: 'kpis',
+    icon: 'gauge',
+    /* KEY NUMBERS, AND NOT NUMBERS, which is the readings' list above: two lists with one name. */
+    name: 'Key numbers',
+    one: 'key number',
+    holds: "the numbers each project is judged by, where each one's values come from and what good looks like",
+    title: 'name',
+    mobile: ['name', 'thing', 'target'],
+    pack: 'portfolio',
+    fields: [
+      { id: 'name', label: 'Name', type: 'text', required: true, search: true },
+      { id: 'thing', label: 'Project', type: 'ref', to: 'things', required: true, index: true },
+      /* ONE LINE OF WHAT IT MEASURES, for the hover and for an agent reading it. */
+      { id: 'measures', label: 'What it measures', type: 'text' },
+      {
+        id: 'source',
+        label: 'Comes from',
+        type: 'enum',
+        values: KPI_LIST.source,
+        labels: { numbers: 'Numbers', figure: 'Worked out from my lists', feed: 'A feed', agent: 'An agent', typed: 'I type it' },
+        default: KPI_LIST.defaults.source,
+        index: true,
+      },
+      /* THE READING'S NAME IN NUMBERS, for every source but `figure`: matched whole or as "measure, project". */
+      { id: 'measure', label: 'Measure', type: 'text', index: true },
+      /* A DECLARED FIGURE WITH `{{it}}`, for `figure`: `project-in-by-month`, `project-owed`, `project-last-worked`. */
+      { id: 'figure', label: 'Figure', type: 'text' },
+      /* `USD`, `players`, `%`, `days`: a currency code makes it money, as a reading's unit does. */
+      { id: 'unit', label: 'Unit', type: 'text' },
+      {
+        id: 'kind',
+        label: 'Shape',
+        type: 'enum',
+        values: KPI_LIST.kind,
+        labels: { level: 'Level', flow: 'Flow', share: 'Share', progress: 'Progress', count: 'Count' },
+      },
+      {
+        id: 'good',
+        label: 'Which way is good',
+        type: 'enum',
+        values: KPI_LIST.good,
+        labels: { up: 'Up', down: 'Down' },
+        default: KPI_LIST.defaults.good,
+      },
+      { id: 'target', label: 'Target', type: 'decimal' },
+      { id: 'target_amount', label: 'Target amount', type: 'money' },
+      { id: 'target_by', label: 'Target by', type: 'day', index: true },
+      {
+        id: 'every',
+        label: 'How often',
+        type: 'enum',
+        values: KPI_LIST.every,
+        labels: { '1h': 'Every hour', '1d': 'Every day', '1w': 'Every week', '1m': 'Every month' },
+      },
+      /* WHO KEEPS IT: a person's name, an agent's kind ("claude"), or a feed's name. */
+      { id: 'owner', label: 'Kept by', type: 'text', index: true },
+      {
+        id: 'today',
+        label: 'Show on Today',
+        type: 'enum',
+        values: KPI_LIST.today,
+        labels: { auto: 'Auto', pinned: 'Always', hidden: 'Never' },
+        default: KPI_LIST.defaults.today,
+        index: true,
+      },
+      { id: 'headline', label: 'Leads the card', type: 'bool', default: KPI_LIST.defaults.headline },
+      { id: 'order', label: 'Order', type: 'int' },
+      /* SUGGESTED AND NOT KEPT YET, as a draft project is (portfolio 1.18.0): nothing is tracked until its owner keeps it. */
+      { id: 'draft', label: 'Not kept yet', type: 'bool', default: KPI_LIST.defaults.draft },
+      /* RETIRED KEEPS ITS HISTORY AND LEAVES EVERY SCREEN. */
+      {
+        id: 'state',
+        label: 'State',
+        type: 'enum',
+        values: KPI_LIST.state,
+        labels: { live: 'Live', retired: 'Retired' },
+        default: KPI_LIST.defaults.state,
+        index: true,
+      },
+    ],
+  },
 };
 
 /** A project somebody is working on: the ones with a page. */
@@ -294,6 +473,36 @@ export const PROJECT_METRICS: Record<string, SeedMetric> = {
     },
   },
   'projects-retired': counted('projects-retired', 'Finished', 'lane is retired'),
+
+  /* ── the key numbers, since portfolio 1.19.0 ──────────────────────────────
+     HOW MANY KEY NUMBERS ARE KEPT, live and not a draft: what a block over them is drawn on, so a record with none
+     draws nothing (calm before rich). */
+  'kpis-held': {
+    metric: 'kpis-held',
+    name: 'Key numbers kept',
+    source: 'register.kpis',
+    where: 'state is live, draft is false',
+    value: { count: 'id' },
+    format: 'int',
+    target: { gte: 0 },
+    window: '30d',
+    compare: 'none',
+  },
+  /* HOW LONG SINCE A MEASURE WAS LAST READ, in days, `{{it}}` the measure's name in Numbers: `kpi-stale:Daily active
+     players`. Held to the days a key number with no cadence may go quiet (`KPI_LIST.stale.days`), so a reading of 23
+     misses it; one with a cadence is held to twice it by the reader. The example left out, and up to today, as every
+     count of Numbers is. A tree, because a measure's name may hold a comma. A measure never read reads nothing. */
+  'kpi-stale': {
+    metric: 'kpi-stale',
+    name: 'Days since it was read',
+    source: 'register.datapoints',
+    where: { all: [{ field: 'name', is: '{{it}}' }, { field: 'source', not: 'example' }, { field: 'at', before: 'tomorrow' }] },
+    value: { age: 'at' },
+    format: 'days',
+    target: { lte: KPI_LIST.stale.days },
+    window: '30d',
+    compare: 'none',
+  },
   /* HOW THE PROJECTS IN PLAY ARE GOING, as parts of one whole, with the ones nobody has said about as their own part. */
   'projects-by-health': { ...counted('projects-by-health', 'How they are going', LIVE), group_by: 'health' },
   /* WHAT THE SPLIT ABOVE IS DRAWN ON, SINCE portfolio 1.17.0 (PGS-C17): the projects in play somebody said how they are
