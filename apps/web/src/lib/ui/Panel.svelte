@@ -3,8 +3,8 @@
   change. Work and Decide draw it.
 
   FROM 1,280 UP IT IS DOCKED (`DOCKS` in `panel.ts`) at the window's end edge: 440 wide (380 below 1,360), inset `--inset` from the
-  window, radius `--r-lg`. Its head is glass (a close circle, the title at `--t-group`, and the caller's verbs) and its
-  body is `--bg` and scrolls. It is a NON-MODAL `<dialog>` opened with `show()`, so the list beside it keeps its pointer
+  window, radius 16, on the tile with a 1px `--rule-strong` edge and no shadow (the UI pass of 20 October, 1.9). Its
+  head is a close circle, the title at 17/600 and the caller's verbs over a hairline; its body scrolls. It is a NON-MODAL `<dialog>` opened with `show()`, so the list beside it keeps its pointer
   and its keyboard, and focus stays where it was: `j` and `k` go on walking the list and the panel follows.
 
   BELOW 1,280 IT IS A SHEET: the same element opened with `showModal()`, over the scrim, holding the overlay lock as
@@ -29,7 +29,7 @@
   and the panel slides out over the work as it widens.
 
   OUT OF A SCREEN'S CROSS-FADE. The work is named `page` while one screen fades to the next (`+layout.svelte`), and a
-  docked panel inside it would be painted into the work's two pictures, its glass cut off from the ground. So for that
+  docked panel inside it would be painted into the work's two pictures. So for that
   moment the docked panel is named `dock`, a picture of its own that stands where it is (`app.css`).
 
   IT MOVES THE SAME WAY OUT AS IN, AND FASTER. In from past the end edge, `translateX(100% + 16px)`, over `--d-panel`
@@ -37,8 +37,8 @@
   goes back down it. `@starting-style` draws the first frame and `display` and `overlay` are held for the close, so `[open]` still
   drops the moment it closes. Reduced motion fades instead of moving.
 
-  SWITCHING WHAT IT SHOWS IS A FADE, a swap on the skin's scale (`--d-menu`, `--ease-fade`) with a 2px settle, so a
-  press on another row reads as the panel answering it.
+  SWITCHING WHAT IT SHOWS IS A FADE IN PLACE, the content swap of the motion system (`--d-swap`, `--ease-standard`),
+  so a press on another row reads as the panel answering it.
   Not from a key: `j` and `k` walk the list with the panel following, and nothing moves on a key (`SYSTEM.md` §8).
 
   ESC CLOSES IT. The sheet form has the `<dialog>`'s own cancel; the docked form is not modal and gets none, so a press
@@ -338,12 +338,12 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background: transparent;
-    border: 0;
-    border-radius: var(--r-lg);
+    background: var(--tile);
+    /* IT FLOATS WITH NO SCRIM, SO IT TAKES THE ONE EDGE a floating layer has (the UI pass of 20 October, 1.9): 1px of
+       `--rule-strong`, and no shadow. */
+    border: 1px solid var(--rule-strong, var(--edge));
+    border-radius: var(--r-tile);
     color: var(--ink);
-    /* LEVEL 2, the chrome's: the glass hairline pair and the floating shadow. */
-    box-shadow: var(--glass-edge), var(--e2);
     transform: var(--dock-off);
     opacity: var(--dock-gone-opacity);
     /* LONGHANDS, so a browser that does not know `allow-discrete` drops that one line and keeps the slide. `display` and
@@ -383,27 +383,15 @@
     transition-property: none;
   }
 
-  /* THE GLASS HEAD: the close circle, the title, the verbs. Glass never holds glass, so nothing in it is glass. */
+  /* THE HEAD: the close circle, the title, the verbs, on the panel's own tile with a hairline under it. No glass. */
   .dock-head {
     flex: none;
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     padding: var(--sp-3);
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
-    border-block-end: 1px solid var(--line);
-  }
-
-  /* SAFARI'S GLASS, IN A BLOCK OF ITS OWN, READING THE SKIN'S ONE VALUE. The build folds a prefixed and an unprefixed
-     declaration in one rule into one, and the prefixed line Safari needs came out of the bundle; a block of its own
-     keeps it. It reads `--glass-blur` and never a literal, because that token already answers for both schemes and
-     for less transparency, and a literal gave dark glass light's colour (`tokens.css` has the measurement). Chromium
-     does not know the prefixed property, so this block is Safari's alone. */
-  @supports (-webkit-backdrop-filter: none) {
-    .dock-head {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
+    background: var(--tile);
+    border-block-end: 1px solid var(--rule, var(--line));
   }
 
   .dock-close {
@@ -413,10 +401,10 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--hover-wash);
+    background: var(--tile-2, var(--hover-wash));
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-round);
+    color: var(--ink-2, var(--ink2));
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -425,20 +413,21 @@
 
   @media (hover: hover) and (pointer: fine) {
     .dock-close:hover {
-      background: var(--hold-wash);
+      background: var(--hover, var(--hold-wash));
       color: var(--ink);
     }
   }
 
-  /* The element holding the words carries the ellipsis, and it is a block, not the flex row. */
+  /* The element holding the words carries the ellipsis, and it is a block, not the flex row. 17/600, a sheet's title. */
   .dock-title {
     flex: 1;
     min-inline-size: 0;
     margin: 0;
     overflow: hidden;
-    font-size: var(--t-group);
-    font-weight: 600;
-    line-height: var(--lh-tight);
+    font-family: var(--font-ui);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: 24px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -451,46 +440,41 @@
   }
 
   /* THE BODY IS A TILE'S SURFACE, and it is what scrolls. `min-block-size: 0` so a flex child can be shorter than its
-     content. Twenty in from each edge, a tile's padding. */
+     content. A tile's padding from each edge. */
   .dock-body {
-    --dock-settle: 2px;
-
     flex: 1 1 auto;
     min-block-size: 0;
-    padding: calc(var(--sp-4) + var(--sp-1));
+    padding: var(--tile-pad);
     overflow-y: auto;
     overscroll-behavior: contain;
-    background: var(--bg);
+    background: var(--tile);
   }
 
-  /* A SWITCH: what the panel shows fades in and settles 2px, a swap on the scale (`--d-menu`, which the skin names for
-     what a panel shows changing in place) on the cross-fade curve. `backwards`, never `both`, because the body can
-     hold glass and a fill that outlives the fade would cut that glass off from what is behind it. */
+  /* A SWITCH: what the panel shows fades in where it stands, the content swap of the motion system (`--d-swap`,
+     `--ease-standard`): a cross-fade in place, no slide. `backwards`, never `both`, so no fill outlives the fade. */
   .dock-body[data-swap='a'] {
-    animation: dock-swap-a var(--d-menu) var(--ease-fade) backwards;
+    animation: dock-swap-a var(--d-swap) var(--ease-standard) backwards;
   }
 
   .dock-body[data-swap='b'] {
-    animation: dock-swap-b var(--d-menu) var(--ease-fade) backwards;
+    animation: dock-swap-b var(--d-swap) var(--ease-standard) backwards;
   }
 
   @keyframes dock-swap-a {
     from {
       opacity: 0;
-      transform: translateY(var(--dock-settle));
     }
   }
 
   @keyframes dock-swap-b {
     from {
       opacity: 0;
-      transform: translateY(var(--dock-settle));
     }
   }
 
-  /* THE SHEET FORM FROM 900 TO 1,280 IS THE DOCKED PANEL'S SHAPE over a scrim, at the sheets' depth. */
+  /* THE SHEET FORM FROM 900 TO 1,280 IS THE DOCKED PANEL'S SHAPE over a scrim, which is its separation: no edge. */
   .dock:global([data-form='sheet']) {
-    box-shadow: var(--e3);
+    border: 0;
   }
 
   /* ON A PHONE (`PHONE` in `panel.ts`), THE BOTTOM SHEET: against the bottom of the screen, above the keyboard, as tall
@@ -509,8 +493,8 @@
       border-end-end-radius: 0;
     }
 
-    /* THE HANDLE: a short pill in the head's top padding, which reads as "this pulls". The head is what takes the
-       pull, and `touch-action: none` keeps a pull on it from scrolling or zooming the page underneath. */
+    /* THE HANDLE, every sheet's (`Sheet.svelte`): 36 by 4 in `--rule-strong`, 8 from the top, in the head's top padding.
+       The head is what takes the pull, and `touch-action: none` keeps a pull on it from scrolling the page underneath. */
     .dock:global([data-form='sheet']) .dock-head {
       position: relative;
       padding-block-start: var(--sp-5);
@@ -522,15 +506,15 @@
       position: absolute;
       inset-block-start: var(--sp-2);
       inset-inline: 0;
-      inline-size: var(--sp-6);
+      inline-size: 36px;
       block-size: var(--sp-1);
       margin-inline: auto;
-      background: var(--line);
-      border-radius: var(--r-pill);
+      background: var(--rule-strong, var(--edge));
+      border-radius: 2px;
     }
 
     .dock:global([data-form='sheet']) .dock-body {
-      padding-block-end: calc(var(--sp-4) + max(0px, calc(env(safe-area-inset-bottom) - var(--kb))));
+      padding: var(--sp-4) var(--sp-4) calc(var(--sp-4) + max(0px, calc(env(safe-area-inset-bottom) - var(--kb))));
     }
   }
 
@@ -565,13 +549,9 @@
       --dock-from-opacity: 0.6;
       --dock-gone-opacity: 0;
     }
-
-    .dock-body {
-      --dock-settle: 0px;
-    }
   }
 
-  /* UNDER FORCED COLOURS the shadows and the glass are gone, so the panel's edge is a border. */
+  /* UNDER FORCED COLOURS the panel's edge is the system's text colour. */
   @media (forced-colors: active) {
     .dock {
       border: 1px solid CanvasText;
