@@ -824,7 +824,10 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
       withPage(
         {
           ...raw,
-          declarations: (raw.declarations as Body[]).map((d) => (d.register === 'things' ? (({ delete: _rule, ...rest }) => rest)(d) : d)),
+          /* AND THE `draft` FIELD comes off with it, added in portfolio 1.18.0: a project the record formed from a first session. */
+          declarations: (raw.declarations as Body[]).map((d) =>
+            d.register === 'things' ? (({ delete: _rule, ...rest }) => (Array.isArray(rest.fields) ? { ...rest, fields: (rest.fields as Body[]).filter((f) => f.id !== 'draft') } : rest))(d) : d,
+          ),
         },
         'portfolio',
         /* AND THE ONE LINE TYPED ON AN IN PLAY CARD comes off with it, added inside the unreleased 1.17.0

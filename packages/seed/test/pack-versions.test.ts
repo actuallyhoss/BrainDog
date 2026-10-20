@@ -1595,6 +1595,23 @@ const DECLARED: Record<string, Version> = {
       "`register.things` declares `delete: refuse_while_referenced`; `page.portfolio` draws a note beside What each one earns, open and folded, counting `projects-earning-said` of `projects-live`; `project-said` counts a project whose health, progress, aim or agent is set -> ae8100fc45762bd5",
     ],
   },
+  /* A PROJECT THE RECORD FORMED ITSELF is marked a draft until its owner keeps it (the first project formed from a first session). 1.17.0 IS RELEASED. The same ids: a field of `things`. */
+  'portfolio@1.18.0': {
+    holds: `
+      metric.project-said
+      metric.projects-aim-30d metric.projects-aiming metric.projects-by-health metric.projects-by-lane metric.projects-earning
+      metric.projects-earning-before metric.projects-earning-change metric.projects-earning-said metric.projects-lane-earning metric.projects-live
+      metric.projects-looked-up metric.projects-need-you metric.projects-not-in-play metric.projects-on-track metric.projects-parked
+      metric.projects-past-aim metric.projects-retired metric.projects-with-agent metric.projects-with-health
+      page.portfolio
+      register.things
+      rule.project-past-aim
+    `,
+    declares: '174811f66edd1c77',
+    history: [
+      "`register.things` gains the field `draft` (a yes or no, Not kept yet, no by default), which marks a project the record formed from an agent's first session until its owner keeps it; no id added or taken away -> 174811f66edd1c77",
+    ],
+  },
   /* THE EARNINGS LINE ONLY WHILE ONE SAYS (seed-58, the look of 13 October, fault J). 1.16.0 IS RELEASED. The same ids
      until batch 101 added two figures. */
   'portfolio@1.17.0': {

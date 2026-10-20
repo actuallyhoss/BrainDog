@@ -645,7 +645,7 @@ const SIGNALS: Record<FirstPartyId, readonly string[]> = {
  *   what an agent asked, off the rail. A page added, nothing taken away.
  */
 export const FIRST_PARTY_VERSIONS: Readonly<Record<FirstPartyId, string>> = {
-  portfolio: '1.17.0',
+  portfolio: '1.18.0',
   people: '3.4.0',
   'money-core': '3.17.0',
   estate: '2.2.0',

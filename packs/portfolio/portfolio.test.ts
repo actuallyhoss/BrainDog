@@ -231,10 +231,10 @@ test('THE FILE IS DATA AND ONLY ITS OWN: no script, one list, one page, twenty f
 
 test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what changed in one plain note', () => {
   const doc = file();
-  /* NOT A STEP ABOVE: Projects 1.17.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
+  /* NOT A STEP ABOVE: Projects 1.18.0 is still unreleased (commit 63423720 holds 1.16.0), so the file takes the version
      the module is at and nothing a record already holds is changed in place. */
   assert.equal(doc.version, FIRST_PARTY_VERSIONS.portfolio);
-  assert.equal(doc.version, '1.17.0');
+  assert.equal(doc.version, '1.18.0');
   const changes = doc.changes;
   assert.ok(typeof changes === 'string' && changes.trim() !== '', 'the file says what this version changed');
   assert.ok(changes.length <= 500 && !/[\r\n]/u.test(changes), 'one note, on one line, 500 characters at most');

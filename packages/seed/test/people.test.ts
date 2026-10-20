@@ -245,7 +245,12 @@ test('A FORGED SENDER MAKES NOBODY AND JOINS NOBODY: a stranger writing under a 
   for (const [n, from] of ['"Mara Lindqvist" <mara.lindqvist@evil.test>', 'Someone New <someone@new-client.test>'].entries())
     assert.ok(k.arrive({ channel: 'email', headers: { from, subject: 'Invoice 2026-041 is overdue' }, body: 'Pay here.', sha256: `forged-${n}`, verified: true }).ok);
   await k.drain();
-  assert.equal(k.count('people'), before, 'a mail nobody claimed made a person');
+  /* THE MAIL'S OWN READING MEETS WHO SENT IT, so a sender like nobody known is a person of their own (Someone New); the one
+     under Mara's name made nobody. */
+  assert.equal(k.count('people'), before + 1, 'a mail made a person under a known name, or a stranger like nobody known was not met');
+  const named = k.list({ register: 'people', where: 'name is "Mara Lindqvist"', limit: 5 });
+  assert.ok(named.ok);
+  assert.equal(named.value.rows.length, 1, 'a second Mara was made');
   const now = mara();
   assert.deepEqual(now.keys, was.keys, 'the stranger\'s address joined the real Mara');
   assert.deepEqual(now.met, was.met);

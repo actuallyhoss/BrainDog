@@ -21,6 +21,10 @@ export type ModuleChange = { version: string; notes: string };
 export const MODULE_CHANGES: Readonly<Record<FirstPartyId | 'agents', readonly ModuleChange[]>> = {
   portfolio: [
     {
+      version: '1.18.0',
+      notes: "A project the record formed from an agent's first session is marked as a draft until you keep it. The line under What each one earns is drawn only once a project in play says what it earned in a year. A project's one line is typed on its card in In play. Each project in play on Projects says how long since anybody worked on it. That line and the line of the work finished on it each week wait until Work is there. Projects counts and answers the questions about your projects.",
+    },
+    {
       version: '1.17.0',
       notes: 'Projects says how many of those in play say what they earned in a year only once one of them does. With none saying, the line is not drawn. A project page lists up to six of its own keys, tools and skills under Runs on, and says which agents used each one. On Projects, the one line under each name can be typed straight on its card. Each project in play on Projects says how long since anybody worked on it. Projects says where each one stands by lane, and how many are in play and earning, with the line of each over the nights. How they are going waits until a project says how it is going.',
     },
