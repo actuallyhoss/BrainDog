@@ -768,6 +768,9 @@
      listed under `secrets.required`: that key fails the first deploy of an environment while the secret is unset,
      and unset is a supported state for every door but that one.
 
+     `SUPPORT_FORWARD` IS THE LAST, AND A SECRET ONLY BECAUSE IT IS HIS OWN INBOX: where mail to the support address is
+     forwarded, put with `wrangler secret put SUPPORT_FORWARD --env <environment>`. Unset, that mail is refused at the door.
+
      A ROTATION IS THE SAME SECRET HOLDING TWO KEYS, the new one, a space, and the old one (`src/keys.ts`, 53 §5.6),
      and never a second binding: `KEK_PREV`, which 53 §5.6 still names, is read by nothing.
      New keys are wrapped under the first at once and every record still opens under either. `rewrapRecord` in
