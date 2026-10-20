@@ -266,8 +266,10 @@ export function namesOf(
   for (const r of rows) {
     if (typeof r.fields[title] === 'string') out.set(r.id, r.fields[title] as string);
     if (typeof r.seq === 'number') {
-      const mark = decl?.identity ? r.fields[decl.identity.mark] : undefined;
-      const hue = decl?.identity ? r.fields[decl.identity.accent] : undefined;
+      /* THE PROJECTS LIST'S OWN IDENTITY FIELDS, else `mark` and `hue` as every seed project holds them: on a tab that has not
+         learnt the list yet the chip's dot was the neutral grey under a project with a colour (as `project-cards.ts`). */
+      const mark = r.fields[decl?.identity?.mark ?? 'mark'];
+      const hue = r.fields[decl?.identity?.accent ?? 'hue'];
       marks.set(r.id, {
         seq: r.seq,
         mark: typeof mark === 'string' && mark !== '' ? mark : null,
