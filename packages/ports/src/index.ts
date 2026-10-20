@@ -172,8 +172,8 @@ export type Conflict = {
  * refuses and never about the boundary a request arrives through, so both hosts and the client each
  * minted their own word for a route that does not exist.
  *
- * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and twenty-nine, counted, in nine
- * families — 54 pack and declaration · 14 grammar · 21 write path · 8 auth and vault · 8 format and
+ * GROUPED AND COUNTED AS `30 §6` GROUPS AND COUNTS THEM: *"One hundred and thirty-one, counted, in nine
+ * families — 54 pack and declaration · 14 grammar · 21 write path · 10 auth and vault · 8 format and
  * lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client."* A sentence that counts is a
  * sentence that can be wrong, so the shape is kept and `refusals.mjs` checks both the total and the
  * nine sizes against the document — the same gate shape `event-kinds` uses for the one other list
@@ -250,13 +250,17 @@ const WRITE = [
   'CURRENCY_FIXED',
 ] as const;
 
-/** Auth and vault — 8. */
+/** Auth and vault — 10. */
 const AUTH = [
   'UNAUTHORIZED', 'FORBIDDEN', 'NEEDS_BROWSER_SESSION', 'WRONG_KEY', 'GRANT_REVOKED', 'DEVICE_CODE_EXPIRED',
   'DEVICE_CODE_TRIES',
   /* A credential past its budget for now, 2026-09-17: a report key's rows a minute. The one code that carries
      `retry_after`, and HTTP 429 with `Retry-After`. */
   'RATE_LIMITED',
+  /* A RUN HE STOPPED OR PAUSED IN THE APP, 2026-10-21 (agents and MCP plan §2.4): the record refuses its changes, for
+     every client, until he resumes it. Not `FORBIDDEN`, which says the credential is short and sends an agent looking
+     for a bigger one; a stopped run is told to answer and end, and a paused one to wait. Both 403. */
+  'RUN_STOPPED', 'RUN_PAUSED',
 ] as const;
 
 /** Format and lifecycle — 8. */
@@ -309,7 +313,7 @@ const CONNECTOR = [
 const HOST = [
   'ROUTE_UNKNOWN', 'BODY_MALFORMED', 'RECORD_UNAVAILABLE', 'UNREACHABLE',
 ] as const;
-/** The hundred and twenty-nine, in `30 §6`'s order. */
+/** The hundred and thirty-one, in `30 §6`'s order. */
 export const REFUSAL_CODES = [
   ...PACK, ...GRAMMAR, ...WRITE, ...AUTH, ...LIFECYCLE, ...DIALECT, ...SLASH, ...CONNECTOR, ...HOST,
 ] as const;
@@ -322,7 +326,7 @@ export const isRefusalCode = (code: string): code is RefusalCode =>
 
 export type Refusal = {
   /**
-   * One of the hundred and twenty-nine. `30-BLUEPRINT` §6, and the list is above.
+   * One of the hundred and thirty-one. `30-BLUEPRINT` §6, and the list is above.
    *
    * STILL `string`, AND THE GATE IS WHY — but the reason is now four codes rather than twenty-four.
    * `ROUTE_UNKNOWN`, `METRIC_UNKNOWN`, `PAGE_UNKNOWN` and the rest were the concepts `30 §6` was

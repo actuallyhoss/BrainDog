@@ -648,7 +648,7 @@ in 41 §5.4 step 3 and its `ponytail:` note.
 
 ### The codes
 
-One hundred and twenty-nine, counted, in nine families — 54 pack and declaration · 14 grammar · 21 write path · 8 auth and
+One hundred and thirty-one, counted, in nine families — 54 pack and declaration · 14 grammar · 21 write path · 10 auth and
 vault · 8 format and lifecycle · 2 dialect · 6 slash · 12 connector · 4 host and client. Every fixture lives at
 `fixtures/refusals/<name>.yaml`; the
 name is the code in kebab-case, and each fixture is keyed by the `via` that raises it — `install`, `lint`, `where`,
@@ -843,6 +843,8 @@ any row is written".*
 | `DEVICE_CODE_EXPIRED` | a poll past the ten-minute life, 12 §6.1 | `device-code-expired` |
 | `DEVICE_CODE_TRIES` | the fifth wrong code — every pending row goes `denied` | `device-code-tries` |
 | `RATE_LIMITED` | a credential past its budget for now: a report key's rows a minute (`REPORT_ROWS_PER_MINUTE`, `budgets.json` `report.rowsPerMinute`). 429, and the refusal carries `retry_after`, the whole seconds to wait, which the host also sends as `Retry-After`. Added September 17th 2026 | `rate-limited` |
+| `RUN_STOPPED` | a change by a run the owner stopped from the app (agents and MCP plan §2.4), for every client: the run may still answer with `instructionsMine`, hand off, log on itself and end, and every other change is refused in his words, "Reply with instructions, then end". 403, because retrying never works until he resumes it, and not `FORBIDDEN`, which sends an agent after a bigger token. Added October 21st 2026 | `run-stopped` |
+| `RUN_PAUSED` | the same for a run he paused: its changes wait until he resumes it, and the sentence says to wait. 403. Added October 21st 2026 | `run-paused` |
 
 **Format and lifecycle** ([03-DOG-FORMAT](03-DOG-FORMAT.md); [33-CONTRACTS](33-CONTRACTS.md) §9):
 
