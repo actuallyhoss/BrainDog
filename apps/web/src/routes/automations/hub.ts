@@ -685,6 +685,7 @@ export function runLines(
 
 export const canvasWords = {
   lastRuns: 'How the last runs went',
+  allRuns: 'All runs',
   lastRunsMeta: (n: number) => `Last ${n.toLocaleString('en')} ${n === 1 ? 'run' : 'runs'}`,
   runsSubject: 'The last runs, by how they ended',
   tookSubject: 'How long each finished run took, oldest first',

@@ -665,7 +665,7 @@
     </PageHead>
     {#if lockedSay}<p class="locked" role="status">{lockedSay}</p>{/if}
     <div class="page">
-      <Segmented class="tabs" role="group" aria-label={title}>
+      <Segmented class="tabs" role="group" aria-label={title} full>
         <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
         {#if row}
           <button type="button" class="segment" aria-pressed={tab === 'runs'} data-on={tab === 'runs' ? '' : undefined} onclick={() => (tab = 'runs')}>{words.runs}</button>
@@ -675,6 +675,7 @@
       </Segmented>
 
       {#if tab === 'steps'}
+        <div class="steps">
         <div class="column flow">
           <div class="canvas">
             <!-- A FAULT ABOUT THE WHOLE AUTOMATION IS READ WITH THE TRIGGER, the card it sits under, so a screen reader
@@ -697,26 +698,6 @@
             {#if served && served.key === null}<p class="fault" id="flow-fault-served"><span class="fault-glyph" aria-hidden="true"><Icon name="alert" /></span>{served.say}</p>{/if}
             <FlowList {flow} list={ROOT} nodes={flow.draft.steps} faults={shown} />
           </div>
-
-          {#if flow.draft.steps.length > 0}
-            <Tried {kind} path={flow.path} {owner} rows={pickRows} {arrivals} bind:pick inline={triedNow} run={ranNow} contest={contestNow} />
-          {/if}
-
-          <!-- RUN AGAIN OVER WHAT IS ALREADY THERE (SHL-D07): the owner's, for a saved inline rule that sets a field, and
-               loaded only here, by `import()`, so no other screen carries it. -->
-          {#if owner && row && againField !== null}
-            {#await import('./RunAgain.svelte') then part}
-              <part.default id={row.id} body={row.body} field={againField} register={row.register} nameOf={ruleNameOf} />
-            {/await}
-          {/if}
-
-          {#if calls.length > 0}
-            <!-- THE CALLS SAY THEIR OWN HEADING AS THE LIST'S TERM (`CallsOut.svelte`), which the tile's heading already
-                 says, so the term is kept for a screen reader and not drawn twice. -->
-            <Tile icon="globe" title={installWords.heading}>
-              <dl class="calls"><CallsOut {calls} hosted={hostedHere(page.data as unknown as Shell)} /></dl>
-            </Tile>
-          {/if}
 
           <div class="foot">
             <!-- SENT SAYS SO ONLY UNTIL THE NEXT EDIT. Kept after one, the footer read "Sent to Decide" over a draft that
@@ -750,15 +731,55 @@
                 <Button onclick={() => void runNow()}><Icon name="play" size="s" />{words.runNow}</Button>
               {/if}
             </div>
+            <!-- TRY AND SAVE, flat at the end of the row at a desk's width; on a phone a bar on the board above the tab bar,
+                 held there only while there is a change to save (agents F12). -->
+            <div class="bar" data-held={flow.dirty ? '' : undefined}>
+              <Button disabled={trying || flow.draft.steps.length === 0 || lockedSay !== null} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
+              <!-- A GREYED SAVE SAYS WHY, read from the footer's sentence, so its reason is not only somewhere above it. -->
+              <Button weight="primary" disabled={busy || blocked || !flow.dirty || lockedSay !== null} aria-describedby={blocked && !untouched && !refusal ? 'flow-held' : undefined} onclick={() => void save()}>{saveWord}</Button>
+            </div>
           </div>
 
-          <!-- TRY AND SAVE, AND NOTHING ELSE, IN THE STICKY GLASS BAR, so on a phone it is one row of two 44px buttons, no
-               taller than `--sticky`, floating above the tab bar. -->
-          <div class="bar">
-            <Button disabled={trying || flow.draft.steps.length === 0 || lockedSay !== null} onclick={() => void tryIt()}>{trying ? editWords.trying : editWords.tryIt}</Button>
-            <!-- A GREYED SAVE SAYS WHY, read from the footer's sentence, so its reason is not only somewhere above it. -->
-            <Button weight="primary" disabled={busy || blocked || !flow.dirty || lockedSay !== null} aria-describedby={blocked && !untouched && !refusal ? 'flow-held' : undefined} onclick={() => void save()}>{saveWord}</Button>
-          </div>
+        </div>
+        <div class="column side">
+          {#if flow.draft.steps.length > 0}
+            <Tried {kind} path={flow.path} {owner} rows={pickRows} {arrivals} bind:pick inline={triedNow} run={ranNow} contest={contestNow} />
+          {/if}
+
+          <!-- RUN AGAIN OVER WHAT IS ALREADY THERE (SHL-D07): the owner's, for a saved inline rule that sets a field, and
+               loaded only here, by `import()`, so no other screen carries it. -->
+          {#if owner && row && againField !== null}
+            {#await import('./RunAgain.svelte') then part}
+              <part.default id={row.id} body={row.body} field={againField} register={row.register} nameOf={ruleNameOf} />
+            {/await}
+          {/if}
+
+          {#if calls.length > 0}
+            <!-- THE CALLS SAY THEIR OWN HEADING AS THE LIST'S TERM (`CallsOut.svelte`), which the tile's heading already
+                 says, so the term is kept for a screen reader and not drawn twice. -->
+            <Tile icon="globe" title={installWords.heading}>
+              <dl class="calls"><CallsOut {calls} hosted={hostedHere(page.data as unknown as Shell)} /></dl>
+            </Tile>
+          {/if}
+
+          {#if row && runs.length > 0}
+            <!-- THE LAST FIVE RUNS, beside the steps they ran: each its state and when, and the way to all of them. -->
+            <Tile icon="history" title={words.runs} count={runs.length}>
+              {#snippet actions()}<Button weight="bare" size="sm" onclick={() => (tab = 'runs')}>{canvasWords.allRuns}</Button>{/snippet}
+              <ol class="runs ledger">
+                {#each runs.slice(0, 5) as r (r.id)}
+                  {@const mark = runMark(r.state)}
+                  <li class="run">
+                    <button type="button" class="run-open line" onclick={() => openRun(r)}>
+                      <IconWell name={mark.icon} size="l" tone={mark.tone} />
+                      <span class="line-main"><span class="line-title">{cap(words.runState[r.state] ?? r.state)}, {since(r.started, now)}</span></span>
+                    </button>
+                  </li>
+                {/each}
+              </ol>
+            </Tile>
+          {/if}
+        </div>
         </div>
       {:else if tab === 'runs' && row}
         {#if runs.length === 0}
@@ -924,6 +945,14 @@
     max-inline-size: 100%;
   }
 
+  /* ON A PHONE THE FOUR SHARE THE WIDTH IN ONE ROW (`Segmented`'s `full`), never a ragged second row. */
+  @media (width < 640px) {
+    .page :global(.tabs[data-full]) {
+      align-self: stretch;
+      flex-wrap: nowrap;
+    }
+  }
+
   /* RUNS, VERSIONS AND AS WRITTEN RUN THE PAGE'S WIDTH, like every other list in the record. */
   .column {
     display: flex;
@@ -932,11 +961,41 @@
     min-inline-size: 0;
   }
 
-  /* THE FLOW KEEPS A MEASURE OF 720, and only the flow: it is one card under another, read top to bottom, and the try
-     tile, the calls, the footer and the bar are the cards' width, so Save never sits out on its own across the window
-     from what it saves. The docked inspector takes the room beside it once a card is open. */
-  .flow {
-    max-inline-size: 720px;
+  /* THE STEPS AND WHAT THEY WOULD DO, SIDE BY SIDE FROM 1100 (agents F12): the flow and its save row on the left, "If it
+     ran now", the calls and the last five runs in a 400px column on the right, so the board beside a 720px column is
+     no longer empty. Under 1100 the side column follows the flow. */
+  .steps {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-5);
+    align-items: start;
+  }
+
+  @media (width >= 1100px) {
+    .steps {
+      grid-template-columns: minmax(0, 1fr) 400px;
+      gap: var(--sp-4);
+    }
+  }
+
+  .side:empty {
+    display: none;
+  }
+
+  .side .runs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .side .run-open {
+    inline-size: 100%;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
   }
 
   .canvas {
@@ -1049,7 +1108,6 @@
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--rule);
   }
 
   .said {
@@ -1097,36 +1155,33 @@
   }
 
   /**
-   * TRY AND SAVE STAY IN REACH AT EVERY WIDTH, in a bar at the foot of the column: an opaque tile with one hairline
-   * round it, no glass (DIRECTION §39). A flow of twenty cards puts them two screens down, and they are the two things
-   * the page is for.
+   * TRY AND SAVE END THE SAVE ROW, FLAT: no edge, no shadow, the board under them (agents F12). Save is the primary.
    *
-   * ON A PHONE IT SITS ABOVE THE TAB BAR, NOT UNDER IT. Below 900px the scroller is the shell's `.body`, whose
-   * scrollport runs to the bottom of the window, and `TabBar` is docked to the bottom edge over its last `--tabbar`, so
-   * this sticks a step above that. It is the two buttons on one row, 44 + 8 = 52px, which is `--sticky`, the most
-   * anything sticky may be on a phone. The sentence, Undo and Run now sit in the flow above it. At 900 and up there is
-   * no tab bar and it floats `--inset` over the bottom edge, at the column's end.
+   * ON A PHONE, WHILE THERE IS A CHANGE, THEY ARE A BAR ABOVE THE TAB BAR: the board with one hairline over it, 12 by 16
+   * in, the whole width, so a change is never more than a thumb away from being saved. With nothing changed they stay
+   * in the row, where Try it still is, and the page ends a bar's height past the tab bar so its last tile clears it.
    */
   .bar {
-    position: sticky;
-    inset-block-end: var(--inset);
-    z-index: var(--z-raise);
     display: flex;
-    justify-content: flex-end;
-    gap: 6px;
-    align-self: flex-end;
-    padding: var(--sp-1);
-    background: var(--tile);
-    border-radius: var(--r-ctl);
-    box-shadow: var(--glass-edge), var(--e2);
+    flex-wrap: wrap;
+    gap: var(--sp-2);
   }
 
   @media (width < 900px) {
-    .bar {
-      inset-block-end: calc(var(--tabbar) + var(--sp-2));
-      align-self: stretch;
-      max-block-size: var(--sticky);
-      border-radius: var(--r-lg);
+    .page:has(.bar[data-held]) {
+      padding-block-end: calc(var(--tabbar) + 72px);
+    }
+
+    .bar[data-held] {
+      position: sticky;
+      inset-block-end: var(--tabbar);
+      z-index: var(--z-raise);
+      flex-wrap: nowrap;
+      inline-size: calc(100% + 2 * var(--gutter));
+      margin-inline: calc(-1 * var(--gutter));
+      padding: var(--sp-3) var(--sp-4);
+      background: var(--board);
+      box-shadow: inset 0 1px 0 var(--rule);
     }
   }
 
@@ -1143,9 +1198,8 @@
     }
   }
 
-  /* FORCED COLOURS DROP THE GLASS AND THE TILES' SHADOWS, so each keeps an edge to be told from the ground by. */
+  /* FORCED COLOURS DROP THE TILES' FILLS, so each keeps an edge to be told from the ground by. */
   @media (forced-colors: active) {
-    .bar,
     .trigger {
       outline: 1px solid CanvasText;
     }
