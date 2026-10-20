@@ -1,4 +1,10 @@
 <!--
+  THE TOOLBAR'S START (the UI pass of 20 October, money F7): the search box, 240 to 360 wide and 36 tall; the quick
+  filter, one segmented control of the slices a list is looked at by, with their counts ("All 38 · Late 4 · Due soon 2 ·
+  Paid 10"); one Filter button that opens every field and the query builder in the sheet; and each filter that is on,
+  as a rectangle (radius 8, never a pill) that a press takes off. On a phone: the search box and the Filter square, and
+  the sheet starts with a Late toggle and leaves out every value that holds nothing.
+
   The bar over the list: the search box, the filters as segments, menus or one phone button, the list
   clauses a segment cannot draw, Clear and Save as a view. And the phone's filter sheet, which is the
   same filters behind the one button. Display is the toolbar's now, beside the view switch.
@@ -36,12 +42,11 @@
   import type { FieldDecl } from '$lib/record/schema.ts';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
-  import Menu from '$lib/ui/Menu.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import ViewsMenu from './ViewsMenu.svelte';
-  import type { Listed } from './list.ts';
+  import type { Quick } from './list.ts';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -62,7 +67,10 @@
     filtered,
     savable = true,
     enums,
-    listed,
+    chips,
+    quick = [],
+    quickAt = null,
+    setQuick,
     facets,
     isOn,
     toggleFilter,
@@ -82,7 +90,12 @@
     savable?: boolean;
     /** Every declared enum field a reader can sift on. */
     enums: readonly FieldDecl[];
-    listed: readonly Listed[];
+    /** Each filter that is on and is not the quick slice's own, as the rectangle that takes it off: its words and its place. */
+    chips: readonly { at: number; said: string }[];
+    /** The list's quick slices, and which one the address is on (`quickOf`, `quickOn`). Empty where the list has none. */
+    quick?: readonly Quick[];
+    quickAt?: Quick['key'] | null;
+    setQuick?: ((key: Quick['key']) => void) | undefined;
     facets: ReadonlyMap<string, ReadonlyMap<string, number>>;
     isOn: (field: string, value: string) => boolean;
     toggleFilter: (field: string, value: string) => void;
@@ -90,12 +103,6 @@
     setQuery: (value: string) => void;
     saveView: () => void;
   } = $props();
-
-  /**
-   * EACH FIELD IS ONE MENU ONCE ITS VALUES WOULD CROWD THE ROW: three fields or more, or more than six values in all.
-   * Tasks' seven states as segments took the whole toolbar and pushed how the list is drawn onto a line of its own.
-   */
-  const menued = $derived(enums.length >= 3 || enums.reduce((n, f) => n + (f.values?.length ?? 0), 0) > 6);
 
   /* The phone's filter sheet: every enum field and Clear, behind one button beside the search box. */
   let filterOpen = $state(false);
@@ -115,6 +122,11 @@
   const value = $derived(toWhere(drawn.root, register, fields));
   /** Whether the phone's one Filter button and its sheet stand in for the bar's controls. */
   const sheeted = $derived(rowsAsCards() && (enums.length > 0 || fields.length > 0));
+  /** Whether the Filter button and its sheet are there at all: a field to filter by, or a question to ask. */
+  const filterable = $derived(enums.length > 0 || fields.length > 0);
+  /** A value the sheet offers: one that holds something, or one that is already chosen (money F8). */
+  const offeredValue = (f: FieldDecl, value: string): boolean => !facets.has(f.id) || (facets.get(f.id)?.get(value) ?? 0) > 0 || isOn(f.id, value);
+  const late = $derived(quick.find((x) => x.key === 'late'));
 
   /**
    * THE BUILDER'S TREE, HELD UNTIL THE SHEET CLOSES, beside the address it was written over. A pill pressed in the
@@ -185,120 +197,56 @@
     />
   </label>
 
-  <!--
-    THREE FIELDS OF PILLS DO NOT FIT ONE ROW. Services filters by kind, cycle and status, ten pills
-    that measured 928px beside a 242px search in a 1126px bar at 1440, so the last group and
-    Display wrapped to a second row, and on a phone the strip clipped its own last word. With
-    three or more fields each field is one control instead: its name, the values chosen in it,
-    and a menu of every value with its count. Two fields still fit, and stay pills, where every
-    choice is visible without a press.
-  -->
-  <!--
-    ON A PHONE THE FIELDS ARE ONE BUTTON AND A SHEET. Three field menus, Clear filters and Display
-    measured past 390 on Services with one filter on, so Clear and Display were reached by
-    scrolling the bar sideways, and a control nobody knows is there is a control that is not
-    there. The sheet holds every field and Clear, and Display is in the toolbar above.
+  <!-- THE QUICK FILTER, from 640: the list's slices with their counts, one chosen. A thumb has the sheet's Late toggle. -->
+  {#if quick.length > 0 && setQuick && !rowsAsCards()}
+    <Segmented class="quick-track" role="group" aria-label={copy.filter}>
+      {#each quick as slice (slice.key)}
+        <button
+          type="button"
+          class="segment"
+          data-on={quickAt === slice.key ? '' : undefined}
+          aria-pressed={quickAt === slice.key ? 'true' : 'false'}
+          onclick={() => setQuick?.(slice.key)}
+        >
+          <span class="segment-word">{slice.label}</span>
+          {#if slice.count !== null}<span class="segment-n num">{slice.count}</span>{/if}
+        </button>
+      {/each}
+    </Segmented>
+  {/if}
 
-    AND THE BUTTON IS 44px SQUARE, so the phone's bar is one row: search and Filter.
-    It said "Filter" and every chosen value in words, which took a second line under
-    the search box. How many values are on is the figure beside the glyph, and what they are is in
-    its name for a screen reader and in the sheet it opens.
+  <!--
+    ONE FILTER BUTTON. Which way, Status and Category were three menus and a builder beside them, eight controls over the
+    rows; they are one sheet now, the fields' values first and the builder under them. On a phone it is a 44px square
+    with how many values are on beside the glyph, so the bar is one row: search and Filter.
   -->
-  {#if sheeted}
+  {#if filterable}
     {@const chosen = enums.flatMap((f) => (f.values ?? []).filter((value) => isOn(f.id, value)).map((value) => valueSaid(f, value)))}
     <button
       type="button"
-      class="sift sift-sheet tap"
-      data-on={chosen.length ? '' : undefined}
+      class="sift sift-build tap"
+      class:sift-sheet={sheeted}
+      data-on={sheeted && chosen.length ? '' : undefined}
       aria-haspopup="dialog"
-      aria-label={chosen.length ? words.filterOn(chosen.join(', ')) : copy.filter}
+      aria-label={sheeted && chosen.length ? words.filterOn(chosen.join(', ')) : copy.filter}
       onclick={() => (filterOpen = true)}
     >
-      <Icon name="filter" size="m" />
-      {#if chosen.length}<span class="sift-count num" aria-hidden="true">{chosen.length}</span>{/if}
+      <Icon name="filter" size={sheeted ? 'm' : 's'} />{#if !sheeted}<span class="sift-name">{copy.filter}</span>{/if}
+      {#if sheeted && chosen.length}<span class="sift-count num" aria-hidden="true">{chosen.length}</span>{/if}
     </button>
-  {:else if menued}
-    {#each enums as f}
-      {@const chosen = (f.values ?? []).filter((value) => isOn(f.id, value))}
-      <Menu label={labelOf(f)}>
-        {#snippet trigger()}
-          <span class="sift" data-on={chosen.length ? '' : undefined}>
-            <span class="sift-name">{labelOf(f)}</span>
-            {#if chosen.length}<span class="sift-chosen">{chosen.map((value) => valueSaid(f, value)).join(', ')}</span>{/if}
-            <span class="sift-open"><Icon name="chevron" size="s" /></span>
-          </span>
-        {/snippet}
-        {#each f.values ?? [] as value}
-          {@const on = isOn(f.id, value)}
-          <button
-            type="button"
-            class="mi"
-            role="menuitemcheckbox"
-            aria-checked={on ? 'true' : 'false'}
-            onclick={() => toggleFilter(f.id, value)}
-          >
-            <span class="mi-tick">{#if on}<Icon name="check" size="s" />{/if}</span>
-            <span class="mi-name">{valueSaid(f, value)}</span>
-            {#if facets.has(f.id)}<span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>{/if}
-          </button>
-        {/each}
-      </Menu>
-    {/each}
-  {:else}
-    {#each enums as f}
-      <Segmented many class="sift-track" role="group" aria-label={labelOf(f)}>
-        {#each f.values ?? [] as value}
-          {@const on = isOn(f.id, value)}
-          <!-- `aria-pressed`, BECAUSE THE STATE WAS ONLY A COLOUR. A raised white segment says
-               "this filter is on" to whoever can see it and nothing at all to anybody else, and
-               which filters are on is the whole of what the grid underneath is showing. `data-on`
-               is the style hook; this is the fact. `RowForm`'s own segmented control has carried it
-               since it was written, so the two were a pair that had drifted. -->
-          <button
-            type="button"
-            class="segment"
-            data-on={on ? '' : undefined}
-            aria-pressed={on ? 'true' : 'false'}
-            onclick={() => toggleFilter(f.id, value)}
-          >
-            <span class="segment-word">{valueSaid(f, value)}</span>
-            {#if facets.has(f.id)}<span class="segment-n">{facets.get(f.id)?.get(value) ?? 0}</span>{/if}
-          </button>
-        {/each}
-      </Segmented>
-    {/each}
   {/if}
 
-  <!-- A LIST CLAUSE, AS THE ONE CONTROL A LIST CAN HAVE. There is no declared set to draw pills
-       from, so the clause is the chip and pressing it takes it off (the page's `listed` says why).
-       It sits after the pills and before Clear because it is the narrowing a reader did not choose
-       here: it arrived in the address, from a block, a metric or a saved view. -->
-  {#each listed as c (c.at)}
-    <button type="button" class="sift listed tap" data-on aria-pressed="true" onclick={() => dropFilter(c.at)}>
-      <span class="sift-name">{c.field ? labelOf(c.field) : c.f.field} {c.f.op}</span>
-      <span class="sift-chosen">{c.f.values[0] ?? ''}</span>
+  <!-- EACH FILTER THAT IS ON, AS A RECTANGLE A PRESS TAKES OFF: its field, how it compares and what. The quick slice's
+       own chips are the segment above and are not drawn twice. -->
+  {#each chips as c (c.at)}
+    <button type="button" class="sift listed tap" data-on aria-label="{copy.clear} {c.said}" onclick={() => dropFilter(c.at)}>
+      <span class="sift-chosen">{c.said}</span>
       <Icon name="close" size="s" />
     </button>
   {/each}
 
-  <!-- THE FILTER ITSELF, FROM 640: the query builder in the sheet, for every field and every question the pills do
-       not ask. It is not a `Menu`, so the gates that open a field's menu by `.menu-trigger:has(.sift)` still open
-       the first field's. Below 640 the one Filter button above opens the same sheet. -->
-  {#if !rowsAsCards() && fields.length}
-    <button type="button" class="sift sift-build" aria-haspopup="dialog" onclick={() => (filterOpen = true)}>
-      <Icon name="filter" size="s" /><span class="sift-name">{copy.filter}</span>
-    </button>
-  {/if}
-
-  {#if filtered && !sheeted}
+  {#if filtered && !sheeted && chips.length > 1}
     <span class="bar-clear"><Button weight="bare" href="/r/{register}"><Icon name="close" size="s" />{copy.clearFilters}</Button></span>
-  {/if}
-
-  <!-- SAVE AS A VIEW, only while a filter or a search is on (`ViewsMenu` says why). It ends the
-       bar, because it is about the list as a whole. On a phone with filters it lives in the filter
-       sheet instead, beside Clear, for the reason Clear does. -->
-  {#if filtered && savable && !sheeted}
-    <span class="bar-save"><ViewsMenu {saveView} /></span>
   {/if}
 </div>
 {/if}
@@ -306,18 +254,32 @@
 <!-- The filter sheet. On a phone it opens with the same fields and values as the bar's menus, as the
      Display sheet's rows, each with its count, and Clear beside Done so undoing every filter is in the
      same place as setting one. At every width the query builder follows, over the same address. -->
-{#if sheeted || fields.length}
+{#if filterable}
   <Sheet bind:open={filterOpen} title={copy.filter}>
+    <!-- LATE FIRST, ON A PHONE (money F8): the one slice a thumb is most often after, as a toggle at the head of the sheet. -->
+    {#if filterOpen && rowsAsCards() && late && setQuick}
+      <button
+        type="button"
+        class="filter-value filter-late"
+        data-on={quickAt === 'late' ? '' : undefined}
+        aria-pressed={quickAt === 'late' ? 'true' : 'false'}
+        onclick={() => setQuick?.(quickAt === 'late' ? 'all' : 'late')}
+      >
+        <span class="filter-box" aria-hidden="true">{#if quickAt === 'late'}<Icon name="check" size="s" />{/if}</span>
+        {late.label}
+        {#if late.count !== null}<span class="filter-n">{late.count}</span>{/if}
+      </button>
+    {/if}
     <!-- THE VALUES ARE DRAWN WHILE THE SHEET IS OPEN AND NOT BEFORE. A closed sheet held two dozen hidden
          `.filter-value` buttons ahead of the Display sheet's in the document, so the first one anything found on the page
          was one nobody could see. -->
-    {#if filterOpen && rowsAsCards() && enums.length}
+    {#if filterOpen && enums.length}
     <div class="filter-groups">
       {#each enums as f}
         <fieldset class="filter-group">
           <legend class="filter-legend">{labelOf(f)}</legend>
           <div class="filter-values">
-            {#each f.values ?? [] as value}
+            {#each (f.values ?? []).filter((value) => offeredValue(f, value)) as value}
               {@const on = isOn(f.id, value)}
               <button
                 type="button"
@@ -326,7 +288,7 @@
                 aria-pressed={on ? 'true' : 'false'}
                 onclick={() => toggleFilter(f.id, value)}
               >
-                <span class="filter-box" aria-hidden="true">{on ? '✓' : ''}</span>
+                <span class="filter-box" aria-hidden="true">{#if on}<Icon name="check" size="s" />{/if}</span>
                 {valueSaid(f, value)}
                 {#if facets.has(f.id)}<span class="filter-n">{facets.get(f.id)?.get(value) ?? 0}</span>{/if}
               </button>
@@ -372,10 +334,8 @@
 {/if}
 
 <style>
-  /* THE SAME WRAP `/audit` TOOK, in a commit whose comment names the measurement: "Five of those
-     in one unwrapping track reached 335px inside a 320px screen". The register's bar has the
-     identical shape and was not fixed with it: at 320 `dropped` ran off the edge of `/r/tasks` and
-     the app panel scrolled sideways by 30px. */
+  /* ONE ROW THAT WRAPS rather than running past a narrow tile: at 320 a filter left on ran off the edge of `/r/tasks`
+     and the panel scrolled sideways by 30px (the wrap `/audit` took). */
   .bar {
     display: flex;
     flex-wrap: wrap;
@@ -383,42 +343,50 @@
     gap: var(--sp-2);
   }
 
-  /* THE SEGMENTS ARE `controls.css`'s: one rectangle in the field's fill, the chosen value the tile's colour on it. The
-     count sits beside the word and quieter than it, so a value says what it holds before it is pressed. */
+  /* THE SEARCH BOX IS A FIELD (`controls.css`), 240 to 360 wide and 36 tall (money F7), so the quick filter beside it
+     keeps its room. */
+  .bar > .field {
+    flex: 1 1 240px;
+    min-inline-size: 240px;
+    max-inline-size: 360px;
+    min-block-size: 36px;
+  }
+
+  @media (pointer: coarse) {
+    .bar > .field {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* THE QUICK FILTER'S SEGMENTS: the slice's word, and its count quieter beside it. */
   .segment {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-  }
-
-  .segment-word {
-    display: inline-block;
-  }
-
-  .segment-word::first-letter {
-    text-transform: uppercase;
+    gap: var(--sp-2);
   }
 
   .segment-n {
-    color: var(--dim);
-    font-weight: 400;
+    color: var(--ink-3);
+    font-weight: var(--fw-regular, 400);
     font-variant-numeric: tabular-nums;
   }
 
-  /* A FIELD AS ONE CONTROL: a rectangle the toolbar's height in the field's fill, its name in the second ink, and what
-     is chosen in it after the name. */
+  /* FILTER AND EACH FILTER THAT IS ON: rectangles the toolbar's height in the quiet fill, radius 8, never a pill. */
   .sift {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    min-block-size: var(--btn-h);
-    padding: 0 var(--sp-2) 0 var(--sp-3);
-    background: var(--field);
+    gap: var(--sp-2);
+    min-block-size: 36px;
+    padding: 0 var(--sp-3);
+    background: var(--tile-2);
+    border: 0;
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
+    font: inherit;
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     white-space: nowrap;
+    cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out);
@@ -430,36 +398,39 @@
     }
   }
 
-  /* Hover only where there is one: a phone keeps `:hover` on the last thing tapped. */
   @media (hover: hover) and (pointer: fine) {
-    :global(.menu-trigger):hover .sift:not([data-on]) {
-      background: var(--field-hover);
+    .sift:not([data-on]):hover {
+      background: var(--hover);
       color: var(--ink);
     }
   }
 
-  /* A FIELD WITH A VALUE CHOSEN IN IT TAKES THE ACCENT'S TINT, which is what selection looks like everywhere. */
+  /* A FILTER THAT IS ON TAKES THE SELECTION'S TINT, the red word on `--red-tint`, and its cross takes it off. */
   .sift[data-on] {
-    background: var(--action-tint-1);
-    color: var(--action-text);
+    background: var(--red-tint);
+    color: var(--red);
   }
 
   .sift-chosen {
+    min-inline-size: 0;
+    overflow: hidden;
     color: inherit;
     font-weight: var(--fw-semi);
+    text-overflow: ellipsis;
   }
 
-  /* THE PHONE'S ONE FILTER CONTROL IS A 44px SQUARE with the glyph and, when values are on, how many.
-     It is a real button, so it sheds the button's own box. */
+  .listed {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    padding-inline-end: var(--sp-2);
+  }
+
+  /* THE PHONE'S ONE FILTER CONTROL IS A 44px SQUARE with the glyph and, when values are on, how many. */
   .sift-sheet {
     justify-content: center;
     gap: var(--sp-1);
     min-inline-size: var(--tap);
     padding: 0 var(--sp-2);
-    border: 0;
-    font: inherit;
-    font-weight: 500;
-    cursor: pointer;
   }
 
   .sift-count {
@@ -467,114 +438,19 @@
     font-size: var(--fs-meta);
   }
 
-  /* THE BUILDER'S CONTROL IS ONE MORE RECTANGLE IN THE ROW, and a real button, so it sheds the button's own box. */
-  .sift-build {
-    border: 0;
-    font: inherit;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .sift-build:hover {
-      background: var(--field-hover);
-      color: var(--ink);
-    }
-  }
-
-  /* On a phone the builder follows the pills' own values, a section's gap below them. */
-  .filter-groups + .filter-build {
-    margin-block-start: var(--sp-5);
-  }
-
-  /* A LIST CLAUSE IS A FILTER THAT IS ALREADY ON, drawn as the rest of the bar is so it
-     reads as one of them rather than as a message. A repository is a URL and a handle is
-     `git:jokonkwo`, so the element gives way with an ellipsis before it runs past a phone's edge. */
-  .listed {
-    min-inline-size: 0;
-    border: 0;
-    font: inherit;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .listed .sift-chosen {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .filter-n {
-    margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .sift-open {
-    display: inline-flex;
-    color: var(--dim);
-    rotate: 90deg;
-  }
-
-  .mi-tick {
-    display: inline-flex;
-    inline-size: var(--sp-4);
-    color: var(--ink);
-  }
-
-  /* THE SEARCH BOX IS A FIELD (`controls.css`), as wide as a phrase and no wider, so the filters beside it keep their
-     room, and the toolbar's height. */
-  .bar > .field {
-    flex: 0 1 300px;
-    min-inline-size: 180px;
-    min-block-size: var(--btn-h);
-  }
-
-  @media (pointer: coarse) {
-    .bar > .field {
-      min-block-size: var(--tap);
-    }
-  }
-
-  /* Save as a view ends the bar: it is about the list as a whole, not one of its filters. */
-  .bar-save {
-    margin-inline-start: auto;
-  }
-
-  /* The menu rows: 32 tall and the same wash on hover as every menu row. */
-  .mi {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    inline-size: 100%;
-    min-block-size: 32px;
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-ui);
-    text-align: start;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .mi-name {
-    flex: 1;
-  }
-
+  /* THE SHEET: the Late toggle, then each field's values as rows with their boxes in one column, then the builder. */
   .filter-groups {
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
+  }
+
+  .filter-late + .filter-groups {
+    margin-block-start: var(--sp-4);
+  }
+
+  .filter-groups + .filter-build {
+    margin-block-start: var(--sp-5);
   }
 
   .filter-group {
@@ -586,9 +462,9 @@
   .filter-legend {
     margin-block-end: var(--sp-2);
     padding: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
   }
 
   .filter-values {
@@ -597,79 +473,76 @@
     gap: 2px;
   }
 
-  /* A full-width row, not a chip. Eight values in a wrapped chip cloud is a shape you have to scan;
-     a column of rows with the boxes aligned is a shape you can run your eye down. */
+  /* A FULL-WIDTH ROW, NOT A CHIP: a column of rows with the boxes aligned is a shape the eye runs down. */
   .filter-value {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
+    inline-size: 100%;
     min-block-size: 36px;
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font: inherit;
     text-align: start;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* 44 UNDER A THUMB, AND BOTH OF THESE WERE MEASURED AT 390 AND FOUND SHORT. `.filter-value` is
-     358x34 and `.mi` is 34. Neither has ever been measured by `layout.mjs`, because both live
-     inside a sheet or a menu the gate does not open, and the gate is right that a page at rest is
-     what it measures. `13 §7` is the rule. */
+  /* 44 UNDER A THUMB (`13 §7`). */
   @media (pointer: coarse) {
-    .filter-value,
-    .mi {
+    .filter-value {
       min-block-size: var(--tap);
     }
   }
 
-  .filter-value:hover {
-    background: var(--hover-wash);
-    color: var(--ink);
+  @media (hover: hover) and (pointer: fine) {
+    .filter-value:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
   }
 
   .filter-value[data-on] {
     color: var(--ink);
-    font-weight: 500;
+    font-weight: var(--fw-medium);
   }
 
+  .filter-n {
+    margin-inline-start: auto;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE SAME BOX AS THE LIST'S PICKER: 16, radius 4, 1.5px of the second ink, the button red with a white check. */
   .filter-box {
     display: grid;
-    place-items: center;
-    inline-size: 17px;
-    block-size: 17px;
     flex: none;
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    color: var(--on-ink);
-    font-size: var(--t-xs);
-    line-height: 1;
+    place-items: center;
+    inline-size: 16px;
+    block-size: 16px;
+    border: 1.5px solid var(--ink-2);
+    border-radius: var(--r-xs);
+    color: var(--on-red);
+  }
+
+  .filter-box :global(svg) {
+    inline-size: 12px;
+    block-size: 12px;
   }
 
   .filter-value[data-on] .filter-box {
-    background: var(--action);
-    border-color: var(--action);
-    color: var(--on-action);
+    background: var(--red-fill);
+    border-color: var(--red-fill);
   }
 
   @media (width < 640px) {
     /**
-     * ONE ROW OF 44px CONTROLS: THE SEARCH BOX AND FILTER.
-     *
-     * The bar was two lines on a phone, the search box across the first and a sideways scroller of
-     * Filter, its chosen values and Display across the second, under a capture line of its own, so
-     * three rows of controls stood over the first card. The capture line went behind the head's "+",
-     * Filter became one square button and Display went up into the toolbar, and what is left fits one
-     * row at 320: the search box takes the width Filter leaves.
-     *
-     * WHAT DOES NOT FIT IS A SECOND LINE, AND ONLY WHILE THERE IS SOMETHING ON IT. A list clause from
-     * the address, and Clear and Save on a list with no fields to filter, wrap under the row. The
-     * search box's floor leaves room for one square button and nothing more, so they cannot squeeze
-     * it. `min-inline-size: 0` keeps the bar inside the panel, which is the 30px sideways scroll the
-     * comment above `.bar` records fixing once.
+     * ONE ROW OF 44px CONTROLS: THE SEARCH BOX AND FILTER (`1fr 44px`, money F8). A filter that is on wraps under the
+     * row, and only while there is one. `min-inline-size: 0` keeps the bar inside the panel.
      */
     .bar {
       min-inline-size: 0;
@@ -678,17 +551,13 @@
     .bar > .field {
       flex: 1 1 0;
       min-inline-size: 0;
+      max-inline-size: none;
     }
 
     .listed,
-    .bar-clear,
-    .bar-save {
+    .bar-clear {
       order: 1;
       min-inline-size: 0;
-    }
-
-    .bar-save {
-      margin-inline-start: 0;
     }
   }
 </style>

@@ -339,7 +339,7 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
        `aria-pressed` values. `.segmented` is left only for a list with one or two fields, and Obligations has more, so
        this scenario waited on a control the screen no longer draws. Each width now opens the control it has, and the
        state is audited with the values in view, which is where somebody who cannot see a tick needs it said. */
-    { name: 'grid: filter menu', route: '/r/obligations', click: '.menu-trigger:has(.sift)', expect: '[role="menu"] [role="menuitemcheckbox"][aria-checked]', wide: true },
+    { name: 'grid: filter sheet, wide', route: '/r/obligations', click: '.sift-build', expect: 'dialog[open] .filter-value[aria-pressed]', wide: true },
     { name: 'grid: filter sheet', route: '/r/obligations', click: '.sift-sheet', expect: 'dialog[open] .filter-value[aria-pressed]', narrow: true },
     { name: 'grid: create sheet', route: '/r/obligations', keys: ['n'], expect: 'dialog[open]' },
     { name: 'grid: display options', route: '/r/obligations', keys: ['v'], expect: 'dialog[open]' },

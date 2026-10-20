@@ -102,14 +102,16 @@ test('THE FOUR STATE SITES AND THE VIEW TITLE SAY A VALUE THROUGH `saidInLine`, 
      the two menus, and the saved view's title. */
   const count = (s: string) => PAGE.split(s).length - 1;
   assert.equal(count("saidInLine(decl?.state ?? '', state)"), 4, 'a state menu or a move sentence no longer reads the state field');
-  assert.equal(count('saidInLine(f.field, v)'), 1, "a saved view's title no longer reads the filtered field's labels");
+  /* The saved view's title, and the rectangle each filter that is on is drawn as (money F7). */
+  assert.equal(count('saidInLine(f.field, v)'), 2, "a saved view's title or a filter's rectangle no longer reads the filtered field's labels");
 });
 
-test('THE PILLS, THE MENU, THE SEGMENTS, THE SHEET AND THE CELL EDITOR DRAW THROUGH `valueSaid`', () => {
+test('THE FILTER BUTTON, THE SHEET AND THE CELL EDITOR DRAW THROUGH `valueSaid`', () => {
   /* `assert.ok` and not `assert.match`, which prints all four thousand lines of the page when it fails. */
   assert.ok(/import \{[^}]*\bvalueSaid\b[^}]*\} from '\$lib\/voice\.ts'/u.test(PAGE), 'the page does not import `valueSaid`');
-  /* The phone's summary, the menu's summary, its items, the segments, the sheet, and the cell editor's options. */
-  assert.equal(PAGE.match(/valueSaid\(f, (value|v)\)/gu)?.length, 6);
+  /* The Filter button's summary, the sheet's values, and the cell editor's options. The bar's menus and segments went
+     into the sheet (the UI pass of 20 October, money F7). */
+  assert.equal(PAGE.match(/valueSaid\(f, (value|v)\)/gu)?.length, 3);
 });
 
 test('A CARD DRAWS THE STORED VALUE BY ITS LABEL, and does not word the label a second time', () => {
