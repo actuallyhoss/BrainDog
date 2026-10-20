@@ -767,3 +767,10 @@ test('HOME DRAWS THE LINE ONCE WHILE A SIGN IS RED AND IS AS IT WAS WHILE NONE I
     assert.deepEqual(red.sentence, before.sentence, 'and the sentence counts what it counted');
   }
 });
+
+test('a feed line says a day as "10 Sep", never the record\u2019s ISO date (today F19)', async () => {
+  const { dayWords } = await import('./default-home.ts');
+  assert.equal(dayWords('Newsletter sending · renews 2026-09-10'), 'Newsletter sending · renews 10 Sep');
+  assert.equal(dayWords('at 2026-09-10T08:00:00Z'), 'at 2026-09-10T08:00:00Z', 'an instant is left to its own reader');
+  assert.equal(dayWords('nothing dated'), 'nothing dated');
+});

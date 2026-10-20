@@ -1114,11 +1114,30 @@ function untold(b: LiveBlock, told: Told): LiveBlock {
   return { ...b, feed: left, rows, shown: Math.max(0, b.shown - gone), total: Math.max(left.length, b.total - gone) };
 }
 
+/** A FEED READS AS WORDS: a bare count said as changes, and a day as "10 Sep". */
+function worded(b: LiveBlock): LiveBlock {
+  return dated(counted(b));
+}
+
+/** A day as a feed line says it: "10 Sep", never the record's "2026-09-10" (today F19). */
+const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const dayWords = (text: string): string =>
+  text.replace(/\b(\d{4})-(\d{2})-(\d{2})(?![\d:T])\b/gu, (whole, _y: string, m: string, d: string) => {
+    const month = MONTH[Number(m) - 1];
+    return month && Number(d) >= 1 && Number(d) <= 31 ? `${Number(d)} ${month}` : whole;
+  });
+
+function dated(b: LiveBlock): LiveBlock {
+  const has = (r: LiveBlock['rows'][number]): boolean => ((r as { cells?: readonly (string | null)[] }).cells ?? []).some((c) => typeof c === 'string' && dayWords(c) !== c);
+  if (!b.rows.some(has)) return b;
+  return { ...b, rows: b.rows.map((r) => (has(r) ? { ...r, cells: r.cells.map((c) => (typeof c === 'string' ? dayWords(c) : c)) } : r)) };
+}
+
 /**
  * A FEED NEVER ENDS ON A BARE NUMBER. A burst the record could put no words to ("248" and nothing after it, under
  * Rules) is said as what it is, that many changes, so the count is in the words and the line reads as a line.
  */
-function worded(b: LiveBlock): LiveBlock {
+function counted(b: LiveBlock): LiveBlock {
   const bare = (r: LiveBlock['rows'][number]): number | null => {
     const cells = (r as { cells?: readonly (string | null)[] }).cells ?? [];
     if (r.key === 'seen' || (cells[3] ?? '').trim() !== '') return null;
