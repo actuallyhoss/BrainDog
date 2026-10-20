@@ -64,7 +64,10 @@
   import { answerQuestion, parkQuestion, type Written } from '$lib/record/decide-write.ts';
   import { proposer, queueMergeOf, queueWords, type FileAt } from '$lib/page/queue-answer.ts';
   import '$lib/decide/form.css';
-  import { cardWords, spoken } from '$lib/decide/card.ts';
+  import { cardWords, queueOf, spoken } from '$lib/decide/card.ts';
+  import OptionVisual from '$lib/decide/OptionVisual.svelte';
+  import { visualOf as drawingOf } from '$lib/decide/option-visual.ts';
+  import { homeCurrency } from '$lib/record/api.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
   import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
   import { mergeListOf, mergeOf, pressOfKey, words as mergeWords, type Press } from '../merge.ts';
@@ -201,6 +204,17 @@
   const offered = $derived(about?.kind === 'options' ? about.body.options : undefined);
   let optionFile = $state.raw<FileAt | undefined>(undefined);
   const visuals = $derived(visualsOf(offered, optionFile));
+
+  /* WHAT EACH OPTION WOULD CHANGE, DRAWN (DIRECTION §45, plan of 20 October): a date it sets, a change from what to
+     what, a merge, money against what it is set against, from the option as it was filed (`option-visual.ts`). An option
+     with nothing it can draw truthfully draws nothing, and one that already shows a colour, a figure or a picture keeps
+     that. */
+  const asQueued = $derived(question ? queueOf(question) : null);
+  const drawingFor = (key: string) => {
+    if (!asQueued || visuals.has(key)) return null;
+    const raw = Array.isArray(offered) ? (offered as unknown[]).find((o) => (o as { id?: unknown } | null)?.id === key) : undefined;
+    return drawingOf(asQueued, { ...(raw !== null && typeof raw === 'object' ? (raw as object) : {}), key }, { now, home: homeCurrency() });
+  };
   async function readPictures(id: string) {
     if (!client) return;
     const file = await readFiles(client.get, offered, (path) => at(path));
@@ -308,6 +322,11 @@
      IT OF EVERY ANSWER, AND AN OPTION'S OWN MARK OF THAT ONE (`hard`, the record's `option_costs`): "Keep my page"
      beside "Take the update's page" is a call, and only taking is worded as hard. */
   const hardOption = (key: string | null): boolean => key !== null && question?.options.find((o) => o.key === key)?.hard === true;
+  /* THE ANSWER'S BUTTON SAYS THE ANSWER CHOSEN, in its own words ("Keep the subdomain"), and Answer before one is. */
+  const chosenLabel = $derived.by(() => {
+    const o = question?.options.find((x) => x.key === selectedKey);
+    return o && question ? labelOf(o, question, moves) : null;
+  });
   const pressSaid = (label: string, key: string | null = null): string => (question?.band === 'undo' || hardOption(key) ? queueWords.hard(label) : label);
 
   /* WHO ASKED AND WHEN, the quiet line over the answers, by the name every screen gives them, never a handle. */
@@ -1066,7 +1085,8 @@
               {:else}
                 <!-- THE ANSWERS AS CHOICES: each a full-width rectangle with its name and what it does, the suggested one
                      saying so in the accent's words, the one chosen ringed (`form.css`). A press chooses; Needs you gives it. -->
-                <ul class="dc-choices" role="radiogroup" aria-label={copy.theOptions}>
+                <!-- TWO OR THREE SIDE BY SIDE on a wide screen, each with what it does and its drawing; stacked on a phone. -->
+                <ul class="dc-choices" role="radiogroup" aria-label={copy.theOptions} data-across={question.options.length <= 3 ? '' : undefined} style:--across={question.options.length}>
                   {#each question.options as option}
                     <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list; where the body
                          holds no reason, the words `questionOf` made of it. -->
@@ -1110,6 +1130,7 @@
                           {#if because.trim() !== ''}
                             <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
                           {/if}
+                          <OptionVisual visual={drawingFor(option.key)} />
                         </span>
                         {#if marked}<span class="dc-rec" aria-hidden="true">{gate.suggested}</span>{/if}
                       </div>
@@ -1126,7 +1147,7 @@
                       aria-disabled={selectedKey === null}
                       disabled={!answerable || holding !== null || sending !== null}
                       aria-describedby={answerable ? undefined : 'cannot-decide'}
-                      onclick={commit}>{pressSaid(gate.decide, selectedKey)}</button
+                      onclick={commit}>{pressSaid(chosenLabel ?? gate.decide, selectedKey)}</button
                     >
                   {/if}
                   {@render later()}
@@ -1942,6 +1963,32 @@
   @media (width < 900px) {
     .page {
       padding: var(--sp-3) var(--gutter) var(--sp-8);
+    }
+  }
+
+  /* ── the options side by side (plan of 20 October) ──────────────────────
+     TWO OR THREE ANSWERS ARE CARDS IN A ROW on a wide screen, each as tall as the tallest, "Suggested" over its name and
+     its drawing under what it does; four or more, and any phone, keep the list. */
+  @media (width >= 1100px) {
+    .dc-choices[data-across] {
+      grid-template-columns: repeat(var(--across), minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .dc-choices[data-across] > li > .dc-choice {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-content: start;
+      block-size: 100%;
+    }
+
+    .dc-choices[data-across] .dc-rec {
+      grid-row: 1;
+      grid-column: 2;
+      justify-self: start;
+    }
+
+    .dc-choices[data-across] .dc-choice-main {
+      grid-column: 2;
     }
   }
 </style>

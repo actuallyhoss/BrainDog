@@ -54,7 +54,12 @@ export const CALLS_READ = 50;
 export const WORDS = {
   later: 'Coming back to you',
   calls: 'How the calls went',
-  ask: 'Ask yourself a question',
+  /** Noting a choice to make yourself, in the head's "⋯" (`AskSheet`). */
+  ask: 'Note a choice to make',
+  /** The head's "⋯", named for a screen reader. */
+  more: 'More on Needs you',
+  /** The "⋯"'s way to the boxes for answering several at once. */
+  select: 'Select',
   /** The phone's switch between Money, Quick and Handled, named for a screen reader. */
   columns: 'Show',
   back: (when: string) => `Comes back ${when}`,

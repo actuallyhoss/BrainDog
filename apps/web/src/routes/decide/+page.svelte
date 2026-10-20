@@ -51,6 +51,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import AskSheet from '$lib/ui/AskSheet.svelte';
@@ -362,6 +363,8 @@
 
   /* ASKING YOURSELF A QUESTION, filed through `AskSheet`; the new question is read back into the queue it joins. */
   let asking = $state(false);
+  /* SELECT, FROM THE "⋯": the boxes for answering several at once are drawn only then, or once one is chosen with `x`. */
+  let selecting = $state(false);
   function filed() {
     asking = false;
     void reread();
@@ -382,8 +385,9 @@
   {/await}
 {:else}
   <!-- THE LINE SAYS HOW MANY WAIT, in words with the first question's suggestion, so the title carries no count; on a
-       page with nothing at all to draw the cleared mark under it says that, once. Asking yourself a question is the one
-       ink pill, and only for somebody who may answer. -->
+       page with nothing at all to draw the cleared mark under it says that, once. NOTHING RED IN THE HEAD (plan of 20
+       October): noting a choice to make is the rarest thing done here, so it and Select are in the "⋯", and only for
+       somebody who may answer. -->
   <!-- THE PAGE'S NAME AND ITS LINE, the header every page draws (DIRECTION §39), and THE SIBLING BEFORE THE PAGE, as
        Home draws it: no element of its own round it and nothing between its sentence and `.page`. The sticky head
        sticks inside this screen's own box either way, and on a phone the page's menu is raised to the end of the
@@ -391,11 +395,17 @@
        asking a question is drawn after the page, not here. -->
   <PageHead icon="decide" title={said('decide')} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
     {#snippet actions()}
-      {#if answerable}<Button weight="primary" onclick={() => (asking = true)}><Icon name="ask" size="s" />{WORDS.ask}</Button>{/if}
+      {#if answerable}
+        <Menu label={WORDS.more} align="end">
+          {#snippet trigger()}<span class="head-more" title={WORDS.more}><Icon name="more" size="m" /></span>{/snippet}
+          <button type="button" role="menuitem" data-ask onclick={() => (asking = true)}>{WORDS.ask}</button>
+          <button type="button" role="menuitemcheckbox" aria-checked={selecting} data-select onclick={() => (selecting = !selecting)}>{WORDS.select}</button>
+        </Menu>
+      {/if}
     {/snippet}
   </PageHead>
 
-  <div class="page" inert={fromCopy}>
+  <div class="page" inert={fromCopy} data-selecting={selecting ? '' : undefined}>
     {#if !answerable && (shaped?.open ?? 0) > 0}
       <!-- WHY THE CARDS OFFER THEIR OPTIONS AS WORDS, above them and not after a press. -->
       <p class="cannot" id="cannot-decide">{whyNot}</p>
@@ -428,6 +438,7 @@
       <div
         class="body"
         data-board={columns.length > 0 ? '' : undefined}
+        data-switch={columns.length > 1 ? '' : undefined}
         data-showing={showing ?? undefined}
         style:--col-money={board.money ?? 'auto'}
         style:--col-quick={board.quick ?? 'auto'}
@@ -562,6 +573,18 @@
       margin-inline: 0;
     }
 
+    /* THE SWITCH ALREADY NAMES THE COLUMN SHOWN, so its tile's name is said to a screen reader and not drawn again. */
+    .body[data-switch] :global(.block-slot[data-key^='decide-']:not([data-arranging]) > .block-bar) {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
     .body[data-showing='money'] :global(.block-slot[data-key='decide-quick']),
     .body[data-showing='quick'] :global(.block-slot[data-key='decide-money']),
     .body[data-showing='handled'] :global(:is(.block-slot[data-key='decide-money'], .block-slot[data-key='decide-quick'])),
@@ -655,6 +678,42 @@
 
   .page :global(.qa-select) {
     transition: none;
+  }
+
+  /* THE BOXES WAIT BEHIND SELECT (plan of 20 October): a box on every card, unexplained, until "⋯" Select asks for
+     them, or until one is chosen with `x`, when every card shows its own so the choice can be widened. */
+  .page:not([data-selecting]) :global(.qa:not([data-picking]) .qa-select) {
+    display: none;
+  }
+
+  .page[data-selecting] :global(.qa-select) {
+    opacity: 1;
+  }
+
+  /* THE "⋯" IN THE HEAD: a quiet square, a tap wide under a thumb. */
+  .head-more {
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--btn-h);
+    block-size: var(--btn-h);
+    background: var(--field);
+    border-radius: var(--r-ctl);
+    color: var(--ink2);
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :global(.menu-trigger):hover > .head-more {
+      background: var(--field-hover);
+      color: var(--ink);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .head-more {
+      inline-size: var(--tap);
+      block-size: var(--tap);
+    }
   }
 
   /* THE STANDING SENTENCE OVER THE QUEUE, at the weight of a hint rather than an alarm: nothing has gone wrong, and this

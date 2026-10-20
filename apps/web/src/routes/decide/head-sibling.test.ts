@@ -30,7 +30,7 @@ test('the head is drawn once, with no element of its own round it', () => {
 });
 
 test('nothing is drawn between the head and the page', () => {
-  assert.match(markup, /<\/PageHead>\s*<div class="page"(?: inert=\{fromCopy\})?>/u, 'something stands between the head’s sentence and .page');
+  assert.match(markup, /<\/PageHead>\s*<div class="page"(?: inert=\{fromCopy\})?(?: data-selecting=\{selecting \? '' : undefined\})?>/u, 'something stands between the head’s sentence and .page');
 });
 
 test('the sheet for asking a question is still drawn, after the page', () => {

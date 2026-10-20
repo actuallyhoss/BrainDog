@@ -8,6 +8,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { readFileSync } from 'node:fs';
+
+import { queueOf } from '../../../lib/decide/card.ts';
+import { visualOf as drawingOf } from '../../../lib/decide/option-visual.ts';
 import { filesNamed, readFiles, visualsOf } from './option-visual.ts';
 
 const SHA = 'a'.repeat(64);
@@ -90,4 +94,18 @@ test('a question with no picture asks the record for nothing', async () => {
   let asked = 0;
   await readFiles(async () => ((asked += 1), { ok: false as const }), OPTIONS.filter((o) => o.id !== 'photo'), (p) => p);
   assert.equal(asked, 0);
+});
+
+test('THE OPTIONS STAND SIDE BY SIDE, EACH WITH ITS DRAWING, and the answer button says the one chosen', () => {
+  /* AN OPTION AS IT WAS FILED, carrying the day it sets: the page hands it with its key and draws the date it moves to. */
+  const q = queueOf({ id: 'SG2', title: 'Retire Tallow?', band: 'call', opened: '2026-10-01T00:00:00Z', options: [{ key: 'park', title: 'Park it', body: '' }, { key: 'retire', title: 'Retire it', body: '' }] });
+  const drawn = drawingOf(q, { id: 'park', key: 'park', due: '2026-11-01' } as { key: string }, { now: Date.parse('2026-10-20T09:00:00Z'), home: null });
+  assert.equal(drawn?.kind, 'date');
+  assert.equal(drawingOf(q, { key: 'retire' }, { now: 0, home: null }), null, 'an option with nothing to draw draws nothing');
+
+  const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  assert.match(page, /data-across=\{question\.options\.length <= 3 \? '' : undefined\}/u, 'two or three options are a list again');
+  assert.match(page, /<OptionVisual visual=\{drawingFor\(option\.key\)\} \/>/u, 'an option is drawn without its picture');
+  assert.match(page, /grid-template-columns: repeat\(var\(--across\), minmax\(0, 1fr\)\);/u);
+  assert.match(page, /pressSaid\(chosenLabel \?\? gate\.decide, selectedKey\)/u, 'the answer button says Decide over the answer chosen');
 });

@@ -14,7 +14,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type QueueQuestion } from '@braindog/kernel';
 import type { Fetch, LiveBlock } from '../../lib/record/page-live.ts';
 import { MONEY_REGISTERS } from '../../../../../packages/seed/src/modules/money/lists/index.ts';
-import { blocksMineFirst, boardOf, callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, GROUP_KEY, MONEY_LISTS, mineFirst, aboutMoney, NEEDS_SHOWN, othersLine, readDecide, waitingOf, type Call } from './views.ts';
+import { blocksMineFirst, boardOf, callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, GROUP_KEY, MONEY_LISTS, mineFirst, aboutMoney, NEEDS_SHOWN, othersLine, readDecide, waitingOf, WORDS, type Call } from './views.ts';
 import { words } from './words.ts';
 
 const CLOCK = Date.UTC(2026, 9, 2, 12);
@@ -375,4 +375,13 @@ test('every open queue on the page puts the reader’s first, and a page naming 
   assert.deepEqual(ada[2]?.queue?.map((q) => q.id), ['q2', 'q1', 'q3']);
   const cy = blocksMineFirst(blocks, 'p_cy');
   cy.forEach((b, n) => assert.equal(b, blocks[n]));
+});
+
+test('nothing red in the head: noting a choice and Select wait in the "⋯", and the boxes wait behind Select', () => {
+  assert.doesNotMatch(screen, /<Button weight="primary" onclick=\{\(\) => \(asking = true\)\}>/u, 'the head draws a red button again');
+  assert.match(screen, /<Menu label=\{WORDS\.more\} align="end">/u);
+  assert.match(screen, /role="menuitem" data-ask onclick=\{\(\) => \(asking = true\)\}>\{WORDS\.ask\}/u);
+  assert.match(screen, /role="menuitemcheckbox" aria-checked=\{selecting\} data-select/u);
+  assert.match(screen, /\.page:not\(\[data-selecting\]\) :global\(\.qa:not\(\[data-picking\]\) \.qa-select\) \{\n\s+display: none;/u);
+  assert.equal(WORDS.ask, 'Note a choice to make');
 });

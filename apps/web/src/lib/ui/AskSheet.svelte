@@ -1,5 +1,5 @@
 <!--
-  Ask yourself a question: the owner writes down a choice they mean to make, with its options and what each one looks
+  Note a choice to make: the owner writes down a choice they mean to make, with its options and what each one looks
   like, and it waits on Decide to be answered with a reason like any other question.
 
   IT FILES AND DOES NOT ANSWER. The sheet writes an `options` question through `propose` (`askYourself` in
@@ -11,7 +11,7 @@
   drawn in (`govern.ts` `showsOf`). A colour is picked with the platform's own picker, one 44px input a swatch, because
   a colour is judged by eye and a typed code would be a developer's word on a person's screen.
 
-  MOUNTED BY DECIDE'S HEAD (`routes/decide/+page.svelte`), with `about` set when a page opens it.
+  MOUNTED BY DECIDE'S HEAD (`routes/decide/+page.svelte`), from its "⋯", with `about` set when a page opens it.
 -->
 <script lang="ts">
   import Sheet from './Sheet.svelte';
@@ -40,7 +40,7 @@
   const SWATCH_MOST = 4;
 
   const words = {
-    title: 'Ask yourself a question',
+    title: 'Note a choice to make',
     subtitle: 'It waits in Needs you until you answer it with a reason.',
     question: 'The question',
     questionHint: 'Which lining for the autumn coat?',
