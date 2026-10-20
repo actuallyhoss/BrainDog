@@ -15,8 +15,8 @@ import { readFileSync } from 'node:fs';
 
 const HERE = new URL('./', import.meta.url);
 
-/** The three pages that draw a track, each without its comments, so a comment quoting the old markup counts for nothing. */
-const PAGES = ['+page.svelte', '[id]/+page.svelte', 'browse/+page.svelte'].map((name) => ({
+/** The four files that draw a track (Add-ons' two halves moved to `AddonsTabs.svelte` on 20 October), each without its comments, so a comment quoting the old markup counts for nothing. */
+const PAGES = ['AddonsTabs.svelte', '[id]/+page.svelte', 'browse/+page.svelte', 'share/+page.svelte'].map((name) => ({
   name,
   text: readFileSync(new URL(name.replaceAll('[', '%5B').replaceAll(']', '%5D'), HERE), 'utf8')
     .replaceAll(/<!--[\s\S]*?-->/gu, '')
@@ -28,7 +28,7 @@ const BY_HAND = /<[a-z][a-z0-9]*\b[^>]*\bclass="[^"]*\bsegmented\b/u;
 /** A segment: the button or link a track holds. */
 const SEGMENT = /\bclass="segment[\s"]/u;
 /** The names these pages give their tracks, which land on the part's element. */
-const TRACKS = ['order', 'chips', 'tabs'];
+const TRACKS = ['order', 'chips', 'tabs', 'modes', 'addons-tabs'];
 
 const markup = (text: string): string => text.replaceAll(/<style[\s\S]*?<\/style>/gu, '').replaceAll(/<script[\s\S]*?<\/script>/gu, '');
 const styles = (text: string): string => (/<style[^>]*>([\s\S]*?)<\/style>/u.exec(text)?.[1] ?? '');

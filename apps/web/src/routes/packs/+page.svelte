@@ -1,5 +1,6 @@
 <!--
-  Add-ons: three tabs, Installed, Updates and "Install from…".
+  Add-ons, Installed: what this record holds, any updates waiting at the top, and installing from a file or a link
+  behind the page's "⋯". Browse is the other half of the same place (`AddonsTabs.svelte`, `/packs/browse`).
 
   A pack declares CONTENT AND IDENTITY, never position or visibility. That is Chrome's line, stated most plainly of
   anyone: extension actions are unpinned by default, and `isOnToolbar` is exposed to the extension READ-ONLY. There is
@@ -13,12 +14,13 @@
   BROWSING IS `/packs/browse`. This screen used to list what could still be installed under what was, with a guess at
   what each would add; the plan now comes from the record, so it is read where the listing is.
 
-  THE LOOK: the three tabs are a glass segmented control in the title row's toolbar, beside Browse, and
-  the sentence under the title says how many are installed and how many have an update, in ink (an update is never
-  urgent). Installed leads with one tile, what the add-ons hold between them as a stacked bar of lists, pages and rules
-  with its reading line; then the add-ons themselves as 56px rows on the ground, each with its own place's glyph (`glyph.ts`), its switch,
-  and its "…" on hover. The counts are read from each add-on's own document (`$lib/market/adds.ts`), the reader the
-  plan sheet's summary uses, and a list is counted from what the record says the add-on holds.
+  THE LOOK (the UI pass of 20 October, agents F8, F22): the name, the sentence saying how many are installed and how
+  many have an update (in ink: an update is never urgent), then Installed | Browse under it, full width on a phone. Any
+  updates lead in their own tile; then the add-ons themselves as rows in one tile, each with its own place's glyph
+  (`glyph.ts`), its line, what it holds counted ("12 lists, 4 pages, 9 rules"), its "…" and its switch. The counts are
+  read from each add-on's own document (`$lib/market/adds.ts`), the reader the plan sheet's summary uses, and a list is
+  counted from what the record says the add-on holds. The one tile that summed lists, pages and rules into one bar is
+  gone: three units do not add.
 -->
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
@@ -52,11 +54,9 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Menu from '$lib/ui/Menu.svelte';
-  import Section from '$lib/ui/Section.svelte';
-  import Segmented from '$lib/ui/Segmented.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import Stacked from '$lib/viz/Stacked.svelte';
+  import AddonsTabs from './AddonsTabs.svelte';
   import { drew } from '../../lib/ui/screen.svelte.ts';
   import { hostedHere } from '../settings/billing.ts';
   import InstallShared from './InstallShared.svelte';
@@ -131,22 +131,11 @@
     if (rows.length > 0 && !RemovedPart) RemovedPart = (await import('./Removed.svelte')).default;
   }
 
-  /* ── the tabs ──────────────────────────────────────────────────────────── */
+  /* ── install from a file or a link ─────────────────────────────────────── */
 
-  const TABS = ['installed', 'updates', 'from'] as const;
-  type Tab = (typeof TABS)[number];
-  /* A LINK MAY OPEN ONE TAB, `/packs?tab=updates`, as the Updates badge elsewhere would. */
-  let tab = $state<Tab>(TABS.find((t) => t === page.url.searchParams.get('tab')) ?? 'installed');
-
-  /** Arrow keys move between tabs, as a tab list's do; focus follows the selection. */
-  function tabKey(e: KeyboardEvent) {
-    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-    if (step === 0) return;
-    e.preventDefault();
-    const next = TABS[(TABS.indexOf(tab) + step + TABS.length) % TABS.length] ?? 'installed';
-    tab = next;
-    document.getElementById(`packs-tab-${next}`)?.focus();
-  }
+  /* OPENED FROM THE "⋯", or by a link that still says `/packs?tab=from`; it sits over the list until Done. An old
+     `?tab=updates` lands on Installed, where the updates now lead. */
+  let from = $state(page.url.searchParams.get('tab') === 'from');
 
   /* ── the plan sheet ────────────────────────────────────────────────────── */
 
@@ -574,7 +563,7 @@
    * from its own document by `addsOf`, the reader the plan sheet's summary uses. A module's document is the seed's,
    * loaded here after the list is drawn; a built-in use case's is its own file; an add-on from the Kennel is read off the
    * catalogue's reach for the version installed. One with no document to read counts its lists and nothing else, so the
-   * tile never says a page or a rule it cannot see.
+   * row never says a page or a rule it cannot see.
    */
   type Holds = { id: string; lists: number; pages: number; rules: number };
   let holds = $state.raw<Holds[] | null>(null);
@@ -606,23 +595,11 @@
     );
   }
 
-  /** The tile's chart and its one line, or `null` when there is nothing to draw. */
-  const holding = $derived.by(() => {
-    if (!holds || holds.length === 0) return null;
-    const sum = (k: 'lists' | 'pages' | 'rules') => holds!.reduce((n, h) => n + h[k], 0);
-    const all = [
-      { label: words.holdsLists(sum('lists')), value: sum('lists') },
-      { label: words.holdsPages(sum('pages')), value: sum('pages') },
-      { label: words.holdsRules(sum('rules')), value: sum('rules') },
-    ].filter((p) => p.value > 0);
-    if (all.length === 0) return null;
-    /* THE LARGEST IS NAMED ONLY WHEN IT IS ONE: a tie names nobody. */
-    const size = (h: Holds) => h.lists + h.pages + h.rules;
-    const top = [...holds].sort((a, b) => size(b) - size(a));
-    const first = top[0];
-    const largest = first && holds.length > 1 && size(first) > size(top[1] ?? { id: '', lists: 0, pages: 0, rules: 0 }) ? nameOf(first.id) : null;
-    return { parts: all, line: words.holds(all.map((p) => p.label), holds.length === 1, largest) };
-  });
+  /** What one add-on holds, said on its row, or nothing until its document has been read. */
+  const holdsOn = (id: string): string => {
+    const h = holds?.find((x) => x.id === id);
+    return h ? words.holds(h) : '';
+  };
 
   /* ── reading ───────────────────────────────────────────────────────────── */
 
@@ -659,41 +636,31 @@
 
 <PageHead icon="packs" title={copy.packs} count={live ? installed.length : undefined} sentence={live ? words.sentence(installed.length, updates ? updates.length : null) : undefined}>
   {#snippet actions()}
-    <!-- THE TABS ARE THE TOOLBAR'S SEGMENTED CONTROL, glass on the ground, and a tab list still: the arrows
-         move between them and the panel they control is the content under the title. -->
-    <Segmented class="tabs" role="tablist" aria-label={words.tabsLabel} tabindex={-1} onkeydown={tabKey}>
-      {#each TABS as t (t)}
-        <button
-          type="button"
-          role="tab"
-          class="segment tab"
-          id="packs-tab-{t}"
-          aria-selected={tab === t}
-          aria-controls="packs-panel"
-          tabindex={tab === t ? 0 : -1}
-          data-on={tab === t ? '' : undefined}
-          onclick={() => (tab = t)}
-        >
-          {words.tabs[t]}{#if t === 'updates' && updates && updates.length > 0}<span class="tab-count num">{updates.length}</span>{/if}
-        </button>
-      {/each}
-    </Segmented>
-    <Button weight="glass" href="/packs/browse"><Icon name="search" size="s" />{words.browse}</Button>
+    <!-- THE PAGE'S "⋯", ALWAYS DRAWN: installing from a file or a link, and sharing this setup. -->
+    <Menu label={words.more} align="end">
+      {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="vh">{words.more}</span></span>{/snippet}
+      <button type="button" class="mi" role="menuitem" onclick={() => (from = true)}><Icon name="download" size="s" />{words.from}</button>
+      <a class="mi" role="menuitem" href={at('/packs/share')}><Icon name="share" size="s" />{copy.shareSetup}</a>
+    </Menu>
   {/snippet}
+  {#snippet below()}<AddonsTabs current="installed" />{/snippet}
 </PageHead>
 
 <div class="page">
-  <div class="tabpanel" id="packs-panel" role="tabpanel" aria-labelledby="packs-tab-{tab}">
+  <div class="board">
     {#if refused}
       <Empty kind="error" title={refused.fix}>
         {#snippet actions()}<Button onclick={() => location.reload()}>{copy.tryAgain}</Button>{/snippet}
       </Empty>
-    {:else if tab === 'installed'}
-      {@render installedTab()}
-    {:else if tab === 'updates'}
-      {@render updatesTab()}
     {:else}
-      <InstallShared {client} {installed} nameOf={planName} oninstalled={() => void reread()} />
+      {#if from}
+        <Tile icon="download" title={words.from}>
+          {#snippet actions()}<Button weight="quiet" size="sm" onclick={() => (from = false)}>{words.fromDone}</Button>{/snippet}
+          <InstallShared {client} {installed} nameOf={planName} oninstalled={() => void reread()} />
+        </Tile>
+      {/if}
+      {@render updatesTab()}
+      {@render installedTab()}
     {/if}
   </div>
 </div>
@@ -707,20 +674,10 @@
     </Empty>
   {/if}
 
-  <!-- WHAT THEY HOLD BETWEEN THEM: one tile, its chart and the line reading it. Drawn once every add-on's document has
-       been read, and not at all when there is nothing to count. -->
-  {#if holding}
-    <Tile icon="packs" title={words.holdsTitle}>
-      <Stacked parts={holding.parts} subject={words.holdsTitle} summary={holding.line} />
-      <p class="reading">{holding.line}</p>
-    </Tile>
-  {/if}
-
   {#if installed.length > 0}
-    <!-- ONE ROW PER ADD-ON: its well, its name and one line, its switch, and one "…" holding Settings,
-         What this adds and Uninstall, destructive last. On the ground, no box, a hairline between rows. -->
-    <Section title={words.installedTitle} count={installed.length}>
-      {#snippet aside()}<Button weight="bare" size="sm" href="/packs/share">{copy.shareSetup}</Button>{/snippet}
+    <!-- ONE ROW PER ADD-ON: its well, its name, its line and what it holds, its "…" holding Settings, What this adds and
+         Uninstall, destructive last, and its switch. In one tile, a hairline between rows. -->
+    <Tile title={words.installedTitle} count={installed.length}>
       <ul class="ledger addons">
         {#each installed as state (state.id)}
           {@const pack = byId.get(state.id)}
@@ -735,6 +692,7 @@
               <a class="addon-main" href={at(`/packs/${state.id}`)}>
                 <span class="line-title addon-name">{name}</span>
                 <span class="line-detail addon-line">{lineOf(state)}</span>
+                {#if holdsOn(state.id)}<span class="addon-holds num">{holdsOn(state.id)}</span>{/if}
               </a>
               <span class="line-verbs">
                 <Menu label={market.more(name)} align="end">
@@ -777,7 +735,7 @@
           </li>
         {/each}
       </ul>
-    </Section>
+    </Tile>
   {/if}
 
   <!-- REMOVED, UNDER WHAT IS INSTALLED: each one uninstalled inside thirty days, what of it stays, and Put back. -->
@@ -806,16 +764,13 @@
 {/snippet}
 
 {#snippet updatesTab()}
-  {#if !updates}
-    <p class="aside" role="status">{words.updatesReading}</p>
-  {:else if updates.length === 0}
-    <Empty kind="cleared" title={words.updatesNone} body={words.updatesNoneBody} />
-  {:else}
-    <!-- THE SAME ROW AS AN INSTALLED ADD-ON: its well, its name, the versions it moves between in its tooltip, and its one
-         press, which reads the plan. "Update all" is the screen's one primary, at the group's heading. -->
-    <Section title={words.updatesTitle} count={updates.length}>
-      {#snippet aside()}
-        <Button weight="primary" disabled={busy !== null || !client} onclick={() => void showAll()}>{busy === 'all' ? words.planning : words.updateAll}</Button>
+  <!-- UPDATES LEAD WHILE THERE ARE ANY, and say nothing while there are none: the sentence already says every one is up
+       to date. The same row as an installed add-on, and its one press, which reads the plan. "Update all" is the
+       screen's one primary, at the tile's heading. -->
+  {#if updates && updates.length > 0}
+    <Tile title={words.updatesTitle} count={updates.length}>
+      {#snippet actions()}
+        <Button weight="primary" size="sm" disabled={busy !== null || !client} onclick={() => void showAll()}>{busy === 'all' ? words.planning : words.updateAll}</Button>
       {/snippet}
       <ul class="ledger addons">
         {#each updates as u (u.key)}
@@ -826,7 +781,7 @@
               <span class="line-mark"><IconWell name="refresh" size="l" /></span>
               <span class="addon-main">
                 <span class="line-title addon-name">{u.title}</span>
-                <span class="line-detail addon-line" title={words.fromTo(u.from, u.to)}>{words.updateAvailable}</span>
+                <span class="line-detail addon-line">{words.updateAvailable}<span class="sep">{' · '}</span><span class="num">{words.fromTo(u.from, u.to)}</span></span>
               </span>
               <Button size="sm" disabled={busy !== null || !client} onclick={() => void showPlan(u)}>{busy === u.key ? words.planning : words.seePlan}</Button>
               {#if s && 'filed' in s}
@@ -842,7 +797,7 @@
           </li>
         {/each}
       </ul>
-    </Section>
+    </Tile>
   {/if}
   {#each unverified as fix, i (i)}<p class="aside">{fix}</p>{/each}
 {/snippet}
@@ -860,50 +815,19 @@
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* NOT `.panel`, which `blocks.css` draws as a page block's box: the tab's content sits straight on the ground. ITS
-     TILES ARE 12 APART, the board's one gap (`--tile-gap`), as on every other screen; they were 32. */
-  .tabpanel {
+  /* THE BOARD: the page's tiles straight on the ground, 12 apart (`--tile-gap`), as on every other screen. */
+  .board {
     display: flex;
     flex-direction: column;
     gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
-  /* THE TABS IN THE TOOLBAR. The count on Updates is a plain number in the quiet ink: an update
-     does not need him, so it is never the red square. */
-  .tab {
-    white-space: nowrap;
-  }
-
-  .tab-count {
-    margin-inline-start: var(--sp-1);
-    color: var(--dim);
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* IN THE COMPACT BAR THE TABS DROP THEIR OWN GLASS, as the bar's buttons do: the bar is glass, and glass never holds
-     glass. Only where the bar is drawn, from 900px up. */
-  @media (width >= 900px) {
-    :global(.head[data-under] .segmented.tabs) {
-      background: transparent;
-      box-shadow: none;
-      backdrop-filter: none;
-    }
-
-    /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-    @supports (-webkit-backdrop-filter: none) {
-      :global(.head[data-under] .segmented.tabs) {
-        -webkit-backdrop-filter: none;
-      }
-    }
-  }
-
-  /* THE TILE'S ONE LINE: what the chart means, in the body size under it. */
-  .reading {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: 20px;
+  /* WHAT ONE ADD-ON HOLDS, under its line: counts, in the quiet ink. */
+  .addon-holds {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   /**
@@ -942,7 +866,7 @@
   /* OFF, AND STILL HERE. The name steps down to secondary ink and the line says "Turned off"; nothing is faded below
      the contrast a person needs to read it, and the switch keeps full strength because it is the way back. Never red. */
   .addon-row[data-off] .addon-name {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .more {
@@ -950,8 +874,8 @@
     place-items: center;
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     transition:
       background var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out);
@@ -970,7 +894,7 @@
   .mi {
     background: none;
     border: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
     text-align: start;
     text-decoration: none;
@@ -979,7 +903,7 @@
 
   .mi:hover,
   .mi:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -994,8 +918,8 @@
     gap: var(--sp-2);
     margin: 0;
     padding-block: 0 var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* WHAT ONE ADD-ON BRINGS, as rows in the sheet: a well and a name, each opening what it names. */
@@ -1006,15 +930,15 @@
 
   .aside {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A ROW THAT IS NOT ITSELF A LINK STILL TAKES THE WASH UNDER THE POINTER, and its hairlines step aside for it, as the
      shared rows' do. */
   @media (hover: hover) and (pointer: fine) {
     .addon:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .addons > li:has(> .addon:hover) > .addon::after,
@@ -1029,26 +953,15 @@
     }
 
     .more:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }
 
-  /* ON A PHONE the tabs take the toolbar's whole line, each a third of it, and a row's name is read at the phone's body
-     size, as every row's first line is. */
+  /* ON A PHONE a row's name is read at the phone's body size, as every row's first line is. */
   @media (width < 900px) {
     .page {
       padding: var(--sp-4) var(--gutter) var(--sp-8);
-    }
-
-    /* The track is `Segmented`'s own element, so the rule reaches it by this page's name for it. */
-    :global(.segmented.tabs) {
-      flex: 1 1 100%;
-    }
-
-    /* EACH TAB AS WIDE AS ITS WORD, the room left shared between them, so "Install from…" is never cut. */
-    .tab {
-      flex: 1 1 auto;
     }
 
     .addon {
@@ -1056,7 +969,16 @@
     }
 
     .addon-name {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
+    }
+
+    /* A LONG LINE KEEPS TO TWO on a phone, so a row is never five lines tall; its page says the rest. */
+    .addon-line {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
     }
   }
 </style>

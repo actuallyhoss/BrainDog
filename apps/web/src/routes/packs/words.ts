@@ -14,8 +14,13 @@ const counted = (n: number, one: string, many: string): string => `${n.toLocaleS
 
 export const words = {
   tabsLabel: 'Add-ons',
-  tabs: { installed: 'Installed', updates: 'Updates', from: 'Install from…' },
+  /* TWO HALVES OF ONE PLACE (agents F8, F9): what is in, and what there is to add. Updates sit at the top of Installed
+     while there are any, and installing from a file or a link is in the page's "⋯". */
+  tabs: { installed: 'Installed', browse: 'Browse' },
   browse: 'Browse add-ons',
+  more: 'More',
+  from: 'Install from a file or link',
+  fromDone: 'Done',
   /* THE TITLE ROW'S SENTENCE. An update is never urgent, so no phrase in it is red. `updates` is `null`
      while the newer versions are still being looked for, and the sentence then says only what is installed. */
   sentence: (installed: number, updates: number | null): string => {
@@ -25,22 +30,20 @@ export const words = {
     if (updates === 0) return installed === 1 ? `${head}, and it is up to date.` : `${head}, and every one is up to date.`;
     return `${head}, and ${updates.toLocaleString('en-GB')} ${updates === 1 ? 'has an update' : 'have an update'}.`;
   },
-  /* WHAT THE INSTALLED ADD-ONS HOLD, the tile over the list: its parts on the chart, then the one line reading it. */
-  holdsTitle: 'What your add-ons hold',
-  holdsLists: (n: number) => counted(n, 'list', 'lists'),
-  holdsPages: (n: number) => counted(n, 'page', 'pages'),
-  holdsRules: (n: number) => counted(n, 'rule', 'rules'),
-  holds: (parts: readonly string[], alone: boolean, largest: string | null): string =>
-    alone
-      ? `It keeps ${joined(parts)}.`
-      : `Between them they keep ${joined(parts)}${largest ? `; ${largest} is the largest` : ''}.`,
+  /* WHAT ONE ADD-ON HOLDS, on its own row (agents F22): "12 lists, 4 pages, 9 rules", each kind it holds none of left
+     out. It was one bar summing lists, pages and rules, three units that do not add. */
+  holds: (h: { lists: number; pages: number; rules: number }): string =>
+    [
+      h.lists > 0 ? counted(h.lists, 'list', 'lists') : '',
+      h.pages > 0 ? counted(h.pages, 'page', 'pages') : '',
+      h.rules > 0 ? counted(h.rules, 'rule', 'rules') : '',
+    ]
+      .filter((p) => p !== '')
+      .join(', '),
   /* THE LIST'S OWN HEADING, and the updates' when that tab is open. */
   installedTitle: 'Installed',
   updatesTitle: 'Updates',
-  /* UPDATES. */
-  updatesNone: 'Everything is up to date',
-  updatesNoneBody: 'A newer version of anything installed here shows up in this list, with its plan.',
-  updatesReading: 'Looking for newer versions',
+  /* UPDATES, at the top of Installed while there are any. */
   seePlan: 'See the plan',
   planning: 'Reading the plan',
   updateAll: 'Update all',

@@ -13,7 +13,7 @@ const rule = (selector: string): string => new RegExp(`(?:^|\\n)  ${selector.rep
 
 test('the tiles are 12 apart, as on every other board', () => {
   assert.match(rule('.page'), /gap: var\(--tile-gap\);/u);
-  assert.match(rule('.tabpanel'), /gap: var\(--tile-gap\);/u, 'the tab\'s tiles are 32 apart again');
+  assert.match(rule('.board'), /gap: var\(--tile-gap\);/u, 'the board\'s tiles are 32 apart again');
   const tokens = readFileSync(new URL('../../../../../packages/skin/tokens.css', import.meta.url), 'utf8');
   assert.match(tokens, /--tile-gap: 12px;/u);
 });
