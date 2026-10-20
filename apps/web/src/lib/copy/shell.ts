@@ -64,6 +64,9 @@ export const shell = {
   palettePlaceholder: 'Ask or change anything',
   /* the product */
   product: 'BrainDog',
+  /* THE ONE ASK, IN HIS WORDS (19 October): the top bar's field, the rail's, the phone's More sheet and the palette's
+     own field say the same five words. The frame draws it, so it lives here. */
+  palettePlaceholder: 'Ask or change anything',
 
   /* the spine */
   home: 'Home',

@@ -670,7 +670,7 @@
     }, () => undefined));
     /* AND AFTER IT, WHAT EVERY AGENT IS TOLD, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./told.ts'), import('./Told.svelte')]).then(async ([m, part]) => {
-      const tile = m.lessonsTile(await tileOnce('lessons', base, ver, () => m.loadLessons(base, io)));
+      const tile = m.lessonsTile(await tileOnce('told', base, ver, () => m.loadLessons(base, io)));
       if (here) agentsTold = tile ? { tile, Part: part.default } : null;
     }, () => undefined));
     /* AND THEN WHAT MAY BE ONE, out of the bracket the same way. */

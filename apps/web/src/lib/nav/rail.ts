@@ -28,7 +28,7 @@ import { WORK_PAGE } from '../work/page.ts';
  * case names its section Shop today and Orders once it folds; both are here, so neither moves the other's rail. A
  * record with neither (his own) reads exactly as before.
  */
-const PLACES = ['work', 'orders', 'shop', 'projects', 'money', 'people', 'agents'];
+export const PLACES = ['work', 'orders', 'shop', 'projects', 'money', 'people', 'agents'];
 
 /** How many places the rail draws, Today and Decide included. */
 export const RAIL_MOST = 7;

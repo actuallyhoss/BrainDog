@@ -199,8 +199,8 @@ export const HELD = {
     why: 'the `people` icon on Hand to.',
   },
   'apps/web/src/lib/nav.ts': {
-    ids: ['agents', 'orders', 'people', 'services', 'work'],
-    why: "the section names the nav orders a day by, the five places the bars draw (a shop's Orders, Projects, Money, Agents: batch 5b), the Work row's key and glyph, and the `work` word of the Work screen's address `/?work`.",
+    ids: ['people', 'services', 'work'],
+    why: "the section names the nav orders a day by, the Work row's key and glyph, and the `work` word of the Work screen's address `/?work`; the five places the bars draw are read off the rail's order.",
   },
   'apps/web/src/lib/nav/rail.ts': {
     ids: ['agents', 'orders', 'people', 'work'],

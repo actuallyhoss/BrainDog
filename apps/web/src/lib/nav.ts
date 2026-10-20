@@ -10,6 +10,9 @@
  * screen waits for: `record/api.ts` carries the whole synthetic record and pulling it in here is the
  * mistake `+layout.ts` already has a paragraph about.
  */
+
+import { PLACES } from './nav/rail.ts';
+
 /* NOT EXPORTED. Both callers want the ORDER as well as the grouping, and a bare `group` beside an
    `arrange` is an invitation to reach for the one that skips the reader's arrangement — which is
    exactly the mistake that left the phone's More sheet ignoring an order the rail honoured. */
@@ -260,7 +263,7 @@ export function isHere(item: Pick<FlatItem, 'near' | 'exact'>, path: string): bo
  * call 2, 20 October). Work lives in Projects and on Today, and everything else is under More. A shop's Orders come
  * first, as on the rail (`lib/nav/rail.ts`): they are what a shop opens the app for.
  */
-const FIVE = ['orders', 'shop', 'projects', 'money', 'agents'];
+const FIVE = PLACES.filter((name) => name !== 'work' && name !== 'people');
 
 /** A place's plain name, its section's or its own key's. */
 const placeName = (i: FlatItem): string => plainOf(i.key.replace(/^section:/u, ''));
