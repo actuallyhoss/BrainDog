@@ -80,7 +80,11 @@ test('A NEW VENDOR BILL WAITS IN TO REVIEW, and the sender is met from the mail'
   assert.equal(k.count('dues'), 0);
   const review = k.governance('suggestion', { status: 'open', review: 'only' });
   assert.ok(review.ok && review.value.length === 1);
-  assert.ok(k.count('folk') >= 1, 'the sender was met');
+  /* A SHARED INBOX IS AN ORGANISATION SPEAKING: it makes no person, so no one is added to the folk list for it. */
+  assert.equal(k.count('folk'), 0, 'billing@ is a role address and makes no person');
+  const person = mail(k, 'Maya Loom <maya@loomhouse.example>', 'Your invoice', bill());
+  assert.equal(person.state, 'review');
+  assert.ok(k.count('folk') >= 1, 'a named sender was met');
   sql.close();
 });
 
@@ -122,6 +126,9 @@ test('AN AMOUNT NOT READ CLEANLY STILL ASKS IN NEEDS YOU, even from a known vend
 test('A RENEWAL NOTICE MOVES THE MATCHING SERVICE RENEWAL DAY by itself', async () => {
   const { k, sql } = await record();
   assert.ok(k.create('folk', { name: 'Nordhaven', email: 'noreply@nordhaven.example' }, { actor: 'p_1' }).ok);
+  /* BRAINDOG MOVES ONLY THE OWNER'S OWN ROWS by itself, so the person who made the service keeps the record. */
+  sql.exec("INSERT INTO person (id, email, name) VALUES ('p_1', 'owner@studio.test', 'Olu Owner')");
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_1', '*', 'owner')");
   const made = k.create('estate', { name: 'kiln.example', renews: '2026-12-01', cost: { amount: 1400, currency: 'GBP' }, cycle: 'yearly' }, { actor: 'p_1' });
   assert.ok(made.ok, JSON.stringify(made));
   const got = mail(k, 'Nordhaven <noreply@nordhaven.example>', 'kiln.example renews soon', 'Your domain kiln.example will renew on 3 March 2027.\nRenewal price: GBP 14.00');
