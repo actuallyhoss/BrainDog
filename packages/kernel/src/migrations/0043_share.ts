@@ -10,7 +10,8 @@
  * ADDITIVE ONLY, nothing is rebuilt. Shares and groups travel with `member` in `governance`, write provenance with
  * `event` in `origin`; token links and read counters belong to one installation, so they are `local`. An older reader
  * skips a table it has no shape for, so the format is still 1. The `access` counter is the access epoch, bumped with
- * every change to who holds what.
+ * every change to who holds what. It is not seeded here: like every register's counter it is made at its first bump
+ * (`shares.ts`), so a fresh record holds no row an import would count as content.
  *
  * `IF NOT EXISTS` and `OR IGNORE`, so it can run twice, as `migrate.test.ts` runs every migration over itself.
  */
@@ -48,7 +49,6 @@ CREATE TABLE IF NOT EXISTS access_via (batch TEXT PRIMARY KEY, who TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS access_seen (day TEXT NOT NULL, who TEXT NOT NULL, via TEXT NOT NULL,
   what TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 1, last_at TEXT NOT NULL,
   PRIMARY KEY (day, who, via, what)) WITHOUT ROWID;
-INSERT OR IGNORE INTO counter (name, next) VALUES ('access', 1);
 INSERT OR IGNORE INTO dog_section (table_name, section) VALUES
   ('share','governance'), ('share_group','governance'), ('share_group_member','governance'),
   ('access_via','origin'), ('token_lens','local'), ('access_seen','local');
