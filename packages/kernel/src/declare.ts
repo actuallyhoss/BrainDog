@@ -24,7 +24,7 @@ import { compile, INBOX_RAW, INBOX_RAW_REFUSES, jsonPath, parseWhere, type Predi
 import { FIELD_TYPES, coerce, isAbsent, isCurrencyCode, looksLikeCredential, measure, range, type FieldDecl, type Json } from './coerce.ts';
 import { jcs } from './jcs.ts';
 import { instant } from './migrate.ts';
-import { SESSION_BODY } from './migrations/0028_runs.ts';
+import { INSTRUCTIONS_BODY, SESSION_BODY } from './migrations/0042_agents.ts';
 import { checkInterval, intervalMs, type PullDecl } from './pull.ts';
 /* A SCHEDULED ACTION'S KEY AND CLOCK, read by the runner from the same lists this file checks against. */
 import { ACTION_AUTH_KINDS, reservedKeyHeader } from './actions.ts';
@@ -4575,6 +4575,7 @@ const KERNEL_PREFIXES: ReadonlyMap<string, string> = new Map([
   ['D', 'decisions'],
   ['SG', 'suggestions'],
   ['S', 'register.session'],
+  ['IN', 'register.instructions'],
 ]);
 
 /** `34 §4`'s grammar for a prefix other than `#`. */
@@ -5349,6 +5350,13 @@ export function validate(decl: Declaration, installed?: Known, owners?: Owners, 
       'PROVIDES_CONFLICT',
       "register.session is the kernel's own register, and no pack or person may declare it.",
       'register.session',
+    );
+  /* AND SO IS `register.instructions` (migration 42), for the same reason: what he tells an agent has one writer. */
+  if (decl.id === 'register.instructions' && (decl.pack !== 'kernel' || jcs(decl.body) !== INSTRUCTIONS_BODY))
+    return bad(
+      'PROVIDES_CONFLICT',
+      "register.instructions is the kernel's own register, and no pack or person may declare it.",
+      'register.instructions',
     );
   /**
     * A DIGEST'S KEYS ARE TYPED AND CLOSED (09 §6), AND NOTHING CHECKED THEM. `validate` deep-checked
@@ -6400,6 +6408,10 @@ export function retireDeclarations(
   if (ids.includes('register.session'))
     return no<number>('PROVIDES_CONFLICT', "register.session is the kernel's own register, and no pack or person may retire it.", {
       at: 'register.session',
+    });
+  if (ids.includes('register.instructions'))
+    return no<number>('PROVIDES_CONFLICT', "register.instructions is the kernel's own register, and no pack or person may retire it.", {
+      at: 'register.instructions',
     });
 
   /* THE SCOPES GUARD, FOR UNINSTALL AS FOR DISABLE. Uninstall retires through here, and taking out the

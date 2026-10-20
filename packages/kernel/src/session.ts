@@ -25,13 +25,13 @@ import { STALE_MS, heardAt, presenceOf } from './presence.ts';
 
 import type { Json } from './coerce.ts';
 import type { Declaration } from './declare.ts';
-import { SESSION_BODY } from './migrations/0028_runs.ts';
+import { SESSION_BODY } from './migrations/0042_agents.ts';
 
 /** The register's id. */
 export const SESSION = 'session';
 
 /**
- * The kernel's declaration, parsed from the bytes of the newest migration that seats it, 28, so that there is one copy
+ * The kernel's declaration, parsed from the bytes of the newest migration that seats it, 42, so that there is one copy
  * of it.
  *
  * The id is read out of the body rather than written here: this is an envelope around the row the
@@ -40,7 +40,7 @@ export const SESSION = 'session';
  * THE NEWEST, NOT THE FIRST. Migration 2's body lacks the app a run is in and three kinds of agent, so every default
  * read from it (`RUNS`, the kinds `agentOf` takes, a page's fields) described a register no record holds any more, and
  * installing it over a record that had run migration 22 wrote migration 2's body back as a newer version. Migration
- * 22's lacks when a run started, for which the same holds.
+ * 22's lacks when a run started, for which the same holds, and 28's the six fields of migration 42.
  */
 export function sessionDeclaration(): Declaration {
   const body = JSON.parse(SESSION_BODY) as Record<string, Json>;
@@ -66,8 +66,13 @@ const KINDS: readonly string[] =
 
 /**
  * The fields only the record writes: when the run was last heard from, the project it resolved to,
- * the token that opened it, and when it started; and migration 28's nine (`0028_runs.ts`), which say how its work went
- * and how its step closed. A caller's patch naming one is refused `IMMUTABLE_FIELD`.
+ * the token that opened it, and when it started; migration 28's nine (`0028_runs.ts`), which say how its work went
+ * and how its step closed; and migration 42's six (`0042_agents.ts`): the instruction and the task in hand, the
+ * settings row it works under, when the bridge last said it is open, whether he paused or stopped it, and the worktree
+ * folder it opened in. A caller's patch naming one is refused `IMMUTABLE_FIELD`.
+ *
+ * `worktree` IS THE RUN'S OWN HINT, and still the record's to write: it is stamped once as the ladder opens the run
+ * (`openingStamp`), as `token_id` is, so a later write cannot move a run out of the folder it opened in.
  */
 export const KERNEL_WRITTEN: readonly string[] = [
   'last_seen',
@@ -83,6 +88,12 @@ export const KERNEL_WRITTEN: readonly string[] = [
   'parent',
   'wrote',
   'seen_before',
+  'instruction',
+  'task',
+  'profile',
+  'pulse_at',
+  'stopped',
+  'worktree',
 ];
 
 /**
@@ -175,6 +186,11 @@ export type SessionHints = {
   host?: string | undefined;
   branch?: string | undefined;
   head?: string | undefined;
+  /**
+   * The worktree folder, kept apart from `repo`, which a builder's worktree shares with its lead. Stamped on the run as
+   * it opens (`openingStamp`), never written by a caller.
+   */
+  worktree?: string | undefined;
   /** `S42`: the run a subagent works for, which places the subagent's run where its parent is when nothing else does. */
   parent?: string | undefined;
   /** Commits HEAD moved since the last handoff here, `12`, for the briefing's card. The run register declares no such field. */
@@ -376,6 +392,15 @@ export function opening(hints: SessionHints, register: RunRegister = RUNS): Reco
   if (agent !== undefined && (out.agent === undefined || out.agent === 'other')) out.agent = agent;
   if (typeof out.doing === 'string') out.doing = clipTitle(out.doing);
   return out;
+}
+
+/**
+ * What the record stamps from the run's own hints as the ladder opens a run, beside `opening`'s patch: the hints
+ * `KERNEL_WRITTEN` holds, which a caller's patch could not carry. Today the worktree folder alone.
+ */
+export function openingStamp(hints: SessionHints, register: RunRegister = RUNS): Record<string, Json> {
+  const tree = typeof hints.worktree === 'string' ? hints.worktree.trim() : '';
+  return tree !== '' && register.has('worktree') ? { worktree: tree } : {};
 }
 
 /* ── what a run is called ────────────────────────────────────────────────── */

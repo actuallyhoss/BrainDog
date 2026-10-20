@@ -61,6 +61,7 @@ import packWaiting0038 from './migrations/0038_pack_waiting.ts';
 import entryMadeIndex0039 from './migrations/0039_entry_made_index.ts';
 import entryPrivate0040 from './migrations/0040_entry_private.ts';
 import entryPrivateTravels0041 from './migrations/0041_entry_private_travels.ts';
+import agents0042 from './migrations/0042_agents.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -107,6 +108,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 39, slug: 'entry_made_index', sql: entryMadeIndex0039 },
   { version: 40, slug: 'entry_private', sql: entryPrivate0040 },
   { version: 41, slug: 'entry_private_travels', sql: entryPrivateTravels0041 },
+  { version: 42, slug: 'agents', sql: agents0042 },
 ];
 
 /**
@@ -164,6 +166,9 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 39 adds `entry_made`, an index no file carries, so the format is still 1.
  * Migration 40 adds `entry_private`, which no file carried until migration 41 put it in `data`: an older reader skips a table it has no shape for, so the format is still 1.
  * Migration 41 adds no table: it lists `entry_private` in `dog_section`, so a file carries the private marks with the rows.
+ * Migration 42 adds two rows, the next version of `register.session` with six fields an older file's runs import without
+ * and `register.instructions`, which an older file lacks and the import seats; `instruction_seen`, `local`; and
+ * `agent_profile` in `governance`, which an older reader skips as a table it has no shape for. So the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 

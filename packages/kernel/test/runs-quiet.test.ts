@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SESSION_BODY } from '../src/migrations/0028_runs.ts';
+import { SESSION_BODY } from '../src/migrations/0042_agents.ts';
 import { isQuiet, isStale, openRecord, QUIET_MS, runAge, STALE_MS, WORKING_MS, type Declaration, type WriteContext } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 

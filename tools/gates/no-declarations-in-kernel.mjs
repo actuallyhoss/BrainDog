@@ -39,6 +39,9 @@ import { skipDir } from './lib.mjs';
 /** `04 §1`'s nine, `script` from kernel migration 12. Another is a migration, which is what `closed-lists` is for. */
 const KINDS = ['register', 'page', 'block', 'ingest', 'rule', 'metric', 'theme', 'digest', 'script'];
 
+/** The kernel's own registers, each seated by a migration with `pack_id = 'kernel'`, and no others. */
+const KERNEL_REGISTERS = ['register.session', 'register.instructions'];
+
 function walk(dir, out = []) {
   let entries;
   try {
@@ -89,17 +92,20 @@ export default function noDeclarationsInKernel(
   for (const file of files)
     if (/\.ya?ml$/i.test(file)) findings.push(`${relative(root, file)} is a document in the kernel, and a document is a declaration`);
 
-  /* 2 · The one row 02 §1 allows, and no other. */
+  /* 2 · The rows 02 §1 allows, and no other: `register.session`, and since migration 42 `register.instructions`, what
+     the owner tells an agent (agents and MCP plan §8.1), which has one writer for the same reason runs do. The id is the
+     first one the statement names, so a second register cannot ride in after an allowed one. */
   let inserts = 0;
   for (const file of files.filter((f) => /migrations[\\/].*\.ts$/.test(f))) {
     const text = decomment(readFileSync(file, 'utf8'));
     for (const m of text.matchAll(/INSERT INTO declaration\b/g)) {
       inserts++;
       const rest = text.slice(m.index, m.index + 600);
-      if (!rest.includes("'register.session'"))
+      const named = /'(register\.[a-z0-9_]+)'/.exec(rest)?.[1];
+      if (named === undefined || !KERNEL_REGISTERS.includes(named))
         findings.push(`${relative(root, file)}:${lineOf(text, m.index)} writes a declaration that is not register.session`);
       else if (!rest.includes("'kernel'"))
-        findings.push(`${relative(root, file)}:${lineOf(text, m.index)} writes register.session without pack_id = 'kernel'`);
+        findings.push(`${relative(root, file)}:${lineOf(text, m.index)} writes ${named} without pack_id = 'kernel'`);
     }
   }
   if (inserts === 0) findings.push('the migrations write no register.session, and 02 §1 and 52 §5.2 require the kernel to');
