@@ -579,7 +579,10 @@
   <!-- A QUESTION IS ANSWERED WHERE IT IS SHOWN (`QueueAnswer.svelte`): one card a question, and the count of what is left is still the door to Decide. -->
   <!-- COMPACT, AT MOST THREE (`queue-answer.ts` `compactOf`): the question and its answers, and the rest a count on Decide. -->
   {@const asked = compact ? compactOf(block.queue, block.total) : { shown: block.queue, more: block.total - block.queue.length }}
-  {@const entries = compact ? asked.shown.map((q): QueueEntry => ({ kind: 'one', q })) : alikeOf(asked.shown)}
+  {@const every = compact ? asked.shown.map((q): QueueEntry => ({ kind: 'one', q })) : alikeOf(asked.shown)}
+  <!-- A QUEUE THAT SAYS HOW MANY IT SHOWS (`most`, Needs you's groups) shows that many cards and opens the rest in place. -->
+  {@const most = !compact && typeof block.most === 'number' && !open && every.length > block.most ? block.most : null}
+  {@const entries = most === null ? every : every.slice(0, most)}
   <div class="queue" data-compact={compact ? '' : undefined}>
     <!-- THE LEAD QUESTION IS DRAWN WHOLE when the block says `lead:`, with what accepting it would put on the screen. -->
     <!-- QUESTIONS OF ONE CAUSE ARE ONE CARD outside a compact queue (`alike.ts`). -->
@@ -594,6 +597,7 @@
       />{/if}{/each}
     {#if asked.more > 0}<a class="queue-more" href={inApp('/decide')}>{compact ? queueWords.moreOnDecide(asked.more) : queueMore(asked.more)}</a>{/if}
   </div>
+  {#if most !== null}<button type="button" class="block-more tap" data-queue-more onclick={(e) => void unfold(e, most)}>{words.more(every.length - most)}</button>{/if}
 {:else if projectCards}
   <ul class="project-cards">
     {#each projectCards as p (p.card.key)}<li><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} inset /></li>{/each}

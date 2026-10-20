@@ -261,6 +261,8 @@ export type Entry = {
 
 export type PageBlock = {
   kind: string;
+  /** The block's name for the engine, declared, which a host keys what it draws by (the kernel's `PageBlock.key`). */
+  key?: string;
   heading?: string;
   /**
    * How many of the page's twelve columns this block takes. 1–12, default 12 (06 §1.1).

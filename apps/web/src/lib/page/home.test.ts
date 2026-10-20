@@ -366,7 +366,7 @@ test('A QUESTION CARD IS A ROW THE CURSOR REACHES, AND ITS NUMBER KEYS PRESS ITS
 });
 
 test('"N MORE" HANDS THE FOCUS TO THE FIRST ROW THAT OPENED, so a keyboard is not dropped to the page when the button goes', () => {
-  assert.equal((SLOT.match(/onclick=\{\(e\) => void unfold\(e, /g) ?? []).length, 3, 'every fold goes through unfold: a table, a segment and Home`s own list');
+  assert.equal((SLOT.match(/onclick=\{\(e\) => void unfold\(e, /g) ?? []).length, 4, 'every fold goes through unfold: a table, a segment, Home`s own list and a queue');
   assert.match(SLOT, /\[from\];/);
   assert.match(SLOT, /to\.focus\(\)/);
 });

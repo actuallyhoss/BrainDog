@@ -64,7 +64,10 @@
   import { decideSpots } from './kept-decide.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { live as poll } from '$lib/data/live.svelte.ts';
-  import { blocksMineFirst, callsRead, dayWord, decideDrawn, mineFirst, readCalls, readDecide, WORDS, type Call, type DecideBody } from './views.ts';
+  import { blocksMineFirst, boardOf, callsRead, dayWord, decideDrawn, GROUP_WORDS, mineFirst, readCalls, readDecide, WORDS, type Call, type Column, type DecideBody } from './views.ts';
+  import Segmented from '$lib/ui/Segmented.svelte';
+  import Handled from '$lib/home/Handled.svelte';
+  import { loadHandled, type Handled as HandledFound } from '$lib/home/handled.ts';
   import { words } from './words.ts';
   import { waitsNow } from '$lib/home/waits.svelte.ts';
 
@@ -159,6 +162,22 @@
     }
   }
 
+  /* ── what BrainDog handled itself, the third column ────────────────────── */
+
+  /**
+   * WHAT BRAINDOG DID WITHOUT ASKING TODAY, each with its Undo (`lib/home/handled.ts`): the third column beside Money and
+   * Quick (plan of 20 October), read once the questions are asked for and never holding them up. `null` draws nothing.
+   */
+  let handled = $state.raw<HandledFound | null>(null);
+  async function readHandled() {
+    handled = await loadHandled(apiBase());
+  }
+
+  $effect(() => {
+    if (classic) return;
+    untrack(() => void readHandled());
+  });
+
   $effect(() => {
     if (classic) return;
     untrack(() => {
@@ -190,7 +209,7 @@
      goes, and one asked elsewhere arrives. */
   async function reread() {
     try {
-      await Promise.all([read(), readImproved()]);
+      await Promise.all([read(), readImproved(), readHandled()]);
     } catch {
       /* The page as it was read stays; the next version asks again. */
     }
@@ -329,6 +348,18 @@
   const went = $derived(callsRead(calls));
   const checked = $derived(went.met + went.missed + went.unread);
 
+  /* ── the board: Money, Quick and Handled ──────────────────────────────── */
+
+  /* HOW MANY EACH COLUMN HOLDS, as the phone's switch says it: cards (one a family) and the lines BrainDog handled. */
+  const handledCount = $derived(handled ? handled.rows.length + handled.more : 0);
+  const counts = $derived<Record<Column, number>>({ money: shaped?.groups.money ?? 0, quick: shaped?.groups.quick ?? 0, handled: handledCount });
+  /* WHERE EACH SITS ON A WIDE BOARD (`boardOf`): a third each, or a half, or the row, for those that hold something. */
+  const board = $derived(boardOf({ money: counts.money > 0, quick: counts.quick > 0, handled: counts.handled > 0 }));
+  const columns = $derived((['money', 'quick', 'handled'] as const).filter((c) => counts[c] > 0));
+  /* ON A PHONE ONE COLUMN AT A TIME, switched with the segmented control over them; the first that holds something. */
+  let chosenColumn = $state<Column | null>(null);
+  const showing = $derived<Column | null>(chosenColumn !== null && columns.includes(chosenColumn) ? chosenColumn : (columns[0] ?? null));
+
   /* ASKING YOURSELF A QUESTION, filed through `AskSheet`; the new question is read back into the queue it joins. */
   let asking = $state(false);
   function filed() {
@@ -380,10 +411,32 @@
       {/if}
     {:else}
       {#if yours}<h2 class="yours">{yours}</h2>{/if}
-      <div class="body">
-        <PageView slug="decide" got={drawn} mode="home" select whole {reread} />
+      <!-- ON A PHONE, ONE COLUMN AT A TIME: Money, Quick and Handled, each with how many it holds. -->
+      {#if columns.length > 1}
+        <div class="switch">
+          <Segmented role="group" aria-label={WORDS.columns}>
+            {#each columns as c (c)}
+              <button type="button" class="segment" data-on={showing === c ? '' : undefined} aria-pressed={showing === c} onclick={() => (chosenColumn = c)}
+                >{GROUP_WORDS[c]} <span class="num switch-n">{counts[c]}</span></button
+              >
+            {/each}
+          </Segmented>
+        </div>
+      {/if}
+      <!-- THE BOARD'S FIRST ROW IS MONEY, QUICK AND HANDLED SIDE BY SIDE, each where `boardOf` puts it, and what was put
+           off and decided folds under all three. -->
+      <div
+        class="body"
+        data-board={columns.length > 0 ? '' : undefined}
+        data-showing={showing ?? undefined}
+        style:--col-money={board.money ?? 'auto'}
+        style:--col-quick={board.quick ?? 'auto'}
+        style:--col-handled={board.handled ?? '1 / -1'}
+      >
+        <PageView slug="decide" got={drawn} mode="home" select whole {reread} opens={handled ? handledColumn : undefined} />
       </div>
     {/if}
+    {#if cleared && handled}<Handled found={handled} heading={GROUP_WORDS.handled} />{/if}
 
     <!-- BRAINDOG'S OWN PAGE UPDATES, one card under the questions, for the owner. Loaded only when something waits. -->
     {#if improved && improving > 0}
@@ -443,6 +496,10 @@
   <AskSheet open={asking} onclose={() => (asking = false)} onfiled={filed} />
 {/if}
 
+{#snippet handledColumn()}
+  {#if handled}<Handled found={handled} heading={GROUP_WORDS.handled} />{/if}
+{/snippet}
+
 <style>
   /* ONE COLUMN, the page's own: its blocks carry their spans, and Decide adds no column of its own beside them. */
   .page {
@@ -457,18 +514,79 @@
     min-inline-size: 0;
   }
 
+  /* ── the board: Money, Quick and Handled side by side ───────────────────
+     ON A WIDE BOARD the three take the first row of the page's twelve columns, where `boardOf` puts each (a third, a
+     half, or the row), and the folds under them start the next. Handled is the board's opening strip (`PageBody`'s
+     `opens`), placed on the same row. The page's own twelve columns hold, so nothing here draws a grid of its own. */
+  @media (width >= 900px) {
+    .body[data-board] :global(.page:not([data-narrow]) .block-slot[data-key='decide-money']) {
+      grid-row: 1;
+      grid-column: var(--col-money);
+    }
+
+    .body[data-board] :global(.page:not([data-narrow]) .block-slot[data-key='decide-quick']) {
+      grid-row: 1;
+      grid-column: var(--col-quick);
+    }
+
+    .body[data-board] :global(.page:not([data-narrow]) > .page-strip[data-opens]) {
+      grid-row: 1;
+      grid-column: var(--col-handled);
+      align-self: start;
+    }
+  }
+
+  /* THE PHONE'S SWITCH: one column at a time, the others out of the way until they are chosen. On a wide board the
+     switch is not drawn and every column shows. */
+  .switch {
+    display: none;
+  }
+
+  .switch-n {
+    color: var(--dim);
+  }
+
+  /* THE COLUMNS' WELLS ARE QUIET: every question here needs you, so red is kept for the answer and for what is late. */
+  .body :global(.block-slot[data-key^='decide-'] > .block-bar .well) {
+    background: var(--field);
+    color: var(--ink2);
+  }
+
+  @media (width < 900px) {
+    .switch {
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .switch > :global(.segmented) {
+      margin-inline: 0;
+    }
+
+    .body[data-showing='money'] :global(.block-slot[data-key='decide-quick']),
+    .body[data-showing='quick'] :global(.block-slot[data-key='decide-money']),
+    .body[data-showing='handled'] :global(:is(.block-slot[data-key='decide-money'], .block-slot[data-key='decide-quick'])),
+    .body:not([data-showing='handled']) :global(.page-strip[data-opens]) {
+      display: none;
+    }
+  }
+
+  /* IN THE ROOM OF A NARROW WINDOW ON A WIDE ONE (a docked panel), one column, and Handled after the questions. */
+  .body :global(.page[data-narrow] > .page-strip[data-opens]) {
+    order: 1;
+  }
+
   /* EACH QUESTION IS A TILE (DIRECTION §39, "Decide reads like a form"). The page reader draws a queue as one tile with
      its questions under hairlines, which is right for a page holding a few among other things; Decide is the questions,
      so here the queue's own tile steps back to the board and every question is a tile of its own, a tile's gap apart.
-     The group's name ("Also waiting") is kept for a screen reader and not drawn: nothing floats on the board but the
-     head, and the head already said what waits. */
+     A queue's name is kept for a screen reader and not drawn, except Money's and Quick's, which name the columns they
+     head (`data-key`, `views.ts` `GROUP_KEY`). */
   .body :global(.block-slot:has(> .queue)) {
     padding: 0;
     background: none;
     border-radius: 0;
   }
 
-  .body :global(.block-slot:not([data-arranging]):has(> .queue) > .block-bar) {
+  .body :global(.block-slot:not([data-arranging], [data-key^='decide-']):has(> .queue) > .block-bar) {
     position: absolute;
     inline-size: 1px;
     block-size: 1px;

@@ -28,6 +28,7 @@ import { moneyInText } from '../../lib/record/money.ts';
 import { blockOf, type Fetch, type LiveBlock, type Opened } from '../../lib/record/page-live.ts';
 import type { PageBlock } from '../../lib/record/schema.ts';
 import { emptyHidden, says } from '../../lib/page/home.ts';
+import { alikeOf } from '../../lib/page/alike.ts';
 import { copy } from '../../lib/copy.ts';
 import { ageDays, countSentence, WORDS as LEAD } from './lead.ts';
 import { words } from './words.ts';
@@ -54,6 +55,8 @@ export const WORDS = {
   later: 'Coming back to you',
   calls: 'How the calls went',
   ask: 'Ask yourself a question',
+  /** The phone's switch between Money, Quick and Handled, named for a screen reader. */
+  columns: 'Show',
   back: (when: string) => `Comes back ${when}`,
   met: 'Came true',
   missed: 'Did not come true',
@@ -169,6 +172,61 @@ export const QUEUE_MOST = 20;
 /** How many decisions the folded list draws, the latest first. */
 export const DECIDED_MOST = 10;
 
+/* ── the groups: Money, Quick and Handled (plan of 20 October, Needs you 2 and 3) ── */
+
+/**
+ * HOW MANY EACH GROUP SHOWS before "N more" opens the rest in place. Questions of one family are one (`alike.ts`), so
+ * five is five cards, never five of twelve alike.
+ */
+export const NEEDS_SHOWN = 5;
+
+/** The two groups of questions. Handled is the third column, and is what BrainDog did itself (`lib/home/handled.ts`). */
+export type Group = 'money' | 'quick';
+export type Column = Group | 'handled';
+
+/** Each group's block, by the key the page keys its tile by (`PageBody`'s `data-key`), so the board places it. */
+export const GROUP_KEY: Readonly<Record<Group, string>> = { money: 'decide-money', quick: 'decide-quick' };
+
+/** The groups' names, as the tiles and the phone's switch say them. */
+export const GROUP_WORDS: Readonly<Record<Column, string>> = { money: 'Money', quick: 'Quick', handled: 'Handled' };
+
+/**
+ * THE LISTS OF MONEY'S OWN MODULE (money-core), whose questions are about money though accepting one may write none:
+ * chasing a late invoice, a plan that did not go through. The module's, never anybody's record by name, and held to the
+ * module's own lists by `views.test.ts`.
+ */
+export const MONEY_LISTS: ReadonlySet<string> = new Set([
+  'obligations',
+  'accounts',
+  'fx',
+  'categories',
+  'filing_rules',
+  'transactions',
+  'recurring',
+  'plans',
+  'installments',
+  'balances',
+  'snapshots',
+  'books',
+]);
+
+/** A question about money: accepting it writes an amount (`money`, the record's own), or its row is on a Money list. */
+export const aboutMoney = (q: QueueQuestion): boolean => (Array.isArray(q.money) && q.money.length > 0) || (typeof q.list === 'string' && MONEY_LISTS.has(q.list));
+
+/**
+ * WHERE EACH COLUMN SITS ON THE TWELVE-COLUMN BOARD, as a `grid-column`, or `null` for one with nothing in it: three
+ * columns a third each, two a half each, one the whole row, in the order Money, Quick, Handled. One board row, so the
+ * three line up at the top and what was put off and decided follows under all of them.
+ */
+export function boardOf(has: Readonly<Record<Column, boolean>>): Record<Column, string | null> {
+  const order: Column[] = ['money', 'quick', 'handled'];
+  const shown = order.filter((c) => has[c]);
+  const span = shown.length === 0 ? 12 : 12 / shown.length;
+  const out: Record<Column, string | null> = { money: null, quick: null, handled: null };
+  shown.forEach((c, n) => (out[c] = `${String(n * span + 1)} / span ${String(span)}`));
+  return out;
+}
+
 /* THE DECIDED LIST'S COLUMNS, as the record names a decision's fields (`kernel/src/pages.ts` `DECIDED`). */
 const DECIDED_COLUMNS = [
   { field: 'question', label: words.question },
@@ -178,9 +236,9 @@ const DECIDED_COLUMNS = [
 ] as const;
 
 /**
- * DECIDE'S BODY, in reading order: the page's line, the first question whole (what its agents suggest, why, and what
- * accepting it does), the rest as cards a person may choose several of and answer from one bar, and then, folded shut,
- * what was put off and comes back, and what was decided lately. Every block is over the record's own questions
+ * DECIDE'S BODY, in reading order: the page's line, the questions that move money and the quick ones beside them, as
+ * cards a person may choose several of and answer from one bar, and then, folded shut, what was put off and comes
+ * back, and what was decided lately. What BrainDog handled itself is the third column, drawn by the page. Every block is over the record's own questions
  * (`governance.*`), so the body is the same for every record and what each one shows is what it holds.
  */
 export function decideHome(): DecideBody {
@@ -190,12 +248,10 @@ export function decideHome(): DecideBody {
     blocks: [
       /* THE PAGE'S LINE. Its words are the calm one; the head says the line worked out from the queue (`decideDrawn`). */
       { kind: 'note', lead: true, body: words.nothingWaiting },
-      /* THE FIRST QUESTION, WHOLE. One question, so it is never chosen with others: it is the one being answered.
-         IT SITS UNDER THE HEAD'S OWN LINE, so Needs you draws no name over it (`+page.svelte`); the heading is what a
-         screen reader names the region, and what a reader with no such rule reads in place of the kind's bare name. */
-      { kind: 'queue', heading: LEAD.waiting, icon: 'decide', source: 'governance.open', limit: 1, lead: true },
-      /* THE REST, AFTER IT. The record answers the same ranked queue, and `decideDrawn` leaves out the one drawn above. */
-      { kind: 'queue', heading: words.alsoWaiting, icon: 'ask', source: 'governance.open', limit: QUEUE_MOST + 1 },
+      /* MONEY, THEN QUICK, SIDE BY SIDE (plan of 20 October): the same ranked queue read twice, and `decideDrawn` gives
+         the first the questions that move money and the second the rest, each question once, five showing in each. */
+      { kind: 'queue', key: GROUP_KEY.money, heading: GROUP_WORDS.money, icon: 'money', source: 'governance.open', limit: QUEUE_MOST },
+      { kind: 'queue', key: GROUP_KEY.quick, heading: GROUP_WORDS.quick, icon: 'decide', source: 'governance.open', limit: QUEUE_MOST },
       /* WHAT WAS PUT OFF, SOONEST BACK FIRST, folded: it is not waiting yet, and is one press away. */
       { kind: 'section', heading: WORDS.later, icon: 'clock', fold: true },
       { kind: 'queue', source: 'governance.later', limit: QUEUE_MOST },
@@ -237,6 +293,8 @@ export type DecideDrawn = {
   open: number;
   /** Whether the page draws anything at all under its head. */
   drawsAny: boolean;
+  /** How many cards each group draws, questions of one family counted once: what the phone's switch says. */
+  groups: Record<Group, number>;
 };
 
 /**
@@ -245,7 +303,8 @@ export type DecideDrawn = {
  * THE LINE GOES TO THE HEAD. A `note lead` in plain words is the head's calm line rather than a tile, and while a
  * question waits the head says `countSentence` instead, from the record's count and the first question's suggestion.
  *
- * A QUESTION IS DRAWN ONCE: the rest leave out what the first block drew, and say how many are left past them.
+ * A QUESTION IS DRAWN ONCE, IN ITS GROUP: the first open queue holds the questions that move money and the second the
+ * rest (Quick), each showing five before "N more" opens the rest in place (`most`, `NEEDS_SHOWN`).
  *
  * AND WHAT HOLDS NOTHING IS NOT DRAWN, the record's rule (`drawn: false` with `why`, the kernel's `drawn.ts`), which
  * `emptyHidden` reads and judges again only where the record drew a block, so a section over nothing goes too.
@@ -266,16 +325,46 @@ export function decideDrawn(
   lateDays: number | null = null,
 ): DecideDrawn {
   let calm: string | null = null;
-  const drawn = new Set<string>();
-  let first: QueueQuestion | undefined;
+  /* EVERY OPEN QUESTION ONCE, in the record's ranked order, whichever open queue it came in. */
+  const pool: QueueQuestion[] = [];
+  const seen = new Set<string>();
+  const openAt: number[] = [];
   let open = 0;
   /* THE RECORD'S COUNTS OF HOW MANY ARE HARD TO UNDO AND HOW MANY HAVE WAITED PAST TWO WEEKS, the most any open queue
-     answered, since each counts every open question and the first is cut to one. Only where no queue answered them
-     are they counted here, each question once by id, over the questions drawn. */
+     answered, since each counts every open question. Only where no queue answered them are they counted here, each
+     question once by id, over the questions drawn. */
   let counted: { hardToUndo: number; stale: number } | null = null;
   const hard = new Set<string>();
   const late = new Set<string>();
   let decided: string | null = null;
+  blocks.forEach((b, n) => {
+    if (says(b) || !b.drawn) return;
+    if (b.source === 'governance.decided' && decided === null) {
+      const at = (b as { latest?: unknown }).latest;
+      if (typeof at === 'string' && at !== '') decided = at;
+    }
+    if (!isOpen(b) || !b.queue) return;
+    openAt.push(n);
+    open = Math.max(open, asked(b));
+    const said = waitingOf(b);
+    if (said) counted = { hardToUndo: Math.max(counted?.hardToUndo ?? 0, said.hardToUndo), stale: Math.max(counted?.stale ?? 0, said.stale) };
+    for (const q of b.queue) {
+      if (q.cost === 'undo') hard.add(q.id);
+      if (lateDays !== null && ageDays(q.at, now) > lateDays) late.add(q.id);
+      if (seen.has(q.id)) continue;
+      seen.add(q.id);
+      pool.push(q);
+    }
+  });
+  /* THE FIRST TWO OPEN QUEUES ARE MONEY AND QUICK, whatever a kept page called them, and any after them draw nothing: a
+     question is drawn once. A page with one open queue draws every question in it, as it always did. */
+  const money = pool.filter(aboutMoney);
+  const quick = pool.filter((q) => !aboutMoney(q));
+  const groups = { money: alikeOf(money).length, quick: alikeOf(quick).length };
+  const groupOf = (n: number): Group | 'all' | null => {
+    if (openAt.length < 2) return n === openAt[0] ? 'all' : null;
+    return n === openAt[0] ? 'money' : n === openAt[1] ? 'quick' : null;
+  };
   const shaped = blocks.map((b, n): LiveBlock => {
     if (says(b) || !b.drawn) return b;
     if (n === 0 && b.kind === 'note' && b.lead === true) {
@@ -286,29 +375,25 @@ export function decideDrawn(
       }
       return b;
     }
-    if (b.source === 'governance.decided' && decided === null) {
-      const at = (b as { latest?: unknown }).latest;
-      if (typeof at === 'string' && at !== '') decided = at;
-    }
     if (!isOpen(b) || !b.queue) return b;
-    open = Math.max(open, asked(b));
-    const said = waitingOf(b);
-    if (said) counted = { hardToUndo: Math.max(counted?.hardToUndo ?? 0, said.hardToUndo), stale: Math.max(counted?.stale ?? 0, said.stale) };
-    for (const q of b.queue) {
-      if (q.cost === 'undo') hard.add(q.id);
-      if (lateDays !== null && ageDays(q.at, now) > lateDays) late.add(q.id);
-    }
-    const fresh = b.queue.filter((q) => !drawn.has(q.id));
-    for (const q of fresh) drawn.add(q.id);
-    if (isLead(b)) first ??= fresh[0];
-    /* THE FIRST QUESTION'S CARD SAYS NO "N MORE": the rest are drawn just under it, and its door would be this page. */
-    if (isLead(b) && blocks.some((x, m) => m > n && isOpen(x) && x.drawn && !says(x)))
-      return { ...b, queue: fresh, shown: fresh.length, total: fresh.length, ...(fresh.length === 0 ? { drawn: false } : {}) };
-    if (fresh.length === b.queue.length) return b;
-    const gone = b.queue.length - fresh.length;
-    return { ...b, queue: fresh, shown: fresh.length, total: Math.max(fresh.length, b.total - gone), ...(fresh.length === 0 ? { drawn: false } : {}) };
+    const group = groupOf(n);
+    if (group === null) return { ...b, queue: [], shown: 0, total: 0, drawn: false };
+    if (group === 'all') return { ...b, queue: pool, shown: pool.length, total: Math.max(pool.length, b.total), lead: false, most: NEEDS_SHOWN } as LiveBlock;
+    const qs = group === 'money' ? money : quick;
+    return {
+      ...b,
+      key: GROUP_KEY[group],
+      heading: GROUP_WORDS[group],
+      icon: group === 'money' ? 'money' : 'decide',
+      lead: false,
+      queue: qs,
+      shown: qs.length,
+      total: qs.length,
+      most: NEEDS_SHOWN,
+      ...(qs.length === 0 ? { drawn: false } : {}),
+    } as LiveBlock;
   });
-  first ??= shaped.find((b) => isOpen(b) && b.drawn && b.queue?.length)?.queue?.[0];
+  const first = pool[0];
   const option = first?.options.find((o) => o.recommended)?.label;
   const tally = counted as { hardToUndo: number; stale: number } | null;
   const asker = first ? who(first) : '';
@@ -324,7 +409,7 @@ export function decideDrawn(
       ? words.noQuestion
       : (calm ?? words.nothingWaiting);
   const out = emptyHidden(shaped);
-  return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn) };
+  return { blocks: out, sentence: waiting ?? { text: quiet, needs: '' }, open, drawsAny: out.some((b) => b.drawn), groups };
 }
 
 /* ── the record's answer, read as the page draws it ───────────────────── */

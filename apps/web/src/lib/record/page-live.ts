@@ -338,6 +338,11 @@ export type LiveBlock = BlockResult & {
   /** HOW MANY HELPERS EACH RUN HAS WORKING WITH IT, on a block of runs at work (`sessions.working`), aligned with the rows. */
   helpers?: number[];
   /**
+   * A QUEUE'S CARDS SHOWN BEFORE "N MORE" OPENS THE REST IN PLACE, questions of one family counted once (Needs you's
+   * groups, `routes/decide/views.ts` `NEEDS_SHOWN`). Absent, a queue shows every card it holds.
+   */
+  most?: number;
+  /**
    * SET ON A BLOCK THE READER ADDED AND THE PAGE NEVER DECLARED (the foot, `footed`). Arrange and Change this page save
    * against the count of declared blocks, and the record refuses a save whose count is off; whoever hands blocks to
    * either leaves these out, and nothing offers to move, change or pin one.

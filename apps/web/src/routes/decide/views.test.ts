@@ -13,7 +13,8 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type QueueQuestion } from '@braindog/kernel';
 import type { Fetch, LiveBlock } from '../../lib/record/page-live.ts';
-import { blocksMineFirst, callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, mineFirst, othersLine, readDecide, waitingOf, type Call } from './views.ts';
+import { MONEY_REGISTERS } from '../../../../../packages/seed/src/modules/money/lists/index.ts';
+import { blocksMineFirst, boardOf, callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, GROUP_KEY, MONEY_LISTS, mineFirst, aboutMoney, NEEDS_SHOWN, othersLine, readDecide, waitingOf, type Call } from './views.ts';
 import { words } from './words.ts';
 
 const CLOCK = Date.UTC(2026, 9, 2, 12);
@@ -81,14 +82,14 @@ async function decideRecord(): Promise<{ k: Kernel; io: Fetch; ids: Record<strin
 
 /* ── the body ── */
 
-test('the body is the line, the first question whole, the rest to choose from, then what was put off and decided, folded', () => {
+test('the body is the line, Money and Quick side by side, then what was put off and decided, folded', () => {
   const body = decideHome();
   assert.equal(body.page, 'decide');
   assert.deepEqual(
     body.blocks.map((b) => [b.kind, b.source ?? '', b.lead === true, b.fold === true]),
     [
       ['note', '', true, false],
-      ['queue', 'governance.open', true, false],
+      ['queue', 'governance.open', false, false],
       ['queue', 'governance.open', false, false],
       ['section', '', false, true],
       ['queue', 'governance.later', false, false],
@@ -96,9 +97,11 @@ test('the body is the line, the first question whole, the rest to choose from, t
       ['table', 'governance.decided', false, false],
     ],
   );
-  /* THE FIRST QUESTION ALONE IS DRAWN WHOLE, so it is never one of several chosen at once: the page's batch bar takes a
-     queue's questions only where it holds two or more. */
-  assert.equal(body.blocks[1]?.limit, 1);
+  /* THE TWO GROUPS ARE KEYED, so the board places each tile, and named as the person says them. */
+  assert.deepEqual(body.blocks.slice(1, 3).map((b) => [b.key, b.heading]), [
+    [GROUP_KEY.money, 'Money'],
+    [GROUP_KEY.quick, 'Quick'],
+  ]);
   /* EVERY HEADING HAS ITS ICON, and the words are the person's, never the system's. */
   for (const b of body.blocks.filter((x) => x.heading)) assert.ok(b.icon, `${b.heading} has no icon`);
   for (const b of body.blocks) assert.doesNotMatch(`${b.heading ?? ''} ${typeof b.body === 'string' ? b.body : ''}`, /\b(row|rows|list item|entity|register)\b/iu);
@@ -126,19 +129,19 @@ test('the record draws the page: the first question whole, the rest after it onc
   for (const b of blocks.filter((x) => x.source === 'governance.open')) assert.deepEqual(waitingOf(b), { stale: 0, hardToUndo: 0 });
 
   const shaped = decideDrawn(blocks, got.now, (q) => (q.who === 'slash' ? 'Slash' : ''));
-  const [note, lead, rest, , later, , decided] = shaped.blocks;
+  const [note, money, quick, , later, , decided] = shaped.blocks;
   /* THE LINE WENT TO THE HEAD, and says how many wait and what the first suggests. */
   assert.equal(note?.drawn, false);
   assert.equal(shaped.open, 3);
   assert.equal(shaped.sentence.text, 'Three questions wait on you. Slash suggests “Raise it” for the first.');
   assert.equal(shaped.sentence.needs, '');
-  /* THE FIRST QUESTION ONCE, AND THE REST AFTER IT. */
-  const leadIds = (lead?.queue ?? []).map((q) => q.id);
-  const restIds = (rest?.queue ?? []).map((q) => q.id);
-  assert.equal(leadIds.length, 1);
-  assert.deepEqual([...leadIds, ...restIds].sort(), [ids.first, ids.second, ids.third].sort());
-  assert.ok(!restIds.includes(leadIds[0]!), 'the first question is drawn twice');
-  assert.equal(rest?.total, 2);
+  /* EACH QUESTION ONCE, IN ITS GROUP: none of these moves money, so Money draws nothing and Quick holds all three. */
+  const moneyIds = (money?.queue ?? []).map((q) => q.id);
+  const quickIds = (quick?.queue ?? []).map((q) => q.id);
+  assert.equal(money?.drawn, false);
+  assert.deepEqual([...moneyIds, ...quickIds].sort(), [ids.first, ids.second, ids.third].sort());
+  assert.equal(quick?.total, 3);
+  assert.deepEqual(shaped.groups, { money: 0, quick: 3 });
   /* WHAT WAS PUT OFF IS A QUEUE LIKE THE OPEN ONE, and what was decided is a table with a door to each decision. */
   assert.deepEqual(later?.queue?.map((q) => q.id), [ids.later]);
   assert.equal(later?.source, 'governance.later');
@@ -184,18 +187,19 @@ test('the head says the record’s count with no quota in red, and red only for 
   const waited = decideDrawn([noteBlock(), queueBlock(old.slice(0, 1), 5, true), queueBlock(old, 5)], CLOCK, () => 'Claude', null, LATE);
   assert.equal(waited.sentence.text, 'Five questions wait on you, two of them for over two weeks. Claude suggests “Yes” for the first.');
   assert.equal(waited.sentence.needs, 'two of them for over two weeks');
-  assert.deepEqual(shaped.blocks[2]?.queue?.map((q) => q.id), ['q2', 'q3', 'q4', 'q5']);
-  assert.equal(shaped.blocks[2]?.total, 4);
-  /* THE FIRST CARD COUNTS ONLY ITSELF, so it draws no "4 more" door back to this page over the four drawn under it. */
-  assert.equal(shaped.blocks[1]?.total, 1);
+  /* NONE MOVES MONEY, so Quick holds every one, once, and Money draws nothing. */
+  assert.deepEqual(shaped.blocks[2]?.queue?.map((q) => q.id), ['q1', 'q2', 'q3', 'q4', 'q5']);
+  assert.equal(shaped.blocks[2]?.total, 5);
+  assert.equal(shaped.blocks[1]?.drawn, false);
   assert.equal(shaped.open, 5);
 
   const one = decideDrawn([noteBlock(), queueBlock([question('q1', 'undo')], 1, true), queueBlock([question('q1', 'undo')], 1)], CLOCK);
   assert.equal(one.sentence.text, 'One question waits on you. It is hard to undo.');
   assert.equal(one.sentence.needs, '');
-  /* THE REST HOLD NOTHING BUT THE FIRST, so they are not drawn, and the indexes stay. */
+  /* A GROUP THAT HOLDS NOTHING IS NOT DRAWN, the question is drawn once, and the indexes stay. */
   assert.equal(one.blocks.length, 3);
-  assert.equal(one.blocks[2]?.drawn, false);
+  assert.equal(one.blocks[1]?.drawn, false);
+  assert.deepEqual(one.blocks[2]?.queue?.map((q) => q.id), ['q1']);
 });
 
 test('the head counts what is hard to undo and what has waited from the record, over every question and not the few drawn', () => {
@@ -278,16 +282,62 @@ test('how the calls went is one line over those already checked', () => {
 const screen = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
 
 test('the screen draws the declared page through the one reader, and keeps the old one at ?classic', () => {
-  assert.match(screen, /<PageView slug="decide" got=\{drawn\} mode="home" select whole \{reread\} \/>/u);
+  assert.match(screen, /<PageView slug="decide" got=\{drawn\} mode="home" select whole \{reread\} opens=\{handled \? handledColumn : undefined\} \/>/u);
   assert.match(screen, /readDecide\(/u);
   assert.match(screen, /decideDrawn\(/u);
   assert.match(screen, /searchParams\.has\('classic'\)/u);
   assert.match(screen, /import\('\.\/Classic\.svelte'\)/u);
 });
 
-test('the head is calm: no group control, no Select, no waiting chart, no key hints, no counts', () => {
-  for (const gone of ['segmented', 'decideSelect', 'decideGroup', '<Bars', 'waitedOf', '<Kbd', 'group-n', 'LEAD.switch'])
+test('the head is calm: no group control, no waiting chart, no key hints, no counts', () => {
+  for (const gone of ['decideSelect', 'decideGroup', '<Bars', 'waitedOf', '<Kbd', 'group-n', 'LEAD.switch'])
     assert.ok(!screen.includes(gone), `the page still draws ${gone}`);
+});
+
+/* ── the groups: Money, Quick and Handled ── */
+
+test('money questions go to Money and the rest to Quick, each once, five showing before N more', () => {
+  const paying = (id: string): QueueQuestion => ({ ...question(id), money: [{ amount: 480000, currency: 'GBP' }] });
+  const qs = [paying('m1'), question('q1'), paying('m2'), question('q2')];
+  const shaped = decideDrawn([noteBlock(), queueBlock(qs, 4), queueBlock(qs, 4)], CLOCK);
+  const [, money, quick] = shaped.blocks;
+  assert.deepEqual(money?.queue?.map((q) => q.id), ['m1', 'm2']);
+  assert.deepEqual(quick?.queue?.map((q) => q.id), ['q1', 'q2']);
+  assert.equal(money?.key, GROUP_KEY.money);
+  assert.equal(quick?.key, GROUP_KEY.quick);
+  assert.equal(money?.most, NEEDS_SHOWN);
+  assert.equal(NEEDS_SHOWN, 5);
+  assert.deepEqual(shaped.groups, { money: 2, quick: 2 });
+  assert.ok(aboutMoney(paying('m3')) && !aboutMoney(question('q3')));
+  /* A LATE INVOICE TO CHASE WRITES NO MONEY, AND IS STILL MONEY: its row is on one of Money's lists. */
+  assert.ok(aboutMoney({ ...question('q4'), list: 'obligations' }));
+  assert.ok(!aboutMoney({ ...question('q5'), list: 'tasks' }));
+  /* A KEPT PAGE WITH ONE OPEN QUEUE draws every question in it, five showing. */
+  const one = decideDrawn([noteBlock(), queueBlock(qs, 4)], CLOCK);
+  assert.deepEqual(one.blocks[1]?.queue?.map((q) => q.id), ['m1', 'q1', 'm2', 'q2']);
+  assert.equal(one.blocks[1]?.most, NEEDS_SHOWN);
+  /* A THIRD OPEN QUEUE DRAWS NOTHING: a question is drawn once. */
+  const three = decideDrawn([noteBlock(), queueBlock(qs, 4), queueBlock(qs, 4), queueBlock(qs, 4)], CLOCK);
+  assert.equal(three.blocks[3]?.drawn, false);
+});
+
+test('Money’s lists are the money module’s own, every one', () => {
+  assert.deepEqual([...MONEY_LISTS].sort(), Object.keys(MONEY_REGISTERS).sort());
+});
+
+test('the board puts Money, Quick and Handled a third each, a half each, or the row, by what holds something', () => {
+  assert.deepEqual(boardOf({ money: true, quick: true, handled: true }), { money: '1 / span 4', quick: '5 / span 4', handled: '9 / span 4' });
+  assert.deepEqual(boardOf({ money: false, quick: true, handled: true }), { money: null, quick: '1 / span 6', handled: '7 / span 6' });
+  assert.deepEqual(boardOf({ money: true, quick: false, handled: false }), { money: '1 / span 12', quick: null, handled: null });
+  assert.deepEqual(boardOf({ money: false, quick: false, handled: false }), { money: null, quick: null, handled: null });
+});
+
+test('the screen shows Handled as the third column and switches between the three on a phone', () => {
+  assert.match(screen, /loadHandled\(apiBase\(\)\)/u);
+  assert.match(screen, /<Handled found=\{handled\} heading=\{GROUP_WORDS\.handled\} \/>/u);
+  assert.match(screen, /<Segmented role="group" aria-label=\{WORDS\.columns\}>/u);
+  assert.match(screen, /\.block-slot\[data-key='decide-money'\]/u);
+  assert.match(screen, /\.block-slot\[data-key='decide-quick'\]/u);
 });
 
 /* ── who decides (USE-A13), with invented people ── */

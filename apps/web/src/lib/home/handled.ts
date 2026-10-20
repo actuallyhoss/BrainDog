@@ -23,6 +23,8 @@ export const HANDLED_WORDS = {
   undo: 'Undo',
   undone: 'Put back.',
   more: (n: number) => `and ${String(n)} more`,
+  /** The press that opens the lines past the first five, in place. */
+  open: (n: number) => `${String(n)} more`,
 } as const;
 
 /** One thing BrainDog did: the decision that puts it back, one line, the reason under it, and when. */
@@ -31,8 +33,11 @@ export type HandledLine = { decision: string; line: string; why: string; at: str
 /** What the record answers: today's lines newest first and how many it held back past its own limit. */
 export type Handled = { rows: HandledLine[]; more: number };
 
-/** What the tile draws: its heading, the first lines, and "and N more" for the rest, or empty. */
-export type HandledTile = { heading: string; lines: HandledLine[]; more: string };
+/**
+ * What the tile draws: its heading, the first lines, and "and N more" for the rest, or empty. `opens` is how many more
+ * lines the record sent that a press on "N more" opens in place; `more` is then only what the record held back.
+ */
+export type HandledTile = { heading: string; lines: HandledLine[]; more: string; opens: number };
 
 /** How the screen asks the record: a client's `call`, or anything shaped like it. */
 export type Call = (name: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -84,10 +89,17 @@ export async function loadHandled(base: string, io?: Fetch): Promise<Handled | n
   }
 }
 
-/** The tile: the first lines and the count of the rest. `null` at nought, which draws nothing. */
-export function handledTile(found: Handled | null): HandledTile | null {
+/**
+ * The tile: the first lines and the count of the rest. `null` at nought, which draws nothing.
+ *
+ * "N MORE" OPENS THE REST (plan of 20 October, Daily use: "and 38 more" was not a link). The lines the record sent past
+ * the first five are a press away (`opens`), and once `open` they are all drawn; only what the record itself held back
+ * past its own limit stays a count, since nothing here holds it.
+ */
+export function handledTile(found: Handled | null, open = false): HandledTile | null {
   if (!found || found.rows.length === 0) return null;
-  const lines = found.rows.slice(0, HANDLED_SHOWN);
-  const rest = found.rows.length - lines.length + found.more;
-  return { heading: HANDLED_WORDS.heading, lines, more: rest > 0 ? HANDLED_WORDS.more(rest) : '' };
+  const lines = open ? found.rows : found.rows.slice(0, HANDLED_SHOWN);
+  const opens = found.rows.length - lines.length;
+  const rest = opens + found.more;
+  return { heading: HANDLED_WORDS.heading, lines, more: rest > 0 ? HANDLED_WORDS.more(rest) : '', opens };
 }

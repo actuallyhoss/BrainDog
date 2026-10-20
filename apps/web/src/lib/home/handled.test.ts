@@ -43,3 +43,15 @@ test('THE TILE IS REACHED BY A DYNAMIC IMPORT, never from a file every screen lo
   assert.match(home, /import\('\.\/handled\.ts'\)/);
   assert.doesNotMatch(home, /^\s*import .* from '\.\/handled\.ts'/mu);
 });
+
+test('"N MORE" OPENS THE LINES THE RECORD SENT, and only what it held back stays a count', () => {
+  const found = handledOf(answer([1, 2, 3, 4, 5, 6, 7].map(line), 2));
+  const shut = handledTile(found);
+  assert.equal(shut?.lines.length, HANDLED_SHOWN);
+  assert.equal(shut?.opens, 2, 'the two lines past the first five open in place');
+  const open = handledTile(found, true);
+  assert.equal(open?.lines.length, 7);
+  assert.equal(open?.opens, 0);
+  assert.equal(open?.more, 'and 2 more', 'what the record held back is still said');
+  assert.equal(handledTile(handledOf(answer([line(1)])), true)?.more, '');
+});
