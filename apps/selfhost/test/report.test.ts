@@ -65,9 +65,9 @@ test('A PROJECT REPORTS WITH ITS KEY OVER HTTP, AND THE KEY OPENS NOTHING ELSE',
     const rows = await post('list', { register: 'points' }, SERVER_KEY);
     assert.equal((rows.body.value as { rows: unknown[] }).rows.length, 3);
 
-    /* EVERY OTHER ROUTE, AS A POST, and none of them answers. Every one is 403 but `log` and `makePrivate`,
-       which check their arguments before they ask who is calling, and answer 422 with nothing from the record in it. */
-    const ARGUMENTS_FIRST = new Set(['log', 'makePrivate']);
+    /* EVERY OTHER ROUTE, AS A POST, and none of them answers. Every one is 403 but `log`, which checks its arguments
+       before it asks who is calling, and answers 422 with nothing from the record in it. `makePrivate` asks who first. */
+    const ARGUMENTS_FIRST = new Set(['log']);
     for (const route of ROUTES) {
       if (route.name === 'report') continue;
       const said = await post(route.name, { register: 'points', seq: 1 }, bearer);
