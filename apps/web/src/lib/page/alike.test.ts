@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { alikeOf, sharedOptions } from './alike.ts';
+import { alikeOf, memberLines, sharedOptions } from './alike.ts';
 
 const opt = (key: string) => ({ key, label: key, because: '', recommended: false });
 const q = (id: string, cause: string | undefined, alike: number, keys = ['accept', 'dismiss']): QueueQuestion =>
@@ -31,4 +31,51 @@ test('an arrangement is never folded', () => {
 
 test('only the options every member offers are shared', () => {
   assert.deepEqual(sharedOptions(q('a', 'c', 2), [q('b', 'c', 2, ['accept'])]).map((o) => o.key), ['accept']);
+});
+
+/* FOUR BANK TEXTS TO FOUR PAYEES, as his record held them on 20 October: one cause each (the payee is in it, and a cause
+   holds one open question), so each came `alike: 1`, and the queue drew four cards. */
+const bank = (id: string, cause: string, amount: number, extra: Partial<QueueQuestion> = {}): QueueQuestion =>
+  ({
+    id,
+    who: 'ingest:bank-ipn-out-sms',
+    at: '2026-10-19T14:48:12.952Z',
+    kind: 'rowset',
+    body_kind: 'rowset',
+    question: 'Add this message to Ledger? Its last digits match HSBC (EGP).',
+    why: 'It was matched to HSBC (EGP) by its last digits, 5826. Say yes once and later ones are added straight away.',
+    cost: 'undo',
+    options: ['accept', 'dismiss'].map(opt),
+    money: [{ amount, currency: 'EGP' }],
+    cause,
+    alike: 1,
+    ...extra,
+  }) as unknown as QueueQuestion;
+
+test('four bank texts with their own causes fold into one card, each told apart by its money', () => {
+  const four = [
+    bank('SG169', 'ingest#0a1b2c3d4e5f60718293a4b5', 3462000),
+    bank('SG174', 'ingest#318a43530caf64d30e0e857a', 150150),
+    q('SG200', 'rule#x', 1),
+    bank('SG175', 'ingest#3275c39700647321fab106b3', 3050),
+    bank('SG179', 'ingest#9f8e7d6c5b4a39281706f5e4', 235235),
+  ];
+  const out = alikeOf(four);
+  assert.deepEqual(out.map((e) => e.kind), ['many', 'one']);
+  const many = out[0]!;
+  assert.ok(many.kind === 'many');
+  assert.equal(many.lead.id, 'SG169');
+  assert.deepEqual(many.rest.map((r) => r.id), ['SG174', 'SG175', 'SG179']);
+  assert.deepEqual(sharedOptions(many.lead, many.rest).map((o) => o.key), ['accept', 'dismiss']);
+  assert.deepEqual(memberLines([many.lead, ...many.rest]).map((m) => m.line), ['EGP 34,620.00', 'EGP 1,501.50', 'EGP 30.50', 'EGP 2,352.35']);
+});
+
+test('bank texts matched to another account, or from another ingest, are another family', () => {
+  const other = bank('b', 'ingest#b', 100, { question: 'Add this message to Ledger? Its last digits match CIB (EGP).' });
+  const card = bank('c', 'ingest#c', 100, { who: 'ingest:card-alerts' });
+  assert.deepEqual(alikeOf([bank('a', 'ingest#a', 100), other, card]).map((e) => e.kind), ['one', 'one', 'one']);
+});
+
+test("a cause's overflow question is the cause it overflowed", () => {
+  assert.deepEqual(alikeOf([q('a', 'rule#c1', 1), q('b', 'rule#c1#2', 1)]).map((e) => e.kind), ['many']);
 });

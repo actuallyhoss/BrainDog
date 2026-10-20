@@ -8,7 +8,7 @@
   import { apiBase } from '$lib/at.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
   import Button from '$lib/ui/Button.svelte';
-  import { alikeWords, sharedOptions } from './alike.ts';
+  import { alikeWords, memberLines, sharedOptions } from './alike.ts';
   import { queueWords } from './queue-answer.ts';
 
   let { lead, rest, onanswered }: { lead: QueueQuestion; rest: QueueQuestion[]; onanswered: () => void } = $props();
@@ -73,7 +73,7 @@
   <details class="members">
     <summary>{alikeWords.members}</summary>
     <ul>
-      {#each all as q (q.id)}<li>{q.question}</li>{/each}
+      {#each memberLines(all) as m (m.id)}<li>{m.line}</li>{/each}
     </ul>
   </details>
 </section>
