@@ -11,6 +11,7 @@ import type { Proposal, Sentenced, SentencePart, TriggerOption } from '../../lib
 
 export const sentenceWords = {
   label: 'Say it as a sentence',
+  /* THE EXAMPLE WHEN THE RECORD'S OWN LISTS SAY NONE (`exampleOf`): it reads on a record with Bills and invoices. */
   placeholder: 'When a bill is due in 3 days, tell me',
   read: 'Read it',
   reading: 'Reading',
@@ -21,7 +22,7 @@ export const sentenceWords = {
   byModel: 'Written by the model from your words. Check it reads right.',
   kept: 'Kept. It runs from now on.',
   filed: 'Sent to Needs you. It runs once you accept it there.',
-  hint: 'For example: When a bill is due in 3 days, tell me.',
+  hint: (example: string) => `For example: ${example}.`,
   noLook: 'I could not look this one back over your rows.',
   steps: 'Steps, in order',
   stepsHint: 'Drag a step, or press Alt with the up and down arrows, to move it.',
@@ -45,6 +46,32 @@ export function keepOf(read: Sentenced): Proposal {
 /** What is shown under the sentence: the look over the last days, then anything it cannot do, then who wrote it. */
 export function underSentence(read: Sentenced): string[] {
   return [read.looked?.line ?? sentenceWords.noLook, ...read.notes, ...(read.by === 'model' ? [sentenceWords.byModel] : [])];
+}
+
+const JOINS = new Set(['and', 'or', 'of', 'the', 'a', 'an', 'to', 'for', 'in', 'on', '&']);
+/** A word as one of it: "bills" is "bill", "categories" is "category", as the record's reader folds a noun. */
+const oneOf = (word: string): string => {
+  const w = word.toLowerCase();
+  if (/ies$/u.test(w)) return `${w.slice(0, -3)}y`;
+  if (/(?:s|x|ch|sh)es$/u.test(w)) return w.slice(0, -2);
+  if (/[^s]s$/u.test(w)) return w.slice(0, -1);
+  return w;
+};
+
+/**
+ * THE BOX'S EXAMPLE, FROM THIS RECORD'S OWN LISTS (agents F3): the first list with a due date, by the first word of its
+ * name, "When a bill is due in 3 days, tell me" for Bills and invoices. The record's reader finds a list by any word of
+ * its name, so the example it shows is one it reads. With no such list, the house example.
+ */
+export function exampleOf(lists: readonly { name: string; fields?: readonly { id: string; type?: string | undefined; deadline?: boolean | undefined }[] | undefined }[]): string {
+  for (const l of lists) {
+    const due = (l.fields ?? []).some((f) => f.type === 'day' && (f.id === 'due' || f.deadline === true));
+    const word = l.name.split(/[\s,/]+/u).find((w) => w !== '' && !JOINS.has(w.toLowerCase()));
+    if (!due || word === undefined) continue;
+    const noun = oneOf(word);
+    return `When ${/^[aeiou]/u.test(noun) ? 'an' : 'a'} ${noun} is due in 3 days, tell me`;
+  }
+  return sentenceWords.placeholder;
 }
 
 /** Whether the box has anything to read yet. */

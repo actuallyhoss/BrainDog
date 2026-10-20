@@ -90,12 +90,22 @@ function one(word: string): string {
 
 const GENERIC = /^(?:row|entry|item|thing|record|something|anything|line)s?$/u;
 
-/** The list a noun names, by its name, its singular or its id; the last word counts when the whole does not. `null` for none or two. */
+/**
+ * The list a noun names, by its name, its singular or its id; the last word counts when the whole does not; and last,
+ * any one word of the list's name, so "bill" finds "Bills and invoices". `null` for none or two.
+ *
+ * A NAME'S OWN WORDS, SINCE THE UI PASS OF 20 OCTOBER (agents F3): the box's own example, "When a bill is due in 3 days",
+ * was refused on the record it was shown on, because no list there is called Bills. "and", "of" and the like are no
+ * list's word.
+ */
+const JOINS = new Set(['and', 'or', 'of', 'the', 'a', 'an', 'to', 'for', 'in', 'on', '&']);
 function listFor(noun: string, lists: readonly SentenceList[]): SentenceList | 'many' | null {
   const said = one(noun);
   if (said === '') return null;
   const names = (l: SentenceList): string[] => [l.name, l.id, l.one ?? ''].filter((x) => x !== '').map(one);
-  for (const pass of [(l: SentenceList) => names(l).includes(said), (l: SentenceList) => names(l).includes(one(said.split(' ').at(-1) ?? ''))]) {
+  const words = (l: SentenceList): string[] => l.name.split(/[\s,/]+/u).filter((w) => w !== '' && !JOINS.has(lower(w))).map(one);
+  const last = one(said.split(' ').at(-1) ?? '');
+  for (const pass of [(l: SentenceList) => names(l).includes(said), (l: SentenceList) => names(l).includes(last), (l: SentenceList) => words(l).includes(last)]) {
     const found = lists.filter(pass);
     if (found.length === 1) return found[0]!;
     if (found.length > 1) return 'many';
@@ -262,7 +272,7 @@ function listOf(noun: string, named: string | undefined, world: SentenceWorld): 
     if (got === 'many') return { why: `More than one list could be "${word.trim()}". Name the list${world.lists[0] ? `, such as "in ${world.lists[0].name}"` : ''}.` };
     if (got !== null) return got;
   }
-  return { why: `I could not tell which list "${(named ?? noun).trim()}" is. Name it as it is called in the sidebar.` };
+  return { why: `I could not tell which list "${(named ?? noun).trim()}" is. Use its name${world.lists[0] ? `, such as ${world.lists[0].name}` : ''}.` };
 }
 
 function triggerOf(text: string, world: SentenceWorld, implied: SentenceDoor | null): Trig | { why: string } {

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Sentenced } from '$lib/flow/source.ts';
-import { addStep, applyOption, askable, composeSentence, dropStep, isCurrent, keepOf, keyMove, moveStep, sentenceWords, swapStep, underSentence } from './sentence.ts';
+import { addStep, applyOption, askable, composeSentence, dropStep, exampleOf, isCurrent, keepOf, keyMove, moveStep, sentenceWords, swapStep, underSentence } from './sentence.ts';
 
 const read = (over: Partial<Sentenced> = {}): Sentenced => ({
   rule: 'when-a-bill-is-due',
@@ -77,4 +77,12 @@ test('Alt with an arrow moves a step by one and stops at the ends', () => {
   assert.equal(keyMove('ArrowDown', true, 2, 3), 2);
   assert.equal(keyMove('ArrowDown', false, 1, 3), null);
   assert.equal(keyMove('Enter', true, 1, 3), null);
+});
+
+test('the box example is the record’s own: its first list with a due date, by the first word of its name', () => {
+  const day = (id: string) => ({ id, type: 'day' });
+  assert.equal(exampleOf([{ name: 'Ledger', fields: [day('on')] }, { name: 'Bills and invoices', fields: [day('due')] }]), 'When a bill is due in 3 days, tell me');
+  assert.equal(exampleOf([{ name: 'Orders', fields: [{ id: 'ship_by', type: 'day', deadline: true }] }]), 'When an order is due in 3 days, tell me');
+  assert.equal(exampleOf([{ name: 'Notes' }]), sentenceWords.placeholder);
+  assert.equal(sentenceWords.hint('When a bill is due in 3 days, tell me'), 'For example: When a bill is due in 3 days, tell me.');
 });

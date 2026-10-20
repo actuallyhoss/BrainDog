@@ -98,3 +98,19 @@ test('a condition naming no field is refused rather than matching everything', (
   const got = parseSentence('When a job is added where colour is red, tell me', world);
   assert.equal(got.ok, false);
 });
+
+test('a noun finds a list by any one word of its name, so the box example reads on Bills and invoices', () => {
+  const named: SentenceWorld = {
+    lists: [
+      { id: 'obligations', name: 'Bills and invoices', one: 'item', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'due', type: 'day' }] },
+      { id: 'transactions', name: 'Ledger', one: 'entry', title: 'what', fields: [{ id: 'what', type: 'text' }, { id: 'on', type: 'day' }] },
+    ],
+    doors: [],
+  };
+  const got = parseSentence('When a bill is due in 3 days, tell me', named, 'x');
+  assert.equal(got.ok, true, got.ok ? '' : got.why);
+  assert.equal(got.ok && got.body.register, 'obligations');
+  const refused = parseSentence('When a widget is due in 3 days, tell me', named, 'x');
+  assert.equal(refused.ok, false);
+  assert.equal(!refused.ok && refused.why, 'I could not tell which list "widget" is. Use its name, such as Bills and invoices.');
+});

@@ -11,12 +11,16 @@
   automation is listed by its sentence, which is its name.
 -->
 <script lang="ts">
+  import { page } from '$app/state';
   import type { Source, Sentenced } from '$lib/flow/source.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import Icon from '$lib/ui/Icon.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import SentenceRead from './SentenceRead.svelte';
   import SentenceSteps from './SentenceSteps.svelte';
-  import { askable, composeSentence, keepOf, sentenceWords as w, underSentence } from './sentence.ts';
+  import { askable, composeSentence, exampleOf, keepOf, sentenceWords as w, underSentence } from './sentence.ts';
 
   let {
     source,
@@ -28,6 +32,16 @@
     /** Called once it is kept, so the list reads again and shows it. */
     onkept: () => void;
   } = $props();
+
+  /* THE EXAMPLE IS THIS RECORD'S, from its lists by the names it gives them and the fields the record has said of each. */
+  const example = $derived(
+    exampleOf(
+      ((page.data as unknown as Partial<Shell>).index?.registers ?? []).map((r) => ({
+        name: r.name,
+        fields: Object.hasOwn(REGISTERS, r.id) ? REGISTERS[r.id]?.fields : undefined,
+      })),
+    ),
+  );
 
   let text = $state('');
   let busy = $state<'' | 'reading' | 'keeping'>('');
@@ -97,15 +111,16 @@
     <label class="field-label" for="sentence-box">{w.label}</label>
     <div class="row">
       <div class="field field-lg">
-        <input id="sentence-box" class="field-input" type="text" bind:value={text} placeholder={w.placeholder} autocomplete="off" disabled={busy !== ''} />
+        <input id="sentence-box" class="field-input" type="text" bind:value={text} placeholder={example} autocomplete="off" disabled={busy !== ''} aria-invalid={fix !== '' ? 'true' : undefined} aria-describedby={fix !== '' ? 'sentence-fix' : undefined} />
       </div>
       <Button weight={read ? 'quiet' : 'primary'} type="submit" disabled={busy !== '' || !askable(text)}>{busy === 'reading' ? w.reading : w.read}</Button>
     </div>
   </form>
 
   {#if fix !== ''}
-    <p class="fix" role="alert">{fix}</p>
-    <p class="hint">{w.hint}</p>
+    <!-- A REFUSAL READS AS ONE: the warn glyph and the line in red, and the field ringed, so it is never taken for a hint. -->
+    <p class="fix" id="sentence-fix" role="alert"><Icon name="alert" size="s" />{fix}</p>
+    <p class="hint">{w.hint(example)}</p>
   {/if}
 
   {#if read}
@@ -154,13 +169,25 @@
   .hint,
   .fix {
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
     color: var(--ink2);
   }
 
   .fix {
-    color: var(--ink);
+    display: flex;
+    gap: var(--sp-2);
+    align-items: flex-start;
+    color: var(--red);
+  }
+
+  .fix :global(.icon) {
+    flex: none;
+    margin-block-start: 1px;
+  }
+
+  .row :global(.field:has(input[aria-invalid='true'])) {
+    box-shadow: inset 0 0 0 1px var(--red);
   }
 
   .said {
