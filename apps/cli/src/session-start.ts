@@ -1,12 +1,18 @@
 /**
  * The work a session's start does on this machine: the skills sync and the tools scan, as one function.
  *
- * TWO CALLERS. Claude Code's start hook calls `startWork` at every start of a session, as it always did (`hooks.ts`).
- * An app with no such hook (Codex, Cursor, and whatever else `braindog mcp --agent` is registered in) gets the same
- * work from its MCP server: `startFromServer`, once that server's first `initialize` has been answered, at most once a
- * day for a machine, a folder and an app (`~/.braindog/started.json`), in the background and inside the hook's time
- * limit. So a session in any app syncs the project's skills, has its servers scanned, and is placed in its project by
- * the folder it started in, which the record reads from the same session headers every call carries.
+ * TWO CALLERS. Claude Code's start hook calls `startWork` at every start of a session (`hooks.ts`). An app with no
+ * such hook (Codex, Cursor, and whatever else `braindog mcp --agent` is registered in) gets the same work from its MCP
+ * server: `startFromServer`, once that server's first `initialize` has been answered, at most once a day for a
+ * machine, a folder and an app (`~/.braindog/started.json`), in the background and inside the hook's time limit. So a
+ * session in any app syncs the project's skills, has its servers scanned, and is placed in its project by the folder it
+ * started in, which the record reads from the same session headers every call carries.
+ *
+ * BEHIND A TAG (`startTag`). The work runs only when something it reads moved since it last ran whole here: the
+ * record's Skills and Tools rows, which the attach's own context carries, or the files on this machine. So a start in a
+ * folder where nothing moved is the attach alone, one round trip, where it was the attach and then every request of
+ * the sync and the scan. A start hook that ran out of time leaves the work owed, and Claude Code's MCP server does it in
+ * the background once the hook's time is over.
  *
  * IT RUNS ONLY WHEN AN APP STARTS A SESSION. Nothing here is on a clock or at night.
  *
@@ -14,7 +20,8 @@
  * and no line quotes an error, because an error could quote anything.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Writable } from 'node:stream';
@@ -22,8 +29,9 @@ import { Writable } from 'node:stream';
 import type { Client, Context } from '@braindog/client';
 import { refused } from '@braindog/ports';
 
+import { CLIENTS } from './clients/index.ts';
 import { clientFor, hostsPath, type Target } from './http.ts';
-import { git, sessionHeaders, type Agent, type Position } from './position.ts';
+import { cliBuild, git, sessionHeaders, type Agent, type Position } from './position.ts';
 import { syncSkills } from './skills.ts';
 import { depositor, scanTools } from './tools.ts';
 
@@ -42,8 +50,9 @@ export const START_WORK_MS = 3_000;
  * the owner meets on Decide and `braindog skills sync` and `braindog tools scan` say in full. Their lines carried file
  * paths and ids, and are not what an agent starts from.
  *
- * NOTHING AT ALL WHEN THE RECORD HAS NEITHER REGISTER: no request, no file read. Each runs on its own client and
- * deadline, and a failure is one fixed item, because an error could quote anything.
+ * NOTHING AT ALL WHEN THE RECORD HAS NEITHER REGISTER: no request, no file read. NOTHING EITHER WHEN THE TAG HERE IS THE
+ * ONE THE WORK LAST RAN WHOLE AT: no request. Each runs on its own client and deadline, and a failure is one fixed
+ * item, because an error could quote anything; a failure or a step with no time left leaves the work owed.
  *
  * `headers`, when given, are the session headers every request of the work carries, as the MCP server sends its own;
  * left out, they are Claude Code's for `run`, as the start hook has always sent them.
@@ -62,23 +71,35 @@ export async function startWork(
   const home = io.home ?? homedir();
   const found = await git(at.cwd, 'rev-parse', '--show-toplevel');
   const top = found === null ? null : resolve(found);
+  const configDir = io.env.CLAUDE_CONFIG_DIR || join(home, '.claude');
+  /* NOTHING MOVED SINCE THE LAST TIME IT RAN WHOLE, HERE: no request, and the start is the attach alone. */
+  const place: Place = { host: to.key, machine: at.host, folder: top ?? resolve(at.cwd), configDir };
+  const kept = readTags(home)[tagKey(place)];
+  const before = startTag(io.env, home, place, top, at.cwd, context);
+  if (before !== null && kept !== undefined && kept.owed !== true && kept.tag === before) return [];
   const said: string[] = [];
+  /* WHOLE ONLY WHEN EVERY STEP RAN TO ITS END: one that ran out of time or failed leaves the work owed. */
+  let whole = true;
   const step = async (label: string, work: (client: Client, signal: AbortSignal, ms: number) => Promise<string[]>) => {
     const left = until - Date.now() - 250;
-    if (left <= 0) return;
+    if (left <= 0) {
+      whole = false;
+      return;
+    }
     const ms = Math.min(START_WORK_MS, left);
     const signal = AbortSignal.timeout(ms);
     try {
       const lines = await work(clientFor(to, async () => headers, signal), signal, ms);
       if (lines.length > 0) said.push(`${label}: ${String(lines.length)} change${lines.length === 1 ? '' : 's'}`);
     } catch {
+      whole = false;
       said.push(`${label} skipped`);
     }
   };
   if (wants('skills'))
     /* The list read stops at half the step's time, on the hook's clock, so what was read is still acted on inside it. */
     await step('skills sync', (client, _signal, ms) =>
-      syncSkills({ client, context, home, configDir: io.env.CLAUDE_CONFIG_DIR || join(home, '.claude'), top, dryRun: false, until: Date.now() + ms / 2 }),
+      syncSkills({ client, context, home, configDir, top, dryRun: false, until: Date.now() + ms / 2 }),
     );
   if (wants('tools'))
     await step('tools scan', (client, signal) =>
@@ -94,7 +115,129 @@ export async function startWork(
         once: { host: to.key, hosts: hostsPath(io.env) },
       }),
     );
+  /* THE TAG AFTER THE WORK, because the work itself writes the lock files and the skill files it reads next time. */
+  const after = whole ? startTag(io.env, home, place, top, at.cwd, context) : null;
+  try {
+    keepTag(home, tagKey(place), after !== null ? { tag: after } : before === null && whole ? null : { tag: kept?.tag ?? '', owed: true });
+  } catch {
+    /* A home folder that cannot be written runs the work again at the next start, as it always did. */
+  }
   return said;
+}
+
+/* ── the tag: whether anything the work reads moved ────────────────────── */
+
+/** Where the start work runs: the host, the machine, the repository's top folder (or the folder), and Claude's config. */
+type Place = { host: string; machine: string; folder: string; configDir: string };
+
+/** What the work last left here: the tag it ran whole at, or `owed` when it did not finish and the server owes it. */
+export type Tagged = { tag: string; at?: string; owed?: true };
+
+/** `~/.braindog/start-tag.json`: one hash a place, never a key, a path or a row. */
+export const startTagPath = (home: string): string => join(home, '.braindog', 'start-tag.json');
+
+/* The places kept, newest first: a few folders a day, and the file stays small however long the machine is used. */
+const TAGS_KEPT = 64;
+
+const sha = (text: string | Buffer): string => createHash('sha256').update(text).digest('hex');
+const tagKey = (p: Place): string => sha(JSON.stringify([p.host, p.machine, p.folder, p.configDir])).slice(0, 24);
+
+function readTags(home: string): Record<string, Tagged> {
+  try {
+    const x: unknown = JSON.parse(readFileSync(startTagPath(home), 'utf8'));
+    if (!isObject(x) || !isObject(x.tags)) return {};
+    const out: Record<string, Tagged> = {};
+    for (const [key, t] of Object.entries(x.tags))
+      if (isObject(t) && typeof t.tag === 'string') out[key] = { tag: t.tag, ...(typeof t.at === 'string' ? { at: t.at } : {}), ...(t.owed === true ? { owed: true as const } : {}) };
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** One place's tag kept, or dropped with `null`; written whole and renamed, as `markStarted` writes its file. */
+function keepTag(home: string, key: string, tagged: Tagged | null): void {
+  const { [key]: _was, ...rest } = readTags(home);
+  const kept = Object.entries(rest)
+    .sort(([, a], [, b]) => (b.at ?? '').localeCompare(a.at ?? ''))
+    .slice(0, TAGS_KEPT - 1);
+  const tags = Object.fromEntries(tagged === null ? kept : [[key, { ...tagged, at: new Date().toISOString() }], ...kept]);
+  const file = startTagPath(home);
+  mkdirSync(join(home, '.braindog'), { recursive: true, mode: 0o700 });
+  const tmp = `${file}.${String(process.pid)}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ tags }, null, 2)}\n`, { mode: 0o600 });
+  renameSync(tmp, file);
+}
+
+/** Whether the start work here did not finish last time, so the MCP server owes it (`startFromServer`). */
+export function owedAt(home: string, place: Place): boolean {
+  return readTags(home)[tagKey(place)]?.owed === true;
+}
+
+/**
+ * EVERYTHING THE SKILLS SYNC AND THE TOOLS SCAN READ, AS ONE HASH, or `null` when it cannot be told, so the work runs.
+ *
+ * THE RECORD'S HALF COMES IN THE ATTACH'S OWN ANSWER: the Skills and Tools rows `context` shows, by name, version, state
+ * and scope, and the project. A list the context cut short (`truncated`) has rows it did not show, so no tag is made and
+ * the work runs, as it did at every start. THE MACHINE'S HALF is read here and costs no request: the two lock files, each
+ * skill and command file by size and time, the MCP servers each app's config names as the scan parses them (Claude
+ * Code rewrites `~/.claude.json` at every start, so its time says nothing), the hosts file, and this command's build.
+ */
+export function startTag(env: Env, home: string, place: Place, top: string | null, cwd: string, context: Context): string | null {
+  const rows: unknown[] = [];
+  for (const id of ['skills', 'tools']) {
+    const reg = context.registers.find((r) => r.id === id);
+    if (reg === undefined) continue;
+    if (reg.truncated) return null;
+    rows.push(id, [...reg.rows, ...reg.inherited].map((r) => [r.spoken, r.version, r.state, r.scope]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+  }
+  const stat = (path: string): unknown[] => {
+    try {
+      const s = statSync(path);
+      return [path, s.size, Math.round(s.mtimeMs)];
+    } catch {
+      return [path];
+    }
+  };
+  const content = (path: string): string | null => {
+    try {
+      return sha(readFileSync(path));
+    } catch {
+      return null;
+    }
+  };
+  const names = (dir: string): string[] => {
+    try {
+      return readdirSync(dir).sort().slice(0, 500);
+    } catch {
+      return [];
+    }
+  };
+  const files: unknown[] = [];
+  for (const base of [place.configDir, ...(top === null ? [] : [join(top, '.claude')])]) {
+    for (const name of names(join(base, 'skills'))) files.push(stat(join(base, 'skills', name, 'SKILL.md')));
+    for (const name of names(join(base, 'commands'))) files.push(stat(join(base, 'commands', name)));
+  }
+  const servers = CLIENTS.map((app) => {
+    try {
+      return [app.id, app.servers(home, top, cwd).map((s) => [s.scope, s.source, s.fault, s.servers])];
+    } catch {
+      return [app.id, null];
+    }
+  });
+  return sha(
+    JSON.stringify([
+      cliBuild(),
+      place,
+      context.project?.spoken ?? null,
+      rows,
+      content(join(home, '.braindog', 'skills-lock.json')),
+      content(join(home, '.braindog', 'tools-lock.json')),
+      files,
+      sha(JSON.stringify(servers)),
+      stat(hostsPath(env)),
+    ]),
+  ).slice(0, 32);
 }
 
 /* ── once a day for a machine, a folder and an app ─────────────────────── */
@@ -172,6 +315,8 @@ export type FromServer = {
   /** This machine's name; the network name `positionOf` reads when left out. */
   machine?: string | undefined;
   now?: (() => number) | undefined;
+  /** How an app with a start hook waits for that hook to be done before it looks for work owed: `ms`, on a timer. */
+  wait?: ((ms: number) => Promise<void>) | undefined;
 };
 
 /** What came of it, for a test: the work ran, it ran today already, the app has its own hook, or the record did not answer. */
@@ -186,14 +331,21 @@ export async function startFromServer(s: FromServer): Promise<Outcome> {
   const now = s.now ?? Date.now;
   const began = now();
   /* THE BUDGET RUNS ON THE MACHINE'S OWN CLOCK, as `startWork` reads it; `now` names the day the start is marked on. */
-  const until = Date.now() + s.ms;
+  let until = Date.now() + s.ms;
   try {
     const client = s.agent ?? 'other';
-    if (HOOKED.includes(client)) return 'hooked';
+    const hooked = HOOKED.includes(client);
+    /* AN APP WITH A START HOOK LEAVES THE WORK TO IT, unless the hook left it owed here, and nothing is asked of the record. */
+    if (hooked && !(await owedHere(s))) return 'hooked';
     const at = await s.where;
     const home = s.io.home ?? homedir();
     const machine = s.machine ?? (at.host || hostname());
-    if (startedToday(home, machine, at.cwd, client, began)) return 'already';
+    if (hooked) {
+      /* ONCE THE HOOK'S OWN TIME IS OVER, so the two never sync at once, and only if it is still owed then. */
+      await (s.wait ?? ((ms) => new Promise<void>((done) => setTimeout(done, ms).unref())))(s.ms);
+      if (!(await owedHere(s))) return 'hooked';
+      until = Date.now() + s.ms;
+    } else if (startedToday(home, machine, at.cwd, client, began)) return 'already';
     const headers = await s.headers().catch(() => ({}) as Record<string, string>);
     const signal = AbortSignal.timeout(Math.max(1, until - Date.now()));
     const out = await clientFor(s.to, async () => headers, signal).context();
@@ -207,7 +359,7 @@ export async function startFromServer(s: FromServer): Promise<Outcome> {
       return 'away';
     }
     try {
-      markStarted(home, machine, at.cwd, client, began);
+      if (!hooked) markStarted(home, machine, at.cwd, client, began);
     } catch {
       /* A home folder that cannot be written runs the work again at the next start, and costs nothing else. */
     }
@@ -218,6 +370,15 @@ export async function startFromServer(s: FromServer): Promise<Outcome> {
     s.say('BrainDog could not do the start work for this session, and the server goes on.');
     return 'failed';
   }
+}
+
+/** Whether the start hook left the work owed in the server's folder, read from the tag file alone. */
+async function owedHere(s: FromServer): Promise<boolean> {
+  const at = await s.where;
+  const home = s.io.home ?? homedir();
+  const found = await git(at.cwd, 'rev-parse', '--show-toplevel');
+  const folder = found === null ? resolve(at.cwd) : resolve(found);
+  return owedAt(home, { host: s.to.key, machine: at.host, folder, configDir: s.io.env.CLAUDE_CONFIG_DIR || join(home, '.claude') });
 }
 
 /* Every `initialize` result carries the revision agreed, and no other reply does. */

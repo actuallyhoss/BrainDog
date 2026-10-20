@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { hookStart } from '../src/hooks.ts';
 import type { Target } from '../src/http.ts';
 import type { Agent, Position } from '../src/position.ts';
-import { afterHello, dayOf, markStarted, startedPath, startedToday, startFromServer, START_WORK_MS } from '../src/session-start.ts';
+import { afterHello, dayOf, markStarted, startedPath, startedToday, startFromServer, startTag, startTagPath, startWork, START_WORK_MS } from '../src/session-start.ts';
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 /* Obviously fake, and long enough that a fragment of it in any output is findable. */
@@ -251,7 +251,7 @@ test('A FAILURE NEVER THROWS: it is one fixed line, and quotes nothing', async (
 
 /* ── the start hook, as before ─────────────────────────────────────────── */
 
-test('THE START HOOK STILL DOES THE WORK AT EVERY START, whatever the server marked for the day', async (t) => {
+test('THE START HOOK DOES THE WORK WHENEVER WHAT IT READS MOVED, whatever the server marked for the day', async (t) => {
   const p = place(t);
   const h = await stubHost(t);
   const kiln = p.folder('kiln');
@@ -271,6 +271,97 @@ test('THE START HOOK STILL DOES THE WORK AT EVERY START, whatever the server mar
   /* The stub sends no card (the record draws it, AGT-B07), so each start prints the one line; the sync is the file above. */
   for (const card of written) assert.equal(card.trimEnd(), 'Connected to BrainDog. Call context.', card);
   assert.deepEqual(h.seen.map((s) => s.method).filter((m) => m !== 'heard'), ['attach', 'get', 'attach', 'get']);
+});
+
+/* ── behind a tag ──────────────────────────────────────────────────────── */
+
+test('NOTHING MOVED, NOTHING ASKED: a start where the rows and the files are as the work last left them is the attach alone', async (t) => {
+  const p = place(t);
+  const h = await stubHost(t);
+  const kiln = p.folder('kiln');
+  const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), BRAINDOG_HOST: h.base, BRAINDOG_TOKEN: TOKEN, CLAUDE_CONFIG_DIR: p.configDir };
+  const hook = (id: string) => hookStart({ env, stdin: JSON.stringify({ cwd: kiln, session_id: id, source: 'startup' }), cwd: kiln, home: p.home, device: 'MacBook', write: () => undefined });
+  const asked = () => h.seen.map((s) => s.method).filter((m) => m !== 'heard');
+
+  await hook('claude-run-1');
+  assert.ok(existsSync(p.skillFile));
+  await hook('claude-run-2');
+  await hook('claude-run-3');
+  assert.deepEqual(asked(), ['attach', 'get', 'attach', 'attach'], 'a start where nothing moved still synced');
+  const kept = readFileSync(startTagPath(p.home), 'utf8');
+  assert.ok(!kept.includes(TOKEN) && !kept.includes(kiln) && !kept.includes(SKILL.name), 'the tag file holds more than hashes');
+
+  /* THE MACHINE MOVED: the skill's file was taken away, so the next start syncs it back, and the one after is quiet. */
+  rmSync(p.skillFile);
+  await hook('claude-run-4');
+  assert.ok(existsSync(p.skillFile));
+  await hook('claude-run-5');
+  assert.deepEqual(asked().slice(4), ['attach', 'get', 'attach']);
+
+  /* THE RECORD MOVED: a new revision of the skill in the attach's context is a start that syncs. */
+  const row = CONTEXT.registers[0]!.inherited[0]!;
+  Object.assign(row, { version: 2, rev: 2 });
+  t.after(() => void Object.assign(row, { version: 1, rev: 1 }));
+  await hook('claude-run-6');
+  assert.deepEqual(asked().slice(7), ['attach', 'get']);
+});
+
+test('A TAG IS THE RECORD’S ROWS AND THE MACHINE’S FILES: a cut-short list has none, and a version or a project moves it', (t) => {
+  const p = place(t);
+  const kiln = p.folder('kiln');
+  const place1 = { host: 'https://brain.dog/acme', machine: MACHINE, folder: kiln, configDir: p.configDir };
+  const context = (o: { version?: number; truncated?: boolean; project?: string } = {}) =>
+    ({
+      ...CONTEXT,
+      project: o.project === undefined ? null : { spoken: o.project, name: 'Kiln', mark: null, hue: null, how: 'folder' },
+      registers: [{ ...CONTEXT.registers[0]!, truncated: o.truncated ?? false, inherited: [{ ...CONTEXT.registers[0]!.inherited[0]!, version: o.version ?? 1 }] }],
+    }) as never;
+  const env = { XDG_CONFIG_HOME: join(p.dir, 'config') };
+  const tag = (c: never) => startTag(env, p.home, place1, null, kiln, c);
+  assert.match(tag(context()) ?? '', /^[0-9a-f]{32}$/);
+  assert.equal(tag(context()), tag(context()), 'the same rows and files are the same tag');
+  assert.notEqual(tag(context({ version: 2 })), tag(context()));
+  assert.notEqual(tag(context({ project: 'things#4' })), tag(context()));
+  assert.equal(tag(context({ truncated: true })), null, 'a list the context cut short was tagged');
+  assert.notEqual(startTag(env, p.home, { ...place1, host: 'https://brain.dog/other' }, null, kiln, context()), tag(context()));
+  /* A skill file on this machine moved. */
+  mkdirSync(dirname(p.skillFile), { recursive: true });
+  const before = tag(context());
+  writeFileSync(p.skillFile, '# Release\n');
+  assert.notEqual(tag(context()), before);
+});
+
+test("A HOOK THAT RAN OUT OF TIME LEAVES THE WORK OWED, and Claude Code's server does it once the hook's time is over", async (t) => {
+  const p = place(t);
+  const h = await stubHost(t);
+  const kiln = p.folder('kiln');
+  const env = { XDG_CONFIG_HOME: join(p.dir, 'config'), CLAUDE_CONFIG_DIR: p.configDir };
+  const to: Target = { key: h.base, base: h.base, token: TOKEN };
+  /* No time left: the hook's attach took all of it, so neither step ran. */
+  assert.deepEqual(await startWork({ env, home: p.home }, to, positionAt(kiln), CONTEXT as never, {}, Date.now()), []);
+  assert.equal(existsSync(p.skillFile), false);
+  assert.equal(h.seen.length, 0);
+
+  const waited: number[] = [];
+  const server = () =>
+    startFromServer({
+      io: { env, home: p.home },
+      to,
+      where: Promise.resolve(positionAt(kiln)),
+      agent: 'claude',
+      headers: async () => ({ 'x-braindog-client': 'claude-run-1' }),
+      ms: 8_000,
+      say: () => undefined,
+      wait: async (ms) => void waited.push(ms),
+    });
+  assert.equal(await server(), 'ran');
+  assert.deepEqual(waited, [8_000], 'the server did not wait out the hook first');
+  assert.ok(existsSync(p.skillFile), 'the owed sync did not run');
+  assert.deepEqual(h.seen.map((s) => s.method), ['context', 'get']);
+  assert.equal(h.seen[0]!.headers['x-braindog-client'], 'claude-run-1', 'the work was not the session’s own run');
+  /* PAID: the next server of the window has nothing owed, and asks nothing. */
+  assert.equal(await server(), 'hooked');
+  assert.equal(h.seen.length, 2);
 });
 
 /* ── after the first initialize ────────────────────────────────────────── */
