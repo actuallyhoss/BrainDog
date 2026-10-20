@@ -82,6 +82,7 @@
   import { page } from '$app/state';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import { WORDS as whoWords } from './decider.ts';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -176,6 +177,8 @@
    * reads the hint here, on the queue, or in the toast a key gives them meets the same words.
    */
   const me = $derived((page.data as unknown as Shell).me);
+  /** Whether the owner opened who decides this, from the "⋯" at the right of the title (`Decider.svelte`). */
+  let whoOpen = $state(false);
   const answerable = $derived(mayAnswer(me.level, me.owner));
   const whyNot = $derived(whyNotAnswering(me.level, me.lists));
 
@@ -909,13 +912,16 @@
   <!-- THE QUESTION IS THE PAGE'S TITLE, and a question that gathered several says how many beside it. No sentence under
        it: how many answers there are and which is suggested is what the tile under it shows, and saying it twice was
        the trivia the reset took out (DIRECTION §39). -->
-  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} />
+  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} actions={!settled && me.owner ? whoMore : undefined} />
+  {#snippet whoMore()}
+    <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
+  {/snippet}
 
   <div class="page" data-plain={sided ? undefined : ''}>
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
     {#if part && !settled}<Applied partial={part} />{/if}
     <!-- WHO DECIDES THIS ONE, and for the owner the way to name them: its own chunk, read only on an open question. -->
-    {#if !settled}{#await import('./Decider.svelte') then m}<m.default {question} owner={me.owner} me={me.person} />{/await}{/if}
+    {#if !settled}{#await import('./Decider.svelte') then m}<m.default {question} owner={me.owner} me={me.person} bind:open={whoOpen} />{/await}{/if}
 
     <!-- ONE TILE, READ LIKE A FORM (DIRECTION §39): who asked and when, why, the answers as choices, Decide and Not now,
          then what accepting does as a plain part of the same tile, and the comments under it all. A settled question

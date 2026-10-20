@@ -26,6 +26,7 @@
     owner,
     members,
     me,
+    open = $bindable(false),
   }: {
     question: Decided;
     /** Whether the reader owns the record; read from the shell when left out. */
@@ -34,6 +35,8 @@
     members?: readonly Person[] | undefined;
     /** The reader's person id; read from the shell when left out. */
     me?: string | undefined;
+    /** Whether the owner opened the picker, from the "⋯" at the right of the page's title. */
+    open?: boolean;
   } = $props();
 
   const shell = $derived(page.data as unknown as Partial<Shell>);
@@ -66,8 +69,6 @@
   });
   let sending = $state(false);
   let refused = $state('');
-  /** Whether the owner opened the picker behind "⋯". */
-  let open = $state(false);
 
   async function save() {
     if (sending || picked === (decider ?? '')) return;
@@ -88,13 +89,9 @@
 {#if line || owns}
   <!-- FOLDED BEHIND "⋯" (the 20 October walk): "Anybody who may decide can answer this. Who decides: Nobody [Save]"
        opened every question and pushed the question down. The line stays when somebody is named, since that is news;
-       the picker is one press away for an owner, and opens by itself only when the record refused a name. -->
-  <div class="decider-fold">
-    {#if line}<p class="decider-line">{line}</p>{/if}
-    {#if owns}
-      <Button weight="bare" size="sm" aria-expanded={open} aria-controls="{field}-pick" aria-label={WORDS.more} onclick={() => (open = !open)}>⋯</Button>
-    {/if}
-  </div>
+       the picker opens from the "⋯" at the right of the page's title, which the page draws, so nothing floats in a row
+       of its own above the question, and it opens by itself only when the record refused a name. -->
+  {#if line}<p class="decider-line">{line}</p>{/if}
   {#if owns && (open || refused !== '')}
   <Tile class="decider" title={line ?? WORDS.nobodyLine}>
       <div class="decider-pick" id="{field}-pick">
@@ -115,17 +112,8 @@
 {/if}
 
 <style>
-  .decider-fold {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-  }
-
   .decider-line {
     margin: 0;
-    margin-inline-end: auto;
     color: var(--ink2);
     font-size: var(--t-ui);
   }

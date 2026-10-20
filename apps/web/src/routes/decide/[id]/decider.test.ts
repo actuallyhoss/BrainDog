@@ -113,9 +113,13 @@ test('a refusal is kept in the record’s own words', async () => {
 test('the part draws who decides in one line, its picker only for an owner, a refusal under it, 44px targets', () => {
   const svelte = readFileSync(fileURLToPath(new URL('./Decider.svelte', import.meta.url)), 'utf8');
   assert.match(svelte, /deciderLine\(/u);
-  assert.match(svelte, /\{#if owns\}/u);
+  assert.match(svelte, /\{#if owns && \(open \|\| refused !== ''\)\}/u);
   assert.match(svelte, /whoCanDecide\(/u);
   assert.match(svelte, /role="alert"/u);
   assert.match(svelte, /min-height: 44px/u);
   assert.doesNotMatch(svelte, /box-shadow|border:\s*1px|gradient|—/u);
+  /* FOLDED BEHIND THE "⋯" AT THE RIGHT OF THE TITLE, never a row of its own above the question (20 Oct walk). */
+  const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
+  assert.match(page, /actions=\{!settled && me\.owner \? whoMore : undefined\}/u);
+  assert.match(page, /bind:open=\{whoOpen\}/u);
 });
