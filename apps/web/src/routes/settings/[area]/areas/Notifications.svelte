@@ -7,13 +7,13 @@
   import { sendTest, testWords } from '$lib/ui/push.ts';
   import type { Call } from '$lib/ui/webhook-doors.ts';
   import { copy } from '$lib/copy.ts';
-  import { macNotifications, setMacNotifications } from '$lib/shell.ts';
+  import { isApp, macNotifications, setMacNotifications } from '$lib/shell.ts';
   import { read } from '$lib/data/read.svelte.ts';
   import { wrote } from '$lib/record/settings-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { createClient } from '@braindog/client';
   import { TONES } from 'braindog-render';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import PushToggle from '$lib/ui/PushToggle.svelte';
@@ -40,7 +40,20 @@
     tellersWhy: (feed: string, home: string) => `Turn one off and its notices leave “${feed}” on ${home}, for you alone. Its urgent ones still show there.`,
     tells: (name: string) => `${name} tells you`,
     muted: 'Off for you',
+    /* WHAT INTERRUPTS, AS ONE SENTENCE (agents F20): three rows that looked like settings and changed nothing were three
+       facts, so they are said once, as the facts they are. */
+    interrupts: 'Only urgent things interrupt you, at most once an hour: keys about to expire, runs held back, and anything a rule marks urgent. The rest waits for your summary.',
+    mac: 'Mac notifications',
+    macLine: 'A new question or handoff rings once, and not while this window is in front.',
   } as const;
+
+  /**
+   * THE QUIET HOURS IN 24-HOUR TIME, ALWAYS (agents F20). A native time field draws in the browser's own language, so an
+   * en-GB record read "09:00 PM" on an American browser. A select of the half hours says "21:00" everywhere; a time the
+   * record holds off the half hour is offered too, so the select never shows a choice that is not the one kept.
+   */
+  const HALF_HOURS: readonly string[] = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 === 0 ? '00' : '30'}`);
+  const timesWith = (kept: string): readonly string[] => (kept === '' || HALF_HOURS.includes(kept) ? HALF_HOURS : [...HALF_HOURS, kept].sort());
 
   let client: ReturnType<typeof createClient> | null = null;
   const clientOf = (): ReturnType<typeof createClient> => (client ??= createClient({ base: apiBase() }));
@@ -97,7 +110,7 @@
 
   /* A PICKER CLEARED BY HAND SENDS NOTHING: an empty time is not a time, and the record would only say so. */
   function pick(end: 'from' | 'to', e: Event): void {
-    const typed = (e.currentTarget as HTMLInputElement).value;
+    const typed = (e.currentTarget as HTMLSelectElement).value;
     if (typed === '' || !on) return;
     void put(end === 'from' ? { from: typed, to } : { from, to: typed });
   }
@@ -196,17 +209,12 @@
   its own, which is this person's (`notify.muted`), not the record's. The last switch is Web Push for this device,
   which is kept by the browser and the record, not a preference over what interrupts.
 -->
-<Section title={copy.whenWeInterrupt}>
-  <p class="hint">{copy.batchByDefault}</p>
-  <!-- WHAT INTERRUPTS, AS ROWS OF FACT: each rule this record holds about interrupting, with its glyph, its name and
-       the one sentence that says it. Nothing here is a control, so no row carries one. -->
-  <StateRow icon="alert" title={copy.urgentKinds} line={words.urgentAre} />
-  <StateRow icon="clock" title={copy.interruptCap} line={copy.interruptCapIs} />
-  <StateRow icon="bell" title={copy.unreadCount} line={copy.unreadCountIs} />
-</Section>
+<Tile icon="bell" title={copy.whenWeInterrupt}>
+  <p class="said-once">{words.interrupts}</p>
+</Tile>
 
 {#if tellers.length > 0}
-  <Section title={words.tellers}>
+  <Tile icon="refresh" title={words.tellers}>
     <p class="hint">{words.tellersWhy(said('since_away'), said('home'))}</p>
     {#each tellers as t (t.actor)}
       {@const tells = !muted.includes(t.actor)}
@@ -227,10 +235,10 @@
     {#if muteRefusal}
       <p class="quiet-refused" role="alert"><span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {muteRefusal}</p>
     {/if}
-  </Section>
+  </Tile>
 {/if}
 
-<Section title={copy.quietHours}>
+<Tile icon="moon" title={copy.quietHours}>
   {#if held.state === 'waiting' || ((held.state === 'refused' || held.state === 'offline') && answered === null)}
     <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
   {:else if unserved !== null && answered === null}
@@ -243,15 +251,15 @@
           {#if on}
             <label class="quiet-word" for="quiet-from">{copy.quietHold}</label>
             <span class="quiet-pickers">
-              <span class="field quiet-field">
-                <input class="field-input quiet-time" id="quiet-from" type="time" value={from} disabled={busy} onchange={(e) => pick('from', e)} />
-              </span>
+              <select class="quiet-time" id="quiet-from" value={from} disabled={busy} onchange={(e) => pick('from', e)}>
+                {#each timesWith(from) as t (t)}<option value={t}>{t}</option>{/each}
+              </select>
               <!-- "TO" AND ITS TIME ARE ONE PIECE, which wraps under the first time where the two will not fit side by side. -->
               <span class="quiet-to">
                 <label class="quiet-word" for="quiet-to">{copy.quietUntil}</label>
-                <span class="field quiet-field">
-                  <input class="field-input quiet-time" id="quiet-to" type="time" value={to} disabled={busy} onchange={(e) => pick('to', e)} />
-                </span>
+                <select class="quiet-time" id="quiet-to" value={to} disabled={busy} onchange={(e) => pick('to', e)}>
+                  {#each timesWith(to) as t (t)}<option value={t}>{t}</option>{/each}
+                </select>
               </span>
             </span>
           {:else}
@@ -282,18 +290,20 @@
       <StateRow icon="moon" title={on ? copy.quietHeld(from, to) : copy.quietOff} line={`${copy.quietWhy} ${copy.quietOwner}`} />
     {/if}
   {/if}
-</Section>
+</Tile>
 <!-- THE ONE CONTROL ON THIS SCREEN THAT IS ABOUT THE DEVICE, NOT THE RECORD. It says whether this browser is rung when
      something interrupts. It draws nothing until the host hands it a key, so on a host without one it is not here.
      THE TILE IS THIS WRAPPER, so the toggle's section lies flat inside it and the test sits under the switch in the same
      tile; a wrapper the toggle drew nothing into is not drawn. -->
-<div class="push tile">
-  <label class="mac">
-    <input type="checkbox" role="switch" checked={mac} onchange={flipMac} />
-    <span>Mac notifications</span>
-  </label>
-  <p class="hint">A new question or handoff rings once, and not while this window is in front.</p>
-</div>
+<!-- THE MAC APP'S OWN SWITCH, only in the Mac app: in a browser there is no Mac notification to turn on. -->
+{#snippet macSwitch()}
+  <button type="button" class="switch" role="switch" aria-checked={mac} aria-label={words.mac} onclick={flipMac}><span class="switch-track"></span></button>
+{/snippet}
+{#if isApp}
+  <Tile>
+    <StateRow icon="monitor" title={words.mac} line={words.macLine} action={macSwitch} />
+  </Tile>
+{/if}
 <div class="push tile">
   <div class="push-switch"><PushToggle host={props.shell.host} onchange={turned} /></div>
   {#if rung}
@@ -319,7 +329,15 @@
     column-gap: var(--sp-3);
     min-block-size: var(--row-h-2);
     padding-block: var(--sp-2);
-    max-inline-size: calc(var(--measure) + var(--sp-9));
+  }
+
+  /* THE FACTS OF WHAT INTERRUPTS, said once, at the body size and kept to 75 characters. */
+  .said-once {
+    margin: 0;
+    max-inline-size: 75ch;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 
   .quiet-said {
@@ -329,7 +347,7 @@
     gap: var(--sp-2);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: var(--lh-body);
   }
@@ -346,14 +364,17 @@
     flex-wrap: nowrap;
   }
 
-  .quiet-field {
-    inline-size: auto;
-  }
-
-  /* A TIME IS NEVER CUT: "10:00 PM" and its picker's mark need nine characters, whatever the row has left. */
+  /* A TIME IS NEVER CUT: "21:00" and the select's mark need eight characters, whatever the row has left. */
   .quiet-time {
-    min-inline-size: 9ch;
+    min-inline-size: 10ch;
     min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-2);
+    background: var(--tile);
+    border: 1px solid var(--switch-off);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-body);
     font-variant-numeric: tabular-nums;
   }
 
@@ -378,9 +399,9 @@
 
   .said {
     margin: var(--sp-2) 0 0;
-    max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    max-inline-size: 75ch;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -395,15 +416,15 @@
 
   .quiet-refused {
     margin: 0 0 var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .hint {
     margin: 0 0 var(--sp-3);
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    max-inline-size: 75ch;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -415,7 +436,7 @@
     }
 
     .quiet-said {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
 
     /* AT 320 THE TWO PICKERS AND "to" OUTRAN THE ROW, and squeezing them cut the times to "10:00 P": each picker keeps
@@ -426,12 +447,12 @@
       min-inline-size: 0;
     }
 
-    .quiet-pickers > .quiet-field,
+    .quiet-pickers > .quiet-time,
     .quiet-to {
       flex: 1 1 auto;
     }
 
-    .quiet-to > .quiet-field {
+    .quiet-to > .quiet-time {
       flex: 1 1 auto;
     }
 
