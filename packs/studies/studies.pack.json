@@ -63,6 +63,11 @@
           },
           "index": true,
           "default": "running"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },
@@ -143,6 +148,11 @@
         {
           "id": "note",
           "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },
@@ -199,6 +209,11 @@
           "id": "thoughts",
           "label": "A line on it",
           "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },
@@ -246,6 +261,11 @@
           "label": "Minutes",
           "type": "int",
           "min": 1
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },

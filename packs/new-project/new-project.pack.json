@@ -54,6 +54,11 @@
           "index": true,
           "required": true,
           "default": "idea"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },
@@ -130,6 +135,11 @@
           "label": "Ticked by",
           "type": "text",
           "index": true
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ],
       "steps": {
@@ -181,6 +191,11 @@
           "label": "Decided on",
           "type": "day",
           "index": true
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },
@@ -231,6 +246,11 @@
           "id": "worry",
           "label": "In the way",
           "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },

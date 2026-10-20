@@ -57,6 +57,11 @@
           "id": "role",
           "label": "Role",
           "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },
@@ -149,6 +154,11 @@
         {
           "id": "note",
           "type": "text"
+        },
+        {
+          "id": "tags",
+          "type": "list",
+          "of": "text"
         }
       ]
     },

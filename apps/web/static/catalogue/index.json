@@ -1736,6 +1736,55 @@
     },
     {
       "kind": "pack",
+      "id": "new-project",
+      "title": "Starting a project",
+      "summary": "A guide for something new: three stages (idea, first users, first money), the next steps at each as a checklist an agent can tick, the decisions you made with reasons, and a weekly page on where it stands.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "ab3a9131703a1a42f772e65281df64e78cc8614e95b627ad0688f0fc3897e6e9",
+          "bytes": 17326,
+          "published_at": "2026-10-20T05:20:53.220Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Projects",
+              "Next steps",
+              "Decisions",
+              "Weekly notes"
+            ],
+            "pages": [
+              "Your project",
+              "This week"
+            ],
+            "rules": [
+              "Ask what comes next when a step is ticked"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "pad",
       "title": "Pad",
       "summary": "Notes beside the work, each with room for a reply under it. It asks no model, so it keeps on any record.",
@@ -2779,6 +2828,53 @@
     },
     {
       "kind": "pack",
+      "id": "studies",
+      "title": "Studies",
+      "summary": "Your courses, assignments with due dates, marks as numbers with a trend for each course, a reading list and study sessions. Says what is due this week first.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "dc4f59d7001a460715710b950150dcf269776d16a1b36259824c8f0bfd567cb3",
+          "bytes": 16282,
+          "published_at": "2026-10-20T05:20:53.220Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Courses",
+              "Assignments",
+              "Reading list",
+              "Study sessions"
+            ],
+            "pages": [
+              "Studies"
+            ],
+            "rules": [
+              "Ask whether to plan study for a new assignment"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "task-tiers",
       "title": "Task tiers",
       "summary": "Give a task four numbers, what it brings in, what it unblocks, whether it has a clock on it and how cheap it is, and the record works out its priority and writes the sum as the reason.",
@@ -2811,6 +2907,53 @@
       ],
       "categories": [
         "automations",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
+      "id": "team-board",
+      "title": "Team task list",
+      "summary": "Tasks with an owner, a person or an agent, a status and a priority, a board to move them across, and a page that says who is doing what right now, fed by agent sessions.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "c931a5b9a84696a79accbc4173962f39ffbdf82d8e0c3542049e3a6c52b4da19",
+          "bytes": 11650,
+          "published_at": "2026-10-20T05:20:53.220Z",
+          "bump": null,
+          "reach": {
+            "modules": [],
+            "lists": [
+              "Team",
+              "Team tasks"
+            ],
+            "pages": [
+              "Board",
+              "Who is doing what"
+            ],
+            "rules": [
+              "Ask what unblocks a blocked task"
+            ],
+            "examples": 7,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version.",
+          "preview": true
+        }
+      ],
+      "categories": [
+        "modules",
         "made-by-braindog"
       ],
       "publisher": {
@@ -3254,6 +3397,64 @@
     },
     {
       "kind": "usecase",
+      "id": "new-project",
+      "title": "Starting a project",
+      "summary": "Something new you want walked through: the stages from idea to first money, the next step at each, the decisions you made and a weekly note on where it stands.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "starter",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "d3ae4f58030bf5ef6bfb042f926c2c7413cc1427baa5c4cec4d8ecb4cefc802e",
+          "bytes": 3512,
+          "published_at": "2026-10-20T05:20:53.220Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "new-project"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "starting a project",
+        "start a project",
+        "new project",
+        "new idea",
+        "side project",
+        "first users",
+        "first customers",
+        "first money",
+        "launch my idea",
+        "what should i do next",
+        "step by step"
+      ],
+      "modules": [
+        "new-project"
+      ]
+    },
+    {
+      "kind": "usecase",
       "id": "personal",
       "title": "Personal",
       "summary": "Your money and bills, what you are saving for, and the projects and goals you care about.",
@@ -3691,6 +3892,67 @@
     },
     {
       "kind": "usecase",
+      "id": "studies",
+      "title": "Studies",
+      "summary": "Courses, assignments and when they are due, your marks as numbers with a trend for each course, and what you are reading.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "individual",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "2b34c143afc44e6a6e2570e4c57f6d36b6195d1b0c6a94a2a970b6ec1b60e3c5",
+          "bytes": 4290,
+          "published_at": "2026-10-20T05:20:53.220Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "studies"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "studies",
+        "my courses",
+        "assignments",
+        "assignment",
+        "due dates",
+        "grades",
+        "my grades",
+        "marks",
+        "grade trend",
+        "reading list",
+        "study sessions",
+        "coursework",
+        "homework",
+        "revision"
+      ],
+      "modules": [
+        "studies"
+      ]
+    },
+    {
+      "kind": "usecase",
       "id": "team",
       "title": "Team board",
       "summary": "Tickets with an owner and a status, the cycle each is in, and the work your agents took on.",
@@ -3788,6 +4050,64 @@
         "portfolio",
         "people",
         "work"
+      ]
+    },
+    {
+      "kind": "usecase",
+      "id": "team-board",
+      "title": "Team task list",
+      "summary": "The tasks your team and its agents are working on: who owns each, its status and priority, a board, and who is doing what right now.",
+      "author": "BrainDog",
+      "license": "MIT",
+      "audience": "team",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "1547ded20e5d4d375d16715521809680a97a8609548adcc1a636f58736cc5b6c",
+          "bytes": 4023,
+          "published_at": "2026-10-20T05:20:53.220Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "team-board"
+            ],
+            "lists": [],
+            "pages": [
+              "Today"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "ways-of-working",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      },
+      "signals": [
+        "team task list",
+        "task list for my team",
+        "team tasks",
+        "our tasks",
+        "task board",
+        "kanban",
+        "who is doing what",
+        "agents and people",
+        "agentic task list",
+        "sprint",
+        "standup"
+      ],
+      "modules": [
+        "team-board"
       ]
     }
   ]
