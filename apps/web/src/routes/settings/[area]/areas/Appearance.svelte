@@ -39,7 +39,7 @@
   import { CONTRAST, choicesOf, lookWords, previewOf, styleOf, type Look } from '$lib/theme/theme-choice.ts';
   /* THE HOUSE'S OWN SEED AND THE EDITOR'S SOLVER, both already in this screen's chunk (`LookEditor`), so the house's
      other scheme is solved here without a new export from the module every screen loads. */
-  import { HOUSE_FRAME, HOUSE_SEED } from '@braindog/theme';
+  import { BRAND_RED, HOUSE_FRAME, HOUSE_SEED } from '@braindog/theme';
   import { baseOf } from '$lib/theme/look.ts';
   import LookEditor from '$lib/theme/LookEditor.svelte';
   import { takeFix } from '$lib/theme/staged.ts';
@@ -243,7 +243,7 @@
   }
 
   /* THE HOUSE SWATCH IS THE HOUSE'S OWN RED, whatever colour the page is drawn in now. */
-  const houseHex = HOUSE_SEED.accent;
+  const houseHex = BRAND_RED;
   const accentName = $derived(accent === null ? words.houseRed : (ACCENTS.find((a) => a.hex === accent)?.name ?? ''));
 
   /* SCREENSHOT MODE, AS THIS SCREEN SHOWS IT NOW: the mark the mode puts on the page, so the switch never claims a mode the
@@ -573,10 +573,15 @@
     font-size: var(--fs-meta);
   }
 
-  /* A CHOICE ON A PHONE IS THE COLUMN'S WIDTH, so a full segmented control shares it evenly (2.A.9). */
+  /* A CHOICE ON A PHONE IS THE COLUMN'S WIDTH, so a full segmented control shares it evenly (2.A.9). The density's
+     three-line picture goes there, so "Comfortable" fits whole beside its two neighbours instead of scrolling. */
   @media (width < 640px) {
     .choice {
       align-items: stretch;
+    }
+
+    .segment .spacing {
+      display: none;
     }
   }
 
