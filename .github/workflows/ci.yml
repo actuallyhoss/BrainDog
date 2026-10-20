@@ -104,11 +104,11 @@ jobs:
           - leg: web
             dirs: 'apps/web packages/render packages/theme packages/skin'
             browser: true
-          # The hosts, the CLI and the site, and the real MCP clients that greet the CLI's source
+          # The hosts, the CLI, the site, the uptime watchdog and the Mac shell, and the real MCP clients that greet the CLI's source
           # (`tools/client-checks`). The docs' tests ride here because `docs/` is not a
           # workspace, so no filter reaches them.
           - leg: apps
-            dirs: 'apps/worker apps/selfhost apps/cli apps/site tools/client-checks'
+            dirs: 'apps/worker apps/selfhost apps/cli apps/site apps/watchdog apps/desktop tools/client-checks'
             links: true
     steps:
       - uses: actions/checkout@v4

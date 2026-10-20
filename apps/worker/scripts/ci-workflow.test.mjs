@@ -167,7 +167,7 @@ test('the legs are the four the workflow was drawn with', () => {
     kernel: ['ports', 'where', 'kernel', 'declare', 'extract', 'dog'].map((p) => `packages/${p}`),
     record: [...['record', 'host', 'mcp', 'client', 'slash', 'seed', 'script', 'connect'].map((p) => `packages/${p}`), ...packs],
     web: ['apps/web', ...['render', 'theme', 'skin'].map((p) => `packages/${p}`)],
-    apps: [...['worker', 'selfhost', 'cli', 'site'].map((a) => `apps/${a}`), 'tools/client-checks'],
+    apps: [...['worker', 'selfhost', 'cli', 'site', 'watchdog', 'desktop'].map((a) => `apps/${a}`), 'tools/client-checks'],
   };
   const found = legs();
   assert.deepEqual(found.map((leg) => leg.leg), Object.keys(drawn));
