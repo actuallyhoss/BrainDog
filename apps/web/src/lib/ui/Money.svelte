@@ -158,7 +158,7 @@
     display: inline-block;
     block-size: 0.9em;
     vertical-align: -0.1em;
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-sm);
   }
 
@@ -188,7 +188,7 @@
      smaller than the figure at every one of them. */
   .code {
     margin-inline-start: 0.3em;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     letter-spacing: 0;
   }

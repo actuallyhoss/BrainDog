@@ -1583,7 +1583,7 @@
     margin: 0 auto;
     padding: 0;
     background: var(--tile);
-    border: 1px solid color-mix(in srgb, var(--ink) 16%, var(--tile));
+    border: 1px solid var(--rule-strong);
     border-radius: var(--r-lg);
     color: var(--ink);
     overflow: hidden;
@@ -1659,7 +1659,7 @@
     padding-block: 0;
     padding-inline: var(--sp-4);
     border-block-end: 1px solid var(--line);
-    color: var(--dim);
+    color: var(--ink-3);
     transition: border-color var(--d-state) var(--ease-out);
   }
 
@@ -1667,8 +1667,8 @@
      that says it is live: its edge darkens toward the ink. Never the accent, which under the query
      read as a validation error before anything had been typed. */
   .p-head:focus-within {
-    border-block-end-color: var(--ink2);
-    color: var(--ink2);
+    border-block-end-color: var(--ink-2);
+    color: var(--ink-2);
   }
 
   /* THE GLYPH AND THE QUERY, one piece: on a phone it is the well the query is typed into. */
@@ -1702,7 +1702,7 @@
   }
 
   .p-input::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE CHIPS A PLAIN LINE WAS READ INTO: rectangles at the control radius, flat on the board's sunk colour. */
@@ -1754,7 +1754,7 @@
   .p-group {
     margin: 0;
     padding: var(--sp-3) var(--sp-2) var(--sp-1);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
@@ -1773,7 +1773,7 @@
     border: 0;
     border-radius: var(--r-ctl);
     background: none;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
     text-align: start;
     cursor: pointer;
@@ -1788,13 +1788,13 @@
 
   /* THE CURSOR ROW IS THE WASH, and the pointer moves the cursor, so hover and the cursor are one state. */
   .p-row[data-cursor] {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   /* AND THE QUIET LINE STEPS UP ONE INK ON IT: `--dim` is measured against the ground, and over the wash in the dark
      scheme it falls under 4.5:1. */
   .p-row[data-cursor] :global(.result-line) {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE KEY CAP HINT, on the cursor row at desktop width with a fine pointer, where the keyboard is. */
@@ -1803,7 +1803,7 @@
     flex: none;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   @media (hover: hover) and (pointer: fine) and (width >= 900px) {
@@ -1815,7 +1815,7 @@
   .p-none {
     margin: 0;
     padding: var(--sp-5) var(--sp-3);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* SLASH ANSWERS IN THE SAME SURFACE. What it looked for sits where a group heading sits, in the meta step,
@@ -1825,20 +1825,20 @@
   .p-slash-where {
     margin: 0;
     padding: var(--sp-3) var(--sp-4) 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-sm);
     overflow-wrap: anywhere;
   }
 
   .p-slash-label {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
   }
 
   /* THE FOLD IS FOLDED, AND IT IS THERE ON EVERY ASK. `23 §6`: its last line is the vault, refused, drawn every time. */
   .p-slash-fold {
     padding: var(--sp-2) var(--sp-4) var(--sp-3);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
   }
 
@@ -1869,7 +1869,7 @@
   .p-slash-said {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-base);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
@@ -1883,7 +1883,7 @@
   }
 
   .p-slash-card[data-armed] {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .p-slash-card > :global(.queue-card) {
@@ -1904,7 +1904,7 @@
   /* RECEDED AND SMALL (`23 §8`), and still there on every proposal. */
   .p-slash-model {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
     overflow-wrap: anywhere;
   }
@@ -1918,7 +1918,7 @@
     padding: 0 var(--sp-1);
     border: 0;
     background: none;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
     text-decoration: underline;
     cursor: pointer;
@@ -1932,7 +1932,7 @@
     gap: var(--sp-1) var(--sp-2);
     padding: var(--sp-2) var(--sp-4);
     border-block-start: 1px solid var(--line);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
   }
 
@@ -1968,7 +1968,7 @@
       gap: var(--sp-2);
       min-block-size: var(--tap);
       padding-inline: var(--sp-3);
-      background: var(--field);
+      background: var(--tile-2);
       border-radius: var(--r-md);
     }
 

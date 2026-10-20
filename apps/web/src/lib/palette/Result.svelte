@@ -83,8 +83,8 @@
   .result-glyph :global(.well) {
     inline-size: 28px;
     block-size: 28px;
-    background: var(--field);
-    color: var(--ink2);
+    background: var(--tile-2);
+    color: var(--ink-2);
   }
 
   .result-glyph :global(.well .icon[data-size]) {
@@ -121,7 +121,7 @@
 
   .result-folded {
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
@@ -130,7 +130,7 @@
     flex: 1 1 0;
     min-inline-size: 0;
     overflow: hidden;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -161,7 +161,7 @@
 
   /* "SHOW ALL 13": a red word, the one link look in the list. */
   .result[data-more] .result-title {
-    color: var(--red, var(--danger-text));
+    color: var(--red);
     font-weight: var(--fw-medium);
   }
 

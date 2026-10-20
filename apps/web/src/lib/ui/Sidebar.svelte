@@ -750,8 +750,8 @@
   .rail {
     --fly-x: var(--rail-w);
     /* THE NAV'S SELECTED FILL for the place you are on, and the hover step under the pointer. */
-    --rail-here: var(--board);
-    --rail-over: var(--hover-wash);
+    --rail-here: var(--nav-selected);
+    --rail-over: var(--hover);
 
     position: relative;
     display: flex;
@@ -762,7 +762,7 @@
        height set the row, and `.scroll` never had less room than it wanted. The foot went off the bottom with it. */
     block-size: 100dvh;
     padding: var(--sp-3) var(--sp-3) 0;
-    background: var(--tile);
+    background: var(--nav);
     border-inline-end: 1px solid var(--rule);
   }
 
@@ -796,7 +796,7 @@
   }
 
   .record :global(.icon) {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .mi {
@@ -806,7 +806,7 @@
     min-block-size: 32px;
     padding: 0 var(--sp-3);
     border-radius: var(--r-sm);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--t-sm);
     text-decoration: none;
     cursor: pointer;
@@ -819,7 +819,7 @@
   }
 
   .mi:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -829,7 +829,7 @@
   }
 
   .mi :global(.icon) {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .mi-avatar {
@@ -841,7 +841,7 @@
     background: var(--ink);
     border-radius: var(--r-sm);
     color: var(--on-ink);
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
     font-weight: 600;
     line-height: 1;
   }
@@ -859,8 +859,8 @@
     padding: 0 var(--sp-1);
     background: var(--s1);
     border-radius: var(--r-sm);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     font-weight: 500;
   }
 
@@ -868,7 +868,7 @@
   .mi-note {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
   }
 
@@ -889,7 +889,7 @@
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: pointer;
     opacity: 0;
     transition:
@@ -927,7 +927,7 @@
     background: var(--rail-here);
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
     text-align: start;
     cursor: text;
@@ -1018,7 +1018,7 @@
     margin: 0;
     padding-inline: var(--sp-2);
     min-block-size: 28px;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
     font-weight: 500;
     letter-spacing: 0;
@@ -1069,7 +1069,7 @@
     display: grid;
     flex: none;
     place-items: center;
-    color: var(--dim);
+    color: var(--ink-3);
     transition: transform var(--d-state) var(--ease-out);
   }
 
@@ -1086,7 +1086,7 @@
     min-block-size: 36px;
     padding: 0 var(--sp-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     text-decoration: none;
@@ -1102,7 +1102,7 @@
     flex: none;
     inline-size: var(--icon-m);
     block-size: var(--icon-m);
-    color: var(--ink2);
+    color: var(--ink-2);
     transition: color var(--d-state) var(--ease-out);
   }
 
@@ -1141,7 +1141,7 @@
 
   /* THE NEW-PAGE LINE reads as an offer and not as a page already there, so it is drawn in `--dim`. */
   .item.view[data-page-line] {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* ITS BOX, WHERE THE LINE WAS: the row's own height and indent, flat, with the focus ring the board draws. 16px, so a
@@ -1171,7 +1171,7 @@
 
   .tally {
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
@@ -1207,7 +1207,7 @@
     flex: none;
     inline-size: 28px;
     block-size: 28px;
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-round);
     color: var(--ink);
     font-size: var(--fs-meta);
@@ -1233,7 +1233,7 @@
     inline-size: 28px;
     block-size: 28px;
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink-3);
     transition: background var(--d-state) var(--ease-out);
   }
 
@@ -1253,7 +1253,7 @@
     }
 
     .mi:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
 
@@ -1351,7 +1351,7 @@
     z-index: var(--z-hint);
     padding: var(--sp-1) var(--sp-3);
     background: var(--tile);
-    border: 1px solid color-mix(in srgb, var(--ink) 16%, var(--tile));
+    border: 1px solid var(--rule-strong);
     border-radius: var(--r-sm);
     color: var(--ink);
     font-size: var(--t-sm);

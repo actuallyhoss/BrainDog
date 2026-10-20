@@ -1382,14 +1382,25 @@
     padding: var(--inset) var(--inset) 0;
   }
 
-  /* THE TOP BAR IS THE WINDOW'S WIDTH, on the tile's white with one hairline under it (19 October). Its own gutter lines
-     its edges up with the work under it. The Mac app's title bar is paid here, once: the work under the bar pays none. */
+  /* THE TOP BAR IS THE WINDOW'S WIDTH, on the nav's surface with one hairline under it in light; in dark the surface
+     alone parts it from the board (frame F4). Its own gutter lines its edges up with the work under it. The Mac app's
+     title bar is paid here, once: the work under the bar pays none. */
   .shell[data-shape='bar'] .bar-slot {
     position: relative;
     z-index: var(--z-palette);
     padding: var(--shell-inset, 0px) 0 0;
-    background: var(--tile);
-    border-block-end: 1px solid var(--line);
+    background: var(--nav);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  :global(html[data-scheme='dark']) .shell[data-shape='bar'] .bar-slot {
+    border-block-end-color: transparent;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(html:not([data-scheme])) .shell[data-shape='bar'] .bar-slot {
+      border-block-end-color: transparent;
+    }
   }
 
   .shell[data-shape='bar'] .body {
@@ -1476,7 +1487,7 @@
   .offline-line {
     margin: 0;
     padding: var(--sp-3) var(--gutter) 0;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* ONE MOTION PER CHANGE (motion F6): where a page change is a view transition the transition is the arrival, and the
@@ -1655,7 +1666,7 @@
   /* The glyph is quiet, and ink on the row you are on, as the rail draws it. */
   .more-row > :global(.icon) {
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .more-row[aria-current='page'] {
@@ -1676,7 +1687,7 @@
 
   .more-tally {
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
   }
 
@@ -1705,7 +1716,7 @@
     background: var(--ink);
     border-radius: var(--r-sm);
     color: var(--bg);
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
     font-weight: 600;
     line-height: 1;
   }
@@ -1717,7 +1728,7 @@
   .more-fold {
     display: inline-grid;
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
     transition: transform var(--d-state) var(--ease-out);
   }
 
@@ -1732,7 +1743,7 @@
 
   .more-note {
     padding: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
   }
 
@@ -1740,7 +1751,7 @@
   .more-section {
     margin-block: var(--sp-4) 0;
     padding-inline: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
     font-weight: 600;
   }
@@ -1754,7 +1765,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .more-row:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .more-row[aria-current='page']:hover {

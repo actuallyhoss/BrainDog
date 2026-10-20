@@ -49,7 +49,7 @@
     border-radius: var(--r-round);
     color: var(--on-red, var(--on-action));
     font-family: var(--font-ui);
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
     font-weight: var(--fw-semi);
     font-variant-numeric: tabular-nums;
     line-height: 20px;
@@ -60,7 +60,7 @@
     block-size: 18px;
     padding-inline: var(--sp-1);
     line-height: 18px;
-    box-shadow: 0 0 0 2px var(--tile);
+    box-shadow: 0 0 0 2px var(--nav);
   }
 
   @media (forced-colors: active) {

@@ -272,7 +272,7 @@
 <style>
   /* Same size as the figure, dimmed: it modifies the number rather than being part of it. */
   .more-sign {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* No margin of its own: it is either there or it is not. */
@@ -280,7 +280,7 @@
     margin: 0;
     padding: var(--sp-2) var(--gutter) 0;
     max-inline-size: calc(var(--measure) + var(--gutter) * 2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
@@ -295,7 +295,7 @@
     inline-size: fit-content;
     margin: 0;
     padding: var(--sp-4) var(--gutter) 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-regular);
     line-height: calc(18 / 13);
@@ -402,7 +402,7 @@
     place-items: center;
     margin-inline-end: var(--sp-3);
     vertical-align: -0.12em;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .name-well {
@@ -417,7 +417,7 @@
   .count {
     flex: none;
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-head);
     font-weight: var(--fw-medium);
     font-variant-numeric: tabular-nums;
@@ -426,7 +426,7 @@
 
   /* THE SPACE IS A CHARACTER, AND IT HAS TO BE: a margin reads `10of 38` to a screen reader and a copy-paste. */
   .of {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
@@ -452,7 +452,7 @@
 
   .head-title-count {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-body);
     font-weight: var(--fw-medium);
   }
@@ -493,7 +493,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .head-actions :global(.btn:is([data-weight='quiet'], [data-weight='glass']):hover:not(:disabled)) {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -506,7 +506,7 @@
     block-size: var(--ctl-h);
     background: var(--tile);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     opacity: 1;
     visibility: visible;
     transition: background var(--d-state) var(--ease-out);
@@ -514,7 +514,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .head-actions :global(.menu-trigger:hover .head-more) {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -532,7 +532,7 @@
     align-items: center;
     gap: var(--sp-1);
     min-inline-size: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     text-decoration: none;
@@ -581,7 +581,7 @@
   }
 
   .page-said :global([data-needs]) {
-    color: var(--red, var(--danger-text));
+    color: var(--red);
     font-weight: var(--fw-medium);
   }
 
@@ -745,7 +745,7 @@
       place-items: center;
       inline-size: 32px;
       block-size: 32px;
-      background: var(--field);
+      background: var(--tile-2);
       border-radius: var(--r-round);
       font-size: var(--fs-meta);
       font-weight: var(--fw-semi);

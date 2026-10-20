@@ -193,7 +193,7 @@
 
   .bar-chevron {
     display: inline-grid;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE STRIP CLIPS SIDEWAYS RATHER THAN THE DOCUMENT SCROLLING, and only sideways: the 4px above and below are the
@@ -223,7 +223,7 @@
     border: 0;
     background: none;
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     text-decoration: none;
@@ -236,25 +236,25 @@
 
   /* HERE IS THE NAV'S SELECTED FILL, ink, and the weight a step up. */
   .bar-item[aria-current='page'] {
-    background: var(--board);
+    background: var(--nav-selected);
     color: var(--ink);
     font-weight: var(--fw-semi);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .bar-brand:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .bar-item:hover:not([aria-current='page']) {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }
 
   .bar-more {
     padding: 0 var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* ASK, DRAWN AS THE FIELD IT OPENS: 280 wide in the field's fill, the words at 14 in the quiet ink, and its key. A
@@ -271,7 +271,7 @@
     border: 0;
     background: var(--board);
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-ctl);
     text-align: start;
     cursor: text;
@@ -280,7 +280,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .bar-ask:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -301,10 +301,10 @@
     block-size: 20px;
     background: var(--tile);
     border-radius: var(--r-sm);
-    color: var(--dim);
+    color: var(--ink-3);
     font: inherit;
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-family: var(--font-mono);
+    font-size: var(--fs-cap);
   }
 
   /* WHO IS WORKING: their makers' marks, the words, and a live dot in the live colour, never the red. */
@@ -317,7 +317,7 @@
     padding: 0 var(--sp-3);
     background: var(--board);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     text-decoration: none;
@@ -327,7 +327,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .bar-crew:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -382,7 +382,7 @@
     flex: none;
     inline-size: 32px;
     block-size: 32px;
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-round);
     color: var(--ink);
     font-size: var(--fs-meta);
@@ -400,18 +400,18 @@
   }
 
   .bar-mi {
-    color: var(--ink2);
+    color: var(--ink-2);
     text-decoration: none;
     cursor: pointer;
   }
 
   .bar-mi:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
   .bar-mi :global(.icon) {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* NARROWER THAN 1,280 the working chip is its marks and its dot. */

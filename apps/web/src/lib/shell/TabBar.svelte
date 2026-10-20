@@ -66,7 +66,7 @@
     box-sizing: border-box;
     block-size: var(--tabbar);
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    background: var(--tile);
+    background: var(--nav);
     border-block-start: 1px solid var(--rule);
     /* HELD STILL IN A PAGE CHANGE: the page's pictures pass under it (`app.css` gives this name no animation). */
     view-transition-name: tabbar;
@@ -91,8 +91,8 @@
     padding: 0 var(--sp-1);
     border: 0;
     background: none;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     font-weight: var(--fw-medium);
     line-height: calc(16 / 12);
     text-decoration: none;
