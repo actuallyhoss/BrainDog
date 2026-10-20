@@ -27,6 +27,7 @@ import { LANES_WINDOW, TONES, lanesInstant, lanesMore, parse } from 'braindog-re
 
 import type { KindDrawer } from './index.ts';
 import { escapeCell, fenced } from './dialect.ts';
+import { AGENT_NAMES, humanize } from '../../record/names.ts';
 
 const two = (n: number): string => String(n).padStart(2, '0');
 
@@ -76,7 +77,10 @@ function whoOf(result: unknown, at: number): string {
   const row = Array.isArray(rows) ? rows[at] : null;
   const fields = row !== null && typeof row === 'object' ? (row as { fields?: unknown }).fields : null;
   const agent = fields !== null && typeof fields === 'object' ? (fields as { agent?: unknown }).agent : null;
-  return typeof agent === 'string' ? agent.replace(/[|\n\r]+/gu, ' ').trim() : '';
+  if (typeof agent !== 'string') return '';
+  /* SAID AS A PERSON SAYS IT: "Claude", never the record's "claude" (`AGENT_NAMES`), as the cards of runs say it. */
+  const kind = agent.replace(/[|\n\r]+/gu, ' ').trim();
+  return kind === '' ? '' : Object.hasOwn(AGENT_NAMES, kind) ? (AGENT_NAMES[kind] ?? kind) : humanize(kind);
 }
 
 /** The rows a lanes block writes, one a lane the answer holds that can be placed on an axis. */
