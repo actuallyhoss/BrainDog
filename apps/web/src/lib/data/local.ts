@@ -42,13 +42,23 @@
  * THE LAST READER, SIGNED (`local-mark.ts`). A live boot leaves a marker naming who read; a cold open before the shell
  * has claimed the copy, and a boot nobody answered (offline), draws only for that person, and only to read. Offline the
  * layout draws the last shell copy marked `offline` (or the refusal, where none is kept) with the error page's offline
- * line, and the screens below draw what the copy holds and keep it on screen through the record's UNREACHABLE.
+ * line, and the screens below draw what the copy holds and keep it on screen through the record's UNREACHABLE. Where no
+ * shell copy is kept, the rail is drawn from the copy itself (`railOf`): the lists its answers were read from, by name,
+ * a count only where an unnarrowed list kept one, and the declared pages it holds where their nav put them.
  *
- * WHO DRAWS FROM IT. Work and a list's first page are patched and, when current, skip the record. Today, a row's page
- * (row, history, what points at it), declared pages (People, Money and the rest under `/p/`) and Needs you are kept
- * `always`: drawn at once, and asked again every time. Needs you and a row's page offer no write while they are the
- * copy's; anywhere else a write from a drawn copy meets the record's compare-and-set like any other. Anything drawn
- * from the copy and not yet answered holds up the quiet mark over the work (`copy-mark.svelte.ts`).
+ * WHO DRAWS FROM IT. The classic Work screen and a list's first page are patched and, when current, skip the record.
+ * Today, a row's page (row, history, what points at it), declared pages (People, Money and the rest under `/p/`, and
+ * the live Work page, under the same key `/p/work` keeps) and Needs you are kept `always`: drawn at once, and asked
+ * again every time. Needs you and a row's page offer no write while they are the copy's; anywhere else a write from a
+ * drawn copy meets the record's compare-and-set like any other. Anything drawn from the copy and not yet answered holds
+ * up the quiet mark over the work (`copy-mark.svelte.ts`).
+ *
+ * OPENED BESIDE BOOT. The layout starts the database opening before it waits on anything (`warmLocal`), and the store
+ * and the marker's key share one connection, so a screen's 60 ms wait (`NEAR_MS`) meets an open database rather than a
+ * cold one, and no paint ever waits on it: a copy that is late is simply not drawn, and the record answers.
+ *
+ * FORGOTTEN ON ASKING. Settings > Sessions says how much is kept here and forgets it (`forgetLocal`): the copy, its
+ * signed marker, the last shell and the offline cache. A live open keeps it again, as after a sign-out.
  *
  * WHAT IT NEVER STORES: a refusal; anything not a plain JSON value; a list whose declaration is unknown to this tab or
  * declares a `secret` field; the vault and the kernel's `session` list; any key named like a credential (`SECRET_KEY`).
