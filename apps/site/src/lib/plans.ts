@@ -49,6 +49,8 @@ type Row = {
   credits: number;
   agents: number;
   people: number | null;
+  /** Whether the plan takes people beyond the owner (the Plus gate on teams). */
+  teams: boolean;
   extra: { runs: ExtraPrice; requests: ExtraPrice; bytes: ExtraPrice; ms: ExtraPrice } | null;
 };
 
@@ -73,6 +75,7 @@ export const TABLE: { free: Row; hosted: Row; plus: Row } = {
     credits: 20,
     agents: 3,
     people: 1,
+    teams: false,
     extra: null,
   },
   hosted: {
@@ -83,6 +86,7 @@ export const TABLE: { free: Row; hosted: Row; plus: Row } = {
     credits: 80,
     agents: 15,
     people: null,
+    teams: false,
     extra: EXTRA,
   },
   plus: {
@@ -93,6 +97,7 @@ export const TABLE: { free: Row; hosted: Row; plus: Row } = {
     credits: 400,
     agents: 75,
     people: null,
+    teams: true,
     extra: EXTRA,
   },
 };
