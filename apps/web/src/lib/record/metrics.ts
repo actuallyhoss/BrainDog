@@ -1006,6 +1006,9 @@ export const targetLine = (decl: MetricDecl, value?: number | null): string => {
   /* A DAY HAS NO LINE: its bound is a day nobody set (the first of 2100, for the day the money runs out), and "At least
      1 Jan 2100" under a date is the declaration talking. The tone says which side of it the day is on. */
   if (decl.format === 'day') return '';
+  /* MONEY IN NO CURRENCY HAS NO LINE: a bare `money` with no home currency is written as the minor units it is kept in
+     ("720000 over your limit"), so it is said only once a caller names the currency (`targetSaid`). */
+  if (decl.format === 'money' && fxSource().home === null) return '';
   /* A LIMIT WITH ITS FIGURE BESIDE IT says nothing while the figure keeps to it, since "Limit 5" under a 2 is a rule
      nobody broke, and says how far over once it does not: the tone already says which side it is on. */
   if (under && typeof value === 'number') return value <= bound ? '' : `${format(decl.format, value - bound).replace(/\.0+$/u, '')} over your limit`;

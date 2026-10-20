@@ -22,7 +22,7 @@ import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
 import { actorFor, forget, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noteOf, settlingOf } from './history-live.ts';
-import { beyondOf, format, fxNote, hrefFor, offTarget, partsText, targetLine } from './metrics.ts';
+import { beyondOf, format, fxNote, hrefFor, partsText, targetSaid } from './metrics.ts';
 import { moneyInText } from './money.ts';
 import { runByIn } from './names.ts';
 import type { AuditEvent } from './schema.ts';
@@ -102,7 +102,9 @@ export function tileOf(id: string, r: Reading | null): Metric {
     value: r.unit ? money(Math.round(r.value), r.unit) : format(decl?.format, r.value),
     /* THE TARGET LINE GOES WITH THE TICK, because "never below zero" under a figure no row contributed to is a bound
        every such figure satisfies, printed as though something had been checked against it. */
-    note: [unsaid ? NO_ROW_SAID : decl && !offTarget(decl, r.unit) ? targetLine(decl, r.value) : '', across].filter(Boolean).join(' · '),
+    /* IN THE CURRENCY THE FIGURE WAS READ IN (`targetSaid`), as a page's tile says it: a bare `money` names none, and
+       Slash's Figures said "720000 over your limit", minor units as they are kept (the audit of 20 October). */
+    note: [unsaid ? NO_ROW_SAID : decl ? targetSaid(decl, r) : '', across].filter(Boolean).join(' · '),
     tone: met === null ? undefined : met ? 'good' : 'warn',
     ...(door ? { href: door } : {}),
   };

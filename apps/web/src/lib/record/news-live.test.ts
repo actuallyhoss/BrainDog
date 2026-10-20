@@ -70,6 +70,19 @@ test("a figure is the record's reading in the declaration's words, and one that 
   assert.equal(broken.note, copy.figureUnavailable);
 });
 
+test('A LIMIT BROKEN IS SAID IN THE FIGURE’S CURRENCY, never as the minor units it is kept in ("720000 over your limit")', () => {
+  const id = 'over-limit-test';
+  METRICS[id] = { metric: id, name: 'Owed past the line', source: 'register.obligations', value: { sum: 'amount' }, format: 'money', target: { lte: 2_000_000 }, window: '30d', compare: 'none' } as never;
+  try {
+    const tile = tileOf(id, { value: 2_720_000, unit: 'EGP', rows: 3, met: false, refusals: [] });
+    assert.equal(tile.value, money(2_720_000, 'EGP'));
+    assert.equal(tile.note, 'EGP 7,200 over your limit');
+    assert.doesNotMatch(tile.note, /720000/u);
+  } finally {
+    delete METRICS[id];
+  }
+});
+
 /**
  * THE THIRD STATE OF A FIGURE, ON ALL THREE ENGINES AT ONCE.
  *
