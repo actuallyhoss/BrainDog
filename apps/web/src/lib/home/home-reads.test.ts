@@ -91,18 +91,17 @@ test('the template draws from the helper, each part once and keyed, so a read la
   assert.ok(order.every((at) => at > 0), 'a part is missing from the template');
 });
 
-test("THE PAGE'S OWN SENTENCE STAYS UNDER THE HEAD: the reader draws the briefing under it, and Home only where no reader does", () => {
-  /* Handed to the reader only while it draws the blocks and there is a card, so no empty row opens the board. */
-  assert.match(home, /<PageView [^>]*opens=\{paged && brief && brief\.cards\.length > 0 \? briefed : undefined\}/u);
-  assert.match(home, /\{#if !paged\}\{@render briefed\(\)\}\{\/if\}/u, 'the briefing is drawn twice, or not at all without a reader');
-  assert.match(home, /const paged = \$derived\(reader && drawn\?\.from === 'live'\);/u);
+test('THE BRIEFING IS BEHIND MORE WITH THE REST: never handed to the reader, and drawn once, in More, as homeReads orders it', () => {
+  /* The desk opens on what needs you, not on the briefing (roadmap slice 1a): the reader is handed no `opens`. */
+  assert.doesNotMatch(home, /<PageView [^>]*opens=/u);
+  assert.equal(home.split('{@render briefed()}').length - 1, 1, 'the briefing is drawn twice, or not at all');
+  const more = home.indexOf('class="more-body"');
+  assert.ok(more > 0 && home.indexOf('{@render briefed()}') > more, 'the briefing is not inside More');
+  assert.ok(home.indexOf('{#each homeReads(') > more, 'More does not draw from the helper');
   const body = readFileSync(new URL('../page/PageBody.svelte', import.meta.url), 'utf8');
-  /* Under the headline when the headline is what a reader meets first, else over the first block: never both. */
+  /* The reader still takes what a kept page opens its board with, under the headline or over the first block. */
   assert.match(body, /const opensAt = \$derived\(opens && !arranging && headline && reading\[0\] === headline \? headline\.at : -1\);/u);
   assert.equal(body.split('{@render opens()}').length - 1, 2);
-  assert.match(body, /\{#if opens && opensAt === at\}/u);
-  assert.match(body, /\{#if opens && opensAt < 0\}/u);
-  /* And who wrote it goes with the cards. */
   /* The engine line says the model has stopped, so the brief's own paused foot is not said twice. */
   assert.match(home, /<brief\.Part cards=\{brief\.cards\} foot=\{engineDown !== null && brief\.foot === brief\.paused \? null : brief\.foot\} \/>/u);
 });

@@ -19,12 +19,15 @@
   IT LISTENS. A write from an agent, a rule or another tab moves the record's version, and Home reads its page again
   without a reload and without blanking it (`listen`).
 
-  THREE READS OF THEIR OWN STAND AROUND THE PAGE: the briefing over it, what matters today as the record wrote it;
-  what went stale under it; and who the record matched as the board's last line. Each is asked for beside the page and
-  never by its read, each is fetched with its own part when it is asked for, and each draws nothing for a record that
-  answers none (`homeReads`). Under them all, the board's last tile: what the record found wrong in its own pages and
-  notes (`TextFaults.svelte`), fetched the same way and drawn only when it found something. After it, last of all,
-  what the answers taught (`Learned.svelte`), the same way.
+  TODAY'S OWN BODY IS THE DESK (roadmap slice 1a): what needs you, who is working and cash, the projects, then Arrivals,
+  what is coming up and people, on one board, and everything else behind one More. A page the person kept is drawn as
+  they laid it out, with the desk over it, and only the tiles around it fold.
+
+  THREE READS OF THEIR OWN STAND AROUND THE PAGE, behind More: the briefing, what matters today as the record wrote it;
+  what went stale; and who the record matched. Each is asked for beside the page and never by its read, each is fetched
+  with its own part when it is asked for, and each draws nothing for a record that answers none (`homeReads`). After
+  them, what the record found wrong in its own pages and notes (`TextFaults.svelte`), fetched the same way and drawn
+  only when it found something, and what the answers taught (`Learned.svelte`), the same way.
 -->
 <script module lang="ts">
   /** What Today draws, top to bottom. */
@@ -74,8 +77,10 @@
   import {
     FIRST_TODAY_MOST,
     TELL_LINE,
+    deskFolded,
     drawsAny,
     homeDrawn,
+    peopleOf,
     railed,
     slashLineOf,
     todayHome,
@@ -108,6 +113,7 @@
   import { untrack } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
   import { typing } from '$lib/a11y/keys.svelte.ts';
+  import Icon from '$lib/ui/Icon.svelte';
 
   import { closed, drew, opened } from '../ui/screen.svelte.ts';
 
@@ -226,12 +232,14 @@
 
   /** The record's week, on Today's own body only: a page the record declares draws what it declares. */
   const week = $derived(declares === null ? weekOf(decls, playedBy('meets')) : undefined);
+  /** The people the desk names a few of, on Today's own body only, the same way. */
+  const people = $derived(declares === null ? peopleOf(decls, playedBy('meets')) : undefined);
 
   /* WHAT TODAY'S BODY IS BUILT AROUND, read off the shell, by that same mode's helper: a block over a list the record
      does not keep is not asked for. It carries one of the tasks list as the record words it (`one`), which names the
      line a task is typed into, read again when the voice is heard so a list renamed in Settings › Words renames the
      line too. And the record's week, where Today's own body is drawn over one. */
-  const holds = $derived<Holds>(week ? { ...holdsOf(data, heard()), week } : holdsOf(data, heard()));
+  const holds = $derived<Holds>({ ...holdsOf(data, heard()), ...(week ? { week } : {}), ...(people ? { people } : {}) });
   const one = $derived(holds.one);
 
   /** The entries of a list as this tab has named them, by the number a person can say. */
@@ -305,7 +313,11 @@
     const m = await import('../../routes/decide/[id]/proposed.ts');
     const drawn = await m.drawnOf(body, apiBase());
     if (drawn.from === 'live')
-      return { from: 'live', page: { page: { page: body.page, title: body.title, layout: body.layout }, blocks: quietHeld(drawn.blocks) }, now: drawn.now };
+      return {
+        from: 'live',
+        page: { page: { page: body.page, title: body.title, ...(body.layout ? { layout: body.layout } : {}) }, blocks: quietHeld(drawn.blocks) },
+        now: drawn.now,
+      };
     if (drawn.from === 'refused') return { from: 'refused', fix: drawn.fix };
     return null;
   }
@@ -406,11 +418,27 @@
   const line = $derived(lead && shaped && live ? homeLineOf(lead, slashLineOf(shaped, declares === null), live.now) : null);
   const slashed = $derived(line?.by === 'slash' ? cutLine(line) : null);
 
+  /**
+   * TODAY'S OWN BODY IS THE DESK (roadmap slice 1a, the 19 October look): what needs you, who is working and cash, the
+   * projects, then Arrivals, what is coming up and people, on one twelve-column board, and EVERYTHING ELSE FOLDED BEHIND
+   * ONE MORE: the rest of the page's blocks (`deskFolded`), the briefing, and every tile Home draws around the page.
+   *
+   * A PAGE THE PERSON KEPT IS THEIRS AND IS DRAWN AS THEY LAID IT OUT, every block of it; only the tiles Home draws around
+   * it fold. More is per visit: shut each time Today opens.
+   */
+  const board = $derived(declares === null);
+  let moreOpen = $state(false);
+
   /* THE PAGE AS HOME DRAWS IT, handed to the reader whole, so the reader's writes index the blocks it draws. A rail with
-     nothing beside it, or nothing in it, is one column. */
-  const drawn = $derived.by((): Opened | null => {
-    if (!got || got.from !== 'live' || !shaped) return got;
+     nothing beside it, or nothing in it, is one column. On the desk, what it does not show at rest is folded. */
+  const desked = $derived.by(() => {
+    if (!got || got.from !== 'live' || !shaped) return null;
     const blocks = deskWorking ? shaped.blocks.map((b) => (b.source === 'sessions.working' ? { ...b, drawn: false } : b)) : shaped.blocks;
+    return board ? deskFolded(blocks, moreOpen) : { blocks, folded: 0 };
+  });
+  const drawn = $derived.by((): Opened | null => {
+    if (!got || got.from !== 'live' || !desked) return got;
+    const blocks = desked.blocks;
     if (railed(blocks)) return { ...got, page: { page: got.page.page, blocks } };
     const { layout: _rail, ...flat } = got.page.page;
     return { ...got, page: { page: flat, blocks } };
@@ -424,7 +452,8 @@
   const capture = $derived(shaped?.capture && view?.capturable(shaped.capture) ? shaped.capture : null);
 
   /* BESIDE THE NAME FROM 900px, AND UNDER THE SENTENCE ON A PHONE (`PageHead`'s `below`): wrapped out of the name's
-     row there, it stood between "Today" and the line that says what today holds. Drawn once, in one place or the other. */
+     row there, it stood between "Today" and the line that says what today holds. Drawn once, in one place or the other.
+     NOT ON THE DESK ON A PHONE, where it pushed what needs you off the first screen: a task is added from the ask bar. */
   const wide = new MediaQuery('(width >= 900px)', true);
 
   /**
@@ -633,13 +662,27 @@
   /* NOTHING TO DRAW AT ALL: the line says so, and nothing under it. A host that cannot draw Today's body is calm too. */
   const calm = $derived((shaped !== null && !drawsAny(shaped.blocks)) || (settled && got === null));
 
-  /* WHETHER THE PAGE'S READER IS DRAWN, and whether it is drawing the page's blocks (`paged`) and not its bars.
-     THE BRIEFING IS DRAWN BY THE READER WHEN IT IS: a page that opens on a sentence of its own (a `note lead` that fills
-     figures, the cash line) keeps that sentence straight under the head's line, and the briefing follows it as the first
-     tile. Drawn over the page it stood between the head and the page's sentence, which then read as a line lost between
-     two tiles. Where no reader draws the blocks, the briefing is drawn here, first, as it was. */
+  /* WHETHER THE PAGE'S READER IS DRAWN. The briefing is no longer the board's first tile: it is behind More with the
+     rest, and the head's sentence says what it led with. */
   const reader = $derived((drawn !== null && (!calm || Boolean(shaped?.capture))) || !settled);
-  const paged = $derived(reader && drawn?.from === 'live');
+
+  /* WHAT MORE HOLDS: the page's blocks the desk folds, and each tile Home draws around the page that has something. */
+  const extras = $derived(
+    [
+      (brief?.cards.length ?? 0) > 0,
+      (stale?.rows.length ?? 0) > 0,
+      (matched?.rows.length ?? 0) > 0,
+      faults,
+      handled,
+      learned,
+      agentsTold,
+      named,
+      hues,
+      imported,
+    ].filter(Boolean).length,
+  );
+  const folds = $derived((desked?.folded ?? 0) + extras);
+  const moreWords = { open: 'More', shut: 'Show less' } as const;
 
   /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
   const empty = $derived(data.index.registers.length === 0 && data.lists.length === 0 && data.open === 0);
@@ -700,7 +743,7 @@
   sentence={tell ? TELL_LINE : slashed ? slashSaid : lead?.text}
   needs={tell || slashed ? undefined : lead?.needs || undefined}
   actions={capture && wide.current ? headCapture : undefined}
-  below={capture && !wide.current ? headCapture : undefined}
+  below={capture && !wide.current && !board ? headCapture : undefined}
 />
 
 <!-- SLASH'S MODEL HAS STOPPED: one line under the head, the same one Slash shows, and nothing while it answers. -->
@@ -732,6 +775,17 @@
   {#if brief}<brief.Part cards={brief.cards} foot={engineDown !== null && brief.foot === brief.paused ? null : brief.foot} />{/if}
 {/snippet}
 
+<!-- THE DESK'S OWN PARTS: who is working, the live projects as cards and what landed, each left out where it has nothing.
+     Height is held while it is on its way where the record has projects. -->
+{#snippet deskPart()}
+  {#if desk}
+    {@const Desk = desk.Part}
+    <Desk cards={desk.cards} working={workingNow()} lines={newLines} lists={data.lists} names={data.names} me={data.me?.person ?? null} now={data.now} />
+  {:else if deskExpected}
+    <div class="desk-held" aria-hidden="true"></div>
+  {/if}
+{/snippet}
+
 <div class="page">
   {#if data.refused}
     <!--
@@ -756,97 +810,92 @@
       {#snippet actions()}<Button weight="primary" href="/start">{said('start_here')}</Button>{/snippet}
     </Empty>
   {:else}
+    <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
+    {#if data.live}<ClearExamples />{/if}
+
+    <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
+    {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{/if}
+
+    {#if calm && lands}
+      <!--
+        A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS TOLD WHICH LIST IS THEIRS, and is never told the record is
+        empty.
+      -->
+      <Empty
+        kind="cleared"
+        title={lands.kind === 'list' ? copy.yourList(lands.name) : copy.yourLists(new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(lands.lists.map((l) => l.name)))}
+        body={copy.yourListBody}
+      >
+        {#snippet actions()}
+          {#if lands.kind === 'list'}
+            <Button weight="primary" href={lands.href}>{copy.openList(lands.name)}</Button>
+          {:else}
+            {#each lands.lists as l (l.href)}<Button weight="quiet" href={l.href}>{copy.openList(l.name)}</Button>{/each}
+          {/if}
+        {/snippet}
+      </Empty>
+    {:else if settled && got === null}
+      <!-- A HOST THAT CANNOT DRAW THE PAGE: the calm line, and what fills it, rather than a blank. -->
+      <Empty kind="cleared" title={waitsLine?.text ?? nothing} body={said('fills_with')} />
+    {/if}
+
+    <!-- A PAGE THE PERSON KEPT: the desk over it, as before, and their page under it as they laid it out. -->
+    {#if !board}{@render deskPart()}{/if}
+
     <!--
-      TOP TO BOTTOM AS `homeReads` SAYS: the briefing, the page, what went stale, who was matched. Keyed by the part, so a read that
-      lands after the page is put over or under it and the page drawn is the page that stays. The briefing is the first
-      tile either way: handed to the page's reader where one draws the blocks (`paged`), under the page's own sentence.
+      THE DESK (`board`): one twelve-column board that the desk's parts and the page's blocks are laid out on together,
+      each where the 19 October desk puts it, and More under them. A kept page is its own board, with More under it.
     -->
-    {#each homeReads(brief?.cards.length ?? 0, matched?.rows.length ?? 0, stale?.rows.length ?? 0) as part (part)}
-      {#if part === 'briefing'}
-        <!-- WHAT MATTERS TODAY, first, and nothing where the record wrote no briefing. -->
-        {#if !paged}{@render briefed()}{/if}
-      {:else if part === 'stale'}
-        <!-- WHAT WENT STALE AND WHERE EACH IS CLEARED, under the page, and nothing where nothing is stale. -->
-        {#if stale}<stale.Part rows={stale.rows} />{/if}
-      {:else if part === 'matched'}
-        <!-- WHO THE RECORD MATCHED ON ITS OWN, the board's last line, and nothing where it matched nobody. -->
-        {#if matched}<matched.Part rows={matched.rows} />{/if}
-      {:else}
-        <!-- THE EXAMPLES SETTING UP PLANTED, offered once they are all that is left to explain. -->
-        {#if data.live}<ClearExamples />{/if}
-
-        <!-- A FIRST TODAY OPENS ON THE CARD: one real thing, read into the entries it becomes, added on one press. -->
-        {#if tell}<TellOne options={tellOptions} onadded={toldOne} />{/if}
-
-        {#if calm && lands}
-          <!--
-            A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD IS TOLD WHICH LIST IS THEIRS, and is never told the record is
-            empty.
-          -->
-          <Empty
-            kind="cleared"
-            title={lands.kind === 'list' ? copy.yourList(lands.name) : copy.yourLists(new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(lands.lists.map((l) => l.name)))}
-            body={copy.yourListBody}
-          >
-            {#snippet actions()}
-              {#if lands.kind === 'list'}
-                <Button weight="primary" href={lands.href}>{copy.openList(lands.name)}</Button>
-              {:else}
-                {#each lands.lists as l (l.href)}<Button weight="quiet" href={l.href}>{copy.openList(l.name)}</Button>{/each}
-              {/if}
-            {/snippet}
-          </Empty>
-        {:else if settled && got === null}
-          <!-- A HOST THAT CANNOT DRAW THE PAGE: the calm line, and what fills it, rather than a blank. -->
-          <Empty kind="cleared" title={waitsLine?.text ?? nothing} body={said('fills_with')} />
-        {/if}
-
-        <!-- THE DESK OPENS TODAY, above the page: who is working, the live projects as cards and what landed, each left out
-             where it has nothing. Height is held while it is on its way where the record has projects. -->
-        {#if desk}
-          {@const Desk = desk.Part}
-          <Desk
-            cards={desk.cards}
-            working={workingNow()}
-            lines={newLines}
-            lists={data.lists}
-            names={data.names}
-            me={data.me?.person ?? null}
-            now={data.now}
-          />
-        {:else if deskExpected}
-          <div class="desk-held" aria-hidden="true"></div>
-        {/if}
-
-        <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
-        {#if reader}
-          <div class="body">
-            <PageView bind:this={view} {slug} got={drawn} mode="home" {reread} opens={paged && brief && brief.cards.length > 0 ? briefed : undefined} />
-          </div>
-        {/if}
-
-        <!-- AND UNDER TODAY'S BLOCKS, THE NEXT STEPS, until they are hidden. -->
-        {#if steps.length > 0}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
+    <div class="body" data-board={board ? '' : undefined}>
+      {#if board}{@render deskPart()}{/if}
+      <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
+      {#if reader}<PageView bind:this={view} {slug} got={drawn} mode="home" {reread} />{/if}
+      <!-- EVERYTHING ELSE, BEHIND ONE MORE: a plain line that says how many, and opens them in place. -->
+      {#if folds > 0}
+        <button type="button" class="more" aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
+          <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
+          {#if !moreOpen}<span class="more-count num">{folds}</span>{/if}
+          <Icon name="chevronDown" size="s" />
+        </button>
       {/if}
-    {/each}
-    <!--
-      WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES, after what went stale and who was matched: the board's last
-      tile, so the six a page shows before its fold are never pushed down by it. A tile and never a question, and
-      nothing at nought.
-    -->
-    {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
-    <!-- WHAT BRAINDOG ARRANGED BY ITSELF TODAY, with an Undo each. Nothing at nought. -->
-    {#if handled}<handled.Part found={handled.found} />{/if}
-    <!-- WHAT THE ANSWERS TAUGHT, after the faults: what the record will not ask again. Nothing at nought. -->
-    {#if learned}<learned.Part found={learned.found} />{/if}
-    <!-- WHAT EVERY AGENT IS TOLD, after what the answers taught, below the fold. Nothing at nought. -->
-    {#if agentsTold}<agentsTold.Part tile={agentsTold.tile} />{/if}
-    <!-- WHAT MAY BE ONE: a pair he can put to Decide. Nothing at nought. -->
-    {#if named}<named.Part found={named.found} />{/if}
-    <!-- WHAT HAS NO COLOUR OF ITS OWN, after what may be one: one press gives each its own. Nothing at nought. -->
-    {#if hues}<hues.Part found={hues.found} />{/if}
-    <!-- IMPORTED AUTOMATIONS AS FILING RULES, below the fold: one press, one Undo. Nothing at nought. -->
-    {#if imported}<imported.Part found={imported.found} />{/if}
+      {#if moreOpen && extras > 0}
+        <div class="more-body">
+          <!--
+            TOP TO BOTTOM AS `homeReads` SAYS: the briefing, what went stale, who was matched, each keyed by its part so a
+            read that lands late is put in its place and moves nothing drawn. The page is on the board, over More.
+          -->
+          {#each homeReads(brief?.cards.length ?? 0, matched?.rows.length ?? 0, stale?.rows.length ?? 0) as part (part)}
+            {#if part === 'briefing'}
+              <!-- WHAT MATTERS TODAY, with who wrote it. -->
+              {@render briefed()}
+            {:else if part === 'stale'}
+              <!-- WHAT WENT STALE AND WHERE EACH IS CLEARED. -->
+              {#if stale}<stale.Part rows={stale.rows} />{/if}
+            {:else if part === 'matched'}
+              <!-- WHO THE RECORD MATCHED ON ITS OWN. -->
+              {#if matched}<matched.Part rows={matched.rows} />{/if}
+            {/if}
+          {/each}
+          <!-- WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES. -->
+          {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
+          <!-- WHAT BRAINDOG ARRANGED BY ITSELF TODAY, with an Undo each. -->
+          {#if handled}<handled.Part found={handled.found} />{/if}
+          <!-- WHAT THE ANSWERS TAUGHT: what the record will not ask again. -->
+          {#if learned}<learned.Part found={learned.found} />{/if}
+          <!-- WHAT EVERY AGENT IS TOLD. -->
+          {#if agentsTold}<agentsTold.Part tile={agentsTold.tile} />{/if}
+          <!-- WHAT MAY BE ONE: a pair he can put to Decide. -->
+          {#if named}<named.Part found={named.found} />{/if}
+          <!-- WHAT HAS NO COLOUR OF ITS OWN: one press gives each its own. -->
+          {#if hues}<hues.Part found={hues.found} />{/if}
+          <!-- IMPORTED AUTOMATIONS AS FILING RULES: one press, one Undo. -->
+          {#if imported}<imported.Part found={imported.found} />{/if}
+        </div>
+      {/if}
+    </div>
+
+    <!-- AND UNDER TODAY, THE NEXT STEPS, until they are hidden. -->
+    {#if steps.length > 0}<WantMore {steps} onhide={() => (prefs = readPref())} />{/if}
   {/if}
 </div>
 
@@ -919,6 +968,237 @@
   }
 
   .body {
+    min-inline-size: 0;
+  }
+
+  /* ── the desk ─────────────────────────────────────────────────────────────
+     ONE BOARD OF TWELVE COLUMNS that the desk's own parts and the page's blocks share (the 19 October desk). The page's
+     reader and its body give up their boxes (`display: contents`), so each block's tile is a tile of this board, and
+     each is put in its row by `order`: what needs you, who is working and cash; the record's week where it keeps one;
+     the projects; Arrivals, what is coming up and people; then More, and what More opens. Not while the page is being
+     arranged, where the body's own layout is what is moved.
+
+     THE ROW'S SHARES ARE THE BOARD'S, by what it holds: five, four and three, and a part that is not there gives its
+     columns to the others, so a row never ends on a hole. Under 960px of board the first of each row takes the whole
+     row and the other two halve the next; on a phone every tile is the whole width, in the same order. */
+  .body[data-board] {
+    --n: 5;
+    --w: 4;
+    --c: 3;
+    --a: 6;
+    --u: 3;
+    --p: 3;
+    container: desk / inline-size;
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--tile-gap);
+  }
+
+  .body[data-board]:has(:global(.home-page[data-arranging])) {
+    display: block;
+  }
+
+  .body[data-board]:not(:has(:global(.home-page[data-arranging]))) :global(:is(.home-page, .home-page > .page)) {
+    display: contents;
+  }
+
+  /* WHAT THE ROWS HOLD, read off the board: who is working is the desk's tile or, without the desk, the page's table. */
+  .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) {
+    --n: 8;
+    --c: 4;
+  }
+
+  .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) {
+    --n: 7;
+    --w: 5;
+  }
+
+  .body[data-board]:not(:has(:global(.block-slot[data-key='needs-you']))) {
+    --w: 7;
+    --c: 5;
+  }
+
+  .body[data-board]:not(:has(:global(.block-slot[data-key='faces']))) {
+    --a: 8;
+    --u: 4;
+  }
+
+  .body[data-board]:not(:has(:global([data-landed]))) {
+    --u: 6;
+    --p: 6;
+  }
+
+  .body[data-board]:not(:has(:global(.block-slot[data-key='coming-up']))) {
+    --a: 8;
+    --p: 4;
+  }
+
+  /* EVERYTHING ON THE BOARD IS A WHOLE ROW unless it is one of the desk's (below): bars while the page is read, the
+     page's ⋯ where a pointer cannot hover, and what More opens. Before the desk, so a bar is never under it. */
+  .body[data-board] > :global(*),
+  .body[data-board] :global(.home-page > *),
+  .body[data-board] :global(.home-page > .page > *) {
+    grid-column: 1 / -1;
+    order: 0;
+    min-inline-size: 0;
+  }
+
+  /* THE PAGE'S BLOCKS THE DESK DOES NOT SHOW AT REST, drawn only once More is open, under it. */
+  .body[data-board] :global(.home-page > .page > .block-slot) {
+    grid-column: 1 / -1;
+    order: 30;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='needs-you']) {
+    order: 1;
+  }
+
+  .body[data-board] > :global([data-working]),
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='working']) {
+    order: 2;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
+    order: 3;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
+    order: 4;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
+    order: 5;
+  }
+
+  .body[data-board] > :global(:is(.projects, .desk-held)) {
+    order: 6;
+  }
+
+  .body[data-board] > :global([data-landed]) {
+    order: 7;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='coming-up']) {
+    order: 8;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot[data-key='faces']) {
+    order: 9;
+  }
+
+  .body[data-board] > .more {
+    order: 20;
+  }
+
+  .body[data-board] > .more-body {
+    order: 40;
+  }
+
+  /* A TILE LEAVING THE BOARD FADES WHERE IT STOOD. The reader lays its copy against the page's own box, and on the desk
+     the page has none, so the copy is measured against the window; it is held to the window for the length of the fade. */
+  .body[data-board] :global(.home-page > .page > [data-leaving]) {
+    position: fixed !important;
+  }
+
+  @container desk (inline-size >= 960px) {
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='needs-you']) {
+      grid-column: span var(--n);
+    }
+
+    .body[data-board] > :global([data-working]),
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='working']) {
+      grid-column: span var(--w);
+    }
+
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
+      grid-column: span var(--c);
+    }
+
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
+      grid-column: span 8;
+    }
+
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-money']) {
+      grid-column: span 4;
+    }
+
+    .body[data-board] > :global([data-landed]) {
+      grid-column: span var(--a);
+    }
+
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='coming-up']) {
+      grid-column: span var(--u);
+    }
+
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='faces']) {
+      grid-column: span var(--p);
+    }
+  }
+
+  @container desk (640px <= inline-size < 960px) {
+    .body[data-board] > :global([data-working]),
+    .body[data-board] :global(.home-page > .page > .block-slot:is([data-key='working'], [data-key='cash'], [data-key='coming-up'], [data-key='faces'])) {
+      grid-column: span 6;
+    }
+
+    /* ONE OF THE PAIR MISSING, the other takes the row. */
+    .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) > :global([data-working]),
+    .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) :global(.home-page > .page > .block-slot[data-key='working']),
+    .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']),
+    .body[data-board]:not(:has(:global(.block-slot[data-key='faces']))) :global(.home-page > .page > .block-slot[data-key='coming-up']),
+    .body[data-board]:not(:has(:global(.block-slot[data-key='coming-up']))) :global(.home-page > .page > .block-slot[data-key='faces']) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* MORE: one plain line across the board, a full target, the count in the quiet ink, the chevron turned when open. */
+  .more {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--tap);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--t-base);
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .more-count {
+    color: var(--dim);
+    font-weight: 400;
+  }
+
+  .more :global(.icon) {
+    color: var(--dim);
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .more[aria-expanded='true'] :global(.icon) {
+    transform: rotate(180deg);
+  }
+
+  .more:hover > span:first-child {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .more :global(.icon) {
+      transition: none;
+    }
+  }
+
+  .more-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 

@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { openRecord } from '@braindog/kernel';
 
-import { COMING_UP_LIMIT, DEFAULT_HOME, TODAY_LEAD, captureHeading, homeDrawn, railed, slashLineOf, todayHome, weekMoney, type Holds, type HomeVoice, type Week } from './default-home.ts';
+import { COMING_UP_LIMIT, DEFAULT_HOME, DESK_KEYS, PEOPLE_LIMIT, TODAY_LEAD, captureHeading, deskFolded, homeDrawn, onDesk, peopleOf, railed, slashLineOf, todayHome, weekMoney, type Holds, type HomeVoice, type Week, type WeekDecl } from './default-home.ts';
 import { homeLineOf, recordDay } from './home-line.ts';
 import type { LiveBlock } from '../record/page-live.ts';
 import type { WithRows } from './home-rows.ts';
@@ -50,11 +50,53 @@ test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks
   /* EVERY TILE WEARS A GLYPH, and every block over a source says what it says when it is empty. */
   for (const b of DEFAULT_HOME.blocks) if (b.kind !== 'note') assert.ok(b.icon, `${b.kind} has an icon`);
   for (const b of DEFAULT_HOME.blocks) if (b.source) assert.ok(b.empty, `${b.source} says its empty line`);
-  /* THE QUEUE IS DRAWN AS TILES, and the agents, cash, what comes up and what changed sit in the rail, what comes up
-     right under cash so the two columns end near each other. */
-  const raw = DEFAULT_HOME.blocks as unknown as { kind: string; tiles?: boolean; area?: string }[];
+  /* THE QUEUE IS DRAWN AS TILES, and Today is one board with no rail: the desk's blocks are keyed and given their share
+     of a row (five, four and three; then three and three beside Arrivals), and the rest fold behind More. */
+  const raw = DEFAULT_HOME.blocks as unknown as { kind: string; tiles?: boolean; area?: string; key?: string; span?: number }[];
   assert.equal(raw.find((b) => b.kind === 'queue')?.tiles, true);
-  assert.deepEqual(raw.filter((b) => b.area === 'rail').map((b) => b.kind), ['table', 'stat', 'timeline', 'feed']);
+  assert.equal(DEFAULT_HOME.layout, undefined);
+  assert.deepEqual(raw.filter((b) => b.area !== undefined), []);
+  assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [['needs-you', 5], ['working', 4], ['cash', 3], ['coming-up', 3]]);
+});
+
+test('THE DESK FOLDS WHAT IT DOES NOT SHOW AT REST, at its place, and More opens it', () => {
+  const desk = (key: string | undefined, drawn = true) => ({ key, drawn });
+  const blocks = [desk('needs-you'), desk('p7'), desk(undefined), desk('p9', false), desk('coming-up'), desk('coming-up-late')];
+  const shut = deskFolded(blocks, false);
+  assert.equal(shut.folded, 3);
+  assert.deepEqual(shut.blocks.map((b) => b.drawn), [true, false, false, false, true, false]);
+  /* NOTHING MOVES: every block keeps its index, so a write still finds its block. */
+  assert.equal(shut.blocks.length, blocks.length);
+  assert.equal(shut.blocks[0], blocks[0]);
+  const open = deskFolded(blocks, true);
+  assert.equal(open.folded, 3);
+  assert.deepEqual(open.blocks, blocks);
+  assert.ok(DESK_KEYS.every((k) => onDesk({ key: k })));
+});
+
+test('THE DESK NAMES A FEW PEOPLE where the record keeps a list of them, by its own words and never by its name', () => {
+  const people: WeekDecl = {
+    id: 'folk',
+    name: 'Folk',
+    one: 'Person',
+    title: 'name',
+    fields: [
+      { id: 'name', type: 'text' },
+      { id: 'merged_into', type: 'ref', to: 'folk' },
+      { id: 'org', type: 'ref', to: 'organisations' },
+    ],
+  } as never;
+  assert.equal(peopleOf([people], null), undefined);
+  assert.equal(peopleOf([], 'folk'), undefined);
+  const p = peopleOf([people], 'folk')!;
+  assert.deepEqual(p, { register: 'folk', name: 'Folk', icon: 'users', title: 'name', fact: 'org' });
+  assert.equal(peopleOf([{ ...people, icon: 'heart' } as never], 'folk')?.icon, 'heart');
+  const tile = todayHome({ tasks: true, adds: true, money: true, people: p }).blocks.find((b) => b.source === 'register.folk') as unknown as { key: string; span: number; heading: string; columns: { field: string; as: string }[]; limit: number };
+  assert.equal(tile.key, 'faces');
+  assert.equal(tile.span, 3);
+  assert.equal(tile.heading, 'Folk');
+  assert.deepEqual(tile.columns.map((c) => [c.field, c.as]), [['name', 'who'], ['org', 'fact']]);
+  assert.equal(tile.limit, PEOPLE_LIMIT);
 });
 
 test('LATE MONEY IS A LINE A THING, oldest first, saying how late it is rather than the day it was due', () => {

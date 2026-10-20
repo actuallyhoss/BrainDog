@@ -116,6 +116,11 @@ export type Holds = {
    * Today is as it was: a record that does not read it, or a reader it is not shown to, would be drawn a refusal.
    */
   quiet?: boolean;
+  /**
+   * THE LIST OF PEOPLE THE RECORD KEEPS (`peopleOf`), which the desk's last row names a few of. Left out where it keeps
+   * none, and the row is Arrivals and Coming up.
+   */
+  people?: People | undefined;
 };
 
 /** The fewest days a figure's line is drawn from (DIRECTION §39: a chart has at least three points, else the tile shows the number). */
@@ -127,13 +132,46 @@ const LINE_LEAST = 3;
  */
 export const captureHeading = (one: string | undefined): string => lists.captureIn(one?.trim() || words.task);
 
-/** A page body as `previewPage` takes it: the main column and a rail four twelfths wide. */
-export type HomeBody = { page: string; title: string; layout: { rail: number; sticky: boolean }; blocks: PageBlock[] };
+/**
+ * A page body as `previewPage` takes it. Today's own is one twelve-column board with no rail (`todayHome`); a body kept
+ * from an older Today may still carry its rail, four twelfths wide.
+ */
+export type HomeBody = { page: string; title: string; layout?: { rail: number; sticky: boolean }; blocks: PageBlock[] };
 
-/* THE RAIL, AND THE QUEUE'S TILE FORM, ARE KEYS THE KERNEL ADMITS (`declare.ts`) AND THE APP'S BLOCK TYPE DOES NOT NAME,
-   so they are spread in rather than written as properties the type would refuse. */
-const RAIL = { area: 'rail' } as const;
+/* THE QUEUE'S TILE FORM AND A BLOCK'S KEY ARE KEYS THE KERNEL ADMITS (`declare.ts`, `block-keys.ts`) AND THE APP'S BLOCK
+   TYPE DOES NOT NAME, so they are spread in rather than written as properties the type would refuse. */
 const TILES = { tiles: true } as const;
+const keyed = (key: DeskKey) => ({ key }) as const;
+
+/* ── the desk ──────────────────────────────────────────────────────────── */
+
+/**
+ * THE BLOCKS TODAY'S DESK SHOWS AT REST, by the key each is declared under (the 19 October desk, roadmap slice 1a): what
+ * needs you, who is working and the cash in the first row, the record's week where it keeps one, then (after the
+ * projects, which are the desk's own) what is coming up and a few people beside Arrivals. Every other block of Today's
+ * own body folds behind one More (`deskFolded`), and so does every tile Home draws around the page.
+ */
+export const DESK_KEYS = ['needs-you', 'working', 'cash', 'week-due', 'week-money', 'coming-up', 'faces'] as const;
+export type DeskKey = (typeof DESK_KEYS)[number];
+const ON_DESK: ReadonlySet<string> = new Set(DESK_KEYS);
+
+/** Whether a block is one the desk shows at rest, by its declared key. */
+export const onDesk = (b: { key?: string | undefined }): boolean => typeof b.key === 'string' && ON_DESK.has(b.key);
+
+/**
+ * TODAY'S BLOCKS WITH THE REST FOLDED: while More is shut, every drawn block the desk does not show at rest is marked
+ * not drawn, at its place, so every write still finds its block by index. `folded` is how many that is, which More
+ * says. Open, the blocks are as they came. A NEW OBJECT ONLY WHERE ONE FOLDS.
+ */
+export function deskFolded<B extends { key?: string | undefined; drawn: boolean }>(blocks: readonly B[], open: boolean): { blocks: B[]; folded: number } {
+  let folded = 0;
+  const out = blocks.map((b) => {
+    if (!b.drawn || onDesk(b)) return b;
+    folded += 1;
+    return open ? b : { ...b, drawn: false };
+  });
+  return { blocks: out, folded };
+}
 
 /* ── a record's week ───────────────────────────────────────────────────── */
 
@@ -185,6 +223,46 @@ export function weekOf(decls: readonly WeekDecl[], people: string | null): Week 
   /* ONLY A FIELD THAT SAYS IT WAS PAID: an order's total is what it comes to, never what came in. */
   const paid = due.fields.find((f) => live(f) && f.type === 'money' && saysOf(f, /paid/i));
   return { due: { register: due.id, name: due.name, one: due.one, day: day.id, who: who.id, what: due.title, open, paid: paid?.id ?? null } };
+}
+
+/**
+ * THE PEOPLE THE RECORD KEEPS, as the desk names a few of them: the list that plays `meets`, its name for itself, the
+ * field each is named by, and one fact beside the name (the first link to another list, such as who they are with).
+ * NEVER BY A LIST'S NAME (§27), and `undefined` where the record keeps no such list or its declaration is not learnt.
+ */
+export type People = { register: string; name: string; icon: string; title: string; fact: string | null };
+
+/** The glyph a tile of people wears where the list declares none of its own. */
+const FACES = 'users';
+
+export function peopleOf(decls: readonly (WeekDecl & { icon?: string | undefined })[], people: string | null): People | undefined {
+  if (people === null) return undefined;
+  const d = decls.find((x) => x.id === people);
+  if (!d || !d.title) return undefined;
+  const fact = d.fields.find((f) => live(f) && f.type === 'ref' && f.to !== people && f.id !== d.title);
+  return { register: d.id, name: d.name, icon: d.icon || FACES, title: d.title, fact: fact?.id ?? null };
+}
+
+/** The people tile's empty line, which Home leaves undrawn as it does every empty block. */
+const NOBODY_YET = 'Nobody here yet.';
+
+/** How many people the desk names: the newest few, and the list's own page has the rest. */
+export const PEOPLE_LIMIT = 4;
+
+/** The desk's tile of people: the newest few, each with their face, opening their own row. */
+function peopleTile(p: People): PageBlock {
+  return {
+    kind: 'cards',
+    ...keyed('faces'),
+    heading: p.name,
+    icon: p.icon,
+    span: 3,
+    source: `register.${p.register}`,
+    columns: [{ field: p.title, as: 'who' }, ...(p.fact ? [{ field: p.fact, as: 'fact' as const }] : [])],
+    order: [{ field: 'seq', dir: 'desc' }],
+    limit: PEOPLE_LIMIT,
+    empty: NOBODY_YET,
+  } as PageBlock;
 }
 
 /**
@@ -303,6 +381,8 @@ export function quietHeld<B extends { source?: string | undefined; refusals: rea
 function weekBlocks(w: Week): PageBlock[] {
   const due: PageBlock = {
     kind: 'table',
+    ...keyed('week-due'),
+    span: 8,
     heading: `${w.due.name} due this week`,
     icon: 'calendar',
     source: `register.${w.due.register}`,
@@ -312,16 +392,20 @@ function weekBlocks(w: Week): PageBlock[] {
     limit: 8,
     empty: `No ${w.due.one.toLowerCase()} is due this week.`,
   } as PageBlock;
-  return [due, weekMoney()];
+  return [due, { ...weekMoney(), ...keyed('week-money'), span: 4 } as PageBlock];
 }
 
 /**
- * TODAY'S BODY, in the words of the voice that speaks. In reading order: the page's line, the line a task is typed
+ * TODAY'S BODY, in the words of the voice that speaks. In declared order: the page's line, the line a task is typed
  * into, the questions waiting on the reader as tiles, one line while a vital sign reads red (`signsLine`), what has
- * gone quiet (`quietTile`), what is late
- * (the tasks late or due today, then the money that fell due), the work handed back and the urgent work; beside them, the agents at work, cash, the next few things
- * that fall due, and what changed since the reader last looked. The record lints it as it would any body before it
- * draws it.
+ * gone quiet (`quietTile`), what is late (the tasks late or due today, then the money that fell due), the work handed
+ * back and the urgent work, the agents at work, cash, the next few things that fall due, a few people, and what changed
+ * since the reader last looked. The record lints it as it would any body before it draws it.
+ *
+ * ONE BOARD OF TWELVE COLUMNS, NO RAIL. Home lays the desk out of it (`DESK_KEYS`, each keyed and given its share of a
+ * row): what needs you, who is working and cash in the first row, the projects, then Arrivals, what is coming up and
+ * people. The order a row is DECLARED in still matters, since a row is drawn once and the first block that holds it
+ * keeps it (`homeDrawn`), so the late work stays before what comes up; Home puts each where the desk wants it.
  *
  * LATE IS ONE TILE. The tasks and the money that are late are two reads, because a task is ticked where it is shown and
  * a bill is not, and Home draws them on one surface under one name (`homeDrawn`), the tasks first.
@@ -383,7 +467,6 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
   return {
     page: 'today',
     title: 'Today',
-    layout: { rail: 4, sticky: false },
     blocks: [
       /* THE PAGE'S LINE. Its words are the calm one; Home says the line worked out from the blocks over it (`homeDrawn`),
          and a record's own `home` page that writes its own line keeps it. */
@@ -394,7 +477,7 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
          who is working keep their order after them. */
       ...(holds.week ? weekBlocks(holds.week) : []),
       /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
-      { kind: 'queue', heading: voice.needsYou, icon: 'ask', source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting, ...TILES },
+      { kind: 'queue', ...keyed('needs-you'), span: 5, heading: voice.needsYou, icon: 'ask', source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting, ...TILES },
       /* WHAT IS WRONG WITH THE RECORD ITSELF, said only while a vital sign reads red: under what needs you, since it
          needs a look too, and over the work, which it may be the reason for. */
       ...(holds.health ? signsLine() : []),
@@ -407,6 +490,8 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
          and no `order:`, and a run that went quiet this morning is not working until midnight. */
       {
         kind: 'table',
+        ...keyed('working'),
+        span: 4,
         heading: voice.workingNow,
         icon: 'session',
         source: 'sessions.working',
@@ -417,18 +502,17 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
         ],
         limit: 6,
         empty: words.noneWorking,
-        ...RAIL,
       },
       /* CASH NOW AND ITS TWELVE WEEKS, read from the Money page's own figure, where that page is. */
       ...(holds.money
-        ? [{ kind: 'stat', heading: words.money, icon: 'wallet', cells: [{ metric: 'cash-now', label: words.cashNow, trend: '12w' }], ...RAIL } as PageBlock]
+        ? [{ kind: 'stat', ...keyed('cash'), span: 3, heading: words.money, icon: 'wallet', cells: [{ metric: 'cash-now', label: words.cashNow, trend: '12w' }] } as PageBlock]
         : []),
       /* THE NEXT FEW THINGS THAT FALL DUE ACROSS EVERY LIST, from today on, read on their own so what is late never
-         takes their place; a task already drawn in the main column is not drawn again. IN THE RAIL, UNDER CASH: the
-         main column is what to act on now and the rail what is coming, so Today's two columns end near each other
-         rather than the main one running a tile longer. */
+         takes their place; a task already drawn in a block above is not drawn again. */
       {
         kind: 'timeline',
+        ...keyed('coming-up'),
+        span: 3,
         heading: voice.comingUp,
         icon: 'calendar',
         source: 'deadlines',
@@ -437,10 +521,12 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
         columns: [{ field: 'day' }, { field: 'title' }, { field: 'amount', sign: { field: 'direction', minus: 'out' } }],
         limit: COMING_UP_LIMIT,
         empty: voice.nothingDue,
-        ...RAIL,
       },
-      /* WHAT CHANGED SINCE THE READER'S MARK, which Home stamps when they leave, never when they open it. */
-      { kind: 'feed', heading: voice.sinceAway, icon: 'activity', source: 'activity', since: 'seen', first: 8, empty: words.nothingNew, ...RAIL },
+      /* A FEW OF THE PEOPLE THE RECORD KEEPS, beside what is coming up, where it keeps a list of them. */
+      ...(holds.people ? [peopleTile(holds.people)] : []),
+      /* WHAT CHANGED SINCE THE READER'S MARK, which Home stamps when they leave, never when they open it. Folded behind
+         More: the desk's Arrivals says what came in. */
+      { kind: 'feed', heading: voice.sinceAway, icon: 'activity', source: 'activity', since: 'seen', first: 8, empty: words.nothingNew },
     ],
   };
 }
@@ -686,7 +772,10 @@ export function homeDrawn(
       /* THE RECORD ANSWERS WHAT IS LATE FIRST, so a block drawn full of late rows has more late rows past its limit, and
          Late says so; once a row that is not late is drawn, the rest past the limit are the later days'. */
       lateAt.push(shaped.length);
-      shaped.push(howLate(pick(b, late, voice.overdue, rest.length === 0 ? late.length + b.total - b.entries.length : late.length), today));
+      /* THE LATE PART OF A BLOCK THE DESK SHOWS IS NOT THAT BLOCK: it takes a key of its own, so the desk keeps the
+         block's key on what comes up and folds what is late with the rest. */
+      const lateKey = onDesk(b) ? { key: `${b.key}-late` } : {};
+      shaped.push({ ...howLate(pick(b, late, voice.overdue, rest.length === 0 ? late.length + b.total - b.entries.length : late.length), today), ...lateKey });
       shaped.push(gone === 0 && late.length === 0 ? b : pick(b, rest, undefined, rest.length === 0 ? 0 : b.total - gone - late.length));
       continue;
     }
