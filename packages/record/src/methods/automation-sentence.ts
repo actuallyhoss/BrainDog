@@ -61,6 +61,7 @@ const isObject = (x: unknown): x is Body => x !== null && typeof x === 'object' 
 /** An id in the grammar's shape, `[a-z][a-z0-9-]` and thirty-two at most, from the sentence's words. */
 export function slugOf(said: string): string {
   const id = said.toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '');
+  if (id === '') return 'automation';
   const led = /^[a-z]/u.test(id) ? id : `r-${id}`;
   return led.slice(0, 32).replace(/-+$/u, '') || 'automation';
 }
