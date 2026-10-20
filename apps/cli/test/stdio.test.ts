@@ -301,6 +301,14 @@ test('A SLOW HELLO DROPS AND REORDERS NOTHING: the lines behind it wait, then ea
   assert.deepEqual(out.find((r) => r.id === 3)!.result, {});
 });
 
+/** The two tools that carry a card (MCP Apps), and the tool-list `_meta` that attaches it for both conventions. */
+const CARDS: Record<string, string> = { get: 'project', governance: 'decision' };
+const cardMetaOf = (kind: string) => ({
+  ui: { resourceUri: `ui://braindog/${kind}.html` },
+  'openai/outputTemplate': `ui://braindog/${kind}.skybridge.html`,
+  'openai/widgetAccessible': true,
+});
+
 test('initialize and tools/list answer without touching the host, and the list is what the server serves', async (t) => {
   const host = await stubHost(t);
   const s = launch({ BRAINDOG_HOST: host.base, BRAINDOG_TOKEN: TOKEN });
@@ -341,7 +349,10 @@ test('initialize and tools/list answer without touching the host, and the list i
         title: tool.title,
         description: tool.description,
         inputSchema: tool.input,
-        annotations: tool.writes ? { destructiveHint: tool.destructive === true, openWorldHint: false } : { readOnlyHint: true, openWorldHint: false },
+        annotations: tool.writes
+          ? { readOnlyHint: false, destructiveHint: tool.destructive === true, idempotentHint: tool.idempotent === true, openWorldHint: false }
+          : { readOnlyHint: true, openWorldHint: false },
+        ...(CARDS[tool.name] === undefined ? {} : { _meta: cardMetaOf(CARDS[tool.name]!) }),
       },
       `${tool.name} did not survive the pipe as it was declared`,
     );
@@ -376,6 +387,7 @@ const CALLS: Record<string, Record<string, unknown>> = {
   handoff: { doing: 'Driving the tool list', next: 'Report what answered' },
   meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
   triage: { arrival: 'a1', ignore: true },
+  undo: { batch: 'b1' },
 };
 
 /** What the stub record answers each method, shaped only where a tool or a resource reads a field off it. */
@@ -397,6 +409,7 @@ const ANSWERS: Record<string, unknown> = {
   handoff: { spoken: 'sessions#1' },
   meet: { person: 'people#1', created: true },
   triage: { id: 'a1', state: 'ignored', entry: null, already: false },
+  undoOwn: { batch: 'b1', undone: 0 },
   sessionsLive: { runs: [] },
   digestToday: { lines: [] },
   actions: [],
@@ -497,7 +510,9 @@ test('AND EVERY RESOURCE WITH NO PARAMETER IS LISTED, so none of them goes quiet
      read its names off `TOOLS`; this half now reads its addresses off the same server. */
   const listed = await s.ask('resources/list');
   const uris = (listed.result.resources as { uri: string }[]).map((r) => r.uri);
-  const wanted = await everyAddress();
+  /* THE CARDS ARE THE SERVER'S TOO: each of the three has an address for MCP Apps hosts and one for ChatGPT. */
+  const cards = ['decision', 'project', 'rule'].flatMap((kind) => [`ui://braindog/${kind}.html`, `ui://braindog/${kind}.skybridge.html`]);
+  const wanted = [...(await everyAddress()), ...cards];
   assert.ok(wanted.length > 0, 'the surface offered no address at all, so this proves nothing');
   /* Sorted, because an address list is a set: what matters is that the pipe carried all of them. */
   assert.deepEqual([...uris].sort(), [...wanted].sort(), 'stdio lists a different set of addresses than the server would offer');

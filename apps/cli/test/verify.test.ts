@@ -155,7 +155,7 @@ test('--json ANSWERS 48 §4.5 Verified, and a refusal is SIGNATURE_INVALID at do
   assert.deepEqual(doc.value, {
     container: 'dogl',
     format: 1,
-    tables: 25,
+    tables: 26,
     rows: (doc.value as { rows: number }).rows,
     manifest: 'ok',
     signature: { valid: true, key_id: await keyIdOf(await signer.publicKey), pinned: true },
