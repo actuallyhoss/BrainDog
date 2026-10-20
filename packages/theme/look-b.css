@@ -3,8 +3,11 @@
    The owner's approved design for the site, 17 October: one flat board, BrainDog red as the one working accent, Lexend
    600 for page names and big figures, Geist for text and Geist Mono for code and times. The names and values are the
    prototype's own (loop/site-2026-10-17/src/site.html), verbatim, so the site's builders code against these names.
-   `--red-fill` is the one added since: the solid red under white words, 4.70:1 in light and 5.44:1 in dark, where
-   `--red` (3.86:1 on white in dark) is for marks and rules.
+   THE UI PASS OF 20 OCTOBER (loop/ui-pass-2026-10-20/SPEC.md 1.1, 4.7) moved the reds onto the app's two tokens:
+   `--red-fill` (#CF413A light, #C2362F dark, white words on it) for a button, a count and the chores band, and `--red`
+   (#C2362F light, #EA645B dark) for red words and marks; `--red-ink`, `--redcard` and the night's red follow them.
+   Dark mode takes the app's board and tiles, and each home band has its own ground (`--band-*`) so two neighbours
+   never share one. The desk draws on the app's surfaces (`--desk-*`), and the `--cat-*` slots are the app's eight.
 
    IT LIVES HERE, IN THE THEME PACKAGE, BECAUSE THIS IS WHERE A COLOUR MAY BE WRITTEN. The values are hand-set from the
    prototype until the generator makes Look B; `@braindog/skin/look-b.css` is the sheet a page imports and pulls this in,
@@ -16,47 +19,67 @@
 
 @layer tokens {
   :root {
-    --page: #FFFFFF; --paper: #F4F5F7; --night: #0F1012; --night-2: #1A1C20; --night-rule: rgba(255, 255, 255, .09);
-    --on-night: #F3F4F6; --on-night-2: rgba(243, 244, 246, .62);
-    --ink: #101114; --ink2: #3B4048; --muted: #686E77; --faint: #A0A5AD; --rule: #E3E5E9; --rule2: #EDEFF2; --soft: #F5F6F8;
-    --red: #CF413A; --red-fill: #CF413A; --red-press: #B3322C; --red-ink: #B3322C; --red-tint: #FBEBE9; --redcard: #CF413A; --on-red: #FFFFFF;
-    --on-red-2: rgba(255, 255, 255, .82); --red-rule: rgba(255, 255, 255, .24);
-    --board: #F3F4F6; --tile: #FFFFFF; --bar: #DCDFE4; --chart: #101114; --good: #2E7D4F; --good-tint: #E7F3EC; --warn: #B7791F;
-    --term: #0F1114; --term-ink: #D9DEE5; --term-dim: #7D8794;
-    --live: #2E9E5B; --live-ring: rgba(46, 158, 91, .18); --term-red: #F07068; --term-green: #6FCF97; --term-bright: #FFFFFF;
-    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #FF8F87;
+    --page: #FFFFFF; --paper: #F4F5F7; --night: #0F1012; --night-2: #1A1C20; --night-rule: rgba(255, 255, 255, .09); --night-lift: #1A1D22;
+    --on-night: #F3F4F6; --on-night-2: rgba(243, 244, 246, .68);
+    --ink: #101114; --ink2: #3B4048; --muted: #5F6670; --faint: #8A919C; --rule: #E3E5E9; --rule2: #EDEFF2; --soft: #F4F5F7;
+    --red: #C2362F; --red-fill: #CF413A; --red-fill-hover: #B3322C; --red-fill-press: #A12A25; --red-press: #A12A25; --red-ink: #C2362F; --red-tint: #FBEBE9; --redcard: #CF413A; --on-red: #FFFFFF;
+    --on-red-2: rgba(255, 255, 255, .86); --red-rule: rgba(255, 255, 255, .26);
+    --board: #F3F4F6; --tile: #FFFFFF; --bar: #E3E5E9; --chart: #101114; --good: #1F7A47; --good-tint: #E4F3EA; --warn: #9A5800;
+    --term: #0F1114; --term-ink: #D9DEE5; --term-dim: #8D96A8;
+    --live: #1F8A55; --live-ring: rgba(31, 138, 85, .18); --term-red: #EA645B; --term-green: #6FCF97; --term-bright: #FFFFFF;
+    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #EA645B;
     --shadow-lift: rgba(16, 24, 40, .08); --shadow-pop: rgba(16, 24, 40, .32);
     --agent-claude: #D97757; --agent-vscode: #007ACC;
-    --win-shadow: 0 50px 100px -40px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .06);
+    --win-shadow: 0 0 0 1px #E3E5E9;
+    --band-who: #F4F5F7; --band-ai: #0F1012; --band-ai-tile: #1A1D22; --band-slash: #FFFFFF; --band-slash-tile: #F4F5F7;
+    --band-yours: #F4F5F7; --band-yours-tile: #FFFFFF; --band-faq: #FFFFFF; --band-faq-tile: #F4F5F7; --band-red-tile: #FFFFFF; --foot-rule: #0F1012;
+    --desk-board: #F3F4F6; --desk-tile: #FFFFFF; --desk-tile-2: #EEF0F3; --desk-hover: #F4F5F7; --desk-rule: #E3E5E9; --desk-nav: #FFFFFF; --desk-nav-on: #F0F1F4; --desk-ink-3: #5F6670;
+    --cat-blue: #2F5BD3; --cat-blue-tint: #E8EEFC; --cat-violet: #6A4FD6; --cat-violet-tint: #EFEAFD; --cat-pink: #B42F78; --cat-pink-tint: #FBE8F2;
+    --cat-teal: #0C7168; --cat-teal-tint: #DFF3F1; --cat-sky: #0B6E95; --cat-sky-tint: #E0F1F8; --cat-gold: #7E6300; --cat-gold-tint: #FAF1D2;
+    --cat-lime: #437010; --cat-lime-tint: #EDF5DF;
     --head: "Lexend", "Geist", ui-sans-serif, system-ui, sans-serif;
     --ui: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --page: #0A0B0D; --paper: #131619; --night: #121418; --night-2: #1B1E23; --night-rule: rgba(255, 255, 255, .08);
-    --on-night: #ECEEF1; --on-night-2: rgba(236, 238, 241, .6);
-    --ink: #ECEEF1; --ink2: #C3C8CF; --muted: #8F96A0; --faint: #5F6670; --rule: #242A31; --rule2: #1D2228; --soft: #1A1F26;
-    --red: #E05148; --red-fill: #C2362F; --red-press: #EA6A61; --red-ink: #F07A71; --red-tint: #3A1F1C; --redcard: #B5372F; --on-red: #FFFFFF;
-    --on-red-2: rgba(255, 255, 255, .84); --red-rule: rgba(255, 255, 255, .22);
-    --board: #0D1014; --tile: #161A20; --bar: #2B3139; --chart: #ECEEF1; --good: #72C08F; --good-tint: #17281E; --warn: #E0A84F;
-    --term: #07090B; --term-ink: #D9DEE5; --term-dim: #6E7884;
-    --live: #2E9E5B; --live-ring: rgba(46, 158, 91, .18); --term-red: #F07068; --term-green: #6FCF97; --term-bright: #FFFFFF;
-    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #FF8F87;
+    --page: #0F121A; --paper: #181C27; --night: #0F1012; --night-2: #1B1E23; --night-rule: rgba(255, 255, 255, .08); --night-lift: #1A1D23;
+    --on-night: #ECEEF1; --on-night-2: rgba(236, 238, 241, .68);
+    --ink: #EDF0F7; --ink2: #BAC2D0; --muted: #8D96A8; --faint: #646D82; --rule: #2A3141; --rule2: #222837; --soft: #1E2331;
+    --red: #EA645B; --red-fill: #C2362F; --red-fill-hover: #CF3F37; --red-fill-press: #B02F29; --red-press: #B02F29; --red-ink: #EA645B; --red-tint: #3B1E22; --redcard: #C2362F; --on-red: #FFFFFF;
+    --on-red-2: rgba(255, 255, 255, .86); --red-rule: rgba(255, 255, 255, .24);
+    --board: #0F121A; --tile: #181C27; --bar: #2A3141; --chart: #EDF0F7; --good: #5FD08F; --good-tint: #14301F; --warn: #F0A64B;
+    --term: #07090B; --term-ink: #D9DEE5; --term-dim: #8D96A8;
+    --live: #47D486; --live-ring: rgba(71, 212, 134, .18); --term-red: #EA645B; --term-green: #6FCF97; --term-bright: #FFFFFF;
+    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #EA645B;
     --shadow-lift: rgba(0, 0, 0, .3); --shadow-pop: rgba(0, 0, 0, .6);
     --agent-vscode: #3C9DF0;
-    --win-shadow: 0 50px 100px -40px rgba(0, 0, 0, .8), 0 0 0 1px rgba(255, 255, 255, .07); color-scheme: dark; } }
+    --win-shadow: 0 0 0 1px #2A3141;
+    --band-who: #181C27; --band-ai: #1A1D23; --band-ai-tile: #23272E; --band-slash: #0F121A; --band-slash-tile: #181C27;
+    --band-yours: #181C27; --band-yours-tile: #222837; --band-faq: #0F121A; --band-faq-tile: #181C27; --band-red-tile: #181C27; --foot-rule: #2A3141;
+    --desk-board: #0F121A; --desk-tile: #181C27; --desk-tile-2: #222837; --desk-hover: #1E2331; --desk-rule: #2A3141; --desk-nav: #171B33; --desk-nav-on: #272B4A; --desk-ink-3: #8D96A8;
+    --cat-blue: #7AA7FF; --cat-blue-tint: #1A2747; --cat-violet: #B29BFF; --cat-violet-tint: #2A2348; --cat-pink: #F28DC4; --cat-pink-tint: #3A1D30;
+    --cat-teal: #4FD1C5; --cat-teal-tint: #12322F; --cat-sky: #5CC8F0; --cat-sky-tint: #10303D; --cat-gold: #E8C34F; --cat-gold-tint: #33290F;
+    --cat-lime: #A6D45F; --cat-lime-tint: #222E12;
+    color-scheme: dark; } }
   :root[data-theme="dark"] {
-    --page: #0A0B0D; --paper: #131619; --night: #121418; --night-2: #1B1E23; --night-rule: rgba(255, 255, 255, .08);
-    --on-night: #ECEEF1; --on-night-2: rgba(236, 238, 241, .6);
-    --ink: #ECEEF1; --ink2: #C3C8CF; --muted: #8F96A0; --faint: #5F6670; --rule: #242A31; --rule2: #1D2228; --soft: #1A1F26;
-    --red: #E05148; --red-fill: #C2362F; --red-press: #EA6A61; --red-ink: #F07A71; --red-tint: #3A1F1C; --redcard: #B5372F; --on-red: #FFFFFF;
-    --on-red-2: rgba(255, 255, 255, .84); --red-rule: rgba(255, 255, 255, .22);
-    --board: #0D1014; --tile: #161A20; --bar: #2B3139; --chart: #ECEEF1; --good: #72C08F; --good-tint: #17281E; --warn: #E0A84F;
-    --term: #07090B; --term-ink: #D9DEE5; --term-dim: #6E7884;
-    --live: #2E9E5B; --live-ring: rgba(46, 158, 91, .18); --term-red: #F07068; --term-green: #6FCF97; --term-bright: #FFFFFF;
-    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #FF8F87;
+    --page: #0F121A; --paper: #181C27; --night: #0F1012; --night-2: #1B1E23; --night-rule: rgba(255, 255, 255, .08); --night-lift: #1A1D23;
+    --on-night: #ECEEF1; --on-night-2: rgba(236, 238, 241, .68);
+    --ink: #EDF0F7; --ink2: #BAC2D0; --muted: #8D96A8; --faint: #646D82; --rule: #2A3141; --rule2: #222837; --soft: #1E2331;
+    --red: #EA645B; --red-fill: #C2362F; --red-fill-hover: #CF3F37; --red-fill-press: #B02F29; --red-press: #B02F29; --red-ink: #EA645B; --red-tint: #3B1E22; --redcard: #C2362F; --on-red: #FFFFFF;
+    --on-red-2: rgba(255, 255, 255, .86); --red-rule: rgba(255, 255, 255, .24);
+    --board: #0F121A; --tile: #181C27; --bar: #2A3141; --chart: #EDF0F7; --good: #5FD08F; --good-tint: #14301F; --warn: #F0A64B;
+    --term: #07090B; --term-ink: #D9DEE5; --term-dim: #8D96A8;
+    --live: #47D486; --live-ring: rgba(71, 212, 134, .18); --term-red: #EA645B; --term-green: #6FCF97; --term-bright: #FFFFFF;
+    --night-tint: rgba(255, 255, 255, .06); --night-tint-2: rgba(255, 255, 255, .09); --night-mark: rgba(255, 255, 255, .075); --night-accent: #EA645B;
     --shadow-lift: rgba(0, 0, 0, .3); --shadow-pop: rgba(0, 0, 0, .6);
     --agent-vscode: #3C9DF0;
-    --win-shadow: 0 50px 100px -40px rgba(0, 0, 0, .8), 0 0 0 1px rgba(255, 255, 255, .07); color-scheme: dark; }
+    --win-shadow: 0 0 0 1px #2A3141;
+    --band-who: #181C27; --band-ai: #1A1D23; --band-ai-tile: #23272E; --band-slash: #0F121A; --band-slash-tile: #181C27;
+    --band-yours: #181C27; --band-yours-tile: #222837; --band-faq: #0F121A; --band-faq-tile: #181C27; --band-red-tile: #181C27; --foot-rule: #2A3141;
+    --desk-board: #0F121A; --desk-tile: #181C27; --desk-tile-2: #222837; --desk-hover: #1E2331; --desk-rule: #2A3141; --desk-nav: #171B33; --desk-nav-on: #272B4A; --desk-ink-3: #8D96A8;
+    --cat-blue: #7AA7FF; --cat-blue-tint: #1A2747; --cat-violet: #B29BFF; --cat-violet-tint: #2A2348; --cat-pink: #F28DC4; --cat-pink-tint: #3A1D30;
+    --cat-teal: #4FD1C5; --cat-teal-tint: #12322F; --cat-sky: #5CC8F0; --cat-sky-tint: #10303D; --cat-gold: #E8C34F; --cat-gold-tint: #33290F;
+    --cat-lime: #A6D45F; --cat-lime-tint: #222E12;
+    color-scheme: dark; }
 }

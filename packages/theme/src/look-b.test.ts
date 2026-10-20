@@ -78,6 +78,14 @@ const HANDED = [
   '--night-accent', '--shadow-lift', '--shadow-pop',
   /* The solid red under white words, which `--red` cannot be in dark. */
   '--red-fill',
+  /* The UI pass of 20 October: the app's red steps, the bands' grounds and tiles, the desk's app surfaces, and the
+     category slots the site's tiles and the desk's projects take (SPEC 1.1, 1.3, 4.7). */
+  '--red-fill-hover', '--red-fill-press', '--night-lift',
+  '--band-who', '--band-ai', '--band-ai-tile', '--band-slash', '--band-slash-tile', '--band-yours', '--band-yours-tile',
+  '--band-faq', '--band-faq-tile', '--band-red-tile', '--foot-rule',
+  '--desk-board', '--desk-tile', '--desk-tile-2', '--desk-hover', '--desk-rule', '--desk-nav', '--desk-nav-on', '--desk-ink-3',
+  '--cat-blue', '--cat-blue-tint', '--cat-violet', '--cat-violet-tint', '--cat-pink', '--cat-pink-tint', '--cat-teal',
+  '--cat-teal-tint', '--cat-sky', '--cat-sky-tint', '--cat-gold', '--cat-gold-tint', '--cat-lime', '--cat-lime-tint',
 ];
 
 test('the light block defines every name the site was handed', () => {
@@ -102,7 +110,7 @@ test('the faces: Lexend for titles, Geist for text, Geist Mono for code', () => 
   assert.equal(D1.get('--agent-vscode'), '#3C9DF0');
 });
 
-test('--red-fill carries white words at 4.5:1 or more in both schemes, and is the brand red in light', () => {
+test('--red-fill carries white words at 4.5:1 or more in both schemes, and the reds are the app\'s two tokens', () => {
   const white = fromHex('#FFFFFF');
   for (const [scheme, block] of [['light', L], ['dark', D1]] as const) {
     const fill = block.get('--red-fill') ?? '';
@@ -111,7 +119,15 @@ test('--red-fill carries white words at 4.5:1 or more in both schemes, and is th
     const ratio = contrast(fromHex(fill), white);
     assert.ok(ratio >= 4.5, `${scheme}: ${fill} on white is ${ratio.toFixed(2)}:1`);
   }
-  assert.equal(L.get('--red-fill'), L.get('--red'), 'in light the fill is the red itself');
+  /* SPEC 1.1 and C1: the fill is #CF413A light and #C2362F dark; red words are #C2362F light and #EA645B dark. */
+  assert.equal(L.get('--red-fill'), '#CF413A', 'the light fill');
+  assert.equal(D1.get('--red-fill'), '#C2362F', 'the dark fill');
+  assert.equal(L.get('--red'), '#C2362F', 'red words in light (C1 default)');
+  assert.equal(D1.get('--red'), '#EA645B', 'red words in dark');
+  for (const block of [L, D1]) {
+    assert.equal(block.get('--red-ink'), block.get('--red'), '--red-ink is the red words');
+    assert.equal(block.get('--redcard'), block.get('--red-fill'), 'the chores band is the fill');
+  }
 });
 
 test('no colour is written outside the three blocks', () => {
