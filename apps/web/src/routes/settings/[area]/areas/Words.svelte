@@ -30,7 +30,6 @@
   import { currencyChoices } from '$lib/record/currencies.ts';
   import { forget } from '$lib/record/boot-live.ts';
   import { speaking, withSpeaks } from '$lib/voice.ts';
-  import { said } from '$lib/voice.svelte.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import type { IconName } from '$lib/ui/icons.ts';
@@ -68,6 +67,9 @@
 
   /* THIS AREA'S OWN WORDS. They name the person's things: their currency, their lists, what the record says. */
   const words = {
+    /* THE LISTS TILE IS "Your lists" (SPEC agents F4): this is the page where lists are named, so it says the word the
+       rail's "Your things" keeps out of everywhere else. */
+    lists: 'Your lists',
     money: 'Money',
     currency: 'Home currency',
     currencyWhy: 'Sums in other currencies are added up in this one, where there is a rate.',
@@ -360,7 +362,7 @@
     {#if owner}
       <form class="words" bind:this={form} onsubmit={submit} novalidate>
         {#if spoken.lists.length > 0}
-          <Tile icon="rows" title={said('lists')} count={spoken.lists.length}>
+          <Tile icon="rows" title={words.lists} count={spoken.lists.length}>
             <div class="lists">
               {#each spoken.lists as l (l.list)}
                 <div class="list-words">
@@ -431,7 +433,7 @@
       </form>
     {:else}
       {#if spoken.lists.length > 0}
-        <Tile icon="rows" title={said('lists')} count={spoken.lists.length}>
+        <Tile icon="rows" title={words.lists} count={spoken.lists.length}>
           {#each spoken.lists as l (l.list)}
             <StateRow icon={iconOf(l.list)} title={l.name?.value ?? nameOf(l.list)} line={l.one ? words.oneOf(l.one.value) : undefined} />
           {/each}
@@ -456,7 +458,7 @@
   <!-- THE LISTS ARE ALWAYS DRAWN (agents F4): with no use case speaking they are read-only names, and one line says what
        would let them be renamed. The area is never one row. -->
   {#if !(spoken && voice && all.length > 0) && shell.index.registers.length > 0}
-    <Tile icon="rows" title={said('lists')} count={shell.index.registers.length}>
+    <Tile icon="rows" title={words.lists} count={shell.index.registers.length}>
       <ul class="list-lines">
         {#each shell.index.registers as r (r.id)}
           <li><Icon name={r.icon} size="s" /><span dir="auto">{r.name}</span></li>

@@ -37,12 +37,15 @@ test("Notifications says a muted rule's notices leave Today's feed and its urgen
   assert.doesNotMatch(said, /—|reaches you/u, 'urgent notices are said to still show, where they show');
 });
 
-test('Words asks for a singular without "a" or "an", titles the lists in the voice, and names the limits a currency strands', () => {
+test('Words asks for a singular without "a" or "an", titles the lists "Your lists", and names the limits a currency strands', () => {
   const src = area('Words');
   const words = wordsOf(src);
   assert.doesNotMatch(words, /One is an? /u, '"One is a update" can be drawn again');
-  assert.doesNotMatch(words, /'Your lists'/u);
-  assert.match(src, /<Tile icon="rows" title=\{said\('lists'\)\}/u);
+  /* "YOUR LISTS" ON THE PAGE WHERE LISTS ARE NAMED (SPEC agents F4), in every one of its three forms; the voice's
+     "Your things" is the rail's word, and said here it titled a tile of list names with something else. */
+  assert.match(words, /lists: 'Your lists'/u);
+  assert.equal(src.match(/<Tile icon="rows" title=\{words\.lists\}/gu)?.length, 3);
+  assert.doesNotMatch(src, /title=\{said\('lists'\)\}/u);
   /* THE PICK WAITS ON WHAT IT WOULD STRAND, and only then is it sent. */
   assert.match(src, /strandedBy\(packs, code, next\)/u);
   assert.match(src, /onchange=\{\(e\) => pickCurrency\(e\.currentTarget\.value\)\}/u);
