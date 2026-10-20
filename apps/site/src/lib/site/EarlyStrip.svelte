@@ -9,7 +9,7 @@
 </script>
 
 <section class="early" aria-label={shell.early.strong}>
-  <div class="wrap row">
+  <div class="wrap strip">
     <p><b>{shell.early.strong}</b> {shell.early.rest}</p>
     <div class="go"><Start /></div>
   </div>
@@ -21,7 +21,7 @@
     color: var(--ink);
   }
 
-  .row {
+  .strip {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -42,7 +42,7 @@
   }
 
   @media (max-width: 760px) {
-    .row {
+    .strip {
       flex-direction: column;
       align-items: stretch;
       gap: 16px;

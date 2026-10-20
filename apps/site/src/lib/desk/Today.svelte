@@ -45,7 +45,7 @@
 {#if behind}
   <div class="behind" id="desk-behind">
     <p class="bh">{DESK.behind} · {evidence.head}</p>
-    {#each evidence.rows as [label, value]}<p class="row"><span>{label}</span><b class="num">{value}</b></p>{/each}
+    {#each evidence.rows as [label, value]}<p class="evr"><span>{label}</span><b class="num">{value}</b></p>{/each}
   </div>
 {/if}
 
@@ -200,7 +200,7 @@
     font-size: 13px;
   }
 
-  .row {
+  .evr {
     display: flex;
     justify-content: space-between;
     gap: 12px;

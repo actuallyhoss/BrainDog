@@ -121,8 +121,11 @@
 {/if}
 
 <style>
+  /* The skin's own .sec is a group heading with a hairline under it; this one is a plain section. */
   .sec {
-    padding-block-start: 120px;
+    display: block;
+    padding-block: 120px 0;
+    border-block-end: 0;
   }
 
   .early {
