@@ -2049,9 +2049,10 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* UNDER THE SHEET ON A PHONE, a step down from it, on the same start edge as the brand and the sheet. */
   @media (width < 900px) {
     .next {
-      padding-inline: var(--sp-1);
+      padding-block-start: var(--sp-4);
     }
   }
 </style>
