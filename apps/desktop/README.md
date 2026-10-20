@@ -47,7 +47,7 @@ password). Export the real values in the shell that runs `cargo tauri build`; th
   verifier to `/auth/google/desktop` and gets the session cookie in the window. Passkey and email link are unchanged.
 - **Go menu.** Today, Needs you, Projects, Money, Agents (Cmd+1 to 5), Settings (Cmd+,) and Slash (Cmd+K) send `goto`
   with an `/app/...` path; the web layout follows it and ignores any other address. Projects, Money and Agents use
-  `/app/p/projects`, `/app/p/money` and `/app/p/agents`; change `GO` in `lib.rs` if those pages are named otherwise.
+  `/app/p/portfolio`, `/app/p/money` and `/app/p/agents`; change `GO` in `lib.rs` if those pages are named otherwise.
 - **Updater.** `tauri-plugin-updater` reads `https://brain.dog/desktop/latest.json` at launch and installs a signed
   update. `plugins.updater.pubkey` in `tauri.conf.json` is a placeholder until the key is made (see
   `signing.example.env`). The download page `/download` on the site is held until `LAUNCH.public`.

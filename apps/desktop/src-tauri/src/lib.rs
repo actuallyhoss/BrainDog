@@ -29,7 +29,7 @@ const BRIDGE: &str = include_str!("bridge.js");
 const GO: [(&str, &str, &str, &str); 5] = [
     ("go-today", "Today", "CmdOrCtrl+1", "/app/"),
     ("go-needs", "Needs you", "CmdOrCtrl+2", "/app/decide"),
-    ("go-projects", "Projects", "CmdOrCtrl+3", "/app/p/projects"),
+    ("go-projects", "Projects", "CmdOrCtrl+3", "/app/p/portfolio"),
     ("go-money", "Money", "CmdOrCtrl+4", "/app/p/money"),
     ("go-agents", "Agents", "CmdOrCtrl+5", "/app/p/agents"),
 ];
