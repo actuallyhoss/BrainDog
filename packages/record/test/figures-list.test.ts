@@ -79,14 +79,14 @@ test('EVERY FIGURE A PACK DECLARES IS LISTED, late-in among them, each with its 
      came to wait on two counts held together (plan-lead-one-figure-74), which made it 108, and
      book-lasts-until, the day one book's money runs out (book-lasts-until-76), made it 109, and the four counts of the Ledger by the rule that filed each entry (filing-rules-page-91) made it 113, and the same
      3.17.0's lasts-no-income, how many days the cash lasts with no income (money-lasts-no-income-95), made it 114, and portfolio's projects-lane-earning and projects-with-health, the earning lane and the projects saying
-     how they are going (projects-lanes-lines-101), made it 116, and money-core's three of the next unpaid part of each plan (the day, what is left and what is left after it; the UI pass of 20 October) made it 119. The number is
+     how they are going (projects-lanes-lines-101), made it 116, and money-core's three of the next unpaid part of each plan (the day, what is left and what is left after it; the UI pass of 20 October) made it 119, and portfolio 1.19.0's kpis-held and kpi-stale, the key numbers kept and the days since a measure was read, made it 121. The number is
      asserted so that a pack shipping fewer figures is noticed here rather than read as the gap closing on its own. */
-  assert.equal(declared.length, 119);
+  assert.equal(declared.length, 121);
   const late = listed.find((f) => f.id === 'late-in');
   assert.deepEqual(late, { id: 'late-in', name: 'Late receivables', format: 'money', list: 'obligations', pack: 'money-core', param: false });
   /* AND THE TEMPLATES, which `metric` refuses bare (`REF_UNKNOWN`, "thing is {{it}}") and answers named, as `project-owed:Kiln`:
-     a project's own figures and its monthly series, a book's cash, the day it runs out, its month, its months and what is due to and from it, a category's budget passed and one plan's eight. */
-  assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['book-cash', 'book-in-by-month', 'book-in-month', 'book-lasts-until', 'book-net-by-month', 'book-net-month', 'book-out-by-month', 'book-out-month', 'book-owed-by', 'book-owed-to', 'book-spent-month', 'budget-passed-on', 'plan-last-due', 'plan-left', 'plan-next-due', 'plan-paid', 'plan-parts', 'plan-parts-open', 'plan-parts-paid', 'project-in-by-month', 'project-in-month', 'project-kept-month', 'project-out-by-month', 'project-out-month', 'project-owed', 'project-said']);
+     a project's own figures and its monthly series, a book's cash, the day it runs out, its month, its months and what is due to and from it, a category's budget passed and one plan's eight, and since portfolio 1.19.0 the days since one measure was read. */
+  assert.deepEqual(listed.filter((f) => f.param).map((f) => f.id), ['book-cash', 'book-in-by-month', 'book-in-month', 'book-lasts-until', 'book-net-by-month', 'book-net-month', 'book-out-by-month', 'book-out-month', 'book-owed-by', 'book-owed-to', 'book-spent-month', 'budget-passed-on', 'kpi-stale', 'plan-last-due', 'plan-left', 'plan-next-due', 'plan-paid', 'plan-parts', 'plan-parts-open', 'plan-parts-paid', 'project-in-by-month', 'project-in-month', 'project-kept-month', 'project-out-by-month', 'project-out-month', 'project-owed', 'project-said']);
   for (const f of listed) {
     const row = declared.find((d) => d.id === `metric.${f.id}`)!;
     assert.equal(f.pack, row.pack_id, f.id);
@@ -173,7 +173,7 @@ test('AND IT IS ROUTED: the client asks the host, READ+, and gets the same list 
   const client = createClient({ base: 'https://braindog.example', fetch });
   const listed = value<Figure[]>(await client.figures());
   assert.deepEqual(listed, value<Figure[]>(await api.figures(owner)));
-  assert.equal(listed.length, 119);
+  assert.equal(listed.length, 121);
   assert.deepEqual(sent, ['GET /api/figures']);
   sql.close();
 });
