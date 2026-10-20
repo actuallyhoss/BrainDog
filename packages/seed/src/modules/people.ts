@@ -563,17 +563,8 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         when: { metric: 'held-twice', gt: 0 },
         body: '{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1).',
       },
-      {
-        /* HOW MANY YOU WERE IN TOUCH WITH, AND HOW THAT MOVED OVER THE MONTH, SINCE People 3.4.0 (PGS-C18): the figure with
-           its line, from the night's save of `people-in-touch-30d`. Until three nights are kept the cell is the figure
-           alone. Only while the record keeps somebody, so a fresh record reads Everyone's empty line and nothing else. */
-        kind: 'stat',
-        heading: 'In touch',
-        icon: 'gauge',
-        span: 12,
-        when: { metric: 'people-count', gt: 0 },
-        cells: [{ metric: 'people-in-touch-30d', label: 'In touch, 30 days', trend: '30d' }],
-      },
+      /* NO IN TOUCH TILE, SINCE People 3.5.0: "In touch, 30 days: 3" filled a whole row with one figure nobody asked for.
+         The figure stays declared and the night's save of it is still kept. */
       {
         /* CARDS, with a face for each person, rather than a table of four columns read
            as a directory. Each card still opens the person's row. Their role, and the projects they were
@@ -584,39 +575,33 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
            NOT THE `met` LINES, which the card drew whole: "2026-08-27 · commit 8b1e4d0 in portage" is where an
            agent was when it met them, in the agent's words, and a card is read by a person. The lines stay on
            the row, where the history of a person is read. */
-        kind: 'cards',
+        kind: 'table',
         heading: 'Everyone',
         icon: 'people',
         span: 12,
         source: 'register.people',
-        /* NEVER SOMEBODY FOLDED INTO ANOTHER, as the organisations below: a merge leaves one card, not two. */
+        /* NEVER SOMEBODY FOLDED INTO ANOTHER, as the organisations below: a merge leaves one line, not two. */
         where: 'merged_into is empty',
-        /* THE ORGANISATION THEY ARE WITH, SINCE People 3.0.0, as the second of a card's three facts: "Client · Halden
-           Type Co" says who somebody is where a role alone said only what they are. */
+        /* PEOPLE AS LINES, SINCE People 3.5.0: each person one line, their name, what they are, who they are with and
+           when you last spoke, where each was a little form of labelled facts. */
         columns: [
-          { field: 'name', label: 'Name', as: 'who' },
-          { field: 'role', label: 'Role', as: 'fact' },
-          { field: 'org', label: 'Organisation', as: 'fact' },
-          { field: 'projects', label: 'Met in', as: 'fact' },
-          { field: 'in_touch', label: 'Last in touch', as: 'when' },
+          { field: 'name', label: 'Name', width: 'minmax(14ch,2fr)' },
+          { field: 'role', label: 'Role', width: '12ch' },
+          { field: 'org', label: 'With', width: 'minmax(14ch,2fr)' },
+          { field: 'in_touch', label: 'Last spoke', width: '14ch', align: 'end' },
         ],
-        /* GROUPED BY THE ORGANISATION THEY ARE WITH, SINCE People 3.0.0 (DIRECTION §37's lists grouped under quiet
-           headings): Halden's people under Halden, and whoever is with nobody under no heading. Three a group are drawn
-           and the rest of it folded behind its count, so one big client does not push everyone else off the page. The
-           order still runs inside each group, the one last in touch first. */
-        group: 'org',
-        fold: 3,
         order: [
           { field: 'in_touch', dir: 'desc' },
           { field: 'seq', dir: 'desc' },
         ],
+        limit: 50,
         empty: 'Nobody yet. Add someone, or an agent adds whoever it meets in a commit or a mail.',
       },
       {
         /* THE ORGANISATIONS, SINCE People 3.0.0, under the people and as a list of names, each opening its own page: the
            companies people are with and the ones the money moves through. Drawn only while there is one, and never one
            folded into another. */
-        kind: 'cards',
+        kind: 'table',
         heading: 'Organisations',
         icon: 'building',
         span: 12,
@@ -624,9 +609,9 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         where: 'merged_into is empty',
         when: { metric: 'organisations-count', gt: 0 },
         columns: [
-          { field: 'name', label: 'Organisation', as: 'who' },
-          { field: 'kind', label: 'Kind', as: 'fact' },
-          { field: 'domain', label: 'Website', as: 'fact' },
+          { field: 'name', label: 'Organisation', width: 'minmax(14ch,2fr)' },
+          { field: 'kind', label: 'Kind', width: '12ch' },
+          { field: 'domain', label: 'Website', width: 'minmax(14ch,2fr)' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
       },

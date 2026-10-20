@@ -103,7 +103,7 @@ test('PEOPLE OPENS ON ONE LINE SAID FROM ITS OWN FIGURES, and the figures count 
  * EACH PERSON ONCE, SINCE People 3.2.0. Gone quiet and Last in touch listed, over Everyone, the people whose cards say the
  * same day under them, so every person with a day was on the page twice. The cards carry the day, so they are what stays.
  */
-test('PEOPLE SHOWS EACH PERSON ONCE, as a card with the day they were last in touch, the latest first', async () => {
+test('PEOPLE SHOWS EACH PERSON ONCE, as a line with the day they last spoke, the latest first', async () => {
   const k = await seeded();
   const page = opened(k, 'people');
   /* NO CHART OF DOTS, SINCE People 3.1.0: twelve weeks a person said when, once each, and nothing else. */
@@ -111,11 +111,11 @@ test('PEOPLE SHOWS EACH PERSON ONCE, as a card with the day they were last in to
   /* AND NEITHER LIST OVER THE CARDS: one block reads the people, and it is Everyone. */
   for (const heading of ['Gone quiet', 'Last in touch']) assert.ok(!page.blocks.some((b) => b.heading === heading), `People lists its people under ${heading} as well as on their cards`);
   const over = page.blocks.filter((b) => (b as { source?: unknown }).source === 'register.people');
-  assert.deepEqual(over.map((b) => [b.kind, b.heading]), [['cards', 'Everyone']]);
+  assert.deepEqual(over.map((b) => [b.kind, b.heading]), [['table', 'Everyone']]);
 
   const cards = over[0]!;
-  /* THE CARD CARRIES THE DAY, which is why it is the one that stays. */
-  assert.deepEqual(cards.columns?.find((c) => c.field === 'in_touch'), { field: 'in_touch', label: 'Last in touch', as: 'when' });
+  /* THE LINE CARRIES THE DAY, which is why it is the one that stays, as a line since batch 6 and not a little form. */
+  assert.deepEqual(cards.columns?.find((c) => c.field === 'in_touch'), { field: 'in_touch', label: 'Last spoke', width: '14ch', align: 'end' });
   const names = cards.rows.map((r) => r.fields.name);
   assert.equal(new Set(names).size, names.length, 'somebody is on Everyone twice');
   const latest = cards.rows.map((r) => r.fields.in_touch).filter((d): d is string => typeof d === 'string');
@@ -319,10 +319,12 @@ test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A
   const held = relation(['people', 'organisations', 'things', 'transactions']);
   assert.deepEqual(held.blocks.map((b) => b.source).filter((s) => s === 'register.things' || s === 'register.transactions'), ['register.things', 'register.transactions']);
 
-  /* THE PEOPLE PAGE LISTS EVERYONE BY THE ORGANISATION THEY ARE WITH, three a group before the rest fold. */
-  const everyone = (PAGES.people!.blocks as { heading?: string; group?: string; fold?: number }[]).find((b) => b.heading === 'Everyone');
-  assert.equal(everyone?.group, 'org');
-  assert.equal(everyone?.fold, 3);
+  /* THE PEOPLE PAGE LISTS EVERYONE AS LINES, SINCE BATCH 6: the name, what they are, who they are with and the day they last
+     spoke, one line each, where each was a little form of labelled facts grouped by organisation. */
+  const everyone = (PAGES.people!.blocks as { kind?: string; heading?: string; group?: string; columns?: { field: string }[] }[]).find((b) => b.heading === 'Everyone');
+  assert.equal(everyone?.kind, 'table');
+  assert.equal(everyone?.group, undefined);
+  assert.deepEqual(everyone?.columns?.map((c) => c.field), ['name', 'role', 'org', 'in_touch']);
 
   /* THE PEOPLE PAGE LISTS THE ORGANISATIONS UNDER EVERYONE. */
   const list = opened(k, 'people').blocks.find((b) => b.heading === 'Organisations');
@@ -367,8 +369,7 @@ test('SOMEBODY HELD TWICE IS SAID UNDER THE PAGE\'S LINE, by how many and never 
   const at = page.blocks.indexOf(note);
   assert.equal(at, 3);
   assert.ok((page.blocks.slice(0, at) as Drawn[]).every((b) => (b.kind === 'note' && b.lead === true) || b.heading === 'Waiting on you'));
-  assert.equal(page.blocks[at + 1]?.heading, 'In touch');
-  assert.equal(page.blocks[at + 2]?.heading, 'Everyone');
+  assert.equal(page.blocks[at + 1]?.heading, 'Everyone');
   assert.notEqual(note.lead, true);
   /* NO ID, NO LIST'S NUMBER: the count and plain words. */
   assert.doesNotMatch(String(note.body).replace('{{held-twice-shown}}', '2').replace('{{held-twice}}', '1'), /people#|#\d|\b[0-9A-HJKMNP-TV-Z]{26}\b|—/u);

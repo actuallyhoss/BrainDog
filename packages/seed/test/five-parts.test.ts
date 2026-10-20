@@ -52,6 +52,14 @@ const CHARTS = new Set(['split', 'bar', 'lines', 'line', 'heat']);
 /** What a list is drawn as. */
 const LISTED = new Set(['cards', 'table', 'todo', 'timeline', 'params']);
 
+/**
+ * THE PAGES THAT DRAW NO FIGURES TILE, SINCE BATCH 6. People's In touch was one figure filling a whole row, and Projects'
+ * In play and earning said "In play 3, Earning 2" over a line that already says it, so both were cut (the plan, People 1
+ * and Projects 1). People then has no figure to draw; Projects keeps its splits, which draw from five in play, so a
+ * record with a project or two draws none. The other parts are held as before.
+ */
+const NO_FIGURES_TILE: ReadonlySet<string> = new Set(['people', 'portfolio']);
+
 /** The five parts, each as the test on one block that says it is that part. */
 const PARTS: Record<string, (b: Block, list: string) => boolean> = {
   lead: (b) => b.kind === 'note' && b.lead === true,
@@ -112,7 +120,10 @@ test('EACH MODULE PAGE DECLARES THE FIVE PARTS: its line, one queue over its own
     const list = PAGE_LIST[slug];
     const blocks = blocksOf(slug);
     assert.ok(PARTS.lead!(blocks[0]!, list), `${slug} does not open on its line`);
-    for (const [part, is] of Object.entries(PARTS)) assert.ok(blocks.some((b) => is(b, list)), `${slug} carries no ${part}`);
+    for (const [part, is] of Object.entries(PARTS)) {
+      if (part === 'figures' && slug === 'people') continue;
+      assert.ok(blocks.some((b) => is(b, list)), `${slug} carries no ${part}`);
+    }
     assert.equal(blocks.filter((b) => b.kind === 'queue').length, 1, `${slug} carries one queue`);
   }
 });
@@ -133,11 +144,8 @@ test('PEOPLE AND SERVICES SHOW WHAT AGENTS DID ON THEM, from the log, three to a
   assert.ok(fold >= 0 && estate.findIndex((b) => b.kind === 'agents') > fold, 'Services draws what agents did above its fold');
 });
 
-test('PEOPLE SAYS HOW MANY YOU WERE IN TOUCH WITH, with its month as a line saved each night, and the line says it no more', () => {
-  const stat = blocksOf('people').filter((b) => b.kind === 'stat');
-  assert.equal(stat.length, 1);
-  assert.deepEqual(stat[0]!.cells, [{ metric: 'people-in-touch-30d', label: 'In touch, 30 days', trend: '30d' }]);
-  assert.deepEqual(stat[0]!.when, { metric: 'people-count', gt: 0 });
+test('PEOPLE DRAWS NO IN TOUCH TILE, and the figure and its night’s save stay declared, and the line says it no more', () => {
+  assert.equal(blocksOf('people').filter((b) => b.kind === 'stat').length, 0);
   assert.deepEqual(PEOPLE_METRICS['people-in-touch-30d']!.snapshot, { grain: 'day', into: 'series.people-in-touch-30d' });
   for (const lead of blocksOf('people').filter((b) => b.lead)) assert.doesNotMatch(String((lead as { body?: string }).body), /\{\{people-in-touch-30d\}\}/u);
 });
@@ -209,7 +217,10 @@ test('ON A RECORD AT WORK EVERY PAGE DRAWS ALL FIVE: one sentence, its queue, it
     for (const b of blocks) assert.deepEqual(b.refusals ?? [], [], `${slug}: ${b.heading ?? b.kind}`);
     const shown = blocks.filter((b) => b.drawn !== false);
     assert.ok(sentenceOf(blocks), `${slug} opens on no sentence`);
-    for (const [part, is] of Object.entries(PARTS)) assert.ok(shown.some((b) => is(b, list)), `${slug} draws no ${part}`);
+    for (const [part, is] of Object.entries(PARTS)) {
+      if (part === 'figures' && NO_FIGURES_TILE.has(slug)) continue;
+      assert.ok(shown.some((b) => is(b, list)), `${slug} draws no ${part}`);
+    }
     assert.equal(shown.find((b) => b.kind === 'queue')?.queue?.length, 1, `${slug}'s queue draws its one question`);
     assert.ok(aboveTheFold(blocks, true).length <= 6, `${slug}: ${aboveTheFold(blocks, true).join(', ')}`);
   }
@@ -225,7 +236,7 @@ test('ON A RECORD AT WORK EVERY PAGE DRAWS ALL FIVE: one sentence, its queue, it
   assert.deepEqual((estate.feed as { target?: string | null }[]).map((r) => r.target), ['services#1']);
 });
 
-test('IN TOUCH IS SAVED EACH NIGHT, and its line is drawn from the nights the record kept', async () => {
+test('IN TOUCH IS SAVED EACH NIGHT, though no tile draws it now, so a page that wants its line has the nights', async () => {
   const sql = openSqlite();
   let now = NOW;
   const k = await openRecord(sql, { now: () => now });
@@ -236,8 +247,6 @@ test('IN TOUCH IS SAVED EACH NIGHT, and its line is drawn from the nights the re
   const points = () => sql.all<{ value: number }>("SELECT value FROM metric_point WHERE series IN ('people-in-touch-30d', 'series.people-in-touch-30d') ORDER BY at");
   assert.deepEqual(points(), [], 'a night is remembered before a save has run');
 
-  const cell = () => (answered(k, 'people').find((b) => b.kind === 'stat') as Drawn & { readings?: { trend?: (number | null)[] }[] }).readings?.[0];
-  assert.equal(cell()?.trend, undefined, 'a line with no night kept');
   for (let n = 1; n <= 3; n++) {
     now = NOW + n * 86_400_000;
     await k.drain();
@@ -245,9 +254,5 @@ test('IN TOUCH IS SAVED EACH NIGHT, and its line is drawn from the nights the re
   assert.ok(points().length >= 3, `three nights kept ${points().length}`);
   /* THE NIGHTS SINCE THEY WERE IN TOUCH COUNT THE TWO: the save counts the figure as it stood each night. */
   assert.deepEqual(points().slice(-3).map((p) => p.value), [2, 2, 2], 'each night since counts the two in touch');
-  const trend = cell()?.trend ?? [];
-  assert.equal(trend.length, 30, 'a month of nights');
-  assert.ok(trend.filter((v) => v !== null).length >= 3, 'the line has its three points');
-  assert.deepEqual(trend.slice(-3), [2, 2, 2], 'and its last nights are the two in touch');
   sql.close();
 });

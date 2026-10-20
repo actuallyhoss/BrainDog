@@ -141,17 +141,13 @@ test('A PROJECT WITH NO TASK HAS NO LAST WORKED, never a nought that reads as wo
 /** The line as the Overview drew it: the one note that counts the projects saying what they earned. */
 const earnsLine = (p: PageResult): Drawn[] => (p.blocks as Drawn[]).filter((b) => b.kind === 'note' && typeof b.body === 'string' && b.body.includes('say what they earned'));
 
-test('PROJECTS SAYS HOW MANY OF THOSE IN PLAY SAY WHAT THEY EARNED, a count of each and never a sum', async () => {
+test('PROJECTS SAYS NO COUNT OF THOSE IN PLAY THAT SAY WHAT THEY EARNED, since the split says it by being drawn', async () => {
   const k = await seeded();
-  const lines = earnsLine(opened(k, 'portfolio'));
-  /* DECLARED TWICE, open while short and folded when long, and the record draws exactly one. */
-  assert.equal(lines.length, 2);
-  const drawn = lines.filter((b) => b.drawn !== false);
-  assert.equal(drawn.length, 1, 'the line is drawn once');
-  assert.equal(drawn[0]!.body, '{{projects-earning-said}} of {{projects-live}} projects in play say what they earned in a year');
-  assert.deepEqual(drawn[0]!.refusals ?? [], []);
-  /* THE SAMPLE'S THREE IN PLAY EACH SAY, in whatever currency: "3 of 3". */
-  assert.deepEqual(drawn[0]!.values, { 'projects-earning-said': 3, 'projects-live': 3 });
+  /* CUT IN BATCH 6: "3 of 3 projects in play say what they earned in a year" sat in a grey box beside the split, and the figure
+     stays declared for the split's own gate. */
+  assert.equal(earnsLine(opened(k, 'portfolio')).length, 0, 'the line is declared again');
+  const split = (opened(k, 'portfolio').blocks as Drawn[]).filter((b) => b.heading === 'What each one earns' && b.drawn !== false);
+  assert.equal(split.length, 1, 'the split is drawn once');
 });
 
 test('WITH NONE SAYING, THE LINE GOES WITH THE SPLIT: neither is drawn', async () => {

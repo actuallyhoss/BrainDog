@@ -1474,7 +1474,7 @@ const DECLARED: Record<string, Version> = {
       rule.payment-unsettles script.unsettle
       metric.lasts-no-income
     `,
-    declares: 'ce04c1a199af2266',
+    declares: '432c185b62df186d',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1509,6 +1509,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (batch 100, integrate 100; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for four changes, two ids added and none taken away: the side column's tile is Lasts, calm, drawn while there is an account and Cash now is at or above nought, and Runs out, in the danger colour while Cash now is under nought, is declared and not placed yet (money-lasts-tile-100, REC-B07 step 8); `page.money`'s and `page.money-book`'s Cash ahead open on ten weeks, `horizon: 70`, offer `horizons: [70, 90, 180, 365, 730, 1825, last]` and declare `axis: fit`, and a book's empty line says Nothing in {{name}} is dated ahead yet. (money-ten-weeks-100, REC-B08); `page.money` ends on Where it went, a folded heading over the split This month, by category (`spent-by-category-month`, unset No category yet) and the bar No category yet, by who was paid (Ledger entries going out with no category in the last 91 days by `payee`, eight bars, drawn while `txn-uncategorised` is more than nought), and gives up This month's spending, Budgets and Last confirmed, which stay declared in their files, so the page still declares 24 blocks (money-where-it-went-100, PGS-C20 job 2); and `script.settle_matched_line` is back as payment-matches' second step, moving a repeating line's Next by the host's ctx.cycle, and `rule.recurring-went-through` moves Next on when 'It went through' is pressed; settle gains quiet and told (money-next-moves-100, REC-B11 jobs 4 and 5) -> e217149ab3abd4e8",
       "Inside the unreleased 3.17.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 3.16.0): `page.money` says its place on the rail, `nav.place` 40, lowest first; no id added or taken away -> db5273f19a418802",
       "Inside the unreleased 3.17.0 (money-days-word): `page.money`'s first line says days after the count of how long the cash lasts with no income, `day(s)`; no id added or taken away -> ce04c1a199af2266",
+      "Inside the unreleased 3.17.0 (batch 6, the look of Money): `page.money`'s Ledger line says the day's count alone, `{{filed-today}} filed today.`, where it said it beside a second count of 30 days that read as a contradiction; no id added or taken away -> 432c185b62df186d",
     ],
   },
   'work@1.17.0': {
@@ -1566,7 +1567,7 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: 'fc96cb39590d3016',
+    declares: '51200b3a57b454df',
     history: [
       "`page.people` says how many people may be on the record twice, in one note under its two lead notes, from the built-in figure held-twice and drawn only above nought; a note added, nothing taken away -> 3c1698b71103bfe4",
       "Folded into the unreleased 3.4.0 (people-twice-link-74; integrate 74; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list of everyone in order of name (`/r/people?sort=name`) and says what to look for; no id added or taken away -> 900ff4486ed1626e",
@@ -1577,6 +1578,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.4.0 (waiting-people-services-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 3.3.0): `page.people` draws the questions about somebody as a queue, Waiting on you, gated on `questions-open-in:people`, with a clause in its line saying how many; a block added, nothing taken away, no id added or taken away -> 72cb3cab41d4f86a",
       "Folded into the unreleased 3.4.0 (services-people-five-parts-101, PGS-C18 and PGS-C24; batch 101; commit 63423720, the deployed build, holds 3.3.0): `metric.people-in-touch-30d` is saved each night into series.people-in-touch-30d; `page.people` gains In touch, the figure with its month as a line, and What agents did, an agents block over the log narrowed to people or organisations, and its line no longer says how many were in touch; `page.activity` declares filters on who, kind and list; two blocks and a save added, nothing taken away, no id added or taken away -> 07e8a5aa097e7ca8",
       "Inside the unreleased 3.4.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 3.3.0): `page.people` says its place on the rail, `nav.place` 50, lowest first; no id added or taken away -> fc96cb39590d3016",
+      "Inside the unreleased 3.4.0 (batch 6, the look of People): `page.people` draws Everyone and Organisations as lines (a table) and not as little forms of labelled facts, and drops the In touch tile, whose figure and its night's save stay declared; no id added or taken away -> 51200b3a57b454df",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
@@ -1608,9 +1610,10 @@ const DECLARED: Record<string, Version> = {
       register.things
       rule.project-past-aim
     `,
-    declares: '174811f66edd1c77',
+    declares: 'e732ff9ab12f1828',
     history: [
       "`register.things` gains the field `draft` (a yes or no, Not kept yet, no by default), which marks a project the record formed from an agent's first session until its owner keeps it; no id added or taken away -> 174811f66edd1c77",
+      "Inside the unreleased 1.18.0 (batch 6, the look of Projects): `page.portfolio` drops the In play and earning strip, which said what the line says, and the note counting how many in play say what they earned, open and folded; their figures stay declared; no id added or taken away -> e732ff9ab12f1828",
     ],
   },
   /* THE EARNINGS LINE ONLY WHILE ONE SAYS (seed-58, the look of 13 October, fault J). 1.16.0 IS RELEASED. The same ids

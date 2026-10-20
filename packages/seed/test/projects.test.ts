@@ -249,15 +249,14 @@ test('PROJECTS OPENS WHAT IT HOLDS WHILE IT IS SHORT, and folds it only past fou
   assert.deepEqual(twice.filter((b) => /-\d+$/u.test(keyOf(b))).map(keyOf), [], 'a folded tile lost its key to the open one');
   const looked = under(short, 'Earnings, agents and dates');
   assert.deepEqual(looked.map((b) => [b.heading, b.drawn !== false, b.span]), [
+    /* NO LINE UNDER IT SINCE BATCH 6: "3 of 3 projects in play say what they earned" was the split said again in a grey box. */
     ['What each one earns', true, 12],
-    /* SINCE portfolio 1.16.0, the line under it: how many of those in play say what they earned. */
-    [undefined, true, 12],
     ['With an agent', true, 6],
     ['Coming up', true, 6],
   ]);
   assert.deepEqual(names(looked[0]!.rows).sort(), THINGS.filter((t) => inPlay(t) && t.revenue !== undefined && t.revenue !== null).map((t) => String(t.name)).sort());
   /* HALF A ROW HOLDS THREE COLUMNS: the project, who holds it and who changed it last. Its next step is on its card. */
-  assert.deepEqual(looked[2]!.columns?.map((c) => c.field), ['name', 'agent', 'changed']);
+  assert.deepEqual(looked[1]!.columns?.map((c) => c.field), ['name', 'agent', 'changed']);
   /* THE PARKED ARE THE TABLE ITSELF, under the tile's heading and none of its own. */
   assert.deepEqual(under(short, 'Parked and finished').map((b) => [b.kind, b.heading, names(b.rows)]), [['table', undefined, ['Tallow']]]);
   /* AND WHAT THE FOLDED HEADINGS HELD IS NOT READ AT ALL: a tile nobody sees costs no query. */
@@ -276,7 +275,6 @@ test('PROJECTS OPENS WHAT IT HOLDS WHILE IT IS SHORT, and folds it only past fou
   }
   assert.deepEqual(under(long, 'Earnings, agents and dates').map((b) => [b.heading, b.drawn !== false, b.span]), [
     ['What each one earns', true, 12],
-    [undefined, true, 12],
     ['With an agent', true, 12],
     ['Coming up', true, 12],
   ]);
@@ -292,10 +290,9 @@ test('PROJECTS OPENS WHAT IT HOLDS WHILE IT IS SHORT, and folds it only past fou
   assert.equal(block(ends, 'In play').rows.length, THINGS.length);
   assert.deepEqual(pair(ends, 'Parked and finished').map((b) => b.drawn), [false, false], 'Parked and finished: a heading over nothing');
   assert.deepEqual(pair(ends, 'Earnings, agents and dates').map((b) => b.drawn !== false), [false, false]);
-  /* AND THE LINE IT HELD IS NOT DRAWN EITHER. Read off the page, since `under` starts from a heading that is drawn. */
+  /* AND THE LINE IT HELD IS GONE, SINCE BATCH 6: no block of the page counts how many say what they earned. */
   const said = (ends.blocks as (Read & { body?: string })[]).filter((b) => typeof b.body === 'string' && b.body.includes('say what they earned'));
-  assert.ok(said.length > 0, 'the page no longer declares the line');
-  assert.deepEqual(said.map((b) => b.drawn !== false), said.map(() => false));
+  assert.deepEqual(said, [], 'the page declares the line again');
 });
 
 test('A PROJECT PAST THE DAY IT AIMED FOR IS ASKED ABOUT ON DECIDE, once, and nothing is written', async () => {
@@ -400,7 +397,9 @@ test('THE PAGE IS CALLED WHAT THE TOP BAR CALLS IT, its statuses start with a ca
      already say. */
   assert.equal(JSON.stringify(row[0]!.when), JSON.stringify({ metric: 'projects-live', gt: 4 }), 'the lanes draw over a few projects');
   assert.equal(JSON.stringify(row[1]!.when), JSON.stringify({ all: [{ metric: 'projects-live', gt: 4 }, { metric: 'projects-with-health', gt: 0 }] }), 'the track draws over a few projects, or over none that says');
-  assert.equal(blocks.find((b) => !b.lead)?.heading, 'In play and earning', 'the strip is not the first under the line');
+  /* NO STRIP UNDER THE LINE SINCE BATCH 6: "In play 3, Earning 2" was a whole row for what the line says. */
+  assert.ok(!blocks.some((b) => b.heading === 'In play and earning'), 'the strip is drawn again');
+  assert.equal(blocks.find((b) => !b.lead)?.heading, 'Where they are', 'the lanes are not the first under the line');
 
   const k = await seeded();
   const going = () => opened(k, 'portfolio').blocks.find((b) => b.heading === 'How they are going')!;

@@ -119,36 +119,24 @@ test('WITH NO HEALTH SET THERE IS NO HEALTH SPLIT, and the first project that sa
   assert.ok(drawn(headed(projects(k), 'How they are going')), 'the split waits after a project said how it is going');
 });
 
-test('THE STRIP SAYS IN PLAY AND EARNING, and its lines are the nights the record saved', async () => {
+test('NO STRIP SAYS IN PLAY AND EARNING, and the record still saves the two nights', async () => {
   const { k, sql, night } = await fresh();
   for (const [name, lane] of SIX) add(k, name, lane);
-  const before = headed(projects(k), 'In play and earning');
-  assert.ok(drawn(before), 'the strip is not drawn with projects in play');
-  assert.deepEqual(
-    (before.readings ?? []).map((r) => [r.label, r.reading?.value, r.trend]),
-    [
-      ['In play', 5, undefined],
-      ['Earning', 2, undefined],
-    ],
-    'before any night the strip is the figures alone',
-  );
-
+  /* CUT IN BATCH 6: a whole row saying "In play 5, Earning 2" over a line that says it. The figures and their nights stay. */
+  assert.equal(projects(k).filter((b) => b.heading === 'In play and earning').length, 0, 'the strip is drawn again');
   for (let n = 0; n < 3; n++) await night();
-  const after = headed(projects(k), 'In play and earning');
-  for (const r of after.readings ?? []) {
-    const saved = sql.all<{ value: number }>("SELECT value FROM metric_point WHERE series = ? AND grain = 'day' ORDER BY at", r.metric).map((p) => p.value);
-    const known = (r.trend ?? []).filter((v): v is number => v !== null);
-    assert.ok(known.length >= 3, `${r.label} has ${known.length} saved nights after three`);
-    assert.deepEqual(known, saved.slice(-known.length), `${r.label}'s line is not its saves`);
+  for (const metric of ['projects-live', 'projects-lane-earning']) {
+    const saved = sql.all<{ value: number }>("SELECT value FROM metric_point WHERE series = ? AND grain = 'day' ORDER BY at", metric).map((p) => p.value);
+    assert.ok(saved.length >= 3, `${metric} has ${saved.length} saved nights after three`);
   }
 });
 
-test('WITH NOTHING IN PLAY THE STRIP IS NOT DRAWN, and the line says In play only through the strip', async () => {
+test('WITH NOTHING IN PLAY THERE IS NO STRIP, and no line of the page says In play as a figure', async () => {
   const { k } = await fresh();
   add(k, 'Harbour', 'parked');
   const page = projects(k);
-  assert.equal(drawn(headed(page, 'In play and earning')), false, 'a strip of noughts is drawn');
-  /* A FIGURE IS SAID ONCE: the strip carries In play, so no line of the page says it again. */
+  assert.equal(page.filter((b) => b.heading === 'In play and earning').length, 0, 'a strip of noughts is drawn');
+  /* A FIGURE IS SAID ONCE, and the page's own line is where. */
   const lines = (PORTFOLIO_PAGES.portfolio!.blocks as unknown as { lead?: boolean; body?: string }[]).filter((b) => b.lead === true);
   for (const line of lines) assert.doesNotMatch(String(line.body), /\{\{projects-live\}\}/u, `the line says In play again: ${line.body}`);
 });
@@ -165,6 +153,6 @@ test('SIX TILES AT MOST BEFORE THE FOLD, drawn on a record with every one of the
     return !boxed && b.lead !== true;
   });
   assert.ok(above.length <= 6, `${above.length} tiles before the fold: ${above.map((b) => b.heading ?? b.kind).join(', ')}`);
-  for (const heading of ['In play and earning', 'Where they are', 'How they are going', 'In play'])
+  for (const heading of ['Where they are', 'How they are going', 'In play'])
     assert.ok(above.some((b) => b.heading === heading), `${heading} is not before the fold`);
 });

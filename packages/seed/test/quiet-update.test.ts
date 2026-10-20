@@ -789,6 +789,50 @@ const withoutBatch100 = (doc: Body): Body => {
 const SPEND_VS_LAST: ReadonlySet<string> = new Set(['spent-last-month', 'spent-by-category-last-month', 'spent-by-category-to-date-last-month', 'spent-vs-last-month']);
 /** Projects' quiet line with the clause for its list's questions, added inside the unreleased portfolio 1.17.0 (waiting-work-projects-99, PGS-C18). */
 const QUIET_PROJECTS = 'Nothing needs a push, {{questions-open-in:things}} question(s) for you';
+/**
+ * PEOPLE'S EVERYONE AND ORGANISATIONS AS CARDS, BEFORE BATCH 6 made them lines (people as lines, the plan's People 2): each
+ * person a little form of labelled facts grouped by the organisation they are with, three to a group, and each
+ * organisation the same. Put back, so the marks the released versions were cut with are still read off today's page.
+ */
+const EVERYONE_CARDS: Body = {
+  kind: 'cards',
+  heading: 'Everyone',
+  icon: 'people',
+  span: 12,
+  source: 'register.people',
+  where: 'merged_into is empty',
+  columns: [
+    { field: 'name', label: 'Name', as: 'who' },
+    { field: 'role', label: 'Role', as: 'fact' },
+    { field: 'org', label: 'Organisation', as: 'fact' },
+    { field: 'projects', label: 'Met in', as: 'fact' },
+    { field: 'in_touch', label: 'Last in touch', as: 'when' },
+  ],
+  group: 'org',
+  fold: 3,
+  order: [
+    { field: 'in_touch', dir: 'desc' },
+    { field: 'seq', dir: 'desc' },
+  ],
+  empty: 'Nobody yet. Add someone, or an agent adds whoever it meets in a commit or a mail.',
+};
+const ORGANISATIONS_CARDS: Body = {
+  kind: 'cards',
+  heading: 'Organisations',
+  icon: 'building',
+  span: 12,
+  source: 'register.organisations',
+  where: 'merged_into is empty',
+  when: { metric: 'organisations-count', gt: 0 },
+  columns: [
+    { field: 'name', label: 'Organisation', as: 'who' },
+    { field: 'kind', label: 'Kind', as: 'fact' },
+    { field: 'domain', label: 'Website', as: 'fact' },
+  ],
+  order: [{ field: 'name', dir: 'asc' }],
+};
+const peopleBefore6 = (b: Body): Body => (b.heading === 'Everyone' ? EVERYONE_CARDS : b.heading === 'Organisations' ? ORGANISATIONS_CARDS : b);
+
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
   'money-core': {
@@ -910,6 +954,7 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
           .filter((b) => !(b.kind === 'queue' && b.where === 'list is people') && b.heading !== 'In touch' && b.heading !== 'What agents did')
           .map((b) => (b.kind === 'note' && b.body === '{{questions-open-in:people}} question(s) for you, {{people-count}} contact(s)' ? { ...b, body: `${b.body}, {{people-in-touch-30d}} in touch in the last 30 days` } : b))
           .map((b) => (b.kind === 'note' && typeof b.body === 'string' ? { ...b, body: b.body.replace('{{questions-open-in:people}} question(s) for you, ', '') } : b))
+          .map(peopleBefore6)
           .flatMap((b) =>
             (b.when as Body | undefined)?.metric === 'held-twice'
               ? []
@@ -1075,7 +1120,8 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   /* PEOPLE DRAWS NO DOTS, AND SINCE 3.2.0 NO LIST OVER ITS CARDS EITHER, and keeps the figures the chart and the list drew on. */
   const people = blocks('people');
   assert.ok(!people.some((b) => b.kind === 'heat'), 'the twelve weeks of dots are still on People');
-  assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), []);
+  /* THE ONLY TABLES ARE THE LINES OF EVERYONE AND THE ORGANISATIONS, SINCE BATCH 6, which are the people and not a list over their cards. */
+  assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), ['Everyone', 'Organisations']);
   for (const id of ['metric.people-in-touch-90d', 'metric.people-in-touch-12w']) assert.ok(k.packClaims('people').includes(id), `${id} is not on the record`);
   /* AND PROJECTS HOLDS EACH HEADING TWICE, open while four or fewer are under it and folded past four. */
   const sections = blocks('portfolio').filter((b) => b.kind === 'section');
@@ -1320,7 +1366,7 @@ test('THE BOARD’S CARDS AND PEOPLE SHOWN ONCE GO IN ON THEIR OWN over the vers
   type Held = { kind: string; heading?: string; source?: string; columns?: { field: string }[] };
   const blocks = (slug: string): Held[] => value<{ blocks: Held[] }>(k.page(slug)).blocks;
   assert.deepEqual(blocks('work-board').find((b) => b.kind === 'board')!.columns!.map((c) => c.field), ['state', 'what', 'by', 'owner']);
-  assert.deepEqual(blocks('people').filter((b) => b.source === 'register.people').map((b) => [b.kind, b.heading]), [['cards', 'Everyone']]);
+  assert.deepEqual(blocks('people').filter((b) => b.source === 'register.people').map((b) => [b.kind, b.heading]), [['table', 'Everyone']]);
   assert.ok(k.packClaims('people').includes('metric.people-in-touch-90d'), 'the figure the list drew on was taken off the record');
 
   assert.deepEqual(await updateFirstParty(port), []);

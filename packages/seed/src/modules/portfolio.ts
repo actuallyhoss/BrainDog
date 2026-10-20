@@ -727,21 +727,8 @@ const EARNS = {
   when: { metric: 'projects-earning-said', gt: 0 },
 };
 
-/* HOW MANY OF THE PROJECTS IN PLAY SAY WHAT THEY EARNED, ALWAYS DRAWN BESIDE THE SPLIT, SINCE portfolio 1.16.0 (REC-C08
-   step 6, "0 of 14"). The split is hidden while none says, so a record where nobody had said read nothing at all about
-   earnings, and a split of two said nothing of the nine silent beside them. Two counts, never a sum: projects that earn
-   in two currencies are counted once each, and no amount is added. Drawn while one project is in play, since "0 of 0"
-   says nothing the line at the top does not.
-
-   ONLY WHILE ONE SAYS, SINCE portfolio 1.17.0. "0 of 11 projects in play say what they earned in a year" read as a
-   telling off on a record that never meant to say, under a split that was not drawn. So the line goes with the split
-   it sits beside: both are drawn from the first project that says, and neither before. */
-const EARNS_SAID = {
-  kind: 'note',
-  span: 12,
-  when: { metric: 'projects-earning-said', gt: 0 },
-  body: '{{projects-earning-said}} of {{projects-live}} projects in play say what they earned in a year',
-};
+/* NO LINE COUNTING HOW MANY SAY WHAT THEY EARNED, SINCE portfolio 1.18.0: "3 of 3 projects in play say what they earned in a
+   year" in a grey box beside the split, which the split says by being drawn. */
 
 /* WHAT AGENTS HOLD, and what each one is doing next on it. An agent takes a project by setting itself as its agent. */
 const WITH_AGENT = {
@@ -879,22 +866,8 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
            how it moved, and a figure is said once on a page. */
         body: 'Nothing needs a push, {{questions-open-in:things}} question(s) for you',
       },
-      {
-        /* HOW MANY ARE IN PLAY AND HOW MANY EARN, OVER TIME, SINCE portfolio 1.17.0 (PGS-C17): two counts the record saves
-           every night (`snapshot:` on each; In play since 1.6.0, Earning since 1.17.0), each with the line of those saves
-           over twelve weeks. A line is drawn from its third saved night; before that the cell is the figure alone.
-           Drawn while a project is in play, as In play is. */
-        kind: 'stat',
-        heading: 'In play and earning',
-        icon: 'gauge',
-        span: 12,
-        key: 'in-play-earning',
-        when: { metric: 'projects-live', gt: 0 },
-        cells: [
-          { metric: 'projects-live', label: 'In play', trend: '12w' },
-          { metric: 'projects-lane-earning', label: 'Earning', trend: '12w' },
-        ],
-      },
+      /* NO IN PLAY AND EARNING STRIP, SINCE portfolio 1.18.0: a full-width tile saying "In play 3, Earning 2", which the line
+         above already says. */
       {
         /* WHERE THEY ARE, BY LANE, SINCE portfolio 1.17.0 (PGS-C17): every project in Building, Earning, Parked or
            Finished as one track, the figure `projects-by-lane` declared since 1.6.0 and drawn by nothing since 1.11.0.
@@ -1014,7 +987,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         when: { metric: 'projects-looked-up', lte: FOLD_PAST },
       },
       { ...EARNS, key: 'open-earns' },
-      { ...EARNS_SAID, key: 'open-earns-said' },
       /* SIDE BY SIDE, HALF EACH, in the open tile, and a half holds three columns. So what an agent holds leaves its
          next step out here: with four projects or fewer every one of them is a card straight above, and a card says
          its next step. Who holds it and who changed it last stay, since no card says who last said where it stands. One
@@ -1033,7 +1005,6 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         when: { metric: 'projects-looked-up', gt: FOLD_PAST },
       },
       EARNS,
-      { ...EARNS_SAID, key: 'earns-said' },
       WITH_AGENT,
       COMING_UP,
       {

@@ -306,9 +306,9 @@ const ASKED_BY_A_RUN = {
  * Working, Today and Earlier, and a run that said nothing, or whose name is the record's own, has no sentence.
  */
 const ENDED_COLUMNS = [
-  { field: 'agent', as: 'title' },
+  { field: 'agent', as: 'who' },
   { field: 'doing_said', as: 'reply' },
-  { field: 'project', label: 'Project', as: 'scope' },
+  { field: 'project', label: 'on', as: 'scope' },
   { field: 'last_seen', as: 'when' },
 ];
 
@@ -480,23 +480,6 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         when: { metric: 'runs-working', is: 0 },
         body: 'No agent is working right now, and {{handoffs-open}} step(s) left for the next run',
       },
-      /* THE DAY AS A PICTURE, SINCE 1.8.0 (DIRECTION §39, the picture first): the last 24 hours, one lane a run, from when
-         it started (`started`, which the record stamps as a run opens) to when it was last heard from, the runs still
-         working in the accent and every other left neutral. Over the list of runs itself and not `sessions.live`, so a
-         run that finished this morning keeps its lane. No `limit:`, which lanes refuse: they draw every run in their
-         hours, and on a busy day the newest of them and how many more. Only while a run was heard from today (`runs-heard-today`), so a quiet day draws no empty track.
-         It shares its heading with the group of runs that stopped today further down: both are today. */
-      {
-        kind: 'lanes',
-        heading: 'Today',
-        icon: 'clock',
-        span: 12,
-        source: 'register.session',
-        columns: [{ field: 'doing' }, { field: 'started' }, { field: 'last_seen' }, { field: 'state' }],
-        tones: { active: 'info' },
-        hours: 24,
-        when: { metric: 'runs-heard-today', gt: 0 },
-      },
       /* WHAT A RUN ASKED YOU, FIRST OF THE GROUPS, SINCE 1.6.0: the questions agents' runs opened, ranked as Decide ranks them, three
          drawn and the rest counted. Only while anything is open at all (`questions-open`, the record's own count); with
          none of them a run's, the queue has nothing in it and is not drawn. */
@@ -529,9 +512,9 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         span: 12,
         source: 'sessions.working',
         columns: [
-          { field: 'agent', as: 'title' },
+          { field: 'agent', as: 'who' },
           { field: 'doing_said', as: 'reply' },
-          { field: 'project', label: 'Project', as: 'scope' },
+          { field: 'project', label: 'on', as: 'scope' },
           { field: 'last_seen', as: 'when' },
         ],
         limit: 12,
@@ -559,13 +542,39 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         limit: 6,
         when: { metric: 'handoffs-open', gt: 0 },
       },
+      /* ONE TILE, TODAY'S RUNS, SINCE 1.14.0: the day's picture on top and the runs that ended or stopped today under it, where
+         two tiles both headed Today said the one word twice. A boxed section draws the blocks after it on one surface, up
+         to the next section, so the two sit under the heading with none of their own; each is still drawn only while it
+         has anything, and the tile goes when neither has (`emptyBoxesShut`). It stands under Working and Left for the
+         next run, because the box takes the blocks after it and Needs a look closes it. */
+      {
+        kind: 'section',
+        heading: 'Today’s runs',
+        icon: 'clock',
+        span: 12,
+        box: true,
+        when: { metric: 'runs-heard-today', gt: 0 },
+      },
+      /* THE DAY AS A PICTURE, SINCE 1.8.0 (DIRECTION §39, the picture first): the last 24 hours, one lane a run, from when
+         it started (`started`, which the record stamps as a run opens) to when it was last heard from, the runs still
+         working in the accent and every other left neutral. Over the list of runs itself and not `sessions.live`, so a
+         run that finished this morning keeps its lane. No `limit:`, which lanes refuse: they draw every run in their
+         hours, and on a busy day the newest of them and how many more. Only while a run was heard from today (`runs-heard-today`), so a quiet day draws no empty track.
+         It shares its heading with the group of runs that stopped today further down: both are today. */
+      {
+        kind: 'lanes',
+        span: 12,
+        source: 'register.session',
+        columns: [{ field: 'doing' }, { field: 'started' }, { field: 'last_seen' }, { field: 'state' }],
+        tones: { active: 'info' },
+        hours: 24,
+        when: { metric: 'runs-heard-today', gt: 0 },
+      },
       /* THE RUNS THAT ENDED OR STOPPED TODAY, SINCE 1.6.0. OVER THE LIST OF RUNS SINCE 1.12.0 (`RUNS_TODAY`), so a run
          that finished today is here, and a helper or a run that wrote nothing is not; the latest first. Where each
-         left off is Left for the next run's to say, above. */
+         left off is Left for the next run's to say, above. UNDER THE DAY'S PICTURE IN ONE TILE SINCE 1.14.0. */
       {
         kind: 'cards',
-        heading: 'Today',
-        icon: 'flag',
         span: 12,
         source: 'register.session',
         where: RUNS_TODAY,
@@ -592,7 +601,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       },
       /* EACH LINE IS ITS FIGURE'S NAME, THEN THE NUMBER, THEN WHAT TO DO (agents-pack-49): "1 key(s) are past their day"
          read wrong for one, so no verb follows a number and each line reads right for one and for many. */
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 0 }, body: 'Keys with no value and nowhere they are kept: {{keys-nowhere}}. Seal each in the vault or say where it lives.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 0 }, body: '{{keys-nowhere}} key(s) with no value. Add the value in the vault.' },
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 0 }, body: 'Keys past their day: {{keys-expired}}. Renew or retire each.' },
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tools-unseen', gt: 0 }, body: 'Tools not seen in a month: {{tools-unseen}}. Retire any you no longer use.' },
       /* KEYS WRITTEN WHERE A KEY SHOULD NOT BE (the kernel's built-in `keys-in-text`, read a slice a night by its key
