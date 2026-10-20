@@ -15,7 +15,7 @@ import { USE_CASES, arrange } from '@braindog/seed/usecases';
 import { carriedDocument, moduleDocument, moduleExamples, plantedRows } from '@braindog/seed/usecases/install';
 
 import { fileFor, withNeeds } from '../routes/start/accept.ts';
-import { firstRun } from './first-run.ts';
+import { STARTING_POINTS } from './first-run.ts';
 
 const TODAY = '2026-09-26';
 const MODULE_IDS = ['portfolio', 'people', 'money-core', 'estate', 'work', 'agents'];
@@ -92,6 +92,6 @@ test('the five chips /start and /signup share each reach their own use case', ()
     'I run a few companies': 'founder',
     "I'm part of a team": 'team',
   };
-  assert.deepEqual([...firstRun.whoChips], Object.keys(want));
-  for (const chip of firstRun.whoChips) assert.equal(arrange(chip).pick?.usecase, want[chip], chip);
+  assert.deepEqual([...STARTING_POINTS], Object.keys(want));
+  for (const chip of STARTING_POINTS) assert.equal(arrange(chip).pick?.usecase, want[chip], chip);
 });

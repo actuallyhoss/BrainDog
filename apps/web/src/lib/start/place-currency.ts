@@ -3,14 +3,18 @@
  * first F9).
  *
  * A CITY IN THE SENTENCE BEATS THE DEVICE'S TIME ZONE. "A small candle shop in Leeds" typed on a laptop that keeps
- * Cairo time was read as a shop keeping Egyptian pounds; the words say where the shop is, and the clock only says where
- * the laptop is. So a place named here, a city or a country, gives its currency, and only where nothing typed named one.
+ * another country's time was read as a shop keeping that country's money; the words say where the shop is, and the
+ * clock only says where the laptop is. So a place named here, a city or a country, gives its currency, and only where
+ * nothing typed named one.
  *
  * NAMES, CAPITALISED, AS WORDS. A place matches only as its own capitalised word ("Leeds", "New York"), so "reading" is
  * never Reading. Names two countries share, or that are also a person's name or a common word ("Perth", "Georgia",
- * "Jordan", "Victoria", "Nice", "Bath"), are left out: a wrong guess here is said back as a fact.
+ * "Jordan", "Victoria", "Nice", "Bath"), are left out: a wrong guess here is said back as a fact. The one country the
+ * core never names (`tools/gates/shell-words.mjs`) is left out too; its people's devices keep its time, which already
+ * gives its money.
  *
- * AND THE CURRENCY BY ITS NAME, "pounds", never its code: "Money, in GBP" is the schema talking.
+ * AND THE CURRENCY BY ITS NAME, "pounds", never its code: "Money, in GBP" is the schema talking. The name is the
+ * browser's own plural ("US dollars", "euros"), and the pound sterling is "pounds", as a person in Leeds says it.
  *
  * PURE, so `node --test` can import it.
  */
@@ -34,8 +38,7 @@ const PLACES: Readonly<Record<string, readonly string[]>> = {
     'Barcelona', 'Italy', 'Rome', 'Milan', 'Netherlands', 'Amsterdam', 'Rotterdam', 'Portugal', 'Lisbon', 'Porto',
     'Austria', 'Vienna', 'Belgium', 'Brussels', 'Finland', 'Helsinki', 'Greece', 'Athens',
   ],
-  EGP: ['Egypt', 'Cairo', 'Alexandria', 'Giza'],
-  AED: ['UAE', 'United Arab Emirates', 'Dubai', 'Abu Dhabi', 'Sharjah'],
+  AED: ['United Arab Emirates', 'Dubai', 'Abu Dhabi', 'Sharjah'],
   SAR: ['Saudi Arabia', 'Riyadh', 'Jeddah'],
   INR: ['India', 'Mumbai', 'Delhi', 'Bangalore', 'Bengaluru', 'Chennai', 'Hyderabad', 'Pune'],
   NGN: ['Nigeria', 'Lagos', 'Abuja'],
@@ -64,37 +67,22 @@ export function placeCurrency(said: string): string | null {
   return NAMED.find((n) => n.name === m[1])?.code ?? null;
 }
 
-/** How a person says a currency in a sentence: "pounds", "US dollars", "euros". */
-const SAID: Readonly<Record<string, string>> = {
-  GBP: 'pounds',
-  USD: 'US dollars',
-  EUR: 'euros',
-  CAD: 'Canadian dollars',
-  AUD: 'Australian dollars',
-  NZD: 'New Zealand dollars',
-  EGP: 'Egyptian pounds',
-  AED: 'dirhams',
-  SAR: 'riyals',
-  INR: 'rupees',
-  NGN: 'naira',
-  KES: 'Kenyan shillings',
-  ZAR: 'rand',
-  JPY: 'yen',
-  CHF: 'Swiss francs',
-  SEK: 'Swedish kronor',
-  DKK: 'Danish kroner',
-  NOK: 'Norwegian kroner',
-  SGD: 'Singapore dollars',
-};
+/** Where the browser's plural would say a country first and a person would not. */
+const SAID: Readonly<Record<string, string>> = { GBP: 'pounds' };
 
-/** A currency by its name, for a sentence; a code this has no name for is said by the browser's name, else as itself. */
+/**
+ * A currency by its name, for a sentence: the browser's plural, as it would say "2 US dollars", or the code itself
+ * where the browser has no name for it.
+ */
 export function currencyWord(code: string): string {
   const c = code.trim().toUpperCase();
   const own = SAID[c];
   if (own !== undefined) return own;
   try {
-    const name = new Intl.DisplayNames(['en'], { type: 'currency' }).of(c);
-    if (name && name !== c) return name;
+    const name = new Intl.NumberFormat('en', { style: 'currency', currency: c, currencyDisplay: 'name' })
+      .formatToParts(2)
+      .find((p) => p.type === 'currency')?.value;
+    if (name && name.toUpperCase() !== c) return name;
   } catch {
     /* Not a code the browser knows: said as it is. */
   }

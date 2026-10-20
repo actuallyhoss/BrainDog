@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { AGENTS_PACK, FIRST_PARTY, firstPartyManifest } from '@braindog/seed';
 import { arrange } from '@braindog/seed/usecases';
 
-import { firstRun } from './first-run.ts';
+import { firstRun, STARTING_POINTS } from './first-run.ts';
 import { PACKS } from './record/fixtures/sample.ts';
 import { heardFor, INSTALL_ORDER, LEANS_ON, shape, titleOfRow, toTurnOn, writable, type PackId, type Shape } from './shape.ts';
 
@@ -146,14 +146,14 @@ test('SERVICES, AGENTS AND WORK, with a team size', () => {
 });
 
 test('EVERY CHIP, on its own, turns something on or suggests a use case', () => {
-  for (const chip of firstRun.whoChips) assert.ok(read(chip).packs.length > 0 || arrange(chip).pick !== null, chip);
+  for (const chip of STARTING_POINTS) assert.ok(read(chip).packs.length > 0 || arrange(chip).pick !== null, chip);
 });
 
 test('THE FIRST RUN ASKS WHAT THIS BRAINDOG IS FOR, not what the business is', () => {
   /* ONE QUESTION, and its chips are use case 6's five starting points, each its own use case. */
-  const first = [firstRun.whoQuestion, firstRun.whoPlaceholder, ...firstRun.whoChips];
+  const first = [firstRun.whoQuestion, firstRun.whoPlaceholder, ...STARTING_POINTS];
   for (const line of first) assert.doesNotMatch(line, /business/iu, line);
-  const kinds = new Set(firstRun.whoChips.map((c) => arrange(c).pick?.usecase).filter(Boolean));
+  const kinds = new Set(STARTING_POINTS.map((c) => arrange(c).pick?.usecase).filter(Boolean));
   assert.deepEqual([...kinds].sort(), ['business', 'founder', 'shop', 'student', 'team']);
 });
 
@@ -166,7 +166,7 @@ const SENTENCES = [
   'Clients like Fenwick and Pell & Vine',
   'hosting costs 20 pounds a month',
   'I freelance',
-  ...firstRun.whoChips,
+  ...STARTING_POINTS,
 ];
 
 test('NEVER INVENTED: every amount is digits the sentence holds, every span is the sentence\'s own text', () => {

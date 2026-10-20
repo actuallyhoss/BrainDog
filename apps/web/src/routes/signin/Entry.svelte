@@ -170,6 +170,7 @@
 
   /* `tabindex="-1"` moves focus to a title when a step changes, for a screen reader; it is never in the tab order. */
   .entry :global(.entry-title:focus:not(:focus-visible)) {
+    /* focus-ok: the title takes focus only by script, as a step changes, so a reader is told where it is; a ring there would read as a control. */
     outline: none;
   }
 

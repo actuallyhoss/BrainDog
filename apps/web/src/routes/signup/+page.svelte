@@ -1608,7 +1608,7 @@
     border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-body);
     line-height: 24px;
     /* A field takes the browser's own tracking, not the body's, and the marks under it take the body's: the same here,
        or every word drifts a little further from its mark. The gutter is kept on both, so a scrollbar wraps neither. */
@@ -1650,12 +1650,19 @@
     overflow: hidden;
     padding: var(--sp-3) var(--sp-4);
     color: transparent;
-    font-size: 16px;
+    font-size: var(--fs-body);
     line-height: 24px;
     white-space: pre-wrap;
     overflow-wrap: break-word;
     scrollbar-gutter: stable;
     pointer-events: none;
+  }
+
+  /* UNDER A THUMB THE FIELD READS AT 16 AT LEAST (`base.css`, so a phone does not zoom it), and the marks with it. */
+  @media (pointer: coarse) {
+    .lit {
+      font-size: max(16px, var(--fs-body));
+    }
   }
 
   /* A WORD HEARD, IN A NEUTRAL WASH: heard is not late, so it is never red. Translucent, so it reads on the field's fill. */

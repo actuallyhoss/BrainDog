@@ -17,15 +17,18 @@
 const andOf = (items: readonly string[]): string =>
   items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 
+/**
+ * THE FIVE STARTING POINTS OF USE CASE 6 (his word of 9 October): a shop, a freelancer, a student, a founder of a few
+ * companies and a team, as a person would say each. No screen draws them any more (the chips under the prompt were a
+ * chip cloud, the UI pass of 20 October, first F6); the reading is still held to understand each one, so they are the
+ * reading's fixtures and not the screen's words.
+ */
+export const STARTING_POINTS = ['I run a small shop', 'I freelance', "I'm a student", 'I run a few companies', "I'm part of a team"] as const;
+
 export const firstRun = {
-  /* THE PROMPT. A question and one field, with one example of an answer in it (the UI pass of 20 October, first F6): the
-     chips that stood under it were a chip cloud, and they went. `whoChips` stays as the five starting points of use case
-     6 (his word of 9 October), a shop, a freelancer, a student, a founder of a few companies and a team, which the
-     reading's tests hold it to; nothing draws them. */
+  /* THE PROMPT. A question and one field, with one example of an answer in it (first F6). */
   whoQuestion: 'Who are you?',
   whoPlaceholder: "I'm Mariam. I run a candle shop and want to keep track of orders, stock and what I owe suppliers.",
-  whoChips: ['I run a small shop', 'I freelance', "I'm a student", 'I run a few companies', "I'm part of a team"],
-  whoChipsLabel: 'Add to your answer',
   whoGo: 'Show my BrainDog',
   /* WHILE SLASH READS WHAT WAS SAID: the button's own word, and nothing else moves. */
   whoReading: 'Reading',

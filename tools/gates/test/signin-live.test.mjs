@@ -142,7 +142,7 @@ test('each of the four, broken alone, is a finding', async () => {
     [{ screen: 'refused' }, /settled as refused/],
     [{ screen: null }, /sign-in stopped: waited for main#main/],
     [{ landAt: '/app/somebody-else/' }, /not on the canary ops/],
-    [{ signsOut: false }, /sign-in stopped: waited for Sign in with a passkey/],
+    [{ signsOut: false }, /sign-in stopped: waited for Use a passkey/],
   ];
   for (const [breaks, finding] of cases) {
     const found = await signInLive(stubPage(breaks), { origin: 'https://brain.dog', slug: 'ops' });

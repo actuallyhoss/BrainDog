@@ -13,15 +13,6 @@
  */
 
 export const account = {
-  /**
-   * THE SLOGAN, AND THERE IS ONE. Not a description of the product, which the sentence under it
-   * does; a thing a person remembers. It is the README's headline, the marketing site's, and this,
-   * and the three are the same five words on purpose: a product with three taglines has none.
-   *
-   * It read "Everything about your business that isn't code." for the life of the build, which is a
-   * definition rather than a promise, and it was rendered nowhere.
-   */
-  tagline: 'Give your business a memory',
   shownInNav: (title: string) => `${title} is back in your nav.`,
   showAgain: 'Show again',
   hiddenPages: 'Hidden from your nav',
@@ -591,7 +582,6 @@ export const account = {
   emailLink: 'Email me a sign-in link',
   emailLabel: 'Email',
   emailLike: 'you@example.com',
-  sendLink: 'Send me a link',
   sendingLink: 'Sending the link',
   linkSentTitle: 'Check your email',
   /* The host answers alike for an address it does not know, so this cannot say the link was sent. */

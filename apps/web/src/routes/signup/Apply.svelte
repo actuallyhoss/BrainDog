@@ -344,7 +344,7 @@
   /* UNDER A THUMB EVERY FIELD READS AT 16, the size below which a phone's browser zooms the page in on focus. */
   @media (pointer: coarse) {
     .ask .field-input {
-      font-size: 16px;
+      font-size: var(--fs-body);
     }
   }
 </style>

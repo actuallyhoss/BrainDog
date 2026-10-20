@@ -1226,7 +1226,7 @@
     border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: 16px;
+    font-size: var(--fs-body);
     line-height: 24px;
     resize: vertical;
     /* IT SCROLLS CLEAR OF THE PHONE'S KEYBOARD with the chips and the press under it still in view. */

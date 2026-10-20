@@ -140,7 +140,6 @@
   },
   "buttons": ["Undo", "Cancel", "Done", "Close", "Back"],
   "held": {
-    "apps/web/src/lib/copy/shell.ts": { "count": 1, "why": "mcp is \"MCP\", the door's name in the shell. EXP-B08 names it for what it does." },
-    "apps/web/src/lib/copy/account.ts": { "count": 1, "why": "firstDoorTitle ends in a full stop. EXP-B08 drops it." }
+    "apps/web/src/lib/copy/shell.ts": { "count": 1, "why": "mcp is \"MCP\", the door's name in the shell. EXP-B08 names it for what it does." }
   }
 }

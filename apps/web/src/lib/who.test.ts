@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { copy } from './copy.ts';
-import { firstRun } from './first-run.ts';
+import { STARTING_POINTS } from './first-run.ts';
 import { hear, heardAt, introduce, nameFromAddress, personRow, withChip } from './who.ts';
 
 test('A NAME BEFORE A COMMA, and the rest kept as the bio', () => {
@@ -45,7 +45,7 @@ test('NO NAME, and the whole sentence is the bio', () => {
 });
 
 test('A SENTENCE THAT IS ONLY A CHIP names nobody', () => {
-  for (const chip of firstRun.whoChips) assert.deepEqual(hear(chip), { name: null, bio: chip }, chip);
+  for (const chip of STARTING_POINTS) assert.deepEqual(hear(chip), { name: null, bio: chip }, chip);
 });
 
 test('ONE LINE, whatever the field was given', () => {

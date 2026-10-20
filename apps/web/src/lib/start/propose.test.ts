@@ -194,7 +194,7 @@ test("MARIAM'S SENTENCE: her as you, her words lit where she typed them, the sho
   assert.equal(p.places.find((x) => x.name === 'Clients')?.phrase, 'Mariam', 'People, called Clients, is there because she is');
   assert.equal(p.places.find((x) => x.name === 'Money')?.phrase, 'who owes me');
   assert.ok(p.modules.includes('portfolio'), 'Projects is still installed, since Money stands on it');
-  assert.equal(p.currency, 'EGP', 'none typed and none from the device, so the shop in Alexandria keeps its own (first F9)');
+  assert.equal(p.currency, null, 'no currency typed and none from the device');
   /* NO COUNT AND NO ENTRY SHE DID NOT TYPE: a place is its name and the words that turned it on, and nothing is filled. */
   for (const x of p.places) assert.deepEqual(Object.keys(x).sort(), ['at', 'id', 'kind', 'name', 'phrase']);
   assert.deepEqual(p.rows, []);

@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 
 import { USE_CASES, arrange } from '@braindog/seed/usecases';
 import { formedFor } from '@braindog/seed/usecases/install';
-import { firstRun } from './first-run.ts';
+import { STARTING_POINTS } from './first-run.ts';
 import { hear } from './who.ts';
 import { arrangeTurns } from './arrange.ts';
 import { propose } from './start/propose.ts';
@@ -31,7 +31,7 @@ test('THE SOLO FOUNDER CARD, TYPED BACK, IS SOLO FOUNDER, and not Personal on a 
 
 test('WALK TWO IS A FOUNDER, read from both turns, whether turn one was typed or the chip', () => {
   assert.equal(arrangeTurns(hear(WHO).bio, ABOUT).pick?.usecase, 'founder');
-  assert.equal(arrangeTurns(firstRun.whoChips[1], ABOUT).pick?.usecase, 'founder');
+  assert.equal(arrangeTurns(STARTING_POINTS[1], ABOUT).pick?.usecase, 'founder');
   const both = arrangeTurns(hear(WHO).bio, ABOUT);
   assert.equal(both.ranked[0]?.score, 2, 'companies in turn one and My companies in turn two');
 });
@@ -74,7 +74,7 @@ const CHIPS: Record<string, string> = {
 };
 
 test('THE TABLE IS EVERY CHIP, and each is what that chip alone proposes', () => {
-  assert.deepEqual(Object.keys(CHIPS), [...firstRun.whoChips]);
+  assert.deepEqual(Object.keys(CHIPS), [...STARTING_POINTS]);
   for (const [chip, id] of Object.entries(CHIPS)) assert.equal(arrange(chip).pick?.usecase, id, chip);
 });
 

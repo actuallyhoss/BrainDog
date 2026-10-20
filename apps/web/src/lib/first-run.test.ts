@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { USE_CASES } from '@braindog/seed/usecases';
 
-import { amend, amendKept, AMEND_KEY, keepAmend, litIn, NO_AMEND, firstRun } from './first-run.ts';
+import { amend, amendKept, AMEND_KEY, keepAmend, litIn, NO_AMEND, firstRun, STARTING_POINTS } from './first-run.ts';
 import { moduleName } from '@braindog/seed/usecases/names';
 import { propose, type Proposal } from './start/propose.ts';
 
@@ -35,8 +35,8 @@ test('ONE SENTENCE GIVES THE WHOLE PROPOSAL: the name, the use case, the modules
 
 test('EACH OF THE FIVE CHIPS PROPOSES ITS OWN PERSON: a shop, a freelancer, a student, a founder and a team (use case 6)', () => {
   const want = ['shop', 'business', 'student', 'founder', 'team'];
-  assert.equal(firstRun.whoChips.length, 5);
-  firstRun.whoChips.forEach((chip, i) => assert.equal(said(chip).usecase, want[i], chip));
+  assert.equal(STARTING_POINTS.length, 5);
+  STARTING_POINTS.forEach((chip, i) => assert.equal(said(chip).usecase, want[i], chip));
 });
 
 test('A SENTENCE THESE RULES CANNOT READ IS KEPT, NEVER REFUSED: nothing heard, nothing guessed', () => {

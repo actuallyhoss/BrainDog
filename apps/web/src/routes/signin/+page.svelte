@@ -871,7 +871,7 @@
   @media (pointer: coarse) {
     .form .field-input,
     .field-input#in-key {
-      font-size: 16px;
+      font-size: var(--fs-body);
     }
   }
 
