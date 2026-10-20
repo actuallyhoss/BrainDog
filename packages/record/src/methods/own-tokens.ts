@@ -17,7 +17,7 @@
  * because refusing a revoke to a stale session would keep an agent running that its person is trying to stop.
  */
 
-import type { Minted, Scope, TokenRow } from '@braindog/kernel';
+import type { Minted, Scope, TokenNarrow, TokenRow } from '@braindog/kernel';
 import type { Refusal, Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
@@ -34,8 +34,47 @@ export const OWN_TOKENS_MOST = 20;
 /** A token's name, as the owner's list and the member's own show it. */
 export const OWN_TOKEN_NAME_MOST = 80;
 
-/** What a member may ask for. No `reach`: what a token opens beyond its scope is the owner's to hand out. */
-export type CreateOwnTokenArgs = { name?: string; scope?: Scope; days?: number };
+/**
+ * What a member may ask for. No `reach`: what a token opens beyond its scope is the owner's to hand out. `narrow` holds
+ * the key to less than its person (lists, a project, a condition, rows, or one of their own shares), within their reach.
+ */
+export type CreateOwnTokenArgs = { name?: string; scope?: Scope; days?: number; narrow?: TokenNarrow };
+
+/**
+ * Why a key's narrowing names something outside the minter's own reach, or `null` (sharing plan 2.9). Its shape is the
+ * kernel's to check (`createToken`); this is the part only the record knows: each list it names is one the minter
+ * reads here, and a share it names is one of the minter's own, live. A narrowing is ANDed into what its person sees and
+ * so can only take away, but a key narrowed to a list its person cannot see is a key that silently reaches nothing.
+ */
+export function narrowBeyond(
+  deps: Pick<RecordDeps, 'kernel' | 'sql' | 'readable'>,
+  ctx: CallContext,
+  person: string,
+  narrow: unknown,
+): Refusal | null {
+  if (narrow === undefined) return null;
+  if (narrow === null || typeof narrow !== 'object' || Array.isArray(narrow))
+    return { code: 'VALUE_MALFORMED', fix: 'A key is narrowed to lists, a project, a condition, rows or a share.', at: 'narrow' };
+  const n = narrow as Record<string, unknown>;
+  if (typeof n.share === 'string') {
+    const held = deps.sql.one(
+      `SELECT 1 AS hit FROM share WHERE id = ? AND revoked_at IS NULL AND effect = 'allow'
+         AND ((who_kind = 'person' AND who = ?) OR (who_kind = 'group' AND who IN (SELECT group_id FROM share_group_member WHERE person_id = ?)))`,
+      n.share,
+      person,
+      person,
+    );
+    return held ? null : { code: 'OUT_OF_BOUNDS', fix: `${n.share} is not a share you hold, so a key cannot be narrowed to it.`, at: 'narrow.share' };
+  }
+  const lists = [...(Array.isArray(n.lists) ? n.lists : []), ...(n.list === undefined ? [] : [n.list])];
+  for (const list of lists) {
+    if (typeof list !== 'string') continue;
+    if (!deps.kernel.register(list)) return { code: 'REGISTER_UNKNOWN', fix: `There is no list called ${list} to narrow a key to.`, at: 'narrow' };
+    const stop = deps.readable(ctx, list);
+    if (stop) return { code: stop.code, fix: `You cannot read ${list}, so a key of yours cannot be narrowed to it.`, at: 'narrow' };
+  }
+  return null;
+}
 
 const SCOPES: readonly Scope[] = ['read', 'propose', 'write'];
 
@@ -98,6 +137,9 @@ export function methods(deps: RecordDeps) {
       if (name.startsWith(REPORT_PREFIX))
         return no('VALUE_MALFORMED', `A name that begins ${REPORT_PREFIX} belongs to a report key. Choose another name.`, { at: 'name' });
 
+      const beyond = narrowBeyond(deps, ctx, who.id, args?.narrow);
+      if (beyond) return { ok: false, refusal: beyond };
+
       const nowIso = new Date(clock.now()).toISOString();
       if (mine(who.id).filter((t) => live(t, nowIso)).length >= OWN_TOKENS_MOST)
         return no('OUT_OF_BOUNDS', `You hold ${OWN_TOKENS_MOST} working keys already. Revoke one you no longer use, then make this one.`, { at: 'scope' });
@@ -108,6 +150,7 @@ export function methods(deps: RecordDeps) {
           scope,
           ...(name === '' ? {} : { label: name }),
           ...(args?.days === undefined ? {} : { days: args.days }),
+          ...(args?.narrow === undefined ? {} : { narrow: args.narrow }),
         }),
       );
     },

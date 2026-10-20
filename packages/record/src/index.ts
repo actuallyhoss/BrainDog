@@ -114,6 +114,8 @@ import {
   type InboxState,
   INBOX_STATES,
   type ArrivalSettled,
+  type ChildArgs,
+  type Minted as ChildMinted,
   type CreateTokenArgs,
   setupCollapser,
   isUlid,
@@ -217,6 +219,7 @@ import { dropPushSub, readPushSub, savePushSub } from './push.ts';
 import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, REPORT_ROWS_MOST, REPORT_ROWS_PER_MINUTE, REPORT_WINDOW_MS, reportBindingOf, reportedFields, reportedRows, reportLabel, type ReportBinding } from './report.ts';
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
+import { narrowBeyond } from './methods/own-tokens.ts';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
 import { learnedOrder, learnedSorted, replacedIn, replacesField } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
@@ -12432,6 +12435,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          here would be a report key nobody chose the register of. */
       if (typeof args?.label === 'string' && args.label.startsWith(REPORT_PREFIX))
         return no('VALUE_MALFORMED', `A label that begins ${REPORT_PREFIX} belongs to a report key. Make one with createReportKey, or choose another label.`, { at: 'label' });
+      /* A NARROWING NAMES NOTHING OUTSIDE THE MINTER'S OWN REACH (sharing plan 2.9); its shape is the kernel's to check. */
+      const beyond = narrowBeyond({ kernel, sql, readable }, ctx, actorOf(ctx), args?.narrow);
+      if (beyond) return { ok: false as const, refusal: beyond };
       return tail(await kernel.createToken(actorOf(ctx), args ?? ({} as never)));
     },
 
@@ -13102,6 +13108,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      */
     async operationGrant(bearer: string): Promise<Result<OperationGrant>> {
       return kernel.operationGrant(bearer, deps.validFrom?.());
+    },
+
+    /**
+     * A short key under a working one, for a host's OAuth door (sharing plan 2.9). HOST-ONLY: no route reaches it, and the
+     * parent is proved by its bearer, which the host holds sealed and never hands an app. The child is never more than
+     * its parent: same person, a scope and a life within its parent's, its narrowing ANDed on, no children of its own
+     * (`mintChild` in the kernel's `token.ts`). The host's cut-off goes down with it, as for a verify.
+     */
+    async mintChild(bearer: string, args: ChildArgs): Promise<Result<ChildMinted>> {
+      if (typeof bearer !== 'string' || bearer === '') return no('REQUIRED_MISSING', 'Which key is this a child of? Send its bearer.', { at: 'parent' });
+      return tail(await kernel.mintChild(bearer, args ?? ({} as never), deps.validFrom?.()));
     },
 
     /** The key this record's exports are signed with, for the hosts' key doors, or `null` with no signer. INTERNAL. */

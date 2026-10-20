@@ -285,7 +285,8 @@ test('A PORT THAT REOPENS THE OBJECT WRITES NO restore.pitr ITSELF, AND restored
 test("THE THREE NEW DOORS ARE THE HOST'S OWN: they exist, and no route reaches them", async () => {
   const r = await record();
   const routed = new Set(ROUTES.map((route) => route.name));
-  for (const name of ['operationGrant', 'signingKey', 'restored'] as const) {
+  /* `mintChild` too (sharing plan 2.9): an app's hourly key, minted under a parent only a host holds. */
+  for (const name of ['operationGrant', 'signingKey', 'restored', 'mintChild'] as const) {
     assert.equal(typeof r.api[name], 'function', name);
     assert.equal(routed.has(name), false, `${name} is routed, and it is INTERNAL`);
   }
