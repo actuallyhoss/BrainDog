@@ -16,7 +16,9 @@ import { createRecordApi, type CallContext } from '@braindog/record';
 import type { Result } from '@braindog/ports';
 
 import { OFFERED_DECIDES, tools, type McpSurface } from '../src/index.ts';
+import { handle, LISTED_MOST, type Reply } from '../src/rpc.ts';
 import { FIXED_ADDRESSES } from '../../record/src/methods/offered.ts';
+import { installSeed } from '../../seed/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { stub, type Ctx } from './stub.ts';
 
@@ -224,5 +226,66 @@ test('A FIGURE THE CALLER MAY NOT READ IS NOT LISTED, nor its list or its page, 
   assert.ok(mine.includes('braindog:metric/pay-out') && mine.includes('braindog:page/pay'));
   /* ONCE A NAME AND NEVER A RETIRED ONE, in the order the list hands them. */
   assert.deepEqual(mine.filter((u) => u.startsWith('braindog:skill/')).sort(), ['braindog:skill/reconcile-invoice', 'braindog:skill/review-pr']);
+  sql.close();
+});
+
+/* ── the list held to 15 KB (agents plan §6.4) ─────────────────────────── */
+
+/**
+ * MEASURED BEFORE: on the owner's record `resources/list` answered 225,553 bytes, 754 of its 933 pages one per agent run;
+ * on the seed 47,292 bytes, and 99,169 once it held 300 more runs, each a page of its own. A page about one row is never
+ * listed now, and the rest is taken in the plan's order until the answer would pass 15 KB.
+ */
+const seeded = async (runs: number) => {
+  const sql = openSqlite();
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  await installSeed(api.kernel);
+  const seedOwner = { principal: { kind: 'token', id: 't', scope: 'write', person: 'p_seed', level: 'owner' } } as unknown as CallContext;
+  for (let i = 0; i < runs; i++)
+    assert.ok((await api.create({ register: 'session', fields: { agent: 'claude', host: 'mac', repo: 'kiln', next: `Step ${String(i)}` } } as never, seedOwner)).ok);
+  return { sql, api, seedOwner };
+};
+const listOver = async <C>(surface: McpSurface<C>, ctx: C) => {
+  const reply = (await handle({ jsonrpc: '2.0', id: 1, method: 'resources/list' }, surface, ctx)) as Reply;
+  assert.ok('result' in reply, JSON.stringify(reply));
+  return { bytes: JSON.stringify(reply).length, uris: (reply.result as { resources: { uri: string }[] }).resources.map((r) => r.uri) };
+};
+
+test('ON THE SEED WITH 120 RUNS THE LIST IS 15 KB OR LESS, names no page about one row, and leads with what a session reads', async () => {
+  const { sql, api, seedOwner } = await seeded(120);
+  const { bytes, uris: listed } = await listOver(api as unknown as McpSurface<CallContext>, seedOwner);
+  assert.ok(bytes <= LISTED_MOST, `resources/list answered ${String(bytes)} bytes`);
+
+  const pages = await api.pages(seedOwner);
+  assert.ok(pages.ok);
+  const about = pages.value.filter((p) => p.about !== null);
+  assert.ok(about.filter((p) => p.about!.register === 'session').length >= 120, 'the runs made no pages, so the test proves nothing');
+  for (const p of about) assert.equal(listed.includes(`braindog:page/${p.slug}`), false, `${p.slug}, a page about one row, is listed`);
+  /* STILL READ BY ITS ADDRESS, as every page is. */
+  const run = about.find((p) => p.about!.register === 'session')!;
+  assert.ok((await tools(api).read(`braindog:page/${run.slug}`, seedOwner)).ok, 'a page about a run no longer reads by its address');
+
+  for (const first of ['context', 'handoffs', 'learnings', 'decisions', 'briefing', 'stale', 'grammar/page', 'grammar/register', 'grammar/kinds'])
+    assert.ok(listed.includes(`braindog:${first}`), `braindog:${first} is cut from the list`);
+  assert.ok(listed.some((u) => u.startsWith('braindog:skill/')), 'no skill is listed');
+  assert.ok(listed.includes('braindog:page/portfolio') && listed.includes('braindog:page/money'), 'a page somebody wrote is cut');
+  /* CUT FROM ITS LEAST-READ END: a figure only once every list's fields are in. */
+  const all = (await tools(api).resources(seedOwner)).map((r) => r.uri);
+  const schemas = all.filter((u) => u.startsWith('braindog:schema/'));
+  if (listed.some((u) => u.startsWith('braindog:metric/'))) for (const s of schemas) assert.ok(listed.includes(s), `${s} is cut while a figure is listed`);
+  /* IN THE ORDER THEY CAME: the list is a subset, never a reshuffle. */
+  const order = listed.filter((u) => u.startsWith('braindog:')).map((u) => all.indexOf(u));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  sql.close();
+});
+
+test('A SURFACE THAT CANNOT SAY WHICH PAGES ARE ABOUT A ROW DROPS NONE FOR IT, and a small list is listed whole', async () => {
+  const { sql, api } = await record();
+  const whole = (await tools(api).resources(owner)).map((r) => r.uri);
+  const { uris } = await listOver(api as unknown as McpSurface<CallContext>, owner);
+  assert.deepEqual(uris.filter((u) => u.startsWith('braindog:')), whole, 'a list well under 15 KB was cut');
+  const blind = Object.create(api) as typeof api;
+  (blind as { pages: unknown }).pages = async () => ({ ok: false, refusal: { code: 'INTERNAL', fix: 'Try again.' } });
+  assert.deepEqual((await listOver(blind as unknown as McpSurface<CallContext>, owner)).uris.filter((u) => u.startsWith('braindog:')), whole);
   sql.close();
 });

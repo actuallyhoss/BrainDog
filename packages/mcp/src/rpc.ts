@@ -383,6 +383,77 @@ function clientOf(params: Record<string, unknown>): string | undefined {
 }
 
 /**
+ * The most a `resources/list` answer may come to, written out as JSON: the agents plan's 15 KB (§6.4).
+ *
+ * WHAT IT WAS. Measured on the owner's record through his own command line, `resources/list` answered 225,553 bytes, 1,124
+ * resources, and 754 of its 933 pages were one page per agent run (`agent-run-1-oct-459`), 147 KB on their own; on the
+ * seed it is 47 KB, 144 of its 238 resources figures. A client that lists resources pays for every run ever made, at
+ * the start of every session, for addresses its templates already name.
+ */
+export const LISTED_MOST = 15_000;
+
+/** The fixed addresses a session reads first, which lead the list whatever else is cut. */
+const LISTED_FIRST: ReadonlySet<string> = new Set(['context', 'instructions', 'presence', 'handoffs', 'learnings', 'decisions', 'briefing', 'stale', 'changes']);
+
+/**
+ * Where one resource stands when the list must be cut, lowest first, or `null` for one never listed.
+ *
+ * THE ORDER IS THE AGENTS PLAN'S LIST (§6.4): the cards; what a session reads first and the grammars;
+ * the skills; the pages somebody wrote. After those, while there is room, the rest of the fixed addresses, each list's
+ * fields and each figure, which their templates (`braindog:schema/{register}`, `braindog:metric/{id}`) name whatever
+ * is listed.
+ *
+ * A PAGE ABOUT ONE ROW IS NEVER LISTED: a template's page for each run, project or person. It is still read by its
+ * address, `braindog:page/{slug}`, and `record_index` and `context` name the rows it is about.
+ */
+function rankOf(uri: string, rows: ReadonlySet<string>): number | null {
+  if (!uri.startsWith('braindog:')) return 0;
+  const path = uri.slice('braindog:'.length);
+  if (LISTED_FIRST.has(path) || path.startsWith('grammar/')) return 1;
+  if (path.startsWith('skill/')) return 2;
+  if (path.startsWith('page/')) return rows.has(path.slice('page/'.length)) ? null : 3;
+  if (path.startsWith('schema/')) return 5;
+  if (path.startsWith('metric/')) return 6;
+  return 4;
+}
+
+/**
+ * The resources to list, in the order they came, held to `LISTED_MOST`: taken by `rankOf` until the next one would not
+ * fit, so a list is cut from its least-read end and never has a gap in the middle of a rank it reached.
+ */
+function listedWithin<R extends { uri: string }>(resources: readonly R[], rows: ReadonlySet<string>): R[] {
+  const ranked = resources
+    .map((r, at) => ({ r, at, rank: rankOf(r.uri, rows) }))
+    .filter((x): x is { r: R; at: number; rank: number } => x.rank !== null)
+    .sort((a, b) => a.rank - b.rank || a.at - b.at);
+  const kept = new Set<number>();
+  /* THE ANSWER AROUND THEM, its `jsonrpc`, `id`, `ttlMs`, `cacheScope` and `resultType`, comes inside the same 15 KB. */
+  let size = 256;
+  for (const { r, at } of ranked) {
+    size += JSON.stringify(r).length + 1;
+    if (size > LISTED_MOST) break;
+    kept.add(at);
+  }
+  return resources.filter((_, at) => kept.has(at));
+}
+
+/**
+ * The pages this caller may open that are about one row, by address: a template's page for each run, project or person
+ * (`pages`' `about`). Empty when the surface cannot say, so nothing is dropped for being about a row it could not name.
+ */
+async function rowPagesOf<C>(surface: McpSurface<C>, ctx: C): Promise<Set<string>> {
+  try {
+    const pages = await surface.pages(ctx);
+    if (!pages.ok || !Array.isArray(pages.value)) return new Set();
+    return new Set(
+      (pages.value as unknown[]).flatMap((p) => (isObject(p) && typeof p.slug === 'string' && isObject(p.about) ? [p.slug] : [])),
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+/**
  * The version an `initialize` is answered with, or `null` for none.
  *
  * THE ONE ASKED FOR, OR THE NEWEST OLDER ONE. A client that names a revision this server does not know
@@ -543,13 +614,13 @@ async function dispatch<C>(
     case 'resources/list': {
       const wrong = paged(params);
       if (wrong) return wrong;
-      const listing = await mcp.resources(ctx);
+      const [listing, rows] = await Promise.all([mcp.resources(ctx), rowPagesOf(surface, ctx)]);
       return said({
-        resources: [
+        resources: listedWithin([
           /* THE CARDS LEAD, each under its own type: MCP Apps hosts and ChatGPT name different ones for the same page. */
           ...cardResources().map(({ uri, name, description, mimeType }) => ({ uri, name, description, mimeType })),
           ...listing.map(({ uri, name, description }) => ({ uri, name, description, mimeType: JSON_TYPE })),
-        ],
+        ], rows),
         ttlMs: MINUTE,
         cacheScope: 'private',
       });
