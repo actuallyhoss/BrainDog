@@ -6140,6 +6140,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     JSON.stringify([ctx.principal, ctx.registers ?? null, ctx.levels ?? null, ctx.wheres ?? null, ctx.outbound ?? null, ctx.operation ?? null]);
 
   /**
+   * HOW MANY ROWS A LIST HOLDS FOR A READER, as `boot`'s rail counts them, held (`heldFor`, plan §4.1 "counts cached by
+   * version"): `record_index` is `boot`, and it counted every list again, with the reader's private rows asked of each.
+   */
+  const countsHeld = new Map<string, Held<number>>();
+  const countNow = (ctx: CallContext, register: string): number =>
+    heldFor(countsHeld, JSON.stringify([readerKey(ctx), register]), () => kernel.count(register, kernel.scope(ctx, register)), 512);
+
+  /**
    * `holds`, ANSWERED ONCE A CALLER FOR EACH HELD QUESTION: a question is weighed against the caller's lists and the
    * rows it names, and `boot` and `context` asked it of every open question in each of their passes. Kept on the row
    * object itself (a `WeakMap`), so it goes when the held questions do, at the next version. Which caller is what
@@ -8725,7 +8733,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (readable(ctx, id)) continue;
           /* THE GLYPH THE LIST DECLARES, as `icon` is checked at install (`declare.ts`): one the rail can draw by name. */
           const icon = (decl as { icon?: unknown }).icon;
-          out.push({ id, name: decl.name, count: kernel.count(id, kernel.scope(ctx, id)), icon: typeof icon === 'string' && icon !== '' ? icon : null });
+          out.push({ id, name: decl.name, count: countNow(ctx, id), icon: typeof icon === 'string' && icon !== '' ? icon : null });
         }
         const shell = shellFor(ctx);
         const waits = waitsFor(ctx);
