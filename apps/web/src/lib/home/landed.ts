@@ -49,6 +49,20 @@ export const LANDED_MOST = 6;
 /* A minted id is never a name. */
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/iu;
 
+/* A handle, not a name: lowercase, one word or words joined by hyphens or underscores, as a tool or a key is filed. */
+const SLUG = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/u;
+
+/**
+ * THE NAME A LINE SAYS: the row's title as the list declares it, and where that is a handle ("nordhaven-dns") the same
+ * words spaced and capitalised ("Nordhaven dns"), so no slug is ever drawn as a name.
+ */
+export function displayName(title: string): string {
+  const name = title.replaceAll(/\s*—\s*/gu, ', ').trim();
+  if (!SLUG.test(name)) return name;
+  const words = name.replaceAll(/[-_]+/gu, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /** The lines to draw, newest first. */
 export function landedOf(
   lines: readonly Line[],
@@ -61,7 +75,7 @@ export function landedOf(
   const out: Landed[] = [];
   for (const l of lines) {
     if (!ARRIVED.has(l.kind) || l.register === 'session') continue;
-    const name = (l.title ?? '').replaceAll(/\s*—\s*/gu, ', ').trim();
+    const name = displayName(l.title ?? '');
     if (name === '' || ULID.test(name)) continue;
     const who = actor(l.actor, me, names, l.run_by ?? null);
     const note = (l.note ?? '').replaceAll(/\s*—\s*/gu, ', ').trim();

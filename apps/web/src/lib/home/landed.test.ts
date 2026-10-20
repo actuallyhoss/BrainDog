@@ -6,6 +6,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { TOOLS } from '@braindog/seed';
+
 import { LANDED_MOST, freshOf, landedOf, type Line } from './landed.ts';
 
 const NOW = Date.parse('2026-10-19T10:00:00Z');
@@ -62,4 +64,13 @@ test('only a line not drawn before is washed, and the first read washes nothing'
   const rows = [{ key: 'a' }, { key: 'b' }];
   assert.equal(freshOf(null, rows).size, 0);
   assert.deepEqual([...freshOf(new Set(['a']), rows)], ['b']);
+});
+
+test('a handle is said as a name, and no lowercase slug reaches a line on the seed', () => {
+  const [r] = landedOf([line('a', { title: 'nordhaven-dns' })], lists, null, NOW);
+  assert.equal(r?.name, 'Nordhaven dns');
+  const lines = TOOLS.map((t, i) => line(`t${i}`, { title: String(t.name), register: 'tools', seq: i + 1 }));
+  const drawn = landedOf(lines, lists, null, NOW, new Map(), lines.length);
+  assert.equal(drawn.length, TOOLS.length);
+  for (const d of drawn) assert.doesNotMatch(d.name, /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/u, `"${d.name}" reached the landed lines as a slug`);
 });
