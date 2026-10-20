@@ -9,29 +9,28 @@
 @layer a11y {
   /* Nothing in this layer is reachable by a theme, because `@layer theme` is declared before it. */
 
-  /* THE RING IS INK, AND IT WAS THE BRAND'S RED. The red sits at danger's own hue, so a focused
-     control looked like a refused one, and the owner's verdict on the whole product was that it
-     read as a warning. `--focus-in` is the generated ink that the theme's
-     checks hold at 3:1 against every declared surface (`packages/theme/src/checks.ts`, check E),
-     so it is a ring in every palette a record installs, and the 2px offset leaves a gap of the
-     element's own ground between the ring and a filled control, which is what `--focus-out` names.
-     Never animated: keyboard navigation through an animated ring is wading (13 §9). Forced colours
-     still replace it with `Highlight` below. */
+  /* ONE RING (SPEC 1.8, frame 3.7): 2px of `--focus` (the ink), 2px off the element, on every control, never animated
+     and never clipped. It was the brand's red once, and a focused control looked like a refused one.
+
+     NO RADIUS OF ITS OWN (frame F4). This rule used to set `border-radius`, which rewrote the focused element's own
+     corner: a round face drew a square ring with 6px corners. An outline follows the element's own radius, so the ring
+     is round on a round control and square on a square one, and nothing changes shape on focus.
+
+     The theme's check T holds `--focus` at 3:1 on the board and the tile in every palette, and the 2px gap of the
+     surface stands between the ring and a filled control. Forced colours replace it with `Highlight` below. */
   :focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
-    border-radius: var(--r-sm);
   }
 
-  /* A TEXT FIELD FOCUSES AS ONE BOX: its own edge darkens to `--ink2`, and a soft ring sits outside
-     it. The 2px offset ring read as two outlines with a stripe of ground between them, and the owner
-     called it out. The 1px outline at -1px lies exactly over the field's border, so nothing moves;
-     `--ink2` is text-strength, so the edge is plainly stronger than the `--edge` it covers, and
-     `--focus-halo` is the soft part. A select and a date are fields too, so they focus this way. */
-  :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='button'], [type='submit'], [type='reset'], [type='image']), textarea, select):focus-visible {
-    outline: 1px solid var(--ink2);
-    outline-offset: -1px;
-    box-shadow: 0 0 0 3px var(--focus-halo);
+  /* A FIELD FOCUSES THE WAY EVERY OTHER CONTROL DOES (frame F4). The bare input had its own look, a 1px edge and a soft
+     halo, so a bare input and a `.field` focused two ways; the ring above is the one way now. A `.field` wrapper draws
+     the ring round the whole well (`controls.css`) and the input inside it draws none. */
+
+  /* INSIDE A TABLE CELL OR A MENU ROW THE RING SITS INSIDE (SPEC 1.8), where a cell's neighbours and a menu's edge
+     would otherwise cut it. */
+  :is(td, th, [role='cell'], [role='gridcell'], [role='columnheader'], [role='rowheader'], [role='menuitem'], [role='menuitemradio'], [role='menuitemcheckbox'], [role='option']):focus-visible {
+    outline-offset: -2px;
   }
 
   /* An invisible hit box, so a 20px chevron inside a 44px control is a 44px target. Both axes: a
@@ -63,6 +62,8 @@
 
      THE SCALE FOLLOWS (`--d-state`, `--d-release`, `--d-move` and `--d-panel-out` are written in `tokens.css` as the
      step they are), so a delay or a wait a script reads from any of them is no longer than the fade.
+
+     NO INFINITE ANIMATION (frame 3.6): every keyframe plays once and ends at once, so the live dot is still.
 
      A KEYFRAME ANIMATION STILL ENDS AT ONCE, because a stylesheet cannot tell a keyframe that fades from one that
      moves. A host that wants a fade here draws it as a transition. The one exception is the arrival tint
@@ -127,8 +128,8 @@
      only the prefixed property keeps its glass. */
   @supports not (backdrop-filter: none) {
     :root {
-      --glass: var(--bg);
-      --glass-strong: var(--bg);
+      --glass: var(--tile);
+      --glass-strong: var(--tile);
     }
   }
 
@@ -140,8 +141,8 @@
      and only an important declaration here wins over theirs. */
   @media (prefers-reduced-transparency: reduce) {
     :root {
-      --glass: var(--bg);
-      --glass-strong: var(--bg);
+      --glass: var(--tile);
+      --glass-strong: var(--tile);
       --glass-blur: none;
     }
 
@@ -152,8 +153,8 @@
     }
   }
 
-  /* ASKED FOR MORE CONTRAST, the palette already makes glass opaque, and its edge becomes a 1px ink outline round it,
-     in place of the two half-pixel hairlines: a glass control is then as plainly a control as a filled one. */
+  /* ASKED FOR MORE CONTRAST, the edge of anything that floats becomes a 1px ink outline round it: a menu or a popover
+     is then as plainly a layer as a sheet on its scrim. */
   @media (prefers-contrast: more) {
     :root {
       --glass-edge: 0 0 0 1px var(--ink);

@@ -37,7 +37,7 @@
     /* THE BOARD (DIRECTION §39): one flat colour under every tile, and no light falling on it. */
     background: var(--board);
     font-family: var(--font-ui);
-    font-size: var(--text);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     /* Geist is drawn a touch loose for text sizes; this is its own designers' body tracking. */
     letter-spacing: -0.006em;
@@ -60,12 +60,12 @@
     margin: 0;
   }
 
-  /* A LINK IS THE WORKING ACCENT WITH A QUIET UNDERLINE (DIRECTION §39). It was the brand's red once, which read as
-     the same fact as a red overdue dot, and then ink, which read as no link at all. Blue is the colour that means
-     "go" here and nothing else; the underline carries the affordance at 40% and firms up under the pointer. */
+  /* A LINK IS RED WITH A QUIET UNDERLINE (SPEC 0.1 item 1: links stay red). `--red` is red as words, held at 4.5:1 on
+     every ground it is drawn on (the theme's check T); the underline carries the affordance at 40% and firms up under
+     the pointer, so a link is never told from a late date by colour alone. */
   a {
-    color: var(--link);
-    text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
+    color: var(--red);
+    text-decoration-color: color-mix(in srgb, var(--red) 40%, transparent);
     text-decoration-thickness: 1px;
     text-underline-offset: 3px;
   }
@@ -113,8 +113,18 @@
    */
   @media (pointer: coarse) {
     input, select, textarea {
-      font-size: max(16px, var(--text)) !important;
+      font-size: max(16px, var(--fs-body)) !important;
     }
+  }
+
+  /* CODE TAKES THE APP'S MONO FACE, AT THE SIZE OF THE WORDS ROUND IT (SF1). The browser's default is its own monospace
+     at 13px, so a `code` in a sentence was a different face and a smaller size from the ids and key caps beside it. */
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-size: inherit;
   }
 
   /* Quantities get tabular figures on a PROPORTIONAL face. A monospace face gives the thousands
@@ -131,12 +141,12 @@
      and tracking breaks the joins. The multiplier and the leading are practitioner numbers, marked
      low confidence in 13 §3.3 and owed a measurement. */
   :root:dir(rtl) body {
-    font-size: calc(var(--text) * 1.12);
+    font-size: calc(var(--fs-body) * 1.12);
     line-height: calc(var(--lh-body) + 0.18);
     letter-spacing: 0;
   }
 
   ::selection {
-    background: var(--action-tint-2);
+    background: var(--red-tint-2);
   }
 }
