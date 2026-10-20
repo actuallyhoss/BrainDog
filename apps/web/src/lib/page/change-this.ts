@@ -204,7 +204,8 @@ export function askedOf(i: AskIn): Edited | null {
   if (top) {
     const n = Number(top[1]);
     if (n < 1) return null;
-    const key = ['feed', 'agents', 'steps'].includes(String(block.kind)) ? 'first' : 'limit';
+    /* A BLOCK THAT DRAWS COLUMNS TAKES A `limit`; one that already says `first`, or has no columns to draw, takes that. */
+    const key = 'first' in block || cols.length === 0 ? 'first' : 'limit';
     return { patch: { [key]: n }, said: changeThisWords.limited(n) };
   }
 

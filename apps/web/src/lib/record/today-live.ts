@@ -118,7 +118,7 @@ export function remindersOf(raw: unknown): ReminderLine[] {
 export type Today = {
   now: number;
   /** `null` when the record holds no tasks list. */
-  tasks: TaskRow[] | null;
+  needs: TaskRow[] | null;
   /** At most three, ranked as every queue is, with their options. */
   questions: QueueQuestion[];
   /** How many questions are open in all. */
@@ -667,7 +667,7 @@ export async function readToday(base: string, io?: Fetch, at?: number): Promise<
     ok: true,
     value: {
       now,
-      tasks: work ? work.tasks : null,
+      needs: work ? work.tasks : null,
       questions: queue.questions,
       open: b.counts?.decide ?? (b.waiting ?? []).length,
       runs: queue.runs,

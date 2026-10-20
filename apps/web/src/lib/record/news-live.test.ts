@@ -333,7 +333,7 @@ test('TODAY READS THE RECORD`S OWN ANSWERS, leaves out what it does not hold, an
   const out = await readToday(BASE, io, Date.parse('2026-09-29T12:00:00'));
   assert.ok(out.ok);
   if (!out.ok) return;
-  assert.deepEqual(out.value.tasks?.map((t) => [t.what, t.why]), [['Pay the VAT', 'late']]);
+  assert.deepEqual(out.value.needs?.map((t) => [t.what, t.why]), [['Pay the VAT', 'late']]);
   assert.deepEqual([out.value.questions.map((q) => q.id), out.value.open], [['SG1'], 5]);
   assert.deepEqual(out.value.runs, [{ seq: 4, agent: 'claude', doing: 'Writing tests', project: 'Northwind app', seen: '2026-09-29T08:59:00.000Z' }]);
   assert.deepEqual([out.value.since.total, out.value.upTo], [1, 9]);

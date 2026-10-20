@@ -153,7 +153,7 @@
       full: v.full !== false,
     };
     return [
-      ...(v.tasks ? [{ list: TASKS, at: ['tasks'], by: null, shown }] : []),
+      ...(v.needs ? [{ list: TASKS, at: ['needs'], by: null, shown }] : []),
       ...(v.coming ? [{ list: TASKS, at: ['coming'], by: null, shown }] : []),
       { list: QUESTIONS, at: ['questions'], by: null, questions: { total: ['open'] } },
     ];
@@ -349,7 +349,7 @@
     | { kind: 'task'; key: string; href: string; task: TaskRow }
     | { kind: 'bill'; key: string; href: string; bill: DueRow };
 
-  const tasks = $derived((t?.tasks ?? []).filter((x) => !gone.has(x.seq)));
+  const tasks = $derived((t?.needs ?? []).filter((x) => !gone.has(x.seq)));
   const bills = $derived(t?.money?.due ?? []);
   const taskNeed = (task: TaskRow): Need => ({ kind: 'task', key: `t${task.seq}`, href: `/r/${TASKS}/${task.seq}`, task });
   const billNeed = (bill: DueRow): Need => ({ kind: 'bill', key: `b${bill.seq}`, href: `/r/obligations/${bill.seq}`, bill });
