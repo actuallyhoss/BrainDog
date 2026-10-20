@@ -26,4 +26,10 @@ export const hand = {
   handRunning: (agent: string): string => `${agent} is on it`,
   handReadFailed: 'BrainDog could not reach this record.',
   handRetry: 'Retry',
+  /* MERGE WITH, from a person's own menu: the item, the sheet's title, its search and its two empty lines. */
+  mergeWith: 'Merge with another person',
+  mergeSheetTitle: (name: string): string => (name ? `Merge ${name} with` : 'Merge this person with'),
+  mergeFind: 'Find a person',
+  mergeNobody: 'Nobody else is on this list.',
+  mergeNoMatch: 'Nobody by that name.',
 } as const;

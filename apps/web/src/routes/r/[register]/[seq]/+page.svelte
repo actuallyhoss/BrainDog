@@ -110,6 +110,7 @@
   import TaskEffects from '$lib/record/TaskEffects.svelte';
   import { timelineWords } from './timeline.ts';
   import HandSheet from '$lib/ui/HandSheet.svelte';
+  import MergeSheet from '$lib/ui/MergeSheet.svelte';
   import UsedBy from '$lib/page/panels/UsedBy.svelte';
   import { may } from '$lib/record/may.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
@@ -593,6 +594,10 @@
   const proposes = $derived(owner || may(page.data as unknown as Shell, 'append'));
   /* THE LIST'S FIELDS SHEET, opened from the foot of "Add a field". */
   let fieldsOpen = $state(false);
+  /* "MERGE WITH ANOTHER PERSON", in the menu of a row of the list that keeps people: the other one is picked in a sheet and
+     the record puts the question to Decide. Only where the caller may change the row, as Archive is. */
+  let mergeOpen = $state(false);
+  const mergeable = $derived(changes && !archived && decl?.meets !== undefined);
   let people = $state<ReadonlyMap<string, string>>(new Map());
   let namesAsked = false;
   function askNames() {
@@ -1188,7 +1193,9 @@
       {/if}
       <!-- THE HEAD'S "…", LAST: the row's link, Archive, and Edit where the primary is the finishing verb. A 36px square in the buttons' shape, named for a screen reader by the
            hidden words and for a pointer by its tooltip. A new field for the list is at the foot of "Add a field". -->
-      {#if live}
+      <!-- NOT BEHIND `live`: a row painted from the local copy kept the whole menu away until the record answered, and a
+           menu that comes and goes as the page re-reads is one that opens nothing. Every verb that writes asks `changes`. -->
+      {#if row}
         <Menu label={copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)} align="end">
           {#snippet trigger()}
             <span class="head-more" title={copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)}
@@ -1199,11 +1206,13 @@
           <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
           <!-- ONLY THE ROW'S MAKER: the record refuses anybody else, so the verb is not offered to them. -->
           {#if mine && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setPrivate(!isPrivate)}>{isPrivate ? copy.rowShareAgain : copy.rowKeepPrivate}</button>{/if}
+          {#if mergeable}<button type="button" class="mi" role="menuitem" data-merge onclick={() => (mergeOpen = true)}>{copy.mergeWith}</button>{/if}
           {#if changes && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setArchived(true)}>{copy.rowArchive}</button>{/if}
         </Menu>
       {/if}
     {/snippet}
   </PageHead>
+  {#if mergeable && row}<MergeSheet bind:open={mergeOpen} register={id} seq={row.seq} name={String(row.fields[decl.title] ?? '')} title={decl.title} mergedInto={decl.meets?.merged_into} />{/if}
   {#if live && proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={() => (got = got && { ...got })} />{/if}
 
   <div class="page">

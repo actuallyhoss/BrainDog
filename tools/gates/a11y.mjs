@@ -351,6 +351,10 @@ export default async function a11y(root = join(import.meta.dirname, '..', '..'))
        unpicked it, because `j` had nowhere to go. */
     { name: 'grid: selection', route: '/r/obligations', keys: ['j', 'x', 'k', 'x'], expect: '[aria-selected="true"]', desktop: true },
     { name: 'grid: row menu', route: '/r/obligations', keys: ['Shift+F10'], expect: '[role="menu"]' },
+    /* A PERSON'S "..." OPENED NOTHING on a real record (2026-10-20). It opens with its verbs, Merge among them, and the
+       sheet Merge opens lists the other people. Audited open, the sheet included. */
+    { name: 'person: more menu', route: '/r/people/1', click: '.menu-trigger:has(.head-more)', expect: '[role="menu"] [data-merge]' },
+    { name: 'person: merge sheet', route: '/r/people/1', click: ['.menu-trigger:has(.head-more)', '[role="menuitem"][data-merge]'], expect: 'dialog[open] [data-merge-with]' },
     { name: 'keymap sheet', route: '/r/obligations', keys: ['?'], expect: 'dialog[open]' },
     { name: 'palette', route: '/', keys: ['/'], expect: '[role="listbox"], [role="dialog"]' },
     { name: 'page: declaration', route: '/p/kiln', keys: ['Shift+E'], expect: '.source, pre' },
