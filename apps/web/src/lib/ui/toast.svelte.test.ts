@@ -23,9 +23,9 @@
  * reactive would pass this entire file. The reactivity is the browser gates' claim; the stack
  * arithmetic, the undo and the countdown are this file's.
  *
- * THE CLOCK IS MOCKED IN EVERY TEST, not only the ones about expiry. The life of a toast is ten
- * seconds of real time, and a test that pushed one and left it would hold the process open for ten
- * seconds after the last assertion.
+ * THE CLOCK IS MOCKED IN EVERY TEST, not only the ones about expiry. The life of a toast is five or
+ * eight seconds of real time, and a test that pushed one and left it would hold the process open for
+ * that long after the last assertion.
  */
 
 import { test, type TestContext } from 'node:test';
@@ -50,8 +50,10 @@ registerHooks({
    body runs, so the module would load before the hook that makes it loadable was registered. */
 const { toasts } = await import('./toast.svelte.ts');
 
-/** The life of a toast, read off the module's own constant rather than guessed at. */
-const LIFE = 10_000;
+/** The life of a toast that offers its Undo (the UI pass of 20 October, 2.A.16): eight seconds. */
+const LIFE = 8_000;
+/** And of one that only reports: five. */
+const REPORT = 5_000;
 
 /**
  * A stack with nothing in it and no hold on it, on a clock this test owns.
@@ -230,7 +232,7 @@ test('and the pointer leaving starts the window again rather than resuming it', 
   toasts.push('Archived obligations#2', { undo: () => {} });
 
   /* Almost out of time, then hovered, then left. The module re-arms a FULL window on release, so the
-     person who looked at the stack and moved away gets the whole ten seconds back. That is the
+     person who looked at the stack and moved away gets the whole window back. That is the
      generous reading of "it pauses", and it is pinned here so a change to it is a decision. */
   t.mock.timers.tick(LIFE - 100);
   toasts.hold();
@@ -278,10 +280,10 @@ test('AN EVICTED TOAST TAKES ITS COUNTDOWN WITH IT, rather than expiring later o
      all expire in the same tick and the evicted one's countdown would be indistinguishable. */
   toasts.push('Archived obligations#1', { undo: () => {} });
   t.mock.timers.tick(1_000);
-  const live = [2, 3, 4].map((n) => toasts.push(`Archived obligations#${n}`));
+  const live = [2, 3, 4].map((n) => toasts.push(`Archived obligations#${n}`, { undo: () => {} }));
   t.mock.timers.tick(1_000);
   /* The fifth is what puts the first over the cap. */
-  toasts.push('Archived obligations#5');
+  toasts.push('Archived obligations#5', { undo: () => {} });
   assert.equal(toasts.items.length, 4);
 
   /**
@@ -297,9 +299,9 @@ test('AN EVICTED TOAST TAKES ITS COUNTDOWN WITH IT, rather than expiring later o
   };
 
   try {
-    /* THE EVICTED TOAST'S OWN WINDOW CLOSES HERE, eight seconds after it left the screen. */
+    /* THE EVICTED TOAST'S OWN WINDOW CLOSES HERE, six seconds after it left the screen. */
     t.mock.timers.tick(LIFE - 2_000);
-    assert.deepEqual(expired, [], 'the evicted toast kept counting down and expired over a stack it had left eight seconds earlier');
+    assert.deepEqual(expired, [], 'the evicted toast kept counting down and expired over a stack it had left six seconds earlier');
 
     /* AND THE GUARD AGAINST A VACUOUS PASS, which is the failure this repository is written against:
        if the mocked clock fired nothing at all, the assertion above would hold for the wrong reason.
@@ -397,4 +399,30 @@ test('and a dismissed toast leaves the rest of the stack alone', (t) => {
   /* Dismissing twice is what a click on the close button of a toast already expiring looks like. */
   toasts.dismiss(first);
   assert.equal(toasts.items.length, 1);
+});
+
+/* ── the two windows ─────────────────────────────────────────────────────── */
+
+test('A TOAST THAT ONLY REPORTS STAYS FIVE SECONDS, one that offers its Undo eight', (t) => {
+  fresh(t);
+  toasts.push('Copied the link.');
+  toasts.push('Archived \u201cInvoice 2026-041\u201d.', { undo: () => {} });
+  t.mock.timers.tick(REPORT - 1);
+  assert.equal(toasts.items.length, 2, 'a report went before its five seconds were up');
+  t.mock.timers.tick(1);
+  assert.deepEqual(toasts.items.map((x) => x.text), ['Archived \u201cInvoice 2026-041\u201d.'], 'the report outlived its window, or the offer went with it');
+  t.mock.timers.tick(LIFE - REPORT);
+  assert.deepEqual(toasts.items, [], 'the offer outlived its eight seconds');
+});
+
+test('AN UNDO THAT IS NOT DRAWN keeps the report\'s window and still answers the shortcut', (t) => {
+  fresh(t);
+  let undone = 0;
+  toasts.push('Added \u201cMotion test bill\u201d.', { undo: () => undone++, offer: false });
+  t.mock.timers.tick(REPORT - 1);
+  assert.equal(toasts.undoLast(), true, 'the shortcut did not reach an undo the toast does not draw');
+  assert.equal(undone, 1);
+  toasts.push('Added \u201cAnother bill\u201d.', { undo: () => {}, offer: false });
+  t.mock.timers.tick(REPORT);
+  assert.deepEqual(toasts.items, [], 'a toast with no drawn action kept the eight seconds of one that has one');
 });

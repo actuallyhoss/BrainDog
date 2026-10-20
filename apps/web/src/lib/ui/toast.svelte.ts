@@ -7,8 +7,8 @@
  * what happened, in the past tense, with the row named, and gives back the one thing a dialog
  * cannot: the state before.
  *
- * The window is generous on purpose. Two seconds is a reflex test; ten is long enough to read the
- * sentence, look at the list, and change your mind. It pauses while the pointer is over the stack
+ * THE WINDOW (the UI pass of 20 October, 2.A.16): five seconds for a toast that only reports, eight for one that offers
+ * an action, long enough to read the sentence, look at the list, and change your mind. It pauses while the pointer is over the stack
  * or focus is inside it, because a countdown that expires while you are reaching for the button is
  * a countdown that was never really offered.
  *
@@ -43,10 +43,15 @@ import { untrack } from 'svelte';
 
 export type Toast = {
   id: number;
-  /** Past tense, the row named. "Archived obligations#4", never "Row archived successfully". */
+  /** Past tense, the thing named by its name in quotes, never an id: "Archived “Invoice 2026-041: brand system”." */
   text: string;
   /** Absent for a toast that only reports. Present, this is the whole point of the toast. */
   undo?: (() => void) | undefined;
+  /**
+   * Whether the toast draws its Undo button. `false` keeps the undo on `⌘Z` and draws only the sentence, for a change
+   * that is on screen with its own way back (a row's "Put back"): one change offers one undo where it can be seen.
+   */
+  offer?: boolean | undefined;
   intent?: 'good' | 'warn' | 'bad' | undefined;
   /**
    * How long it stays, in milliseconds, when not the ten seconds every other toast gets. An optimistic write's receipt
@@ -56,10 +61,15 @@ export type Toast = {
   life?: number | undefined;
 };
 
-const LIFE = 10_000;
+/** How long a toast that only reports stays, and one that offers its action. */
+const LIFE = 5_000;
+const LIFE_ACTION = 8_000;
 
 /** Four, then the oldest goes. A stack that grows without bound covers the work it is reporting on. */
 const CAP = 4;
+
+/** A toast's window: its own, else eight seconds when it draws an action and five when it only reports. */
+const lifeOf = (t: Toast | undefined): number => t?.life ?? (t?.undo && t.offer !== false ? LIFE_ACTION : LIFE);
 
 class Toasts {
   items = $state<Toast[]>([]);
@@ -69,10 +79,10 @@ class Toasts {
   #next = 1;
   #timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  push(text: string, opts: { undo?: () => void; intent?: Toast['intent']; life?: number } = {}): number {
+  push(text: string, opts: { undo?: () => void; intent?: Toast['intent']; life?: number; offer?: boolean } = {}): number {
     return untrack(() => {
       const id = this.#next++;
-      const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent, life: opts.life }];
+      const next = [...this.items, { id, text, undo: opts.undo, intent: opts.intent, life: opts.life, offer: opts.offer }];
 
       /* THE OLDEST GOES THROUGH `dismiss` RATHER THAN JUST OFF THE END OF THE ARRAY, so that its
          countdown goes with it. A timer left armed on a toast nobody can see expires up to ten seconds
@@ -161,7 +171,7 @@ class Toasts {
     if (t) clearTimeout(t);
     this.#timers.set(
       id,
-      setTimeout(() => this.dismiss(id), untrack(() => this.items.find((x) => x.id === id)?.life) ?? LIFE),
+      setTimeout(() => this.dismiss(id), untrack(() => lifeOf(this.items.find((x) => x.id === id)))),
     );
   }
 }

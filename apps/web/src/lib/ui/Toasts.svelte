@@ -1,15 +1,21 @@
 <!--
-  The toast stack, bottom centre of the work: one glass-strong card, the verb, the thing, and Undo with its key.
+  The toast stack (the UI pass of 20 October, 2.A.16): an inverted bar, the sentence, and Undo with its key.
 
-  BOTTOM CENTRE OF THE WORK, 24 UP, and the work is what the shell leaves beside the rail: the stack's start edge is
-  the rail card's own end edge, at the rail's full width or its narrow one, and nothing at all on the top bar and menu
-  shapes, which have no rail. Its end edge is the docked panel's, so a toast never lands on the panel either. It was
-  bottom-left beside the rail, which put it under the eye only on the shapes that have a rail, and at the full rail's
-  width whatever the rail was drawn at.
+  AN INVERTED BAR, because with no shadows a white card on a white tile is not there: `--toast` (near ink in light, a
+  lifted slate in dark) with the words in `--on-toast` at 14/500, radius 8, 48 tall at least, 12 by 16 in, 480 wide at
+  most. The action is a text button in the same colour at 600 with a 1px underline, so no second red is spent on it.
 
-  THE VERB LEADS. A receipt that offers an undo is "Archived obligations#4", the past tense and then the thing, so the
-  verb is set at 600 and the thing after it at the body's weight. A toast that only reports is a sentence and is drawn
-  as one.
+  AT THE BOTTOM START OF THE WORK, 24 IN AND 24 UP, after the rail where the shell draws one and before the docked panel
+  where one is open, so a toast never lands on either. On a phone it is centred above the tab bar, 12 above it and 12
+  from each side.
+
+  THE WORDS SAY WHAT HAPPENED, BY NAME, IN QUOTES, NEVER AN ID: "Archived “Invoice 2026-041: brand system”." An Undo is
+  drawn only when the change is not on screen; a row's own "Put back" is that change's undo, and the toast then keeps
+  the undo on `⌘Z` without drawing it (`offer: false` in `toast.svelte.ts`). Five seconds for a report, eight with an
+  action, paused while the pointer or focus is on the stack.
+
+  HELD STILL THROUGH A PAGE CHANGE: the stack is named `toasts` for the view transition, so a toast that is up while
+  the work cross-fades does not blink with it.
 
   THE KEY ON UNDO IS THE ONE THAT WORKS: `⌘Z` (Ctrl+Z off a Mac, which `Kbd` says), the stack's own chord in the
   layout. The design system draws a bare `z`, and no such binding exists.
@@ -144,12 +150,6 @@
      carried the meaning on its own (13 §2.3), and it did it because the icon set had `check` and
      `alert` but nothing for `bad` or `info`. It has both now. */
   const GLYPH = { good: 'check', warn: 'alert', bad: 'ban' } as const;
-
-  /** A receipt's verb and the thing it was done to; `null` for a toast that only reports. */
-  const parts = (text: string): [string, string] | null => {
-    const at = text.indexOf(' ');
-    return at > 0 ? [text.slice(0, at), text.slice(at)] : null;
-  };
 </script>
 
 <div
@@ -165,7 +165,6 @@
   onfocusout={() => free('focused')}
 >
   {#each drawn as { toast, gone } (toast.id)}
-    {@const said = toast.undo ? parts(toast.text) : null}
     {@const held = covered && !failed(toast)}
     <div
       class="toast"
@@ -177,14 +176,14 @@
       aria-hidden={gone ? 'true' : undefined}
     >
       {#if toast.intent}
-        <span class="tone" aria-hidden="true"><Icon name={GLYPH[toast.intent]} size="s" /></span>
+        <span class="tone" aria-hidden="true"><Icon name={GLYPH[toast.intent]} size="m" /></span>
       {/if}
-      <span class="text">{#if said}<span class="verb">{said[0]}</span>{said[1]}{:else}{toast.text}{/if}</span>
-      {#if toast.undo}
+      <span class="text">{toast.text}</span>
+      {#if toast.undo && toast.offer !== false}
         <button type="button" class="undo tap" onclick={() => toasts.run(toast.id)}>{copy.undo}<Kbd keys="⌘Z" /></button>
       {/if}
       <button type="button" class="close tap" onclick={() => toasts.dismiss(toast.id)} aria-label={copy.close}>
-        <Icon name="close" size="s" />
+        <Icon name="close" size="m" />
       </button>
     </div>
   {/each}
@@ -193,13 +192,11 @@
 <style>
   /**
    * THE WORK'S WIDTH, between what the rail takes at the start and what the docked panel takes at the end, with the
-   * toasts centred in it. `--toast-start` is nothing until the shell says it draws a rail, and then the rail's width as
+   * toasts at its start. `--toast-start` is nothing until the shell says it draws a rail, and then the rail's width as
    * `Sidebar.svelte` declares it on the root (`--rail-w`), so the stack follows the rail at either width.
    *
    * `--dock-w` WITH ITS FALLBACK, because only `Panel.svelte`'s stylesheet declares it, and a screen that draws no
-   * panel has not loaded that sheet. An unset variable throws out the whole `inset-inline`, both edges, and the stack
-   * fell back to where it sits in the page: measured at 1440 on a screen with no panel, the toast was 16 from the
-   * window's edge, on top of the rail card.
+   * panel has not loaded that sheet. An unset variable throws out the whole `inset-inline`, both edges.
    */
   .stack {
     --toast-start: 0px;
@@ -210,10 +207,11 @@
     z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--sp-2);
-    padding-inline: var(--sp-4);
+    padding-inline: var(--sp-5);
     pointer-events: none;
+    view-transition-name: toasts;
     /* WHAT A POPOVER IS GIVEN BY THE BROWSER, taken back, so lifted into the top layer the stack stands where it did:
        no box, no centring margin, no fit-content size, and no top edge pulling it to the window's top. */
     inset-block-start: auto;
@@ -236,48 +234,32 @@
     pointer-events: auto;
   }
 
-  /**
-   * ONE GLASS-STRONG CARD, AT LEVEL 2, RADIUS 20: the stack floats over whatever the work is showing, and
-   * `glass-strong` is the fill legible over busy content. The filter is on the card itself, which holds no fixed
-   * descendant, and the motion is a transition on the card and never an animation on the stack, so nothing that holds
-   * the glass is ever left filled. The start pads a full step and the end half of one, so the text clears the curve
-   * and the close glyph sits inside it.
-   */
+  /* THE BAR. The start pads a full step and the end less, so the close glyph sits in its own square at the end. */
   .toast {
-    /* Where an arrival starts and a leaving ends, and the opacity an arrival starts at. */
+    /* Where an arrival starts and the opacity it starts at. */
     --toast-from: translateY(8px);
-    --toast-gone: translateY(4px);
-    --toast-from-opacity: 1;
+    --toast-from-opacity: 0;
 
     display: flex;
     align-items: center;
     gap: var(--sp-3);
+    box-sizing: border-box;
     max-inline-size: min(480px, 100%);
-    min-block-size: 44px;
-    padding-block: var(--sp-1);
-    padding-inline: var(--sp-4) var(--sp-1);
-    background: var(--glass-strong);
-    border-radius: 20px;
-    box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
-    color: var(--ink);
-    font-size: var(--t-base);
-    /* Swift out, as everything arriving: no overshoot on a report. */
+    min-block-size: 48px;
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+    background: var(--toast, var(--ink));
+    border-radius: var(--r-ctl);
+    color: var(--on-toast, var(--bg));
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
+    /* In on the arriving step and curve: no overshoot on a report. */
     transition-property: transform, opacity;
     transition-duration: var(--d-enter);
     transition-timing-function: var(--ease-out);
   }
 
-  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives. */
-  @supports (-webkit-backdrop-filter: none) {
-    .toast {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  /* No `opacity: 0` in a start state, see Sheet.svelte. A toast that never fades in is still a
-     toast; a toast stuck at zero opacity is a report nobody got. Reduced motion fades it in from
-     a state that is still readable. */
+  /* THE FIRST FRAME: 8px down and clear, so it rises and fades in. */
   @starting-style {
     .toast {
       transform: var(--toast-from);
@@ -285,9 +267,8 @@
     }
   }
 
-  /* GONE: it drops back 4px as it fades, in the leaving duration, and nothing on it can be pressed. */
+  /* GONE: it fades where it stands, quicker than it came, and nothing on it can be pressed. */
   .toast[data-leaving] {
-    transform: var(--toast-gone);
     opacity: 0;
     pointer-events: none;
     transition-duration: var(--d-exit);
@@ -301,10 +282,9 @@
     inset-inline: var(--inset) calc(min(480px, 100vw - 2 * var(--inset)) + 2 * var(--inset));
   }
 
-  /* HELD UNDER A SHEET: every toast but a failure drops back as a leaving one does, inert. When the sheet has gone they
-     rise into place on the arriving step, from where they went. */
+  /* HELD UNDER A SHEET: every toast but a failure fades out of sight, inert. When the sheet has gone they come back on
+     the arriving step. */
   .toast[data-held] {
-    transform: var(--toast-gone);
     opacity: 0;
     pointer-events: none;
     transition-duration: var(--d-exit);
@@ -314,8 +294,6 @@
   @media (prefers-reduced-motion: reduce) {
     .toast {
       --toast-from: none;
-      --toast-gone: none;
-      --toast-from-opacity: 0.6;
     }
   }
 
@@ -323,78 +301,83 @@
     display: grid;
     place-items: center;
     flex: none;
-    color: var(--tone, var(--dim));
+    color: var(--on-toast, var(--bg));
   }
 
   .text {
     flex: 1;
     min-inline-size: 0;
-    color: var(--ink2);
   }
 
-  .verb {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  /* THE UNDO IS THE ONE THING TO PRESS IN THE TOAST, AND IT LOOKS PRESSABLE: the word in ink at 600 and its key cap,
-     on a soft pill of the wash, the quiet control's own fill, so it reads as a control and not as a bold word in a
-     sentence. Never the ink fill: the receipt is not the screen's primary. A 44px target on a thumb (`tap`), because
-     it is the only control in the product that gives you your data back, on a countdown. */
+  /* THE ACTION IS A TEXT BUTTON in the bar's own colour at 600 with a 1px underline, and its key cap after it. A 44px
+     target on a thumb (`tap`): it is the one control in the product that gives you your data back, on a countdown. */
   .undo {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
     flex: none;
-    min-block-size: 32px;
-    padding: 0 var(--sp-2) 0 var(--sp-3);
-    background: var(--hover-wash);
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-2);
+    background: none;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink);
+    border-radius: var(--r-ctl);
+    color: var(--on-toast, var(--bg));
     font: inherit;
-    font-weight: 600;
+    font-weight: var(--fw-semi);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
-  /* A THUMB SEES THE PRESS: the pill deepens to the held wash while it is down, as a quiet button does. */
-  .undo:active {
-    background: var(--hold-wash);
+  .undo :global(.kbd) {
+    background: color-mix(in oklab, var(--on-toast, var(--bg)) 16%, transparent);
+    color: var(--on-toast, var(--bg));
   }
 
-  /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH. `a11y.css`'s `.tap::before` grows a small
-     control to `--tap` in both axes, which is what keeps a 28px ✕ visually right and 44px to a
-     thumb — the same trick the palette launcher uses. */
+  .undo:active {
+    background: color-mix(in oklab, var(--on-toast, var(--bg)) 16%, transparent);
+  }
+
+  /* `tap` EXPANDS THE HIT AREA WITHOUT MOVING THE GLYPH: a 32px close to the eye, 44 to a thumb. */
   .close {
     display: grid;
     place-items: center;
-    inline-size: 28px;
-    block-size: 28px;
+    inline-size: var(--ctl-h);
+    block-size: var(--ctl-h);
     flex: none;
+    padding: 0;
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--dim);
+    border-radius: var(--r-ctl);
+    color: color-mix(in oklab, var(--on-toast, var(--bg)) 72%, transparent);
     cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   /* HOVER ONLY WHERE THERE IS ONE: a phone keeps `:hover` on the last thing tapped. */
   @media (hover: hover) and (pointer: fine) {
-    .undo:hover {
-      background: var(--hold-wash);
-    }
-
+    .undo:hover,
     .close:hover {
-      background: var(--hover-wash);
-      color: var(--ink);
+      background: color-mix(in oklab, var(--on-toast, var(--bg)) 12%, transparent);
+      color: var(--on-toast, var(--bg));
     }
   }
 
-  /* A THUMB READS THE TOAST AND ITS UNDO AT THE CONTROL SIZE, 16, and has no key to press. */
+  /* THE FOCUS RING IN THE BAR'S OWN COLOUR, since the page's ink ring would vanish on a dark bar. */
+  .undo:focus-visible,
+  .close:focus-visible {
+    outline: 2px solid var(--on-toast, var(--bg));
+    outline-offset: -2px;
+  }
+
+  /* A THUMB READS THE TOAST AND ITS UNDO A STEP UP, AT 15, and has no key to press. */
   @media (pointer: coarse) {
     .toast {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
 
     .undo :global(.kbd-run) {
@@ -402,18 +385,17 @@
     }
   }
 
-  /* No rail below 900px, and the floating tab bar owns the bottom edge. */
+  /* No rail below 900px, and the tab bar owns the bottom edge: centred, 12 above the bar and 12 from each side. */
   @media (width < 900px) {
     .stack {
-      inset-inline: var(--inset);
-      /* ABOVE THE FLOATING BAR: `--tabbar` is the bar and the home indicator, and the bar floats `--inset` over that. */
-      inset-block-end: calc(var(--tabbar) + var(--inset) * 2);
-      align-items: stretch;
-      padding-inline: 0;
+      inset-inline: 0;
+      inset-block-end: calc(var(--tabbar) + var(--sp-3));
+      align-items: center;
+      padding-inline: var(--sp-3);
     }
 
     .toast {
-      max-inline-size: none;
+      inline-size: 100%;
     }
 
     /* AND WITH THE KEYBOARD UP IT SITS WHERE THE BAR WAS. `html[data-kb]` has just removed the
@@ -431,7 +413,7 @@
     }
   }
 
-  /* FORCED COLOURS DROP THE GLASS AND ITS SHADOWS, so the floating surface keeps an edge to be told from the ground by. */
+  /* FORCED COLOURS: the bar keeps an edge to be told from the ground by. */
   @media (forced-colors: active) {
     .toast {
       border: 1px solid CanvasText;
