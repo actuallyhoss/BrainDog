@@ -119,11 +119,6 @@ export const firstRun = {
   openHome: 'Open my BrainDog',
 
   /**
-   * AND ONCE IT IS MADE, "Connect your agent" (`/start#made`, `Made.svelte`, words in `agents/first-connect.ts`), then
-   * Today. The source it once offered is Today's own next step (`WantMore`).
-   */
-  madeTitle: 'Your BrainDog is ready',
-  /**
    * The agent: Claude Code, by its maker's mark, with the one command that connects it. What it sees is the record's
    * own lists by their own names (`made.ts` `agentThings`): "It sees your orders and clients" on a shop, as the vision
    * says it (use case 6, step 6), and the house words below only where a list is named by its id alone.

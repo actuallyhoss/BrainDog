@@ -126,7 +126,6 @@ export const shell = {
      about the record rather than an apology: nothing was written, because this screen never got as
      far as writing. */
   screenFailed: 'This screen did not load',
-  screenFailedBody: 'Nothing was changed. Load it again.',
   /* THE ERROR PAGE, ONE LINE OF WHAT HAPPENED AND ONE BUTTON FOR WHAT TO DO. No request id and no status word: a person
      cannot act on either. Support is named only on the last one, where waiting and retrying are not going to fix it. */
   errorPage: {
