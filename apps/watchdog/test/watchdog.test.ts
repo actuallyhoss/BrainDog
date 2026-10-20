@@ -1,4 +1,4 @@
-/** The uptime Worker: five probes, a mail on the second miss in a row and once on recovery, latency written for each. */
+/** The uptime Worker: five probes, a mail on the second miss in a row and once on recovery, each probe one log line. */
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,16 +15,14 @@ const WELL = (url: string, init?: RequestInit): Response => {
 
 function rig() {
   const sent: { subject: string; text: string; to: string }[] = [];
-  const points: { indexes: string[]; doubles: number[] }[] = [];
   const kv = new Map<string, string>();
   const env = {
     EMAIL: { send: async (m: { subject: string; text: string; to: string }) => void sent.push(m) },
     STATE: { get: async (k: string) => kv.get(k) ?? null, put: async (k: string, v: string) => void kv.set(k, v) },
-    PROBES: { writeDataPoint: (p: { indexes: string[]; doubles: number[] }) => void points.push(p) },
     OPS_ALERT_TO: 'ops@example.test',
     MAIL_FROM: 'hello@brain.dog',
   };
-  return { sent, points, env };
+  return { sent, env };
 }
 
 const quietly = async (f: () => Promise<void>) => {
@@ -37,15 +35,14 @@ const quietly = async (f: () => Promise<void>) => {
   }
 };
 
-test('all five probes pass on a healthy site, and each writes its latency', async () => {
+test('all five probes pass on a healthy site and say nothing', async () => {
   const { watch } = (await import(script)) as Mod;
-  const { env, points, sent } = rig();
+  const { env, sent } = rig();
   await quietly(async () => {
     const out = await watch(env, new Date(), (async (u: string, i?: RequestInit) => WELL(String(u), i)) as unknown as typeof fetch);
     assert.deepEqual(out.map((r) => r.name), ['site', 'app', 'healthz', 'mcp', 'signin']);
     assert.ok(out.every((r) => r.ok));
   });
-  assert.equal(points.length, 5);
   assert.equal(sent.length, 0);
 });
 

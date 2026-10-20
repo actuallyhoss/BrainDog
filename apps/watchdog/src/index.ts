@@ -23,7 +23,6 @@ type Mail = { from: { email: string; name: string }; to: string; subject: string
 export type Env = {
   EMAIL?: { send(message: Mail): Promise<unknown> };
   STATE?: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> };
-  PROBES?: { writeDataPoint(point: { indexes: string[]; blobs: string[]; doubles: number[] }): void };
   OPS_ALERT_TO?: string;
   MAIL_FROM?: string;
   WATCH_HOST?: string;
@@ -118,7 +117,6 @@ export async function watch(env: Env, now = new Date(), fetcher: typeof fetch = 
   const host = env.WATCH_HOST?.trim() || 'brain.dog';
   const results = await Promise.all(PROBES.map((p) => run(p, host, fetcher)));
   for (const r of results) {
-    env.PROBES?.writeDataPoint({ indexes: [r.name], blobs: [r.name, r.ok ? 'ok' : 'fail'], doubles: [r.ms, r.status] });
     console.log(JSON.stringify({ op: 'probe', name: r.name, ok: r.ok, status: r.status, ms: r.ms, slow: r.ms > SLOW_MS, ...(r.why ? { why: r.why } : {}) }));
   }
   const bad = results.filter((r) => !r.ok);

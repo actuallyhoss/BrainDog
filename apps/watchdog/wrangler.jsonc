@@ -18,7 +18,6 @@
   "triggers": { "crons": ["*/5 * * * *"] },
   "vars": { "OPS_ALERT_TO": "admin@brain.dog", "MAIL_FROM": "hello@brain.dog", "WATCH_HOST": "brain.dog" },
   "send_email": [{ "name": "EMAIL" }],
-  "kv_namespaces": [{ "binding": "STATE", "id": "STATE_KV_ID_TODO" }],
-  /* One data point per probe per run: name, ok, status and milliseconds. A slow day is a query over this dataset. */
-  "analytics_engine_datasets": [{ "binding": "PROBES", "dataset": "braindog_probes" }]
+  /* Each probe is one log line a run (name, ok, status, ms, slow), so a slow day is a search of the Worker's logs. */
+  "kv_namespaces": [{ "binding": "STATE", "id": "STATE_KV_ID_TODO" }]
 }
