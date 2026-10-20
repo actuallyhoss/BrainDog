@@ -20,7 +20,7 @@ export type Goto = { key: string; href: string; name: string };
 
 /** The seven of the old table, as declared letters on their own places. */
 const LEARNT: readonly Goto[] = [
-  { key: 'h', href: '/', name: 'Home' },
+  { key: 'h', href: '/', name: 'Today' },
   { key: 'd', href: '/decide', name: 'Needs you' },
   { key: 'i', href: '/inbox', name: 'Inbox' },
   { key: 's', href: '/search', name: 'Search' },

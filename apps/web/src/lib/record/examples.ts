@@ -26,7 +26,7 @@ export const words = {
   fresh: (n: number) =>
     `Setting up added ${many(n)} so each page has something to show. They are marked as examples. Clear them when you are ready to use your own.`,
   beside: (n: number) =>
-    `Your own things are here now, beside ${many(n)} setting up added. They show on Home, Money and the Dashboard until you clear them.`,
+    `Your own things are here now, beside ${many(n)} setting up added. They show on Today, Money and the Dashboard until you clear them.`,
   touched: (n: number) => (n === 1 ? ' One example you changed stays.' : ` ${n} examples you changed stay.`),
   button: 'Clear the examples',
   confirm: (n: number) => (n === 1 ? 'Delete the example' : `Delete ${n} examples`),
