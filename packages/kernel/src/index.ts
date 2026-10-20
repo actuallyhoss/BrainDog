@@ -2903,8 +2903,11 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       };
     };
 
-    for (const decl of batch) {
+    for (const [at, decl] of batch.entries()) {
       if (decl.kind !== 'register') continue;
+      /* A LIST STAGED AGAIN LATER IN THE BATCH IS ASKED AS ITS LAST BODY, which is the one left live: a rebased list is staged
+         as the pack's body and then with the owner's additions over it, and the first lacks what the second lays back. */
+      if (batch.some((later, i) => i > at && later.id === decl.id)) continue;
       const register = ownId(decl);
       const was = heldRow(decl.id);
       if (!was) continue;
