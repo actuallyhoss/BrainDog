@@ -63,8 +63,8 @@
 
   .cell-label {
     grid-area: label;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
   }
 
@@ -73,10 +73,11 @@
     justify-self: start;
   }
 
-  /* THE DOT IS FOR A FIGURE THAT MISSES ITS TARGET, amber or red, and for nothing else: a green dot beside "Open 15"
-     says nothing, and three of them in one tile made the one that mattered a fourth. Any other tone keeps its name for
-     a screen reader and draws nothing. */
-  .cell:not([data-intent='warn'], [data-intent='bad']) > .glyph {
+  /* THE DOT IS FOR A FIGURE THE PAGE FOUND MISSED, red, and for nothing else: a green dot beside "Open 15" says
+     nothing, and an amber one beside "With what is due" said "watch this" with no word (the UI pass of 20 October: a
+     status always carries its word, and amber is off Money). Any other tone keeps its name for a screen reader and
+     draws nothing. */
+  .cell:not([data-intent='bad']) > .glyph {
     position: absolute;
     inline-size: 1px;
     block-size: 1px;
@@ -101,14 +102,14 @@
      says the currency, and half of a figure the fit has already stepped down came to 8 to 10px at 390. A card's figure
      takes the same rule in `cards.css`. */
   .cell-figure .amount-code {
-    font-size: max(var(--t-xs), 0.5em);
+    font-size: max(var(--fs-cap), 0.5em);
   }
 
   /* THE READING LINE: what the figure means, under it. */
   .cell-note {
     grid-area: note;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A FIGURE IS INK, even when it is off its target. The dot beside the label says so and the note
@@ -121,7 +122,7 @@
      thing that needs the person, so it is said in the red at the figure's own size, and no other tone reaches it
      (`page-live.ts` `tileOf` answers `bad` only there; a missed target anywhere else is amber and stays ink). */
   .cell[data-intent='bad'] .cell-figure {
-    color: var(--danger);
+    color: var(--red);
   }
 
   /* A STAT'S TREND IS ITS SPARKLINE, TOP RIGHT, 120 by 32 with no axes, on the label's line and never
@@ -147,8 +148,9 @@
   }
 
   /* One line and one dot, for every small trend the renderer draws (`stat`, `sparkline`, and a card's in `cards.css`):
-     2px of the accent (`--chart-1`) with round joins and a 3px dot on the last point, the dot in the figure's tone when it
-     has one. */
+     2px of the first series (`--chart-1`: ink, or a project's colour inside one) with round joins and a 3px dot on the
+     last point, today, in the same ink (Today's cash tile, today F5). Only a figure the page found missed (`bad`, the
+     day the cash runs out) puts its dot in the late red, beside its red figure. A good figure is not a green dot. */
   .trend-line {
     fill: none;
     stroke: var(--chart-1);
@@ -158,7 +160,7 @@
   }
 
   .trend-end {
-    stroke: var(--tone, var(--chart-1));
+    stroke: var(--chart-1);
     stroke-width: 6px;
     stroke-linecap: round;
   }
@@ -171,6 +173,10 @@
     stroke: var(--chart-1);
     stroke-width: 4px;
     stroke-linecap: butt;
+  }
+
+  .cell[data-intent='bad'] .trend-end {
+    stroke: var(--chart-late);
   }
 
   /* `stat lead`: the first figure is the screen's one lead figure, up to the page name's 28 (DIRECTION §39: a figure is

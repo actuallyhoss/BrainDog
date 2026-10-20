@@ -39,6 +39,15 @@
      late mark here and in `kinds/lanes.css` (loaded beside this file by the page view) paints it, and
      `separation.test.ts` in `packages/theme` holds that. Here and not in `tokens.css`, so only a page that draws a chart
      pays for it. */
+  /* THE SERIES AFTER THE FIRST TAKE THE CATEGORY HUES (SPEC 1.3, his call on 20 Oct: charts outside a project are ink,
+     with the category hues for the series after it, so a dark screen reads in colour and not in greys). A project's
+     scope may set these to its own ramp, as it sets `--chart-1`. "Other" stays `--chart-other`. */
+  :root {
+    --series-2: var(--cat-blue);
+    --series-3: var(--cat-teal);
+    --series-4: var(--cat-violet);
+  }
+
   :root {
     --chart-late-hatch: repeating-linear-gradient(
       135deg,
@@ -124,37 +133,70 @@
   }
 
   /* ── split: one track in parts, a legend, and the hole ────────────────────
-     COLOUR IS STATE, NEVER DECORATION. A part is a neutral step, darkest first, and a row with a
-     tone is drawn in its intent's fill; the dot in the legend is the same step, so a part is found
-     by its place and its figure rather than by a hue. The hairline where two parts meet is the
-     page's own ground showing through. */
+     A part is the chart's series in order: the first in `--chart-1` (ink, or the project's colour inside one), the
+     next in the category hues, the rest in `--chart-other`; a part that is a project, an agent or a person wears its own
+     slot (`data-slot`, proj F6), and a row with a tone is drawn in its intent's fill. The dot in the legend is the same
+     colour, and its name and figure say it, so no part is told by its hue alone. Parts are kept apart by a 2px cut in
+     the tile's own colour. */
   .split {
     gap: var(--sp-3);
   }
 
   .split-track {
     display: block;
-    block-size: 10px;
-    border-radius: var(--r-pill);
+    block-size: 12px;
+    border-radius: var(--r-xs);
     overflow: hidden;
   }
 
-  /* THE PARTS OF A WHOLE, A SPLIT'S AND A RING'S: the accent, then its two tints, then grey for the rest, and a row
+  /* THE PARTS OF A WHOLE, A SPLIT'S AND A RING'S: the first series, then the category hues, then "other", and a row
      with a tone in its intent's fill. */
   :is(.split-seg, .split-dot, .ring-arc, .ring-dot) {
     --part: var(--chart-1);
   }
 
   :is(.split-seg, .split-dot, .ring-arc, .ring-dot)[data-step='1'] {
-    --part: var(--chart-2);
+    --part: var(--series-2);
   }
 
   :is(.split-seg, .split-dot, .ring-arc, .ring-dot)[data-step='2'] {
-    --part: var(--chart-3);
+    --part: var(--series-3);
   }
 
   :is(.split-seg, .split-dot, .ring-arc, .ring-dot)[data-step='3'] {
     --part: var(--chart-other);
+  }
+
+  :is(.split-seg, .split-dot)[data-slot='blue'] {
+    --part: var(--cat-blue);
+  }
+
+  :is(.split-seg, .split-dot)[data-slot='violet'] {
+    --part: var(--cat-violet);
+  }
+
+  :is(.split-seg, .split-dot)[data-slot='pink'] {
+    --part: var(--cat-pink);
+  }
+
+  :is(.split-seg, .split-dot)[data-slot='teal'] {
+    --part: var(--cat-teal);
+  }
+
+  :is(.split-seg, .split-dot)[data-slot='sky'] {
+    --part: var(--cat-sky);
+  }
+
+  :is(.split-seg, .split-dot)[data-slot='yellow'] {
+    --part: var(--cat-yellow);
+  }
+
+  :is(.split-seg, .split-dot)[data-slot='lime'] {
+    --part: var(--cat-lime);
+  }
+
+  :is(.split-seg, .split-dot)[data-slot='slate'] {
+    --part: var(--cat-slate);
   }
 
   .split-seg[data-intent],
@@ -199,7 +241,7 @@
 
   .split-cut {
     fill: none;
-    stroke: var(--bg);
+    stroke: var(--tile);
     stroke-width: 2px;
   }
 
@@ -220,7 +262,7 @@
     gap: var(--sp-2);
     min-inline-size: 0;
     max-inline-size: 100%;
-    font-size: var(--t-sm);
+    font-size: var(--fs-ctl);
   }
 
   .split-dot,
@@ -234,7 +276,7 @@
 
   .split-label {
     min-inline-size: 0;
-    color: var(--ink2);
+    color: var(--ink);
     overflow-wrap: anywhere;
   }
 
@@ -287,7 +329,7 @@
   .split-value {
     color: var(--ink);
     font-variant-numeric: tabular-nums;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   /* ON A PHONE EVERY PART HAS A LINE OF ITS OWN: the dot and the name, then the figure and its share at the end. Two
@@ -317,7 +359,8 @@
 
   .split-share,
   .split-note {
-    color: var(--dim);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .split-note:empty {
@@ -519,9 +562,10 @@
 
   /* ── series: bars by bucket ───────────────────────────────────────────────
      A COLUMN A BUCKET, its bars thin (no wider than 24px) with the free end rounded, over the scale's three lines. The
-     first series is the accent, a second its tint; money out hangs under zero in the light tint, and the net is a
-     line of ink over them. A bucket says its figures on hover, in a small card over the column. The current bucket is
-     faint inside a solid edge; one still to come is a wash inside a dashed one. Too few buckets are the totals alone. */
+     first series is `--chart-1` (ink outside a project), the next ones the category hues; money out hangs under zero
+     in the second series' hue, and the net is a line of `--ink-2` with a dot a month. A month to come is the same bars
+     at half strength. Red is only a 2px cap on a month whose net is below zero, keyed "More out than in" (the money
+     review, F2). A bucket says its figures on hover, in a small card over the column. Too few buckets are the totals. */
   .block[data-kind='series'] {
     container-type: inline-size;
   }
@@ -538,14 +582,14 @@
     gap: var(--sp-1) var(--sp-4);
     padding: 0;
     list-style: none;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .series-key {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .series-swatch {
@@ -553,7 +597,7 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: var(--r-pill);
-    background: var(--chart-2);
+    background: var(--series-3);
   }
 
   .series-key[data-dir='in'][data-step='0'] .series-swatch {
@@ -561,13 +605,21 @@
   }
 
   .series-key[data-dir='out'] .series-swatch {
-    background: var(--chart-3);
+    background: var(--series-2);
   }
 
   .series-key[data-net] .series-swatch {
     block-size: 2px;
+    inline-size: 12px;
     border-radius: 0;
-    background: var(--ink);
+    background: var(--ink-2);
+  }
+
+  .series-key[data-under] .series-swatch {
+    block-size: 2px;
+    inline-size: 12px;
+    border-radius: 0;
+    background: var(--chart-late);
   }
 
   /* THE PLOT LEAVES ITS FIRST COLUMN TO THE SCALE'S FIGURES, and the columns and the bucket names share the rest. */
@@ -599,15 +651,15 @@
 
   .series-line[data-zero] {
     border-block-start-style: solid;
-    border-block-start-color: var(--line);
+    border-block-start-color: var(--rule-strong);
   }
 
   .series-line-label {
     position: absolute;
     inset-inline-end: calc(100% + var(--sp-2));
     translate: 0 -50%;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     line-height: 1;
     white-space: nowrap;
   }
@@ -628,7 +680,7 @@
   .series-bar {
     --y: 0;
     --h: 0;
-    --bar: var(--chart-2);
+    --bar: var(--series-3);
     position: absolute;
     inset-block-start: calc(var(--y) * 1%);
     inset-inline-start: 50%;
@@ -643,7 +695,7 @@
   }
 
   .series-bar[data-dir='out'] {
-    --bar: var(--chart-3);
+    --bar: var(--series-2);
   }
 
   /* THE FREE END IS ROUNDED, the top of what stands up and the foot of what hangs down. */
@@ -657,24 +709,17 @@
     border-end-end-radius: 4px;
   }
 
-  /* THE CURRENT BUCKET SO FAR: its fill is faint because the bucket is not over, so a solid edge keeps its height
-     readable against the tile, as the dashed edge does for the two states below. */
+  /* A MONTH NOT OVER, OR STILL TO COME, IS THE SAME BAR AT HALF STRENGTH: the shape says the height, the strength says
+     it is not settled, and its tip says so in words ("so far", "due", "ahead"). Dashed outlines read as a second chart. */
   .series-bar[data-state='partial'],
   .series-bar[data-state='due'],
   .series-bar[data-state='ahead'] {
-    background: color-mix(in oklab, var(--bar) 40%, transparent);
-    box-shadow: inset 0 0 0 1px var(--bar);
+    background: color-mix(in oklab, var(--bar) 50%, var(--tile));
   }
 
-  .series-bar[data-state='due'],
-  .series-bar[data-state='ahead'] {
-    box-shadow: none;
-    outline: 1px dashed var(--bar);
-    outline-offset: -1px;
-  }
-
-  .series-bar[data-state='ahead'] {
-    background: color-mix(in oklab, var(--bar) 22%, transparent);
+  /* MORE WENT OUT THAN CAME IN: a 2px cap in the late red at the free end of the money that hangs under zero. */
+  .series-col[data-under] > .series-bar[data-dir='out'][data-end] {
+    border-block-end: 2px solid var(--chart-late);
   }
 
   /* A BUCKET'S FIGURES ON HOVER, in a small card beside its bar at the top of the plot, before the bar in the right
@@ -689,11 +734,11 @@
     display: none;
     gap: 2px;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-sm);
-    background: var(--bg);
-    box-shadow: 0 0 0 1px var(--line), var(--e2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-ctl);
+    background: var(--tile);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
@@ -705,8 +750,8 @@
   }
 
   .series-tip-label {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .series-tip-value > .num {
@@ -717,7 +762,7 @@
   @media (hover: hover) and (pointer: fine) {
     /* HALF THE ROW WASH: a full one was a grey slab behind a 24px bar, heavier than the bar it pointed at. */
     .series-col:hover {
-      background: color-mix(in oklab, var(--hover-wash) 50%, transparent);
+      background: color-mix(in oklab, var(--hover) 50%, transparent);
     }
 
     .series-col:hover > .series-tip {
@@ -738,7 +783,7 @@
 
   .series-net {
     fill: none;
-    stroke: var(--ink);
+    stroke: var(--ink-2);
     stroke-width: 2px;
     stroke-linejoin: round;
     stroke-linecap: round;
@@ -746,7 +791,7 @@
 
   .series-dot {
     fill: none;
-    stroke: var(--ink);
+    stroke: var(--ink-2);
     stroke-width: 6px;
     stroke-linecap: round;
   }
@@ -793,8 +838,8 @@
   .series-tick {
     container-type: inline-size;
     min-inline-size: 0;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     text-align: center;
     white-space: nowrap;
   }
@@ -852,24 +897,41 @@
     gap: var(--sp-2);
   }
 
+  /* ONE FACT ONCE (the money review, F5): the name at the start, "4 of 8" at the end, the track under them, and nothing
+     else. The share and what is left said the figure twice more; they stay in the track's name for a screen reader, and
+     what is left comes back only where the row carries an intent (a budget close to or past its limit). */
   .progress-row {
     display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'label figure'
+      'track track'
+      'left note';
+    gap: var(--sp-2) var(--sp-3);
+    align-items: baseline;
+    padding: var(--sp-1) 0;
+    font-size: var(--fs-ctl);
+  }
+
+  .progress-row > .progress-share,
+  .progress-row:not([data-intent]) > .progress-left {
+    display: none;
+  }
+
+  /* A RANGE'S WORDS TAKE THE THIRD COLUMN a goal's share gave up (`kinds/progress.css`). */
+  .progress[data-form='range'] > .progress-row {
     grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
       'label figure share'
       'track track track'
       'left note note';
-    gap: var(--sp-1) var(--sp-3);
-    align-items: baseline;
-    padding: var(--sp-1) 0;
-    font-size: var(--t-sm);
   }
 
   .progress-label {
     grid-area: label;
     min-inline-size: 0;
     overflow: hidden;
-    color: var(--ink2);
+    color: var(--ink);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -878,7 +940,7 @@
     grid-area: figure;
     display: inline-flex;
     gap: var(--sp-1);
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -901,7 +963,7 @@
     position: relative;
     display: block;
     block-size: 6px;
-    border-radius: var(--r-pill);
+    border-radius: 3px;
     background: var(--chart-track);
     overflow: hidden;
   }
@@ -1395,6 +1457,8 @@
   /* `--forecast-gutter` is the room the value axis stands in at the chart's end edge. */
   .forecast {
     --forecast-gutter: 5ch;
+    /* How far above the figure the head's row is centred, for the tools placed in it. Measured against `.block-bar`. */
+    --forecast-head: 46px;
     gap: var(--sp-3);
   }
 
@@ -1443,34 +1507,51 @@
     position: absolute;
     inset-block-start: calc(var(--at) * 100%);
     translate: 0 -50%;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
   .forecast-axis-tick[data-zero] {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE WASH UNDER THE WALK AND THE GRID AT EACH STEP, both quieter than the line: the line is the answer. */
   .forecast-area {
     fill: var(--chart-1);
-    fill-opacity: 0.08;
+    fill-opacity: 0.06;
     stroke: none;
   }
 
-  /* THE PART OF THE WASH UNDER ZERO IS A QUIET DANGER TINT, the one place the walk is a thing the person must act on.
-     The renderer draws it as its own path (`data-below`), so the wash above the line stays the neutral one. */
+  /* THE PART OF THE WASH UNDER ZERO IS THE LATE RED AT 14%, the one place the walk is a thing the person must act on
+     (the money review, F2). The renderer draws it as its own path (`data-below`), so the wash above stays the ink's. */
   .forecast-area[data-below] {
-    fill: var(--danger);
-    fill-opacity: 0.08;
+    fill: var(--chart-late);
+    fill-opacity: 0.14;
+  }
+
+  /* THE LINE'S TWO INKS, cut at the zero rule by the gradient the renderer draws only where the walk goes under: the
+     series' own above £0 and the late red under it, which the pin's day and the crossing's dot say in words. */
+  .forecast-above {
+    stop-color: var(--chart-1);
+  }
+
+  .forecast-under {
+    stop-color: var(--chart-late);
   }
 
   .forecast-grid {
     fill: none;
-    stroke: var(--line);
+    stroke: var(--rule);
     stroke-dasharray: 2 3;
+  }
+
+  /* TODAY, A HAIRLINE DOWN THE CHART where the remembered line ends and the walk begins, under every mark. */
+  .forecast-today {
+    fill: none;
+    stroke: var(--rule-strong);
+    stroke-width: 1px;
   }
 
   .forecast-chart {
@@ -1495,7 +1576,7 @@
   }
 
   .forecast-future {
-    stroke-dasharray: 5 4;
+    stroke-dasharray: 4 3;
   }
 
   /* The baseline a moved knob is read against: a quiet grey, but one that still reads as a 1.5px line (the earlier
@@ -1517,15 +1598,21 @@
     stroke: var(--chart-1);
   }
 
-  .forecast-cross {
-    stroke: var(--warn);
+  /* WHERE THE WALK GOES UNDER, ITS LOWEST POINT IS UNDER £0, so its dot is the late red the line is there. */
+  .forecast-chart:has(.forecast-area[data-below]) .forecast-low {
+    stroke: var(--chart-late);
   }
 
-  /* THE CROSSING IS TIED TO ITS FLAG BY ONE HAIRLINE in the warn tone at half strength, from the chart's top edge down
+  /* THE DAY IT GOES UNDER IS THE LATE RED, the dot, its hairline and its day, because under £0 is what the red means. */
+  .forecast-cross {
+    stroke: var(--chart-late);
+  }
+
+  /* THE CROSSING IS TIED TO ITS FLAG BY ONE HAIRLINE in the late red at half strength, from the chart's top edge down
      to the point where the balance goes under: enough to say which day the words above mean, quieter than the line. */
   .forecast-cross-rule {
     fill: none;
-    stroke: var(--warn);
+    stroke: var(--chart-late);
     stroke-opacity: 0.5;
     stroke-width: 1px;
   }
@@ -1547,12 +1634,20 @@
     inset-inline-start: calc(var(--at) * 100%);
     inset-block-start: calc(var(--y) * 100%);
     translate: var(--sp-2) calc(-100% - var(--sp-1));
+    display: grid;
     color: var(--ink);
-    font-size: var(--t-xs);
-    font-weight: 500;
+    font-size: var(--fs-meta);
+    line-height: 16px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     pointer-events: none;
+  }
+
+  /* "TODAY" OVER THE FIGURE, quiet, so the balance is the word read and the day only names the hairline. */
+  .forecast-now-word {
+    color: var(--ink-3);
+    font-weight: 400;
   }
 
   .forecast-now-label:dir(rtl) {
@@ -1577,8 +1672,9 @@
     inset-inline-start: calc(var(--at) * 100%);
     /* CLEAR OF THE CHART'S TOP EDGE, where a walk at its highest runs: at 390 the dashed line ran into "1 Jan". */
     translate: -50% calc(-100% - var(--sp-2));
-    color: var(--ink);
-    font-size: var(--t-xs);
+    color: var(--red);
+    font-size: var(--fs-meta);
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     pointer-events: none;
@@ -1625,8 +1721,8 @@
     position: absolute;
     inset-inline-start: calc(var(--at) * 100%);
     translate: -50% 0;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     white-space: nowrap;
   }
 
@@ -1739,11 +1835,11 @@
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);
     border: 1px solid transparent;
-    border-radius: var(--r-pill);
-    background: var(--s1);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-ctl);
     text-align: start;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
@@ -1803,11 +1899,46 @@
     translate: -16px 0;
   }
 
-  /* ADJUST AND FULL SCREEN, a row of quiet pills under the chart. */
+  /* ADJUST AND FULL SCREEN, a row of quiet buttons under the chart; in a tile with a head they stand at the head's
+     end as 32px ghost buttons (below), so the chart is not followed by 40px of controls (the money review, F17). */
   .forecast-tools {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
+  }
+
+  .forecast-tool[data-full] {
+    justify-content: center;
+    padding-inline: 0;
+    inline-size: var(--ctl-h);
+  }
+
+  .forecast-tool-icon {
+    inline-size: 16px;
+    block-size: 16px;
+  }
+
+  /* IN THE HEAD. The block's head is the host's (`.block-bar`), drawn just above the figure; the tools are placed over
+     its end, centred on its 28px row, and the head's own end slot is empty on a forecast. Only where the head is there:
+     a forecast drawn bare keeps them under the chart. */
+  .block-slot:has(> .block-bar) .forecast {
+    position: relative;
+  }
+
+  .block-slot:has(> .block-bar) .forecast > .forecast-tools {
+    position: absolute;
+    inset-inline-end: 0;
+    inset-block-start: calc(-1 * var(--forecast-head));
+    flex-wrap: nowrap;
+  }
+
+  .block-slot:has(> .block-bar) .forecast-tool:not(.forecast-chip, .forecast-reset) {
+    min-block-size: 32px;
+    background: transparent;
+  }
+
+  .block-slot:has(> .block-bar) .forecast-tool[data-full] {
+    inline-size: 32px;
   }
 
   /* ADJUST AS A DISCLOSURE, AT EVERY WIDTH, where the renderer draws it as one (`aria-expanded`): the knobs fold under
@@ -2087,8 +2218,10 @@
     /* EVERY MONTH OR EVERY OTHER, BY HOW MANY THERE ARE, so the names do not run into each other on a phone and no
        month is left alone on its axis. The plan names at most twelve months, and a walk of years by quarters, half
        years or years (`src/forecast.ts` `TICKS_MOST`), so from seven names every other one is kept. Every third was
-       the rule for any walk once, and a walk that crossed two or three month starts kept only the first. */
-    .forecast-ticks:has(> .forecast-tick:nth-child(7)) > .forecast-tick:nth-child(even) {
+       the rule for any walk once, and a walk that crossed two or three month starts kept only the first. FROM FIVE,
+       since a phone's plot is about 280px: five names or more leave under 56px a name, and at 390 "Jun" and "Jul" met
+       (the money review, F17). */
+    .forecast-ticks:has(> .forecast-tick:nth-child(5)) > .forecast-tick:nth-child(even) {
       display: none;
     }
 

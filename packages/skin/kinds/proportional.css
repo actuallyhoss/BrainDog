@@ -18,9 +18,12 @@
     gap: var(--sp-1);
   }
 
+  /* THE TRACK IS CAPPED AT 480px AND THE FIGURE SITS RIGHT AFTER IT (the money review, F5): on a 1100px tile a 4px bar
+     ran the whole width and its figure stood 700px from the name it belongs to. */
   .prop-row {
     display: grid;
-    grid-template-columns: minmax(9ch, 20ch) minmax(0, 1fr) auto auto auto;
+    grid-template-columns: minmax(9ch, 20ch) minmax(0, 480px) auto auto auto;
+    justify-content: start;
     gap: var(--sp-3);
     align-items: center;
     margin-inline: calc(-1 * var(--sp-3));
@@ -36,9 +39,9 @@
 
   .prop-track {
     position: relative;
-    block-size: 6px;
-    border-radius: calc(var(--r-sm) / 2);
-    background: var(--field);
+    block-size: 8px;
+    border-radius: var(--r-xs);
+    background: var(--chart-track);
     overflow: hidden;
   }
 
@@ -54,12 +57,12 @@
     inset-inline-start: 0;
     inline-size: calc(var(--magnitude) * 100%);
     border-radius: inherit;
-    background: var(--tone-fill, var(--ink));
+    background: var(--tone-fill, color-mix(in oklab, var(--chart-1) 85%, var(--tile)));
   }
 
   .prop-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
   }
 
   /* AND A PART'S NAME IS A TARGET, so on a thumb it is one. Measured at 61x17 on `/p/work` below
@@ -86,14 +89,14 @@
 
   .prop-value {
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-ctl);
     font-variant-numeric: tabular-nums;
     font-weight: 500;
   }
 
   .prop-note {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* The hole is the only row that is a button: it opens the register filtered to exactly those
@@ -144,6 +147,7 @@
 
     .prop-row {
       grid-template-columns: minmax(35%, 1fr) minmax(0, auto) auto;
+      justify-content: stretch;
       gap: var(--sp-1) var(--sp-4);
       align-items: baseline;
     }
