@@ -10,8 +10,9 @@
   below), so moving between screens asks nothing again; a payment made in Stripe's page comes back as a new page load,
   which asks afresh.
 
-  IN THE FLOW, NEVER FIXED. It sits where the layout mounts it and pushes the screen down, so it can never cover the
-  phone's tab bar, and at 390 its sentence wraps to two lines and its buttons stack under it.
+  IN THE FLOW, NEVER FIXED, AND DRAWN AS THE ONE BANNER (`Banner.svelte`, the UI pass of 20 October 2.A.17): the
+  red tint with the red lock, "Pay again" primary and "Export" quiet. It sits where the layout mounts it and pushes the
+  screen down, so it can never cover the phone's tab bar, and at 390 its buttons stack under its sentence.
 -->
 <script module lang="ts">
   import { readBilling, type BillingAnswer, type Said } from '../../routes/settings/billing.ts';
@@ -27,6 +28,7 @@
   import type { Shell } from '$lib/record/boot-live.ts';
   import { hostedHere, lapseLines, paymentPage, thisRecord } from '../../routes/settings/billing.ts';
   import { untrack } from 'svelte';
+  import Banner from './Banner.svelte';
   import Button from './Button.svelte';
   import Icon from './Icon.svelte';
   import { toasts } from './toast.svelte.ts';
@@ -68,71 +70,13 @@
 </script>
 
 {#if lines && here}
-  <div class="lapse" role="status">
-    <p class="lapse-text">
-      <span class="lapse-glyph"><Icon name="lock" size="s" /></span>
-      <span>{lines.fix}{#if lines.deletes}{' '}{lines.deletes}{/if}</span>
-    </p>
-    <div class="lapse-actions">
+  <Banner tone="late" icon="lock">
+    {lines.fix}{#if lines.deletes}{' '}{lines.deletes}{/if}
+    {#snippet actions()}
       <Button weight="primary" onclick={payAgain} aria-busy={going} disabled={going}
         >{going ? copy.billingOpening : copy.billingPayAgain}</Button
       >
-      <Button href="/settings/export"><Icon name="download" size="s" />{copy.export}</Button>
-    </div>
-  </div>
+      <Button href="/settings/export"><Icon name="download" size="m" />{copy.export}</Button>
+    {/snippet}
+  </Banner>
 {/if}
-
-<style>
-  /* A TILE ON THE GROUND, over whatever screen is open: opaque, radius 22, level 1, inside the work's own
-     gutter. Red is the glyph and nothing else, because this is the one line on the screen that needs him. */
-  .lapse {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2) var(--sp-3);
-    margin: var(--inset) var(--gutter) 0;
-    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5);
-    border-radius: var(--r-lg);
-    background: var(--bg);
-    box-shadow: var(--e1);
-    color: var(--ink);
-  }
-
-  .lapse-text {
-    display: flex;
-    flex: 1 1 30ch;
-    align-items: baseline;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    margin: 0;
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
-  }
-
-  .lapse-glyph {
-    flex: none;
-    color: var(--danger-text);
-  }
-
-  .lapse-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
-  }
-
-  /* ON A PHONE THE TWO BUTTONS ARE FULL-WIDTH ROWS UNDER THE SENTENCE, at the touch height, so neither is a narrow
-     pill squeezed beside wrapped text. */
-  @media (width < 640px) {
-    .lapse-actions {
-      flex: 1 1 100%;
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .lapse-actions :global(.btn) {
-      justify-content: center;
-      min-block-size: 44px;
-    }
-  }
-</style>

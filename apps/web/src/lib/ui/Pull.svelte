@@ -13,7 +13,7 @@
   has settled again (`settled()` in `screen.svelte.ts`), or `LONGEST` at most, so a read that never answers cannot leave
   it running. It is `aria-hidden` for the layout's hairline's reason: the screen's own states say what it read.
 
-  THE OFFLINE LINE is drawn while the poll says offline and something on screen came from the copy: "Offline · from
+  THE OFFLINE LINE is the one banner (`Banner.svelte`, the UI pass of 20 October 2.A.17), in the warn tint, drawn while the poll says offline and something on screen came from the copy: "Offline · from
   14:02", and that nothing changed here is sent until he is back online.
 -->
 <script lang="ts">
@@ -22,6 +22,7 @@
   import { live, reread } from '$lib/data/live.svelte.ts';
   import { when, words } from '$lib/data/offline.ts';
   import { settled } from '$lib/ui/screen.svelte.ts';
+  import Banner from './Banner.svelte';
 
   /** How far, in CSS pixels, a pull from the top travels before letting go reads again. */
   const FAR = 72;
@@ -116,10 +117,7 @@
     aria-hidden="true"
   ></div>
   {#if offline}
-    <p class="pull-offline">
-      <span class="pull-from">{words.from(kept)}</span>
-      <span>{words.notSent}</span>
-    </p>
+    <Banner tone="warn" icon="alert"><span class="pull-from">{words.from(kept)}</span>{' '}{words.notSent}</Banner>
   {/if}
 </div>
 
@@ -136,7 +134,7 @@
     inset-block-start: 0;
     inset-inline: 0;
     block-size: 2px;
-    background: var(--dim);
+    background: var(--ink-3, var(--dim));
     transform: scaleX(var(--pull-drag, 0));
     /* FROM THE MIDDLE, so it grows the same way in a right-to-left language. */
     transform-origin: center;
@@ -146,7 +144,7 @@
   /* WHILE IT READS, A RUNNING LINE AND NOT A FULL ONE, so a finished pull and a read still out look different. Under
      reduced motion `a11y.css` collapses the animation and the line stands still at full width, which still says it. */
   .pull-line[data-reading] {
-    animation: pull-run var(--d-move) ease-in-out infinite alternate;
+    animation: pull-run var(--d-panel) ease-in-out infinite alternate;
   }
 
   @keyframes pull-run {
@@ -158,20 +156,7 @@
     }
   }
 
-  /* ON THE GROUND, INSIDE THE WORK'S GUTTER: a rounded line in the warn wash, not a band across the window. */
-  .pull-offline {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-1) var(--sp-3);
-    margin: var(--inset) var(--gutter) 0;
-    padding: var(--sp-2) var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--warn-wash);
-    color: var(--ink);
-    font-size: var(--t-sm);
-  }
-
   .pull-from {
-    font-weight: 500;
+    font-weight: var(--fw-semi);
   }
 </style>
