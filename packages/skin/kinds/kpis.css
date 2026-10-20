@@ -1,0 +1,623 @@
+/*
+ * `kpis`: a project's numbers and Today's (`packages/render/svelte/Kpis.svelte`, planned by `src/kpis.ts`).
+ *
+ * THE TILE IS THE BOX. The lead KPI sits at the top, its chart across the rest of the tile; the others are a grid
+ * under one hairline, with no box of their own, separated by space as a strip of stats is. Figures are Lexend 600
+ * (34 on the lead, 28 in the grid, 22 on a Today row), tabular, in ink; a code or a unit beside one is the meta step.
+ *
+ * COLOUR SAYS ONE THING EACH. The chart is `--chart-1`, the project's colour inside a project (the page sets it) or the
+ * row's own on Today. A change is `--good` when it went the good way and `--warn` when it did not, always with "Up" or
+ * "Down" beside its arrow. A stale KPI says so in `--warn` with its fix. Red is for off target alone, with its words.
+ *
+ * No colour is written here: every value is a role, both schemes come from `house.css`. No glass, shadow, gradient or
+ * glow; the area under a flow is one flat tint of its line.
+ */
+
+@layer components {
+  .kpis {
+    display: grid;
+    gap: var(--sp-5);
+    container-type: inline-size;
+    min-inline-size: 0;
+  }
+
+  .kpis p {
+    margin: 0;
+  }
+
+  .kpi {
+    min-inline-size: 0;
+  }
+
+  /* ── words ── */
+
+  .kpi-name {
+    overflow: hidden;
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .kpi-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
+    margin-block-start: var(--sp-1);
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--fs-page);
+    font-weight: var(--fw-semi);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    line-height: 34px;
+  }
+
+  .kpi-main {
+    white-space: nowrap;
+  }
+
+  /* A CODE OR A UNIT IS READ AFTER THE FIGURE, never with it: the meta step in the meta ink, in the text face. */
+  .kpi-code,
+  .kpi-unit {
+    color: var(--ink-3);
+    font-family: var(--font-ui);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0;
+    line-height: 18px;
+  }
+
+  .kpi-none {
+    color: var(--ink-3);
+  }
+
+  .kpi-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 6px;
+    margin-block-start: var(--sp-1);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .kpi-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--ink-2);
+    font-weight: var(--fw-semi);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-change[data-tone='good'] {
+    color: var(--good);
+  }
+
+  .kpi-change[data-tone='warn'] {
+    color: var(--warn);
+  }
+
+  .kpi-arrow,
+  .kpi-tick,
+  .kpi-clock {
+    flex: none;
+    inline-size: 12px;
+    block-size: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .kpi-clock {
+    inline-size: 14px;
+    block-size: 14px;
+    stroke-width: 1.5px;
+  }
+
+  .kpi-target,
+  .kpi-sofar,
+  .kpi-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-block-start: var(--sp-2);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .kpi-sofar,
+  .kpi-left {
+    margin-block-start: var(--sp-1);
+  }
+
+  .kpi-target[data-state='met'] {
+    color: var(--good);
+    font-weight: var(--fw-medium);
+  }
+
+  /* OFF TARGET IS THE ONE RED, and it is words: "Off target: 33 of 50 people by 1 Oct". */
+  .kpi-target[data-state='off'] {
+    color: var(--red);
+    font-weight: var(--fw-medium);
+  }
+
+  /* ── stale, and its fix ── */
+
+  .kpi-stale {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    margin-block-start: var(--sp-2);
+  }
+
+  .kpi-stale-said {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--warn);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 18px;
+  }
+
+  /* THE FIX IS A QUIET BUTTON, 32 tall (44 under a thumb), never red: the red fill is for the page's one primary act. */
+  .kpi-fix {
+    display: inline-flex;
+    white-space: nowrap;
+    align-items: center;
+    min-block-size: 32px;
+    padding: 0 var(--sp-3);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
+    cursor: pointer;
+    transition: background-color var(--d-state) var(--ease-out);
+  }
+
+  .kpi-fix:hover {
+    background: color-mix(in oklab, var(--ink) 9%, var(--tile));
+  }
+
+  .kpi-fix:active {
+    background: color-mix(in oklab, var(--ink) 13%, var(--tile));
+    transition-duration: var(--d-press);
+  }
+
+  @media (pointer: coarse) {
+    .kpi-fix {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* ── the chart ── */
+
+  .kpi-plot {
+    position: relative;
+    block-size: 44px;
+  }
+
+  .kpi-plot[data-size='lead'] {
+    block-size: 132px;
+  }
+
+  .kpi-plot[data-size='row'] {
+    block-size: 36px;
+  }
+
+  .kpi-chart {
+    display: block;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+  }
+
+  .kpi-line {
+    fill: none;
+    stroke: var(--chart-1);
+    stroke-width: 2px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .kpi-area {
+    fill: color-mix(in oklab, var(--chart-1) 12%, transparent);
+    stroke: none;
+  }
+
+  .kpi-end {
+    fill: none;
+    stroke: var(--chart-1);
+    stroke-width: 7px;
+    stroke-linecap: round;
+  }
+
+  /* THE PERIOD STILL RUNNING is where it stands so far, faint, and never joined to the line: half a month is not a fall. */
+  .kpi-partial {
+    fill: none;
+    stroke: var(--chart-1);
+    stroke-width: 7px;
+    stroke-linecap: round;
+    opacity: 0.35;
+  }
+
+  .kpi-target-line {
+    stroke: var(--ink-3);
+    stroke-width: 1px;
+    stroke-dasharray: 4 4;
+    opacity: 0.7;
+  }
+
+  /* LABELLED ONCE, at the line's right end, on the lead only. */
+  .kpi-target-label {
+    position: absolute;
+    inset-inline-end: 0;
+    inset-block-start: calc(var(--y) * 1%);
+    padding-block-end: 2px;
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
+    line-height: 16px;
+    white-space: nowrap;
+    transform: translateY(-100%);
+  }
+
+  .kpi-ticks {
+    position: relative;
+    block-size: 16px;
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
+    line-height: 16px;
+    list-style: none;
+  }
+
+  .kpi-tick-label {
+    position: absolute;
+    inset-inline-start: calc(var(--at) * 100%);
+    white-space: nowrap;
+    transform: translateX(-50%);
+  }
+
+  .kpi-tick-label[data-align='start'] {
+    transform: none;
+  }
+
+  .kpi-tick-label[data-align='end'] {
+    transform: translateX(-100%);
+  }
+
+  /* A STALE KPI'S LINE IS ITS OLD SELF, half strength, so the eye goes to the words under it. */
+  .kpi[data-state='stale'] .kpi-chart,
+  .kpi[data-state='stale'] .kpi-ring {
+    opacity: 0.5;
+  }
+
+  /* A share: one ring of a hundred, the target a tick across it. */
+  .kpi-ring {
+    flex: none;
+    inline-size: 40px;
+    block-size: 40px;
+    overflow: visible;
+  }
+
+  .kpi-ring-track,
+  .kpi-ring-arc {
+    fill: none;
+    stroke-width: 4px;
+    transform: rotate(-90deg);
+    transform-origin: 18px 18px;
+  }
+
+  .kpi-ring-track {
+    stroke: var(--chart-track);
+  }
+
+  .kpi-ring-arc {
+    stroke: var(--chart-1);
+  }
+
+  .kpi-ring-mark {
+    stroke: var(--ink-2);
+    stroke-width: 1.5px;
+    stroke-linecap: round;
+  }
+
+  /* Progress: a track toward the target, a mark where the target fell once it is passed. */
+  .kpi-bar {
+    display: grid;
+    gap: var(--sp-2);
+  }
+
+  .kpi-track {
+    position: relative;
+    display: block;
+    block-size: 8px;
+    border-radius: var(--r-xs);
+    background: var(--chart-track);
+  }
+
+  .kpi-fill {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    inline-size: calc(var(--fill) * 100%);
+    border-radius: var(--r-xs);
+    background: var(--chart-1);
+  }
+
+  .kpi-mark {
+    position: absolute;
+    inset-block: -4px;
+    inset-inline-start: calc(var(--at) * 100%);
+    inline-size: 2px;
+    border-radius: 1px;
+    background: var(--ink);
+    transform: translateX(-1px);
+  }
+
+  .kpi-bar-said {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .kpi-share {
+    color: var(--ink);
+    font-weight: var(--fw-semi);
+  }
+
+  .kpi-by {
+    margin-inline-start: auto;
+  }
+
+  /* ── project: the lead ── */
+
+  .kpi-lead {
+    display: grid;
+    gap: var(--sp-4);
+  }
+
+  .kpi-lead .kpi-figure {
+    font-size: var(--fs-hero);
+    line-height: 40px;
+    letter-spacing: -0.035em;
+  }
+
+  /* Room above the chart for the target's label when the target is its top. */
+  .kpi-lead .kpi-plot {
+    margin-block-start: var(--sp-4);
+  }
+
+  /* ON A WIDE TILE THE WORDS STAND LEFT AND THE CHART TAKES THE REST, both on one floor. */
+  @container (min-width: 640px) {
+    .kpi-lead {
+      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+      align-items: start;
+      column-gap: var(--sp-6);
+    }
+
+    .kpi-lead[data-chart='bar'] .kpi-body {
+      padding-block-end: var(--sp-1);
+    }
+  }
+
+  /* ── project: the grid ── */
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-5) var(--sp-4);
+    margin: 0;
+    padding: var(--sp-5) 0 0;
+    border-block-start: 1px solid var(--rule);
+    list-style: none;
+  }
+
+  @container (min-width: 640px) {
+    .kpi-grid {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      column-gap: var(--sp-6);
+    }
+  }
+
+  .kpi-tile {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* A LONG NAME TAKES TWO LINES IN A TILE rather than losing its end: "Monthly recurring reven…" says nothing. */
+  .kpi-tile .kpi-name {
+    display: -webkit-box;
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .kpi-tile-figure {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+  }
+
+  .kpi-tile .kpi-body {
+    margin-block-start: var(--sp-3);
+  }
+
+  @container (max-width: 479px) {
+    .kpi-tile .kpi-figure {
+      font-size: var(--fs-figure);
+      line-height: 26px;
+    }
+
+    .kpi-tile .kpi-ring {
+      inline-size: 32px;
+      block-size: 32px;
+    }
+
+    /* A STALE TILE WITH ITS FIX TAKES THE WHOLE ROW on a phone, so the button keeps its words on one line. */
+    .kpi-tile:has(.kpi-fix) {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* ── Today: rows ── */
+
+  .kpi-rows {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-4);
+    padding-block: var(--sp-3);
+  }
+
+  .kpi-row + .kpi-row {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .kpi-row:first-child {
+    padding-block-start: 0;
+  }
+
+  .kpi-row:last-child {
+    padding-block-end: 0;
+  }
+
+  .kpi-who {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-inline-size: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .kpi-swatch {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-round);
+    background: var(--chart-1);
+  }
+
+  .kpi-project {
+    color: var(--ink-2);
+    font-weight: var(--fw-semi);
+  }
+
+  .kpi-who .kpi-name {
+    color: var(--ink-3);
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+  }
+
+  .kpi-row .kpi-figure {
+    margin-block-start: 2px;
+    font-size: var(--fs-figure);
+    line-height: 26px;
+    letter-spacing: -0.02em;
+  }
+
+  .kpi-why {
+    margin-block-start: 2px;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .kpi-why[data-state='off'] {
+    color: var(--red);
+    font-weight: var(--fw-medium);
+  }
+
+  .kpi-why[data-state='stale'] {
+    color: var(--warn);
+    font-weight: var(--fw-medium);
+  }
+
+  .kpi-row-chart {
+    inline-size: clamp(72px, 24cqi, 120px);
+  }
+
+  /* A ROW'S LINE IS A SPARKLINE: no target across it, the words under the figure say the target. */
+  .kpi-row .kpi-target-line {
+    display: none;
+  }
+
+  .kpis-foot {
+    display: flex;
+  }
+
+  /* ── motion: a chart draws in once, left to right, in the recompose step; a reader who asked for less sees it at once ── */
+
+  @media (prefers-reduced-motion: no-preference) {
+    .kpi-chart,
+    .kpi-fill {
+      animation: kpi-draw var(--d-recompose) var(--ease-out) backwards;
+    }
+
+    .kpi-ring-arc {
+      animation: kpi-fade var(--d-recompose) var(--ease-out) backwards;
+    }
+  }
+
+  @keyframes kpi-draw {
+    from {
+      clip-path: inset(0 100% 0 0);
+    }
+    to {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  @keyframes kpi-fade {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  @layer components {
+    html:not([data-scheme='light']) .kpi-area {
+      fill: color-mix(in oklab, var(--chart-1) 18%, transparent);
+    }
+  }
+}
+
+@layer components {
+  html[data-scheme='dark'] .kpi-area {
+    fill: color-mix(in oklab, var(--chart-1) 18%, transparent);
+  }
+}
