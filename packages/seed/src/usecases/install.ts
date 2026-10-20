@@ -475,6 +475,16 @@ export function fitted(doc: Body, holds: ReadonlySet<string>): Body {
     if (typeof d.register === 'string' && !waits(d))
       for (const f of (Array.isArray(d.fields) ? (d.fields as unknown[]) : []).filter(isBody))
         if (isLink(f) && !waits(f) && !has(String(f.to))) goneIn.set(d.register, (goneIn.get(d.register) ?? new Set<string>()).add(String(f.id)));
+  /* AND A LINK THIS DOCUMENT LAYS ON ANOTHER PACK'S LIST (`extends`) TO A LIST NOT HELD, SINCE founder 3.0.0, with what
+     reads it, as one of its own lists' would go: the founder lays a reading's organisation and service on Portfolio's
+     Numbers, and its figure over `about_service` goes with the field on a record with no services. */
+  const lays = isBody(doc.extends) ? doc.extends : {};
+  for (const [id, ext] of Object.entries(lays)) {
+    const onto = listIn(id);
+    if (onto === null || !isBody(ext) || !Array.isArray(ext.fields)) continue;
+    for (const f of (ext.fields as unknown[]).filter(isBody))
+      if (isLink(f) && !waits(f) && !has(String(f.to))) goneIn.set(onto, (goneIn.get(onto) ?? new Set<string>()).add(String(f.id)));
+  }
   const goneOf = (list: string | null): ReadonlySet<string> => (list === null ? new Set<string>() : (goneIn.get(list) ?? new Set<string>()));
   const gone = new Set([...goneIn.values()].flatMap((s) => [...s]));
   const fieldGone = (list: string | null, field: unknown): boolean => goneOf(list).has(String(field));
@@ -592,7 +602,21 @@ export function fitted(doc: Body, holds: ReadonlySet<string>): Body {
         : [goneOf(String(s.register)).size === 0 || !isBody(s.fields) ? s : { ...s, fields: Object.fromEntries(Object.entries(s.fields).filter(([k]) => !fieldGone(String(s.register), k))) }],
     );
   if (isBody(doc.extends)) {
-    const kept = Object.fromEntries(Object.entries(doc.extends).filter(([id]) => has(listIn(id))));
+    /* EACH LIST'S LAID FIELDS LESS THE LINKS THAT WENT, and a list left with nothing laid on it goes. */
+    const laid = (id: string, ext: unknown): unknown => {
+      const cut = goneOf(listIn(id));
+      if (cut.size === 0 || !isBody(ext) || !Array.isArray(ext.fields)) return ext;
+      const fields = (ext.fields as unknown[]).filter((f) => !isBody(f) || !cut.has(String(f.id)));
+      const out: Body = { ...ext, fields };
+      if (fields.length === 0) delete out.fields;
+      return Object.keys(out).length > 0 ? out : null;
+    };
+    const kept = Object.fromEntries(
+      Object.entries(doc.extends)
+        .filter(([id]) => has(listIn(id)))
+        .map(([id, ext]) => [id, laid(id, ext)] as const)
+        .filter(([, ext]) => ext !== null),
+    );
     if (Object.keys(kept).length > 0) out.extends = kept;
     else delete out.extends;
   }
