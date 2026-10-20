@@ -14,7 +14,7 @@
   import RowMenu from '$lib/ui/RowMenu.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
-  import StatusDot from '$lib/ui/StatusDot.svelte';
+  import StateDot from '$lib/ui/StateDot.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { dotOf } from './list.ts';
 
@@ -113,7 +113,7 @@
             onclose();
           }}
         >
-          <span class="mi-dot"><StatusDot state={dotOf(decl, state)} /></span>
+          <span class="mi-dot"><StateDot state={dotOf(decl, state)} /></span>
           <span class="mi-name">{state === now ? `${stateName}: ${word}` : copy.setTo(word)}</span>
           {#if state === now}<span class="mi-on"><Icon name="check" size="s" /></span>{/if}
         </button>

@@ -38,7 +38,7 @@
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Face from '$lib/ui/Face.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
-  import StatusDot from '$lib/ui/StatusDot.svelte';
+  import StateDot from '$lib/ui/StateDot.svelte';
   import { rowIn, rowOut, settle } from '$lib/ui/motion.ts';
   import { boxOf, deadlineOf, dotOf, dueOf, withoutGood, withoutZeros, type Receipt } from './list.ts';
 
@@ -232,13 +232,13 @@
   {#snippet enumSaid(row: TableRow, field: string, value: string)}
     {#if field === decl.state}
       {@const stored = String(rowAt(Number(row.key.split('#')[1]))?.fields[field] ?? '')}
-      <span class="state" data-stand={dotOf(decl, stored)}><StatusDot state={dotOf(decl, stored)} /><span class="enum">{copy.valueWord(value)}</span></span>
+      <span class="state" data-stand={dotOf(decl, stored)}><StateDot state={dotOf(decl, stored)} /><span class="enum">{copy.valueWord(value)}</span></span>
     {:else}<span class="enum">{copy.valueWord(value)}</span>{/if}
   {/snippet}
   <!-- ANY OTHER VALUE: an amount as the column draws it, and a late row's deadline with how late it is before the day. -->
   {#snippet plainSaid(row: TableRow, field: string, value: string)}
     {@const late = lateSaid(row, field)}
-    {#if late}<span class="late-dot"><StatusDot state="late" /></span><span class="late-word">{late}</span><span class="late-sep" aria-hidden="true">{' · '}</span>{/if}{figureCell(field, value)}
+    {#if late}<span class="late-dot"><StateDot state="late" /></span><span class="late-word">{late}</span><span class="late-sep" aria-hidden="true">{' · '}</span>{/if}{figureCell(field, value)}
   {/snippet}
   <!-- THE SELECT-ALL BOX over the column of pickers: every row on screen, or none. A dash when some are picked. -->
   {#snippet selectHead()}
@@ -615,7 +615,7 @@
   }
 
   /**
-   * WHERE A ROW STANDS, AS ITS STATE'S DOT BEFORE ITS WORD (`StatusDot`): a ring while it is open, half filled when part
+   * WHERE A ROW STANDS, AS ITS STATE'S DOT BEFORE ITS WORD (`StateDot`): a ring while it is open, half filled when part
    * of it is done, slate once finished. Never red: a late row says so on its date, in words, with the one red dot.
    */
   .state {

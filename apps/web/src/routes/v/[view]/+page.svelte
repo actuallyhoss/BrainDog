@@ -414,7 +414,7 @@
   >
     {#snippet actions()}
       <!-- THE TOOLBAR IS GLASS. The list this view narrows is the kicker's link, one step up, so it is not a
-           pill here as well; `o` still opens it. "Narrow this view" wherever the list has fields to narrow by,
+           pill here as well; `o` still opens it. "Filter" wherever the list has fields to narrow by,
            and the way back to the view's own address once the address has narrowed it. -->
       {#if fields.length}
         <Button weight="glass" aria-haspopup="dialog" onclick={() => (narrowing = true)}><Icon name="filter" size="s" />{copy.filter}</Button>

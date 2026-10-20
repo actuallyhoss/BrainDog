@@ -48,10 +48,11 @@ export const ACTS = {
     {
       name: 'Display open',
       run: async (page) => {
-        /* DISPLAY IS IN THE LIST'S "⋯" (money F7): the toolbar's from 640, the head's below it. */
-        await page.locator('.menu-trigger:has([data-list-more]):visible').first().click({ timeout: 4000 });
-        await page.getByRole('menuitem', { name: 'Display' }).click({ timeout: 4000 });
-        await page.waitForSelector('.filter-value', { timeout: 4000 });
+        /* DISPLAY IS IN THE LIST'S "⋯" (money F7): the toolbar's from 640, the head's below it. Each step waits as long. */
+        const soon = { timeout: 4000 };
+        await page.locator('.menu-trigger:has([data-list-more]):visible').first().click(soon);
+        await page.getByRole('menuitem', { name: 'Display' }).click(soon);
+        await page.waitForSelector('.filter-value', soon);
       },
     },
   ],

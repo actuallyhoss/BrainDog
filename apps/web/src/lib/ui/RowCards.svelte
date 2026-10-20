@@ -66,7 +66,7 @@
   import Face from './Face.svelte';
   import Money from './Money.svelte';
   import ScopeChip from './ScopeChip.svelte';
-  import StatusDot from './StatusDot.svelte';
+  import StateDot from './StateDot.svelte';
   import { rowIn, rowOut, settle } from './motion.ts';
 
   let {
@@ -310,7 +310,7 @@
   const slotted = $derived(faced || Boolean(decl?.state || dated));
 
   /**
-   * THE DOT BESIDE THE WORD (`StatusDot`, 2.A.6): red and filled only for a late row, whose word says "late"; a row due
+   * THE DOT BESIDE THE WORD (`StateDot`, 2.A.6): red and filled only for a late row, whose word says "late"; a row due
    * soon keeps the open ring and says when in ink; otherwise the row's state, a ring while open, half filled when part of
    * it is done, slate once finished.
    */
@@ -378,7 +378,7 @@
                has a quiet dot with no name, since the word says all there is. -->
           <span class="card-b" data-slot={slotted ? '' : undefined} data-tone={line.tone} data-stand={decl.state ? (finishedOf(e) ? 'done' : 'open') : undefined}>
             {#if line.word}
-              <span class="card-dot"><StatusDot state={dotOf(e, line.tone)} /></span>
+              <span class="card-dot"><StateDot state={dotOf(e, line.tone)} /></span>
             {/if}
             {#if line.word}<span class="card-word" data-late={line.tone ? '' : undefined}>{line.word}</span>{/if}
             {#if line.also}<span aria-hidden="true">{' · '}</span><span class="card-state">{line.also}</span>{/if}

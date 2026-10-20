@@ -62,6 +62,4 @@ export const query = {
   queryKeep: 'Keep',
   queryDrop: 'Drop',
   queryApproveAll: 'Approve all',
-  /** The saved view's control that opens the builder over the view's narrowing. */
-  queryNarrowView: 'Narrow this view',
 } as const;

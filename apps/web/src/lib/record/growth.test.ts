@@ -312,10 +312,13 @@ test('and every capped list draws the line that says so', () => {
        no numbers would satisfy a substring check and say nothing. */
     assert.match(src, /<CapLine shown=\{[^}]+\} total=\{[^}]+\} \/>/, `${route} caps its list and never says so`);
   }
-  for (const route of ['r/[register]/parts/ListTable.svelte', 'v/[view]/+page.svelte']) {
-    const src = readFileSync(join(routes, route), 'utf8');
-    assert.ok(/cap=\{DOM_CAP\}/.test(src), `${route} slices to the cap and does not pass it to Table`);
-  }
+  const table = readFileSync(join(routes, 'r/[register]/parts/ListTable.svelte'), 'utf8');
+  assert.ok(/cap=\{DOM_CAP\}/.test(table), 'r/[register]/parts/ListTable.svelte slices to the cap and does not pass it to Table');
+  /* A SAVED VIEW DRAWS THE LIST'S OWN TABLE (the UI pass of 20 October, money F10), so the cap reaches `Table` through
+     `ListTable` above, over rows the view has sliced to the same cap. */
+  const view = readFileSync(join(routes, 'v/[view]/+page.svelte'), 'utf8');
+  assert.match(view, /<ListTable\b/, 'v/[view]/+page.svelte draws a table of its own and not the list\'s');
+  assert.match(view, /entries\.slice\(0, DOM_CAP\)/, 'v/[view]/+page.svelte does not slice to the cap');
 });
 
 

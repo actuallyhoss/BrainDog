@@ -511,7 +511,7 @@ export function standOf(decl: RegisterDecl | undefined, value: string, late: boo
 }
 
 /**
- * A STATE AS ITS DOT (`StatusDot`, the UI pass of 20 October, 2.A.6): a finished state is the filled slate, a state that
+ * A STATE AS ITS DOT (`StateDot`, the UI pass of 20 October, 2.A.6): a finished state is the filled slate, a state that
  * says part of it is done ("Part paid") the half-filled ring, and every other open state the hollow ring. NEVER RED: a
  * row's lateness is said where the date is, in the word "late" beside a red dot, and not in its state's colour.
  */

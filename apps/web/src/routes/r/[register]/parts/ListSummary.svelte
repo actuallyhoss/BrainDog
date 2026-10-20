@@ -32,7 +32,7 @@
 <script lang="ts">
   import { labelOf } from '$lib/record/api.ts';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
-  import StatusDot from '$lib/ui/StatusDot.svelte';
+  import StateDot from '$lib/ui/StateDot.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { valueSaid } from '$lib/voice.ts';
   import { byStateOf, dotOf, figureParts, figureSaid, figureSplit, isLate, stateReading, wholeMoney, type Figured } from './list.ts';
@@ -172,7 +172,7 @@
   <ul class="sum-lines" aria-label={label}>
     {#each lines as l, at (l.key)}
       <li class="sum-line" data-stand={l.stand ?? undefined} data-tint={l.tint ? '' : undefined}>
-        <span class="sum-name">{#if l.stand}<StatusDot state={l.stand} />{/if}<span class="sum-label" dir="auto">{l.label}</span></span>
+        <span class="sum-name">{#if l.stand}<StateDot state={l.stand} />{/if}<span class="sum-label" dir="auto">{l.label}</span></span>
         <span class="sum-count num">{l.count ?? ''}</span>
         <span class="sum-value num">{#if fig && l.value !== null}{said(fig, l.value)}{:else}{words.share(Math.round(l.share * 100))}{/if}</span>
         <span class="sum-bar" aria-hidden="true"
