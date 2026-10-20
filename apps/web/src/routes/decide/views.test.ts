@@ -13,8 +13,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { openRecord, type QueueQuestion } from '@braindog/kernel';
 import type { Fetch, LiveBlock } from '../../lib/record/page-live.ts';
-import { MONEY_REGISTERS } from '../../../../../packages/seed/src/modules/money/lists/index.ts';
-import { blocksMineFirst, boardOf, callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, GROUP_KEY, MONEY_LISTS, mineFirst, aboutMoney, NEEDS_SHOWN, othersLine, readDecide, waitingOf, WORDS, type Call } from './views.ts';
+import { blocksMineFirst, boardOf, callsRead, DECIDE_HOME, decideBlockOf, decideDrawn, decideHome, GROUP_KEY, mineFirst, aboutMoney, NEEDS_SHOWN, othersLine, readDecide, waitingOf, WORDS, type Call } from './views.ts';
 import { words } from './words.ts';
 
 const CLOCK = Date.UTC(2026, 9, 2, 12);
@@ -309,9 +308,10 @@ test('money questions go to Money and the rest to Quick, each once, five showing
   assert.equal(NEEDS_SHOWN, 5);
   assert.deepEqual(shaped.groups, { money: 2, quick: 2 });
   assert.ok(aboutMoney(paying('m3')) && !aboutMoney(question('q3')));
-  /* A LATE INVOICE TO CHASE WRITES NO MONEY, AND IS STILL MONEY: its row is on one of Money's lists. */
-  assert.ok(aboutMoney({ ...question('q4'), list: 'obligations' }));
-  assert.ok(!aboutMoney({ ...question('q5'), list: 'tasks' }));
+  /* A LATE INVOICE TO CHASE WRITES NO MONEY, AND IS STILL MONEY: the record's sentence of it names the amount. */
+  assert.ok(aboutMoney({ ...question('q4'), question: 'Invoice 2026-041 was due 38 days ago, GBP 4,800.00. Chase it?' }));
+  assert.ok(!aboutMoney({ ...question('q5'), question: 'Does Tallow get retired, or parked for another year?' }));
+  assert.ok(!aboutMoney({ ...question('q6'), question: 'Follow ISO 4217 for the codes?' }), 'a standard is no amount');
   /* A KEPT PAGE WITH ONE OPEN QUEUE draws every question in it, five showing. */
   const one = decideDrawn([noteBlock(), queueBlock(qs, 4)], CLOCK);
   assert.deepEqual(one.blocks[1]?.queue?.map((q) => q.id), ['m1', 'q1', 'm2', 'q2']);
@@ -319,10 +319,6 @@ test('money questions go to Money and the rest to Quick, each once, five showing
   /* A THIRD OPEN QUEUE DRAWS NOTHING: a question is drawn once. */
   const three = decideDrawn([noteBlock(), queueBlock(qs, 4), queueBlock(qs, 4), queueBlock(qs, 4)], CLOCK);
   assert.equal(three.blocks[3]?.drawn, false);
-});
-
-test('Money’s lists are the money module’s own, every one', () => {
-  assert.deepEqual([...MONEY_LISTS].sort(), Object.keys(MONEY_REGISTERS).sort());
 });
 
 test('the board puts Money, Quick and Handled a third each, a half each, or the row, by what holds something', () => {

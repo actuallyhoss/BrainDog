@@ -373,6 +373,16 @@ const STORED = /\b([A-Z]{3}) ([−-]?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?/gu;
  */
 const TENDER: ReadonlySet<string> = new Set(Intl.supportedValuesOf('currency'));
 
+/**
+ * WHETHER A SENTENCE THE RECORD WROTE NAMES AN AMOUNT, as its rules write one ("GBP 4,800.00", the kernel's
+ * `moneyText`), in a code the runtime lists as tender: "Invoice 2026-041 ... GBP 4,800.00. Chase it?" is about money
+ * though answering it writes none. `ISO 4217` is the name of a standard, not an amount.
+ */
+export function namesAmount(text: string): boolean {
+  for (const m of text.matchAll(STORED)) if (TENDER.has(m[1]!)) return true;
+  return false;
+}
+
 /** The digits of a whole, grouped in threes: `2400` and `2,400` are both `2,400`. */
 const grouped = (whole: string): string => whole.replace(/,/gu, '').replace(/\B(?=(?:\d{3})+$)/gu, ',');
 

@@ -24,7 +24,7 @@ import { day, relative, since } from 'braindog-render';
 import type { QueueQuestion } from '@braindog/kernel';
 import { createClient } from '@braindog/client';
 import { everyGovernance, governancePage, type Governor, type Read } from '../../lib/record/governance.ts';
-import { moneyInText } from '../../lib/record/money.ts';
+import { moneyInText, namesAmount } from '../../lib/record/money.ts';
 import { blockOf, type Fetch, type LiveBlock, type Opened } from '../../lib/record/page-live.ts';
 import type { PageBlock } from '../../lib/record/schema.ts';
 import { emptyHidden, says } from '../../lib/page/home.ts';
@@ -196,27 +196,11 @@ export const GROUP_KEY: Readonly<Record<Group, string>> = { money: 'decide-money
 export const GROUP_WORDS: Readonly<Record<Column, string>> = { money: 'Money', quick: 'Quick', handled: 'Handled' };
 
 /**
- * THE LISTS OF MONEY'S OWN MODULE (money-core), whose questions are about money though accepting one may write none:
- * chasing a late invoice, a plan that did not go through. The module's, never anybody's record by name, and held to the
- * module's own lists by `views.test.ts`.
+ * A QUESTION ABOUT MONEY: accepting it writes an amount (`money`, the record's own), or the record's sentence of it names
+ * one (`namesAmount`), as a late invoice to chase or a payment that did not go through does though answering writes none.
+ * Read off the question and never off which list it is on: the web knows no list by its name.
  */
-export const MONEY_LISTS: ReadonlySet<string> = new Set([
-  'obligations',
-  'accounts',
-  'fx',
-  'categories',
-  'filing_rules',
-  'transactions',
-  'recurring',
-  'plans',
-  'installments',
-  'balances',
-  'snapshots',
-  'books',
-]);
-
-/** A question about money: accepting it writes an amount (`money`, the record's own), or its row is on a Money list. */
-export const aboutMoney = (q: QueueQuestion): boolean => (Array.isArray(q.money) && q.money.length > 0) || (typeof q.list === 'string' && MONEY_LISTS.has(q.list));
+export const aboutMoney = (q: QueueQuestion): boolean => (Array.isArray(q.money) && q.money.length > 0) || namesAmount(q.question);
 
 /**
  * WHERE EACH COLUMN SITS ON THE TWELVE-COLUMN BOARD, as a `grid-column`, or `null` for one with nothing in it: three
