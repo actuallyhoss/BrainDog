@@ -2,7 +2,7 @@
   One glyph from `icons.ts`, inline, in `currentColor` and nothing else. Always decorative here:
   every glyph on this site sits beside the words that say what it means.
 
-  THE SET'S OWN STROKE, 1.75, with round caps and joins (the design system's glyphs), and 2.75 for the two glyphs
+  THE SET'S OWN STROKE, 1.5 (SPEC 4.7 S6), with round caps and joins (the design system's glyphs), and 2.75 for the two glyphs
   drawn as dots. The shapes are the set's markup, written in by `{@html}` because a glyph is circles,
   rects and paths and not one path; every string is a constant in `icons.ts`, never a reader's text.
 -->
@@ -18,7 +18,7 @@
   viewBox="0 0 24 24"
   fill="none"
   stroke="currentColor"
-  stroke-width={DOTTED.has(name) ? 2.75 : 1.75}
+  stroke-width={DOTTED.has(name) ? 2.75 : 1.5}
   stroke-linecap="round"
   stroke-linejoin="round"
   aria-hidden="true"

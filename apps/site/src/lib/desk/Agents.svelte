@@ -1,64 +1,36 @@
 <!--
-  The desk's Agents: Claude's terminal on Tidepool, starting from the brief and leaving a note, beside Tidepool's
-  latest notes. The terminal plays again each time the place is opened (`opened` counts the openings); every line
-  is in the HTML for a reader without scripting.
+  The desk's Agents, as the app's Agents page draws it (site F5): the AI tools Maya has connected, each by its maker's
+  mark, name and when it was last seen, beside what is working now. The home page's AI tools band shows the notes and
+  the connect line, so this place repeats neither.
 -->
 <script lang="ts">
   import AgentMark from '../AgentMark.svelte';
   import Icon from '../Icon.svelte';
-  import { NOTES, PROJECT, PROJECTS, TERM } from '../demo/maya.ts';
-  import Term from './Term.svelte';
+  import { CONNECTED, TODAY } from '../demo/maya.ts';
   import { DESK } from './words.ts';
-
-  let { opened }: { opened: number } = $props();
-
-  const p = PROJECTS[PROJECT.id];
-  const latest = NOTES.slice(0, 2);
 </script>
 
 <div class="grid">
-  <div class="s8">
-    {#key opened}<Term lines={TERM} />{/key}
-  </div>
-  <div class="t s4 note-card hide-phone">
-    <p class="th"><span class="pface small" style="--ph:{p.hue}"><Icon name={p.icon} /></span>{p.name} · {DESK.agents.notes}</p>
-    {#each latest as n}
-      <div class="note">
-        <span class="agent"><AgentMark id={n.agent} /></span>
-        <div><p>{n.text}</p><div class="meta">{n.meta}</div></div>
-      </div>
-    {/each}
-  </div>
+  <section class="t s6" aria-label={DESK.agents.connected}>
+    <p class="thd"><span class="well"><Icon name="plug" /></span>{DESK.agents.connected}<span class="r num">{CONNECTED.length}</span></p>
+    <div class="list">
+      {#each CONNECTED as c (c.agent)}
+        <div class="li">
+          <span class="aface" class:on={c.live}><AgentMark id={c.agent} size={16} /></span>
+          <div class="grow"><b>{c.name}</b><span>{c.seen}</span></div>
+        </div>
+      {/each}
+    </div>
+  </section>
+  <section class="t s6" aria-label={DESK.agents.working}>
+    <p class="thd"><span class="well"><Icon name="agent" /></span>{DESK.agents.working}<span class="r num">{TODAY.working.length}</span></p>
+    <div class="list">
+      {#each TODAY.working as w (w.agent)}
+        <div class="li">
+          <span class="aface on"><AgentMark id={w.agent} size={16} /></span>
+          <div class="grow"><b>{w.what}</b><span>{w.sub}</span></div>
+        </div>
+      {/each}
+    </div>
+  </section>
 </div>
-
-<style>
-  .note-card {
-    display: grid;
-    gap: 14px;
-    align-content: start;
-  }
-
-  .note {
-    display: grid;
-    grid-template-columns: 26px minmax(0, 1fr);
-    gap: 12px;
-    align-items: start;
-  }
-
-  .note p {
-    margin: 0;
-    font-size: var(--t-site-small);
-  }
-
-  .meta {
-    color: var(--muted);
-    font-size: var(--t-app-xs);
-    margin-block-start: 2px;
-  }
-
-  .small {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-  }
-</style>

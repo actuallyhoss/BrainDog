@@ -16,7 +16,7 @@
   import { tick } from 'svelte';
   import Glyph from './Glyph.svelte';
   import { spark } from '../desk/draw.ts';
-  import { ASKS, FINDS, MAKES, PROJECTS, usd, type Parts, type ProjectId } from '../demo/maya.ts';
+  import { ASKS, FINDS, MAKES, PROJECTS, slotVars, usd, type Parts, type ProjectId } from '../demo/maya.ts';
   import { slashDrawing as w, type Mode } from '../copy/slash.ts';
 
   let { mode, at }: { mode: Mode; at: number } = $props();
@@ -53,7 +53,7 @@
 {/snippet}
 
 {#snippet face(id: ProjectId)}
-  <span class="pface" style:--ph={PROJECTS[id].hue}><Glyph name={PROJECTS[id].icon} size={16} /></span>
+  <span class="pface" style={slotVars(PROJECTS[id].slot)}><Glyph name={PROJECTS[id].icon} size={16} /></span>
 {/snippet}
 
 {#if ask}
@@ -74,17 +74,17 @@
   {/if}
   {#if ask.spark}
     {@const line = spark(ask.spark.series, 140, 44)}
-    <div class="t spark-t" style:--ph={ask.project ? PROJECTS[ask.project].hue : 0}>
+    <div class="t spark-t" style={slotVars(ask.project ? PROJECTS[ask.project].slot : 'slate')}>
       <div><div class="sub">{ask.spark.head}</div><div class="big">{ask.spark.big}</div></div>
       <svg class="spark" viewBox="0 0 140 44" aria-hidden="true"><path class="a" d={line.fill} /><path class="l" d={line.line} /></svg>
     </div>
   {/if}
   <div class="t read">
     <span class="sub">{ask.read}</span>
-    {#each ask.actions as a (a.label)}<button type="button" class="btn sm {a.tone}">{a.label}</button>{/each}
+    {#each ask.actions as a (a.label)}<button type="button" class="btn sm {a.tone === 'tint' ? 'red' : 'quiet'}">{a.label}</button>{/each}
   </div>
 {:else if find}
-  <p class="th">{w.found(find.count)}<span class="r">{find.aside}</span></p>
+  <p class="thd">{w.found(find.count)}<span class="r">{find.aside}</span></p>
   {#each find.hits as h (h.title)}
     {@const [before, hit, after] = marked(h.title, find.q)}
     <div class="hit">
@@ -120,7 +120,7 @@
     </div>
   {:else if make.rule}
     <div class="t">
-      <p class="th"><Glyph name="bell" size={15} />{make.rule.head}</p>
+      <p class="thd"><Glyph name="bell" size={15} />{make.rule.head}</p>
       <p class="rule-s">{#each make.rule.parts as p, i (i)}{#if typeof p === 'string'}{p}{:else}<b>{p.text}</b>{/if}{/each}</p>
       <p class="sub rule-sub">{make.rule.sub}</p>
     </div>
@@ -128,7 +128,7 @@
   <div class="propose" class:done={answered !== null} bind:this={box} aria-live="polite">
     {#if answered === null}
       <span class="sub">{make.from}</span>
-      <button type="button" class="btn tint sm" onclick={() => answer(true)}>{make.yes}</button>
+      <button type="button" class="btn red sm" onclick={() => answer(true)}>{make.yes}</button>
       <button type="button" class="btn quiet sm" onclick={() => answer(false)}>{w.notNow}</button>
     {:else if answered.yes}
       <span class="ok"><Glyph name="check" size={16} /></span>
@@ -147,32 +147,27 @@
   .who b { font-weight: 600; font-size: var(--t-site-small); }
   .pface {
     width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none;
-    --pf-bg: color-mix(in srgb, hsl(var(--ph) 70% 45%) 14%, var(--tile)); --pf-ink: hsl(var(--ph) 65% 38%);
-    background: var(--pf-bg); color: var(--pf-ink);
-  }
-  :global(:root[data-theme='dark']) .pface { --pf-ink: hsl(var(--ph) 70% 70%); --pf-bg: color-mix(in srgb, hsl(var(--ph) 70% 45%) 24%, var(--tile)); }
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme='light'])) .pface { --pf-ink: hsl(var(--ph) 70% 70%); --pf-bg: color-mix(in srgb, hsl(var(--ph) 70% 45%) 24%, var(--tile)); }
+    background: var(--ph-tint); color: var(--ph);
   }
   .brief { font-size: var(--t-site-18); line-height: 1.5; margin: 0; text-wrap: pretty; }
   .fig { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .late { color: var(--red-ink); }
+  .late { color: var(--red); font-weight: 600; }
   .hbar { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 12px; align-items: center; padding: 7px 0; font-size: var(--t-site-small); }
   .meter { display: block; height: 6px; border-radius: 4px; background: var(--bar); overflow: hidden; }
-  .meter i { display: block; height: 100%; border-radius: 4px; background: var(--chart); }
+  .meter i { display: block; height: 100%; border-radius: 4px; background: var(--ink2); }
   .num { font-variant-numeric: tabular-nums; }
   .when2 { color: var(--muted); font-size: var(--t-site-12); }
   .spark-t { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .sub { display: block; color: var(--muted); font-size: var(--t-site-12-5); margin: 0; }
   .big { font: 600 27px/1.05 var(--head); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
   .spark { width: 140px; height: 44px; overflow: visible; flex: none; }
-  .spark { --pf-line: hsl(var(--ph) 65% 45%); }
+  .spark { --pf-line: var(--ph); }
   .spark .l { fill: none; stroke: var(--pf-line); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; }
   .spark .a { fill: color-mix(in srgb, var(--pf-line) 12%, transparent); stroke: none; }
   .read { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px; }
   .read .sub { flex: 1; min-width: 10em; }
-  .th { display: flex; align-items: center; gap: 8px; margin: 2px 4px 0; font: 500 12.5px/1.2 var(--ui); color: var(--muted); }
-  .t .th { margin: 0 0 10px; }
+  .thd { display: flex; align-items: center; gap: 8px; margin: 2px 4px 0; font: 500 12.5px/1.2 var(--ui); color: var(--muted); }
+  .t .thd { margin: 0 0 10px; }
   .r { margin-inline-start: auto; }
   .hit { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--tile); min-width: 0; }
   .agent { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; flex: none; background: var(--soft); color: var(--ink); box-shadow: inset 0 0 0 1px var(--rule); }
@@ -186,7 +181,7 @@
   .draft-top b { display: block; font: 600 16px/1.2 var(--head); letter-spacing: -0.02em; }
   .draft-top span { display: block; color: var(--muted); font-size: var(--t-site-12); }
   .dtbox { overflow-x: auto; }
-  .dtbox:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+  .dtbox:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
   .dt { width: 100%; border-collapse: collapse; font-size: var(--t-site-13-5); }
   .dt th { text-align: start; font-weight: 500; color: var(--muted); font-size: var(--t-site-12); padding: 6px 16px; border-block-start: 1px solid var(--rule2); }
   .dt td { padding: 8px 16px; border-block-start: 1px solid var(--rule2); white-space: nowrap; }
@@ -199,9 +194,9 @@
   .propose .sub { flex: 1; min-width: 11em; }
   .propose .said { flex: 1; }
   .ok { display: inline-flex; color: var(--good); }
-  .undo { all: unset; cursor: pointer; font-size: var(--t-site-12-5); font-weight: 500; color: var(--red-ink); }
+  .undo { all: unset; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--red); }
   .undo:hover { text-decoration: underline; }
-  .undo:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; border-radius: 4px; }
+  .undo:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
   @media (pointer: coarse) {
     .undo { min-height: 44px; display: inline-flex; align-items: center; padding: 0 6px; }
   }

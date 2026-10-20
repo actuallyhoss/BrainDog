@@ -5,7 +5,7 @@
 <script lang="ts">
   import AgentMark from '../AgentMark.svelte';
   import Icon from '../Icon.svelte';
-  import { PEOPLE, PROJECT, PROJECTS } from '../demo/maya.ts';
+  import { PEOPLE, PROJECT, PROJECTS, slotVars } from '../demo/maya.ts';
   import { BARS, bars } from './draw.ts';
 
   const p = PROJECTS[PROJECT.id];
@@ -17,18 +17,18 @@
   );
 </script>
 
-<div class="phead" style="--ph:{p.hue}">
-  <span class="pface big-face"><Icon name={p.icon} /></span>
+<div class="phead" style={slotVars(p.slot)}>
+  <span class="well ph big-face"><Icon name={p.icon} /></span>
   <div><h3>{PROJECT.title}</h3><p class="sub">{PROJECT.sub}</p></div>
   <span class="next">
-    <span class="agent"><AgentMark id={PROJECT.next.agent} /></span>
+    <span class="aface on"><AgentMark id={PROJECT.next.agent} size={14} /></span>
     <span>{PROJECT.next.text} · <b>{PROJECT.next.who}</b>, {PROJECT.next.when}</span>
   </span>
 </div>
 
-<div class="grid" style="--ph:{p.hue}">
+<div class="grid" style={slotVars(p.slot)}>
   <div class="t s8">
-    <p class="th"><Icon name="menu" />{PROJECT.brief.head}</p>
+    <p class="thd"><span class="well"><Icon name="file" /></span>{PROJECT.brief.head}</p>
     <p class="stands">
       {#each PROJECT.brief.parts as part}{#if typeof part === 'string'}{part}{:else}<span class="fig" class:late={part.late}
             >{part.text}</span
@@ -43,7 +43,7 @@
   </div>
 
   <div class="t s6">
-    <p class="th"><Icon name="cash" />{PROJECT.months.head}<span class="r">{PROJECT.months.unit}</span></p>
+    <p class="thd"><span class="well"><Icon name="bars" /></span>{PROJECT.months.head}<span class="r">{PROJECT.months.unit}</span></p>
     <svg class="bars" viewBox="0 0 {BARS.w} {BARS.h}" aria-hidden="true">
       {#each drawn as b}
         <rect x={b.x} y={b.y} width={b.w} height={b.h} rx="5" class:now={b.now} />
@@ -53,12 +53,12 @@
   </div>
 
   <div class="t s3 hide-phone">
-    <p class="th"><Icon name="users" />{PROJECT.people.head}</p>
+    <p class="thd"><span class="well"><Icon name="people" /></span>{PROJECT.people.head}</p>
     <div class="list">
       {#each PROJECT.people.who as id}
         {@const who = PEOPLE[id]}
         <div class="li">
-          <span class="face" style="--h:{who.hue}" aria-hidden="true">{who.initials}</span>
+          <span class="face" style={slotVars(who.slot)} aria-hidden="true">{who.initials}</span>
           <div class="grow">{who.name}<span>{who.role}</span></div>
         </div>
       {/each}
@@ -66,7 +66,7 @@
   </div>
 
   <div class="t s3 hide-phone">
-    <p class="th"><Icon name="refresh" />{PROJECT.runsOn.head}</p>
+    <p class="thd"><span class="well"><Icon name="server" /></span>{PROJECT.runsOn.head}</p>
     <div class="list">
       {#each PROJECT.runsOn.services as s}
         <div class="li">
@@ -97,10 +97,15 @@
     margin: 0;
   }
 
-  .big-face {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+  .phead :global(.big-face) {
+    inline-size: 48px;
+    block-size: 48px;
+    border-radius: 12px;
+  }
+
+  .phead :global(.big-face .icon) {
+    inline-size: 24px;
+    block-size: 24px;
   }
 
   .next {
@@ -108,14 +113,14 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 11px;
-    border-radius: 9px;
+    padding: 8px 12px;
+    border-radius: 8px;
     background: var(--tile);
-    font-size: var(--t-app-sm);
+    font-size: 13px;
   }
 
   .stands {
-    font-size: var(--t-site-18);
+    font-size: 17px;
     line-height: 1.5;
     margin: 0;
     text-wrap: pretty;
@@ -133,7 +138,7 @@
 
   .up {
     color: var(--good);
-    font-size: var(--t-app-xs);
+    font-size: 13px;
     font-weight: 500;
   }
 
@@ -143,18 +148,18 @@
     display: block;
   }
 
+  /* A project's chart takes the project's slot (proj F6): past months its tint mix, this month its colour. */
   .bars rect {
-    fill: var(--bar);
+    fill: color-mix(in oklab, var(--ph) 45%, var(--tile));
   }
 
   .bars rect.now {
-    --now: hsl(var(--ph) 65% 45%);
-    fill: var(--now);
+    fill: var(--ph);
   }
 
   .bars text {
     fill: var(--muted);
-    font: 500 10.5px var(--ui);
+    font: 500 12px var(--ui);
   }
 
   .face {
@@ -163,30 +168,16 @@
     border-radius: 50%;
     display: grid;
     place-items: center;
-    font: 600 10.5px/1 var(--ui);
-    /* The person's hue (`--h`, set on the face) is the one thing that varies; the two steps are named once and read below. */
-    --face-bg: hsl(var(--h) 45% 88%);
-    --face-ink: hsl(var(--h) 45% 28%);
-    background: var(--face-bg);
-    color: var(--face-ink);
+    font: 600 12px/1 var(--ui);
+    /* A person's face (SPEC 1.3): the slot's tint disc and its foreground letter. */
+    background: var(--ph-tint);
+    color: var(--ph);
     flex: none;
   }
 
-  :global(:root[data-theme='dark']) .face {
-    --face-bg: hsl(var(--h) 25% 24%);
-    --face-ink: hsl(var(--h) 55% 82%);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :global(:root:not([data-theme='light'])) .face {
-      --face-bg: hsl(var(--h) 25% 24%);
-      --face-ink: hsl(var(--h) 55% 82%);
-    }
-  }
-
   .dot {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--live);
     flex: none;
@@ -198,7 +189,7 @@
 
   @media (max-width: 760px) {
     .stands {
-      font-size: var(--t-site-16-5);
+      font-size: 16px;
     }
 
     .next {

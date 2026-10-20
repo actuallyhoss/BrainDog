@@ -7,7 +7,7 @@
  * its table gives, and `icons.test.ts` fails when the two come apart: a glyph renamed or redrawn in the app is a red
  * test here until the script is run. NEVER EDIT BETWEEN THE MARKS. The second part is the shapes of the same set that
  * the app does not draw, and those are by hand. All of them are the set's own: a 24 grid, strokes only, round caps and
- * joins, drawn by `Icon.svelte` at 1.75 (the design system's glyphs). Each value is the inner markup of the `<svg>`, so
+ * joins, drawn by `Icon.svelte` at 1.5 (SPEC 4.7 S6, the app's stroke). Each value is the inner markup of the `<svg>`, so
  * a glyph here is the glyph a visitor meets again inside the product.
  *
  * EVERY NAME THE SITE ASKED FOR BEFORE STILL RESOLVES. The older names (`arrow`, `close`, `rows`, `back`, `board`,
@@ -68,9 +68,11 @@ const SET = {
   box: '<path d="M12 3.25 20.25 7.5v9L12 20.75 3.75 16.5v-9z"/><path d="M3.75 7.5 12 11.75l8.25-4.25M12 11.75v9"/>',
   code: '<path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5l-3 14"/>',
   bell: '<path d="M6.25 16.75V11a5.75 5.75 0 0 1 11.5 0v5.75l1.5 1.75H4.75z"/><path d="M10 20.5a2.1 2.1 0 0 0 4 0"/>',
+  history: '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 8.75"/><path d="M4.5 5.25v3.5h3.5"/><path d="M12 8v4l2.75 1.75"/>',
   /* icons:end */
   /* The icon set's shapes the app does not draw, kept by hand. One the app comes to draw moves up, into the script's table. */
   minus: '<path d="M5.25 12h13.5"/>',
+  store: '<path d="M4 9.5 5.25 4.75h13.5L20 9.5"/><path d="M4 9.5a2.67 2.67 0 0 0 5.33 0 2.67 2.67 0 0 0 5.34 0 2.67 2.67 0 0 0 5.33 0"/><path d="M5.25 12v8.25h13.5V12"/><path d="M10 20.25v-4.5h4v4.5"/>',
   undo: '<path d="M9 14.5 4.5 10 9 5.5"/><path d="M4.5 10h10a5 5 0 0 1 0 10H11"/>',
   upload: '<path d="M12 15.5V4.25M7.5 8.5 12 4l4.5 4.5"/><path d="M4.75 14.75v2.5a3 3 0 0 0 3 3h8.5a3 3 0 0 0 3-3v-2.5"/>',
   pause: '<path d="M8.5 5.5v13M15.5 5.5v13"/>',

@@ -132,10 +132,10 @@
     width: 100%;
     height: 34px;
     padding: 0 10px;
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--soft);
     color: var(--muted);
-    font: 400 13px/1 var(--ui);
+    font: 400 14px/1 var(--ui);
     transition: box-shadow 0.2s;
   }
 
@@ -145,14 +145,14 @@
   }
 
   .desk-ask-bar:focus-visible {
-    outline: 2px solid var(--red);
+    outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
 
   .open .desk-ask-bar {
     background: var(--tile);
     color: var(--ink);
-    border-radius: 9px 9px 0 0;
+    border-radius: 12px 12px 0 0;
     box-shadow: inset 0 0 0 1.5px var(--red);
   }
 
@@ -182,8 +182,7 @@
     background: var(--tile);
     border: 1.5px solid var(--red);
     border-block-start: 0;
-    border-radius: 0 0 14px 14px;
-    box-shadow: 0 24px 48px -20px var(--shadow-pop);
+    border-radius: 0 0 12px 12px;
     overflow: hidden;
   }
 

@@ -37,64 +37,81 @@ export const CENTS = {
   salaries: 440_000,
   googleWorkspace: 15_600,
   figmaBill: 6_400,
+  monthlyBurn: 344_000,
 } as const;
 
-export const FOUNDER = { name: 'Maya Okafor', short: 'Maya', initials: 'MO', hue: 18 } as const;
+/**
+ * THE APP'S EIGHT CATEGORY SLOTS (SPEC 1.3): a project's, a person's or the founder's colour is one of them, drawn
+ * with the slot's foreground and its tint (`--cat-<slot>`, `--cat-<slot>-tint` in Look B). Never red or orange, so
+ * nothing in a category reads as late.
+ */
+export type Slot = 'blue' | 'violet' | 'pink' | 'teal' | 'sky' | 'gold' | 'lime' | 'slate';
+
+/** The two custom properties a drawing sets to paint something in its slot: `--ph` and `--ph-tint`. */
+export const slotVars = (slot: Slot): string => `--ph:var(--cat-${slot});--ph-tint:var(--cat-${slot}-tint)`;
+
+export const FOUNDER = { name: 'Maya Okafor', short: 'Maya', initials: 'M', hue: 18, slot: 'violet' } as const;
 
 export type ProjectId = 'tidepool' | 'ferment' | 'northbound' | 'pocketlab';
 
-export type Project = { name: string; hue: number; icon: IconName; lane: string };
+export type Project = { name: string; hue: number; slot: Slot; icon: IconName; lane: string };
 
 /** Her four projects, in the order the desk draws them. */
 export const PROJECTS: Record<ProjectId, Project> = {
-  tidepool: { name: 'Tidepool', hue: 198, icon: 'cloud', lane: 'Building' },
-  ferment: { name: 'Ferment & Co', hue: 32, icon: 'box', lane: 'Earning' },
-  northbound: { name: 'Northbound', hue: 262, icon: 'target', lane: 'Client' },
-  pocketlab: { name: 'Pocketlab', hue: 152, icon: 'rocket', lane: 'Building' },
+  tidepool: { name: 'Tidepool', hue: 198, slot: 'sky', icon: 'cloud', lane: 'Building' },
+  ferment: { name: 'Ferment & Co', hue: 32, slot: 'gold', icon: 'box', lane: 'Earning' },
+  northbound: { name: 'Northbound', hue: 262, slot: 'violet', icon: 'target', lane: 'Client' },
+  pocketlab: { name: 'Pocketlab', hue: 152, slot: 'teal', icon: 'rocket', lane: 'Building' },
 };
 
 export const PROJECT_ORDER: readonly ProjectId[] = ['tidepool', 'ferment', 'northbound', 'pocketlab'];
 
 export type PersonId = 'dana' | 'leo' | 'sam';
 
-export type Person = { name: string; initials: string; role: string; hue: number };
+export type Person = { name: string; initials: string; role: string; hue: number; slot: Slot };
 
 export const PEOPLE: Record<PersonId, Person> = {
-  dana: { name: 'Dana Reyes', initials: 'DR', role: 'design', hue: 330 },
-  leo: { name: 'Leo Brandt', initials: 'LB', role: 'books', hue: 120 },
-  sam: { name: 'Sam Patel', initials: 'SP', role: 'Northbound', hue: 262 },
+  dana: { name: 'Dana Reyes', initials: 'DR', role: 'design', hue: 330, slot: 'pink' },
+  leo: { name: 'Leo Brandt', initials: 'LB', role: 'books', hue: 120, slot: 'lime' },
+  sam: { name: 'Sam Patel', initials: 'SP', role: 'Northbound', hue: 262, slot: 'teal' },
 };
 
 /** The agents the drawings name, by the handle their marks are kept under. */
 export type AgentId = 'claude' | 'cursor' | 'chatgpt' | 'codex';
 
-export type EvidenceKey = 'inv' | 'late' | 'dana' | 'payout';
+export type EvidenceKey = 'cash' | 'inv' | 'dana';
 
 /** A figure in a sentence. With a `key` it opens its evidence; `late` draws it in the deeper red, beside its words. */
 export type Figure = { text: string; key?: EvidenceKey; late?: boolean };
 
+/** A press in the greeting's line: it opens one of the desk's places, or the evidence under the line. */
+export type Lead = { text: string; go: 'needs' | 'agents' } | { text: string; key: EvidenceKey };
+
 /** A sentence with figures in it, in reading order. */
 export type Parts = (string | Figure)[];
 
-/** The morning brief, rewritten when something changes. */
-export const BRIEF: { date: 'Thursday 19 March'; rewritten: '07:02'; parts: Parts } = {
+/**
+ * THE GREETING AND ITS ONE LINE, as the app's Today says them (the 19 October Today): the date, "Good morning, Maya",
+ * and one sentence whose first phrase is what needs her, in red. The count is the desk's own (`needs.svelte.ts`), so
+ * `NEEDS` here is what it starts at; the other two figures open the Agents place and the cash's evidence.
+ */
+export const BRIEF: { date: string; hello: string; agents: Lead; cash: Lead } = {
   date: 'Thursday 19 March',
-  rewritten: '07:02',
-  parts: [
-    "Two things need you today. Northbound's invoice of ",
-    { text: usd(CENTS.northboundInvoice), key: 'inv' },
-    ' is ',
-    { text: '4 days late', key: 'late', late: true },
-    ", and Dana's ",
-    { text: usd(CENTS.danaInvoice), key: 'dana' },
-    " is due Friday. Tidepool's March payout of ",
-    { text: usd(CENTS.tidepoolPayout), key: 'payout' },
-    ' landed this morning.',
-  ],
+  hello: 'Good morning, Maya',
+  agents: { text: '2 agents', go: 'agents' },
+  cash: { text: '14 months', key: 'cash' },
 };
 
-/** What each brief figure opens: a heading and its facts, as label and value. */
+/** What a figure opens: a heading and its facts, as label and value ("where it comes from"). */
 export const EVIDENCE: Record<EvidenceKey, { head: string; rows: [string, string][] }> = {
+  cash: {
+    head: 'How long the cash lasts',
+    rows: [
+      ['In the bank, 2 accounts', usd(CENTS.cashAhead)],
+      ['Goes out a month, after what comes in', usd(CENTS.monthlyBurn)],
+      ['At this pace it lasts', 'about 14 months'],
+    ],
+  },
   inv: {
     head: 'Northbound · invoice 1042',
     rows: [
@@ -102,14 +119,6 @@ export const EVIDENCE: Record<EvidenceKey, { head: string; rows: [string, string
       ['Due', '15 Mar'],
       ['Reminder drafted for your yes', '17 Mar'],
       ['Amount', usd(CENTS.northboundInvoice, { pence: true })],
-    ],
-  },
-  late: {
-    head: 'How late',
-    rows: [
-      ['Due', 'Sun 15 Mar'],
-      ['Today', 'Thu 19 Mar'],
-      ['Northbound usually pays', 'in 9 days'],
     ],
   },
   dana: {
@@ -121,81 +130,94 @@ export const EVIDENCE: Record<EvidenceKey, { head: string; rows: [string, string
       ['Amount', usd(CENTS.danaInvoice, { pence: true })],
     ],
   },
-  payout: {
-    head: 'Stripe payout to Tidepool',
-    rows: [
-      ['Landed', 'today, 07:02'],
-      ['Filed by your rule', 'Stripe payouts'],
-      ['Amount', usd(CENTS.tidepoolPayout, { pence: true })],
-    ],
-  },
 };
 
-/** A project's card on Today: its big figure and line, and a spark or a meter when it has one. */
+/**
+ * A project's card on Today, the app's card (proj section 4): its figure and label, a spark when it has three points
+ * or more, a meter where there is progress, the next step, and who is on it at the foot.
+ */
 export type Card = {
   big: string;
-  sub: string;
-  late?: boolean;
+  label: string;
+  late?: string;
   series?: number[];
   meter?: { percent: number; sub: string };
+  next: string;
+  foot: { agents: AgentId[]; say: string; working: boolean };
 };
 
-/** One thing in the brief that waits on her, with the button that takes her to it. */
-export type TodayNeed = { what: string; sub: string; act: string; tone: 'quiet' | 'tint' };
+export type Working = { agent: 'claude' | 'cursor'; project: ProjectId; what: string; sub: string };
 
-export type Working = { agent: 'claude' | 'cursor' | 'chatgpt'; project: ProjectId; what: string; sub: string; live: boolean };
-
-/** The Today tab. A `series` is a shape for a spark or an area, never read as money. */
+/** The Today place: the cash tile, the agents at work, and the four project cards. A `series` is a shape, never money. */
 export const TODAY: {
-  needs: TodayNeed[];
-  cash: { head: string; aside: string; amount: string; sub: string; series: number[] };
+  cash: { head: string; figure: string; say: string; foot: string; series: number[] };
   cards: Record<ProjectId, Card>;
   working: Working[];
-  heads: { working: string; arrivals: string; arrivalsAside: string; done: string };
-  hidePhone: ProjectId[];
+  heads: { needs: string; working: string; projects: string; all: string };
 } = {
-  needs: [
-    { what: `Chase Northbound for ${usd(CENTS.northboundInvoice)}`, sub: '4 days late · Sam Patel', act: 'Chase it', tone: 'quiet' },
-    { what: `Pay Dana Reyes ${usd(CENTS.danaInvoice)}`, sub: 'due Friday · you usually pay her with the salaries', act: 'Plan it', tone: 'tint' },
-  ],
   cash: {
     head: 'Cash ahead',
-    aside: '2 accounts',
-    amount: usd(CENTS.cashAhead),
-    sub: 'lasts about 14 months at this pace',
+    figure: '14 months',
+    say: 'at this pace',
+    foot: `${usd(CENTS.cashAhead)} across 2 accounts`,
     series: [52, 51, 49.5, 50.8, 48.2, 47.6, 46.9, 49.1, 48.3, 47.2, 46.4, 48.2],
   },
   cards: {
-    tidepool: { big: usd(CENTS.tidepoolPayout), sub: 'MRR, up 6%', series: [5.1, 5.4, 5.9, 6.3, 6.8, 7.2, 7.6, 7.9, 8.4] },
-    ferment: { big: '128', sub: 'orders this week', series: [90, 96, 104, 99, 112, 118, 121, 128] },
+    tidepool: {
+      big: usd(CENTS.tidepoolPayout),
+      label: 'a month',
+      series: [5.1, 5.4, 5.9, 6.3, 6.8, 7.2, 7.6, 7.9, 8.4],
+      next: 'Ship webhook retries',
+      foot: { agents: ['claude'], say: 'Claude working', working: true },
+    },
+    ferment: {
+      big: '128',
+      label: 'orders this week',
+      series: [90, 96, 104, 99, 112, 118, 121, 128],
+      next: 'Pack the Hart Street Grocer order',
+      foot: { agents: [], say: 'Worked on today', working: false },
+    },
     northbound: {
       big: usd(CENTS.northboundInvoice),
-      sub: 'owed, 4 days late',
-      late: true,
+      label: 'owed',
+      late: '1 late',
       meter: { percent: 62, sub: '25 of 40 hours this sprint' },
+      next: 'Move the April sprint a week',
+      foot: { agents: ['chatgpt'], say: 'ChatGPT, Tuesday', working: false },
     },
-    pocketlab: { big: '412', sub: 'beta users', series: [80, 120, 170, 220, 260, 310, 355, 412] },
+    pocketlab: {
+      big: '412',
+      label: 'beta users',
+      series: [80, 120, 170, 220, 260, 310, 355, 412],
+      next: 'Finish the onboarding screens',
+      foot: { agents: ['cursor'], say: 'Cursor working', working: true },
+    },
   },
   working: [
-    { agent: 'claude', project: 'tidepool', what: 'Claude on Tidepool', sub: 'webhook retries · since 09:12', live: true },
-    { agent: 'cursor', project: 'pocketlab', what: 'Cursor on Pocketlab', sub: 'onboarding screens · since 10:40', live: true },
-    { agent: 'chatgpt', project: 'northbound', what: 'ChatGPT on Northbound', sub: 'logged call notes with Sam · Tuesday', live: false },
+    { agent: 'claude', project: 'tidepool', what: 'Claude on Tidepool', sub: 'webhook retries · since 09:12' },
+    { agent: 'cursor', project: 'pocketlab', what: 'Cursor on Pocketlab', sub: 'onboarding screens · since 10:40' },
   ],
-  heads: { working: 'Working now', arrivals: 'Just in', arrivalsAside: 'files itself', done: 'done' },
-  hidePhone: ['tidepool', 'northbound', 'pocketlab', 'ferment'],
+  heads: { needs: 'Needs you', working: 'Working now', projects: 'Projects', all: 'All projects' },
 };
 
-/** What lands while she watches, and where it was filed. `amount` is null when nothing was paid. */
-export type Arrival = { icon: IconName; what: string; amount: string | null; to: string; how: string };
-
-export const ARRIVALS: Arrival[] = [
-  { icon: 'download', what: 'Stripe payout', amount: usd(CENTS.tidepoolPayout), to: 'Tidepool', how: 'filed as revenue' },
-  { icon: 'card', what: 'Card · Figma', amount: usd(CENTS.figmaCard), to: 'Spending', how: 'filed by your rule' },
-  { icon: 'branch', what: 'Commit "retry failed webhooks"', amount: null, to: 'Tidepool', how: 'by Claude' },
-  { icon: 'mail', what: 'Invoice from Dana Reyes', amount: usd(CENTS.danaInvoice), to: 'Needs you', how: 'due Friday' },
-  { icon: 'download', what: 'Shopify payout', amount: usd(CENTS.shopifyPayout), to: 'Ferment & Co', how: 'filed as revenue' },
-  { icon: 'card', what: 'Card · AWS', amount: usd(CENTS.awsCard, { pence: true }), to: 'Tidepool', how: 'filed by your rule' },
+/** The AI tools Maya has connected, as the desk's Agents place lists them. */
+export const CONNECTED: { agent: AgentId; name: string; seen: string; live: boolean }[] = [
+  { agent: 'claude', name: 'Claude', seen: 'working now', live: true },
+  { agent: 'cursor', name: 'Cursor', seen: 'working now', live: true },
+  { agent: 'chatgpt', name: 'ChatGPT', seen: 'last seen Tuesday', live: false },
+  { agent: 'codex', name: 'Codex', seen: 'last seen Monday', live: false },
 ];
+
+/** The Money place: what goes out in the next days, and what she is owed. */
+export const MONEY: {
+  owed: { who: string; amount: string; sub: string; late: boolean }[];
+  due: { head: string; foot: string };
+  owedHead: string;
+} = {
+  owed: [{ who: 'Northbound, invoice 1042', amount: usd(CENTS.northboundInvoice), sub: '4 days late · Sam Patel', late: true }],
+  due: { head: 'Going out this month', foot: `${usd(CENTS.billsMonth)} across five bills` },
+  owedHead: 'Owed to you',
+};
 
 /** The project tab: Tidepool's page. Month bars are cents, drawn against `max`, labelled in thousands. */
 export const PROJECT: {
@@ -251,20 +273,57 @@ export const PROJECT: {
   },
 };
 
-/** A question only she can answer, with both answers and what the record says once she says yes. */
-export type Need = { id: string; kind: string; by: string; ask: string; why: string; yes: string; no: string; done: string };
+/**
+ * WHAT WAITS FOR MAYA ON THE DESK: the two things her Today names, each with its line, its figure and the answer that
+ * does it. `ask` and `why` are how the Needs you place says it; `done` is the line once she says yes.
+ */
+export type Need = {
+  id: string;
+  what: string;
+  sub: string;
+  late: boolean;
+  amount: string;
+  ask: string;
+  why: string;
+  yes: string;
+  no: string;
+  done: string;
+  evidence: EvidenceKey;
+};
 
 export const NEEDS: Need[] = [
   {
+    id: 'chase',
+    what: 'Northbound invoice',
+    sub: '4 days late · Sam Patel',
+    late: true,
+    amount: usd(CENTS.northboundInvoice),
+    ask: `Northbound's ${usd(CENTS.northboundInvoice)} invoice is 4 days late. Chase it?`,
+    why: 'A reminder in your words is drafted. Northbound usually pays in 9 days.',
+    yes: 'Chase it',
+    no: 'Not now',
+    done: 'Reminder to Sam Patel drafted in your words',
+    evidence: 'inv',
+  },
+  {
     id: 'pay',
-    kind: 'Money',
-    by: 'BrainDog',
+    what: 'Dana Reyes',
+    sub: 'due Friday · Tidepool icons',
+    late: false,
+    amount: usd(CENTS.danaInvoice),
     ask: `Dana Reyes sent a ${usd(CENTS.danaInvoice)} invoice, due Friday. Pay it with the salaries?`,
     why: 'Her invoice came in Monday. You paid her last three with the salaries.',
     yes: 'Plan it for Friday',
     no: 'Not now',
     done: "Dana's invoice is planned for Friday, with the salaries",
+    evidence: 'dana',
   },
+];
+
+/** A question the chores band shows: something only a person decides, that the desk does not show. */
+export type Asked = { id: string; kind: string; by: string; ask: string; why: string; yes: string; no: string; done: string };
+
+export const ASKED: Asked[] = [
   {
     id: 'sam',
     kind: 'Person',
@@ -280,7 +339,7 @@ export const NEEDS: Need[] = [
     kind: 'Key',
     by: 'Cursor',
     ask: 'A Stripe key was pasted into a note. Move it to the vault?',
-    why: 'Agents can still use it from the vault, without ever seeing it.',
+    why: 'AI tools can still use it from the vault, without ever seeing it.',
     yes: 'Move it',
     no: 'Not now',
     done: 'Key moved to the vault, note cleaned',
@@ -384,7 +443,7 @@ export const ASKS: Ask[] = [
     lead: [
       'Just Northbound: ',
       { text: usd(CENTS.northboundInvoice), late: true },
-      ', four days late. A reminder is drafted and waits for your yes.',
+      ', 4 days late. A reminder is drafted and waits for your yes.',
     ],
     read: 'Read 9 invoices',
     actions: [{ label: 'Chase it', tone: 'tint' }, KEEP],

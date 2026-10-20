@@ -1,270 +1,505 @@
 <!--
-  The desk's Today: Maya's brief with the two things that need her, cash ahead, her four projects, the agents at
-  work and what has just come in.
+  The desk's Today, as the app's 19 October Today draws it: the date, "Good morning, Maya" with one line beside it, then
+  three tiles (Needs you, Working now, Cash ahead) and the four project cards.
 
-  JUST IN TAKES A NEW ARRIVAL EVERY 4.2 SECONDS, and only while it can be watched: `active` is true while Today is the
-  open place and the desk is on screen, and each beat also asks that the tab be visible and motion allowed. The HTML
-  holds the first three arrivals, so with scripting off nothing is missing and nothing moves.
+  THE LINE'S FIGURES PRESS. "2 things need you" opens Needs you, "2 agents" opens Agents, and "14 months" opens where
+  it comes from, attached under the line (the job the old Brief card did). Answering on the Needs you tile moves the
+  ask out with an Undo, and the count on the tab and the line's first phrase follow, because all three read one store.
+
+  With scripting off every word is still here; the answer buttons are drawn for a page whose script runs.
 -->
 <script lang="ts">
   import AgentMark from '../AgentMark.svelte';
   import Icon from '../Icon.svelte';
-  import { ARRIVALS, BRIEF, PROJECT_ORDER, PROJECTS, TODAY, type Arrival } from '../demo/maya.ts';
+  import { BRIEF, EVIDENCE, NEEDS, PROJECT_ORDER, PROJECTS, TODAY, slotVars } from '../demo/maya.ts';
   import { AREA, area, spark } from './draw.ts';
+  import { needs } from './needs.svelte.ts';
   import { DESK, type Tab } from './words.ts';
 
-  let { active, ongo }: { active: boolean; ongo: (tab: Tab) => void } = $props();
+  let { ongo }: { ongo: (tab: Tab) => void } = $props();
 
   const cash = area(TODAY.cash.series);
+  const byId = new Map(NEEDS.map((n) => [n.id, n]));
+  const open = $derived(needs.open.map((id) => byId.get(id)!).filter(Boolean));
+  const done = $derived(needs.done.map((id) => byId.get(id)!).filter(Boolean));
 
-  let shown = $state<{ a: Arrival; n: number }[]>(ARRIVALS.slice(0, 3).map((a, n) => ({ a, n })));
-  let next = 3;
-  let fresh = $state(-1);
-
-  $effect(() => {
-    if (!active) return;
-    const beat = setInterval(() => {
-      let reduced = false;
-      try {
-        reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      } catch {}
-      if (reduced || document.hidden) return;
-      const a = ARRIVALS[next % ARRIVALS.length]!;
-      fresh = next;
-      shown = [{ a, n: next }, ...shown].slice(0, 3);
-      next += 1;
-    }, 4200);
-    return () => clearInterval(beat);
-  });
+  let behind = $state(false);
+  const evidence = EVIDENCE.cash;
 </script>
 
-<div class="grid">
-  <div class="t s8">
-    <p class="th"><Icon name="menu" />{BRIEF.date}<span class="r">{DESK.today.rewritten} {BRIEF.rewritten}</span></p>
-    <p class="brief">
-      {#each BRIEF.parts as part}{#if typeof part === 'string'}{part}{:else}<span class="fig" class:late={part.late}
-            >{part.text}</span
-          >{/if}{/each}
+<p class="date">{BRIEF.date}</p>
+<div class="hello">
+  <h3 class="greet">{BRIEF.hello}</h3>
+  <p class="line">
+    <button type="button" class="lead needs" class:clear={open.length === 0} onclick={() => ongo('needs')}
+      >{DESK.needYou(open.length)}</button
+    >, <button type="button" class="lead" onclick={() => ongo('agents')}>{BRIEF.agents.text}</button>{DESK.areWorking}<button
+      type="button"
+      class="lead"
+      aria-expanded={behind}
+      aria-controls="desk-behind"
+      onclick={() => (behind = !behind)}>{BRIEF.cash.text}</button
+    >.
+  </p>
+</div>
+{#if behind}
+  <div class="behind" id="desk-behind">
+    <p class="bh">{DESK.behind} · {evidence.head}</p>
+    {#each evidence.rows as [label, value]}<p class="row"><span>{label}</span><b class="num">{value}</b></p>{/each}
+  </div>
+{/if}
+
+<div class="dtiles">
+  <section class="t needs-tile" aria-label={TODAY.heads.needs}>
+    <p class="thd">
+      <span class="well"><Icon name="inbox" /></span>{TODAY.heads.needs}
+      {#if open.length}<span class="count num">{open.length}</span>{/if}
     </p>
-    {#each TODAY.needs as need}
-      <div class="needrow">
-        <span class="dotr" aria-hidden="true"></span>
-        <p>{need.what}<span>{need.sub}</span></p>
-        <button type="button" class="dbtn desk-js" data-tone={need.tone} onclick={() => ongo('needs')}>{need.act}</button>
+    {#each open as n (n.id)}
+      <div class="need">
+        <span class="well l" class:late={n.late}><Icon name={n.late ? 'alert' : 'calendar'} /></span>
+        <div class="grow">
+          <b>{n.what}</b>
+          {#if n.late}{@const [first, ...rest] = n.sub.split(' · ')}<span
+              ><strong class="late-word">{first}</strong>{rest.length ? ` · ${rest.join(' · ')}` : ''}</span
+            >{:else}<span>{n.sub}</span>{/if}
+        </div>
+        <div class="end">
+          <span class="fig">{n.amount}</span>
+          <button type="button" class="dbtn red desk-js" onclick={() => needs.answer(n.id, true)}>{n.yes}</button>
+        </div>
       </div>
     {/each}
-  </div>
+    {#each done as n (n.id)}
+      <div class="done">
+        <Icon name="check" />
+        <p>{n.done}</p>
+        <button type="button" class="undo desk-js" onclick={() => needs.undo(n.id)}>{DESK.needs.undo}</button>
+      </div>
+    {/each}
+    {#if open.length === 0 && done.length === 0}<p class="sub">{DESK.needs.empty}</p>{/if}
+  </section>
 
-  <div class="t s4 hide-phone">
-    <p class="th"><Icon name="cash" />{TODAY.cash.head}<span class="r">{TODAY.cash.aside}</span></p>
-    <div class="big">{TODAY.cash.amount}</div>
-    <div class="sub">{TODAY.cash.sub}</div>
+  <section class="t" aria-label={TODAY.heads.working}>
+    <p class="thd"><span class="well"><Icon name="agent" /></span>{TODAY.heads.working}<span class="r num">{TODAY.working.length}</span></p>
+    <div class="list">
+      {#each TODAY.working as w (w.agent)}
+        <div class="li">
+          <span class="aface on"><AgentMark id={w.agent} size={16} /></span>
+          <div class="grow"><b>{w.what}</b><span>{w.sub}</span></div>
+        </div>
+      {/each}
+    </div>
+  </section>
+
+  <section class="t hide-phone hide-mid" aria-label={TODAY.cash.head}>
+    <p class="thd"><span class="well"><Icon name="money" /></span>{TODAY.cash.head}</p>
+    <p class="cashfig"><span class="big">{TODAY.cash.figure}</span> <span class="sub">{TODAY.cash.say}</span></p>
     <svg class="area" viewBox="0 0 {AREA.w} {AREA.h}" preserveAspectRatio="none" aria-hidden="true">
       <path class="a" d={cash.fill} /><path class="l" d={cash.line} vector-effect="non-scaling-stroke" />
     </svg>
-  </div>
+    <p class="sub foot">{TODAY.cash.foot}</p>
+  </section>
+</div>
 
-  {#each PROJECT_ORDER as id}
+<div class="cards hide-phone">
+  {#each PROJECT_ORDER as id (id)}
     {@const p = PROJECTS[id]}
-    {@const card = TODAY.cards[id]}
-    <div class="t s3 pcard" class:hide-phone={TODAY.hidePhone.includes(id)} style="--ph:{p.hue}">
-      <div class="row1"><span class="pface"><Icon name={p.icon} /></span><b>{p.name}</b><span class="lane">{p.lane}</span></div>
-      {#if card.meter}
-        <div><div class="big">{card.big}</div><div class="sub" class:late={card.late}>{card.sub}</div></div>
-        <span class="meter" aria-hidden="true"><i style="width:{card.meter.percent}%"></i></span>
-        <div class="sub">{card.meter.sub}</div>
-      {:else}
-        {@const line = spark(card.series ?? [])}
-        <div class="val">
-          <div><div class="big">{card.big}</div><div class="sub" class:late={card.late}>{card.sub}</div></div>
-          {#if card.series && card.series.length >= 3}
-            <svg class="spark" viewBox="0 0 84 30" aria-hidden="true"><path class="a" d={line.fill} /><path class="l" d={line.line} /></svg>
-          {/if}
+    {@const c = TODAY.cards[id]}
+    <div class="pcard" style={slotVars(p.slot)}>
+      <div class="ra">
+        <span class="pwell"><Icon name={p.icon} /></span>
+        <div class="pname"><b>{p.name}</b><span>{p.lane}</span></div>
+        {#if c.late}<span class="lateflag"><i aria-hidden="true"></i>{c.late}</span>{/if}
+      </div>
+      <div class="rb">
+        <p><span class="pbig">{c.big}</span> <span class="sub">{c.label}</span></p>
+        {#if c.series && c.series.length >= 3}
+          {@const line = spark(c.series, 84, 28)}
+          <svg class="spark" viewBox="0 0 84 28" aria-hidden="true"><path class="a" d={line.fill} /><path class="l" d={line.line} /></svg>
+        {/if}
+      </div>
+      {#if c.meter}
+        <div class="rc">
+          <span class="meter" aria-hidden="true"><i style="width:{c.meter.percent}%"></i></span>
+          <span class="sub">{c.meter.sub}</span>
         </div>
       {/if}
+      <p class="rd"><Icon name="arrow-right" /><span>{c.next}</span></p>
+      <div class="re">
+        {#each c.foot.agents as a (a)}<span class="aface sm" class:on={c.foot.working}><AgentMark id={a} size={14} /></span>{/each}
+        <span class="sub">{c.foot.say}</span>
+      </div>
     </div>
   {/each}
-
-  <div class="t s6 hide-phone">
-    <p class="th"><Icon name="zap" />{TODAY.heads.working}</p>
-    <div class="list">
-      {#each TODAY.working as w}
-        <div class="li">
-          <span class="agent"><AgentMark id={w.agent} /></span>
-          <div class="grow">{w.what}<span>{w.sub}</span></div>
-          {#if w.live}<span class="livedot" aria-hidden="true"></span>{:else}<span class="tag">{TODAY.heads.done}</span>{/if}
-        </div>
-      {/each}
-    </div>
-  </div>
-
-  <div class="t s6 hide-phone">
-    <p class="th"><Icon name="download" />{TODAY.heads.arrivals}<span class="r">{TODAY.heads.arrivalsAside}</span></p>
-    <div class="list">
-      {#each shown as item (item.n)}
-        <div class="li" class:arr={item.n === fresh}>
-          <span class="agent"><Icon name={item.a.icon} /></span>
-          <div class="grow">{item.a.what}<span>{item.a.to} · {item.a.how}</span></div>
-          {#if item.a.amount}<span class="amt num">{item.a.amount}</span>{/if}
-        </div>
-      {/each}
-    </div>
-  </div>
 </div>
 
 <style>
-  .brief {
-    font-size: var(--t-site-18);
-    line-height: 1.5;
+  .date {
     margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .hello {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 16px;
+    margin-block: 4px 16px;
+  }
+
+  .greet {
+    margin: 0;
+    font: 600 28px/1.15 var(--head);
+    letter-spacing: -0.035em;
+  }
+
+  .line {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.45;
+    color: var(--ink2);
     text-wrap: pretty;
   }
 
-  .needrow {
+  /* THE LINE'S FIGURES: ink and 600, pressable; the first phrase is the needs-you red while something waits. */
+  .lead {
+    all: unset;
+    cursor: pointer;
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+    text-underline-offset: 4px;
+  }
+
+  .lead:hover {
+    text-decoration-color: currentColor;
+  }
+
+  .lead.needs {
+    color: var(--red);
+  }
+
+  .lead.needs.clear {
+    color: var(--ink);
+  }
+
+  .behind {
+    max-inline-size: 520px;
+    margin: -4px 0 16px;
+    padding: 12px 16px;
+    background: var(--tile);
+    border-radius: 12px;
+  }
+
+  .bh {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0;
+    padding: 4px 0;
+    font-size: 14px;
+  }
+
+  .dtiles {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 4fr) minmax(0, 3fr);
+    gap: 12px;
+    align-items: start;
+  }
+
+  .count {
+    min-inline-size: 20px;
+    block-size: 20px;
+    padding-inline: 6px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    background: var(--red-fill);
+    color: var(--on-red);
+    font: 600 12px/20px var(--ui);
+    text-align: center;
+  }
+
+  .need {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 11px 0 0;
-    margin-block-start: 11px;
-    border-block-start: 1px solid var(--rule2);
+    padding: 12px 0;
+    border-block-start: 1px solid var(--rule);
   }
 
-  .needrow p {
-    margin: 0;
+  .need:first-of-type {
+    border-block-start: 0;
+    padding-block-start: 0;
+  }
+
+  .end {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+
+  .end .fig {
+    font-size: 15px;
+  }
+
+  .done {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 0;
+    border-block-start: 1px solid var(--rule);
+    color: var(--ink2);
+    font-size: 13px;
+    animation: land 200ms ease-out both;
+  }
+
+  .done :global(.icon) {
+    inline-size: 16px;
+    block-size: 16px;
+    color: var(--good);
+  }
+
+  .done p {
     flex: 1;
-    min-width: 0;
+    margin: 0;
   }
 
-  .needrow p span {
-    display: block;
-    color: var(--muted);
-    font-size: var(--t-app-sm);
+  @keyframes land {
+    from {
+      translate: 0 -6px;
+    }
+    to {
+      translate: 0 0;
+    }
+  }
+
+  .cashfig {
+    margin: 0;
+  }
+
+  .foot {
+    margin: 8px 0 0;
+  }
+
+  /* THE PROJECT CARDS, the app's card (proj section 4): no top stripe, the slot's well, figure and spark. */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-block-start: 12px;
   }
 
   .pcard {
-    display: grid;
-    gap: 10px;
-    align-content: start;
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    padding: 16px;
+    background: var(--tile);
+    border-radius: 16px;
   }
 
-  .row1 {
+  .ra {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 12px;
   }
 
-  .row1 b {
-    font-weight: 600;
-    font-size: var(--t-site-small);
+  .pwell {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 40px;
+    block-size: 40px;
+    border-radius: 8px;
+    background: var(--ph-tint);
+    color: var(--ph);
   }
 
-  .lane {
-    margin-inline-start: auto;
-    font-size: var(--t-app-xs);
+  .pwell :global(.icon) {
+    inline-size: 20px;
+    block-size: 20px;
+  }
+
+  .pname {
+    min-inline-size: 0;
+    flex: 1;
+  }
+
+  .pname b {
+    display: block;
+    overflow: hidden;
+    font: 600 17px/22px var(--ui);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pname span {
     color: var(--muted);
+    font-size: 13px;
   }
 
-  .val {
+  /* "1 late" (SPEC 0.2): a red dot and a 13/600 red word, no fill. */
+  .lateflag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--red);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .lateflag i {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+    background: var(--red);
+  }
+
+  .rb {
     display: flex;
     align-items: end;
     justify-content: space-between;
     gap: 8px;
+    margin-block-start: 16px;
   }
 
-  .val .big {
-    font-size: var(--t-site-21);
+  .rb p {
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .pbig {
+    font: 600 28px/34px var(--head);
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
   }
 
   .spark {
-    width: 84px;
-    height: 30px;
-    overflow: visible;
     flex: none;
+    inline-size: 84px;
+    block-size: 28px;
+    overflow: visible;
   }
 
   .spark .l {
     fill: none;
-    --spark: hsl(var(--ph) 65% 45%);
-    stroke: var(--spark);
-    stroke-width: 1.8;
-    stroke-linejoin: round;
+    stroke: var(--ph);
+    stroke-width: 2;
     stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .spark .a {
-    --spark: hsl(var(--ph) 65% 45%);
-    fill: color-mix(in srgb, var(--spark) 12%, transparent);
+    fill: color-mix(in srgb, var(--ph) 12%, transparent);
+  }
+
+  .rc {
+    display: grid;
+    gap: 6px;
+    margin-block-start: 12px;
   }
 
   .meter {
     display: block;
-    height: 6px;
+    block-size: 6px;
     border-radius: 4px;
-    background: var(--bar);
+    background: var(--soft);
     overflow: hidden;
   }
 
   .meter i {
     display: block;
-    height: 100%;
-    border-radius: 4px;
-    --meter: hsl(var(--ph, 0) 60% 50%);
-    background: var(--meter);
+    block-size: 100%;
+    background: var(--ph);
   }
 
-  .area {
-    width: 100%;
-    height: 64px;
-    display: block;
-    margin-block-start: 10px;
+  .rd {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 0;
+    color: var(--ink2);
+    font-size: 14px;
   }
 
-  .area .l {
-    fill: none;
-    stroke: var(--chart);
-    stroke-width: 1.6;
+  .rd :global(.icon) {
+    inline-size: 16px;
+    block-size: 16px;
+    color: var(--ph);
   }
 
-  .area .a {
-    fill: color-mix(in srgb, var(--chart) 7%, transparent);
+  .rd span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .livedot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--live);
-    flex: none;
-    box-shadow: 0 0 0 3px var(--live-ring);
+  .re {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-block-start: auto;
+    padding-block-start: 12px;
+    min-block-size: 24px;
   }
 
-  .amt {
-    font-weight: 600;
+  .re :global(.aface.sm) {
+    inline-size: 24px;
+    block-size: 24px;
   }
 
-  .arr {
-    animation: land 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  }
-
-  @keyframes land {
-    from {
-      opacity: 0;
-      transform: translateY(-8px);
+  @media (max-width: 1060px) {
+    .dtiles {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
-    to {
-      opacity: 1;
-      transform: none;
+
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 760px) {
-    .brief {
-      font-size: var(--t-site-16-5);
+    /* The phone's top bar carries the date. */
+    .date {
+      display: none;
+    }
+
+    .greet {
+      font-size: 22px;
+    }
+
+    .hello {
+      margin-block: 2px 12px;
+    }
+
+    .line {
+      font-size: 16px;
+    }
+
+    .dtiles {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (pointer: coarse) {
+    .lead {
+      padding-block: 10px;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .arr {
+    .done {
       animation: none;
     }
   }
