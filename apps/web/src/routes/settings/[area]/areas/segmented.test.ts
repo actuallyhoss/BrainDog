@@ -35,7 +35,8 @@ const styles = (text: string): string => (/<style[^>]*>([\s\S]*?)<\/style>/u.exe
 
 test('the areas are read, and the ones known to hold a track are among them', () => {
   const holding = AREAS.filter((a) => SEGMENT.test(markup(a.text))).map((a) => a.name);
-  for (const name of ['Appearance.svelte', 'Look.svelte', 'MyTokens.svelte', 'People.svelte']) {
+  /* THE DESIGN BOOK LEFT SETTINGS FOR `/design` (UI pass 20 Oct, agents F29), and its track with it. */
+  for (const name of ['Appearance.svelte', 'MyTokens.svelte', 'People.svelte']) {
     assert.ok(holding.includes(name), `${name} no longer draws a segment; re-measure`);
   }
 });

@@ -11,7 +11,8 @@ import { test } from 'node:test';
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
 const controls = read('./SheetControls.svelte');
 const charts = read('./SheetCharts.svelte');
-const look = read('../../routes/settings/[area]/areas/Look.svelte');
+/* THE DESIGN BOOK'S OWN PAGE, AT `/design` SINCE THE UI PASS OF 20 OCTOBER (agents F29); it was a Settings area. */
+const look = read('../../routes/design/+page.svelte');
 
 /** A component's own words: its `const words = {` object, without the comments in it. */
 const wordsOf = (src: string): string => {
@@ -84,10 +85,10 @@ test('the charts sheet draws the faces: a person, a project, a retired project, 
   assert.match(charts, /<Mark /u, "the app's own glyph");
 });
 
-test('the Look area is an address of its own that draws both sheets and keeps its words inside itself', () => {
+test('the design book is an address of its own that draws both sheets and keeps its words inside itself', () => {
   assert.match(look, /import SheetControls from '\$lib\/design\/SheetControls\.svelte'/u);
   assert.match(look, /import SheetCharts from '\$lib\/design\/SheetCharts\.svelte'/u);
-  assert.match(look, /let props: AreaProps = \$props\(\)/u, 'every area takes the same props');
+  assert.match(look, /const shell = \$derived\(page\.data as unknown as Shell\)/u, 'the charts sheet reads the shell the layout asked for');
   assert.doesNotMatch(look, /from '\.\/copies\.ts'/u, 'its words are its own');
   assert.match(wordsOf(look), /controls: 'Controls and rows'[\s\S]*charts: 'Charts and marks'/u, 'the two sheets by their names');
 });
@@ -110,10 +111,10 @@ test('neither sheet draws glass, a gradient or a shadow of its own', () => {
   }
 });
 
-test('the design book is generated from the renderer and the skin, and sits in the Look area', () => {
+test('the design book is generated from the renderer and the skin, and sits on its own page', () => {
   const book = read('./DesignBook.svelte');
   for (const name of ['designBook', 'LOOK_B_CSS', 'SCALE_CSS', 'SHEET_NOW']) assert.match(book, new RegExp(`\\b${name}\\b`, 'u'), name);
   assert.doesNotMatch(book.slice(book.indexOf('<style>')), /#[0-9a-f]{3,8}\b|rgb\(|gradient\(|box-shadow:(?! none)/iu, 'the book names no colour of its own');
   assert.match(look, /import DesignBook from '\$lib\/design\/DesignBook\.svelte'/u);
-  assert.match(look, /design: 'Design book'/u);
+  assert.match(look, /title: 'Design book'/u);
 });
