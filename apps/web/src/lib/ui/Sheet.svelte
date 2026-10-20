@@ -1,7 +1,16 @@
 <!--
   A `<dialog>`: from 900px up a drawer that floats `--inset` in from the window's end edge, a tile's surface at radius
-  `--r-lg` and the third level of depth, over a scrim with no blur. Below 900px, the phone,
-  it is a bottom sheet that is as tall as what it holds, up to 88dvh, with a grab handle and a head on one line.
+  16 over the scrim, with no border, no shadow and no blur. Below 900px, the phone, it is THE bottom sheet (the UI pass
+  of 20 October, 2.A.14): as tall as what it holds, up to 88dvh, its top corners 16, a grab handle 36 by 4 in
+  `--rule-strong` 8 from its top, a head on one line, and 16 of padding on every side of its body.
+
+  ONE SHEET IN THE PRODUCT. A menu under a thumb is this sheet with `kind="menu"`, which drops the title row (the title
+  names the dialog for a screen reader instead) and holds the menu's rows; it is a bottom sheet at every width, 560
+  wide at most, since only a coarse pointer reaches it from 640 up. The docked panel's phone form draws the same
+  handle, corners and timing (`Panel.svelte`).
+
+  THE FOOT: on a phone, its buttons are equal columns 44 tall, 8 apart; from 900 up they sit at the end edge, the
+  primary last, whatever order the caller wrote them in. A sentence in the foot takes its own line above them.
 
   THE PHONE SHEET FITS ITS CONTENT. It was always 88% of the screen, so a Display sheet of six
   options was two thirds empty panel. Its height now comes from what is in it, capped at
@@ -34,6 +43,7 @@
     open = $bindable(false),
     title,
     subtitle,
+    kind,
     onclose,
     children,
     footer,
@@ -41,6 +51,8 @@
     open?: boolean | undefined;
     title: string;
     subtitle?: string | undefined;
+    /** `menu`: a menu's rows under a thumb. No title row; the title names the dialog; a bottom sheet at every width. */
+    kind?: 'menu' | undefined;
     /** For a caller whose open state is derived from something else, a peeked row's number, say. */
     onclose?: (() => void) | undefined;
     children: Snippet;
@@ -207,7 +219,8 @@
 
   function grab(e: PointerEvent) {
     const from = e.currentTarget as HTMLElement;
-    if (!el || !e.isPrimary || e.button !== 0 || !matchMedia(PHONE_WIDTH).matches) return;
+    /* A MENU'S SHEET IS A BOTTOM SHEET AT EVERY WIDTH, so its handle pulls at every width too. */
+    if (!el || !e.isPrimary || e.button !== 0 || (kind !== 'menu' && !matchMedia(PHONE_WIDTH).matches)) return;
     /* Asked of the strip or the head and not past it, since the page around the sheet can hold a control. */
     const pressed = e.target instanceof Element ? e.target.closest(PRESSABLE) : null;
     if (pressed && from.contains(pressed)) return;
@@ -233,7 +246,9 @@
 <dialog
   bind:this={el}
   class="sheet"
-  aria-labelledby="{uid}-title"
+  data-kind={kind}
+  aria-labelledby={kind === 'menu' ? undefined : `${uid}-title`}
+  aria-label={kind === 'menu' ? title : undefined}
   onclick={onbackdrop}
   oncancel={(e) => (e.preventDefault(), close())}
   onclose={closed}
@@ -243,33 +258,36 @@
     <span class="sheet-grab-bar"></span>
   </div>
 
-  <!-- ONE LINE: the title and its Close, centred on each other. A title that does not fit ends in
-       an ellipsis rather than pushing Close down to a second row. -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <header class="sheet-head" onpointerdown={grab} onpointermove={drag} onpointerup={drop} onpointercancel={drop}>
-    <h2 class="sheet-title" id="{uid}-title">{title}</h2>
-    <button type="button" class="sheet-close tap" onclick={close} aria-label={copy.close} title={copy.close}>
-      <Icon name="close" size="m" />
-    </button>
-  </header>
-  {#if subtitle}<p class="sheet-sub">{subtitle}</p>{/if}
+  {#if kind !== 'menu'}
+    <!-- ONE LINE: the title and its Close, centred on each other. A title that does not fit ends in
+         an ellipsis rather than pushing Close down to a second row. -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header class="sheet-head" onpointerdown={grab} onpointermove={drag} onpointerup={drop} onpointercancel={drop}>
+      <h2 class="sheet-title" id="{uid}-title">{title}</h2>
+      <button type="button" class="sheet-close tap" onclick={close} aria-label={copy.close} title={copy.close}>
+        <Icon name="close" size="m" />
+      </button>
+    </header>
+    {#if subtitle}<p class="sheet-sub">{subtitle}</p>{/if}
+  {/if}
 
   <!-- `tabindex="0"` because this is the scrolling box, and a scrolling box that a keyboard cannot
        reach is content a keyboard cannot read. The sheet that proved it was the KEYMAP: forty
        bindings, all of them text and `kbd`, not one focusable node in the whole panel — so the one
        surface in the product whose entire subject is the keyboard could not be scrolled with one.
        Sheets that are full of fields never showed the bug, because their fields carry the focus
-       that scrolls the box for free. -->
+       that scrolls the box for free. A MENU'S SHEET is not a stop of its own: its rows are, and the
+       arrows walk them, so the first row and not the box takes the focus as it opens. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div class="sheet-body" tabindex="0">{@render children()}</div>
+  <div class="sheet-body" tabindex={kind === 'menu' ? undefined : 0}>{@render children()}</div>
 
   {#if footer}<footer class="sheet-foot">{@render footer()}</footer>{/if}
 </dialog>
 
 <style>
   /* THE DRAWER, from 900px up. It floats `--inset` in from the window's end edge on three sides, as the docked panel
-     does, rather than hanging off the edge with a rule down its side: a sheet is a tile's surface at radius
-     `--r-lg` and the third level of depth, and a tile has no border. */
+     does, rather than hanging off the edge with a rule down its side: a tile's surface at radius 16 over the scrim,
+     which is all the separation it needs. No border and no shadow (the UI pass of 20 October, 1.9). */
   .sheet {
     /* THE MOTION: in over the panel's step on the sheet curve, out along the same path a step quicker, from wherever
        `--sheet-off` puts it out of sight, as `Panel.svelte` moves. Both opacities are 1, so it slides and does not
@@ -306,11 +324,10 @@
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background: var(--bg);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-tile);
     color: var(--ink);
-    box-shadow: var(--e3);
     transform: var(--sheet-off);
     opacity: var(--sheet-gone-opacity);
     /* LONGHANDS, so a browser that does not know `allow-discrete` drops that one line and keeps the slide. `display` and
@@ -384,38 +401,39 @@
     display: none;
   }
 
-  /* ONE LINE: the title and its close circle, centred on each other. */
+  /* ONE LINE: the title and its close circle, centred on each other, the title on the body's 16px edge. */
   .sheet-head {
     flex: none;
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-3) var(--sp-2) calc(var(--sp-4) + var(--sp-1));
+    padding: var(--sp-3) var(--sp-3) var(--sp-2) var(--sp-4);
   }
 
-  /* The element holding the words carries the ellipsis, and it is a block, not the flex row. A sheet's title is at a
-     group heading's step, as the docked panel's is. */
+  /* The element holding the words carries the ellipsis, and it is a block, not the flex row. A sheet's title is 17/600
+     in the text face, as the docked panel's is. */
   .sheet-title {
     flex: 1;
     min-inline-size: 0;
     margin: 0;
     overflow: hidden;
-    font-size: var(--t-group);
-    font-weight: 600;
-    line-height: var(--lh-tight);
+    font-family: var(--font-ui);
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
+    line-height: 24px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .sheet-sub {
     margin: 0;
-    padding: 0 calc(var(--sp-4) + var(--sp-1)) var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    padding: 0 var(--sp-4) var(--sp-3);
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-meta);
   }
 
-  /* A 36px CIRCLE, the toolbar's icon circle, with a quiet fill at rest so it reads as a thing to press.
-     `.tap` grows its hit box to 44 where the pointer is a thumb. */
+  /* A CONTROL'S HEIGHT, ROUND, with the quiet fill at rest so it reads as a thing to press. `.tap` grows its hit box to
+     44 where the pointer is a thumb. */
   .sheet-close {
     flex: none;
     display: grid;
@@ -423,10 +441,10 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--s1);
+    background: var(--tile-2, var(--s1));
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-round);
+    color: var(--ink-2, var(--ink2));
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -435,32 +453,38 @@
 
   @media (hover: hover) and (pointer: fine) {
     .sheet-close:hover {
-      background: var(--hold-wash);
+      background: var(--hover, var(--hold-wash));
       color: var(--ink);
     }
   }
 
-  /* `min-block-size: 0` so a sheet capped at 88dvh scrolls its body instead of growing past the cap:
-     a flex item will not shrink below its content without it. Twenty in from each edge, a tile's padding. */
+  /* SIXTEEN IN FROM EVERY EDGE, so a focused field's ring (2px at a 2px offset) stays inside the sheet.
+     `min-block-size: 0` so a sheet capped at 88dvh scrolls its body instead of growing past the cap: a flex item will
+     not shrink below its content without it. */
   .sheet-body {
     flex: 1 1 auto;
     min-block-size: 0;
-    padding: var(--sp-2) calc(var(--sp-4) + var(--sp-1)) calc(var(--sp-4) + var(--sp-1));
+    padding: var(--sp-4);
     overflow-y: auto;
     overscroll-behavior: contain;
   }
 
   /* WRAPPING, because a footer can carry a sentence as well as buttons: the reason a control is
      disabled belongs beside it, and squeezed into a flex row it became three lines in a 12ch
-     column. A footer with only buttons in it wraps to exactly the row it was. */
+     column. At the end edge, the primary last. */
   .sheet-foot {
     flex: none;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: var(--sp-2);
-    padding: var(--sp-3) calc(var(--sp-4) + var(--sp-1));
-    border-block-start: 1px solid var(--line);
+    padding: var(--sp-3) var(--sp-4);
+    border-block-start: 1px solid var(--rule, var(--line));
+  }
+
+  .sheet-foot > :global(.btn[data-weight='primary']) {
+    order: 1;
   }
 
   /**
@@ -523,22 +547,24 @@
       --sheet-off: translateY(calc(100% + var(--kb)));
     }
 
-    /* A 24px strip across the top, so a thumb finds it, holding a short pill a person reads as
-       "this pulls". `touch-action: none` keeps the pull from scrolling the page underneath. */
+    /* THE HANDLE: a 36 by 4 bar in the rule's strong ink, 8 from the sheet's top, in a 20px strip a thumb finds.
+       `touch-action: none` keeps the pull from scrolling the page underneath. */
     .sheet-grab {
       display: grid;
-      place-items: center;
+      place-items: start center;
       flex: none;
-      block-size: var(--sp-5);
+      box-sizing: border-box;
+      block-size: 20px;
+      padding-block-start: var(--sp-2);
       touch-action: none;
       cursor: grab;
     }
 
     .sheet-grab-bar {
-      inline-size: var(--sp-6);
+      inline-size: 36px;
       block-size: var(--sp-1);
-      background: var(--line);
-      border-radius: var(--r-pill);
+      background: var(--rule-strong, var(--edge));
+      border-radius: 2px;
     }
 
     /* The handle's strip is the head's top padding on a phone, so it is not paid twice. The head
@@ -548,26 +574,74 @@
       touch-action: none;
     }
 
-    /* THE FOOTER'S BUTTONS SHARE ITS WIDTH ON A PHONE, so the one primary is a full-width target
-       under a thumb, and two buttons are two halves of one row. A sentence beside them keeps its
-       own width and wraps above them. */
+    /* THE FOOT'S BUTTONS ARE EQUAL COLUMNS ON A PHONE, 44 tall and 8 apart, so the one primary is a wide target under
+       a thumb and two buttons are two halves of one row. A sentence beside them takes its own line above them. */
     .sheet-foot > :global(.btn) {
-      flex: 1 1 auto;
+      flex: 1 1 0;
+      min-block-size: var(--tap);
     }
+
+    .sheet-foot > :global(:not(.btn)) {
+      flex: 1 1 100%;
+    }
+  }
+
+  /* A MENU'S SHEET (`kind="menu"`): a bottom sheet at every width, 560 wide at most and centred on the bottom edge,
+     with the handle and no title row. Its body is 8 in and its rows carry their own 12, so a row's fill reaches near
+     the sheet's edge. */
+  .sheet[data-kind='menu'] {
+    --sheet-off: translateY(calc(100% + var(--kb)));
+
+    inset-block: auto var(--kb);
+    inset-inline: 0;
+    inline-size: min(100%, 560px);
+    block-size: auto;
+    max-block-size: calc(88dvh - var(--kb));
+    margin-inline: auto;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    padding-block-end: max(0px, calc(env(safe-area-inset-bottom) - var(--kb)));
+  }
+
+  :global([dir='rtl']) .sheet[data-kind='menu'] {
+    --sheet-off: translateY(calc(100% + var(--kb)));
+  }
+
+  .sheet[data-kind='menu'] .sheet-grab {
+    display: grid;
+    place-items: start center;
+    flex: none;
+    box-sizing: border-box;
+    block-size: 20px;
+    padding-block-start: var(--sp-2);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .sheet[data-kind='menu'] .sheet-grab-bar {
+    inline-size: 36px;
+    block-size: var(--sp-1);
+    background: var(--rule-strong, var(--edge));
+    border-radius: 2px;
+  }
+
+  .sheet[data-kind='menu'] .sheet-body {
+    padding: 0 var(--sp-2) var(--sp-2);
   }
 
   /* A FADE IN PLACE OF EVERY MOVE: the drawer and the phone sheet fade where they stand. The a11y
      layer shortens the duration; this takes the move away. */
   @media (prefers-reduced-motion: reduce) {
     .sheet,
-    :global([dir='rtl']) .sheet {
+    :global([dir='rtl']) .sheet,
+    .sheet[data-kind='menu'] {
       --sheet-off: none;
       --sheet-from-opacity: 0.6;
       --sheet-gone-opacity: 0;
     }
   }
 
-  /* UNDER FORCED COLOURS the shadow is gone, so the sheet's edge is a border. */
+  /* UNDER FORCED COLOURS the scrim may not show, so the sheet's edge is a border. */
   @media (forced-colors: active) {
     .sheet {
       border: 1px solid CanvasText;
