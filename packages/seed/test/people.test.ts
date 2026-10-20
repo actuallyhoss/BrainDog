@@ -319,14 +319,15 @@ test('A PERSON\'S PAGE SAYS THEIR ORGANISATION AND WHERE THEY WERE SEEN, NEVER A
   const held = relation(['people', 'organisations', 'things', 'transactions']);
   assert.deepEqual(held.blocks.map((b) => b.source).filter((s) => s === 'register.things' || s === 'register.transactions'), ['register.things', 'register.transactions']);
 
-  /* THE PEOPLE PAGE LISTS EVERYONE AS LINES, SINCE BATCH 6: the name, what they are, who they are with and the day they last
-     spoke, one line each, where each was a little form of labelled facts grouped by organisation. */
+  /* THE PEOPLE PAGE LISTS EVERYONE AS LINES, SINCE BATCH 6: the name, what they are and the day they last spoke, one line
+     each, where each was a little form of labelled facts grouped by organisation. Who they are with left the line in the
+     UI pass of 20 October (money F13), since on a phone it took the place of the day they last spoke. */
   const everyone = (PAGES.people!.blocks as { kind?: string; heading?: string; group?: string; columns?: { field: string }[] }[]).find((b) => b.heading === 'Everyone');
   assert.equal(everyone?.kind, 'table');
   assert.equal(everyone?.group, undefined);
-  assert.deepEqual(everyone?.columns?.map((c) => c.field), ['name', 'role', 'org', 'in_touch']);
+  assert.deepEqual(everyone?.columns?.map((c) => c.field), ['name', 'role', 'in_touch']);
 
-  /* THE PEOPLE PAGE LISTS THE ORGANISATIONS UNDER EVERYONE. */
+  /* THE PEOPLE PAGE LISTS THE ORGANISATIONS BESIDE EVERYONE. */
   const list = opened(k, 'people').blocks.find((b) => b.heading === 'Organisations');
   assert.ok(list && list.drawn !== false);
   assert.equal(list.rows.length, ORGANISATIONS.length);

@@ -578,16 +578,21 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         kind: 'table',
         heading: 'Everyone',
         icon: 'people',
-        span: 12,
+        /* HALF, WITH THE ORGANISATIONS BESIDE IT (the UI pass of 20 October, money F13): two lists a page wide left a
+           third of each row empty at 1512. Half and not two thirds, since a table's floor is half a row (`floorFor`
+           in apps/web), so two thirds and a third drew the organisations under it. On a phone each takes the width. */
+        span: 6,
         source: 'register.people',
         /* NEVER SOMEBODY FOLDED INTO ANOTHER, as the organisations below: a merge leaves one line, not two. */
         where: 'merged_into is empty',
         /* PEOPLE AS LINES, SINCE People 3.5.0: each person one line, their name, what they are, who they are with and
            when you last spoke, where each was a little form of labelled facts. */
+        /* NAME, ROLE AND WHEN YOU LAST SPOKE, and not who they are with (money F13): a phone's line holds two values
+           after the name, and "With" took the place of Last spoke there, so the one fact a person scans People for was
+           dropped on a phone. Who they are with is on their own page, first line. */
         columns: [
           { field: 'name', label: 'Name', width: 'minmax(14ch,2fr)' },
           { field: 'role', label: 'Role', width: '12ch' },
-          { field: 'org', label: 'With', width: 'minmax(14ch,2fr)' },
           { field: 'in_touch', label: 'Last spoke', width: '14ch', align: 'end' },
         ],
         order: [
@@ -604,14 +609,15 @@ export const PEOPLE_PAGES: Record<string, SeedPage> = {
         kind: 'table',
         heading: 'Organisations',
         icon: 'building',
-        span: 12,
+        span: 6,
         source: 'register.organisations',
         where: 'merged_into is empty',
         when: { metric: 'organisations-count', gt: 0 },
+        /* THE NAME AND WHAT KIND, in a third of the page: the website, which most shops have none of, is on the
+           organisation's own page. */
         columns: [
           { field: 'name', label: 'Organisation', width: 'minmax(14ch,2fr)' },
-          { field: 'kind', label: 'Kind', width: '12ch' },
-          { field: 'domain', label: 'Website', width: 'minmax(14ch,2fr)' },
+          { field: 'kind', label: 'Kind', width: '10ch' },
         ],
         order: [{ field: 'name', dir: 'asc' }],
       },

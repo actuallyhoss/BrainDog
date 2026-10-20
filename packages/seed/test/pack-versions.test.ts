@@ -1569,7 +1569,7 @@ const DECLARED: Record<string, Version> = {
       register.organisations register.people
       rule.meet-payees rule.meet-sender-organisations rule.meet-senders
     `,
-    declares: '51200b3a57b454df',
+    declares: '081821b86f69e21d',
     history: [
       "`page.people` says how many people may be on the record twice, in one note under its two lead notes, from the built-in figure held-twice and drawn only above nought; a note added, nothing taken away -> 3c1698b71103bfe4",
       "Folded into the unreleased 3.4.0 (people-twice-link-74; integrate 74; commit 63423720, the deployed build, holds 3.3.0): `page.people`'s note of people who may be held twice links the list of everyone in order of name (`/r/people?sort=name`) and says what to look for; no id added or taken away -> 900ff4486ed1626e",
@@ -1581,6 +1581,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.4.0 (services-people-five-parts-101, PGS-C18 and PGS-C24; batch 101; commit 63423720, the deployed build, holds 3.3.0): `metric.people-in-touch-30d` is saved each night into series.people-in-touch-30d; `page.people` gains In touch, the figure with its month as a line, and What agents did, an agents block over the log narrowed to people or organisations, and its line no longer says how many were in touch; `page.activity` declares filters on who, kind and list; two blocks and a save added, nothing taken away, no id added or taken away -> 07e8a5aa097e7ca8",
       "Inside the unreleased 3.4.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 3.3.0): `page.people` says its place on the rail, `nav.place` 50, lowest first; no id added or taken away -> fc96cb39590d3016",
       "Inside the unreleased 3.4.0 (batch 6, the look of People): `page.people` draws Everyone and Organisations as lines (a table) and not as little forms of labelled facts, and drops the In touch tile, whose figure and its night's save stay declared; no id added or taken away -> 51200b3a57b454df",
+      "Inside the unreleased 3.4.0 (the UI pass of 20 October, money F13): `page.people` draws Everyone and Organisations side by side at span 6 each, Everyone's columns are name, role and Last spoke (With is on the person's page) and Organisations' are name and kind (Website is on the organisation's page); no id added or taken away -> 081821b86f69e21d",
     ],
   },
   /* A PROJECT OTHERS POINT AT STAYS, AND WHERE IT STANDS IS SAID (batch 46, REC-C08 and REC-C16). 1.15.0 IS RELEASED. */
