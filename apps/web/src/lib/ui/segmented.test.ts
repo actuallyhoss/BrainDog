@@ -19,6 +19,7 @@ type Kit = {
   thumbOf: (chosen: Box | null, trackWidth: number, rtl?: boolean) => Thumb | null;
   wraps: (tops: readonly number[]) => boolean;
   slides: (move: { had: boolean; changed: boolean; wrapped: boolean; reduced: boolean }) => boolean;
+  scrolls: (segments: number, needs: number, room: number) => boolean;
 };
 
 const FILE = process.env.SEGMENTED_SRC ?? join(dirname(fileURLToPath(import.meta.url)), 'Segmented.svelte');
@@ -26,7 +27,7 @@ const SOURCE = readFileSync(FILE, 'utf8');
 const cut = /thumb:start[^\n]*\n([\s\S]*?)\n[^\n]*thumb:end/.exec(SOURCE);
 assert.ok(cut, 'Segmented.svelte keeps its thumb marks');
 const js = stripTypeScriptTypes(cut[1]!).replace(/^(\s*)export /gm, '$1');
-const { thumbOf, wraps, slides } = new Function(`${js}\nreturn { thumbOf, wraps, slides };`)() as Kit;
+const { thumbOf, wraps, slides, scrolls } = new Function(`${js}\nreturn { thumbOf, wraps, slides, scrolls };`)() as Kit;
 
 /** Table, Board, Cards in a 240 track with 2 of padding and a gap of 2: the second is chosen. */
 const BOARD: Box = { left: 72, top: 2, width: 76, height: 28 };
@@ -76,6 +77,13 @@ test('the first placing is not a move, and neither is the same choice at a new s
   assert.equal(slides({ had: true, changed: false, wrapped: false, reduced: false }), false);
 });
 
+test('a full track on a phone shares its width while its words fit, and scrolls when they do not or past four', () => {
+  assert.equal(scrolls(3, 300, 358), false);
+  assert.equal(scrolls(4, 358, 358), false);
+  assert.equal(scrolls(3, 400, 358), true, 'a cut label shares instead of scrolling');
+  assert.equal(scrolls(5, 200, 358), true, 'five segments squeezed into one row');
+});
+
 /**
  * A TRACK WHERE MORE THAN ONE CAN BE CHOSEN (`many`) HAS NO THUMB. One thumb under the first chosen segment slid
  * across to a second that already looked chosen when the first was switched off, a move that did not happen. A `many`
@@ -94,6 +102,12 @@ const RULES = [...SHEET.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map((m) => ({ select
 test('many is a prop of the part, and off unless it is asked for', () => {
   assert.match(PART, /\bmany = false,/u, 'the part takes no `many`, or it is on by default');
   assert.match(PART, /\bmany\?: boolean;/u);
+});
+
+test('full is a prop of the part, off unless asked for, and marks the track', () => {
+  assert.match(PART, /\bfull = false,/u);
+  assert.match(TRACK, /data-full=\{full \? '' : undefined\}/u);
+  assert.match(TRACK, /data-scroll=\{full && scroll \? '' : undefined\}/u);
 });
 
 test('a track given many is marked, and measures and draws no thumb', () => {

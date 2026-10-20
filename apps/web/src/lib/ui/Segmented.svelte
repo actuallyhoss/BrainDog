@@ -20,6 +20,13 @@
   IT JUMPS, TOO, when the track has wrapped to two lines (a diagonal slide says nothing) and under reduced motion.
   Before the first measure, and with no script at all, the chosen segment is filled the way it always was.
 
+  ITS HEIGHT IS HELD BEFORE ITS LABELS LAND (the UI pass of 20 October, 2.A.9, motion F2.4): the track is 36 tall at
+  least, 48 under a thumb or on a phone, so a segment whose count arrives a beat late does not push the page down.
+
+  `full` IS A PAGE'S OWN CONTROL ON A PHONE: below 640px the track is the page's width and its segments share it
+  equally, each at 15 with an ellipsis. When a label would be cut, or there are more than four, it scrolls instead, on
+  its own row, with 16 of room at its end and the last 24px fading out, so a strip that runs on looks like one.
+
   `many` IS A TRACK WHERE MORE THAN ONE CAN BE CHOSEN (toggles pressed in and out). One thumb cannot sit under two
   segments, and a thumb under the first slid across to a second that already looked chosen when the first was switched
   off. So a `many` track draws no thumb and measures nothing: every chosen segment keeps its own flat fill.
@@ -53,6 +60,13 @@
   export function slides(move: { had: boolean; changed: boolean; wrapped: boolean; reduced: boolean }): boolean {
     return move.had && move.changed && !move.wrapped && !move.reduced;
   }
+  /**
+   * Whether a full-width track on a phone scrolls rather than shares: more than four segments, or segments whose words
+   * need more room than the track has (their natural widths, which `scrollWidth` reads even while a segment is cut).
+   */
+  export function scrolls(segments: number, needs: number, room: number): boolean {
+    return segments > 4 || needs > room + 1;
+  }
   /* thumb:end */
 </script>
 
@@ -63,6 +77,7 @@
   let {
     tag = 'div',
     many = false,
+    full = false,
     class: cls = '',
     children,
     ...rest
@@ -72,6 +87,8 @@
     tag?: 'div' | 'nav' | 'ol';
     /** More than one segment can be chosen at once: no thumb is drawn, and each chosen segment fills itself. */
     many?: boolean;
+    /** A page's own control: the page's width on a phone, its segments sharing it, scrolling when they do not fit. */
+    full?: boolean;
     class?: string;
     children: Snippet;
   } = $props();
@@ -79,6 +96,8 @@
   let track = $state<HTMLElement | null>(null);
   let thumb = $state<Thumb | null>(null);
   let slide = $state(false);
+  let scroll = $state(false);
+
 
   $effect(() => {
     const el = track;
@@ -143,6 +162,37 @@
       marks.disconnect();
     };
   });
+
+  /* A FULL TRACK ON A PHONE: whether it shares its width or scrolls, measured again whenever it or a segment changes
+     size. Only below 640px, where `full` draws anything. */
+  $effect(() => {
+    const el = track;
+    if (!el || !full || typeof ResizeObserver !== 'function') {
+      scroll = false;
+      return;
+    }
+    const phone = matchMedia('(width < 640px)');
+    const measure = () => {
+      if (!phone.matches) {
+        scroll = false;
+        return;
+      }
+      const segments = Array.from(el.children).filter((c): c is HTMLElement => c instanceof HTMLElement);
+      const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+      const needs = segments.reduce((sum, s) => sum + s.scrollWidth, 0) + gap * Math.max(0, segments.length - 1);
+      const pad = parseFloat(getComputedStyle(el).paddingInlineStart) * 2 || 0;
+      scroll = scrolls(segments.length, needs, el.clientWidth - pad);
+    };
+    const sizes = new ResizeObserver(measure);
+    sizes.observe(el);
+    for (const child of el.children) sizes.observe(child);
+    phone.addEventListener('change', measure);
+    measure();
+    return () => {
+      sizes.disconnect();
+      phone.removeEventListener('change', measure);
+    };
+  });
 </script>
 
 <svelte:element
@@ -152,6 +202,8 @@
   class={['segmented', cls]}
   data-slides=""
   data-many={many ? '' : undefined}
+  data-full={full ? '' : undefined}
+  data-scroll={full && scroll ? '' : undefined}
   data-thumb={thumb ? (slide ? 'slide' : 'jump') : undefined}
   style:--x={thumb ? `${thumb.x}px` : undefined}
   style:--y={thumb ? `${thumb.y}px` : undefined}
@@ -160,3 +212,57 @@
 >
   {@render children()}
 </svelte:element>
+
+<style>
+  /* THE HEIGHT, HELD: a 32px segment and the track's 2 round it, and 44 under a thumb or on a phone. */
+  .segmented {
+    min-block-size: 36px;
+  }
+
+  @media (width < 640px), (pointer: coarse) {
+    .segmented {
+      min-block-size: 48px;
+    }
+  }
+
+  /* A PAGE'S OWN CONTROL ON A PHONE: the page's width, the segments sharing it, each at 15 with an ellipsis. */
+  @media (width < 640px) {
+    .segmented[data-full] {
+      box-sizing: border-box;
+      inline-size: 100%;
+      flex-wrap: nowrap;
+    }
+
+    .segmented[data-full] > :global(.segment) {
+      flex: 1 1 0;
+      min-inline-size: 0;
+      overflow: hidden;
+      font-size: var(--fs-body);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* AND WHEN THEY DO NOT FIT, IT SCROLLS: each segment its own width, 16 of room at the end, the last 24px fading out
+       so a strip that runs on looks like one. */
+    .segmented[data-full][data-scroll] {
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      padding-inline-end: var(--sp-4);
+      mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
+    }
+
+    .segmented[data-full][data-scroll]::-webkit-scrollbar {
+      display: none;
+    }
+
+    .segmented[data-full][data-scroll] > :global(.segment) {
+      flex: none;
+      overflow: visible;
+    }
+
+    :global([dir='rtl']) .segmented[data-full][data-scroll] {
+      mask-image: linear-gradient(to left, var(--ink) calc(100% - 24px), transparent);
+    }
+  }
+</style>
