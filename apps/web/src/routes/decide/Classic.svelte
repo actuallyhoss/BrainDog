@@ -53,7 +53,7 @@
   import { mayAnswer, whyNotAnswering } from './answering.ts';
   import { dayWord, readViews, WORDS, type Views } from './views.ts';
   import { groupedAddress, groupingOf, type Grouping } from './grouping.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { keepDecided, olderDecisions, plainOf, readQueue, type Queue } from '$lib/record/governance.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
@@ -97,7 +97,7 @@
   async function readLive() {
     const at = opened();
     client ??= createClient({ base: apiBase() });
-    const [out, more] = await Promise.all([readQueue(client), readViews(client, Date.now())]);
+    const [out, more] = await Promise.all([readQueue(client), readViews(client, recordNow())]);
     /* A RE-READ AFTER A CONFLICT KEEPS THE OLDER DECISIONS ALREADY ASKED FOR, which a fresh read answers without. */
     if (out.from === 'live') live = keepDecided(live, out.value);
     if (out.from === 'refused') refusal = out.fix;
@@ -141,7 +141,7 @@
 
   /* THE CLOCK A BAND IS READ AGAINST, taken when the read answers. Nothing reads it before then: the
      queue, the ledger and every press are drawn only once `from` is `live`. */
-  const now = $derived(from === 'live' ? Date.now() : 0);
+  const now = $derived(from === 'live' ? recordNow() : 0);
 
   /**
    * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN NEVER ASKED.

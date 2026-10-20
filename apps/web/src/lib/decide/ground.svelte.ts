@@ -9,6 +9,7 @@ import { page } from '$app/state';
 import { apiBase } from '../at.ts';
 import { keep, keptAnswer } from '../data/kept.ts';
 import { live } from '../data/live.svelte.ts';
+import { recordNow } from '../record/boot-live.ts';
 import { groundOf, monthKey, refOf, rowOf, type Ground, type GroundRead, type GroundRow } from './ground.ts';
 
 type Asked = { id: string; about: string; list: string | null };
@@ -97,7 +98,7 @@ async function flush(): Promise<void> {
   const registers = (page.data as { registers?: { id: string; name: string }[] }).registers ?? [];
   const next = new Map(known);
   for (const b of batch) {
-    const g = groundOf(b.about, read, Date.now(), registers.find((r) => r.id === b.list)?.name ?? null);
+    const g = groundOf(b.about, read, recordNow(), registers.find((r) => r.id === b.list)?.name ?? null);
     if (g) next.set(b.id, g);
   }
   known = next;

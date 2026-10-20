@@ -62,7 +62,7 @@
   import type { QueueQuestion } from '@braindog/kernel';
   import { apiBase, at } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
   import { answerQuestion } from '$lib/record/decide-write.ts';
   import { may as mayOf } from '$lib/record/may.ts';
@@ -157,7 +157,7 @@
   /* AN OPTION THAT IS A PICTURE (his D28.33, "each option shown as what it is") carries its address from `cardOf`, which
      reads the options once with the page's way to a file (`waysOf` keeps an address of another host off the card).
      Before `inlineOf`, so answers that are pictures are the form's choices and not a row of bare buttons. */
-  const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: Date.now(), lead, file: fileAt }));
+  const card = $derived(cardOf(question, { me: me?.person ?? null, names, now: recordNow(), lead, file: fileAt }));
   const from = $derived([card.by.app, card.by.run].filter((s): s is string => s !== null));
   /* THE ANSWERS AS A ROW OF BUTTONS, one press each (`inlineOf`), or the form's list to choose from and Decide. */
   const inline = $derived(inlineOf(card, compact));
@@ -233,7 +233,8 @@
   const askedLine = $derived.by(() => {
     if (!row) return '';
     const at = new Date(question.at);
-    const day = Number.isFinite(at.getTime()) ? at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+    /* THREE LETTERS FOR THE MONTH, as every other date reads ("3 Sep"); `en-GB`'s own short month says "Sept". */
+    const day = Number.isFinite(at.getTime()) ? `${at.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][at.getMonth()]}` : '';
     const rule = card.by.kind === 'rule' ? card.by.name.replace(/^A rule: /u, '') : null;
     const who = rule !== null ? cardWords.byRule(rule.charAt(0).toUpperCase() + rule.slice(1)) : card.by.kind === 'you' ? cardWords.byYou : cardWords.by(card.by.name);
     return day ? `${who}, ${day}` : who;
@@ -246,7 +247,7 @@
   const line = $derived.by(() => {
     if (chosen === null) return '';
     if (mergeLine) return mergeLine;
-    if (card.slash) return answeredLine(card, chosen, person, since(answeredAt || new Date().toISOString(), Date.now()));
+    if (card.slash) return answeredLine(card, chosen, person, since(answeredAt || new Date(recordNow()).toISOString(), recordNow()));
     return outcomeOf(chosen.label, row ? { title: row.title, amount: row.amount } : { title: card.question });
   });
 
@@ -540,7 +541,7 @@
     <span class="queue-label dc-choice-name" dir="auto">{way.label}</span>
     {#if way.because}<span class="dc-choice-does" dir="auto">{way.because}</span>{/if}
     <!-- WHAT IT WOULD CHANGE, drawn small; an option with a swatch, figure or picture of its own keeps that. -->
-    {#if !way.shows}<OptionVisual visual={optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...grounded, now: Date.now(), home: grounded?.home ?? null })} />{/if}
+    {#if !way.shows}<OptionVisual visual={optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...grounded, now: recordNow(), home: grounded?.home ?? null })} />{/if}
   </span>
 {/snippet}
 
