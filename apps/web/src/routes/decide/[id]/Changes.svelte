@@ -56,8 +56,10 @@
   const moreWhy = $derived(firstWhy < 0 ? 0 : updates.filter((u) => u.why !== undefined).length - 1);
 
   /** One side of a move, as its chip: the project it names, or `null` for everywhere. */
-  const sideOf = (to: string, said: string | null): Scope | null =>
-    said === null ? null : (placeNamed(places[to] ?? null, said) ?? { spoken: said, name: scopeWords.someProject, mark: null, hue: null });
+  const sideOf = (to: string, said: string | null, named: string | null = null): Scope | null =>
+    said === null
+      ? null
+      : (placeNamed(places[to] ?? null, said) ?? { spoken: said, name: named !== null && named !== said ? named : scopeWords.someProject, mark: null, hue: null });
 </script>
 
 <ul class="changes">
@@ -100,10 +102,16 @@
           <p class="change-line">
             <span class="change-label">{c.label}</span>
             <span class="plain">
-              <del class="was was-chip"><span class="vh">{words.before}: </span><ScopeChip scope={sideOf(c.scope.to, c.scope.before)} /></del>
+              <del class="was was-chip"><span class="vh">{words.before}: </span><ScopeChip scope={sideOf(c.scope.to, c.scope.before, c.scope.said?.before)} /></del>
               <span class="move-to" aria-hidden="true">→</span>
-              <ins class="now"><span class="vh">{words.after}: </span><ScopeChip scope={sideOf(c.scope.to, c.scope.after)} /></ins>
+              <ins class="now"><span class="vh">{words.after}: </span><ScopeChip scope={sideOf(c.scope.to, c.scope.after, c.scope.said?.after)} /></ins>
             </span>
+          </p>
+        {:else if u.added}
+          <!-- A NEW ROW HAS NO BEFORE: each field is what it would hold, with nothing struck through. -->
+          <p class="change-line">
+            <span class="change-label">{c.label}</span>
+            <span class="plain"><span class="now">{c.after ?? words.empty}</span></span>
           </p>
         {:else}
           <p class="change-line">

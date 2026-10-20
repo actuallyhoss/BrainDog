@@ -56,7 +56,7 @@
     type TicksContext,
   } from './arranged.ts';
   import { proposedOf } from './proposed.ts';
-  import { updatesOf, words as changeWords } from './changes.ts';
+  import { createsOf, updatesOf, words as changeWords } from './changes.ts';
   import { joinedCount, pickableOf, rowsToSend, words as pickWords } from './picked.ts';
   import { answerFor, type Answer } from '$lib/record/answer.ts';
   import { COMMENT_MOST, sayComment } from '$lib/record/comments.ts';
@@ -267,7 +267,7 @@
 
   /* A `rowset` that updates rows: each changed field, as a diff for prose and before and after for the rest. A merge's
      patches are the card's names, and drawn as a diff they were the record's handles and a deleted day. */
-  const updates = $derived(question && live && !merge ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers)) : []);
+  const updates = $derived(question && live && !merge ? updatesOf(live.rowset, live.registers, live.rows, plainOf(live.registers, live.names)) : []);
 
   /* A QUESTION THAT GATHERED SEVERAL, each arrival joining the one already open (`kernel/ingest.ts` `openRowset`), says
      how many it holds beside its title, so a reader never accepts twelve having read one. */
@@ -788,12 +788,14 @@
   const costed = $derived(question !== undefined && !settled && !(from === 'live' && live?.closed));
   /** The rows to tick, while there is still a decision for them to be part of. */
   const picking = $derived(pickable.length > 0 && costed);
+  /* A NEW ROW, OR ROWS THE TICKS DO NOT DRAW, field by field: what accepting adds is read before the press (`createsOf`). */
+  const creates = $derived(question && live && !merge && pickable.length === 0 && costed ? createsOf(live.rowset, live.registers, plainOf(live.registers, live.names)) : []);
   /** What accepting would call out, while it can still be approved. */
   const calling = $derived(from === 'live' && live !== null && live.calls.length > 0 && costed);
   /* WHAT ACCEPTING DOES HAS SOMETHING TO SAY: an arrangement, what a proposal puts in place, the rows to tick, the rows
      it changes, what it calls out, or what deciding late costs. A question of options alone has none of these. */
   const doesAny = $derived(
-    Boolean((story && !settled) || (preview && !settled) || picking || updates.length || calling || (costed && question?.cost)),
+    Boolean((story && !settled) || (preview && !settled) || picking || creates.length || updates.length || calling || (costed && question?.cost)),
   );
 
   /**
@@ -1230,6 +1232,13 @@
                         {/each}
                       </ul>
                       {#if picked}<p class="pick-hint" role="status">{pickWords.some(picked.length, pickable.length)}</p>{/if}
+                    </section>
+                  {/if}
+
+                  {#if creates.length}
+                    <section class="changed">
+                      <h3 class="does-h">{pickWords.heading}</h3>
+                      <Changes updates={creates} />
                     </section>
                   {/if}
 

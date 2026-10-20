@@ -17,6 +17,7 @@ import { money } from 'braindog-render';
    inside the kernel's page source would never reach this screen, and two rankings of one queue that
    disagreed would be worse than no ranking at all. */
 import { COSTS, costOf, costRank, optionCost } from '@braindog/kernel';
+import { nameSpokenIn } from '@braindog/kernel/spoken-names';
 
 import { copy } from '../copy.ts';
 import { citedWords, figuresIn } from '../cite.ts';
@@ -66,8 +67,11 @@ export type Decl = {
 /** A row a proposal would update, as `get` answers it. */
 export type Held = { id?: string; register?: string; seq: number | null; version: number; fields: Record<string, unknown> };
 
-/** What a diff is drawn from: each named register's declaration and the rows it would change. */
-export type Rows = { registers: Record<string, Decl>; rows: Record<string, Held[]> };
+/**
+ * What a diff is drawn from: each named register's declaration, the rows it would change, and `names`, what each row a
+ * ref in it points at is called (`refNames`), so a diff says "Prism" and never `01M3MV…` or `things#23`.
+ */
+export type Rows = { registers: Record<string, Decl>; rows: Record<string, Held[]>; names?: Record<string, string> };
 
 /** What an open suggestion is, as filed: its kind, its body as the record holds it, and who filed it. The queue groups by
     `by`, and a `change` or a `pattern` is previewed from `body` (`routes/decide/[id]/proposed.ts`). `merge` is the group a
@@ -345,16 +349,83 @@ export function rowsetOf(row: Row): RowsetBody | undefined {
  * said the role was changing from "client" to "registrar" over a row that reads Work contact and a form that
  * offers Agency.
  */
-export function plainOf(registers: Readonly<Record<string, Decl>>) {
+export function plainOf(registers: Readonly<Record<string, Decl>>, names: Readonly<Record<string, string>> = {}) {
+  const said = (ref: string): string => names[ref] ?? (ROW_ID.test(ref) ? SOME_ROW : nameSpokenIn(ref, (s) => names[s] ?? null));
   return (register: string, field: string, value: unknown): string | null => {
     if (value === null || value === undefined || value === '') return null;
     const f = registers[register]?.fields.find((x) => x.id === field);
     const type = f?.type;
     if (type === 'bool') return value ? 'yes' : 'no';
     if (type === 'enum') return f?.labels?.[String(value)] ?? String(value).replace(/_/g, ' ');
+    /* A REF IS SAID BY THE ROW'S NAME, one or a list of them, and an id nothing here can name is "a row", never the id. */
+    if (type === 'ref' && typeof value === 'string') return said(value);
+    if (Array.isArray(value)) {
+      const parts = value.filter((v) => v !== null && v !== undefined && v !== '').map((v) => (typeof v === 'string' ? (f?.of === 'ref' ? said(v) : v) : JSON.stringify(v)));
+      return parts.length === 0 ? null : parts.join(', ');
+    }
     if (isRow(value)) return typeof value.amount === 'number' && typeof value.currency === 'string' ? money(value.amount, value.currency) : JSON.stringify(value);
-    return String(value);
+    return nameSpokenIn(String(value), (s) => names[s] ?? null);
   };
+}
+
+/** A row a ref names that nothing here can name: said as that, never by its id. */
+const SOME_ROW = 'A row you cannot open';
+
+/** A row's internal id, as a ref holds it. */
+const ROW_ID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
+/** A spoken id inside a sentence, as `nameSpokenIn` reads one. */
+const SPOKEN = /(?<![\w#/.-])(?:[a-z][a-z0-9_]{0,31}#[1-9]\d{0,14}|S[1-9]\d{0,14})(?![\w#-])/gu;
+/** How many rows one question's refs are read for at most: a question naming more says the rest as "a row". */
+const NAMES_MOST = 40;
+
+/**
+ * THE REFS A ROWSET NAMES, each a row id or a spoken id: the ref fields of what it would write, and of the rows as they
+ * are, and the spoken ids written into its text. Read by field type alone, in the order met, each once.
+ */
+export function refsOf(bodies: readonly RowsetBody[], registers: Readonly<Record<string, Decl>>, held: Readonly<Record<string, readonly Held[]>> = {}): string[] {
+  const out = new Set<string>();
+  const take = (decl: Decl | undefined, fields: Record<string, unknown>): void => {
+    for (const [id, v] of Object.entries(fields)) {
+      const f = decl?.fields.find((x) => x.id === id);
+      const refs = f?.type === 'ref' ? [v] : f?.type === 'list' && f.of === 'ref' && Array.isArray(v) ? v : [];
+      for (const r of refs) if (typeof r === 'string' && r !== '') out.add(r);
+      if (typeof v === 'string' && (f === undefined || f.type === 'text')) for (const m of v.matchAll(SPOKEN)) out.add(m[0]);
+    }
+  };
+  for (const body of bodies)
+    for (const r of body.rows) {
+      const list = listOf(body, r);
+      const decl = registers[list];
+      if (typeof r.at === 'string') {
+        if (isRow(r.patch)) take(decl, r.patch);
+        const seq = Number(/(\d+)$/u.exec(r.at)?.[1]);
+        const was = (held[list] ?? []).find((e) => e.id === r.at || e.seq === seq);
+        if (was) take(decl, was.fields);
+      } else take(decl, r);
+    }
+  return [...out];
+}
+
+/** What each ref is called: the title of the row it names, in its own list's words; one the record will not give is left out. */
+async function refNames(client: Governor, refs: readonly string[], registers: Record<string, Decl>, read: ReadonlyMap<string, Held | null>): Promise<Record<string, string>> {
+  const names: Record<string, string> = {};
+  for (const ref of refs.slice(0, NAMES_MOST)) {
+    let row = read.get(ref);
+    if (row === undefined) {
+      const got = await client.call('get', { spoken: ref });
+      row = got.ok && isHeld(got.value) ? got.value : null;
+    }
+    if (row === null || typeof row.register !== 'string') continue;
+    const list = row.register;
+    if (!(list in registers)) {
+      const decl = await client.schema(list);
+      if (decl.ok && isDecl(decl.value)) registers[list] = relabel({ ...decl.value, id: list }, labels());
+    }
+    const key = registers[list]?.title;
+    const title = key === undefined ? undefined : row.fields[key];
+    if (typeof title === 'string' && title.trim() !== '') names[ref] = title.replace(/\s+/gu, ' ').trim();
+  }
+  return names;
 }
 
 const isDecl = (v: unknown): v is Decl => isRow(v) && Array.isArray(v.fields);
@@ -379,9 +450,11 @@ const isHeld = (v: unknown): v is Held =>
  * A ROW MAY NAME ITS OWN LIST (`register`), when a fold moves a link another list holds: that row is read, and its
  * declaration asked, in the list it names, and every other row in the question's.
  */
-export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): Promise<Rows> {
+export async function heldBy(client: Governor, bodies: readonly RowsetBody[], opts: { names?: boolean } = {}): Promise<Rows> {
   const registers: Record<string, Decl> = {};
   const rows: Record<string, Held[]> = {};
+  /* EVERY ROW A REF WAS READ FOR, so naming the refs (`refNames`) never asks for one a second time. */
+  const read = new Map<string, Held | null>();
   for (const body of bodies) {
     if (!(body.register in registers)) {
       const decl = await client.schema(body.register);
@@ -412,12 +485,17 @@ export async function heldBy(client: Governor, bodies: readonly RowsetBody[]): P
           if (typeof ref !== 'string' || ref === '' || had.has(ref)) continue;
           const one = await client.call('get', { spoken: ref });
           const row = one.ok && isHeld(one.value) ? one.value : undefined;
+          read.set(ref, row ?? null);
           if (row && (row.register ?? to) === to && !(rows[to] ?? []).some((e) => e.id === row.id && e.seq === row.seq)) (rows[to] ??= []).push(row);
         }
       }
     }
   }
-  return { registers, rows };
+  /* AND WHAT EACH REF IS CALLED, for one question's page (`readOne`): the queue reads every open question, and a get for
+     every ref of each would be the request count the audit of 20 October counted against it. */
+  if (!opts.names) return { registers, rows };
+  const names = await refNames(client, refsOf(bodies, registers, rows), registers, read);
+  return { registers, rows, names };
 }
 
 /**
@@ -459,6 +537,10 @@ const ranked = (open: Question[]): Question[] =>
     .sort((a, b) => costRank(a.band ?? '') - costRank(b.band ?? '') || a.opened.localeCompare(b.opened) || a.id.localeCompare(b.id))
     .map((q, i) => ({ ...q, rank: i + 1 }));
 
+/** What a question was asked as: `boot`'s words for it, else the words the governance row carries, else nothing. */
+export const askedOf = (asked: ReadonlyMap<string, string | undefined>, row: Row): string | undefined =>
+  asked.get(String(row.id))?.trim() || text(row.question).trim() || undefined;
+
 const questionsAsked = (booted: Awaited<ReturnType<Governor['boot']>> | null): Map<string, string | undefined> =>
   new Map((booted?.ok ? (booted.value.waiting ?? []) : []).map((w) => [w.id, w.question]));
 
@@ -479,7 +561,7 @@ export async function readQueue(client: Governor): Promise<Read<Queue>> {
   return {
     from: 'live',
     value: {
-      open: ranked(rows.map((r) => questionOf(r, asked.get(String(r.id)) || text(r.question), 0))),
+      open: ranked(rows.map((r) => questionOf(r, askedOf(asked, r), 0))),
       decided: decided.decided,
       ...(decided.older ? { older: { ...decided.older, total: Math.max(total ?? 0, decided.decided.length) } } : {}),
       rowsets,
@@ -534,14 +616,16 @@ export async function readOne(client: Governor, id: string): Promise<Read<One>> 
     return { from: 'live', value: { question: decisionOf(row, settled), rowset: undefined, registers: {}, rows: {}, closed: true, calls: [], ...keptApplied(row, settled) } };
   }
 
-  const drawn = questionOf(row, questionsAsked(booted).get(id), 1);
+  /* THE WORDS THE QUESTION WAS ASKED IN, from `boot`'s waiting list and else from the row itself. `boot` names only the
+     newest it holds, so an older question's page was drawn with no title over its Accept and Decline. */
+  const drawn = questionOf(row, askedOf(questionsAsked(booted), row), 1);
   if (row.status === 'open') {
     const rowset = rowsetOf(row);
     const calls = callsOutOf(isRow(row.body) ? row.body.egress : undefined);
     const pagesNow = row.body_kind === 'arrange' && isRow(row.body) ? await pagesStanding(client, row.body.pages) : {};
     return {
       from: 'live',
-      value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [])), closed: false, calls, about: aboutOf(row), pagesNow },
+      value: { question: drawn, rowset, ...(await heldBy(client, rowset ? [rowset] : [], { names: true })), closed: false, calls, about: aboutOf(row), pagesNow },
     };
   }
   const by = await linkedRow(client, 'decision', row.decision);

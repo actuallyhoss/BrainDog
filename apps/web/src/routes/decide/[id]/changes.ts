@@ -37,7 +37,7 @@ export const words = {
  * projects are in, and the project each side names, as the proposal and the record hold it, `null` for everywhere.
  * `Changes.svelte` names each one from that list; the ids themselves are never drawn.
  */
-export type Moved = { to: string; before: string | null; after: string | null };
+export type Moved = { to: string; before: string | null; after: string | null; said?: { before: string | null; after: string | null } };
 
 export type Change =
   | { field: string; label: string; long: true; block: Block }
@@ -55,7 +55,7 @@ export type Takes = { said: Take[]; closed: number };
  * `why` IS THE ROW'S OWN REASON, from the question's `why` (a scope question's "used by 3 runs in Kiln."), with the
  * title the record led it with cut, since the title is drawn beside it. A row the question gives no reason has none.
  */
-export type Updated = { at: string; title: string; changes: Change[]; takes?: Takes; why?: string };
+export type Updated = { at: string; title: string; changes: Change[]; takes?: Takes; why?: string; added?: true };
 
 /** In the queue's card only the first row's reason is drawn, and the rest are this count. */
 export const moreReasons = (n: number): string => (n === 1 ? 'and one more reason' : `and ${String(n)} more reasons`);
@@ -221,7 +221,14 @@ export function updatesOf(
       }
       changes.push(
         isScope(f)
-          ? { field, label, long: false, before: null, after: null, scope: { to: f.to, before: placeSaid(before), after: placeSaid(after) } }
+          ? {
+              field,
+              label,
+              long: false,
+              before: null,
+              after: null,
+              scope: { to: f.to, before: placeSaid(before), after: placeSaid(after), said: { before: show(list, field, before), after: show(list, field, after) } },
+            }
           : isLong(f?.type ?? 'text', before, after)
             ? { field, label, long: true, block: diffBlock(text(before), text(after)) }
             : { field, label, long: false, before: dated(show(list, field, before)), after: dated(show(list, field, after)) },
@@ -243,5 +250,52 @@ export function updatesOf(
       ...(reason !== undefined ? { why: reason } : {}),
     });
   }
+  return out;
+}
+
+/** The keys a create row may carry that are the proposal's and not the row's fields. */
+const NOT_FIELDS = new Set(['at', 'patch', 'version', 'register']);
+
+/**
+ * THE ROWS A PROPOSAL WOULD CREATE (`added`), each field it would hold as a line with no before, in the order its list
+ * declares them. "Add Send Jennifer the refund email to Tasks?" showed Accept and Decline over nothing: a create was
+ * left to the ticks (`picked.ts`), which draw only a proposal of two or more. A field with nothing in it, or a retired
+ * one, is not drawn, the title is the row's heading, and a ref is said by the row's name (`show`).
+ */
+export function createsOf(
+  body: { register: string; rows: readonly Record<string, unknown>[] } | undefined,
+  registers: Readonly<Record<string, Decl | undefined>>,
+  show: (register: string, field: string, value: unknown) => string | null,
+): Updated[] {
+  if (!body) return [];
+  const out: Updated[] = [];
+  body.rows.forEach((r, n) => {
+    if (typeof r.at === 'string') return;
+    const list = typeof r.register === 'string' && r.register !== '' ? r.register : body.register;
+    const decl = registers[list];
+    const order = (k: string): number => {
+      const i = decl?.fields.findIndex((f) => f.id === k) ?? -1;
+      return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    const keys = Object.keys(r)
+      .filter((k) => !NOT_FIELDS.has(k) || decl?.fields.some((f) => f.id === k))
+      .sort((a, b) => order(a) - order(b));
+    const changes: Change[] = [];
+    for (const field of keys) {
+      const f = decl?.fields.find((x) => x.id === field);
+      if (f?.retired === true || field === decl?.title) continue;
+      const value = r[field];
+      if (value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) continue;
+      const label = f?.label ?? field.replace(/_/g, ' ').replace(/^./u, (c) => c.toUpperCase());
+      changes.push(
+        isLong(f?.type ?? 'text', null, value)
+          ? { field, label, long: true, block: diffBlock('', text(value)) }
+          : { field, label, long: false, before: null, after: dated(show(list, field, value)) },
+      );
+    }
+    const title = decl?.title ? wordsIn(r[decl.title]) : '';
+    if (changes.length === 0 && title === '') return;
+    out.push({ at: `new:${String(n)}`, title: title === '' ? words.untitled : title, changes, added: true });
+  });
   return out;
 }
