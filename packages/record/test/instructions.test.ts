@@ -42,7 +42,7 @@ async function record() {
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });
   value(await installSeed(api.kernel));
-  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_seed', 'sam@example.com', 'Sam')");
+  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_seed', 'teo@vance-studio.example', 'Teodor')");
   clock.advance(MIN);
   return { api, sql, clock };
 }
@@ -63,7 +63,7 @@ test('ONLY A PERSON TELLS: a token is refused NEEDS_BROWSER_SESSION, and the run
   const told = value<{ id: string; to: string; to_run: string | null; line: string }>(await api.instruct({ said: 'Merge wave 1, then stop', to_run: run }, owner));
   assert.equal(told.to, 'run');
   assert.equal(told.to_run, run);
-  assert.match(told.line, /^Sam said in BrainDog \(IN1\): "Merge wave 1, then stop"\./u);
+  assert.match(told.line, /^Teodor said in BrainDog \(IN1\): "Merge wave 1, then stop"\./u);
 
   const mine = value<{ run: string; pending: { id: string; state: string; line: string }[]; lines: string[]; stamp: string }>(await api.instructionsMine({}, ctx));
   assert.equal(mine.run, run);
@@ -139,7 +139,7 @@ test('HIS THREADS: newest first, who saw each and how, filtered by state and run
   const all = value<{ rows: { id: string; seen: { run: string; how: string }[]; by_name: string }[]; cursor: string | null }>(await api.instructionList({}, owner));
   assert.deepEqual(all.rows.map((r) => r.id), ['IN2', 'IN1']);
   assert.deepEqual(all.rows[1]!.seen.map((s) => [s.run, s.how]), [[run, 'prompt']]);
-  assert.equal(all.rows[0]!.by_name, 'Sam');
+  assert.equal(all.rows[0]!.by_name, 'Teodor');
   const mine = value<{ rows: { id: string }[] }>(await api.instructionList({ run }, owner));
   assert.deepEqual(mine.rows.map((r) => r.id), ['IN1']);
   const paged = value<{ rows: { id: string }[]; cursor: string | null }>(await api.instructionList({ limit: 1 }, owner));
@@ -166,7 +166,7 @@ test('A RUN STARTS SEEING WHAT WAITS: attach marks it seen at start, context lis
   const ctx = agent('c-start');
   const attached = value<{ spoken: string; context: Context }>(await api.attach({ source: 'startup' }, ctx));
   assert.deepEqual(attached.context.told?.map((i) => [i.id, i.seen_how]), [['IN1', 'start']]);
-  assert.match(attached.context.told![0]!.line, /^Sam said in BrainDog \(IN1\): "Check the bounce numbers first"\. Take it with instructions take IN1\.$/u);
+  assert.match(attached.context.told![0]!.line, /^Teodor said in BrainDog \(IN1\): "Check the bounce numbers first"\. Take it with instructions take IN1\.$/u);
 
   const now = value<Context>(await api.context({}, ctx));
   assert.ok(typeof now.stamp === 'string' && now.stamp !== '');

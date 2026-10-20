@@ -10900,7 +10900,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (handKey !== null) {
         if (!token) return no('FORBIDDEN', 'A task in hand is a run’s, so only an agent takes or finishes one. Change the task itself from the app.', { at: handKey });
         const ref = said[handKey];
-        if (typeof ref !== 'string' || ref.trim() === '') return no('VALUE_MALFORMED', `${handKey} names a task by its handle, such as tasks#396.`, { at: handKey });
+        if (typeof ref !== 'string' || ref.trim() === '') return no('VALUE_MALFORMED', `${handKey} names a task by its handle, as get and list say it.`, { at: handKey });
         const row = kernel.get(ref.trim());
         if (row === null || row.register === SESSION || readable(ctx, row.register) !== null || !rowAdmitted(ctx, row.register, row.seq))
           return no('ROW_UNKNOWN', `There is no task you can read called ${ref.trim()}.`, { at: handKey });
@@ -11039,7 +11039,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (wrong) return { ok: false, refusal: wrong };
       for (const key of ['task', 'project', 'since'] as const)
         if (said[key] !== undefined && said[key] !== null && (typeof said[key] !== 'string' || (said[key] as string).trim() === '' || (said[key] as string).length > LINE))
-          return no('VALUE_MALFORMED', key === 'since' ? 'since is the stamp an earlier answer carried.' : `${key} is a name or a handle, such as ${key === 'task' ? 'tasks#396' : 'BrainDog'}.`, { at: key });
+          return no('VALUE_MALFORMED', key === 'since' ? 'since is the stamp an earlier answer carried.' : `${key} is a name or a handle as get and list say it.`, { at: key });
       if (said.depth !== undefined && said.depth !== null && !(CONTEXT_DEPTHS as readonly unknown[]).includes(said.depth))
         return no('ENUM_VALUE_UNKNOWN', `depth is one of ${CONTEXT_DEPTHS.join(', ')}.`, { at: 'depth', allowed: CONTEXT_DEPTHS });
       if (said.format !== undefined && said.format !== null && said.format !== 'full' && said.format !== 'brief')

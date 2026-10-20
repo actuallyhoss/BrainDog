@@ -42,7 +42,7 @@ async function record() {
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });
   value(await installSeed(api.kernel));
-  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_seed', 'sam@example.com', 'Sam')");
+  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_seed', 'teo@vance-studio.example', 'Teodor')");
   clock.advance(MIN);
   return { api, sql, clock };
 }
@@ -65,16 +65,16 @@ test('A STOPPED RUN IS REFUSED EVERY CHANGE IN HIS WORDS, and still answers, han
 
   const no = refusal(await api.create(task('After the stop'), ctx));
   assert.equal(no.code, 'RUN_STOPPED');
-  assert.equal(no.fix, 'Sam stopped this run in BrainDog (IN1): "Stop and wait for me". Reply with instructions, then end.');
+  assert.equal(no.fix, 'Teodor stopped this run in BrainDog (IN1): "Stop and wait for me". Reply with instructions, then end.');
   assert.equal(refusal(await api.propose({ question: 'May I?', body_kind: 'options', body: { options: [{ id: 'y', label: 'Yes', because: 'x' }, { id: 'n', label: 'No', because: 'y' }] } }, ctx)).code, 'RUN_STOPPED');
   /* A READ IS NOT A CHANGE. */
   value(await api.list({ register: 'tasks' }, ctx));
   /* WHAT IT IS ASKED TO DO STILL REACHES THE RECORD. */
   const mine = value<{ stop: { kind: string; id: string } | null; lines: string[] }>(await api.instructionsMine({}, ctx));
   assert.deepEqual(mine.stop && [mine.stop.kind, mine.stop.id], ['stop', 'IN1']);
-  assert.match(mine.lines[0]!, /^Sam stopped this run in BrainDog \(IN1\)/u);
+  assert.match(mine.lines[0]!, /^Teodor stopped this run in BrainDog \(IN1\)/u);
   value(await api.instructionsMine({ reply: 'IN1', said: 'Stopped after the first task.' }, ctx));
-  value(await api.handoff({ next: 'Pick up the second task once Sam resumes' }, ctx));
+  value(await api.handoff({ next: 'Pick up the second task once he resumes' }, ctx));
   const seq = Number(run.slice(1));
   value(await api.log({ register: 'session', seq, note: 'Stopped as asked.' }, ctx));
   value(await api.end({}, ctx));
@@ -90,7 +90,7 @@ test('A PAUSE HOLDS UNTIL A RESUME, and a helper obeys its lead', async () => {
   value(await api.instruct({ said: 'Hold on', kind: 'pause', to_run: run }, owner));
   const held = refusal(await api.create(task('While paused'), lead));
   assert.equal(held.code, 'RUN_PAUSED');
-  assert.match(held.fix, /^Sam paused this run in BrainDog \(IN1\): "Hold on"\. Wait until it is resumed\.$/u);
+  assert.match(held.fix, /^Teodor paused this run in BrainDog \(IN1\): "Hold on"\. Wait until it is resumed\.$/u);
   assert.equal(refusal(await api.create(task('A helper writing'), helper)).code, 'RUN_PAUSED');
   value(await api.instruct({ said: 'Go on', kind: 'resume', to_run: run }, owner));
   value(await api.create(task('After the resume'), lead));

@@ -8,7 +8,7 @@
  * `instructionsMine` is the agent's: what is pending for its own run (and marking it seen), taking one, and answering
  * it. The MCP tool `instructions` is that door.
  *
- * HIS VOICE IS MARKED (§10.2). Every instruction reaches an agent as `Sam said in BrainDog (IN4): "…"`, a line built
+ * HIS VOICE IS MARKED (§10.2). Every instruction reaches an agent as `Teodor said in BrainDog (IN4): "…"`, a line built
  * here once (`toldOf`), which the briefing, the pulse and this door all hand on, so no path words it another way.
  *
  * RECEIPTS ARE NOT STORED (§8.1). They are read from the log: the run's batches between `taken_at` and `replied_at`,

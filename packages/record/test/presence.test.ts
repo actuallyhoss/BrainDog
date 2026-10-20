@@ -43,7 +43,7 @@ async function record() {
   const clock = fixedClock(NOW);
   const api = await createRecordApi({ sql, clock });
   value(await installSeed(api.kernel));
-  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_seed', 'sam@example.com', 'Sam')");
+  sql.exec("INSERT OR REPLACE INTO person (id, email, name) VALUES ('p_seed', 'teo@vance-studio.example', 'Teodor')");
   clock.advance(MIN);
   return { api, sql, clock };
 }
@@ -94,7 +94,7 @@ test('A PULSE HEARS WHAT HE SAID: pending in his voice, new lines once, shown id
   const heard = value<Pulse>(await api.pulse({ stamp: quiet.stamp! }, ctx));
   assert.equal(heard.changed, true);
   assert.deepEqual(heard.pending.map((i) => [i.id, i.kind, i.to]), [['IN1', 'tell', 'anyone']]);
-  assert.match(heard.lines[0]!, /^Sam said in BrainDog \(IN1\): "Look at the bounce numbers"\./u);
+  assert.match(heard.lines[0]!, /^Teodor said in BrainDog \(IN1\): "Look at the bounce numbers"\./u);
 
   clock.advance(15_000);
   value(await api.pulse({ stamp: heard.stamp!, shown: ['IN1'] }, ctx));
@@ -105,7 +105,7 @@ test('A PULSE HEARS WHAT HE SAID: pending in his voice, new lines once, shown id
   clock.advance(15_000);
   const stopped = value<Pulse>(await api.pulse({ stamp: heard.stamp! }, ctx));
   assert.deepEqual(stopped.stop && [stopped.stop.kind, stopped.stop.id], ['stop', 'IN2']);
-  assert.match(stopped.lines[0]!, /^Sam stopped this run in BrainDog \(IN2\): "Stop now"\. Reply with instructions, then end\.$/u);
+  assert.match(stopped.lines[0]!, /^Teodor stopped this run in BrainDog \(IN2\): "Stop now"\. Reply with instructions, then end\.$/u);
   sql.close();
 });
 
