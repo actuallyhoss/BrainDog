@@ -135,7 +135,7 @@ test('the foot draws a painted mark as well as the fade, off until there is more
   assert.match(SOURCE, /<span class="more-below" aria-hidden="true" data-on=\{edges\.below \? '' : undefined\}>/);
   const rule = /\n  \.more-below \{([^}]*)\}/.exec(SOURCE)?.[1] ?? '';
   assert.match(rule, /opacity: 0;/);
-  assert.match(rule, /block-size: 0;/, 'it takes no room, so nothing moves when it comes and goes');
+  assert.match(rule, /block-size: 16px;/, 'it has its own room under the scroller, so it never covers the last row, and nothing moves when it comes and goes');
   assert.match(SOURCE, /\.more-below\[data-on\] \{\s*opacity: 1;/);
   assert.match(SOURCE, /\.more-below::before \{[^}]*border-block-start: 1px solid var\(--rule\);/);
 });

@@ -1044,14 +1044,14 @@
   }
 
   /* THE FOOT'S PAINTED CUE: a hairline the rail's width where the rows are cut, and a chevron sitting on it over a
-     notch of the board's own colour, so it reads over whatever row is fading under it. Nothing tall: it lies over
-     the scroller's last 16px and takes no room. Drawn by `data-on` (`edgeCue`'s `below`). */
+     notch of the board's own colour. It has its own 16px under the scroller and lies over no row, so the last row is
+     never covered by the chevron. Drawn by `data-on` (`edgeCue`'s `below`). */
   .more-below {
     position: relative;
     display: flex;
     flex: none;
     justify-content: center;
-    block-size: 0;
+    block-size: 16px;
     opacity: 0;
     pointer-events: none;
   }
