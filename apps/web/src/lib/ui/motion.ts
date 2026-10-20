@@ -1,0 +1,48 @@
+/**
+ * The one place list motion lives (the motion system of 20 October, section 3): a row arriving, a row leaving, and
+ * the rows beside it closing the gap. Every list that adds or takes away a row uses these three, so nothing picks its
+ * own duration or curve.
+ *
+ *   {#each rows as row (row.seq)}
+ *     <div role="row" in:rowIn out:rowOut animate:flip={settle()}>…</div>
+ *   {/each}
+ *
+ * `in:` plays only for a row added after the list first drew (Svelte's default, no `|global`), so a page opening does
+ * not ripple. The durations are read from the skin's tokens, so a skin or `a11y.css` that changes the scale changes
+ * these too; the numbers beside them are what the tokens say today.
+ *
+ * ROW HEIGHT IS THE ONE LAYOUT PROPERTY THAT ANIMATES ANYWHERE: a row opening is the point of the motion, and the row
+ * is the only thing laid out. Under reduced motion it is a 120ms fade and nothing moves.
+ */
+
+import { cubicIn, quartOut } from 'svelte/easing';
+import type { TransitionConfig } from 'svelte/transition';
+
+/** Whether the reader asked for less motion. */
+export const still = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** The fade that stands in for every move under reduced motion. */
+export const FADE = 120;
+
+/** A token's milliseconds from the skin, or the fallback where there is no document (a test, the server). */
+export const ms = (name: string, fallback: number): number => {
+  if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return fallback;
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
+};
+
+/** A row arriving: its height opens and it fades in. `quartOut` stands for `--ease-out`. */
+export function rowIn(node: Element): TransitionConfig {
+  if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
+  const h = (node as HTMLElement).offsetHeight;
+  return { duration: ms('--d-rows', 180), easing: quartOut, css: (t) => `opacity:${t};block-size:${t * h}px;overflow:clip` };
+}
+
+/** A row leaving: the same height closing, accelerating away (`cubicIn` stands for `--ease-in`). */
+export function rowOut(node: Element): TransitionConfig {
+  if (still()) return { duration: FADE, css: (t) => `opacity:${t}` };
+  const h = (node as HTMLElement).offsetHeight;
+  return { duration: ms('--d-rows', 180), easing: cubicIn, css: (t) => `opacity:${t};block-size:${t * h}px;overflow:clip` };
+}
+
+/** Neighbours closing the gap: pass to `animate:flip`. Instant under reduced motion. */
+export const settle = (): { duration: number; easing: (t: number) => number } => ({ duration: still() ? 0 : ms('--d-rows', 180), easing: quartOut });
