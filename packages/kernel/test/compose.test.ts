@@ -94,6 +94,30 @@ test('A PAGE WHERE NOTHING HAPPENED READS AS DECLARED: no lead, no order, no nex
   assert.match(look.basis, /^r[0-9a-z]{7}$/u);
 });
 
+test('MONEY OPENS ON ITS CASH: a late instalment leads no page past the walk of the money ahead, and is still said next', () => {
+  const INSTALMENTS: ListShape = { id: 'installments', done: ['paid', 'cancelled'], fields: [{ id: 'what', type: 'text' }, { id: 'due', type: 'day', deadline: true }, { id: 'state', type: 'enum' }] };
+  const blocks = keyed(
+    block({ kind: 'note', lead: true, body: 'Cash is E£11,905' }),
+    block({ kind: 'forecast', source: 'forecast.runway', heading: 'Cash ahead' }),
+    block({ kind: 'split', source: 'metric.cash-by-account', heading: 'Accounts', area: 'rail' }),
+    block({ kind: 'section', heading: 'Coming and going' }),
+    block({ kind: 'progress', source: 'register.installments', heading: 'Instalments', rows: [row('installments', 11, { what: 'Instalment, harbourview, 2 of 40', due: '2026-09-29' })], matched: 1 }),
+  );
+  const [, walk, , , instalments] = keysOf(blocks);
+  const look = composeLook(input(blocks, { page: 'money', lists: [INSTALMENTS], titleOf: (r) => (r === 'installments' ? 'what' : null) }));
+  assert.equal(look.lead, undefined, 'the instalments did not lead past Cash ahead');
+  assert.deepEqual(look.next, { row: 'installments#11', text: 'Instalment, harbourview, 2 of 40 is 7 days late' }, 'what is late is still said, in the next line');
+  const drawn = applyLook(blocks, look);
+  assert.ok(keysOf(drawn.blocks).indexOf(walk!) < keysOf(drawn.blocks).indexOf(instalments!), 'the walk stays above');
+
+  /* A LOOK STORED BEFORE THE RULE, naming the tile as its lead, is laid the same way: unless it is the person's own. */
+  const stored = applyLook(blocks, { look: 'money', basis: 'rold', by: 'rule', lead: instalments! });
+  assert.equal(stored.look.lead, undefined);
+  assert.equal(keysOf(stored.blocks)[1], walk);
+  const his = applyLook(blocks, { look: 'money', basis: 'rhis', by: 'owner', lead: instalments! });
+  assert.equal(keysOf(his.blocks)[1], instalments, 'his own arrangement is his');
+});
+
 test('LATE BEATS NEEDS-YOU BEATS CHANGED BEATS FIGURES, inside a group, and the most pressing block leads', () => {
   const blocks = keyed(
     block({ kind: 'note', lead: true, body: 'Your desk' }),
@@ -395,12 +419,14 @@ test('A QUEUE NEVER LEADS A PAGE ABOUT SOMETHING ELSE: Money keeps its cash ahea
   assert.deepEqual(look.next, { row: 'SG4', text: 'Let it read the bank texts?' }, 'it is still the one next action');
   assert.deepEqual(keysOf(applyLook(blocks, look).blocks), [sentence, ahead, waiting, accounts]);
 
-  /* SOMETHING LATE STILL LEADS, AROUND THE QUEUE: the queue keeps its place while the late list takes the top. */
+  /* NOR DOES SOMETHING LATE, PAST THE CASH AHEAD (the audit of 20 October: Money opened on Instalments): it is the next
+     action, and the walk stays the page's first answer. */
   const late = keyed(...blocks, block({ kind: 'table', source: 'register.tasks', heading: 'Due', rows: [row('tasks', 3, { what: 'Pay rent', by: '2026-10-02' })], matched: 1 }));
   const due = keysOf(late)[4];
   const led = composeLook(input(late, { page: 'money' }));
-  assert.equal(led.lead, due);
-  assert.deepEqual(keysOf(applyLook(late, led).blocks), [sentence, due, ahead, waiting, accounts]);
+  assert.equal(led.lead, undefined);
+  assert.deepEqual(led.next, { row: 'tasks#3', text: 'Pay rent is 4 days late' });
+  assert.deepEqual(keysOf(applyLook(late, led).blocks).slice(0, 2), keysOf(late).slice(0, 2), 'the opening line, then the walk');
 });
 
 test('A LOOK SLASH WROTE IS HELD TO IT TOO, and the person\'s own look leads with whatever he picked', () => {

@@ -552,7 +552,11 @@ export function composeLook(input: ComposeInput): LookBody {
   });
   if (leadAt !== -1) {
     const top = topOf(blocks);
-    if (blocks.slice(top, leadAt).some((_, n) => pinned.has(keys[top + n]!))) leadAt = -1;
+    /* NOR PAST A WALK OF THE MONEY AHEAD. A page that opens on its cash and how long it lasts answers that first
+       (DIRECTION §2: "Money leads with cash and runway"), and a late instalment led his Money above both: what is late
+       is said in the page's next line, and its tile moves up only within its own group, under the walk. Today and Decide
+       are the reader's desk, where what waits on him comes first (`questionsLead`). */
+    if (blocks.slice(top, leadAt).some((b, n) => pinned.has(keys[top + n]!) || (!asksFirst && b.kind === 'forecast' && areaOf(b) === 'main' && b.drawn !== false))) leadAt = -1;
   }
   const lead = leadAt === -1 ? undefined : keys[leadAt]!;
 
@@ -583,7 +587,9 @@ export function composeLook(input: ComposeInput): LookBody {
   const groupOf = groupsOf(blocks);
   const groups: number[][] = [...new Set(groupOf)].map((g) =>
     blocks.flatMap((b, i) => {
-      const movable = !STAYS.has(b.kind) && !pinned.has(keys[i]!) && !keptInPlace(i) && i !== leadAt && !hidden.has(keys[i]!) && b.drawn !== false;
+      /* THE WALK OF THE MONEY AHEAD KEEPS ITS PLACE in its group as well, so nothing pressing is sorted over it (above). */
+      const walk = !asksFirst && b.kind === 'forecast' && areaOf(b) === 'main';
+      const movable = !STAYS.has(b.kind) && !walk && !pinned.has(keys[i]!) && !keptInPlace(i) && i !== leadAt && !hidden.has(keys[i]!) && b.drawn !== false;
       return groupOf[i] === g && movable ? [i] : [];
     }),
   );
@@ -774,7 +780,10 @@ export function applyLook(read: readonly BlockResult[], look: LookBody, page: { 
        among them, which `composeLook` already refused to do and this did for any look that named a lead: so the lead
        stays where it is, and the look does not say it leads. */
     const moves = areaOf(block) === 'main' && block.drawn !== false && top !== -1 && top < from && !leads;
-    if (moves && out.slice(top, from).some((b) => areaOf(b) === 'main' && pins.has(keyOf(b)))) lead = undefined;
+    /* NOR PAST THE WALK OF THE MONEY AHEAD, as `composeLook` leads none past it, unless it is the person's own look:
+       a look stored overnight before that rule still named a late tile over the cash. */
+    const walkAbove = !owns && !questionsLead(look.look, read) && out.slice(top, from).some((b) => areaOf(b) === 'main' && b.kind === 'forecast' && b.drawn !== false);
+    if (moves && (walkAbove || out.slice(top, from).some((b) => areaOf(b) === 'main' && pins.has(keyOf(b))))) lead = undefined;
     else if (moves) {
       out.splice(from, 1);
       out.splice(top, 0, block);
