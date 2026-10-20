@@ -22,7 +22,6 @@
   import { untrack } from 'svelte';
   import { titleOf } from '$lib/title.ts';
   import Empty from '$lib/ui/Empty.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { HeatGrid } from '$lib/viz/index.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
@@ -142,9 +141,11 @@
     {/if}
     <p class="note">{short ? w.runsSomeMissing : w.runsReach}</p>
     {#each days as day (day.key)}
-      <Section title={day.title} count={day.lines.length}>
-        <HubRows rows={day.lines.map(rowOf)} />
-      </Section>
+      <Tile class="section" data-surface="tile" title={day.title} count={day.lines.length || undefined}>
+        <div class="section-body">
+          <HubRows rows={day.lines.map(rowOf)} />
+        </div>
+      </Tile>
     {/each}
   {/if}
 </div>
@@ -162,7 +163,7 @@
   .reading {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -170,7 +171,7 @@
   .note {
     margin: 0 0 calc(var(--sp-2) - var(--sp-5));
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 </style>

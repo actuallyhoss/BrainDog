@@ -13,7 +13,7 @@
   import { checkBrainl } from '@braindog/kernel';
   import { TONES } from 'braindog-render';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
@@ -140,56 +140,58 @@
   <Button href="/packs/share">{copy.shareSetup}</Button>
 {/snippet}
 
-<Section title={copy.yourData}>
-  <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
-       product's central promise: take your record and go. They say what they would do.
+<Tile class="section" data-surface="tile" title={copy.yourData}>
+  <div class="section-body">
+    <!-- THE WHOLE CONTENT OF THIS SCREEN WAS TWO DEAD BUTTONS, on the page that carries the
+         product's central promise: take your record and go. They say what they would do.
 
-       AND ONE OF THEM DESCRIBED THE WRONG FILE. It read "written to a .dog file, LINE PER
-       ROW", which welds together the two containers `03 §2.1` keeps in separate columns: a
-       `.brain` is a SQLite database you open with `sqlite3` and no SDK, and a `.brainl` is
-       the canonical logical dump (one JSON row per line) that the record streams out of a
-       Durable Object in pages. Both are signed over the same manifest, which is why `verify`
-       and `import` take either; they are not the same artefact and the sentence made the
-       database sound like a text format.
+         AND ONE OF THEM DESCRIBED THE WRONG FILE. It read "written to a .dog file, LINE PER
+         ROW", which welds together the two containers `03 §2.1` keeps in separate columns: a
+         `.brain` is a SQLite database you open with `sqlite3` and no SDK, and a `.brainl` is
+         the canonical logical dump (one JSON row per line) that the record streams out of a
+         Durable Object in pages. Both are signed over the same manifest, which is why `verify`
+         and `import` take either; they are not the same artefact and the sentence made the
+         database sound like a text format.
 
-       THE EXTENSIONS MOVED, AND THE REASON IS WORTH KEEPING. These two were `.dog` and
-       `.dogl` until the record gave the name up: `.dog` is a PAGE's source now, one page to
-       a file, which is what somebody means when they open the source of a page. The three
-       layers are unchanged; only the name on the container moved. -->
-  {#if lastExport}<p class="last-export">{lastExport}</p>{/if}
-  <!-- WHAT THE FILE IS, ONCE: the row under says it, so the line that repeated it over the row is gone (agents F27). -->
-  <!--
-    AND THE COPY IS THE OWNER'S TO TAKE, WHILE THE CHECK IS ANYBODY'S.
+         THE EXTENSIONS MOVED, AND THE REASON IS WORTH KEEPING. These two were `.dog` and
+         `.dogl` until the record gave the name up: `.dog` is a PAGE's source now, one page to
+         a file, which is what somebody means when they open the source of a page. The three
+         layers are unchanged; only the name on the container moved. -->
+    {#if lastExport}<p class="last-export">{lastExport}</p>{/if}
+    <!-- WHAT THE FILE IS, ONCE: the row under says it, so the line that repeated it over the row is gone (agents F27). -->
+    <!--
+      AND THE COPY IS THE OWNER'S TO TAKE, WHILE THE CHECK IS ANYBODY'S.
 
-    `export` needs `owner`, so all four export buttons refused a colleague at the press. What
-    does not need the record at all is `Check a file`: `checkBrainl` runs in this browser over
-    a file the person already holds, sends nothing anywhere and asks the record nothing, so it
-    stays exactly as it is for every reader. That split is the whole point of asking per
-    control rather than per screen.
-  -->
-  {#if !anOwner}
-    <p class="hint">{levelWords.ownersOnly}</p>
-  {/if}
-  <StateRow icon="download" title={words.oneFile} line={copy.exportWhat} action={anOwner ? exportWhole : undefined} />
-  <!-- A REAL CHECK, IN THIS BROWSER. It said what it would do, on a record as on the sample; it runs the
-       import's own `checkBrainl` now: the format line, every table against its manifest, then the signature. -->
-  <StateRow icon="check" title={copy.verifyFile} line={words.checkLine} action={checkOne} />
-  <input
-    bind:this={checkInput}
-    class="file-pick"
-    type="file"
-    accept=".brainl"
-    tabindex="-1"
-    aria-hidden="true"
-    onchange={(e) => void checkFile(e.currentTarget.files?.[0])}
-  />
-  {#if checkSaid}
-    <p class="hint checked" data-intent={checkSaid.tone} role="status">
-      <span class="glyph" role="img" aria-label={TONES[checkSaid.tone].label}>{TONES[checkSaid.tone].glyph}</span>
-      {checkSaid.text}
-    </p>
-  {/if}
-</Section>
+      `export` needs `owner`, so all four export buttons refused a colleague at the press. What
+      does not need the record at all is `Check a file`: `checkBrainl` runs in this browser over
+      a file the person already holds, sends nothing anywhere and asks the record nothing, so it
+      stays exactly as it is for every reader. That split is the whole point of asking per
+      control rather than per screen.
+    -->
+    {#if !anOwner}
+      <p class="hint">{levelWords.ownersOnly}</p>
+    {/if}
+    <StateRow icon="download" title={words.oneFile} line={copy.exportWhat} action={anOwner ? exportWhole : undefined} />
+    <!-- A REAL CHECK, IN THIS BROWSER. It said what it would do, on a record as on the sample; it runs the
+         import's own `checkBrainl` now: the format line, every table against its manifest, then the signature. -->
+    <StateRow icon="check" title={copy.verifyFile} line={words.checkLine} action={checkOne} />
+    <input
+      bind:this={checkInput}
+      class="file-pick"
+      type="file"
+      accept=".brainl"
+      tabindex="-1"
+      aria-hidden="true"
+      onchange={(e) => void checkFile(e.currentTarget.files?.[0])}
+    />
+    {#if checkSaid}
+      <p class="hint checked" data-intent={checkSaid.tone} role="status">
+        <span class="glyph" role="img" aria-label={TONES[checkSaid.tone].label}>{TONES[checkSaid.tone].glyph}</span>
+        {checkSaid.text}
+      </p>
+    {/if}
+  </div>
+</Tile>
 
 <!-- AND THE SLICE, WHICH IS A DIFFERENT FILE FOR A DIFFERENT JOB.
 
@@ -200,16 +202,18 @@
      The screen offered one button for the whole record and nothing for the other three, so the
      only exit this product appeared to have was all-or-nothing. A pack is the readable-text
      half: your lists, pages, metrics and rules without a single row of your business in it. -->
-<Section title={copy.takeAway}>
-  <p class="hint">{copy.takeAwayWhat}</p>
-  <!-- THE SAME LADDER AS THE WHOLE COPY ABOVE: a slice of the record is still the record, so a
-       colleague is shown both rows and handed neither button. `Share this setup` stays for everybody,
-       because it is a link to a screen that explains itself. -->
-  <StateRow icon="skill" title={words.wayTitle} line={words.wayLine(things)} action={anOwner ? exportPack : undefined} />
-  <StateRow icon="rows" title={words.rowsTitle} line={words.rowsLine(things)} action={anOwner ? exportRows : undefined} />
-  <!-- THE ARRANGEMENT, NOT WHAT IS WRITTEN IN IT: a use case somebody else can install. -->
-  <StateRow icon="packs" title={words.setupTitle} line={words.setupLine} action={shareOne} />
-</Section>
+<Tile class="section" data-surface="tile" title={copy.takeAway}>
+  <div class="section-body">
+    <p class="hint">{copy.takeAwayWhat}</p>
+    <!-- THE SAME LADDER AS THE WHOLE COPY ABOVE: a slice of the record is still the record, so a
+         colleague is shown both rows and handed neither button. `Share this setup` stays for everybody,
+         because it is a link to a screen that explains itself. -->
+    <StateRow icon="skill" title={words.wayTitle} line={words.wayLine(things)} action={anOwner ? exportPack : undefined} />
+    <StateRow icon="rows" title={words.rowsTitle} line={words.rowsLine(things)} action={anOwner ? exportRows : undefined} />
+    <!-- THE ARRANGEMENT, NOT WHAT IS WRITTEN IN IT: a use case somebody else can install. -->
+    <StateRow icon="packs" title={words.setupTitle} line={words.setupLine} action={shareOne} />
+  </div>
+</Tile>
 <!--
   THE KEY THAT MAKES A YEAR-OLD BACKUP CHECKABLE, and this screen is where four documents put
   it. `53 §4`: *"the public half in Settings > export and at the well-known URL 03 §4 names"*.
@@ -233,9 +237,11 @@
   well-known URL is served by none of the three apps. The value, a copy button and advice on
   verifying come back together, the day there is a real key to stand beside them.
 -->
-<Section title={copy.theSignature}>
-  <StateRow icon="key" title={words.notHereYet} line={copy.theSignatureNotHere} />
-</Section>
+<Tile class="section" data-surface="tile" title={copy.theSignature}>
+  <div class="section-body">
+    <StateRow icon="key" title={words.notHereYet} line={copy.theSignatureNotHere} />
+  </div>
+</Tile>
 
 <style>
   /* WHEN IT WAS LAST TAKEN, the first line in the tile, at body size. */

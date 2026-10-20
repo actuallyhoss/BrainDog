@@ -27,7 +27,7 @@
   import { bareOrigin } from '../settings-state.svelte.ts';
   import { createClient, type TokenRow } from '@braindog/client';
   import { TONES, relative, since } from 'braindog-render';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -106,77 +106,81 @@
   const put = (line: string, said: string): void => void clipboard.put(line, line, said);
 </script>
 
-<Section title={words.title}>
-  <p class="mine-why">{words.why}</p>
-  {#if minted}
-    {@const bearer = minted.bearer}
-    <div class="mine-minted" role="status">
-      <p class="mine-step">{copy.tokenOnce}</p>
-      <p class="mine-step">{words.agentStep}</p>
-      <div class="mine-line">
-        <code class="mine-code">{agentLine(bearer)}</code>
-        <Button weight="primary" onclick={() => put(agentLine(bearer), copy.lineCopied)}>{words.copyAgentLine}</Button>
-      </div>
-      <div class="mine-line">
-        <code class="mine-code">{bearer}</code>
-        <Button weight="quiet" onclick={() => put(bearer, copy.keyCopied)}>{copy.copyKey}</Button>
-      </div>
-      <p class="mine-step">{copy.doorKeyHeader}</p>
-      <div class="mine-line">
-        <code class="mine-code">{headerLine(bearer)}</code>
-        <Button weight="quiet" onclick={() => put(headerLine(bearer), copy.lineCopied)}>{copy.copyHeader}</Button>
-      </div>
-      <div class="mine-done">
-        <Button weight="bare" onclick={() => (minted = null)}>{copy.connectDone}</Button>
-      </div>
-    </div>
-  {:else}
-    <form class="mine-form field-row" onsubmit={make}>
-      <label class="field-row-label" for="own-key-name">{words.nameLabel}</label>
-      <div class="field-row-controls">
-        <div class="field">
-          <input class="field-input" id="own-key-name" type="text" autocomplete="off" maxlength={LABEL_MAX} bind:value={name} aria-describedby="own-key-said" />
+<Tile class="section" data-surface="tile" title={words.title}>
+  <div class="section-body">
+    <p class="mine-why">{words.why}</p>
+    {#if minted}
+      {@const bearer = minted.bearer}
+      <div class="mine-minted" role="status">
+        <p class="mine-step">{copy.tokenOnce}</p>
+        <p class="mine-step">{words.agentStep}</p>
+        <div class="mine-line">
+          <code class="mine-code">{agentLine(bearer)}</code>
+          <Button weight="primary" onclick={() => put(agentLine(bearer), copy.lineCopied)}>{words.copyAgentLine}</Button>
         </div>
-        <Button type="submit" disabled={minting}>{words.make}</Button>
+        <div class="mine-line">
+          <code class="mine-code">{bearer}</code>
+          <Button weight="quiet" onclick={() => put(bearer, copy.keyCopied)}>{copy.copyKey}</Button>
+        </div>
+        <p class="mine-step">{copy.doorKeyHeader}</p>
+        <div class="mine-line">
+          <code class="mine-code">{headerLine(bearer)}</code>
+          <Button weight="quiet" onclick={() => put(headerLine(bearer), copy.lineCopied)}>{copy.copyHeader}</Button>
+        </div>
+        <div class="mine-done">
+          <Button weight="bare" onclick={() => (minted = null)}>{copy.connectDone}</Button>
+        </div>
       </div>
-      <p class="setting-help">{words.nameHelp}</p>
-      <Segmented role="group" aria-label={words.scopeLabel}>
-        {#each OWN_SCOPES as s (s)}
-          <button type="button" class="segment" aria-pressed={scope === s} data-on={scope === s ? '' : undefined} onclick={() => (scope = s)}>{SCOPE_WORDS[s]}</button>
-        {/each}
-      </Segmented>
-      <p class="mine-said" id="own-key-said" role="status" data-intent={refusal ? 'bad' : undefined}>
-        {#if refusal}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}{/if}
-      </p>
-    </form>
-  {/if}
-</Section>
-
-<Section title={words.mine} count={rows.length}>
-  {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
-    <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
-  {:else if rows.length === 0}
-    <Empty kind="no-data-yet" compact title={words.none} body={words.noneWhy} />
-  {:else}
-    {@const nowMs = Date.now()}
-    <ul class="mine-list">
-      {#each rows as t (t.id)}
-        <li class="mine-card">
-          <IconWell name="key" size="l" />
-          <div class="mine-main">
-            <span class="mine-name" dir="auto">{t.label ?? words.unnamed}</span>
-            <span class="mine-facts">
-              {#each factsOf(t, nowMs) as fact}<span>{fact}</span>{/each}
-            </span>
+    {:else}
+      <form class="mine-form field-row" onsubmit={make}>
+        <label class="field-row-label" for="own-key-name">{words.nameLabel}</label>
+        <div class="field-row-controls">
+          <div class="field">
+            <input class="field-input" id="own-key-name" type="text" autocomplete="off" maxlength={LABEL_MAX} bind:value={name} aria-describedby="own-key-said" />
           </div>
-          <span class="mine-do">
-            <Button weight="bare" tone="bad" disabled={revoking !== null} onclick={() => void revokeOne(t)}>{copy.revokeKey}</Button>
-          </span>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</Section>
+          <Button type="submit" disabled={minting}>{words.make}</Button>
+        </div>
+        <p class="setting-help">{words.nameHelp}</p>
+        <Segmented role="group" aria-label={words.scopeLabel}>
+          {#each OWN_SCOPES as s (s)}
+            <button type="button" class="segment" aria-pressed={scope === s} data-on={scope === s ? '' : undefined} onclick={() => (scope = s)}>{SCOPE_WORDS[s]}</button>
+          {/each}
+        </Segmented>
+        <p class="mine-said" id="own-key-said" role="status" data-intent={refusal ? 'bad' : undefined}>
+          {#if refusal}<span role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}{/if}
+        </p>
+      </form>
+    {/if}
+  </div>
+</Tile>
+
+<Tile class="section" data-surface="tile" title={words.mine} count={rows.length || undefined}>
+  <div class="section-body">
+    {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
+      <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
+    {:else if rows.length === 0}
+      <Empty kind="no-data-yet" compact title={words.none} body={words.noneWhy} />
+    {:else}
+      {@const nowMs = Date.now()}
+      <ul class="mine-list">
+        {#each rows as t (t.id)}
+          <li class="mine-card">
+            <IconWell name="key" size="l" />
+            <div class="mine-main">
+              <span class="mine-name" dir="auto">{t.label ?? words.unnamed}</span>
+              <span class="mine-facts">
+                {#each factsOf(t, nowMs) as fact}<span>{fact}</span>{/each}
+              </span>
+            </div>
+            <span class="mine-do">
+              <Button weight="bare" tone="bad" disabled={revoking !== null} onclick={() => void revokeOne(t)}>{copy.revokeKey}</Button>
+            </span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+</Tile>
 
 <style>
   .mine-why,

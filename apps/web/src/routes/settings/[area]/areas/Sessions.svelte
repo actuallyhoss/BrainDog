@@ -9,7 +9,7 @@
   import { since } from 'braindog-render';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -101,55 +101,59 @@
   }
 </script>
 
-<Section title={copy.sessions} count={ordered?.length ?? 0}>
-  <p class="hint">{copy.sessionsHow}</p>
-  {#if me === null}
-    {#if s.hostAuth !== null}<Empty kind="no-data-yet" compact title={copy.sessionsSignedOut} />{/if}
-  {:else if unread}
-    <p class="hint">{copy.sessionsUnread}</p>
-  {:else if ordered}
-    <!-- EACH BROWSER AS A ROW ON THE GROUND: this one's well is ink, the product's "here", as the rail's current place
-         is; the others are the plain well. -->
-    <ul class="ledger ledger-lead sessions">
-      {#each ordered as r (r.ref)}
-        <li class="session" data-current={r.current ? '' : undefined}>
-          <div class="line line-tall">
-            <span class="line-mark"><IconWell name="monitor" size="l" tone={r.current ? 'ink' : undefined} /></span>
-            <span class="line-main">
-              <span class="line-title session-title">{r.current ? copy.sessionThis : copy.sessionOther}</span>
-              <span class="line-detail session-detail">{copy.sessionWhen(when(r.authedAt), when(r.activeAt))}</span>
-            </span>
-            <span class="line-amount"></span>
-            <span class="line-when"></span>
-          </div>
-        </li>
-      {/each}
-    </ul>
-    {#if others === 0}
-      <p class="hint">{copy.sessionsNoneElse}</p>
-    {:else}
-      <div class="row-actions">
-        <Button tone="bad" onclick={endOthers} aria-busy={ending} disabled={ending}
-          >{ending ? copy.sessionsEnding : copy.sessionsEndOthers}</Button
-        >
-      </div>
+<Tile class="section" data-surface="tile" title={copy.sessions} count={(ordered?.length ?? 0) || undefined}>
+  <div class="section-body">
+    <p class="hint">{copy.sessionsHow}</p>
+    {#if me === null}
+      {#if s.hostAuth !== null}<Empty kind="no-data-yet" compact title={copy.sessionsSignedOut} />{/if}
+    {:else if unread}
+      <p class="hint">{copy.sessionsUnread}</p>
+    {:else if ordered}
+      <!-- EACH BROWSER AS A ROW ON THE GROUND: this one's well is ink, the product's "here", as the rail's current place
+           is; the others are the plain well. -->
+      <ul class="ledger ledger-lead sessions">
+        {#each ordered as r (r.ref)}
+          <li class="session" data-current={r.current ? '' : undefined}>
+            <div class="line line-tall">
+              <span class="line-mark"><IconWell name="monitor" size="l" tone={r.current ? 'ink' : undefined} /></span>
+              <span class="line-main">
+                <span class="line-title session-title">{r.current ? copy.sessionThis : copy.sessionOther}</span>
+                <span class="line-detail session-detail">{copy.sessionWhen(when(r.authedAt), when(r.activeAt))}</span>
+              </span>
+              <span class="line-amount"></span>
+              <span class="line-when"></span>
+            </div>
+          </li>
+        {/each}
+      </ul>
+      {#if others === 0}
+        <p class="hint">{copy.sessionsNoneElse}</p>
+      {:else}
+        <div class="row-actions">
+          <Button tone="bad" onclick={endOthers} aria-busy={ending} disabled={ending}
+            >{ending ? copy.sessionsEnding : copy.sessionsEndOthers}</Button
+          >
+        </div>
+      {/if}
     {/if}
-  {/if}
-  {#if said}<p class="hint" role="status">{said}</p>{/if}
-</Section>
+    {#if said}<p class="hint" role="status">{said}</p>{/if}
+  </div>
+</Tile>
 
-<Section title={keptWords.title}>
-  {#if forgot}
-    <p class="hint" role="status">{keptWords.forgot}</p>
-  {:else if kept !== null}
-    <p class="hint">{kept.answers === 0 ? keptWords.none : keptWords.held(sized(kept.bytes))}</p>
-    {#if kept.answers > 0}
-      <div class="row-actions">
-        <Button tone="bad" onclick={forget} aria-busy={forgetting} disabled={forgetting}>{forgetting ? keptWords.forgetting : keptWords.forget}</Button>
-      </div>
+<Tile class="section" data-surface="tile" title={keptWords.title}>
+  <div class="section-body">
+    {#if forgot}
+      <p class="hint" role="status">{keptWords.forgot}</p>
+    {:else if kept !== null}
+      <p class="hint">{kept.answers === 0 ? keptWords.none : keptWords.held(sized(kept.bytes))}</p>
+      {#if kept.answers > 0}
+        <div class="row-actions">
+          <Button tone="bad" onclick={forget} aria-busy={forgetting} disabled={forgetting}>{forgetting ? keptWords.forgetting : keptWords.forget}</Button>
+        </div>
+      {/if}
     {/if}
-  {/if}
-</Section>
+  </div>
+</Tile>
 
 <style>
   .hint {

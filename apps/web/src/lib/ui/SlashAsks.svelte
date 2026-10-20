@@ -29,7 +29,7 @@
   import { createClient, type EngineHealth, type SlashStatus } from '@braindog/client';
   import { asksShown, atCap, capOf, capSaid, metered, resetsWords, words } from '$lib/ui/slash-asks.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import { engineLines } from '../../routes/settings/[area]/health.ts';
@@ -174,7 +174,7 @@
 {#if page.data.live && bare && modelHere && (status || refused)}
   <div class="asks-bare">{@render body()}</div>
 {:else if page.data.live && !bare && (!modelHere || status || refused)}
-  <Section title={words.title}>{@render body()}</Section>
+  <Tile class="section" data-surface="tile" title={words.title}><div class="section-body">{@render body()}</div></Tile>
 {/if}
 
 <style>
@@ -200,8 +200,8 @@
   }
 
   .fact-key {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .fact-value {
@@ -210,7 +210,7 @@
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     overflow-wrap: anywhere;
   }
 
@@ -219,7 +219,7 @@
     grid-column: 1 / -1;
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
@@ -228,22 +228,22 @@
     grid-column: 1 / -1;
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
 
   .engine-said [data-needs] {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: var(--fw-medium);
   }
 
   .hint {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -255,8 +255,8 @@
   }
 
   .cap-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .cap-row {
@@ -272,7 +272,7 @@
 
   .cap-said {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-meta);
   }
 </style>

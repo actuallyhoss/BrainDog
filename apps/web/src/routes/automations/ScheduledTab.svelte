@@ -18,7 +18,6 @@
   import { untrack } from 'svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { WeekStrip } from '$lib/viz/index.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
@@ -111,26 +110,30 @@
     </Tile>
   {/if}
   {#if paused.length > 0}
-    <Section title={w.paused} count={paused.length}>
-      <HubRows rows={paused} />
-    </Section>
+    <Tile class="section" data-surface="tile" title={w.paused} count={paused.length || undefined}>
+      <div class="section-body">
+        <HubRows rows={paused} />
+      </div>
+    </Tile>
   {/if}
   {#if clocked.length > 0}
-    <Section title={w.onClock} count={clocked.length}>
-      <ul class="clocked">
-        {#each clocked as c (c.ingest)}
-          <li>
-            <HubRows rows={[c.row]} />
-            <div class="press">
-              <Button size="sm" disabled={pressing[c.ingest] === true} aria-label={runWords.aria(c.row.name)} onclick={() => void press(c.ingest)}>{runWords.press}</Button>
-              <!-- THE STATUS IS THERE BEFORE ITS LINE, so a screen reader hears the line arrive: a live region drawn
-                   with its words in it is often read as nothing. -->
-              <p class="pressed" role="status">{pressed[c.ingest] ?? ''}</p>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    </Section>
+    <Tile class="section" data-surface="tile" title={w.onClock} count={clocked.length || undefined}>
+      <div class="section-body">
+        <ul class="clocked">
+          {#each clocked as c (c.ingest)}
+            <li>
+              <HubRows rows={[c.row]} />
+              <div class="press">
+                <Button size="sm" disabled={pressing[c.ingest] === true} aria-label={runWords.aria(c.row.name)} onclick={() => void press(c.ingest)}>{runWords.press}</Button>
+                <!-- THE STATUS IS THERE BEFORE ITS LINE, so a screen reader hears the line arrive: a live region drawn
+                     with its words in it is often read as nothing. -->
+                <p class="pressed" role="status">{pressed[c.ingest] ?? ''}</p>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    </Tile>
   {/if}
 {/if}
 
@@ -139,7 +142,7 @@
   .reading {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -167,7 +170,7 @@
   .pressed {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 </style>

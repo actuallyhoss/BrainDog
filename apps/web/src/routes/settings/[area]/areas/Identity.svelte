@@ -15,7 +15,7 @@
   import { createClient } from '@braindog/client';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -349,162 +349,164 @@
   `33 §10` is the fact that makes the area make sense at all: "Login is account-level (a
   person may hold several records), so identity lives OUTSIDE the record."
 -->
-<Section title={copy.you}>
-  <div class="person">
-    <span class="person-face"><Face name={faceName} you size="l" /></span>
-    <div class="person-words">
-      <p class="person-name">{myName ?? copy.identityNoName}</p>
-      {#if myEmail && !signedOut}<p class="person-email">{myEmail}</p>{/if}
+<Tile class="section" data-surface="tile" title={copy.you}>
+  <div class="section-body">
+    <div class="person">
+      <span class="person-face"><Face name={faceName} you size="l" /></span>
+      <div class="person-words">
+        <p class="person-name">{myName ?? copy.identityNoName}</p>
+        {#if myEmail && !signedOut}<p class="person-email">{myEmail}</p>{/if}
+      </div>
     </div>
-  </div>
 
-  <!-- A PERSON IN A BROWSER, signed in or on a host that lets its one person in without a
-       session; the record refuses a token, so nothing here is offered to one. -->
-  {#if !signedOut && (s.hostAuth?.me || s.hostAuth?.open)}
-    {#if renaming}
-      <form class="rename" onsubmit={saveName}>
-        <label class="identity-label" for="identity-name">{copy.identityNameLabel}</label>
-        <span class="field rename-field" class:rename-bad={!!nameRefusal}>
-          <input
-            class="field-input"
-            id="identity-name"
-            type="text"
-            autocomplete="name"
-            maxlength="200"
-            bind:value={typedName}
-            aria-describedby="identity-name-help"
-            disabled={savingName}
-          />
-        </span>
-        <p class="identity-help" class:identity-bad={!!nameRefusal} id="identity-name-help" role={nameRefusal ? 'alert' : undefined}>
-          {nameRefusal || copy.identityNameHint}
-        </p>
-        <div class="rename-actions">
-          <Button weight="primary" type="submit" disabled={savingName}>{savingName ? copy.identitySaving : copy.identitySaveName}</Button>
-          <Button weight="bare" disabled={savingName} onclick={() => (renaming = false)}>{copy.identityCancel}</Button>
+    <!-- A PERSON IN A BROWSER, signed in or on a host that lets its one person in without a
+         session; the record refuses a token, so nothing here is offered to one. -->
+    {#if !signedOut && (s.hostAuth?.me || s.hostAuth?.open)}
+      {#if renaming}
+        <form class="rename" onsubmit={saveName}>
+          <label class="identity-label" for="identity-name">{copy.identityNameLabel}</label>
+          <span class="field rename-field" class:rename-bad={!!nameRefusal}>
+            <input
+              class="field-input"
+              id="identity-name"
+              type="text"
+              autocomplete="name"
+              maxlength="200"
+              bind:value={typedName}
+              aria-describedby="identity-name-help"
+              disabled={savingName}
+            />
+          </span>
+          <p class="identity-help" class:identity-bad={!!nameRefusal} id="identity-name-help" role={nameRefusal ? 'alert' : undefined}>
+            {nameRefusal || copy.identityNameHint}
+          </p>
+          <div class="rename-actions">
+            <Button weight="primary" type="submit" disabled={savingName}>{savingName ? copy.identitySaving : copy.identitySaveName}</Button>
+            <Button weight="bare" disabled={savingName} onclick={() => (renaming = false)}>{copy.identityCancel}</Button>
+          </div>
+        </form>
+      {:else}
+        <div class="row-actions">
+          <Button onclick={startRename}>{copy.identityChangeName}</Button>
         </div>
-      </form>
-    {:else}
-      <div class="row-actions">
-        <Button onclick={startRename}>{copy.identityChangeName}</Button>
-      </div>
+      {/if}
+      {#if nameSaid}<p class="hint" role="status">{nameSaid}</p>{/if}
+      {#if peopleRow}
+        <div class="row-actions">
+          <Button onclick={renameRow} disabled={rowBusy}>{copy.identityPeopleRow}</Button>
+        </div>
+      {/if}
+      {#if rowSaid}<p class="hint" role="status">{rowSaid}</p>{/if}
     {/if}
-    {#if nameSaid}<p class="hint" role="status">{nameSaid}</p>{/if}
-    {#if peopleRow}
-      <div class="row-actions">
-        <Button onclick={renameRow} disabled={rowBusy}>{copy.identityPeopleRow}</Button>
-      </div>
-    {/if}
-    {#if rowSaid}<p class="hint" role="status">{rowSaid}</p>{/if}
-  {/if}
 
-<!-- HOW YOU SIGN IN, AS ROWS, IN THE SAME TILE AS WHO YOU ARE (agents F14): each fact with its glyph, what it is in the
-     meta line and what is true in the title's. Two tiles of one and two lines each were one thing said twice. -->
-  <ul class="facts">
-    <!-- THE EMAIL, NOT THE PERSON ID. It printed `you` (the schema's own id for the signed-in
-         human) while `/settings/people` one click away renders the same person as "You" with
-         an address and a join date. `19 §9` bans a word the schema uses about itself, and an
-         address is what an invitation binds to and what identifies you across the records
-         listed below. -->
-    <!-- AND NOBODY ONCE THE SESSION IS OVER. The fallbacks below are the record's idea of who
-         you are, so after Sign out this still read "Signed in as owner@example.test" beside
-         "You are signed out." -->
-    <!-- AND NEVER AN ID: with no address and no name the row says
-         nothing rather than the person's id. -->
-    <!-- AND A REAL SIGN-IN STATE. "Signed in as" stood beside a "Sign in" button whenever the
-         host answered no session, because the row's only condition was that nobody had pressed Sign
-         out here. It is drawn only while a session names somebody, and otherwise the row says which
-         of the two other states this is: a host that lets its one person in without signing in, or
-         nobody signed in at all. -->
-    {#if !signedOut && s.hostAuth?.me}
-      <li><IconWell name="lock" /><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{myEmail ?? myName ?? copy.you}</span></li>
-    {:else}
-      <li><IconWell name="monitor" /><span class="fact-key">{identityWords.here}</span><span class="fact-value">{s.hostAuth?.open && !signedOut ? identityWords.openHost : identityWords.notSignedIn}</span></li>
-    {/if}
-    {#if !signedOut}
-      {#if passkeysHere}
-        <!-- THE PASSKEYS AS ONE LINE FIRST: how many, on which kinds of device, and whether you could still sign in
-             with one lost. Below two it carries the way to add one, which is Recovery's. With none, nothing can be
-             lost, so it says only that there are none yet. -->
-        <li class="fact-act">
-          <IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span>
-          <span class="fact-value">{(s.liveKeys?.length ?? 0) === 0 ? copy.identityPasskeys(0) : keysSaid.line}</span>
-          {#if keysSaid.short}<span class="fact-do"><Button href={at('/settings/signing-in')}>{copy.addPasskey}</Button></span>{/if}
-        </li>
+  <!-- HOW YOU SIGN IN, AS ROWS, IN THE SAME TILE AS WHO YOU ARE (agents F14): each fact with its glyph, what it is in the
+       meta line and what is true in the title's. Two tiles of one and two lines each were one thing said twice. -->
+    <ul class="facts">
+      <!-- THE EMAIL, NOT THE PERSON ID. It printed `you` (the schema's own id for the signed-in
+           human) while `/settings/people` one click away renders the same person as "You" with
+           an address and a join date. `19 §9` bans a word the schema uses about itself, and an
+           address is what an invitation binds to and what identifies you across the records
+           listed below. -->
+      <!-- AND NOBODY ONCE THE SESSION IS OVER. The fallbacks below are the record's idea of who
+           you are, so after Sign out this still read "Signed in as owner@example.test" beside
+           "You are signed out." -->
+      <!-- AND NEVER AN ID: with no address and no name the row says
+           nothing rather than the person's id. -->
+      <!-- AND A REAL SIGN-IN STATE. "Signed in as" stood beside a "Sign in" button whenever the
+           host answered no session, because the row's only condition was that nobody had pressed Sign
+           out here. It is drawn only while a session names somebody, and otherwise the row says which
+           of the two other states this is: a host that lets its one person in without signing in, or
+           nobody signed in at all. -->
+      {#if !signedOut && s.hostAuth?.me}
+        <li><IconWell name="lock" /><span class="fact-key">{copy.signedInAs}</span><span class="fact-value">{myEmail ?? myName ?? copy.you}</span></li>
+      {:else}
+        <li><IconWell name="monitor" /><span class="fact-key">{identityWords.here}</span><span class="fact-value">{s.hostAuth?.open && !signedOut ? identityWords.openHost : identityWords.notSignedIn}</span></li>
       {/if}
-      {#if passkeysHere && (s.liveKeys?.length ?? 0) > 0}
-        <!-- EACH PASSKEY BY ITS NAME, with Rename on its own line (LCH-A04); the form takes the line's place while open. -->
-        {#each s.liveKeys ?? [] as k (k.id)}
-          {@const name = k.label ?? copy.passkeyUnnamed}
+      {#if !signedOut}
+        {#if passkeysHere}
+          <!-- THE PASSKEYS AS ONE LINE FIRST: how many, on which kinds of device, and whether you could still sign in
+               with one lost. Below two it carries the way to add one, which is Recovery's. With none, nothing can be
+               lost, so it says only that there are none yet. -->
           <li class="fact-act">
-            <IconWell name="key" /><span class="fact-key">{copy.identityPasskeyWay}</span>
-            {#if keyRenaming === k.id}
-              <form class="rename key-form" onsubmit={saveKeyName}>
-                <label class="identity-label" for="identity-key-name">{copy.identityPasskeyNameLabel}</label>
-                <span class="field rename-field" class:rename-bad={!!keyRefusal}>
-                  <input
-                    class="field-input"
-                    id="identity-key-name"
-                    type="text"
-                    autocomplete="off"
-                    maxlength="64"
-                    bind:value={typedKey}
-                    aria-describedby="identity-key-help"
-                    disabled={savingKey}
-                  />
-                </span>
-                <p class="identity-help" class:identity-bad={!!keyRefusal} id="identity-key-help" role={keyRefusal ? 'alert' : undefined}>
-                  {keyRefusal || copy.identityPasskeyNameHint}
-                </p>
-                <div class="rename-actions">
-                  <Button weight="primary" type="submit" disabled={savingKey}>{savingKey ? copy.identitySaving : copy.identityPasskeySaveName}</Button>
-                  <Button weight="bare" disabled={savingKey} onclick={() => (keyRenaming = null)}>{copy.identityCancel}</Button>
-                </div>
-              </form>
-            {:else}
-              <span class="fact-value">{name}</span>
-              <span class="fact-do">
-                <Button weight="bare" onclick={() => startKeyRename(k)} aria-label={copy.identityRenamePasskeyOf(name)}>{copy.identityRenamePasskey}</Button>
-              </span>
-            {/if}
+            <IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span>
+            <span class="fact-value">{(s.liveKeys?.length ?? 0) === 0 ? copy.identityPasskeys(0) : keysSaid.line}</span>
+            {#if keysSaid.short}<span class="fact-do"><Button href={at('/settings/signing-in')}>{copy.addPasskey}</Button></span>{/if}
           </li>
-        {/each}
+        {/if}
+        {#if passkeysHere && (s.liveKeys?.length ?? 0) > 0}
+          <!-- EACH PASSKEY BY ITS NAME, with Rename on its own line (LCH-A04); the form takes the line's place while open. -->
+          {#each s.liveKeys ?? [] as k (k.id)}
+            {@const name = k.label ?? copy.passkeyUnnamed}
+            <li class="fact-act">
+              <IconWell name="key" /><span class="fact-key">{copy.identityPasskeyWay}</span>
+              {#if keyRenaming === k.id}
+                <form class="rename key-form" onsubmit={saveKeyName}>
+                  <label class="identity-label" for="identity-key-name">{copy.identityPasskeyNameLabel}</label>
+                  <span class="field rename-field" class:rename-bad={!!keyRefusal}>
+                    <input
+                      class="field-input"
+                      id="identity-key-name"
+                      type="text"
+                      autocomplete="off"
+                      maxlength="64"
+                      bind:value={typedKey}
+                      aria-describedby="identity-key-help"
+                      disabled={savingKey}
+                    />
+                  </span>
+                  <p class="identity-help" class:identity-bad={!!keyRefusal} id="identity-key-help" role={keyRefusal ? 'alert' : undefined}>
+                    {keyRefusal || copy.identityPasskeyNameHint}
+                  </p>
+                  <div class="rename-actions">
+                    <Button weight="primary" type="submit" disabled={savingKey}>{savingKey ? copy.identitySaving : copy.identityPasskeySaveName}</Button>
+                    <Button weight="bare" disabled={savingKey} onclick={() => (keyRenaming = null)}>{copy.identityCancel}</Button>
+                  </div>
+                </form>
+              {:else}
+                <span class="fact-value">{name}</span>
+                <span class="fact-do">
+                  <Button weight="bare" onclick={() => startKeyRename(k)} aria-label={copy.identityRenamePasskeyOf(name)}>{copy.identityRenamePasskey}</Button>
+                </span>
+              {/if}
+            </li>
+          {/each}
+        {/if}
       {/if}
+      <!-- A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD was told "Can read, cannot change": the shell's
+           `read` is a fallback for them, and the Expenses bookkeeper's whole job is changing rows.
+           What they hold is the lists, so the lists are named. -->
+      <li><IconWell name="rows" /><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{me.lists && me.lists.length > 0 ? namesOf(me.lists) : (copy.levelMeans[me.level] ?? me.level)}</span></li>
+    </ul>
+    {#if keySaid}<p class="hint" role="status">{keySaid}</p>{/if}
+    <p class="hint">{copy.identityOutside}</p>
+    {#if moving}<p class="hint" role="status">{copy.identityEmailMoving}</p>{/if}
+    {#if movedSaid}<p class="hint" role="status">{movedSaid}</p>{/if}
+    {#if moveRefusal}
+      <p class="identity-help identity-bad" role="alert">{moveRefusal}</p>
+      <!-- A SESSION OLDER THAN FIFTEEN MINUTES, and the link was left unspent for it: sign in again
+           here, then open the link in the mail once more. -->
+      {#if moveStale}<div class="row-actions"><Button href={signinFor(page.url)}>{copy.signIn}</Button></div>{/if}
     {/if}
-    <!-- A COLLEAGUE WHO HOLDS LISTS AND NOT THE RECORD was told "Can read, cannot change": the shell's
-         `read` is a fallback for them, and the Expenses bookkeeper's whole job is changing rows.
-         What they hold is the lists, so the lists are named. -->
-    <li><IconWell name="rows" /><span class="fact-key">{copy.onThisRecord}</span><span class="fact-value">{me.lists && me.lists.length > 0 ? namesOf(me.lists) : (copy.levelMeans[me.level] ?? me.level)}</span></li>
-  </ul>
-  {#if keySaid}<p class="hint" role="status">{keySaid}</p>{/if}
-  <p class="hint">{copy.identityOutside}</p>
-  {#if moving}<p class="hint" role="status">{copy.identityEmailMoving}</p>{/if}
-  {#if movedSaid}<p class="hint" role="status">{movedSaid}</p>{/if}
-  {#if moveRefusal}
-    <p class="identity-help identity-bad" role="alert">{moveRefusal}</p>
-    <!-- A SESSION OLDER THAN FIFTEEN MINUTES, and the link was left unspent for it: sign in again
-         here, then open the link in the mail once more. -->
-    {#if moveStale}<div class="row-actions"><Button href={signinFor(page.url)}>{copy.signIn}</Button></div>{/if}
-  {/if}
-  <!-- AND THE WAY TO REACH ANOTHER RECORD, from the area that is about who this one
-       thinks you are. The palette carries the same row; this is the one a person finds
-       without knowing the palette exists. -->
-  <!-- SIGNING OUT LIVES HERE, beside who you are signed in as, and it takes the place of the way
-       in only while there is a session to end. -->
-  <div class="row-actions">
-    {#if signedInEmail}
-      {#if mailsHere}<Button onclick={startEmail}>{copy.identityChangeEmail}</Button>{/if}
-      <Button onclick={signOutHere} aria-busy={signingOutNow}>{signingOutNow ? copy.signingOut : copy.signOut}</Button>
-    {:else}
-      <!-- WITH A WAY BACK HERE. A bare `/signin` sent the person to the app's front door after
-           signing in, which is the tab's kept sample. -->
-      <!-- "ADD A PASSKEY", NOT "SIGN IN" (agents F14): nothing here is a second sign-in, and inside Signing in the
-           Passkeys tile right under this offers it, so it is drawn only on its own. -->
-      {#if part === undefined}<Button href={signinFor(page.url)}>{copy.addPasskey}</Button>{/if}
-    {/if}
+    <!-- AND THE WAY TO REACH ANOTHER RECORD, from the area that is about who this one
+         thinks you are. The palette carries the same row; this is the one a person finds
+         without knowing the palette exists. -->
+    <!-- SIGNING OUT LIVES HERE, beside who you are signed in as, and it takes the place of the way
+         in only while there is a session to end. -->
+    <div class="row-actions">
+      {#if signedInEmail}
+        {#if mailsHere}<Button onclick={startEmail}>{copy.identityChangeEmail}</Button>{/if}
+        <Button onclick={signOutHere} aria-busy={signingOutNow}>{signingOutNow ? copy.signingOut : copy.signOut}</Button>
+      {:else}
+        <!-- WITH A WAY BACK HERE. A bare `/signin` sent the person to the app's front door after
+             signing in, which is the tab's kept sample. -->
+        <!-- "ADD A PASSKEY", NOT "SIGN IN" (agents F14): nothing here is a second sign-in, and inside Signing in the
+             Passkeys tile right under this offers it, so it is drawn only on its own. -->
+        {#if part === undefined}<Button href={signinFor(page.url)}>{copy.addPasskey}</Button>{/if}
+      {/if}
+    </div>
+    {#if outSaid}<p class="hint" role="status">{outSaid}</p>{/if}
   </div>
-  {#if outSaid}<p class="hint" role="status">{outSaid}</p>{/if}
-</Section>
+</Tile>
 
 <!-- CHANGE EMAIL, AS A SHEET: a bottom sheet under 640px with the field at 16px, and the sent
      state as one sentence that says where the link went and for how long. -->
@@ -552,53 +554,57 @@
      lands on, so the keyboard and the middle button have a real place to go. Two surfaces
      offering one act must not answer it two ways. The record you are already in is not a link
      at all: you are in it. -->
-<Section title={copy.yourRecords} count={me.records.length}>
-  <ul class="ledger ledger-lead">
-    {#each me.records as r}
-      {@const here = r.slug === SLUG}
-      <li>
-        <svelte:element
-          this={here ? 'div' : 'a'}
-          class="line line-tall"
-          href={here ? undefined : at('/', `${BASE}/${r.slug}/`)}
-          role={here ? undefined : 'link'}
-          onclick={here
-            ? undefined
-            : (e: MouseEvent) => {
-                e.preventDefault();
-                void openOther(r);
-              }}
-        >
-          <span class="line-mark"><Face name={r.name} of="record" size="l" /></span>
-          <span class="line-main">
-            <span class="line-title">{r.name}</span>
-            <span class="line-detail">{r.level === null ? levelWord(r) : (copy.levelMeans[r.level] ?? r.level)}</span>
-          </span>
-          <span class="line-amount"></span>
-          <span class="line-when">{#if here}<span class="here">{copy.thisOne}</span>{:else}<span class="go" aria-hidden="true"><Icon name="chevron" size="s" /></span>{/if}</span>
-        </svelte:element>
-      </li>
-    {/each}
-  </ul>
-  <!-- AND THE HEADING SAYS WHAT IT COULD NOT COUNT. The rows are the account's answer, so when
-       that read is refused this section holds the record you are inside and nothing else. A
-       section called "Records you can open" that quietly holds one row reads as a product with
-       one record in it, which is a different claim from the true one. The rail's switcher
-       reports the same sentence, because two surfaces offering one fact must not answer it
-       two ways. -->
-  {#if shell.recordsRefused}<p class="hint">{shell.recordsRefused}</p>{/if}
-</Section>
+<Tile class="section" data-surface="tile" title={copy.yourRecords} count={me.records.length || undefined}>
+  <div class="section-body">
+    <ul class="ledger ledger-lead">
+      {#each me.records as r}
+        {@const here = r.slug === SLUG}
+        <li>
+          <svelte:element
+            this={here ? 'div' : 'a'}
+            class="line line-tall"
+            href={here ? undefined : at('/', `${BASE}/${r.slug}/`)}
+            role={here ? undefined : 'link'}
+            onclick={here
+              ? undefined
+              : (e: MouseEvent) => {
+                  e.preventDefault();
+                  void openOther(r);
+                }}
+          >
+            <span class="line-mark"><Face name={r.name} of="record" size="l" /></span>
+            <span class="line-main">
+              <span class="line-title">{r.name}</span>
+              <span class="line-detail">{r.level === null ? levelWord(r) : (copy.levelMeans[r.level] ?? r.level)}</span>
+            </span>
+            <span class="line-amount"></span>
+            <span class="line-when">{#if here}<span class="here">{copy.thisOne}</span>{:else}<span class="go" aria-hidden="true"><Icon name="chevron" size="s" /></span>{/if}</span>
+          </svelte:element>
+        </li>
+      {/each}
+    </ul>
+    <!-- AND THE HEADING SAYS WHAT IT COULD NOT COUNT. The rows are the account's answer, so when
+         that read is refused this section holds the record you are inside and nothing else. A
+         section called "Records you can open" that quietly holds one row reads as a product with
+         one record in it, which is a different claim from the true one. The rail's switcher
+         reports the same sentence, because two surfaces offering one fact must not answer it
+         two ways. -->
+    {#if shell.recordsRefused}<p class="hint">{shell.recordsRefused}</p>{/if}
+  </div>
+</Tile>
 
 <!-- CLOSE YOUR ACCOUNT, LAST: what goes and what stays said before anybody presses, the
      red text button here and the one filled red button inside the sheet that does it. At 390px
      `row-actions` stacks, so the button is full width. -->
 {#if closable || closedNow}
-  <Section title={copy.closeTitle}>
-    <p class="hint">{copy.closeSays}</p>
-    <div class="row-actions">
-      <Button tone="bad" onclick={startClose}>{copy.closeStart}</Button>
+  <Tile class="section" data-surface="tile" title={copy.closeTitle}>
+    <div class="section-body">
+      <p class="hint">{copy.closeSays}</p>
+      <div class="row-actions">
+        <Button tone="bad" onclick={startClose}>{copy.closeStart}</Button>
+      </div>
     </div>
-  </Section>
+  </Tile>
 
   <Sheet bind:open={closeOpen} title={copy.closeTitle}>
     {#if closedNow}
@@ -774,7 +780,7 @@
   }
 
   /* A FORM, AS THE DESIGN SYSTEM DRAWS ONE: the label above the field, the help under it, and a refusal in
-     the help's place in `--danger` with the field's edge in `--danger` too. */
+     the help's place in `--red` with the field's edge in `--red` too. */
   .rename {
     display: flex;
     flex-direction: column;
@@ -793,7 +799,7 @@
     font-size: var(--fs-body);
   }
 
-  /* THE FIELD'S EDGE IN `--danger`: a field has no border, so the edge is drawn inside it. */
+  /* THE FIELD'S EDGE IN `--red`: a field has no border, so the edge is drawn inside it. */
   .rename-bad {
     box-shadow: inset 0 0 0 1.5px var(--red);
   }

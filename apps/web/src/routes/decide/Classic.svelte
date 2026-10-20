@@ -63,7 +63,6 @@
   import type { Question } from '$lib/record/schema.ts';
   import { CapLine } from 'braindog-render/svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -819,37 +818,39 @@
 <!-- THE REST OF THE QUEUE, ON THE GROUND. Ranked, it starts after the open question; grouped, every question is a row
      under the heading of what it is about. The keys show once the keyboard is in the queue. -->
 {#snippet waitingList()}
-  <Section title={LEAD.waiting}>
-    {#snippet aside()}
+  <Tile class="section" data-surface="tile" title={LEAD.waiting}>
+    {#snippet actions()}
       {#if waiting.length > 1}<span class="hint" aria-hidden="true"><Kbd keys="j" /><Kbd keys="k" /><span>{LEAD.switch}</span></span>{/if}
     {/snippet}
-    {#if grouping === 'none'}
-      <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
-        <!-- THE ORDER IS SAID OUT LOUD, because a list whose order cannot be seen is a list a reader assumes is
-             arbitrary, and this one is not: it is dearest-to-get-wrong first. -->
-        <ol class="queue" start={2} aria-label={copy.rankedBy}>
-          {#each order.slice(1) as q (q.id)}{@render card(q, false)}{/each}
-        </ol>
-      </div>
-    {:else}
-      {#each groups as g (g.key)}
+    <div class="section-body">
+      {#if grouping === 'none'}
         <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
-          <h3 class="group-head">{g.name}<span class="group-n num">{g.items.length}</span></h3>
-          <ol class="queue">
-            {#each g.items as q (q.id)}{@render card(q, false)}{/each}
+          <!-- THE ORDER IS SAID OUT LOUD, because a list whose order cannot be seen is a list a reader assumes is
+               arbitrary, and this one is not: it is dearest-to-get-wrong first. -->
+          <ol class="queue" start={2} aria-label={copy.rankedBy}>
+            {#each order.slice(1) as q (q.id)}{@render card(q, false)}{/each}
           </ol>
         </div>
-      {/each}
-    {/if}
+      {:else}
+        {#each groups as g (g.key)}
+          <div class="group" data-picking={picked.size > 0 || selecting ? '' : undefined}>
+            <h3 class="group-head">{g.name}<span class="group-n num">{g.items.length}</span></h3>
+            <ol class="queue">
+              {#each g.items as q (q.id)}{@render card(q, false)}{/each}
+            </ol>
+          </div>
+        {/each}
+      {/if}
 
-    {#if waiting.length === 0}
-      <Empty kind="cleared" compact title={said('no_questions')}>
-        {#snippet actions()}
-          {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
-        {/snippet}
-      </Empty>
-    {/if}
-  </Section>
+      {#if waiting.length === 0}
+        <Empty kind="cleared" compact title={said('no_questions')}>
+          {#snippet actions()}
+            {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}
+          {/snippet}
+        </Empty>
+      {/if}
+    </div>
+  </Tile>
 {/snippet}
 
 <div class="page">
@@ -975,86 +976,92 @@
   <!-- WHAT WAS PUT OFF, the soonest back first. The queue above leaves a deferred question out until its day comes, so
        without this list a question put off was a question nobody could find until it reappeared. -->
   {#if from === 'live' && views.later.length}
-    <Section title={WORDS.later}>
-      <ul class="ledger ledger-lead">
-        {#each views.later.slice(0, DOM_CAP) as q (q.id)}
-          <li>
-            <a class="line line-tall" href={at(`/decide/${q.id}`)}>
-              <span class="line-mark"><IconWell name="clock" size="l" /></span>
-              <span class="line-main">
-                <span class="line-title">{q.title}</span>
-                {#if q.why}<span class="line-detail">{q.why}</span>{/if}
-              </span>
-              <span class="line-when">{WORDS.back(dayWord(q.until, now))}</span>
-            </a>
-          </li>
-        {/each}
-      </ul>
-      <CapLine shown={Math.min(views.later.length, DOM_CAP)} total={views.later.length} />
-    </Section>
+    <Tile class="section" data-surface="tile" title={WORDS.later}>
+      <div class="section-body">
+        <ul class="ledger ledger-lead">
+          {#each views.later.slice(0, DOM_CAP) as q (q.id)}
+            <li>
+              <a class="line line-tall" href={at(`/decide/${q.id}`)}>
+                <span class="line-mark"><IconWell name="clock" size="l" /></span>
+                <span class="line-main">
+                  <span class="line-title">{q.title}</span>
+                  {#if q.why}<span class="line-detail">{q.why}</span>{/if}
+                </span>
+                <span class="line-when">{WORDS.back(dayWord(q.until, now))}</span>
+              </a>
+            </li>
+          {/each}
+        </ul>
+        <CapLine shown={Math.min(views.later.length, DOM_CAP)} total={views.later.length} />
+      </div>
+    </Tile>
   {/if}
 
   <!-- THE CALLS A PREDICTION WAS MADE ABOUT, and whether it came true, so a decision is judged by what followed and
        not by how sure it sounded. The word carries the outcome; the glyph beside it is never the only sign. -->
   {#if from === 'live' && views.calls.length}
-    <Section title={WORDS.calls}>
-      <ul class="ledger ledger-lead">
-        {#each views.calls as c (c.id)}
-          {@const when = dayWord(c.at, now)}
-          <li>
-            {#snippet body()}
-              <span class="line-mark"><IconWell name="observe" size="l" tone={c.went === 'met' ? 'earn' : undefined} /></span>
-              <span class="line-main">
-                <span class="line-title">{c.claim}</span>
-                <span class="line-detail call-went" data-went={c.went}>
-                  {#if c.went === 'met'}<Icon name="check" size="s" />{WORDS.met}{:else if c.went === 'missed'}<Icon name="close" size="s" />{WORDS.missed}{:else if c.went === 'unread'}{WORDS.unread}{:else}<Icon name="clock" size="s" />{WORDS.due(when)}{/if}
+    <Tile class="section" data-surface="tile" title={WORDS.calls}>
+      <div class="section-body">
+        <ul class="ledger ledger-lead">
+          {#each views.calls as c (c.id)}
+            {@const when = dayWord(c.at, now)}
+            <li>
+              {#snippet body()}
+                <span class="line-mark"><IconWell name="observe" size="l" tone={c.went === 'met' ? 'earn' : undefined} /></span>
+                <span class="line-main">
+                  <span class="line-title">{c.claim}</span>
+                  <span class="line-detail call-went" data-went={c.went}>
+                    {#if c.went === 'met'}<Icon name="check" size="s" />{WORDS.met}{:else if c.went === 'missed'}<Icon name="close" size="s" />{WORDS.missed}{:else if c.went === 'unread'}{WORDS.unread}{:else}<Icon name="clock" size="s" />{WORDS.due(when)}{/if}
+                  </span>
                 </span>
-              </span>
-              {#if c.went !== 'due' && when}<span class="line-when">{WORDS.checked(when)}</span>{/if}
-            {/snippet}
-            {#if c.about}<a class="line line-tall" href={at(`/decide/${c.about}`)}>{@render body()}</a>{:else}<div class="line line-tall">{@render body()}</div>{/if}
-          </li>
-        {/each}
-      </ul>
-    </Section>
+                {#if c.went !== 'due' && when}<span class="line-when">{WORDS.checked(when)}</span>{/if}
+              {/snippet}
+              {#if c.about}<a class="line line-tall" href={at(`/decide/${c.about}`)}>{@render body()}</a>{:else}<div class="line line-tall">{@render body()}</div>{/if}
+            </li>
+          {/each}
+        </ul>
+      </div>
+    </Tile>
   {/if}
 
   <!-- DECIDED LATELY: the answer each one got and the reason it kept, the newest first. The first few, then the whole
        ledger in place under "All decisions", capped and paged as it always was. -->
   {#if DECIDED.length}
-    <Section title={LEAD.decided} count={decidedTotal}>
-      {#snippet aside()}
+    <Tile class="section" data-surface="tile" title={LEAD.decided} count={decidedTotal || undefined}>
+      {#snippet actions()}
         {#if !allDecided && decidedTotal > DECIDED_FIRST}
           <Button weight="bare" size="sm" onclick={() => (allDecided = true)}>{LEAD.allDecided}<Icon name="arrow" size="s" /></Button>
         {/if}
       {/snippet}
-      <ul class="ledger ledger-lead">
-        {#each decidedShown as q}
-          <!-- THE OPTION BY ITS LABEL. A live decision keeps the option's id, and its options come from the suggestion it settled. -->
-          {@const choseTitle = q.options.find((o) => o.key === q.decided?.option)?.title}
-          <li>
-            <a class="line line-tall" href={at(`/decide/${q.id}`)}>
-              <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
-              <span class="line-main">
-                <span class="line-title">{q.title}</span>
-                <span class="line-detail">{#if choseTitle}<span class="decided-choice">{choseTitle}</span> {/if}{q.decided?.reason}</span>
-              </span>
-              <span class="line-when">{since(q.decided?.at ?? '', now)}</span>
-            </a>
-          </li>
-        {/each}
-      </ul>
-      {#if allDecided}
-        <!-- THE WHOLE LEDGER IS `DECIDED.slice(0, DOM_CAP)`, and the line under it says when it holds more. -->
-        <CapLine shown={Math.min(DECIDED.length, DOM_CAP)} total={decidedTotal} />
-        {#if from === 'live' && live?.older && live.older.cursor !== null}
-          <div class="older">
-            <Button weight="quiet" onclick={loadOlder} disabled={loadingOlder}>{copy.olderEntries}</Button>
-          </div>
+      <div class="section-body">
+        <ul class="ledger ledger-lead">
+          {#each decidedShown as q}
+            <!-- THE OPTION BY ITS LABEL. A live decision keeps the option's id, and its options come from the suggestion it settled. -->
+            {@const choseTitle = q.options.find((o) => o.key === q.decided?.option)?.title}
+            <li>
+              <a class="line line-tall" href={at(`/decide/${q.id}`)}>
+                <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
+                <span class="line-main">
+                  <span class="line-title">{q.title}</span>
+                  <span class="line-detail">{#if choseTitle}<span class="decided-choice">{choseTitle}</span> {/if}{q.decided?.reason}</span>
+                </span>
+                <span class="line-when">{since(q.decided?.at ?? '', now)}</span>
+              </a>
+            </li>
+          {/each}
+        </ul>
+        {#if allDecided}
+          <!-- THE WHOLE LEDGER IS `DECIDED.slice(0, DOM_CAP)`, and the line under it says when it holds more. -->
+          <CapLine shown={Math.min(DECIDED.length, DOM_CAP)} total={decidedTotal} />
+          {#if from === 'live' && live?.older && live.older.cursor !== null}
+            <div class="older">
+              <Button weight="quiet" onclick={loadOlder} disabled={loadingOlder}>{copy.olderEntries}</Button>
+            </div>
+          {/if}
+          {#if olderFix}<p class="older-fix" role="status">{olderFix}</p>{/if}
         {/if}
-        {#if olderFix}<p class="older-fix" role="status">{olderFix}</p>{/if}
-      {/if}
-    </Section>
+      </div>
+    </Tile>
   {/if}
 </div>
 
@@ -1073,8 +1080,8 @@
   .cannot {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -1113,7 +1120,7 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -1125,8 +1132,8 @@
     display: none;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .col:has(:focus-visible) .hint {
@@ -1148,15 +1155,15 @@
     gap: var(--sp-2);
     margin: 0 0 var(--sp-1);
     padding-block: var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .group-n {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
   }
 
@@ -1187,7 +1194,7 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding: var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     scroll-margin-block: var(--sp-7);
     transition: background var(--d-state) var(--ease-out);
   }
@@ -1198,13 +1205,13 @@
     inset-block-start: 0;
     inset-inline: var(--sp-3);
     block-size: 1px;
-    background: var(--line);
+    background: var(--rule);
     pointer-events: none;
     transition: opacity var(--d-state) var(--ease-out);
   }
 
   .q:not([data-lead])[data-cursor] {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .q[data-cursor]::after,
@@ -1214,7 +1221,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .q:not([data-lead]):hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .q:not([data-lead]):hover::after,
@@ -1225,7 +1232,7 @@
 
   /* THE CURSOR IS THE FOCUS RING while it is the keyboard's, drawn round the question. A pointer reader never sees it. */
   .q:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -1236,7 +1243,7 @@
 
   .q[data-lead]:focus-visible {
     outline-offset: var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   /* A DECIDED QUESTION IS ONE LINE, and the rule over it stays so the list keeps its rhythm. */
@@ -1248,8 +1255,8 @@
     display: flex;
     align-items: baseline;
     gap: var(--sp-1) var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     text-decoration: none;
   }
 
@@ -1259,7 +1266,7 @@
 
   .q-receipt .q-title {
     min-inline-size: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: 400;
   }
 
@@ -1267,11 +1274,11 @@
     flex: none;
     align-self: start;
     padding-block-start: 2px;
-    color: var(--earn);
+    color: var(--good);
   }
 
   .q-said {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .q-said::before {
@@ -1305,7 +1312,7 @@
 
   .q-title {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
@@ -1321,7 +1328,7 @@
     padding: 0;
     list-style: none;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -1334,7 +1341,7 @@
   .q-does :global(.icon) {
     flex: none;
     margin-block-start: 2px;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .q-rec {
@@ -1342,14 +1349,14 @@
     flex-direction: column;
     gap: var(--sp-2);
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .q-rec-h {
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }
@@ -1358,7 +1365,7 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -1371,8 +1378,8 @@
 
   .q-ev-key {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* ── the selection check ───────────────────────────────────────────────── */
@@ -1388,9 +1395,9 @@
     margin-block-start: 2px;
     padding: 0;
     background: none;
-    border: 1.5px solid var(--dim);
-    border-radius: var(--r-pill);
-    color: var(--on-ink);
+    border: 1.5px solid var(--ink-3);
+    border-radius: var(--r-ctl);
+    color: var(--on-red);
     cursor: pointer;
     visibility: hidden;
     transition:
@@ -1463,8 +1470,8 @@
   }
 
   .said-what {
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .why {
@@ -1475,22 +1482,22 @@
   }
 
   .why-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
-  /* A FIELD IS 40 ON `--s1` IN A TILE AND ON THE TILE'S OWN WHITE ON THE GROUND, radius 12, and no border: the fill is
+  /* A FIELD IS 40 ON `--tile-2` IN A TILE AND ON THE TILE'S OWN WHITE ON THE GROUND, radius 12, and no border: the fill is
      its edge. */
   .why-field {
     inline-size: 100%;
     min-block-size: 40px;
     padding: 10px var(--sp-3);
-    background: var(--bg);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     resize: vertical;
     /* THE REASON STAYS ABOVE THE KEYBOARD, with room under it for Send: a focused field scrolls clear of the sticky bar
@@ -1500,14 +1507,14 @@
   }
 
   .q[data-lead] .why-field {
-    background: var(--s1);
+    background: var(--tile-2);
   }
 
   .why-note {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .send {
@@ -1523,8 +1530,8 @@
     display: none;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .why:focus-within .keys {
@@ -1539,7 +1546,7 @@
   .why-fix {
     margin: 0;
     max-inline-size: var(--measure);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   /* ── the selection's bar: glass chrome at the foot of the view ─────────────────────────────── */
@@ -1558,22 +1565,15 @@
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
     padding: 6px 6px 6px var(--sp-4);
-    background: var(--glass-strong);
-    backdrop-filter: var(--glass-blur);
-    border-radius: var(--r-lg);
-    box-shadow: var(--glass-edge), var(--e2);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+    border: 1px solid var(--rule-strong);
   }
 
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .batch {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
 
   .batch-n {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -1584,12 +1584,12 @@
     min-inline-size: 0;
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--hover-wash);
+    background: var(--hover);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   /* A question the cursor lands on clears the bar, which stands over the foot of the view. */
@@ -1599,8 +1599,8 @@
 
   .batch-note {
     flex: 1;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   /* ── the lists under the queue ─────────────────────────────────────────── */
@@ -1612,8 +1612,8 @@
   }
 
   .older-fix {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A WELL, THE WORDS, AND WHEN, on every width. `rows.css` gives a lead column; on a phone the when goes under the
@@ -1651,7 +1651,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .decided-choice {
@@ -1664,14 +1664,8 @@
   :global(.head[data-under] .segmented.group-by) {
     background: transparent;
     box-shadow: none;
-    backdrop-filter: none;
   }
 
-  @supports (-webkit-backdrop-filter: none) {
-    :global(.head[data-under] .segmented.group-by) {
-      -webkit-backdrop-filter: none;
-    }
-  }
 
   /* NO KEY IS PRINTED WHERE THERE IS NO KEYBOARD, and the group control, a desk's nicety, gives way on a phone. */
   @media (width < 900px), (pointer: coarse) {

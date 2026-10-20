@@ -32,7 +32,6 @@
   import Face from '$lib/ui/Face.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
@@ -596,7 +595,7 @@
     {/if}
 
     {#if offerAll || actors.length > 1 || kinds.length > 1 || days.length > 1}
-      <!-- THE FILTERS ARE ONE SEGMENTED CONTROL: one `--field` rectangle, each filter a segment in it, and a filter that
+      <!-- THE FILTERS ARE ONE SEGMENTED CONTROL: one `--tile-2` rectangle, each filter a segment in it, and a filter that
            narrows the stream wears the chosen segment's tile fill, so a narrowed stream says so at a glance. Who and
            what open their menus from their segment; the day is the native select, drawn as a segment.
 
@@ -844,27 +843,29 @@
 
       {#each bands as day, d (day.key)}
         {#if d === 1 && tiles && phone}{@render sideTiles()}{/if}
-        <Section title={day.title} count={day.count}>
-          {#each day.hours as band (band.key)}
-            <!-- THE HOUR IS A SUBHEAD INSIDE ITS DAY, in the meta step and tabular, so the times line up down the tile. -->
-            <h3 class="hour num">{band.title}</h3>
-            <ul class="ledger">
-              <!-- ONE RUN'S WORK IS ITS NEWEST LINE, and the rest of it one press away in the same place (`runFolds`). -->
-              {#each runFolds(band.lines) as f (f.key)}
-                {@render entry(f.head)}
-                {#if f.rest.length > 0}
-                  {#if foldOpen(f, unfolded)}
-                    {#each f.rest as t, i (t.key)}{@render entry(t, i === 0 ? t.key : undefined)}{/each}
-                  {:else}
-                    <li class="fold-row">
-                      <button type="button" class="fold tap" aria-expanded="false" onclick={() => void unfold(f)}>{historyWords.more(f.rest.length)}</button>
-                    </li>
+        <Tile class="section" data-surface="tile" title={day.title} count={day.count || undefined}>
+          <div class="section-body">
+            {#each day.hours as band (band.key)}
+              <!-- THE HOUR IS A SUBHEAD INSIDE ITS DAY, in the meta step and tabular, so the times line up down the tile. -->
+              <h3 class="hour num">{band.title}</h3>
+              <ul class="ledger">
+                <!-- ONE RUN'S WORK IS ITS NEWEST LINE, and the rest of it one press away in the same place (`runFolds`). -->
+                {#each runFolds(band.lines) as f (f.key)}
+                  {@render entry(f.head)}
+                  {#if f.rest.length > 0}
+                    {#if foldOpen(f, unfolded)}
+                      {#each f.rest as t, i (t.key)}{@render entry(t, i === 0 ? t.key : undefined)}{/each}
+                    {:else}
+                      <li class="fold-row">
+                        <button type="button" class="fold tap" aria-expanded="false" onclick={() => void unfold(f)}>{historyWords.more(f.rest.length)}</button>
+                      </li>
+                    {/if}
                   {/if}
-                {/if}
-              {/each}
-            </ul>
-          {/each}
-        </Section>
+                {/each}
+              </ul>
+            {/each}
+          </div>
+        </Tile>
       {/each}
       {#if bands.length === 1 && tiles && phone}{@render sideTiles()}{/if}
 
@@ -892,8 +893,8 @@
   /* QUIETER THAN THE SENTENCE OVER IT, and still body size; a finger's height on a phone. */
   .as-page {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   @media (pointer: coarse) {
@@ -969,14 +970,14 @@
     margin: 0;
     margin-block-start: auto;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .foot {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A TILE'S FOOT SITS UNDER ITS READING, a step closer than the tile's own gap. */
@@ -1018,16 +1019,16 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     cursor: pointer;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .fold:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }
@@ -1129,9 +1130,9 @@
     inline-size: 100%;
     background: none;
     border: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     text-align: start;
     cursor: pointer;
   }
@@ -1143,7 +1144,7 @@
 
   .mi:hover,
   .mi:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -1153,8 +1154,8 @@
   }
 
   .mi-n {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1187,7 +1188,7 @@
 
   /* THE VERB IN THE SECOND INK, WHAT IT WAS DONE TO IN INK: the thing is what a reader scans for. */
   .verb {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .target {
@@ -1206,7 +1207,7 @@
   @media (hover: hover) and (pointer: fine) {
     /* ITS OWN TARGET, `> .line`: a step opened under a pass is a line of its own, and hovering it washes it alone. */
     .ledger > li:has(> .line .target:hover) > .line {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .ledger > li:has(> .line .target:hover) > .line::after,
@@ -1254,8 +1255,8 @@
     grid-row: 1;
     max-inline-size: 18ch;
     overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1276,7 +1277,7 @@
      hour after the first, so the day reads as one tile with places in it. */
   .hour {
     margin: var(--sp-2) 0 var(--sp-1);
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     line-height: 18px;

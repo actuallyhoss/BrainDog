@@ -35,7 +35,6 @@
   import { countsOf, monthRange, monthsBeside, monthWords, readUsage, words, type Named, type UsageView } from '$lib/record/actions.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -315,53 +314,57 @@
       {:else}
         <!-- BY PROJECT, EACH PROJECT'S ACTIONS UNDER IT and the global ones last under Everywhere; a project's "Runs on"
              opens its slice, and the link beside the heading shows every project again. -->
-        <Section title={sliced.length > 0 ? words.only(sliced[0]?.name ?? '') : reading.projects} count={sliced.length > 0 ? 0 : groups.length}>
-          {#snippet aside()}
+        <Tile class="section" data-surface="tile" title={sliced.length > 0 ? words.only(sliced[0]?.name ?? '') : reading.projects} count={(sliced.length > 0 ? 0 : groups.length) || undefined}>
+          {#snippet actions()}
             {#if sliced.length > 0}<a class="use-all tap" href={at(`/usage?month=${view.month}`)}>{words.allProjects}</a>{/if}
           {/snippet}
-          <div class="use-groups">
-            {#each groups as g (g.key)}
-              <div class="use-group" data-faint={g.faint ? '' : undefined}>
-                <h3 class="use-group-h">
-                  <IconWell name={g.faint ? 'globe' : 'board'} size="l" />
-                  <span class="use-group-name">{g.name}</span>
-                  <span class="use-counts num">{countsOf(g.totals)}</span>
-                </h3>
-                {@render list(g.actions)}
-              </div>
-            {/each}
+          <div class="section-body">
+            <div class="use-groups">
+              {#each groups as g (g.key)}
+                <div class="use-group" data-faint={g.faint ? '' : undefined}>
+                  <h3 class="use-group-h">
+                    <IconWell name={g.faint ? 'globe' : 'board'} size="l" />
+                    <span class="use-group-name">{g.name}</span>
+                    <span class="use-counts num">{countsOf(g.totals)}</span>
+                  </h3>
+                  {@render list(g.actions)}
+                </div>
+              {/each}
+            </div>
           </div>
-        </Section>
+        </Tile>
       {/if}
 
       <!-- DELIVERIES AND ARRIVALS, EACH KIND ONE ROW: the name and its count beside it, wrapping under it on a phone. A
            month with neither draws nothing, since there is nothing the owner can do about a zero here. -->
       {#if countedRows.sent.length > 0 || countedRows.arrived.length > 0}
-        <Section title={said.counted}>
-          <p class="use-why">{said.countedWhy}</p>
-          <div class="use-groups">
-            {#each countedGroups as g (g.key)}
-              {#if g.rows.length > 0}
-                <div class="use-group">
-                  <h3 class="use-group-h">
-                    <IconWell name={g.icon} size="l" />
-                    <span class="use-group-name">{g.title}</span>
-                  </h3>
-                  <ul class="ledger use-list">
-                    {#each g.rows as r (r.key)}
-                      <li>
-                        <div class="line use-row">
-                          <span class="line-title">{r.name}</span>
-                          <span class="line-when use-counts">{r.counts}</span>
-                        </div>
-                      </li>
-                    {/each}
-                  </ul>
-                </div>
-              {/if}
-            {/each}
+        <Tile class="section" data-surface="tile" title={said.counted}>
+          <div class="section-body">
+            <p class="use-why">{said.countedWhy}</p>
+            <div class="use-groups">
+              {#each countedGroups as g (g.key)}
+                {#if g.rows.length > 0}
+                  <div class="use-group">
+                    <h3 class="use-group-h">
+                      <IconWell name={g.icon} size="l" />
+                      <span class="use-group-name">{g.title}</span>
+                    </h3>
+                    <ul class="ledger use-list">
+                      {#each g.rows as r (r.key)}
+                        <li>
+                          <div class="line use-row">
+                            <span class="line-title">{r.name}</span>
+                            <span class="line-when use-counts">{r.counts}</span>
+                          </div>
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
+              {/each}
+            </div>
           </div>
-        </Section>
+        </Tile>
       {/if}
 
       <!-- SLASH'S SECTION, THIS MONTH AND THE OWNER'S ONLY: the ledger's door answers the owner alone, and the status door
@@ -428,7 +431,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     line-height: 34px;
     letter-spacing: -0.02em;
@@ -436,8 +439,8 @@
   }
 
   .figure-unit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     letter-spacing: 0;
   }
@@ -447,23 +450,23 @@
   .reading {
     margin: auto 0 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .slash-line {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .aside-line {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -491,14 +494,14 @@
 
   .ring-name {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
 
   .ring-line {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     font-variant-numeric: tabular-nums;
   }
@@ -521,7 +524,7 @@
     gap: var(--sp-3);
     min-block-size: var(--row-h);
     margin: 0;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }
@@ -536,13 +539,13 @@
   }
 
   .use-group[data-faint] .use-group-name {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .use-counts {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
@@ -558,18 +561,18 @@
   }
 
   .use-row .line-title {
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .use-row[data-faint] .line-title {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .use-why {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -577,8 +580,8 @@
     display: inline-flex;
     align-items: center;
     min-block-size: var(--ctl-h-sm);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: none;
   }

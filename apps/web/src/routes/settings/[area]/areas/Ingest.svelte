@@ -14,7 +14,6 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
   import CodeLine from '$lib/ui/CodeLine.svelte';
@@ -213,27 +212,29 @@
   </Tile>
 {/if}
 
-<Section title={copy.sources}>
-  <p class="hint">{copy.sourcesHow}</p>
-  <!-- A RECORD LISTS ITS OWN SCHEDULED ACTIONS, with Resume and Reconnect that write.
+<Tile class="section" data-surface="tile" title={copy.sources}>
+  <div class="section-body">
+    <p class="hint">{copy.sourcesHow}</p>
+    <!-- A RECORD LISTS ITS OWN SCHEDULED ACTIONS, with Resume and Reconnect that write.
 
-       AND A SHELL WITH NO RECORD LISTS NOTHING. This arm drew the sample's `SOURCES`, three
-       connectors nobody set up, one of them paused on a credential nobody holds, with
-       Reconnect and Retry now buttons that only said what would have happened. The shell's
-       own refusal is already on the screen, so nothing here repeats it. -->
-  {#if shell.live}
-    <Actions project={null} />
-  {/if}
-  <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
-       shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
-       it were today's is the failure that actually costs somebody money." -->
-  <p class="hint">{copy.staleShows}</p>
-<!-- THERE WAS NO WAY TO ADD ONE, and inventing a button would be worse: `25 §9` draws this
-     screen without one, because a source is a declaration and arrives the way every
-     declaration does (`04 §1`: `ingest` is one of the kinds an add-on carries). So the screen
-     says where a new one comes from and links there. -->
-  <p class="hint sources-add">{copy.sourcesAdd} <a class="tap" href={at('/packs')}>{copy.sourcesAddGo}</a></p>
-</Section>
+         AND A SHELL WITH NO RECORD LISTS NOTHING. This arm drew the sample's `SOURCES`, three
+         connectors nobody set up, one of them paused on a credential nobody holds, with
+         Reconnect and Retry now buttons that only said what would have happened. The shell's
+         own refusal is already on the screen, so nothing here repeats it. -->
+    {#if shell.live}
+      <Actions project={null} />
+    {/if}
+    <!-- `25 §9`'s own blockquote, and it outranks the screen: "every chart fed by a stale series
+         shows a gap and a stale badge. A dashboard that keeps yesterday's number on screen as if
+         it were today's is the failure that actually costs somebody money." -->
+    <p class="hint">{copy.staleShows}</p>
+  <!-- THERE WAS NO WAY TO ADD ONE, and inventing a button would be worse: `25 §9` draws this
+       screen without one, because a source is a declaration and arrives the way every
+       declaration does (`04 §1`: `ingest` is one of the kinds an add-on carries). So the screen
+       says where a new one comes from and links there. -->
+    <p class="hint sources-add">{copy.sourcesAdd} <a class="tap" href={at('/packs')}>{copy.sourcesAddGo}</a></p>
+  </div>
+</Tile>
 
 <!--
   WHERE FORWARDED MAIL ARRIVES, AND UNTIL NOW NO OWNER COULD ASK FOR AN ADDRESS.
@@ -264,100 +265,102 @@
   either: `mintsHere === false` is true of every reader, and only after that does it matter
   who is asking.
 -->
-<Section title={mailWords.title}>
-  <p class="hint">{mailWords.how}</p>
-  {#if mintsHere === false}
-    <!-- THE HOST'S ANSWER, AS THE SECTION'S OWN SENTENCE. It says where a self-host keeps the
-         address and what writing and deleting that file do, so the person leaves with the thing
-         they came for instead of a control that cannot work. Nothing is said about a fresh
-         sign-in, because there is no door here for a sign-in to open. -->
-    {#if shell.host === 'cloud'}
-      <p class="hint">{words.unroutedHosted}</p>
-    {:else}
-      <p class="hint">{words.unrouted} <CodeLine inline text={mailWords.tokenFile} />.</p>
-      <p class="hint">{mailWords.unroutedDoes}</p>
-    {/if}
-  {:else if mintsHere === true && !anOwner}
-    <!-- AND THE PERSON ONLY ONCE THE HOST HAS ANSWERED, which `mintsHere === true` is what
-         says. Written as a bare `{:else if !anOwner}` this arm also caught the moment before
-         the probe lands, where `mintsHere` is still `null`: a colleague on a host with no door
-         read "Only an owner of this record can do this", and then watched it be replaced by
-         the sentence about `inbound.token` when the GET came back. The section says one thing
-         or says nothing, and an owner has always been drawn nothing until the door answers. -->
-    <p class="hint">{levelWords.ownersOnly}</p>
-  {:else if mintsHere === true}
-    <!--
-      THREE STEPS, IN THE ORDER A PERSON TAKES THEM: make the address, point the mail at it,
-      and send one to see it land. It was a wall of five paragraphs around two buttons, and the step
-      that tells somebody it worked was not on the screen at all. Each step is its number, its title,
-      its one sentence and its control, and nothing is boxed.
-    -->
-    <ol class="steps">
-      <li class="step">
-        <span class="step-n num" aria-hidden="true">1</span>
-        <div class="step-body">
-          <h3 class="step-title">{words.stepMake}</h3>
-          <p class="hint">{mailWords.freshWhy}</p>
-          <div class="row-actions">
-            <!-- ONE PRIMARY ON THE SCREEN: once an address is on it, copying that address is the one
-                 thing to do next, so making another steps down to a secondary. -->
-            <Button weight={mailSaid?.kind === 'minted' ? 'quiet' : 'primary'} disabled={mailBusy} onclick={() => void askMail('mint')}>
-              {mailBusy && mailPending === 'mint' ? mailWords.minting : mailWords.mint}
-            </Button>
-            <!-- THE QUIETER ACTION, AND THE MORE DAMAGING ONE. It writes `null` and answers no value; a bank
-                 posting to the old address is refused from that moment, with nothing to show for it. -->
-            <Button weight="bare" tone="bad" disabled={mailBusy} onclick={() => void askMail('revoke')}>
-              {mailBusy && mailPending === 'revoke' ? mailWords.revoking : mailWords.revoke}
-            </Button>
-          </div>
-          <!-- Always in the document, for the reason the agents field gives: a live region inserted with its
-               first sentence is not reliably announced. -->
-          <p class="code-said" role="status" data-intent={mailTone}>{mailLine}</p>
-          {#if mailSaid?.kind === 'signin'}
-            <!-- A STALE SIGN-IN IS A STATE WITH A WAY FORWARD, not an error. The same passkey re-proof the
-                 agents area offers, and then the same press again rather than a press the person has to find. -->
+<Tile class="section" data-surface="tile" title={mailWords.title}>
+  <div class="section-body">
+    <p class="hint">{mailWords.how}</p>
+    {#if mintsHere === false}
+      <!-- THE HOST'S ANSWER, AS THE SECTION'S OWN SENTENCE. It says where a self-host keeps the
+           address and what writing and deleting that file do, so the person leaves with the thing
+           they came for instead of a control that cannot work. Nothing is said about a fresh
+           sign-in, because there is no door here for a sign-in to open. -->
+      {#if shell.host === 'cloud'}
+        <p class="hint">{words.unroutedHosted}</p>
+      {:else}
+        <p class="hint">{words.unrouted} <CodeLine inline text={mailWords.tokenFile} />.</p>
+        <p class="hint">{mailWords.unroutedDoes}</p>
+      {/if}
+    {:else if mintsHere === true && !anOwner}
+      <!-- AND THE PERSON ONLY ONCE THE HOST HAS ANSWERED, which `mintsHere === true` is what
+           says. Written as a bare `{:else if !anOwner}` this arm also caught the moment before
+           the probe lands, where `mintsHere` is still `null`: a colleague on a host with no door
+           read "Only an owner of this record can do this", and then watched it be replaced by
+           the sentence about `inbound.token` when the GET came back. The section says one thing
+           or says nothing, and an owner has always been drawn nothing until the door answers. -->
+      <p class="hint">{levelWords.ownersOnly}</p>
+    {:else if mintsHere === true}
+      <!--
+        THREE STEPS, IN THE ORDER A PERSON TAKES THEM: make the address, point the mail at it,
+        and send one to see it land. It was a wall of five paragraphs around two buttons, and the step
+        that tells somebody it worked was not on the screen at all. Each step is its number, its title,
+        its one sentence and its control, and nothing is boxed.
+      -->
+      <ol class="steps">
+        <li class="step">
+          <span class="step-n num" aria-hidden="true">1</span>
+          <div class="step-body">
+            <h3 class="step-title">{words.stepMake}</h3>
+            <p class="hint">{mailWords.freshWhy}</p>
             <div class="row-actions">
-              <Button weight="quiet" disabled={mailReproving} onclick={() => void mailSignInAgain()}>{copy.signInAgain}</Button>
+              <!-- ONE PRIMARY ON THE SCREEN: once an address is on it, copying that address is the one
+                   thing to do next, so making another steps down to a secondary. -->
+              <Button weight={mailSaid?.kind === 'minted' ? 'quiet' : 'primary'} disabled={mailBusy} onclick={() => void askMail('mint')}>
+                {mailBusy && mailPending === 'mint' ? mailWords.minting : mailWords.mint}
+              </Button>
+              <!-- THE QUIETER ACTION, AND THE MORE DAMAGING ONE. It writes `null` and answers no value; a bank
+                   posting to the old address is refused from that moment, with nothing to show for it. -->
+              <Button weight="bare" tone="bad" disabled={mailBusy} onclick={() => void askMail('revoke')}>
+                {mailBusy && mailPending === 'revoke' ? mailWords.revoking : mailWords.revoke}
+              </Button>
             </div>
-          {/if}
-        </div>
-      </li>
-      <li class="step">
-        <span class="step-n num" aria-hidden="true">2</span>
-        <div class="step-body">
-          <h3 class="step-title">{words.stepForward}</h3>
-          <p class="hint">{mailWords.forwardHow}</p>
-          {#if mailSaid?.kind === 'minted'}
-            <!-- SHOWN ONCE, from `mailSaid` alone, which leaving the area empties. -->
-            <div class="code-form" role="status">
-              <p class="code-label">{mailWords.once}</p>
-              <p class="address wrap">{mailAddress}</p>
+            <!-- Always in the document, for the reason the agents field gives: a live region inserted with its
+                 first sentence is not reliably announced. -->
+            <p class="code-said" role="status" data-intent={mailTone}>{mailLine}</p>
+            {#if mailSaid?.kind === 'signin'}
+              <!-- A STALE SIGN-IN IS A STATE WITH A WAY FORWARD, not an error. The same passkey re-proof the
+                   agents area offers, and then the same press again rather than a press the person has to find. -->
               <div class="row-actions">
-                <!-- THE LABEL IS PASSED, because `clipboard.put(text)` quotes the text in its own toast, and
-                     the text here is a live credential. -->
-                <Button weight="primary" onclick={() => void clipboard.put(mailAddress, mailWords.addressCopied)}>{mailWords.copyAddress}</Button>
+                <Button weight="quiet" disabled={mailReproving} onclick={() => void mailSignInAgain()}>{copy.signInAgain}</Button>
               </div>
-            </div>
-          {:else}
-            <!-- THE FACT THE SCREEN CANNOT HIDE: there is no route that reads an address back, so this says so
-                 rather than leaving a blank where a value would go and letting it read as "you have none". -->
-            <p class="hint">{mailWords.unknown}</p>
-          {/if}
-        </div>
-      </li>
-      <li class="step">
-        <span class="step-n num" aria-hidden="true">3</span>
-        <div class="step-body">
-          <h3 class="step-title">{words.stepTest}</h3>
-          <p class="hint">{words.testLine}</p>
-          <div class="row-actions">
-            <Button href="/inbox">{words.openInbox}</Button>
+            {/if}
           </div>
-        </div>
-      </li>
-    </ol>
-  {/if}
-</Section>
+        </li>
+        <li class="step">
+          <span class="step-n num" aria-hidden="true">2</span>
+          <div class="step-body">
+            <h3 class="step-title">{words.stepForward}</h3>
+            <p class="hint">{mailWords.forwardHow}</p>
+            {#if mailSaid?.kind === 'minted'}
+              <!-- SHOWN ONCE, from `mailSaid` alone, which leaving the area empties. -->
+              <div class="code-form" role="status">
+                <p class="code-label">{mailWords.once}</p>
+                <p class="address wrap">{mailAddress}</p>
+                <div class="row-actions">
+                  <!-- THE LABEL IS PASSED, because `clipboard.put(text)` quotes the text in its own toast, and
+                       the text here is a live credential. -->
+                  <Button weight="primary" onclick={() => void clipboard.put(mailAddress, mailWords.addressCopied)}>{mailWords.copyAddress}</Button>
+                </div>
+              </div>
+            {:else}
+              <!-- THE FACT THE SCREEN CANNOT HIDE: there is no route that reads an address back, so this says so
+                   rather than leaving a blank where a value would go and letting it read as "you have none". -->
+              <p class="hint">{mailWords.unknown}</p>
+            {/if}
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-n num" aria-hidden="true">3</span>
+          <div class="step-body">
+            <h3 class="step-title">{words.stepTest}</h3>
+            <p class="hint">{words.testLine}</p>
+            <div class="row-actions">
+              <Button href="/inbox">{words.openInbox}</Button>
+            </div>
+          </div>
+        </li>
+      </ol>
+    {/if}
+  </div>
+</Tile>
 <!-- EVERY OTHER SENDER, AND RECORD METHODS RATHER THAN A HOST DOOR. `doors` lists what this record declares and
      `ingestMint` mints for one of them, so unlike the mail section there is no probe: the section is drawn, and
      a record that declares no door says so in its own empty state. -->
@@ -390,7 +393,7 @@
   .address {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--bg);
+    background: var(--tile);
     border-radius: var(--r-pop);
     font-family: var(--font-mono);
     font-size: var(--fs-meta);
@@ -413,7 +416,7 @@
   }
 
   .step + .step {
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
   }
 
   .step-n {

@@ -15,7 +15,6 @@
     readBilling, shareOf, stateLine, thisRecord, tileWords, upgradeOf, words as billWords, type BilledRecord,
   } from '../../billing.ts';
   import { untrack } from 'svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -167,87 +166,91 @@
   on both hosts: "At no point is export withheld." A lapsed record says so in its own sentence.
 -->
 {#if hosted}
-  <Section title={copy.billingYours}>
-    {#if bill.state === 'ready' && bill.value}
-      <!-- A HOST THAT SELLS PACKS AND NO PLAN is taking payments, for credits, so it is never told it is not. -->
-      {#if !bill.value.open && bill.value.packs.length === 0}<p class="hint">{copy.billingNotOpen}</p>{/if}
-      <!-- ROWS ON THE GROUND: a well, the record and its plan, the state under them, and the verbs at the
-           end. A bill that needs him wears the red well, and says so in its sentence, so red is never the only sign. -->
-      <ul class="bills">
-        {#each bill.value.records as r (r.record)}
-          {@const late = r.state === 'past_due' || r.state === 'lapsed'}
-          {@const upgrade = upgradeOf(r, bill.value)}
-          {@const credits = packsOf(r, bill.value)}
-          {@const said = r.state !== 'unbilled' || r.gift ? stateLine(r, shell.now) : ''}
-          <li class="bill">
-            <IconWell name="money" size="l" tone={late ? 'danger' : undefined} />
-            <div class="bill-main">
-              <div class="bill-head">
-                <span class="bill-name" dir="auto">{nameOf(r)}</span>
-                <span class="bill-plan">{planShown(r)}</span>
-              </div>
-              {#if upgrade}
-                <p class="bill-state">{upgrade.line}</p>
-              {:else if said}
-                <p class="bill-state" data-state={r.state}>{said}</p>
-              {/if}
-              {#if credits.left}<p class="bill-state num">{credits.left}</p>{/if}
-              <!-- SLASH CREDIT PACKS (LCH-A10), under what the record says of its plan: one quiet rectangle a pack, each
-                   with its credits and the Worker's price. None while the host sells no pack, so that answer is today's. -->
-              {#if credits.buy.length > 0}
-                <div class="bill-packs" role="group" aria-labelledby="packs-{r.record}">
-                  <span class="bill-state" id="packs-{r.record}">{billWords.buyCredits}</span>
-                  <div class="bill-pack-buttons">
-                    {#each credits.buy as b (b.pack.id)}
-                      {@const mine = going === `${r.record} ${b.pack.id}`}
-                      <Button onclick={() => goBuy(r, b.pack.id)} aria-label={mine ? undefined : b.said} aria-busy={mine} disabled={going !== null}
-                        >{mine ? copy.billingOpening : b.label}</Button
-                      >
-                    {/each}
+  <Tile class="section" data-surface="tile" title={copy.billingYours}>
+    <div class="section-body">
+      {#if bill.state === 'ready' && bill.value}
+        <!-- A HOST THAT SELLS PACKS AND NO PLAN is taking payments, for credits, so it is never told it is not. -->
+        {#if !bill.value.open && bill.value.packs.length === 0}<p class="hint">{copy.billingNotOpen}</p>{/if}
+        <!-- ROWS ON THE GROUND: a well, the record and its plan, the state under them, and the verbs at the
+             end. A bill that needs him wears the red well, and says so in its sentence, so red is never the only sign. -->
+        <ul class="bills">
+          {#each bill.value.records as r (r.record)}
+            {@const late = r.state === 'past_due' || r.state === 'lapsed'}
+            {@const upgrade = upgradeOf(r, bill.value)}
+            {@const credits = packsOf(r, bill.value)}
+            {@const said = r.state !== 'unbilled' || r.gift ? stateLine(r, shell.now) : ''}
+            <li class="bill">
+              <IconWell name="money" size="l" tone={late ? 'danger' : undefined} />
+              <div class="bill-main">
+                <div class="bill-head">
+                  <span class="bill-name" dir="auto">{nameOf(r)}</span>
+                  <span class="bill-plan">{planShown(r)}</span>
+                </div>
+                {#if upgrade}
+                  <p class="bill-state">{upgrade.line}</p>
+                {:else if said}
+                  <p class="bill-state" data-state={r.state}>{said}</p>
+                {/if}
+                {#if credits.left}<p class="bill-state num">{credits.left}</p>{/if}
+                <!-- SLASH CREDIT PACKS (LCH-A10), under what the record says of its plan: one quiet rectangle a pack, each
+                     with its credits and the Worker's price. None while the host sells no pack, so that answer is today's. -->
+                {#if credits.buy.length > 0}
+                  <div class="bill-packs" role="group" aria-labelledby="packs-{r.record}">
+                    <span class="bill-state" id="packs-{r.record}">{billWords.buyCredits}</span>
+                    <div class="bill-pack-buttons">
+                      {#each credits.buy as b (b.pack.id)}
+                        {@const mine = going === `${r.record} ${b.pack.id}`}
+                        <Button onclick={() => goBuy(r, b.pack.id)} aria-label={mine ? undefined : b.said} aria-busy={mine} disabled={going !== null}
+                          >{mine ? copy.billingOpening : b.label}</Button
+                        >
+                      {/each}
+                    </div>
                   </div>
+                {/if}
+              </div>
+              <!-- A FREE RECORD'S ONE OFFER, as a quiet button: the page's one ink button stays the person's own act. -->
+              {#if upgrade}
+                <div class="bill-actions">
+                  <Button onclick={() => goPay('checkout', r, upgrade.plan.id)} aria-busy={going === r.record} disabled={going !== null}
+                    >{going === r.record ? copy.billingOpening : copy.billingUpgrade(upgrade.plan.name)}</Button
+                  >
                 </div>
               {/if}
-            </div>
-            <!-- A FREE RECORD'S ONE OFFER, as a quiet button: the page's one ink button stays the person's own act. -->
-            {#if upgrade}
-              <div class="bill-actions">
-                <Button onclick={() => goPay('checkout', r, upgrade.plan.id)} aria-busy={going === r.record} disabled={going !== null}
-                  >{going === r.record ? copy.billingOpening : copy.billingUpgrade(upgrade.plan.name)}</Button
-                >
-              </div>
-            {/if}
-            <!-- THE ACTIONS STRIPE CAN TAKE, and only while this host is taking payments: with billing off every
-                 billing door refuses, so a button here would be a press that can only fail. A record with no row
-                 has no customer at Stripe, so it has nothing to manage either, and nor has a gift. -->
-            {#if managedAtStripe(r, bill.value)}
-              <div class="bill-actions">
-                {#if r.state === 'lapsed'}
-                  <Button weight="primary" onclick={() => goPay('checkout', r)} aria-busy={going === r.record} disabled={going !== null}
-                    >{going === r.record ? copy.billingOpening : copy.billingPayAgain}</Button
+              <!-- THE ACTIONS STRIPE CAN TAKE, and only while this host is taking payments: with billing off every
+                   billing door refuses, so a button here would be a press that can only fail. A record with no row
+                   has no customer at Stripe, so it has nothing to manage either, and nor has a gift. -->
+              {#if managedAtStripe(r, bill.value)}
+                <div class="bill-actions">
+                  {#if r.state === 'lapsed'}
+                    <Button weight="primary" onclick={() => goPay('checkout', r)} aria-busy={going === r.record} disabled={going !== null}
+                      >{going === r.record ? copy.billingOpening : copy.billingPayAgain}</Button
+                    >
+                  {/if}
+                  <Button onclick={() => goPay('portal', r)} aria-busy={going === r.record} disabled={going !== null}
+                    >{copy.billingManage}</Button
                   >
-                {/if}
-                <Button onclick={() => goPay('portal', r)} aria-busy={going === r.record} disabled={going !== null}
-                  >{copy.billingManage}</Button
-                >
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {:else if bill.state === 'empty'}
-      <Empty kind="no-data-yet" compact title={copy.billingNoneOwned} />
-    {:else if bill.state !== 'ready'}
-      <ReadState state={bill.state} refusal={bill.refusal} onretry={() => void bill.reread()} />
-    {/if}
-  </Section>
+                </div>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {:else if bill.state === 'empty'}
+        <Empty kind="no-data-yet" compact title={copy.billingNoneOwned} />
+      {:else if bill.state !== 'ready'}
+        <ReadState state={bill.state} refusal={bill.refusal} onretry={() => void bill.reread()} />
+      {/if}
+    </div>
+  </Tile>
 {:else}
-  <Section title={copy.billing}>
-    <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. The sample's `DEPLOYMENT.kind` read `self-host` in
-         every shipped bundle, so a live Cloud record was told "This record runs on your own
-         machine." `billing.ts` says what is asked instead. -->
-    <!-- AS A ROW, NOT A PARAGRAPH: the state in its title, the host's sentence as its line. -->
-    <StateRow icon="money" title={copy.billingNotBilled} line={billingLine({ host: shell.host, mintsMail: mintsHere })} />
-  </Section>
+  <Tile class="section" data-surface="tile" title={copy.billing}>
+    <div class="section-body">
+      <!-- THE HOST'S ANSWER AND NOT THE BUILD'S. The sample's `DEPLOYMENT.kind` read `self-host` in
+           every shipped bundle, so a live Cloud record was told "This record runs on your own
+           machine." `billing.ts` says what is asked instead. -->
+      <!-- AS A ROW, NOT A PARAGRAPH: the state in its title, the host's sentence as its line. -->
+      <StateRow icon="money" title={copy.billingNotBilled} line={billingLine({ host: shell.host, mintsMail: mintsHere })} />
+    </div>
+  </Tile>
 {/if}
 
 <div class="row-actions">

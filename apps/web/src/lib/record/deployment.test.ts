@@ -140,9 +140,9 @@ test('and the Cloud half promises nothing the Worker cannot do', () => {
    * was drawn only over the sample on the Cloud build, which is gone. Going back is `Restore this` on a
    * copy the record listed.
    */
-  const at = AREA.indexOf('<Section title={copy.restore}>');
+  const at = AREA.indexOf('<Tile class="section" data-surface="tile" title={copy.restore}>');
   assert.ok(at > 0, 'the going-back section is gone');
-  const section = AREA.slice(at, AREA.indexOf('</Section>', at)).replaceAll(/<!--[\s\S]*?-->/gu, '');
+  const section = AREA.slice(at, AREA.indexOf('</Tile>', at)).replaceAll(/<!--[\s\S]*?-->/gu, '');
   assert.match(section, /copy\.restoreNotHere/u, 'a record that keeps no copies is told nothing about going back');
   assert.doesNotMatch(section, /restoreToTime|copy\.restoreTo\b|'sample'/u, 'a restore to a time is drawn again');
 });
@@ -174,7 +174,7 @@ test('a night that kept nothing is not counted as a copy that is kept', () => {
   /* THE COPIES ARE GROUPED BY MONTH NOW (the blend), and each month's heading counts that month's kept copies: the
      count still follows the list it heads, and still leaves out a night that kept nothing. */
   assert.match(AREA, /const kept = month\.lines\.filter\(\(line\) => line\.failed === null\)\.length/u, 'the heading counts the failed night again');
-  assert.match(AREA, /count=\{kept\}/u);
+  assert.match(AREA, /count=\{kept \|\| undefined\}/u);
 });
 
 test('and the delete field does not put the answer in the box', () => {

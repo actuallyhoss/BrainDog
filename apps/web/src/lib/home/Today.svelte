@@ -44,7 +44,6 @@
   import { openPaletteWith } from '$lib/palette/open.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import RemindersTile from './RemindersTile.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -645,37 +644,39 @@
 
           <!-- WHAT NEEDS YOU, and nothing when nothing does: the sentence above has already said so. -->
           {#if needing > 0}
-            <Section title={words.needs}>
-              <ul class="ledger ledger-lead rows">
-                {#each shownNeeds as n (n.key)}
-                  <li data-row={n.key} data-cursor={cursor === n.key ? '' : undefined} onfocusin={() => (cursor = n.key)}>
-                    {#if n.kind === 'question'}
-                      <Question bind:this={answers[n.key]} question={n.q} now={t.now} onanswered={answered} />
-                    {:else if n.kind === 'task'}
-                      {@render taskRow(n.task, n.href, true)}
-                    {:else}
-                      {@render billRow(n.bill, n.href, true)}
-                    {/if}
-                  </li>
-                {/each}
-                {#if needs.length > FIRST}
-                  <li>
-                    <button type="button" class="line line-short more-row" aria-expanded={unfolded} onclick={() => (unfolded = !unfolded)}>
-                      <span class="line-mark more-mark" data-open={unfolded ? '' : undefined}><Icon name="chevron" size="m" /></span>
-                      <span class="line-main"><span class="line-title">{unfolded ? words.showFewer : words.showMore(needs.length - FIRST)}</span></span>
-                    </button>
-                  </li>
-                {/if}
-                {#if moreQuestions > 0}
-                  <li>
-                    <a class="line line-short more-row" href={at('/decide')}>
-                      <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
-                      <span class="line-main"><span class="line-title">{words.moreQuestions(moreQuestions)}</span></span>
-                    </a>
-                  </li>
-                {/if}
-              </ul>
-            </Section>
+            <Tile class="section" data-surface="tile" title={words.needs}>
+              <div class="section-body">
+                <ul class="ledger ledger-lead rows">
+                  {#each shownNeeds as n (n.key)}
+                    <li data-row={n.key} data-cursor={cursor === n.key ? '' : undefined} onfocusin={() => (cursor = n.key)}>
+                      {#if n.kind === 'question'}
+                        <Question bind:this={answers[n.key]} question={n.q} now={t.now} onanswered={answered} />
+                      {:else if n.kind === 'task'}
+                        {@render taskRow(n.task, n.href, true)}
+                      {:else}
+                        {@render billRow(n.bill, n.href, true)}
+                      {/if}
+                    </li>
+                  {/each}
+                  {#if needs.length > FIRST}
+                    <li>
+                      <button type="button" class="line line-short more-row" aria-expanded={unfolded} onclick={() => (unfolded = !unfolded)}>
+                        <span class="line-mark more-mark" data-open={unfolded ? '' : undefined}><Icon name="chevron" size="m" /></span>
+                        <span class="line-main"><span class="line-title">{unfolded ? words.showFewer : words.showMore(needs.length - FIRST)}</span></span>
+                      </button>
+                    </li>
+                  {/if}
+                  {#if moreQuestions > 0}
+                    <li>
+                      <a class="line line-short more-row" href={at('/decide')}>
+                        <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
+                        <span class="line-main"><span class="line-title">{words.moreQuestions(moreQuestions)}</span></span>
+                      </a>
+                    </li>
+                  {/if}
+                </ul>
+              </div>
+            </Tile>
           {/if}
         </div>
 
@@ -693,28 +694,30 @@
         {#if groups.length > 0}
           <div class="t-coming">
             {#each groups as g (g.key)}
-              <Section title={g.title}>
-                {#snippet aside()}<span class="span-said">{g.span}</span>{/snippet}
-                <ul class="ledger ledger-lead rows">
-                  {#each g.items.slice(0, PER_GROUP) as l (l.key)}
-                    <li data-row={l.key} data-cursor={cursor === l.key ? '' : undefined} onfocusin={() => (cursor = l.key)}>
-                      {#if l.kind === 'task'}
-                        {@render taskRow(l.task, l.href, false)}
-                      {:else}
-                        {@render billRow(l.bill, l.href, false)}
-                      {/if}
-                    </li>
-                  {/each}
-                  {#if g.items.length > PER_GROUP}
-                    <li>
-                      <a class="line line-short more-row" href={at('/?work')}>
-                        <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
-                        <span class="line-main"><span class="line-title">{words.moreOn(g.items.length - PER_GROUP)}</span></span>
-                      </a>
-                    </li>
-                  {/if}
-                </ul>
-              </Section>
+              <Tile class="section" data-surface="tile" title={g.title}>
+                {#snippet actions()}<span class="span-said">{g.span}</span>{/snippet}
+                <div class="section-body">
+                  <ul class="ledger ledger-lead rows">
+                    {#each g.items.slice(0, PER_GROUP) as l (l.key)}
+                      <li data-row={l.key} data-cursor={cursor === l.key ? '' : undefined} onfocusin={() => (cursor = l.key)}>
+                        {#if l.kind === 'task'}
+                          {@render taskRow(l.task, l.href, false)}
+                        {:else}
+                          {@render billRow(l.bill, l.href, false)}
+                        {/if}
+                      </li>
+                    {/each}
+                    {#if g.items.length > PER_GROUP}
+                      <li>
+                        <a class="line line-short more-row" href={at('/?work')}>
+                          <span class="line-mark more-mark"><Icon name="chevron" size="m" /></span>
+                          <span class="line-main"><span class="line-title">{words.moreOn(g.items.length - PER_GROUP)}</span></span>
+                        </a>
+                      </li>
+                    {/if}
+                  </ul>
+                </div>
+              </Tile>
             {/each}
           </div>
         {/if}
@@ -807,21 +810,23 @@
           {:else if money && money.cash.length > 0}
             <!-- WITH NOTHING TO DRAW, THE CASH IS TWO LINES ON THE GROUND, never a figure alone in a tile. -->
             <div class="t-cash">
-              <Section title={words.cash}>
-                {#snippet aside()}<a class="aside-link tap" href={at('/p/money')}>{words.money}<Icon name="arrow" size="s" /></a>{/snippet}
-                <ul class="ledger ledger-lead rows">
-                  {#each [...money.cash.map((c) => ({ label: currencyName(c.currency), amount: c.amount })), ...money.books.map((b) => ({ label: b.label ?? words.cashNow, amount: b.amount }))] as c, i (i)}
-                    <li>
-                      <div class="line">
-                        <span class="line-mark"><IconWell name="money" size="l" /></span>
-                        <span class="line-main"><span class="line-title">{c.label}</span></span>
-                        <span class="line-amount num">{c.amount}</span>
-                        <span></span>
-                      </div>
-                    </li>
-                  {/each}
-                </ul>
-              </Section>
+              <Tile class="section" data-surface="tile" title={words.cash}>
+                {#snippet actions()}<a class="aside-link tap" href={at('/p/money')}>{words.money}<Icon name="arrow" size="s" /></a>{/snippet}
+                <div class="section-body">
+                  <ul class="ledger ledger-lead rows">
+                    {#each [...money.cash.map((c) => ({ label: currencyName(c.currency), amount: c.amount })), ...money.books.map((b) => ({ label: b.label ?? words.cashNow, amount: b.amount }))] as c, i (i)}
+                      <li>
+                        <div class="line">
+                          <span class="line-mark"><IconWell name="money" size="l" /></span>
+                          <span class="line-main"><span class="line-title">{c.label}</span></span>
+                          <span class="line-amount num">{c.amount}</span>
+                          <span></span>
+                        </div>
+                      </li>
+                    {/each}
+                  </ul>
+                </div>
+              </Tile>
             </div>
           {/if}
         </div>
@@ -906,7 +911,7 @@
 
     /* "2 DAYS LATE", THE ROW'S ONE RED. The words carry it, at 500 so the red is never a hairline of colour. */
     .line-late {
-      color: var(--danger-text);
+      color: var(--red);
       font-weight: 500;
     }
   }
@@ -946,8 +951,8 @@
   .t-needs {
     min-inline-size: 0;
     padding: var(--sp-5) var(--sp-4) var(--sp-4);
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    background: var(--tile);
+    border-radius: var(--r-tile);
   }
 
   .t-needs :global(.section-head) {
@@ -1037,15 +1042,15 @@
     padding: 0;
     background: var(--ink);
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--on-ink);
+    border-radius: var(--r-ctl);
+    color: var(--on-red);
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .add:hover {
-      background: var(--primary-hover);
+      background: var(--red-fill-hover);
     }
   }
 
@@ -1068,22 +1073,22 @@
   @media (hover: hover) and (pointer: fine) {
     .rows > li > div.line:hover,
     .rows > li > :global(.q:hover) {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
   .rows > li[data-cursor] > :global(.q) {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   /* THE COLUMN FOR THE AMOUNT and the verbs: a bill's figure where a task's pills are. */
   .line-amount[data-in] {
-    color: var(--earn);
+    color: var(--good);
     font-weight: 600;
   }
 
   .when-today {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: 500;
   }
 
@@ -1102,7 +1107,7 @@
     inline-size: 100%;
     background: none;
     border: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
     cursor: pointer;
   }
@@ -1112,7 +1117,7 @@
   }
 
   .more-mark {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .more-mark[data-open] :global(.icon) {
@@ -1124,15 +1129,15 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: none;
     white-space: nowrap;
   }
 
   .span-said {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
@@ -1156,17 +1161,16 @@
     min-inline-size: 0;
     block-size: 40px;
     padding: 0 var(--sp-3);
-    background: var(--bg);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-md);
-    box-shadow: var(--e1);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .capture-input::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .capture-btn {
@@ -1177,28 +1181,28 @@
     padding: 0 var(--sp-2) 0 var(--sp-4);
     background: var(--ink);
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--on-ink);
+    border-radius: var(--r-ctl);
+    color: var(--on-red);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     cursor: pointer;
   }
 
   .capture-btn :global(.kbd) {
-    background: color-mix(in srgb, var(--on-ink) 18%, transparent);
-    color: var(--on-ink);
+    background: color-mix(in srgb, var(--on-red) 18%, transparent);
+    color: var(--on-red);
   }
 
   .capture-btn.quiet {
     padding-inline: var(--sp-4);
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
   .capture-btn:disabled {
-    background: var(--s2);
-    color: var(--dim);
+    background: var(--tile-2);
+    color: var(--ink-3);
     cursor: not-allowed;
   }
 
@@ -1209,7 +1213,7 @@
   @media (pointer: coarse) {
     .capture-input {
       block-size: var(--tap);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
 
     .capture-btn {
@@ -1228,13 +1232,13 @@
   .reading {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
     text-wrap: pretty;
   }
 
   .needs-said {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
@@ -1258,7 +1262,7 @@
     overflow-wrap: anywhere;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     line-height: calc(34 / 30);
     letter-spacing: -0.02em;
@@ -1268,8 +1272,8 @@
   .figure-meta {
     min-inline-size: 0;
     overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1281,8 +1285,8 @@
 
   .figure-sub {
     margin: calc(-1 * var(--sp-3)) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .minor {
@@ -1299,15 +1303,15 @@
 
   .minor-fig {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
     font-variant-numeric: tabular-nums;
   }
 
   .minor-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* THE AGENTS: a line a run, its face with the live ring, who and where and what, and how long it has been at it. */
@@ -1335,7 +1339,7 @@
     gap: 6px;
     min-inline-size: 0;
     overflow: hidden;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     white-space: nowrap;
   }
 
@@ -1353,14 +1357,14 @@
   .run-doing {
     min-inline-size: 0;
     overflow: hidden;
-    color: var(--ink2);
+    color: var(--ink-2);
     text-overflow: ellipsis;
   }
 
   .run-time {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 
@@ -1384,9 +1388,9 @@
     gap: var(--sp-2);
     min-block-size: 28px;
     min-inline-size: 0;
-    border-radius: var(--r-sm);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     text-decoration: none;
   }
 

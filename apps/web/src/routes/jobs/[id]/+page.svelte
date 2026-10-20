@@ -55,7 +55,6 @@
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Money from '$lib/ui/Money.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
@@ -274,56 +273,58 @@
       </Tile>
     {/if}
 
-    <Section title={runWords.transcript} count={steps.length}>
-      {#if steps.length === 0}
-        <p class="none">{words.empty}</p>
-      {:else}
-        <ol class="transcript">
-          {#each steps as s (s.seq)}
-            {@const ended = s.kind === 'end' && s.status !== null ? statusOf(s.status) : null}
-            <li class="step" data-kind={s.kind}>
-              <IconWell name={iconFor(s)} size="l" tone={s.kind === 'error' || ended?.tone === 'bad' ? 'danger' : undefined} />
-              <div class="step-body">
-                {#if s.kind === 'tool' && s.tool}
-                  <!-- A TOOL ROW: its name on its own line on a phone and in a fixed track from 640 up, what it was
-                       called with beside it, and the result folded under it once the result has come. -->
-                  <div class="call">
-                    <span class="call-name">{s.tool.name}</span>
-                    <code class="call-input">{s.text}</code>
-                  </div>
-                  {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
-                  {#if s.tool.out}
-                    <details class="out" data-failed={s.tool.out.failed ? '' : undefined}>
-                      <summary class="out-head tap">{s.tool.out.failed ? words.failed : words.result}</summary>
-                      <pre class="out-text">{s.tool.out.text}</pre>
-                      {#if s.tool.out.cut !== null}<p class="cut">{words.cutAt(s.tool.out.cut)}</p>{/if}
+    <Tile class="section" data-surface="tile" title={runWords.transcript} count={steps.length || undefined}>
+      <div class="section-body">
+        {#if steps.length === 0}
+          <p class="none">{words.empty}</p>
+        {:else}
+          <ol class="transcript">
+            {#each steps as s (s.seq)}
+              {@const ended = s.kind === 'end' && s.status !== null ? statusOf(s.status) : null}
+              <li class="step" data-kind={s.kind}>
+                <IconWell name={iconFor(s)} size="l" tone={s.kind === 'error' || ended?.tone === 'bad' ? 'danger' : undefined} />
+                <div class="step-body">
+                  {#if s.kind === 'tool' && s.tool}
+                    <!-- A TOOL ROW: its name on its own line on a phone and in a fixed track from 640 up, what it was
+                         called with beside it, and the result folded under it once the result has come. -->
+                    <div class="call">
+                      <span class="call-name">{s.tool.name}</span>
+                      <code class="call-input">{s.text}</code>
+                    </div>
+                    {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
+                    {#if s.tool.out}
+                      <details class="out" data-failed={s.tool.out.failed ? '' : undefined}>
+                        <summary class="out-head tap">{s.tool.out.failed ? words.failed : words.result}</summary>
+                        <pre class="out-text">{s.tool.out.text}</pre>
+                        {#if s.tool.out.cut !== null}<p class="cut">{words.cutAt(s.tool.out.cut)}</p>{/if}
+                      </details>
+                    {/if}
+                  {:else if s.kind === 'think'}
+                    <details class="out">
+                      <summary class="out-head tap">{words.thinking}</summary>
+                      <p class="think">{s.text}</p>
                     </details>
+                  {:else if s.kind === 'out'}
+                    <pre class="out-text">{s.text}</pre>
+                  {:else if ended !== null}
+                    <p class="end" data-intent={ended.tone ?? undefined}>
+                      {#if ended.tone}<span class="glyph" role="img" aria-label={TONES[ended.tone].label}>{TONES[ended.tone].glyph}</span>{/if}<span
+                        class="end-word">{ended.word}</span
+                      >{#if s.text}. {s.text}{/if}
+                    </p>
+                  {:else}
+                    <p class="say">{s.text}</p>
+                    {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
                   {/if}
-                {:else if s.kind === 'think'}
-                  <details class="out">
-                    <summary class="out-head tap">{words.thinking}</summary>
-                    <p class="think">{s.text}</p>
-                  </details>
-                {:else if s.kind === 'out'}
-                  <pre class="out-text">{s.text}</pre>
-                {:else if ended !== null}
-                  <p class="end" data-intent={ended.tone ?? undefined}>
-                    {#if ended.tone}<span class="glyph" role="img" aria-label={TONES[ended.tone].label}>{TONES[ended.tone].glyph}</span>{/if}<span
-                      class="end-word">{ended.word}</span
-                    >{#if s.text}. {s.text}{/if}
-                  </p>
-                {:else}
-                  <p class="say">{s.text}</p>
-                  {#if s.cut !== null}<p class="cut">{words.cutAt(s.cut)}</p>{/if}
-                {/if}
-              </div>
-              <!-- THE MINUTE IT CAME IN, in Geist Mono as a feed's times are. -->
-              {#if sentAt.get(s.seq)}<time class="step-at" datetime={sentAt.get(s.seq)}>{stampOf(sentAt.get(s.seq))}</time>{/if}
-            </li>
-          {/each}
-        </ol>
-      {/if}
-    </Section>
+                </div>
+                <!-- THE MINUTE IT CAME IN, in Geist Mono as a feed's times are. -->
+                {#if sentAt.get(s.seq)}<time class="step-at" datetime={sentAt.get(s.seq)}>{stampOf(sentAt.get(s.seq))}</time>{/if}
+              </li>
+            {/each}
+          </ol>
+        {/if}
+      </div>
+    </Tile>
 
     {#if live || stopFix}
       <div class="stop-bar">
@@ -364,8 +365,8 @@
     block-size: 6px;
     margin-inline-end: var(--sp-2);
     overflow: hidden;
-    border-radius: var(--r-pill);
-    background: var(--dim);
+    border-radius: var(--r-ctl);
+    background: var(--ink-3);
     color: transparent;
     text-indent: 100%;
     white-space: nowrap;
@@ -385,7 +386,7 @@
   }
 
   .state[data-intent='bad'] .dot {
-    background: var(--danger);
+    background: var(--red);
   }
 
   /* ── this run ── */
@@ -410,14 +411,14 @@
   }
 
   .fact dt {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .fact dd {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
@@ -426,7 +427,7 @@
   .reading {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -434,8 +435,8 @@
 
   .none {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-ui);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     max-inline-size: var(--measure);
   }
 
@@ -471,9 +472,9 @@
 
   .step-at {
     padding-block-start: 7px;
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-cap);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -506,15 +507,15 @@
 
   .call-name {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
 
   .call-input {
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -524,7 +525,7 @@
   .end {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -532,18 +533,18 @@
   }
 
   .think {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .step[data-kind='note'] .say,
   .step[data-kind='start'] .say,
   .step[data-kind='limit'] .say {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .step[data-kind='error'] .say {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .end .glyph {
@@ -556,12 +557,12 @@
   }
 
   .end[data-intent='bad'] .end-word {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .out {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .out-head {
@@ -574,7 +575,7 @@
   }
 
   .out[data-failed] .out-head {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* WHAT A TOOL ANSWERED, AS IT CAME: monospace on the tile's own white, rounded as a field is, scrolling inside
@@ -582,11 +583,11 @@
   .out-text {
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-md);
-    background: var(--bg);
+    border-radius: var(--r-pop);
+    background: var(--tile);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     max-block-size: 20lh;
@@ -595,8 +596,8 @@
 
   .cut {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* STOP, AT THE FOOT WHILE THE RUN IS LIVE: in the flow from 900 up, where the whole screen is in reach. */
@@ -609,8 +610,8 @@
 
   .stop-fix {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
     max-inline-size: var(--measure);
   }
 
@@ -626,8 +627,8 @@
       max-block-size: var(--sticky);
       padding-inline: var(--sp-3);
       background: var(--tile);
-      border-radius: var(--r-lg);
-      box-shadow: var(--glass-edge), var(--e2);
+      border-radius: var(--r-tile);
+      border: 1px solid var(--rule-strong);
       overflow: hidden;
     }
   }

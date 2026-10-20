@@ -65,7 +65,6 @@
   import { reprove } from '$lib/record/vault.ts';
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -411,191 +410,193 @@
     </div>
 
     {#if entries.length}
-      <Section title={words.settings}>
-        <form class="settings" bind:this={form} onsubmit={submit} novalidate>
-          {#if holds === null}<p class="when">{words.when}</p>{/if}
+      <Tile class="section" data-surface="tile" title={words.settings}>
+        <div class="section-body">
+          <form class="settings" bind:this={form} onsubmit={submit} novalidate>
+            {#if holds === null}<p class="when">{words.when}</p>{/if}
 
-          {#each entries as [key, decl] (key)}
-            {@const d = drafts[key]}
-            {@const label = labelOf(key, decl)}
-            {@const why = pending.wrong[key] ?? (besideField && fixAt === key ? fix : '')}
-            {@const segmented = decl.type === 'enum' && (decl.values?.length ?? 0) <= 4}
-            <!-- THE ONE USE CASE ON SPEAKS whatever `speaks` holds, which is written down only once two are on. -->
-            {@const only = key === SPEAKS && alone}
-            {#if d}
-              <div class="setting" data-kind={decl.type === 'bool' ? 'switch' : undefined}>
-                {#if decl.type === 'bool' || segmented || isList(decl)}
-                  <span class="setting-label" id="set-{key}-label">{label}</span>
-                {:else}
-                  <label class="setting-label" for="set-{key}">{label}</label>
-                {/if}
-
-                <div class="setting-control">
-                  {#if decl.type === 'bool'}
-                    <!-- THE ONE USE CASE ON SPEAKS, and the switch says so rather than sitting off beside a rail in its
-                         words. There is nothing to choose between until a second use case is on. -->
-                    <button
-                      type="button"
-                      class="switch"
-                      role="switch"
-                      id="set-{key}"
-                      aria-checked={only || d.on ? 'true' : 'false'}
-                      aria-labelledby="set-{key}-label"
-                      disabled={only}
-                      onclick={() => (d.on = !d.on)}
-                    ><span class="switch-track"></span></button>
-                  {:else if segmented}
-                    {@const values = decl.values ?? []}
-                    <Segmented role="radiogroup" aria-labelledby="set-{key}-label">
-                      {#each settingChoices(decl) as [v, said], i (v)}
-                        <button
-                          type="button"
-                          class="segment"
-                          role="radio"
-                          tabindex={d.text === v || (i === 0 && !values.includes(d.text)) ? 0 : -1}
-                          data-on={d.text === v ? '' : undefined}
-                          aria-checked={d.text === v ? 'true' : 'false'}
-                          onclick={() => (d.text = v)}
-                          onkeydown={(e) => step(e, values, i, d)}
-                        >{said}</button>
-                      {/each}
-                    </Segmented>
-                  {:else if isList(decl)}
-                    <!-- A LIST IS ITS LINES, one box each, so a person reads the whole value and changes one line
-                         without retyping the rest. A blank box is left out of what is saved. -->
-                    {@const rows = lines[key] ?? []}
-                    {@const most = mostOf(decl)}
-                    <div class="setting-lines" id="set-{key}" role="group" aria-labelledby="set-{key}-label">
-                      {#each rows as row, i (i)}
-                        <div class="setting-line">
-                          <div class="field setting-field">
-                            <input
-                              class="field-input"
-                              type="text"
-                              value={row}
-                              aria-label={listWords.line(label, i + 1)}
-                              oninput={(e) => setLine(key, i, typed(e))}
-                              aria-invalid={why ? 'true' : undefined}
-                              aria-describedby={why ? `set-${key}-why` : undefined}
-                            />
-                          </div>
-                          <Button weight="bare" disabled={busy} aria-label={listWords.removeLine(label, i + 1)} onclick={() => dropLine(key, i)}>{listWords.remove}</Button>
-                        </div>
-                      {/each}
-                      <div>
-                        <Button weight="bare" disabled={busy || (most !== null && rows.length >= most)} onclick={() => addLine(key)}>{listWords.add}</Button>
-                      </div>
-                    </div>
-                  {:else if decl.type === 'enum'}
-                    <select class="setting-select" id="set-{key}" value={d.text} onchange={(e) => (d.text = typed(e))}>
-                      {#each settingChoices(decl) as [v, said] (v)}<option value={v}>{said}</option>{/each}
-                    </select>
-                  {:else if key === HOME_CURRENCY_SETTING && decl.type === 'text'}
-                    <!-- A HOME CURRENCY IS CHOSEN, NOT TYPED: the common ones first, then every ISO 4217 code. None is no home currency.
-                         THE ORDER IS THE SAVED CURRENCY'S AND NOT THE DRAFT'S. `currencyChoices` moves the code it is
-                         handed to the front, and handed the draft it moved every pick: stepping a closed select from GBP
-                         with the down arrow, measured through `currencyChoices`, went AED, AUD, AED, AUD and never
-                         reached a third code. A saved code the picker does not offer still draws, because the draft
-                         starts as the saved value and every pick is an offered one. -->
-                    {@const saved = settings?.values[key]}
-                    {@const choices = currencyChoices(typeof saved === 'string' ? saved : '')}
-                    <select class="setting-select" id="set-{key}" value={d.text.trim().toUpperCase()} onchange={(e) => (d.text = typed(e))}>
-                      <option value="">{copy.currencyNone}</option>
-                      <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
-                      <optgroup label={copy.currencyAll}>{#each choices.other as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
-                    </select>
-                  {:else if decl.type === 'day'}
-                    <input
-                      class="setting-select"
-                      id="set-{key}"
-                      type="date"
-                      value={d.text}
-                      onchange={(e) => (d.text = typed(e))}
-                      aria-invalid={why ? 'true' : undefined}
-                      aria-describedby={why ? `set-${key}-why` : undefined}
-                    />
-                  {:else if decl.type === 'money'}
-                    {@const currency = currencyOf(settings, key)}
-                    <div class="field setting-field">
-                      {#if currency}<span class="setting-unit">{currency}</span>{/if}
-                      <input
-                        class="field-input num"
-                        id="set-{key}"
-                        type="text"
-                        inputmode="decimal"
-                        placeholder={heldElsewhere(settings, key) ?? undefined}
-                        value={d.text}
-                        oninput={(e) => (d.text = typed(e))}
-                        aria-invalid={why ? 'true' : undefined}
-                        aria-describedby={why ? `set-${key}-why` : undefined}
-                      />
-                    </div>
-                  {:else if decl.type === 'number'}
-                    <div class="field setting-number">
-                      <input
-                        class="field-input num"
-                        id="set-{key}"
-                        type="text"
-                        inputmode="decimal"
-                        value={d.text}
-                        oninput={(e) => (d.text = typed(e))}
-                        aria-invalid={why ? 'true' : undefined}
-                        aria-describedby={why ? `set-${key}-why` : undefined}
-                      />
-                    </div>
-                  {:else if decl.type === 'duration'}
-                    <div class="field setting-number">
-                      <input
-                        class="field-input num"
-                        id="set-{key}"
-                        type="text"
-                        inputmode="numeric"
-                        value={d.text}
-                        oninput={(e) => (d.text = typed(e))}
-                        aria-invalid={why ? 'true' : undefined}
-                        aria-describedby={why ? `set-${key}-why` : undefined}
-                      />
-                    </div>
-                    <select class="setting-select" aria-label="{label}, {words.unit}" value={d.unit} onchange={(e) => (d.unit = typed(e) as Unit)}>
-                      {#each UNITS as [u] (u)}<option value={u}>{words.units[u]}</option>{/each}
-                    </select>
+            {#each entries as [key, decl] (key)}
+              {@const d = drafts[key]}
+              {@const label = labelOf(key, decl)}
+              {@const why = pending.wrong[key] ?? (besideField && fixAt === key ? fix : '')}
+              {@const segmented = decl.type === 'enum' && (decl.values?.length ?? 0) <= 4}
+              <!-- THE ONE USE CASE ON SPEAKS whatever `speaks` holds, which is written down only once two are on. -->
+              {@const only = key === SPEAKS && alone}
+              {#if d}
+                <div class="setting" data-kind={decl.type === 'bool' ? 'switch' : undefined}>
+                  {#if decl.type === 'bool' || segmented || isList(decl)}
+                    <span class="setting-label" id="set-{key}-label">{label}</span>
                   {:else}
-                    <div class="field setting-field">
-                      <input
-                        class="field-input"
+                    <label class="setting-label" for="set-{key}">{label}</label>
+                  {/if}
+
+                  <div class="setting-control">
+                    {#if decl.type === 'bool'}
+                      <!-- THE ONE USE CASE ON SPEAKS, and the switch says so rather than sitting off beside a rail in its
+                           words. There is nothing to choose between until a second use case is on. -->
+                      <button
+                        type="button"
+                        class="switch"
+                        role="switch"
                         id="set-{key}"
-                        type="text"
+                        aria-checked={only || d.on ? 'true' : 'false'}
+                        aria-labelledby="set-{key}-label"
+                        disabled={only}
+                        onclick={() => (d.on = !d.on)}
+                      ><span class="switch-track"></span></button>
+                    {:else if segmented}
+                      {@const values = decl.values ?? []}
+                      <Segmented role="radiogroup" aria-labelledby="set-{key}-label">
+                        {#each settingChoices(decl) as [v, said], i (v)}
+                          <button
+                            type="button"
+                            class="segment"
+                            role="radio"
+                            tabindex={d.text === v || (i === 0 && !values.includes(d.text)) ? 0 : -1}
+                            data-on={d.text === v ? '' : undefined}
+                            aria-checked={d.text === v ? 'true' : 'false'}
+                            onclick={() => (d.text = v)}
+                            onkeydown={(e) => step(e, values, i, d)}
+                          >{said}</button>
+                        {/each}
+                      </Segmented>
+                    {:else if isList(decl)}
+                      <!-- A LIST IS ITS LINES, one box each, so a person reads the whole value and changes one line
+                           without retyping the rest. A blank box is left out of what is saved. -->
+                      {@const rows = lines[key] ?? []}
+                      {@const most = mostOf(decl)}
+                      <div class="setting-lines" id="set-{key}" role="group" aria-labelledby="set-{key}-label">
+                        {#each rows as row, i (i)}
+                          <div class="setting-line">
+                            <div class="field setting-field">
+                              <input
+                                class="field-input"
+                                type="text"
+                                value={row}
+                                aria-label={listWords.line(label, i + 1)}
+                                oninput={(e) => setLine(key, i, typed(e))}
+                                aria-invalid={why ? 'true' : undefined}
+                                aria-describedby={why ? `set-${key}-why` : undefined}
+                              />
+                            </div>
+                            <Button weight="bare" disabled={busy} aria-label={listWords.removeLine(label, i + 1)} onclick={() => dropLine(key, i)}>{listWords.remove}</Button>
+                          </div>
+                        {/each}
+                        <div>
+                          <Button weight="bare" disabled={busy || (most !== null && rows.length >= most)} onclick={() => addLine(key)}>{listWords.add}</Button>
+                        </div>
+                      </div>
+                    {:else if decl.type === 'enum'}
+                      <select class="setting-select" id="set-{key}" value={d.text} onchange={(e) => (d.text = typed(e))}>
+                        {#each settingChoices(decl) as [v, said] (v)}<option value={v}>{said}</option>{/each}
+                      </select>
+                    {:else if key === HOME_CURRENCY_SETTING && decl.type === 'text'}
+                      <!-- A HOME CURRENCY IS CHOSEN, NOT TYPED: the common ones first, then every ISO 4217 code. None is no home currency.
+                           THE ORDER IS THE SAVED CURRENCY'S AND NOT THE DRAFT'S. `currencyChoices` moves the code it is
+                           handed to the front, and handed the draft it moved every pick: stepping a closed select from GBP
+                           with the down arrow, measured through `currencyChoices`, went AED, AUD, AED, AUD and never
+                           reached a third code. A saved code the picker does not offer still draws, because the draft
+                           starts as the saved value and every pick is an offered one. -->
+                      {@const saved = settings?.values[key]}
+                      {@const choices = currencyChoices(typeof saved === 'string' ? saved : '')}
+                      <select class="setting-select" id="set-{key}" value={d.text.trim().toUpperCase()} onchange={(e) => (d.text = typed(e))}>
+                        <option value="">{copy.currencyNone}</option>
+                        <optgroup label={copy.currencyCommon}>{#each choices.common as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+                        <optgroup label={copy.currencyAll}>{#each choices.other as c (c)}<option value={c}>{c}</option>{/each}</optgroup>
+                      </select>
+                    {:else if decl.type === 'day'}
+                      <input
+                        class="setting-select"
+                        id="set-{key}"
+                        type="date"
                         value={d.text}
-                        oninput={(e) => (d.text = typed(e))}
+                        onchange={(e) => (d.text = typed(e))}
                         aria-invalid={why ? 'true' : undefined}
                         aria-describedby={why ? `set-${key}-why` : undefined}
                       />
-                    </div>
-                  {/if}
+                    {:else if decl.type === 'money'}
+                      {@const currency = currencyOf(settings, key)}
+                      <div class="field setting-field">
+                        {#if currency}<span class="setting-unit">{currency}</span>{/if}
+                        <input
+                          class="field-input num"
+                          id="set-{key}"
+                          type="text"
+                          inputmode="decimal"
+                          placeholder={heldElsewhere(settings, key) ?? undefined}
+                          value={d.text}
+                          oninput={(e) => (d.text = typed(e))}
+                          aria-invalid={why ? 'true' : undefined}
+                          aria-describedby={why ? `set-${key}-why` : undefined}
+                        />
+                      </div>
+                    {:else if decl.type === 'number'}
+                      <div class="field setting-number">
+                        <input
+                          class="field-input num"
+                          id="set-{key}"
+                          type="text"
+                          inputmode="decimal"
+                          value={d.text}
+                          oninput={(e) => (d.text = typed(e))}
+                          aria-invalid={why ? 'true' : undefined}
+                          aria-describedby={why ? `set-${key}-why` : undefined}
+                        />
+                      </div>
+                    {:else if decl.type === 'duration'}
+                      <div class="field setting-number">
+                        <input
+                          class="field-input num"
+                          id="set-{key}"
+                          type="text"
+                          inputmode="numeric"
+                          value={d.text}
+                          oninput={(e) => (d.text = typed(e))}
+                          aria-invalid={why ? 'true' : undefined}
+                          aria-describedby={why ? `set-${key}-why` : undefined}
+                        />
+                      </div>
+                      <select class="setting-select" aria-label="{label}, {words.unit}" value={d.unit} onchange={(e) => (d.unit = typed(e) as Unit)}>
+                        {#each UNITS as [u] (u)}<option value={u}>{words.units[u]}</option>{/each}
+                      </select>
+                    {:else}
+                      <div class="field setting-field">
+                        <input
+                          class="field-input"
+                          id="set-{key}"
+                          type="text"
+                          value={d.text}
+                          oninput={(e) => (d.text = typed(e))}
+                          aria-invalid={why ? 'true' : undefined}
+                          aria-describedby={why ? `set-${key}-why` : undefined}
+                        />
+                      </div>
+                    {/if}
 
-                  {#if !isDefault(decl, settings.values[key])}
-                    <Button weight="bare" disabled={busy} aria-label="{words.reset} {label}" onclick={() => void send({ [key]: null })}>{words.reset}</Button>
-                  {/if}
+                    {#if !isDefault(decl, settings.values[key])}
+                      <Button weight="bare" disabled={busy} aria-label="{words.reset} {label}" onclick={() => void send({ [key]: null })}>{words.reset}</Button>
+                    {/if}
+                  </div>
+
+                  {#if only}<p class="setting-note">{words.speaksAlone}</p>{/if}
+                  {#if decl.note}<p class="setting-note">{decl.note}</p>{/if}
+                  {#if holds?.[key]}<p class="setting-note">{takesHoldSaid(holds[key], name)}</p>{/if}
+                  {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{why}</p>{/if}
                 </div>
+              {/if}
+            {/each}
 
-                {#if only}<p class="setting-note">{words.speaksAlone}</p>{/if}
-                {#if decl.note}<p class="setting-note">{decl.note}</p>{/if}
-                {#if holds?.[key]}<p class="setting-note">{takesHoldSaid(holds[key], name)}</p>{/if}
-                {#if why}<p class="setting-why" id="set-{key}-why" data-intent="bad"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{why}</p>{/if}
-              </div>
-            {/if}
-          {/each}
-
-          <div class="settings-actions">
-            <Button weight="primary" type="submit" disabled={!dirty || held || busy}>{words.save}</Button>
-            {#if signin}
-              <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-            {/if}
-          </div>
-          <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-          <p class="setting-said" role="status" data-intent={fix && !besideField ? 'bad' : undefined}>{#if fix && !besideField}<span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{fix}{/if}</p>
-        </form>
-      </Section>
+            <div class="settings-actions">
+              <Button weight="primary" type="submit" disabled={!dirty || held || busy}>{words.save}</Button>
+              {#if signin}
+                <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+              {/if}
+            </div>
+            <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+            <p class="setting-said" role="status" data-intent={fix && !besideField ? 'bad' : undefined}>{#if fix && !besideField}<span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span>{fix}{/if}</p>
+          </form>
+        </div>
+      </Tile>
       {#if HOME_CURRENCY_SETTING in settings.config}
         <!-- EXCHANGE RATES ARE A PRESET OF THE NEW-ACTION SHEET, reached by its address.
              This page drew a form written for one pack, which it imported by name; now it links to the same sheet
@@ -631,39 +632,43 @@
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
            where somebody comes to find out what they were. Nothing to set is a quiet line under its
            own heading, never a whole-screen state with a glyph above what the add-on does bring. -->
-      <Section title={words.settings}>
-        <Empty
-          kind="no-data-yet"
-          compact
-          title={copy.packNothingToSet}
-          body={pack && (pack.registers.length || pack.pages.length) ? copy.packNothingToSetWhy : undefined}
-        />
-      </Section>
+      <Tile class="section" data-surface="tile" title={words.settings}>
+        <div class="section-body">
+          <Empty
+            kind="no-data-yet"
+            compact
+            title={copy.packNothingToSet}
+            body={pack && (pack.registers.length || pack.pages.length) ? copy.packNothingToSetWhy : undefined}
+          />
+        </div>
+      </Tile>
     {/if}
     {#if pack && (pack.registers.length || pack.pages.length)}
-      <Section title={copy.installDiff} count={pack.registers.length + pack.pages.length}>
-        <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->
-        <ul class="ledger">
-          {#each pack.registers as r (r)}
-            <li>
-              <a class="line added" href={at(`/r/${r}`)}>
-                <span class="line-mark"><IconWell name="rows" size="l" /></span>
-                <span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? inWords(r)}</span>
-                <span class="added-go"><Icon name="chevron" size="s" /></span>
-              </a>
-            </li>
-          {/each}
-          {#each pack.pages as p (p)}
-            <li>
-              <a class="line added" href={at(`/p/${p}`)}>
-                <span class="line-mark"><IconWell name="doc" size="l" /></span>
-                <span class="line-title">{PAGES[p]?.title ?? inWords(p)}</span>
-                <span class="added-go"><Icon name="chevron" size="s" /></span>
-              </a>
-            </li>
-          {/each}
-        </ul>
-      </Section>
+      <Tile class="section" data-surface="tile" title={copy.installDiff} count={(pack.registers.length + pack.pages.length) || undefined}>
+        <div class="section-body">
+          <!-- EACH LIST AND PAGE IT ADDED, a 44px row with its well that opens it. -->
+          <ul class="ledger">
+            {#each pack.registers as r (r)}
+              <li>
+                <a class="line added" href={at(`/r/${r}`)}>
+                  <span class="line-mark"><IconWell name="rows" size="l" /></span>
+                  <span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? inWords(r)}</span>
+                  <span class="added-go"><Icon name="chevron" size="s" /></span>
+                </a>
+              </li>
+            {/each}
+            {#each pack.pages as p (p)}
+              <li>
+                <a class="line added" href={at(`/p/${p}`)}>
+                  <span class="line-mark"><IconWell name="doc" size="l" /></span>
+                  <span class="line-title">{PAGES[p]?.title ?? inWords(p)}</span>
+                  <span class="added-go"><Icon name="chevron" size="s" /></span>
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      </Tile>
     {/if}
   </div>
 {/if}
@@ -762,7 +767,7 @@
   .rate-now {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-lg);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
@@ -845,11 +850,11 @@
 
   .setting-unit {
     color: var(--ink-3);
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
     font-size: var(--fs-meta);
   }
 
-  /* A SELECT OR A DATE IS A FIELD: the `--s1` well, no border, the `--r-md` corner, 40 tall and 44 under a thumb. The
+  /* A SELECT OR A DATE IS A FIELD: the `--tile-2` well, no border, the `--r-pop` corner, 40 tall and 44 under a thumb. The
      house chevron is `controls.css`'s. */
   .setting-select {
     min-block-size: 40px;

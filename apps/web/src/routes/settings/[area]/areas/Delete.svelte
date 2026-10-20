@@ -9,7 +9,7 @@
   /* Lane F: deleting the record. */
   import { deleteRecordNow } from '$lib/record/settings-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -103,61 +103,65 @@
   who is not one has no second step to take on this screen except asking somebody.
 -->
 {#if !anOwner}
-  <Section title={copy.deleteRecord(RECORD)}>
-    <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
-  </Section>
+  <Tile class="section" data-surface="tile" title={copy.deleteRecord(RECORD)}>
+    <div class="section-body">
+      <Empty kind="no-permission" title={levelWords.ownersOnlyTitle} body={levelWords.ownersOnlyHow} />
+    </div>
+  </Tile>
 {:else}
 <!-- ON THE GROUND AND UNBOXED: the sentence, what it costs, the typed name and the verb. The box this
      sat in was a red-edged panel, and red is what needs him, not what is dangerous; the words carry the weight here. -->
-<Section title={copy.deleteRecord(RECORD)}>
-  <div class="danger">
-    <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
-    <!-- WHAT IT COSTS, BEFORE THE FIELD, AND THE COST IS THE NAME. This line used to offer a
-         final copy and an hour to change his mind. `Directory.prepare` refuses a released
-         slug with *"is never given out again"*, so the reversal it invited is the exact one
-         the host has already decided against, and `destroy()` takes no copy on the way out.
-         `delete-costs.test.ts` holds both. -->
-    <p class="danger-why">{copy.deleteCosts}</p>
-    <!-- THE ONE WAY BACK, BEFORE THE FIELD: a copy taken now is the only thing that answers a change of mind. -->
-    <div><Button href="/settings/export" size="sm"><Icon name="download" size="s" />{words.exportFirst}</Button></div>
-    <!-- `field-row` PUTS THE LABEL ABOVE THE FIELD. ARMED, the button is the primary with its bin (2.A.1); OFF it is
-         quiet and `aria-disabled`, and a press says why. -->
-    <div class="field-row">
-      <label class="field-row-label" for="delete-slug">{copy.typeSlug(RECORD)}</label>
-      <div class="field-row-controls">
-        <div class="field field-lg" data-invalid={wrong ? '' : undefined}>
-          <input
-            class="field-input"
-            id="delete-slug"
-            type="text"
-            autocapitalize="off"
-            spellcheck="false"
-            autocomplete="off"
-            aria-invalid={wrong}
-            aria-describedby="delete-said"
-            bind:this={field}
-            bind:value={typed}
-            oninput={() => (wrong = false)}
-            onkeydown={onkey}
-          />
+<Tile class="section" data-surface="tile" title={copy.deleteRecord(RECORD)}>
+  <div class="section-body">
+    <div class="danger">
+      <p class="danger-title">{copy.deleteWhat(RECORD)}</p>
+      <!-- WHAT IT COSTS, BEFORE THE FIELD, AND THE COST IS THE NAME. This line used to offer a
+           final copy and an hour to change his mind. `Directory.prepare` refuses a released
+           slug with *"is never given out again"*, so the reversal it invited is the exact one
+           the host has already decided against, and `destroy()` takes no copy on the way out.
+           `delete-costs.test.ts` holds both. -->
+      <p class="danger-why">{copy.deleteCosts}</p>
+      <!-- THE ONE WAY BACK, BEFORE THE FIELD: a copy taken now is the only thing that answers a change of mind. -->
+      <div><Button href="/settings/export" size="sm"><Icon name="download" size="s" />{words.exportFirst}</Button></div>
+      <!-- `field-row` PUTS THE LABEL ABOVE THE FIELD. ARMED, the button is the primary with its bin (2.A.1); OFF it is
+           quiet and `aria-disabled`, and a press says why. -->
+      <div class="field-row">
+        <label class="field-row-label" for="delete-slug">{copy.typeSlug(RECORD)}</label>
+        <div class="field-row-controls">
+          <div class="field field-lg" data-invalid={wrong ? '' : undefined}>
+            <input
+              class="field-input"
+              id="delete-slug"
+              type="text"
+              autocapitalize="off"
+              spellcheck="false"
+              autocomplete="off"
+              aria-invalid={wrong}
+              aria-describedby="delete-said"
+              bind:this={field}
+              bind:value={typed}
+              oninput={() => (wrong = false)}
+              onkeydown={onkey}
+            />
+          </div>
+          <Button
+            weight={matches ? 'primary' : 'quiet'}
+            tone="bad"
+            aria-disabled={!matches}
+            aria-busy={deleting}
+            disabled={deleting}
+            onclick={deleteNow}
+            >{copy.deleteRecord(RECORD)}</Button
+          >
         </div>
-        <Button
-          weight={matches ? 'primary' : 'quiet'}
-          tone="bad"
-          aria-disabled={!matches}
-          aria-busy={deleting}
-          disabled={deleting}
-          onclick={deleteNow}
-          >{copy.deleteRecord(RECORD)}</Button
-        >
+        <p id="delete-said" class="said" data-wrong={wrong ? '' : undefined} aria-live="polite">
+          {#if wrong}<Icon name="alert" size="s" />{words.notIt(RECORD)}{:else if !matches}{words.exactly(RECORD)}{/if}
+        </p>
       </div>
-      <p id="delete-said" class="said" data-wrong={wrong ? '' : undefined} aria-live="polite">
-        {#if wrong}<Icon name="alert" size="s" />{words.notIt(RECORD)}{:else if !matches}{words.exactly(RECORD)}{/if}
-      </p>
+      {#if deletedSaid}<p class="hint" role="status">{deletedSaid}</p>{/if}
     </div>
-    {#if deletedSaid}<p class="hint" role="status">{deletedSaid}</p>{/if}
   </div>
-</Section>
+</Tile>
 {/if}
 
 <style>

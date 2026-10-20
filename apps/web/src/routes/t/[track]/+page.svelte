@@ -55,7 +55,6 @@
   import { liveOf } from '$lib/ui/face.ts';
   import { actor } from '$lib/record/names.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Swimlanes from '$lib/viz/Swimlanes.svelte';
@@ -347,32 +346,34 @@
       <!-- NOT DRAWN UNTIL SOMEBODY HAS SAID SOMETHING (proj F11): the tile above, headed "Say where it stands", is the one
            thing a new thread asks, and a second tile saying nothing has been said said it twice. -->
       {#if updates.length > 0}
-      <Section title="What has been said" count={updates.length}>
-        <ol class="thread">
-          {#each updates.slice(0, DOM_CAP) as u (u.seq)}
-            {@const who = actorOf(String(u.fields.by))}
-            <li class="update">
-              <!-- WHO SAID IT, AS A FACE, so an update reads as somebody speaking rather than a log
-                   line; the health stays on the chip. -->
-              <div class="u-head">
-                <Face name={who} you={who === 'you'} kind={actor(String(u.fields.by)).kind} />
-                <span class="u-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
-                <Chip
-                  label={healthSaid(REGISTERS.updates, String(u.fields.health))}
-                  tone={healthTone(String(u.fields.health) as never)}
-                />
-                <span class="u-at">{since(String(u.fields.at), clock)}</span>
-              </div>
-              <p class="u-body" dir="auto">{u.fields.body}</p>
-            </li>
-          {/each}
-        </ol>
-        <CapLine shown={Math.min(updates.length, DOM_CAP)} total={updates.length} />
-        <p class="foot">
-          Updates are never edited. A correction is a new update that replaces the one before it, so the
-          thread stays the record of what was believed and when.
-        </p>
-      </Section>
+      <Tile class="section" data-surface="tile" title="What has been said" count={updates.length || undefined}>
+        <div class="section-body">
+          <ol class="thread">
+            {#each updates.slice(0, DOM_CAP) as u (u.seq)}
+              {@const who = actorOf(String(u.fields.by))}
+              <li class="update">
+                <!-- WHO SAID IT, AS A FACE, so an update reads as somebody speaking rather than a log
+                     line; the health stays on the chip. -->
+                <div class="u-head">
+                  <Face name={who} you={who === 'you'} kind={actor(String(u.fields.by)).kind} />
+                  <span class="u-by">{who.charAt(0).toUpperCase() + who.slice(1)}</span>
+                  <Chip
+                    label={healthSaid(REGISTERS.updates, String(u.fields.health))}
+                    tone={healthTone(String(u.fields.health) as never)}
+                  />
+                  <span class="u-at">{since(String(u.fields.at), clock)}</span>
+                </div>
+                <p class="u-body" dir="auto">{u.fields.body}</p>
+              </li>
+            {/each}
+          </ol>
+          <CapLine shown={Math.min(updates.length, DOM_CAP)} total={updates.length} />
+          <p class="foot">
+            Updates are never edited. A correction is a new update that replaces the one before it, so the
+            thread stays the record of what was believed and when.
+          </p>
+        </div>
+      </Tile>
       {/if}
     </section>
 
@@ -417,21 +418,23 @@
            the task, where it is ticked. -->
       <!-- NOT DRAWN WHILE NOTHING IS OPEN (proj F11): a heading over "nothing" is a tile that says nothing. -->
       {#if tasks.length > 0}
-      <Section title="Still open" count={tasks.length}>
-        <ul class="ledger ledger-lead">
-          {#each tasks as t (t.seq)}
-            <li>
-              <a class="line line-tall" href={at(`/r/tasks/${t.seq}`)}>
-                <span class="line-mark"><span class="line-check" aria-hidden="true"></span></span>
-                <span class="line-main">
-                  <span class="line-title" dir="auto">{t.fields.what}</span>
-                  <span class="line-detail">{display('tasks', 'by', t.fields.by) ?? 'no date'}</span>
-                </span>
-              </a>
-            </li>
-          {/each}
-        </ul>
-      </Section>
+      <Tile class="section" data-surface="tile" title="Still open" count={tasks.length || undefined}>
+        <div class="section-body">
+          <ul class="ledger ledger-lead">
+            {#each tasks as t (t.seq)}
+              <li>
+                <a class="line line-tall" href={at(`/r/tasks/${t.seq}`)}>
+                  <span class="line-mark"><span class="line-check" aria-hidden="true"></span></span>
+                  <span class="line-main">
+                    <span class="line-title" dir="auto">{t.fields.what}</span>
+                    <span class="line-detail">{display('tasks', 'by', t.fields.by) ?? 'no date'}</span>
+                  </span>
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      </Tile>
       {/if}
     </aside>
   </div>
@@ -478,16 +481,16 @@
   /* THE HEALTH READS AT THE SENTENCE'S SIZE, and off track, the one that needs him, reads in red. */
   .standing :global(.chip) {
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: 24px;
   }
 
   .standing[data-needs] :global(.chip) {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .standing-by {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* ── The composer ──────────────────────────────────────────────────────── */
@@ -498,7 +501,7 @@
     min-inline-size: 0;
   }
 
-  /* A FIELD: the `--s1` fill, radius 12 and no border, the ink ring when focused (`controls.css`). 16PX AT
+  /* A FIELD: the `--tile-2` fill, radius 12 and no border, the ink ring when focused (`controls.css`). 16PX AT
      EVERY WIDTH, so a phone does not zoom into it, and it scrolls clear of the keyboard with the health and Post under
      it still in view. */
   .c-area {
@@ -506,24 +509,24 @@
     inline-size: 100%;
     min-block-size: calc(var(--row-h-2) * 2);
     padding: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     resize: vertical;
     scroll-margin-block: calc(var(--sticky) + var(--sp-4)) var(--sp-9);
   }
 
   .c-area:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
   .c-area::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE HEALTH AND POST ON ONE LINE UNDER THE FIELD, Post at the end; they wrap to two under a thumb. */
@@ -595,15 +598,15 @@
 
   .u-by {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
 
   .u-at {
     margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -614,7 +617,7 @@
     padding-inline-start: calc(24px + var(--sp-3));
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
     overflow-wrap: anywhere;
   }
@@ -622,8 +625,8 @@
   .foot {
     margin-block: var(--sp-4) 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -632,8 +635,8 @@
   /* THE LINE UNDER THE LANES: what the chart means, in the second ink. */
   .reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
     text-wrap: pretty;
   }
@@ -651,13 +654,13 @@
      the ring only on a face that is a door to its run, and this one is not, because the whole row is that door. */
   .line-mark :global(.agent-face:is([data-live='working'], [data-live='quiet'])) {
     border-color: var(--live);
-    box-shadow: inset 0 0 0 1px var(--bg);
+    box-shadow: inset 0 0 0 1px var(--tile);
   }
 
   /* On a phone the lanes are rows of 60 through `rows.css`, and the update's text reads at 16. */
   @media (width < 900px) {
     .u-body {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
       line-height: 24px;
     }
   }

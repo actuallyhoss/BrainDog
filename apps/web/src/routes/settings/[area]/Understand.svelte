@@ -13,7 +13,7 @@
   import { doIt, lookFirst, undoIt, understandWords as words, type Look } from '$lib/record/understand-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
 
   /* WHERE THE LINE IS: nothing asked yet, the look in front of the owner, or what Do it did with its Undo. */
@@ -64,48 +64,50 @@
 </script>
 
 {#if !gone}
-  <Section title={words.title}>
-    {#if step.at === 'idle'}
-      <div class="u-line">
-        <p class="u-hint">{words.hint}</p>
-        <Button disabled={busy !== null} aria-busy={busy === 'look' ? 'true' : undefined} onclick={() => void look()}
-          >{busy === 'look' ? words.looking : words.look}</Button
-        >
-      </div>
-    {:else}
-      {@const l = step.look}
-      <p class="u-said" role="status">{l.said}</p>
-      {#if l.lines.length > 0}
-        <ul class="u-lines">
-          {#each l.lines as line, i (i)}<li class="u-row">{line}</li>{/each}
-        </ul>
-      {/if}
-      {#if l.more}<p class="u-note">{l.more}</p>{/if}
-      {#if l.asks}<p class="u-note">{l.asks}</p>{/if}
-      {#if step.at === 'done' && !l.done}<p class="u-note">{words.nextPart}</p>{/if}
-      <div class="u-do">
-        {#if step.at === 'look'}
-          {#if !l.empty}
-            <Button weight="primary" disabled={busy !== null} aria-busy={busy === 'do' ? 'true' : undefined} onclick={() => void go()}
-              >{words.doIt}</Button
-            >
-          {/if}
-          <Button weight="bare" disabled={busy !== null} onclick={() => (step = { at: 'idle' })}>{words.notNow}</Button>
-        {:else}
-          {@const undo = step.undo}
-          {#if undo.length > 0}
-            <Button disabled={busy !== null} aria-busy={busy === 'undo' ? 'true' : undefined} onclick={() => void back(undo)}
-              >{words.undo}</Button
-            >
-          {/if}
-          {#if !l.done}
-            <Button weight="bare" disabled={busy !== null} onclick={() => void look()}>{words.lookAgain}</Button>
-          {/if}
-          <Button weight="bare" disabled={busy !== null} onclick={() => (step = { at: 'idle' })}>{words.close}</Button>
+  <Tile class="section" data-surface="tile" title={words.title}>
+    <div class="section-body">
+      {#if step.at === 'idle'}
+        <div class="u-line">
+          <p class="u-hint">{words.hint}</p>
+          <Button disabled={busy !== null} aria-busy={busy === 'look' ? 'true' : undefined} onclick={() => void look()}
+            >{busy === 'look' ? words.looking : words.look}</Button
+          >
+        </div>
+      {:else}
+        {@const l = step.look}
+        <p class="u-said" role="status">{l.said}</p>
+        {#if l.lines.length > 0}
+          <ul class="u-lines">
+            {#each l.lines as line, i (i)}<li class="u-row">{line}</li>{/each}
+          </ul>
         {/if}
-      </div>
-    {/if}
-  </Section>
+        {#if l.more}<p class="u-note">{l.more}</p>{/if}
+        {#if l.asks}<p class="u-note">{l.asks}</p>{/if}
+        {#if step.at === 'done' && !l.done}<p class="u-note">{words.nextPart}</p>{/if}
+        <div class="u-do">
+          {#if step.at === 'look'}
+            {#if !l.empty}
+              <Button weight="primary" disabled={busy !== null} aria-busy={busy === 'do' ? 'true' : undefined} onclick={() => void go()}
+                >{words.doIt}</Button
+              >
+            {/if}
+            <Button weight="bare" disabled={busy !== null} onclick={() => (step = { at: 'idle' })}>{words.notNow}</Button>
+          {:else}
+            {@const undo = step.undo}
+            {#if undo.length > 0}
+              <Button disabled={busy !== null} aria-busy={busy === 'undo' ? 'true' : undefined} onclick={() => void back(undo)}
+                >{words.undo}</Button
+              >
+            {/if}
+            {#if !l.done}
+              <Button weight="bare" disabled={busy !== null} onclick={() => void look()}>{words.lookAgain}</Button>
+            {/if}
+            <Button weight="bare" disabled={busy !== null} onclick={() => (step = { at: 'idle' })}>{words.close}</Button>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  </Tile>
 {/if}
 
 <style>
@@ -159,7 +161,7 @@
   }
 
   .u-row + .u-row {
-    border-block-start: 1px solid var(--line-soft);
+    border-block-start: 1px solid var(--rule);
   }
 
   .u-note {

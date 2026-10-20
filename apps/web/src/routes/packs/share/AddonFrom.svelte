@@ -18,7 +18,6 @@
   import { read } from '$lib/data/record.ts';
   import { saveDog } from '$lib/dog/source.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { kennelFetch, publishedHref, publishedLink, publishedSaid, submitToKennel, type Submitted } from '$lib/market/publish.ts';
@@ -254,32 +253,36 @@
     >
       <!-- A ZERO IS NO COUNT, which Section already draws as none; a spread here would put Svelte's prop merging in the
            chunk every screen loads. -->
-      <Section title={words.picks} count={ticks.size}>
-        {#each groups as group (group.kind)}
-          <fieldset class="group">
-            <legend class="group-h">{group.heading}</legend>
-            {#each group.items as item (item.id)}
-              <label class="pick">
-                <input type="checkbox" checked={ticks.has(item.id)} onchange={(e) => tick(item.id, e.currentTarget.checked)} />
-                <span>{item.title}</span>
-              </label>
-            {/each}
-          </fieldset>
-        {/each}
-      </Section>
+      <Tile class="section" data-surface="tile" title={words.picks} count={ticks.size || undefined}>
+        <div class="section-body">
+          {#each groups as group (group.kind)}
+            <fieldset class="group">
+              <legend class="group-h">{group.heading}</legend>
+              {#each group.items as item (item.id)}
+                <label class="pick">
+                  <input type="checkbox" checked={ticks.has(item.id)} onchange={(e) => tick(item.id, e.currentTarget.checked)} />
+                  <span>{item.title}</span>
+                </label>
+              {/each}
+            </fieldset>
+          {/each}
+        </div>
+      </Tile>
 
       {#if skillOffer.length > 0}
-        <Section title={words.skillsHeading} count={skillTicks.size}>
-          <p class="quiet">{words.skillsHint}</p>
-          <fieldset class="group">
-            {#each skillOffer as skill (skill.seq)}
-              <label class="pick">
-                <input type="checkbox" checked={skillTicks.has(skill.seq)} onchange={(e) => tickSkill(skill.seq, e.currentTarget.checked)} />
-                <span>{words.skillLine(skill.name, skill.trigger)}</span>
-              </label>
-            {/each}
-          </fieldset>
-        </Section>
+        <Tile class="section" data-surface="tile" title={words.skillsHeading} count={skillTicks.size || undefined}>
+          <div class="section-body">
+            <p class="quiet">{words.skillsHint}</p>
+            <fieldset class="group">
+              {#each skillOffer as skill (skill.seq)}
+                <label class="pick">
+                  <input type="checkbox" checked={skillTicks.has(skill.seq)} onchange={(e) => tickSkill(skill.seq, e.currentTarget.checked)} />
+                  <span>{words.skillLine(skill.name, skill.trigger)}</span>
+                </label>
+              {/each}
+            </fieldset>
+          </div>
+        </Tile>
       {/if}
 
       {#if forId !== null}
@@ -345,50 +348,52 @@
       </div>
     </form>
 
-    <Section title={stateWords.heading} count={subs === null ? mine.length : subs.length}>
-      {#if took}<p class="quiet" role="status">{took}</p>{/if}
-      {#if subs !== null && subs.length > 0}
-        <!-- EACH SUBMISSION IN ITS STATE, as the store tells it: waiting, listed, declined with the operator's reason, or
-             taken out. A declined one is fixed and sent again as a later version; a listed one gets an update. -->
-        <ul class="lines">
-          {#each subs as row (`${row.id}@${row.version}`)}
-            {@const own = mine.find((m) => m.id === row.id)}
-            <li>
-              <span>{row.title}</span>
-              <span class="detail">{stateWords.version(row.version)}. {stateLine(row)}</span>
-              <div class="actions">
-                {#if row.state === 'declined'}
-                  <Button onclick={() => reuse(row)}>{words.fixAndSend}</Button>
-                {:else if row.state === 'listed'}
-                  <Button onclick={() => reuse(row)}>{words.publishUpdate}</Button>
-                  {#if own}
-                    <Button disabled={taking !== null} aria-busy={taking === own.id ? 'true' : undefined} onclick={() => void takeOut(own)}>
-                      {taking === own.id ? unpublishWords.working : unpublishWords.unpublish}
-                    </Button>
+    <Tile class="section" data-surface="tile" title={stateWords.heading} count={(subs === null ? mine.length : subs.length) || undefined}>
+      <div class="section-body">
+        {#if took}<p class="quiet" role="status">{took}</p>{/if}
+        {#if subs !== null && subs.length > 0}
+          <!-- EACH SUBMISSION IN ITS STATE, as the store tells it: waiting, listed, declined with the operator's reason, or
+               taken out. A declined one is fixed and sent again as a later version; a listed one gets an update. -->
+          <ul class="lines">
+            {#each subs as row (`${row.id}@${row.version}`)}
+              {@const own = mine.find((m) => m.id === row.id)}
+              <li>
+                <span>{row.title}</span>
+                <span class="detail">{stateWords.version(row.version)}. {stateLine(row)}</span>
+                <div class="actions">
+                  {#if row.state === 'declined'}
+                    <Button onclick={() => reuse(row)}>{words.fixAndSend}</Button>
+                  {:else if row.state === 'listed'}
+                    <Button onclick={() => reuse(row)}>{words.publishUpdate}</Button>
+                    {#if own}
+                      <Button disabled={taking !== null} aria-busy={taking === own.id ? 'true' : undefined} onclick={() => void takeOut(own)}>
+                        {taking === own.id ? unpublishWords.working : unpublishWords.unpublish}
+                      </Button>
+                    {/if}
                   {/if}
-                {/if}
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {:else if mine.length === 0}
-        <p class="quiet">{unpublishWords.none}</p>
-      {:else}
-        <ul class="lines">
-          {#each mine as one (one.id)}
-            <li>
-              <span>{one.title}</span>
-              <span class="detail">{one.versions.map((v) => unpublishWords.version(v)).join(', ')}</span>
-              <div class="actions">
-                <Button disabled={taking !== null} aria-busy={taking === one.id ? 'true' : undefined} onclick={() => void takeOut(one)}>
-                  {taking === one.id ? unpublishWords.working : unpublishWords.unpublish}
-                </Button>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </Section>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {:else if mine.length === 0}
+          <p class="quiet">{unpublishWords.none}</p>
+        {:else}
+          <ul class="lines">
+            {#each mine as one (one.id)}
+              <li>
+                <span>{one.title}</span>
+                <span class="detail">{one.versions.map((v) => unpublishWords.version(v)).join(', ')}</span>
+                <div class="actions">
+                  <Button disabled={taking !== null} aria-busy={taking === one.id ? 'true' : undefined} onclick={() => void takeOut(one)}>
+                    {taking === one.id ? unpublishWords.working : unpublishWords.unpublish}
+                  </Button>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    </Tile>
   {/if}
 </div>
 
@@ -422,7 +427,7 @@
     padding: 0;
     margin-block-end: var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }

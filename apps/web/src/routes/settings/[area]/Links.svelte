@@ -17,7 +17,7 @@
   import { closeLink, linkState, readLinks, words, type ShareRow } from '$lib/record/share-write.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -77,36 +77,38 @@
 </script>
 
 {#if !unrouted}
-<Section title={words.linksTitle} count={openCount}>
-  <p class="links-lead">{words.linksLead}</p>
-  {#if refused !== null}
-    <p class="links-refused" role="alert">{refused}</p>
-  {:else if links !== null && links.length === 0}
-    <Empty kind="no-data-yet" title={words.linksNone} body={words.linksNoneBody} />
-  {:else if links !== null}
-    <ul class="links">
-      {#each sorted as l (l.id)}
-        {@const open = linkState(l, now) === 'open'}
-        <li class="link" data-open={open ? '' : undefined}>
-          <IconWell name="link" size="l" />
-          <div class="link-text">
-            <span class="link-title">{l.title}</span>
-            <span class="link-when">{stateSaid(l)} · {words.linksOpened(since(l.opened_at, now))}</span>
-          </div>
-          {#if open}
-            <Button
-              tone="bad"
-              disabled={closing !== null}
-              aria-busy={closing === l.id ? 'true' : undefined}
-              aria-label={words.linksClose(l.title)}
-              onclick={() => void close(l)}>{words.linksCloseShort}</Button
-            >
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</Section>
+<Tile class="section" data-surface="tile" title={words.linksTitle} count={openCount || undefined}>
+  <div class="section-body">
+    <p class="links-lead">{words.linksLead}</p>
+    {#if refused !== null}
+      <p class="links-refused" role="alert">{refused}</p>
+    {:else if links !== null && links.length === 0}
+      <Empty kind="no-data-yet" title={words.linksNone} body={words.linksNoneBody} />
+    {:else if links !== null}
+      <ul class="links">
+        {#each sorted as l (l.id)}
+          {@const open = linkState(l, now) === 'open'}
+          <li class="link" data-open={open ? '' : undefined}>
+            <IconWell name="link" size="l" />
+            <div class="link-text">
+              <span class="link-title">{l.title}</span>
+              <span class="link-when">{stateSaid(l)} · {words.linksOpened(since(l.opened_at, now))}</span>
+            </div>
+            {#if open}
+              <Button
+                tone="bad"
+                disabled={closing !== null}
+                aria-busy={closing === l.id ? 'true' : undefined}
+                aria-label={words.linksClose(l.title)}
+                onclick={() => void close(l)}>{words.linksCloseShort}</Button
+              >
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+</Tile>
 {/if}
 
 <style>

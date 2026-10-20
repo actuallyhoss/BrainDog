@@ -29,7 +29,7 @@
   import { copy } from '$lib/copy.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { keptWithUndo, type Deps } from '$lib/record/pref-write.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -313,189 +313,193 @@
   alone, and the People matrix cites that rule and gets it right, which is the tell: the fix
   was known, written down, and applied to one group.
 -->
-<Section title={words.looks}>
-  <p class="hint">{kept === 'record' ? words.hint(props.shell.index.name) : kept === 'pending' ? words.hintPending : words.hintDevice}</p>
-  <div class="looks">
-    <div class="choices">
-      <!-- EVERY LOOK THE RECORD HOLDS, ONE PRESS EACH: House, High contrast, the record's own, one for each add-on. The
-           one drawn now carries a tick as well as its fill, so the state is never colour alone. -->
-      {#if answered && choices.length > 1}
+<Tile class="section" data-surface="tile" title={words.looks}>
+  <div class="section-body">
+    <p class="hint">{kept === 'record' ? words.hint(props.shell.index.name) : kept === 'pending' ? words.hintPending : words.hintDevice}</p>
+    <div class="looks">
+      <div class="choices">
+        <!-- EVERY LOOK THE RECORD HOLDS, ONE PRESS EACH: House, High contrast, the record's own, one for each add-on. The
+             one drawn now carries a tick as well as its fill, so the state is never colour alone. -->
+        {#if answered && choices.length > 1}
+          <div class="choice">
+            <span class="choice-name" id="choice-look">{lookWords.title}</span>
+            <span class="choice-line">{accent === null ? lookWords.line : lookWords.ownOnTop}</span>
+            <div class="look-picks" role="group" aria-labelledby="choice-look">
+              {#each choices as c (c.id)}
+                <button
+                  type="button"
+                  class="look-pick"
+                  aria-pressed={c.on}
+                  data-on={c.on ? '' : undefined}
+                  disabled={picking}
+                  onclick={() => void pickLook(c.id)}>{#if c.on}<Icon name="check" size="s" />{/if}{c.name}</button
+                >
+              {/each}
+            </div>
+          </div>
+        {/if}
+
         <div class="choice">
-          <span class="choice-name" id="choice-look">{lookWords.title}</span>
-          <span class="choice-line">{accent === null ? lookWords.line : lookWords.ownOnTop}</span>
-          <div class="look-picks" role="group" aria-labelledby="choice-look">
-            {#each choices as c (c.id)}
-              <button
-                type="button"
-                class="look-pick"
-                aria-pressed={c.on}
-                data-on={c.on ? '' : undefined}
-                disabled={picking}
-                onclick={() => void pickLook(c.id)}>{#if c.on}<Icon name="check" size="s" />{/if}{c.name}</button
+          <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
+          <Segmented full role="group" aria-labelledby="choice-scheme">
+            {#each SCHEMES as [v, label, icon] (v)}
+              <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}
+                ><Icon name={icon} size="s" />{label}</button
               >
             {/each}
-          </div>
+          </Segmented>
         </div>
-      {/if}
 
-      <div class="choice">
-        <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
-        <Segmented full role="group" aria-labelledby="choice-scheme">
-          {#each SCHEMES as [v, label, icon] (v)}
-            <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}
-              ><Icon name={icon} size="s" />{label}</button
-            >
-          {/each}
-        </Segmented>
-      </div>
+        <div class="choice">
+          <span class="choice-name" id="choice-text">{copy.textSize}</span>
+          <Segmented full role="group" aria-labelledby="choice-text">
+            {#each TEXTS as [v, label] (v)}
+              <button
+                type="button"
+                class="segment"
+                aria-pressed={text === v}
+                data-on={text === v ? '' : undefined}
+                onclick={() => set('text', v)}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
+              >
+            {/each}
+          </Segmented>
+        </div>
 
-      <div class="choice">
-        <span class="choice-name" id="choice-text">{copy.textSize}</span>
-        <Segmented full role="group" aria-labelledby="choice-text">
-          {#each TEXTS as [v, label] (v)}
-            <button
-              type="button"
-              class="segment"
-              aria-pressed={text === v}
-              data-on={text === v ? '' : undefined}
-              onclick={() => set('text', v)}><span class="aa" data-size={v} aria-hidden="true">Aa</span>{label}</button
-            >
-          {/each}
-        </Segmented>
-      </div>
+        <div class="choice">
+          <span class="choice-name" id="choice-density">{copy.density}</span>
+          <Segmented full role="group" aria-labelledby="choice-density">
+            {#each DENSITIES as [v, label] (v)}
+              <button
+                type="button"
+                class="segment"
+                aria-pressed={density === v}
+                data-on={density === v ? '' : undefined}
+                onclick={() => set('density', v)}
+                ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
+              >
+            {/each}
+          </Segmented>
+        </div>
 
-      <div class="choice">
-        <span class="choice-name" id="choice-density">{copy.density}</span>
-        <Segmented full role="group" aria-labelledby="choice-density">
-          {#each DENSITIES as [v, label] (v)}
-            <button
-              type="button"
-              class="segment"
-              aria-pressed={density === v}
-              data-on={density === v ? '' : undefined}
-              onclick={() => set('density', v)}
-              ><span class="spacing" data-density={v} aria-hidden="true"><span></span><span></span><span></span></span>{label}</button
-            >
-          {/each}
-        </Segmented>
-      </div>
-
-      <!--
-        THE PERSON'S OWN COLOUR, over the record's look. `@braindog/theme` solves an entire coherent palette from one seed
-        against every floor it defines, and until now nothing called it with anything but the house
-        red, so a bakery and a type foundry looked identical. The swatches are suggestions, not the
-        set: any colour that passes goes in, and one that does not says which floor it missed rather
-        than being quietly approximated.
-      -->
-      <div class="choice">
-        <span class="choice-name" id="choice-accent">{copy.accentTitle}</span>
-        <span class="choice-line">{copy.accentHint}</span>
-        <!-- A SWATCH PER COLOUR, HOUSE FIRST AND RED LIKE THE OTHERS (2.A.11): the chosen one ringed in red a gap away
-             with a tick badge at its corner, and its name under the row. -->
-        <div class="swatches" role="group" aria-labelledby="choice-accent">
-          <button
-            type="button"
-            class="swatch"
-            aria-pressed={accent === null}
-            data-on={accent === null ? '' : undefined}
-            style="--swatch:{houseHex}"
-            aria-label={words.houseRed}
-            onclick={() => pickAccent(null)}
-          >
-            {#if accent === null}<span class="tick" aria-hidden="true"><Icon name="check" size="s" /></span>{/if}
-          </button>
-          {#each ACCENTS as a (a.hex)}
+        <!--
+          THE PERSON'S OWN COLOUR, over the record's look. `@braindog/theme` solves an entire coherent palette from one seed
+          against every floor it defines, and until now nothing called it with anything but the house
+          red, so a bakery and a type foundry looked identical. The swatches are suggestions, not the
+          set: any colour that passes goes in, and one that does not says which floor it missed rather
+          than being quietly approximated.
+        -->
+        <div class="choice">
+          <span class="choice-name" id="choice-accent">{copy.accentTitle}</span>
+          <span class="choice-line">{copy.accentHint}</span>
+          <!-- A SWATCH PER COLOUR, HOUSE FIRST AND RED LIKE THE OTHERS (2.A.11): the chosen one ringed in red a gap away
+               with a tick badge at its corner, and its name under the row. -->
+          <div class="swatches" role="group" aria-labelledby="choice-accent">
             <button
               type="button"
               class="swatch"
-              aria-pressed={accent === a.hex}
-              data-on={accent === a.hex ? '' : undefined}
-              style="--swatch:{a.hex}"
-              aria-label={a.name}
-              onclick={() => pickAccent(a.hex)}
+              aria-pressed={accent === null}
+              data-on={accent === null ? '' : undefined}
+              style="--swatch:{houseHex}"
+              aria-label={words.houseRed}
+              onclick={() => pickAccent(null)}
             >
-              {#if accent === a.hex}<span class="tick" aria-hidden="true"><Icon name="check" size="s" /></span>{/if}
+              {#if accent === null}<span class="tick" aria-hidden="true"><Icon name="check" size="s" /></span>{/if}
             </button>
-          {/each}
+            {#each ACCENTS as a (a.hex)}
+              <button
+                type="button"
+                class="swatch"
+                aria-pressed={accent === a.hex}
+                data-on={accent === a.hex ? '' : undefined}
+                style="--swatch:{a.hex}"
+                aria-label={a.name}
+                onclick={() => pickAccent(a.hex)}
+              >
+                {#if accent === a.hex}<span class="tick" aria-hidden="true"><Icon name="check" size="s" /></span>{/if}
+              </button>
+            {/each}
+          </div>
+          {#if accentName}<p class="swatch-name">{accentName}</p>{/if}
+          {#if accentWrong}<p class="wrong" role="alert">{accentWrong}</p>{/if}
         </div>
-        {#if accentName}<p class="swatch-name">{accentName}</p>{/if}
-        {#if accentWrong}<p class="wrong" role="alert">{accentWrong}</p>{/if}
+      </div>
+
+      <!--
+        THE PREVIEW: the app in small, drawn from the tokens every screen reads, so it is never a picture of a choice but
+        the choice itself. The mark wears the record's colour, the sentence carries its one red phrase, and the rows are a
+        list drawn the way every list is drawn, at the chosen row height and text size. Shapes and sample words, never a
+        control, so it is hidden from a screen reader: the choices beside it say what they are.
+      -->
+      <div class="previews" aria-hidden="true">
+      {#each previews as p (p.scheme)}
+      <div class="preview" data-other={p.here ? undefined : ''}>
+        <p class="preview-name">{p.scheme === 'light' ? words.light : words.dark}</p>
+        <!-- THE SCHEME IN USE IS THE PAGE'S OWN TOKENS; THE OTHER IS DRAWN FROM ITS OWN SOLVED COLOURS, the tokens the record
+             would draw it in, so neither is a picture of a choice but the choice itself. -->
+        <div class="pv" style={p.style}>
+          <div class="pv-bar">
+            <span class="pv-mark"></span>
+            <span class="pv-place" data-on></span>
+            <span class="pv-place"></span>
+            <span class="pv-place"></span>
+          </div>
+          <div class="pv-tile">
+            <div class="pv-head">
+              <IconWell name="today" />
+              <span class="pv-title">{copy.today}</span>
+            </div>
+            <p class="pv-said">{words.said} <span class="pv-needs">{words.needs}</span></p>
+            <ul class="ledger ledger-lead pv-rows">
+              {#each copy.densityPreviewRows as row, i (row)}
+                <li>
+                  <div class="line">
+                    <span class="line-mark"><IconWell name={SPECIMEN[i % SPECIMEN.length] ?? 'doc'} size="l" /></span>
+                    <span class="line-main"><span class="line-title pv-row">{row}</span></span>
+                    <span class="line-amount"></span>
+                    <span class="line-when"></span>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        </div>
+      </div>
+      {/each}
       </div>
     </div>
 
     <!--
-      THE PREVIEW: the app in small, drawn from the tokens every screen reads, so it is never a picture of a choice but
-      the choice itself. The mark wears the record's colour, the sentence carries its one red phrase, and the rows are a
-      list drawn the way every list is drawn, at the chosen row height and text size. Shapes and sample words, never a
-      control, so it is hidden from a screen reader: the choices beside it say what they are.
+      THE PALETTE THAT COULD NOT BE TURNED ON.
+
+      `packages/theme` solves a second palette against a higher contrast floor, `theme.mjs` writes
+      it into `house.css` behind `html[data-theme='hc']`, and `theme.mjs --check` byte-compares it
+      on every build. Nothing in `apps/web/src` ever set that attribute, so sixteen checks' worth
+      of generated work was unreachable by the reader it exists for.
+
+      WHAT WAS IN ITS WAY WAS THE ACCENT. `data-theme` carried two meanings and only one of them
+      was ever read: `house.css` has four `data-theme` selectors and all four say `hc`, while
+      `accent.ts` builds its palette into an adopted stylesheet and needs no attribute at all. The
+      one being written was the one nothing read.
+
+      A SWITCH AND NOT A SEGMENT, because it is one thing that is on or off, and `13 §5.1` wants
+      the state said in something other than styling: `aria-checked` carries it.
     -->
-    <div class="previews" aria-hidden="true">
-    {#each previews as p (p.scheme)}
-    <div class="preview" data-other={p.here ? undefined : ''}>
-      <p class="preview-name">{p.scheme === 'light' ? words.light : words.dark}</p>
-      <!-- THE SCHEME IN USE IS THE PAGE'S OWN TOKENS; THE OTHER IS DRAWN FROM ITS OWN SOLVED COLOURS, the tokens the record
-           would draw it in, so neither is a picture of a choice but the choice itself. -->
-      <div class="pv" style={p.style}>
-        <div class="pv-bar">
-          <span class="pv-mark"></span>
-          <span class="pv-place" data-on></span>
-          <span class="pv-place"></span>
-          <span class="pv-place"></span>
-        </div>
-        <div class="pv-tile">
-          <div class="pv-head">
-            <IconWell name="today" />
-            <span class="pv-title">{copy.today}</span>
-          </div>
-          <p class="pv-said">{words.said} <span class="pv-needs">{words.needs}</span></p>
-          <ul class="ledger ledger-lead pv-rows">
-            {#each copy.densityPreviewRows as row, i (row)}
-              <li>
-                <div class="line">
-                  <span class="line-mark"><IconWell name={SPECIMEN[i % SPECIMEN.length] ?? 'doc'} size="l" /></span>
-                  <span class="line-main"><span class="line-title pv-row">{row}</span></span>
-                  <span class="line-amount"></span>
-                  <span class="line-when"></span>
-                </div>
-              </li>
-            {/each}
-          </ul>
-        </div>
-      </div>
-    </div>
-    {/each}
-    </div>
+    <StateRow icon="eye" title={copy.contrast} line={copy.contrastHint} action={contrastSwitch} />
+    <!-- A DISPLAY MODE FOR A SHOULDER, not a redaction: the sentence says both halves, so nobody takes it for a lock. -->
+    <StateRow icon="eye" title={copy.shot} line={copy.shotHint} action={shotSwitch} />
   </div>
-
-  <!--
-    THE PALETTE THAT COULD NOT BE TURNED ON.
-
-    `packages/theme` solves a second palette against a higher contrast floor, `theme.mjs` writes
-    it into `house.css` behind `html[data-theme='hc']`, and `theme.mjs --check` byte-compares it
-    on every build. Nothing in `apps/web/src` ever set that attribute, so sixteen checks' worth
-    of generated work was unreachable by the reader it exists for.
-
-    WHAT WAS IN ITS WAY WAS THE ACCENT. `data-theme` carried two meanings and only one of them
-    was ever read: `house.css` has four `data-theme` selectors and all four say `hc`, while
-    `accent.ts` builds its palette into an adopted stylesheet and needs no attribute at all. The
-    one being written was the one nothing read.
-
-    A SWITCH AND NOT A SEGMENT, because it is one thing that is on or off, and `13 §5.1` wants
-    the state said in something other than styling: `aria-checked` carries it.
-  -->
-  <StateRow icon="eye" title={copy.contrast} line={copy.contrastHint} action={contrastSwitch} />
-  <!-- A DISPLAY MODE FOR A SHOULDER, not a redaction: the sentence says both halves, so nobody takes it for a lock. -->
-  <StateRow icon="eye" title={copy.shot} line={copy.shotHint} action={shotSwitch} />
-</Section>
+</Tile>
 
 <!--
   THE RECORD'S LOOK, which is everybody's, under the person's own choices, which are theirs alone (`21 §6`).
   The editor is its own component with its own styles, because this file's style block is the device choices'.
 -->
-<Section title={copy.lookTitle}>
-  <p class="hint">{copy.lookHint}</p>
-  <LookEditor {owner} {staged} />
-</Section>
+<Tile class="section" data-surface="tile" title={copy.lookTitle}>
+  <div class="section-body">
+    <p class="hint">{copy.lookHint}</p>
+    <LookEditor {owner} {staged} />
+  </div>
+</Tile>
 
 <style>
   /* The hint sits above the control it explains, not beside it: a sentence in a column beside a
@@ -842,11 +846,11 @@
     font-weight: 600;
   }
 
-  /* THE SENTENCE AND THE ROWS READ `--text`, the size chosen, and the rows `--row-h` through the list they sit in. */
+  /* THE SENTENCE AND THE ROWS READ `--fs-body`, the size chosen, and the rows `--row-h` through the list they sit in. */
   .pv-said {
     margin: 0;
     color: var(--ink-2);
-    font-size: var(--text);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     transition: font-size var(--d-state) var(--ease-out);
   }
@@ -858,7 +862,7 @@
 
   .pv-row {
     color: var(--ink-2);
-    font-size: var(--text);
+    font-size: var(--fs-body);
     transition: font-size var(--d-state) var(--ease-out);
   }
 </style>

@@ -63,7 +63,6 @@
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { ALIKE, SAMPLES_MOST, groupsOf, type Group } from './shapes.ts';
   import { builderPath } from '$lib/pattern/draft.ts';
-  import Section from '$lib/ui/Section.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import { recordNow } from '$lib/record/boot-live.ts';
@@ -857,22 +856,24 @@
           {#if patterns.length > 0}
             <!-- PATTERNS FIRST: one accepted pattern files every arrival like its samples from then on, so it is worth
                  more than any one arrival below it. Each opens its question on Decide, where it is accepted or not. -->
-            <Section title={words.patterns} count={patterns.length}>
-              <ul class="ledger ledger-lead">
-                {#each patterns as p (p.id)}
-                  <li>
-                    <a class="line line-tall pattern" href={at(`/decide/${encodeURIComponent(p.id)}`)}>
-                      <IconWell name="decide" size="l" />
-                      <span class="line-main">
-                        <span class="line-title">{p.title}</span>
-                        <span class="line-detail">{words.patternWhy}</span>
-                      </span>
-                      <span class="pattern-go" aria-hidden="true"><Icon name="chevron" size="m" /></span>
-                    </a>
-                  </li>
-                {/each}
-              </ul>
-            </Section>
+            <Tile class="section" data-surface="tile" title={words.patterns} count={patterns.length || undefined}>
+              <div class="section-body">
+                <ul class="ledger ledger-lead">
+                  {#each patterns as p (p.id)}
+                    <li>
+                      <a class="line line-tall pattern" href={at(`/decide/${encodeURIComponent(p.id)}`)}>
+                        <IconWell name="decide" size="l" />
+                        <span class="line-main">
+                          <span class="line-title">{p.title}</span>
+                          <span class="line-detail">{words.patternWhy}</span>
+                        </span>
+                        <span class="pattern-go" aria-hidden="true"><Icon name="chevron" size="m" /></span>
+                      </a>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            </Tile>
           {/if}
           {@render waitingSeries()}
         {/if}
@@ -899,44 +900,46 @@
          back, since the record keeps a rule's filing to its list. -->
     <div class="days">
       {#each daysOf(series.items.map((i) => ({ ...i, arrived: i.settled?.at ?? i.arrived })), clock) as d (d.day)}
-        <Section title={d.label} count={d.items.length}>
-          <ul class="ledger ledger-lead arrivals">
-            {#each d.items as item (item.id)}
-              {@const s = item.settled}
-              {@const who = s ? actor(s.by, me || null) : null}
-              <li>
-                <div class="line line-tall settled-line">
-                  <span class="line-mark">
-                    {#if who}<Face name={who.name} you={who.kind === 'you'} kind={who.kind} size="l" />{:else}<IconWell name={state === 'matched' ? 'check' : 'archive'} size="l" />{/if}
-                  </span>
-                  <span class="line-main">
-                    <span class="line-title">{item.subject}</span>
-                    <span class="line-detail settled-detail">
-                      {#if state === 'matched'}
-                        {#if s?.row}
-                          <span>{words.filedIn}
-                            {#if s.row.seq !== null && !s.row.archived}<a class="settled-list" href={at(`/r/${encodeURIComponent(s.row.register)}/${s.row.seq}`)}>{listOf(s.row.register)}</a>{:else}{listOf(s.row.register)}{/if}
-                            {words.by(who?.name ?? '')}</span>
+        <Tile class="section" data-surface="tile" title={d.label} count={d.items.length || undefined}>
+          <div class="section-body">
+            <ul class="ledger ledger-lead arrivals">
+              {#each d.items as item (item.id)}
+                {@const s = item.settled}
+                {@const who = s ? actor(s.by, me || null) : null}
+                <li>
+                  <div class="line line-tall settled-line">
+                    <span class="line-mark">
+                      {#if who}<Face name={who.name} you={who.kind === 'you'} kind={who.kind} size="l" />{:else}<IconWell name={state === 'matched' ? 'check' : 'archive'} size="l" />{/if}
+                    </span>
+                    <span class="line-main">
+                      <span class="line-title">{item.subject}</span>
+                      <span class="line-detail settled-detail">
+                        {#if state === 'matched'}
+                          {#if s?.row}
+                            <span>{words.filedIn}
+                              {#if s.row.seq !== null && !s.row.archived}<a class="settled-list" href={at(`/r/${encodeURIComponent(s.row.register)}/${s.row.seq}`)}>{listOf(s.row.register)}</a>{:else}{listOf(s.row.register)}{/if}
+                              {words.by(who?.name ?? '')}</span>
+                          {:else}
+                            <span>{who ? words.filedBy(who.name) : words.byRule}</span>
+                          {/if}
                         {:else}
-                          <span>{who ? words.filedBy(who.name) : words.byRule}</span>
+                          <span>{who ? words.archivedBy(who.name) : words.archivedPlain}</span>
                         {/if}
-                      {:else}
-                        <span>{who ? words.archivedBy(who.name) : words.archivedPlain}</span>
-                      {/if}
-                      <span class="from">{item.from}</span>
+                        <span class="from">{item.from}</span>
+                      </span>
                     </span>
-                  </span>
-                  <span class="line-when">{since(s?.at ?? item.arrived, clock)}</span>
-                  {#if s}
-                    <span class="settled-verb">
-                      <Button size="sm" disabled={backing !== null} onclick={() => putBack(item.id, s.row?.version ?? null)}>{words.putBack}</Button>
-                    </span>
-                  {/if}
-                </div>
-              </li>
-            {/each}
-          </ul>
-        </Section>
+                    <span class="line-when">{since(s?.at ?? item.arrived, clock)}</span>
+                    {#if s}
+                      <span class="settled-verb">
+                        <Button size="sm" disabled={backing !== null} onclick={() => putBack(item.id, s.row?.version ?? null)}>{words.putBack}</Button>
+                      </span>
+                    {/if}
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        </Tile>
       {/each}
     </div>
     {#if series.cursor !== null}
@@ -970,122 +973,128 @@
   {:else}
     {#if reviews.length > 0}
       <!-- TO REVIEW: what BrainDog read and would file, one line each. The suggested filing is the one primary. -->
-      <Section title={words.toReview} count={reviews.length}>
-        <p class="why">{words.toReviewWhy}</p>
-        <ul class="ledger ledger-lead">
-          {#each reviews as r (r.id)}
-            <li>
-              <div class="line line-tall alike-line">
-                <span class="line-main">
-                  <span class="line-title">{r.line}</span>
-                </span>
-                <span class="alike-verbs">
-                  <Button size="sm" weight="primary" disabled={reviewing !== null} onclick={() => settleReview(r, 'file')}>{words.fileIn(listOf(r.register))}</Button>
-                  <Button size="sm" disabled={reviewing !== null} onclick={() => settleReview(r, 'else')}>{words.somethingElse}</Button>
-                  <Button size="sm" weight="bare" disabled={reviewing !== null} onclick={() => settleReview(r, 'ignore')}>{words.ignore}</Button>
-                </span>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      </Section>
+      <Tile class="section" data-surface="tile" title={words.toReview} count={reviews.length || undefined}>
+        <div class="section-body">
+          <p class="why">{words.toReviewWhy}</p>
+          <ul class="ledger ledger-lead">
+            {#each reviews as r (r.id)}
+              <li>
+                <div class="line line-tall alike-line">
+                  <span class="line-main">
+                    <span class="line-title">{r.line}</span>
+                  </span>
+                  <span class="alike-verbs">
+                    <Button size="sm" weight="primary" disabled={reviewing !== null} onclick={() => settleReview(r, 'file')}>{words.fileIn(listOf(r.register))}</Button>
+                    <Button size="sm" disabled={reviewing !== null} onclick={() => settleReview(r, 'else')}>{words.somethingElse}</Button>
+                    <Button size="sm" weight="bare" disabled={reviewing !== null} onclick={() => settleReview(r, 'ignore')}>{words.ignore}</Button>
+                  </span>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      </Tile>
     {/if}
     {#if alike.length > 0}
       <!-- LEARNED ONCE. Each sender with two or more alike is one row: how many, from whom, and the newest of them.
            Asking Slash waits for the record's threshold for a pattern, since it spends a model call; making the rule by
            hand is offered for any group, because pointing at two alike messages costs nothing
            and already shows what the rule would read. Both are quiet: filing is the screen's one primary. -->
-      <Section title={words.learn} count={alike.length}>
-        <p class="why">{words.learnWhy}</p>
-        <ul class="ledger ledger-lead">
-          {#each alike as group (group.shape)}
-            {@const newest = group.items[0]}
-            <li>
-              <div class="line line-tall alike-line">
-                <IconWell name="learning" size="l" />
-                <span class="line-main">
-                  <span class="line-title">{words.alikeFrom(group.items.length, newest?.from ?? '')}</span>
-                  {#if newest}<span class="line-detail">{words.newest(newest.subject, since(newest.arrived, clock))}</span>{/if}
-                </span>
-                <span class="alike-verbs">
-                  {#if group.items.length >= ALIKE}
-                    <Button size="sm" disabled={asking !== null} onclick={() => askPattern(group)}>
-                      {asking === group.shape ? words.asking : words.askPattern}
-                    </Button>
-                  {/if}
-                  <Button size="sm" weight="bare" href={builderPath(group.items.slice(0, SAMPLES_MOST).map((i) => i.id))}>{words.makeOne}</Button>
-                </span>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      </Section>
-    {/if}
-
-    <!-- ONE TILE FOR ALL THAT WAITS (today F14), each day a quiet subhead over its rows and no rule above it. -->
-    <Section title={words.waiting} count={INBOX.length}>
-      {#each days as d (d.day)}
-        <h3 class="day-h">{d.label}</h3>
-          <ul class="ledger arrivals" data-picking={picking ? '' : undefined}>
-            {#each d.items as item (item.id)}
-              {@const i = place.get(item.id) ?? -1}
-              <li class="arrival" data-cursor={i === cursor ? '' : undefined} data-open={open === item.id ? '' : undefined}>
-                <!-- THE LEADING MARK IS THE CHECK THAT SELECTS IT: a 20px ring, ink with its tick once picked. -->
-                <button
-                  type="button"
-                  class="pick line-check tap"
-                  role="checkbox"
-                  aria-checked={picked.has(item.id)}
-                  aria-label={item.subject}
-                  data-on={picked.has(item.id) ? '' : undefined}
-                  onclick={() => toggle(item.id)}
-                ><Icon name="check" size="s" /></button>
-                <!-- THE SUBJECT LEADS, then who sent it and the first of what they said, then when. The
-                     sender's domain led the row in a column of its own and was said again under the
-                     subject. -->
-                <button
-                  type="button"
-                  id="arrival-{item.id}"
-                  class="line line-tall"
-                  aria-expanded={open === item.id}
-                  onclick={() => {
-                    cursor = i;
-                    open = open === item.id ? null : item.id;
-                  }}
-                >
+      <Tile class="section" data-surface="tile" title={words.learn} count={alike.length || undefined}>
+        <div class="section-body">
+          <p class="why">{words.learnWhy}</p>
+          <ul class="ledger ledger-lead">
+            {#each alike as group (group.shape)}
+              {@const newest = group.items[0]}
+              <li>
+                <div class="line line-tall alike-line">
+                  <IconWell name="learning" size="l" />
                   <span class="line-main">
-                    <span class="line-title">{item.subject}</span>
-                    {#if hintLines.get(item.id)}<span class="hint">{hintLines.get(item.id)}</span>{/if}
-                    <span class="line-detail"><span class="from">{item.from}</span>{#if open !== item.id && item.body}<span class="gist">{firstWords(item.body)}</span>{/if}</span>
+                    <span class="line-title">{words.alikeFrom(group.items.length, newest?.from ?? '')}</span>
+                    {#if newest}<span class="line-detail">{words.newest(newest.subject, since(newest.arrived, clock))}</span>{/if}
                   </span>
-                  <span class="line-when">{since(item.arrived, clock)}</span>
-                </button>
-                <!-- THE ROW'S VERBS, WITH THE KEYS THAT DO THE SAME: shown on the cursor row and under the pointer, and
-                     left out of the tab order, since `e` and Delete are the keyboard's way and the open row's buttons
-                     are a tab away. -->
-                <span class="line-verbs arrival-verbs">
-                  <Button size="sm" kbd="e" tabindex={-1} aria-label={words.fileNamed(item.subject)} disabled={busy} onclick={() => ((cursor = i), settle(item, 'file'))}>{words.file}</Button>
-                  <Button size="sm" weight="bare" kbd="Delete" tabindex={-1} aria-label={words.archiveNamed(item.subject)} disabled={busy} onclick={() => ((cursor = i), settle(item, 'archive'))}>{words.archive}</Button>
-                </span>
-
-                {#if open === item.id}
-                  <div class="body">
-                    <!-- Plain text. Never the renderer, never {@html}, never a link the record made. -->
-                    <p class="raw">{item.body}</p>
-
-                    <!-- FILING IS THE PRIMARY, and archiving follows it in words. -->
-                    <div class="actions">
-                      {@render fileInto('row')}
-                      <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{target ? copy.fileItIn(listOf(target)) : copy.fileIt}</Button>
-                      <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
-                    </div>
-                  </div>
-                {/if}
+                  <span class="alike-verbs">
+                    {#if group.items.length >= ALIKE}
+                      <Button size="sm" disabled={asking !== null} onclick={() => askPattern(group)}>
+                        {asking === group.shape ? words.asking : words.askPattern}
+                      </Button>
+                    {/if}
+                    <Button size="sm" weight="bare" href={builderPath(group.items.slice(0, SAMPLES_MOST).map((i) => i.id))}>{words.makeOne}</Button>
+                  </span>
+                </div>
               </li>
             {/each}
           </ul>
-      {/each}
-    </Section>
+        </div>
+      </Tile>
+    {/if}
+
+    <!-- ONE TILE FOR ALL THAT WAITS (today F14), each day a quiet subhead over its rows and no rule above it. -->
+    <Tile class="section" data-surface="tile" title={words.waiting} count={INBOX.length || undefined}>
+      <div class="section-body">
+        {#each days as d (d.day)}
+          <h3 class="day-h">{d.label}</h3>
+            <ul class="ledger arrivals" data-picking={picking ? '' : undefined}>
+              {#each d.items as item (item.id)}
+                {@const i = place.get(item.id) ?? -1}
+                <li class="arrival" data-cursor={i === cursor ? '' : undefined} data-open={open === item.id ? '' : undefined}>
+                  <!-- THE LEADING MARK IS THE CHECK THAT SELECTS IT: a 20px ring, ink with its tick once picked. -->
+                  <button
+                    type="button"
+                    class="pick line-check tap"
+                    role="checkbox"
+                    aria-checked={picked.has(item.id)}
+                    aria-label={item.subject}
+                    data-on={picked.has(item.id) ? '' : undefined}
+                    onclick={() => toggle(item.id)}
+                  ><Icon name="check" size="s" /></button>
+                  <!-- THE SUBJECT LEADS, then who sent it and the first of what they said, then when. The
+                       sender's domain led the row in a column of its own and was said again under the
+                       subject. -->
+                  <button
+                    type="button"
+                    id="arrival-{item.id}"
+                    class="line line-tall"
+                    aria-expanded={open === item.id}
+                    onclick={() => {
+                      cursor = i;
+                      open = open === item.id ? null : item.id;
+                    }}
+                  >
+                    <span class="line-main">
+                      <span class="line-title">{item.subject}</span>
+                      {#if hintLines.get(item.id)}<span class="hint">{hintLines.get(item.id)}</span>{/if}
+                      <span class="line-detail"><span class="from">{item.from}</span>{#if open !== item.id && item.body}<span class="gist">{firstWords(item.body)}</span>{/if}</span>
+                    </span>
+                    <span class="line-when">{since(item.arrived, clock)}</span>
+                  </button>
+                  <!-- THE ROW'S VERBS, WITH THE KEYS THAT DO THE SAME: shown on the cursor row and under the pointer, and
+                       left out of the tab order, since `e` and Delete are the keyboard's way and the open row's buttons
+                       are a tab away. -->
+                  <span class="line-verbs arrival-verbs">
+                    <Button size="sm" kbd="e" tabindex={-1} aria-label={words.fileNamed(item.subject)} disabled={busy} onclick={() => ((cursor = i), settle(item, 'file'))}>{words.file}</Button>
+                    <Button size="sm" weight="bare" kbd="Delete" tabindex={-1} aria-label={words.archiveNamed(item.subject)} disabled={busy} onclick={() => ((cursor = i), settle(item, 'archive'))}>{words.archive}</Button>
+                  </span>
+
+                  {#if open === item.id}
+                    <div class="body">
+                      <!-- Plain text. Never the renderer, never {@html}, never a link the record made. -->
+                      <p class="raw">{item.body}</p>
+
+                      <!-- FILING IS THE PRIMARY, and archiving follows it in words. -->
+                      <div class="actions">
+                        {@render fileInto('row')}
+                        <Button weight="primary" disabled={busy} onclick={() => settle(item, 'file')}>{target ? copy.fileItIn(listOf(target)) : copy.fileIt}</Button>
+                        <Button weight="bare" disabled={busy} onclick={() => settle(item, 'archive')}>{copy.archiveArrival}</Button>
+                      </div>
+                    </div>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+        {/each}
+      </div>
+    </Tile>
     <CapLine shown={Math.min(INBOX.length, DOM_CAP)} total={INBOX.length} />
     {#if live && live.cursor !== null}
       <div class="older">
@@ -1120,7 +1129,7 @@
 
   .segment-n {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1134,41 +1143,26 @@
     min-block-size: var(--ctl-h);
     max-inline-size: 100%;
     padding-inline-start: var(--sp-4);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
   }
 
   .file-into[data-where='bar'] {
-    background: var(--glass);
-    backdrop-filter: var(--glass-blur);
-    box-shadow: var(--glass-edge);
+    background: var(--tile);
+    border: 1px solid var(--rule-strong);
   }
 
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .file-into[data-where='bar'] {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
 
   /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the pills in it drop their own. The series
      is the part's element (`Segmented`), not this file's, so its rule is global or it reaches nothing. */
   :global(.head[data-under]) .file-into[data-where='bar'],
   :global(.head[data-under] .series) {
     background: transparent;
-    backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  @supports (-webkit-backdrop-filter: none) {
-    :global(.head[data-under]) .file-into[data-where='bar'],
-    :global(.head[data-under] .series) {
-      -webkit-backdrop-filter: none;
-    }
+    border-color: transparent;
   }
 
   .file-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 
@@ -1176,10 +1170,10 @@
     min-block-size: var(--ctl-h);
     max-inline-size: 24ch;
     background-color: transparent;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -1195,8 +1189,8 @@
   }
 
   .file-into[data-where='row'] .file-select {
-    background-color: var(--s1);
-    border-radius: var(--r-md);
+    background-color: var(--tile-2);
+    border-radius: var(--r-pop);
   }
 
   /* `Select` IS A PHONE'S AND A THUMB'S, for the reason `selecting` gives. */
@@ -1210,9 +1204,9 @@
     place-items: center;
     inline-size: var(--tap);
     block-size: var(--tap);
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .isr {
@@ -1268,7 +1262,7 @@
   }
 
   .way + .way {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .way-main {
@@ -1287,7 +1281,7 @@
 
   .way-last {
     overflow: hidden;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
     text-overflow: ellipsis;
@@ -1308,7 +1302,7 @@
 
   .way-count {
     min-inline-size: 11ch;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     text-align: end;
@@ -1319,7 +1313,7 @@
      reason under it, led by its word in the deeper red. A hairline between lines, inside the tile, as the ways in. */
   .did-sentence {
     margin: 0 0 var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 22px;
   }
@@ -1353,7 +1347,7 @@
   }
 
   .did-line + .did-line {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .did-head {
@@ -1375,30 +1369,30 @@
 
   .did-counts {
     flex: none;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
   .did-why {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 22px;
   }
 
   .did-plain,
   .did-unread {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .did-why[data-refused] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .did-mark {
     margin-inline-end: var(--sp-2);
-    color: var(--danger-text);
+    color: var(--red);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
   }
@@ -1424,7 +1418,7 @@
   .clear {
     padding: var(--tile-pad);
     background: var(--tile);
-    border-radius: var(--tile-r);
+    border-radius: var(--r-tile);
   }
 
   .main,
@@ -1444,7 +1438,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     line-height: 34px;
     letter-spacing: -0.02em;
@@ -1452,8 +1446,8 @@
   }
 
   .figure-unit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
     letter-spacing: 0;
@@ -1462,16 +1456,16 @@
   /* THE ONE LINE THAT READS THE CHART. */
   .reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .why {
     margin: 0 0 var(--sp-2);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -1484,7 +1478,7 @@
 
   .pattern-go {
     display: inline-flex;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .alike-line {
@@ -1502,13 +1496,13 @@
 
   /**
    * AN ARRIVAL IS ITS CHECK, ITS ROW, ITS VERBS, AND ITS BODY WHEN OPEN. The check and the row are two buttons side by
-   * side, so the wash is the list item's, round the lot: the cursor row and a hovered one take `--hover-wash`, and a
-   * picked one `--selected`. The row button draws no fill of its own, or the two would stack.
+   * side, so the wash is the list item's, round the lot: the cursor row and a hovered one take `--hover`, and a
+   * picked one `--red-tint`. The row button draws no fill of its own, or the two would stack.
    */
   /* EACH DAY A QUIET SUBHEAD IN THE ONE TILE (today F14): 13/600 in the quiet ink, 16 above, no rule. */
   .day-h {
     margin: var(--sp-4) 0 var(--sp-1);
-    color: var(--dim);
+    color: var(--ink-3);
     font-family: var(--font-ui);
     font-size: var(--fs-meta);
     font-weight: var(--fw-semi);
@@ -1522,29 +1516,29 @@
   /* ONE GRID FOR AN OPEN ROW AND A SHUT ONE (today F14): the check, the words, and the time at the end of the third
      column always, so every row's time and hairline end at the same place. */
   .arrival {
-    --row-wash: var(--hover-wash);
+    --row-wash: var(--hover);
     position: relative;
     display: grid;
     grid-template-columns: 28px minmax(0, 1fr) 72px;
     align-items: center;
     padding-inline: var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     scroll-margin-block: var(--sp-7);
     transition: background var(--d-state) var(--ease-out);
   }
 
   .arrival[data-cursor] {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .arrival:has(.pick[data-on]) {
-    --row-wash: var(--selected);
-    background: var(--selected);
+    --row-wash: var(--red-tint);
+    background: var(--red-tint);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .arrival:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     /* The hairlines either side of a washed row step aside, as the shared rows' do. */
@@ -1600,12 +1594,12 @@
 
   /* THE CURSOR IS THE FOCUS RING, and only while it is the keyboard's. */
   .arrival .line:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: -2px;
   }
 
   .from {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .gist::before {
@@ -1616,8 +1610,8 @@
   /* WHAT THE RECORD READ IT AS, under the subject: muted, at the body's size, one line. */
   .hint {
     overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: 20px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1634,8 +1628,8 @@
   .raw {
     max-inline-size: var(--measure);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 1.6;
     /* A body is text somebody else wrote, line breaks included, and one unbroken token must not
        push the card wider than the screen. */
@@ -1670,7 +1664,7 @@
   .settled-list {
     color: var(--ink);
     text-decoration: underline;
-    text-decoration-color: var(--line);
+    text-decoration-color: var(--rule);
     text-underline-offset: 3px;
   }
 
@@ -1694,21 +1688,15 @@
     max-inline-size: 100%;
     margin-inline: auto;
     padding: 6px 6px 6px var(--sp-4);
-    background: var(--glass-strong);
-    backdrop-filter: var(--glass-blur);
-    border-radius: var(--r-lg);
-    box-shadow: var(--glass-edge), var(--e2);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+    border: 1px solid var(--rule-strong);
   }
 
-  @supports (-webkit-backdrop-filter: none) {
-    .batch {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
 
   .batch-n {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -1721,8 +1709,8 @@
 
   .foot {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     text-align: center;
   }
 

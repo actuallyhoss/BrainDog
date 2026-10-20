@@ -10,7 +10,7 @@
   import { since } from 'braindog-render';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -92,55 +92,57 @@
 {#if livePasskeys}
   <!-- THE HOST'S OWN PASSKEYS, for somebody signed in to a host that offers them. Adding one is
        real only here, because only a live session can say whose passkey it is. -->
-  <Section title={copy.passkeys} count={liveKeys?.length ?? 0}>
-    <p class="hint">{copy.passkeyHow}</p>
-    {#if liveKeys === null}
-      <p class="hint">{copy.passkeysUnread}</p>
-    {:else if liveKeys.length === 0}
-      <Empty kind="no-data-yet" title={words.noPasskey(livePasskeys.magic !== false)} body={livePasskeys.magic !== false ? undefined : copy.noPasskeysWhy(false)} />
-    {:else}
-      <ul class="ledger ledger-lead">
-        {#each liveKeys as k (k.id)}
-          <li>
-            <div class="line line-tall">
-              <span class="line-mark"><IconWell name="key" size="l" /></span>
-              <span class="line-main">
-                <span class="line-title">{k.label ?? copy.passkeyUnnamed}</span>
-                <span class="line-detail"
-                  >{copy.addedWhen(since(new Date(k.createdAt).toISOString()))} · {k.lastUsed
-                    ? copy.usedWhen(since(new Date(k.lastUsed).toISOString()))
-                    : copy.neverUsed}</span
-                >
-              </span>
-              <span class="line-amount"></span>
-              <span class="line-when">
-                <Button
-                  weight="bare"
-                  tone="bad"
-                  disabled={liveKeys.length <= 1}
-                  aria-describedby={liveKeys.length <= 1 ? 'last-key' : undefined}
-                  onclick={() => dropPasskey(k.id)}
-                >{copy.remove}</Button>
-              </span>
-            </div>
-          </li>
-        {/each}
-      </ul>
-      {#if liveKeys.length <= 1}<p class="hint" id="last-key">{copy.lastPasskey}</p>{/if}
-    {/if}
-    {#if canAddPasskey}
-      <label class="name-label" for="recovery-key-name">{copy.identityPasskeyNameLabel}</label>
-      <span class="field name-field">
-        <input class="field-input" id="recovery-key-name" type="text" autocomplete="off" maxlength="64" bind:value={typedName} disabled={addingKey} />
-      </span>
-      <div class="row-actions">
-        <Button weight="primary" onclick={addLivePasskey} aria-busy={addingKey}
-          ><Icon name="plus" size="s" />{addingKey ? copy.addingPasskey : copy.addPasskey}</Button
-        >
-      </div>
-    {/if}
-    {#if addSaid}<p class="hint" role="status">{addSaid}</p>{/if}
-  </Section>
+  <Tile class="section" data-surface="tile" title={copy.passkeys} count={(liveKeys?.length ?? 0) || undefined}>
+    <div class="section-body">
+      <p class="hint">{copy.passkeyHow}</p>
+      {#if liveKeys === null}
+        <p class="hint">{copy.passkeysUnread}</p>
+      {:else if liveKeys.length === 0}
+        <Empty kind="no-data-yet" title={words.noPasskey(livePasskeys.magic !== false)} body={livePasskeys.magic !== false ? undefined : copy.noPasskeysWhy(false)} />
+      {:else}
+        <ul class="ledger ledger-lead">
+          {#each liveKeys as k (k.id)}
+            <li>
+              <div class="line line-tall">
+                <span class="line-mark"><IconWell name="key" size="l" /></span>
+                <span class="line-main">
+                  <span class="line-title">{k.label ?? copy.passkeyUnnamed}</span>
+                  <span class="line-detail"
+                    >{copy.addedWhen(since(new Date(k.createdAt).toISOString()))} · {k.lastUsed
+                      ? copy.usedWhen(since(new Date(k.lastUsed).toISOString()))
+                      : copy.neverUsed}</span
+                  >
+                </span>
+                <span class="line-amount"></span>
+                <span class="line-when">
+                  <Button
+                    weight="bare"
+                    tone="bad"
+                    disabled={liveKeys.length <= 1}
+                    aria-describedby={liveKeys.length <= 1 ? 'last-key' : undefined}
+                    onclick={() => dropPasskey(k.id)}
+                  >{copy.remove}</Button>
+                </span>
+              </div>
+            </li>
+          {/each}
+        </ul>
+        {#if liveKeys.length <= 1}<p class="hint" id="last-key">{copy.lastPasskey}</p>{/if}
+      {/if}
+      {#if canAddPasskey}
+        <label class="name-label" for="recovery-key-name">{copy.identityPasskeyNameLabel}</label>
+        <span class="field name-field">
+          <input class="field-input" id="recovery-key-name" type="text" autocomplete="off" maxlength="64" bind:value={typedName} disabled={addingKey} />
+        </span>
+        <div class="row-actions">
+          <Button weight="primary" onclick={addLivePasskey} aria-busy={addingKey}
+            ><Icon name="plus" size="s" />{addingKey ? copy.addingPasskey : copy.addPasskey}</Button
+          >
+        </div>
+      {/if}
+      {#if addSaid}<p class="hint" role="status">{addSaid}</p>{/if}
+    </div>
+  </Tile>
 {:else if hostAuth}
 <!-- NOBODY SIGNED IN, OR A HOST THAT OFFERS NO PASSKEYS, AND NO LIST OF KEYS NOBODY MADE.
      This arm drew the sample's `PASSKEYS`, two keys on two devices that never existed, with a
@@ -151,15 +153,17 @@
 <!-- AND THE WAY TO ONE, WHERE THE HOST OFFERS PASSKEYS AND NOBODY IS SIGNED IN. There is
      still nobody to add a passkey for, so the action is signing in, which lands back here with
      "Add a passkey" drawn by the arm above. A host that offers no passkeys is offered nothing. -->
-<Section title={copy.passkeys}>
-  <p class="hint">{copy.passkeyHow}</p>
-  <Empty
-    kind="no-data-yet"
-    title={words.noPasskey(hostAuth.magic !== false)}
-    body={hostAuth.magic !== false ? undefined : copy.noPasskeysWhy(false)}
-    actions={hostAuth.passkey && !hostAuth.me ? signInToAdd : undefined}
-  />
-</Section>
+<Tile class="section" data-surface="tile" title={copy.passkeys}>
+  <div class="section-body">
+    <p class="hint">{copy.passkeyHow}</p>
+    <Empty
+      kind="no-data-yet"
+      title={words.noPasskey(hostAuth.magic !== false)}
+      body={hostAuth.magic !== false ? undefined : copy.noPasskeysWhy(false)}
+      actions={hostAuth.passkey && !hostAuth.me ? signInToAdd : undefined}
+    />
+  </div>
+</Tile>
 {/if}
 
 {#snippet signInToAdd()}
@@ -167,23 +171,25 @@
 {/snippet}
 
 <!-- THE WAYS BACK IN, IN THE ORDER THEY ARE NEEDED: one passkey lost, all of them lost, and too many tries. -->
-<Section title={words.wayBack}>
-  <!-- WHAT A LOST PASSKEY COSTS, said before it happens. The last passkey cannot be removed from this screen (above),
-       and the host allows it on purpose (`passkey.remove`, "the last one included"), so a person who signs in by the
-       mailed link can still clear a key they lost. The sentence names that way when this host sends mail, and the
-       person who runs the host as the last resort either way, because there is no recovery code to offer. -->
-  {#if livePasskeys}
-    <StateRow icon="key" title={copy.passkeyLost} line={copy.passkeyLostHow(livePasskeys.magic !== false)} />
-  {/if}
-  <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
-       `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery
-       screen offering a link that cannot be sent is worse than one offering nothing. Until the
-       host answers, it is not offered: the fallback was the sample's `AUTH_METHODS`. -->
-  {#if hostAuth?.magic}
-    <StateRow icon="link" title={copy.magicLink} line={copy.magicHow} />
-  {/if}
-  <StateRow icon="clock" title={copy.lockout} line={copy.lockoutHow} />
-</Section>
+<Tile class="section" data-surface="tile" title={words.wayBack}>
+  <div class="section-body">
+    <!-- WHAT A LOST PASSKEY COSTS, said before it happens. The last passkey cannot be removed from this screen (above),
+         and the host allows it on purpose (`passkey.remove`, "the last one included"), so a person who signs in by the
+         mailed link can still clear a key they lost. The sentence names that way when this host sends mail, and the
+         person who runs the host as the last resort either way, because there is no recovery code to offer. -->
+    {#if livePasskeys}
+      <StateRow icon="key" title={copy.passkeyLost} line={copy.passkeyLostHow(livePasskeys.magic !== false)} />
+    {/if}
+    <!-- AND THE ONE THAT IS OFFERED ONLY WHERE IT EXISTS. `49 §5.6`: on a self-host with no SMTP
+         `GET /auth/methods` answers `magic: false` "so the screen never offers it". A recovery
+         screen offering a link that cannot be sent is worse than one offering nothing. Until the
+         host answers, it is not offered: the fallback was the sample's `AUTH_METHODS`. -->
+    {#if hostAuth?.magic}
+      <StateRow icon="link" title={copy.magicLink} line={copy.magicHow} />
+    {/if}
+    <StateRow icon="clock" title={copy.lockout} line={copy.lockoutHow} />
+  </div>
+</Tile>
 
 <style>
   .hint {

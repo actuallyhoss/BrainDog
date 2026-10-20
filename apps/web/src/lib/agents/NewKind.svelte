@@ -18,7 +18,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { FILE_TOOLS, PERMISSIONS, RECORD_TOOLS, TURNS_MOST, blankKind, fileKind, kindFaultAt, recordToolWords, slotsOf, words, writesOf, type KindDraft } from './new-kind.ts';
   import Button from '$lib/ui/Button.svelte';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
 
   let draft = $state<KindDraft>(blankKind());
   let pressed = $state(false);
@@ -68,105 +68,107 @@
 {/snippet}
 
 <div class="form">
-  <Section title={words.heading}>
-    <!-- WHAT IT IS ON THE LEFT, WHAT IT MAY TOUCH ON THE RIGHT, from 1100 (agents F17). -->
-    <div class="fields form-two">
-      <div class="column">
-      <div class="item">
-        <label class="label" for="kind-title">{words.title}</label>
-        <div class="field" data-wrong={faultAt('title') ? '' : undefined}>
-          <input id="kind-title" class="field-input" type="text" autocomplete="off" maxlength="120" aria-describedby="kind-title-help" aria-invalid={faultAt('title') ? 'true' : undefined} bind:value={draft.title} />
+  <Tile class="section" data-surface="tile" title={words.heading}>
+    <div class="section-body">
+      <!-- WHAT IT IS ON THE LEFT, WHAT IT MAY TOUCH ON THE RIGHT, from 1100 (agents F17). -->
+      <div class="fields form-two">
+        <div class="column">
+        <div class="item">
+          <label class="label" for="kind-title">{words.title}</label>
+          <div class="field" data-wrong={faultAt('title') ? '' : undefined}>
+            <input id="kind-title" class="field-input" type="text" autocomplete="off" maxlength="120" aria-describedby="kind-title-help" aria-invalid={faultAt('title') ? 'true' : undefined} bind:value={draft.title} />
+          </div>
+          {@render help('kind-title-help', 'title', words.titleHelp)}
         </div>
-        {@render help('kind-title-help', 'title', words.titleHelp)}
-      </div>
 
-      <div class="item">
-        <label class="label" for="kind-prompt">{words.prompt}</label>
-        <textarea
-          id="kind-prompt"
-          class="lines"
-          rows="6"
-          aria-describedby="kind-prompt-help"
-          aria-invalid={faultAt('prompt') ? 'true' : undefined}
-          data-wrong={faultAt('prompt') ? '' : undefined}
-          value={draft.prompt}
-          oninput={(e) => retype(e.currentTarget.value)}
-        ></textarea>
-        {@render help('kind-prompt-help', 'prompt', words.promptHelp)}
-        {#if draft.args.length > 0}
-          <p class="sub">{words.slots}</p>
-          {#each draft.args as a (a.id)}
-            <label class="sub" for={`kind-slot-${a.id}`}>{words.slotLabel(a.id)}</label>
-            <div class="field">
-              <input id={`kind-slot-${a.id}`} class="field-input" type="text" autocomplete="off" maxlength="40" value={a.label} oninput={(e) => relabel(a.id, e.currentTarget.value)} />
-            </div>
-          {/each}
-        {/if}
-      </div>
-
-      <div class="item">
-        <label class="label" for="kind-repo">{words.repo}</label>
-        <div class="field" data-wrong={faultAt('repo') ? '' : undefined}>
-          <input id="kind-repo" class="field-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="kind-repo-help" bind:value={draft.repo} />
+        <div class="item">
+          <label class="label" for="kind-prompt">{words.prompt}</label>
+          <textarea
+            id="kind-prompt"
+            class="lines"
+            rows="6"
+            aria-describedby="kind-prompt-help"
+            aria-invalid={faultAt('prompt') ? 'true' : undefined}
+            data-wrong={faultAt('prompt') ? '' : undefined}
+            value={draft.prompt}
+            oninput={(e) => retype(e.currentTarget.value)}
+          ></textarea>
+          {@render help('kind-prompt-help', 'prompt', words.promptHelp)}
+          {#if draft.args.length > 0}
+            <p class="sub">{words.slots}</p>
+            {#each draft.args as a (a.id)}
+              <label class="sub" for={`kind-slot-${a.id}`}>{words.slotLabel(a.id)}</label>
+              <div class="field">
+                <input id={`kind-slot-${a.id}`} class="field-input" type="text" autocomplete="off" maxlength="40" value={a.label} oninput={(e) => relabel(a.id, e.currentTarget.value)} />
+              </div>
+            {/each}
+          {/if}
         </div>
-        {@render help('kind-repo-help', 'repo', words.repoHelp)}
-      </div>
-      </div>
 
-      <div class="column">
-
-      <fieldset class="item">
-        <legend class="label">{words.recordTools}</legend>
-        <div class="picks form-checks">
-          {#each RECORD_TOOLS as t (t)}
-            <label class="pick"><input type="checkbox" checked={draft.tools.includes(t)} onchange={() => (draft.tools = toggle(draft.tools, t))} />{recordToolWords(t)}</label>
-          {/each}
+        <div class="item">
+          <label class="label" for="kind-repo">{words.repo}</label>
+          <div class="field" data-wrong={faultAt('repo') ? '' : undefined}>
+            <input id="kind-repo" class="field-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="kind-repo-help" bind:value={draft.repo} />
+          </div>
+          {@render help('kind-repo-help', 'repo', words.repoHelp)}
         </div>
-      </fieldset>
-
-      <fieldset class="item">
-        <legend class="label">{words.fileTools}</legend>
-        <div class="picks form-checks">
-          {#each FILE_TOOLS as t (t)}
-            <label class="pick"><input type="checkbox" checked={draft.tools.includes(t)} onchange={() => (draft.tools = toggle(draft.tools, t))} />{words.toolFile[t] ?? t}</label>
-          {/each}
         </div>
-      </fieldset>
 
-      <div class="item">
-        <label class="label" for="kind-commands">{words.commands}</label>
-        <textarea id="kind-commands" class="lines code" rows="3" spellcheck="false" autocapitalize="off" aria-describedby="kind-commands-help" data-wrong={faultAt('commands') ? '' : undefined} bind:value={draft.commands}></textarea>
-        {@render help('kind-commands-help', 'commands', words.commandsHelp)}
-      </div>
+        <div class="column">
 
-      <div class="item">
-        <label class="label" for="kind-turns">{words.turns}</label>
-        <div class="field form-number" data-wrong={faultAt('turns') ? '' : undefined}>
-          <input id="kind-turns" class="field-input" type="number" min="1" max={TURNS_MOST} step="1" inputmode="numeric" aria-describedby="kind-turns-help" value={draft.turns} oninput={(e) => (draft.turns = Number(e.currentTarget.value))} />
+        <fieldset class="item">
+          <legend class="label">{words.recordTools}</legend>
+          <div class="picks form-checks">
+            {#each RECORD_TOOLS as t (t)}
+              <label class="pick"><input type="checkbox" checked={draft.tools.includes(t)} onchange={() => (draft.tools = toggle(draft.tools, t))} />{recordToolWords(t)}</label>
+            {/each}
+          </div>
+        </fieldset>
+
+        <fieldset class="item">
+          <legend class="label">{words.fileTools}</legend>
+          <div class="picks form-checks">
+            {#each FILE_TOOLS as t (t)}
+              <label class="pick"><input type="checkbox" checked={draft.tools.includes(t)} onchange={() => (draft.tools = toggle(draft.tools, t))} />{words.toolFile[t] ?? t}</label>
+            {/each}
+          </div>
+        </fieldset>
+
+        <div class="item">
+          <label class="label" for="kind-commands">{words.commands}</label>
+          <textarea id="kind-commands" class="lines code" rows="3" spellcheck="false" autocapitalize="off" aria-describedby="kind-commands-help" data-wrong={faultAt('commands') ? '' : undefined} bind:value={draft.commands}></textarea>
+          {@render help('kind-commands-help', 'commands', words.commandsHelp)}
         </div>
-        {@render help('kind-turns-help', 'turns', words.turnsHelp)}
-      </div>
 
-      <!-- TWO CHOICES, AND ONLY THE KERNEL'S. A skipped permission is not among them, so it cannot be picked. -->
-      <fieldset class="item" aria-describedby="kind-permission-help">
-        <legend class="label">{words.permission}</legend>
-        <div class="picks form-checks">
-          {#each PERMISSIONS as p (p)}
-            <label class="pick"><input type="radio" name="kind-permission" value={p} checked={draft.permission === p} onchange={() => (draft.permission = p)} />{p === 'acceptEdits' ? words.acceptEdits : words.dontAsk}</label>
-          {/each}
+        <div class="item">
+          <label class="label" for="kind-turns">{words.turns}</label>
+          <div class="field form-number" data-wrong={faultAt('turns') ? '' : undefined}>
+            <input id="kind-turns" class="field-input" type="number" min="1" max={TURNS_MOST} step="1" inputmode="numeric" aria-describedby="kind-turns-help" value={draft.turns} oninput={(e) => (draft.turns = Number(e.currentTarget.value))} />
+          </div>
+          {@render help('kind-turns-help', 'turns', words.turnsHelp)}
         </div>
-        {@render help('kind-permission-help', 'permission', forced ? words.acceptEditsHelp : words.dontAskHelp)}
-      </fieldset>
 
-      <div class="item">
-        <label class="pick">
-          <input type="checkbox" aria-describedby="kind-writes-help" checked={writesOf(draft)} disabled={forced} onchange={(e) => (draft.writes = e.currentTarget.checked)} />{words.writes}
-        </label>
-        {@render help('kind-writes-help', 'writes', forced ? words.writesForced : words.writesHelp)}
-      </div>
+        <!-- TWO CHOICES, AND ONLY THE KERNEL'S. A skipped permission is not among them, so it cannot be picked. -->
+        <fieldset class="item" aria-describedby="kind-permission-help">
+          <legend class="label">{words.permission}</legend>
+          <div class="picks form-checks">
+            {#each PERMISSIONS as p (p)}
+              <label class="pick"><input type="radio" name="kind-permission" value={p} checked={draft.permission === p} onchange={() => (draft.permission = p)} />{p === 'acceptEdits' ? words.acceptEdits : words.dontAsk}</label>
+            {/each}
+          </div>
+          {@render help('kind-permission-help', 'permission', forced ? words.acceptEditsHelp : words.dontAskHelp)}
+        </fieldset>
+
+        <div class="item">
+          <label class="pick">
+            <input type="checkbox" aria-describedby="kind-writes-help" checked={writesOf(draft)} disabled={forced} onchange={(e) => (draft.writes = e.currentTarget.checked)} />{words.writes}
+          </label>
+          {@render help('kind-writes-help', 'writes', forced ? words.writesForced : words.writesHelp)}
+        </div>
+        </div>
       </div>
     </div>
-  </Section>
+  </Tile>
 
   {#if refusal}<p class="said" data-intent="bad" role="alert"><span class="glyph" role="img" aria-label={TONES.bad.label}>{TONES.bad.glyph}</span> {refusal}</p>{/if}
   {#if filed !== null}
@@ -211,33 +213,33 @@
   /* THE LABEL SITS ABOVE ITS FIELD in the meta size and the second ink. */
   .label {
     padding: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .sub {
     margin: 0;
     margin-block-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .help {
     margin: 0;
     margin-block-start: calc(var(--sp-1) - var(--sp-2));
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .help.wrong {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* A FIELD WITH A FAULT IN IT: a red edge drawn inside it, since a field has no border to colour. */
   .field[data-wrong],
   .lines[data-wrong] {
-    box-shadow: inset 0 0 0 1.5px var(--danger);
+    box-shadow: inset 0 0 0 1.5px var(--red);
   }
 
   /* A FIELD IS THE INNER FILL WITH NO BORDER, as on every other form. */
@@ -246,23 +248,23 @@
     inline-size: 100%;
     min-inline-size: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
     resize: vertical;
   }
 
   .code {
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
   }
 
   .lines:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -271,8 +273,8 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     cursor: pointer;
   }
 
@@ -282,8 +284,8 @@
 
   .said {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -297,7 +299,7 @@
 
   .link {
     margin-inline-end: var(--sp-1);
-    color: var(--link);
+    color: var(--red);
   }
 
 
@@ -305,7 +307,7 @@
   @media (pointer: coarse) {
     .pick {
       min-block-size: var(--tap);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
 
     .link {

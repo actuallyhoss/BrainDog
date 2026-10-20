@@ -43,7 +43,6 @@
   import { arrange, orderLists } from '$lib/nav.ts';
   import * as pref from '$lib/pref.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
@@ -325,82 +324,88 @@
         void download();
       }}
     >
-      <Section title={words.about}>
-        <div class="fields">
-          <div class="pair">
-            <label class="field-label" for="share-title">{copy.shareTitle}</label>
-            <div class="field"><input class="field-input" id="share-title" type="text" autocomplete="off" bind:value={title} /></div>
-          </div>
-          <div class="pair">
-            <label class="field-label" for="share-version">{copy.shareVersion}</label>
-            <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
-            {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{/if}
-          </div>
-          <fieldset class="pair steps">
-            <legend class="field-label">{copy.shareStep}</legend>
-            <label class="row-pick"><input type="radio" name="share-step" value="patch" checked={step === 'patch'} onchange={() => ((step = 'patch'), (typed = false))} /><span>{copy.shareStepPatch}</span></label>
-            <label class="row-pick"><input type="radio" name="share-step" value="minor" checked={step === 'minor'} onchange={() => ((step = 'minor'), (typed = false))} /><span>{copy.shareStepMinor}</span></label>
-          </fieldset>
-          <div class="pair">
-            <label class="field-label" for="share-summary">{copy.shareSummary}</label>
-            <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" bind:value={summary} /></div>
-          </div>
-          <div class="pair">
-            <label class="field-label" for="share-audience">{copy.shareAudience}</label>
-            <div class="field">
-              <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" bind:value={audience} />
+      <Tile class="section" data-surface="tile" title={words.about}>
+        <div class="section-body">
+          <div class="fields">
+            <div class="pair">
+              <label class="field-label" for="share-title">{copy.shareTitle}</label>
+              <div class="field"><input class="field-input" id="share-title" type="text" autocomplete="off" bind:value={title} /></div>
             </div>
-            <datalist id="share-audience-suggestions">
-              {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}
-            </datalist>
+            <div class="pair">
+              <label class="field-label" for="share-version">{copy.shareVersion}</label>
+              <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
+              {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{/if}
+            </div>
+            <fieldset class="pair steps">
+              <legend class="field-label">{copy.shareStep}</legend>
+              <label class="row-pick"><input type="radio" name="share-step" value="patch" checked={step === 'patch'} onchange={() => ((step = 'patch'), (typed = false))} /><span>{copy.shareStepPatch}</span></label>
+              <label class="row-pick"><input type="radio" name="share-step" value="minor" checked={step === 'minor'} onchange={() => ((step = 'minor'), (typed = false))} /><span>{copy.shareStepMinor}</span></label>
+            </fieldset>
+            <div class="pair">
+              <label class="field-label" for="share-summary">{copy.shareSummary}</label>
+              <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" bind:value={summary} /></div>
+            </div>
+            <div class="pair">
+              <label class="field-label" for="share-audience">{copy.shareAudience}</label>
+              <div class="field">
+                <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" bind:value={audience} />
+              </div>
+              <datalist id="share-audience-suggestions">
+                {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}
+              </datalist>
+            </div>
           </div>
         </div>
-      </Section>
+      </Tile>
 
       {#if live && own && own.registers.length > 0}
-        <Section title={copy.shareExamples}>
-          <p class="note">{count === 0 ? copy.shareExamplesNone : copy.shareExamplesPicked(count)} {copy.shareExamplesMost}</p>
-          {#each own.registers as register (register)}
-            <fieldset class="rows">
-              <legend class="rows-h">{names[register] ?? listWords(register)}</legend>
-              {#each rows[register] ?? [] as row (row.seq)}
-                {@const on = (picked[register] ?? []).includes(row.seq)}
-                <label class="row-pick">
-                  <input type="checkbox" checked={on} disabled={!on && (picked[register]?.length ?? 0) >= EXAMPLES_MOST} onchange={(e) => toggle(register, row.seq, e.currentTarget.checked)} />
-                  <span>{row.title}</span>
-                </label>
-              {:else}
-                <p class="note">{copy.shareNoRows}</p>
-              {/each}
-            </fieldset>
-          {/each}
-        </Section>
+        <Tile class="section" data-surface="tile" title={copy.shareExamples}>
+          <div class="section-body">
+            <p class="note">{count === 0 ? copy.shareExamplesNone : copy.shareExamplesPicked(count)} {copy.shareExamplesMost}</p>
+            {#each own.registers as register (register)}
+              <fieldset class="rows">
+                <legend class="rows-h">{names[register] ?? listWords(register)}</legend>
+                {#each rows[register] ?? [] as row (row.seq)}
+                  {@const on = (picked[register] ?? []).includes(row.seq)}
+                  <label class="row-pick">
+                    <input type="checkbox" checked={on} disabled={!on && (picked[register]?.length ?? 0) >= EXAMPLES_MOST} onchange={(e) => toggle(register, row.seq, e.currentTarget.checked)} />
+                    <span>{row.title}</span>
+                  </label>
+                {:else}
+                  <p class="note">{copy.shareNoRows}</p>
+                {/each}
+              </fieldset>
+            {/each}
+          </div>
+        </Tile>
       {/if}
 
-      <Section title={copy.shareExtras}>
-        <p class="note">{copy.shareRailOrder}</p>
-        {#if signals.length > 0}
-          <label class="row-pick"><input type="checkbox" bind:checked={withSignals} /><span>{copy.shareSignals([...signals])}</span></label>
-        {/if}
-        <fieldset class="rows">
-          <legend class="rows-h">{copy.shareSkills}</legend>
-          {#each skillRows as skill (skill.seq)}
-            <label class="row-pick">
-              <input
-                type="checkbox"
-                checked={skillsPicked.includes(skill.seq)}
-                onchange={(e) => (skillsPicked = e.currentTarget.checked ? [...skillsPicked, skill.seq] : skillsPicked.filter((n) => n !== skill.seq))}
-              />
-              <span class="pick-text">
-                <span>{skill.title}</span>
-                {#if skill.trigger}<span class="pick-detail">{skill.trigger}</span>{/if}
-              </span>
-            </label>
-          {:else}
-            <p class="note">{copy.shareNoSkills}</p>
-          {/each}
-        </fieldset>
-      </Section>
+      <Tile class="section" data-surface="tile" title={copy.shareExtras}>
+        <div class="section-body">
+          <p class="note">{copy.shareRailOrder}</p>
+          {#if signals.length > 0}
+            <label class="row-pick"><input type="checkbox" bind:checked={withSignals} /><span>{copy.shareSignals([...signals])}</span></label>
+          {/if}
+          <fieldset class="rows">
+            <legend class="rows-h">{copy.shareSkills}</legend>
+            {#each skillRows as skill (skill.seq)}
+              <label class="row-pick">
+                <input
+                  type="checkbox"
+                  checked={skillsPicked.includes(skill.seq)}
+                  onchange={(e) => (skillsPicked = e.currentTarget.checked ? [...skillsPicked, skill.seq] : skillsPicked.filter((n) => n !== skill.seq))}
+                />
+                <span class="pick-text">
+                  <span>{skill.title}</span>
+                  {#if skill.trigger}<span class="pick-detail">{skill.trigger}</span>{/if}
+                </span>
+              </label>
+            {:else}
+              <p class="note">{copy.shareNoSkills}</p>
+            {/each}
+          </fieldset>
+        </div>
+      </Tile>
 
       {#if draft}
         <Tile icon="refresh" title={draft.state === 'ready' && draft.since !== null ? words.changesSince(draft.since) : words.changesFirst} count={draft.state === 'ready' && lines.length > 0 ? lines.length : undefined}>
@@ -518,7 +523,7 @@
     padding: 0;
     margin-block-end: var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }

@@ -25,7 +25,6 @@
   import { relative, since } from 'braindog-render';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -487,11 +486,13 @@
   a second person exists, which is the day each of them means something.
 -->
 {#if peopleFrom === 'reading'}
-  <Section title={copy.whoCanSee}>{''}</Section>
+  <Tile class="section" data-surface="tile" title={copy.whoCanSee}><div class="section-body">{''}</div></Tile>
 {:else if peopleFrom === 'refused' || peopleFrom === 'unrouted'}
-  <Section title={copy.whoCanSee}>
-    <Empty kind="error" title={peopleRefusal} />
-  </Section>
+  <Tile class="section" data-surface="tile" title={copy.whoCanSee}>
+    <div class="section-body">
+      <Empty kind="error" title={peopleRefusal} />
+    </div>
+  </Tile>
 {:else if alone}
   <!-- ONE PERSON IS THE TILE'S SENTENCE AND NOTHING ELSE: there is nobody to list and nobody to compare. -->
   <Tile icon="users" title={tileWords.title} count={tileWords.none}>
@@ -512,250 +513,252 @@
       {/each}
     </ul>
   </Tile>
-  <Section title={copy.whoCanSee} count={people.length}>
-    <p class="hint">{copy.accessScope}</p>
-    <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
+  <Tile class="section" data-surface="tile" title={copy.whoCanSee} count={people.length || undefined}>
+    <div class="section-body">
+      <p class="hint">{copy.accessScope}</p>
+      <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
 
-         The control is five buttons wide and the sentence beside it is a full clause, so in one
-         row of that grid the email clipped mid-address and the sentence saying what the person
-         can DO was squeezed out of existence, leaving five bare ladder words as the only
-         answer to the question this screen exists for. Who they are on the first line, what they
-         can do on the second, and the sentence directly under the control that sets it. -->
-    <ul class="whos">
-      {#each people as p (p.id)}
-        <li class="who">
-          <div class="who-head">
-            <Face name={said(p)} you={self(p)} kind="person" />
-            <span class="who-name">{said(p)}</span>
-            <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
-                 tells two people with one name apart. And WHEN, because access with no date is
-                 a list you cannot audit. -->
-            <!-- AND WHETHER THEY HAVE LOOKED. `20 §6` (*"Read marks on decisions: who has
-                 seen the thing that binds them"*) is the one row of its table this screen
-                 could not draw: `member.seen_at` has been in the DDL since migration 0001 and
-                 `members()` returns it per person, and the browser's mirror stopped one column
-                 short. So the screen said what four people MAY do and nothing about whether any
-                 of them had been.
+           The control is five buttons wide and the sentence beside it is a full clause, so in one
+           row of that grid the email clipped mid-address and the sentence saying what the person
+           can DO was squeezed out of existence, leaving five bare ladder words as the only
+           answer to the question this screen exists for. Who they are on the first line, what they
+           can do on the second, and the sentence directly under the control that sets it. -->
+      <ul class="whos">
+        {#each people as p (p.id)}
+          <li class="who">
+            <div class="who-head">
+              <Face name={said(p)} you={self(p)} kind="person" />
+              <span class="who-name">{said(p)}</span>
+              <!-- THE EMAIL, because that is what the invitation is bound to (12 §3) and what
+                   tells two people with one name apart. And WHEN, because access with no date is
+                   a list you cannot audit. -->
+              <!-- AND WHETHER THEY HAVE LOOKED. `20 §6` (*"Read marks on decisions: who has
+                   seen the thing that binds them"*) is the one row of its table this screen
+                   could not draw: `member.seen_at` has been in the DDL since migration 0001 and
+                   `members()` returns it per person, and the browser's mirror stopped one column
+                   short. So the screen said what four people MAY do and nothing about whether any
+                   of them had been.
 
-                 ONLY FOR SOMEBODY WHO HAS ACCEPTED. An invitation still out has also never been
-                 looked at, and saying so twice in one line is saying nothing. -->
-            <span class="who-detail">
-              <!-- A RECORD KEEPS NO ACCEPTANCE DATE, so it says when they last looked and nothing it cannot know. -->
-              {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}
-            </span>
-            <span class="who-do">
-            <!-- STOP IS NOT FOR YOURSELF, for the reason your own level is not: it is the press that removes your own
-                 way back to this screen. Nor for the last owner, who would leave the record with nobody to let anybody
-                 back in. -->
-            <Button
-              weight="bare"
-              disabled={lastOwner(p) || self(p) || peopleBusy}
-              aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
-              onclick={() => stopOrLetBack(p)}
-            >{p.suspended ? copy.letBackIn : copy.stopAccess}</Button>
-            <Button
-              weight="bare"
-              tone="bad"
-              disabled={lastOwner(p) || self(p) || peopleBusy}
-              aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
-              onclick={() => takeAway(p)}
-            >{copy.removeAccess}</Button>
-            </span>
-          </div>
-          <div class="who-level">
-            <!--
-              SIX OPTIONS, AND THE SIXTH IS NOT A LEVEL.
-
-              `member.level` is five words and `member` is a ROW that may not exist, and
-              `members.ts` records what it cost to conflate the two. `access()` first promoted a
-              scoped level to the record-wide one, so somebody invited to one list as its owner
-              owned the record; the fix then gave a scoped-only member `read`, which hands an
-              APPENDER a record-wide read, and `append`'s point is that it does not read. `null`
-              is the answer both versions were reaching for, and a control offering five words
-              could not say it.
-
-              It is first, not last: it is the state somebody is in before you decide anything,
-              and reading left to right the row now says *nothing on the record, then these
-              lists*, which is the sentence "invite the bookkeeper" makes.
-            -->
-            <Segmented class="levels" role="group" aria-label={copy.levelFor(said(p))}>
-              <!-- THE SIXTH OPTION IS NOT A LEVEL, AND ONLY THE COMMENT SAID SO. It rendered as
-                   the first of six identical chips with the same `aria-pressed`, inside a group
-                   labelled "What <name> can do", so a screen reader heard six equivalent levels
-                   and the screen showed six equivalent chips. `13 §5.1`: the meaning cannot live
-                   in the styling alone. The accessible name says what it is, and the chip is set
-                   apart from the ladder beside it. -->
-              {#each [null, ...LEVELS] as level}
-                <button
-                  type="button"
-                  class="segment"
-                  class:level-none={level === null}
-                  data-on={p.level === level ? '' : undefined}
-                  aria-pressed={p.level === level ? 'true' : 'false'}
-                  aria-label={level === null ? copy.noRecordLevelMeans : undefined}
-                  disabled={(lastOwner(p) && level !== 'owner') || (self(p) && level !== p.level) || peopleBusy}
-                  aria-describedby={lastOwner(p) && level !== 'owner'
-                    ? 'last-owner'
-                    : self(p) && level !== p.level
-                      ? 'own-level'
-                      : undefined}
-                  onclick={() => levelChange(p, level)}
-                >{roleSaid(level)}</button>
-              {/each}
-            </Segmented>
-            <!-- BELOW 520PX THE LADDER IS A SELECT. Six segments wrap to three lines on a phone and the chosen one lands
-                 wherever the wrap put it; one select is one line, 44px tall, with the same six answers and the same
-                 ones disabled. Both are drawn and CSS shows one, so each keeps its own accessible name. -->
-            <select
-              class="ex-select level-select"
-              aria-label={copy.levelFor(said(p))}
-              value={p.level ?? ''}
-              disabled={lastOwner(p) || self(p) || peopleBusy}
-              aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
-              onchange={(e) => {
-                const to = e.currentTarget.value;
-                levelChange(p, (LEVELS as readonly string[]).includes(to) ? (to as Level) : null);
-                /* THE SELECT SHOWS WHAT THE RECORD HOLDS, not what was picked: the list read after the write moves it,
-                   and a refusal leaves it where it was rather than on a level nobody has. */
-                e.currentTarget.value = p.level ?? '';
-              }}
-            >
-              {#each [null, ...LEVELS] as level}<option value={level ?? ''}>{roleSaid(level)}</option>{/each}
-            </select>
-            <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
-                 sets it. Five ladder words with nothing explaining them is the schema's
-                 vocabulary on the screen that decides who can change somebody's business. -->
-            <p class="means">{p.level === null ? copy.noRecordLevelMeans : (copy.levelMeans[p.level] ?? p.level)}</p>
-
-            <!--
-              THE EXCEPTIONS, WHICH ARE THE MATRIX.
-
-              `20 §1` materialises person × register × level and `19 §2` names the absence of a
-              screen for it as the reason this area was added back. Drawing the whole grid (five
-              people down, fourteen lists across) is the shape that makes a person close the
-              page: most cells are the same value, and the same value is the record level one
-              line up.
-
-              So the record level is the answer and these are the EXCEPTIONS to it. Somebody with
-              none has one line and nothing else, which is almost everybody; somebody with two
-              has two, named, with what they hold on each. It is the same information and it is
-              the difference between a table nobody reads and a sentence anybody can.
-            -->
-            {#if p.scoped.length > 0}
-              <ul class="exceptions">
-                {#each p.scoped as ex}
-                  <li>
-                    <span class="ex-list">{lists.find((l) => l.id === ex.register)?.name ?? REGISTERS[ex.register]?.name ?? ex.register}</span>
-                    <!-- THE LEVEL, AND THEN WHAT IT MEANS. The cell showed the sentence alone (the
-                         same sentence the record level one line up already shows), so you could
-                         not see at a glance whether an exception was above or below it, which is
-                         the one thing a matrix is for. The word is the comparison; the sentence
-                         is what the word means. -->
-                    <span class="ex-word">{levelSaid(ex.level)}</span>
-                    <span class="ex-level">{copy.levelMeans[ex.level] ?? ex.level}</span>
-                    <!-- NOT THE DANGER TONE. Going back to their level undoes an exception, which is
-                         the safe direction, and red on it said the opposite. -->
-                    <Button
-                      weight="bare"
-                      disabled={peopleBusy}
-                      onclick={() => backToLevel(p, ex.register)}
-                    >{copy.removeException}</Button>
-                    <!-- WHICH ROWS OF THE LIST, when the grant is narrowed, said as a sentence on its own line under
-                         the exception it narrows, since it is part of what they hold there. -->
-                    {#if onlySaid(p, ex.register) !== null}<span class="ex-only">{onlySaid(p, ex.register)}</span>{/if}
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-            <!-- `45 §5.6` HAS ONE METHOD FOR ALL OF IT: `invite` takes the record level and the
-                 register map together, so adding an exception is the same call as changing a
-                 level. One control, because one call.
-
-                 IN ITS OWN ROW, because as the next sibling after the `<ul>` it floated up beside
-                 the list on a wide screen and read as belonging to the first exception. -->
-            <div class="ex-add">
-            {#if picking === p.id}
-              <!-- ONE LIST AND ONE LEVEL, then Add. It is the same `invite` as a level change, carrying the
-                   exceptions that stay, so nothing else they hold moves. -->
-              <form class="ex-pick" onsubmit={(e) => saveException(e, p)}>
-                <label class="ex-field">
-                  <span class="ex-label">{copy.exceptionList}</span>
-                  <select class="ex-select" bind:value={pickList} onchange={() => {
-                    pickField = '';
-                    pickValue = '';
-                  }}>
-                    {#each lists as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
-                  </select>
-                </label>
-                <label class="ex-field">
-                  <span class="ex-label">{copy.exceptionLevel}</span>
-                  <!-- ONE LIST TAKES THE THREE LEVELS THE RECORD HONOURS THERE (`20 §1`, D5): a list's own Decides or
-                       Owner answers nothing more than Edits does, so offering them described a power it does not grant. -->
-                  <select class="ex-select" bind:value={pickLevel}>
-                    {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
-                  </select>
-                </label>
-                <!-- AND WHICH ROWS OF IT: every row, or only those where one of the list's own fields holds
-                     one value, the value picked from a choice or typed. Offered only when the list's fields are known
-                     here, because a field this screen cannot name is not one it can offer. -->
-                {#if ruleFields.length > 0}
-                  <div class="ex-where">
-                    <label class="ex-field">
-                      <span class="ex-label">{copy.exceptionOnly}</span>
-                      <select class="ex-select" bind:value={pickField} onchange={(e) => startValue(e.currentTarget.value)}>
-                        <option value="">{copy.exceptionEveryRow}</option>
-                        {#each ruleFields as f (f.id)}<option value={f.id}>{labelOf(f)}</option>{/each}
-                      </select>
-                    </label>
-                    {#if ruleField}
-                      <label class="ex-field">
-                        <span class="ex-label">{copy.exceptionIs}</span>
-                        {#if ruleField.type === 'enum' && (ruleField.values?.length ?? 0) > 0}
-                          <select class="ex-select" bind:value={pickValue}>
-                            {#each ruleField.values ?? [] as v (v)}<option value={v}>{ruleField.labels?.[v] ?? v}</option>{/each}
-                          </select>
-                        {:else if ruleField.type === 'bool'}
-                          <select class="ex-select" bind:value={pickValue}>
-                            <option value="true">{copy.exceptionYes}</option>
-                            <option value="false">{copy.exceptionNo}</option>
-                          </select>
-                        {:else}
-                          <span class="field ex-value">
-                            <input
-                              class="field-input"
-                              type={ruleField.type === 'day' ? 'date' : ruleField.type === 'email' ? 'email' : ruleField.type === 'url' ? 'url' : 'text'}
-                              inputmode={ruleField.type === 'int' ? 'numeric' : ruleField.type === 'decimal' ? 'decimal' : undefined}
-                              autocomplete="off"
-                              bind:value={pickValue}
-                            />
-                          </span>
-                        {/if}
-                      </label>
-                    {/if}
-                  </div>
-                {/if}
-                <Button weight="primary" type="submit" disabled={peopleBusy || !pickList || (ruleField !== undefined && ruleSent === null)}>{copy.exceptionAdd}</Button>
-                <Button weight="bare" onclick={() => (picking = null)}>{copy.exceptionCancel}</Button>
-              </form>
-            {:else}
-            <Button
-              weight="bare"
-              disabled={peopleBusy}
-              onclick={() => startException(p)}
-            ><Icon name="plus" size="s" />{copy.addException}</Button>
-            {/if}
+                   ONLY FOR SOMEBODY WHO HAS ACCEPTED. An invitation still out has also never been
+                   looked at, and saying so twice in one line is saying nothing. -->
+              <span class="who-detail">
+                <!-- A RECORD KEEPS NO ACCEPTANCE DATE, so it says when they last looked and nothing it cannot know. -->
+                {#if secondSaid(p, said(p))}{secondSaid(p, said(p))}{' · '}{/if}{p.seen ? copy.lastLooked(since(p.seen, Date.now())) : copy.neverLooked}{#if p.suspended}{' · '}{copy.suspendedSince(relative(p.suspended, Date.now()))}{/if}
+              </span>
+              <span class="who-do">
+              <!-- STOP IS NOT FOR YOURSELF, for the reason your own level is not: it is the press that removes your own
+                   way back to this screen. Nor for the last owner, who would leave the record with nobody to let anybody
+                   back in. -->
+              <Button
+                weight="bare"
+                disabled={lastOwner(p) || self(p) || peopleBusy}
+                aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
+                onclick={() => stopOrLetBack(p)}
+              >{p.suspended ? copy.letBackIn : copy.stopAccess}</Button>
+              <Button
+                weight="bare"
+                tone="bad"
+                disabled={lastOwner(p) || self(p) || peopleBusy}
+                aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
+                onclick={() => takeAway(p)}
+              >{copy.removeAccess}</Button>
+              </span>
             </div>
-          </div>
-        </li>
-      {/each}
-    </ul>
-    <!-- `LEVEL_REQUIRED`'s own fix sentence, and it is always on screen rather than inside the
-         refusal: a disabled control whose reason arrives only after you press it is a control
-         that has already wasted the press. -->
-    <p class="hint" id="last-owner">{copy.lastOwner}</p>
-    <!-- BESIDE THE CONTROL, NOT AFTER THE PRESS, for the reason the line above it gives. -->
-    <p class="hint" id="own-level">{copy.ownLevel}</p>
-  </Section>
+            <div class="who-level">
+              <!--
+                SIX OPTIONS, AND THE SIXTH IS NOT A LEVEL.
+
+                `member.level` is five words and `member` is a ROW that may not exist, and
+                `members.ts` records what it cost to conflate the two. `access()` first promoted a
+                scoped level to the record-wide one, so somebody invited to one list as its owner
+                owned the record; the fix then gave a scoped-only member `read`, which hands an
+                APPENDER a record-wide read, and `append`'s point is that it does not read. `null`
+                is the answer both versions were reaching for, and a control offering five words
+                could not say it.
+
+                It is first, not last: it is the state somebody is in before you decide anything,
+                and reading left to right the row now says *nothing on the record, then these
+                lists*, which is the sentence "invite the bookkeeper" makes.
+              -->
+              <Segmented class="levels" role="group" aria-label={copy.levelFor(said(p))}>
+                <!-- THE SIXTH OPTION IS NOT A LEVEL, AND ONLY THE COMMENT SAID SO. It rendered as
+                     the first of six identical chips with the same `aria-pressed`, inside a group
+                     labelled "What <name> can do", so a screen reader heard six equivalent levels
+                     and the screen showed six equivalent chips. `13 §5.1`: the meaning cannot live
+                     in the styling alone. The accessible name says what it is, and the chip is set
+                     apart from the ladder beside it. -->
+                {#each [null, ...LEVELS] as level}
+                  <button
+                    type="button"
+                    class="segment"
+                    class:level-none={level === null}
+                    data-on={p.level === level ? '' : undefined}
+                    aria-pressed={p.level === level ? 'true' : 'false'}
+                    aria-label={level === null ? copy.noRecordLevelMeans : undefined}
+                    disabled={(lastOwner(p) && level !== 'owner') || (self(p) && level !== p.level) || peopleBusy}
+                    aria-describedby={lastOwner(p) && level !== 'owner'
+                      ? 'last-owner'
+                      : self(p) && level !== p.level
+                        ? 'own-level'
+                        : undefined}
+                    onclick={() => levelChange(p, level)}
+                  >{roleSaid(level)}</button>
+                {/each}
+              </Segmented>
+              <!-- BELOW 520PX THE LADDER IS A SELECT. Six segments wrap to three lines on a phone and the chosen one lands
+                   wherever the wrap put it; one select is one line, 44px tall, with the same six answers and the same
+                   ones disabled. Both are drawn and CSS shows one, so each keeps its own accessible name. -->
+              <select
+                class="ex-select level-select"
+                aria-label={copy.levelFor(said(p))}
+                value={p.level ?? ''}
+                disabled={lastOwner(p) || self(p) || peopleBusy}
+                aria-describedby={lastOwner(p) ? 'last-owner' : self(p) ? 'own-level' : undefined}
+                onchange={(e) => {
+                  const to = e.currentTarget.value;
+                  levelChange(p, (LEVELS as readonly string[]).includes(to) ? (to as Level) : null);
+                  /* THE SELECT SHOWS WHAT THE RECORD HOLDS, not what was picked: the list read after the write moves it,
+                     and a refusal leaves it where it was rather than on a level nobody has. */
+                  e.currentTarget.value = p.level ?? '';
+                }}
+              >
+                {#each [null, ...LEVELS] as level}<option value={level ?? ''}>{roleSaid(level)}</option>{/each}
+              </select>
+              <!-- WHAT THE SELECTED ONE MEANS, said once, in a sentence, under the control that
+                   sets it. Five ladder words with nothing explaining them is the schema's
+                   vocabulary on the screen that decides who can change somebody's business. -->
+              <p class="means">{p.level === null ? copy.noRecordLevelMeans : (copy.levelMeans[p.level] ?? p.level)}</p>
+
+              <!--
+                THE EXCEPTIONS, WHICH ARE THE MATRIX.
+
+                `20 §1` materialises person × register × level and `19 §2` names the absence of a
+                screen for it as the reason this area was added back. Drawing the whole grid (five
+                people down, fourteen lists across) is the shape that makes a person close the
+                page: most cells are the same value, and the same value is the record level one
+                line up.
+
+                So the record level is the answer and these are the EXCEPTIONS to it. Somebody with
+                none has one line and nothing else, which is almost everybody; somebody with two
+                has two, named, with what they hold on each. It is the same information and it is
+                the difference between a table nobody reads and a sentence anybody can.
+              -->
+              {#if p.scoped.length > 0}
+                <ul class="exceptions">
+                  {#each p.scoped as ex}
+                    <li>
+                      <span class="ex-list">{lists.find((l) => l.id === ex.register)?.name ?? REGISTERS[ex.register]?.name ?? ex.register}</span>
+                      <!-- THE LEVEL, AND THEN WHAT IT MEANS. The cell showed the sentence alone (the
+                           same sentence the record level one line up already shows), so you could
+                           not see at a glance whether an exception was above or below it, which is
+                           the one thing a matrix is for. The word is the comparison; the sentence
+                           is what the word means. -->
+                      <span class="ex-word">{levelSaid(ex.level)}</span>
+                      <span class="ex-level">{copy.levelMeans[ex.level] ?? ex.level}</span>
+                      <!-- NOT THE DANGER TONE. Going back to their level undoes an exception, which is
+                           the safe direction, and red on it said the opposite. -->
+                      <Button
+                        weight="bare"
+                        disabled={peopleBusy}
+                        onclick={() => backToLevel(p, ex.register)}
+                      >{copy.removeException}</Button>
+                      <!-- WHICH ROWS OF THE LIST, when the grant is narrowed, said as a sentence on its own line under
+                           the exception it narrows, since it is part of what they hold there. -->
+                      {#if onlySaid(p, ex.register) !== null}<span class="ex-only">{onlySaid(p, ex.register)}</span>{/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+              <!-- `45 §5.6` HAS ONE METHOD FOR ALL OF IT: `invite` takes the record level and the
+                   register map together, so adding an exception is the same call as changing a
+                   level. One control, because one call.
+
+                   IN ITS OWN ROW, because as the next sibling after the `<ul>` it floated up beside
+                   the list on a wide screen and read as belonging to the first exception. -->
+              <div class="ex-add">
+              {#if picking === p.id}
+                <!-- ONE LIST AND ONE LEVEL, then Add. It is the same `invite` as a level change, carrying the
+                     exceptions that stay, so nothing else they hold moves. -->
+                <form class="ex-pick" onsubmit={(e) => saveException(e, p)}>
+                  <label class="ex-field">
+                    <span class="ex-label">{copy.exceptionList}</span>
+                    <select class="ex-select" bind:value={pickList} onchange={() => {
+                      pickField = '';
+                      pickValue = '';
+                    }}>
+                      {#each lists as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
+                    </select>
+                  </label>
+                  <label class="ex-field">
+                    <span class="ex-label">{copy.exceptionLevel}</span>
+                    <!-- ONE LIST TAKES THE THREE LEVELS THE RECORD HONOURS THERE (`20 §1`, D5): a list's own Decides or
+                         Owner answers nothing more than Edits does, so offering them described a power it does not grant. -->
+                    <select class="ex-select" bind:value={pickLevel}>
+                      {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+                    </select>
+                  </label>
+                  <!-- AND WHICH ROWS OF IT: every row, or only those where one of the list's own fields holds
+                       one value, the value picked from a choice or typed. Offered only when the list's fields are known
+                       here, because a field this screen cannot name is not one it can offer. -->
+                  {#if ruleFields.length > 0}
+                    <div class="ex-where">
+                      <label class="ex-field">
+                        <span class="ex-label">{copy.exceptionOnly}</span>
+                        <select class="ex-select" bind:value={pickField} onchange={(e) => startValue(e.currentTarget.value)}>
+                          <option value="">{copy.exceptionEveryRow}</option>
+                          {#each ruleFields as f (f.id)}<option value={f.id}>{labelOf(f)}</option>{/each}
+                        </select>
+                      </label>
+                      {#if ruleField}
+                        <label class="ex-field">
+                          <span class="ex-label">{copy.exceptionIs}</span>
+                          {#if ruleField.type === 'enum' && (ruleField.values?.length ?? 0) > 0}
+                            <select class="ex-select" bind:value={pickValue}>
+                              {#each ruleField.values ?? [] as v (v)}<option value={v}>{ruleField.labels?.[v] ?? v}</option>{/each}
+                            </select>
+                          {:else if ruleField.type === 'bool'}
+                            <select class="ex-select" bind:value={pickValue}>
+                              <option value="true">{copy.exceptionYes}</option>
+                              <option value="false">{copy.exceptionNo}</option>
+                            </select>
+                          {:else}
+                            <span class="field ex-value">
+                              <input
+                                class="field-input"
+                                type={ruleField.type === 'day' ? 'date' : ruleField.type === 'email' ? 'email' : ruleField.type === 'url' ? 'url' : 'text'}
+                                inputmode={ruleField.type === 'int' ? 'numeric' : ruleField.type === 'decimal' ? 'decimal' : undefined}
+                                autocomplete="off"
+                                bind:value={pickValue}
+                              />
+                            </span>
+                          {/if}
+                        </label>
+                      {/if}
+                    </div>
+                  {/if}
+                  <Button weight="primary" type="submit" disabled={peopleBusy || !pickList || (ruleField !== undefined && ruleSent === null)}>{copy.exceptionAdd}</Button>
+                  <Button weight="bare" onclick={() => (picking = null)}>{copy.exceptionCancel}</Button>
+                </form>
+              {:else}
+              <Button
+                weight="bare"
+                disabled={peopleBusy}
+                onclick={() => startException(p)}
+              ><Icon name="plus" size="s" />{copy.addException}</Button>
+              {/if}
+              </div>
+            </div>
+          </li>
+        {/each}
+      </ul>
+      <!-- `LEVEL_REQUIRED`'s own fix sentence, and it is always on screen rather than inside the
+           refusal: a disabled control whose reason arrives only after you press it is a control
+           that has already wasted the press. -->
+      <p class="hint" id="last-owner">{copy.lastOwner}</p>
+      <!-- BESIDE THE CONTROL, NOT AFTER THE PRESS, for the reason the line above it gives. -->
+      <p class="hint" id="own-level">{copy.ownLevel}</p>
+    </div>
+  </Tile>
 {/if}
 
 <!--
@@ -771,116 +774,120 @@
   own refusal is on this screen, in the record's own words, over the list this form adds to.
 -->
 {#if anOwner && teamsHeld}
-<Section title={copy.inviteTitle}>
-  <p class="hint">{copy.inviteHeld}</p>
-</Section>
+<Tile class="section" data-surface="tile" title={copy.inviteTitle}>
+  <div class="section-body">
+    <p class="hint">{copy.inviteHeld}</p>
+  </div>
+</Tile>
 {:else if anOwner}
-<Section title={copy.inviteTitle}>
-  <p class="hint">{copy.inviteHow}</p>
-  <!-- NO MAIL LEAVES THIS HOST, and the sentence says so beside the control rather than after the press:
-       the owner sends the link themselves, and somebody expecting an email would wait for one that never comes. -->
-  <p class="hint">{copy.inviteNoMail}</p>
-  <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
-       row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
-  <form class="code-form invite-form" onsubmit={makeInvite}>
-    <label class="ex-label" for="invite-email">{copy.inviteEmailLabel}</label>
-    <div class="field field-lg invite-email">
-      <input
-        class="field-input"
-        id="invite-email"
-        type="email"
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck="false"
-        bind:value={inviteTo}
-      />
-    </div>
-    <Segmented class="reach" role="group" aria-label={copy.inviteReachLabel}>
-      {#each REACHES as r (r.reach)}
-        <button
-          type="button"
-          class="segment"
-          data-on={inviteReach === r.reach ? '' : undefined}
-          aria-pressed={inviteReach === r.reach ? 'true' : 'false'}
-          onclick={() => (inviteReach = r.reach)}
-        >{r.said}</button>
-      {/each}
-    </Segmented>
-    {#if inviteReach === 'record'}
-      <label class="ex-field">
-        <span class="ex-label">{copy.inviteLevelLabel}</span>
-        <select class="ex-select" bind:value={inviteLevel}>
-          {#each LEVELS as level}<option value={level}>{roleSaid(level)}</option>{/each}
-        </select>
-      </label>
-      <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`, D4): the record keeps an
-           appender off Keys, People and any list declared for owners, and an owner who meant them to add keys would
-           otherwise learn it from the colleague. -->
-      {#if inviteLevel === 'append'}<p class="hint">{copy.inviteAddsOnlyLeavesOut}</p>{/if}
-    {:else}
-      <p class="hint">{copy.inviteListsHint}</p>
-      <!-- A ROW PER LIST, EACH WITH ITS SELECT, and a list is chosen by giving it a level. The three levels one list
-           honours (`LIST_LEVELS`), and Nothing first, because nothing is what every list gives until the owner says. -->
-      <ul class="invite-lists">
-        {#each lists as l (l.id)}
-          <li>
-            <label class="invite-list-name" for="invite-list-{l.id}">{l.name}</label>
-            <select
-              class="ex-select"
-              id="invite-list-{l.id}"
-              value={inviteLists[l.id] ?? ''}
-              onchange={(e) => pickListLevel(l.id, e.currentTarget.value)}
-            >
-              <option value="">{copy.inviteListNothing}</option>
-              {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
-            </select>
+<Tile class="section" data-surface="tile" title={copy.inviteTitle}>
+  <div class="section-body">
+    <p class="hint">{copy.inviteHow}</p>
+    <!-- NO MAIL LEAVES THIS HOST, and the sentence says so beside the control rather than after the press:
+         the owner sends the link themselves, and somebody expecting an email would wait for one that never comes. -->
+    <p class="hint">{copy.inviteNoMail}</p>
+    <!-- ONE COLUMN AT EVERY WIDTH: the address, what it opens, then the level or the lists, then the button. It was one
+         row, and a row has no room for "these lists, at these levels", which is the sentence inviting a bookkeeper is. -->
+    <form class="code-form invite-form" onsubmit={makeInvite}>
+      <label class="ex-label" for="invite-email">{copy.inviteEmailLabel}</label>
+      <div class="field field-lg invite-email">
+        <input
+          class="field-input"
+          id="invite-email"
+          type="email"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          bind:value={inviteTo}
+        />
+      </div>
+      <Segmented class="reach" role="group" aria-label={copy.inviteReachLabel}>
+        {#each REACHES as r (r.reach)}
+          <button
+            type="button"
+            class="segment"
+            data-on={inviteReach === r.reach ? '' : undefined}
+            aria-pressed={inviteReach === r.reach ? 'true' : 'false'}
+            onclick={() => (inviteReach = r.reach)}
+          >{r.said}</button>
+        {/each}
+      </Segmented>
+      {#if inviteReach === 'record'}
+        <label class="ex-field">
+          <span class="ex-label">{copy.inviteLevelLabel}</span>
+          <select class="ex-select" bind:value={inviteLevel}>
+            {#each LEVELS as level}<option value={level}>{roleSaid(level)}</option>{/each}
+          </select>
+        </label>
+        <!-- WHAT A WHOLE-RECORD "ADDS ONLY" LEAVES OUT, said before the link is made (`20 §1`, D4): the record keeps an
+             appender off Keys, People and any list declared for owners, and an owner who meant them to add keys would
+             otherwise learn it from the colleague. -->
+        {#if inviteLevel === 'append'}<p class="hint">{copy.inviteAddsOnlyLeavesOut}</p>{/if}
+      {:else}
+        <p class="hint">{copy.inviteListsHint}</p>
+        <!-- A ROW PER LIST, EACH WITH ITS SELECT, and a list is chosen by giving it a level. The three levels one list
+             honours (`LIST_LEVELS`), and Nothing first, because nothing is what every list gives until the owner says. -->
+        <ul class="invite-lists">
+          {#each lists as l (l.id)}
+            <li>
+              <label class="invite-list-name" for="invite-list-{l.id}">{l.name}</label>
+              <select
+                class="ex-select"
+                id="invite-list-{l.id}"
+                value={inviteLists[l.id] ?? ''}
+                onchange={(e) => pickListLevel(l.id, e.currentTarget.value)}
+              >
+                <option value="">{copy.inviteListNothing}</option>
+                {#each LIST_LEVELS as level}<option value={level}>{levelSaid(level)}</option>{/each}
+              </select>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      <div class="invite-send">
+        <Button weight="primary" type="submit" disabled={inviting || !inviteTo.trim() || !reachChosen} aria-busy={inviting}>
+          <Icon name="plus" size="s" />{inviting ? copy.inviteMaking : copy.invitePerson}
+        </Button>
+      </div>
+    </form>
+
+    {#if madeLink}
+      <!-- ONCE. The record keeps the hash and hands back the only copy of the link, so leaving this screen is
+           the last of it; Done takes it off the screen deliberately rather than by navigation. -->
+      <div class="invite-made">
+        <p class="hint">{copy.inviteLinkReady(madeLink.email)}</p>
+        <div class="field-row-controls">
+          <div class="field field-lg">
+            <input class="field-input" id="invite-link" type="text" readonly aria-label={copy.inviteLinkLabel} value={madeLink.link} />
+          </div>
+          <Button weight="primary" onclick={copyLink}>{copy.inviteCopyLink}</Button>
+          <Button weight="quiet" onclick={() => (madeLink = null)}>{copy.inviteDone}</Button>
+        </div>
+      </div>
+    {/if}
+
+    {#if waitingInvites.length > 0}
+      <p class="invites-head">{copy.invitesWaiting}</p>
+      <ul class="invites">
+        {#each waitingInvites as inv (inv.id)}
+          <!-- A ROW THAT RAN OUT STAYS, SAYING SO, with New link beside Withdraw: the owner who hears nothing sees why,
+               and one press makes a fresh link giving what this one gave. A waiting row has New link too, for the
+               link that was copied somewhere and lost. -->
+          <li class="invite" data-expired={inv.expired ? '' : undefined}>
+            <span class="invite-who">{inv.email}</span>
+            <span class="invite-when">{inv.expired
+              ? copy.inviteRanOut(inviteGives(inv), inv.expires_at.slice(0, 10))
+              : copy.inviteWaitingRow(inviteGives(inv), inv.expires_at.slice(0, 10))}</span>
+            <span class="invite-do">
+              <Button weight="bare" disabled={inviting || peopleBusy} onclick={() => void renew(inv)}>{copy.inviteNewLink}</Button>
+              <Button weight="bare" tone="bad" disabled={peopleBusy} onclick={() => void withdraw(inv)}>{copy.inviteWithdraw}</Button>
+            </span>
           </li>
         {/each}
       </ul>
     {/if}
-    <div class="invite-send">
-      <Button weight="primary" type="submit" disabled={inviting || !inviteTo.trim() || !reachChosen} aria-busy={inviting}>
-        <Icon name="plus" size="s" />{inviting ? copy.inviteMaking : copy.invitePerson}
-      </Button>
-    </div>
-  </form>
-
-  {#if madeLink}
-    <!-- ONCE. The record keeps the hash and hands back the only copy of the link, so leaving this screen is
-         the last of it; Done takes it off the screen deliberately rather than by navigation. -->
-    <div class="invite-made">
-      <p class="hint">{copy.inviteLinkReady(madeLink.email)}</p>
-      <div class="field-row-controls">
-        <div class="field field-lg">
-          <input class="field-input" id="invite-link" type="text" readonly aria-label={copy.inviteLinkLabel} value={madeLink.link} />
-        </div>
-        <Button weight="primary" onclick={copyLink}>{copy.inviteCopyLink}</Button>
-        <Button weight="quiet" onclick={() => (madeLink = null)}>{copy.inviteDone}</Button>
-      </div>
-    </div>
-  {/if}
-
-  {#if waitingInvites.length > 0}
-    <p class="invites-head">{copy.invitesWaiting}</p>
-    <ul class="invites">
-      {#each waitingInvites as inv (inv.id)}
-        <!-- A ROW THAT RAN OUT STAYS, SAYING SO, with New link beside Withdraw: the owner who hears nothing sees why,
-             and one press makes a fresh link giving what this one gave. A waiting row has New link too, for the
-             link that was copied somewhere and lost. -->
-        <li class="invite" data-expired={inv.expired ? '' : undefined}>
-          <span class="invite-who">{inv.email}</span>
-          <span class="invite-when">{inv.expired
-            ? copy.inviteRanOut(inviteGives(inv), inv.expires_at.slice(0, 10))
-            : copy.inviteWaitingRow(inviteGives(inv), inv.expires_at.slice(0, 10))}</span>
-          <span class="invite-do">
-            <Button weight="bare" disabled={inviting || peopleBusy} onclick={() => void renew(inv)}>{copy.inviteNewLink}</Button>
-            <Button weight="bare" tone="bad" disabled={peopleBusy} onclick={() => void withdraw(inv)}>{copy.inviteWithdraw}</Button>
-          </span>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-</Section>
+  </div>
+</Tile>
 {/if}
 
 <!-- The read-only links to single pages, beside who can see the record. -->
@@ -898,39 +905,41 @@
   <!-- `53 §5.8`: the owner erases a person from here, and it is the one control on this screen
        that is not about access at all: it is `02 §10`'s cascade over sixteen stores, in one
        transaction. It says which, because "erase" without a subject is a word nobody can act on. -->
-  <Section title={copy.erasePerson}>
-    <div class="danger">
-      <p class="danger-title">{copy.eraseWhat}</p>
-      {#if eraseOpen}
-        <label class="code-label" for="erase-person">{copy.eraseWhichPerson}</label>
-        <div class="field field-lg">
-          <select class="field-input" id="erase-person" bind:value={erasePersonId}>
-            <option value="">{copy.eraseNobody}</option>
-            {#each people.filter((p) => p.level !== 'owner') as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
-          </select>
-        </div>
-        <label class="code-label" for="erase-who">{copy.eraseWho}</label>
-        <div class="field field-lg">
-          <input class="field-input" id="erase-who" type="text" autocomplete="off" spellcheck="false" bind:value={eraseWho} />
-        </div>
-        <label class="code-label" for="erase-basis">{copy.eraseBasis}</label>
-        <div class="field field-lg">
-          <input class="field-input" id="erase-basis" type="text" autocomplete="off" bind:value={eraseBasis} />
-        </div>
-        <div class="row-actions">
-          <Button
-            tone="bad"
-            disabled={eraseBusy || (!eraseWho.trim() && !erasePersonId) || !eraseBasis.trim()}
-            aria-busy={eraseBusy}
-            onclick={eraseNow}
-          >{copy.eraseNow}</Button>
-          <Button weight="bare" disabled={eraseBusy} onclick={() => (eraseOpen = false)}>{copy.keepAsIs}</Button>
-        </div>
-      {:else}
-        <Button tone="bad" onclick={startErase}>{copy.erasePerson}</Button>
-      {/if}
+  <Tile class="section" data-surface="tile" title={copy.erasePerson}>
+    <div class="section-body">
+      <div class="danger">
+        <p class="danger-title">{copy.eraseWhat}</p>
+        {#if eraseOpen}
+          <label class="code-label" for="erase-person">{copy.eraseWhichPerson}</label>
+          <div class="field field-lg">
+            <select class="field-input" id="erase-person" bind:value={erasePersonId}>
+              <option value="">{copy.eraseNobody}</option>
+              {#each people.filter((p) => p.level !== 'owner') as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+            </select>
+          </div>
+          <label class="code-label" for="erase-who">{copy.eraseWho}</label>
+          <div class="field field-lg">
+            <input class="field-input" id="erase-who" type="text" autocomplete="off" spellcheck="false" bind:value={eraseWho} />
+          </div>
+          <label class="code-label" for="erase-basis">{copy.eraseBasis}</label>
+          <div class="field field-lg">
+            <input class="field-input" id="erase-basis" type="text" autocomplete="off" bind:value={eraseBasis} />
+          </div>
+          <div class="row-actions">
+            <Button
+              tone="bad"
+              disabled={eraseBusy || (!eraseWho.trim() && !erasePersonId) || !eraseBasis.trim()}
+              aria-busy={eraseBusy}
+              onclick={eraseNow}
+            >{copy.eraseNow}</Button>
+            <Button weight="bare" disabled={eraseBusy} onclick={() => (eraseOpen = false)}>{copy.keepAsIs}</Button>
+          </div>
+        {:else}
+          <Button tone="bad" onclick={startErase}>{copy.erasePerson}</Button>
+        {/if}
+      </div>
     </div>
-  </Section>
+  </Tile>
 {/if}
 
 <style>
@@ -1213,7 +1222,7 @@
     min-inline-size: var(--tap);
     max-inline-size: 100%;
     padding: 0 var(--sp-3);
-    background: var(--s3);
+    background: var(--tile-2);
     border: 1px solid var(--rule);
     border-radius: var(--r-pop);
     color: var(--ink);

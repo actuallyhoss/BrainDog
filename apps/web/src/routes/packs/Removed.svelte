@@ -12,7 +12,7 @@
 <script lang="ts">
   import { at } from '$lib/at.ts';
   import Button from '$lib/ui/Button.svelte';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import { FRESH, PUT_BACK, removedLines, versionSaid, type Removed, type Way } from './removed.ts';
 
   let {
@@ -51,34 +51,36 @@
   }
 </script>
 
-<Section title={PUT_BACK.title} count={rows.length}>
-  <ul class="ledger removed">
-    {#each rows as r, i (r.id)}
-      {@const l = lines[i]}
-      {@const name = r.title || nameOf(r.id)}
-      {@const way = wayOf(r)}
-      {@const version = versionSaid(r.version, way.newest)}
-      <li>
-        <div class="line gone">
-          <span class="gone-main">
-            <span class="line-title gone-name">{name}</span>
-            <span class="line-detail gone-line">{l?.when}. {l?.stayed}</span>
-            {#if version}<span class="line-detail gone-line">{version}</span>{/if}
-            {#if !r.back}<span class="line-detail gone-line">{FRESH}</span>{/if}
-          </span>
-          {#if way.kind === 'here'}
-            <Button size="sm" disabled={held || going !== null} aria-busy={going === r.id} aria-label={PUT_BACK.label(name)} onclick={() => void putBack(r, name)}>
-              {going === r.id ? PUT_BACK.going : PUT_BACK.idle}
-            </Button>
-          {:else}
-            <Button size="sm" href={at(way.href)} aria-label={PUT_BACK.label(name)}>{PUT_BACK.idle}</Button>
-          {/if}
-          {#if said[r.id]}<p class="gone-said" role="status">{said[r.id]}</p>{/if}
-        </div>
-      </li>
-    {/each}
-  </ul>
-</Section>
+<Tile class="section" data-surface="tile" title={PUT_BACK.title} count={rows.length || undefined}>
+  <div class="section-body">
+    <ul class="ledger removed">
+      {#each rows as r, i (r.id)}
+        {@const l = lines[i]}
+        {@const name = r.title || nameOf(r.id)}
+        {@const way = wayOf(r)}
+        {@const version = versionSaid(r.version, way.newest)}
+        <li>
+          <div class="line gone">
+            <span class="gone-main">
+              <span class="line-title gone-name">{name}</span>
+              <span class="line-detail gone-line">{l?.when}. {l?.stayed}</span>
+              {#if version}<span class="line-detail gone-line">{version}</span>{/if}
+              {#if !r.back}<span class="line-detail gone-line">{FRESH}</span>{/if}
+            </span>
+            {#if way.kind === 'here'}
+              <Button size="sm" disabled={held || going !== null} aria-busy={going === r.id} aria-label={PUT_BACK.label(name)} onclick={() => void putBack(r, name)}>
+                {going === r.id ? PUT_BACK.going : PUT_BACK.idle}
+              </Button>
+            {:else}
+              <Button size="sm" href={at(way.href)} aria-label={PUT_BACK.label(name)}>{PUT_BACK.idle}</Button>
+            {/if}
+            {#if said[r.id]}<p class="gone-said" role="status">{said[r.id]}</p>{/if}
+          </div>
+        </li>
+      {/each}
+    </ul>
+  </div>
+</Tile>
 
 <style>
   /* THE SAME ROW AS AN INSTALLED ONE, less the well and the switch: the words, then the one press on the edge. */

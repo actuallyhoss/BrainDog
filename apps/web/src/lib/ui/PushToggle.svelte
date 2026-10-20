@@ -23,7 +23,7 @@
   import { copy } from '$lib/copy.ts';
   import { hostKey, offerOf, startOf, turnOff, turnOn, type Manager, type Offer, type Ports, type Said } from '$lib/ui/push.ts';
   import type { Call } from '$lib/ui/webhook-doors.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
 
   /* THE HOST `boot` NAMED, when it named one. Only the Worker serves the key, so a self-host is not asked: the GET was a
@@ -91,21 +91,23 @@
 </script>
 
 {#if offer}
-  <Section title={copy.pushTitle}>
-    <p class="hint">{copy.pushHow}</p>
-    {#if !offer.can}
-      <p class="hint">{offer.line}</p>
-    {:else}
-      <p class="hint">{on ? copy.pushIsOn : copy.pushIsOff}</p>
-      <div class="row-actions">
-        <Button weight={on ? 'quiet' : 'primary'} disabled={busy} onclick={() => void press()}>
-          {busy ? copy.pushAsking : on ? copy.pushTurnOff : copy.pushTurnOn}
-        </Button>
-      </div>
-      <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-      <p class="said" role="status" data-intent={bad ? 'bad' : undefined}>{line}</p>
-    {/if}
-  </Section>
+  <Tile class="section" data-surface="tile" title={copy.pushTitle}>
+    <div class="section-body">
+      <p class="hint">{copy.pushHow}</p>
+      {#if !offer.can}
+        <p class="hint">{offer.line}</p>
+      {:else}
+        <p class="hint">{on ? copy.pushIsOn : copy.pushIsOff}</p>
+        <div class="row-actions">
+          <Button weight={on ? 'quiet' : 'primary'} disabled={busy} onclick={() => void press()}>
+            {busy ? copy.pushAsking : on ? copy.pushTurnOff : copy.pushTurnOn}
+          </Button>
+        </div>
+        <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+        <p class="said" role="status" data-intent={bad ? 'bad' : undefined}>{line}</p>
+      {/if}
+    </div>
+  </Tile>
 {/if}
 
 <style>
@@ -114,15 +116,15 @@
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .said {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-meta);
   }
 
   .row-actions {

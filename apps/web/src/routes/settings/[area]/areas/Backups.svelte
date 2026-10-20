@@ -17,7 +17,6 @@
   import { TONES, bytes, relative } from 'braindog-render';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -272,27 +271,31 @@
      · 4" over three copies and a row saying *nothing kept*, counting the failure as a backup,
      which is the same class of error as hiding it. -->
 {#if copiesFrom === 'refused'}
-  <Section title={copy.kept}>
-    <!-- NOT ON THIS HOST YET, AS A ROW, with the record's own sentence as its line and the one way
-         out that does exist on every host, the export, as its action. NO LINE OVER IT: "First copy tonight" over a
-         host that keeps no copies is a promise the next row takes back. -->
-    <!-- THE RESTORE TEST IS THE HOST'S, and true whether or not this record's copies can be listed here. -->
-    {@render drillLineOf()}
-    <div role="status">
-      <StateRow icon="archive" title={words.notHereYet} line={words.exportInstead} action={anOwner ? exportInstead : undefined} />
+  <Tile class="section" data-surface="tile" title={copy.kept}>
+    <div class="section-body">
+      <!-- NOT ON THIS HOST YET, AS A ROW, with the record's own sentence as its line and the one way
+           out that does exist on every host, the export, as its action. NO LINE OVER IT: "First copy tonight" over a
+           host that keeps no copies is a promise the next row takes back. -->
+      <!-- THE RESTORE TEST IS THE HOST'S, and true whether or not this record's copies can be listed here. -->
+      {@render drillLineOf()}
+      <div role="status">
+        <StateRow icon="archive" title={words.notHereYet} line={words.exportInstead} action={anOwner ? exportInstead : undefined} />
+      </div>
     </div>
-  </Section>
+  </Tile>
 {:else if copiesFrom === 'reading'}
   <!-- NOTHING UNTIL THE RECORD ANSWERS: "No backup yet" drawn while the list is read is a sentence the answer may take
        straight back. -->
-  <Section title={copy.kept}>{''}</Section>
+  <Tile class="section" data-surface="tile" title={copy.kept}><div class="section-body">{''}</div></Tile>
 {:else if copyLines.length === 0}
   <!-- "The 30 newest are kept" IS A SENTENCE ABOUT A LIST THAT HAS SOME. On a record whose
        first backup has not run it describes a policy over nothing, above nothing. -->
-  <Section title={copy.kept} aside={backUpButton}>
-    {@render lastCopyLine()}
-    <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
-  </Section>
+  <Tile class="section" data-surface="tile" title={copy.kept} actions={backUpButton}>
+    <div class="section-body">
+      {@render lastCopyLine()}
+      <Empty kind="no-data-yet" title={copy.noSnapshots} body={copy.noSnapshotsWhy} />
+    </div>
+  </Tile>
 {:else}
   <!-- ONE GROUP ON THE GROUND PER MONTH, each counting what it kept, with the rows sitting straight on the ground. The
        newest month's heading carries Back up now, and only that one. -->
@@ -339,9 +342,9 @@
   {#each months as month, i (`${month.key}:${i}`)}
     {@const kept = month.lines.filter((line) => line.failed === null).length}
     {#if i === 0}
-      <Section title={month.label} count={kept} aside={backUpButton}>{@render lastCopyLine()}{@render monthRows(month.lines)}</Section>
+      <Tile class="section" data-surface="tile" title={month.label} count={kept || undefined} actions={backUpButton}><div class="section-body">{@render lastCopyLine()}{@render monthRows(month.lines)}</div></Tile>
     {:else}
-      <Section title={month.label} count={kept}>{@render monthRows(month.lines)}</Section>
+      <Tile class="section" data-surface="tile" title={month.label} count={kept || undefined}><div class="section-body">{@render monthRows(month.lines)}</div></Tile>
     {/if}
   {/each}
 {/if}
@@ -349,15 +352,17 @@
 <!-- `49 §8`, and it asks for exactly this: the key "is what a self-hoster must back up
      SEPARATELY; Settings > backups says so in one line." A snapshot sealed with a key that
      is only inside the snapshot is a snapshot nobody can open. -->
-<Section title={copy.theKey}>
-  <!-- IT GAVE AN INSTRUCTION AND WITHHELD THE ONE THING NEEDED TO FOLLOW IT. This section had
-       no button, no link and no value: "Back that key up somewhere else, or the copies cannot
-       be opened" over an empty box. `12 §8` keeps the age identity outside the product on
-       purpose, so the fix is not to print it here; it is to say where it already is. -->
-  <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
-       both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
-  <StateRow icon="key" title={words.keyOutside} line={shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere} />
-</Section>
+<Tile class="section" data-surface="tile" title={copy.theKey}>
+  <div class="section-body">
+    <!-- IT GAVE AN INSTRUCTION AND WITHHELD THE ONE THING NEEDED TO FOLLOW IT. This section had
+         no button, no link and no value: "Back that key up somewhere else, or the copies cannot
+         be opened" over an empty box. `12 §8` keeps the age identity outside the product on
+         purpose, so the fix is not to print it here; it is to say where it already is. -->
+    <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
+         both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
+    <StateRow icon="key" title={words.keyOutside} line={shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere} />
+  </div>
+</Tile>
 
 <!--
   ONE COPY OF THIS PARAGRAPH. It was here twice, one copy indented and one not, which is the defect
@@ -379,32 +384,34 @@
   record's own answer and was drawn only for the sample, and with the sample gone it is not
   drawn at all: a restore is to one of the copies listed above, or it is asked for.
 -->
-<Section title={copy.restore}>
-  <!-- THE RECORD'S OWN ANSWER, AND NOTHING UNTIL IT ARRIVES. There were four answers, and the
-       two that were not the record's came from the sample's `DEPLOYMENT.kind`: which host the
-       build thought it was on, drawn for as long as the read took and for the sample always. -->
-  {#if copiesFrom === 'refused'}
-    <StateRow icon="history" title={words.askForIt} line={copy.restoreNotHere} />
-  {:else if copiesFrom === 'live'}
-    <p class="hint">{copy.restoreLive}</p>
-  {/if}
-  {#if restoring}
-    <!-- THE CONFIRM IS WORDS AND TWO VERBS ON THE GROUND: a destructive verb is its words in ink asking to
-         be pressed again, never a red box. What it replaces is said in the sentence, which is the part to read. -->
-    <div class="confirm" role="group" aria-label={copy.restoreThis}>
-      <p class="confirm-said">{copy.restoreConfirm(restoring)}</p>
-      <div class="row-actions">
-        <Button tone="bad" disabled={restoreBusy} aria-busy={restoreBusy} onclick={restoreCopy}>{copy.restoreThis}</Button>
-        <Button weight="bare" disabled={restoreBusy} onclick={() => (restoring = null)}>{copy.keepAsIs}</Button>
+<Tile class="section" data-surface="tile" title={copy.restore}>
+  <div class="section-body">
+    <!-- THE RECORD'S OWN ANSWER, AND NOTHING UNTIL IT ARRIVES. There were four answers, and the
+         two that were not the record's came from the sample's `DEPLOYMENT.kind`: which host the
+         build thought it was on, drawn for as long as the read took and for the sample always. -->
+    {#if copiesFrom === 'refused'}
+      <StateRow icon="history" title={words.askForIt} line={copy.restoreNotHere} />
+    {:else if copiesFrom === 'live'}
+      <p class="hint">{copy.restoreLive}</p>
+    {/if}
+    {#if restoring}
+      <!-- THE CONFIRM IS WORDS AND TWO VERBS ON THE GROUND: a destructive verb is its words in ink asking to
+           be pressed again, never a red box. What it replaces is said in the sentence, which is the part to read. -->
+      <div class="confirm" role="group" aria-label={copy.restoreThis}>
+        <p class="confirm-said">{copy.restoreConfirm(restoring)}</p>
+        <div class="row-actions">
+          <Button tone="bad" disabled={restoreBusy} aria-busy={restoreBusy} onclick={restoreCopy}>{copy.restoreThis}</Button>
+          <Button weight="bare" disabled={restoreBusy} onclick={() => (restoring = null)}>{copy.keepAsIs}</Button>
+        </div>
       </div>
-    </div>
-  {/if}
-  <!-- AND NO "RESTORE TO A TIME". It was drawn only over the sample's copies on the Cloud
-       build, because every record that answered, on either host, either listed its copies above
-       or refused, and no host serves a restore to an instant: `apps/worker/src/copies.ts` goes
-       back to a copy by the bookmark that copy recorded and leaves `getBookmarkForTime` out on
-       purpose. Going back is `Restore this` on one of the copies listed above. -->
-</Section>
+    {/if}
+    <!-- AND NO "RESTORE TO A TIME". It was drawn only over the sample's copies on the Cloud
+         build, because every record that answered, on either host, either listed its copies above
+         or refused, and no host serves a restore to an instant: `apps/worker/src/copies.ts` goes
+         back to a copy by the bookmark that copy recorded and leaves `getBookmarkForTime` out on
+         purpose. Going back is `Restore this` on one of the copies listed above. -->
+  </div>
+</Tile>
 
 <style>
   /* A LIST WHOSE LEAD COLUMN IS ONLY A GLYPH: no id, so the glyph sits against the title and the trailing column may

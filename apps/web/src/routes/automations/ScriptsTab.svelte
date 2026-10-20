@@ -12,7 +12,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import Empty from '$lib/ui/Empty.svelte';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import { readScripts, startsBy, stateOf, words, type Script } from '$lib/record/scripts.ts';
   import HubRows from './HubRows.svelte';
@@ -68,9 +68,11 @@
   <!-- NO BUTTON OF ITS OWN: the heading's "New script" is above it, and two read as two different things to press. -->
   <Empty kind="no-data-yet" title={words.none} body={words.noneWhy} agentPrompt={w.scriptsPrompt} />
 {:else if from === 'ready'}
-  <Section title={w.scripts} count={shown.length}>
-    <HubRows rows={shown} />
-  </Section>
+  <Tile class="section" data-surface="tile" title={w.scripts} count={shown.length || undefined}>
+    <div class="section-body">
+      <HubRows rows={shown} />
+    </div>
+  </Tile>
   <p class="more">{w.scriptsMore} <a href={at('/scripts')}>{w.scriptsOpen}</a></p>
 {/if}
 
@@ -78,8 +80,8 @@
   .more {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .more a {

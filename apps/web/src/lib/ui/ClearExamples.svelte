@@ -14,7 +14,7 @@
   import { createClient } from '@braindog/client';
   import { clearExamples, offerOf, readExamples, type Examples, type ExamplesClient } from '$lib/record/examples.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
 
   let client: ExamplesClient | null = null;
@@ -59,19 +59,21 @@
 </script>
 
 {#if offer}
-  <Section title={offer.title}>
-    <div class="examples" data-loud={offer.loud ? '' : undefined}>
-      <p class="examples-said">{offer.body}</p>
-      <div class="examples-do">
-        {#if asking}
-          <Button weight="primary" tone="bad" disabled={busy} onclick={clear}>{offer.confirm}</Button>
-          <Button weight="bare" disabled={busy} onclick={() => (asking = false)}>{offer.keep}</Button>
-        {:else}
-          <Button weight={offer.loud ? 'primary' : 'quiet'} onclick={() => (asking = true)}>{offer.button}</Button>
-        {/if}
+  <Tile class="section" data-surface="tile" title={offer.title}>
+    <div class="section-body">
+      <div class="examples" data-loud={offer.loud ? '' : undefined}>
+        <p class="examples-said">{offer.body}</p>
+        <div class="examples-do">
+          {#if asking}
+            <Button weight="primary" tone="bad" disabled={busy} onclick={clear}>{offer.confirm}</Button>
+            <Button weight="bare" disabled={busy} onclick={() => (asking = false)}>{offer.keep}</Button>
+          {:else}
+            <Button weight={offer.loud ? 'primary' : 'quiet'} onclick={() => (asking = true)}>{offer.button}</Button>
+          {/if}
+        </div>
       </div>
     </div>
-  </Section>
+  </Tile>
 {/if}
 
 <style>
@@ -85,13 +87,13 @@
 
   .examples-said {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .examples[data-loud] .examples-said {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .examples-do {

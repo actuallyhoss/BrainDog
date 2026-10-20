@@ -46,7 +46,7 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { words as levelWords } from '../../routes/settings/levels.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -163,119 +163,121 @@
   }
 </script>
 
-<Section title={copy.doorsTitle}>
-  {#snippet aside()}
+<Tile class="section" data-surface="tile" title={copy.doorsTitle}>
+  {#snippet actions()}
     {#if owner}<Button weight="quiet" onclick={() => (making = true)}>{actionWords.newDoor}</Button>{/if}
   {/snippet}
-  <p class="hint">{copy.doorsHow}</p>
-  {#if !owner}
-    <p class="hint">{levelWords.ownersOnly}</p>
-  {:else if listed === null}
-    <p class="hint" role="status">{copy.doorsReading}</p>
-  {:else if listed.kind !== 'doors'}
-    <p class="code-said" role="status" data-tone={toneOf(listed)}>{#if toneOf(listed)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(listed)}</p>
-    {#if listed.kind === 'signin'}
-      <div class="row-actions">
-        <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-      </div>
-    {/if}
-  {:else if doors.length === 0}
-    <Empty kind="no-data-yet" compact title={copy.doorsNone} body={copy.doorsNoneWhy} agentPrompt={copy.doorsPrompt} />
-  {:else}
-    <p class="hint">{copy.doorsUnknown}</p>
-    <ul class="doors">
-      {#each doors as door (door.id)}
-        {@const mine = said[door.id]}
-        {@const flipped = flips[door.id]}
-        {@const off = offLine(door, now)}
-        <li class="door">
-          <IconWell name="plug" size="l" />
-          <div class="door-main">
-            <p class="door-name">{door.name}</p>
-            {#if door.register}
-              <p class="hint">{copy.doorsWrites(door.register)}</p>
-            {/if}
-            {#if door.on !== null}
-              <!-- OFF IS SAID IN WORDS, in ink, so the state never rests on the switch's fill alone. -->
-              {#if off}<p class="door-off">{off}</p>{/if}
-              <p class="hint">{lastLine(door, now)}</p>
-              <p class="code-said" role="status" data-tone={toneOf(flipped)}>{#if toneOf(flipped)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(flipped)}</p>
-              {#if flipped?.kind === 'signin'}
-                <div class="row-actions">
-                  <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-                </div>
+  <div class="section-body">
+    <p class="hint">{copy.doorsHow}</p>
+    {#if !owner}
+      <p class="hint">{levelWords.ownersOnly}</p>
+    {:else if listed === null}
+      <p class="hint" role="status">{copy.doorsReading}</p>
+    {:else if listed.kind !== 'doors'}
+      <p class="code-said" role="status" data-tone={toneOf(listed)}>{#if toneOf(listed)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(listed)}</p>
+      {#if listed.kind === 'signin'}
+        <div class="row-actions">
+          <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+        </div>
+      {/if}
+    {:else if doors.length === 0}
+      <Empty kind="no-data-yet" compact title={copy.doorsNone} body={copy.doorsNoneWhy} agentPrompt={copy.doorsPrompt} />
+    {:else}
+      <p class="hint">{copy.doorsUnknown}</p>
+      <ul class="doors">
+        {#each doors as door (door.id)}
+          {@const mine = said[door.id]}
+          {@const flipped = flips[door.id]}
+          {@const off = offLine(door, now)}
+          <li class="door">
+            <IconWell name="plug" size="l" />
+            <div class="door-main">
+              <p class="door-name">{door.name}</p>
+              {#if door.register}
+                <p class="hint">{copy.doorsWrites(door.register)}</p>
               {/if}
-            {/if}
-            {#if !door.mintable}
-              <p class="hint">{copy.doorsOtherCheck}</p>
-            {:else}
-              <p class="hint">{door.held ? copy.doorsHeld : copy.doorsNotHeld}</p>
-              {#if mine?.kind === 'minted'}
-                {@const minted = mine}
-                <!-- SHOWN ONCE, from `said` alone. THE SENTENCE IS PASSED to `clipboard.put` as `said`, so the toast is
-                     that one line: passed only as the label it read "Copied Address copied.", and with
-                     neither it would quote the text, which is a live credential. -->
-                <div class="code-form">
-                  <p class="code-label">{copy.doorsOnce}</p>
-                  {#if minted.url}
-                    <p class="mono wrap">{minted.url}</p>
-                    <div class="row-actions">
-                      <Button weight="primary" onclick={() => void clipboard.put(minted.url ?? '', copy.doorsUrlCopied, copy.doorsUrlCopied)}>{copy.doorsCopyUrl}</Button>
-                    </div>
-                    <p class="hint">{copy.doorsPost}</p>
-                  {:else}
-                    <!-- NO PATH IN THE ANSWER, SO NO ADDRESS. The token is still the only copy there will be, so it is
-                         shown rather than thrown away, with the sentence that says why the address is missing. -->
-                    <p class="mono wrap">{minted.token}</p>
-                    <div class="row-actions">
-                      <Button weight="primary" onclick={() => void clipboard.put(minted.token, copy.doorsTokenCopied, copy.doorsTokenCopied)}>{copy.doorsCopyToken}</Button>
-                    </div>
-                    <p class="hint">{copy.doorsNoAddress}</p>
-                  {/if}
-                </div>
+              {#if door.on !== null}
+                <!-- OFF IS SAID IN WORDS, in ink, so the state never rests on the switch's fill alone. -->
+                {#if off}<p class="door-off">{off}</p>{/if}
+                <p class="hint">{lastLine(door, now)}</p>
+                <p class="code-said" role="status" data-tone={toneOf(flipped)}>{#if toneOf(flipped)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(flipped)}</p>
+                {#if flipped?.kind === 'signin'}
+                  <div class="row-actions">
+                    <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+                  </div>
+                {/if}
               {/if}
-              {#if asking === door.id}
-                <!-- THE CONFIRM IS IN PLACE OF THE BUTTON, as `ClearExamples` asks: the press that replaces sits where
-                     the first press was, and keeping the old one is the quieter of the two. -->
-                <p class="code-said">{copy.doorsReplaceAsk}</p>
-                <div class="row-actions">
-                  <Button weight="primary" tone="bad" disabled={busy !== null} onclick={() => void mint(door.id)}>{copy.doorsReplace}</Button>
-                  <Button weight="bare" disabled={busy !== null} onclick={() => (asking = null)}>{copy.doorsKeep}</Button>
-                </div>
+              {#if !door.mintable}
+                <p class="hint">{copy.doorsOtherCheck}</p>
               {:else}
-                <div class="row-actions">
-                  <Button weight={door.held ? 'quiet' : 'primary'} disabled={busy !== null} onclick={() => press(door)}>
-                    {busy === door.id ? copy.doorsMinting : door.held ? copy.doorsRemint : copy.doorsMint}
-                  </Button>
-                </div>
+                <p class="hint">{door.held ? copy.doorsHeld : copy.doorsNotHeld}</p>
+                {#if mine?.kind === 'minted'}
+                  {@const minted = mine}
+                  <!-- SHOWN ONCE, from `said` alone. THE SENTENCE IS PASSED to `clipboard.put` as `said`, so the toast is
+                       that one line: passed only as the label it read "Copied Address copied.", and with
+                       neither it would quote the text, which is a live credential. -->
+                  <div class="code-form">
+                    <p class="code-label">{copy.doorsOnce}</p>
+                    {#if minted.url}
+                      <p class="mono wrap">{minted.url}</p>
+                      <div class="row-actions">
+                        <Button weight="primary" onclick={() => void clipboard.put(minted.url ?? '', copy.doorsUrlCopied, copy.doorsUrlCopied)}>{copy.doorsCopyUrl}</Button>
+                      </div>
+                      <p class="hint">{copy.doorsPost}</p>
+                    {:else}
+                      <!-- NO PATH IN THE ANSWER, SO NO ADDRESS. The token is still the only copy there will be, so it is
+                           shown rather than thrown away, with the sentence that says why the address is missing. -->
+                      <p class="mono wrap">{minted.token}</p>
+                      <div class="row-actions">
+                        <Button weight="primary" onclick={() => void clipboard.put(minted.token, copy.doorsTokenCopied, copy.doorsTokenCopied)}>{copy.doorsCopyToken}</Button>
+                      </div>
+                      <p class="hint">{copy.doorsNoAddress}</p>
+                    {/if}
+                  </div>
+                {/if}
+                {#if asking === door.id}
+                  <!-- THE CONFIRM IS IN PLACE OF THE BUTTON, as `ClearExamples` asks: the press that replaces sits where
+                       the first press was, and keeping the old one is the quieter of the two. -->
+                  <p class="code-said">{copy.doorsReplaceAsk}</p>
+                  <div class="row-actions">
+                    <Button weight="primary" tone="bad" disabled={busy !== null} onclick={() => void mint(door.id)}>{copy.doorsReplace}</Button>
+                    <Button weight="bare" disabled={busy !== null} onclick={() => (asking = null)}>{copy.doorsKeep}</Button>
+                  </div>
+                {:else}
+                  <div class="row-actions">
+                    <Button weight={door.held ? 'quiet' : 'primary'} disabled={busy !== null} onclick={() => press(door)}>
+                      {busy === door.id ? copy.doorsMinting : door.held ? copy.doorsRemint : copy.doorsMint}
+                    </Button>
+                  </div>
+                {/if}
+                <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+                <p class="code-said" role="status" data-tone={toneOf(mine)}>{#if toneOf(mine)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(mine)}</p>
+                {#if mine?.kind === 'signin'}
+                  <div class="row-actions">
+                    <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
+                  </div>
+                {/if}
               {/if}
-              <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-              <p class="code-said" role="status" data-tone={toneOf(mine)}>{#if toneOf(mine)}<span class="glyph" aria-hidden="true"><Icon name="alert" /></span>{/if}{lineOf(mine)}</p>
-              {#if mine?.kind === 'signin'}
-                <div class="row-actions">
-                  <Button weight="quiet" disabled={reproving} onclick={() => void signInAgain()}>{copy.signInAgain}</Button>
-                </div>
-              {/if}
+            </div>
+            {#if door.on !== null}
+              <!-- THE HOUSE SWITCH (`controls.css`), 44px under a thumb. Its name says what on means for this door. -->
+              <button
+                type="button"
+                class="switch"
+                role="switch"
+                aria-checked={door.on}
+                aria-label={switchLabel(door)}
+                disabled={flipping !== null}
+                onclick={() => void flip(door.id, door.on !== true)}><span class="switch-track"></span></button
+              >
             {/if}
-          </div>
-          {#if door.on !== null}
-            <!-- THE HOUSE SWITCH (`controls.css`), 44px under a thumb. Its name says what on means for this door. -->
-            <button
-              type="button"
-              class="switch"
-              role="switch"
-              aria-checked={door.on}
-              aria-label={switchLabel(door)}
-              disabled={flipping !== null}
-              onclick={() => void flip(door.id, door.on !== true)}><span class="switch-track"></span></button
-            >
-          {/if}
-        </li>
-      {/each}
-    </ul>
-    <p class="hint">{copy.doorsFreshWhy}</p>
-  {/if}
-</Section>
+          </li>
+        {/each}
+      </ul>
+      <p class="hint">{copy.doorsFreshWhy}</p>
+    {/if}
+  </div>
+</Tile>
 
 {#if owner}
   <NewAction open={making} kind="door" onclose={made} />
@@ -287,8 +289,8 @@
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -327,7 +329,7 @@
     margin: 0 0 2px;
     padding-block-start: 6px;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
@@ -340,7 +342,7 @@
   .door-off {
     margin: 0 0 var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -358,8 +360,8 @@
 
   .code-label {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -371,8 +373,8 @@
 
   /* AN ADDRESS IS SET IN GEIST MONO. */
   .mono {
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     letter-spacing: 0;
   }
 
@@ -382,8 +384,8 @@
     align-items: flex-start;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .code-said[data-tone='bad'] {
@@ -394,7 +396,7 @@
     display: inline-flex;
     flex: none;
     margin-block-start: 1px;
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .row-actions {

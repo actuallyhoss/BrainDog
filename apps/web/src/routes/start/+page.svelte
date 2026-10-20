@@ -71,7 +71,6 @@
   import Face from '$lib/ui/Face.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { PEOPLE } from '$lib/who.ts';
   import { accept, pressKey, type NotMade, type SetupRow } from './accept.ts';
@@ -1100,13 +1099,15 @@
           {/if}
 
           {#if proposal && offParts.length > 0}
-            <Section title={words.alsoHere} count={offParts.length}>
-              <div class="keeps">
-                {#each offParts as p (p.id)}
-                  <Part part={p} {busy} {locale} onflip={flip} />
-                {/each}
+            <Tile class="section" data-surface="tile" title={words.alsoHere} count={offParts.length || undefined}>
+              <div class="section-body">
+                <div class="keeps">
+                  {#each offParts as p (p.id)}
+                    <Part part={p} {busy} {locale} onflip={flip} />
+                  {/each}
+                </div>
               </div>
-            </Section>
+            </Tile>
           {/if}
 
           {#if proposal}
@@ -1156,13 +1157,13 @@
   .sentence {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 24px;
   }
 
   .needs {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
@@ -1245,7 +1246,7 @@
 
   /* THE CHOICES ARE `Button`'S QUIET PILLS, as every other choice on the screen is; the chosen one on the selected fill. */
   .chips :global(.btn[aria-pressed='true']) {
-    background: var(--selected);
+    background: var(--red-tint);
     color: var(--ink);
     font-weight: 600;
   }
@@ -1290,8 +1291,8 @@
 
   /* THE HINT ONLY ON HOVER OR FOCUS (§35): the control is one quiet word until a person reaches for it. */
   .bring-hint {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     opacity: 0;
     transition: opacity 120ms var(--ease-out);
@@ -1320,11 +1321,11 @@
     display: grid;
     place-items: center;
     margin: 0;
-    border: 1px dashed var(--ink2);
+    border: 1px dashed var(--ink-2);
     border-radius: inherit;
-    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    background: color-mix(in srgb, var(--tile) 92%, transparent);
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 500;
     pointer-events: none;
   }
@@ -1382,15 +1383,15 @@
 
   .who-name {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   /* TIMES IN A FEED ARE GEIST MONO. */
   .who-time {
-    color: var(--dim);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
   }
 
   /* HIS WORDS IN THE TILE'S WELL, whole, with each phrase heard lifted onto the tile's own fill. The whole of it is one
@@ -1401,12 +1402,12 @@
     inline-size: 100%;
     min-block-size: var(--tap);
     padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     text-align: start;
     cursor: text;
@@ -1415,7 +1416,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .said-line:hover:not(:disabled) {
-      background: var(--s2);
+      background: var(--tile-2);
     }
   }
 
@@ -1429,16 +1430,16 @@
   .said-mark {
     margin-inline: -3px;
     padding: 1px 3px;
-    background: var(--bg);
-    border-radius: var(--r-sm);
+    background: var(--tile);
+    border-radius: var(--r-xs);
     color: var(--ink);
     font-weight: 500;
     box-decoration-break: clone;
   }
 
   .said-edit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .reply {
@@ -1460,7 +1461,7 @@
   .reply-h {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }
@@ -1468,7 +1469,7 @@
   .reply-line {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -1476,7 +1477,7 @@
   .mine-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -1492,15 +1493,15 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--link);
+    color: var(--red);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     cursor: pointer;
   }
 
   .change:disabled {
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: default;
   }
 
@@ -1554,15 +1555,15 @@
   .nudge {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
   /* A SENTENCE IN THE QUIET INK IS STILL A SENTENCE, read at the body size (DIRECTION §36). */
   .quiet {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -1577,7 +1578,7 @@
     inline-size: var(--dot);
     block-size: var(--dot);
     flex: none;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: var(--live);
   }
 
@@ -1588,7 +1589,7 @@
     display: grid;
     gap: var(--sp-3);
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .ask-label {
@@ -1601,24 +1602,24 @@
 
   .ask-word {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .ask[data-open] .ask-word {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .ask-meta {
     margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .ask-q {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -1629,7 +1630,7 @@
   }
 
   .more-field .field-input {
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .failed-part {
@@ -1648,8 +1649,8 @@
 
   .why summary {
     min-block-size: var(--tap);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     cursor: pointer;
   }
 
@@ -1663,8 +1664,8 @@
 
   .keys-word {
     margin-inline: 2px var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .keys-word:last-child {
@@ -1704,8 +1705,8 @@
 
   .reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -1744,15 +1745,15 @@
   .again-h {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
 
   .again-why {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 24px;
   }
 

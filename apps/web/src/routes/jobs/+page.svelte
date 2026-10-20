@@ -59,7 +59,6 @@
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -313,35 +312,37 @@
 
       <div class="feed">
         {#each groups as g (g.key)}
-          <Section title={g.title} count={g.rows.length}>
-            <ul class="ledger ledger-lead runs">
-              {#each g.rows as r (r.id)}
-                {@const state = statusOf(r.status, r.lost, r.cancel)}
-                {@const outcome = outcomeOf(r)}
-                {@const took = tookOf(r, now)}
-                <li data-live={isLive(r.status) ? '' : undefined}>
-                  <!-- THE WHOLE ROW IS THE LINK, and its name is the run's: the kind, then the outcome and the facts. -->
-                  <a class="line line-tall run" href={at(`/jobs/${encodeURIComponent(r.id)}`)}>
-                    <IconWell name={iconOf(r)} size="l" tone={outcome === 'running' ? 'live' : undefined} />
-                    <span class="line-main">
-                      <span class="line-title" dir="auto">{runName(r)}</span>
-                      <span class="line-detail">
-                        <!-- THE OUTCOME IS A DOT AND ITS WORD. A toned dot is the intent's own mark,
-                             named for a screen reader as `TONES` names it, so colour never says it alone. -->
-                        <span class="status" data-intent={state.tone ?? undefined} data-outcome={outcome}
-                          >{#if state.tone}<span class="dot glyph" role="img" aria-label={TONES[state.tone].label}>{TONES[state.tone].glyph}</span>{:else}<span
-                              class="dot"
-                              aria-hidden="true"
-                            ></span>{/if}{state.word}</span
-                        >{#each detailOf(r) as part, k (k)}<span class="sep" aria-hidden="true">{' · '}</span><span>{part}</span>{/each}
+          <Tile class="section" data-surface="tile" title={g.title} count={g.rows.length || undefined}>
+            <div class="section-body">
+              <ul class="ledger ledger-lead runs">
+                {#each g.rows as r (r.id)}
+                  {@const state = statusOf(r.status, r.lost, r.cancel)}
+                  {@const outcome = outcomeOf(r)}
+                  {@const took = tookOf(r, now)}
+                  <li data-live={isLive(r.status) ? '' : undefined}>
+                    <!-- THE WHOLE ROW IS THE LINK, and its name is the run's: the kind, then the outcome and the facts. -->
+                    <a class="line line-tall run" href={at(`/jobs/${encodeURIComponent(r.id)}`)}>
+                      <IconWell name={iconOf(r)} size="l" tone={outcome === 'running' ? 'live' : undefined} />
+                      <span class="line-main">
+                        <span class="line-title" dir="auto">{runName(r)}</span>
+                        <span class="line-detail">
+                          <!-- THE OUTCOME IS A DOT AND ITS WORD. A toned dot is the intent's own mark,
+                               named for a screen reader as `TONES` names it, so colour never says it alone. -->
+                          <span class="status" data-intent={state.tone ?? undefined} data-outcome={outcome}
+                            >{#if state.tone}<span class="dot glyph" role="img" aria-label={TONES[state.tone].label}>{TONES[state.tone].glyph}</span>{:else}<span
+                                class="dot"
+                                aria-hidden="true"
+                              ></span>{/if}{state.word}</span
+                          >{#each detailOf(r) as part, k (k)}<span class="sep" aria-hidden="true">{' · '}</span><span>{part}</span>{/each}
+                        </span>
                       </span>
-                    </span>
-                    <span class="took num" data-live={isLive(r.status) ? '' : undefined}>{took ?? ''}</span>
-                  </a>
-                </li>
-              {/each}
-            </ul>
-          </Section>
+                      <span class="took num" data-live={isLive(r.status) ? '' : undefined}>{took ?? ''}</span>
+                    </a>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          </Tile>
         {/each}
         {#if cursor !== null}
           <div class="more"><Button disabled={reading} onclick={() => void showOlder()}>{words.older}</Button></div>
@@ -477,7 +478,7 @@
     grid-template-columns: 24px minmax(0, 1fr);
     align-items: start;
     column-gap: var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 1.55;
   }
@@ -486,7 +487,7 @@
     display: inline-grid;
     place-items: center;
     block-size: 24px;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     background: var(--tile-2);
     color: var(--ink-2);
     font-size: var(--fs-meta);
@@ -523,7 +524,7 @@
     align-items: stretch;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     line-height: 1.55;
   }
@@ -533,7 +534,7 @@
   }
 
   .machine + .machine {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .machine-main {
@@ -553,12 +554,12 @@
   }
 
   .machine-seen {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
   .machine-listening {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE LIVE DOT IN THE SENTENCE: 6px of the one hue that means alive, still, before the clause it belongs to. */
@@ -567,7 +568,7 @@
     inline-size: 6px;
     block-size: 6px;
     margin-inline-end: var(--sp-2);
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: var(--live);
     vertical-align: 0.2em;
   }
@@ -620,7 +621,7 @@
     margin: 0;
     margin-block-start: auto;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -651,7 +652,7 @@
   }
 
   .sep {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .status {
@@ -659,7 +660,7 @@
     flex: none;
     align-items: center;
     gap: 6px;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: 500;
   }
 
@@ -671,8 +672,8 @@
     inline-size: 6px;
     block-size: 6px;
     overflow: hidden;
-    border-radius: var(--r-pill);
-    background: var(--dim);
+    border-radius: var(--r-ctl);
+    background: var(--ink-3);
     color: transparent;
     text-indent: 100%;
     white-space: nowrap;
@@ -691,7 +692,7 @@
   }
 
   .status[data-intent='bad'] .dot {
-    background: var(--danger);
+    background: var(--red);
   }
 
   /* HOW LONG IT TOOK: the row's figure, tabular at the right; while it runs, the time so far in the live hue. */
@@ -699,7 +700,7 @@
     grid-column: 3;
     grid-row: 1;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     text-align: end;
@@ -719,13 +720,13 @@
   .sheet-note,
   .sheet-fix {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-ui);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     max-inline-size: var(--measure);
   }
 
   .sheet-fix {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .kinds {
@@ -735,7 +736,7 @@
     margin-block-end: var(--sp-4);
   }
 
-  /* A KIND IS A ROW IN THE SHEET, not a boxed card: the wash on hover, the chosen one `--selected` with its check. */
+  /* A KIND IS A ROW IN THE SHEET, not a boxed card: the wash on hover, the chosen one `--red-tint` with its check. */
   .kind {
     grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
     gap: var(--sp-3);
@@ -747,12 +748,12 @@
   }
 
   .kind[aria-pressed='true'] {
-    background: var(--selected);
+    background: var(--red-tint);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .kind:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -774,7 +775,7 @@
     align-items: center;
     min-block-size: var(--ctl-h);
     margin-block-start: var(--sp-3);
-    color: var(--link);
+    color: var(--red);
   }
   @media (pointer: coarse) {
     .link {
@@ -789,7 +790,7 @@
 
   /* SIXTEEN PIXELS IN EVERY FIELD (design 6.6): under that a phone zooms the page on focus and it stays zoomed. */
   .arg .field-input {
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     scroll-margin-block-start: calc(var(--sticky) + var(--sp-4));
   }
 

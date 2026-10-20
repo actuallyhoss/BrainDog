@@ -48,7 +48,6 @@
   import { methods, passkeySignIn, support } from '$lib/auth.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
@@ -678,165 +677,169 @@
     </Tile>
   {/if}
 
-  <Section title={words.keys} count={keys.length}>
-    {#snippet aside()}
+  <Tile class="section" data-surface="tile" title={words.keys} count={keys.length || undefined}>
+    {#snippet actions()}
       <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
       {#if acts && index.kind === 'held'}
         <span class="add-desk"><Button onclick={openAdd}>{words.addKey}</Button></span>
       {/if}
     {/snippet}
-    {#if indexTell}
-      <!--
-        WHAT THE RECORD SAID, RATHER THAN "No keys yet." OVER IT. A record with no Keys register and a
-        record that will not hand the index over are two different states, and both used to be drawn as
-        the third, an index that came back empty.
-      -->
-      <Empty kind={indexTell.kind} title={indexTell.title} body={indexTell.body}>
-        {#snippet actions()}
-          {#if index.kind === 'absent'}<Button weight="primary" href="/packs">{tells.browse}</Button>{/if}
-        {/snippet}
-      </Empty>
-    {:else if from !== 'reading' && keys.length === 0}
-      <Empty kind="no-data-yet" glyph="key" title={words.noKeys} body={words.noKeysHow}>
-        {#snippet actions()}
-          {#if acts && index.kind === 'held'}<Button weight="primary" onclick={openAdd}>{words.addKey}</Button>{/if}
-        {/snippet}
-      </Empty>
-      <div class="agent-add">
-        <p>{words.noKeysAgent}</p>
-        <CodeLine text={words.noKeysCommand} />
-      </div>
-    {/if}
-    <!-- A COUNT THE RECORD WOULD NOT GIVE IS SAID ONCE, in the record's own words, and never drawn as "never opened". -->
-    {#if uncounted}<p class="said">{uncounted}</p>{/if}
-    <!-- KEYS THE RECORD HOLDS PAST THE ONES READ ARE SAID, so a list that stopped short never reads as all of them. -->
-    {#if moreKeys}<p class="said">{tileWords.moreKeys(keys.length)}</p>{/if}
-    <!-- KEYS THAT LOOK LIKE THEY BELONG TO A PROJECT: one line and one button that puts the move on Decide. Loaded after
-         the screen drew; nothing here at nought or on a refusal. -->
-    {#if scope}<scope.Note found={scope.found} call={scope.call} />{/if}
-    <ul class="ledger ledger-lead whos keys">
-      {#each keys as k (k.id)}
+    <div class="section-body">
+      {#if indexTell}
         <!--
-          ONE ROW ANATOMY: the key's well, its name (a link to its row), and under it where it applies, what it
-          opens and whether a value is sealed here; how often it was opened at the end; Reveal and the "…" menu always drawn at a desk, the "…" alone on a phone.
-          Replace and Revoke stay in the key's own menu (design 2.14): neither is what a person comes to the vault to do most.
-
-          A SEALED KEY SAYS WHAT IT IS, UNOPENED, after what it opens: the hint the host wrote when it sealed it. A KEY WITH
-          NO VALUE HAS "Add value" WHERE A SAVED ONE HAS REVEAL, which opens the sheet Replace opens and seals onto
-          this same row. Where the key came from, when its row says, is the first line of its menu.
+          WHAT THE RECORD SAID, RATHER THAN "No keys yet." OVER IT. A record with no Keys register and a
+          record that will not hand the index over are two different states, and both used to be drawn as
+          the third, an index that came back empty.
         -->
-        {@const state = stateOf(k)}
-        {@const hint = hintOf(k)}
-        {@const action = rowAction(k)}
-        {@const origin = cameFrom.get(k.id)}
-        {@const href = rowPath(k)}
-        {@const u = lastBy.get(k.id)}
-        <li class="who key" data-selected={shown && shown.id === k.id ? '' : undefined}>
-          <div class="line line-tall">
-            <span class="line-mark"><IconWell name="key" size="l" /></span>
-            <span class="line-main">
-              {#if href}<a class="line-title key-name tap" href={at(href)}>{k.label}</a>{:else}<span class="line-title key-name">{k.label}</span>{/if}
-              <!-- WHERE IT APPLIES, THEN WHAT IT OPENS, as words in the meta line: the project's dot and name, or "All
-                   projects". A saved value draws nothing; a key with no value says so with the ring and the words. -->
-              <span class="line-detail key-meta">
-                {#if k.scope}<ScopeChip scope={k.scope} inline />{:else}<span class="key-all">{tileWords.allProjects}</span>{/if}
-                {#if k.opens}<span class="sep" aria-hidden="true">{' · '}</span><span class="key-opens">{k.opens}</span>{/if}
-                {#if hint}<span class="key-hint">{hint}</span>{/if}
-                {#if !state.sealed}<span class="sep" aria-hidden="true">{' · '}</span><span class="state" data-warn={state.warn ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>{/if}
-              </span>
-            </span>
-            <span class="key-count">
-              {#if k.sealed && counts}
-                <span class="key-opened num">{openedSaid(k.opened)}</span>
-                {#if u}
-                  {@const run = runPath(u.run)}
-                  {@const who = tileWords.lastBy(u.agent ?? u.run, since(u.at, Date.now()))}
-                  <span class="key-last who-used">{#if run}<a href={at(run)}>{who}</a>{:else}{who}{/if}</span>
-                {:else if k.lastOpened}
-                  <span class="key-last">{words.lastOpened(since(k.lastOpened, Date.now()))}</span>
-                {/if}
-              {/if}
-            </span>
-            {#if acts}
-              <span class="line-verbs who-do key-do">
-                {#if action?.act === 'reveal'}
-                  <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
-                  <Button size="sm" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
-                    {revealing === k.id ? words.revealing : words.reveal}
-                  </Button>
-                {:else if action?.act === 'seal'}
-                  <Button size="sm" onclick={() => openReplace(k)}>{action.word}</Button>
-                {:else if k.sealed}
-                  <Button size="sm" onclick={() => openReplace(k)}>{words.replace}</Button>
-                {/if}
-                <Menu label={moreFor(k.label)} align="end">
-                  {#snippet trigger()}
-                    <span class="more-trigger"><Icon name="more" size="s" /><span class="vh">{moreFor(k.label)}</span></span>
-                  {/snippet}
-                  {#if origin}<p class="mi-note">{tileWords.cameFromSaid(origin)}</p>{/if}
-                  {#if action?.act === 'reveal'}
-                    <button type="button" class="mi" role="menuitem" disabled={revealing === k.id} onclick={() => void revealKey(k)}>{words.reveal}</button>
-                  {/if}
-                  <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{k.sealed ? words.replace : tileWords.sealValue}</button>
-                  {#if k.grant && k.sealed}
-                    <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
-                  {/if}
-                </Menu>
-              </span>
-            {/if}
-          </div>
-          {#if shown && shown.id === k.id}
-            <!--
-              THE ONE PLACE A VALUE IS DRAWN. It goes by itself, the countdown says when, and nothing puts it in
-              the address, in the page title or in a toast.
-            -->
-            <div class="shown">
-              <output class="shown-value" for={`key-${k.id}`}>{shown.value}</output>
-              <div class="shown-do">
-                <Button size="sm" onclick={() => void copyShown()}>{words.copyValue}</Button>
-                <Button size="sm" weight="bare" onclick={forget}>{words.hide}</Button>
-                <span class="shown-left num">{words.hidesIn(shown.left)}</span>
-              </div>
-            </div>
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  </Section>
+        <Empty kind={indexTell.kind} title={indexTell.title} body={indexTell.body}>
+          {#snippet actions()}
+            {#if index.kind === 'absent'}<Button weight="primary" href="/packs">{tells.browse}</Button>{/if}
+          {/snippet}
+        </Empty>
+      {:else if from !== 'reading' && keys.length === 0}
+        <Empty kind="no-data-yet" glyph="key" title={words.noKeys} body={words.noKeysHow}>
+          {#snippet actions()}
+            {#if acts && index.kind === 'held'}<Button weight="primary" onclick={openAdd}>{words.addKey}</Button>{/if}
+          {/snippet}
+        </Empty>
+        <div class="agent-add">
+          <p>{words.noKeysAgent}</p>
+          <CodeLine text={words.noKeysCommand} />
+        </div>
+      {/if}
+      <!-- A COUNT THE RECORD WOULD NOT GIVE IS SAID ONCE, in the record's own words, and never drawn as "never opened". -->
+      {#if uncounted}<p class="said">{uncounted}</p>{/if}
+      <!-- KEYS THE RECORD HOLDS PAST THE ONES READ ARE SAID, so a list that stopped short never reads as all of them. -->
+      {#if moreKeys}<p class="said">{tileWords.moreKeys(keys.length)}</p>{/if}
+      <!-- KEYS THAT LOOK LIKE THEY BELONG TO A PROJECT: one line and one button that puts the move on Decide. Loaded after
+           the screen drew; nothing here at nought or on a refusal. -->
+      {#if scope}<scope.Note found={scope.found} call={scope.call} />{/if}
+      <ul class="ledger ledger-lead whos keys">
+        {#each keys as k (k.id)}
+          <!--
+            ONE ROW ANATOMY: the key's well, its name (a link to its row), and under it where it applies, what it
+            opens and whether a value is sealed here; how often it was opened at the end; Reveal and the "…" menu always drawn at a desk, the "…" alone on a phone.
+            Replace and Revoke stay in the key's own menu (design 2.14): neither is what a person comes to the vault to do most.
 
-  <Section title={words.mayOpen} count={holding.length}>
-    {#if machinesTell}
-      <!-- THE HALF THAT IS OWNER-ONLY SAYS SO IN THE RECORD'S WORDS, and it no longer takes the page with it. -->
-      <Empty kind={machinesTell.kind} title={machinesTell.title} body={machinesTell.body} />
-    {:else if from !== 'reading' && holding.length === 0}
-      <Empty kind="no-data-yet" title={words.noMachines} />
-    {/if}
-    <ul class="ledger ledger-lead whos">
-      {#each holding as d (d.handle)}
-        <!-- THE KEYS' ROW SHAPE, so a machine and a key read as one kind of list: its well, its name, where it may open
-             keys and when it was last used, when its grant ends, and Revoke on hover. -->
-        <li class="who">
-          <div class="line line-tall">
-            <span class="line-mark"><IconWell name="session" size="l" /></span>
-            <span class="line-main">
-              <span class="line-title who-name">{d.label ?? copy.unnamedMachine}</span>
-              <span class="line-detail who-detail"
-                >{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">{' · '}</span>{d.last_used
-                  ? copy.usedWhen(since(d.last_used, Date.now()))
-                  : copy.neverUsed}</span
-              >
-            </span>
-            <span class="line-when">{copy.endsWhen(relative(d.expires.slice(0, 10), Date.now()))}</span>
-            {#if acts}
-              <span class="line-verbs who-do">
-                <Button size="sm" weight="bare" tone="bad" onclick={() => void revokeRow(d)}>{copy.revokeKey}</Button>
+            A SEALED KEY SAYS WHAT IT IS, UNOPENED, after what it opens: the hint the host wrote when it sealed it. A KEY WITH
+            NO VALUE HAS "Add value" WHERE A SAVED ONE HAS REVEAL, which opens the sheet Replace opens and seals onto
+            this same row. Where the key came from, when its row says, is the first line of its menu.
+          -->
+          {@const state = stateOf(k)}
+          {@const hint = hintOf(k)}
+          {@const action = rowAction(k)}
+          {@const origin = cameFrom.get(k.id)}
+          {@const href = rowPath(k)}
+          {@const u = lastBy.get(k.id)}
+          <li class="who key" data-selected={shown && shown.id === k.id ? '' : undefined}>
+            <div class="line line-tall">
+              <span class="line-mark"><IconWell name="key" size="l" /></span>
+              <span class="line-main">
+                {#if href}<a class="line-title key-name tap" href={at(href)}>{k.label}</a>{:else}<span class="line-title key-name">{k.label}</span>{/if}
+                <!-- WHERE IT APPLIES, THEN WHAT IT OPENS, as words in the meta line: the project's dot and name, or "All
+                     projects". A saved value draws nothing; a key with no value says so with the ring and the words. -->
+                <span class="line-detail key-meta">
+                  {#if k.scope}<ScopeChip scope={k.scope} inline />{:else}<span class="key-all">{tileWords.allProjects}</span>{/if}
+                  {#if k.opens}<span class="sep" aria-hidden="true">{' · '}</span><span class="key-opens">{k.opens}</span>{/if}
+                  {#if hint}<span class="key-hint">{hint}</span>{/if}
+                  {#if !state.sealed}<span class="sep" aria-hidden="true">{' · '}</span><span class="state" data-warn={state.warn ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>{/if}
+                </span>
               </span>
+              <span class="key-count">
+                {#if k.sealed && counts}
+                  <span class="key-opened num">{openedSaid(k.opened)}</span>
+                  {#if u}
+                    {@const run = runPath(u.run)}
+                    {@const who = tileWords.lastBy(u.agent ?? u.run, since(u.at, Date.now()))}
+                    <span class="key-last who-used">{#if run}<a href={at(run)}>{who}</a>{:else}{who}{/if}</span>
+                  {:else if k.lastOpened}
+                    <span class="key-last">{words.lastOpened(since(k.lastOpened, Date.now()))}</span>
+                  {/if}
+                {/if}
+              </span>
+              {#if acts}
+                <span class="line-verbs who-do key-do">
+                  {#if action?.act === 'reveal'}
+                    <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
+                    <Button size="sm" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
+                      {revealing === k.id ? words.revealing : words.reveal}
+                    </Button>
+                  {:else if action?.act === 'seal'}
+                    <Button size="sm" onclick={() => openReplace(k)}>{action.word}</Button>
+                  {:else if k.sealed}
+                    <Button size="sm" onclick={() => openReplace(k)}>{words.replace}</Button>
+                  {/if}
+                  <Menu label={moreFor(k.label)} align="end">
+                    {#snippet trigger()}
+                      <span class="more-trigger"><Icon name="more" size="s" /><span class="vh">{moreFor(k.label)}</span></span>
+                    {/snippet}
+                    {#if origin}<p class="mi-note">{tileWords.cameFromSaid(origin)}</p>{/if}
+                    {#if action?.act === 'reveal'}
+                      <button type="button" class="mi" role="menuitem" disabled={revealing === k.id} onclick={() => void revealKey(k)}>{words.reveal}</button>
+                    {/if}
+                    <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{k.sealed ? words.replace : tileWords.sealValue}</button>
+                    {#if k.grant && k.sealed}
+                      <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
+                    {/if}
+                  </Menu>
+                </span>
+              {/if}
+            </div>
+            {#if shown && shown.id === k.id}
+              <!--
+                THE ONE PLACE A VALUE IS DRAWN. It goes by itself, the countdown says when, and nothing puts it in
+                the address, in the page title or in a toast.
+              -->
+              <div class="shown">
+                <output class="shown-value" for={`key-${k.id}`}>{shown.value}</output>
+                <div class="shown-do">
+                  <Button size="sm" onclick={() => void copyShown()}>{words.copyValue}</Button>
+                  <Button size="sm" weight="bare" onclick={forget}>{words.hide}</Button>
+                  <span class="shown-left num">{words.hidesIn(shown.left)}</span>
+                </div>
+              </div>
             {/if}
-          </div>
-        </li>
-      {/each}
-    </ul>
-  </Section>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  </Tile>
+
+  <Tile class="section" data-surface="tile" title={words.mayOpen} count={holding.length || undefined}>
+    <div class="section-body">
+      {#if machinesTell}
+        <!-- THE HALF THAT IS OWNER-ONLY SAYS SO IN THE RECORD'S WORDS, and it no longer takes the page with it. -->
+        <Empty kind={machinesTell.kind} title={machinesTell.title} body={machinesTell.body} />
+      {:else if from !== 'reading' && holding.length === 0}
+        <Empty kind="no-data-yet" title={words.noMachines} />
+      {/if}
+      <ul class="ledger ledger-lead whos">
+        {#each holding as d (d.handle)}
+          <!-- THE KEYS' ROW SHAPE, so a machine and a key read as one kind of list: its well, its name, where it may open
+               keys and when it was last used, when its grant ends, and Revoke on hover. -->
+          <li class="who">
+            <div class="line line-tall">
+              <span class="line-mark"><IconWell name="session" size="l" /></span>
+              <span class="line-main">
+                <span class="line-title who-name">{d.label ?? copy.unnamedMachine}</span>
+                <span class="line-detail who-detail"
+                  >{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">{' · '}</span>{d.last_used
+                    ? copy.usedWhen(since(d.last_used, Date.now()))
+                    : copy.neverUsed}</span
+                >
+              </span>
+              <span class="line-when">{copy.endsWhen(relative(d.expires.slice(0, 10), Date.now()))}</span>
+              {#if acts}
+                <span class="line-verbs who-do">
+                  <Button size="sm" weight="bare" tone="bad" onclick={() => void revokeRow(d)}>{copy.revokeKey}</Button>
+                </span>
+              {/if}
+            </div>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  </Tile>
 
   {#if opens}
     <!-- THE ONE FIGURE: how often the sealed keys were opened, one bar a key, the most opened in ink.
@@ -963,7 +966,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     line-height: 34px;
     letter-spacing: -0.02em;
@@ -971,8 +974,8 @@
   }
 
   .figure-unit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     letter-spacing: 0;
   }
@@ -982,15 +985,15 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   /* THE RECORD'S OWN SENTENCE FOR A COUNT IT WOULD NOT GIVE, once, above the rows it is about. */
   .said {
     margin: 0 0 var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -1000,7 +1003,7 @@
      step aside, as `rows.css` does for a link's row, so the fill is one clean shape. */
   @media (hover: hover) and (pointer: fine) {
     .whos > li:hover > .line {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .whos > li:hover > .line::after,
@@ -1041,19 +1044,19 @@
     flex: 0 1 auto;
     min-inline-size: 0;
     overflow: hidden;
-    color: var(--ink2);
+    color: var(--ink-2);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   /* WHAT A SEALED KEY IS, UNOPENED: quieter than what it opens, and whole, since it is the short one of the two. */
   .key-hint {
-    color: var(--dim);
+    color: var(--ink-3);
     white-space: nowrap;
   }
 
   .sep {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* A STATE IS A 6PX DOT AND ITS WORD: ink for a value sealed here, an open ring for a key kept
@@ -1070,8 +1073,8 @@
     inline-size: 6px;
     block-size: 6px;
     box-sizing: border-box;
-    border: 1.5px solid var(--dim);
-    border-radius: var(--r-pill);
+    border: 1.5px solid var(--ink-3);
+    border-radius: var(--r-ctl);
   }
 
   /* NO VALUE YET IS THE ONE STATE THAT NEEDS SOMETHING: a ring in the warn hue, and its words in ink. */
@@ -1108,8 +1111,8 @@
   }
 
   .key-opened {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
     font-variant-numeric: tabular-nums;
@@ -1117,8 +1120,8 @@
   }
 
   .key-last {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     white-space: nowrap;
   }
@@ -1134,8 +1137,8 @@
     place-items: center;
     inline-size: var(--ctl-h-sm);
     block-size: var(--ctl-h-sm);
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     transition:
       background var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out);
@@ -1143,7 +1146,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .more-trigger:hover {
-      background: var(--hold-wash);
+      background: var(--tile-2);
       color: var(--ink);
     }
   }
@@ -1167,17 +1170,17 @@
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     text-align: start;
     cursor: pointer;
   }
 
   .mi:hover,
   .mi:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   /* A SENTENCE IN A MENU, not a row: nothing happens when it is pressed. Where the key came from, wrapped, never cut. */
@@ -1185,8 +1188,8 @@
     max-inline-size: 280px;
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1211,15 +1214,14 @@
     gap: var(--sp-2);
     margin: 0 var(--sp-3) var(--sp-3) calc(var(--well-l) + var(--sp-3) * 2);
     padding: var(--sp-3);
-    background: var(--bg);
-    border-radius: var(--r-md);
-    box-shadow: var(--e1);
+    background: var(--tile);
+    border-radius: var(--r-pop);
   }
 
   .shown-value {
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
     user-select: all;
   }
@@ -1232,8 +1234,8 @@
   }
 
   .shown-left {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1257,8 +1259,8 @@
   }
 
   .code-input {
-    font-family: var(--font-id);
-    font-size: var(--t-md);
+    font-family: var(--font-mono);
+    font-size: var(--fs-body);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.18em;
   }
@@ -1269,8 +1271,8 @@
     gap: 6px;
     min-block-size: 18px;
     margin: var(--sp-2) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -1279,11 +1281,11 @@
   }
 
   .code-said[data-intent='good'] .code-glyph {
-    color: var(--earn);
+    color: var(--good);
   }
 
   .code-said[data-intent='bad'] .code-glyph {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .row-actions {
@@ -1313,8 +1315,8 @@
 
   .field-hint {
     margin: 0 0 var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -1326,7 +1328,7 @@
     gap: var(--sp-2);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     cursor: pointer;
   }
 

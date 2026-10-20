@@ -25,7 +25,6 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Button from '$lib/ui/Button.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
 
@@ -147,112 +146,114 @@
 </script>
 
 <div class="form">
-  <Section title={words.header}>
-    <!-- WHAT IT IS ON THE LEFT, WHAT IT MAY TOUCH ON THE RIGHT, from 1100 (agents F17): the fields stopped at 716 in a
-         1440 tile, and twenty checkboxes wrapped raggedly under them. -->
-    <div class="fields form-two">
-      <div class="column">
-      <div class="item">
-        <label class="label" for="script-title">{words.title}</label>
-        <div class="field" data-wrong={faultAt('title') ? '' : undefined}>
-          <!-- THE HELP LINE IS WHERE A FAULT IS SAID, so the field names it (`aria-describedby`) and a screen reader hears
-               the fault with the field, not only as a line somewhere under it. -->
-          <input id="script-title" class="field-input" type="text" autocomplete="off" aria-describedby="script-title-help" aria-invalid={faultAt('title') ? 'true' : undefined} bind:value={draft.title} />
+  <Tile class="section" data-surface="tile" title={words.header}>
+    <div class="section-body">
+      <!-- WHAT IT IS ON THE LEFT, WHAT IT MAY TOUCH ON THE RIGHT, from 1100 (agents F17): the fields stopped at 716 in a
+           1440 tile, and twenty checkboxes wrapped raggedly under them. -->
+      <div class="fields form-two">
+        <div class="column">
+        <div class="item">
+          <label class="label" for="script-title">{words.title}</label>
+          <div class="field" data-wrong={faultAt('title') ? '' : undefined}>
+            <!-- THE HELP LINE IS WHERE A FAULT IS SAID, so the field names it (`aria-describedby`) and a screen reader hears
+                 the fault with the field, not only as a line somewhere under it. -->
+            <input id="script-title" class="field-input" type="text" autocomplete="off" aria-describedby="script-title-help" aria-invalid={faultAt('title') ? 'true' : undefined} bind:value={draft.title} />
+          </div>
+          <p class="help" id="script-title-help" class:wrong={faultAt('title') !== null}>{faultAt('title') ?? words.titleHelp}</p>
         </div>
-        <p class="help" id="script-title-help" class:wrong={faultAt('title') !== null}>{faultAt('title') ?? words.titleHelp}</p>
-      </div>
 
-      <!-- WHAT STARTS IT IS A GROUP OF CHOICES WITH ONE FAULT BETWEEN THEM, so the group carries the fault's id. -->
-      <fieldset class="item" aria-describedby={faultAt('starts') ? 'script-starts-fault' : undefined}>
-        <legend class="label">{words.starts}</legend>
-        <p class="sub" id="script-every">{words.every}</p>
-        <Segmented role="group" aria-labelledby="script-every">
-          <button type="button" class="segment" aria-pressed={draft.every === ''} data-on={draft.every === '' ? '' : undefined} onclick={() => (draft.every = '')}>{words.everyNone}</button>
-          {#each everyChoices as e (e)}
-            <button type="button" class="segment" aria-pressed={draft.every === e} data-on={draft.every === e ? '' : undefined} onclick={() => (draft.every = e)}>
-              {words.everyAs[e] ?? words.everyOther(e)}
-            </button>
-          {/each}
-        </Segmented>
-
-        {#if doorChoices !== null && doorChoices.length > 0}
-          <p class="sub" id="script-door">{words.door}</p>
-          <Segmented role="group" aria-labelledby="script-door">
-            <button type="button" class="segment" aria-pressed={draft.door === ''} data-on={draft.door === '' ? '' : undefined} onclick={() => (draft.door = '')}>{words.doorNone}</button>
-            {#each doorChoices as d (d.id)}
-              <button type="button" class="segment" aria-pressed={draft.door === d.id} data-on={draft.door === d.id ? '' : undefined} title={d.description || undefined} onclick={() => (draft.door = d.id)}>
-                {humanize(d.id)}
+        <!-- WHAT STARTS IT IS A GROUP OF CHOICES WITH ONE FAULT BETWEEN THEM, so the group carries the fault's id. -->
+        <fieldset class="item" aria-describedby={faultAt('starts') ? 'script-starts-fault' : undefined}>
+          <legend class="label">{words.starts}</legend>
+          <p class="sub" id="script-every">{words.every}</p>
+          <Segmented role="group" aria-labelledby="script-every">
+            <button type="button" class="segment" aria-pressed={draft.every === ''} data-on={draft.every === '' ? '' : undefined} onclick={() => (draft.every = '')}>{words.everyNone}</button>
+            {#each everyChoices as e (e)}
+              <button type="button" class="segment" aria-pressed={draft.every === e} data-on={draft.every === e ? '' : undefined} onclick={() => (draft.every = e)}>
+                {words.everyAs[e] ?? words.everyOther(e)}
               </button>
             {/each}
           </Segmented>
-        {:else if doorChoices === null}
-          <label class="sub" for="script-door-typed">{words.doorTyped}</label>
-          <div class="field">
-            <input id="script-door-typed" class="field-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" bind:value={draft.door} />
-          </div>
-        {/if}
 
-        <div class="switch-line">
-          <span id="script-rule">{words.rule}</span>
-          <button type="button" class="switch" role="switch" aria-checked={draft.rule} aria-labelledby="script-rule" onclick={() => (draft.rule = !draft.rule)}>
-            <span class="switch-track"></span>
-          </button>
+          {#if doorChoices !== null && doorChoices.length > 0}
+            <p class="sub" id="script-door">{words.door}</p>
+            <Segmented role="group" aria-labelledby="script-door">
+              <button type="button" class="segment" aria-pressed={draft.door === ''} data-on={draft.door === '' ? '' : undefined} onclick={() => (draft.door = '')}>{words.doorNone}</button>
+              {#each doorChoices as d (d.id)}
+                <button type="button" class="segment" aria-pressed={draft.door === d.id} data-on={draft.door === d.id ? '' : undefined} title={d.description || undefined} onclick={() => (draft.door = d.id)}>
+                  {humanize(d.id)}
+                </button>
+              {/each}
+            </Segmented>
+          {:else if doorChoices === null}
+            <label class="sub" for="script-door-typed">{words.doorTyped}</label>
+            <div class="field">
+              <input id="script-door-typed" class="field-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" bind:value={draft.door} />
+            </div>
+          {/if}
+
+          <div class="switch-line">
+            <span id="script-rule">{words.rule}</span>
+            <button type="button" class="switch" role="switch" aria-checked={draft.rule} aria-labelledby="script-rule" onclick={() => (draft.rule = !draft.rule)}>
+              <span class="switch-track"></span>
+            </button>
+          </div>
+          {#if faultAt('starts')}<p class="help wrong" id="script-starts-fault">{faultAt('starts')}</p>{/if}
+        </fieldset>
+
+        <div class="item">
+          <label class="label" for="script-egress">{words.egress}</label>
+          <textarea
+            id="script-egress"
+            class="lines"
+            rows="3"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+            inputmode="url"
+            aria-describedby="script-egress-help"
+            aria-invalid={faultAt('egress') ? 'true' : undefined}
+            data-wrong={faultAt('egress') ? '' : undefined}
+            bind:value={draft.egress}
+          ></textarea>
+          <p class="help" id="script-egress-help" class:wrong={faultAt('egress') !== null}>{faultAt('egress') ?? words.egressHelp}</p>
         </div>
-        {#if faultAt('starts')}<p class="help wrong" id="script-starts-fault">{faultAt('starts')}</p>{/if}
-      </fieldset>
 
-      <div class="item">
-        <label class="label" for="script-egress">{words.egress}</label>
-        <textarea
-          id="script-egress"
-          class="lines"
-          rows="3"
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-          inputmode="url"
-          aria-describedby="script-egress-help"
-          aria-invalid={faultAt('egress') ? 'true' : undefined}
-          data-wrong={faultAt('egress') ? '' : undefined}
-          bind:value={draft.egress}
-        ></textarea>
-        <p class="help" id="script-egress-help" class:wrong={faultAt('egress') !== null}>{faultAt('egress') ?? words.egressHelp}</p>
-      </div>
-
-      <fieldset class="item">
-        <legend class="label">{words.keys}</legend>
-        {#if keyChoices.length > 0}
-          <div class="picks form-checks">
-            {#each keyChoices as k (k)}
-              <label class="pick"><input type="checkbox" checked={draft.keys.includes(k)} onchange={() => (draft.keys = toggle(draft.keys, k))} />{k}</label>
-            {/each}
-          </div>
-        {/if}
-        {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone}</p>{/if}
-      </fieldset>
-      </div>
-
-      <div class="column">
-
-      {#each GROUPS as group (group.which)}
         <fieldset class="item">
-          <legend class="label">{group.label}</legend>
-          {#if listChoices.length === 0}
-            <p class="help">{words.listsNone}</p>
-          {:else}
+          <legend class="label">{words.keys}</legend>
+          {#if keyChoices.length > 0}
             <div class="picks form-checks">
-              {#each listChoices as l (l.id)}
-                <label class="pick">
-                  <input type="checkbox" checked={draft[group.which].includes(l.id)} onchange={() => (draft[group.which] = toggle(draft[group.which], l.id))} />{l.name}
-                </label>
+              {#each keyChoices as k (k)}
+                <label class="pick"><input type="checkbox" checked={draft.keys.includes(k)} onchange={() => (draft.keys = toggle(draft.keys, k))} />{k}</label>
               {/each}
             </div>
           {/if}
+          {#if keys === null}<p class="help">{words.keysShut}</p>{:else if keyChoices.length === 0}<p class="help">{words.keysNone}</p>{/if}
         </fieldset>
-      {/each}
+        </div>
+
+        <div class="column">
+
+        {#each GROUPS as group (group.which)}
+          <fieldset class="item">
+            <legend class="label">{group.label}</legend>
+            {#if listChoices.length === 0}
+              <p class="help">{words.listsNone}</p>
+            {:else}
+              <div class="picks form-checks">
+                {#each listChoices as l (l.id)}
+                  <label class="pick">
+                    <input type="checkbox" checked={draft[group.which].includes(l.id)} onchange={() => (draft[group.which] = toggle(draft[group.which], l.id))} />{l.name}
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          </fieldset>
+        {/each}
+        </div>
       </div>
     </div>
-  </Section>
+  </Tile>
 
   <div class="work">
     <Tile icon="code" title={words.source}>
@@ -348,8 +349,8 @@
   /* THE LABEL SITS ABOVE ITS FIELD in the meta size and the second ink. */
   .label {
     padding: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -363,26 +364,26 @@
   .sub {
     margin: 0;
     margin-block-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .help {
     margin: 0;
     margin-block-start: calc(var(--sp-1) - var(--sp-2));
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .help.wrong {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* A FIELD WITH A FAULT IN IT: a red edge drawn inside it, since a field has no border to colour. */
   .field[data-wrong],
   .lines[data-wrong],
   .code[data-wrong] {
-    box-shadow: inset 0 0 0 1.5px var(--danger);
+    box-shadow: inset 0 0 0 1.5px var(--red);
   }
 
   .switch-line {
@@ -392,8 +393,8 @@
     justify-content: start;
     gap: var(--sp-3);
     margin-block-start: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   /* A FIELD IS THE INNER FILL WITH NO BORDER, rounded 12, on the ground and inside a tile alike. */
@@ -403,11 +404,11 @@
     inline-size: 100%;
     min-inline-size: 0;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     resize: vertical;
   }
@@ -420,7 +421,7 @@
   /* THE SOURCE KEEPS ITS LINES. It scrolls sideways inside its own box, never the page, and holds its indentation. */
   .code {
     min-block-size: calc(var(--sp-9) * 4);
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
     white-space: pre;
     overflow-x: auto;
     tab-size: 2;
@@ -433,7 +434,7 @@
   /* FOCUS IS THE 2PX INK RING OFFSET 2, as on every other field. */
   .lines:focus-visible,
   .code:focus-visible {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 
@@ -449,8 +450,8 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     cursor: pointer;
   }
 
@@ -471,8 +472,8 @@
 
   .said {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -490,24 +491,24 @@
     margin: 0;
     padding-inline-start: var(--sp-5);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .log {
     margin: 0;
     padding: var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
   .link {
     margin-inline-start: var(--sp-2);
-    color: var(--link);
+    color: var(--red);
   }
 
   .do {
@@ -521,7 +522,7 @@
 
     .pick {
       min-block-size: var(--tap);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 

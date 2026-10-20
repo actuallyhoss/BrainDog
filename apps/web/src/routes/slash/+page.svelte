@@ -52,7 +52,6 @@
   import { changeWords } from '$lib/record/slash.ts';
   import AskPage from '$lib/page/AskPage.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
@@ -588,69 +587,75 @@
             <!-- WHAT SLASH NOTICED, in the one hue that means Slash's own lines (`live`). Each is the record's own
                  reading of how this BrainDog is used, a sentence a person reads whole. With nothing noticed it is not
                  drawn, and the fold's line does not name it. -->
-            <Section title={words.noticed} count={reading.noticed.length}>
-              <ul class="ledger ledger-lead slash-list">
-                {#each reading.noticed as n (`${n.kind}:${n.subject}`)}
-                  <li class="slash-noticed">
-                    <div class="line line-tall">
-                      <span class="line-mark"><IconWell name="slash" size="l" tone="live" /></span>
-                      <span class="line-main"><span class="line-title slash-wrap slash-sentence">{n.text}</span></span>
-                    </div>
-                  </li>
-                {/each}
-              </ul>
-            </Section>
+            <Tile class="section" data-surface="tile" title={words.noticed} count={reading.noticed.length || undefined}>
+              <div class="section-body">
+                <ul class="ledger ledger-lead slash-list">
+                  {#each reading.noticed as n (`${n.kind}:${n.subject}`)}
+                    <li class="slash-noticed">
+                      <div class="line line-tall">
+                        <span class="line-mark"><IconWell name="slash" size="l" tone="live" /></span>
+                        <span class="line-main"><span class="line-title slash-wrap slash-sentence">{n.text}</span></span>
+                      </div>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            </Tile>
           {/if}
 
           <!-- WHAT YOU ANSWERED, UNDER ITS OWN HEADING: each still opens its question on Decide, where the answer is. -->
           {#if settled.length > 0}
-            <Section title={pageWords.answeredTitle} count={settled.length}>
-              <ul class="ledger ledger-lead slash-list">
-                {#each settled as s (s.href ?? s.question)}
-                  {@const by = byLine(s.by)}
-                  <li class="slash-suggestion" data-state={s.state}>
-                    {#snippet body()}
-                      <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
-                      <span class="line-main">
-                        <span class="line-title slash-question">{s.question}</span>
-                        {#if s.taken}<span class="line-detail">{s.taken}</span>{/if}
-                        {#if by}<span class="line-detail">{by}</span>{/if}
-                      </span>
-                    {/snippet}
-                    {#if s.href}
-                      <a class="line" href={at(s.href)}>{@render body()}<span class="line-when">{words.open}</span></a>
-                    {:else}
-                      <div class="line">{@render body()}</div>
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            </Section>
+            <Tile class="section" data-surface="tile" title={pageWords.answeredTitle} count={settled.length || undefined}>
+              <div class="section-body">
+                <ul class="ledger ledger-lead slash-list">
+                  {#each settled as s (s.href ?? s.question)}
+                    {@const by = byLine(s.by)}
+                    <li class="slash-suggestion" data-state={s.state}>
+                      {#snippet body()}
+                        <span class="line-mark"><IconWell name="check" size="l" tone="earn" /></span>
+                        <span class="line-main">
+                          <span class="line-title slash-question">{s.question}</span>
+                          {#if s.taken}<span class="line-detail">{s.taken}</span>{/if}
+                          {#if by}<span class="line-detail">{by}</span>{/if}
+                        </span>
+                      {/snippet}
+                      {#if s.href}
+                        <a class="line" href={at(s.href)}>{@render body()}<span class="line-when">{words.open}</span></a>
+                      {:else}
+                        <div class="line">{@render body()}</div>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            </Tile>
           {/if}
 
           {#if modelHere && lately && lately.length > 0}
             <!-- WHAT YOU ASKED LATELY, each line reopening its proposal on Decide or asking its question again at the top.
                  Nothing asked yet is not drawn, as the fold's line does not name it. -->
-            <Section title={askWords.lately} count={lately.length}>
-              <ul class="ledger ledger-lead slash-list">
-                {#each lately as line (line.id)}
-                  <li class="slash-lately">
-                    <div class="line">
-                      <span class="line-mark"><IconWell name="history" size="l" /></span>
-                      <span class="line-main"><span class="line-title slash-question">{line.question}</span></span>
-                      <span class="line-when">{line.when}{line.refused ? `, ${askWords.refused}` : ''}</span>
-                      <span class="line-verbs">
-                        {#if line.href}
-                          <Button size="sm" href={line.href}>{askWords.open}</Button>
-                        {:else}
-                          <Button size="sm" disabled={asking} onclick={() => askAgain(line.question)}>{askWords.again}</Button>
-                        {/if}
-                      </span>
-                    </div>
-                  </li>
-                {/each}
-              </ul>
-            </Section>
+            <Tile class="section" data-surface="tile" title={askWords.lately} count={lately.length || undefined}>
+              <div class="section-body">
+                <ul class="ledger ledger-lead slash-list">
+                  {#each lately as line (line.id)}
+                    <li class="slash-lately">
+                      <div class="line">
+                        <span class="line-mark"><IconWell name="history" size="l" /></span>
+                        <span class="line-main"><span class="line-title slash-question">{line.question}</span></span>
+                        <span class="line-when">{line.when}{line.refused ? `, ${askWords.refused}` : ''}</span>
+                        <span class="line-verbs">
+                          {#if line.href}
+                            <Button size="sm" href={line.href}>{askWords.open}</Button>
+                          {:else}
+                            <Button size="sm" disabled={asking} onclick={() => askAgain(line.question)}>{askWords.again}</Button>
+                          {/if}
+                        </span>
+                      </div>
+                    </li>
+                  {/each}
+                </ul>
+              </div>
+            </Tile>
           {/if}
 
           {#if tally || reading.daily}
@@ -670,14 +675,16 @@
           {#if reading.model !== null}
             <!-- THE DESCRIPTION'S DRAFTS ARE DRAWN HERE, as a page's own "Change this page" draws them: each as the
                  pages it would make, beside the pages as they are, kept, asked on Decide or dropped from here. -->
-            <Section title={changeWords.describeTitle}>
-              <AskPage
-                model={true}
-                onkept={async () => {
-                  await load();
-                }}
-              />
-            </Section>
+            <Tile class="section" data-surface="tile" title={changeWords.describeTitle}>
+              <div class="section-body">
+                <AskPage
+                  model={true}
+                  onkept={async () => {
+                    await load();
+                  }}
+                />
+              </div>
+            </Tile>
           {/if}
         </div>
       </details>
@@ -713,7 +720,7 @@
   }
 
   .slash-engine [data-needs] {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: var(--fw-medium);
   }
 
@@ -732,7 +739,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     line-height: 34px;
     letter-spacing: -0.02em;
@@ -740,8 +747,8 @@
   }
 
   .figure-unit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     letter-spacing: 0;
   }
@@ -751,7 +758,7 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -759,8 +766,8 @@
   .slash-hint {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -772,8 +779,8 @@
   .slash-empty {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -788,7 +795,7 @@
     background: none;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-align: start;
     cursor: pointer;
@@ -803,12 +810,12 @@
   .slash-drafts {
     margin: 0;
     max-inline-size: var(--measure);
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
     line-height: 16px;
   }
 
   .slash-drafts-link {
-    color: var(--dim);
+    color: var(--ink-3);
     text-decoration: none;
   }
 
@@ -823,7 +830,7 @@
 
   .slash-drafts-link:hover,
   .slash-drafts-link:focus-visible {
-    color: var(--ink2);
+    color: var(--ink-2);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
@@ -832,8 +839,8 @@
   .slash-sub {
     margin: var(--sp-4) 0 var(--sp-1);
     padding-inline: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
@@ -848,9 +855,9 @@
     inline-size: fit-content;
     max-inline-size: 100%;
     padding: var(--sp-2);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    border-radius: var(--r-pop);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
     list-style: none;
     cursor: pointer;
@@ -862,7 +869,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .more-summary:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -876,7 +883,7 @@
   .more-icon {
     display: grid;
     align-self: center;
-    color: var(--dim);
+    color: var(--ink-3);
     transition: rotate 120ms ease;
   }
 
@@ -897,7 +904,7 @@
 
   .more-said {
     min-inline-size: 0;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .more-body {
@@ -946,7 +953,7 @@
 
   .slash-answer {
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .slash-asked {
@@ -958,14 +965,14 @@
   }
 
   .slash-asked-said {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .slash-asked-q {
     min-inline-size: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
     overflow-wrap: anywhere;
@@ -977,19 +984,19 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
     overflow-wrap: anywhere;
   }
 
   .slash-source :global(.icon) {
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .slash-source-n {
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1000,7 +1007,7 @@
   .slash-row-go {
     display: grid;
     place-items: center;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* SLASH'S SENTENCE, BESIDE ITS FACE: an answer is somebody's, and the model that drew it is named under it. */
@@ -1023,7 +1030,7 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: 22px;
     overflow-wrap: anywhere;
   }
@@ -1036,7 +1043,7 @@
   .slash-card {
     container-type: inline-size;
     padding: var(--sp-3);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   .slash-card:empty {
@@ -1044,7 +1051,7 @@
   }
 
   .slash-card[data-armed] {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .slash-card > :global(.queue-card) {
@@ -1055,15 +1062,15 @@
   /* `23 §8`'s footer: receded and small, but always there. */
   .slash-model {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     overflow-wrap: anywhere;
   }
 
   .slash-fold {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .slash-fold ul {
@@ -1074,7 +1081,7 @@
 
   .slash-summary {
     inline-size: fit-content;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: 500;
     cursor: pointer;
   }
@@ -1085,7 +1092,7 @@
      aside so the fill is one shape. */
   @media (hover: hover) and (pointer: fine) {
     .slash-list > li:hover > div.line {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .slash-list > li:hover > .line::after,
@@ -1125,7 +1132,7 @@
     flex: none;
     inline-size: 6px;
     block-size: 6px;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: var(--ink);
   }
 
@@ -1137,11 +1144,11 @@
   .slash-by::before {
     content: '·';
     margin-inline-end: 6px;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .slash-suggestion[data-state='answered'] .slash-question {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   @media (width < 900px) {

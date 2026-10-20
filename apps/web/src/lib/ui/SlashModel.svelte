@@ -43,7 +43,7 @@
     type Start,
   } from '$lib/ui/slash-model.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
 
@@ -125,105 +125,107 @@
 </script>
 
 {#if page.data.live && owner && start}
-  <Section title={words.legend}>
-    <p class="now" role="status">{nowSaid(start)}</p>
-    <form class="model-form" onsubmit={save} novalidate>
-      <fieldset class="kinds">
-        <legend class="visually-hidden">{words.legend}</legend>
-        {#each kinds as value (value)}
-          <label class="kind">
-            <input
-              type="radio"
-              name="slash-kind"
-              {value}
-              checked={draft.kind === value}
-              onchange={() => choose(value)}
-              disabled={saving}
-              aria-describedby="slash-kind-{value}"
-            />
-            <span class="kind-words">
-              <span>{words.kinds[value].label}</span>
-              <span class="hint" id="slash-kind-{value}">{words.kinds[value].hint}</span>
-            </span>
-          </label>
-        {/each}
-      </fieldset>
-
-      {#if draft.kind === 'key'}
+  <Tile class="section" data-surface="tile" title={words.legend}>
+    <div class="section-body">
+      <p class="now" role="status">{nowSaid(start)}</p>
+      <form class="model-form" onsubmit={save} novalidate>
         <fieldset class="kinds">
-          <legend class="model-label">{words.providerLabel}</legend>
-          {#each PROVIDERS as value (value)}
+          <legend class="visually-hidden">{words.legend}</legend>
+          {#each kinds as value (value)}
             <label class="kind">
-              <input type="radio" name="slash-provider" {value} checked={draft.provider === value} onchange={() => (draft.provider = value)} disabled={saving} />
-              <span>{providerName(value)}</span>
+              <input
+                type="radio"
+                name="slash-kind"
+                {value}
+                checked={draft.kind === value}
+                onchange={() => choose(value)}
+                disabled={saving}
+                aria-describedby="slash-kind-{value}"
+              />
+              <span class="kind-words">
+                <span>{words.kinds[value].label}</span>
+                <span class="hint" id="slash-kind-{value}">{words.kinds[value].hint}</span>
+              </span>
             </label>
           {/each}
         </fieldset>
 
-        <label class="model-label" for="slash-base">{words.baseLabel}</label>
-        <p class="hint" id="slash-base-hint">{words.baseHint}</p>
-        <div class="field">
-          <input
-            class="field-input"
-            id="slash-base"
-            type="url"
-            inputmode="url"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="https://"
-            bind:value={draft.base_url}
-            aria-describedby="slash-base-hint slash-model-said"
-          />
-        </div>
-      {/if}
+        {#if draft.kind === 'key'}
+          <fieldset class="kinds">
+            <legend class="model-label">{words.providerLabel}</legend>
+            {#each PROVIDERS as value (value)}
+              <label class="kind">
+                <input type="radio" name="slash-provider" {value} checked={draft.provider === value} onchange={() => (draft.provider = value)} disabled={saving} />
+                <span>{providerName(value)}</span>
+              </label>
+            {/each}
+          </fieldset>
 
-      <!-- THE NAME ONLY WHERE IT IS READ. On the Cloud's included model the engine clears it on save, so a field there would
-           take a name thrown away the moment it is saved; on a self-host the included model is its own endpoint's. -->
-      {#if draft.kind === 'included' && named}
-        <p class="hint">{endpoint}</p>
-      {/if}
-      {#if draft.kind === 'key' || named}
-        <label class="model-label" for="slash-model">{words.modelLabel}</label>
-        <p class="hint" id="slash-model-hint">{draft.kind === 'key' ? words.keyModelHint : words.modelHint}</p>
-        <div class="field">
-          <input
-            class="field-input"
-            id="slash-model"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            bind:value={draft.model}
-            aria-describedby="slash-model-hint slash-model-said"
-            aria-invalid={refusal ? 'true' : undefined}
-          />
-        </div>
-      {/if}
-
-      {#if draft.kind === 'key'}
-        <span class="model-label" id="slash-key-label">{words.keyLabel}</span>
-        {#if keysRefused}
-          <p class="hint" role="status">{keysRefused}</p>
-        {:else if keys !== null && keys.length === 0}
-          <p class="hint" role="status">{words.keyNone}</p>
-        {:else}
-          <div class="key-row">
-            {#if picked}
-              <span class="key-picked" dir="auto">{picked.label}</span>
-            {:else if keys !== null && draft.grant_id !== null}
-              <span class="hint">{words.keyGone}</span>
-            {/if}
-            <Button disabled={saving || keys === null} onclick={() => (picking = true)}>{picked ? words.keyChange : words.keyPick}</Button>
+          <label class="model-label" for="slash-base">{words.baseLabel}</label>
+          <p class="hint" id="slash-base-hint">{words.baseHint}</p>
+          <div class="field">
+            <input
+              class="field-input"
+              id="slash-base"
+              type="url"
+              inputmode="url"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="https://"
+              bind:value={draft.base_url}
+              aria-describedby="slash-base-hint slash-model-said"
+            />
           </div>
         {/if}
-      {/if}
 
-      <div class="model-actions">
-        <Button type="submit" disabled={saving || patch === null}>{words.go}</Button>
-      </div>
-      <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
-      <p class="model-said" id="slash-model-said" role="status" data-intent={refusal ? 'bad' : undefined}>{refusal}</p>
-    </form>
-  </Section>
+        <!-- THE NAME ONLY WHERE IT IS READ. On the Cloud's included model the engine clears it on save, so a field there would
+             take a name thrown away the moment it is saved; on a self-host the included model is its own endpoint's. -->
+        {#if draft.kind === 'included' && named}
+          <p class="hint">{endpoint}</p>
+        {/if}
+        {#if draft.kind === 'key' || named}
+          <label class="model-label" for="slash-model">{words.modelLabel}</label>
+          <p class="hint" id="slash-model-hint">{draft.kind === 'key' ? words.keyModelHint : words.modelHint}</p>
+          <div class="field">
+            <input
+              class="field-input"
+              id="slash-model"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              bind:value={draft.model}
+              aria-describedby="slash-model-hint slash-model-said"
+              aria-invalid={refusal ? 'true' : undefined}
+            />
+          </div>
+        {/if}
+
+        {#if draft.kind === 'key'}
+          <span class="model-label" id="slash-key-label">{words.keyLabel}</span>
+          {#if keysRefused}
+            <p class="hint" role="status">{keysRefused}</p>
+          {:else if keys !== null && keys.length === 0}
+            <p class="hint" role="status">{words.keyNone}</p>
+          {:else}
+            <div class="key-row">
+              {#if picked}
+                <span class="key-picked" dir="auto">{picked.label}</span>
+              {:else if keys !== null && draft.grant_id !== null}
+                <span class="hint">{words.keyGone}</span>
+              {/if}
+              <Button disabled={saving || keys === null} onclick={() => (picking = true)}>{picked ? words.keyChange : words.keyPick}</Button>
+            </div>
+          {/if}
+        {/if}
+
+        <div class="model-actions">
+          <Button type="submit" disabled={saving || patch === null}>{words.go}</Button>
+        </div>
+        <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
+        <p class="model-said" id="slash-model-said" role="status" data-intent={refusal ? 'bad' : undefined}>{refusal}</p>
+      </form>
+    </div>
+  </Tile>
 
   <!-- THE PICKER IS A SHEET: a drawer from 640px up and a bottom sheet below it, so at 390px the keys sit under the thumb.
        It names each key by the label he gave it and never shows a value, which this page never has. -->
@@ -253,8 +255,8 @@
   .now {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -284,7 +286,7 @@
     min-block-size: var(--tap);
     padding: var(--sp-2) var(--sp-3);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     background: none;
     color: var(--ink);
     font: inherit;
@@ -295,12 +297,12 @@
 
   /* THE PICKED KEY IS THE "ON" SURFACE, AND HOVER ONLY WHERE THERE IS ONE: a phone keeps `:hover` on the last row tapped. */
   .key[aria-pressed='true'] {
-    background: var(--selected);
+    background: var(--red-tint);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .key:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -349,15 +351,15 @@
   .hint {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .model-label {
     margin-block-start: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* THE COLUMN'S WIDTH UP TO A LINE'S, so an address fits on a desk and never runs past the gutter on a phone. */
@@ -374,7 +376,7 @@
 
   .model-said {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-meta);
   }
 </style>

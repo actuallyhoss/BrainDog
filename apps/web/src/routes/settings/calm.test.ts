@@ -44,7 +44,7 @@ test('the sub-nav draws "here" as the rail does: the tile under the row and the 
   const index = strip(readFileSync(new URL('./[area]/SettingsIndex.svelte', import.meta.url), 'utf8'));
   const here = /\.area-row\[aria-current='page'\] \{([^}]*)\}/u.exec(index)?.[1] ?? '';
   assert.match(here, /background: var\(--tile\);/u);
-  assert.doesNotMatch(here, /--selected/u, 'the current area still wears the tinted wash');
+  assert.doesNotMatch(here, /--red-tint/u, 'the current area still wears the tinted wash');
   const glyph = /\.area-row\[aria-current='page'\] \.area-icon :global\(\.well\.well\) \{([^}]*)\}/u.exec(index)?.[1] ?? '';
   assert.match(glyph, /background: transparent;/u);
   /* THE RED AS A MARK (UI pass 20 Oct, SPEC 1.1): the selection's glyph is `--red`, the fill is for buttons. */
@@ -56,8 +56,8 @@ test('the sub-nav draws "here" as the rail does: the tile under the row and the 
 
 test('each Navigation section draws at most one hint', () => {
   const nav = markup('Navigation');
-  for (const section of nav.split(/<Section\b/u).slice(1)) {
-    const body = section.slice(0, section.indexOf('</Section>'));
+  for (const section of nav.split(/<Tile\b/u).slice(1)) {
+    const body = section.slice(0, section.indexOf('</Tile>'));
     /* THE SHAPE'S TWO HINTS ARE ONE A WIDTH: the picker's on a wide screen, the phone's one sentence on a phone. */
     const hints = (body.match(/<p class="hint(?![^"]*phone-only)/gu) ?? []).length;
     assert.ok(hints <= 1, `a section draws ${hints} hints: ${body.slice(0, 80)}`);

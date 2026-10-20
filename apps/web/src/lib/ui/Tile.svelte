@@ -1,6 +1,6 @@
 <!--
   A content tile: the one surface that holds a group of rows, a figure, its chart and the line saying what it means
-  (the UI pass of 20 October, 2.A.4). `Section.svelte` draws through this until it goes.
+  (the UI pass of 20 October, 2.A.4). It is the only tile: `Section.svelte`, its older door, went in wave 4 (F11).
 
   THE HEADING ROW IS THE TILE'S OWN, so every tile on every screen starts the same way: a 28px NEUTRAL well with an 18px
   icon, the title at 15/600 in ink, an optional count at 15/500 in `--ink-3`, and at the far end one link ("All 17",
@@ -14,6 +14,11 @@
 
   A TILE THAT HOLDS ONLY AN EMPTY STATE HUGS IT (frame F20): 640 wide at most, on the page's start edge, rather than a
   sentence at the start of 1440px of white.
+
+  A GROUP OF ROWS IS `class="section"` WITH ITS ROWS IN ONE `.section-body` (what `Section` drew): the rows keep their own
+  flow rather than the tile's 16 between children, `Empty` draws a section's empty state as the compact line, and
+  inside a tile or a sheet the section is only its heading and its rows, because a tile never holds a tile. Pass the
+  count as `count || undefined` there: "Passkeys 0" over "No passkey yet." says the same fact twice.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -87,6 +92,18 @@
 </section>
 
 <style>
+  .tile > :global(.section-body) {
+    min-inline-size: 0;
+  }
+
+  /* A TILE NEVER HOLDS A TILE: inside one, or inside a sheet, a section is its heading and its rows on the surface it
+     stands on. */
+  :global(:is(.tile, .sheet, .dock-body) .tile.section) {
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
   .tile {
     display: flex;
     flex-direction: column;
@@ -148,7 +165,7 @@
 
   .tile-count {
     flex: none;
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-weight: var(--fw-medium);
     font-variant-numeric: tabular-nums;
   }
@@ -167,7 +184,7 @@
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--ink-3, var(--dim));
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -178,8 +195,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    border-radius: var(--r-xs, var(--r-sm));
-    color: var(--ink-2, var(--ink2));
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
     text-decoration: none;
