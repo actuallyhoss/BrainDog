@@ -56,7 +56,6 @@
   import Button from '$lib/ui/Button.svelte';
   import Face from '$lib/ui/Face.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
-  import LeadHead from '$lib/ui/LeadHead.svelte';
   import Panel from '$lib/ui/Panel.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import RowMenu from '$lib/ui/RowMenu.svelte';
@@ -1127,11 +1126,6 @@
       <div class="cols">
       <!-- ══ THE LEAD TILE: the sentence, the capture line and the bands ══ -->
       <div class="lead-tile tile">
-      {#if sentence}
-        <LeadHead meta={daySaid(today)} sentence={sentence.text} needs={sentence.needs || undefined}>
-          {#snippet aside()}{@render headTools()}{/snippet}
-        </LeadHead>
-      {/if}
       <!-- ══ THE CAPTURE LINE, and how the typed words read ══ -->
       {#if mayAdd}
         <form class="capture" onsubmit={add}>

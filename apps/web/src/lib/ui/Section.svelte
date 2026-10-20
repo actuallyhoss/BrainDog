@@ -1,11 +1,22 @@
 <!--
-  A group as a tile (DIRECTION §39): the tile's colour on the board, flat, radius 16 and 20 in, the heading at 15
-  semibold with its count in the quiet ink and the actions at the right, and the rows inside it.
+  A group as a tile, drawn by `Tile.svelte` (the UI pass of 20 October, 2.A.4): one tile in the product, and this is
+  its older door, kept until every caller has moved to `Tile` (wave 4 deletes it).
+
+  THE SAME TILE: `--tile`, radius 16, `--tile-pad`, the heading at 15/600 with its count at 15/500 in `--ink-3`, and
+  `aside` at the heading's end, where `Tile` puts its `actions`. The element keeps the `section` class beside `tile`,
+  so `Empty`'s rule that a section's empty state is the compact line still finds it.
+
+  THE ROWS ARE ONE CHILD. A tile spaces its children 16 apart, and a section's rows were laid out by their own flow; the
+  body wrapper keeps them as they were.
+
+  A ZERO IS NOT A COUNT here, as it never was: "Passkeys 0" over "No passkey yet." says the same fact twice.
 
   INSIDE A TILE OR A SHEET IT IS ONLY THE HEADING AND ITS ROWS, because a tile never holds a tile.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
+
+  import Tile from './Tile.svelte';
 
   let {
     title,
@@ -15,75 +26,20 @@
   }: { title: string; count?: number; children: Snippet; aside?: Snippet } = $props();
 </script>
 
-<section class="section" data-surface="tile">
-  <div class="section-head">
-    <h2 class="section-title">
-      {title}
-      <!--
-        A ZERO IS NOT A COUNT, and the test was `count !== undefined`, which zero passes.
-
-        So a new record read `Passkeys 0` over "No passkey yet.", `Connectors 0` over "Nothing feeds
-        this record yet.", `What is kept 0` over "No backup yet." and `Installed 0` over "No packs
-        installed." The same fact twice, once in the schema's register and once in the reader's, and
-        the number is the half that says nothing: a count is here to save somebody counting rows,
-        and there are no rows to count. The sentence below is the one that names what would be here
-        and what puts it there, so it is the one that stays.
-      -->
-      {#if count}<span class="section-count num">{count}</span>{/if}
-    </h2>
-    {#if aside}<div class="section-aside">{@render aside()}</div>{/if}
-  </div>
-  {@render children()}
-</section>
+<Tile class="section" data-surface="tile" {title} count={count ? count : undefined} actions={aside}>
+  <div class="section-body">{@render children()}</div>
+</Tile>
 
 <style>
-  .section {
+  .section-body {
     min-inline-size: 0;
-    padding: var(--tile-pad);
-    background: var(--tile);
-    border-radius: var(--tile-r);
   }
 
-  :global(:is(.tile, .sheet)) .section {
+  /* A TILE NEVER HOLDS A TILE: inside one, or inside a sheet, the section is its heading and its rows on the surface
+     it stands on. */
+  :global(:is(.tile, .sheet, .dock-body) .tile.section) {
     padding: 0;
     background: none;
     border-radius: 0;
-    box-shadow: none;
-  }
-
-  .section-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: var(--btn-h);
-    margin-block: calc(-1 * var(--sp-1)) var(--sp-2);
-  }
-
-  /* A TILE'S HEADING IS 15 AT 600, the step every tile heading on a page takes (`.block-head`), so a section and a
-     block beside it read as two tiles of one board. It ranks over a row title (15 at 500) by weight alone. */
-  .section-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--fs-body);
-    font-weight: var(--fw-semi);
-    line-height: 22px;
-  }
-
-  .section-count {
-    color: var(--dim);
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .section-aside {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    margin-inline-start: auto;
   }
 </style>

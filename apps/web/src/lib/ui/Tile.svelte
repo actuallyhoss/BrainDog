@@ -1,13 +1,19 @@
 <!--
-  A content tile: the white surface that holds a figure, its chart and the one line saying what the chart means.
+  A content tile: the one surface that holds a group of rows, a figure, its chart and the line saying what it means
+  (the UI pass of 20 October, 2.A.4). `Section.svelte` draws through this until it goes.
 
-  THE HEADING ROW IS THE TILE'S OWN, so every tile on every screen starts the same way: a 28px icon well in the tone that
-  says what the tile is (`tone`), the title at the row size and 600, an optional count in the quiet ink, and at the far
-  end either a link word with its arrow or a line of meta. `actions` sits there too, for a tile whose heading carries a
-  control of its own.
+  THE HEADING ROW IS THE TILE'S OWN, so every tile on every screen starts the same way: a 28px NEUTRAL well with an 18px
+  icon, the title at 15/600 in ink, an optional count at 15/500 in `--ink-3`, and at the far end one link ("All 17",
+  13/500, with its arrow), a line of meta, or the tile's own `actions`.
 
-  NO TILE INSIDE A TILE, NO GLASS UNDER ONE, NO BORDER ROUND IT, NO SHADOW. The tile is told from the board by its
-  fill alone, in light and in dark.
+  THE WELL NEVER TAKES A TONE. A heading names a group, and a group is not late or good; a tone is for a ROW that means
+  it (`IconWell`). `tone` is still accepted so a caller that passes one does not break, and it colours nothing.
+
+  NO TILE INSIDE A TILE, NO BORDER ROUND IT, NO SHADOW. The tile is told from the board by its fill alone, in light and
+  in dark: `--tile`, radius 16, padding `--tile-pad` (24 on the screen's lead tile, 16 on a phone).
+
+  A TILE THAT HOLDS ONLY AN EMPTY STATE HUGS IT (frame F20): 640 wide at most, on the page's start edge, rather than a
+  sentence at the start of 1440px of white.
 -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
@@ -19,7 +25,7 @@
 
   let {
     icon,
-    tone,
+    tone: _tone,
     title,
     count,
     meta,
@@ -33,10 +39,7 @@
   }: {
     /** The glyph in the heading's well. */
     icon?: IconName | undefined;
-    /**
-     * What the well says by its colour (`IconWell`'s tones): `action` for a question waiting, `danger` for what is late,
-     * `earn` for cash and what is earned. Left out, the well is the quiet grey.
-     */
+    /** Accepted and ignored: a tile's heading well is always neutral (2.A.5). */
     tone?: 'action' | 'danger' | 'earn' | 'live' | 'warn' | undefined;
     title?: string | undefined;
     /** Beside the title in the quiet ink. A zero is a count too here, since a tile that holds a number says it. */
@@ -61,7 +64,7 @@
 <section class={['tile', extra]} data-lead={lead ? '' : undefined} {...rest}>
   {#if head}
     <header class="tile-head">
-      {#if icon}<IconWell name={icon} size="m" {tone} />{/if}
+      {#if icon}<IconWell name={icon} size="m" />{/if}
       {#if title}
         <h2 class="tile-title">
           <span class="tile-name">{title}</span>
@@ -89,9 +92,9 @@
     flex-direction: column;
     gap: var(--sp-4);
     min-inline-size: 0;
-    padding: 20px;
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    padding: var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--r-tile);
     color: var(--ink);
   }
 
@@ -99,8 +102,21 @@
     padding: var(--sp-5);
   }
 
+  /* SIXTEEN ON A PHONE, lead or not: at 390 every pixel of padding is a pixel of the row's words. */
+  @media (width < 640px) {
+    .tile,
+    .tile[data-lead] {
+      padding: var(--sp-4);
+    }
+  }
+
+  /* A TILE OF ONE EMPTY STATE, its heading aside, is as wide as the state and no wider. */
+  .tile:has(> :global(.empty)):not(:has(> :not(.tile-head, :global(.empty)))) {
+    max-inline-size: 640px;
+  }
+
   /* THE ROW WRAPS WHEN IT CANNOT HOLD ITS ASIDE: on a phone a meta line such as "all on <host>" goes under the title
-     rather than past the tile's edge, and on a wide tile nothing moves. */
+     rather than past the tile's edge, and on a wide tile nothing moves. 28 tall at least, the well's height. */
   .tile-head {
     display: flex;
     flex-wrap: wrap;
@@ -117,9 +133,10 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
-    font-weight: 600;
-    line-height: 20px;
+    font-family: var(--font-ui);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: 22px;
   }
 
   .tile-name {
@@ -131,8 +148,8 @@
 
   .tile-count {
     flex: none;
-    color: var(--dim);
-    font-weight: 500;
+    color: var(--ink-3, var(--dim));
+    font-weight: var(--fw-medium);
     font-variant-numeric: tabular-nums;
   }
 
@@ -150,19 +167,21 @@
     min-inline-size: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
+  /* ONE LINK, "All 17": 13/500 in the second ink, its arrow after it. */
   .tile-link {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    border-radius: var(--r-xs, var(--r-sm));
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
     text-decoration: none;
     white-space: nowrap;
     transition: color var(--d-state) var(--ease-out);
