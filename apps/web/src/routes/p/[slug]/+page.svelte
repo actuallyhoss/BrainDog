@@ -306,10 +306,14 @@
    * WHAT EVERY AGENT IS TOLD, UNDER THE RUNS ON AGENTS (the UI pass of 20 October, today F19): the record's lessons as
    * one tile after the page's blocks, read once a record when the agents page has drawn. `told.ts` is route-only (it
    * carries the client), so it is imported here and only for this page. Nothing at nought or on a refusal.
+   *
+   * THE PAGE OF RUNS IS KNOWN BY WHAT IT DRAWS, never by its slug, which is a pack's word: the page whose lanes are
+   * the record's own runs (`register.session`).
    */
+  const ofRuns = $derived(got?.from === 'live' && got.page.blocks.some((b) => b.kind === 'lanes' && (b as { source?: unknown }).source === 'register.session'));
   let told = $state<{ base: string; tile: LessonsTile | null } | null>(null);
   $effect(() => {
-    if (slug !== 'agents' || got?.from !== 'live') return;
+    if (!ofRuns) return;
     const base = apiBase();
     if (untrack(() => told?.base) === base) return;
     told = { base, tile: null };
@@ -318,7 +322,7 @@
       if (told?.base === base) told = { base, tile };
     });
   });
-  const lessons = $derived(slug === 'agents' && told?.base === apiBase() ? told.tile : null);
+  const lessons = $derived(ofRuns && told?.base === apiBase() ? told.tile : null);
   const offerBusy = $derived.by(() => {
     void offerTick;
     return offerActions.busy();
