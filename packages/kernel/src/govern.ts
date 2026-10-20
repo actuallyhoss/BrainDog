@@ -24,7 +24,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { clash, no, ok } from '@braindog/ports';
 
 import { approvalLines, egressOf, keyNamed, runnerCannotOpen, type Egress } from './actions.ts';
-import { agentOf, kindsOfProposal, recordReader, rungOf, shapeIn, stampOf, tokenOfRun } from './change-kind.ts';
+import { agentOf, kindsOfProposal, ownerIn, recordReader, rungOf, shapeIn, stampOf, tokenOfRun } from './change-kind.ts';
 import { instant } from './migrate.ts';
 import { point } from './metrics.ts';
 import { pairsReads, type PairsDecl } from './pairs.ts';
@@ -1761,17 +1761,46 @@ const HANDLED_REASON = 'It only arranges your own rows, and every change can be 
 const ARRANGES = (verb: string): boolean => verb === 'edit' || verb === 'tag' || verb.startsWith('move:');
 
 /**
- * Why BrainDog may not answer this question itself, or `null` when it may. Only what BrainDog files itself (an ingest, a
- * rule, Slash) and only rows that already exist: every write an edit, a tag or a move, none on the floor (money, keys,
- * sharing, who someone is, deletes, add-ons, outside the record, another person's row). Rows the owner made count as the
- * owner's own, as they do for Slash. The kinds are worked out now, as `ladderFault` works them, never from the stamp.
+ * How `handledFault` reads an agent's question. `agents` is set only by the hourly pass over what still waits
+ * (`settleWaiting`): there a question one of the owner's own agents filed, still open after `SETTLE_AFTER_MS`, is settled
+ * as BrainDog's own would be. Filed, it stays the ladder's (`ladderFault`), so a write at Ask still asks first.
  */
-export function handledFault(sql: Sql, row: { body_kind: string; body: string; opened_by: string }): string | null {
+export type HandledOpts = { agents?: { nowMs: number } };
+
+/**
+ * Why an agent's question is not one BrainDog settles for its owner, or `null`: the run was opened by a grant that is
+ * still good, and the grant is a person's who keeps the whole record. A member's agent, or one whose key was revoked, run
+ * out or suspended, still waits for a person.
+ */
+function ownAgentFault(sql: Sql, by: string, nowMs: number): string | null {
+  const token = tokenOfRun(sql, by);
+  if (token === null) return 'Only what BrainDog or one of your own agents files is settled by it.';
+  const grant = sql.one<{ person_id: string; revoked_at: string | null; expires_at: string | null }>('SELECT person_id, revoked_at, expires_at FROM token WHERE id = ?', token);
+  if (!grant || grant.revoked_at !== null || (grant.expires_at !== null && grant.expires_at <= instant(nowMs))) return 'The grant it was filed under has ended.';
+  return ownerIn(sql, grant.person_id) ? null : 'It was filed by an agent of someone who does not keep the whole record.';
+}
+
+/**
+ * Why BrainDog may not answer this question itself, or `null` when it may. Only what BrainDog files itself (an ingest, a
+ * rule, Slash), or, in the hourly pass (`opts.agents`), what one of the owner's own agents filed, and only rows that
+ * already exist: every write an edit, a tag or a move, none on the floor (money, keys, sharing, who someone is, deletes,
+ * add-ons, outside the record, another person's row). Rows the owner made count as the owner's own, as they do for
+ * Slash. The kinds are worked out now, as `ladderFault` works them, never from the stamp.
+ *
+ * A QUESTION ASKED BECAUSE ITS RUN READ OUTSIDE TEXT (`outside`) IS NEVER SETTLED HERE: DIRECTION §37 drops that run to
+ * Ask so that a person reads what it would change, and settling it an hour later would undo the reason it asked.
+ */
+export function handledFault(sql: Sql, row: { body_kind: string; body: string; opened_by: string }, opts: HandledOpts = {}): string | null {
   if (row.body_kind !== 'rowset') return `A ${row.body_kind} is never settled by BrainDog.`;
   const by = row.opened_by;
-  if (!(by === SLASH || by.startsWith('ingest:') || by.startsWith('rule:'))) return 'Only what BrainDog files itself is settled by it.';
+  if (!(by === SLASH || by.startsWith('ingest:') || by.startsWith('rule:'))) {
+    if (opts.agents === undefined) return 'Only what BrainDog files itself is settled by it.';
+    const mine = ownAgentFault(sql, by, opts.agents.nowMs);
+    if (mine !== null) return mine;
+  }
   const body = parse(row.body);
   if (!body) return 'The question cannot be read.';
+  if (body.outside === true) return 'Its run read text from outside the record, so it waits for you.';
   const rows = (body.rows ?? []) as Record<string, unknown>[];
   /* A CONFIDENT ARRIVAL IS THE ONE ADD BRAINDOG FILES ITSELF (DIRECTION §45): an ingest says so in the body
      (`arrivalSure`), and only new rows of that ingest's own list count; money is read cleanly by then, every other floor stands. */
@@ -1787,6 +1816,114 @@ export function handledFault(sql: Sql, row: { body_kind: string; body: string; o
   const fields = new Map((shape?.fields ?? []).map((f) => [f.id, f]));
   const held = rows.flatMap((r) => Object.entries((isMap(r.patch) ? r.patch : r) as Record<string, unknown>)).find(([k]) => fields.get(k)?.by === 'decide')?.[0];
   return held === undefined ? null : `${held} changes only when a person accepts it.`;
+}
+
+/** How long one of the owner's agents' small questions waits for him before BrainDog settles it in the hourly pass. */
+export const SETTLE_AFTER_MS = 60 * 60 * 1000;
+
+/** How many open questions one pass reads, newest first, so an hour costs the same whatever the queue holds. */
+export const SETTLE_BOUND = 300;
+
+/** What a question an agent asked again closes with: the line in its history. No ids and no list's words. */
+export const SUPERSEDED = 'A newer question asks the same about this row.';
+
+/** One open rowset as the pass reads it. */
+type Waiting = { id: string; opened_by: string; opened_at: string; body: string };
+
+/**
+ * The fields each open rowset question would change, by row: `register|row id|field`. `null` for one that adds a row,
+ * names no row this record holds, or cannot be read, which no other question can be said to ask again.
+ */
+function cellsOf(sql: Sql, body: string): Set<string> | null {
+  const b = parse(body);
+  if (!b || typeof b.register !== 'string' || !Array.isArray(b.rows) || b.rows.length === 0) return null;
+  const register = b.register;
+  const out = new Set<string>();
+  for (const r of b.rows as unknown[]) {
+    if (!isMap(r) || typeof r.at !== 'string' || !isMap(r.patch)) return null;
+    const at = r.at.trim();
+    const hash = at.lastIndexOf('#');
+    const id =
+      hash > 0
+        ? sql.one<{ id: string }>('SELECT id FROM entry WHERE register = ? AND seq = ?', at.slice(0, hash), Number(at.slice(hash + 1)))?.id
+        : (sql.one<{ id: string }>('SELECT id FROM entry WHERE id = ? AND register = ?', at, register)?.id ?? tokenRowOf(sql, register, at));
+    if (id === undefined || id === null) return null;
+    for (const field of Object.keys(r.patch)) out.add(`${register}|${id}|${field}`);
+  }
+  return out.size === 0 ? null : out;
+}
+
+/** A row named by its list's own prefix (`S12`), as `get` reads one, or `null`. */
+function tokenRowOf(sql: Sql, register: string, at: string): string | null {
+  const prefix = sql.one<{ p: string | null }>(
+    "SELECT json_extract(body, '$.seq_prefix') AS p FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 AND json_valid(body) ORDER BY version DESC LIMIT 1",
+    `register.${register}`,
+  )?.p;
+  if (typeof prefix !== 'string' || prefix === '' || prefix === '#' || !at.startsWith(prefix)) return null;
+  const n = at.slice(prefix.length);
+  return /^[1-9][0-9]*$/.test(n) ? (sql.one<{ id: string }>('SELECT id FROM entry WHERE register = ? AND seq = ?', register, Number(n))?.id ?? null) : null;
+}
+
+/**
+ * BrainDog's own arranging, over what already waits (DIRECTION d3, live 20 Oct: "small reversible questions settle
+ * themselves: none did"). Run by the hourly sweep while `handledOn` holds, in two steps:
+ *
+ *   1. A QUESTION ASKED AGAIN IS CLOSED. An open rowset whose every field on every row a newer open question also
+ *      changes is closed as moot with `SUPERSEDED`, as `recheck` closes one already so: fifteen "last seen" questions
+ *      about two tools waited on the owner, each older one a value the newest replaced. No decision, no brake, no rung.
+ *   2. WHAT IS LEFT AND SMALL IS SETTLED. Each open rowset `handledFault` passes is answered by `settle`, signed
+ *      `rule:handled`, so it is one line in Handled today with its Undo. One an agent of the owner's filed waits
+ *      `SETTLE_AFTER_MS` first, so he sees it before BrainDog answers it; what BrainDog filed itself and could not settle
+ *      when it was filed is tried again at once. A refusal (a row changed since, a field only a person changes) leaves it open.
+ *
+ * Before this, the rule ran only at the moment a question was filed, and only for an ingest, a rule or Slash: every
+ * question on the owner's record had been filed by one of his agents, and nothing ever looked at them again.
+ */
+export function settleWaiting(
+  sql: Sql,
+  nowMs: number,
+  mint: () => string,
+  settle: (id: string) => Result<unknown>,
+): { superseded: string[]; settled: string[] } {
+  const waiting = sql.all<Waiting>(
+    "SELECT id, opened_by, opened_at, body FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' ORDER BY opened_at DESC, rowid DESC LIMIT ?",
+    SETTLE_BOUND,
+  );
+  /* NEWEST FIRST: each question is asked again only by one filed after it, so the cells seen so far are the newer ones. */
+  const newer = new Set<string>();
+  const superseded: string[] = [];
+  const left: Waiting[] = [];
+  for (const q of waiting) {
+    const cells = cellsOf(sql, q.body);
+    if (cells !== null && [...cells].every((c) => newer.has(c))) {
+      superseded.push(q.id);
+      continue;
+    }
+    if (cells !== null) for (const c of cells) newer.add(c);
+    left.push(q);
+  }
+  if (superseded.length > 0) {
+    const shut = JSON.stringify(superseded.map((q) => ({ q, e: mint() })));
+    sql.exec(`UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE status = 'open' AND id IN (SELECT json_extract(value, '$.q') FROM json_each(?))`, shut);
+    sql.exec(
+      `INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v, note)
+       SELECT json_extract(value, '$.e'), ?, 'system', 'resolve', 'suggestion:' || json_extract(value, '$.q'), 'suggestion', 'moot', ?
+       FROM json_each(?) ORDER BY key`,
+      instant(nowMs),
+      SUPERSEDED,
+      shut,
+    );
+  }
+  const settled: string[] = [];
+  const due = instant(nowMs - SETTLE_AFTER_MS);
+  /* OLDEST FIRST, so the Handled list reads in the order he would have answered them. */
+  for (const q of left.reverse()) {
+    const ours = q.opened_by === SLASH || q.opened_by.startsWith('ingest:') || q.opened_by.startsWith('rule:');
+    if (!ours && q.opened_at > due) continue;
+    if (handledFault(sql, { body_kind: 'rowset', body: q.body, opened_by: q.opened_by }, { agents: { nowMs } }) !== null) continue;
+    if (settle(q.id).ok) settled.push(q.id);
+  }
+  return { superseded, settled };
 }
 
 /** What the decision says when the rule answered, in the words the owner reads it by in Decide. */
@@ -2812,7 +2949,7 @@ export type Verdict =
    * (`ladderFault`), answered as `LADDER_RULE`. Its rows are signed by the run that filed them, since they are that
    * agent's changes and its byline is what Undo finds; a question Slash filed has its rows signed by the ladder.
    */
-  | { rule: 'additive' | 'ladder' | 'handled' };
+  | { rule: 'additive' | 'ladder' | 'handled'; swept?: true };
 
 /** One approved line as a suggestion holds it: what accept reads of it before anything is armed. */
 type SentLine = { key?: unknown; paged?: unknown; channel?: unknown; ingest?: unknown };
@@ -2961,7 +3098,7 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
     const ladder = verdict.rule === 'ladder';
     const handled = verdict.rule === 'handled';
     const why = handled
-      ? handledFault(deps.sql, row)
+      ? handledFault(deps.sql, row, verdict.swept === true ? { agents: { nowMs: deps.nowMs } } : {})
       : ladder
         ? ladderFault(deps.sql, row, deps.nowMs)
         : row.body_kind === 'change'

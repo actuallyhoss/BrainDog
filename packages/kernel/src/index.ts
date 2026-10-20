@@ -141,6 +141,7 @@ import {
   countOpenQuestions,
   propose as openSuggestion,
   handledOn,
+  settleWaiting,
   HANDLED_RULE,
   reopen,
   withdraw as withdrawSuggestion,
@@ -7878,6 +7879,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* A QUESTION THAT IS ALREADY SO is closed as moot in the same hour, with the sentence that says why (`cause.ts`
        `recheck`, AGT-C08): the owner answered it by doing it, so it leaves Decide and counts on no brake. */
     transaction(() => recheck(sql, clock.now(), mint));
+    /* AND WHAT STILL WAITS AND IS SMALL SETTLES ITSELF (DIRECTION d3, `settleWaiting`): a question asked again is closed,
+       and an arrangement of the owner's own rows that BrainDog or his agent filed is answered as `rule:handled`, one
+       line in Handled today with its Undo. Each settle in its own savepoint, so one refusal leaves that question open. */
+    if (handledOn(sql))
+      transaction(() =>
+        settleWaiting(sql, clock.now(), mint, (id) => attempt(sql, transaction, () => decide(governDeps(), id, { rule: 'handled', swept: true }, HANDLED_RULE))),
+      );
     /* AND THE TIDY COUNTS WHAT IS LEFT (`tidy.ts` `tidyHour`, AGT-C18): one line a finder a day in `tidy_line`, after
        the cleaning above, so a line says what is still stale and what this hour cleared.
 

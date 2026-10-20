@@ -555,7 +555,7 @@ export function madeByIn(sql: Sql, rowId: string): string | null {
 }
 
 /** Whether a person keeps the whole record: an owner of every list, not suspended, as `members.ts` counts one. */
-const ownerIn = (sql: Sql, person: string): boolean =>
+export const ownerIn = (sql: Sql, person: string): boolean =>
   sql.one(
     "SELECT 1 AS y FROM member m JOIN person p ON p.id = m.person_id WHERE m.person_id = ? AND m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL",
     person,
