@@ -108,7 +108,8 @@ const HUB_PAGES = [
 test('the hub: the tabs are drawn once, in the layout, on the tab the address names', () => {
   const drawn = markup(LAYOUT);
   assert.equal(drawn.match(/<HubTabs\b/gu)?.length, 1, 'the layout draws the tabs once');
-  assert.match(drawn, /<HubTabs here=\{tab\} \/>/u, 'the tab is the address\'s, so it moves without a redraw');
+  assert.match(drawn, /<HubTabs here=\{at\} full=\{phone\.current\} \/>/u, 'the tab is the address\'s, so it moves without a redraw');
+  assert.match(drawn, /\{@render tabs\(tab\)\}/u, 'the snippet is handed the address\'s tab');
   assert.match(LAYOUT, /const tab = \$derived\(tabHere\(page\.route\.id, page\.url\.searchParams\)\);/u);
   assert.match(drawn, /\{@render children\(\)\}/u, 'the page is drawn under the head');
   /* The head is not inside a block keyed on the address: a key would draw it again, and a new control jumps. */

@@ -17,14 +17,30 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { page } from '$app/state';
+  import { MediaQuery } from 'svelte/reactivity';
+  import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
   import { words } from '$lib/flow/flow.ts';
   import HubTabs from './HubTabs.svelte';
-  import { hubWords as w } from './hub.ts';
+  import { hubWords as w, type Tab } from './hub.ts';
   import { clearHead, emptyHead, headFor, shareHead, tabHere } from './hub-head.ts';
 
   let { children }: { children: Snippet } = $props();
+
+  /* THE PHONE'S HEAD (PageHead under 900px, agents F8): the tabs go under the sentence, the whole width, and the tab's
+     one primary is the 44px button with the plus on the name's row. Beside the name they cut "Automations" in two and
+     left the primary on a row of its own. */
+  const phone = new MediaQuery('(width < 900px)', false);
+  const make = $derived(
+    tab === 'automations'
+      ? { href: '/automations/new', label: words.newOne }
+      : tab === 'scheduled'
+        ? { href: '/automations?tab=scheduled&new=action', label: w.newAction }
+        : tab === 'scripts'
+          ? { href: '/scripts/new', label: w.newScript }
+          : null,
+  );
 
   const head = $state(emptyHead());
   shareHead(head);
@@ -45,18 +61,20 @@
 <!-- THE TABS ARE THE TOOLBAR'S SEGMENTED CONTROL, beside the one primary action, which is the tab's own: "New
      automation", "New scheduled action", "New script", and none on Doors, whose section carries "New door" for an
      owner, and none on Runs, where nothing is made. -->
+<!-- THE TABS ARE DRAWN ONCE, beside the name at a desk's width and under the sentence on a phone. -->
+{#snippet tabs(at: Tab)}<HubTabs here={at} full={phone.current} />{/snippet}
+
 {#if tab && shown}
   <PageHead icon="refresh" title={words.heading} count={shown.count} sentence={shown.sentence} needs={shown.needs}>
     {#snippet actions()}
-      <HubTabs here={tab} />
-      {#if tab === 'automations'}
-        <Button weight="primary" href="/automations/new">{words.newOne}</Button>
-      {:else if tab === 'scheduled'}
-        <Button weight="primary" href="/automations?tab=scheduled&new=action">{w.newAction}</Button>
-      {:else if tab === 'scripts'}
-        <Button weight="primary" href="/scripts/new">{w.newScript}</Button>
+      {#if !phone.current}{@render tabs(tab)}{/if}
+      {#if make && phone.current}
+        <Button weight="primary" href={make.href} aria-label={make.label} data-circle><Icon name="plus" size="s" /></Button>
+      {:else if make}
+        <Button weight="primary" href={make.href}>{make.label}</Button>
       {/if}
     {/snippet}
+    {#snippet below()}{#if phone.current}{@render tabs(tab)}{/if}{/snippet}
   </PageHead>
 {/if}
 

@@ -164,6 +164,21 @@
     min-inline-size: 0;
   }
 
+  /* ON A PHONE THE SENTENCE HAS THE WHOLE WIDTH, so its example is read to its end, and Read it is under it. */
+  @media (width < 640px) {
+    .row {
+      flex-wrap: wrap;
+    }
+
+    .row :global(.field) {
+      flex-basis: 100%;
+    }
+
+    .row > :global(.btn) {
+      flex: 1 1 100%;
+    }
+  }
+
   .lead,
   .under,
   .hint,

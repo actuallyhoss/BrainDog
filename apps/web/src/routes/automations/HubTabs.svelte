@@ -19,7 +19,8 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import { TABS, hubWords, type Tab } from './hub.ts';
 
-  let { here }: { here: Tab } = $props();
+  /* `full` ON A PHONE: the page's own control, under the sentence and the whole width (`Segmented`). */
+  let { here, full = false }: { here: Tab; full?: boolean } = $props();
 
   /* Run when the track is drawn, and again whenever `here` changes, after the links have been marked. */
   const inView: Attachment<HTMLElement> = (bar) => {
@@ -28,7 +29,7 @@
   };
 </script>
 
-<Segmented tag="nav" class="hub-tabs" aria-label={hubWords.tabs} {@attach inView}>
+<Segmented tag="nav" class="hub-tabs" aria-label={hubWords.tabs} {full} {@attach inView}>
   {#each TABS as t (t.id)}
     <a
       class="hub-tab segment tap"
@@ -66,33 +67,9 @@
     white-space: nowrap;
   }
 
-  /* GLASS NEVER HOLDS GLASS: once the title row is the compact glass bar, the control in it drops its own. */
+  /* NO GLASS (the UI pass of 20 October): once the title row is the compact bar, the control in it is the bar's. */
   :global(.head[data-under] .hub-tabs) {
     background: transparent;
-    backdrop-filter: none;
-    box-shadow: none;
-  }
-
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    :global(.head[data-under] .hub-tabs) {
-      -webkit-backdrop-filter: none;
-    }
-  }
-
-  /* A PHONE'S HEAD IS NEVER THE GLASS BAR (`PageHead`), so there the control keeps its own glass. */
-  @media (width < 900px) {
-    :global(.head[data-under] .hub-tabs) {
-      background: var(--glass);
-      backdrop-filter: var(--glass-blur);
-      box-shadow: var(--glass-edge);
-    }
-
-    @supports (-webkit-backdrop-filter: none) {
-      :global(.head[data-under] .hub-tabs) {
-        -webkit-backdrop-filter: var(--glass-blur);
-      }
-    }
   }
 
   /* 44 UNDER A THUMB ON BOTH AXES (`13 §7`); `controls.css` gives the height and the width floor, and the word keeps
