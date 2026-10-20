@@ -40,7 +40,7 @@ they say:
 | Authorise a call against scope, level or ceiling | the record, in one place (30 §10). The tools hand `ctx` on and never read it |
 | Touch a database, a port, a `node:` module or `process` | it holds `surface` and `ctx` and nothing else; the `stack` and `graph` gates hold it to that |
 | Speak the legacy HTTP+SSE transport | not carried (ADR-054) |
-| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the sixteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
+| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the seventeen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
 | Decide | there is no `decide` tool, and no token holds `decide` (30 §10) |
 | Hand over a credential | there is no vault tool. `context` names a key by its label and what it opens, never its value (§8) |
 
@@ -100,7 +100,7 @@ export type McpSurface<C> = {
 export type Tool = { name: string; description: string; input: Record<string, unknown>; writes: boolean };
 export type Resource = { uri: string; name: string; description: string; ttlMs: number };
 
-export const TOOLS: readonly Tool[];                  // sixteen, §4.4
+export const TOOLS: readonly Tool[];                  // seventeen, §4.4
 export const TEMPLATES: readonly { uriTemplate: string; name: string; description: string }[];   // six, §4.7
 export const HOUR = 3_600_000;
 export const MINUTE = 60_000;
@@ -144,7 +144,7 @@ whatever the stdio loop passes, because the bearer travels in each request. The 
 
 **The ten optional methods** are optional because a host may not answer them. Both HTTP hosts hand `serveMcp` the
 whole record API (`apps/worker/src/index.ts`, `apps/selfhost/src/server.ts`), so over `/mcp` all ten arrive. The
-command line builds a narrower surface in `apps/cli/src/surface.ts`: the sixteen required methods are one
+command line builds a narrower surface in `apps/cli/src/surface.ts`: the seventeen required methods are one
 `client.call` each, and the ten optional ones are offered only when the client's route table names them, which it
 learns by a probe that sends nothing. So a command line built before a route landed still works against an older
 host. Without one:
@@ -177,7 +177,7 @@ packages/mcp/
 │                        scripts: test = node --test test/*.test.ts · typecheck = tsc --noEmit -p tsconfig.json
 ├── tsconfig.json        extends ../../tsconfig.base.json; includes src/ and test/
 ├── src/
-│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, ttlOf, compact, tools(): the sixteen, the resource list, the read
+│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, ttlOf, compact, tools(): the seventeen, the resource list, the read
 │   ├── rpc.ts           handle(): framing, version negotiation, the result renderer
 │   ├── http.ts          serveMcp(), gate(), unauthorized(): POST /mcp, §5.1
 │   ├── instructions.ts  INSTRUCTIONS, §4.6
@@ -209,7 +209,7 @@ type-checked, because `tsc` follows the import from `src/index.ts`.
 The transports' own halves live with their hosts. The stdio loop is `apps/cli/src/stdio.ts`, over the surface
 `apps/cli/src/surface.ts` builds on `@braindog/client`, and each host's `/mcp` branch calls `serveMcp`
 (`apps/worker/src/index.ts`, `apps/selfhost/src/server.ts`). There is no `mcp-budget` gate and no generated schema
-file: the budget is `budget.test.ts` (§7), and the sixteen input schemas are written by hand in `index.ts` (§4.4).
+file: the budget is `budget.test.ts` (§7), and the seventeen input schemas are written by hand in `index.ts` (§4.4).
 
 ---
 
@@ -323,8 +323,7 @@ Invariants. An `ok` result has one content block, `JSON.stringify` of the value,
 nothing consumes it and it would double the bytes. A refusal's text is the refusal itself,
 `{"code":"...","fix":"...","at":"...","allowed":[...]}`, because `allowed` is the half that teaches and a one-line
 rendering dropped it. A conflict's text is `{ code: 'VERSION_STALE', fix, version, actor, current }`, and `fix` names
-the actor and the version to send, so the retry needs no second read. `annotations.readOnlyHint` rides on the ten
-tools that never write, so a client can tell its user before one runs. `ttlMs` and `cacheScope` are top-level fields,
+the actor and the version to send, so the retry needs no second read. `annotations` ride on every tool: `readOnlyHint` true on the nine that never write and false on the eight that do, with `destructiveHint`, `idempotentHint` and `openWorldHint` said on the writes, so a client can tell its user before one runs. `ttlMs` and `cacheScope` are top-level fields,
 as 10 §1 names them. `cacheScope` takes one of the two values the MCP specification allows: `private` for anything a
 record answers, which is every result above but one, and `public` for `server/discover` alone, the one answer that
 reads nothing and is the same for every caller. The resource list is held for a minute rather than an hour because it
@@ -350,6 +349,7 @@ names pages, and a page appears when its row does.
 | `handoff` | `handoff(args)` | `next?`, `tried?`, `note?`, `doing?`, `state?` (`idle`, `handoff` or `done`) | yes |
 | `meet` | `meet(args)` | `name?`, `email?`, `handle?`, `where` | yes |
 | `triage` | `triage(args)` | `arrival`, `register?`, `fields?`, `ignore?`, `note?` | yes |
+| `undo` | `undoOwn({ batch, dry? })`, optional like `meet`; a surface without it answers that the owner puts it back from the app | `batch`, `dry?` | yes |
 
 Fourteen of these are the set the agent path planned. Five tools left to pay for the three that
 plan added (`context`, `handoff`, `meet`): `pages`, `page` and `metric` were already resources (§4.7); `credentials`
@@ -569,6 +569,7 @@ ladder still decides who reads them and a surface of any age can serve them.
 | 18 | `braindog:declaration/{slug}` | `arrangement({ page: slug })` | 60,000 | never one by one: a template only |
 | 19 | `braindog:automation/{id}` | `automations({ rule: id })`, the definition and its last ten runs | 60,000 | never one by one: a template only |
 | 20 | `braindog:understand` | `understandPlan({})`, what the record would link and ask next, in names | 60,000 | the surface has `understandPlan` and it reads |
+| 21 | `braindog:design` | `arrangement({ grammar: 'design' })`, the design book: every block kind with an example, colours, type, spacing and layout rules | 3,600,000 | the surface has `arrangement` and it reads |
 
 **Every address is asked before it is advertised.** A listing that names what the caller may not read tells them it
 exists, and one that names what then refuses sends an agent to a certain refusal. So the list is never ahead of the
@@ -606,7 +607,11 @@ Each row is a brief: `{ spoken, version, scope, state }`, then the register's ti
 given as its spoken id. A `secret` field is `{ sealed, opened, last_opened, last_by }`, and the grant's id never
 appears.
 
-`resources/templates/list` returns rows 14 to 19 as templates. The arguments are checked against a grammar before
+`resources/templates/list` returns rows 14 to 19 as templates.
+
+**Cards are resources of their own kind, and are never listed.** `resources/read` of `ui://braindog/project.html`, `decision.html` or `rule.html` (`text/html;profile=mcp-app`), or of the `.skybridge.html` twin (`text/html+skybridge`), answers the card's page with `ttlMs` an hour and `cacheScope` `public`, since it reads nothing of the record. `get` carries the project card and `governance` the decision card, by `_meta` on the tool; the page draws what the tool answered, and a button on it is only a press the person made.
+
+**Receipts.** `create`, `update`, `log`, `triage`, `handoff`, `propose` and `meet` end their answer in a receipt line, and `structuredContent.receipt` carries the same line: what was done in names, then `undo` with the write's batch. No credential is in it. `undo` has none (`RECEIPTED` in `index.ts`). The arguments are checked against a grammar before
 they are arguments: `{register}`, `{slug}` and `{id}` match `^[a-z][a-z0-9_-]{0,63}$`, and `{name}` matches
 `^[a-z0-9][a-z0-9-]{0,63}$`, the folder names the command line writes skills under. The address is split, never
 resolved, so `braindog:schema/../../x` is `ROUTE_UNKNOWN`.
@@ -658,8 +663,8 @@ nothing is streamed.
 
 1. Nothing is read from the record. The list is the same for every record and every caller, so it always arrives,
    and a caller who can read nothing still learns what it could call.
-2. `tools = TOOLS.map(listed)`: for each of the sixteen, in §4.4's order, `{ name, description, inputSchema }`, where
-   `inputSchema` is the tool's `input`, plus `annotations: { readOnlyHint: true }` on the nine that never write.
+2. `tools = TOOLS.map(listed)`: for each of the seventeen, in §4.4's order, `{ name, description, inputSchema }`, where
+   `inputSchema` is the tool's `input`, plus `annotations`: `{ readOnlyHint: true, openWorldHint: false }` on the nine that never write, and `readOnlyHint: false` with `destructiveHint`, `idempotentHint` and `openWorldHint` on the eight that do. A tool that carries a card also has `_meta.ui.resourceUri` and `_meta['openai/outputTemplate']` (§4.7).
 3. Result `{ tools, instructions: INSTRUCTIONS, ttlMs: 3_600_000, cacheScope: 'private' }`.
 
 The `inputSchema` objects are constants written by hand in `index.ts` with three helpers: `obj()` adds
@@ -669,10 +674,10 @@ what `budget.test.ts` counts (§5.9).
 
 ### 5.3 · `tools/call`
 
-1. A `params.name` that is not a string is `-32602`, with the sixteen in `data.allowed`. `params.arguments`, `{}` when
+1. A `params.name` that is not a string is `-32602`, with the seventeen in `data.allowed`. `params.arguments`, `{}` when
    absent, that is not an object is `-32602`. Neither reaches a tool.
 2. `tools(surface).call(name, args, ctx)` looks the name up with `Object.hasOwn`. A name that is not one of the
-   sixteen is an error result, `ROUTE_UNKNOWN` with the sixteen in `allowed`, and nothing runs. That covers every
+   seventeen is an error result, `ROUTE_UNKNOWN` with the seventeen in `allowed`, and nothing runs. That covers every
    VAULT, JOBS and ADMIN method name, and every name on `Object.prototype` (§6.2).
 3. The tool addresses the call (§4.4). It parses `spoken` into `{ register, seq }`, or hands a prefixed id or a row id
    to the record, or hands a figure's id to `metric`, or refuses `VALUE_MALFORMED` at `spoken`; `log` refuses an empty note `REQUIRED_MISSING` at `note`;
@@ -743,7 +748,7 @@ drops its cursor.
 
 Neither notification is sent, and the capabilities declare `tools: {}` and `resources: {}` with no `listChanged`.
 The transport has no session and no server-initiated stream, and nothing is remembered between messages (§4.1), so
-there is nobody to tell. Nothing needs telling about the tools: the sixteen do not change on an install, and no
+there is nobody to tell. Nothing needs telling about the tools: the seventeen do not change on an install, and no
 description names a register (§4.5), so a client may hold `tools/list` for its hour without holding anything stale.
 
 What an install does change is read, never pushed:
@@ -857,13 +862,13 @@ code is relayed from the record unchanged.
 
 Plus the HTTP answers with an empty body: `405` (not `POST`), `403` (an `Origin`), `413` (over `maxBodyBytes`) and
 `415` (not JSON), and `202` for a notification. An unknown tool is not a protocol error. It is an error result
-carrying `ROUTE_UNKNOWN`, with the sixteen in `allowed` (§4.4), because a result is what the model reads to correct
+carrying `ROUTE_UNKNOWN`, with the seventeen in `allowed` (§4.4), because a result is what the model reads to correct
 the call.
 
 ### 6.2 · The corpus codes this package raises before any call
 
 **Not built.** There is no `REFUSED` table in `index.ts`. A VAULT, JOBS or ADMIN method name sent to `tools/call` is
-`ROUTE_UNKNOWN`, with the sixteen in `allowed` (§5.3), and the record refuses a token at those groups in any case
+`ROUTE_UNKNOWN`, with the seventeen in `allowed` (§5.3), and the record refuses a token at those groups in any case
 (30 §10). The table below is an earlier revision's design, kept as that.
 
 > **The ADMIN row is about a direct write, not about metadata (September 22nd 2026).** An agent never calls `setDeclaration`, and it does not need to: it adds a
@@ -970,13 +975,13 @@ level.
 | Arguments | the record's: it refuses a wrong field by name, with `allowed`. The tool layer checks addresses and nothing else (§4.4) |
 | Body size | 1 MB, on `Content-Length` and again on the bytes as they arrive (§5.1 step 5) |
 | Header agreement | a mirrored header must equal the body whenever it is sent, so a check an intermediary makes on the header is a check on the call (§5.1 step 7) |
-| Code generation | none. The sixteen input schemas are constants written by hand |
+| Code generation | none. The seventeen input schemas are constants written by hand |
 | A script trial | `propose` with `try` runs a draft in the host's sandbox, with the caller's reads and no key opened for a token (§4.4). It writes nothing and files nothing, and the record checks the draft as an install would before it runs |
 | Error text | a 401 is one word; a throw is `internal` and a UUID; a refusal carries the record's `code`, `fix`, `at` and `allowed`. No stack, no SQL and no path crosses the wire (12 §8) |
 | Logging | a throw writes one line to the host's log, or to standard error under stdio: the reference, the method and the error, and never an argument |
 | Credentials | no tool names a VAULT method, and the record refuses every token there. `context` names a key by its label and what it opens, and shows its secret field as `{ sealed, opened, last_opened, last_by }`: never the grant, the sealed bytes or a value (ADR-010). `braindog:actions` names a key by its vault label |
 | Deciding | there is no `decide` tool, and no token reaches `decide` (30 §10) |
-| Completeness | the tool list is fixed at sixteen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
+| Completeness | the tool list is fixed at seventeen, and any other name is `ROUTE_UNKNOWN`, looked up with `Object.hasOwn` |
 
 **What never travels:** a plaintext credential, a stack trace, an exception message, a SQL string, a file path, a
 principal identifier the client did not already hold.

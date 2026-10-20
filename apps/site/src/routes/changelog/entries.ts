@@ -86,6 +86,134 @@ export type Entry = {
  * checker only requires that a day never reappears after it has ended.
  */
 export const ENTRIES: Entry[] = [
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Every agent write gets a receipt and an undo',
+    body:
+      'Each write by an agent ends in a receipt that names the change and the batch to undo it with. An agent can take back its own write by that batch, and every tool now says whether it only reads. Not released yet.',
+    commits: ['54eadd45', 'f493a133'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Handled today: what BrainDog settled by itself, with an Undo',
+    body:
+      'BrainDog files a sure bill or card text by itself when the move is reversible, and marks it. Today lists each one with its reason and an Undo. Not released yet.',
+    commits: ['37a3f50d', 'c5cbab74', '0c921914', 'e8a6c281'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'To review: doubtful arrivals wait with a suggested filing',
+    body:
+      'An arrival BrainDog is not sure of waits under To review with the list it would use. Nothing is written until you file it, pick another list or ignore it. Not released yet.',
+    commits: ['de9a71a2'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Write an automation as a sentence and press parts of it to change them',
+    body:
+      'Describe an automation in one line and BrainDog reads it back in your words, with what it would have done over the last 30 days. Steps can be reordered, and a reminder puts its line on Today. Not released yet.',
+    commits: ['deb7b270', 'e6fb5156'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Change this on a block, Make a component, and a shelf',
+    body:
+      "Type one line about a block to change how it is drawn, written into the page's own source. Make a component draws a new block from a line, and the shelf keeps components to place on any page. Not released yet.",
+    commits: ['11263e6c', 'c5f40a0e', '6c22a67f'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'The design book, in Settings and for agents',
+    body:
+      'The design book shows every kind of block, the colours, type and spacing in Settings, beside the look. Agents read the same book at braindog:design before they design anything. Not released yet.',
+    commits: ['ce979a1e', '83ee2338'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Teams: an Admin role and rows kept private to their maker',
+    body:
+      'A record can hold a team with four roles: Viewer, Member, Admin and Owner. A row can be kept private to its maker, and private rows stay out of lists, figures, exports and search. The team gate waits for billing, so it is not switched on yet.',
+    commits: ['85894f66', '7d5a163e', 'c7005455', '3c33b88d'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Cards for agents, and a five line brief',
+    body:
+      "Project, decision and rule cards draw inside an agent's app that supports them, and the tool's text lines carry the same facts elsewhere. The agent brief is now five short lines in names, never ids. Not released yet.",
+    commits: ['226e4939', 'ccdd511f', '25d7ba26', 'c124f075'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'A better first run: connect an agent, and a first project formed for you',
+    body:
+      "After sign-up BrainDog offers Connect your agent, and an agent's first session forms a draft first project on Today, kept with one press. The first brief is drawn from that session. Not released yet.",
+    commits: ['504df523', '447eb0c9', 'ad9cbec4', '5892b065'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Read forwarded mail for who and what it is about',
+    body:
+      'Forwarded mail is read for the people and things in it, and sure bills and renewals are filed by themselves with a mark and an Undo. Not released yet.',
+    commits: ['f828b612'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Publish your own add-on to the store',
+    body:
+      'You can publish an add-on of your own to the store, where it is reviewed on admin and can be unpublished later. Publishers see their submissions and are offered updates and skills. Not released yet.',
+    commits: ['cd045eb3', '4b8db9bf'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'A stranger can start a self-host, back it up and restore it',
+    body:
+      'A first self-host start now goes from clone to a working record with a one-time passkey link. Backup and restore are written out in the self-host guide. Not released yet.',
+    commits: ['c0e280c8'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'The Mac app: dock badge, notifications, Google sign-in and updates',
+    body:
+      'BrainDog has a Mac window with a Dock badge, notifications, open at login, Option+Space for Slash and Google sign-in. Its download page is held until launch. Not released yet.',
+    commits: ['26daa94c', 'e74105de', 'f0a5aac2'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'shipped',
+    title: 'Offline reading catches up from a local copy',
+    body:
+      'The app keeps a local copy of read lists, caught up from the change log, and draws more screens from it with no signal. Not released yet.',
+    commits: ['c5b6099c', '0f745994', '69ef27e7'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'changed',
+    title: 'Decide is now called Needs you',
+    body:
+      'Everything a person reads now says Needs you where it said Decide, and its empty states say what will land there. Not released yet.',
+    commits: ['28fe85c7', 'e13fd0e1'],
+  },
+  {
+    date: '2026-10-20',
+    kind: 'changed',
+    title: 'Plain limits and plain errors',
+    body:
+      'Every door has one table of limits and answers a limit in one plain line saying when to try again. Failed writes and expired links now say what to do next. Not released yet.',
+    commits: ['16fcac95', '9fd1f6be', '3b648b0e'],
+  },
   /* FREE LEADS (DIRECTION §35), WRITTEN BEFORE ITS COMMIT: the work was not committed when this was written, and an
      anchor is never guessed. The commit that lands sign-up's free path goes first in `commits`, and the checker
      reports this entry as unanchored until it does. */

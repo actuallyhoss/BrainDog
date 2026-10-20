@@ -35,6 +35,10 @@ The editor also sets the corners: Square, Soft or Round. **Use the house look** 
 
 Nothing that fails can be saved: the look waits until every pair marked Fails is fixed. An add-on that brings a look with colours that cannot be read offers **Fix and install**, with a fix ready for each colour, for you to check before it goes in.
 
+## The design book
+
+**Design book**, beside the look in Settings, shows the language BrainDog's own pages are written in: every kind of block with an example, the colours, type and spacing. It is read only and drawn from the same source the look uses. An agent reads the same book at `braindog:design` before it designs a page.
+
 ## Navigation shapes
 
 Choose where your navigation lives, in Settings under Navigation:

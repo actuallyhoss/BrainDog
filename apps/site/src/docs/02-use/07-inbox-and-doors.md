@@ -50,6 +50,10 @@ Select several with x to file or archive them at once. What left the Inbox is st
 
 The top of the Inbox counts what the rules filed this week and what still waits.
 
+## To review
+
+When BrainDog read an arrival and was not sure enough to file it, the arrival waits under **To review** with the filing it would suggest. Nothing is written until you say. Press **File in** the suggested list, pick **Something else** to choose where it goes, or **Ignore** it. A message that looks like one already filed is held as a repeat instead, and **It is a second one** files it anyway.
+
 ## Teach it a rule
 
 Arrivals that are alike are drawn together. Once three or more alike are waiting, the group offers two ways to make a rule:

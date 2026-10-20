@@ -23,6 +23,7 @@ braindog:inbox/patterns | What each pattern did with the last 14 days of message
 braindog:actions | Every scheduled action: what it calls, how often, whether it is paused and why, and this month so far | A minute
 braindog:automations | Every automation: what starts it, when it runs next, and how its runs went this month | A minute
 braindog:arrangement | How the record is arranged: its packs, what else is on offer, its voice and settings, its pages, and what waits | A minute
+braindog:design | The design book: every kind of block with an example, the colours, type and spacing, and the layout rules. Read it before designing a page, a card or a visual | An hour
 ```
 
 `braindog:sessions/live` matters more than it looks. Two sessions working in one folder overwrite each other, so an agent that finds another session in its repository should coordinate or stop.

@@ -27,6 +27,10 @@ Add steps | Pick each from the step menu, in the order they should happen | Unde
 Send to Needs you | It runs once it is accepted there | At the foot of the canvas
 ```
 
+## Say it as a sentence
+
+On the Automations tab, **Say it as a sentence** takes one line, such as "When a bill is due in 3 days, tell me". Press **Read it** and BrainDog shows what it understood, in parts you can press to change, with the steps in order. Drag a step, or press Alt with the up and down arrows, to move it. It also shows what the automation would have done over the last 30 days of your rows. Nothing runs from a sentence alone: **Keep it** files the same change the canvas does, and it runs once accepted. A reminder step puts its line on Today.
+
 ## What starts it
 
 ```comparison | Triggers

@@ -14,6 +14,10 @@ Home keeps itself up to date. When an agent, a rule or another tab changes somet
 
 A colleague who holds some of your lists and not the whole record sees a Home that names their lists and opens them in one press.
 
+## Handled today
+
+When BrainDog settles something reversible by itself, such as filing a bill it was sure about, it says so on Home under **Handled today**. Each line says what was done and why, and has an **Undo** that puts it back. The newest five show, with a count of the rest. Nothing irreversible is ever settled this way.
+
 ## Pages
 
 A page gathers what you keep an eye on: figures, charts, tables of rows, boards, calendars, notes. Each block reads from your lists, so a page is never out of date and never holds rows of its own. Removing a page removes nothing from your lists.
@@ -52,6 +56,14 @@ A page drawn once for each row cannot be rearranged from one of those rows, beca
 ## Put a list on a page
 
 On any list, filter it down to what you want to watch, then choose **Put this on a page** (Alt+B). It becomes a block on a page, reading the same filter, so the page shows those rows as they change.
+
+## Change this
+
+Open a block's menu and choose **Change this**, then type one line about that block: "show it as a calendar", "sort by due", "newest first", "only this month", "hide paid ones", "top 5". The change is written into the page's own source, the same way the block editor writes it, so Undo puts the block back. A line it cannot read is handed to Slash.
+
+## Make a component and the shelf
+
+**Make a component** in the add menu draws something from a line: a list, a shape such as a calendar, board, table, timeline or bars, a time window and a filter, as in "invoices not paid, next 90 days as a calendar". It becomes an ordinary block you can change. **Save to shelf** keeps a component by name, up to 50, and **Your shelf** in the add menu places it on any page. A shelf item holds how to draw, never the rows, so it always shows today's.
 
 ## Ask Slash for a page
 

@@ -51,6 +51,8 @@ log {"spoken": "tasks#41", "note": "Waiting on the client's reply."}
 propose {"question": "Which client should we chase first?", "body_kind": "options", "body": {"options": [{"id": "a", "label": "Northwind", "because": "Two invoices are overdue."}, {"id": "b", "label": "Contoso", "because": "The larger balance."}]}}
 ```
 
+`undo` takes back one of the agent's own writes. Every write ends in a receipt line that names what was done and the batch to undo it with, and `undo {"batch": "..."}` puts that write back. It will not touch anybody else's writes, and `dry` shows what would go back without doing it.
+
 ## Keeping the session
 
 `handoff` keeps the session's handoff true: what it is doing, the one next step, a dead end it tried, a line of reasoning, and its state (`idle`, `handoff` to ask another session to take it on, or `done`). `tried` and `note` add to what is there. `meet` records someone the agent came across in the work, matched by email or handle and added if new, and links them to the project with where they were met.
