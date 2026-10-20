@@ -258,29 +258,29 @@
   .once {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
   .share-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   /* The link wraps anywhere: a token has no spaces to break at, and a sideways scroll inside a sheet on a phone hides
      the half that matters. */
-  /* A FIELD: the `--s1` fill with no border, radius `--r-md`, as `controls.css` draws `.field`. */
+  /* A FIELD: the `--tile-2` fill with no border, radius 8, as `controls.css` draws `.field`. */
   .share-link {
     inline-size: 100%;
     min-block-size: 40px;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2, var(--s1));
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono, var(--font-id));
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
     word-break: break-all;
     resize: none;
@@ -300,21 +300,21 @@
 
   .share-hint {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-meta);
   }
 
   .refused {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red, var(--danger-text));
+    font-size: var(--fs-meta);
   }
 
   /* THE TEMPLATE'S FACTS: a small heading over each, and the lines under it in the sheet's one column. */
   .share-h {
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -323,14 +323,14 @@
     gap: var(--sp-1);
     margin: 0;
     padding-inline-start: var(--sp-5);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-meta);
   }
 
   .share-line {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -338,7 +338,7 @@
   .share-sent {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .share-sent a {
