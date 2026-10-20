@@ -308,7 +308,9 @@ const ASKED_BY_A_RUN = {
 const ENDED_COLUMNS = [
   { field: 'agent', as: 'who' },
   { field: 'doing_said', as: 'reply' },
-  { field: 'project', label: 'on', as: 'scope' },
+  /* NO LABEL SINCE THE UI PASS OF 20 OCTOBER (agents F7, S8): a scope is said in the card's meta line as "on ● Kiln",
+     and "on" in a 96px label column read "on        Kiln". */
+  { field: 'project', as: 'scope' },
   { field: 'last_seen', as: 'when' },
 ];
 
@@ -514,7 +516,7 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
         columns: [
           { field: 'agent', as: 'who' },
           { field: 'doing_said', as: 'reply' },
-          { field: 'project', label: 'on', as: 'scope' },
+          { field: 'project', as: 'scope' },
           { field: 'last_seen', as: 'when' },
         ],
         limit: 12,
@@ -561,27 +563,19 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
          run that finished this morning keeps its lane. No `limit:`, which lanes refuse: they draw every run in their
          hours, and on a busy day the newest of them and how many more. Only while a run was heard from today (`runs-heard-today`), so a quiet day draws no empty track.
          It shares its heading with the group of runs that stopped today further down: both are today. */
+      /* TODAY'S RUNS ONLY, SINCE THE UI PASS OF 20 OCTOBER (agents F7): the runs heard from today, the window from
+         midnight to now, and each lane the run's own row, its agent and what it was doing, its bar in the agent's hue.
+         The cards of the runs that stopped today went: they were the same runs drawn twice, and said 1 where the lanes
+         drew 3. `runs-today` stays declared for an agent that reads it. */
       {
         kind: 'lanes',
         span: 12,
         source: 'register.session',
+        where: 'last_seen is today',
         columns: [{ field: 'doing' }, { field: 'started' }, { field: 'last_seen' }, { field: 'state' }],
         tones: { active: 'info' },
         hours: 24,
         when: { metric: 'runs-heard-today', gt: 0 },
-      },
-      /* THE RUNS THAT ENDED OR STOPPED TODAY, SINCE 1.6.0. OVER THE LIST OF RUNS SINCE 1.12.0 (`RUNS_TODAY`), so a run
-         that finished today is here, and a helper or a run that wrote nothing is not; the latest first. Where each
-         left off is Left for the next run's to say, above. UNDER THE DAY'S PICTURE IN ONE TILE SINCE 1.14.0. */
-      {
-        kind: 'cards',
-        span: 12,
-        source: 'register.session',
-        where: RUNS_TODAY,
-        columns: ENDED_COLUMNS,
-        order: LATEST_FIRST,
-        limit: 8,
-        when: { metric: 'runs-today', gt: 0 },
       },
       /* WHAT TO PUT RIGHT IN THE KEYS AND TOOLS, SINCE 1.10.0 (AGT-D01), as one tile of up to four lines, as Money's Heads
          up is: a boxed section draws the blocks after it, up to the next section, on one surface, and each line is drawn
@@ -601,12 +595,15 @@ export const AGENTS_PAGES: Record<string, Record<string, unknown> & { page: stri
       },
       /* EACH LINE IS ITS FIGURE'S NAME, THEN THE NUMBER, THEN WHAT TO DO (agents-pack-49): "1 key(s) are past their day"
          read wrong for one, so no verb follows a number and each line reads right for one and for many. */
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 0 }, body: '{{keys-nowhere}} key(s) with no value. Add the value in the vault.' },
+      /* ONE NOTE FOR ONE AND ONE FOR MANY (SF12), so no line says "key(s)", and the way to the vault is a link. */
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', is: 1 }, body: '1 key has no value. [Add it in the vault](/vault)' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-nowhere', gt: 1 }, body: '{{keys-nowhere}} keys have no value. [Add them in the vault](/vault)' },
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-expired', gt: 0 }, body: 'Keys past their day: {{keys-expired}}. Renew or retire each.' },
       { kind: 'note', tone: 'warn', span: 12, when: { metric: 'tools-unseen', gt: 0 }, body: 'Tools not seen in a month: {{tools-unseen}}. Retire any you no longer use.' },
       /* KEYS WRITTEN WHERE A KEY SHOULD NOT BE (the kernel's built-in `keys-in-text`, read a slice a night by its key
          scan): a count of places, and the first one's list and number in the reading's why, never the key. */
-      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', gt: 0 }, body: 'Keys written in plain text: {{keys-in-text}} place(s). Move each to the vault.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', is: 1 }, body: 'A key is written in plain text in 1 place. Move it to the vault.' },
+      { kind: 'note', tone: 'warn', span: 12, when: { metric: 'keys-in-text', gt: 1 }, body: 'Keys are written in plain text in {{keys-in-text}} places. Move each to the vault.' },
       /* WHAT HAS GONE STALE, SINCE 1.11.0 (AGT-C18): the record's own `gone-stale`, every finder's count added up (steps
          nobody took in a month, questions left open, runs that did nothing), and beside it what the record cleared in
          seven days (`tidied-week`), so the line says both what waits and that something is clearing it. Drawn only

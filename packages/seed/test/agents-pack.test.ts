@@ -302,10 +302,13 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
   assert.deepEqual(headed(blocks, 'Working').rows.map((r) => r.fields.doing), working.map((r) => r.doing), 'a stopped run is listed as working, or the order is not by last seen');
   const stopped = RUNS.filter((r) => r.state !== 'active' && today(r)).sort(seen);
   assert.ok(stopped.length > 0, 'the seed has no run that stopped today');
-  /* THE RUNS THAT STOPPED TODAY ARE THE CARDS UNDER THE DAY'S TILE, which has the one heading and the lanes over them. */
-  const todays = blocks[blocks.indexOf(headed(blocks, 'Today’s runs')) + 1]!;
-  assert.equal(todays.heading, undefined, 'the runs that stopped today carry a second Today');
-  assert.deepEqual(todays.rows.map((r) => r.fields.doing), stopped.map((r) => r.doing), 'a run that stopped today is missing, or a working one is listed');
+  /* THE RUNS THAT STOPPED TODAY ARE LANES, SINCE THE UI PASS OF 20 OCTOBER (agents F7): the day's tile holds the lanes
+     alone, so no cards stand under them to say 1 where the lanes draw 3. */
+  const under = all[all.indexOf(headed(all, 'Today’s runs')) + 1]!;
+  assert.equal(under.kind, 'lanes', 'the lanes are not right under Today’s runs');
+  assert.notEqual(all[all.indexOf(under) + 1]!.kind, 'cards', 'cards still stand under the day’s lanes');
+  const laned = ((under as Drawn & { lanes?: { title: string }[] }).lanes ?? []).map((l) => l.title);
+  for (const r of stopped) assert.ok(laned.some((t) => t.includes(String(r.doing).slice(0, 12))), `${r.doing} stopped today and has no lane`);
   /* EARLIER IS A FOLD SINCE 1.11.0: its heading counts the runs and the cards right under it are the runs. */
   const fold = headed(blocks, 'Earlier');
   const earlier = blocks[blocks.indexOf(fold) + 1]!;
@@ -314,7 +317,7 @@ test('/p/agents: the runs grouped, what a run asked first, then working, today a
   assert.deepEqual([fold.kind, fold.matched, earlier.kind, earlier.heading], ['section', 2 + before.length, 'cards', undefined], 'Earlier is not a counted heading over its cards');
   assert.deepEqual([...earlier.rows.map((r) => String(r.fields.doing))].sort(), ['Left open since yesterday', 'Stopped yesterday', ...before].sort(), 'a run last heard from yesterday is not under Earlier');
   /* EVERY RUN UNDER EXACTLY ONE HEADING, the finished ones too. */
-  const drawn = [headed(blocks, 'Working'), todays, earlier].flatMap((b) => b.rows.map((r) => String(r.fields.doing)));
+  const drawn = [headed(blocks, 'Working'), earlier].flatMap((b) => b.rows.map((r) => String(r.fields.doing)));
   assert.equal(new Set(drawn).size, drawn.length, `a run is under two headings: ${drawn.join(', ')}`);
   /* THE NEXT STEP A RUN LEFT IS SAID ONCE, under Left for the next run, and on no run's card since 1.12.0. */
   const declared = AGENTS_PAGES.agents!.blocks as { kind: string; source?: string; columns?: { field: string }[] }[];
@@ -568,8 +571,6 @@ test('A CARD IS THE AGENT AND WHAT IT SAID: a finished run is under Today or Ear
   for (const b of page) assert.deepEqual(b.refusals, [], `${String(b.heading)}: ${JSON.stringify(b.refusals)}`);
   const cards = page.filter((b) => b.kind === 'cards');
   const group = (heading: string) => cards.find((b) => b.heading === heading)!;
-  /* THE RUNS THAT STOPPED TODAY ARE THE CARDS UNDER THE DAY'S TILE (batch 6): after Today’s runs and its lanes, with no heading. */
-  const stoppedToday = (): Card => page[page.findIndex((b) => b.kind === 'section' && b.heading === 'Today’s runs') + 2]!;
   const role = (b: Card, as: string) => (b.columns ?? []).filter((c) => c.as === as).map((c) => c.field);
   const said = (b: Card) => b.rows.map((r) => [r.fields.agent, r.fields.doing_said]);
 
@@ -581,16 +582,10 @@ test('A CARD IS THE AGENT AND WHAT IT SAID: a finished run is under Today or Ear
   assert.deepEqual(said(working), [['claude', ''], ['codex', 'Fixing the invoice totals'], ['claude', '']]);
   assert.ok(!(working.columns ?? []).some((c) => c.field === 'next' || c.field === 'doing'), 'a Working card carries a next step, or the name the record gave');
 
-  /* TODAY: the run that ended today and wrote. Not the one that wrote nothing, not the helper, and no working run. */
-  const today = stoppedToday();
-  assert.equal(today.kind, 'cards');
-  assert.deepEqual(role(today, 'who'), ['agent']);
-  /* THE SAME CARD AS A WORKING ONE: the sentence under the agent, and the project by its name where it was placed. */
-  assert.deepEqual([role(today, 'reply'), role(today, 'scope'), role(today, 'when')], [['doing_said'], ['project'], ['last_seen']]);
-  assert.deepEqual(said(today), [['claude', 'Closing the books']]);
-  assert.deepEqual(today.rows.map((r) => r.fields.doing), ['Closing the books']);
-  assert.equal(today.matched, 1);
-  assert.equal(reading(k, 'runs-today'), 1, 'the figure Today is drawn on counts other runs than its cards');
+  /* TODAY IS THE LANES SINCE THE UI PASS OF 20 OCTOBER: no card of a run that stopped today, and the figure still
+     counts the run that ended today and wrote, not the one that wrote nothing, nor the helper, nor a working run. */
+  assert.ok(!cards.some((b) => b.where === AGENTS_MODULE.RUNS_TODAY), 'a card of the runs that stopped today is still drawn');
+  assert.equal(reading(k, 'runs-today'), 1, 'the figure of the runs that stopped today counts other runs');
 
   /* EARLIER: the eight that ended last week, six drawn, the latest first, and all eight counted on the fold. */
   const fold = page.findIndex((b) => b.kind === 'section' && b.heading === 'Earlier');
@@ -682,6 +677,38 @@ const staleBefore13 = (blocks: { key?: string; when?: { metric?: string } }[]): 
  * the versions under it is still read off what the add-on declares today.
  */
 type Loose = Record<string, unknown>;
+
+/**
+ * AND THE PAGE AS IT STOOD BEFORE THE UI PASS OF 20 OCTOBER (agents F7, SF12): the lanes over the last 24 hours with no
+ * `where`, the cards of the runs that stopped today under them, "on" as the scope's label, and the key lines as one
+ * note each with "(s)". Put back first, so `batch6Back` reads the page batch 6 left.
+ */
+const ON = (columns: Loose[]): Loose[] => columns.map((c) => (c.field === 'project' && c.as === 'scope' && c.label === undefined ? { field: 'project', label: 'on', as: 'scope' } : c));
+const uiPassBack = (blocks: Loose[]): Loose[] => {
+  const out: Loose[] = [];
+  for (const b of blocks) {
+    const metric = (b.when as { metric?: string; is?: number } | undefined)?.metric;
+    const one = (b.when as { is?: number } | undefined)?.is === 1;
+    if ((metric === 'keys-nowhere' || metric === 'keys-in-text') && one) continue;
+    if (metric === 'keys-nowhere') out.push({ ...b, when: { metric, gt: 0 }, body: '{{keys-nowhere}} key(s) with no value. Add the value in the vault.' });
+    else if (metric === 'keys-in-text') out.push({ ...b, when: { metric, gt: 0 }, body: 'Keys written in plain text: {{keys-in-text}} place(s). Move each to the vault.' });
+    else if (b.kind === 'lanes') {
+      const { where: _w, ...rest } = b;
+      out.push(rest);
+      out.push({
+        kind: 'cards',
+        span: 12,
+        source: 'register.session',
+        where: AGENTS_MODULE.RUNS_TODAY,
+        columns: [{ field: 'agent', as: 'who' }, { field: 'doing_said', as: 'reply' }, { field: 'project', label: 'on', as: 'scope' }, { field: 'last_seen', as: 'when' }],
+        order: [{ field: 'last_seen', dir: 'desc' }],
+        limit: 8,
+        when: { metric: 'runs-today', gt: 0 },
+      });
+    } else out.push(Array.isArray(b.columns) && b.kind === 'cards' ? { ...b, columns: ON(b.columns as Loose[]) } : b);
+  }
+  return out;
+};
 const columnsBefore6 = (columns: Loose[]): Loose[] =>
   columns.map((c) => (c.field === 'agent' && c.as === 'who' && c.label === undefined ? { ...c, as: 'title' } : c.field === 'project' && c.label === 'on' ? { ...c, label: 'Project' } : c));
 const batch6Back = (blocks: Loose[]): Loose[] => {
@@ -713,7 +740,7 @@ const before13 = (declarations: Record<string, unknown>[]): Record<string, unkno
     .filter((d) => d.page !== 'brain' && !FIGURES_13.includes(String(d.metric)))
     .map((d) =>
       d.page === 'agents'
-        ? { ...d, nav: (({ place: _place, ...rest }) => rest)(d.nav as Record<string, unknown>), blocks: staleBefore13((batch6Back(d.blocks as Loose[]) as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
+        ? { ...d, nav: (({ place: _place, ...rest }) => rest)(d.nav as Record<string, unknown>), blocks: staleBefore13((batch6Back(uiPassBack(d.blocks as Loose[])) as { key?: string; when?: { metric?: string } }[]).filter((b) => b.key !== 'brain-link' && b.when?.metric !== 'stale-rows-same')) }
         : listBefore13(d),
     );
 
@@ -815,11 +842,13 @@ test('EARLIER IS FOLDED UNDER ITS OWN HEADING, which counts the runs, and Left f
    (places-and-computed-101; it was a9f073bfd65c161a), which `before13` takes off as it does the rest, and again for the
    look of Agents (batch 6; it was c8e4bf508d3d4bfa): Today’s runs as one tile over the day's lanes and the runs that
    stopped today, the agent as the card's mark and the project said "on", and keys with no value said plainly, which
-   `batch6Back` puts back. */
+   `batch6Back` puts back, and again for the UI pass of 20 October (agents F7, SF12; it was 37af65a2925448e1): the lanes
+   today's alone with no cards under them, the scope with no label, and the key lines one for one and one for many,
+   which `uiPassBack` puts back. */
 test('AGENTS 1.13.0 DECLARES WHAT IT DID WHEN IT WAS CUT, and 1.12.0 under it is as it was', () => {
   const doc = agentsPackDocument() as { version: string; declarations: Record<string, unknown>[] };
   assert.equal(doc.version, '1.13.0', 'a new version takes a mark of its own beside this one');
-  assert.equal(mark(doc.declarations), '37af65a2925448e1', 'the Agents add-on changed what it declares with no new version');
+  assert.equal(mark(doc.declarations), 'e346e74a0007c783', 'the Agents add-on changed what it declares with no new version');
   assert.equal(mark(before13(doc.declarations)), '42ceb4a21591e2e8', 'something 1.12.0 declared is changed beside what 1.13.0 put in');
   assert.equal(doc.declarations.length - before13(doc.declarations).length, 5, '1.13.0 put in a page and four figures');
 });
@@ -1027,7 +1056,11 @@ test('THE KEYS, TOOLS AND RUNS FIGURES COUNT WHAT EACH CLAUSE SAYS, over the see
 const NOTES = ['keys-nowhere', 'keys-expired', 'tools-unseen', 'keys-in-text'] as const;
 
 type Note = Drawn & { drawn?: boolean; when?: { metric?: string }; values?: Record<string, unknown> };
-const noteOn = (blocks: Drawn[], metric: string): Note | undefined => (blocks as Note[]).find((b) => b.kind === 'note' && b.when?.metric === metric);
+const noteOn = (blocks: Drawn[], metric: string): Note | undefined => {
+  const all = (blocks as Note[]).filter((b) => b.kind === 'note' && b.when?.metric === metric);
+  /* A PAIR (one for one, one for many) is read by the one drawn, or the first where neither is. */
+  return all.find((b) => b.drawn !== false) ?? all[0];
+};
 
 /**
  * NEEDS A LOOK, SINCE 1.10.0: one boxed tile under the runs, its four lines each drawn only while its figure is above
@@ -1046,31 +1079,39 @@ test('NEEDS A LOOK HOLDS THE KEYS AND TOOLS TO PUT RIGHT, each line drawn only w
     [...String(noteOn(declared as Drawn[], 'stale-rows-same')?.body).matchAll(/\]\(([^)]+)\)/gu)].map((m) => m[1]),
     ['/r/skills?twice=1', '/r/tools?twice=1', '/r/credentials?twice=1', '/r/learnings?twice=1'],
   );
-  assert.deepEqual(declared.slice(box + 1, box + 1 + BOX.length).map((b) => b.when?.metric), BOX, 'the lines are not in the box, or not in order');
-  const closer = declared[box + 1 + BOX.length]!;
+  /* THE KEY LINES ARE A PAIR EACH SINCE THE UI PASS OF 20 OCTOBER (SF12): one for one and one for many. */
+  const LINES = BOX.flatMap((m) => (m === 'keys-nowhere' || m === 'keys-in-text' ? [m, m] : [m]));
+  assert.deepEqual(declared.slice(box + 1, box + 1 + LINES.length).map((b) => b.when?.metric), LINES, 'the lines are not in the box, or not in order');
+  const closer = declared[box + 1 + LINES.length]!;
   assert.deepEqual([closer.kind, closer.heading, closer.fold], ['section', 'Earlier', true], 'nothing closes the box, so it swallows what follows');
   for (const metric of NOTES) {
-    const note = declared.find((b) => b.kind === 'note' && b.when?.metric === metric)!;
-    assert.deepEqual(note.when, { metric, gt: 0 });
+    const pair = metric === 'keys-nowhere' || metric === 'keys-in-text';
+    const note = declared.find((b) => b.kind === 'note' && b.when?.metric === metric && !(b.when as { is?: number }).is)!;
+    assert.deepEqual(note.when, { metric, gt: pair ? 1 : 0 });
     assert.equal(note.tone, 'warn', `${metric}'s line is not toned`);
     assert.ok(note.body?.includes(`{{${metric}}}`), `${metric}'s line does not say its number`);
     assert.doesNotMatch(String(note.body), /—|credential|session|\brow\b/iu, `${metric}'s line reads as the machine`);
     /* RIGHT FOR ONE (agents-pack-49): its figure's name, the number, then what to do, so "1 key(s) are past their day"
        is never said. Filled as the host fills it, with one and with many. */
     const name = metric === 'keys-in-text' ? KEYS_IN_TEXT.name : String(AGENTS_MODULE.AGENTS_METRICS[metric]?.name);
-    /* KEYS WITH NO VALUE SAYS IT PLAINLY SINCE BATCH 6: "2 keys with no value. Add the value in the vault." */
-    if (metric === 'keys-nowhere') assert.equal(note.body, '{{keys-nowhere}} key(s) with no value. Add the value in the vault.');
+    /* THE KEY LINES SAY IT PLAINLY SINCE THE UI PASS: "2 keys have no value. Add them in the vault", the way a link. */
+    if (pair) assert.ok(!note.body?.includes('(s)'), `${metric}'s line says (s)`);
     else assert.ok(note.body?.startsWith(`${name}: `), `${metric}'s line does not lead with its figure's name`);
     for (const n of [1, 3]) {
       const said = String(note.body).replaceAll(`{{${metric}}}`, String(n));
       assert.doesNotMatch(said, /\d+ \w+\(s\) (?:are|is|were|was|hold|holds|have|has)\b/u, `${metric}'s line reads wrong for ${n}: ${said}`);
-      assert.match(said, /\.$/u, `${metric}'s line is not a sentence`);
+      assert.match(said, /(?:\.|\]\(\/vault\))$/u, `${metric}'s line is not a sentence`);
     }
   }
-  assert.equal(
-    declared.find((b) => b.kind === 'note' && b.when?.metric === 'keys-in-text')?.body,
-    'Keys written in plain text: {{keys-in-text}} place(s). Move each to the vault.',
-  );
+  const bodies = (metric: string) => declared.filter((b) => b.kind === 'note' && b.when?.metric === metric).map((b) => [b.when, b.body]);
+  assert.deepEqual(bodies('keys-nowhere'), [
+    [{ metric: 'keys-nowhere', is: 1 }, '1 key has no value. [Add it in the vault](/vault)'],
+    [{ metric: 'keys-nowhere', gt: 1 }, '{{keys-nowhere}} keys have no value. [Add them in the vault](/vault)'],
+  ]);
+  assert.deepEqual(bodies('keys-in-text'), [
+    [{ metric: 'keys-in-text', is: 1 }, 'A key is written in plain text in 1 place. Move it to the vault.'],
+    [{ metric: 'keys-in-text', gt: 1 }, 'Keys are written in plain text in {{keys-in-text}} places. Move each to the vault.'],
+  ]);
 
   /* THE SEED HOLDS LIVE KEYS KEPT NOWHERE, so that line is drawn with its count, and the two quiet ones are not. */
   const { k, sql } = await seeded();
