@@ -120,7 +120,11 @@ const lesson = (n: number, kind: string, day: string, scope: Brief['scope'] = 'g
 
 test('A RULE OLDER THAN TEN NEWER LEARNINGS STILL REACHES THE CARD, read from every learning before the five are cut', () => {
   const rule = row('learnings#1', { lesson: 'Divide every estimate by four.', kind: 'rule', created_at: '2026-01-01' }, 'global');
-  const newer = Array.from({ length: 10 }, (_, i) => lesson(i + 2, 'fact', `2026-10-${String(i + 10).padStart(2, '0')}`)).reverse();
+  /* LONGER THAN THE RULE, since Learned says the shortest learning that applies: the rule reaches the card as a candidate
+     and wins by being the shortest, where a shorter lesson would rightly have been said in its place. */
+  const newer = Array.from({ length: 10 }, (_, i) =>
+    row(`learnings#${String(i + 2)}`, { lesson: `Lesson ${String(i + 2)} holds, and it runs longer than the rule does.`, kind: 'fact', created_at: `2026-10-${String(i + 10).padStart(2, '0')}` }, 'global'),
+  ).reverse();
   const all = [...newer, rule];
   const capped = capRegister([], all, { register: 'learnings', used: (r) => [typeof r.created_at === 'string' ? r.created_at : null] });
   assert.ok(!capped.inherited.includes(rule), 'the five shown are the newest, the rule among none of them');
@@ -130,7 +134,8 @@ test('A RULE OLDER THAN TEN NEWER LEARNINGS STILL REACHES THE CARD, read from ev
   const drawn = card({ ...ctx({ registers }), ...{ rules } }, {}, NOW).card;
   const learned = drawn.split('\n').find((l) => l.startsWith('Learned '));
   assert.ok(learned?.slice(9).startsWith('Divide every estimate by four.'), drawn);
-  assert.match(drawn, /11 learnings/u, 'More counts every learning, not the five sent');
+  /* THE CARD IS FIVE SHORT LINES, so More no longer counts what is behind it: it points at the whole picture. */
+  assert.match(drawn, /\nMore {5}call context for the full picture$/u);
 });
 
 test('RULES: up to three of kind rule, this project\'s first, the newest next, and how many more', () => {

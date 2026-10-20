@@ -130,7 +130,10 @@ test('WITH ALL OF IT ON A FULL RECORD the card stays at 130 words, and line one 
   assert.equal(drawn.words, wordCount(drawn.card));
   assert.equal(drawn.card.split('\n')[0], 'Claude Code on MacBook Pro, working on Kiln');
   assert.ok((slot(drawn.card, 'Also') ?? '').startsWith(`${TWO_SESSIONS} Also here: Claude (S4)`), drawn.card);
-  assert.match(slot(drawn.card, 'Next') ?? '', /^Fire the test tiles .* Left by Claude 1h ago\. Check before acting\.$/u);
+  /* A TASK HANDED TO THE AGENT LEADS THE NEXT LINE, before the step, so the slot on the card is the first of them and the
+     step follows it whole in the line the card is made from. */
+  assert.match(slot(drawn.card, 'Next') ?? '', /^Read the whole firing log .* \(handed to you\)$/u);
+  assert.match(drawn.next ?? '', /\(tasks#1, handed to you\) · .*\(tasks#2, handed to you\) · Fire the test tiles .* Left by Claude \(S5\) 1h ago\. Check before acting\. · Tried:/u);
   assert.ok((drawn.next ?? '').endsWith(`${lines.join(' · ')} · 3 older steps were left here: read braindog:handoffs`), String(drawn.next));
   assert.doesNotMatch(drawn.card, /dead end/u);
 });

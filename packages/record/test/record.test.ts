@@ -1789,11 +1789,17 @@ test('AN INVITATION BY ADDRESS is an owner in a browser: never a token, never a 
 
   assert.equal(refusal(await api.invite(ask, token('write'))).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refusal(await api.invite(ask, token('read'))).code, 'NEEDS_BROWSER_SESSION');
-  assert.equal(refusal(await api.invite(ask, person('decide'))).code, 'LEVEL_REQUIRED');
+  assert.equal(refusal(await api.invite(ask, person('write'))).code, 'LEVEL_REQUIRED');
   assert.equal(refusal(await api.invite(ask, { ...owner, credentialed: false })).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refusal(await api.invitations(token('write'))).code, 'NEEDS_BROWSER_SESSION');
   assert.equal(refusal(await api.revokeInvite({ id: 'i_x' }, token('write'))).code, 'NEEDS_BROWSER_SESSION');
   assert.deepEqual(value(await api.invitations(owner)), [], 'a refused invitation was minted');
+
+  /* AN ADMIN, a person at the decide level in a browser, may invite, and never to the owner's rung. */
+  assert.equal(refusal(await api.invite({ email: 'cy@example.com', level: 'owner' }, person('decide'))).code, 'FORBIDDEN');
+  assert.deepEqual(value(await api.invitations(owner)), [], 'an Admin minted an owner');
+  value(await api.invite(ask, person('decide')));
+  assert.equal(value<unknown[]>(await api.invitations(owner)).length, 1, 'an Admin could not invite');
 });
 
 test('A HOST WITH NO SIGN-IN MINTS NO LINK, and says why in its own words', async () => {

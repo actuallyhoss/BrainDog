@@ -228,13 +228,16 @@ test('SKILLS ARE OFFERED ONLY WHEN THE RECORD KEEPS THEM, and one ticked goes ou
   value(await api.create({ register: 'skills', fields: { name: 'Weekly tidy', trigger: 'On a Friday, when the week is done.', what: 'Closes out the week.', body: '1. List what is open.\n2. Ask which to carry over.' } } as never, owner));
   value(await api.create({ register: 'skills', fields: { name: 'Mail the client', trigger: 'When a job is done.', body: 'Write to ada.client@example.org with the result.' } } as never, owner));
   const offered = value<ExportOffer>(await exportPack(undefined, owner)).skills;
-  assert.deepEqual(offered?.map((s) => [s.name, s.trigger]), [['Weekly tidy', 'On a Friday, when the week is done.'], ['Mail the client', 'When a job is done.']]);
+  /* NEWEST MADE FIRST, as every list reads in its default order. */
+  assert.deepEqual(offered?.map((s) => [s.name, s.trigger]), [['Mail the client', 'When a job is done.'], ['Weekly tidy', 'On a Friday, when the week is done.']]);
+  const tidy = offered!.find((s) => s.name === 'Weekly tidy')!;
+  const mail = offered!.find((s) => s.name === 'Mail the client')!;
 
-  const out = value<ExportedPack>(await exportPack({ declarations: ['page.jobs-board'], skills: [offered![0]!.seq] }, owner));
+  const out = value<ExportedPack>(await exportPack({ declarations: ['page.jobs-board'], skills: [tidy.seq] }, owner));
   const doc = JSON.parse(out.text) as { skills: { name: string; trigger: string; what: string; body: string }[] };
   assert.deepEqual(doc.skills, [{ name: 'weekly-tidy', trigger: 'On a Friday, when the week is done.', what: 'Closes out the week.', body: '1. List what is open.\n2. Ask which to carry over.' }]);
 
-  const withAddress = refusal(await exportPack({ declarations: ['page.jobs-board'], skills: [offered![1]!.seq] }, owner));
+  const withAddress = refusal(await exportPack({ declarations: ['page.jobs-board'], skills: [mail.seq] }, owner));
   assert.deepEqual([withAddress.code, withAddress.at], ['VALUE_MALFORMED', 'skills']);
   assert.match(withAddress.fix, /Mail the client/u);
 });

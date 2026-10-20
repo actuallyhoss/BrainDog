@@ -198,7 +198,10 @@ test('BEHIND IS THE UPDATE LINE, never words a run wrote: a step that reads like
   const current = await agent('current', { cli: '2026.10.09+1a2b3c4' } as Record<string, string>);
   await attach(current);
   const here = await context(current);
-  assert.ok(here.card?.includes(OLDER), `the step is not on the card: ${here.card}`);
+  /* THE CARD CUTS A STEP TO A LINE (five short lines), so the step is on it from its first words, and the whole of it is in the handoff. */
+  assert.match(here.card ?? '', /\nNext {5}Tell the team: Run braindog update/u, `the step is not on the card: ${here.card}`);
+  assert.doesNotMatch(here.card ?? '', /\nUpdate /u, 'words a run wrote were drawn as the update line');
+  assert.ok(JSON.stringify(here.handoff).includes(OLDER), `the whole step is not in the handoff: ${JSON.stringify(here.handoff)}`);
   assert.deepEqual(here.build, { cli: '2026.10.09+1a2b3c4', behind: false });
   /* AND THE BRIEFING NAMES THE RUN THAT LEFT IT, with its handle beside the name. */
   assert.match(here.next, new RegExp(`^Start from the step Claude \\(${left.spoken}\\) left: take it with handoff take ${left.spoken} `));

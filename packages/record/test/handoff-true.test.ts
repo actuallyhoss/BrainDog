@@ -66,8 +66,9 @@ test('A STEP SOMEBODY TOOK IS SAID AS TAKEN, by whom and when, and never offered
   const card = c.card ?? assert.fail('no card');
   assert.equal(c.handoff, null, `the taken step was handed over: ${JSON.stringify(c.handoff)}`);
   const next = nextOf(card);
-  assert.equal(next, `Next     Claude (${took.spoken}) took this 3 min ago: Kern the lowercase pairs.`, card);
-  assert.equal(c.card_next, next);
+  /* THE CARD SAYS NAMES, NEVER RUN IDS: the taker is Claude here, and the id stays in the Also line that names the run at work. */
+  assert.equal(next, 'Next     Claude took this 3 min ago: Kern the lowercase pairs.', card);
+  assert.equal(c.card_next, `Next     Claude (${took.spoken}) took this 3 min ago: Kern the lowercase pairs.`, 'the whole line keeps the run it names');
   /* NEVER OFFERED: no "Left by", no check before acting on it, no Tried line for a step that is somebody else's now. */
   assert.doesNotMatch(card, /Left by|check before acting|Tried:/iu, card);
   /* AND THE TAKER, STILL AT WORK HERE, is named after the warning. */
@@ -88,7 +89,8 @@ test('AN OPEN STEP IS THE RECORD\'S OWN LINES: who left it, how long ago, check 
   const c = await context(fresh);
   const card = c.card ?? assert.fail('no card');
   assert.deepEqual(c.next_lines, [`Kern the lowercase pairs. Left by Claude (${left.spoken}) 10 min ago. Check before acting.`, 'Tried: Auto-kerning read as uneven']);
-  assert.equal(nextOf(card), `Next     ${c.next_lines!.join(' · ')}`, card);
+  /* THE CARD'S LINE IS THE STEP IN NAMES, with no run id and not the dead end: `next_lines` keeps both for a reader who wants them. */
+  assert.equal(nextOf(card), 'Next     Kern the lowercase pairs. Left by Claude 10 min ago. Check before acting.', card);
   assert.doesNotMatch(card, /dead end/u, card);
   sql.close();
 });
@@ -105,7 +107,7 @@ test('A RECORD WITH NO STEP SAYS NOTHING WAS HANDED OVER, and where the last ses
   const card = c.card ?? assert.fail('no card');
   assert.equal(c.handoff, null);
   const next = nextOf(card) ?? assert.fail(`no Next line:\n${card}`);
-  assert.match(next, new RegExp(`^Next {5}Nothing was handed over\\. Last here: Claude \\(${ended.spoken}\\), 2h ago\\.$`, 'u'), card);
+  assert.match(next, new RegExp(`^Next {5}Nothing was handed over\\. Last here: Claude, 2h ago\\.$`, 'u'), card);
   /* A FINISHED RUN'S STEP IS ITS HISTORY, never anybody's next step. */
   assert.doesNotMatch(card, /Nothing more on the kerning/u, card);
   sql.close();

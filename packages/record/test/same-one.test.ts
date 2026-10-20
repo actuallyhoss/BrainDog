@@ -182,6 +182,8 @@ function door(verb?: (w: unknown, a: { rows: readonly string[] }) => Result<{ id
     register: (id: string) => ({ people: { name: 'People' }, things: { name: 'Projects' } })[id],
     get: (ref: string) => ROWS[ref] ?? null,
     titleOfRow: (ref: string) => ROWS[ref]?.name ?? null,
+    /* THE CALLER'S RULE ON A LIST, as the kernel's one read scope answers it: here the numbers a narrowed grant admits. */
+    scope: (ctx: CallContext, register: string) => (ctx.wheres as Record<string, number[]> | undefined)?.[register],
     /* A NARROWED GRANT, as the real kernel reads one: the rule here is the numbers it admits. */
     list: (q: { where: { is: number } }, rule: number[]) => ok({ rows: rule.includes(q.where.is) ? [{}] : [] }),
     ...(verb === undefined ? {} : { askSame: (w: unknown, a: { rows: readonly string[] }) => (handed.push([w, a]), verb(w, a)) }),
