@@ -1,6 +1,6 @@
 /**
  * What Settings says about where a choice lands, read from the areas themselves: the look is each record's, a muted rule
- * leaves Today's feed, a list's singular is asked for without "a" or "an", and the settings ground keeps Safari off glass.
+ * leaves Today's feed, a list's singular is asked for without "a" or "an", and the settings ground draws no glass.
  */
 
 import assert from 'node:assert/strict';
@@ -42,15 +42,14 @@ test('Words asks for a singular without "a" or "an", titles the lists in the voi
   const words = wordsOf(src);
   assert.doesNotMatch(words, /One is an? /u, '"One is a update" can be drawn again');
   assert.doesNotMatch(words, /'Your lists'/u);
-  assert.match(src, /<Section title=\{said\('lists'\)\}/u);
+  assert.match(src, /<Tile icon="rows" title=\{said\('lists'\)\}/u);
   /* THE PICK WAITS ON WHAT IT WOULD STRAND, and only then is it sent. */
   assert.match(src, /strandedBy\(packs, code, next\)/u);
   assert.match(src, /onchange=\{\(e\) => pickCurrency\(e\.currentTarget\.value\)\}/u);
   for (const s of [...words.matchAll(/`([^`]*)`|'([^']*)'/gu)].map((m) => m[1] ?? m[2] ?? '')) assert.doesNotMatch(s, /—/u, `an em dash in "${s}"`);
 });
 
-test("the settings ground takes Safari's own glass off the segmented track, in a block of its own", () => {
+test('the settings ground draws no glass at all: no backdrop filter, prefixed or not (UI pass 20 Oct, no glass anywhere)', () => {
   const css = readFileSync(new URL('./settings.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
-  const block = /@supports \(-webkit-backdrop-filter: none\)\s*\{\s*\.settings-place \.segmented[^{]*\{\s*-webkit-backdrop-filter: none;/u;
-  assert.match(css, block, 'Safari keeps the toolbar glass on a settings track');
+  assert.doesNotMatch(css, /backdrop-filter/u, 'a settings rule still draws glass');
 });

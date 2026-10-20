@@ -13,9 +13,12 @@
  *
  * THE CLASSES, for an area's markup:
  *
- *   `.setting-row`         a sentence and the control it governs, on one line: the sentence first, the
- *                          control (a switch, usually) right after the sentence's measure, never at the
- *                          far edge of a wide page.
+ *   `.setting-row`         a sentence and the control it governs, on one line: the sentence first, at most
+ *                          75 characters, the control (a switch, usually) at the row's end.
+ *   `.switch-row`          THE ONE SWITCH ROW (UI pass 20 Oct, agents F19 and S6): `.switch-row-words` holding a
+ *                          `.switch-row-title` (15/500) and a `.switch-row-line` (at most 75ch), then the `.switch` at
+ *                          the tile's right padding edge. Every switch in Settings ends on that one x, and so does
+ *                          `StateRow`'s, which runs the tile's full width the same way.
  *   `.field-row`           a labelled field: `.field-row-label` above, then `.field-row-controls` holding
  *                          the `.field` and its button at one height, the button on the field's baseline.
  *   `.setting-help`        the one line of help under a sentence or a field.
@@ -23,22 +26,62 @@
  *                          `StateRow` it belongs to and starting where that row's title starts.
  *   `.wide-only`           not drawn below 900px (the index's Keyboard row; a desktop-only control).
  *
- * AND WHAT SETTINGS DRAWS ON THE GROUND, WHICH IS EVERY AREA'S BODY: a segmented control there is
- * glass-free, a `--hover-wash` track with the chosen segment a `--bg` pill, because glass is for chrome and never
- * holds content; and a `.ledger-lead` list keeps its 32px well beside the title at a phone's width, where `rows.css`
- * would move the well above the title.
+ * AND A `.ledger-lead` LIST keeps its 32px well beside the title at a phone's width, where `rows.css` would move the
+ * well above the title.
  */
 
-/* THE SWITCH SITS BESIDE ITS SENTENCE. The sentence's track was `minmax(0, var(--measure))`, which is
-   always the whole measure, so a short sentence left its switch 72ch away across empty page.
-   `fit-content` makes the track as wide as the sentence and no wider than the measure. */
+/* ONE SWITCH COLUMN (agents F19): the sentence takes the row and stops at 75 characters, and the switch sits at the row's
+   end, which is the tile's right padding edge. Two columns of switches (one at the tile's edge, one after an 832px
+   measure) was the same control in two places. */
 .settings-place .setting-row {
   display: grid;
-  grid-template-columns: fit-content(var(--measure)) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   /* TOP-ALIGNED, so a sentence of three lines keeps its switch by its first line rather than its middle. */
   align-items: start;
-  justify-content: start;
   column-gap: var(--sp-5);
+}
+
+.settings-place .setting-row > p {
+  max-inline-size: 75ch;
+}
+
+.settings-place .switch-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--sp-5);
+  padding-block: var(--sp-3);
+}
+
+.settings-place .switch-row + .switch-row {
+  border-block-start: 1px solid var(--rule);
+}
+
+.settings-place .switch-row-words {
+  display: grid;
+  gap: var(--sp-1);
+  min-inline-size: 0;
+}
+
+.settings-place .switch-row-title {
+  color: var(--ink);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.settings-place .switch-row-line {
+  margin: 0;
+  max-inline-size: 75ch;
+  color: var(--ink-2);
+  font-size: var(--fs-body);
+  line-height: 22px;
+}
+
+/* THE SWITCH'S MIDDLE ON THE TITLE'S LINE, whatever height the pointer gives the switch. */
+.settings-place .switch-row > .switch {
+  margin-block: calc((20px - var(--ctl-h)) / 2);
 }
 
 /* THE SWITCH'S MIDDLE ON THE SENTENCE'S FIRST LINE, whatever height the pointer gives the switch. The
@@ -69,7 +112,6 @@
   gap: var(--sp-2);
   margin-block: calc(-1 * var(--sp-1)) var(--sp-3);
   padding-inline-start: calc(var(--well) + var(--sp-3));
-  max-inline-size: calc(var(--measure) + var(--sp-9));
 }
 
 /**
@@ -99,7 +141,7 @@
   background: none;
   border: 0;
   border-radius: var(--r-md);
-  color: var(--ink2);
+  color: var(--ink-2);
   text-align: start;
   cursor: pointer;
 }
@@ -111,7 +153,7 @@
   aspect-ratio: 16 / 10;
   overflow: hidden;
   border-radius: var(--r-md);
-  box-shadow: 0 0 0 1px var(--line);
+  box-shadow: 0 0 0 1px var(--rule);
   transition: box-shadow var(--d-state) var(--ease-out);
   /* A DRAWING, AND IT KEEPS ITS COLOURS where the system forces its own, as a picture would. */
   forced-color-adjust: none;
@@ -119,7 +161,7 @@
 
 .settings-place .picture[data-on] .picture-shot {
   box-shadow:
-    0 0 0 2px var(--sunk),
+    0 0 0 2px var(--board),
     0 0 0 4px var(--ink);
 }
 
@@ -129,7 +171,7 @@
   }
 
   .settings-place .picture:not([data-on]):hover .picture-shot {
-    box-shadow: 0 0 0 1px var(--edge);
+    box-shadow: 0 0 0 1px var(--rule-strong);
   }
 }
 
@@ -137,10 +179,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  column-gap: 6px;
+  column-gap: var(--sp-2);
   min-block-size: 20px;
-  padding-inline: 2px;
-  font-size: var(--t-base);
+  font-size: var(--fs-body);
   font-weight: 500;
   line-height: 20px;
 }
@@ -151,8 +192,8 @@
 }
 
 .settings-place .picture-meta {
-  color: var(--dim);
-  font-size: var(--t-sm);
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
   font-weight: 400;
 }
 
@@ -173,12 +214,9 @@
    well inside a tile, and on the grey ground it reads as a smudge rather than a shape. A toned well keeps its tone,
    and a well inside a tile, a sheet or the panel's body keeps `IconWell`'s own fill. */
 .settings-place .well:not([data-tone]):not(:is(.tile, .sheet, dialog, [data-surface='tile']) .well) {
-  background: var(--bg);
+  background: var(--tile);
 }
 
-/* GLASS-FREE ON THE GROUND. `controls.css` draws a segmented track as glass, which is the toolbar's; an area's body is
-   content on the ground, so the track is the ground's own wash and the chosen segment is the white pill on it. Inside a
-   tile, a sheet or the panel's body `controls.css` already draws the `--s1` track, and this leaves those alone. */
 /* A ROW AFTER A CONTROL DRAWN UNDER THE ROW BEFORE IT keeps the list's hairline, so the rows read as one group with
    their controls between them. `StateRow` draws the same line between two rows that follow each other. */
 .settings-place .setting-under + .state-row::after {
@@ -187,30 +225,15 @@
   inset-block-start: 0;
   inset-inline: calc(var(--well) + var(--sp-3)) 0;
   block-size: 1px;
-  background: var(--line);
+  background: var(--rule);
   pointer-events: none;
 }
 
 /* AND THE TRACK HUGS ITS OPTIONS: a settings choice is two to six short words, and a track run to the far edge of the
-   area reads as a field with the words bunched at one end. It still wraps inside the column on a phone. */
-.settings-place .segmented {
+   area reads as a field with the words bunched at one end. Below 640px `Segmented`'s `full` takes the row instead. */
+.settings-place .segmented:not([data-full]) {
   inline-size: fit-content;
   max-inline-size: 100%;
-}
-
-.settings-place .segmented:not(:is(.tile, .sheet, dialog, [data-surface='tile']) .segmented) {
-  background: var(--hover-wash);
-  backdrop-filter: none;
-  box-shadow: none;
-}
-
-/* AND SAFARI'S GLASS TAKEN OFF IN A BLOCK OF ITS OWN. `controls.css` gives Safari the track's blur inside
-   `@supports (-webkit-backdrop-filter: none)`, and a prefixed line beside the unprefixed one above is folded into it by
-   the build (`Panel.svelte` has why), so the only `none` Safari's own property was sure to meet is this one. */
-@supports (-webkit-backdrop-filter: none) {
-  .settings-place .segmented:not(:is(.tile, .sheet, dialog, [data-surface='tile']) .segmented) {
-    -webkit-backdrop-filter: none;
-  }
 }
 
 /* A LIST LED BY A 32px WELL KEEPS IT BESIDE THE TITLE ON A PHONE. `rows.css` turns a row into a two-line card below
@@ -270,8 +293,8 @@
 }
 
 .settings-place .field-row-label {
-  color: var(--ink2);
-  font-size: var(--t-sm);
+  color: var(--ink-2);
+  font-size: var(--fs-meta);
   font-weight: 500;
 }
 
@@ -317,8 +340,8 @@
   margin-block: var(--sp-1) 0;
   margin-inline: 0;
   max-inline-size: var(--measure);
-  color: var(--dim);
-  font-size: var(--t-sm);
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
   line-height: var(--lh-body);
 }
 
