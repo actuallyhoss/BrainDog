@@ -32,7 +32,7 @@ export const queueWords = {
   send: 'Send',
   suggested: 'Suggested',
   /** The button that answers a question of options with the one chosen (DIRECTION §39, "Decide reads like a form"). */
-  decide: 'Decide',
+  decide: 'Answer',
   /** Putting a question off, said as a person says it: the button opens the question's own page at the step. */
   notNow: 'Not now',
   /** A button whose answer is hard to take back says so in its own words, not in a chip beside it. */

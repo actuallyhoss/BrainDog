@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 
 import type { QueueQuestion } from '@braindog/kernel';
 
-import { answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, wayTail } from './card.ts';
+import { answeredLine, askerOf, byWords, cardOf, hardOf, inlineOf, movesOf, nameOrNull, pressOf, pressSaid, pressTail, primaryOf, queueOf, shiftsOf, spoken, startsOn, suggestsOf, wayTail } from './card.ts';
 
 const now = Date.parse('2026-10-06T09:00:00Z');
 
@@ -309,7 +309,7 @@ test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the s
   assert.equal(inlineOf(cardOf(named(2), { now })), true, 'Chase it and Not yet are two buttons');
   assert.equal(inlineOf(cardOf(named(3), { now })), true);
   assert.equal(inlineOf(cardOf(named(4), { now })), false, 'a fourth answer keeps the form');
-  assert.equal(inlineOf(cardOf(ask(), { now })), false, 'an answer with a line of what it does keeps the form’s rectangles');
+  assert.equal(inlineOf(cardOf(ask({ options: ask().options.map((o) => ({ ...o, recommended: false })) }), { now })), false, 'an answer with a line of what it does keeps the form’s rectangles');
   assert.equal(inlineOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), true, 'Accept and Decline were always buttons');
   /* COMPACT, OUTSIDE DECIDE, the line of what each does waits on the question's page, and only a fourth answer does not fit. */
   assert.equal(inlineOf(cardOf(ask(), { now }), true), true);
@@ -350,6 +350,7 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
   assert.equal(pressOf(cardOf(ask({ kind: 'rowset', options: [] }), { now })), false, 'the record’s own two are a row of buttons');
   /* THE ROW OF BUTTONS IS STILL ONLY FOR NAMES: an answer with a line stays a full-width rectangle that says it. */
   assert.equal(inlineOf(cardOf(described(2), { now })), false);
+  assert.equal(inlineOf(cardOf(ask(), { now })), true, 'a suggested answer is the button, not a rectangle');
 
   const card = src('./DecisionCard.svelte');
   /* NOT WHILE THE RECORD'S REASON LINE IS OPEN, NOR ON A HOST THAT ASKS FOR A REASON ITSELF, where a press only chooses. */
@@ -393,6 +394,36 @@ test('COMPACT, OUTSIDE DECIDE: the question and its buttons only, and at most th
   const host = src('../page/QueueAnswer.svelte');
   assert.match(host, /compact = false,/u, 'QueueAnswer takes no compact prop');
   assert.match(host, /\{compact\} \/>/u, 'QueueAnswer does not hand compact to the card');
+});
+
+test('THE SUGGESTED ANSWER IS THE RED PRIMARY, IN ITS OWN WORDS, and the others are quiet beside it', () => {
+  const three = ask({
+    options: [
+      { key: 'apex', label: 'Move to the apex', because: 'One domain to renew.', recommended: false },
+      { key: 'keep', label: 'Keep the subdomain', because: 'Reputation stays where it is.', recommended: true },
+      { key: 'both', label: 'Run both', because: 'Twice the warm-up.', recommended: false },
+    ],
+  });
+  const card = cardOf(three, { now });
+  assert.equal(suggestsOf(card), true);
+  assert.equal(inlineOf(card), true, 'the answers are a row of buttons in Needs you');
+  assert.equal(primaryOf(card), 'keep', 'the primary is the suggested option');
+  assert.equal(card.ways[0]?.key, 'keep', 'the suggested option leads the row');
+  assert.equal(card.ways[0]?.label, 'Keep the subdomain', 'the primary says the answer in its own words, not Decide');
+  assert.equal(card.enter, 'keep', 'Enter gives the suggestion where it costs nothing');
+  /* A HARD CARD KEEPS THE SAME PRIMARY, worded with its care, and no key answers it. */
+  const hard = cardOf({ ...three, cost: 'undo' } as QueueQuestion, { now });
+  assert.equal(primaryOf(hard), 'keep');
+  assert.equal(hard.enter, null);
+  assert.equal(wayTail(hard, hard.ways[0]!, primaryOf(hard)), ', can’t be undone easily');
+  /* A MONEY CARD IS NEVER ACCEPTED BY ENTER, whatever is suggested. */
+  const paying = cardOf({ ...three, money: [{ amount: 480000, currency: 'GBP' }] } as QueueQuestion, { now, home: 'GBP' });
+  assert.equal(primaryOf(paying), 'keep');
+  assert.equal(paying.enter, null, 'Enter never accepts money');
+  /* NOTHING SUGGESTED, A FOURTH ANSWER, OR AN ANSWER THAT SHOWS ITS PICTURE: the form, as before. */
+  assert.equal(suggestsOf(cardOf(ask({ options: three.options.map((o) => ({ ...o, recommended: false })) }), { now })), false);
+  assert.equal(suggestsOf(cardOf(ask({ options: [...three.options, { key: 'sell', label: 'Sell it', because: '', recommended: false }] }), { now })), false);
+  assert.equal(suggestsOf(cardOf(ask({ options: [{ ...three.options[1]!, shows: { swatch: ['#aa7744'] } }, three.options[0]!] }), { now })), false);
 });
 
 /* ── every place a question is drawn draws this card ───────────────────────── */

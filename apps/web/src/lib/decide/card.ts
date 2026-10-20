@@ -535,7 +535,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
 export const hardOf = (card: Pick<Card, 'cost'>, way?: Pick<Way, 'hard'> | null): boolean => card.cost === 'undo' || way?.hard === true;
 
 /**
- * WHAT A BUTTON THAT ANSWERS SAYS, with the care a hard answer asks for in its own words (DIRECTION §39): "Decide, can’t
+ * WHAT A BUTTON THAT ANSWERS SAYS, with the care a hard answer asks for in its own words (DIRECTION §39): "Answer, can’t
  * be undone easily", "Accept £12.98, can’t be undone easily". Every other band leaves the words as they are; the band
  * still ranks the card and still takes Enter away (`acceptKey`), it is only not drawn as a chip.
  */
@@ -573,8 +573,9 @@ export const INLINE_MOST = 3;
  * WHETHER THE ANSWERS ARE A ROW OF BUTTONS, each one press that decides, rather than the form's list of choices and
  * Decide. "Chase it" and "Not yet", "It went through" and "It stopped": two or three answers that say what they are in
  * their own name, with no line of what each does and nothing to show, are buttons, as the record's own Accept and
- * Decline always were. An answer that carries a line of what it does, or a fourth answer, keeps the form's list of
- * full-width choices, where that line is read; one press on a choice decides there too where there are no more than
+ * Decline always were, and so are two or three where one is suggested (`suggestsOf`). An answer that carries a line of
+ * what it does with none suggested, or a fourth answer, keeps the form's list of full-width choices, where that line is
+ * read; one press on a choice decides there too where there are no more than
  * three and none is hard to undo (`pressOf`). A merge is neither; it has its own card.
  *
  * `compact` IS A QUESTION SHOWN OUTSIDE DECIDE (Home, a declared page), which draws the question and its buttons only:
@@ -585,7 +586,20 @@ export function inlineOf(card: Pick<Card, 'ways' | 'decline' | 'merge'>, compact
   if (card.merge !== null) return false;
   if (card.decline !== null) return true;
   if (card.ways.length < 2 || card.ways.length > INLINE_MOST) return false;
-  return compact || card.ways.every((w) => w.because === '' && w.shows === null);
+  return compact || suggestsOf(card) || card.ways.every((w) => w.because === '' && w.shows === null);
+}
+
+/**
+ * WHETHER THE SUGGESTED ANSWER IS THE BUTTON (plan of 20 October, Needs you 1): a question of two or three answers where
+ * an agent suggested one, none of which shows a colour, a figure or a picture. In Needs you its answers are then a row
+ * of buttons, the suggested one the red primary in its own words ("Keep the subdomain") and the rest quiet beside it,
+ * and the full choices, each with its line of what it does and its drawing, are on the question's own page. An answer
+ * that shows something keeps the form, where it is drawn.
+ */
+export function suggestsOf(card: Pick<Card, 'ways' | 'decline' | 'merge'>): boolean {
+  if (card.merge !== null || card.decline !== null) return false;
+  if (card.ways.length < 2 || card.ways.length > INLINE_MOST) return false;
+  return card.ways.some((w) => w.recommended) && card.ways.every((w) => w.shows === null);
 }
 
 /**

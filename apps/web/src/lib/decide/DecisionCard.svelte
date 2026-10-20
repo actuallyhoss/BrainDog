@@ -11,13 +11,14 @@
   TWO OR THREE ANSWERS ARE ONE PRESS EACH (`card.ts` `pressOf`), whether or not they carry a line of what they do: the
   choices stay full-width rectangles, with no ring and no Decide under them, and pressing one decides, held for its Undo
   like every answer. THE RING AND DECIDE STAY WHERE A PRESS SHOULD BE TWO: an answer that is hard to undo, where nothing
-  is chosen for anybody and the button says the care it asks for in its own words ("Decide, can’t be undone easily",
+  is chosen for anybody and the button says the care it asks for in its own words ("Answer, can’t be undone easily",
   never a chip); a fourth answer, where the suggestion is already chosen where a key may give it (`startsOn`); a record
   that asks for a reason, while its line is open; and a host that asks for one itself (`onpress`).
 
   TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS (`card.ts` `inlineOf`): "Chase it" and "Not yet",
   the record's own Accept and Decline. The suggested one, or else the first, is filled with the accent and the rest are
-  quiet, and one press decides.
+  quiet, and one press decides. SO ARE TWO OR THREE WHERE ONE IS SUGGESTED (`suggestsOf`): the suggestion is the red
+  primary in its own words, and the full choices, each with what it does and its drawing, are on the question's page.
 
   THE SIDE IS THERE ONLY WHEN IT HAS SOMETHING TO SAY: on a wide tile, why it is asked and what it changes sit in a
   280px column beside the form. A question with neither is one column, and no column is kept for who asked alone.

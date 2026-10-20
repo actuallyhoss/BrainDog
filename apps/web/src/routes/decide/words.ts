@@ -60,7 +60,7 @@ export const words = {
   /* ── the gate ── */
 
   /** The gate's answer to a question of options, with the one chosen (DIRECTION §39). */
-  decide: 'Decide',
+  decide: 'Answer',
   /** Putting the question off: opens the step that asks why and until when. */
   notNow: 'Not now',
 
