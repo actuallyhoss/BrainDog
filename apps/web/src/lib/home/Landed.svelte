@@ -1,46 +1,85 @@
 <!--
-  What landed: what arrived since the reader last looked, a line each (Today as the desk).
+  Arrivals: what arrived since the reader last looked, a line each (Today as the desk, today F10).
 
-  WHEN, WHO, WHAT, AND WHERE IT WAS FILED, as the prototype's Arrivals draw them: the name in the heavier weight, its
-  note after it in the quiet ink, and the list at the right with a tick. The lines are Home's own read of `whatsNew`, the
-  same read the read mark is stamped from, so what is drawn here is what the mark will say was seen.
+  WHEN, WHO, WHAT, AND WHERE IT WAS FILED: the name in the heavier weight, its note after it in the quiet ink, and the
+  list at the right with a tick. LINES THAT SHARE WHO, LIST AND HOUR ARE ONE LINE ("BrainDog filed 6 into Tools"),
+  opening in place to the names (`arrivalsOf`). The lines are Home's own read of `whatsNew`, the same read the read mark
+  is stamped from, so what is drawn here is what the mark will say was seen.
 
-  A LINE THAT ARRIVES WHILE THE READER LOOKS is washed in `--arrived-wash` and the wash fades (Home reads the record
-  again when it moves). Under reduced motion it holds and goes in one step. NOTHING IS DRAWN FOR NOTHING.
+  WHAT WAITS IN THE INBOX is said in the heading ("4 to review"), opening it (today F14).
+
+  A LINE THAT ARRIVES WHILE THE READER LOOKS opens in (`rowIn`) and is washed in `--arrived`, the wash fading over 1.5s
+  (motion F12). Under reduced motion it fades in and the wash holds, then goes in one step. NOTHING IS DRAWN FOR NOTHING.
 -->
 <script lang="ts">
+  import { flip } from 'svelte/animate';
   import { at } from '$lib/at.ts';
   import Face from '$lib/ui/Face.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import { freshOf, type Landed } from './landed.ts';
+  import { rowIn, rowOut, settle } from '$lib/ui/motion.ts';
+  import { arrivalsOf, freshOf, groupSaid, type Landed } from './landed.ts';
 
-  let { rows }: { rows: readonly Landed[] } = $props();
+  let { rows, review = 0 }: { rows: readonly Landed[]; review?: number } = $props();
 
-  const words = { title: 'What landed', all: 'Activity' } as const;
+  const words = {
+    title: 'Arrivals',
+    all: 'Activity',
+    review: (n: number) => `${n.toLocaleString('en-GB')} to review`,
+    names: (n: number) => `Show the ${n.toLocaleString('en-GB')}`,
+  } as const;
+
+  const lines = $derived(arrivalsOf(rows));
 
   /* The keys drawn before this read: a line not among them came while the reader looked. `null` until the first read. */
   let before: ReadonlySet<string> | null = null;
   const fresh = $derived.by(() => {
-    const now = freshOf(before, rows);
-    before = new Set(rows.map((r) => r.key));
+    const now = freshOf(before, lines);
+    before = new Set(lines.map((r) => r.key));
     return now;
   });
+
+  /* WHICH GROUPED LINES ARE OPEN to their names. */
+  let open = $state<ReadonlySet<string>>(new Set());
+  const toggle = (key: string) => {
+    const next = new Set(open);
+    if (!next.delete(key)) next.add(key);
+    open = next;
+  };
 </script>
 
-{#if rows.length > 0}
-  <Tile icon="activity" title={words.title} count={rows.length} href="/audit" hrefLabel={words.all} data-landed>
+{#if lines.length > 0}
+  <Tile icon="activity" title={words.title} count={rows.length} data-landed>
+    {#snippet actions()}
+      {#if review > 0}<a class="l-review tap" href={at('/inbox')}>{words.review(review)}<Icon name="arrow" size="s" /></a>
+      {:else}<a class="l-review l-all tap" href={at('/audit')}>{words.all}<Icon name="arrow" size="s" /></a>{/if}
+    {/snippet}
     <ul class="stream">
-      {#each rows as r (r.key)}
-        <li class="l-row" data-arrived={fresh.has(r.key) ? '' : undefined}>
+      {#each lines as r (r.key)}
+        <li class="l-row" data-arrived={fresh.has(r.key) ? '' : undefined} in:rowIn out:rowOut animate:flip={settle()}>
           <span class="l-at num">{r.at}</span>
           <span class="l-face"><Face name={r.who} kind={r.kind} run={r.run} size="s" /></span>
-          <span class="l-what" dir="auto">
-            {#if r.href}<a class="l-name" href={at(r.href)}>{r.name}</a>{:else}<b class="l-name">{r.name}</b>{/if}
-            {#if r.note}<span class="l-note">{r.note}</span>{/if}
-            <span class="l-who">{r.who}</span>
-          </span>
-          {#if r.to}<span class="l-to"><Icon name="check" size="s" />{r.to}</span>{/if}
+          {#if 'group' in r}
+            <span class="l-what" dir="auto">
+              <button type="button" class="l-open tap" aria-expanded={open.has(r.key)} onclick={() => toggle(r.key)}
+                ><span class="l-name">{groupSaid(r)}</span><Icon name="chevronDown" size="s" /></button
+              >
+            </span>
+            {#if open.has(r.key)}
+              <ul class="l-names">
+                {#each r.rows as n (n.key)}
+                  <li>{#if n.href}<a href={at(n.href)}>{n.name}</a>{:else}{n.name}{/if}{#if n.note}<span class="l-note">{' · '}{n.note}</span>{/if}</li>
+                {/each}
+              </ul>
+            {/if}
+          {:else}
+            <span class="l-what" dir="auto">
+              {#if r.href}<a class="l-name" href={at(r.href)}>{r.name}</a>{:else}<b class="l-name">{r.name}</b>{/if}
+              {#if r.note}<span class="l-note">{r.note}</span>{/if}
+              <span class="l-who">{r.who}</span>
+            </span>
+            {#if r.to}<span class="l-to"><Icon name="check" size="s" />{r.to}</span>{/if}
+          {/if}
         </li>
       {/each}
     </ul>
@@ -54,14 +93,14 @@
     list-style: none;
   }
 
+  /* NO RADIUS ON A RULED ROW: a corner and a hairline together curl the rule at both ends (today F10). */
   .l-row {
     display: grid;
     grid-template-columns: 4.5rem auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-2) var(--sp-3);
     padding: var(--sp-2) 0;
-    border-radius: var(--r-md);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .l-row + .l-row {
@@ -74,7 +113,7 @@
 
   @keyframes landed {
     from {
-      background-color: var(--arrived-wash);
+      background-color: var(--arrived);
     }
   }
 
@@ -85,8 +124,8 @@
   }
 
   .l-at {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 
@@ -105,9 +144,63 @@
     text-decoration: none;
   }
 
+  .l-open {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .l-open > :global(.icon) {
+    color: var(--ink-3);
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .l-open[aria-expanded='true'] > :global(.icon) {
+    transform: rotate(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .l-open > :global(.icon) {
+      transition: none;
+    }
+  }
+
+  .l-names {
+    grid-column: 3 / -1;
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: 0 0 var(--sp-1);
+    list-style: none;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .l-names a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .l-names a:hover,
+    a.l-name:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
   /* A finger needs the full target the layout gate measures. */
   @media (pointer: coarse) {
-    .l-name {
+    .l-name,
+    .l-open,
+    .l-names a {
       display: inline-flex;
       align-items: center;
       min-block-size: var(--tap);
@@ -116,43 +209,57 @@
 
   .l-note,
   .l-who {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .l-to {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 
-  /* ON A PHONE the list moves under the line, and the time and the list share a second line, so nothing is cut. */
+  .l-review {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    color: var(--red);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .l-all {
+    color: var(--ink-2);
+  }
+
+  /* ON A PHONE, ONE LINE AN ARRIVAL (today F10): the time, the face, the name with its note cut short, and the list. */
   @media (width < 640px) {
     .l-row {
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      grid-template-areas:
-        'face what what'
-        '. at to';
-      row-gap: 2px;
-    }
-
-    .l-face {
-      grid-area: face;
+      grid-template-columns: 48px 20px minmax(0, 1fr) auto;
+      column-gap: var(--sp-2);
     }
 
     .l-what {
-      grid-area: what;
+      flex-wrap: nowrap;
+      overflow: hidden;
+      white-space: nowrap;
     }
 
-    .l-at {
-      grid-area: at;
+    .l-what > * {
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .l-to {
-      grid-area: to;
+    .l-who {
+      display: none;
+    }
+
+    .l-names {
+      grid-column: 3 / -1;
     }
   }
 </style>

@@ -28,6 +28,8 @@ export type Landed = {
   key: string;
   /** "12 min ago", as the record's one clock says it. */
   at: string;
+  /** When it landed, as the record stamped it: the hour lines are grouped by. */
+  ts: string;
   who: string;
   kind: ActorKind;
   /** The run an agent signed as, which its face is coloured by; empty for anybody else. */
@@ -82,6 +84,7 @@ export function landedOf(
     out.push({
       key: l.id,
       at: since(l.ts, now),
+      ts: l.ts,
       who: who.name,
       kind: who.kind,
       run: /^S\d+$/u.test(l.actor) ? l.actor : '',
@@ -98,3 +101,37 @@ export function landedOf(
 /** The keys that were not drawn before: a row that came while the reader looked, which is washed as it lands. */
 export const freshOf = (before: ReadonlySet<string> | null, rows: readonly { key: string }[]): Set<string> =>
   before === null ? new Set() : new Set(rows.filter((r) => !before.has(r.key)).map((r) => r.key));
+
+/** Several arrivals by one hand into one list within one hour, said as one line that opens to their names (today F10). */
+export type LandedGroup = { key: string; group: true; at: string; who: string; kind: ActorKind; run: string; to: string; rows: Landed[] };
+
+/** "BrainDog filed 6 into Tools". */
+export const groupSaid = (g: Pick<LandedGroup, 'who' | 'to' | 'rows'>): string => `${g.who} filed ${g.rows.length.toLocaleString('en-GB')} into ${g.to}`;
+
+/**
+ * ARRIVALS AS THEY ARE READ (today F10): lines that share who brought them, the list they went into and the hour are one
+ * line, "BrainDog filed 6 into Tools · 12h ago", which opens in place to the names; a line on its own stays a line. In
+ * the order of the newest line of each, and at most `most` of them.
+ */
+export function arrivalsOf(rows: readonly Landed[], most = LANDED_MOST): (Landed | LandedGroup)[] {
+  const hour = (ts: string): string => ts.slice(0, 13);
+  const groups = new Map<string, Landed[]>();
+  for (const r of rows) {
+    if (r.to === null) continue;
+    const k = `${r.who}|${r.to}|${hour(r.ts)}`;
+    groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  const out: (Landed | LandedGroup)[] = [];
+  const done = new Set<string>();
+  for (const r of rows) {
+    const k = r.to === null ? null : `${r.who}|${r.to}|${hour(r.ts)}`;
+    const held = k === null ? undefined : groups.get(k);
+    if (k !== null && held && held.length > 1) {
+      if (done.has(k)) continue;
+      done.add(k);
+      out.push({ key: `g:${held[0]!.key}`, group: true, at: r.at, who: r.who, kind: r.kind, run: r.run, to: r.to!, rows: held });
+    } else out.push(r);
+    if (out.length >= most) break;
+  }
+  return out;
+}

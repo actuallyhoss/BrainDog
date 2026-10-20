@@ -23,6 +23,7 @@
     me,
     now,
     part = 'all',
+    review = 0,
   }: {
     cards: Cards | null;
     working: readonly Working[];
@@ -33,14 +34,18 @@
     now: number;
     /** One part of the three, where Today lays them among the page's tiles; `all` is the three in a row. */
     part?: 'all' | 'working' | 'projects' | 'landed';
+    /** What waits in the inbox, which Arrivals' heading opens (today F14). */
+    review?: number;
   } = $props();
 
   /* A working agent's project lends its card's colour to the dot before its name. */
   const hues = $derived(new Map((cards?.cards ?? []).map((c) => [c.name, c.hue] as const)));
   const rows = $derived(workingRows(working, hues, now));
-  const landed = $derived(landedOf(lines, new Map(lists.map((l) => [l.id, l.name])), me, now, new Map(Object.entries(names))));
+  /* ENOUGH LINES TO GROUP (`arrivalsOf`), which then shows the newest few. */
+  const LANDED_READ = 40;
+  const landed = $derived(landedOf(lines, new Map(lists.map((l) => [l.id, l.name])), me, now, new Map(Object.entries(names)), LANDED_READ));
 </script>
 
 {#if part === 'all' || part === 'working'}<WorkingNow {rows} />{/if}
 {#if cards && (part === 'all' || part === 'projects')}<ProjectCards cards={cards.cards} more={cards.more} list={cards.list} name={cards.name} {working} />{/if}
-{#if part === 'all' || part === 'landed'}<Landed rows={landed} />{/if}
+{#if part === 'all' || part === 'landed'}<Landed rows={landed} {review} />{/if}
