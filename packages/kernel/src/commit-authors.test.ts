@@ -1,21 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 
 import { commitAuthors } from './commit-authors.ts';
 
 describe('who a session says its recent commits were by', () => {
   it('reads names and addresses once each, in order', () => {
-    expect(commitAuthors('Ada Lin <Ada@Example.com>, Bo <bo@kiln.example>, Ada L <ada@example.com>')).toEqual([
+    assert.deepEqual(commitAuthors('Ada Lin <Ada@Example.com>, Bo <bo@kiln.example>, Ada L <ada@example.com>'), [
       { name: 'Ada Lin', email: 'ada@example.com' },
       { name: 'Bo', email: 'bo@kiln.example' },
     ]);
   });
 
   it('drops bots, no-reply and entries with no real address, and invents nothing', () => {
-    expect(commitAuthors('dependabot[bot] <bot@x.example>, Cy <noreply@x.example>, Dee, Eli <eli>')).toEqual([]);
-    expect(commitAuthors(undefined)).toEqual([]);
+    assert.deepEqual(commitAuthors('dependabot[bot] <bot@x.example>, Cy <noreply@x.example>, Dee, Eli <eli>'), []);
+    assert.deepEqual(commitAuthors(undefined), []);
   });
 
   it('keeps an author with no name as the address alone', () => {
-    expect(commitAuthors('<fay@x.example>')).toEqual([{ email: 'fay@x.example' }]);
+    assert.deepEqual(commitAuthors('<fay@x.example>'), [{ email: 'fay@x.example' }]);
   });
 });
