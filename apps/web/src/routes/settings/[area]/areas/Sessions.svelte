@@ -1,5 +1,7 @@
 <!--
   Settings > Sessions: every browser this person is signed in on, this one first, and the one press that ends the rest.
+  Under them, what this browser keeps of the record to draw at once and read offline (`lib/data/local.ts`), its size,
+  and the one press that forgets it.
 -->
 <script lang="ts">
   import { copy } from '$lib/copy.ts';
@@ -13,6 +15,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
+  import { forgetLocal, localSize } from '$lib/data/local-tab.ts';
 
   let { shell }: AreaProps = $props();
 
@@ -70,6 +73,32 @@
   }
 
   const when = (ms: number): string => since(new Date(ms).toISOString());
+
+  /* ── what this browser keeps ── */
+  const keptWords = {
+    title: 'Kept on this device',
+    none: 'Nothing of this record is kept on this device yet.',
+    held: (size: string) => `About ${size} of what you read here is kept on this device, so screens draw at once and you can read offline.`,
+    forget: "Forget this device's copy",
+    forgetting: 'Forgetting…',
+    forgot: 'Forgotten. It is kept again the next time you open the record online.',
+  } as const;
+  const sized = (bytes: number): string =>
+    bytes < 1024 ? 'under 1 KB' : bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  let kept = $state<{ answers: number; bytes: number } | null>(null);
+  let forgetting = $state(false);
+  let forgot = $state(false);
+  $effect(() => {
+    untrack(() => void localSize().then((n) => (kept = n)));
+  });
+  async function forget() {
+    if (forgetting) return;
+    forgetting = true;
+    await forgetLocal();
+    kept = await localSize();
+    forgetting = false;
+    forgot = true;
+  }
 </script>
 
 <Section title={copy.sessions} count={ordered?.length ?? 0}>
@@ -107,6 +136,19 @@
     {/if}
   {/if}
   {#if said}<p class="hint" role="status">{said}</p>{/if}
+</Section>
+
+<Section title={keptWords.title}>
+  {#if forgot}
+    <p class="hint" role="status">{keptWords.forgot}</p>
+  {:else if kept !== null}
+    <p class="hint">{kept.answers === 0 ? keptWords.none : keptWords.held(sized(kept.bytes))}</p>
+    {#if kept.answers > 0}
+      <div class="row-actions">
+        <Button tone="bad" onclick={forget} aria-busy={forgetting} disabled={forgetting}>{forgetting ? keptWords.forgetting : keptWords.forget}</Button>
+      </div>
+    {/if}
+  {/if}
 </Section>
 
 <style>
