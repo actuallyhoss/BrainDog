@@ -8,6 +8,9 @@
  * THE CLAIM SIGNS THE LAST READER (`local-mark.ts`), and the wipe drops it, so a cold open and an offline boot find the
  * same person the copy was kept for, or nobody.
  *
+ * OFF WHILE THE RECORD IS SEEN AS SOMEBODY (`see-as.svelte.ts`): nothing read as them is kept, nothing kept is drawn for
+ * them, and the copy is not claimed for them, so the owner's copy is as he left it when he exits.
+ *
  * `@braindog/client` IS IMPORTED WHEN THE LOG IS FIRST ASKED, for `live.svelte.ts`'s reason: this file is reached from
  * the layout, and the client carries the route table.
  */
@@ -19,6 +22,7 @@ import { idbKey, idbStore, openEarly } from './local-db.ts';
 import { dropMark, memoryKey, readMark, writeMark, type MarkDeps } from './local-mark.ts';
 import { localCopy, memoryStore, railOf, scopeOf, type LocalCopy, type Log, type Near, type Rail, type Spot } from './local.ts';
 import { forget as forgetOffline } from './offline.ts';
+import { seeingAs } from '../sharing/see-as.svelte.ts';
 
 /* THE BUILD, READ OFF KIT'S OWN `define` RATHER THAN `$app/environment`. That module lives in the entry, and naming its
    `version` from this lazy file made the build stamp a chunk the entry has to import on every visit (`bundle` gate).
@@ -41,6 +45,7 @@ export function offlineLocal(on: boolean): void {
  * layout calls it before it waits on anything, so the database opens beside `boot` and never in front of a paint.
  */
 export function warmLocal(base: string): void {
+  if (seeingAs() !== null) return;
   openEarly();
   void lastReader(base)
     .then((person) => tab().answer('', '', base, person))
@@ -120,6 +125,7 @@ export function claimLocal(
     lens?: string | undefined;
   },
 ): void {
+  if (seeingAs() !== null) return;
   /* SOMEBODY ONLY SHARES LET IN (a grant, and no role on the whole record) IS A GUEST HERE, whose copy is drawn a day at
      most and never past their last share's end. */
   const guest = me.grant !== undefined && !me.owner && me.lists !== null ? { guest: { until: me.grant.until } } : {};
@@ -185,6 +191,7 @@ export function wipeLocal(): Promise<void> {
  * yet, so a slow database still beats a slower record and never replaces what the record said.
  */
 export async function nearLocal<T>(name: string, key: string, base: string, late?: (near: Near<T>) => void): Promise<Near<T> | null> {
+  if (seeingAs() !== null) return null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let waited = false;
   const learn = (near: Near<T>): Near<T> => {
@@ -230,6 +237,7 @@ export type KeepHow = { spots?: readonly Spot[]; always?: boolean };
 
 /** Keep an answer read from `lists`, with the declarations this tab holds for them, and any the screen read itself. */
 export function keepLocal(name: string, key: string, lists: readonly string[], value: unknown, ticket: number, known: Record<string, unknown> = {}, how: KeepHow = {}): void {
+  if (seeingAs() !== null) return;
   const decls: Record<string, unknown> = { ...known };
   for (const l of lists) if (decls[l] === undefined && REGISTERS[l] !== undefined) decls[l] = REGISTERS[l];
   void tab().put(name, key, lists, decls, value, ticket, how).catch(() => false);

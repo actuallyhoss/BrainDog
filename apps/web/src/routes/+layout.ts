@@ -15,6 +15,8 @@ import { redirect, type LoadEvent } from '@sveltejs/kit';
 
 import { apiBase, at, here, signInFirst } from '$lib/at.ts';
 import type { Shell } from '$lib/record/boot-live.ts';
+/* SEE AS PUTS ITS HEADER ON THE TAB'S FETCH AS THIS LOADS, before the first `boot` is asked (`see-as.svelte.ts`). */
+import { exitSeeAs, seeingAs } from '$lib/sharing/see-as.svelte.ts';
 
 export const ssr = false;
 export const prerender = false;
@@ -66,6 +68,8 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
      in front of the first paint, and its last reader verified, so the first screen's ask finds it open. */
   const first = !opened;
   opened = true;
+  /* SEEN AS SOMEBODY, NOTHING KEPT IS DRAWN AND NOTHING IS KEPT: the last shell and the local copy are the owner's. */
+  const seen = seeingAs() !== null;
   if (first && depends && !spared) void import('$lib/data/local-tab.ts').then((c) => c.warmLocal(api), () => undefined);
   const [live, voice] = await Promise.all([import('$lib/record/boot-live.ts'), import('$lib/voice.svelte.ts')]);
   depends?.('braindog:boot');
@@ -73,7 +77,7 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   /* ON A COLD OPEN THE SHELL IS DRAWN FROM THE LAST COPY AT ONCE, then `boot` is read behind it and this load runs again
      with the live answer (redirects and refusals included). Not on the screens that must see the record's own answer. */
   if (first) {
-    const copy = depends && !spared ? copies.readCopy(api) : null;
+    const copy = depends && !spared && !seen ? copies.readCopy(api) : null;
     if (copy) {
       /* ASKED HERE AND REPLACED FROM THE SHELL (`+layout.svelte`), once this navigation has drawn. An `invalidate` from
          here could land while the first navigation was still loading: it took that navigation's place, had no page to
@@ -90,6 +94,11 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   /* A HOST NOBODY REACHED IS NO REFUSAL: the last copy and the local copy stay, since offline is when they earn their
      keep. Any refusal the record gave takes both. */
   const unreached = booted.from === 'refused' && booted.code === 'UNREACHABLE';
+  /* A RECORD THAT WILL NOT BE SEEN AS THEM (they left it, or the caller is no longer an Admin) is seen as yourself again. */
+  if (seen && booted.from === 'refused' && !unreached) {
+    exitSeeAs();
+    return new Promise<never>(() => undefined);
+  }
   if (booted.from === 'refused' && !unreached) {
     copies.dropCopy();
     void import('$lib/data/local-tab.ts').then((c) => c.wipeLocal(), () => undefined);
@@ -193,6 +202,6 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   const sent = booted.from === 'live' ? booted.boot.slash : false;
   const slash = typeof sent === 'boolean' ? sent : ((modelHere ??= askModel(api, fetch)), modelSaid === true);
 
-  if (booted.from === 'live') copies.saveCopy(api, shell);
+  if (booted.from === 'live' && !seen) copies.saveCopy(api, shell);
   return { ...shell, slash };
 }
