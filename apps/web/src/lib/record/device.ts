@@ -342,3 +342,57 @@ export const TOKEN_DAYS = 90;
 
 /** The label `deviceStart` allows, and the one this screen asks for when minting. */
 export const LABEL_MAX = 120;
+
+/** How far back an agent counts as one that works here: heard from in the last 30 days. */
+export const HEARD_DAYS = 30;
+
+/** A project a run was placed in, as a chip draws it: its name, mark and hue. */
+export type HeardScope = { spoken: string; name: string; mark: string | null; hue: number | null };
+
+/**
+ * One agent heard from in a run, whatever let it in: its kind (`claude`), the newest run it worked in, when the record
+ * last heard from it, and the project that run was placed in.
+ */
+export type Heard = { agent: string; seq: number; seen: string; scope: HeardScope | null };
+
+/**
+ * THE AGENTS THAT WORK HERE, FROM THE RUNS (UI pass 20 Oct, agents F1). A record the seed or an import filled has runs by
+ * Claude and Codex and no machine or key row, and the list said "Connected 0" under a bar saying "2 working". One row per
+ * kind of agent heard from in the last `HEARD_DAYS`, newest first, read from every run (`runsOf` keeps only a key's).
+ * `projects` names a run's `things#1` by its project; one it cannot name is left out of the line, never printed as an id.
+ */
+export function heardFrom(rows: readonly unknown[], nowMs: number, projects: ReadonlyMap<string, HeardScope> = new Map()): Heard[] {
+  const newest = new Map<string, Heard>();
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue;
+    const { seq, fields } = row as { seq?: unknown; fields?: unknown };
+    if (typeof seq !== 'number' || typeof fields !== 'object' || fields === null) continue;
+    const f = fields as Record<string, unknown>;
+    const agent = text(f.agent)?.toLowerCase().replace(/^agent:/u, '') ?? null;
+    const seen = text(f.last_seen) ?? text(f.started);
+    if (agent === null || seen === null) continue;
+    const at = Date.parse(seen);
+    if (!Number.isFinite(at) || nowMs - at > HEARD_DAYS * 86_400_000) continue;
+    const had = newest.get(agent);
+    if (had && had.seen >= seen) continue;
+    const spoken = text(f.project);
+    newest.set(agent, { agent, seq, seen, scope: spoken === null ? null : (projects.get(spoken) ?? null) });
+  }
+  return [...newest.values()].sort((a, b) => (a.seen > b.seen ? -1 : a.seen < b.seen ? 1 : 0));
+}
+
+/** Projects by their spoken ref (`things#1`), from the rows `list` answers for the projects list. */
+export function projectsOf(register: string, rows: readonly unknown[]): Map<string, HeardScope> {
+  const out = new Map<string, HeardScope>();
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue;
+    const { seq, fields } = row as { seq?: unknown; fields?: unknown };
+    if (typeof seq !== 'number' || typeof fields !== 'object' || fields === null) continue;
+    const f = fields as Record<string, unknown>;
+    const name = text(f.name) ?? text(f.title);
+    if (name === null) continue;
+    const spoken = `${register}#${seq}`;
+    out.set(spoken, { spoken, name, mark: text(f.mark), hue: typeof f.hue === 'number' ? f.hue : null });
+  }
+  return out;
+}

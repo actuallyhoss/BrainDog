@@ -290,3 +290,25 @@ test('a client that is not one reads as no client, and the words carry no em das
   }
   assert.equal(APP_NAMES['claude-code'], 'Claude Code');
 });
+
+/* ── the agents heard from in runs (UI pass 20 Oct, agents F1) ── */
+
+test('the agents that work here come from every run, one per agent, newest first, named by project', () => {
+  const now = Date.parse('2026-09-03T12:00:00Z');
+  const run = (seq: number, agent: string, last_seen: string, project?: string) => ({ seq, fields: { agent, last_seen, ...(project ? { project } : {}) } });
+  const projects = device.projectsOf('things', [{ seq: 1, fields: { name: 'Kiln', mark: '◼', hue: 265 } }]);
+  const heard = device.heardFrom(
+    [
+      run(1, 'claude', '2026-09-03T11:57:00Z', 'things#1'),
+      run(2, 'codex', '2026-09-03T11:48:00Z', 'things#9'),
+      run(3, 'claude', '2026-09-02T10:00:00Z'),
+      run(4, 'cursor', '2026-07-01T10:00:00Z'),
+    ],
+    now,
+    projects,
+  );
+  assert.deepEqual(heard.map((h) => h.agent), ['claude', 'codex']);
+  assert.equal(heard[0]?.scope?.name, 'Kiln');
+  /* A PROJECT IT CANNOT NAME IS LEFT OUT, never drawn as `things#9`. */
+  assert.equal(heard[1]?.scope, null);
+});
