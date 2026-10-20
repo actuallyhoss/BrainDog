@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { calendarOf, duesOf, lanesOf, roadmapOf, trendOf, visualsFor, type ListDecl, type Listing } from './visuals.ts';
+import { calendarOf, duesOf, lanesOf, monthsDrawn, pathOf, roadmapOf, trendOf, visualsFor, type ListDecl, type Listing, type PathRead } from './visuals.ts';
 
 const TODAY = '2026-10-20';
 const say = (n: number, c: string) => `${c} ${n}`;
@@ -117,4 +117,42 @@ test('VISUALS ARE CHOSEN BY WHAT THE PROJECT HAS, NOTHING DRAWN EMPTY', () => {
   const got = visualsFor({ fields: {}, decl: undefined }, { ...base, inByMonth: months(5, 7), outByMonth: months(3), listings: [{ decl: repDecl, rows: [line('Pay', '2026-10-25', 'monthly')] }] });
   assert.deepEqual(got.map((v) => v.kind), ['in', 'dues']);
   assert.equal(got[0]!.rows[0]!.detail, 'GBP 5');
+});
+
+/* ── the path (proj F3) ── */
+
+const READ: PathRead = { title: 'what', state: 'state', done: ['done', 'dropped'], deadline: 'by', agent: 'agent', waits: ['review', 'blocked'], doneOn: 'done_on' };
+const row = (seq: number, what: string, state: string, by?: string, agent = '') => ({ seq, fields: { what, state, ...(by ? { by } : {}), agent } });
+
+test('THE PATH IS THE LAST TWO DONE, THE ONE NOW AND THE NEXT THREE, never a dropped row', () => {
+  const p = pathOf(
+    [
+      row(1, 'One', 'done', '2026-10-01'),
+      row(2, 'Two', 'done', '2026-10-05'),
+      row(3, 'Three', 'done', '2026-10-09'),
+      row(4, 'Gone', 'dropped', '2026-10-10'),
+      row(5, 'Held', 'doing', '2026-10-25', 'claude'),
+      row(6, 'Late', 'open', '2026-10-18'),
+      row(7, 'Checked', 'review', '2026-10-28'),
+      row(8, 'Later', 'open', '2026-11-02'),
+      row(9, 'Much later', 'open', '2026-12-01'),
+    ],
+    READ,
+    TODAY,
+  )!;
+  assert.deepEqual(p.stops.map((s) => s.title), ['Two', 'Three', 'Held', 'Late', 'Checked', 'Later']);
+  assert.deepEqual(p.stops.map((s) => s.kind), ['done', 'done', 'now', 'late', 'waits', 'later']);
+  assert.deepEqual(p.stops.map((s) => s.sub), ['5 Oct', '9 Oct', 'Agent at work', 'Late', 'Waits on you', '2 Nov']);
+  assert.equal(p.total, 8, 'every row but the dropped one, for "All 8"');
+});
+
+test('A PATH OF ONE STOP DRAWS NOTHING', () => {
+  assert.equal(pathOf([row(1, 'Only', 'open', '2026-10-25')], READ, TODAY), null);
+});
+
+test('MONEY BY MONTH IS DRAWN ONLY AS A SHAPE: three months, two of them above nought (proj F8)', () => {
+  const m = (...v: number[]) => ({ currency: 'GBP', total: v.reduce((a, b) => a + b, 0), months: v.map((value, i) => ({ key: `2026-0${i + 1}`, value, partial: false })) });
+  assert.equal(monthsDrawn(m(5, 7)), false);
+  assert.equal(monthsDrawn(m(5, 0, 0)), false);
+  assert.equal(monthsDrawn(m(5, 0, 3)), true);
 });

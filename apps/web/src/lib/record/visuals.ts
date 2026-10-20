@@ -106,6 +106,82 @@ export function lanesOf(spans: readonly { left: number; right: number }[], gap =
   });
 }
 
+/* ── the path ───────────────────────────────────────────────────────────── */
+
+/**
+ * A STOP ON THE PATH (proj F3): done, the one now, late or waiting on a person in the red, or later. Its line under it
+ * is a day ("3 Sep"), "Late", "Waits on you", or "Agent at work" for the one an agent holds; the agent is named once, in the
+ * hero and the Work tile (proj F1), so the path says only that one holds it.
+ */
+export type StopKind = 'done' | 'now' | 'late' | 'waits' | 'later';
+export type Stop = { key: string; seq: number | null; title: string; kind: StopKind; sub: string; red: boolean };
+export type Path = { stops: Stop[]; total: number };
+
+/** What of the work list the path reads, from its declaration (`figures.ts` `viaOf` hands most of it). */
+export type PathRead = {
+  title: string;
+  state: string;
+  /** The states that end a row; the first is finished, the rest (dropped) leave the path. */
+  done: readonly string[];
+  deadline: string | null;
+  agent: string | null;
+  /** The states a row waits on a person in (handed back, blocked). */
+  waits: readonly string[];
+  /** The day a finished row was finished on, where the list keeps one. */
+  doneOn: string | null;
+};
+
+/** At most this many stops: the last two done, the one now, the next three. */
+export const PATH_STOPS = 6;
+const PATH_DONE = 2;
+const PATH_NEXT = 3;
+
+export const shortDay = (day: string): string => new Date(`${day.slice(0, 10)}T00:00:00Z`).toLocaleString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+/**
+ * THE PROJECT'S WORK AS A STEPPER, NOT A TIME AXIS (proj F3): its own tasks only, never its bills. The last two finished,
+ * the one under way now (one an agent holds or one being done, else the soonest open), then the next three by day.
+ * Fewer than two stops draw nothing. `total` is every row on the path, finished or not, for the "All 17" link.
+ */
+export function pathOf(rows: readonly { seq?: number | undefined; fields: Readonly<Record<string, unknown>> }[], p: PathRead, today: string): Path | null {
+  const finish = p.done[0];
+  type Item = { key: string; seq: number | null; title: string; state: string; day: string; agent: string };
+  const items: Item[] = [];
+  rows.forEach((r, i) => {
+    const f = r.fields;
+    const title = text(f[p.title]);
+    const state = text(f[p.state]);
+    if (title === '' || (p.done.includes(state) && state !== finish)) return;
+    const due = p.deadline && isDay(f[p.deadline]) ? (f[p.deadline] as string).slice(0, 10) : '';
+    const on = state === finish && p.doneOn && isDay(f[p.doneOn]) ? (f[p.doneOn] as string).slice(0, 10) : due;
+    items.push({ key: typeof r.seq === 'number' ? `s${r.seq}` : `i${i}`, seq: typeof r.seq === 'number' ? r.seq : null, title, state, day: on, agent: p.agent ? text(f[p.agent]) : '' });
+  });
+  const byDay = (a: Item, b: Item) => (a.day === b.day ? (a.seq ?? 0) - (b.seq ?? 0) : a.day === '' ? 1 : b.day === '' ? -1 : a.day < b.day ? -1 : 1);
+  const done = items.filter((x) => x.state === finish).sort(byDay);
+  const open = items.filter((x) => x.state !== finish).sort(byDay);
+  const total = items.length;
+  const moving = open.find((x) => x.agent !== '') ?? open.find((x) => /doing|progress|active/u.test(x.state)) ?? open[0];
+  const after = open.filter((x) => x !== moving).slice(0, PATH_NEXT);
+  const late = (x: Item) => x.day !== '' && x.day < today;
+  const stop = (x: Item, now: boolean): Stop => {
+    if (x.state === finish) return { key: x.key, seq: x.seq, title: x.title, kind: 'done', sub: x.day ? shortDay(x.day) : 'Done', red: false };
+    const waits = p.waits.includes(x.state);
+    const kind: StopKind = now ? 'now' : waits ? 'waits' : late(x) ? 'late' : 'later';
+    if (waits) return { key: x.key, seq: x.seq, title: x.title, kind, sub: 'Waits on you', red: true };
+    if (late(x)) return { key: x.key, seq: x.seq, title: x.title, kind, sub: 'Late', red: true };
+    if (x.agent !== '') return { key: x.key, seq: x.seq, title: x.title, kind, sub: now ? 'Agent at work' : 'With an agent', red: false };
+    return { key: x.key, seq: x.seq, title: x.title, kind, sub: x.day ? shortDay(x.day) : now ? 'Now' : '', red: false };
+  };
+  const stops = [...done.slice(-PATH_DONE).map((x) => stop(x, false)), ...(moving ? [stop(moving, true)] : []), ...after.map((x) => stop(x, false))];
+  return stops.length < 2 ? null : { stops: stops.slice(-PATH_STOPS), total };
+}
+
+/**
+ * WHETHER MONEY BY MONTH IS A SHAPE (proj F8): three months or more, and at least two of them above nought. Otherwise
+ * the total is said as a line and nothing is drawn.
+ */
+export const monthsDrawn = (m: Months | null | undefined): m is Months => !!m && m.months.length >= 3 && m.months.filter((x) => x.value > 0).length >= 2;
+
 /* ── dues ───────────────────────────────────────────────────────────────── */
 
 export type Due = { day: string; late: boolean; what: string };
