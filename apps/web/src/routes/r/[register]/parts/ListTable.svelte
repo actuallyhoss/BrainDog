@@ -334,7 +334,7 @@
             onfocusout={leftTheRow}
             onkeydown={(e) => {
               e.stopPropagation();
-              if (e.key === 'Escape') cancelEdit();
+              if (e.key === 'Escape') cellKeys(e, false);
             }}
           >
             {#each f.values ?? [] as v}<option value={v}>{valueSaid(f, v)}</option>{/each}

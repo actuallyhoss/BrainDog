@@ -1835,6 +1835,13 @@
     editing = { seq, field };
     editValue = draftOf(f, shown, listCurrency(field));
     editTicked = shown === true;
+    /* THE CARET GOES INTO THE BOX. `autofocus` on an element drawn into a cell that already holds focus did not take, so
+       F2 opened a box the keyboard was still outside of; the cell hands it on once the box is drawn. */
+    void tick().then(() => {
+      const cell = document.activeElement instanceof HTMLElement ? document.activeElement.closest('[role="gridcell"]') : null;
+      const box = cell?.querySelector<HTMLElement>('input, select, textarea');
+      if (box && !box.contains(document.activeElement)) box.focus();
+    });
   }
 
   /**
@@ -1856,11 +1863,22 @@
     commitEdit();
   }
 
-  /** The editor's keys. Escape cancels; Enter commits where Enter is not a new line, and ⌘Enter commits everywhere. */
+  /**
+   * The editor's keys. Escape cancels; Enter commits where Enter is not a new line, and ⌘Enter commits everywhere. EITHER
+   * WAY THE KEYBOARD GOES BACK TO THE CELL (motion F5.3), so the arrows carry on from where the edit was rather than
+   * from the top of the page, which is where focus lands when the element holding it leaves the document.
+   */
   function cellKeys(e: KeyboardEvent, enterCommits: boolean) {
     e.stopPropagation();
-    if (e.key === 'Enter' && (enterCommits || e.metaKey || e.ctrlKey)) commitEdit();
-    else if (e.key === 'Escape') cancelEdit();
+    const cell = e.currentTarget instanceof HTMLElement ? e.currentTarget.closest<HTMLElement>('[role="gridcell"]') : null;
+    const back = () => void tick().then(() => cell?.isConnected && cell.focus());
+    if (e.key === 'Enter' && (enterCommits || e.metaKey || e.ctrlKey)) {
+      commitEdit();
+      back();
+    } else if (e.key === 'Escape') {
+      cancelEdit();
+      back();
+    }
   }
 
   /** Escape in a cell: the editor closes, and `cancelled` tells the blur that follows that it is not a commit. */
