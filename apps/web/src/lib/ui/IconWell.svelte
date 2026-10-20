@@ -1,30 +1,52 @@
 <!--
-  An icon in its well: the rounded square that leads a tile's heading, a rail place and a row that is
-  not a task or a person. `m` is 28 (a tile heading), `l` is 32 (a row). The icon is
-  18 in `--ink2` on `--field`, at the control's 8px corner.
+  A WHAT, as a square: an icon (or a project's letter) in its well (the UI pass of 20 October, 2.A.5). Round is a who
+  (`Face`); square is a what, and this is the one square.
 
-  A TONE IS A MEANING, never decoration. `ink` is the chosen form, the rail's current place: an ink
-  fill with the icon in `--on-ink`. `action` is the working accent's tint, for a thing in progress or chosen and a tile of questions waiting on him.
-  `danger`, `earn`, `warn` and `live` tint the icon in that intent and fill the well with a 12% tint of it (the `-fill` roles are saturated, so they would draw red on red). Red is for what needs him and nothing else.
+  FIVE SIZES, each with its one icon size: `m` 28 (a tile's heading, icon 18), `l` 32 (a row, icon 16), `card` 40 (a
+  project card, icon 20), and `xl` 56 on a project's hero (icon 28, radius 16), 48 on a phone (icon 24). Radius 8 up to
+  40, 12 at 48, 16 at 56.
 
-  Decorative: the words beside a well say what it means, so the icon is hidden from assistive tech.
+  NEUTRAL BY DEFAULT: `--tile-2` with the icon in `--ink-2`. A PROJECT passes its `slot` (`slotOf` in `face.ts`), and the
+  well is the slot's tint with the glyph in the slot's colour; `slot="here"` takes the `--ph` and `--ph-tint` a project's
+  page sets round it.
+
+  A TONE IS A MEANING, NEVER DECORATION, and only on a ROW that means it: `late` (also `danger`, and `action` for a
+  question waiting on him) is `--red-tint` with a `--red` icon; `good` (also `earn` and `live`) is `--good-tint` with
+  `--good`; `warn` is `--warn-tint` with `--warn`. `ink` is the chosen form, an ink well with the icon in the tile's
+  colour. A tile's heading never passes a tone (`Tile` drops it).
+
+  Decorative: the words beside a well say what it means, so the well is hidden from assistive tech.
 -->
 <script lang="ts">
+  import type { Slot } from './face.ts';
   import Icon from './Icon.svelte';
   import type { IconName } from './icons.ts';
 
   let {
     name,
+    letter,
     size = 'm',
     tone,
+    slot,
   }: {
-    name: IconName;
-    size?: 'm' | 'l';
-    tone?: 'ink' | 'action' | 'danger' | 'earn' | 'live' | 'warn' | undefined;
+    /** The glyph; when there is none, `letter` is drawn instead. */
+    name?: IconName | undefined;
+    /** A project's or a thing's letter, where its mark names no glyph. */
+    letter?: string | undefined;
+    size?: 'm' | 'l' | 'card' | 'xl';
+    tone?: 'ink' | 'action' | 'danger' | 'late' | 'earn' | 'good' | 'live' | 'warn' | undefined;
+    /** A project's category slot, or `here` for the project whose page this is. */
+    slot?: Slot | 'here' | undefined;
   } = $props();
+
+  /* The old tone names say the same three meanings. */
+  const MEANS = { action: 'late', danger: 'late', late: 'late', earn: 'good', good: 'good', live: 'good', warn: 'warn', ink: 'ink' } as const;
+  const means = $derived(tone ? MEANS[tone] : undefined);
 </script>
 
-<span class="well" data-size={size} data-tone={tone}><Icon {name} size="l" /></span>
+<span class="well" data-size={size} data-tone={tone} data-means={means} data-slot={slot} aria-hidden="true"
+  >{#if name}<Icon {name} size="l" />{:else if letter}<span class="well-letter">{letter}</span>{/if}</span
+>
 
 <style>
   .well {
@@ -34,49 +56,145 @@
     inline-size: var(--well);
     block-size: var(--well);
     border-radius: var(--r-ctl);
-    background: var(--field);
-    color: var(--ink2);
-  }
-  .well[data-size='l'] {
-    inline-size: var(--well-l);
-    block-size: var(--well-l);
+    background: var(--tile-2, var(--field));
+    color: var(--ink-2, var(--ink2));
+    font-family: var(--font-ui);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-semi);
+    line-height: 1;
   }
 
-  /* 18, between the named `--icon-m` (16) and `--icon-l` (20): the design system draws a well's icon at 18. The
-     attribute is in the selector so this outranks `Icon`'s own size rule without leaning on source order. */
+  /* 18 IN THE HEADING'S 28, between the named `--icon-m` (16) and `--icon-l` (20). The attribute is in the selector so
+     this outranks `Icon`'s own size rule without leaning on source order. */
   .well :global(.icon[data-size]) {
     inline-size: 18px;
     block-size: 18px;
   }
 
-  .well[data-tone='ink'] {
-    background: var(--ink);
-    color: var(--on-ink);
+  /* 32, A ROW'S: the icon at 16. */
+  .well[data-size='l'] {
+    inline-size: var(--well-l);
+    block-size: var(--well-l);
+    font-size: var(--fs-body);
   }
-  .well[data-tone='action'] {
-    background: var(--action-tint-1);
-    color: var(--action-text);
+
+  .well[data-size='l'] :global(.icon[data-size]) {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
   }
-  .well[data-tone='danger'] {
-    background: color-mix(in srgb, var(--danger) 12%, var(--tile));
-    color: var(--danger);
+
+  /* 40, A CARD'S: the icon at 20. */
+  .well[data-size='card'] {
+    inline-size: 40px;
+    block-size: 40px;
+    font-size: var(--fs-head);
   }
-  .well[data-tone='earn'] {
-    background: color-mix(in srgb, var(--earn) 12%, var(--tile));
-    color: var(--earn);
+
+  .well[data-size='card'] :global(.icon[data-size]) {
+    inline-size: var(--icon-l);
+    block-size: var(--icon-l);
   }
-  .well[data-tone='warn'] {
-    background: color-mix(in srgb, var(--warn) 12%, var(--tile));
+
+  /* 56, A HERO'S, at a tile's corner and the icon at 28; 48 on a phone, at the pop's corner and 24. */
+  .well[data-size='xl'] {
+    inline-size: 56px;
+    block-size: 56px;
+    border-radius: var(--r-tile);
+    font-size: var(--fs-figure);
+  }
+
+  .well[data-size='xl'] :global(.icon[data-size]) {
+    inline-size: 28px;
+    block-size: 28px;
+  }
+
+  @media (width < 640px) {
+    .well[data-size='xl'] {
+      inline-size: 48px;
+      block-size: 48px;
+      border-radius: var(--r-pop, var(--r-md));
+    }
+
+    .well[data-size='xl'] :global(.icon[data-size]) {
+      inline-size: var(--icon-xl);
+      block-size: var(--icon-xl);
+    }
+  }
+
+  /* THE TONES: a soft tint and the meaning's own colour on it, each pair 4.5:1 in both schemes. */
+  .well[data-means='late'] {
+    background: var(--red-tint, var(--action-tint-1));
+    color: var(--red, var(--action-text));
+  }
+
+  .well[data-means='good'] {
+    background: var(--good-tint, color-mix(in srgb, var(--earn) 12%, var(--tile)));
+    color: var(--good, var(--earn));
+  }
+
+  .well[data-means='warn'] {
+    background: var(--warn-tint, var(--warn-wash));
     color: var(--warn);
   }
-  .well[data-tone='live'] {
-    background: color-mix(in srgb, var(--live) 12%, var(--tile));
-    color: var(--live);
+
+  .well[data-means='ink'] {
+    background: var(--ink);
+    color: var(--tile);
+  }
+
+  /* A PROJECT'S SLOT: its tint under its colour. Each pair is solved in the theme to 4.5:1 in light and dark. */
+  .well[data-slot] {
+    background: var(--ph-tint);
+    color: var(--ph);
+  }
+
+  .well[data-slot='blue'] {
+    --ph: var(--cat-blue, var(--info));
+    --ph-tint: var(--cat-blue-tint, var(--field));
+  }
+
+  .well[data-slot='violet'] {
+    --ph: var(--cat-violet, var(--info));
+    --ph-tint: var(--cat-violet-tint, var(--field));
+  }
+
+  .well[data-slot='pink'] {
+    --ph: var(--cat-pink, var(--ink2));
+    --ph-tint: var(--cat-pink-tint, var(--field));
+  }
+
+  .well[data-slot='teal'] {
+    --ph: var(--cat-teal, var(--earn));
+    --ph-tint: var(--cat-teal-tint, var(--field));
+  }
+
+  .well[data-slot='sky'] {
+    --ph: var(--cat-sky, var(--info));
+    --ph-tint: var(--cat-sky-tint, var(--field));
+  }
+
+  .well[data-slot='gold'] {
+    --ph: var(--cat-gold, var(--warn));
+    --ph-tint: var(--cat-gold-tint, var(--field));
+  }
+
+  .well[data-slot='lime'] {
+    --ph: var(--cat-lime, var(--earn));
+    --ph-tint: var(--cat-lime-tint, var(--field));
+  }
+
+  .well[data-slot='slate'] {
+    --ph: var(--cat-slate, var(--dim));
+    --ph-tint: var(--cat-slate-tint, var(--field));
+  }
+
+  .well-letter {
+    font-variant-numeric: tabular-nums;
   }
 
   /* Forced colours drop the fill, so the chosen well keeps an edge to be told from the rest by. */
   @media (forced-colors: active) {
-    .well[data-tone='ink'] {
+    .well[data-means='ink'] {
       outline: 1px solid CanvasText;
       outline-offset: -1px;
     }
