@@ -334,6 +334,7 @@
     background: var(--tile-2);
     border-radius: var(--r-ctl);
     color: var(--ink);
+    font-size: var(--fs-body);
     line-height: 1;
   }
 
@@ -343,9 +344,10 @@
     border: 1.5px solid var(--red);
   }
 
+  /* ABOUT 11 BESIDE THE DATE AT 15, as a share of it, so the block keeps its proportion at every text size. */
   .hd-week {
     color: var(--ink-3);
-    font-size: 11px;
+    font-size: 0.75em;
     font-weight: var(--fw-medium);
     line-height: 12px;
   }
