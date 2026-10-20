@@ -57,6 +57,9 @@
   import SettingsIndex from './SettingsIndex.svelte';
   /* THE ROWS EVERY AREA SHARES, scoped under `.settings-place` below; the file says why it is global. */
   import './settings.css';
+  /* THE FORM LAYOUT EVERY AREA'S FORMS WEAR (2.A.26): two columns from 1100px, checkbox groups, number fields, the
+     submit row at the tile's foot. */
+  import '$lib/ui/forms.css';
   /* EVERY AREA TAKES `{ shell, area }` AND NOTHING ELSE, so each arm of the chain below is the same line. */
   import Appearance from './areas/Appearance.svelte';
   import SigningIn from './areas/SigningIn.svelte';
