@@ -66,6 +66,8 @@
   });
   let sending = $state(false);
   let refused = $state('');
+  /** Whether the owner opened the picker behind "⋯". */
+  let open = $state(false);
 
   async function save() {
     if (sending || picked === (decider ?? '')) return;
@@ -84,9 +86,18 @@
 </script>
 
 {#if line || owns}
-  <Tile class="decider" title={line ?? WORDS.nobodyLine}>
+  <!-- FOLDED BEHIND "⋯" (the 20 October walk): "Anybody who may decide can answer this. Who decides: Nobody [Save]"
+       opened every question and pushed the question down. The line stays when somebody is named, since that is news;
+       the picker is one press away for an owner, and opens by itself only when the record refused a name. -->
+  <div class="decider-fold">
+    {#if line}<p class="decider-line">{line}</p>{/if}
     {#if owns}
-      <div class="decider-pick">
+      <Button weight="bare" size="sm" aria-expanded={open} aria-controls="{field}-pick" aria-label={WORDS.more} onclick={() => (open = !open)}>⋯</Button>
+    {/if}
+  </div>
+  {#if owns && (open || refused !== '')}
+  <Tile class="decider" title={line ?? WORDS.nobodyLine}>
+      <div class="decider-pick" id="{field}-pick">
         <label class="decider-label" for={field}>{WORDS.pick}</label>
         <div class="decider-row">
           <select id={field} class="decider-select" bind:value={picked} disabled={sending} aria-invalid={refused !== '' ? 'true' : undefined}>
@@ -99,11 +110,26 @@
         </div>
         {#if refused}<p class="decider-said" role="alert"><Icon name="alert" size="s" />{refused}</p>{/if}
       </div>
-    {/if}
   </Tile>
+  {/if}
 {/if}
 
 <style>
+  .decider-fold {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .decider-line {
+    margin: 0;
+    margin-inline-end: auto;
+    color: var(--ink2);
+    font-size: var(--t-ui);
+  }
+
   .decider-pick {
     display: flex;
     flex-direction: column;

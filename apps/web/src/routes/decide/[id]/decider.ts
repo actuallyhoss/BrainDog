@@ -32,6 +32,7 @@ export const WORDS = {
   you: (name: string) => `${name} (you)`,
   nobody: 'Nobody',
   pick: 'Who decides',
+  more: 'Who decides this',
   save: 'Save',
   nobodyLine: 'Anybody who may decide can answer this.',
   handed: (name: string) => `${name} decides this now.`,
