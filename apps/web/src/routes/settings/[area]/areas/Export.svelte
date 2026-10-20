@@ -94,7 +94,7 @@
    */
   const words = {
     oneFile: 'Everything, in one file',
-    checkLine: 'Checked in this browser against its own manifest and signature. The file is sent nowhere.',
+    checkLine: 'Checked in this browser against its own fingerprint. The file is sent nowhere.',
     checkGo: 'Check a file',
     wayTitle: 'The way you work',
     wayLine: (things: string) => `How ${things} are set up, with your pages, figures and rules, and nothing you wrote in them.`,
@@ -157,7 +157,7 @@
        a file, which is what somebody means when they open the source of a page. The three
        layers are unchanged; only the name on the container moved. -->
   {#if lastExport}<p class="last-export">{lastExport}</p>{/if}
-  <p class="hint">{copy.exportWhat}</p>
+  <!-- WHAT THE FILE IS, ONCE: the row under says it, so the line that repeated it over the row is gone (agents F27). -->
   <!--
     AND THE COPY IS THE OWNER'S TO TAKE, WHILE THE CHECK IS ANYBODY'S.
 

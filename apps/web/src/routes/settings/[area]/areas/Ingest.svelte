@@ -17,6 +17,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import WebhookDoors from '$lib/ui/WebhookDoors.svelte';
+  import CodeLine from '$lib/ui/CodeLine.svelte';
   import { callerAt, listDoors, type Door } from '$lib/ui/webhook-doors.ts';
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
@@ -177,6 +178,10 @@
     stepTest: 'Send one to test it',
     testLine: 'Forward one message to the address. It lands in your Inbox, so look there.',
     openInbox: 'Open the Inbox',
+    /* WHERE THE HOST HAS NO DOOR (agents F27): one plain sentence, and on the hosted service no file a person cannot
+       reach. */
+    unrouted: 'Forwarding addresses are set up on the machine BrainDog runs on, in a file named',
+    unroutedHosted: 'Forwarding addresses are not offered here yet.',
   };
 </script>
 
@@ -266,9 +271,12 @@
          address and what writing and deleting that file do, so the person leaves with the thing
          they came for instead of a control that cannot work. Nothing is said about a fresh
          sign-in, because there is no door here for a sign-in to open. -->
-    <p class="hint">{mailWords.unrouted}</p>
-    <p class="hint"><code>{mailWords.tokenFile}</code></p>
-    <p class="hint">{mailWords.unroutedDoes}</p>
+    {#if shell.host === 'cloud'}
+      <p class="hint">{words.unroutedHosted}</p>
+    {:else}
+      <p class="hint">{words.unrouted} <CodeLine inline text={mailWords.tokenFile} />.</p>
+      <p class="hint">{mailWords.unroutedDoes}</p>
+    {/if}
   {:else if mintsHere === true && !anOwner}
     <!-- AND THE PERSON ONLY ONCE THE HOST HAS ANSWERED, which `mintsHere === true` is what
          says. Written as a bare `{:else if !anOwner}` this arm also caught the moment before

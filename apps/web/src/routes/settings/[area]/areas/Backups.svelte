@@ -35,9 +35,12 @@
    * matters is the row's line. The sentences stay in `copy`.
    */
   const words = {
-    notHereYet: 'Not on this host yet',
+    /* THE REWRITES OF THE UI PASS OF 20 OCTOBER (agents F27): what a person can do, not what a deployment lacks. */
+    notHereYet: 'No backups here yet',
+    exportInstead: 'Export a copy instead; it works anywhere.',
     keyOutside: 'Kept outside BrainDog',
-    askForIt: 'Asked for, not pressed',
+    keyYours: 'If you run BrainDog yourself, the key is the file you made at set-up. Keep a copy somewhere else.',
+    askForIt: 'Going back to a copy',
   };
 
   /* THE OWNER QUESTION IS SHARED with every area that has an owner's control (`settings-state.svelte.ts`).
@@ -277,7 +280,7 @@
     <!-- THE RESTORE TEST IS THE HOST'S, and true whether or not this record's copies can be listed here. -->
     {@render drillLineOf()}
     <div role="status">
-      <StateRow icon="archive" title={words.notHereYet} line={copiesSaid} action={anOwner ? exportInstead : undefined} />
+      <StateRow icon="archive" title={words.notHereYet} line={words.exportInstead} action={anOwner ? exportInstead : undefined} />
     </div>
   </Section>
 {:else if copiesFrom === 'reading'}
@@ -354,7 +357,7 @@
        purpose, so the fix is not to print it here; it is to say where it already is. -->
   <!-- ONE ROW, AND THE HOST'S HALF OF THE ANSWER AS ITS LINE. The two sentences were two paragraphs on
        both hosts, and the second is only true on a self-host, where the key is a file its owner made. -->
-  <StateRow icon="key" title={words.keyOutside} line={shell.host === 'cloud' ? copy.theKeyIs : copy.theKeyWhere} />
+  <StateRow icon="key" title={words.keyOutside} line={shell.host === 'cloud' ? copy.theKeyIs : words.keyYours} />
 </Section>
 
 <!--

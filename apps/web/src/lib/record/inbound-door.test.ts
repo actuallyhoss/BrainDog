@@ -101,7 +101,7 @@ test('THE SCREEN SAYS WHAT THE HOST CAN DO BEFORE IT OFFERS TO DO IT', () => {
   );
   assert.match(
     INGEST,
-    /mintsHere === false[\s\S]*?mailWords\.unrouted/u,
+    /mintsHere === false[\s\S]*?words\.unrouted/u,
     'a host without the door does not say so before the press',
   );
   /**
