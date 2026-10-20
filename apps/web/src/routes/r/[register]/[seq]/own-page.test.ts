@@ -6,7 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { REGISTERS } from '../../../../lib/record/held.ts';
 import { learnRowPages, ownPageIn, rowPagesOf, rowScreen } from '../../../../lib/record/row-href.ts';
+import type { RegisterDecl } from '../../../../lib/record/schema.ts';
 import { load } from './+page.ts';
 
 const pages = rowPagesOf([
@@ -31,7 +33,7 @@ const loaded = async (path: string): Promise<{ status: number; location: string 
   const url = new URL(`http://localhost${path}`);
   const [, , register = '', seq = ''] = url.pathname.replace(/^\/app\/studio/u, '').split('/');
   try {
-    await load({ params: { register, seq }, url, parent: async () => ({}) });
+    await load({ params: { register, seq }, url, parent: async () => ({}), fetch: async () => new Response('{}', { status: 500 }) });
     return null;
   } catch (e) {
     const r = e as { status?: number; location?: string };
@@ -41,12 +43,22 @@ const loaded = async (path: string): Promise<{ status: number; location: string 
 };
 
 test('THE ROUTE SENDS A PROJECT ROW TO ITS PAGE INSIDE THE RECORD, after the shell has said its pages', async () => {
-  learnRowPages([{ slug: 'kiln', about: { register: 'things', seq: 3 } }]);
+  learnRowPages([
+    { slug: 'kiln', about: { register: 'things', seq: 3 } },
+    { slug: 'ada-vine', about: { register: 'people', seq: 4 } },
+    { slug: 'review-pr', about: { register: 'skills', seq: 1 } },
+  ]);
+  REGISTERS.things = { scopes: {}, fields: [] } as unknown as RegisterDecl;
+  REGISTERS.people = { fields: [] } as unknown as RegisterDecl;
   try {
     assert.deepEqual(await loaded('/app/studio/r/things/3'), { status: 307, location: '/app/studio/p/kiln' });
     assert.equal(await loaded('/app/studio/r/things/3?fields=1'), null, 'the fields stay on the row');
     assert.equal(await loaded('/app/studio/r/tasks/3'), null, 'a row with no page stays');
+    assert.equal(await loaded('/app/studio/r/people/4'), null, 'a row of a list that is not the projects list keeps its own screen');
+    assert.equal(await loaded('/app/studio/r/skills/1'), null, 'a list not yet declared, and whose declaration was refused, stays');
   } finally {
     learnRowPages([]);
+    delete REGISTERS.things;
+    delete REGISTERS.people;
   }
 });
