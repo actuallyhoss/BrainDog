@@ -23,7 +23,7 @@ import { createClient } from '@braindog/client';
 import { copy } from '../copy.ts';
 import { currencyFor, display, labelOf } from './api.ts';
 import { REGISTERS, TITLES } from './held.ts';
-import { currencyOf } from './money.ts';
+import { currencyOf, moneyInText } from './money.ts';
 import { entryOf, orderOf, refMapOf, targetsOf, treeOf, type RecordRow, type RefMap, type Refs } from './remote.ts';
 import type { Fetch } from './row-live.ts';
 import type { Entry, Fields, Filter, RegisterDecl } from './schema.ts';
@@ -290,7 +290,9 @@ export function capturedFields(
     const value = emptiest(register, f, now, seen);
     if (value === undefined) continue;
     fields[f.id] = value;
-    filled.push(`${labelOf(f).toLowerCase()} ${display(register, f.id, value, now) ?? ''}`.trim());
+    /* SAID AS A PERSON SAYS IT: "amount £0", never the stored "amount GBP 0.00" (`moneyInText`, the home currency
+       without its code, whole when it is whole). */
+    filled.push(`${labelOf(f).toLowerCase()} ${moneyInText(display(register, f.id, value, now) ?? '')}`.trim());
   }
   return { fields, filled };
 }

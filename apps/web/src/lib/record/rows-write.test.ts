@@ -341,7 +341,8 @@ test('a typed line becomes a row the record accepts, and says what it filled in'
     state: 'open',
   });
   /* SAID IN THE READER'S SPELLING, never the record's: `owed_by_me` is "owed by me". */
-  assert.deepEqual(out.filled, ['which way Money out', 'amount GBP 0.00', 'due 3 Sep 2026', 'status Open']);
+  /* AND AN AMOUNT AS A PERSON WRITES IT, never "amount GBP 0.00": with no home currency known here its code is said after it. */
+  assert.deepEqual(out.filled, ['which way Money out', 'amount £0\u00a0GBP', 'due 3 Sep 2026', 'status Open']);
 });
 
 test('the address answers what it already says, and is never guessed at from a set', () => {
@@ -381,7 +382,7 @@ test('the currency comes from the rows on screen, never from a guess', () => {
   const seen = [entry(1, { amount: { amount: 480_000, currency: 'EUR' } })];
   const out = capturedFields('obligations', 'Rent', [], at, seen);
   assert.deepEqual(out.fields.amount, { amount: 0, currency: 'EUR' });
-  assert.ok(out.filled.includes('amount EUR 0.00'));
+  assert.ok(out.filled.includes('amount €0\u00a0EUR'), out.filled.join(', '));
 });
 
 test('both register screens write through this module', () => {
