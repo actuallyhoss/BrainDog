@@ -31,10 +31,10 @@ test('THE TEAM LIST READS THROUGH THE ADD-ON DOOR AND INSTALLS IN A SCRATCH RECO
 });
 
 test('AN OWNER IS A MEMBER, and a member is a person or an agent', () => {
-  const members = FILE.declarations.find((d) => d.register === 'members');
+  const members = FILE.declarations.find((d) => d.register === 'teammates');
   assert.deepEqual(members?.fields?.find((f) => f.id === 'kind')?.values, ['person', 'agent']);
   const tasks = FILE.declarations.find((d) => d.register === 'team_tasks');
-  assert.equal(tasks?.fields?.find((f) => f.id === 'owner')?.to, 'members');
+  assert.equal(tasks?.fields?.find((f) => f.id === 'owner')?.to, 'teammates');
   assert.deepEqual(tasks?.fields?.find((f) => f.id === 'state')?.values, ['todo', 'doing', 'review', 'blocked', 'done']);
   assert.deepEqual(tasks?.fields?.find((f) => f.id === 'priority')?.values, ['urgent', 'high', 'normal', 'low']);
 });

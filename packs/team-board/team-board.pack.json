@@ -13,7 +13,7 @@
   },
   "declarations": [
     {
-      "register": "members",
+      "register": "teammates",
       "name": "Team",
       "icon": "people",
       "one": "member",
@@ -49,7 +49,7 @@
           "default": "person"
         },
         {
-          "id": "handle",
+          "id": "login",
           "label": "Handle",
           "type": "text"
         },
@@ -89,7 +89,7 @@
           "id": "owner",
           "label": "Owner",
           "type": "ref",
-          "to": "members",
+          "to": "teammates",
           "index": true
         },
         {
@@ -162,7 +162,7 @@
       "icon": "board",
       "pack": "team-board",
       "requires": [
-        "register.members",
+        "register.teammates",
         "register.team_tasks"
       ],
       "blocks": [
@@ -444,29 +444,29 @@
   ],
   "seeds": [
     {
-      "register": "members",
+      "register": "teammates",
       "fields": {
         "name": "Mara Lindqvist",
         "kind": "person",
-        "handle": "mara",
+        "login": "mara",
         "role": "Lead"
       }
     },
     {
-      "register": "members",
+      "register": "teammates",
       "fields": {
         "name": "Teodor Vance",
         "kind": "person",
-        "handle": "teo",
+        "login": "teo",
         "role": "Design"
       }
     },
     {
-      "register": "members",
+      "register": "teammates",
       "fields": {
         "name": "Wren",
         "kind": "agent",
-        "handle": "wren",
+        "login": "wren",
         "role": "Writes drafts and fixes"
       }
     },

@@ -190,9 +190,9 @@
       "icon": "calendar-days",
       "one": "week",
       "holds": "one note a week on where the project stands and what comes next",
-      "title": "headline",
+      "title": "gist",
       "mobile": [
-        "headline",
+        "gist",
         "week_of"
       ],
       "order": {
@@ -202,7 +202,7 @@
       "pack": "new-project",
       "fields": [
         {
-          "id": "headline",
+          "id": "gist",
           "label": "Where it stands",
           "type": "text",
           "required": true,
@@ -430,7 +430,7 @@
           "source": "register.venture_weeks",
           "columns": [
             {
-              "field": "headline",
+              "field": "gist",
               "as": "title"
             },
             {
@@ -526,7 +526,7 @@
               "width": "13ch"
             },
             {
-              "field": "headline",
+              "field": "gist",
               "label": "Where it stood"
             }
           ],
@@ -705,7 +705,7 @@
     {
       "register": "venture_weeks",
       "fields": {
-        "headline": "Five conversations done, three people want to try it.",
+        "gist": "Five conversations done, three people want to try it.",
         "week_of": {
           "day": "-3"
         },
