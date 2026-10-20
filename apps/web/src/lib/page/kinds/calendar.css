@@ -32,8 +32,29 @@
   .calendar-empty,
   .calendar-skipped {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  /* MONTH OR LIST, in the tile's head where the renderer draws the choice (`opts.scenario`): a 32px segmented control at
+     the head's end, over the block's own top edge. Only where the head is there and the grid has the room to be read;
+     narrow, the month is already a strip of days over the list. */
+  .calendar-views {
+    justify-self: end;
+  }
+
+  .calendar-views .segment {
+    min-block-size: 28px;
+  }
+
+  .block-slot:has(> .block-bar) .calendar {
+    position: relative;
+  }
+
+  .block-slot:has(> .block-bar) .calendar > .calendar-views {
+    position: absolute;
+    inset-inline-end: 0;
+    inset-block-start: -44px;
   }
 
   /* ── the month grid ─────────────────────────────────────────────────────── */
@@ -48,7 +69,7 @@
   .calendar-caption {
     padding-block-end: var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: var(--lh-tight);
     text-align: start;
@@ -56,8 +77,8 @@
 
   .calendar-month th {
     padding: 0 var(--sp-2) var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     font-weight: 500;
     text-align: start;
   }
@@ -67,7 +88,7 @@
   .calendar-cell {
     block-size: 6.5rem;
     padding: var(--sp-1) var(--sp-2);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
     vertical-align: top;
     overflow: hidden;
   }
@@ -81,8 +102,9 @@
     place-items: center;
     min-inline-size: 1.75em;
     block-size: 1.75em;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
+    font-variant-numeric: tabular-nums;
   }
 
   /* TODAY IS AN INK DISC WITH THE DATE IN THE GROUND'S COLOUR, told by weight as well as
@@ -90,8 +112,8 @@
   .calendar-cell[data-today] .calendar-num,
   .calendar-day[data-today] .calendar-date {
     background: var(--ink);
-    border-radius: var(--r-pill);
-    color: var(--on-ink);
+    border-radius: var(--r-round);
+    color: var(--tile);
     font-weight: 600;
   }
 
@@ -109,8 +131,43 @@
     gap: var(--sp-1);
     min-inline-size: 0;
     color: var(--ink);
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
     line-height: var(--lh-tight);
+  }
+
+  /* AN ENTRY IS INK, NOT A LINK'S RED (the money review, F2): five bills in red underlines read as five things late. The
+     underline comes on hover; red is only a late entry's, beside its glyph. */
+  .calendar-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .calendar-title a:focus-visible {
+    text-decoration: underline;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .calendar-title a:hover {
+      text-decoration: underline;
+      text-decoration-color: var(--rule-strong);
+      text-underline-offset: 2px;
+    }
+  }
+
+  .calendar-item[data-intent='bad'] .calendar-title {
+    color: var(--red);
+  }
+
+  /* A ROW'S AMOUNT is said in the list only; a day in the grid has room for its name. */
+  .calendar-amount {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .calendar-cell .calendar-amount {
+    display: none;
   }
 
   /* One line a row in the grid: the day is a place to glance at, and the agenda has the whole title. */
@@ -128,27 +185,74 @@
   .calendar-more {
     display: block;
     margin-block-start: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
   }
 
   /* ── the agenda ─────────────────────────────────────────────────────────── */
 
+  /* A LIST IS A COLUMN A READER RUNS DOWN, not a line across 1100px: its ring and its amount stay near the name. */
   .calendar-agenda {
     display: none;
+    max-inline-size: 720px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* A DAY'S DATE IN ITS OWN COLUMN and its rows beside it, so the eye runs down the dates. */
+  /* A FEW ENTRIES ARE THE LIST AND NOT THE MONTH (`data-few`, `CALENDAR_FEW`), unless the reader asked for the month;
+     the list at any width when they asked for it. */
+  .calendar[data-few]:not([data-view='month']) .calendar-month,
+  .calendar[data-view='list'] .calendar-month {
+    display: none;
+  }
+
+  .calendar[data-few]:not([data-view='month']) .calendar-agenda,
+  .calendar[data-view='list'] .calendar-agenda {
+    display: block;
+  }
+
+  /* A DAY'S DATE IN ITS OWN COLUMN and its rows beside it, so the eye runs down the dates: the date, the name, the
+     amount at the end in tabular figures, and the entry's ring (the money review, F5). */
   .calendar-day {
     display: grid;
-    grid-template-columns: minmax(7ch, auto) minmax(0, 1fr);
+    grid-template-columns: 9ch minmax(0, 1fr);
     align-items: baseline;
     gap: var(--sp-3);
+    min-block-size: 44px;
     padding: var(--sp-2) 0;
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
+  }
+
+  .calendar-day .calendar-items {
+    gap: var(--sp-2);
+  }
+
+  .calendar-day .calendar-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  /* OPEN IS A NEUTRAL RING, late a filled red dot beside its red name and glyph (2.A.6). */
+  .calendar-day .calendar-item::after {
+    content: '';
+    grid-column: 3;
+    grid-row: 1;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-round);
+    box-shadow: inset 0 0 0 1.5px var(--ink-2);
+  }
+
+  .calendar-day .calendar-item[data-intent='bad']::after {
+    background: var(--red);
+    box-shadow: none;
+  }
+
+  .calendar-day .calendar-item > .glyph {
+    display: none;
   }
 
   .calendar-day:last-child {
@@ -158,12 +262,14 @@
   .calendar-date {
     justify-self: start;
     padding-inline: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .calendar-day .calendar-item {
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .calendar-day .calendar-title {
@@ -202,27 +308,48 @@
       display: block;
     }
 
-    /* THE TABLE BECOMES ROWS OF DAYS. The weeks are unwrapped with `contents` and the days wrap at the block's edge, as
-       many to a line as fit, so the whole month is on screen and the page never scrolls sideways. It was one strip that
-       scrolled inside the block, and a region that scrolls with nothing in it to focus is one a keyboard cannot move.
-       The days outside the month are not drawn here. */
+    .calendar-views {
+      display: none;
+    }
+
+    /* NARROW, THE MONTH IS ALWAYS THE STRIP OVER THE LIST, whatever a few entries or a choice made wide asked for. */
+    .calendar[data-few]:not([data-view='month']) .calendar-month,
+    .calendar[data-view='list'] .calendar-month {
+      display: grid;
+    }
+
+    /* THE TABLE BECOMES SEVEN COLUMNS UNDER THEIR WEEKDAY LETTERS (the money review, F5): the days wrapped "as many to a
+       line as fit" put six to a line, so 7 Sep, a Monday, sat under Tuesday. A day outside the month keeps its column
+       and draws nothing, so every date stands under its own weekday. At 390 a tile has about 318px, 45px a day. */
     .calendar-month {
-      display: block;
+      display: grid;
     }
 
     .calendar-caption {
       display: block;
-      font-size: var(--t-base);
+      font-size: var(--fs-body);
     }
 
-    .calendar-month thead {
-      display: none;
-    }
-
+    .calendar-month thead,
+    .calendar-month thead tr,
     .calendar-month tbody {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--sp-1);
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+
+    .calendar-month thead tr {
+      grid-column: 1 / -1;
+    }
+
+    /* "Mon" is drawn as its first letter: the word is still the cell's, and `abbr` names it in full. */
+    .calendar-month th {
+      padding: 0 0 var(--sp-1);
+      font-size: 0;
+      text-align: center;
+    }
+
+    .calendar-month th::first-letter {
+      font-size: var(--fs-cap);
     }
 
     .calendar-month tr {
@@ -231,18 +358,18 @@
 
     .calendar-cell {
       display: grid;
-      flex: none;
       justify-items: center;
       align-content: start;
       gap: var(--sp-1);
-      inline-size: var(--tap);
+      inline-size: auto;
+      min-block-size: 44px;
       block-size: auto;
       padding: var(--sp-1) 0;
       border: 0;
     }
 
     .calendar-cell[data-outside] {
-      display: none;
+      visibility: hidden;
     }
 
     .calendar-cell .calendar-items,
@@ -251,7 +378,7 @@
     }
 
     .calendar-num {
-      font-size: var(--t-sm);
+      font-size: var(--fs-meta);
     }
 
     /* A BUSY DAY'S DOT, drawn from the count the renderer wrote. It is `--ink2` and not a tone: a dot says "something is
@@ -265,7 +392,7 @@
     }
 
     .calendar-cell[data-count]::after {
-      background: var(--ink2);
+      background: var(--ink-2);
     }
   }
 }
