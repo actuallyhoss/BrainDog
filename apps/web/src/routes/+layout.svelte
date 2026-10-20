@@ -1155,7 +1155,7 @@
           <!-- The host's own sentence when the records could not be listed, as the rail's switcher says it. -->
           {#if recordsRefused}<li class="more-note">{recordsRefused}</li>{/if}
           <li>
-            <a class="more-row" href={at('/settings/identity')}><Icon name="settings" size="m" /><span class="more-name">{copy.recordSettings}</span></a>
+            <a class="more-row" href={at('/settings/signing-in')}><Icon name="settings" size="m" /><span class="more-name">{copy.recordSettings}</span></a>
           </li>
           <!-- NO "NEW RECORD" HERE: it opened this record's own `/start`, and it is drawn only once the host says
                the person may make a record, which `boot` does not carry yet. The rail's copy of it went the same way. -->

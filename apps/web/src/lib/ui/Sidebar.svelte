@@ -475,7 +475,7 @@
       <!-- When the records could not be listed, the host's own sentence says why. -->
       {#if refused}<p class="mi-note">{refused}</p>{/if}
       <hr class="mi-rule" />
-      <a class="mi" role="menuitem" href={at('/settings/identity')}><Icon name="settings" size="s" />{copy.recordSettings}</a>
+      <a class="mi" role="menuitem" href={at('/settings/signing-in')}><Icon name="settings" size="s" />{copy.recordSettings}</a>
       <!-- SIGN OUT AT EVERY WIDTH (LCH-A04): the rail's account menu says it as the phone's More does, with auth.ts loaded
            on the press. A press that did not end the session leaves the page where it is and says so. -->
       <button type="button" class="mi" role="menuitem" onclick={() => void import('../auth.ts').then((m) => m.signOutAndLeave(`${BASE}/signin`)).then((out) => { if (!out.ok) toasts.push(copy.signOutFailed, { intent: 'warn' }); }, () => toasts.push(copy.signOutFailed, { intent: 'warn' }))}><Icon name="lock" size="s" />{copy.signOut}</button>
