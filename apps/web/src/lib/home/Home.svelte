@@ -1347,6 +1347,7 @@
      label and value. */
   .body[data-board] :global(.block-slot[data-key='faces'] .cards-item) {
     display: flex;
+    flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-start;
