@@ -107,6 +107,43 @@ function resolveDependencies(file: string, deps: string[], { hostId, hostType }:
 }
 
 /**
+ * AND NO ROUTE'S LIST NAMES A STYLESHEET THE ROOT LAYOUT'S LIST ALREADY NAMES.
+ *
+ * Vite appends each node's stylesheets after `resolveDependencies` has run, so the rule above cannot reach them, and
+ * with the kernel out of the shell the shell's own components (`Icon`, `Kbd`, `Button`) each got a stylesheet of their
+ * own that forty route lists then repeated in the entry, 154 bytes past its recorded number. Kit draws a route only
+ * once every node of it has loaded, node 0 first among them, and node 0's load waits for its stylesheets; on a later
+ * navigation they are already in the page. So a repeat holds nothing back that the root list does not already hold.
+ *
+ * ONLY IN THE CHUNK THAT CARRIES NODE 0'S LIST, the generated app entry, and only after Vite has written the lists.
+ * A list is rewritten by index into the one table Vite emits, so a name the root list does not carry is never touched.
+ */
+const layoutCssPlugin: Plugin = {
+  name: 'braindog:layout-css-once',
+  generateBundle: {
+    order: 'post',
+    handler(_, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk') continue;
+        const table = /m\.f\|\|\(m\.f=(\[[^\]]*\])\)/u.exec(chunk.code);
+        if (table === null) continue;
+        const files: string[] = JSON.parse(table[1] ?? '[]');
+        const CALL = /__vite__mapDeps\(\[([0-9,]*)\]\)/gu;
+        const lists = [...chunk.code.matchAll(CALL)].map((m) => (m[1] ?? '').split(',').filter(Boolean).map(Number));
+        const root = lists.find((list) => list.some((i) => /(?:^|\/)nodes\/0\.[\w-]+\.js$/u.test(files[i] ?? '')));
+        if (root === undefined) continue;
+        const rootCss = new Set(root.filter((i) => files[i]?.endsWith('.css')));
+        chunk.code = chunk.code.replace(CALL, (call, ids: string) => {
+          const list = ids.split(',').filter(Boolean).map(Number);
+          if (list === root || list.some((i) => /(?:^|\/)nodes\/0\.[\w-]+\.js$/u.test(files[i] ?? ''))) return call;
+          return `__vite__mapDeps([${list.filter((i) => !rootCss.has(i)).join(',')}])`;
+        });
+      }
+    },
+  },
+};
+
+/**
  * AND `/app/<slug>/api/*`, AS WRITTEN, TO THE SAME PLACE. Under a slug `apiBase()` (`lib/at.ts`) sends every record
  * call to `/app/<slug>/api/<method>`, and with only `/api` here nothing forwarded it, so a dev tab on
  * `/app/acme/r/tasks` asked Vite for the record and Vite has none. The path is NOT rewritten to `/api`: the record
@@ -153,7 +190,7 @@ const ownWordsPlugin: Plugin = {
 };
 
 export default defineConfig({
-  plugins: [sveltekit(), entryGraphPlugin, ownWordsPlugin],
+  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin],
   define: { __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   /* `/app/catalogue` AND NOT `/catalogue`: the app is served under `/app` (`svelte.config.js`) and asks for the catalogue
