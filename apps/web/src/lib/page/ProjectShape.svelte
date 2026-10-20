@@ -5,7 +5,8 @@
   READ FOR THE ROW IT IS GIVEN, in parallel and outside the page's own read: the row, what points at it, its history and
   its three figures. It draws nothing for a row that is not a project's and nothing for a project with nothing to say, so
   a page about any other row is unchanged. While the reads are out and the list is known to be a projects list, a little
-  height is held so the page's own blocks do not jump when the shape lands.
+  height is held so the page's own blocks do not jump when the shape lands, and held as the bars every read waits in
+  (`Waiting`), busy, never a blank band under the head (the audit of 20 October: about 190px of nothing on Sketchpad).
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -22,9 +23,19 @@
   import { money } from 'braindog-render';
   import ProjectBlocks from './ProjectBlocks.svelte';
   import ProjectVisuals from './ProjectVisuals.svelte';
+  import Waiting from '$lib/ui/Waiting.svelte';
   import type { Listing, Months } from '$lib/record/visuals.ts';
 
-  let { register, seq, onshape }: { register: string; seq: number; onshape: (blocks: readonly Block[], row: Readonly<Record<string, unknown>> | null) => void } = $props();
+  let {
+    register,
+    seq,
+    onshape,
+  }: {
+    register: string;
+    seq: number;
+    /** What the shape draws, the row it drew it for, and whether its reads are back: until they are, nothing it may say is known. */
+    onshape: (blocks: readonly Block[], row: Readonly<Record<string, unknown>> | null, known: boolean) => void;
+  } = $props();
 
   type Read = {
     key: string;
@@ -93,7 +104,7 @@
   );
   const said = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
   /* WHAT THE SHAPE DRAWS, said to the page so a declared block that repeats one is left out (`repeatOf`). */
-  $effect(() => onshape(shape ? blocksOf(shape.facts) : [], shape && read ? read.fields : null));
+  $effect(() => onshape(shape ? blocksOf(shape.facts) : [], shape && read ? read.fields : null, read !== null || settled === `${register}#${seq}`));
   /* A PROJECTS LIST KNOWN BEFORE ITS ROW ANSWERS holds a little height, so the declared blocks wait where they will be. */
   const holds = $derived(read === null && settled !== `${register}#${seq}` && isProject(REGISTERS[register]));
 </script>
@@ -105,7 +116,7 @@
   <ProjectVisuals fields={read.fields} decl={REGISTERS[register]} inByMonth={read.inByMonth} outByMonth={read.outByMonth} listings={read.listings} format={said} />
 {/if}
 {#if !(shape && blocksOf(shape.facts).length > 0) && holds}
-  <div class="held" aria-hidden="true"></div>
+  <div class="held"><Waiting rows={3} /></div>
 {/if}
 
 <style>

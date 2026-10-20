@@ -176,6 +176,9 @@
   /* What the project's shape draws on this page, said by `ProjectShape` once its reads are back. */
   let shapeDrew = $state.raw<readonly Block[]>([]);
   let shapeRow = $state.raw<Readonly<Record<string, unknown>> | null>(null);
+  /* Whether the shape's reads are back. Until they are, what it runs on is taken as the shape's, so a declared Runs on
+     does not stand empty and then go when the shape lands (the audit of 20 October, his Sketchpad). */
+  let shapeKnown = $state(false);
   const about = $derived(mode === 'page' ? (live?.page.page.param ?? null) : null);
   const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
   /* AN UNBOXED ACTIONS SECTION IS COUNTED TOO, for the one case that asks: it is left out when the shape took what it heads. */
@@ -319,8 +322,11 @@
    * between the name and the page's own sentence and said less than it. Read whether or not the page opens on it, so the
    * line does not come back while arranging or reading the source.
    */
-  /* A PAGE ABOUT A ROW is the row's own: the template's default line is not his words, so it is left off there too. */
-  const headlined = $derived(!!live && (about !== null || judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs)).some((b) => b.drawn && b.kind === 'note' && b.lead === true)));
+  /* A PAGE ABOUT A ROW is the row's own: the template's default line is not his words, so it is left off there too. NOR
+     ON A PAGE AN ADD-ON BROUGHT: Money on a record whose version of it has no line of its own opened on the filler, a
+     line about pages in general, above its cash (the audit of 20 October). Its own blocks say what it is. */
+  const fromPack = $derived(!!live && typeof (live.page.page as { pack?: unknown }).pack === 'string');
+  const headlined = $derived(!!live && (about !== null || fromPack || judgedWith(live.page.blocks, counted, (bs) => emptyHidden(bs)).some((b) => b.drawn && b.kind === 'note' && b.lead === true)));
 
   /* ── arranging a home ──────────────────────────────────────────────────────
      TODAY AND DECIDE ARRANGE THEIR BODY, NOT WHAT THEIR SCREEN DREW (`home-arrange.ts`): the mode reads the body again,
@@ -430,6 +436,7 @@
     /* A SCREEN WHOSE SHELL NAMES NO READER keeps every line, as it drew them before, and the record answers a press. */
     const drawn = heldTo(inVoice(blocks, said), (list) => !shell?.me || may(shell, 'append', list));
     /* A BLOCK THE PROJECT'S SHAPE SAYS ALREADY IS LEFT OUT, by the source it declares (`repeatOf`), once the shape has it. */
+    if (about && !shapeKnown) return withoutRepeats(drawn, ['runs-on'], counted?.length ?? null, null);
     return about && shapeDrew.length > 0 ? withoutRepeats(drawn, shapeDrew, counted?.length ?? null, shapeRow) : drawn;
   });
 
@@ -688,7 +695,7 @@
     <SourceView {slug} title={live.page.page.title} />
   {:else}
     <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, as the row's own page does; its blocks follow. -->
-    {#snippet shapeAt()}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b, r) => ((shapeDrew = b), (shapeRow = r))} />{/snippet}
+    {#snippet shapeAt()}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/snippet}
     <PageBody
       mode="page"
       opens={about ? shapeAt : null}
