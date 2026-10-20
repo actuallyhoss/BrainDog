@@ -46,6 +46,7 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import '$lib/ui/forms.css';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import Preview from '../browse/Preview.svelte';
   import { drawnOrder, exportShared, listWords, moduleTitle, offeredVersion, rowTitle, speakingOf, speakingStates } from '../sharing.ts';
@@ -317,130 +318,135 @@
   {:else}
     {#if live && speaking === null}<p class="note">{copy.shareNoUseCase}</p>{/if}
 
+    <!-- TWO COLUMNS FROM 1100 (2.A.26): what goes in the file on the left, what it changes and how an installer sees it
+         on the right; the submit row inside the last tile of the first column, primary first. -->
     <form
-      class="share-form"
+      class="share-form form-two"
       onsubmit={(e) => {
         e.preventDefault();
         void download();
       }}
     >
-      <Tile class="section" data-surface="tile" title={words.about}>
-        <div class="section-body">
-          <div class="fields">
-            <div class="pair">
-              <label class="field-label" for="share-title">{copy.shareTitle}</label>
-              <div class="field"><input class="field-input" id="share-title" type="text" autocomplete="off" bind:value={title} /></div>
-            </div>
-            <div class="pair">
-              <label class="field-label" for="share-version">{copy.shareVersion}</label>
-              <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
-              {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{/if}
-            </div>
-            <fieldset class="pair steps">
-              <legend class="field-label">{copy.shareStep}</legend>
-              <label class="row-pick"><input type="radio" name="share-step" value="patch" checked={step === 'patch'} onchange={() => ((step = 'patch'), (typed = false))} /><span>{copy.shareStepPatch}</span></label>
-              <label class="row-pick"><input type="radio" name="share-step" value="minor" checked={step === 'minor'} onchange={() => ((step = 'minor'), (typed = false))} /><span>{copy.shareStepMinor}</span></label>
-            </fieldset>
-            <div class="pair">
-              <label class="field-label" for="share-summary">{copy.shareSummary}</label>
-              <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" bind:value={summary} /></div>
-            </div>
-            <div class="pair">
-              <label class="field-label" for="share-audience">{copy.shareAudience}</label>
-              <div class="field">
-                <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" bind:value={audience} />
-              </div>
-              <datalist id="share-audience-suggestions">
-                {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}
-              </datalist>
-            </div>
-          </div>
-        </div>
-      </Tile>
-
-      {#if live && own && own.registers.length > 0}
-        <Tile class="section" data-surface="tile" title={copy.shareExamples}>
+      <div class="share-col">
+        <Tile class="section" data-surface="tile" title={words.about}>
           <div class="section-body">
-            <p class="note">{count === 0 ? copy.shareExamplesNone : copy.shareExamplesPicked(count)} {copy.shareExamplesMost}</p>
-            {#each own.registers as register (register)}
-              <fieldset class="rows">
-                <legend class="rows-h">{names[register] ?? listWords(register)}</legend>
-                {#each rows[register] ?? [] as row (row.seq)}
-                  {@const on = (picked[register] ?? []).includes(row.seq)}
-                  <label class="row-pick">
-                    <input type="checkbox" checked={on} disabled={!on && (picked[register]?.length ?? 0) >= EXAMPLES_MOST} onchange={(e) => toggle(register, row.seq, e.currentTarget.checked)} />
-                    <span>{row.title}</span>
-                  </label>
-                {:else}
-                  <p class="note">{copy.shareNoRows}</p>
-                {/each}
+            <div class="fields">
+              <div class="pair">
+                <label class="field-label" for="share-title">{copy.shareTitle}</label>
+                <div class="field"><input class="field-input" id="share-title" type="text" autocomplete="off" bind:value={title} /></div>
+              </div>
+              <div class="pair">
+                <label class="field-label" for="share-version">{copy.shareVersion}</label>
+                <div class="field"><input class="field-input" id="share-version" type="text" inputmode="decimal" autocomplete="off" bind:value={version} oninput={() => (typed = true)} /></div>
+                {#if lastShared}<p class="note">{copy.shareLastShared(lastShared)}</p>{/if}
+              </div>
+              <fieldset class="pair steps">
+                <legend class="field-label">{copy.shareStep}</legend>
+                <label class="row-pick"><input type="radio" name="share-step" value="patch" checked={step === 'patch'} onchange={() => ((step = 'patch'), (typed = false))} /><span>{copy.shareStepPatch}</span></label>
+                <label class="row-pick"><input type="radio" name="share-step" value="minor" checked={step === 'minor'} onchange={() => ((step = 'minor'), (typed = false))} /><span>{copy.shareStepMinor}</span></label>
               </fieldset>
-            {/each}
+              <div class="pair">
+                <label class="field-label" for="share-summary">{copy.shareSummary}</label>
+                <div class="field"><input class="field-input" id="share-summary" type="text" autocomplete="off" bind:value={summary} /></div>
+              </div>
+              <div class="pair">
+                <label class="field-label" for="share-audience">{copy.shareAudience}</label>
+                <div class="field">
+                  <input class="field-input" id="share-audience" type="text" autocomplete="off" list="share-audience-suggestions" bind:value={audience} />
+                </div>
+                <datalist id="share-audience-suggestions">
+                  {#each AUDIENCES as a (a)}<option value={copy.shareAudiences[a]}></option>{/each}
+                </datalist>
+              </div>
+            </div>
           </div>
         </Tile>
-      {/if}
 
-      <Tile class="section" data-surface="tile" title={copy.shareExtras}>
-        <div class="section-body">
-          <p class="note">{copy.shareRailOrder}</p>
-          {#if signals.length > 0}
-            <label class="row-pick"><input type="checkbox" bind:checked={withSignals} /><span>{copy.shareSignals([...signals])}</span></label>
-          {/if}
-          <fieldset class="rows">
-            <legend class="rows-h">{copy.shareSkills}</legend>
-            {#each skillRows as skill (skill.seq)}
-              <label class="row-pick">
-                <input
-                  type="checkbox"
-                  checked={skillsPicked.includes(skill.seq)}
-                  onchange={(e) => (skillsPicked = e.currentTarget.checked ? [...skillsPicked, skill.seq] : skillsPicked.filter((n) => n !== skill.seq))}
-                />
-                <span class="pick-text">
-                  <span>{skill.title}</span>
-                  {#if skill.trigger}<span class="pick-detail">{skill.trigger}</span>{/if}
-                </span>
-              </label>
-            {:else}
-              <p class="note">{copy.shareNoSkills}</p>
-            {/each}
-          </fieldset>
-        </div>
-      </Tile>
-
-      {#if draft}
-        <Tile icon="refresh" title={draft.state === 'ready' && draft.since !== null ? words.changesSince(draft.since) : words.changesFirst} count={draft.state === 'ready' && lines.length > 0 ? lines.length : undefined}>
-          {#if draft.state === 'reading'}
-            <p class="note" role="status">{words.drafting}</p>
-          {:else if draft.state === 'refused'}
-            <p class="note">{draft.fix}</p>
-          {:else}
-            {#if draft.since === null}<p class="note">{words.firstAll}</p>{/if}
-            {#if lines.length > 0}
-              <ul class="changes">
-                {#each lines as line, i (i)}<li>{line}</li>{/each}
-              </ul>
-            {:else if draft.since !== null}
-              <p class="note">{words.noChanges}</p>
-            {/if}
-          {/if}
-        </Tile>
-        {#if installerView}
-          <Tile icon="eye" title={words.installer}>
-            <Preview preview={installerView} large />
+        {#if live && own && own.registers.length > 0}
+          <Tile class="section" data-surface="tile" title={copy.shareExamples}>
+            <div class="section-body">
+              <p class="note">{count === 0 ? copy.shareExamplesNone : copy.shareExamplesPicked(count)} {copy.shareExamplesMost}</p>
+              {#each own.registers as register (register)}
+                <fieldset class="rows">
+                  <legend class="rows-h">{names[register] ?? listWords(register)}</legend>
+                  {#each rows[register] ?? [] as row (row.seq)}
+                    {@const on = (picked[register] ?? []).includes(row.seq)}
+                    <label class="row-pick">
+                      <input type="checkbox" checked={on} disabled={!on && (picked[register]?.length ?? 0) >= EXAMPLES_MOST} onchange={(e) => toggle(register, row.seq, e.currentTarget.checked)} />
+                      <span>{row.title}</span>
+                    </label>
+                  {:else}
+                    <p class="note">{copy.shareNoRows}</p>
+                  {/each}
+                </fieldset>
+              {/each}
+            </div>
           </Tile>
         {/if}
-      {/if}
 
-      {#if wrong}<p class="wrong" role="alert">{wrong}</p>{/if}
-      {#if sent}
-        <p class="sent" role="status">{publishedSaid(sent)} <a href={at(publishedHref(sent))}>{publishedLink(sent)}</a></p>
-      {/if}
-      <div class="actions">
-        <Button weight="primary" type="submit" disabled={busy || !live}>{copy.shareDownload}</Button>
-        <Button disabled={publishing || !live} aria-busy={publishing ? 'true' : undefined} onclick={() => void publish()}>
-          {publishing ? publishWords.publishing : publishWords.publish}
-        </Button>
+        <Tile class="section" data-surface="tile" title={copy.shareExtras}>
+          <div class="section-body">
+            <p class="note">{copy.shareRailOrder}</p>
+            {#if signals.length > 0}
+              <label class="row-pick"><input type="checkbox" bind:checked={withSignals} /><span>{copy.shareSignals([...signals])}</span></label>
+            {/if}
+            <fieldset class="rows">
+              <legend class="rows-h">{copy.shareSkills}</legend>
+              {#each skillRows as skill (skill.seq)}
+                <label class="row-pick">
+                  <input
+                    type="checkbox"
+                    checked={skillsPicked.includes(skill.seq)}
+                    onchange={(e) => (skillsPicked = e.currentTarget.checked ? [...skillsPicked, skill.seq] : skillsPicked.filter((n) => n !== skill.seq))}
+                  />
+                  <span class="pick-text">
+                    <span>{skill.title}</span>
+                    {#if skill.trigger}<span class="pick-detail">{skill.trigger}</span>{/if}
+                  </span>
+                </label>
+              {:else}
+                <p class="note">{copy.shareNoSkills}</p>
+              {/each}
+            </fieldset>
+          </div>
+          {#if wrong}<p class="wrong" role="alert">{wrong}</p>{/if}
+          {#if sent}
+            <p class="sent" role="status">{publishedSaid(sent)} <a href={at(publishedHref(sent))}>{publishedLink(sent)}</a></p>
+          {/if}
+          <div class="actions form-submit">
+            <Button weight="primary" type="submit" disabled={busy || !live}>{copy.shareDownload}</Button>
+            <Button disabled={publishing || !live} aria-busy={publishing ? 'true' : undefined} onclick={() => void publish()}>
+              {publishing ? publishWords.publishing : publishWords.publish}
+            </Button>
+          </div>
+        </Tile>
       </div>
+
+      {#if draft}
+        <div class="share-col">
+          <Tile icon="refresh" title={draft.state === 'ready' && draft.since !== null ? words.changesSince(draft.since) : words.changesFirst} count={draft.state === 'ready' && lines.length > 0 ? lines.length : undefined}>
+            {#if draft.state === 'reading'}
+              <p class="note" role="status">{words.drafting}</p>
+            {:else if draft.state === 'refused'}
+              <p class="note">{draft.fix}</p>
+            {:else}
+              {#if draft.since === null}<p class="note">{words.firstAll}</p>{/if}
+              {#if lines.length > 0}
+                <ul class="changes">
+                  {#each lines as line, i (i)}<li>{line}</li>{/each}
+                </ul>
+              {:else if draft.since !== null}
+                <p class="note">{words.noChanges}</p>
+              {/if}
+            {/if}
+          </Tile>
+          {#if installerView}
+            <Tile icon="eye" title={words.installer}>
+              <Preview preview={installerView} large />
+            </Tile>
+          {/if}
+        </div>
+      {/if}
     </form>
   {/if}
 </div>
@@ -471,9 +477,15 @@
      inside it, so a title box is never 1,600 wide. Groups sit 28 apart, so each reads as its own heading and what it
      heads. */
   .share-form {
+    align-items: start;
+    min-inline-size: 0;
+  }
+
+  /* EACH COLUMN IS ITS TILES, 20 apart; the second is what the file changes and how an installer sees it. */
+  .share-col {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
+    gap: var(--sp-5);
     min-inline-size: 0;
   }
 
@@ -590,10 +602,9 @@
     text-decoration: underline;
   }
 
+  /* THE SUBMIT ROW AT THE FOOT OF THE LAST TILE (`.form-submit`), 24 under what it sends. */
   .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-2);
+    margin-block-start: var(--sp-5);
   }
 
   @media (width < 900px) {
