@@ -595,7 +595,8 @@ function hiddenOf(h: Hide | undefined, l: CatalogList): string[] {
   return named.filter((f) => !title.has(f));
 }
 
-function narrowFault(n: unknown): string | null {
+/** Why a token's narrowing is not a target or a share by id, by shape alone, or `null`. */
+export function narrowFault(n: unknown): string | null {
   if (isObj(n) && Object.keys(n).join() === 'share') return isText(n.share) ? null : 'A narrowing by share names its id.';
   return targetFault(n);
 }

@@ -120,9 +120,12 @@ import {
   SCOPES,
   createToken,
   listTokens,
+  mintChild,
   noteTool,
+  pruneChildren,
   revokeToken,
   verifyToken,
+  type ChildArgs,
   type CreateTokenArgs,
   type Minted,
   type Scope,
@@ -130,6 +133,7 @@ import {
   type TokenRow,
   type Verified,
 } from './token.ts';
+import type { Narrow as TokenNarrowOf } from './lens.ts';
 import {
   decide,
   getGovernance,
@@ -657,6 +661,7 @@ export { PANEL_TABLE, PANELS } from './kinds/words.ts';
 export { CEILING, CLIENT_KINDS, SCOPES, ceilingOf, DEFAULT_DAYS as TOKEN_DAYS } from './token.ts';
 export { cutOffReadable, endedByCutOff, isBuild } from './token.ts';
 export { AGENTS_KEY, agentCap, agentsFull, liveAgents, type AgentCap } from './token.ts';
+export { CHILD_MINUTES_MOST } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member } from './members.ts';
@@ -677,7 +682,7 @@ export { dayOf as shareDayOf, sentenceOf as shareSentenceOf, type ShareNames, ty
 export { SHARE_TEMPLATES, type ShareTemplate, type TemplateAsk as ShareTemplateAsk, type TemplateRow as ShareTemplateRow } from './share-templates.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
-export type { ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
+export type { ChildArgs, ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
 /* THE JOB QUEUE'S NAMES (`jobs.ts`, `kernel.jobs`). Its `Claimed` stays unexported here, because the scheduler's `Claimed`
    already has the name; a caller reads it as `ReturnType` of `kernel.jobs.claim`. */
 export { JOB_EVENT_KINDS, JOB_LEASE_MS, JOB_MCP_PATH, JOB_MCP_PREFIX, JOB_PERMISSIONS, JOB_STATUSES, commandOf, fillPrompt, jobBody } from './jobs.ts';
@@ -8076,6 +8081,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     }
     /* A DEVICE GRANT past its time, or silent for fourteen days, is let go in the same hour. */
     transaction(() => deviceSweep(tokenDeps()));
+    /* AND A CHILD KEY PAST ITS HOUR, which verifies as nothing and only fills the token table (`pruneChildren`). */
+    transaction(() => pruneChildren(sql, clock.now()));
     /* A JOB NOBODY TOOK IN A DAY, OR ONE WHOSE MACHINE STOPPED ANSWERING, is let go in the same hour (`jobs.ts`). */
     transaction(() => sweepJobs(tokenDeps()));
     /* AND THE DOOR'S MARKS once thirty days old, which no sign reads any more (`door.ts`). */
@@ -9812,7 +9819,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       });
     },
 
-    access: (person: string) => access(sql, person),
+    /** What a person holds here; an agent's narrowing chain, handed in, comes back on the answer (a stub until slice 5). */
+    access: (person: string, narrows?: readonly TokenNarrowOf[]) => access(sql, person, narrows),
 
     /**
      * Who owns this record, by id.
@@ -9891,6 +9899,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      */
     verifyToken: (bearer: string, surface?: string, validFrom?: string, build?: string): Promise<Result<Verified>> =>
       verifyToken({ ...tokenDeps(), validFrom }, bearer, surface, build),
+
+    /**
+     * A short key under a working one, proved by the parent's bearer (`mintChild` in `token.ts`). HOST-ONLY: the record's
+     * own `mintChild` is its one caller, and no route reaches either. `validFrom` is the host's cut-off, as for a verify.
+     */
+    mintChild: (bearer: string, args: ChildArgs, validFrom?: string): Promise<Result<Minted>> =>
+      Promise.resolve({ ...tokenDeps(), validFrom }).then((deps) => transaction(() => mintChild(deps, bearer, args))),
 
     /** A session on this key called a tool: its `last_tool_at` moves to now, with no event (AGT-A02). */
     noteTool: (tokenId: string): void => noteTool(sql, tokenId, instant(clock.now())),

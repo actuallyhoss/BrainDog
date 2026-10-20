@@ -19,6 +19,7 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { compile, type Compiled, type Json, type Schema } from '@braindog/where';
 
+import type { Narrow } from './lens.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
 import { instant } from './migrate.ts';
 
@@ -86,11 +87,16 @@ export type MemberDeps = {
  * `registers` IS THE CEILING AND `null` IS "ALL OF THEM". A person with a register-scoped row holds
  * that register and nothing else — which is what makes "invite the bookkeeper to one register"
  * true rather than decorative.
+ *
+ * `narrows` IS AN AGENT'S CHAIN, as `verifyToken` answers it (`Verified.narrows`: the parent's narrowing, then the key's
+ * own). Handed in, it comes back on the answer so the lens can AND every link into what the person holds. A STUB: no
+ * reader applies it yet, and the sharing plan's slice 5 turns this answer into a lens that does (`lensOf`'s `token`).
  */
 export function access(
   sql: Sql,
   person: string,
-): { level: Level | null; registers: string[] | null; levels: Record<string, Level>; wheres?: Wheres } | null {
+  narrows?: readonly Narrow[],
+): { level: Level | null; registers: string[] | null; levels: Record<string, Level>; wheres?: Wheres; narrows?: Narrow[] } | null {
   /* A SUSPENDED PERSON HOLDS NOTHING, and until now the column was a thing the interface could show
      and the ladder could not enforce: `access` read only `member`, `verifyToken` joined nothing, and
      a suspension was a label. Suspending somebody is what you do when you cannot yet decide whether
@@ -158,6 +164,7 @@ export function access(
     registers: whole ? null : scoped.map((r) => r.register),
     levels: Object.fromEntries(scoped.map((r) => [r.register, r.level])),
     ...(Object.keys(wheres).length === 0 ? {} : { wheres }),
+    ...(narrows === undefined || narrows.length === 0 ? {} : { narrows: [...narrows] }),
   };
 }
 

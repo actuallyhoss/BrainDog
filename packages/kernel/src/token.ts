@@ -23,6 +23,7 @@ import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
 import type { Rung } from './change-kind.ts';
+import { narrowFault, type Narrow } from './lens.ts';
 import { instant } from './migrate.ts';
 
 /** The three. There is no fourth, and there is deliberately no `admin`. */
@@ -101,6 +102,14 @@ export type TokenRow = {
   person_name?: string | null;
   /** Who the app is, on a token whose host said so when it was minted. Absent on every other, and every older one. */
   client?: TokenClient;
+  /** What the key is held to beyond its person (`token_lens.narrow`). Absent on a key narrowed to nothing more. */
+  narrow?: Narrow;
+  /**
+   * The short keys minted under this one (`mintChild`), newest first, on `listTokens`'s root rows only. Absent when it has
+   * none. A child is never a row of its own in the listing: it is its parent's key for an hour, and revoking the parent
+   * ends it.
+   */
+  children?: TokenRow[];
 };
 
 const VISIBLE =
@@ -173,11 +182,30 @@ const reachOf = (column: string | null): TokenReach[] => {
   return Array.isArray(parsed) ? TOKEN_REACHES.filter((r) => parsed.includes(r)) : [];
 };
 
-type Stored = Omit<TokenRow, 'reach' | 'ended_by' | 'client'> & {
+type Stored = Omit<TokenRow, 'reach' | 'ended_by' | 'client' | 'narrow' | 'children'> & {
   reach: string | null;
   client_id: string | null;
   client_kind: string | null;
   host: string | null;
+  /** From `token_lens`, on the listing's query only. */
+  parent_id?: string | null;
+  narrow?: string | null;
+};
+
+/**
+ * A `token_lens.narrow` column as the narrowing it holds: `null` for none, `undefined` for text that is not one.
+ *
+ * UNREADABLE IS NOT NONE. A narrowing that cannot be read is a key somebody meant to hold to less, so `verifyToken`
+ * refuses it rather than reading it as a key held to nothing more.
+ */
+const narrowOf = (column: string | null | undefined): Narrow | null | undefined => {
+  if (column === null || column === undefined) return null;
+  try {
+    const parsed: unknown = JSON.parse(column);
+    return narrowFault(parsed) === null ? (parsed as Narrow) : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 /** The three client columns as one value, or `undefined` when the token was minted with none. */
@@ -197,20 +225,22 @@ const LISTED =
   't.created_at AS created_at, t.last_used_at AS last_used_at, t.last_surface AS last_surface, ' +
   't.last_build AS last_build, t.last_tool_at AS last_tool_at, ' +
   't.expires_at AS expires_at, t.revoked_at AS revoked_at, t.client_id AS client_id, t.client_kind AS client_kind, ' +
-  't.host AS host, COALESCE(p.name, p.email) AS person_name ' +
-  'FROM token t LEFT JOIN person p ON p.id = t.person_id';
+  't.host AS host, COALESCE(p.name, p.email) AS person_name, l.parent_id AS parent_id, l.narrow AS narrow ' +
+  'FROM token t LEFT JOIN person p ON p.id = t.person_id LEFT JOIN token_lens l ON l.token_id = t.id';
 
 /**
  * A stored row as a listing shows it, marked when the cut-off has ended it. A revoked row is not marked: somebody ended
  * it before the operator did, and that is the reason the list already gives.
  */
 const rowOf = (raw: Stored, validFrom?: string): TokenRow => {
-  const { client_id: _id, client_kind: _kind, host: _host, ...rest } = raw;
+  const { client_id: _id, client_kind: _kind, host: _host, parent_id: _parent, narrow: _narrow, ...rest } = raw;
   const client = clientOf(raw);
+  const narrow = narrowOf(raw.narrow);
   return {
     ...rest,
     reach: reachOf(raw.reach),
     ...(client === undefined ? {} : { client }),
+    ...(narrow === null || narrow === undefined ? {} : { narrow }),
     ...(raw.revoked_at === null && endedByCutOff(validFrom, raw.created_at) ? { ended_by: 'operator' as const } : {}),
   };
 };
@@ -219,6 +249,8 @@ const rowOf = (raw: Stored, validFrom?: string): TokenRow => {
 export const DEFAULT_DAYS = 90;
 /** A year. Past it a token is a password somebody wrote on a sticky note. */
 const MAX_DAYS = 365;
+/** The longest a child key lives, in minutes: an hour, which is what an OAuth app's access token is (sharing plan 2.9). */
+export const CHILD_MINUTES_MOST = 60;
 
 export type TokenDeps = {
   sql: Sql;
@@ -281,11 +313,13 @@ const JOB_LABEL = 'job:';
  */
 export function liveAgents(deps: Pick<TokenDeps, 'sql' | 'nowMs' | 'validFrom'>): number {
   const jobs = deps.sql.one("SELECT 1 AS hit FROM sqlite_master WHERE type = 'table' AND name = 'job'") !== undefined;
+  /* A CHILD IS NOT AN AGENT EITHER: it is its parent's key for an hour, and the parent is the one counted. */
   return deps.sql
     .all<{ created_at: string }>(
       `SELECT t.created_at AS created_at FROM token t
        WHERE t.revoked_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > ?)
          AND (t.label IS NULL OR substr(t.label, 1, 7) <> 'report:')
+         AND NOT EXISTS (SELECT 1 FROM token_lens l WHERE l.token_id = t.id AND l.parent_id IS NOT NULL)
          ${jobs ? `AND NOT EXISTS (SELECT 1 FROM job j WHERE t.label = '${JOB_LABEL}' || j.id AND j.status = 'claimed')` : ''}`,
       instant(deps.nowMs),
     )
@@ -320,6 +354,12 @@ export type CreateTokenArgs = {
    * the record's methods take it from a host-only context. Left out, the token says nothing about its app.
    */
   client?: TokenClient;
+  /**
+   * What the key is held to beyond its person: lists, a project, a condition, rows, or one of the person's shares by id
+   * (`Narrow` in `lens.ts`). ANDed into everything its person sees, so it can only take away. Left out, the key sees
+   * what its person sees. The record checks it names nothing outside the minter's own reach before it gets here.
+   */
+  narrow?: Narrow;
 };
 
 const b64url = (bytes: Uint8Array): string => {
@@ -379,6 +419,11 @@ export async function createToken(
       allowed: CLIENT_KINDS,
     });
 
+  if (args.narrow !== undefined) {
+    const bad = narrowFault(args.narrow);
+    if (bad !== null) return no<Minted>('VALUE_MALFORMED', `A key is narrowed to lists, a project, a condition, rows or a share. ${bad}`, { at: 'narrow' });
+  }
+
   const record = deps.recordId();
   if (!record)
     return no<Minted>('OUT_OF_BOUNDS', 'This record has no id yet, and a bearer carries the record it is for.', { at: 'record' });
@@ -411,6 +456,8 @@ export async function createToken(
     client?.kind ?? null,
     client?.host ?? null,
   );
+  if (args.narrow !== undefined)
+    deps.sql.exec('INSERT INTO token_lens (token_id, parent_id, narrow, made_by, made_at) VALUES (?, NULL, ?, ?, ?)', id, JSON.stringify(args.narrow), person, at);
   /* THE REACH GOES IN `field`, WHICH IS WHAT A GRANT IS ON. A person's level names the list it is held to there, and a
      token's names what it opens beyond its scope, so who let an agent read the inbox, and when, is one query over the
      log. `to_v` stays the scope, which is what Home's sentence for a new key reads. */
@@ -437,8 +484,18 @@ export async function createToken(
  * working in an incident says so on the owner's list rather than looking live. Each row says whose it is
  * (`person_name`), since a colleague may hold tokens of their own.
  */
-export const listTokens = (sql: Sql, validFrom?: string): TokenRow[] =>
-  sql.all<Stored>(`${LISTED} ORDER BY t.created_at DESC, t.id`).map((raw) => rowOf(raw, validFrom));
+export function listTokens(sql: Sql, validFrom?: string): TokenRow[] {
+  const roots: TokenRow[] = [];
+  const kids = new Map<string, TokenRow[]>();
+  for (const raw of sql.all<Stored>(`${LISTED} ORDER BY t.created_at DESC, t.id`)) {
+    const row = rowOf(raw, validFrom);
+    const parent = raw.parent_id ?? null;
+    if (parent === null) roots.push(row);
+    else kids.set(parent, [...(kids.get(parent) ?? []), row]);
+  }
+  /* A CHILD WHOSE PARENT IS NOT LISTED IS NOT LISTED EITHER: it verifies as nothing, and the nightly prune takes it. */
+  return roots.map((r) => (kids.has(r.id) ? { ...r, children: kids.get(r.id)! } : r));
+}
 
 /**
  * Revoke one.
@@ -455,6 +512,14 @@ export function revokeToken(deps: TokenDeps, person: string, id: string): Result
 
   const at = instant(deps.nowMs);
   deps.sql.exec('UPDATE token SET revoked_at = ? WHERE id = ?', at, id);
+  /* AND EVERY CHILD WITH IT, in the same statement's transaction and with no event of its own: a child is its parent's
+     key, and the parent's revoke is the line the log keeps. `verifyToken` refuses a revoked parent's child anyway, so
+     this is what the listing says, not what stops it. */
+  deps.sql.exec(
+    'UPDATE token SET revoked_at = ? WHERE revoked_at IS NULL AND id IN (SELECT token_id FROM token_lens WHERE parent_id = ?)',
+    at,
+    id,
+  );
   deps.sql.exec(
     "INSERT INTO event (id, ts, actor, kind, target, target_kind, to_v) VALUES (?, ?, ?, 'access.revoke', ?, 'token', ?)",
     deps.mint(),
@@ -473,13 +538,108 @@ export function revokeToken(deps: TokenDeps, person: string, id: string): Result
  * record's inbox gate trusts it for exactly that reason.
  */
 export type Verified = {
+  /**
+   * The agent the call is: the token's own id, or, for a child holding its parent's scope, the parent's, so an OAuth
+   * app is one agent on the ladder and in the log however many hourly keys it has been through. A child minted to a
+   * lower scope is an agent of its own, because the ladder reads a grant's scope by this id (`ladder.ts`'s `grantOf`).
+   */
   id: string;
   person_id: string;
   scope: Scope;
   reach: TokenReach[];
   /** Who the app is, when its host said so at minting: what a change of client is noticed by. */
   client?: TokenClient;
+  /**
+   * What the key is held to beyond its person, parent's first: every one is ANDed in (`lensOf`'s token narrowing).
+   * Absent for a key narrowed to nothing more. Carried, not yet applied: the sharing plan's slice 5 reads it.
+   */
+  narrows?: Narrow[];
+  /** Present when the bearer was a child key (`mintChild`): its own id, and its parent's. */
+  child?: { id: string; parent: string };
 };
+
+/** A token row as a bearer finds it, with its person's suspension and, for a child, its parent's row beside it. */
+type Held = {
+  id: string;
+  person_id: string;
+  scope: Scope;
+  reach: string | null;
+  label: string | null;
+  created_at: string;
+  expires_at: string | null;
+  revoked_at: string | null;
+  suspended_at: string | null;
+  client_id: string | null;
+  client_kind: string | null;
+  host: string | null;
+  narrow: string | null;
+  parent_id: string | null;
+  parent_person: string | null;
+  parent_scope: Scope | null;
+  parent_created: string | null;
+  parent_expires: string | null;
+  parent_revoked: string | null;
+  parent_narrow: string | null;
+  /** The parent's own parent, which no key may have: children are one deep. */
+  grand: string | null;
+};
+
+/**
+ * The row a bearer names, if it still works, and the narrowing it carries: `null` for an unknown, revoked, expired or
+ * cut-off bearer, a suspended person's, or a child whose parent no longer works.
+ *
+ * THE PERSON'S SUSPENSION TRAVELS WITH THE TOKEN. A token is a capability handed to an agent by a PERSON — that is the
+ * whole of what the second ladder means — so a suspended person's agent must stop with them. This once joined nothing,
+ * and both hosts happened to call `access` afterwards, which closed the door by accident of call order rather than by a
+ * check: any caller of `verifyToken` alone re-opened it.
+ *
+ * AND A CHILD STOPS WITH ITS PARENT, read in the same statement: the parent revoked, run out or ended by the cut-off
+ * ends every child at its next call, whatever the child's own row says. A child is the same person's as its parent and
+ * one deep, and one that is not is refused as a key nobody made.
+ */
+async function heldBy(deps: TokenDeps, bearer: string): Promise<{ row: Held; narrows: Narrow[] } | null> {
+  const cut = bearer.indexOf('.');
+  const record = cut < 0 ? '' : bearer.slice(0, cut);
+  const secret = cut < 0 ? '' : bearer.slice(cut + 1);
+  /* THE RECORD IS CHECKED FIRST AND THE ANSWER IS THE SAME EITHER WAY. A different sentence for "a
+     token, but not for this record" would tell whoever is guessing which half they got right. */
+  if (!record || !secret || record !== deps.recordId()) return null;
+
+  const row = deps.sql.one<Held>(
+    `SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.reach AS reach, t.label AS label, t.created_at AS created_at,
+            t.expires_at AS expires_at, t.revoked_at AS revoked_at, p.suspended_at AS suspended_at,
+            t.client_id AS client_id, t.client_kind AS client_kind, t.host AS host,
+            l.narrow AS narrow, l.parent_id AS parent_id,
+            pt.person_id AS parent_person, pt.scope AS parent_scope, pt.created_at AS parent_created,
+            pt.expires_at AS parent_expires, pt.revoked_at AS parent_revoked, pl.narrow AS parent_narrow, pl.parent_id AS grand
+     FROM token t LEFT JOIN person p ON p.id = t.person_id
+       LEFT JOIN token_lens l ON l.token_id = t.id
+       LEFT JOIN token pt ON pt.id = l.parent_id
+       LEFT JOIN token_lens pl ON pl.token_id = pt.id
+     WHERE t.hash = ?`,
+    await deps.digest(secret),
+  );
+  const now = instant(deps.nowMs);
+  if (!row || row.revoked_at || row.suspended_at) return null;
+  if (row.expires_at && row.expires_at <= now) return null;
+  /* THE OPERATOR'S CUT-OFF ANSWERS AS AN UNKNOWN BEARER DOES, so the instant cannot be found by probing: a caller
+     learns only that this bearer does not work, and the operator who set the instant already knows why. */
+  if (endedByCutOff(deps.validFrom, row.created_at)) return null;
+  if (row.parent_id !== null) {
+    if (row.parent_person === null || row.parent_person !== row.person_id || row.grand !== null) return null;
+    if (row.parent_revoked !== null || (row.parent_expires !== null && row.parent_expires <= now)) return null;
+    if (endedByCutOff(deps.validFrom, row.parent_created)) return null;
+    if (row.parent_scope === null || rank(row.scope) > rank(row.parent_scope)) return null;
+  }
+  const own = narrowOf(row.narrow);
+  const parents = narrowOf(row.parent_narrow);
+  /* A NARROWING THAT CANNOT BE READ IS A KEY HELD TO LESS THAN ANYBODY CAN SAY, so it opens nothing. */
+  if (own === undefined || parents === undefined) return null;
+  return { row, narrows: [parents, own].filter((n): n is Narrow => n !== null) };
+}
+
+/** Where a scope stands in `read ⊂ propose ⊂ write`. */
+const rank = (scope: Scope): number => SCOPES.indexOf(scope);
 
 /**
  * A bearer, checked.
@@ -487,66 +647,120 @@ export type Verified = {
  * THE HASH IS COMPARED AND THE SECRET IS NEVER STORED, so this is the only way a token is recognised
  * and there is no other. A revoked or expired row verifies as nothing — not as a lesser scope, and
  * not with a warning: a credential that half works is a credential nobody replaces. So does a row made
- * before the operator's cut-off, `deps.validFrom`.
+ * before the operator's cut-off, `deps.validFrom`, and a child whose parent is any of those (`heldBy`).
  *
  * AND THE USE IS RECORDED WITHOUT AN EVENT. `last_used_at` is what makes a listing say "this one has
  * not been used since March", which is how somebody decides what to revoke. An event per call would
- * be a ledger of an agent's polling.
+ * be a ledger of an agent's polling. A child's use is its parent's too, so the app's row says it is in use.
  *
  * `build` IS WHAT THE COMMAND SAID IT WAS (`x-braindog-cli`), kept in the same statement, so a call costs no write more.
  * A value that is not a build (`isBuild`) is dropped and the build already kept stays: a header anybody can send is not
  * let into a column a person reads.
  */
 export async function verifyToken(deps: TokenDeps, bearer: string, surface?: string, build?: string): Promise<Result<Verified>> {
-  const cut = bearer.indexOf('.');
-  const record = cut < 0 ? '' : bearer.slice(0, cut);
-  const secret = cut < 0 ? '' : bearer.slice(cut + 1);
-  const wrong = no<Verified>('FORBIDDEN', 'That bearer is not one this record knows.', { at: 'authorization' });
-
-  /* THE RECORD IS CHECKED FIRST AND THE ANSWER IS THE SAME EITHER WAY. A different sentence for "a
-     token, but not for this record" would tell whoever is guessing which half they got right. */
-  if (!record || !secret || record !== deps.recordId()) return wrong;
-
-  /* THE PERSON'S SUSPENSION TRAVELS WITH THE TOKEN. A token is a capability handed to an agent by a
-     PERSON — that is the whole of what the second ladder means — so a suspended person's agent must
-     stop with them. This joined nothing, and both hosts happened to call `access` afterwards, which
-     closed the door by accident of call order rather than by a check: any caller of `verifyToken`
-     alone re-opened it. */
-  const row = deps.sql.one<{
-    id: string;
-    person_id: string;
-    scope: Scope;
-    reach: string | null;
-    created_at: string;
-    expires_at: string | null;
-    revoked_at: string | null;
-    suspended_at: string | null;
-    client_id: string | null;
-    client_kind: string | null;
-    host: string | null;
-  }>(
-    `SELECT t.id AS id, t.person_id AS person_id, t.scope AS scope, t.reach AS reach, t.created_at AS created_at,
-            t.expires_at AS expires_at, t.revoked_at AS revoked_at, p.suspended_at AS suspended_at,
-            t.client_id AS client_id, t.client_kind AS client_kind, t.host AS host
-     FROM token t LEFT JOIN person p ON p.id = t.person_id WHERE t.hash = ?`,
-    await deps.digest(secret),
-  );
-  if (!row || row.revoked_at || row.suspended_at) return wrong;
-  if (row.expires_at && row.expires_at <= instant(deps.nowMs)) return wrong;
-  /* THE OPERATOR'S CUT-OFF ANSWERS AS AN UNKNOWN BEARER DOES, so the instant cannot be found by probing: a caller
-     learns only that this bearer does not work, and the operator who set the instant already knows why. Checked before
-     the use is written, because a refused bearer was not used. */
-  if (endedByCutOff(deps.validFrom, row.created_at)) return wrong;
+  const held = await heldBy(deps, bearer);
+  if (held === null) return no<Verified>('FORBIDDEN', 'That bearer is not one this record knows.', { at: 'authorization' });
+  const { row, narrows } = held;
 
   deps.sql.exec(
-    'UPDATE token SET last_used_at = ?, last_surface = ?, last_build = COALESCE(?, last_build) WHERE id = ?',
+    'UPDATE token SET last_used_at = ?, last_surface = ?, last_build = COALESCE(?, last_build) WHERE id IN (?, ?)',
     instant(deps.nowMs),
     surface ?? null,
     build !== undefined && isBuild(build) ? build : null,
     row.id,
+    row.parent_id ?? row.id,
   );
   const client = clientOf(row);
-  return ok({ id: row.id, person_id: row.person_id, scope: row.scope, reach: reachOf(row.reach), ...(client === undefined ? {} : { client }) });
+  const agent = row.parent_id !== null && row.scope === row.parent_scope ? row.parent_id : row.id;
+  return ok({
+    id: agent,
+    person_id: row.person_id,
+    scope: row.scope,
+    reach: reachOf(row.reach),
+    ...(client === undefined ? {} : { client }),
+    ...(narrows.length === 0 ? {} : { narrows }),
+    ...(row.parent_id === null ? {} : { child: { id: row.id, parent: row.parent_id } }),
+  });
+}
+
+/** What a child key is minted with. `scope` and `narrow` left out are the parent's own. */
+export type ChildArgs = { minutes: number; scope?: Scope; narrow?: Narrow };
+
+/**
+ * A short key under a working one (sharing plan 2.9), and the only copy of its secret. HOST-ONLY: the record's
+ * `mintChild` is never a route, and the parent is proved by its bearer, never named by its id.
+ *
+ * NEVER MORE THAN ITS PARENT. The same person; a scope no higher; a life that ends at `minutes` from now or at the
+ * parent's end, whichever is first; the parent's reach and app; and its narrowing ANDed onto the parent's
+ * (`verifyToken` reads both). A child has no children (one deep), counts for nothing against the plan's agents
+ * (`liveAgents`), writes no event (its parent's grant is the line the log keeps), and dies with its parent.
+ */
+export async function mintChild(deps: TokenDeps, bearer: string, args: ChildArgs): Promise<Result<Minted>> {
+  const minutes = args?.minutes;
+  if (typeof minutes !== 'number' || !Number.isInteger(minutes) || minutes < 1 || minutes > CHILD_MINUTES_MOST)
+    return no<Minted>('OUT_OF_BOUNDS', `A child key lasts between one minute and ${CHILD_MINUTES_MOST}, and this one asked for ${String(minutes)}.`, { at: 'minutes' });
+  if (args.scope !== undefined && !(SCOPES as readonly string[]).includes(args.scope))
+    return no<Minted>('ENUM_VALUE_UNKNOWN', `${String(args.scope)} is not a scope a token can hold.`, { at: 'scope', allowed: SCOPES });
+  if (args.narrow !== undefined) {
+    const bad = narrowFault(args.narrow);
+    if (bad !== null) return no<Minted>('VALUE_MALFORMED', `A key is narrowed to lists, a project, a condition, rows or a share. ${bad}`, { at: 'narrow' });
+  }
+
+  const held = await heldBy(deps, bearer);
+  if (held === null) return no<Minted>('FORBIDDEN', 'That key no longer works, so nothing can be minted under it.', { at: 'parent' });
+  const parent = held.row;
+  if (parent.parent_id !== null) return no<Minted>('FORBIDDEN', 'A child key has no children of its own.', { at: 'parent' });
+  const scope = args.scope ?? parent.scope;
+  if (rank(scope) > rank(parent.scope))
+    return no<Minted>('FORBIDDEN', `A child key holds at most its parent's scope, ${parent.scope}, and this asked for ${scope}.`, { at: 'scope' });
+
+  const record = deps.recordId()!;
+  const secret = b64url(deps.random(32));
+  const id = `t_${deps.mint()}`;
+  const at = instant(deps.nowMs);
+  const asked = deps.nowMs + minutes * 60_000;
+  const ends = parent.expires_at === null ? asked : Math.min(asked, Date.parse(parent.expires_at));
+  const expires = instant(ends);
+  deps.sql.exec(
+    'INSERT INTO token (id, person_id, hash, scope, reach, label, created_at, expires_at, client_id, client_kind, host) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    id,
+    parent.person_id,
+    await deps.digest(secret),
+    scope,
+    parent.reach,
+    parent.label,
+    at,
+    expires,
+    parent.client_id,
+    parent.client_kind,
+    parent.host,
+  );
+  deps.sql.exec(
+    'INSERT INTO token_lens (token_id, parent_id, narrow, made_by, made_at) VALUES (?, ?, ?, ?, ?)',
+    id,
+    parent.id,
+    args.narrow === undefined ? null : JSON.stringify(args.narrow),
+    parent.person_id,
+    at,
+  );
+  return ok({ id, bearer: `${record}.${secret}`, scope, reach: reachOf(parent.reach), expires_at: expires });
+}
+
+/**
+ * Let go of child keys past their end, and their `token_lens` rows: the record's sweep runs it. A child lives an hour,
+ * so an app that has been connected a month would otherwise leave seven hundred rows nobody can use. Answers how many.
+ */
+export function pruneChildren(sql: Sql, nowMs: number): number {
+  const gone = sql.all<{ id: string }>(
+    `SELECT t.id AS id FROM token t JOIN token_lens l ON l.token_id = t.id
+     WHERE l.parent_id IS NOT NULL AND t.expires_at IS NOT NULL AND t.expires_at <= ?`,
+    instant(nowMs),
+  );
+  for (const { id } of gone) {
+    sql.exec('DELETE FROM token_lens WHERE token_id = ?', id);
+    sql.exec('DELETE FROM token WHERE id = ?', id);
+  }
+  return gone.length;
 }
 
 /**
