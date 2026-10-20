@@ -20,7 +20,7 @@ const at = (path: string) => new URL(`../../${path}`, import.meta.url);
 const text = (path: string) => readFileSync(at(path), 'utf8');
 
 const MCP = text('mcp/src/index.ts');
-const ROUTE_FILES = ['host/src/index.ts', ...readdirSync(at('host/src/routes')).filter((f) => f.endsWith('.ts')).map((f) => `host/src/routes/${f}`)];
+const ROUTE_FILES = ['host/src/index.ts', 'host/src/table.ts', ...readdirSync(at('host/src/routes')).filter((f) => f.endsWith('.ts')).map((f) => `host/src/routes/${f}`)];
 
 /** Every verb a session may call: a tool its client lists, or a route its host answers. */
 const VERBS = new Set([
