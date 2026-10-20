@@ -29,6 +29,8 @@ import { learnPages, REGISTERS } from './held.ts';
 import { learnRowPages } from './row-href.ts';
 import { copy } from '../copy.ts';
 import { forgetKept } from '../data/kept.ts';
+import { forgetRows } from '../data/ref-rows.ts';
+import { forgetToday } from '../home/today-kept.ts';
 import { dropCopy } from './boot-copy.ts';
 import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
@@ -268,6 +270,19 @@ function earlyBoot(url: string): Promise<Response> | null {
 export function readBoot(base: string, io?: Fetch): Promise<Booted> {
   if (keptFor !== base) kept = null;
   keptFor = base;
+  if (behind) {
+    behind = false;
+    const was = kept;
+    if (was !== null) {
+      kept = null;
+      const next = readBoot(base, io);
+      kept = was;
+      void next.then((got) => {
+        if (got.from === 'live' && kept === was) kept = next;
+      });
+      return was;
+    }
+  }
   kept ??= (async (): Promise<Booted> => {
     /* THE EARLY ANSWER, WHEN IT WAS ASKED AT THIS ADDRESS, is the one `boot` read; anything else goes to the network. */
     const early = io ? null : earlyBoot(`${base}/api/boot`);
@@ -491,12 +506,37 @@ export const recordsAsked = (): Promise<Answer<SwitcherRow[]>> | null => reach;
 
 /** Drop the kept answer, and the refusal beside it, so the next screen asks the record again. */
 export function forget(): void {
+  forgetShell();
+  forgetSchemas();
+  forgetRows();
+  forgetKept();
+  forgetToday();
+}
+
+/** Drop only the kept answer to `boot` and the last shell copy, so the next screen asks `boot` again. */
+export function forgetShell(): void {
+  behind = false;
   kept = null;
   refusal = null;
-  forgetSchemas();
-  forgetKept();
   dropCopy();
 }
+
+/**
+ * Have the next `readBoot` ask `boot` again BEHIND the kept answer, for a write that changes what `boot` says and
+ * nothing a list answers (the reader's mark): that screen draws from the shell it had, and the fresh answer takes the
+ * kept one's place when it lands. A refusal drops it, as `readBoot` drops any.
+ *
+ * DROPPING IT HELD UP THE NEXT SCREEN. The root load runs on every navigation and waits on `readBoot`, so leaving Today
+ * (which stamps the mark) left the next screen's heading waiting a whole `boot` round trip. Asked at the next read and
+ * not here, so a tab closing as it stamps the mark asks nothing more.
+ */
+export function refreshShell(base: string): void {
+  if (keptFor !== base || kept === null) return forgetShell();
+  behind = true;
+}
+
+/* `refreshShell` was called: the next `readBoot` hands back the kept answer and asks again behind it. */
+let behind = false;
 
 /* A RULE IS `rule:<id>` ON THE RECORD AND `rule.<id>` IN THE SAMPLE, and `actorOf` words the second. The reader's own
    lines are "you", as the sample's are. */

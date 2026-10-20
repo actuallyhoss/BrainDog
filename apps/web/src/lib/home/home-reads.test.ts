@@ -78,8 +78,9 @@ test('what went stale is drawn once, from its own read, between the page and who
   /* IN THE FILE AS ON THE SCREEN IT IS AFTER THE BRIEFING; the page is the each's last branch, placed by the helper. */
   assert.ok(home.indexOf('<stale.Part') > home.indexOf("part === 'briefing'"));
   /* ASKED WITH THE OTHER TWO, and the screen is closed as read only when all three are in. */
-  assert.match(home, /const out = await m\.readStale\(base\);\s*if \(here\) stale = \{ rows: out\.value, Part: part\.default \};/u);
-  assert.match(home, /Promise\.allSettled\(\[briefing, matches, stales\]\)\.then\(\(\) => closed\(true, at\)\)/u);
+  /* ONCE A VERSION FOR THE TAB, and kept to draw at once when Today is opened again (`today-kept.ts`). */
+  assert.match(home, /const out = await tileOnce\('stale', base, ver, \(\) => m\.readStale\(base\)\);\s*if \(here\) keepPart\('stale', base, \(stale = \{ rows: out\.value, Part: part\.default \}\)\);/u);
+  assert.match(home, /Promise\.allSettled\(\[briefing, matches, stales\]\)\.then\(\(\) => at !== null && closed\(true, at\)\)/u);
 });
 
 test('the template draws from the helper, each part once and keyed, so a read landing late moves nothing drawn', () => {

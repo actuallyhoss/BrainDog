@@ -270,7 +270,9 @@ export function portAt(base: string, io?: Fetch): Port {
     automation: (rule) => client.automation(rule),
     categories: () => client.list({ register: CATEGORIES, limit: 500 }),
     filingRules: () => client.list({ register: FILING_RULES, limit: 500 }),
-    schema: (register) => client.schema(register),
+    /* THROUGH THE BROWSER'S OWN FETCH, where one is passed only to abort a leave: the tab's kept schemas are kept by the
+       fetch they went through, so a fetch made per visit asked every list's schema again on every visit. */
+    schema: (register) => (io ? createClient({ base }) : client).schema(register),
     capture: (rows) => client.capture({ rows }),
     setAutomation: (rule, enabled) => client.setAutomation({ rule, enabled }),
     undo: async (batch) => {

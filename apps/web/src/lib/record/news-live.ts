@@ -19,7 +19,7 @@ import { MISSING, money } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { NO_ROW_SAID, unsaidFigure, type Metric } from './api.ts';
-import { actorFor, forget, type Fetch } from './boot-live.ts';
+import { actorFor, refreshShell, type Fetch } from './boot-live.ts';
 import { METRICS } from './declared.ts';
 import { noteOf, settlingOf } from './history-live.ts';
 import { beyondOf, format, fxNote, hrefFor, partsText, targetSaid } from './metrics.ts';
@@ -116,7 +116,7 @@ export function tileOf(id: string, r: Reading | null): Metric {
  */
 
 /**
- * Mark everything up to `upTo` read, and drop the shell's kept answer, whose feed it was. `upTo` is the record's cursor
+ * Mark everything up to `upTo` read, and ask the shell's `boot` again behind it, whose feed it was. `upTo` is the record's cursor
  * for the newest line: a rowid for the owner, `e.<id>` for a member held to named lists, handed back as it came.
  *
  * THE REQUEST IS MADE BEFORE THIS FIRST WAITS: nothing is awaited between the call and the client's fetch, so a screen
@@ -126,7 +126,10 @@ export function tileOf(id: string, r: Reading | null): Metric {
 export async function markAll(base: string, upTo: Cursor | null, io?: Fetch): Promise<boolean> {
   const client = createClient({ base, ...(io ? { fetch: io } : {}) });
   const out = await client.markRead(upTo ?? undefined);
-  forget();
+  /* ONLY THE SHELL, WHOSE FEED IT WAS, and asked again behind the kept one so the next screen does not wait on it. The
+     mark moves no row and no declaration: dropping the schemas and kept reads with it (`forget`) had the next screen
+     ask every list's schema and walk again on every leave of Today. */
+  refreshShell(base);
   return out.ok;
 }
 

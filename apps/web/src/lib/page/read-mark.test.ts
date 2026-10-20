@@ -207,6 +207,6 @@ test('Home stamps through `readMarkOf` with what its last page read held, and as
      page read goes out, so the cursor kept is never newer than the page it is kept beside. */
   const reads = [...text.matchAll(/newsNow\(\)[\s\S]{0,120}?\breadBody\(/gu)];
   assert.equal(reads.length, 2, 'a read of Home’s page does not ask what is new before it');
-  assert.equal(text.match(/\bkeepNews\(before, mine\)/gu)?.length, 2, 'what was new is kept beside a page that was not drawn');
+  assert.equal(text.match(/\bkeepNews\(before, mine(?:, key)?\)/gu)?.length, 2, 'what was new is kept beside a page that was not drawn');
   assert.equal(text.match(/\.whatsNew\(/gu)?.length, 1, 'Home asks what is new in a second place');
 });

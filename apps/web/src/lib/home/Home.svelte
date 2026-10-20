@@ -100,7 +100,7 @@
   import { madeSteps } from '$lib/start/made.ts';
   import { playedBy } from '$lib/start/parts.ts';
   import type { TellOptions } from '$lib/tell/read.ts';
-  import { createClient, type Cursor, type EngineHealth, type EventLine } from '@braindog/client';
+  import { createClient, wrote, type Cursor, type EngineHealth, type EventLine } from '@braindog/client';
   import { engineLine, type EngineLine } from '$lib/ui/engine-line.ts';
   import { page } from '$app/state';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
@@ -116,6 +116,7 @@
   import Icon from '$lib/ui/Icon.svelte';
 
   import { closed, drew, opened } from '../ui/screen.svelte.ts';
+  import { keepPart, keptPart, tileOnce } from '$lib/home/today-kept.ts';
 
   let { data }: { data: Shell } = $props();
 
@@ -291,14 +292,22 @@
     }
   }
   /** Keep what was new beside the page just drawn, unless a later read of the page has gone out since. */
-  function keepNews(before: Promise<News | null>, mine: number): void {
+  function keepNews(before: Promise<News | null>, mine: number, key: string | null = null): void {
     void before.then((now) => {
       if (now !== null && mine === pageRead) {
         news = now;
         newLines = now.lines;
+        if (key !== null && got?.from === 'live') keepPart('body', key, { got, news: now } satisfies KeptBody);
       }
     });
   }
+
+  /**
+   * TODAY OPENED AGAIN DRAWS WHAT IT LAST DREW (`today-kept.ts`), and the read below goes on quietly behind it. The key
+   * is every input of the read, so a page drawn for another voice or other lists is never drawn for this one.
+   */
+  type KeptBody = { got: Opened; news: News | null };
+  const bodyKey = (slug: string | null, spoken: HomeVoice, held: Holds): string => JSON.stringify([apiBase(), slug, spoken, held]);
 
   /** Home's page, from whichever of the three sources the record holds. */
   async function readBody(slug: string | null, spoken: HomeVoice, held: Holds): Promise<Opened | null> {
@@ -330,8 +339,18 @@
     if (slug === null && learnt === 0) return;
     const spoken = voice;
     const held = holds;
+    const key = bodyKey(slug, spoken, held);
+    /* DRAWN FROM WHAT TODAY LAST DREW, the screen is settled at once, and the read is not bracketed: it lands over it. */
+    const was = untrack(() => got) === null ? keptPart<KeptBody>('body', key) : null;
+    if (was) {
+      got = was.got;
+      news = was.news;
+      newLines = was.news?.lines ?? [];
+      settled = true;
+      untrack(() => drew('ready'));
+    }
     /* UNTRACKED, or the effect reads the pending count it writes, and every answer opens the read again. */
-    const at = untrack(opened);
+    const at = was ? null : untrack(opened);
     let ok = false;
     reading = true;
     const mine = ++pageRead;
@@ -339,15 +358,18 @@
     void readBody(slug, spoken, held)
       .then((out) => {
         if (slug !== declares) return;
+        /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`). */
+        if (was && out?.from !== 'live') return;
         got = out;
         ok = out?.from === 'live';
-        if (ok) keepNews(before, mine);
+        if (ok && out) keepPart('body', key, { got: out, news: null } satisfies KeptBody);
+        if (ok) keepNews(before, mine, key);
       })
       .catch(() => {})
       .finally(() => {
         reading = false;
         settled = true;
-        closed(ok, at);
+        if (at !== null) closed(ok, at);
       });
   });
 
@@ -358,17 +380,17 @@
     const slug = declares;
     reading = true;
     const mine = ++pageRead;
+    const spoken = untrack(() => voice);
+    const held = untrack(() => holds);
     /* A home that draws no feed of the log has shown nothing new, and asks nothing. */
     const before = untrack(() => feeds) ? newsNow() : null;
     try {
-      const out = await readBody(
-        slug,
-        untrack(() => voice),
-        untrack(() => holds),
-      );
+      const out = await readBody(slug, spoken, held);
       if (slug === declares && out?.from === 'live') {
         got = out;
-        if (before) keepNews(before, mine);
+        const key = bodyKey(slug, spoken, held);
+        keepPart('body', key, { got: out, news: untrack(() => news) } satisfies KeptBody);
+        if (before) keepNews(before, mine, key);
       }
     } catch {
       /* The page as it was read stays; the next version asks again. */
@@ -506,27 +528,42 @@
   let hues = $state.raw<{ found: HuesFound; Part: HuesPart } | null>(null);
   /* IMPORTED AUTOMATIONS AS FILING RULES, an offer he presses. Kept once shown, so its Undo outlives the reread its press causes. */
   let imported = $state.raw<{ found: ImportedFound; Part: ImportedPart } | null>(null);
+  /**
+   * THE VERSION A TILE IS ASKED ONCE AT (`tileOnce`): the record's, as the poll heard it, and this tab's writes. Read in
+   * each effect, so a move of the record still asks every tile again.
+   */
+  const asOf = (): string => `${moving.version} ${wrote()}`;
   $effect(() => {
     if (data.refused) return;
-    void moving.version;
+    const ver = asOf();
     const base = apiBase();
     let here = true;
+    /* WHAT TODAY LAST DREW OF THEM, drawn at once (`today-kept.ts`); with all three there, the reads land over them. */
+    type Briefed = NonNullable<typeof brief>;
+    type Matches = NonNullable<typeof matched>;
+    type Stales = NonNullable<typeof stale>;
+    const wasBrief = untrack(() => brief) ?? keptPart<Briefed>('brief', base);
+    const wasMatched = untrack(() => matched) ?? keptPart<Matches>('matched', base);
+    const wasStale = untrack(() => stale) ?? keptPart<Stales>('stale', base);
+    brief = wasBrief;
+    matched = wasMatched;
+    stale = wasStale;
     /* BRACKETED AS A READ OF THIS SCREEN, so the screen is not measured with a tile still on its way, and closed as
        fine whatever came back: none of the reads refuses the screen. */
-    const at = untrack(opened);
+    const at = wasBrief && wasMatched && wasStale ? null : untrack(opened);
     const briefing = Promise.all([import('./briefing.ts'), import('./Briefing.svelte')]).then(async ([m, part]) => {
-      const out = await m.readBriefingSaid(base);
-      if (here) brief = { cards: out.value.rows, foot: m.footOf(out.value), paused: out.value.paused, Part: part.default };
+      const out = await tileOnce('briefing', base, ver, () => m.readBriefingSaid(base));
+      if (here) keepPart('brief', base, (brief = { cards: out.value.rows, foot: m.footOf(out.value), paused: out.value.paused, Part: part.default }));
     });
     const matches = Promise.all([import('./matched.ts'), import('./Matched.svelte')]).then(async ([m, part]) => {
-      const out = await m.readMatched(base);
-      if (here) matched = { rows: out.value, Part: part.default };
+      const out = await tileOnce('matched', base, ver, () => m.readMatched(base));
+      if (here) keepPart('matched', base, (matched = { rows: out.value, Part: part.default }));
     });
     const stales = Promise.all([import('./stale.ts'), import('./Stale.svelte')]).then(async ([m, part]) => {
-      const out = await m.readStale(base);
-      if (here) stale = { rows: out.value, Part: part.default };
+      const out = await tileOnce('stale', base, ver, () => m.readStale(base));
+      if (here) keepPart('stale', base, (stale = { rows: out.value, Part: part.default }));
     });
-    void Promise.allSettled([briefing, matches, stales]).then(() => closed(true, at));
+    void Promise.allSettled([briefing, matches, stales]).then(() => at !== null && closed(true, at));
     return () => {
       here = false;
     };
@@ -566,13 +603,16 @@
   });
   $effect(() => {
     if (data.refused) return;
-    void moving.version;
+    const ver = asOf();
     const base = apiBase();
     let here = true;
+    /* THE DESK AS TODAY LAST DREW IT, at once (`today-kept.ts`), and read again behind it. */
+    if (untrack(() => desk) === null) desk = keptPart<NonNullable<typeof desk>>('desk', base);
     void Promise.all([import('./desk-read.ts'), import('./Desk.svelte')]).then(
       async ([m, part]) => {
-        const cards = await m.readCards(base, data.lists, asked).catch(() => null);
-        if (here) desk = { cards, Part: part.default };
+        const lists = data.lists;
+        const cards = await tileOnce('desk', base, ver, () => m.readCards(base, lists, asked)).catch(() => null);
+        if (here) keepPart('desk', base, (desk = { cards, Part: part.default }));
       },
       () => undefined,
     );
@@ -596,7 +636,7 @@
    */
   $effect(() => {
     if (data.refused || !settled) return;
-    void moving.version;
+    const ver = asOf();
     const base = apiBase();
     let here = true;
     /* A TAB BEING LEFT ASKS NOTHING MORE: WebKit refuses every call begun once a navigation starts and prints each as an
@@ -615,33 +655,33 @@
     }, () => undefined));
     /* AND WHAT BRAINDOG ARRANGED BY ITSELF TODAY, with an Undo each, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./handled.ts'), import('./Handled.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadHandled(base, io);
+      const found = await tileOnce('handled', base, ver, () => m.loadHandled(base, io));
       if (here) handled = found && found.rows.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND AFTER IT, WHAT THE ANSWERS TAUGHT, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadLearned(base, io);
+      const found = await tileOnce('learned', base, ver, () => m.loadLearned(base, io));
       if (here) learned = found && found.rows.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND AFTER IT, WHAT EVERY AGENT IS TOLD, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./told.ts'), import('./Told.svelte')]).then(async ([m, part]) => {
-      const tile = m.lessonsTile(await m.loadLessons(base, io));
+      const tile = m.lessonsTile(await tileOnce('lessons', base, ver, () => m.loadLessons(base, io)));
       if (here) agentsTold = tile ? { tile, Part: part.default } : null;
     }, () => undefined));
     /* AND THEN WHAT MAY BE ONE, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadNamedTwice(base, io);
+      const found = await tileOnce('named', base, ver, () => m.loadNamedTwice(base, io));
       if (here) named = found && found.lines.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND WHAT HAS NO COLOUR OF ITS OWN, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./hues.ts'), import('./Hues.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadHues(base, io);
+      const found = await tileOnce('hues', base, ver, () => m.loadHues(base, io));
       if (here) hues = found && found.lists.length > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND THE IMPORTED AUTOMATIONS TO KEEP AS FILING RULES. Never set back to null on a reload: after the press the
        automations are off and the reload finds none, and the tile must keep its Undo. */
     tiles.push(() => Promise.all([import('./imported-rules.ts'), import('./ImportedRules.svelte')]).then(async ([m, part]) => {
-      const found = await m.loadImported(base, io);
+      const found = await tileOnce('imported', base, ver, () => m.loadImported(base, io));
       if (here && found && found.rules.length > 0) imported = { found, Part: part.default };
     }, () => undefined));
     void (async () => {

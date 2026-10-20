@@ -89,7 +89,7 @@ test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, last, a
   }
   assert.match(home, /import\('\.\/learned\.ts'\)/u);
   assert.match(home, /import\('\.\/Learned\.svelte'\)/u);
-  assert.match(home, /const found = await m\.loadLearned\(base, io\);\s*if \(here\) learned = found && found\.rows\.length > 0 \? \{ found, Part: part\.default \} : null;/u);
+  assert.match(home, /const found = await tileOnce\('learned', base, ver, \(\) => m\.loadLearned\(base, io\)\);\s*if \(here\) learned = found && found\.rows\.length > 0 \? \{ found, Part: part\.default \} : null;/u);
   assert.equal(home.split('<learned.Part').length - 1, 1, 'the tile is drawn once');
   assert.ok(home.indexOf('<learned.Part') > home.indexOf('<faults.Part'), 'it comes after what the record found wrong');
 });
