@@ -113,7 +113,8 @@ test('neither sheet draws glass, a gradient or a shadow of its own', () => {
 
 test('the design book is generated from the renderer and the skin, and sits on its own page', () => {
   const book = read('./DesignBook.svelte');
-  for (const name of ['designBook', 'LOOK_B_CSS', 'SCALE_CSS', 'SHEET_NOW']) assert.match(book, new RegExp(`\\b${name}\\b`, 'u'), name);
+  /* THE APP'S OWN FRAME, NOT THE SITE'S LOOK, since the UI pass of 20 October. */
+  for (const name of ['designBook', 'HOUSE_FRAME', 'SCALE_CSS', 'SHEET_NOW']) assert.match(book, new RegExp(`\\b${name}\\b`, 'u'), name);
   assert.doesNotMatch(book.slice(book.indexOf('<style>')), /#[0-9a-f]{3,8}\b|rgb\(|gradient\(|box-shadow:(?! none)/iu, 'the book names no colour of its own');
   assert.match(look, /import DesignBook from '\$lib\/design\/DesignBook\.svelte'/u);
   assert.match(look, /title: 'Design book'/u);

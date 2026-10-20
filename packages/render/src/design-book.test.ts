@@ -11,7 +11,7 @@ import { parse } from './parse.ts';
 
 const look = `@layer tokens { :root { --board: #F3F4F6; --tile: #FFFFFF; --red: #CF413A; --ink: #101114; }
   :root[data-theme="dark"] { --board: #0D1014; --tile: #161A20; --red: #E05148; --ink: #ECEEF1; } }`;
-const scale = ':root { --t-sm: 13px; --t-base: 15px; --sp-1: 4px; --r-md: 12px; }';
+const scale = ':root { --fs-meta: 13px; --fs-body: 15px; --t-sm: 13px; --sp-1: 4px; --r-pop: 12px; }';
 const book = designBook({ look, scale });
 
 test('every kind the renderer draws is in the book, once', () => {
@@ -38,7 +38,8 @@ test('every chart kind carries the sheet specimen', () => {
 test('colours come from both palettes and steps from the scale', () => {
   const board = book.tokens.colours.find((c) => c.name === '--board');
   assert.deepEqual([board?.light, board?.dark], ['#F3F4F6', '#0D1014']);
-  assert.deepEqual(book.tokens.type, [{ name: '--t-sm', value: '13px' }, { name: '--t-base', value: '15px' }]);
+  /* THE TYPE STEPS ARE THE `fs-` SCALE (UI pass 20 Oct, SPEC 1.4); the old `t-` names are not read. */
+  assert.deepEqual(book.tokens.type, [{ name: '--fs-meta', value: '13px' }, { name: '--fs-body', value: '15px' }]);
   assert.equal(book.tokens.space[0]?.value, '4px');
   assert.equal(book.tokens.radii[0]?.value, '12px');
 });

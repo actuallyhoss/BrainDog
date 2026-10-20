@@ -10,12 +10,16 @@
 <script lang="ts">
   import { Block, Degraded } from 'braindog-render/svelte';
   import { SHEET_NOW, designBook, parse } from 'braindog-render';
-  import { LOOK_B_CSS } from '@braindog/theme/look-b.ts';
+  import { HOUSE_FRAME } from '@braindog/theme';
   import { SCALE_CSS } from '@braindog/theme/scale.ts';
 
   import Tile from '$lib/ui/Tile.svelte';
 
-  const book = designBook({ look: LOOK_B_CSS, scale: SCALE_CSS });
+  /* THE APP'S OWN FRAME (SPEC 1.1), light and dark, written as the declarations the book reads: the board, the tiles,
+     the inks and the two reds the app is drawn in. It read the site's palette before the UI pass of 20 October. */
+  const frameCss = (scheme: 'light' | 'dark') => Object.entries(HOUSE_FRAME[scheme]).map(([k, v]) => `--${k}: ${v};`).join(' ');
+  const APP_LOOK = `:root { ${frameCss('light')} } :root[data-theme="dark"] { ${frameCss('dark')} }`;
+  const book = designBook({ look: APP_LOOK, scale: SCALE_CSS });
   const opts = { now: SHEET_NOW };
   const GROUPS = ['say', 'figure', 'list', 'plan', 'media'] as const;
   const words = {
@@ -100,7 +104,7 @@
           <Tile title={k.kind}>
             <p class="for">{k.for}</p>
             <p class="meta">
-              {words.cells}: {k.cells}{#if k.reads} . {words.reads}: {k.reads}{/if} . {words.narrowest(k.narrowest)}{#if k.pageOnly} . {words.pageOnly}{/if}
+              {words.cells}: {k.cells}{#if k.reads}{' · '}{words.reads}: {k.reads}{/if}{' · '}{words.narrowest(k.narrowest)}{#if k.pageOnly}{' · '}{words.pageOnly}{/if}
             </p>
             {#if k.example}
               <div class="example">
@@ -130,14 +134,14 @@
   .for,
   .meta {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .meta,
   .note,
   .swatch-values {
-    color: var(--muted);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .book-h,
@@ -147,11 +151,11 @@
   }
 
   .book-h {
-    font-size: var(--t-xl);
+    font-size: var(--fs-figure);
   }
 
   .book-g {
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
   }
 
   .swatches,
@@ -176,7 +180,7 @@
     inline-size: 32px;
     block-size: 32px;
     border: 1px solid var(--rule);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   .specimens li {
@@ -215,7 +219,7 @@
 
   .rules dd {
     margin: 0 0 var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* The desk grid itself: a tile per kind, three across where there is room, one on a phone. */

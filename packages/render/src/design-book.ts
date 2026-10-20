@@ -49,17 +49,19 @@ export type DesignBook = {
 const ROLES: Readonly<Record<string, string>> = {
   board: 'the ground of a page, behind the tiles',
   tile: 'a block and every card: sits on the board',
-  page: 'the plain page behind chrome',
+  'tile-2': 'a well inside a tile, and a quiet control on it',
+  nav: 'the top bar and the side rail',
   ink: 'text',
-  ink2: 'second-line text',
-  muted: 'meta and captions',
+  'ink-2': 'second-line text',
+  'ink-3': 'meta and captions',
   rule: 'a line between rows',
-  red: 'the one accent: late, over, and what needs a person',
+  'red-fill': 'the primary button and the count pill, with white words',
+  red: 'red words and marks: late, links, and what needs a person',
   'red-tint': 'the wash behind a red mark',
-  good: 'done and paid',
-  warn: 'due soon and waiting',
-  chart: 'a chart line or bar at rest',
-  bar: 'the empty track of a bar',
+  good: 'done and paid, with its word',
+  warn: 'a real warning, with its word',
+  info: 'a note, with its word',
+  live: 'the dot of something working now, never text',
 };
 
 const fence = (info: string, rows: readonly string[]): string => ['```' + info, ...rows, '```'].join('\n');
@@ -148,7 +150,7 @@ export function designBook(input: { look: string; scale: string }): DesignBook {
       'BrainDog describes every page, card, component and visual in its own language: the .dog page declaration, whose blocks are the kinds below. Compose from them. Nothing is drawn by hand outside it.',
     tokens: {
       colours,
-      type: steps(input.scale, 't-'),
+      type: steps(input.scale, 'fs-'),
       space: steps(input.scale, 'sp-'),
       radii: steps(input.scale, 'r-'),
       hues: 'A project or card carries a hue, a whole number from 0 to 359. It colours that one mark and nothing else, never an edge, a ground or a tone.',

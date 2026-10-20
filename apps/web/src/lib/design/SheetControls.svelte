@@ -6,9 +6,13 @@
   or `BatchBar.svelte` itself, so what is wrong in the code is wrong on the sheet, and a later build is judged beside
   the photograph of this one.
 
-  HOVER, FOCUS AND PRESSED ARE THE BROWSER'S, and no stylesheet can hold a button in one. So each of those cells is a
-  real button that takes the state when it is pointed at, tabbed to or held down, and carries `data-sheet` naming the
-  cell (`button primary m hover`), which is the handle the photographer puts it into its state by.
+  HOVER, FOCUS AND PRESSED ARE HELD HERE (agents F29): each of those cells carries `data-state` and this sheet draws
+  the state the product draws under the pointer, the keyboard or the press, so the picture shows what it names. It is
+  still a real button that takes the state for real, and carries `data-sheet` naming the cell (`button primary m
+  hover`), the handle the photographer reaches it by.
+
+  AND THE PARTS EVERY SCREEN SHARES SINCE THE UI PASS OF 20 OCTOBER: the banner, a command line with its Copy, and the
+  state dot with its word.
 
   THE TOAST AND THE BULK BAR ARE FIXED TO THE WINDOW IN THE PRODUCT, and here each is drawn inside a small picture of
   the work. A frame that is a containing block (`transform`) holds a fixed child, so the same component stands at the
@@ -27,7 +31,10 @@
   import { apiBase } from '$lib/at.ts';
   import BatchBar from '$lib/page/BatchBar.svelte';
   import { Picked } from '$lib/page/picked.svelte.ts';
+  import Banner from '$lib/ui/Banner.svelte';
   import Button from '$lib/ui/Button.svelte';
+  import CodeLine from '$lib/ui/CodeLine.svelte';
+  import StateDot from '$lib/ui/StateDot.svelte';
   import Count from '$lib/ui/Count.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
@@ -43,6 +50,7 @@
   const LINES = ['rest', 'wash', 'selected', 'arrived', 'changed'] as const;
   const PLACES = ['start', 'centre'] as const;
   const SEVERAL = ['kept', 'none'] as const;
+  const DOTS = ['open', 'part', 'done', 'late', 'needs-you', 'warn', 'good', 'live'] as const;
 
   /* THE DEFAULTS OF THE TWO CALLS (EXP-C01, "Needs him"): toasts at the bottom left of the work, and choosing several kept. */
   const TOAST_DEFAULT = 'start';
@@ -84,6 +92,26 @@
     questions: ['Move the printer booking to Monday?', 'Archive the old price list?', 'Add Rent to this month?'],
     asked: 'Asked today',
     choose: (q: string) => `Choose: ${q}`,
+    banners: 'A banner',
+    bannerLate: 'Your plan lapsed on 3 September. Pay again to keep adding.',
+    bannerWarn: 'You are offline. What you change is sent when you are back.',
+    payAgain: 'Pay again',
+    exportCopy: 'Export',
+    code: 'A command',
+    codeLine: 'braindog keys put stripe-live',
+    codeInline: 'Run it with',
+    codeInlineAfter: 'from the folder.',
+    dots: 'A state',
+    dot: {
+      open: 'Due in 4 days',
+      part: 'Part paid',
+      done: 'Paid',
+      late: '64 days late',
+      'needs-you': 'Needs you',
+      warn: 'At risk',
+      good: 'On track',
+      live: 'Working now',
+    },
     byDefault: 'Default',
     other: 'The other way',
   } as const;
@@ -127,7 +155,13 @@
           <div class="cells">
             {#each STATES as state (state)}
               <figure class="cell">
-                <Button {weight} {size} disabled={state === 'disabled'} data-sheet="button {weight} {size} {state}">{words.save}</Button>
+                <Button
+                  {weight}
+                  {size}
+                  disabled={state === 'disabled'}
+                  data-state={state === 'hover' || state === 'focus' || state === 'pressed' ? state : undefined}
+                  data-sheet="button {weight} {size} {state}">{words.save}</Button
+                >
                 <figcaption class="said">{words.state[state]}{#if words.how[state]}<span class="how">{words.how[state]}</span>{/if}</figcaption>
               </figure>
             {/each}
@@ -187,7 +221,7 @@
             <label class="field-label" for="sheet-field-{f}">{words.fieldLabel}</label>
             <!-- THE ERROR IS THIS SHEET'S OWN RULE: `controls.css` has no refused state for a field yet, so the deeper red
                  edge and the line under it are drawn here, with a mark and the words, never the colour alone. -->
-            <div class="field" data-refused={f === 'error' ? '' : undefined}>
+            <div class="field" data-refused={f === 'error' ? '' : undefined} data-state={f === 'focus' ? 'focus' : undefined}>
               <input
                 class="field-input"
                 id="sheet-field-{f}"
@@ -212,6 +246,27 @@
       {#each [3, 12, 120] as n (n)}<Count {n} label={words.waiting(n)} />{/each}
     </div>
     <p class="line-said">{words.countLine}</p>
+  </Tile>
+
+  <Tile title={words.banners} class="sheet-wide">
+    <div class="banners">
+      <Banner tone="late" icon="alert">
+        {words.bannerLate}
+        {#snippet actions()}<Button weight="primary" size="sm">{words.payAgain}</Button><Button size="sm">{words.exportCopy}</Button>{/snippet}
+      </Banner>
+      <Banner tone="warn" icon="alert">{words.bannerWarn}</Banner>
+    </div>
+  </Tile>
+
+  <Tile title={words.code}>
+    <CodeLine text={words.codeLine} />
+    <p class="line-said">{words.codeInline} <CodeLine inline text="braindog sync" /> {words.codeInlineAfter}</p>
+  </Tile>
+
+  <Tile title={words.dots}>
+    <ul class="dots">
+      {#each DOTS as d (d)}<li><StateDot state={d} word={words.dot[d]} /></li>{/each}
+    </ul>
   </Tile>
 
   <Tile title={words.lines} class="sheet-wide">
@@ -311,8 +366,8 @@
 
   .group-name {
     margin: 0 0 var(--sp-3);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -348,18 +403,18 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0 var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .how {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .line-said {
     margin: var(--sp-3) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .pair {
@@ -371,7 +426,7 @@
   }
 
   .pair-name {
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
   }
 
   .field-box {
@@ -381,8 +436,56 @@
   /* A FIELD THE RECORD REFUSED: the deeper red as a 2px edge inside the field's own corner, and under it the mark and
      the sentence. Red is "needs you" here, and the words say what to do. */
   .field[data-refused] {
-    outline: 2px solid var(--danger);
+    outline: 2px solid var(--red);
     outline-offset: -2px;
+  }
+
+  /* ── THE STATES HELD FOR THE PICTURE (agents F29), each the product's own: the hover fill, the focus ring and the
+     press, as `Button.svelte` and `controls.css` draw them under a real pointer, key or finger. ── */
+  .sheet :global(.btn[data-state='hover']) {
+    background: var(--hover);
+  }
+
+  .sheet :global(.btn[data-weight='primary'][data-state='hover']) {
+    background: var(--red-fill-hover);
+  }
+
+  .sheet :global(.btn[data-weight='bare'][data-state='hover']) {
+    background: var(--hover);
+    color: var(--ink);
+  }
+
+  .sheet :global(.btn[data-state='focus']),
+  .field[data-state='focus'] {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .sheet :global(.btn[data-state='pressed']) {
+    background: color-mix(in oklab, var(--ink) 8%, var(--btn-fill));
+  }
+
+  .sheet :global(.btn[data-weight='primary'][data-state='pressed']) {
+    background: var(--red-fill-press);
+  }
+
+  .sheet :global(.btn[data-weight='bare'][data-state='pressed']) {
+    background: var(--tile-2);
+    color: var(--ink);
+  }
+
+  .banners {
+    display: grid;
+    gap: var(--sp-3);
+  }
+
+  .dots {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
+    gap: var(--sp-3) var(--sp-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .refused {
@@ -390,8 +493,8 @@
     align-items: center;
     gap: var(--sp-2);
     margin: var(--sp-2) 0 0;
-    color: var(--danger-text);
-    font-size: var(--t-base);
+    color: var(--red);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
@@ -409,7 +512,7 @@
 
   /* `PageBody.svelte`'s rule for a line another hand changed and nobody has opened yet, to the letter. */
   .hold :global(li[data-changed] > .line) {
-    background-color: color-mix(in oklab, var(--arrived-wash) 60%, transparent);
+    background-color: color-mix(in oklab, var(--arrived) 60%, transparent);
   }
 
   .plain :global(.line) {
@@ -437,7 +540,7 @@
     block-size: 168px;
     overflow: hidden;
     background: var(--board);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     transform: translateZ(0);
   }
 
@@ -453,7 +556,7 @@
     inset-block: 0;
     inset-inline-start: 0;
     inline-size: 56px;
-    background: var(--s2);
+    background: var(--nav);
   }
 
   /* WHERE THE STACK STANDS IN THE FRAME: clear of the frame's rail, a step up from its foot, and at the start edge of
