@@ -172,7 +172,7 @@ test('a key row joins its grant for the counts, and a row with no grant is an in
     lastOpened: '2026-09-14T10:00:00Z',
     grant: 'g1',
   });
-  assert.deepEqual(keys.find((k) => k.id === 'c2'), { id: 'c2', spoken: null, label: 'Admin panel', opens: 'The panel', project: null, scope: null, sealed: false, opened: 0, lastOpened: null, grant: null });
+  assert.deepEqual(keys.find((k) => k.id === 'c2'), { id: 'c2', spoken: null, label: 'Admin panel', opens: 'The panel', project: null, scope: null, sealed: false, opened: 0, lastOpened: null, grant: null, kept: true });
   assert.equal(keys.find((k) => k.id === 'c4')?.opened, 2);
   /* THE GRANT IS WHAT `revokeGrant` NAMES, and a row that holds its counts instead names none. */
   assert.equal(keys.find((k) => k.id === 'c4')?.grant, null);
@@ -189,8 +189,8 @@ test('NOTHING A PERSON READS CARRIES A VALUE, A CODE OR A HANDLE', () => {
   const drawn = [words.waiting, words.keys, words.mayOpen, words.noKeys, words.noKeysHow, words.noMachines, words.notNow, words.packInstalled, words.touches];
   const dash = String.fromCharCode(0x2014);
   for (const line of drawn) assert.ok(!line.includes(dash), 'no em dash on screen');
-  assert.match(words.noKeysHow, /braindog keys exec <label> -- <command>/, 'the one way the CLI reads a key is the one named');
-  assert.doesNotMatch(words.noKeysHow, /keys get/);
+  assert.equal(words.noKeysCommand, 'braindog keys put <name>', 'the one way an agent adds a key is the one named, on its own line');
+  for (const line of [words.noKeysHow, words.noKeysCommand]) assert.doesNotMatch(line, /keys get/);
 });
 
 test('A SEALED ROW SAYS WHAT IT IS UNOPENED: its size and its hint, from the grant or from what a briefing already knew', () => {

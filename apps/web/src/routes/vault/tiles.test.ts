@@ -31,21 +31,25 @@ const KEYS = [
   key({ id: 'd', label: 'Kept in a password manager', sealed: false, grant: null }),
 ];
 
-test('THE SENTENCE SAYS HOW MANY AND HOW OFTEN, and has no red while nobody is asking', () => {
+test('THE SENTENCE SAYS HOW MANY, HOW OFTEN, AND HOW MANY HAVE NO VALUE, and has no red while nobody is asking', () => {
   const s = sentenceOf({ keys: KEYS, listed: true, counts: true, asking: 0, seesMachines: true });
-  assert.deepEqual(s, { text: '4 keys, 3 sealed here, opened 15 times.', needs: undefined });
+  assert.deepEqual(s, { text: '4 keys, opened 15 times. 1 has no value yet.', needs: undefined });
+  /* A KEY KEPT SOMEWHERE NAMED HAS A VALUE, just not here, so it is not one to see to. */
+  const kept = [...KEYS.slice(0, 3), key({ id: 'd', label: 'Kept', sealed: false, grant: null, kept: true })];
+  assert.equal(sentenceOf({ keys: kept, listed: true, counts: true, asking: 0, seesMachines: true })?.text, '4 keys, opened 15 times.');
+  assert.doesNotMatch(s?.text ?? '', /sealed/u, 'sealed is not a word on screen');
 });
 
 test('A MACHINE ASKING IS THE RED PHRASE, and it is a phrase the sentence holds', () => {
   const s = sentenceOf({ keys: KEYS.slice(0, 3), listed: true, counts: true, asking: 1, seesMachines: true });
-  assert.equal(s?.text, '3 keys sealed, opened 15 times. A machine is asking to open them.');
+  assert.equal(s?.text, '3 keys, opened 15 times. A machine is asking to open them.');
   assert.ok(s?.needs && s.text.includes(s.needs));
   assert.equal(sentenceOf({ keys: [], listed: true, counts: true, asking: 2, seesMachines: true })?.text, '2 machines are asking to open your keys.');
 });
 
 test('A READER REFUSED THE MACHINES IS NOT TOLD HOW MANY ARE ASKING, and a refused count is not said as zero', () => {
   const s = sentenceOf({ keys: KEYS.slice(0, 2), listed: true, counts: false, asking: 1, seesMachines: false });
-  assert.deepEqual(s, { text: '2 keys sealed.', needs: undefined });
+  assert.deepEqual(s, { text: '2 keys.', needs: undefined });
   assert.equal(sentenceOf({ keys: [], listed: false, counts: false, asking: 0, seesMachines: false }), null);
 });
 
@@ -91,10 +95,11 @@ test('NO VALUE, NO EM DASH: every string built here is names and counts', () => 
   for (const line of [t?.reading ?? '', ...Object.values(words as Record<string, unknown>).filter((w): w is string => typeof w === 'string')]) assert.ok(!line.includes('—'), line);
 });
 
-test('A KEY SAYS WHETHER IT IS SEALED, taken out of service, or kept somewhere else', () => {
-  assert.deepEqual(stateOf(KEYS[0]!), { word: words.sealedHere, sealed: true });
-  assert.deepEqual(stateOf(key({ sealed: false, grant: 'g' })), { word: words.retired, sealed: false });
-  assert.deepEqual(stateOf(KEYS[3]!), { word: words.elsewhere, sealed: false });
+test('A KEY SAYS WHETHER ITS VALUE IS SAVED, taken out of service, kept somewhere else, or not there yet', () => {
+  assert.deepEqual(stateOf(KEYS[0]!), { word: 'Value saved', sealed: true, warn: false });
+  assert.deepEqual(stateOf(key({ sealed: false, grant: 'g' })), { word: words.retired, sealed: false, warn: false });
+  assert.deepEqual(stateOf(key({ sealed: false, grant: null, kept: true })), { word: 'Kept elsewhere', sealed: false, warn: false });
+  assert.deepEqual(stateOf(KEYS[3]!), { word: 'No value yet', sealed: false, warn: true });
 });
 
 test('A LONG NAME IS CLIPPED FOR ITS BAR, and a key row links to its row page by its spoken id', () => {
@@ -113,11 +118,11 @@ test('A SEALED KEY SAYS ITS HINT UNOPENED, and a key with no value, an older sea
   assert.equal(hintOf(key({ sealed: false, grant: 'g', hint: 'a 40-character value' })), null);
 });
 
-test('THE ROW HAS ONE BUTTON: Reveal where a value is sealed, "Seal a value" where there is none', () => {
-  assert.equal(words.sealValue, 'Seal a value');
+test('THE ROW HAS ONE BUTTON: Reveal where a value is sealed, "Add value" where there is none', () => {
+  assert.equal(words.sealValue, 'Add value');
   assert.deepEqual(rowAction(KEYS[0]!), { act: 'reveal' });
-  assert.deepEqual(rowAction(KEYS[3]!), { act: 'seal', word: 'Seal a value' }, 'kept somewhere else: one press seals it onto this row');
-  assert.deepEqual(rowAction(key({ sealed: false, grant: 'g' })), { act: 'seal', word: 'Seal a value' }, 'out of service: the same row takes a new value');
+  assert.deepEqual(rowAction(KEYS[3]!), { act: 'seal', word: 'Add value' }, 'kept somewhere else: one press puts it onto this row');
+  assert.deepEqual(rowAction(key({ sealed: false, grant: 'g' })), { act: 'seal', word: 'Add value' }, 'out of service: the same row takes a new value');
   /* A row a briefing already knew is sealed and names no grant to open, so it has neither: there is a value, and no door to it here. */
   assert.equal(rowAction(key({ sealed: true, grant: null })), null);
 });
@@ -138,8 +143,8 @@ test('A KEY SAYS WHERE IT CAME FROM when its row does, by the row and never by a
 test('EVERY KEY IS COUNTED, however many: 405 handed is 405 said, not the first page of them', () => {
   const many = Array.from({ length: 405 }, (_, i) => key({ id: `k${i}`, label: `Key ${i}`, opened: 1, ...(i < 90 ? { sealed: false, grant: null } : {}) }));
   const s = sentenceOf({ keys: many, listed: true, counts: true, asking: 0, seesMachines: true });
-  assert.equal(s?.text, '405 keys, 315 sealed here, opened 315 times.');
-  assert.equal(sentenceOf({ keys: many.slice(90), listed: true, counts: false, asking: 0, seesMachines: false })?.text, '315 keys sealed.');
+  assert.equal(s?.text, '405 keys, opened 315 times. 90 have no value yet.');
+  assert.equal(sentenceOf({ keys: many.slice(90), listed: true, counts: false, asking: 0, seesMachines: false })?.text, '315 keys.');
 });
 
 test('MORE KEYS THAN WERE READ IS SAID, and a read that got them all says nothing', () => {

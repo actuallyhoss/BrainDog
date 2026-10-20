@@ -48,12 +48,16 @@ export const words = {
   /* WHO OPENED IT LAST, when that was a run: `usedBy`'s newest, as a key's row page and "Runs on" say it. */
   openedBy: (run: string, agent: string | null, when: string) => `Last opened by ${run}${agent ? ` (${agent})` : ''} ${when}`,
   noKeys: 'No keys yet',
-  noKeysHow: 'Add one here, or let an agent add one with braindog keys put and run a command with it through braindog keys exec <label> -- <command>.',
+  noKeysHow: 'A key is a password, a token or a set of codes an agent may use without ever reading it.',
+  /* THE COMMAND AN AGENT ADDS ONE WITH, said on its own line with Copy, never mid-sentence. */
+  noKeysAgent: 'Or have an agent add one:',
+  noKeysCommand: 'braindog keys put <name>',
   noMachines: 'No machine may open keys',
   /* Putting a key in, replacing one, and reading one back: `/api/keys/*`, a browser session only. */
   addKey: 'Add a key',
   replace: 'Replace value',
-  replaceTitle: (label: string) => `Replace ${label}`,
+  replaceTitle: (label: string) => `Replace the value of ${label}`,
+  addValueTitle: (label: string) => `Add the value for ${label}`,
   nameField: 'Name',
   nameHint: 'What you would call it out loud, such as Kiln deploy.',
   opensAsk: 'What it opens',
@@ -62,7 +66,7 @@ export const words = {
   projectField: 'Project',
   projectNone: 'No project',
   valueField: 'Value',
-  valueHint: 'Pasted once. This host seals it, and the record is handed sealed bytes.',
+  valueHint: 'Paste it once. It is locked before it is saved, and nobody can read it back here, you included.',
   valueAgain: 'The new value replaces the old one. What the old one opened stays on the record.',
   save: 'Save',
   saving: 'Saving',
@@ -97,7 +101,11 @@ export const words = {
   /* THE VAULT PASSPHRASE (`12 §6`, "The optional second factor"): the switch, the honesty table and the two sheets. The
      table is the document's own trade, said in a person's words, with the consequence in the same place as the switch. */
   passphrase: 'Passphrase',
-  lockSwitch: 'Vault passphrase',
+  lockSwitch: 'Passphrase',
+  /* THE PASSPHRASE ROW'S LINE WHILE IT IS OFF: the state and what turning it on does, in one sentence (`12 §6`). */
+  lockOffRow: 'Off. Turn it on and only you can open your keys.',
+  lockNoKeys: 'Add a key first. Then you can lock them with a passphrase.',
+  lockHow: 'How it works',
   lockOn: 'On. Keys open only with your passphrase.',
   lockOff: 'Off. BrainDog opens your keys with the key this host keeps.',
   lockReading: 'Checking whether the vault has a passphrase.',
@@ -288,6 +296,9 @@ export type KeyRow = {
   lastOpened: string | null;
   /** The grant `revokeGrant` names, where this row points at one. An index row points at none. */
   grant: string | null;
+  /** Whether the row says where the key is kept when its value is not here (`where`), so it is not one with no value
+      anywhere: the Agents page's "keys with no value" counts the same rows (`keys-nowhere`). */
+  kept?: boolean;
   /** How long the sealed value is, in bytes. Absent on a row with no value sealed here and on a seal older than the fact. */
   bytes?: number;
   /** What the sealed value is, unopened ("a 40-character value"), as the host wrote it when it sealed. Absent as `bytes` is. */
@@ -369,6 +380,7 @@ export function keysOf(
         sealed,
         opened: known?.opened ?? grant?.opened ?? 0,
         lastOpened: known?.last_opened ?? grant?.last_opened ?? null,
+        ...(typeof r.fields.where === 'string' && r.fields.where.trim() !== '' ? { kept: true } : {}),
         ...(sealed ? unopened(known ?? grant ?? {}) : {}),
       };
     })

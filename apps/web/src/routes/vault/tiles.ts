@@ -28,16 +28,20 @@ export const words = {
   opensMeta: 'Counts only, never a value',
   opensUnit: (n: number) => (n === 1 ? 'open' : 'opens'),
   never: 'never opened',
-  /* A key's state, said as a word beside a dot. */
-  sealedHere: 'Sealed',
+  /* A key's state, said as a word beside a dot. A saved value draws nothing: it is how a key should be. */
+  sealedHere: 'Value saved',
+  noValue: 'No value yet',
+  keptElsewhere: 'Kept elsewhere',
   /* A key's count at the end of its row: how often, and who last, when a run did it. */
   lastBy: (who: string, when: string) => `last by ${who} ${when}`,
   retired: 'Out of service',
-  elsewhere: 'Not sealed here',
+  elsewhere: 'No value yet',
   /* The toolbar's add, on a phone, where it is a circle with no words of its own. */
   addKey: 'Add a key',
   /* The one button on a key with no value, where a sealed key has Reveal. */
-  sealValue: 'Seal a value',
+  sealValue: 'Add value',
+  /* WHERE A KEY APPLIES WHEN IT IS NO PROJECT'S, in the row's meta line. */
+  allProjects: 'All projects',
   /* Where a key came from, as its row says it, in the row's menu. */
   cameFrom: 'Came from',
   cameFromSaid: (where: string) => `Came from ${where}`,
@@ -63,10 +67,13 @@ export type Sentence = { text: string; needs: string | undefined };
 export function sentenceOf(o: { keys: readonly KeyRow[]; listed: boolean; counts: boolean; asking: number; seesMachines: boolean }): Sentence | null {
   const parts: string[] = [];
   if (o.listed && o.keys.length > 0) {
+    /* "6 keys. 2 have no value yet.": the keys with a value nowhere are the ones to see to, counted as Agents counts
+       them (`keys-nowhere`), and "sealed" is not a word on screen. */
     const sealed = o.keys.filter((k) => k.sealed);
-    const head = sealed.length === o.keys.length ? `${keysSaid(o.keys.length)} sealed` : `${keysSaid(o.keys.length)}, ${sealed.length} sealed here`;
     const total = sealed.reduce((sum, k) => sum + k.opened, 0);
-    parts.push(o.counts && sealed.length > 0 ? `${head}, ${total === 0 ? 'none opened yet' : vault.opened(total)}.` : `${head}.`);
+    parts.push(o.counts && sealed.length > 0 ? `${keysSaid(o.keys.length)}, ${total === 0 ? 'none opened yet' : vault.opened(total)}.` : `${keysSaid(o.keys.length)}.`);
+    const none = o.keys.filter(missing).length;
+    if (none > 0) parts.push(`${none === 1 ? '1 has' : `${none} have`} no value yet.`);
   }
   let needs: string | undefined;
   if (o.seesMachines && o.asking > 0) {
@@ -125,9 +132,21 @@ export function readingOf(ranked: readonly KeyRow[], lastBy: ReadonlyMap<string,
   return `${top.label} was ${vault.opened(top.opened)}${last}${tail}.`;
 }
 
-/** A key's state as a word, and whether a value is sealed on this record behind it. */
-export const stateOf = (k: KeyRow): { word: string; sealed: boolean } =>
-  k.sealed ? { word: words.sealedHere, sealed: true } : { word: k.grant ? words.retired : words.elsewhere, sealed: false };
+/** A key with a value nowhere: none here, none taken out of service, and nowhere it says it is kept. */
+export const missing = (k: KeyRow): boolean => !k.sealed && !k.grant && !k.kept;
+
+/**
+ * A key's state as a word, whether a value is sealed on this record behind it, and whether it needs one (`warn`, the
+ * ring and the words). A saved value is drawn as nothing at all.
+ */
+export const stateOf = (k: KeyRow): { word: string; sealed: boolean; warn: boolean } =>
+  k.sealed
+    ? { word: words.sealedHere, sealed: true, warn: false }
+    : k.grant
+      ? { word: words.retired, sealed: false, warn: false }
+      : k.kept
+        ? { word: words.keptElsewhere, sealed: false, warn: false }
+        : { word: words.noValue, sealed: false, warn: true };
 
 /**
  * WHAT A SEALED KEY IS, UNOPENED: the hint the record stored when it sealed it ("a 40-character value"), or `null`.
@@ -141,7 +160,7 @@ export const hintOf = (k: KeyRow): string | null => {
 };
 
 /**
- * THE ONE BUTTON AT THE END OF A KEY'S ROW: Reveal where a value is sealed behind a grant, "Seal a value" where the
+ * THE ONE BUTTON AT THE END OF A KEY'S ROW: Reveal where a value is sealed behind a grant, "Add value" where the
  * row holds none, which opens the sheet Replace opens and seals onto that same row.
  *
  * `null` for a row that is sealed and names no grant to open: there is a value, and no door to it from here.

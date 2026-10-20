@@ -56,6 +56,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import Bars from '$lib/viz/Bars.svelte';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
+  import CodeLine from '$lib/ui/CodeLine.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { countSaid, machinesTellOf, mayAct, saidOf, tellOf, words as tells, type Said } from './said.ts';
@@ -382,8 +383,12 @@
   let form = $state(blank());
   let saving = $state(false);
   let sheetSaid = $state('');
-  const sheetTitle = $derived(sheet === null ? words.addKey : sheet.mode === 'replace' ? words.replaceTitle(sheet.row.label) : words.addKey);
-  const sheetHint = $derived(sheet?.mode === 'replace' ? words.valueAgain : words.valueHint);
+  /* A KEY WITH NO VALUE IS GIVEN ONE, and only one with a value has it replaced: "Replace Fenwick Cloud recovery codes"
+     over a key that held nothing said there was something to replace. */
+  const sheetTitle = $derived(
+    sheet === null ? words.addKey : sheet.mode === 'replace' ? (sheet.row.sealed ? words.replaceTitle(sheet.row.label) : words.addValueTitle(sheet.row.label)) : words.addKey,
+  );
+  const sheetHint = $derived(sheet?.mode === 'replace' && sheet.row.sealed ? words.valueAgain : words.valueHint);
 
   /**
    * THE ONE KEY ON THE SCREEN, and the two timers that take it away: it hides itself after thirty seconds, and a
@@ -673,24 +678,6 @@
     </Tile>
   {/if}
 
-  {#if opens || acts}
-    <div class="tiles">
-      {#if opens}
-        <!-- THE ONE FIGURE: how often the sealed keys were opened, one bar a key, the most opened in ink.
-             Counts and names only; a value never reaches a chart. -->
-        <Tile icon="key" title={tileWords.opensTitle} meta={tileWords.opensMeta}>
-          <p class="figure num">{opens.total.toLocaleString('en')}<span class="figure-unit">{tileWords.opensUnit(opens.total)}</span></p>
-          <Bars items={opens.bars} subject={tileWords.opensTitle} />
-          <p class="reading">{opens.reading}</p>
-        </Tile>
-      {/if}
-      <!-- THE PASSPHRASE BESIDE THE KEYS IT GUARDS, and only for a person who may act here: it is an owner's decision. -->
-      {#if acts}
-        <Passphrase {lock} {client} onturn={(next) => (lock = next)} />
-      {/if}
-    </div>
-  {/if}
-
   <Section title={words.keys} count={keys.length}>
     {#snippet aside()}
       <!-- AND NO FORM OVER A LIST THAT IS NOT THERE: an eight-field sheet whose save the record would refuse. -->
@@ -710,7 +697,15 @@
         {/snippet}
       </Empty>
     {:else if from !== 'reading' && keys.length === 0}
-      <Empty kind="no-data-yet" title={words.noKeys} body={words.noKeysHow} />
+      <Empty kind="no-data-yet" glyph="key" title={words.noKeys} body={words.noKeysHow}>
+        {#snippet actions()}
+          {#if acts && index.kind === 'held'}<Button weight="primary" onclick={openAdd}>{words.addKey}</Button>{/if}
+        {/snippet}
+      </Empty>
+      <div class="agent-add">
+        <p>{words.noKeysAgent}</p>
+        <CodeLine text={words.noKeysCommand} />
+      </div>
     {/if}
     <!-- A COUNT THE RECORD WOULD NOT GIVE IS SAID ONCE, in the record's own words, and never drawn as "never opened". -->
     {#if uncounted}<p class="said">{uncounted}</p>{/if}
@@ -723,11 +718,11 @@
       {#each keys as k (k.id)}
         <!--
           ONE ROW ANATOMY: the key's well, its name (a link to its row), and under it where it applies, what it
-          opens and whether a value is sealed here; how often it was opened at the end; Reveal and the "…" menu on hover.
+          opens and whether a value is sealed here; how often it was opened at the end; Reveal and the "…" menu always drawn at a desk, the "…" alone on a phone.
           Replace and Revoke stay in the key's own menu (design 2.14): neither is what a person comes to the vault to do most.
 
           A SEALED KEY SAYS WHAT IT IS, UNOPENED, after what it opens: the hint the host wrote when it sealed it. A KEY WITH
-          NO VALUE HAS "Seal a value" WHERE A SEALED ONE HAS REVEAL, which opens the sheet Replace opens and seals onto
+          NO VALUE HAS "Add value" WHERE A SAVED ONE HAS REVEAL, which opens the sheet Replace opens and seals onto
           this same row. Where the key came from, when its row says, is the first line of its menu.
         -->
         {@const state = stateOf(k)}
@@ -741,11 +736,13 @@
             <span class="line-mark"><IconWell name="key" size="l" /></span>
             <span class="line-main">
               {#if href}<a class="line-title key-name tap" href={at(href)}>{k.label}</a>{:else}<span class="line-title key-name">{k.label}</span>{/if}
+              <!-- WHERE IT APPLIES, THEN WHAT IT OPENS, as words in the meta line: the project's dot and name, or "All
+                   projects". A saved value draws nothing; a key with no value says so with the ring and the words. -->
               <span class="line-detail key-meta">
-                <ScopeChip scope={k.scope} />
-                {#if k.opens}<span class="key-opens">{k.opens}</span>{/if}
+                {#if k.scope}<ScopeChip scope={k.scope} inline />{:else}<span class="key-all">{tileWords.allProjects}</span>{/if}
+                {#if k.opens}<span class="sep" aria-hidden="true">{' · '}</span><span class="key-opens">{k.opens}</span>{/if}
                 {#if hint}<span class="key-hint">{hint}</span>{/if}
-                <span class="state" data-sealed={state.sealed ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>
+                {#if !state.sealed}<span class="sep" aria-hidden="true">{' · '}</span><span class="state" data-warn={state.warn ? '' : undefined}><span class="dot" aria-hidden="true"></span>{state.word}</span>{/if}
               </span>
             </span>
             <span class="key-count">
@@ -761,7 +758,7 @@
               {/if}
             </span>
             {#if acts}
-              <span class="line-verbs who-do">
+              <span class="line-verbs who-do key-do">
                 {#if action?.act === 'reveal'}
                   <!-- ONLY WHERE THERE IS SOMETHING SEALED TO OPEN: an index row points at no grant. -->
                   <Button size="sm" disabled={revealing === k.id} onclick={() => void revealKey(k)}>
@@ -769,13 +766,18 @@
                   </Button>
                 {:else if action?.act === 'seal'}
                   <Button size="sm" onclick={() => openReplace(k)}>{action.word}</Button>
+                {:else if k.sealed}
+                  <Button size="sm" onclick={() => openReplace(k)}>{words.replace}</Button>
                 {/if}
                 <Menu label={moreFor(k.label)} align="end">
                   {#snippet trigger()}
                     <span class="more-trigger"><Icon name="more" size="s" /><span class="vh">{moreFor(k.label)}</span></span>
                   {/snippet}
                   {#if origin}<p class="mi-note">{tileWords.cameFromSaid(origin)}</p>{/if}
-                  <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{words.replace}</button>
+                  {#if action?.act === 'reveal'}
+                    <button type="button" class="mi" role="menuitem" disabled={revealing === k.id} onclick={() => void revealKey(k)}>{words.reveal}</button>
+                  {/if}
+                  <button type="button" class="mi" role="menuitem" onclick={() => openReplace(k)}>{k.sealed ? words.replace : tileWords.sealValue}</button>
                   {#if k.grant && k.sealed}
                     <button type="button" class="mi" role="menuitem" data-tone="bad" onclick={() => void retireKey(k)}>{copy.revokeKey}</button>
                   {/if}
@@ -835,6 +837,22 @@
       {/each}
     </ul>
   </Section>
+
+  {#if opens}
+    <!-- THE ONE FIGURE: how often the sealed keys were opened, one bar a key, the most opened in ink.
+         Counts and names only; a value never reaches a chart. -->
+    <Tile icon="key" title={tileWords.opensTitle} meta={tileWords.opensMeta}>
+      <p class="figure num">{opens.total.toLocaleString('en')}<span class="figure-unit">{tileWords.opensUnit(opens.total)}</span></p>
+      <Bars items={opens.bars} subject={tileWords.opensTitle} />
+      <p class="reading">{opens.reading}</p>
+    </Tile>
+  {/if}
+
+  <!-- THE PASSPHRASE IS ONE ROW AT THE FOOT, for a person who may act here: the keys come first, since they are what a
+       person opens the vault for, and how the passphrase works is a fold under it. -->
+  {#if acts}
+    <Passphrase {lock} {client} keys={keys.length} onturn={(next) => (lock = next)} />
+  {/if}
 
   <Sheet open={sheet !== null} title={sheetTitle} subtitle={sheetHint} onclose={shut}>
     <form class="key-form" id="key-form" onsubmit={saveKey} novalidate>
@@ -923,13 +941,18 @@
     max-inline-size: var(--page-max);
   }
 
-  /* TWO TILES SIDE BY SIDE AT A DESK, 12 apart, one over the other where two will not fit; a lone tile
-     takes the row. Each is as tall as what it holds. */
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-    align-items: start;
-    gap: var(--sp-3);
+  /* THE COMMAND AN AGENT ADDS A KEY WITH, under the empty list, on a line of its own with Copy. */
+  .agent-add {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    max-inline-size: 640px;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .agent-add p {
+    margin: 0;
   }
 
   /* THE FIGURE, `t-figure`, with its unit in meta beside it. */
@@ -1051,9 +1074,22 @@
     border-radius: var(--r-pill);
   }
 
-  .state[data-sealed] .dot {
-    background: var(--ink2);
-    border-color: var(--ink2);
+  /* NO VALUE YET IS THE ONE STATE THAT NEEDS SOMETHING: a ring in the warn hue, and its words in ink. */
+  .state[data-warn] {
+    color: var(--ink);
+  }
+
+  .state[data-warn] .dot {
+    border-color: var(--warn);
+  }
+
+  .key-all {
+    color: var(--ink-2);
+  }
+
+  /* THE KEY'S ONE PRESS IS ALWAYS DRAWN AT A DESK, "Add value" or Reveal, never only under the pointer. */
+  .key .key-do {
+    opacity: 1;
   }
 
   .dot[data-tone='warn'] {
@@ -1373,6 +1409,15 @@
     .who-detail {
       flex-wrap: wrap;
       row-gap: 2px;
+    }
+
+    /* ON A PHONE A KEY'S ROW KEEPS ONLY ITS "⋯", which holds the same presses, so the name keeps its one line. */
+    .key-do > :global(.btn) {
+      display: none;
+    }
+
+    .key-meta .key-opens {
+      white-space: normal;
     }
 
     .shown {

@@ -16,11 +16,15 @@
 
   NOTHING IS KEPT. Both fields are emptied when the sheet shuts, whatever the answer was.
 
-  A TILE WITH NO FIGURE: it holds a control and the trade it makes, not a number, so it has no chart. The
-  switch sits in the tile's heading, where a tile's own control goes, and the table is the tile's body.
+  ONE ROW AT THE FOOT OF THE VAULT (agents F16): the lock in its well, "Passphrase", the line that says where it stands
+  and what turning it on does ("Off. Turn it on and only you can open your keys."), and the switch at the row's end.
+  The trade in full, the table and what happens to backups, is a "How it works" fold under it. With no key yet there
+  is nothing to lock: the row says to add one first, and has no switch and no fold.
 -->
 <script lang="ts">
   import Tile from '$lib/ui/Tile.svelte';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
   import Button from '$lib/ui/Button.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -31,10 +35,13 @@
   let {
     lock,
     client,
+    keys = 1,
     onturn,
   }: {
     lock: Lock;
     client: Locker | null;
+    /** How many keys the vault holds: with none there is nothing to lock yet. */
+    keys?: number;
     /** The vault after a change, or after a refusal that said where it is. */
     onturn: (lock: Lock) => void;
   } = $props();
@@ -45,7 +52,17 @@
   /* THE LAST BRANCH READS `fix` THROUGH `in`, because eliminating all three literals of the first variant's `state`
      does not itself narrow TypeScript to the second variant across a ternary chain; `in` does. */
   const line = $derived(
-    lock.state === 'on' ? words.lockOn : lock.state === 'off' ? words.lockOff : lock.state === 'reading' ? words.lockReading : 'fix' in lock ? lock.fix : '',
+    keys === 0
+      ? words.lockNoKeys
+      : lock.state === 'on'
+        ? words.lockOn
+        : lock.state === 'off'
+          ? words.lockOffRow
+          : lock.state === 'reading'
+            ? words.lockReading
+            : 'fix' in lock
+              ? lock.fix
+              : '',
   );
 
   let sheet = $state<'on' | 'off' | null>(null);
@@ -99,55 +116,64 @@
   }
 </script>
 
-<Tile icon="lock" title={words.lockSwitch} data-part="passphrase">
-  {#snippet actions()}
-    <button
-      type="button"
-      class="switch"
-      role="switch"
-      aria-checked={on}
-      aria-label={words.lockSwitch}
-      aria-describedby="lock-line"
-      disabled={!can || busy}
-      onclick={press}><span class="switch-track"></span></button
-    >
-  {/snippet}
-  <p class="lock-line" id="lock-line" role="status" data-on={on ? '' : undefined}>
-    <span class="lock-dot" aria-hidden="true"></span>{line}
-  </p>
+<Tile data-part="passphrase">
+  <div class="lock-row">
+    <IconWell name="lock" size="l" />
+    <span class="lock-main">
+      <span class="lock-title" id="lock-title">{words.lockSwitch}</span>
+      <span class="lock-line" id="lock-line" role="status" data-on={on ? '' : undefined}>{line}</span>
+    </span>
+    {#if keys > 0 && can}
+      <button
+        type="button"
+        class="switch"
+        role="switch"
+        aria-checked={on}
+        aria-labelledby="lock-title"
+        aria-describedby="lock-line"
+        disabled={!can || busy}
+        onclick={press}><span class="switch-track"></span></button
+      >
+    {/if}
+  </div>
 
-  <p class="lock-text">{words.lockProtects}</p>
+  {#if keys > 0}
+    <details class="lock-how">
+      <summary class="lock-how-head tap"><Icon name="chevron" size="s" />{words.lockHow}</summary>
+      <p class="lock-text">{words.lockProtects}</p>
 
-  <!--
-    THE HONESTY TABLE, `12 §6`'s two rows. At 1440 it is a table; under 640px each row is a block with its two cells
-    labelled above their values, because three columns of sentences do not fit a phone and a label before every value
-    is what a row of facts is on a phone. Each label is drawn only under 640px, where the column headers are not, so a
-    screen reader hears one or the other and never both.
-  -->
-  <table class="lock-table">
-    <caption class="lock-hidden">{words.tableCaption}</caption>
-    <thead>
-      <tr>
-        <th scope="col">{words.tableState}</th>
-        <th scope="col">{words.tableReads}</th>
-        <th scope="col">{words.tableForget}</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr data-now={on ? undefined : ''}>
-        <th scope="row">{words.rowOff} <span class="lock-note">{words.rowOffNote}</span></th>
-        <td><span class="lock-label">{words.tableReads}</span>{words.offReads}</td>
-        <td><span class="lock-label">{words.tableForget}</span>{words.offForget}</td>
-      </tr>
-      <tr data-now={on ? '' : undefined}>
-        <th scope="row">{words.rowOn}</th>
-        <td><span class="lock-label">{words.tableReads}</span>{words.onReads}</td>
-        <td><span class="lock-label">{words.tableForget}</span><strong class="lock-strong">{words.onForget}</strong></td>
-      </tr>
-    </tbody>
-  </table>
+      <!--
+        THE HONESTY TABLE, `12 §6`'s two rows. At 1440 it is a table; under 640px each row is a block with its two cells
+        labelled above their values, because three columns of sentences do not fit a phone and a label before every
+        value is what a row of facts is on a phone. Each label is drawn only under 640px, where the column headers are
+        not, so a screen reader hears one or the other and never both.
+      -->
+      <table class="lock-table">
+        <caption class="lock-hidden">{words.tableCaption}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{words.tableState}</th>
+            <th scope="col">{words.tableReads}</th>
+            <th scope="col">{words.tableForget}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-now={on ? undefined : ''}>
+            <th scope="row">{words.rowOff} <span class="lock-note">{words.rowOffNote}</span></th>
+            <td><span class="lock-label">{words.tableReads}</span>{words.offReads}</td>
+            <td><span class="lock-label">{words.tableForget}</span>{words.offForget}</td>
+          </tr>
+          <tr data-now={on ? '' : undefined}>
+            <th scope="row">{words.rowOn}</th>
+            <td><span class="lock-label">{words.tableReads}</span>{words.onReads}</td>
+            <td><span class="lock-label">{words.tableForget}</span><strong class="lock-strong">{words.onForget}</strong></td>
+          </tr>
+        </tbody>
+      </table>
 
-  <p class="reading">{words.backups}</p>
+      <p class="reading">{words.backups}</p>
+    </details>
+  {/if}
 </Tile>
 
 <Sheet
@@ -183,30 +209,86 @@
 </Sheet>
 
 <style>
-  /* THE SWITCH'S OWN LINE, what the vault is now: a dot for the state, ink when the passphrase is on, and the words. */
-  .lock-line {
+  /* THE ROW: the well, the name over the line that says where it stands, and the switch at the tile's own edge. */
+  .lock-row {
+    display: grid;
+    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  .lock-main {
     display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-    margin: 0;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .lock-title {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
 
-  .lock-dot {
-    flex: none;
-    inline-size: 6px;
-    block-size: 6px;
-    border: 1.5px solid var(--dim);
-    border-radius: var(--r-pill);
-    transform: translateY(-1px);
+  .lock-line {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
-  .lock-line[data-on] .lock-dot {
-    background: var(--ink);
-    border-color: var(--ink);
+  .lock-line[data-on] {
+    color: var(--ink-2);
+  }
+
+  /* HOW IT WORKS, FOLDED: a chevron that turns, lined up with the row's words. */
+  .lock-how {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    padding-inline-start: calc(var(--well-l) + var(--sp-3));
+  }
+
+  .lock-how-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    inline-size: fit-content;
+    min-block-size: var(--ctl-h-sm);
+    color: var(--ink);
+    font-size: var(--fs-meta);
+    font-weight: 500;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .lock-how-head::-webkit-details-marker {
+    display: none;
+  }
+
+  .lock-how-head :global(.icon) {
+    color: var(--ink-3);
+    transition: rotate var(--d-state) var(--ease-out);
+  }
+
+  .lock-how[open] > .lock-how-head :global(.icon) {
+    rotate: 90deg;
+  }
+
+  .lock-how[open] > :not(summary) {
+    margin-block-start: var(--sp-3);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lock-how-head :global(.icon) {
+      transition: none;
+    }
+  }
+
+  @media (width < 640px) {
+    .lock-how {
+      padding-inline-start: 0;
+    }
   }
 
   .lock-text,
@@ -343,9 +425,4 @@
     }
   }
 
-  @media (forced-colors: active) {
-    .lock-line[data-on] .lock-dot {
-      background: CanvasText;
-    }
-  }
 </style>
