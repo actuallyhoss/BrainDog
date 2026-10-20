@@ -67,6 +67,7 @@
     bareBody: 'A number on its own does not say which list it is in. Search for the thing by what it says instead.',
     spokenTitle: (said: string): string => `Nothing answers to “${said}”`,
     spokenBody: 'Nothing on this record goes by that name. Search for it by what it says instead.',
+    opening: (said: string): string => `Opening ${said}`,
   } as const;
 
   const BARE = /^#?\d+$/;
@@ -118,6 +119,12 @@
 
   let done = $state(false);
   let refusal = $state<Refusal | null>(null);
+  /* A LOOKUP STILL OUT AFTER 150ms SAYS WHAT IT IS OPENING (money F15), inside the shell: the screen was blank while
+     the record was asked, which read as a page that had failed to draw. Under 150ms nothing is drawn, so a quick
+     answer does not flash. */
+  let slow = $state(false);
+  let slowTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => () => clearTimeout(slowTimer));
 
   /**
    * Ask the record, when there is something to ask.
@@ -133,7 +140,11 @@
       return;
     }
     const began = opened();
+    slow = false;
+    clearTimeout(slowTimer);
+    slowTimer = setTimeout(() => (slow = true), 150);
     const out = await resolved(said);
+    clearTimeout(slowTimer);
     if (spoken() !== said) return closed(true, began);
     closed(out.refusal === null, began);
     if (out.to) {
@@ -168,7 +179,13 @@
      in the body, and the title still claimed `Nothing answers to “tasks#3”` over it, about a row nobody looked up. -->
 <svelte:head><title>{titleOf(done && !refusal ? (missing ?? raw) : raw)}</title></svelte:head>
 
-{#if done && refusal?.code === 'UNREACHABLE'}
+{#if !done && slow && shape === 'spoken'}
+  <!-- THE HEAD'S PLACE AND ONE TILE'S, while the record is asked: what is opening, at the body size in the quiet ink. -->
+  <div class="page opening" role="status">
+    <p class="opening-said">{words.opening(raw)}</p>
+    <div class="opening-tile" aria-hidden="true"></div>
+  </div>
+{:else if done && refusal?.code === 'UNREACHABLE'}
   <div class="page">
     <!-- THE RECORD WAS NOT ASKED, SO THE SCREEN SAYS THAT AND OFFERS THE ONE THING THAT HELPS. The client's sentence
          carries the socket's words ("200 with a body that is not JSON"), and those are for whoever reports the
@@ -205,5 +222,24 @@
      measure; the column is not capped here. */
   .page {
     padding: var(--inset) var(--gutter) var(--sp-8);
+  }
+
+  .opening {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+
+  .opening-said {
+    margin: 0;
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .opening-tile {
+    block-size: 120px;
+    background: var(--tile);
+    border-radius: var(--r-tile);
   }
 </style>
