@@ -1,5 +1,5 @@
 /**
- * What every agent is told, on Home: the record's `learnings` as one tile below the fold (`Told.svelte`). AGT-C14
+ * What every agent is told, on Agents: the record's `learnings` as one tile under the runs (`Told.svelte`). AGT-C14
  * on the screen: a session that starts is handed what was learned and still stands, in the record's own order (a
  * method before a fact, this project before everywhere, the newest first), and this shows him the same lessons in
  * that same order, each with its because.

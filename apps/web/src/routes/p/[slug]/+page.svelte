@@ -46,6 +46,8 @@
   import type { Near } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { live } from '$lib/data/live.svelte.ts';
+  import Told from '$lib/home/Told.svelte';
+  import type { LessonsTile } from '$lib/home/told.ts';
 
   const slug = $derived(route.params.slug ?? '');
   const showSource = $derived(route.url.searchParams.get('src') === '1');
@@ -300,6 +302,23 @@
     const pen = (route.data as unknown as Shell).pen ?? [];
     return pageOffer(pen, { slug, blocks: got.page.blocks }, { suggest: navPrefs.suggest, gone: (o) => navPrefs.isDismissed(o) || offerActions.hidden(o) });
   });
+  /**
+   * WHAT EVERY AGENT IS TOLD, UNDER THE RUNS ON AGENTS (the UI pass of 20 October, today F19): the record's lessons as
+   * one tile after the page's blocks, read once a record when the agents page has drawn. `told.ts` is route-only (it
+   * carries the client), so it is imported here and only for this page. Nothing at nought or on a refusal.
+   */
+  let told = $state<{ base: string; tile: LessonsTile | null } | null>(null);
+  $effect(() => {
+    if (slug !== 'agents' || got?.from !== 'live') return;
+    const base = apiBase();
+    if (untrack(() => told?.base) === base) return;
+    told = { base, tile: null };
+    void import('$lib/home/told.ts').then(async (m) => {
+      const tile = m.lessonsTile(await m.loadLessons(base));
+      if (told?.base === base) told = { base, tile };
+    });
+  });
+  const lessons = $derived(slug === 'agents' && told?.base === apiBase() ? told.tile : null);
   const offerBusy = $derived.by(() => {
     void offerTick;
     return offerActions.busy();
@@ -315,11 +334,16 @@
 {#if strip}<PageTabs {strip} />{/if}
 <!-- THE OFFER SITS UNDER THE PAGE'S OWN BLOCKS (PageView's `offer`), as one quiet line that opens on tap, so the page's
      content comes first on a phone and on a laptop alike. -->
-{#snippet offerCard()}{#if offer}<OfferCard item={offer} acts={offerActions} busy={offerBusy} compact />{/if}{/snippet}
-<div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={view.got} {reread} offer={offer ? offerCard : undefined} /></div>
+{#snippet offerCard()}{#if lessons}<Told tile={lessons} />{/if}{#if offer}<OfferCard item={offer} acts={offerActions} busy={offerBusy} compact />{/if}{/snippet}
+<div class="read" aria-busy={reading ? 'true' : undefined}><PageView slug={view.slug} {showSource} got={view.got} {reread} offer={offer || lessons ? offerCard : undefined} /></div>
 
 <style>
   .read {
     display: contents;
+  }
+
+  /* THE OFFER UNDER WHAT EVERY AGENT IS TOLD, one tile gap below it. */
+  .read :global([data-lessons] + *) {
+    margin-block-start: var(--tile-gap);
   }
 </style>

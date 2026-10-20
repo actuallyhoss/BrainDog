@@ -1,5 +1,5 @@
 /**
- * What every agent is told, on Home: the record's `learnings` as one line a lesson with its because, in the record's
+ * What every agent is told, on Agents: the record's `learnings` as one line a lesson with its because, in the record's
  * order, no id drawn, a foot only for counts above nought, and nothing at all at nought or on a host without the read.
  */
 
@@ -96,10 +96,11 @@ test('THROUGH THE CLIENT: it asks for six, never throws, and a host without the 
 
 const bare = (text: string): string => text.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 
-test('THE TILE IS FLAT, HAS NO BORDER OR SHADOW, NOTHING TO PRESS, AND ITS WORDS ARE 15 OR MORE', () => {
+test('THE TILE IS THE ONE TILE WITH ITS ICON, HAS NO BORDER OR SHADOW, NOTHING TO PRESS, AND ITS WORDS ARE 15 OR MORE', () => {
   const part = readFileSync(new URL('./Told.svelte', import.meta.url), 'utf8');
   const style = /<style>([\s\S]*)<\/style>/u.exec(part)![1]!;
-  assert.match(style, /\.lessons \{[^}]*border-radius: var\(--r-tile, 16px\);/u);
+  /* THROUGH `Tile` SINCE THE UI PASS OF 20 OCTOBER (today F19): the heading in the tile's own head, with its icon. */
+  assert.match(part, /<Tile icon="learning" title=\{tile\.heading\}/u);
   assert.doesNotMatch(style, /box-shadow|gradient|backdrop-filter/u);
   assert.doesNotMatch(style.replace(/@media \(forced-colors: active\)[\s\S]*$/u, ''), /\bborder:/u);
   for (const size of style.matchAll(/font-size: ([^;]+);/gu)) assert.match(size[1]!, /^var\(--t-(row|base)(, 15px)?\)$/u);

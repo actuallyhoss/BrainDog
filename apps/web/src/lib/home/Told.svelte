@@ -1,7 +1,8 @@
 <!--
-  What every agent is told, as one tile below the board's fold (DIRECTION §39): the heading, then each lesson that
-  stands with its because, in the order a session reads them when it starts, and one foot line for what the record
-  left out.
+  What every agent is told, as one tile on Agents, under the runs (the UI pass of 20 October, today F19: it left Today,
+  where it sat below the fold with no icon, for the page of the agents it is told to). The heading in the tile's own
+  head with its icon, then each lesson that stands with its because, in the order a session reads them when it starts,
+  and one foot line for what the record left out.
 
   A LESSON USED TO BE TOLD ONLY TO AGENTS. The record hands every session what was learned before it begins, and no
   screen said what that was. Here the record says it, in its own words and its own order.
@@ -12,15 +13,16 @@
   THE LESSON STAYS IN INK, its because and the foot in the quieter colour, all at the row's own size (15).
 -->
 <script lang="ts">
+  import Tile from '../ui/Tile.svelte';
+
   /* THE TILE'S SHAPE IS SAID HERE, not imported: the module's path spells a list an add-on declares (core-names), and
      the shape is the module's `LessonsTile`, which the screen passes in whole. */
-  type Tile = { heading: string; lines: { lesson: string; because: string | null }[]; foot: string };
+  type Lessons = { heading: string; lines: { lesson: string; because: string | null }[]; foot: string };
 
-  let { tile }: { tile: Tile } = $props();
+  let { tile }: { tile: Lessons } = $props();
 </script>
 
-<section class="lessons" aria-labelledby="lessons-h" data-lessons>
-  <h2 class="n-head" id="lessons-h">{tile.heading}</h2>
+<Tile icon="learning" title={tile.heading} count={tile.lines.length} data-lessons="">
   <ol class="n-list">
     {#each tile.lines as line, i (i)}
       <li class="n-line">
@@ -30,31 +32,13 @@
     {/each}
   </ol>
   {#if tile.foot}<p class="n-foot">{tile.foot[0]!.toUpperCase() + tile.foot.slice(1)}.</p>{/if}
-</section>
+</Tile>
 
 <style>
-  /* A TILE OF ITS OWN, the whole row of the board: flat, no border, no shadow, the board's own radius. */
-  .lessons {
-    grid-column: 1 / -1;
-    min-inline-size: 0;
-    padding: var(--tile-pad, 20px);
-    background: var(--tile, var(--bg));
-    border-radius: var(--r-tile, 16px);
-  }
-
-  .n-head {
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-base);
-    font-weight: 500;
-    line-height: 1.4;
-  }
-
   .n-list {
     display: flex;
     flex-direction: column;
-    margin: var(--sp-3) 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
@@ -86,12 +70,6 @@
   }
 
   .n-foot {
-    margin: var(--sp-2) 0 0;
-  }
-
-  @media (forced-colors: active) {
-    .lessons {
-      border: 1px solid CanvasText;
-    }
+    margin: 0;
   }
 </style>
