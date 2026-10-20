@@ -79,6 +79,8 @@ import { methods as huesMethods } from './hues.ts';
 import { methods as pushTestMethods } from './push-test.ts';
 import { methods as doorSwitchMethods } from './door-switch.ts';
 import { methods as actionRun } from './action-run.ts';
+import { methods as instructions } from './instructions.ts';
+import { methods as agentProfile } from './agent-profile.ts';
 /* END METHODS */
 
 /**
@@ -227,6 +229,8 @@ export function methods(deps: RecordDeps) {
     ...pushTestMethods(deps),
     ...doorSwitchMethods(deps),
     ...actionRun({ ...deps, nudgeAction }),
+    ...instructions(deps),
+    ...agentProfile(deps),
     /* END METHODS */
   };
 }

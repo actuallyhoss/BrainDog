@@ -10,11 +10,12 @@
 
 import type { Result } from '@braindog/ports';
 import { ok } from '@braindog/ports';
-import { agentOf, sessionDeclaration, type ArrivalSettled, type Entry, type Patch, type WriteContext } from '@braindog/kernel';
+import { SEEN_HOW, agentOf, liveStateOf, sessionDeclaration, type ArrivalSettled, type Entry, type LiveState, type Patch, type SeenHow, type Stop, type WriteContext } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 import { listFor } from '../agent-lists.ts';
+import { OWN_RUN, stopLine, toldOf, type Told } from './instructions.ts';
 
 /** One run's use of a key or a tool: the run by its spoken id, its agent and machine, when it last used it, and how often. */
 export type UsedByRun = { run: string; agent: string | null; machine: string | null; at: string; count: number };
@@ -41,7 +42,10 @@ const KEY_FIELD = 'value';
 const TOOLS = 'tools';
 
 /** The kernel's own list of runs, whose rows are spoken `S47`: every write an agent makes is signed with that name. */
-const RUN = sessionDeclaration().body as unknown as { id: string; seq_prefix: string };
+const RUN = sessionDeclaration().body as unknown as { id: string; seq_prefix: string; title: string };
+
+/** The field a run's name is held in, which `presence` answers as `name`. */
+const RUN_TITLE = RUN.title;
 
 /**
  * A run's name as a `GLOB` reads it: the prefix, with any character `GLOB` would read as a pattern put in brackets so
@@ -89,8 +93,57 @@ export type Beat = { run: string | null };
 /** The longest branch or commit `end` takes, as `attach` and `handoff` hold every line they take (`LINE` in `index.ts`). */
 const END_LINE = 280;
 
+/**
+ * What `pulse` answers (plan §2.3 C, §8.3): the caller's run, its stamp, what is pending for it as the inbox file holds
+ * it, what stops it, and the lines in his voice for what is new since the stamp the bridge sent. `run: null` when the
+ * session has no run yet, which is not a refusal: a bridge that pulses before the first write has nothing to keep.
+ */
+export type Pulse = {
+  run: string | null;
+  stamp: string | null;
+  changed: boolean;
+  pending: { id: string; kind: string; said: string; at: string; to: string; line: string }[];
+  stop: Stop | null;
+  lines: string[];
+};
+
+/** What `pulse` takes: the bridge's last stamp, and the instructions it showed since, with how. */
+const PULSE_TAKES = ['stamp', 'shown', 'how'] as const;
+
+/** The most ids one pulse says were shown. */
+const SHOWN_MOST = 50;
+
+/**
+ * One row of `presence` (plan §4.4): a session open now, with where it is, what it says it is doing, what it holds
+ * from him, its helpers, how long it has run and when it was last heard, and how a stop reaches it.
+ */
+export type PresenceRow = {
+  run: string;
+  name: string | null;
+  agent: string | null;
+  machine: string | null;
+  project: string | null;
+  repo: string | null;
+  worktree: string | null;
+  branch: string | null;
+  doing: string | null;
+  state: LiveState;
+  instruction: string | null;
+  task: string | null;
+  stopped: 'stop' | 'pause' | null;
+  helpers: string[];
+  parent: string | null;
+  for_s: number;
+  heard_s: number;
+  /** `hooks`: a stop halts its next tool call. `next_call`: it is told at its next BrainDog call, and keeps editing till then. */
+  reach: 'hooks' | 'next_call';
+};
+
+/** What `presence` takes: one project or one repository. */
+const PRESENCE_TAKES = ['project', 'repo'] as const;
+
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, guard, scoped, readable, admin, no, tail } = deps;
+  const { kernel, sql, guard, scoped, readable, admin, no, tail, clock } = deps;
 
   /**
    * Whether the caller reads the record as a whole, rather than the lists they were invited to: `wholeRecord` in
@@ -184,7 +237,7 @@ export function methods(deps: RecordDeps) {
      * lost answer, writes one end. A person is never a run; a person closes one from the app with `handoff`.
      */
     async end(args: { branch?: string; head?: string } | undefined, ctx: CallContext): Promise<Result<Ended>> {
-      const stop = guard(ctx, 'propose');
+      const stop = guard(ctx, 'propose', OWN_RUN);
       if (stop) return { ok: false, refusal: stop };
       const p = ctx.principal;
       if (p.kind !== 'token')
@@ -231,7 +284,7 @@ export function methods(deps: RecordDeps) {
      * is not a refusal, because a hook that beats on every tool call has nothing to do about it.
      */
     async beat(args: Record<string, never> | undefined, ctx: CallContext): Promise<Result<Beat>> {
-      const stop = guard(ctx, 'propose');
+      const stop = guard(ctx, 'propose', OWN_RUN);
       if (stop) return { ok: false, refusal: stop };
       const p = ctx.principal;
       if (p.kind !== 'token')
@@ -248,6 +301,127 @@ export function methods(deps: RecordDeps) {
         ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
       };
       return ok({ run: kernel.heartbeat(w) });
+    },
+
+    /**
+     * The bridge says the session is open (plan §2.3 C, §4.4): the caller's run's `pulse_at` moves, with no version and
+     * no event, and the answer is what the inbox file holds: the run's stamp, what is pending for it, what stops it, and
+     * the lines in his voice for what changed since the stamp the bridge sent. A token's call, needing `propose`, as
+     * `beat` does; a stopped or paused run still pulses, since the pulse is how it hears that it is stopped.
+     *
+     * `shown` ARE THE INSTRUCTIONS THE BRIDGE PUT IN FRONT OF THE AGENT SINCE ITS LAST PULSE, with `how` (a prompt's
+     * hook by default), so the app can say "Seen by S883 on its next prompt". An id that is not the run's is passed
+     * over: the file may be older than a withdrawal.
+     *
+     * IT FINDS THE CALLER'S RUN AND OPENS NONE, as `beat` does. No run answers `run: null`, which is not a refusal.
+     * A pulse closer than ten seconds to the last moves nothing (`PULSE_MIN_MS`) and is still answered in full, since
+     * reading the stamp costs one indexed read.
+     */
+    async pulse(args: { stamp?: string; shown?: string[]; how?: string } | undefined, ctx: CallContext): Promise<Result<Pulse>> {
+      const stop = guard(ctx, 'propose', OWN_RUN);
+      if (stop) return { ok: false, refusal: stop };
+      const p = ctx.principal;
+      if (p.kind !== 'token') return no('FORBIDDEN', 'pulse is how an agent’s bridge says its session is open, and a person is never a run.', { at: 'principal' });
+      const a = (args ?? {}) as Record<string, unknown>;
+      const stray = Object.keys(a).find((k) => !(PULSE_TAKES as readonly string[]).includes(k));
+      if (stray !== undefined)
+        return no('FIELD_UNKNOWN', `${stray} is not something pulse takes. It takes ${PULSE_TAKES.join(', ')}.`, { at: stray, allowed: [...PULSE_TAKES] });
+      if (a.stamp !== undefined && a.stamp !== null && (typeof a.stamp !== 'string' || a.stamp.length > 64))
+        return no('VALUE_MALFORMED', 'stamp is the one the last pulse answered with.', { at: 'stamp' });
+      if (a.shown !== undefined && (!Array.isArray(a.shown) || a.shown.length > SHOWN_MOST || a.shown.some((s) => typeof s !== 'string' || s.length > 64)))
+        return no('VALUE_MALFORMED', `shown is a list of at most ${String(SHOWN_MOST)} instructions, as ["IN4"].`, { at: 'shown' });
+      if (a.how !== undefined && !(SEEN_HOW as readonly unknown[]).includes(a.how))
+        return no('ENUM_VALUE_UNKNOWN', `how is one of ${SEEN_HOW.join(', ')}.`, { at: 'how', allowed: SEEN_HOW });
+      const found = kernel.findRun(ctx.session ?? {}, p.id);
+      if (found === null) return ok({ run: null, stamp: null, changed: false, pending: [], stop: null, lines: [] });
+      const run = kernel.nameOf(found.id);
+      kernel.pulseRun(run);
+      const shown = (a.shown as string[] | undefined) ?? [];
+      const how = (a.how as SeenHow | undefined) ?? 'prompt';
+      for (const id of shown) kernel.seenInstruction(id, run, how);
+      const was = typeof a.stamp === 'string' ? a.stamp : '';
+      const delta = kernel.changedSince(run, was);
+      const pending = kernel.instructionFor({}, run).map((i) => toldOf(sql, i));
+      const fresh = new Set(delta.pending.map((i) => i.id));
+      const held = stopLine(sql, kernel, delta.stop);
+      const lines = delta.changed
+        ? [...(held === null ? [] : [held]), ...pending.filter((i: Told) => fresh.has(i.id) && i.kind !== 'stop' && i.kind !== 'pause').map((i) => i.line)]
+        : [];
+      return tail(
+        ok({
+          run,
+          stamp: delta.stamp,
+          changed: delta.changed,
+          pending: pending.map((i) => ({ id: i.id, kind: i.kind, said: i.said, at: i.at, to: i.to, line: i.line })),
+          stop: delta.stop,
+          lines,
+        }),
+      );
+    },
+
+    /**
+     * The sessions open now (plan §4.4), newest heard from first: Today's "Working now", the Agents page and a
+     * project's "Working here now", in one read. Each row says the agent, its machine, project, repository, worktree,
+     * branch and what it says it is doing; the instruction and the task in hand; its helpers; how long it has run and
+     * when it was last heard; whether he paused or stopped it; and whether a stop halts its next tool call (Claude Code
+     * with hooks) or reaches it only at its next BrainDog call.
+     *
+     * READ+, TO ANYBODY WHO MAY READ THE RUNS, as `sessionsLive` is. A helper is a row of its own and is named on its
+     * lead's row. `project` or `repo` narrows to one place.
+     */
+    async presence(args: { project?: string; repo?: string } | undefined, ctx: CallContext): Promise<Result<PresenceRow[]>> {
+      const stop = guard(ctx, 'read', RUN.id);
+      if (stop) return { ok: false, refusal: stop };
+      const a = (args ?? {}) as Record<string, unknown>;
+      const stray = Object.keys(a).find((k) => !(PRESENCE_TAKES as readonly string[]).includes(k));
+      if (stray !== undefined)
+        return no('FIELD_UNKNOWN', `${stray} is not something presence takes. It takes ${PRESENCE_TAKES.join(' and ')}.`, { at: stray, allowed: [...PRESENCE_TAKES] });
+      for (const key of PRESENCE_TAKES)
+        if (a[key] !== undefined && a[key] !== null && (typeof a[key] !== 'string' || (a[key] as string).trim() === ''))
+          return no('VALUE_MALFORMED', `${key} is a name.`, { at: key });
+      const now = clock.now();
+      const rows = kernel.presentRuns();
+      const of = (f: Record<string, unknown>, key: string): string | null => (typeof f[key] === 'string' && (f[key] as string).trim() !== '' ? (f[key] as string) : null);
+      const spoken = (r: { seq: number }): string => `${RUN.seq_prefix}${String(r.seq)}`;
+      /* THE PROJECT AS RUNS HOLD IT, by spoken name; one named by title or id is read to it first. */
+      const projectSaid = typeof a.project === 'string' ? ((row) => (row === null ? (a.project as string).trim() : kernel.nameOf(row.id)))(kernel.get((a.project as string).trim())) : null;
+      const repoSaid = typeof a.repo === 'string' ? a.repo.trim() : null;
+      const helpersOf = new Map<string, string[]>();
+      for (const r of rows) {
+        const parent = of(r.fields, 'parent');
+        if (parent !== null) helpersOf.set(parent, [...(helpersOf.get(parent) ?? []), spoken(r)]);
+      }
+      const secs = (iso: string | null): number => (iso === null ? 0 : Math.max(0, Math.floor((now - Date.parse(iso)) / 1000)));
+      const out: PresenceRow[] = rows
+        .filter((r) => (projectSaid === null || of(r.fields, 'project') === projectSaid) && (repoSaid === null || of(r.fields, 'repo') === repoSaid))
+        .map((r) => {
+          const f = r.fields as Record<string, unknown>;
+          const agent = of(f, 'agent');
+          const heard = [of(f, 'last_seen'), of(f, 'pulse_at')].filter((v): v is string => v !== null).sort().at(-1) ?? null;
+          const profile = kernel.profileFor({ kind: agent, token: of(f, 'token_id'), host: of(f, 'host') });
+          const stopped = f.stopped === 'stop' || f.stopped === 'pause' ? f.stopped : null;
+          return {
+            run: spoken(r),
+            name: of(f, RUN_TITLE),
+            agent,
+            machine: of(f, 'host'),
+            project: of(f, 'project'),
+            repo: of(f, 'repo'),
+            worktree: of(f, 'worktree'),
+            branch: of(f, 'branch'),
+            doing: of(f, 'doing'),
+            state: liveStateOf(r, now),
+            instruction: of(f, 'instruction'),
+            task: of(f, 'task'),
+            stopped,
+            helpers: helpersOf.get(spoken(r)) ?? [],
+            parent: of(f, 'parent'),
+            for_s: secs(of(f, 'started') ?? r.created_at),
+            heard_s: secs(heard),
+            reach: agent === 'claude' && profile.enforce.hooks ? 'hooks' : 'next_call',
+          };
+        });
+      return ok(out);
     },
 
     /**

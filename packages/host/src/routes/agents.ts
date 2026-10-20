@@ -1,5 +1,11 @@
 /**
- * The route rows for the record's agent methods (`packages/record/src/methods/agents.ts`).
+ * The route rows for the record's agent methods (`packages/record/src/methods/agents.ts`), and for what he tells them
+ * and the settings they work under (`methods/instructions.ts`, `methods/agent-profile.ts`, agents and MCP plan §8.2).
+ *
+ * `pulse`, `instruct`, `withdrawInstruction` AND `instructionsMine` ARE DATA: `pulse` is `beat`'s sibling, a session
+ * saying it is open, and `instructionsMine` an agent reading and answering its own; `instruct` and its withdrawal are a
+ * person's, every token refused `NEEDS_BROWSER_SESSION` by the record. `presence`, `instructionList` and `agentProfiles`
+ * are READ+, the last two the owner's. `setAgentProfile` is ADMIN: only he changes what an agent may do, in a browser.
  *
  * ONE ROW A LINE, IN THE SHAPE `ROUTES` HAS ALWAYS HAD, because the two gates over the table read it by that shape:
  * `router-groups` holds each row's group to `docs/30-BLUEPRINT.md` §5, and `guards` holds the record method of the same
@@ -27,6 +33,17 @@ export const ROUTES: readonly Route[] = [
   { name: 'end', group: 'DATA', writes: true, what: 'Say this agent’s session closed. Its run ends as done, or waits for the next session when it left a fresh next step. An agent only.' },
   { name: 'beat', group: 'DATA', writes: true, what: 'Say this agent is still working between writes, so its run reads as working. Nothing is added to its history. An agent only.' },
   { name: 'triage', group: 'DATA', writes: true, what: 'File one arrival from the inbox as a row, set it aside, or put a filed or archived one back.' },
+  { name: 'pulse', group: 'DATA', writes: true, what: 'Say this agent’s session is open, and hear what is pending for its run and whether it is stopped. Nothing is added to its history. An agent only.' },
+  { name: 'presence', group: 'READ+', writes: false, what: 'The sessions open now: each agent, its machine, project, branch, what it is doing, what it holds, and how long since it was heard.',
+    takes: { project: 'text', repo: 'text' } },
+  { name: 'instruct', group: 'DATA', writes: true, what: 'Tell an agent something: a run, a kind of agent, whoever is next, or a task; or stop, pause, resume or redirect a run. A person only.' },
+  { name: 'withdrawInstruction', group: 'DATA', writes: true, what: 'Take back an instruction no run has taken yet. A person only.' },
+  { name: 'instructionList', group: 'READ+', writes: false, what: 'What you told agents, newest first: each with who saw it and how, the reply, and what the run changed. The owner only.',
+    takes: { state: 'text', project: 'text', task: 'text', run: 'text', limit: 'integer', cursor: 'text' } },
+  { name: 'instructionsMine', group: 'DATA', writes: true, what: 'An agent reads what it was told and marks it seen, takes one, or answers one with done, needs_you or declined. An agent only.' },
+  { name: 'agentProfiles', group: 'READ+', writes: false, what: 'The settings each kind of agent works under, with what each lets it do and when it was last heard. The owner only.',
+    takes: { retired: 'json' } },
+  { name: 'setAgentProfile', group: 'ADMIN', writes: true, what: 'Make, change or retire one agent’s settings: how far it may go, where, which tools, its brief. The owner, signed in.' },
   { name: 'createJob', group: 'JOBS', writes: true, what: 'Start one job of a kind the owner approved. It waits in the queue until a runner claims it.' },
   { name: 'cancelJob', group: 'JOBS', writes: true, what: 'Stop one job. A runner working on it reads the stop and ends it.' },
   { name: 'listJobs', group: 'JOBS', writes: false, what: 'The jobs on this record, newest first, in one state or all of them, a page at a time.',

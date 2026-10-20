@@ -379,11 +379,30 @@ export type Offered = Answer<'offered'>;
  */
 export type Brief = { spoken: string; version: number; scope: 'project' | 'global'; state: string | null } & Record<string, unknown>;
 
+/** What `context({ since })` answers: only what moved for the caller's run since that stamp, as the lines to say. */
+export type ContextSince = {
+  since: { stamp: string | null; changed: boolean; pending: Answer<'instructionsMine'>['pending']; stop: Answer<'pulse'>['stop']; lines: string[] };
+};
+
 /** `context`: where an agent stands, in one call. See `Context` in `@braindog/record`. */
 export type Context = {
   session: { spoken: string; state: string | null } | null;
-  project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' } | null;
+  project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' | 'asked' } | null;
   ambiguous: string[];
+  /** What stops this run, with the line in his words, or `null`. Absent from a host older than instructions (plan §2.4). */
+  stop?: (Answer<'pulse'>['stop'] & { line: string }) | null;
+  /** What he told this run that is still open, a stop or pause first, each with the line in his voice. Absent from an older host. */
+  told?: Answer<'instructionsMine'>['pending'];
+  /** The run's version stamp, which moves with anything for it; `null` before it has a run. Absent from an older host. */
+  stamp?: string | null;
+  /** What his settings let this agent do, as one sentence, and his brief for it. Absent from an older host. */
+  may?: string | null;
+  brief?: string | null;
+  /** The context size his settings give this agent, in tokens. Absent from an older host. */
+  budget?: number;
+  depth?: 'card' | 'brief' | 'task' | 'full';
+  /** The task `context({ task })` asked for, whole. */
+  task?: { spoken: string; register: string; list: string; version: number; fields: Record<string, unknown>; project: string | null; history: string[] } | null;
   /**
    * The step another run left open here (`openHandoffs`, marked `next`). `agent` is the kind of agent that left it,
    * `left_at` when, and `earlier` how many more steps are open here besides. Those three are absent from a host older
@@ -1674,6 +1693,46 @@ export function createClient(options: ClientOptions) {
     ) => call<Answer<'triage'>>('triage', args as Record<string, unknown>),
     /** Which runs used a key or a tool, the one that used it last first, by the row's spoken name. READ+. */
     usedBy: (args: { spoken: string }) => call<Answer<'usedBy'>>('usedBy', args as Record<string, unknown>),
+    /**
+     * Tell an agent something from the app (agents and MCP plan §2.1): `to` a run (`to_run`, S883), a kind of agent
+     * (`to_agent`), whoever is next, or a task; `when` now or at the next start; or stop, pause, resume or redirect a run
+     * (`kind`). A person only: every key is refused `NEEDS_BROWSER_SESSION`. DATA.
+     */
+    instruct: (args: {
+      said: string;
+      kind?: 'tell' | 'stop' | 'pause' | 'resume' | 'redirect';
+      when?: 'now' | 'next';
+      to?: 'run' | 'agent' | 'anyone' | 'task';
+      to_run?: string;
+      to_agent?: string;
+      project?: string;
+      task?: string;
+      repo?: string;
+      replaces?: string;
+      waits_ms?: number;
+    }) => call<Answer<'instruct'>>('instruct', args as Record<string, unknown>),
+    /** Take back an instruction no run has taken yet (IN4). A person only. DATA. */
+    withdrawInstruction: (args: { id: string }) => call<Answer<'withdrawInstruction'>>('withdrawInstruction', args as Record<string, unknown>),
+    /**
+     * What he told agents, newest first, each with who saw it and how and the receipts: in one state (`open` is Sent,
+     * Seen and Working), on a project or task, or to or by a run. `cursor` is the one the page above answered with. READ+.
+     */
+    instructionList: (args: { state?: string; project?: string; task?: string; run?: string; limit?: number; cursor?: string } = {}) =>
+      call<Answer<'instructionList'>>('instructionList', args as Record<string, unknown>),
+    /**
+     * An agent's own instructions: with nothing, what is pending (marked seen); `take` one; `reply` to one with `said`
+     * and `state` (done, needs_you or declined); or `seen`, the ids a client showed it, with `how`. DATA.
+     */
+    instructionsMine: (args: { take?: string; reply?: string; said?: string; state?: 'done' | 'needs_you' | 'declined'; seen?: string[]; how?: string } = {}) =>
+      call<Answer<'instructionsMine'>>('instructionsMine', args as Record<string, unknown>),
+    /** The bridge says this session is open, and hears its run's stamp, what is pending and whether it is stopped. DATA. */
+    pulse: (args: { stamp?: string; shown?: string[]; how?: string } = {}) => call<Answer<'pulse'>>('pulse', args as Record<string, unknown>),
+    /** The sessions open now, on one project or in one repository when asked. READ+. */
+    presence: (args: { project?: string; repo?: string } = {}) => call<Answer<'presence'>>('presence', args as Record<string, unknown>),
+    /** Every agent settings row, Defaults first, each with what it lets an agent do. The owner's. READ+. */
+    agentProfiles: (args: { retired?: boolean } = {}) => call<Answer<'agentProfiles'>>('agentProfiles', args as Record<string, unknown>),
+    /** Make (no `id`), change or retire (`retired: true`) one agent settings row. ADMIN: the owner, signed in. */
+    setAgentProfile: (args: Record<string, unknown>) => call<Answer<'setAgentProfile'>>('setAgentProfile', args),
     /** Queue a job of a declared kind for a runner to take. */
     createJob: (args: { kind: string; args?: Record<string, unknown>; about?: string }) =>
       call<Answer<'createJob'>>('createJob', args as Record<string, unknown>),
@@ -1950,7 +2009,14 @@ export function createClient(options: ClientOptions) {
     ) => call<unknown>('handoff', args as Record<string, unknown>),
     sessionsLive: () => call<LiveRun[]>('sessionsLive'),
     /** Where the caller stands: its run, its project, the last handoff, who is live, and what applies. */
-    context: () => call<Context>('context'),
+    /**
+     * Where the caller stands: its run, its project, the last handoff, who is live, and what applies. `project` stands it
+     * in a project by name, `task` hands one task whole with its version, and `depth` says how much (agents and MCP plan
+     * §3.1).
+     */
+    context: (args: { task?: string; project?: string; depth?: 'card' | 'brief' | 'task' | 'full' } = {}) => call<Context>('context', args as Record<string, unknown>),
+    /** Only what moved for the caller's run since `since`, a stamp an earlier answer carried: "Nothing new." when nothing did. */
+    contextSince: (since: string) => call<ContextSince>('context', { since }),
     /** Someone or some organisation met in the work, a commit author, a sender or a payee, as the caller's run. */
     meet: (args: Meet) => call<Met>('meet', args as Record<string, unknown>),
     /**
