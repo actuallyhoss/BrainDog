@@ -1420,6 +1420,15 @@
       white-space: normal;
     }
 
+    /* THE STATE ON A LINE OF ITS OWN ON A PHONE, with no dot before it: wrapped, the dot began a line by itself. */
+    .key-meta .sep:has(+ .state) {
+      display: none;
+    }
+
+    .key-meta .state {
+      flex-basis: 100%;
+    }
+
     .shown {
       margin-inline: var(--sp-3);
     }
