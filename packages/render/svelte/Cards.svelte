@@ -83,6 +83,8 @@
   const scoped = (i: number): boolean => opts.scope?.columns.includes(i) ?? false;
 
   const label = (i: number): string => L.labels[i] ?? '';
+  /** The word before a project in a card's meta line. */
+  const CARDS_ON = 'on';
   const said = (r: Row, i: number): string => (i < 0 ? '' : text(inline(r.cells[i] ?? '', opts)));
   const nodes = (r: Row, i: number) => inline(r.cells[i] ?? '', opts);
   /* A ROW'S MARK IS A PICTURE WHERE IT NAMES ONE (`markOf`), and a picture only the set holds is asked again once the
@@ -279,18 +281,19 @@
     onkeydown={(ev) => keyed(ev, r, n, i, e)}
   />{/snippet}
 
+<!-- WHERE A ROW APPLIES, IN THE CARD'S META LINE (agents F7, S8): "on ● Kiln", the project's dot in its hue and its
+     name, as words and not a fact in the label column, where "on" sat 96px from "Kiln". A row for every project says
+     "Everywhere". The dot is hidden from a screen reader, which reads "on Kiln". -->
+{#snippet scopeLine(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<p class="cards-scope">{#if everywhere}<span class="scope-name">{said}</span>{:else}{CARDS_ON}{' '}<span class="cards-scope-dot" style={m?.hue === null || m?.hue === undefined ? undefined : `--hue:${m.hue}`} aria-hidden="true"></span><span class="scope-name">{said}</span>{/if}</p>{/snippet}
+
 {#snippet labelled(i: number)}{#if label(i)}<span class="cards-label">{label(i)}</span>{/if}{/snippet}
 
-<!-- A SCOPE CHIP, as `p/Table.svelte` draws one: the globe beside "Everywhere", or the project's mark in its own hue
-     beside its name, its picture or its letter as `markOf` answers it, so a chip wears what the project's card wears.
-     The mark is hidden from a screen reader, which reads the name. -->
-{#snippet scopeChip(cells: ScopeCells, said: string)}{@const everywhere = said === cells.everywhere}{@const m = everywhere ? undefined : cells.marks.get(said)}<span class="scope-chip" data-everywhere={everywhere ? '' : undefined}>{#if everywhere && cells.glyph}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={cells.glyph} /></svg>{:else if m?.mark}{@const sm = markOf(m.mark, said)}{@const sg = markGlyphOf(sm)}{#if sm}<span class="scope-mark" data-glyph={sg ?? undefined} style={m.hue === null ? undefined : `--hue:${m.hue}`} aria-hidden="true">{#if sg}{@const d = markArt(sg)}{#if d}<svg class="scope-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path {d} /></svg>{/if}{:else}{sm}{/if}</span>{/if}{/if}<span class="scope-name">{said}</span></span>{/snippet}
 
 <!-- A RUN'S FACE, as `apps/web`'s `AgentFace` draws one: the kind's glyph on a disc washed in the run's
      hue, ringed in that hue while the run is open, solid while it works and dashed once it has gone quiet, and a door to
      the run's page. The hue is written on the drawing alone, so the card's own `--hue` is left as it was. -->
 {#snippet runFace(f: RunFace)}{@const d = f.glyph === 'slash' ? 'M15.5 4.5 8.5 19.5' : (opts.icon?.(f.glyph) ?? null)}{@const m = runMarkOf(f, opts.agentMark)}<a
-    class="cards-face cards-run"
+    class="cards-face cards-run tap"
     style="background:none"
     href={hrefFor(opts, `/r/session/${f.seq}`)}
     data-live={f.live}
@@ -398,6 +401,7 @@
         {:else if L.reply >= 0 && r.cells[L.reply]}<p class="cards-reply"><Text nodes={nodes(r, L.reply)} {opts} /></p>{/if}
         <!-- A RUN'S HELPERS ARE SAID UNDER ITS SENTENCE, in the reply's quieter voice (`helpersOf`), as in `toHTML`. -->
         {#if helped}<p class="cards-reply" data-helpers="">{helped}</p>{/if}
+        {#each L.facts.filter((i) => scoped(i) && r.cells[i]) as i (i)}{@render scopeLine(opts.scope!, r.cells[i] ?? '')}{/each}
         {#if shows || newest || t || (L.ring >= 0 && r.cells[L.ring])}
           <div class="cards-body">
             {#if shows}
@@ -446,15 +450,14 @@
         {/if}
         <!-- A FACT NOBODY WROTE IS NOT DRAWN: "Met in —" on a person met in no project said a field was missing where
              there was nothing to say. A card with no fact written draws no list at all. -->
-        {#if L.facts.some((i) => r.cells[i] || boxOf(r, i))}
+        {#if L.facts.some((i) => !scoped(i) && (r.cells[i] || boxOf(r, i)))}
           <dl class="cards-facts">
             {#each L.facts as i}
               {@const fe = scoped(i) ? null : boxOf(r, i)}
-              {#if r.cells[i] || fe}
-                {@const scope = scoped(i) ? opts.scope : undefined}
+              {#if !scoped(i) && (r.cells[i] || fe)}
                 <div class="cards-fact">
                   <dt>{label(i)}</dt>
-                  <dd>{#if fe}{@render box(r, n, i, fe, EMPTY_LINE)}{:else if scope}{@render scopeChip(scope, r.cells[i] ?? '')}{:else}<Text nodes={nodes(r, i)} {opts} />{/if}</dd>
+                  <dd>{#if fe}{@render box(r, n, i, fe, EMPTY_LINE)}{:else}<Text nodes={nodes(r, i)} {opts} />{/if}</dd>
                 </div>
               {/if}
             {/each}

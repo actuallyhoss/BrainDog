@@ -345,6 +345,35 @@
     column-gap: var(--sp-3);
   }
 
+  /* A CARD'S PROJECT, IN ITS META LINE: "on", the project's 8px dot in its hue, its name, at 13 in the quiet ink. */
+  .cards-scope {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .cards-scope .scope-name {
+    color: var(--ink-2);
+  }
+
+  .cards-scope-dot {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    margin-inline-start: 2px;
+    border-radius: var(--r-round);
+    background: oklch(var(--mark-l) var(--mark-c) var(--hue, 0));
+  }
+
+  .cards-scope-dot:not([style]) {
+    background: var(--ink-3);
+  }
+
   .cards-fact {
     display: contents;
     font-size: var(--t-sm);

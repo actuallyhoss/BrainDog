@@ -151,8 +151,8 @@ test("BOTH DRAWERS DRAW THE SAME MARKS: the picture where it names one, else the
   assert.match(html[4]!, />K<\/span>$/u);
 });
 
-test('A CELL NAMING A PROJECT WEARS THE PROJECT\'S MARK: its picture, or the letter of its own name', () => {
-  const [block] = parse('```cards\ntitle | fact: Project\nShip the export | Crumb.gg\nFix the rail | BrainDog\n```', { page: true });
+test('A CELL NAMING A PROJECT IS SAID IN THE CARD\'S META LINE: "on", the project\'s dot in its hue, and its name', () => {
+  const [block] = parse('```cards\ntitle | fact: Project\nShip the export | Crumb.gg\nFix the rail | BrainDog\nTidy | Everywhere\n```', { page: true });
   if (block?.type !== 'block') return assert.fail('the fixture did not parse as a block');
   const scope = {
     columns: [1],
@@ -164,8 +164,11 @@ test('A CELL NAMING A PROJECT WEARS THE PROJECT\'S MARK: its picture, or the let
     ]),
   };
   const opts = { scope, icon: (name: string) => (name === 'gift' ? 'M4 4h16v16H4z' : null) };
-  const chips = [...render(Block, { props: { block, opts } }).body.replace(/<!--[\s\S]*?-->/gu, '').matchAll(/<span class="scope-mark"[^>]*>.*?<\/span>/gu)].map((m) => m[0]);
-  assert.equal(chips.length, 2);
-  assert.match(chips[0]!, /data-glyph="gift".*<path d="M4 4h16v16H4z"/u);
-  assert.match(chips[1]!, />B<\/span>$/u);
+  const body = render(Block, { props: { block, opts } }).body.replace(/<!--[\s\S]*?-->/gu, '');
+  const lines = [...body.matchAll(/<p class="cards-scope[^"]*">(.*?)<\/p>/gu)].map((m) => m[1]!);
+  assert.equal(lines.length, 3);
+  assert.match(lines[0]!, /^on <span class="cards-scope-dot[^"]*" style="--hue:20" aria-hidden="true"><\/span><span class="scope-name[^"]*">Bake\.gg<\/span>$/u);
+  assert.match(lines[1]!, /style="--hue:200"/u);
+  assert.match(lines[2]!, /^<span class="scope-name[^"]*">Everywhere<\/span>$/u, 'a row for every project is not "on" one');
+  assert.doesNotMatch(body, /<dt>Project<\/dt>/u, 'never a fact in the label column');
 });
