@@ -90,6 +90,22 @@ export function roadmapOf(listings: readonly Listing[], today: string): Roadmap 
   return { marks: kept.map((m) => ({ ...m, at: at(ms(m.day)) })), today, todayAt: at(ms(today)) };
 }
 
+/**
+ * WHICH LINE UNDER THE ROAD EACH LABEL HANGS ON, so no two run into each other (the audit of 20 October: "Proofing press,
+ * 5 of 8" over "Settle how Kiln is licensed" on Kiln). Each label is its span across the tile, `left` to `right` in
+ * pixels as drawn; it takes the first line whose last label ends `gap` before it starts, else a new line. In the order
+ * handed, which is the road's, so the soonest label keeps the top line.
+ */
+export function lanesOf(spans: readonly { left: number; right: number }[], gap = 12): number[] {
+  const ends: number[] = [];
+  return spans.map(({ left, right }) => {
+    let lane = ends.findIndex((end) => end + gap <= left);
+    if (lane === -1) lane = ends.push(right) - 1;
+    else ends[lane] = right;
+    return lane;
+  });
+}
+
 /* ── dues ───────────────────────────────────────────────────────────────── */
 
 export type Due = { day: string; late: boolean; what: string };

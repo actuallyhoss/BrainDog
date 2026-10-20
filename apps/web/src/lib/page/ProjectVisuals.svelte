@@ -9,7 +9,7 @@
 <script lang="ts">
   import Tile from '$lib/ui/Tile.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { roadmapOf, visualsFor, type Listing, type Months, type Mark } from '$lib/record/visuals.ts';
+  import { lanesOf, roadmapOf, visualsFor, type Listing, type Months, type Mark } from '$lib/record/visuals.ts';
   import type { DataRow } from '$lib/record/project.ts';
 
   let {
@@ -46,6 +46,34 @@
     const at = road.marks.findIndex((m) => m.day > road.today);
     out.splice(at === -1 ? out.length : at, 0, { now: true, key: 'now', at: road.todayAt });
     return out;
+  });
+  /* WHICH LINE EACH LABEL HANGS ON, from where each is drawn (`lanesOf`), so no two run into each other at any width:
+     measured once drawn, again when the tile changes width or the fonts land. Until then, and on a phone where the road
+     is a list, every third label steps down as before. */
+  let roadEl = $state<HTMLOListElement>();
+  let lanes = $state.raw<Readonly<Record<string, number>>>({});
+  let laneCount = $state(3);
+  $effect(() => {
+    void steps;
+    const el = roadEl;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      if (!matchMedia('(width >= 640px)').matches) return;
+      const at = el.getBoundingClientRect().left;
+      const items = [...el.querySelectorAll<HTMLElement>('li.step[data-key]')];
+      const got = lanesOf(items.map((li) => {
+        const r = li.getBoundingClientRect();
+        return { left: r.left - at, right: r.right - at };
+      }));
+      const next = Object.fromEntries(items.map((li, i) => [li.dataset.key!, got[i]!]));
+      if (JSON.stringify(next) !== JSON.stringify(lanes)) lanes = next;
+      laneCount = Math.max(1, ...got.map((l) => l + 1));
+    };
+    measure();
+    const seen = new ResizeObserver(measure);
+    seen.observe(el);
+    void document.fonts?.ready.then(measure);
+    return () => seen.disconnect();
   });
   const STATE: Record<Mark['state'], string> = { done: 'Done', late: 'Late', next: 'Next', later: 'Later' };
   const dayWords = (day: string): string => new Date(`${day}T00:00:00Z`).toLocaleString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -102,13 +130,13 @@
     {#if road}
       <div class="vis wide">
         <Tile icon="task" title="Roadmap">
-          <ol class="road" aria-label="Roadmap">
+          <ol class="road" aria-label="Roadmap" bind:this={roadEl} style:--lanes={laneCount}>
             {#each steps as s (s.key)}
               {#if 'now' in s && s.now}
                 <li class="step now" style:--at={s.at}><span class="dot" aria-hidden="true"></span><span class="what">Now</span></li>
               {:else}
                 {@const m = s as Mark}
-                <li class="step" data-state={m.state} data-milestone={m.milestone} style:--at={m.at} style:--lane={steps.indexOf(s) % 3} title="{dayWords(m.day)}">
+                <li class="step" data-key={m.key} data-state={m.state} data-milestone={m.milestone} style:--at={m.at} style:--lane={lanes[m.key] ?? steps.indexOf(s) % 3} title="{dayWords(m.day)}">
                   <span class="dot" aria-hidden="true"></span>
                   <span class="what" dir="auto">{m.title}</span>
                   <span class="when">{dayWords(m.day)}{#if m.state === 'late'}, late{/if}</span>
@@ -268,7 +296,8 @@
   @media (width >= 640px) {
     .road {
       display: block;
-      block-size: 112px;
+      /* The line, then one 20px line of labels for each lane they need. */
+      block-size: calc(56px + var(--lanes, 3) * 20px);
       padding-block-start: 20px;
     }
 

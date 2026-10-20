@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { calendarOf, duesOf, roadmapOf, trendOf, visualsFor, type ListDecl, type Listing } from './visuals.ts';
+import { calendarOf, duesOf, lanesOf, roadmapOf, trendOf, visualsFor, type ListDecl, type Listing } from './visuals.ts';
 
 const TODAY = '2026-10-20';
 const say = (n: number, c: string) => `${c} ${n}`;
@@ -36,6 +36,25 @@ test('ROADMAP MARKS DONE, LATE, NEXT FEW AND LATER, IN TIME ORDER WITH THE NOW M
   assert.equal(r.marks.find((m) => m.title === 'n3')!.milestone, true);
   assert.ok(r.marks[0]!.at === 0 && r.marks.at(-1)!.at === 1);
   assert.ok(r.todayAt > r.marks[1]!.at && r.todayAt < r.marks[2]!.at);
+});
+
+test('ROADMAP LABELS NEVER RUN INTO EACH OTHER: one that would overlap the line above hangs on the next line down', () => {
+  /* Kiln's road at 1512: four labels close together around the start of September, then two far apart. */
+  const spans = [
+    { left: 0, right: 150 },
+    { left: 120, right: 270 },
+    { left: 200, right: 360 },
+    { left: 300, right: 470 },
+    { left: 700, right: 840 },
+    { left: 860, right: 990 },
+  ];
+  const lanes = lanesOf(spans);
+  assert.deepEqual(lanes, [0, 1, 0, 1, 0, 0]);
+  /* No two labels on one line overlap, with the gap kept between them. */
+  for (let a = 0; a < spans.length; a++)
+    for (let b = a + 1; b < spans.length; b++)
+      if (lanes[a] === lanes[b]) assert.ok(spans[a]!.right + 12 <= spans[b]!.left || spans[b]!.right + 12 <= spans[a]!.left, `${a} and ${b} overlap`);
+  assert.deepEqual(lanesOf([]), []);
 });
 
 test('ROADMAP WITH ONE DAY FOR EVERYTHING SITS IN THE MIDDLE', () => {
