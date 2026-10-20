@@ -697,10 +697,6 @@
     font-weight: inherit;
   }
 
-  .table-slot :global(.td .scope-chip .thing-glyph) {
-    margin-inline-end: 0;
-  }
-
   /* WHERE THE CHIP MOVES THE ROW IT IS A BUTTON, a rectangle at the control's radius round the same words, with the
      chevron that says a press opens something. Its wash shows under a mouse only, and its edge is held out by its own
      padding so the words stay on the column's edge. 28px tall, inside the 44px `.tap` grows under a thumb. */

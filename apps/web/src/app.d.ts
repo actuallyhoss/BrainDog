@@ -12,6 +12,8 @@
  */
 declare const __BRAINDOG_ENV__: string;
 declare const __BRAINDOG_FLAGS__: string;
+/** Kit's build name, which it `define`s for `$app/environment`'s `version`; read directly by `lib/data/local-tab.ts`. */
+declare const __SVELTEKIT_APP_VERSION__: string;
 
 /**
  * The product's own words, made at build time out of the copy files by the `braindog:own-words` plugin of

@@ -258,7 +258,9 @@
   function place(item: Shelved) {
     const list = listOf(item.block);
     if (list !== null && !REGISTERS[list]) return void toasts.push(shelfWords.gone, { intent: 'warn' });
-    add($state.snapshot(item.block) as unknown as PageBlock, true);
+    /* A JSON COPY, NOT `$state.snapshot`: a shelf item is a declaration the record keeps as JSON, and the clone
+       `$state.snapshot` brings sits in the Svelte chunk every screen loads, which put the entry over its debt. */
+    add(JSON.parse(JSON.stringify(item.block)) as PageBlock, true);
     toasts.push(shelfWords.placed(item.name));
   }
 

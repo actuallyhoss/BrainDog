@@ -12,8 +12,6 @@
  * the layout, and the client carries the route table.
  */
 
-import { version as build } from '$app/environment';
-
 import { REGISTERS } from '../record/held.ts';
 import type { RegisterDecl } from '../record/schema.ts';
 import { dropCopy, readCopy } from '../record/boot-copy.ts';
@@ -21,6 +19,11 @@ import { idbKey, idbStore, openEarly } from './local-db.ts';
 import { dropMark, memoryKey, readMark, writeMark, type MarkDeps } from './local-mark.ts';
 import { localCopy, memoryStore, railOf, scopeOf, type LocalCopy, type Log, type Near, type Rail, type Spot } from './local.ts';
 import { forget as forgetOffline } from './offline.ts';
+
+/* THE BUILD, READ OFF KIT'S OWN `define` RATHER THAN `$app/environment`. That module lives in the entry, and naming its
+   `version` from this lazy file made the build stamp a chunk the entry has to import on every visit (`bundle` gate).
+   Kit folds the same constant into `version` there; `''` where nothing defines it, as in Node. */
+const build = typeof __SVELTEKIT_APP_VERSION__ === 'string' ? __SVELTEKIT_APP_VERSION__ : '';
 
 /** How long a screen waits for the copy before it asks the record without it. */
 const NEAR_MS = 60;

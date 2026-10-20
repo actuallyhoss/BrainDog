@@ -453,31 +453,6 @@
     }
   }
 
-  /**
-   * A THING'S MARK: ONE SMALL DOT OF ITS COLOUR, AND ITS NAME BESIDE IT (DIRECTION 39).
-   *
-   * The marks were the characters a project was given (a circle, a triangle, a diamond, a square), drawn as four
-   * shapes, and in front of every title they read as glyphs that meant nothing to anybody who had not learnt them.
-   * The name always stands beside the mark, so the name is what says which project, and the colour is the quick look.
-   * Every mark is the same 8px dot now, whatever shape the row stores in `data-shape`, which stays for a screen reader's
-   * label and for anything that still reads it. A row with no project keeps the slot empty, so titles share an edge.
-   */
-  .thing-glyph {
-    display: inline-block;
-    flex: none;
-    inline-size: 8px;
-    block-size: 8px;
-    margin-inline-end: var(--sp-2);
-    overflow: hidden;
-    background: currentColor;
-    border-radius: 50%;
-    vertical-align: 0.06em;
-  }
-
-  .thing-glyph[data-shape=""] {
-    background: none;
-  }
-
   /* A LEAD COLUMN KEEPS ITS PLACE ON A PHONE. The card above moves `.line-main` under the top line, and in a list with a
      check, a well or a face in front that put the words under the mark. The mark keeps column 1 and the words sit beside
      it on the first line, as they do at 1440. */

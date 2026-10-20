@@ -55,7 +55,6 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { follow, live } from '$lib/data/live.svelte.ts';
   import { claimLocal } from '$lib/data/local-tab.ts';
-  import { copyMark } from '$lib/data/copy-mark.svelte.ts';
   import { timingOpened } from '$lib/data/timing.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette carries its commands, its search and Slash's drawing, so importing them
@@ -66,6 +65,7 @@
   import type PaletteView from '$lib/palette/Palette.svelte';
   import type KeymapView from '$lib/ui/Keymap.svelte';
   import type TopBarView from '$lib/ui/TopBar.svelte';
+  import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
@@ -96,9 +96,12 @@
      and it landed in the entry chunk the lazy import was there to shrink. */
   let Palette = $state<typeof PaletteView | null>(null);
   let Keymap = $state<typeof KeymapView | null>(null);
+  /* AND THE COPY'S HAIRLINE: invisible until a screen drawn from the local copy holds it, so it can land after the shell. */
+  let CopyMark = $state<typeof CopyMarkView | null>(null);
   $effect(() => {
     void import('$lib/palette/Palette.svelte').then((m) => (Palette = m.default));
     void import('$lib/ui/Keymap.svelte').then((m) => (Keymap = m.default));
+    void import('$lib/ui/CopyMark.svelte').then((m) => (CopyMark = m.default));
   });
 
   /* THE TOP BAR TOO, AND ONLY FOR SOMEBODY WHO CHOSE IT. The rail is the shell (DIRECTION 37) and the strip is one
@@ -916,9 +919,8 @@
     -->
     {#key page.url.pathname}
     <main id="main" class="body" data-screen={shape === 'bar' && TopBar === null ? undefined : settled()}>
-      <!-- THE QUIET MARK: something on this screen was drawn from the local copy and the record is being asked again.
-           Sticky and no taller than nothing, so it moves no row; it fades out once every answer has landed. -->
-      <div class="copy-mark" aria-hidden="true" data-on={copyMark.on ? '' : undefined}></div>
+      <!-- THE QUIET MARK, over the work while something drawn from the local copy is asked again (`CopyMark.svelte`). -->
+      {#if CopyMark}<CopyMark />{/if}
       <Pull />
       {#if data.offline}
         <!-- OFFLINE, THE ERROR PAGE'S OWN WORDS, as one line over what the local copy drew. -->
@@ -1332,30 +1334,6 @@
    */
   :global(html[data-moving]) .body {
     view-transition-name: page;
-  }
-
-  /* A HAIRLINE OVER THE WORK, NOT ITS OWN ROW: a sticky box of no height, and its line drawn out of it. */
-  .copy-mark {
-    position: sticky;
-    inset-block-start: 0;
-    z-index: var(--z-hint);
-    block-size: 0;
-    pointer-events: none;
-  }
-
-  .copy-mark::after {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline: 0;
-    block-size: 2px;
-    content: '';
-    background: var(--line);
-    opacity: 0;
-    transition: opacity var(--d-move) var(--ease-out);
-  }
-
-  .copy-mark[data-on]::after {
-    opacity: 1;
   }
 
   /* The offline line: the page's gutter, muted words, the measure of a sentence. */
