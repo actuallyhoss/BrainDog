@@ -157,11 +157,11 @@ test('one green and the rest unread is never all healthy, and the unread are cou
   assert.equal(text(healthSaid(null, null, { faults: [], signs: signs('green', 'none') })), 'Nothing is broken. One vital sign has not been read yet.');
 });
 
-test('one red with the rest unread: red leads and is marked, and the unread are said after it', () => {
+test('one red with the rest unread: red leads and is marked, and the unread are not said behind it', () => {
   const said = healthSaid('in', null, { faults: [], signs: signs('red', 'none', 'none'), signsAt: '/p/health' });
-  assert.equal(text(said), 'One vital sign needs a look. Last night’s copy is in. 2 vital signs have not been read yet.');
+  assert.equal(text(said), 'One vital sign needs a look. Last night’s copy is in.');
   assert.deepEqual(needs(said), ['One vital sign needs a look']);
-  assert.deepEqual(links(said), ['/p/health', '/p/health']);
+  assert.deepEqual(links(said), ['/p/health']);
   assert.doesNotMatch(text(said), /healthy/u);
 });
 

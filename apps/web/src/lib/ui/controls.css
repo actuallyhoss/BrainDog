@@ -372,8 +372,8 @@
    * segmented control is for choosing between named options. The button is the hit area, 44px under
    * a thumb; the track is drawn inside it.
    *
-   * ON IS THE WORKING ACCENT'S TRACK, THE THUMB IN THE ACCENT'S LABEL COLOUR (DIRECTION §39). It was the brand's red once, and six red
-   * switches down a list of add-ons read as six alarms; blue says "on" and nothing more. The thumb's position says the
+   * ON IS THE INK TRACK, THE THUMB THE TILE'S OWN COLOUR (batch 6). The working accent is the brand's red, and six red
+   * switches down a list of add-ons read as six alarms; ink says "on" and nothing more. The thumb's position says the
    * state without the colour; the fill says it again for a reader who cannot see the position change.
    */
   .switch {
@@ -418,13 +418,15 @@
       background var(--d-state) var(--ease-out);
   }
 
+  /* INK, NEVER THE WORKING ACCENT, WHICH IS THE BRAND'S RED: red means late or needs you, and six red switches down a list
+     read as six alarms (`tools/gates/colour-grep.mjs` holds that no switch or ring is red). */
   .switch[aria-checked='true'] .switch-track {
-    background: var(--on);
+    background: var(--ink);
   }
 
   .switch[aria-checked='true'] .switch-track::after {
     translate: 14px 0;
-    background: var(--on-action);
+    background: var(--tile);
   }
 
   /* THE THUMB TRAVELS THE OTHER WAY IN A RIGHT-TO-LEFT PAGE. `translate` is physical, and the thumb

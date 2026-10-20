@@ -221,7 +221,10 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
     space();
     parts.push({ text: `${upper(joined(good))}.` });
   }
-  if (unreadSaid.length > 0) {
+  /* WHAT IS BROKEN IS SAID ALONE, SINCE BATCH 6: "One vital sign needs a look. 15 vital signs have not been read yet." put a second
+     sentence in link colour behind the one that matters, and the line is a plain one. The signs not read yet are the Health
+     page's own Not read yet; they are said here only where nothing is broken and so no sentence leads. */
+  if (unreadSaid.length > 0 && lead.length === 0) {
     space();
     parts.push(...unreadSaid);
   }

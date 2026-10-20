@@ -163,7 +163,7 @@ test('the home currency is written where the kernel reads it: the first pack on,
 
 test('the area is on the index, in the record\'s group, with a mark of its own, and the page draws it', () => {
   assert.equal(AREAS.get('words')?.label, 'Words and money');
-  assert.ok(DEFAULT_GROUPS.find((g) => g.title === 'This record')?.areas.some((a) => a.id === 'words'));
+  assert.ok(DEFAULT_GROUPS.find((g) => g.title === 'You')?.areas.some((a) => a.id === 'words'), 'Words is one of the five on top');
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /area === 'words'\}\s*<Words \{shell\} \{area\} \/>/u);
 });

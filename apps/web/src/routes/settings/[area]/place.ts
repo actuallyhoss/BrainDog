@@ -52,58 +52,54 @@ const area = (address: string, label: string, icon: IconName, line: string): Are
  * scheme.
  */
 export const DEFAULT_GROUPS: readonly AreaGroup[] = [
+  /* FIVE ON TOP, SINCE BATCH 6 (call 6): what a person changes for themselves and reaches for. Appearance holds the theme,
+     the density and the accent; Navigation the phone bar and the order; Words what the lists are called; Notifications
+     when BrainDog interrupts; Agents the machines that work here. Sixteen areas stood in four groups before, against the
+     five agreed. */
   {
     title: 'You',
     icon: 'sliders-horizontal',
     areas: [
-      area('/settings/appearance', 'Appearance', 'sun', 'Colour, text size and density'),
-      area('/settings/look', 'Look', 'eye', 'Every control and chart, as drawn'),
-      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
-      area('/settings/navigation', 'Navigation', 'rows', 'Where it sits, its order and hidden pages'),
-      area('/settings/pages', 'Pages', 'doc', 'Every page, and the one that opens first'),
+      area('/settings/appearance', 'Appearance', 'sun', 'Theme, text size, density and accent'),
+      area('/settings/navigation', 'Navigation', 'rows', 'The phone bar, its order and hidden pages'),
+      area('/settings/words', 'Words and money', 'tag', 'What your lists are called, and your currency'),
       area('/settings/notifications', 'Notifications', 'bell', 'When BrainDog interrupts you'),
+      area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
     ],
   },
+  /* THE REST UNDER MORE: signing in, sharing, what comes in, what the record keeps and costs, and, last, the one
+     irreversible act, so deleting the record is the last row of the last group and never a neighbour of the colour scheme. */
   {
-    title: 'Signing in',
-    icon: 'lock',
+    title: 'More',
+    icon: 'archive',
     areas: [
+      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
+      area('/settings/pages', 'Pages', 'doc', 'Every page, and the one that opens first'),
       area('/settings/identity', 'Identity', 'user-check', 'Who you are, and your records'),
       area('/settings/recovery', 'Recovery', 'key', 'Passkeys, and getting back in'),
       area('/settings/sessions', 'Sessions', 'monitor', 'Where you are signed in'),
-    ],
-  },
-  {
-    title: 'Sharing and access',
-    icon: 'link',
-    areas: [
       area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and invites'),
-      area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
-    ],
-  },
-  {
-    title: 'This record',
-    icon: 'archive',
-    areas: [
-      /* THE RECORD'S OWN WORDS AND ITS CURRENCY, which every screen reads and every member sees, so they are the
-         record's and not the person's: the first row of this group, ahead of what it keeps and costs. */
-      area('/settings/words', 'Words and money', 'tag', 'What your lists are called, and your currency'),
-      /* ITS OWN GLYPH, NOT ITS GROUP'S: Backups wore the box `This record` is headed with, so the group's heading and its
-         first row carried one mark and read as one thing said twice. A copy to go back to is the clock turned back. */
+      /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
       area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
       area('/settings/billing', 'Billing', 'money', 'What this record costs'),
       area('/settings/export', 'Export', 'download', 'Take a signed copy of your data'),
-      /* ITS OWN ROW, AND IT WAS THE LAST SECTION OF `Export`. A person who wants a copy of their data clicks the row
-         labelled Export, scrolls past the file and the keys, and arrived at the one irreversible act in the product.
-         A destructive act reached by somebody looking for a backup is reached by the person least expecting it. */
+      /* ITS OWN ROW, AND IT WAS THE LAST SECTION OF `Export`: a destructive act reached by somebody looking for a backup is
+         reached by the person least expecting it. */
       area('/settings/delete', 'Delete this record', 'trash', 'Removes the record for good'),
     ],
   },
 ];
 
+/**
+ * THE DESIGN BOOK IS NOT A SETTING, SINCE BATCH 6 (call 6). Look is a reference for designers and agents, every control and
+ * chart as drawn, and sat beside Appearance as if it were a choice. It is on no index and no chooser, and still opens at
+ * its address, so a link to it lands and the agents that read it lose nothing.
+ */
+export const OFF_INDEX: readonly Area[] = [area('/settings/look', 'Design book', 'eye', 'Every control and chart, as drawn')];
+
 /** Every area this build draws, by id, whatever a declared index lists. */
-export const AREAS: ReadonlyMap<string, Area> = new Map(DEFAULT_GROUPS.flatMap((g) => g.areas.map((a) => [a.id, a] as const)));
+export const AREAS: ReadonlyMap<string, Area> = new Map([...DEFAULT_GROUPS.flatMap((g) => g.areas), ...OFF_INDEX].map((a) => [a.id, a] as const));
 
 /**
  * THE AREAS A PHONE'S INDEX LEAVES OUT.
@@ -117,8 +113,7 @@ export const ONLY_WIDE: ReadonlySet<string> = new Set(['keyboard']);
 export type IndexBody = { page: string; title: string; blocks: PageBlock[] };
 
 /**
- * THE INDEX, DECLARED: a `link` tile for each group, half the page wide, so the four sit two by two from 900px up and
- * one under another on a phone. Each row is written out as `[name, address, line, icon]`: the shape a `link` row
+ * THE INDEX, DECLARED: a `link` tile for each group, the page wide, the five on top and the rest under More, one under another. Each row is written out as `[name, address, line, icon]`: the shape a `link` row
  * takes, and the area's own glyph after it, so the index draws each area with the well the chooser beside an open area
  * draws it with. A reader that draws three cells leaves the fourth unread.
  */
@@ -130,7 +125,7 @@ export function indexBody(groups: readonly AreaGroup[] = DEFAULT_GROUPS): IndexB
       kind: 'link',
       heading: g.title,
       icon: g.icon,
-      span: 6,
+      span: 12,
       authored: g.areas.map((a) => ({ cells: [a.label, `${AREA_AT}${a.id}`, a.line, a.icon] })),
     })),
   };

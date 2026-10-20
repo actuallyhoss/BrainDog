@@ -24,7 +24,7 @@ test('the house index is a page of link tiles, one for each group, each area onc
     DEFAULT_GROUPS.map((g) => ['link', g.title, 'string']),
   );
   const rows = SETTINGS_INDEX.blocks.flatMap((b) => b.authored ?? []);
-  assert.equal(rows.length, AREAS.size);
+  assert.equal(rows.length, DEFAULT_GROUPS.flatMap((g) => g.areas).length);
   for (const r of rows) {
     assert.equal(r.cells.length, 4);
     assert.ok(r.cells[1]!.startsWith(AREA_AT), `${r.cells[1]} is not a settings address`);
@@ -112,4 +112,12 @@ test('every area this build declares has an arm in the page that draws it', () =
   const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.ok(AREAS.size >= 12, `only ${AREAS.size} areas are declared`);
   for (const id of AREAS.keys()) assert.ok(route.includes(`area === '${id}'`), `the index offers ${id} and no arm draws it`);
+});
+
+test('FIVE AREAS STAND ON TOP AND THE REST UNDER MORE, and the design book is on no index but still opens', () => {
+  assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'More']);
+  assert.deepEqual(DEFAULT_GROUPS[0]!.areas.map((a) => a.id), ['appearance', 'navigation', 'words', 'notifications', 'agents']);
+  assert.ok(!DEFAULT_GROUPS.some((g) => g.areas.some((a) => a.id === 'look')), 'the design book is a setting again');
+  assert.ok(AREAS.has('look'), 'a link to the design book no longer lands');
+  assert.ok(!SETTINGS_INDEX.blocks.some((b) => (b.authored ?? []).some((r) => String(r.cells[1]).endsWith('/look'))));
 });

@@ -362,7 +362,7 @@
 
 </script>
 
-{#snippet healthLine()}{#each health ?? [] as part}{#if part.href}<a class="tap" href={at(part.href)} data-needs={part.needs ? '' : undefined}>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+{#snippet healthLine()}<span class="health-dot" data-bad={health?.some((p) => p.needs) ? '' : undefined} aria-hidden="true"></span>{#each health ?? [] as part}{#if part.href}<a class="tap" href={at(part.href)} data-needs={part.needs ? '' : undefined}>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- WHAT CAN BE DONE ABOUT AN OPEN FAULT, under the sentence: Try again on the one it names, and for the owner the whole
      list. A rectangle each; the list is in a tile, and a refusal is the record's own sentence. -->
@@ -507,6 +507,21 @@
 {/if}
 
 <style>
+  /* THE HEALTH LINE'S DOT: ink while all is well, and the late red only when something is broken (batch 6, call 6). */
+  .health-dot {
+    display: inline-block;
+    inline-size: 8px;
+    block-size: 8px;
+    margin-inline-end: var(--sp-2);
+    border-radius: var(--r-round);
+    background: var(--ink);
+    vertical-align: middle;
+  }
+
+  .health-dot[data-bad] {
+    background: var(--danger-text);
+  }
+
   /* TRY AGAIN AND DETAILS: rectangles in a row under the sentence, wrapping on a phone. */
   .fault-tools {
     display: flex;
