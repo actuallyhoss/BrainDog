@@ -24,7 +24,7 @@ answer. Say what is there.
 |---|---|
 | `board` | One flat board. Every block is a tile: flat, opaque, no border, no shadow, radius 16, on a flat board colour. Nothing floats on the board but the page header. No glass, no gradients, no floating cards. The rail is the board's flat left column, not a card. |
 | `header` | The page's name at 28px with its icon and one headline sentence at 17px under it, in body colour. No hero card, no 40px sentence, no card around the header. |
-| `accent` | One red working accent (DIRECTION 42) for selection, primary buttons, links and charts. No blue left from before. No second accent. Status shows as a small dot and a word, never a fill across a whole line. |
+| `accent` | One red accent in two tokens (UI pass, 20 Oct): the fill for primary buttons, counts and a switch that is on, and red words and marks for links, late and needs you. Charts are ink, or the project's hue inside a project; red in a chart only for late or below zero, always with its word. An open thing is a neutral ring, never red. No blue left from before. No second accent. Status shows as a small dot and a word, never a fill across a whole line. |
 | `late` | Anything late or needing the person takes the deeper red and also carries a mark or a word ("Late", "Needs you", a count). Colour alone fails, and it fails in both themes. |
 | `buttons` | Buttons are rectangles, radius 8. Pills (fully round) only for counts. No dashed chips for empty fields. |
 | `type` | Body text 15px or more, meta 13px, weights 400 to 600, Geist, tabular figures for money. Nothing grey on grey. |

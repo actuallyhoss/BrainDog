@@ -238,7 +238,19 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
   const crossed = crossings(await page.evaluate(textBoxesIn).catch(() => []));
   const base = `${screen.key}-${width}-${theme}`;
   await page.screenshot({ path: join(out, `${base}.png`) });
+  /* THE WHOLE PAGE IS THE SCROLL CONTAINER'S, NOT THE DOCUMENT'S (SF11). The shell scrolls `.body` and holds `html` and
+     `body` at the window's height (`app.css`), so a full-page picture of the document was the first screen again. The
+     window is made as tall as the container's content plus its top for the picture, and put back after. */
+  const viewport = page.viewportSize();
+  const tall = await page
+    .evaluate(() => {
+      const scroller = [...document.querySelectorAll('.body, main')].find((el) => el.scrollHeight > el.clientHeight + 1);
+      return scroller ? Math.ceil(scroller.getBoundingClientRect().top + scroller.scrollHeight) : 0;
+    })
+    .catch(() => 0);
+  if (viewport && tall > viewport.height) await page.setViewportSize({ width: viewport.width, height: tall });
   await page.screenshot({ path: join(out, `${base}-full.png`), fullPage: true });
+  if (viewport && tall > viewport.height) await page.setViewportSize(viewport);
   /* What went on is not what was refused: `forwarded` is the reads handed to the record, kept apart. */
   const { forwarded = 0, ...blocked } = since(before, source.counts());
   return {
