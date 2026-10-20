@@ -22,6 +22,7 @@
   import type { QueueQuestion } from '@braindog/kernel';
   import { at } from '$lib/at.ts';
   import DecisionCard from '$lib/decide/DecisionCard.svelte';
+  import { rowOut } from '$lib/ui/motion.ts';
   import type { Picked } from './picked.svelte.ts';
   import { QUEUE_FILE, type FileAt } from './queue-answer.ts';
 
@@ -53,8 +54,11 @@
   setContext<FileAt>(QUEUE_FILE, (row, field) => file?.(row, field) ?? null);
 </script>
 
-<!-- A ROW OF THE PAGE, by the question's id, so a home's cursor walks to it and Enter opens it on Decide. -->
+<!-- A ROW OF THE PAGE, by the question's id, so a home's cursor walks to it and Enter opens it on Decide. AN ANSWERED
+     ONE COLLAPSES OUT (`rowOut`, the motion system's row leaving) when the queue reads again without it, so the rows
+     under it close the gap instead of jumping up. -->
 <div
+  out:rowOut
   class="qa"
   data-row="q:{question.id}"
   data-open={at(`/decide/${encodeURIComponent(question.id)}`)}
