@@ -155,8 +155,9 @@ test('--json ANSWERS 48 §4.5 Verified, and a refusal is SIGNATURE_INVALID at do
   assert.deepEqual(doc.value, {
     container: 'dogl',
     format: 1,
-    /* 27 since migration 42 put `agent_profile` in the governance a file carries. */
-    tables: 27,
+    /* 27 since migration 42 put `agent_profile` in the governance a file carries, and 31 since 43 put `share`,
+       `share_group` and `share_group_member` there and `access_via` in its origin. */
+    tables: 31,
     rows: (doc.value as { rows: number }).rows,
     manifest: 'ok',
     signature: { valid: true, key_id: await keyIdOf(await signer.publicKey), pinned: true },
