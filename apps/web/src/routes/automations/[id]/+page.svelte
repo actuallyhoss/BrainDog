@@ -71,7 +71,8 @@
   import RunView from '$lib/flow/RunView.svelte';
   import Tried from '$lib/flow/Tried.svelte';
   import { FlowDraft } from '$lib/flow/flow.svelte.ts';
-  import { ROOT, callsIn, freshId, learnScripts, sayStart, triggerKind, words } from '$lib/flow/flow.ts';
+  import { ROOT, callsIn, freshId, learnScripts, listsIn, sayStart, triggerKind, words } from '$lib/flow/flow.ts';
+  import { learn } from '$lib/record/remote.ts';
   import {
     diffLines,
     durationOf,
@@ -229,12 +230,18 @@
       from = 'missing';
       return;
     }
+    /* THE LISTS IT NAMES, LEARNT BEFORE ITS STEPS ARE DRAWN, so a field is said by its name ("As the bank wrote it")
+       and never its id (`fieldName` in `flow.ts`). A list the record will not describe keeps its id in words. */
+    await Promise.all(listsIn(one.value.body).map((list) => learn(described.schema, list, listsAsked))).catch(() => undefined);
     take({ ...one.value, acted: rows.find((r) => r.id === one.value.id)?.acted });
     from = 'ready';
   }
 
   /* THE SCRIPTS' TITLES BEFORE THE STEPS ARE DRAWN, so a script step names the script as it declares itself
      (`learnScripts`); a record that cannot answer leaves each step its id in words. */
+  const described = createClient({ base: apiBase() });
+  const listsAsked = new Map<string, Promise<void>>();
+
   async function readScriptTitles() {
     const out = await createClient({ base: apiBase() })
       .scripts()

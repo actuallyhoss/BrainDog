@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import { REGISTERS } from '../record/held.ts';
 import type { RegisterDecl } from '../record/schema.ts';
-import { fieldName, sayParts, sayStart, sayStep, sayTrigger } from './flow.ts';
+import { fieldName, listsIn, sayParts, sayStart, sayStep, sayTrigger } from './flow.ts';
 
 const learnt = (id: string, decl: Partial<RegisterDecl>): void => {
   REGISTERS[id] = { id, name: id, title: 'what', fields: [], ...decl } as unknown as RegisterDecl;
@@ -29,6 +29,7 @@ learnt('filing_rules', {
   fields: [
     { id: 'match', label: 'Matches', type: 'text' },
     { id: 'match_by', label: 'Match by', type: 'text' },
+    { id: 'state', label: 'Status', type: 'enum' },
   ] as RegisterDecl['fields'],
 });
 
@@ -48,6 +49,14 @@ test('a condition and the fields a trigger waits on are said by name', () => {
   assert.match(said, /only when as the bank wrote it or filed by changes/u);
   assert.match(said, /only when filed by is empty, as the bank wrote it is set/u);
   assert.equal(sayTrigger({ written: { register: 'filing_rules', fields: ['match_by'] } } as never, () => 'Filing rules'), 'When an item in Filing rules is added or changed, and only when match by changes');
+  /* A FIELD A CLAUSE OPENS WITH, by its name, and the value after it left as written. */
+  const rule = { trigger: { written: { register: 'filing_rules', fields: ['state'] } }, when: 'state is on and match is set' };
+  assert.match(sayStart(rule as never, () => 'Filing rules'), /only when status changes, only when status is on and matches is set$/u);
+});
+
+test('the lists an automation names are found anywhere in its body, for the page to learn before it draws', () => {
+  const body = { on: { written: { register: 'transactions' } }, steps: [{ link: { field: 'category', to: { register: 'filing_rules', by: 'match' } } }, { create: { register: 'tasks' } }] };
+  assert.deepEqual(listsIn(body), ['transactions', 'filing_rules', 'tasks']);
 });
 
 test('a field no list this tab knows declares is its id in words, and a reference into the run keeps its last part', () => {

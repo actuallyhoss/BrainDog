@@ -18,6 +18,7 @@
 import { notInThisBuild } from '@braindog/kernel';
 import { dropIndex, moveAt } from '../record/arrange.ts';
 import { REGISTERS } from '../record/held.ts';
+import { singularOf } from '../voice.ts';
 import { often } from '../record/actions.ts';
 import { DAYS, EVERY, calendarWords, clockWords, inMonths } from './calendar.ts';
 import { idWords } from './chips.ts';
@@ -1244,6 +1245,24 @@ export function fieldName(id: string, register?: string): string {
   return label ? label : id.replace(/[_-]+/gu, ' ');
 }
 
+/**
+ * Every list an automation's body names (`register:` anywhere in it: the trigger, a link's target, a create), so a
+ * screen can learn their declarations before it draws the sentences that name their fields.
+ */
+export function listsIn(body: unknown): string[] {
+  const out = new Set<string>();
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) for (const x of v) walk(x);
+    else if (v !== null && typeof v === 'object')
+      for (const [k, x] of Object.entries(v)) {
+        if (k === 'register' && typeof x === 'string' && /^[a-z][a-z0-9_]*$/u.test(x)) out.add(x);
+        else walk(x);
+      }
+  };
+  walk(body);
+  return [...out];
+}
+
 /** A field's name inside a sentence: its first letter lower case, unless the name is an initialism ("VAT"). */
 const fieldSaid = (id: string, register?: string): string => {
   const name = fieldName(id, register);
@@ -1252,8 +1271,8 @@ const fieldSaid = (id: string, register?: string): string => {
 
 /** One item of a list, as a sentence says it: "the filing rule". The list's own singular, else its id in words. */
 const oneOf = (register: string): string => {
-  const one = REGISTERS[register]?.one?.trim();
-  return one ? one.charAt(0).toLowerCase() + one.slice(1) : register.replace(/[_-]+/gu, ' ').replace(/s$/u, '');
+  const one = REGISTERS[register]?.one?.trim() || singularOf(REGISTERS[register]?.name?.trim() || register.replace(/[_-]+/gu, ' '));
+  return /^[A-Z][A-Z]/u.test(one) ? one : one.charAt(0).toLowerCase() + one.slice(1);
 };
 
 /** The ids with an underscore in a condition as written ("filed_by is empty"), said as their fields' names. A
@@ -1261,7 +1280,17 @@ const oneOf = (register: string): string => {
 const idsSaid = (text: string, register?: string): string =>
   text
     .split(/(\{\{[^}]*\}\})/u)
-    .map((part) => (part.startsWith('{{') ? part : part.replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/gu, (id) => fieldSaid(id, register))))
+    .map((part) =>
+      part.startsWith('{{')
+        ? part
+        : part
+            /* THE FIELD EACH CLAUSE OPENS WITH, when the list declares it: "state is on" under a trigger that said
+               "status changes" is the same field said two ways. */
+            .replace(/(^|,\s*|\s(?:and|or)\s)([a-z][a-z0-9_]*)(?=\s)/gu, (whole, lead: string, id: string) =>
+              register && REGISTERS[register]?.fields.some((f) => f.id === id) ? `${lead}${fieldSaid(id, register)}` : whole,
+            )
+            .replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/gu, (id) => fieldSaid(id, register)),
+    )
     .join('');
 
 /** A reference as a card names it: `{{counterparty_text}}`, the item's own field, by its name; `{{vars.rate}}` as `rate`. */
