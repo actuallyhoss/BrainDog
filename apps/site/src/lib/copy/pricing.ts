@@ -142,6 +142,5 @@ export const pricing = {
         { q: 'Can I cancel any time?', a: 'Yes, from Settings. Your record stays readable, and you can export it.', billing: true },
       ],
     },
-    close: { title: 'Start free.', body: 'Upgrade when it earns it. No card for the free plan.' },
   },
 } as const;

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { GLYPHS } from '../icons.ts';
 import * as maya from './maya.ts';
 import {
-  ARRIVALS,
+  ASKED,
   ASKS,
   BRIEF,
   CENTS,
@@ -52,24 +52,25 @@ test('the cast: Maya Okafor, her four projects and her people', () => {
 test('every icon the record names is one the site draws', () => {
   const icons = [
     ...Object.values(PROJECTS).map((p) => p.icon),
-    ...ARRIVALS.map((a) => a.icon),
     ...FINDS.flatMap((f) => f.hits.map((h) => h.icon)),
   ];
   for (const icon of icons) assert.ok(Object.hasOwn(GLYPHS, icon), `${icon} is not in icons.ts`);
 });
 
-test('every Needs you question has its own id', () => {
-  const ids = NEEDS.map((n) => n.id);
+test('every question has its own id, and the desk and the chores band ask different things', () => {
+  const ids = [...NEEDS, ...ASKED].map((n) => n.id);
   assert.equal(new Set(ids).size, ids.length, `ids repeat: ${ids.join(', ')}`);
+  /* SITE F1: the desk's Today shows Northbound and Dana, so the chores band asks the two only a person decides. */
+  assert.deepEqual(NEEDS.map((n) => n.id), ['chase', 'pay']);
+  assert.deepEqual(ASKED.map((n) => n.id), ['sam', 'key']);
 });
 
-test("every figure in the brief opens evidence that exists, and the late one says it's late", () => {
-  const figures = BRIEF.parts.filter((p) => typeof p !== 'string');
-  assert.equal(figures.length, 4);
-  for (const f of figures) {
-    assert.ok(f.key !== undefined && Object.hasOwn(EVIDENCE, f.key), `${f.text} opens nothing`);
-  }
-  for (const f of figures.filter((x) => x.late)) assert.match(f.text, /late/);
+test("the greeting's figures and every need open evidence that exists, and the late one says it's late", () => {
+  assert.equal(BRIEF.hello, 'Good morning, Maya');
+  assert.ok('key' in BRIEF.cash && Object.hasOwn(EVIDENCE, BRIEF.cash.key), 'the cash figure opens its evidence');
+  assert.ok('go' in BRIEF.agents && BRIEF.agents.go === 'agents', 'the agents figure opens the Agents place');
+  for (const n of NEEDS) assert.ok(Object.hasOwn(EVIDENCE, n.evidence), `${n.id} opens nothing`);
+  for (const n of NEEDS.filter((x) => x.late)) assert.match(n.sub, /late/);
 });
 
 test('usd() says the figures the way the prototype does', () => {
@@ -83,12 +84,12 @@ test('usd() says the figures the way the prototype does', () => {
 });
 
 test('the drawn figures are the cents behind them', () => {
-  assert.equal(TODAY.cash.amount, '$48,210');
+  assert.equal(TODAY.cash.foot, '$48,210 across 2 accounts');
   assert.equal(TODAY.cards.tidepool.big, '$8,420');
   assert.equal(EVIDENCE.inv.rows.at(-1)?.[1], '$3,200.00');
   assert.deepEqual(
-    ARRIVALS.map((a) => a.amount),
-    ['$8,420', '$64.20', null, '$1,800', '$2,315', '$520.00'],
+    NEEDS.map((n) => n.amount),
+    ['$3,200', '$1,800'],
   );
   const owed = ASKS[0]?.bars ?? [];
   assert.equal(
@@ -122,10 +123,10 @@ test('the truth fixes are in', () => {
   assert.equal(pay?.yes, 'Plan it for Friday');
   assert.equal(pay?.done, "Dana's invoice is planned for Friday, with the salaries");
   assert.deepEqual(
-    TODAY.needs.map((n) => [n.what, n.act]),
+    NEEDS.map((n) => [n.what, n.yes]),
     [
-      ['Chase Northbound for $3,200', 'Chase it'],
-      ['Pay Dana Reyes $1,800', 'Plan it'],
+      ['Northbound invoice', 'Chase it'],
+      ['Dana Reyes', 'Plan it for Friday'],
     ],
   );
   assert.ok(EVIDENCE.inv.rows.some(([label]) => label === 'Reminder drafted for your yes'));

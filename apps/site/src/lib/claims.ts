@@ -16,8 +16,8 @@
  * the ledger came from, so this file carries a plain key and nothing else.
  *
  * SIGN-UP OPENED ON 8 OCTOBER, SO WHAT RESTS ON `signup` IS `true`, and it stays true by invitation: production runs
- * `SIGNUP=invite` from 17 October, where a stranger who presses Start free signs up with an invite or applies for
- * one, and the site says nothing about invites (DIRECTION §49). Billing is still off or in test mode, so a claim
+ * `SIGNUP=invite` from 17 October, where a stranger who presses Get early access signs up with an invite or applies
+ * for one, and from 20 October the site says so (D1: "Early access, invite only"). Billing is still off or in test mode, so a claim
  * that a stranger can pay, upgrade, cancel or have colleagues is `flag`. The repository is private, so a claim that
  * anybody can read the code is `not-yet`, and `claims.test.ts` asks for it to be marked again once `LAUNCH.repo` is on.
  */
@@ -40,19 +40,20 @@ export type Claim = {
 
 export const CLAIMS: readonly Claim[] = [
   /* The home page (`copy/home.ts`, spread into `site`, so `hero.sub` is its `home.hero.sub`). */
-  { id: 'every-agent', said: 'every AI agent you use', where: 'hero.sub', state: 'true' },
-  { id: 'brief-rewritten', said: 'rewritten whenever something changes', where: 'cards.brief.say', state: 'true' },
-  { id: 'agents-leave-a-note', said: 'leaves a note when it', where: 'cards.agents.say', state: 'true' },
-  { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'cards.chores.say', state: 'true' },
-  { id: 'floor-waits', said: 'Money, keys, sharing and deletes always wait for your yes.', where: 'cards.chores.floor', state: 'true' },
-  { id: 'slash-card-yes', said: 'Nothing goes in without your yes.', where: 'cards.slash.say', state: 'true' },
-  { id: 'undo-any-change', said: 'you can undo it', where: 'yours.points.0.body', state: 'true' },
-  { id: 'export-any-time', said: 'Export the whole record as one file', where: 'yours.points.1.body', state: 'true' },
-  { id: 'keys-unseen', said: 'Agents use your keys without ever seeing them', where: 'yours.points.2.body', state: 'true' },
-  { id: 'first-brief-quick', said: 'read your first brief in a few minutes', where: 'closing.body', state: 'true', flag: 'signup' },
+  { id: 'ai-tools-read', said: 'Your AI tools read from it too.', where: 'hero.sub', state: 'true' },
+  { id: 'brief-each-morning', said: 'in one short brief each morning', where: 'who.small.say', state: 'true' },
+  { id: 'agents-leave-a-note', said: "leaves a note when it's done", where: 'tools.say', state: 'true' },
+  { id: 'chores-reason-undo', said: 'each with a reason and an undo', where: 'chores.say', state: 'true' },
+  { id: 'floor-waits', said: 'Money, keys, sharing and deletes always wait for your yes.', where: 'chores.floor', state: 'true' },
+  { id: 'slash-card-yes', said: 'Nothing goes in without your yes.', where: 'slash.say', state: 'true' },
+  { id: 'undo-any-change', said: 'Every change has a name on it, and an undo.', where: 'yours.points.0.text', state: 'true' },
+  { id: 'export-any-time', said: 'Export everything as one file, any time.', where: 'yours.points.1.text', state: 'true' },
+  { id: 'keys-unseen', said: 'AI tools use your keys without ever seeing them.', where: 'yours.points.2.text', state: 'true' },
+  { id: 'invite-only', said: 'BrainDog is invite only for now.', where: 'free.say', state: 'true', flag: 'signup' },
 
   /* The Slash page (`copy/slash.ts`, its own export `slashPage`, which the ledger reads beside `site`). */
   { id: 'slash-asks-first', said: 'Nothing it makes goes in until you say yes.', where: 'slashPage.head.lead', state: 'true' },
+  { id: 'own-key-no-limit', said: 'or no limit with your own AI key', where: 'slashPage.counted.say', state: 'true' },
   { id: 'finding-free', said: 'Finding is free and never spends an ask.', where: 'slashPage.find.body.1', state: 'true' },
   { id: 'own-key-unlimited', said: 'Asks on your own key have no monthly limit.', where: 'slashPage.faq.questions.2.a', state: 'true' },
 
@@ -61,24 +62,25 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'agent-sees-no-key', said: 'See a key. It uses them from the vault, by name.', where: 'agents.cannot.lines.0', state: 'true' },
   { id: 'agent-asks-first', said: 'Move money, share or delete without your yes.', where: 'agents.cannot.lines.1', state: 'true' },
   { id: 'agent-signs-writes', said: 'Hide what it did. Everything it writes carries its name.', where: 'agents.cannot.lines.2', state: 'true' },
-  { id: 'agent-write-undo', said: 'A receipt with an undo for everything it writes.', where: 'agents.gets.lines.2', state: 'true' },
-  { id: 'five-apps-connect', said: 'Claude, ChatGPT, Codex, Cursor and VS Code can read your record, propose changes and leave notes.', where: 'agents.lead', state: 'true' },
+  { id: 'agent-write-undo', said: 'A receipt and an undo for everything it writes.', where: 'agents.gets.lines.2', state: 'true' },
+  { id: 'five-apps-connect', said: 'Claude, ChatGPT, Codex, Cursor and VS Code can read your BrainDog, suggest changes and leave notes.', where: 'agents.lead', state: 'true' },
 
-  /* The pricing page (`copy/pricing.ts`, `pricing`). */
-  { id: 'free-no-card', said: 'No card for the free plan.', where: 'pricing.close.body', state: 'true', flag: 'signup' },
+  /* The pricing page (`copy/pricing.ts`, `pricing`): the early access page while billing is off, then the plans. */
+  { id: 'early-free', said: 'Everything in it is free while we open it up.', where: 'pricing.early.lede', state: 'true', flag: 'signup' },
+  { id: 'nothing-lost', said: 'nothing you make now will be lost or locked when they arrive', where: 'pricing.early.later.say', state: 'true' },
+  { id: 'export-any-time-early', said: 'Yes, all of it, as one file, whenever you like.', where: 'pricing.early.faq.questions.2.a', state: 'true' },
   { id: 'export-every-plan', said: 'Yes, all of it, as one file, on every plan.', where: 'pricing.faq.questions.2.a', state: 'true' },
   { id: 'cancel-any-time', said: 'Yes, from Settings.', where: 'pricing.faq.questions.3.a', state: 'flag', flag: 'billing' },
   { id: 'extra-use-soon', said: 'Coming soon.', where: 'pricing.extra.soon', state: 'not-yet', flag: 'billing', soon: true },
   { id: 'waits-next-month', said: 'Nothing stops at the limit. It waits for next month.', where: 'pricing.holds.say', state: 'true' },
   { id: 'brief-spends-no-ask', said: 'Your brief, filing and your rules never spend one.', where: 'pricing.faq.questions.0.a', state: 'true' },
   { id: 'extra-use-capped', said: 'Turn it on with a monthly cap, and BrainDog never goes past it.', where: 'pricing.extra.say', state: 'flag', flag: 'billing' },
-  { id: 'upgrade-earns-it', said: 'Upgrade when it earns it.', where: 'pricing.close.body', state: 'flag', flag: 'billing' },
 
   /* The pages for each kind of person (`copy/for.ts`). */
   { id: 'bills-file-themselves', said: 'Once it knows their shape, each lands in the right list with its amount and due day.', where: 'person.who.personal.rows.0.said', state: 'true' },
   { id: 'students-reminded', said: 'Automations remind you before things are due', where: 'person.who.student.sub', state: 'true' },
   { id: 'late-invoice-drafted', said: 'a reminder is drafted in your words and waits for your yes.', where: 'person.who.founder.rows.1.said', state: 'true' },
-  { id: 'team-colleagues-free', said: 'Colleagues are free, and every change says who made it.', where: 'person.who.team.sub', state: 'flag', flag: 'billing' },
+  { id: 'team-who-changed', said: 'every change says who made it.', where: 'person.who.team.sub', state: 'true' },
 
   /* The trust pages (`copy/trust.ts`) and the shared words (`copy/shell.ts`). */
   { id: 'licence', said: 'The software is licensed under the Apache License 2.0', where: 'legal.licence.body.0', state: 'true' },
@@ -88,10 +90,10 @@ export const CLAIMS: readonly Claim[] = [
   { id: 'terms-meta', said: 'and its Terms of Service and Privacy Policy', where: 'meta.legal.description', state: 'flag', flag: 'legal' },
   { id: 'support-before-signup', said: 'The support address is published here before sign-up opens.', where: 'support.mail.pending', state: 'not-yet' },
   { id: 'issues-on-github', said: 'Report a fault as an issue, or ask a question in Discussions', where: 'support.github.body', state: 'flag', flag: 'repo' },
-  { id: 'no-shared-table', said: 'No table holds two customers', where: 'security.kept.facts.0.text', state: 'true' },
-  { id: 'sealed-copies', said: 'Every night a copy of each record is sealed to a key kept outside Cloudflare', where: 'security.kept.facts.2.text', state: 'true' },
+  { id: 'no-shared-table', said: 'Nothing is shared between customers', where: 'security.kept.facts.0.text', state: 'true' },
+  { id: 'sealed-copies', said: 'Every night a copy is sealed to a key kept outside Cloudflare', where: 'security.kept.facts.2.text', state: 'true' },
   { id: 'no-password', said: 'There is no password to steal.', where: 'security.kept.facts.3.text', state: 'true' },
-  { id: 'token-reach', said: 'No token can open your keys, erase data, restore a copy or delete the record', where: 'security.kept.facts.4.text', state: 'true' },
+  { id: 'token-reach', said: 'Opening keys, erasing data, restoring a copy or deleting everything needs you, signed in.', where: 'security.kept.facts.4.text', state: 'true' },
   { id: 'report-before-signup', said: 'The address for reporting a weakness is published here before sign-up opens.', where: 'security.report.pending', state: 'not-yet' },
 
   /* The packs pages (`copy/packs.ts`). */

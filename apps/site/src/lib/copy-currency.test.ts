@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 
 import { site } from './copy.ts';
 import { slashPage } from './copy/slash.ts';
-import { PLANS } from './plans.ts';
+import { PLANS, TABLE } from './plans.ts';
 import { cardsFor, extra, holds } from './pricing/cards.ts';
 
 const REPO = new URL('../../../../', import.meta.url);
@@ -86,9 +86,9 @@ const HELD: Record<string, Set<number>> = {
 function figuresNotHeld(text: string): string[] {
   const out: string[] = [];
   for (const m of text.matchAll(/\$\d[\d,]*(?:\.\d+)?/g)) if (!PRICES.has(m[0])) out.push(m[0]);
-  const meter = /(\d[\d,]*) (?:Slash credits|credits|questions|agents|automation runs|runs)\b/g;
+  const meter = /(\d[\d,]*) (?:Slash credits|credits|questions|agents|AI tools|automation runs|runs)\b/g;
   for (const m of text.matchAll(meter)) {
-    const key = /credits|questions/.test(m[0]) ? 'credits' : /agents/.test(m[0]) ? 'agents' : 'runs';
+    const key = /credits|questions/.test(m[0]) ? 'credits' : /agents|AI tools/.test(m[0]) ? 'agents' : 'runs';
     if (!HELD[key]!.has(Number(m[1]!.replace(/,/g, '')))) out.push(m[0]);
   }
   return out;
@@ -99,10 +99,12 @@ const p = site.pricing;
 /** A meter of the pricing table as the figure check reads it: its cell, then the word the check knows it by. */
 const WORD: Record<string, string> = { agents: 'agents', credits: 'questions', runs: 'automation runs' };
 
-/** What the pricing page and the Slash page's asks say, as the routes put it together. */
+/** What the pricing page, the Slash page's asks and home's early access tile say, as the routes put it together. */
 const said: string[] = [
   JSON.stringify({ pricing: p, slash: slashPage }),
-  ...slashPage.counted.month.cells.map((n) => `${n} questions`),
+  ...p.early.plan.lines(TABLE.free),
+  `${TABLE.free.agents} ${site.free.tools}`,
+  `${TABLE.free.credits} ${site.free.asks}`,
   ...PLANS.flatMap((pl) => [pl.price, pl.unit, pl.for]),
   ...[cardsFor({ billing: false }), cardsFor({ billing: true })].flat().flatMap((card) => [
     `${card.price} ${card.per}`,
@@ -138,6 +140,7 @@ test('the figure check sees what it is meant to', () => {
   /* THE PLANTED FAULTS: a price no plan has, Free with a fourth agent, and the roadmap's old Cloud Plus runs. */
   assert.deepEqual(figuresNotHeld('Cloud is $14 a month'), ['$14']);
   assert.deepEqual(figuresNotHeld('Connect up to 4 agents'), ['4 agents']);
+  assert.deepEqual(figuresNotHeld('5 AI tools connected'), ['5 AI tools']);
   assert.deepEqual(figuresNotHeld('30 questions to Slash a month'), ['30 questions']);
   assert.deepEqual(figuresNotHeld('400 Slash credits and 60,000 runs a month'), ['60,000 runs']);
   assert.deepEqual(figuresNotHeld('$12 a month, $29 a month, $0.50 a GB, 100 credits for $5'), []);

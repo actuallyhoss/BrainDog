@@ -26,6 +26,7 @@
         <p class="ask">{n.ask}</p>
         <p class="why">{n.why}</p>
         <div class="facts">
+          <p class="fh">{DESK.behind} · {ev.head}</p>
           {#each ev.rows as [label, value]}<p><span>{label}</span><b class="num">{value}</b></p>{/each}
         </div>
         <div class="acts desk-js">
@@ -93,6 +94,11 @@
 
   .facts span {
     color: var(--muted);
+  }
+
+  .facts .fh {
+    color: var(--muted);
+    font-weight: 500;
   }
 
   .acts {
