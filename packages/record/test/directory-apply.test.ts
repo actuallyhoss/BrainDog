@@ -159,7 +159,9 @@ test('AN INVITATION MINTS ONE CODE THAT SIGNS THEM UP, AND ONLY ITS HASH IS KEPT
   /* SPENT THROUGH SIGN-UP BY INVITATION, as directory-invite.test.ts does. */
   const start = (await d.auth({ flow: 'signup.start', email, slug: 'dana-studio', ip: nextIp(), checked: true, invite: true, code } as never)) as AuthResult;
   assert.equal(start.status, 200);
-  const link = start.status === 200 ? (start.mail as { link?: string } | undefined)?.link : undefined;
+  /* THE CODE WAS MAILED TO THIS ADDRESS, SO IT PROVES IT: no second mail, the proof comes back to spend. */
+  assert.equal(start.status === 200 ? start.mail : 'none', undefined);
+  const link = start.status === 200 ? (start.body as { proof?: string }).proof : undefined;
   assert.ok(link);
   assert.equal((await d.auth({ flow: 'signup.verify', token: link, ip: nextIp() })).status, 200);
   assert.equal((await d.invites({ flow: 'invite.list' }))[0]?.state, 'spent');
@@ -224,4 +226,18 @@ test('A COPY MADE BEFORE APPLICATIONS EXISTED STILL LOADS, and is not taken for 
   assert.ok(setup().d.load(older).ok);
   const cut = lines.filter((l, i) => !(i >= lines.indexOf('#table dir_credit') && l.startsWith('#table dir_credit')));
   assert.equal(setup().d.load(cut).ok, false);
+});
+
+test('A CODE USED FROM ANOTHER ADDRESS IS STILL PROVED BY MAIL', async () => {
+  const { d } = setup();
+  await submit(d, { name: 'Dana Reyes', email: 'dana@example.com' });
+  const [row] = await list(d);
+  assert.ok(row);
+  const decided = await d.applications({ flow: 'apply.decide', id: row.id, decision: 'invite' });
+  const code = decided.ok && 'code' in decided.value ? decided.value.code : '';
+  assert.ok(code);
+  const start = (await d.auth({ flow: 'signup.start', email: 'other@example.com', slug: 'other-studio', ip: nextIp(), checked: true, invite: true, code } as never)) as AuthResult;
+  assert.equal(start.status, 200);
+  assert.ok(start.status === 200 && (start.mail as { link?: string } | undefined)?.link);
+  assert.equal(start.status === 200 ? (start.body as { proof?: string }).proof : 'x', undefined);
 });

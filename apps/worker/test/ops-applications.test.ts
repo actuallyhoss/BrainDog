@@ -88,9 +88,10 @@ test('AN INVITATION MAILS ONE LETTER WHOSE LINK SIGNS UP BY INVITATION', async (
       headers: { 'cf-connecting-ip': '198.51.100.250' },
     });
     assert.equal(start.status, 200, await start.clone().text());
+    /* THE CODE WAS MAILED TO THIS ADDRESS, SO IT PROVES IT: one inbox trip, no second letter, the proof comes back. */
     await new Promise((r) => setTimeout(r, 0));
-    assert.equal(c.letters().length, 2);
-    assert.match(String(c.letters()[1]?.text), /\/app\/signup#verify=/);
+    assert.equal(c.letters().length, 1);
+    assert.match(String((JSON.parse(await start.clone().text()) as { value?: { proof?: string } }).value?.proof), /^[A-Za-z0-9_-]{43}$/);
 
     /* DECIDED ONCE. */
     assert.equal((await c.call('/account/ops/applications', { invite: row?.id })).status, 422);

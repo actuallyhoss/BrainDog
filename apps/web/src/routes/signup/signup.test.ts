@@ -216,7 +216,7 @@ test('AN INVITATION\'S CODE IS READ OFF THE ADDRESS AND WIPED, as a mailed link 
 
 test('THE CODE RIDES WITH THE START, and a refusal at code is the host\'s own sentence', async () => {
   const yes = host({ ok: true, value: {} });
-  assert.deepEqual(await startSignup({ email: ' sami@example.com ', slug: 'kiln', code: CODE }, yes.io), { ok: true, value: null });
+  assert.deepEqual(await startSignup({ email: ' sami@example.com ', slug: 'kiln', code: CODE }, yes.io), { ok: true, value: { proof: null } });
   assert.equal(yes.sent[0]?.url, '/auth/signup/start');
   assert.equal(yes.sent[0]?.body?.['code'], CODE);
   const none = host({ ok: true, value: {} });

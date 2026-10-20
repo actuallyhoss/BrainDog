@@ -782,7 +782,7 @@ export async function checkName(slug: string, io: Io = live()): Promise<Asked<Na
 export async function startSignup(
   ask: { email: string; slug: string; name?: string; tz?: string | null; turnstile?: string | null; code?: string | null; said?: Draft | null },
   io: Io = live(),
-): Promise<Asked<null>> {
+): Promise<Asked<{ proof: string | null }>> {
   const said = saidForLink(ask.said);
   const out = await call(io, '/auth/signup/start', {
     email: ask.email.trim(),
@@ -793,7 +793,8 @@ export async function startSignup(
     ...(ask.code ? { code: ask.code } : {}),
     ...(said !== null ? { said } : {}),
   });
-  return out.ok ? { ok: true, value: null } : out;
+  /* WITH AN INVITATION MAILED TO THIS ADDRESS THE HOST SENDS NO SECOND MAIL and hands the proof back to spend now. */
+  return out.ok ? { ok: true, value: { proof: isObj(out.value) ? str(out.value.proof) : null } } : out;
 }
 
 /** Spend the mailed proof, once: the person is made and this browser is signed in as them. */

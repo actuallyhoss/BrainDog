@@ -207,6 +207,7 @@ function partsOf(kind: MailKind, v: { [K in keyof MailVars]-?: string }): { subj
           { say: 'Your invite to BrainDog is ready. Open this link to make your account:' },
           ...link,
           { say: /^[1-9]\d*$/u.test(v.days) ? `It works once, and it ends in ${v.days} ${v.days === '1' ? 'day' : 'days'}.` : 'It works once.' },
+          { say: 'This link proves your address, so there is no second email to wait for.' },
         ],
       };
     case 'passkey.added':

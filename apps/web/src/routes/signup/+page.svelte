@@ -813,6 +813,15 @@
     /* WHAT WAS SAID RIDES IN THE LINK (`said`), so a link opened on another device builds the same BrainDog. */
     const out = await startSignup({ email, slug, name: person, tz: zone(), turnstile: human, code: codeKept(tabStore()), said: draftNow() });
     busy = false;
+    if (out.ok && out.value.proof !== null) {
+      /* THE INVITATION WAS MAILED TO THIS ADDRESS, so it proved it: no second mail, straight on to the build. */
+      keepCode(tabStore(), null);
+      keepAll();
+      hold(globalThis.sessionStorage, { slug, name: titleSent(read, person.trim() || null), tz: zone(), plan });
+      keepPlan(localStore(), plan);
+      await verify(out.value.proof);
+      return;
+    }
     if (out.ok) {
       sentTo = email.trim();
       sentCut = saidFromLink(saidForLink(draftNow()))?.cut === true;
