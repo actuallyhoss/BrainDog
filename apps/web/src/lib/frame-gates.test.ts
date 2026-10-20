@@ -1,0 +1,313 @@
+/**
+ * THE FRAME'S GATES (the UI pass of 20 October, wave 4): what the pass took out stays out.
+ *
+ * Six refusals, each over every component, stylesheet and script of the app, the skin and the renderer (and the site
+ * where it says so), read as text with the comments taken out, so a comment that quotes an old spelling is not a use:
+ *
+ *   1. NO GLASS. Nothing blurs what is behind it (`backdrop-filter`, either spelling): a floating layer is the opaque
+ *      tile with a 1px `--rule-strong` edge (SPEC 1.9).
+ *   2. NO ELEVATION. A `box-shadow` is a ring or a line, never a cast shadow (its blur is 0), and only on the rules
+ *      listed below by file and selector: the cut-out rings (a count on a tab icon, a face in a stack, a dot over a
+ *      hairline), the inside edge a field, a chip or a chosen card draws instead of a border it has no room for, and
+ *      the few indicator lines. A new one is added here on purpose, with its reason, or it is refused.
+ *   3. NO LITERAL RED. A red is `--red`, `--red-fill` or one of their states, and the only place a red hex is written
+ *      is `packages/theme` and the palettes it generates (`house.css`, `alpha.css`).
+ *   4. NO OLD NAME. Every name SPEC 1.10, 1.7 and frame 3.9 retired is gone, the elevation and the glass with them.
+ *   5. NO RAW SEGMENT. A `class="segment"` sits inside a `<Segmented>` track, the one part that draws it.
+ *   6. NO ICON BUTTON NAMED ONLY BY `title`. A tooltip is not a name: a button that shows only a glyph says what it does
+ *      with `aria-label`, which a screen reader reads and a touch screen does not need a hover for.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+
+function walk(dir: string, keep: (name: string) => boolean): string[] {
+  return readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) => {
+    if (e.name === 'node_modules' || e.name.startsWith('.')) return [];
+    const at = join(dir, e.name);
+    return e.isDirectory() ? walk(at, keep) : keep(e.name) ? [at] : [];
+  });
+}
+
+const CODE = (name: string): boolean => /\.(svelte|css|ts|js|mjs|html)$/u.test(name) && !/\.(test|spec)\.[jt]s$/u.test(name);
+/** The product's own code: the app, the skin, the renderer. */
+const PRODUCT = [...walk('apps/web/src', CODE), ...walk('packages/skin', CODE), ...walk('packages/render/src', CODE)];
+const GENERATED = new Set(['packages/skin/house.css', 'packages/skin/alpha.css']);
+const at = (file: string): string => relative(ROOT, join(ROOT, file)).replaceAll('\\', '/');
+
+/** A file's text without its comments (CSS and script block comments, markup comments, and `//` line comments). */
+function code(file: string): string {
+  const text = readFileSync(join(ROOT, file), 'utf8');
+  return text
+    .replaceAll(/<!--[\s\S]*?-->/gu, '')
+    .replaceAll(/\/\*[\s\S]*?\*\//gu, '')
+    .replaceAll(/(^|[^:'"`\\])\/\/[^\n]*/gu, '$1');
+}
+
+/** The CSS a file holds: a stylesheet whole, a component's `<style>` blocks. */
+function css(file: string): string {
+  const text = code(file);
+  if (file.endsWith('.css')) return text;
+  if (file.endsWith('.svelte') || file.endsWith('.html')) return [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gu)].map((m) => m[1]).join('\n');
+  return '';
+}
+
+const lineOf = (text: string, index: number): number => text.slice(0, index).split('\n').length;
+
+test('the walk reads the app, the skin and the renderer', () => {
+  assert.ok(PRODUCT.filter((f) => f.endsWith('.svelte')).length > 200, `${PRODUCT.length} files: the walk is not reading the app`);
+  assert.ok(PRODUCT.includes('packages/skin/tokens.css'));
+});
+
+/* ── 1. No glass ─────────────────────────────────────────────────────────── */
+
+test('nothing blurs what is behind it', () => {
+  const found = PRODUCT.flatMap((file) => {
+    const text = code(file);
+    return [...text.matchAll(/backdrop-filter/gu)].map((m) => `${at(file)}:${lineOf(text, m.index)}`);
+  });
+  assert.deepEqual(found, [], `a floating layer is the opaque tile with a 1px edge: ${found.join(', ')}`);
+});
+
+/* ── 2. No elevation ─────────────────────────────────────────────────────── */
+
+/** Every `box-shadow` a stylesheet declares, with the selector it sits under (the innermost prelude). */
+function shadows(source: string): { selector: string; value: string; line: number }[] {
+  const out: { selector: string; value: string; line: number }[] = [];
+  const stack: string[] = [];
+  let buf = '';
+  let start = 0;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]!;
+    if (ch === '{') {
+      stack.push(buf.trim().replaceAll(/\s+/gu, ' '));
+      buf = '';
+      start = i + 1;
+    } else if (ch === ';' || ch === '}') {
+      const m = /^\s*box-shadow\s*:\s*([\s\S]*?)\s*$/u.exec(buf);
+      if (m) out.push({ selector: [...stack].reverse().find((s) => !s.startsWith('@')) ?? '', value: m[1]!.replaceAll(/\s+/gu, ' '), line: lineOf(source, start) });
+      buf = '';
+      start = i + 1;
+      if (ch === '}') stack.pop();
+    } else buf += ch;
+  }
+  return out;
+}
+
+/** A value's top-level parts: each bracketed group kept whole, split on the separator at depth 0. */
+function split(value: string, by: RegExp): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let buf = '';
+  for (const ch of value) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth === 0 && by.test(ch)) {
+      if (buf.trim()) out.push(buf.trim());
+      buf = '';
+    } else buf += ch;
+  }
+  if (buf.trim()) out.push(buf.trim());
+  return out;
+}
+
+/** A shadow that casts nothing: every part of it is offsets and a spread with a blur of 0, then its colour. */
+function flat(value: string): boolean {
+  return split(value, /,/u).every((part) => {
+    const items = split(part, /\s/u).filter((t) => t !== 'inset');
+    const colour = items.at(-1) ?? '';
+    const lengths = /^(-?[\d.]+[a-z%]*|calc\(.*\))$/u.test(colour) ? items : items.slice(0, -1);
+    return lengths.length >= 2 && lengths.length <= 4 && (lengths.length < 3 || /^0(px)?$/u.test(lengths[2]!));
+  });
+}
+
+/**
+ * THE SHADOWS THAT STAY, BY FILE AND SELECTOR. Each is a ring or a line (`flat`), and each is here for a reason:
+ *   ring  a cut-out ring in the surface it sits on, so a dot, a count or a face reads over what it overlaps
+ *   edge  an inside edge (inset, 1 to 1.5px) where a border would move the box: a field's fault, a chosen card, a dot
+ *         that is an empty ring, a chart's cell
+ *   line  a 1 to 2px indicator line drawn inside the box: the step under way, the hairline under a sticky head
+ */
+const SHADOWS: Record<string, readonly string[]> = {
+  'apps/web/src/lib/agents/NewKind.svelte': ['.field[data-wrong], .lines[data-wrong]'], // edge
+  'apps/web/src/lib/decide/DecisionCard.svelte': ['.queue-card[data-selected]'], // edge
+  'apps/web/src/lib/decide/form.css': ['.dc-btn[data-on]'], // edge
+  'apps/web/src/lib/flow/RunView.svelte': ['.rv-card[data-state=\'unreached\']'], // edge
+  'apps/web/src/lib/flow/Tokens.svelte': ['.tok-box :global(.tok-pill)'], // edge
+  'apps/web/src/lib/page/PageTabs.svelte': ['.tab[aria-current=\'page\'], .tab-more[data-here] .tab'], // edge
+  'apps/web/src/lib/page/ProjectVisuals.svelte': ['.stop[data-kind=\'now\'] .c'], // edge
+  'apps/web/src/lib/page/kinds/calendar.css': ['.calendar-day .calendar-item::after'], // edge
+  'apps/web/src/lib/ui/AgentFace.svelte': ['.agent-face-live', '.agent-face-live[data-live=\'quiet\']', '.agent-face-project'], // edge, ring
+  'apps/web/src/lib/ui/BlockBar.svelte': ['.width[data-on]'], // edge
+  'apps/web/src/lib/ui/Count.svelte': ['.badge[data-size=\'s\']'], // ring
+  'apps/web/src/lib/ui/NewAction.svelte': ['.field[data-bad]'], // edge
+  'apps/web/src/lib/ui/PageHead.svelte': ['.head-bar::before'], // line
+  'apps/web/src/lib/ui/StateDot.svelte': ['.dot[data-state=\'open\']', '.dot[data-state=\'part\']'], // edge
+  'apps/web/src/lib/work/WorkClassic.svelte': ['.capture-field:focus-within', '.find:focus-within'], // edge
+  'apps/web/src/routes/automations/AutomationSentence.svelte': ['.row :global(.field:has(input[aria-invalid=\'true\']))'], // edge
+  'apps/web/src/routes/automations/SentenceSteps.svelte': ['li[data-over]'], // line
+  'apps/web/src/routes/automations/[id]/+page.svelte': ['.bar[data-held]'], // line
+  'apps/web/src/routes/decide/[id]/Proposed.svelte': ['.swatch'], // edge
+  'apps/web/src/routes/packs/browse/+page.svelte': ['.find', '.sort-select'], // edge
+  'apps/web/src/routes/packs/browse/[id]/+page.svelte': ['.narrow-only'], // line
+  'apps/web/src/routes/r/[register]/parts/ListBoard.svelte': ['.bcard[data-cursor]', '.bcard[data-picked]', '.bcard:not([data-picked], [data-cursor]):hover'], // edge
+  'apps/web/src/routes/scripts/[id]/ScriptForm.svelte': ['.field[data-wrong], .lines[data-wrong], .code[data-wrong]'], // edge
+  'apps/web/src/routes/settings/[area]/areas/Appearance.svelte': ['.swatch', '.tick'], // edge, ring
+  'apps/web/src/routes/settings/[area]/areas/Delete.svelte': ['.field[data-invalid]'], // edge
+  'apps/web/src/routes/settings/[area]/areas/Identity.svelte': ['.rename-bad'], // edge
+  'apps/web/src/routes/settings/[area]/areas/Ingest.svelte': ['.door-state[data-state=\'off\']::before'], // edge
+  'apps/web/src/routes/settings/[area]/settings.css': ['.settings-place .picture-shot', '.settings-place .picture[data-on] .picture-shot', '.settings-place .picture:not([data-on]):hover .picture-shot'], // edge, ring
+  'apps/web/src/routes/t/[track]/+page.svelte': ['.line-mark :global(.agent-face:is([data-live=\'working\'], [data-live=\'quiet\']))'], // edge
+  'packages/skin/blocks-charts.css': ['.split-dot:not([data-step]), .ring-dot:not([data-step])', '.roadmap-item[data-date] .roadmap-bar', '.roadmap-bar[data-dragging]', '.heat-day'], // edge, ring
+  'packages/skin/kinds/board.css': ['.board-col[data-drop]'], // edge
+  'packages/skin/kinds/feed.css': ['.feed-row[data-focused]'], // ring
+  'packages/skin/kinds/filters.css': ['.filters-group[data-control=\'segmented\'] .filters-choice:is([aria-pressed=\'true\'], [data-on]), .filters-group[data-control=\'segmented\'] button.filters-choice[aria-pressed=\'true\']:hover'], // edge
+  'packages/skin/kinds/queue.css': ['.queue-card[data-focused]', '.queue-options:has(.queue-because) > .queue-option', '.queue-options:has(.queue-because) > .queue-option:has(> .queue-act[data-on])', '.queue-card[data-selected]:not([data-focused])'], // edge, ring
+};
+
+test('a box-shadow is a ring or a line, and only where this file lists it', () => {
+  const found = PRODUCT.flatMap((file) =>
+    shadows(css(file))
+      .filter((s) => s.value !== 'none')
+      .map((s) => ({ file: at(file), ...s })),
+  );
+  assert.ok(found.length > 0, 'the walk found no shadow at all, so it is not reading the styles');
+  const cast = found.filter((s) => !flat(s.value)).map((s) => `${s.file}:${s.line} ${s.selector} { box-shadow: ${s.value} }`);
+  assert.deepEqual(cast, [], `a shadow casts nothing in the frame (SPEC 1.9): ${cast.join('; ')}`);
+  const unlisted = found.filter((s) => !(SHADOWS[s.file] ?? []).includes(s.selector)).map((s) => `'${s.file}': '${s.selector}' (${s.value})`);
+  assert.deepEqual(unlisted, [], `a shadow that is not a cut-out ring, an inside edge or a line: ${unlisted.join('; ')}`);
+});
+
+/* ── 3. No literal red ───────────────────────────────────────────────────── */
+
+/** Whether a hex colour is a red: saturated, neither near black nor near white, its hue within 20 degrees of red. */
+function red(hex: string): boolean {
+  let h = hex.slice(1);
+  if (h.length <= 4) h = [...h.slice(0, 3)].map((c) => c + c).join('');
+  const [r, g, b] = [0, 2, 4].map((i) => Number.parseInt(h.slice(i, i + 2), 16) / 255) as [number, number, number];
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) return false;
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let hue = (max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60;
+  if (hue < 0) hue += 360;
+  return s >= 0.35 && l > 0.12 && l < 0.88 && (hue >= 340 || hue <= 20);
+}
+
+test('no red is written as a hex outside the theme and the palettes it generates', () => {
+  const files = [...PRODUCT, ...walk('apps/site/src', CODE)].filter((f) => !GENERATED.has(f));
+  const found = files.flatMap((file) => {
+    const text = code(file);
+    return [...text.matchAll(/(?<![\w&])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])/gu)]
+      .filter((m) => red(m[0]))
+      .map((m) => `${at(file)}:${lineOf(text, m.index)} ${m[0]}`);
+  });
+  assert.deepEqual(found, [], `a red is --red or --red-fill (SPEC 1.1): ${found.join(', ')}`);
+});
+
+/* ── 4. No old name ──────────────────────────────────────────────────────── */
+
+/* Written without their dashes, so a search of the tree for an old name finds nothing here either. */
+const OLD = [
+  // SPEC 1.10 and frame 3.9: surfaces, text, the reds, status, washes
+  'sunk', 'bg', 's1', 's2', 's3', 'field', 'soft', 'hold-wash', 'hover-wash', 'field-hover', 'line', 'rule2', 'line-soft',
+  'edge', 'ink2', 'dim', 'faint', 'muted', 'focus-in', 'focus-out', 'action', 'on', 'danger-fill', 'accent', 'brand',
+  'action-hover', 'primary-hover', 'accent-hover', 'accent-press', 'red-press', 'action-text', 'link', 'danger-text',
+  'accent-text', 'red-ink', 'danger', 'accent-edge', 'status-late', 'on-action', 'on-ink', 'accent-ink', 'action-tint-1',
+  'selected', 'action-tint-2', 'earn', 'earn-fill', 'status-ok', 'warn-fill', 'status-waiting', 'chart-risk', 'warn-wash',
+  'info-fill', 'live-fill', 'arrived-wash', 'status-working', 'status-done', 'status-idle',
+  // frame 3.9: type, faces, radii
+  'tile-r', 'font-id', 't-xs', 't-sm', 't-base', 't-row', 't-md', 't-ui', 'text', 't-group', 't-lg', 't-figure', 't-xl',
+  't-title', 't-2xl', 't-lead', 't-3xl', 'r-sm', 'r-well', 'r-pill', 'r-md', 'r-lg',
+  // SPEC 1.7: motion
+  'd-release', 'd-move', 'ease-spring', 'ease-fade', 'ease-push',
+  // SPEC 1.9: elevation and glass
+  'e1', 'e2', 'e3', 'glass', 'glass-strong', 'glass-blur', 'glass-edge', 'ground-light', 'ground-glow', 'press-dim', 'focus-halo',
+];
+
+test('no file names a token the pass retired', () => {
+  const name = new RegExp(`(?<![\\w-])--(?:${OLD.join('|')})(?![\\w-])`, 'gu');
+  const found = PRODUCT.flatMap((file) => {
+    const text = readFileSync(join(ROOT, file), 'utf8');
+    return [...text.matchAll(name)].map((m) => `${at(file)}:${lineOf(text, m.index)} ${m[0]}`);
+  });
+  assert.deepEqual(found, [], `use the frame's name (SPEC 1.10): ${found.join(', ')}`);
+});
+
+/* ── 5. No raw segment ───────────────────────────────────────────────────── */
+
+/** A component's markup: no script, no style, no comments. */
+const markup = (file: string): string =>
+  readFileSync(join(ROOT, file), 'utf8')
+    .replaceAll(/<!--[\s\S]*?-->/gu, '')
+    .replaceAll(/<script[\s\S]*?<\/script>/gu, '')
+    .replaceAll(/<style[\s\S]*?<\/style>/gu, '');
+
+/** The markup with every `<Segmented>` track taken out, nested ones included. */
+function outsideTracks(text: string): string {
+  let out = text;
+  for (let before = ''; before !== out; ) {
+    before = out;
+    out = out.replaceAll(/<Segmented\b(?:(?!<Segmented\b)[\s\S])*?<\/Segmented>/gu, '');
+  }
+  return out;
+}
+
+test('a segment sits in the one track that draws it', () => {
+  const components = PRODUCT.filter((f) => f.endsWith('.svelte') && !f.endsWith('/Segmented.svelte'));
+  const found = components.flatMap((file) => {
+    const text = outsideTracks(markup(file));
+    return [...text.matchAll(/\bclass="segment[\s"]|\bclass=\{\[?\s*'segment'/gu)].map(() => at(file));
+  });
+  assert.deepEqual([...new Set(found)], [], `wrap the segments in <Segmented> (2.A.9): ${[...new Set(found)].join(', ')}`);
+});
+
+/* ── 6. No icon button named only by its title ───────────────────────────── */
+
+/** The end of the tag that opens at `start`, braces and quotes respected. */
+function tagEnd(text: string, start: number): number {
+  let depth = 0;
+  let quote = '';
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]!;
+    if (quote) {
+      if (ch === quote) quote = '';
+    } else if (ch === '{') depth++;
+    else if (ch === '}') depth--;
+    else if (depth === 0 && (ch === '"' || ch === "'")) quote = ch;
+    else if (depth === 0 && ch === '>') return i + 1;
+  }
+  return text.length;
+}
+
+test('a button that shows only a glyph is named by aria-label, never by its title alone', () => {
+  const components = PRODUCT.filter((f) => f.endsWith('.svelte'));
+  let glyphs = 0;
+  const found = components.flatMap((file) => {
+    const text = markup(file);
+    const out: string[] = [];
+    for (const m of text.matchAll(/<(button|Button)\b/gu)) {
+      const end = tagEnd(text, m.index);
+      const tag = text.slice(m.index, end);
+      if (tag.endsWith('/>')) continue;
+      const close = text.indexOf(`</${m[1]}>`, end);
+      if (close < 0) continue;
+      const inside = text.slice(end, close);
+      /* ONLY A GLYPH: the content is icons and space, with nothing a person reads. */
+      const words = inside.replaceAll(/<(Icon|AgentMark|svg)\b[\s\S]*?(\/>|<\/svg>)/gu, '').replaceAll(/\s+/gu, '');
+      if (words !== '' || !/<(Icon|AgentMark|svg)\b/u.test(inside)) continue;
+      glyphs++;
+      if (/\btitle=/u.test(tag) && !/\baria-label(ledby)?=/u.test(tag)) out.push(`${at(file)}:${lineOf(text, m.index)}`);
+    }
+    return out;
+  });
+  assert.ok(glyphs > 20, `the walk found ${glyphs} buttons that show only a glyph, so it is not reading the markup`);
+  assert.deepEqual(found, [], `name the button with aria-label (a title is a tooltip): ${found.join(', ')}`);
+});
