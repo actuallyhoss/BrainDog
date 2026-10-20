@@ -299,15 +299,14 @@
   /* A SHARE BEING CHANGED KEEPS ITS TARGET, so no chip offers to write another. */
   const chips = $derived(held.kind === 'held' ? [] : chipsFor(offersOf(held)));
   const title = $derived(change ? copy.shareSheetChange : copy.shareSheetTitle(held.name));
-  /* EVERY LIST, for a share of the record from the Sharing page: everything, or one list. */
-  const everyList = $derived(
-    held.kind === 'record'
-      ? Object.entries(decls)
-          .filter(([, d]) => d !== undefined)
-          .map(([id, d]) => ({ id, name: d?.name ?? id }))
-          .sort((a, b) => a.name.localeCompare(b.name))
-      : [],
-  );
+  /* EVERY LIST, for a share of the record from the Sharing page: everything, or one list. The rail's lists, which the
+     shell always holds, with any declaration the tab has read beside them. */
+  const everyList = $derived.by(() => {
+    if (held.kind !== 'record') return [];
+    const names = new Map<string, string>((shell.lists ?? []).map((l) => [l.id, l.name]));
+    for (const [id, d] of Object.entries(decls)) if (d !== undefined && !names.has(id)) names.set(id, d.name);
+    return [...names].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
 </script>
 
 {#if allowed}
