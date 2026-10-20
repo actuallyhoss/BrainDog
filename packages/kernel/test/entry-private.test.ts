@@ -33,7 +33,7 @@ test('A PRIVATE ROW READS AS ABSENT TO A COLLEAGUE AND PRESENT TO ITS MAKER, THR
   const seenBy = (ctx: { principal: { kind: string; id: string } }) => {
     const out = k.list({ register: 'jotter' }, k.scope(ctx, 'jotter'));
     assert.ok(out.ok);
-    return (out as { value: { rows: { fields: { what: string } }[] } }).value.rows.map((r) => r.fields.what).sort();
+    return (out as unknown as { value: { rows: { fields: { what: string } }[] } }).value.rows.map((r) => r.fields.what).sort();
   };
   assert.deepEqual(seenBy(person('p_bo')), ['Ada open']);
   assert.deepEqual(seenBy(person('p_ada')), ['Ada hidden', 'Ada open']);
