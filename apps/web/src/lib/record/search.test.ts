@@ -219,11 +219,11 @@ test('`/search` is a destination the palette teaches', () => {
 });
 
 test('the count is styled on every screen, not only on a phone', () => {
-  /* The rule was written INSIDE `@media (pointer: coarse), (width < 640px)`, so on a desktop the
-     number rendered at `--t-ui` and lost `tabular-nums` — the one property a figure that changes on
-     every keystroke needs, because proportional digits make it twitch. */
+  /* The rule was written INSIDE the phone's media block, so on a desktop it fell back to the
+     default. The count is now said and not shown (2.A.15), and the rule that hides it from the eye
+     has to hold on every screen or a desktop prints it in the field. */
   const at = PALETTE.indexOf('.p-count {');
-  const media = PALETTE.indexOf('@media (pointer: coarse)');
+  const media = PALETTE.indexOf('@media (width < 640px)');
   assert.ok(at > 0 && media > 0, 'the palette lost one of the two');
   assert.ok(at < media, '`.p-count` is inside the phone media block again');
 });

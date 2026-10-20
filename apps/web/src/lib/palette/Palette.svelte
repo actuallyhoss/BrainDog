@@ -1,14 +1,17 @@
 <!--
   The palette: the ask field, opened, reaching OBJECTS and not only the screens they live on.
 
-  IT GROWS OUT OF THE FIELD IT WAS ASKED FROM, AND THE WHOLE SCREEN BELOW 640PX. It was a panel
-  two thirds of the width, pinned to the inline end, and then a 640px box centred 12vh down, which
-  opened somewhere other than where the person had just clicked or was looking. Now the rail's or the
-  top bar's ask field (`data-palette-from="bar"`) is the field: it widens in place to 640 and the
-  results drop down under it as one surface, so what was pressed is what is typed into. With no field
-  on screen it hangs from the top of the screen, full width; on a phone the field is in the top bar and
-  the results fill what is left. Each result is a glyph, a title and one line saying where it sits
-  (`Result.svelte`), so the width a result needs is the width of its title and not of a row of columns.
+  A CENTRED MODAL FROM 640PX, AND THE WHOLE SCREEN BELOW IT (frame F6, 2.A.15). It grew out of the top bar's field
+  and dropped over the nav with no scrim, so Agents was cut to "A" and the page stayed at full strength behind it. Now
+  the bar's field is only the trigger: the palette is 640 wide (the screen less 16 a side), 96 from the top, at most
+  560 tall, a tile with one strong hairline and radius 16, over the scrim, and solid: no glass, no shadow. It fades in
+  from .98 of its size over `--d-panel` and fades out over `--d-panel-out`; focus goes to the field and back to the
+  trigger. On a phone it is the screen, the field a 44px well in a 56px bar with Cancel at its end. Each result is a
+  glyph in a 28px well, a title and one line saying where it sits (`Result.svelte`).
+
+  WITH NOTHING TYPED IT IS TWO SHORT GROUPS, "Go to" (the five places and Settings) and "Recent" (the last five rows
+  changed): it opened on a wall of fifteen figures. A group shows six rows and then "Show all 13". A figure is drawn
+  only when the query matches it, and its reading is written whole, the way a tile writes it.
 
   AND THE OBJECTS COME FIRST IN IT. The groups used to be ranked commands, destinations, pages,
   figures, decisions, with everything the record answered with underneath all of them, so typing
@@ -31,9 +34,8 @@
   at desktop width: its binding, read from the keymap registry so it cannot drift from what is bound,
   and `↵`. The `?` sheet is where the whole map lives.
 
-  GLASS, THE STRONG ONE: 640 wide, level 2, the field's own height and radius on top and `--r-lg`
-  under the results, and the results grouped under meta headings. Slash's answers are drawn in the same surface, under the same
-  headings, rather than in a second panel.
+  The results are grouped under meta headings. Slash's answers are drawn in the same surface, under the same headings,
+  rather than in a second panel.
 
   Prefixes work in EVERY mode: `>` commands, `#` rows, `@` people, `/` pages and registers, none is
   everything ranked. GitHub's palette has one grammar per mode and a second opener that fast-paths
@@ -51,7 +53,8 @@
   import { apiBase, at } from '../at.ts';
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
-  import { since } from 'braindog-render';
+  import { moneyWhole, readable, readFigure, since } from 'braindog-render';
+  import { homeCurrency } from '../record/api.ts';
   import { copy } from '../copy.ts';
   import { terms, tokensOf } from '../record/find.ts';
   import { BINDINGS, overlays } from '../a11y/keys.svelte.ts';
@@ -90,7 +93,16 @@
   import DecisionCard from '$lib/decide/DecisionCard.svelte';
   import type { About, Reading, SlashStatus } from '@braindog/client';
 
-  let { open = $bindable(false), nav }: { open?: boolean; nav: NavEntry[] } = $props();
+  let {
+    open = $bindable(false),
+    nav,
+    places: goPlaces = [],
+  }: {
+    open?: boolean;
+    nav: NavEntry[];
+    /** Where "Go to" leads with nothing typed: the five places the bar draws, and Settings. */
+    places?: readonly { key: string; href: string; label: string; icon: string }[];
+  } = $props();
 
   type Row = {
     id: string;
@@ -130,6 +142,10 @@
     paging?: Paging | undefined;
     /** Set on the row a plain line makes (EXP-D13), which is ranked after every match. */
     plain?: true | undefined;
+    /** How many rows of one title this line stands for, past the first. */
+    folded?: number | undefined;
+    /** The group a "Show all" row opens. */
+    more?: string | undefined;
   };
 
   let el = $state<HTMLDialogElement>();
@@ -404,9 +420,17 @@
    * writes and this build stores nothing at all about where a person has been. A heading promising
    * the second and delivering the first is one somebody would notice within a day.
    */
+  /** The phone's way out of the whole-screen palette, said as a word (2.A.15). */
+  const words = { cancel: 'Cancel' } as const;
   const FIGURES = 'Figures';
   const OPEN_QUESTION = 'Open question';
-  const RECENT = 'Recently changed';
+  const RECENT = 'Recent';
+  /* THE PLACES WITH NOTHING TYPED, under the destinations' own heading, so one heading never means two groups. */
+  const GO_TO = copy.destinations;
+  const BEST = 'Best match';
+  /** The most rows a group shows before its "Show all" row (2.A.15). */
+  const GROUP_CAP = 6;
+  const showAll = (n: number): string => `Show all ${n.toLocaleString('en')}`;
 
   /**
    * WHAT ORDER THE GROUPS COME IN, and the commands used to be second in it.
@@ -441,6 +465,7 @@
     [createWords.group]: -1,
     /* AND THE CUSTOMISE ROWS WITH IT, for the same reason: "dark" or "hide inbox" is a thing to do, typed out. */
     [copy.customise.group]: -1,
+    [BEST]: -0.5,
     [copy.records]: 0,
     /* WHAT THE NAME IS, OVER THE LISTS THAT HOLD THE WORD: the one thing meant comes before every row that mentions it. */
     [aboutWords.group]: 0.5,
@@ -674,6 +699,12 @@
       return want.every((w) => has.some((tok) => tok.startsWith(w)));
     };
     const out: Row[] = [...about];
+    /* NOTHING TYPED IS TWO GROUPS: where to go, and what changed last. Commands, pages, lists, figures and questions
+       wait for a word. */
+    const blank = prefix === null && text.trim() === '';
+    if (blank)
+      for (const place of goPlaces)
+        out.push({ id: `g-${place.key}`, title: place.label, href: place.href, group: GO_TO, icon: place.icon as IconName, complete: place.label });
 
     // Exact spoken id first, always. It is the string a person heard out loud.
     // AND THE LINE UNDER IT SAID SO. `spoken id` is what this repository calls the convention among
@@ -686,7 +717,7 @@
 
     // Strict-prefix aliases outrank fuzzy matching. It is the only verified mechanism found that
     // keeps a growing action index from rotting (19 §7).
-    if (prefix === null || prefix === '>') {
+    if ((prefix === null && !blank) || prefix === '>') {
       /* THE FIFTH RULE IN A SURFACE SAID TO HAVE ONE. `19 §7`'s strict-prefix aliases outrank fuzzy
          matching, and that is about ORDER rather than about membership: `ranked()` in `admit.ts` scores each
          command against what was typed (the whole title, its start, every word's start, then an alias) and
@@ -739,7 +770,7 @@
       if (pageFound) out.push(pageFound);
     }
 
-    if (prefix === null || prefix === '/') {
+    if ((prefix === null && !blank) || prefix === '/') {
       /* EVERY ROW WEARS ITS OWN GLYPH. The commands each carried a real one and then every other row
          in the palette fell back to the same arrow, which is the one surface where a person is
          scanning a mixed list at speed and the glyph is the only thing separating a page from a list
@@ -772,7 +803,7 @@
      * declaration this build cannot evaluate. Neither is greyed out, and neither prints the record's
      * missing-value dash on a surface somebody is scanning at speed.
      */
-    if ((prefix === null || prefix === '/') && isLive) {
+    if (((prefix === null && !blank) || prefix === '/') && isLive && text.trim() !== '') {
       for (const read of extra?.figures ?? [])
         if (starts(read.label) && read.href)
           out.push({ id: `m-${read.id}`, title: read.label, value: read.value, detail: read.note, tone: read.tone, href: read.href, group: FIGURES, icon: 'observe', complete: read.label });
@@ -817,7 +848,7 @@
      * Only with an empty query, because past that `search()` is already answering and a second
      * source for the same rows would draw each of them twice.
      */
-    if (prefix === null && text === '')
+    if (prefix === null && text === '' && !blank)
       for (const question of (isLive ? (shell.questions ?? []) : []).slice(0, OPEN_CAP))
         out.push({ id: `q-${question.id}`, title: question.title, detail: OPEN_QUESTION, href: `/decide/${question.id}`, group: copy.decide, icon: 'decide', complete: question.title });
 
@@ -975,16 +1006,55 @@
    */
   const overflow = $derived(rows.find((r) => r.id === 'all' || r.id === 'slash'));
 
+  /* THE GROUPS OPENED PAST THEIR SIX, for this query only. */
+  let opened = $state<ReadonlySet<string>>(new Set());
+  $effect(() => {
+    void q;
+    opened = new Set();
+  });
+
+  /** Rows that are a thing a person would name (a page, a list, a row, a person), never a command or a reading. */
+  const named = (r: Row): boolean =>
+    r.href !== null && r.group !== GO_TO && r.group !== RECENT && r.group !== FIGURES && r.group !== copy.commands && r.group !== copy.destinations && r.group !== '';
+
   const groups = $derived.by(() => {
     const out = new Map<string, Row[]>();
+    /* THE THING MEANT FIRST (motion F13): a page, a list, a project or a person whose name is exactly what was typed
+       comes before every row that only mentions it. "kiln" drew three ledger lines before the project. */
+    const needle = parsed.text.trim().toLowerCase();
+    const best = needle === '' ? new Set<string>() : new Set(rows.filter((r) => named(r) && r.title.trim().toLowerCase() === needle).slice(0, 3).map((r) => r.id));
     for (const r of rows) {
       if (r.id === 'all' || r.id === 'slash') continue;
-      if (!out.has(r.group)) out.set(r.group, []);
-      out.get(r.group)!.push(r);
+      const group = best.has(r.id) ? BEST : r.group;
+      if (!out.has(group)) out.set(group, []);
+      out.get(group)!.push(group === r.group ? r : { ...r, group });
+    }
+    /* IDENTICAL TITLES IN ONE GROUP ARE ONE LINE WITH A COUNT, which opens the search for that title: three
+       "KILN STOREFRONT PAYOUT" lines said nothing the one does not. Then each group shows six, and a row to show all. */
+    for (const [group, items] of out) {
+      const seen = new Map<string, Row>();
+      const folded: Row[] = [];
+      for (const r of items) {
+        const key = r.title.trim().toLowerCase();
+        const had = seen.get(key);
+        if (had && r.href !== null && had.href !== null && group !== GO_TO) {
+          had.folded = (had.folded ?? 1) + 1;
+          had.href = `/search?q=${encodeURIComponent(r.title)}`;
+          continue;
+        }
+        const own = { ...r };
+        seen.set(key, own);
+        folded.push(own);
+      }
+      if (folded.length > GROUP_CAP && !opened.has(group))
+        out.set(group, [...folded.slice(0, GROUP_CAP), { id: `more-${group}`, title: showAll(folded.length), href: null, group, more: group }]);
+      else out.set(group, folded);
     }
     /* Stable, so two groups of the same rank keep the order `search()` handed them over in. THE PLAIN LINE'S ROW
        GOES LAST whatever its heading's rank, since it is offered for any line and outranks nothing typed. */
-    const at = ([group, items]: [string, Row[]]): number => (items.every((r) => r.plain === true) ? Number.MAX_SAFE_INTEGER : rankOf(group));
+    const blank = parsed.prefix === null && parsed.text.trim() === '';
+    const at = ([group, items]: [string, Row[]]): number =>
+      items.every((r) => r.plain === true) ? Number.MAX_SAFE_INTEGER : blank && group === GO_TO ? -2 : rankOf(group);
     return [...out].sort((a, b) => at(a) - at(b));
   });
 
@@ -998,6 +1068,19 @@
    * would be the second list that rule exists to prevent, and it is the list that goes stale first,
    * because a row is edited far more often than a binding.
    */
+  /* A FIGURE'S READING AS A TILE WRITES IT, whole and in the record's currency without its code: "£8,160", never
+     "GBP 8,160.00". Anything that is not one stored amount is left as it came. */
+  const figureOf = (value: string | undefined): string | undefined => {
+    if (value === undefined) return undefined;
+    const f = readFigure(value.trim());
+    return (f && moneyWhole(f.minor, f.currency, homeCurrency())?.text) ?? value;
+  };
+
+  /* THE SECOND LINE TELLS ROWS APART, AND NEVER SAYS THE GROUP AGAIN: "Ledger" under the heading Ledger, or "Work
+     page" on every page, is a kind label the heading already gave. A status is said as a word instead (`Result`). */
+  const lineOf = (row: Row): string | undefined =>
+    row.detail && row.detail !== row.group && !/ page$/u.test(row.detail) && row.tone !== 'bad' && row.tone !== 'warn' ? row.detail : undefined;
+
   const keyFor = (id: string | undefined): string | undefined => (id === undefined ? undefined : BINDINGS.find((b) => b.id === id)?.key);
 
   /**
@@ -1046,79 +1129,9 @@
     document.getElementById(id)?.scrollIntoView({ block: 'nearest' });
   });
 
-  /**
-   * WHERE IT OPENS FROM: the ask field it was asked from, which it grows out of and shrinks back into.
-   *
-   * A FIELD SAYS SO ON ITSELF, `data-palette-from="bar"` (the rail's and the top bar's), and a small door like the
-   * phone's search button says `data-palette-from` with no value. The one pressed is the focused one where the
-   * browser focuses a pressed button; past that, and for `/` or `⌘K` pressed anywhere, it is the field on screen.
-   *
-   * WRITTEN STRAIGHT ONTO THE DIALOG, not through the template, because `@starting-style` reads them on the frame
-   * `showModal()` draws it, and a template's attribute lands on Svelte's next flush rather than before that frame.
-   * A field opens it in place (`bar`): the field's box, then 640 wide or the screen less its edges, growing toward the
-   * side of the screen with the room. Anything else hangs it from the top of the screen at full width (`top`), opening
-   * out of the door when the door is in the top strip and dropping from the strip when it is not.
-   */
-  const FROM = '[data-palette-from]';
-  const PHONE = '(width < 640px)';
-  const WIDE = 640;
-  const EDGE = 16;
-  let from: HTMLElement | null = null;
-
-  const shown = (e: Element | null | undefined): DOMRect | null => {
-    if (!(e instanceof HTMLElement)) return null;
-    const r = e.getBoundingClientRect();
-    return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight ? r : null;
-  };
-
-  function pickFrom(): HTMLElement | null {
-    const pressed = document.activeElement?.closest<HTMLElement>(FROM) ?? null;
-    const all = [...document.querySelectorAll<HTMLElement>(FROM)];
-    return [pressed, ...all.filter((a) => a.dataset.paletteFrom === 'bar'), ...all].find((a) => shown(a) !== null) ?? null;
-  }
-
-  function place() {
-    if (!el) return;
-    const r = shown(from);
-    const vw = document.documentElement.clientWidth;
-    const s = from && r ? getComputedStyle(from) : null;
-    if (r && s && from?.dataset.paletteFrom === 'bar' && !matchMedia(PHONE).matches) {
-      /* IN THE LINE'S OWN DIRECTION, as `inset-inline-start` reads it. */
-      const x0 = getComputedStyle(document.documentElement).direction === 'rtl' ? vw - r.right : r.left;
-      const w = Math.max(r.width, Math.min(WIDE, vw - 2 * EDGE));
-      const grown = x0 + r.width / 2 > vw / 2 ? x0 + r.width - w : x0;
-      const x = Math.max(Math.min(grown, vw - EDGE - w), Math.min(x0, EDGE));
-      const radius = s.borderStartStartRadius;
-      const clip = `inset(0 0 calc(100% - ${r.height}px) 0 round ${radius})`;
-      el.dataset.from = 'bar';
-      el.setAttribute(
-        'style',
-        `--bar-x: ${x0}px; --bar-y: ${r.top}px; --bar-w: ${r.width}px; --bar-h: ${r.height}px; --bar-r: ${radius}; --bar-pad: ${s.paddingInlineStart}; --bar-text: ${s.fontSize}; --to-x: ${x}px; --to-w: ${w}px; --from-clip: ${clip};`,
-      );
-      return;
-    }
-    const door = r && s && r.bottom <= 120 ? `inset(${r.top}px ${vw - r.right}px calc(100% - ${r.bottom}px) ${r.left}px round ${s.borderStartStartRadius})` : null;
-    el.dataset.from = 'top';
-    el.setAttribute('style', `--from-clip: ${door ?? 'inset(0 0 calc(100% - var(--sticky)) 0)'};`);
-  }
-
-  /* AND IT FOLLOWS THE FIELD while it is open, so a window resized or a page scrolled under it keeps the two as one. */
-  $effect(() => {
-    if (!open) return;
-    const again = () => place();
-    addEventListener('resize', again);
-    addEventListener('scroll', again, { capture: true, passive: true });
-    return () => {
-      removeEventListener('resize', again);
-      removeEventListener('scroll', again, { capture: true });
-    };
-  });
-
   $effect(() => {
     if (!el) return;
     if (open && !el.open) {
-      from = pickFrom();
-      place();
       el.showModal();
       overlays.open();
       /* WHAT TODAY'S ASK BAR HANDED OVER, taken once and cleared, so the next open starts empty as it always has. */
@@ -1134,8 +1147,6 @@
       if (slashHere) warm();
       queueMicrotask(() => input?.focus());
     } else if (!open && el.open) {
-      /* MEASURED AGAIN, so it shrinks back into the field where the field is now. */
-      place();
       el.close();
       overlays.close();
     }
@@ -1156,6 +1167,13 @@
 
   function run(row: Row | undefined) {
     if (!row) return;
+    /* "SHOW ALL" OPENS ITS GROUP IN PLACE, and the cursor stays on the first row it brought. */
+    if (row.more !== undefined) {
+      const index = flat.indexOf(row);
+      opened = new Set([...opened, row.more]);
+      cursor = Math.max(0, index);
+      return void input?.focus();
+    }
     /* SLASH'S ROW ANSWERS IN THE PANEL, so it is the one row that leaves it open. */
     if (row.ask !== undefined) return askSlash(row.ask);
     /* A RENAME WITH NO NEW NAME YET WRITES THE SENTENCE INTO THE BOX, and the palette stays open for its last word. */
@@ -1336,6 +1354,7 @@
 
 <dialog bind:this={el} class="palette" onclick={onbackdrop} oncancel={(e) => (e.preventDefault(), slashShown ? (slash = null) : (open = false))} onclose={() => (open = false)}>
   <div class="p-head">
+    <span class="p-field">
     <Icon name="search" size="m" />
     <input
       bind:this={input}
@@ -1353,6 +1372,7 @@
       spellcheck="false"
       autocomplete="off"
     />
+    </span>
     <!--
       A WAY OUT A THUMB CAN REACH.
 
@@ -1370,9 +1390,7 @@
          can see the list still benefits from knowing twelve of forty-eight are on screen, and a
          reader who cannot has nothing else to tell them the list changed. -->
     <p class="p-count" role="status">{announced}</p>
-    <button type="button" class="p-close tap" onclick={() => (open = false)} aria-label={copy.close}>
-      <Icon name="close" size="m" />
-    </button>
+    <button type="button" class="p-close tap" onclick={() => (open = false)}>{words.cancel}</button>
   </div>
   <!-- WHAT THE PLAIN LINE WAS READ AS (EXP-D13): a chip for each, under the field, drawn only while the line makes a row. -->
   {#if plainMade && plainMade.chips.length > 0}
@@ -1510,7 +1528,7 @@
     onmouseenter={() => (cursor = index)}
     onclick={() => run(row)}
   >
-    <Result icon={row.icon} title={row.title} line={row.detail} value={row.value} tone={row.tone} />
+    <Result icon={row.more !== undefined ? undefined : row.icon} title={row.more !== undefined ? row.title : readable(row.title)} line={lineOf(row)} value={figureOf(row.value)} tone={row.tone} status={row.tone === 'bad' || row.tone === 'warn' ? row.detail : undefined} folded={row.folded} more={row.more !== undefined} />
     <!-- THE KEY CAP HINT, ON THE CURSOR ROW ONLY (the design system: "the cursor row is wash plus a key cap hint"): the row's own
          binding when it has one, so the slow path teaches the fast one, and `↵`, which is what runs it now. Drawn only at
          desktop width with a fine pointer (the style block says when), and `aria-hidden` so no key is read out as part of
@@ -1520,178 +1538,149 @@
 {/snippet}
 
 <style>
-  /* THE BUTTON IS FOR A THUMB, and a fine pointer on a wide screen has Esc and the page around
-     the field, so it is drawn only where neither is to hand. */
+  /* THE WAY OUT ON A PHONE, a word at the end of the field (the rule below 640px draws it): with a fine pointer on a wide
+     screen there is Esc and the scrim around the palette. */
   .p-close {
     display: none;
   }
 
-  /* THE COUNT IS THE SAME COUNT ON EVERY SCREEN, and this rule was once written INSIDE the phone's
-     media block, so on a desktop the number lost its size and its tabular figures, which is the one
-     property a count that changes on every keystroke needs: proportional digits make it twitch. */
+  /* THE COUNT IS SAID AND NOT SHOWN (2.A.15, "no count in the field"): a screen reader hears how many matched, and the
+     eye has the list itself. */
   .p-count {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    clip-path: inset(50%);
     white-space: nowrap;
   }
 
-  @media (pointer: coarse), (width < 640px) {
-    .p-close {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: none;
-      inline-size: var(--ctl-h);
-      block-size: var(--ctl-h);
-      padding: 0;
-      border: 0;
-      border-radius: var(--r-pill);
-      background: var(--hover-wash);
-      color: var(--ink2);
-      cursor: pointer;
-    }
-  }
-
   /**
-   * OUT OF THE FIELD, NOT IN THE MIDDLE OF THE SCREEN, and the whole screen below 640px.
+   * A CENTRED MODAL, OVER THE SCRIM (frame F6): 640 wide or the screen less 16 a side, 96 from the top, at most 560 tall
+   * and the list scrolls inside past that. A tile's surface, one strong hairline, radius 16, and solid: no glass, no
+   * shadow. Its height is its content's.
    *
-   * THE FALLBACK FIRST (`top`): with no ask field on screen it hangs from the top of the screen at full width, its
-   * results under the field and its lower corners `--r-lg`. A FIELD (`bar`) puts it where the field is: its top edge,
-   * height and radius are the field's, it is 640 wide, and the results drop down under it as one surface, so the
-   * field's lower corners are gone and the panel's top is the field's bottom. `place()` writes the numbers.
-   *
-   * GLASS, THE STRONG ONE, AT LEVEL 2: the palette opens over whatever the page holds, and legibility over
-   * busy content is what the strong glass is for. The hairline pair and `--e2`, the light shadow; no border.
-   * Its height is its content's, up to what leaves room under it, and past that the list scrolls inside.
+   * IN OVER `--d-panel` FROM .98 OF ITS SIZE, OUT OVER `--d-panel-out` AS A FADE, never laid out on the way. Under
+   * `prefers-reduced-motion` it fades only.
    *
    * THE EXPLICIT SIZES ARE NOT REDUNDANT: see `Sheet.svelte`. The UA stylesheet gives `<dialog>` a
    * `max-height: calc(100% - 6px - 2em)`, a matching `max-width` and an automatic margin on both
    * axes, and each of those would move or cut the dialog this places.
    */
   .palette {
-    /* ITS WAY IN, AND A STEP QUICKER ITS WAY OUT, as the panel's are. */
-    --palette-d: var(--d-panel);
-
     position: fixed;
-    inset-block: 0 auto;
+    inset-block-start: 96px;
     inset-inline: 0;
     z-index: var(--z-palette);
     display: flex;
     flex-direction: column;
-    inline-size: 100%;
-    max-inline-size: 100%;
+    box-sizing: border-box;
+    inline-size: min(640px, calc(100vw - 2 * var(--sp-4)));
+    max-inline-size: none;
     block-size: auto;
-    max-block-size: 76dvh;
-    margin: 0;
+    max-block-size: min(560px, calc(100dvh - 160px));
+    margin: 0 auto;
     padding: 0;
-    padding-block-start: env(safe-area-inset-top, 0px);
-    background: var(--glass-strong);
-    backdrop-filter: var(--glass-blur);
-    border: 0;
-    border-radius: 0;
-    border-end-start-radius: var(--r-lg);
-    border-end-end-radius: var(--r-lg);
+    background: var(--tile);
+    border: 1px solid color-mix(in srgb, var(--ink) 16%, var(--tile));
+    border-radius: var(--r-lg);
     color: var(--ink);
-    box-shadow: var(--glass-edge), var(--e2);
     overflow: hidden;
-    /* PAST ITS OWN EDGES, so the shadow is not cut: the clip is only there to be the field on the first frame. */
-    clip-path: inset(-64px);
+    opacity: 1;
+    scale: 1;
     transition:
-      inset-inline-start var(--palette-d) var(--ease-out),
-      inline-size var(--palette-d) var(--ease-out),
-      clip-path var(--palette-d) var(--ease-out),
-      opacity var(--palette-d) var(--ease-fade),
-      display var(--palette-d) allow-discrete,
-      overlay var(--palette-d) allow-discrete;
+      opacity var(--d-panel) var(--ease-out),
+      scale var(--d-panel) var(--ease-out),
+      display var(--d-panel) allow-discrete,
+      overlay var(--d-panel) allow-discrete;
   }
 
-  /* SAFARI'S GLASS, in a block of its own and reading the skin's one value, for the reason `Panel.svelte` gives: the
-     build folds a prefixed line beside the one above into it. The token reaches Safari too (`tokens.css`), so a reader
-     who asked for less transparency gets `none` here as everywhere (`a11y.css`). The phone's sheet below takes it away
-     again. */
-  @supports (-webkit-backdrop-filter: none) {
-    .palette {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  /* THE FIELD WIDENS AND THE RESULTS DROP. It is there on the frame the key is pressed, as the field it was, and grows
-     from it in `--d-panel`; closing runs it back into the field and lets the field show through. Under
-     `prefers-reduced-motion` `a11y.css` keeps only the fade, so it is simply open, and simply gone. A browser without
-     `@starting-style` opens it at once, which is what it did before. */
   .palette[open] {
     display: flex;
   }
 
   .palette:not([open]) {
-    --palette-d: var(--d-panel-out);
-
     display: none;
-    clip-path: var(--from-clip);
     opacity: 0;
+    transition:
+      opacity var(--d-panel-out) var(--ease-in),
+      display var(--d-panel-out) allow-discrete,
+      overlay var(--d-panel-out) allow-discrete;
   }
 
   @starting-style {
     .palette[open] {
-      clip-path: var(--from-clip);
+      opacity: 0;
+      scale: 0.98;
+    }
+  }
+
+  /* THE SCRIM, fading with it, so the page behind steps back and the palette is the one thing to read. */
+  .palette::backdrop {
+    background: var(--scrim);
+    opacity: 1;
+    transition:
+      opacity var(--d-panel) var(--ease-out),
+      display var(--d-panel) allow-discrete,
+      overlay var(--d-panel) allow-discrete;
+  }
+
+  .palette:not([open])::backdrop {
+    opacity: 0;
+    transition-duration: var(--d-panel-out);
+  }
+
+  @starting-style {
+    .palette[open]::backdrop {
       opacity: 0;
     }
+  }
 
-    .palette:global([data-from='bar'])[open] {
-      inset-inline-start: var(--bar-x);
-      inline-size: var(--bar-w);
+  @media (prefers-reduced-motion: reduce) {
+    .palette,
+    .palette:not([open]) {
+      scale: none;
+    }
+
+    @starting-style {
+      .palette[open] {
+        scale: none;
+      }
     }
   }
 
-  /* THE FIELD'S PLACE. The room under it is the screen's less where it sits, so the last row is never off the bottom.
-     `:global` ON THE ATTRIBUTE ONLY: `place()` writes it, so the template never shows it to Svelte, which would drop the
-     rule as unused. */
-  .palette:global([data-from='bar']) {
-    inset-block-start: var(--bar-y);
-    inset-inline: var(--to-x) auto;
-    inline-size: var(--to-w);
-    max-block-size: min(76dvh, calc(100dvh - var(--bar-y) - var(--sp-5)));
-    padding-block-start: 0;
-    border-start-start-radius: var(--bar-r);
-    border-start-end-radius: var(--bar-r);
-  }
-
-  .palette:global([data-from='bar']):not([open]) {
-    inset-inline-start: var(--bar-x);
-    inline-size: var(--bar-w);
-  }
-
-  /* NO DIM. The page stays as it was around the field; the backdrop is only there to catch the click that closes it. */
-  .palette::backdrop {
-    background: transparent;
-  }
-
-  /* THE 52PX FIELD: the glyph, the query, the count. The hairline under it is the one rule in the panel. */
+  /* THE FIELD: 56 tall, the glyph, the query. The hairline under it is the one rule in the panel. */
   .p-head {
     display: flex;
     align-items: center;
     gap: var(--sp-3);
-    min-block-size: calc(var(--sp-7) + var(--sp-1));
+    min-block-size: 56px;
     padding-block: 0;
-    padding-inline: calc(var(--sp-4) + var(--sp-1)) var(--sp-4);
+    padding-inline: var(--sp-4);
     border-block-end: 1px solid var(--line);
     color: var(--dim);
     transition: border-color var(--d-state) var(--ease-out);
   }
 
   /* The state change the input gave up. It is the row that looks like a field, so it is the row
-     that says it is live, and it says it the way every focused field in the product does: its edge
-     darkens toward the ink. Never the accent, which under the query read as a validation error
-     before anything had been typed. */
+     that says it is live: its edge darkens toward the ink. Never the accent, which under the query
+     read as a validation error before anything had been typed. */
   .p-head:focus-within {
     border-block-end-color: var(--ink2);
     color: var(--ink2);
   }
 
-  /* A FULL-HEIGHT TARGET, and it was 262x28 on a phone: the palette's only text field, on the surface `19 §4` makes the
-     primary way to reach a row. */
+  /* THE GLYPH AND THE QUERY, one piece: on a phone it is the well the query is typed into. */
+  .p-field {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  /* A FULL-HEIGHT TARGET: the palette's only text field, on the surface `19 §4` makes the primary way to reach a row. */
   .p-input {
     flex: 1;
     min-block-size: var(--ctl-h);
@@ -1700,18 +1689,11 @@
     border-radius: var(--r-sm);
     background: none;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-head);
   }
 
-  /* A 2px ring plus a 4px halo drawn around a transparent, borderless input inside an already-modal
-     dialog is a box floating in the middle of the panel around nothing: it frames the text,
-     not a control, because there is no control there to frame. The blinking caret is the platform's
-     own focus indicator for a text field and is what every command palette relies on; this panel
-     opens with focus here and traps it, so there is nowhere else for focus to have gone.
-
-     The ring is not simply deleted, though. It moves to `.p-head`, which is the thing that actually
-     looks like a field, as a border tint rather than an outline, so there is still a visible change
-     of state, it just belongs to the right box. */
+  /* The caret is the platform's own focus indicator for a text field, and the panel opens with focus
+     here and traps it; the state change belongs to `.p-head`, the thing that looks like a field. */
   .p-input:focus-visible {
     /* focus-ok: the caret indicates focus here, and `.p-head:focus-within` above carries the state
        change for the field the reader actually sees. */
@@ -1721,19 +1703,6 @@
 
   .p-input::placeholder {
     color: var(--dim);
-  }
-
-  /* OPENED FROM A FIELD, THE HEAD IS THAT FIELD: its height, its inset before the glyph and its text size, so the glyph
-     does not jump and the words start where the field's did. */
-  .palette:global([data-from='bar']) .p-head {
-    gap: var(--sp-2);
-    min-block-size: var(--bar-h);
-    padding-inline-start: var(--bar-pad);
-  }
-
-  .palette:global([data-from='bar']) .p-input {
-    min-block-size: 0;
-    font-size: var(--bar-text);
   }
 
   /* THE CHIPS A PLAIN LINE WAS READ INTO: rectangles at the control radius, flat on the board's sunk colour. */
@@ -1786,8 +1755,8 @@
     margin: 0;
     padding: var(--sp-3) var(--sp-2) var(--sp-1);
     color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
   }
 
   /* A ROW'S HEIGHT, 44, WITH A FINE POINTER OR A COARSE ONE, AND 56px ON A PHONE, where a result is two lines
@@ -1799,10 +1768,10 @@
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: max(var(--row-h), var(--tap));
+    min-block-size: var(--tap);
     padding: var(--sp-1) var(--sp-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     background: none;
     color: var(--ink2);
     font: inherit;
@@ -1968,10 +1937,8 @@
   }
 
   /**
-   * ON A PHONE THE PALETTE IS THE SCREEN, with the field in a top bar `--sticky` tall, because a
-   * dialog floating over 390px would be a narrower screen inside the screen. It is a sheet there and
-   * not glass: the whole screen, on the tile's surface. It opens out of the head bar's search button
-   * (`PageHead.svelte`), across the bar and then down to the foot of the screen, as the field does above.
+   * ON A PHONE THE PALETTE IS THE SCREEN (2.A.15): a 56px bar holding the field as a 44px well, radius 12, and "Cancel"
+   * as a word at its end; the results fill what is left. No scrim to see and no hairline round it.
    *
    * EACH INSET IS PAID HERE, ONCE. The top one is under the bar, because the palette sits in the top
    * layer and nothing of the shell's padding reaches it; the bottom one and the keyboard (`--kb`,
@@ -1981,36 +1948,61 @@
   @media (width < 640px) {
     .palette {
       inset-block: 0;
-      inset-inline: 0;
       inline-size: 100%;
-      max-inline-size: 100%;
       block-size: 100dvh;
       max-block-size: 100dvh;
       padding-block-start: env(safe-area-inset-top, 0px);
-      background: var(--bg);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
+      border: 0;
       border-radius: 0;
-      box-shadow: none;
     }
 
     .p-head {
-      min-block-size: var(--sticky);
-      padding-inline: var(--sp-4) var(--sp-3);
+      gap: var(--sp-2);
+      min-block-size: 56px;
+      padding-inline: var(--sp-3) var(--sp-2);
+      border-block-end: 0;
     }
 
-    /* ONE EDGE DOWN THE SCREEN: the list's inset plus a row's own puts every glyph on the 16px gutter
-       the field's glyph sits on in the bar above. */
+    /* THE FIELD IS A WELL: the glyph and the query inside a 44px fill, radius 12. */
+    .p-field {
+      gap: var(--sp-2);
+      min-block-size: var(--tap);
+      padding-inline: var(--sp-3);
+      background: var(--field);
+      border-radius: var(--r-md);
+    }
+
+    .p-input {
+      min-block-size: var(--tap);
+      font-size: max(16px, var(--fs-body));
+    }
+
+    .p-close {
+      display: inline-flex;
+      align-items: center;
+      flex: none;
+      min-block-size: var(--tap);
+      padding: 0 var(--sp-2);
+      border: 0;
+      background: none;
+      color: var(--ink);
+      font: inherit;
+      font-size: var(--fs-body);
+      font-weight: var(--fw-medium);
+      cursor: pointer;
+    }
+
+    /* ONE EDGE DOWN THE SCREEN: the list's inset plus a row's own puts every glyph on the 16px gutter. */
     #palette-list {
       padding-inline: var(--sp-2);
       padding-block-end: calc(var(--kb) + env(safe-area-inset-bottom, 0px) + var(--sp-2));
     }
   }
 
-  /* UNDER FORCED COLOURS the glass and the shadow are gone, so the palette's edge is a border. */
+  /* UNDER FORCED COLOURS the palette's edge is the system's text colour. */
   @media (forced-colors: active) {
     .palette {
-      border: 1px solid CanvasText;
+      border-color: CanvasText;
     }
   }
 </style>

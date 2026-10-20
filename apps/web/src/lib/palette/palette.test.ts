@@ -455,16 +455,15 @@ test('a look row and its toast say where the change is kept: this record, this d
     assert.doesNotMatch(s ?? '', /\u2014/u, 'an em dash in a look line');
 });
 
-test("the palette's glass is given to Safari in a block of its own, and taken away again on a phone", () => {
+test("the palette is solid over a scrim, centred, with no glass anywhere (frame F6, 2.A.15)", () => {
   const code = readFileSync(new URL('./Palette.svelte', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
-  const glass = code.match(/(?<!-webkit-)backdrop-filter:\s*var\(--glass-blur\)/gu)?.length ?? 0;
-  /* SAFARI'S BLOCK READS THE SKIN'S ONE VALUE, never a blur in so many words that no token (and no ask for less
-     transparency) can reach. */
-  const safari = code.match(/@supports \(-webkit-backdrop-filter: none\)\s*\{\s*\.palette\s*\{\s*-webkit-backdrop-filter: var\(--glass-blur\);/gu)?.length ?? 0;
-  assert.doesNotMatch(code, /-webkit-backdrop-filter: blur\(/u, 'a blur literal no token reaches');
-  assert.ok(glass > 0, 'the palette has no glass to check');
-  assert.ok(safari >= glass, `${glass} glass rules and ${safari} Safari blocks`);
-  /* THE PHONE'S SHEET IS SOLID, so Safari's own property is taken off there too. */
-  const phone = code.slice(code.indexOf('@media (width < 640px)'));
-  assert.match(phone, /-webkit-backdrop-filter: none;/u);
+  const style = code.slice(code.indexOf('<style>'));
+  /* NO GLASS: not the skin's blur, not Safari's, not a literal. */
+  assert.doesNotMatch(style, /backdrop-filter/u, 'the palette still blurs what is behind it');
+  assert.doesNotMatch(style, /--glass/u, 'the palette still reads a glass token');
+  /* THE SCRIM UNDER IT, and no shadow on it: separation is the scrim and one hairline. */
+  assert.match(style, /\.palette::backdrop \{[^}]*background: var\(--scrim\);/u);
+  assert.doesNotMatch(style, /box-shadow: var\(--e\d\)/u);
+  /* CENTRED, 640 WIDE OR THE SCREEN LESS 16 A SIDE, 96 FROM THE TOP. */
+  assert.match(style, /\.palette \{[^}]*inset-block-start: 96px;[^}]*inline-size: min\(640px, calc\(100vw - 2 \* var\(--sp-4\)\)\);[^}]*margin: 0 auto;/u);
 });
