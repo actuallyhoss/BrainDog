@@ -25,9 +25,13 @@ export const questionAlert = (w: { id: string; question?: string | undefined }):
   goto: '/app/decide',
 });
 
-/** A handoff line from the record's recent events, sent to Agents. Anything else is not one. */
-export function handoffAlert(e: { id: string; kind: string; actor?: string; title?: string | null; note?: string | null }): Alert | null {
-  if (e.kind !== 'handoff') return null;
+/**
+ * A handoff line from the record's recent events, sent to Agents. The record writes no event kind of its own for it:
+ * a run that hands off is a `state` event whose new value is `handoff` (`packages/kernel/src/handoff.ts`). Anything
+ * else is not one.
+ */
+export function handoffAlert(e: { id: string; kind: string; to?: unknown; actor?: string; title?: string | null; note?: string | null }): Alert | null {
+  if (e.kind !== 'state' || e.to !== 'handoff') return null;
   return {
     id: `h:${e.id}`,
     title: 'Handed off',
