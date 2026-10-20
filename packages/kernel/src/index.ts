@@ -375,6 +375,9 @@ export { FORMAT_VERSION, KERNEL_MIGRATION, MIGRATIONS, canon, checksum, statemen
 export { checkBrainl, keyIdOf, b64url, manifestBytes, signBrainl, type Signature, type Signer } from './brainl.ts';
 export { SHAPE_MARK, Scrambler, isShape, shapeBrainl, type Published, type ShapeOptions } from './shape.ts';
 export { SLASH, SLASH_KINDS, slashMayWrite } from './slash.ts';
+
+/** The `field` of the line `setPrivate` writes on a row, kept private or shared again (leak matrix N1). */
+export const PRIVATE_NOTE = 'private';
 export { DRAFT_FIELD, cleanName, firstProjectFields, firstProjectName } from './first-project.ts';
 export { KERNEL_WRITTEN, REVIVED, RUN_FACTS, TITLE_MAX, agentOf, clipTitle, isHelper, leftFreshStep, provisionalTitle, runAge, sessionDeclaration } from './session.ts';
 /* A FIELD WORKED OUT FROM OTHER FIELDS (SHL-B18): its shapes and refusals, and the rows filled at read. `shapeOf` is the
@@ -2037,6 +2040,45 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return scopeFor(ctx.wheres, register, viewer, anyHiddenFrom(viewer, register));
   };
 
+  /**
+   * The clause a row of one list meets to be admitted under a grant (`wheres`) for a viewer, or `null` when every row is:
+   * `scope`'s rule compiled once, so a reader that writes its own SQL (`inScope`, `backlinks`, a search's count) leaves
+   * out what `list` leaves out. A rule that cannot be read admits nothing, as `narrowed` holds it for `list`.
+   * Its bare column names resolve to the innermost `entry` of the statement it is put in.
+   */
+  const admitClause = (register: string, grant: Readonly<Wheres> | undefined, viewer: string | undefined): { sql: string; params: (string | number)[] } | null => {
+    const rule = scopeFor(grant, register, viewer, anyHiddenFrom(viewer, register));
+    if (rule === undefined) return null;
+    if (!registers.has(register)) return { sql: '0', params: [] };
+    const c = ruleOf(rule, schemaOf(register), evalContext());
+    return c.bad.length ? { sql: '0', params: [] } : { sql: c.sql, params: c.params as (string | number)[] };
+  };
+
+  /** How many ids `admittedIds` asks about in one statement: the walk's own batch (sharing plan §2.13). */
+  const ADMIT_BATCH = 500;
+
+  /**
+   * Which of these rows of one list a grant admits for a viewer (sharing plan §2.5 item 3): one statement per 500 ids,
+   * in place of one `list` per row. A deleted row is still admitted when its rule admits it, as `get` with
+   * `includeDeleted` reads it; an id that is not a row of the list is never admitted.
+   */
+  const admittedIds = (register: string, ids: readonly string[], grant: Readonly<Wheres> | undefined, viewer: string | undefined): Set<string> => {
+    const out = new Set<string>();
+    if (ids.length === 0) return out;
+    const c = admitClause(register, grant, viewer);
+    for (let at = 0; at < ids.length; at += ADMIT_BATCH) {
+      const some = JSON.stringify(ids.slice(at, at + ADMIT_BATCH));
+      const rows = sql.all<{ id: string }>(
+        `SELECT id FROM entry WHERE register = ? AND id IN (SELECT value FROM json_each(?))${c === null ? '' : ` AND (${c.sql})`}`,
+        register,
+        some,
+        ...(c === null ? [] : c.params),
+      );
+      for (const r of rows) out.add(r.id);
+    }
+    return out;
+  };
+
   /** Which of these rows are private, by id, so a list can mark them: a lock beside a row its viewer kept to themselves. */
   const privateAmong = (ids: readonly string[]): Set<string> =>
     ids.length === 0 ? new Set() : new Set(sql.all<{ entry_id: string }>('SELECT entry_id FROM entry_private WHERE entry_id IN (SELECT value FROM json_each(?))', JSON.stringify(ids)).map((r) => r.entry_id));
@@ -2099,7 +2141,20 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     return transaction(() => {
       if (on) sql.exec('INSERT OR REPLACE INTO entry_private (entry_id, person_id) VALUES (?, ?)', row.id, actor);
       else sql.exec('DELETE FROM entry_private WHERE entry_id = ?', row.id);
-      noteEvent(sql, mint, clock.now(), actor, `${on ? 'Kept private' : 'Shared again'}: ${row.register}#${row.seq ?? row.id}`);
+      /* THE LINE IS ABOUT THE ROW, `entry:<id>` (leak matrix N1). Written with no target it went to every whole-record
+         reader, so everybody's log, catch-up and version poll learnt that a private row was made, and its number. On the
+         row, it is shown to whoever is shown the row: its maker while it is private, everybody it reaches once shared.
+         `field` says it is this line, so a poll that trusts plain row writes (`versionFor`) does not trust it. */
+      slashMayWrite(actor, 'note');
+      sql.exec(
+        "INSERT INTO event (id, ts, actor, kind, target, target_kind, field, note) VALUES (?, ?, ?, 'note', ?, 'entry', ?, ?)",
+        mint(),
+        instant(clock.now()),
+        actor,
+        `entry:${row.id}`,
+        PRIVATE_NOTE,
+        `${on ? 'Kept private' : 'Shared again'}: ${row.register}#${row.seq ?? row.id}`,
+      );
       return ok({ id: row.id, private: on });
     });
   }
@@ -3856,6 +3911,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     cursor?: string | null;
     /** Who is asking, so rows kept private to somebody else are neither the row asked about nor one that points at it. */
     viewer?: string | undefined;
+    /** The caller's grant (`wheres`): a row its rule leaves out is neither the row asked about nor one that points at it. */
+    grant?: Readonly<Wheres> | undefined;
   }): Result<Backlinks> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
@@ -3870,7 +3927,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        is worse than an empty answer. */
     /* A PRIVATE ROW READS AS ABSENT, as `get` answers it. */
     if (!row) return ok({ to, from: [], cursor: null });
-    if (hiddenFrom(row.id, q.viewer)) return ok({ to: { register: q.register, seq: null, id: null }, from: [], cursor: null });
+    /* AND A ROW THE CALLER'S RULE LEAVES OUT IS ANSWERED AS ONE THAT IS NOT THERE (leak matrix G3): it answered its id. */
+    if (!admittedIds(q.register, [row.id], q.grant, q.viewer).has(row.id)) return ok({ to: { register: q.register, seq: null, id: null }, from: [], cursor: null });
 
     const parts = typeof q.cursor === 'string' && q.cursor !== '' ? q.cursor.split('|') : null;
     if (parts !== null && (parts.length !== 3 || !/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/.test(parts[0] ?? '')))
@@ -3903,8 +3961,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const resuming = at !== null;
       at = null;
 
-      const where = `register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${pair.field}') = ? AND id <> ?${q.viewer === undefined ? '' : ' AND id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)'}`;
-      const who = q.viewer === undefined ? [] : [q.viewer];
+      /* THE POINTING ROWS UNDER THE SAME GRANT AND THE SAME PRIVATE ROWS, list by list, as `list` would read each. */
+      const admit = admitClause(pair.register, q.grant, q.viewer);
+      const where = `register = ? AND deleted_at IS NULL AND json_extract(fields, '$.${pair.field}') = ? AND id <> ?${admit === null ? '' : ` AND (${admit.sql})`}`;
+      const who = admit === null ? [] : admit.params;
       /* ONE MORE THAN THERE IS ROOM FOR, which is how the walk learns there is a next page without
          asking a second question, and how a relation whose rows are all drawn still notices the next
          relation has some. */
@@ -3967,7 +4027,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   function inScope(
     register: string,
     project: string | null,
-    opts: { limit?: number; open?: boolean } = {},
+    opts: { limit?: number; open?: boolean; grant?: Readonly<Wheres> | undefined; viewer?: string | undefined } = {},
   ): Result<{ rows: Entry[]; inherited: Entry[] }> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
@@ -3983,14 +4043,18 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const at = `'$.${f.id}'`;
     const done = decl.done ?? [];
     const open = opts.open && done.length ? ` AND coalesce(e.state, '') NOT IN (${done.map(() => '?').join(', ')})` : '';
+    /* AND HELD TO THE CALLER'S GRANT AND THE ROWS KEPT PRIVATE FROM THEM (leak matrix G2), as `list` holds a read: the
+       brief read every row here, so an agent was told of other people's private rows and of rows outside its rule. */
+    const admit = admitClause(register, opts.grant, opts.viewer);
     const read = (where: string, ...params: string[]): Entry[] =>
       sql
         .all<Record<string, unknown>>(
-          `SELECT ${COLUMNS} FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND ${where}${open}
+          `SELECT ${COLUMNS} FROM entry e WHERE e.register = ? AND e.deleted_at IS NULL AND ${where}${open}${admit === null ? '' : ` AND (${admit.sql})`}
            ORDER BY e.updated_at DESC, e.id DESC LIMIT ?`,
           register,
           ...params,
           ...(open ? done : []),
+          ...(admit === null ? [] : admit.params),
           limit,
         )
         .map(hydrate);
@@ -7295,10 +7359,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
       const c = compile(said.predicate, schema);
       if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
+      /* AND NOT THE ROWS KEPT PRIVATE FROM THE PAGE'S READER (leak matrix N2), which the table under the chips leaves out
+         through `list`: a chip counted them, so a strip over Kiln said one more in Review than the block drew. */
+      const kept = admitClause(q.register, undefined, viewer);
       const rows = sql.all<{ value: Json; n: number }>(
-        `SELECT ${fieldSqlIn(schema, q.field)} AS value, COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql}) GROUP BY 1`,
+        `SELECT ${fieldSqlIn(schema, q.field)} AS value, COUNT(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})${kept === null ? '' : ` AND (${kept.sql})`} GROUP BY 1`,
         q.register,
         ...c.params,
+        ...(kept === null ? [] : kept.params),
       );
       return ok(rows);
     },
@@ -7316,7 +7384,14 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const on = q.dated === null || q.value === null ? 'NULL' : `CASE WHEN ${amount} IS NULL THEN NULL ELSE substr(${fieldSqlIn(schema, q.dated)}, 1, 10) END`;
       const cols = [...by.map((e, n) => `${e} AS b${n}`), `${unit} AS unit`, `${on} AS day`, `COALESCE(SUM(${amount}), 0) AS sum`, `COUNT(*) AS n`, `COUNT(${amount}) AS said`];
       const group = Array.from({ length: by.length + 2 }, (_, n) => n + 1).join(', ');
-      const rows = sql.all<Record<string, unknown>>(`SELECT ${cols.join(', ')} FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql}) GROUP BY ${group}`, q.register, ...c.params);
+      /* THE SAME ROWS `list` READS FOR THE PAGE'S READER, so a sum is never over a row kept private from them. */
+      const kept = admitClause(q.register, undefined, viewer);
+      const rows = sql.all<Record<string, unknown>>(
+        `SELECT ${cols.join(', ')} FROM entry WHERE register = ? AND deleted_at IS NULL AND (${c.sql})${kept === null ? '' : ` AND (${kept.sql})`} GROUP BY ${group}`,
+        q.register,
+        ...c.params,
+        ...(kept === null ? [] : kept.params),
+      );
       /* A LABEL IS HANDED BACK AS THE ROW HOLDS IT, as the walk hands it: SQLite says a yes or no as 1 or 0 and a value
          of several parts (a list, an amount) as its JSON text, and a page would draw `1` and `["home"]` for them. */
       const held = q.by.map(({ field, day }) => (day ? null : (schema.fields[field]?.type ?? null)));
@@ -8684,8 +8759,18 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * functions for one query, so the record's own count of the searches that found nothing stays a count of
    * searches rather than of code paths.
    */
-  function searchMatched(q: string, opts: { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined } = {}): Searched {
-    const found = ftsSearchMatched(sql, q, opts);
+  function searchMatched(
+    q: string,
+    opts: { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined; grant?: Readonly<Wheres> | undefined } = {},
+  ): Searched {
+    /* THE CALLER'S GRANT, LIST BY LIST (leak matrix G5): the hits and `matched` both count the rows its rule admits. The
+       private rows are `viewer`'s, already in the query, so only a list with a rule of its own is held here. */
+    const { grant, ...asked } = opts;
+    const admits = Object.keys(grant ?? {}).flatMap((register) => {
+      const c = admitClause(register, grant, undefined);
+      return c === null ? [] : [{ register, ...c }];
+    });
+    const found = ftsSearchMatched(sql, q, { ...asked, admits });
     if (found.hits.length === 0 && q.trim()) observe(sql, clock.now(), [{ kind: 'search.empty', subject: q.trim().toLowerCase().slice(0, 60) }]);
     return found;
   }
@@ -11503,6 +11588,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     admits,
     ruleFields,
     ownerName,
+    /** Which of these rows of one list a grant admits for a viewer, one statement per 500 (sharing plan §2.5). */
+    admittedIds,
+    /** The clause one list's rows meet under a grant for a viewer, for a reader that writes its own count, or `null`. */
+    admitClause,
     setPrivate,
     version,
     history,

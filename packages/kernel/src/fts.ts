@@ -120,7 +120,10 @@ export type Hit = { id: string; register: string; rank: number };
 
 /** What a search is asked: the words, the registers the caller may see, and how many hits to draw. */
 /* `viewer` LEAVES OUT THE ROWS SOMEBODY ELSE KEPT PRIVATE (migration 40), in the query, so hits and counts agree. */
-type Ask = { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined };
+/* `admits` HOLDS A LIST TO THE CALLER'S GRANT (leak matrix G5): the clause each narrowed list's rows meet, compiled by the
+   kernel from `wheres` (`admitClause`), so the hits and `matched` are both the rows the caller is shown. */
+type Admit = { register: string; sql: string; params: readonly (string | number)[] };
+type Ask = { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined; admits?: readonly Admit[] | undefined };
 
 /**
  * A search's whole answer: the page of hits, and how many rows there were to have.
@@ -187,17 +190,20 @@ export type Searched = {
  * caller who never asked to be scoped, which is the owner's own search; `[]` is a caller who asked
  * and holds nothing.
  */
-function matching(q: string, registers: readonly string[] | undefined, viewer?: string): { from: string; args: string[] } | null {
+function matching(q: string, registers: readonly string[] | undefined, viewer?: string, admits: readonly Admit[] = []): { from: string; args: (string | number)[] } | null {
   const query = ftsQuery(q);
   if (!query) return null;
   if (registers !== undefined && registers.length === 0) return null;
   const scope = registers ? ` AND entry_fts.register IN (${registers.map(() => '?').join(', ')})` : '';
   const kept = viewer === undefined ? '' : ' AND entry.id NOT IN (SELECT entry_id FROM entry_private WHERE person_id <> ?)';
+  /* A NARROWED LIST'S ROWS ARE THE ONES ITS CLAUSE ADMITS, asked in a statement of their own so the clause's bare names
+     are that statement's `entry`, never the search's `entry_fts`, which has an `id` and a `register` too. */
+  const held = admits.map((a) => ` AND (entry_fts.register <> ? OR entry.id IN (SELECT id FROM entry WHERE register = ? AND (${a.sql})))`).join('');
   return {
     from: `FROM entry_fts
        JOIN entry ON entry.rowid = entry_fts.rowid
-      WHERE entry_fts MATCH ?${scope} AND entry.deleted_at IS NULL${kept}`,
-    args: [query, ...(registers ?? []), ...(viewer === undefined ? [] : [viewer])],
+      WHERE entry_fts MATCH ?${scope} AND entry.deleted_at IS NULL${kept}${held}`,
+    args: [query, ...(registers ?? []), ...(viewer === undefined ? [] : [viewer]), ...admits.flatMap((a) => [a.register, a.register, ...a.params])],
   };
 }
 
@@ -211,7 +217,7 @@ function matching(q: string, registers: readonly string[] | undefined, viewer?: 
  * tell a full page from a whole answer.
  */
 export function search(sql: Sql, q: string, opts: Ask = {}): Hit[] {
-  const m = matching(q, opts.registers, opts.viewer);
+  const m = matching(q, opts.registers, opts.viewer, opts.admits);
   if (!m) return [];
   return sql.all<Hit>(
     `SELECT entry_fts.id AS id, entry_fts.register AS register, bm25(entry_fts) AS rank
@@ -227,7 +233,7 @@ export function search(sql: Sql, q: string, opts: Ask = {}): Hit[] {
 
 /** The same hits, with the count that makes them tellable from the whole answer. See `Searched`. */
 export function searchMatched(sql: Sql, q: string, opts: Ask = {}): Searched {
-  const m = matching(q, opts.registers, opts.viewer);
+  const m = matching(q, opts.registers, opts.viewer, opts.admits);
   if (!m) return { hits: [], matched: {} };
   const matched: Record<string, number> = {};
   for (const row of sql.all<{ register: string; n: number }>(
