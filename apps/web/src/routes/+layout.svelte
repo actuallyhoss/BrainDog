@@ -641,6 +641,23 @@
     };
   });
 
+  /* A SHELL DRAWN FROM THE LAST COPY IS REPLACED ONCE `boot` ANSWERS, and from here, after the first navigation has drawn:
+     the load that drew it asked `boot` and must not invalidate before that navigation lands (`+layout.ts`). */
+  $effect(() => {
+    if (data.stale !== true) return;
+    const base = untrack(() => apiBase(page.url));
+    let gone = false;
+    void import('$lib/record/boot-live.ts')
+      .then((m) => m.readBoot(base))
+      .then(() => {
+        if (!gone) void invalidate('braindog:boot');
+      })
+      .catch(() => undefined);
+    return () => {
+      gone = true;
+    };
+  });
+
   /* THE LOCAL COPY IS CLAIMED BY THE READER A LIVE BOOT NAMES, never by a drawn copy: another person, record or scope
      wipes it before it is drawn from again (`lib/data/local.ts`). */
   $effect(() => {

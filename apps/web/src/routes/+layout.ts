@@ -75,7 +75,10 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
   if (first) {
     const copy = depends && !spared ? copies.readCopy(api) : null;
     if (copy) {
-      void live.readBoot(api).then(() => import('$app/navigation').then((n) => n.invalidate('braindog:boot')));
+      /* ASKED HERE AND REPLACED FROM THE SHELL (`+layout.svelte`), once this navigation has drawn. An `invalidate` from
+         here could land while the first navigation was still loading: it took that navigation's place, had no page to
+         go back to, and the tab drew nothing at all, on every reload with a copy kept. */
+      void live.readBoot(api).catch(() => undefined);
       return { ...copy, slash: false };
     }
   }
