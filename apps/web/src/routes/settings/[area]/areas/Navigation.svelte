@@ -22,8 +22,7 @@
   import type { Rehearsed } from '../../../decide/[id]/proposed.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { navPrefs, TABS_MOST, type Saved } from '$lib/nav-prefs.svelte.ts';
-  import { arrange } from '$lib/nav.ts';
-  import { PLACES } from '$lib/nav/rail.ts';
+  import { arrange, tabsOf, type FlatItem } from '$lib/nav.ts';
   import type { IconName } from '$lib/ui/icons.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
@@ -82,21 +81,28 @@
    * fifth is refused in words beside its switch rather than silently dropping three.
    */
   const NEEDS = '/decide';
-  /* THE SAME FIVE `tabsOf` READS (`lib/nav.ts` `FIVE`), from the one list of places, never spelled here. */
-  const FIVE = PLACES.filter((name) => name !== 'work' && name !== 'people');
   type BarRow = { href: string; title: string; icon: IconName; section?: string | undefined };
   const barRows = $derived<BarRow[]>([
     { href: NEEDS, title: voiceSaid('decide'), icon: 'inbox' },
     ...shown.flatMap(([section, list]) => list.map((p) => ({ href: p.href, title: p.title, icon: p.icon as IconName, section }))),
   ]);
   const plain = (x: string | undefined): string => (x ?? '').trim().toLowerCase();
+  /* THE DEFAULT IS `tabsOf`'S OWN ANSWER, asked of these pages as the rail hands them: Today, Needs you by its key, each
+     section's first page by its section, and every other page as itself. One rule for the bar and this screen. */
   const defaultBar = $derived.by((): string[] => {
-    const named = FIVE.flatMap((name) => {
-      const lead = barRows.find((r) => plain(r.section) === name);
-      return lead ? [lead.href] : [];
-    });
-    const rest = barRows.filter((r) => r.href !== NEEDS && !named.includes(r.href)).map((r) => r.href);
-    return [NEEDS, ...named, ...rest].slice(0, TABS_MOST);
+    const led = new Set<string>();
+    const main: FlatItem[] = [
+      { key: 'today', href: '/', label: copy.today, icon: 'today', near: [] },
+      ...barRows.map((r): FlatItem => {
+        const section = plain(r.section);
+        const lead = r.href !== NEEDS && section !== '' && !led.has(section);
+        if (lead) led.add(section);
+        return { key: r.href === NEEDS ? 'decide' : lead ? `section:${section}` : `page:${r.href}`, href: r.href, label: r.title, icon: r.icon, near: [] };
+      }),
+    ];
+    return tabsOf(main, TABS_MOST + 1)
+      .slice(1)
+      .map((i) => i.href);
   });
   const picked = $derived(navPrefs.tabs.filter((h) => barRows.some((r) => r.href === h)));
   const barNow = $derived(picked.length > 0 ? picked : defaultBar);
