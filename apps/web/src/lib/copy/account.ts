@@ -435,10 +435,10 @@ export const account = {
 
   /* The shape of the navigation — `19 §3`'s table, in the words a reader would use for each one.
      The labels name the THING and not the setting: somebody choosing between these is picking
-     where their navigation lives, so "Sidebar" and "Top bar" are the answer and "Rail" is ours. */
+     where their navigation lives, so "Top bar" and "Side rail" are the answer and "Rail" alone is ours. */
   navShape: 'Where your navigation lives',
-  navShapeHint: 'The sidebar holds as many pages as you like, in sections you arrange. A top bar holds a few in one strip and puts the rest behind More. The menu keeps nothing on screen and opens all of them when you ask.',
-  navShapeRail: 'Sidebar',
+  navShapeHint: 'The top bar holds your five places in one strip and puts the rest behind More. The side rail holds as many pages as you like, in sections you arrange. The menu keeps nothing on screen and opens all of them when you ask.',
+  navShapeRail: 'Side rail',
   navShapeBar: 'Top bar',
   navShapeMenu: 'Menu',
   /* AND THE ONE CONDITION THAT IS NOT A TASTE. A narrow screen keeps the tab bar whatever this

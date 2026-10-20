@@ -48,10 +48,11 @@ export async function breakpoints(root) {
 }
 
 /* THE THREE SHAPES `19 §3` OFFERS, by what the shell writes on `.shell[data-shape]` and what the record keeps to ask
-   for each. The rail is the default and asks for nothing; the record's word for it is not the shell's. */
+   for each. The top bar is the default (his call 1, 20 October) and asks for nothing; the record's word for the side
+   rail is `side`, not the shell's. The default comes first, as the one a seeded pass draws. */
 export const SHAPES = [
-  { name: 'the rail', drawn: 'rail', keeps: null },
-  { name: 'the top bar', drawn: 'bar', keeps: { 'nav.shape': 'bar' } },
+  { name: 'the top bar', drawn: 'bar', keeps: null },
+  { name: 'the rail', drawn: 'rail', keeps: { 'nav.shape': 'side' } },
   { name: 'the menu', drawn: 'menu', keeps: { 'nav.shape': 'menu' } },
 ];
 

@@ -45,7 +45,7 @@
   import { leaving, settled } from '$lib/ui/screen.svelte.ts';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
-  import Sidebar, { suggested } from '$lib/ui/Sidebar.svelte';
+  import TopBar from '$lib/ui/TopBar.svelte';
   import { assets } from '$app/paths';
 
   import { named } from '$lib/env.ts';
@@ -62,18 +62,19 @@
   /* Named as types, which the compiler erases: the layout still reaches both, as `dead-copy` reads it. */
   import type PaletteView from '$lib/palette/Palette.svelte';
   import type KeymapView from '$lib/ui/Keymap.svelte';
-  import type TopBarView from '$lib/ui/TopBar.svelte';
+  import type SidebarView from '$lib/ui/Sidebar.svelte';
   import type CopyMarkView from '$lib/ui/CopyMark.svelte';
   import { palette } from '$lib/palette/open.svelte.ts';
+  import { moreSheet } from '$lib/shell/more.svelte.ts';
   import { levelWord, openRecord } from '$lib/record/switcher.ts';
   import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
-  import { railOf } from '$lib/nav/rail.ts';
+  import { agentsHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount } from '$lib/home/need-you.ts';
   import { heardWaits, waitsNow, waitsTicket, workingNow } from '$lib/home/waits.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
-  import { penCount } from '$lib/design/pen.ts';
+  import { penCount, suggested } from '$lib/design/pen.ts';
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -103,18 +104,17 @@
     void import('$lib/ui/CopyMark.svelte').then((m) => (CopyMark = m.default));
   });
 
-  /* THE TOP BAR TOO, AND ONLY FOR SOMEBODY WHO CHOSE IT. The rail is the shell (DIRECTION 37) and the strip is one
-     choice away in Settings, so its script and its styles rode in the entry every visit loads, for the few who pick
-     it, and the entry stylesheet has a budget (`tools/gates/budgets.json`). Asked for once the shape says `bar`; its
-     slot holds the strip's height while it comes, so the work under it does not jump.
+  /* THE SIDE RAIL, AND ONLY FOR SOMEBODY WHO CHOSE IT. The top bar is the shell again (his call 1, 20 October) and the
+     rail is one choice away in Settings, so its script and its styles would ride in the entry every visit loads, for
+     the few who pick it, and the entry has a budget (`tools/gates/budgets.json`). Asked for once the shape says `rail`.
 
      AND THE SCREEN IS NOT SETTLED UNTIL IT IS THERE. `data-screen` is what a gate waits for before it reads the window,
-     and a screen that computes its content at once settles on its first frame, before the strip's chunk can land: the
-     `prefs` gate's shape probe counts `nav.topbar` at that moment. So the claim waits for the strip, as it would for a
+     and a screen that computes its content at once settles on its first frame, before the rail's chunk can land: the
+     `prefs` gate's shape probe counts `nav.rail` at that moment. So the claim waits for the rail, as it would for a
      call the screen made. */
-  let TopBar = $state<typeof TopBarView | null>(null);
+  let Sidebar = $state<typeof SidebarView | null>(null);
   $effect(() => {
-    if (shape === 'bar' && TopBar === null) void import('$lib/ui/TopBar.svelte').then((m) => (TopBar = m.default));
+    if (shape === 'rail' && Sidebar === null) void import('$lib/ui/Sidebar.svelte').then((m) => (Sidebar = m.default));
   });
 
   /* These surfaces carry no shell. `/start` because a record with zero registers has no nav to draw,
@@ -285,6 +285,11 @@
    */
   const rail = $derived(railOf(flat, said('decide')));
   const tabs = $derived(tabsOf(rail.places, 5, navPrefs.tabs));
+  /* THE TOP BAR'S FIVE: the same places in the same order, without the phone's own pick, which Settings names for the
+     phone. Agents may sit past the rail's seven, so the places under More are read too. */
+  const barPlaces = $derived(tabsOf([...rail.places, ...rail.more]));
+  /* WHERE THE TOP BAR'S WORKING CHIP GOES: the Agents place, wherever the rail put it. */
+  const agentsAt = $derived(agentsHref([...rail.places, ...rail.more]));
 
   /**
    * A PLACE THAT COMES INTO THE RAIL IS SAID ONCE (USE-B02): a place is drawn when it has something to show, so the day
@@ -313,8 +318,8 @@
     drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden] };
     if (names.length > 0) toasts.push(copy.placeArrived(names));
   });
-  /* WHAT THE TOP BAR SAYS IS UNDER MORE: the sections and pages that are not rows, and the lists. */
-  const behind = $derived(flat.more.length + flat.pages.length + moreLists.length);
+  /* WHAT THE TOP BAR SAYS IS UNDER MORE: the places past its five, the pages that are not rows, and the lists. */
+  const behind = $derived(rail.places.length + rail.more.length - barPlaces.length + flat.pages.length + moreLists.length);
   /* THE PERSON READING, by the name the record told them, for the top bar's face. */
   const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim());
 
@@ -322,7 +327,7 @@
   const place = $derived(placeOf(here(page.url.pathname), page.url.searchParams));
 
   /* `g 1`–`9` COUNT WHAT IS ON SCREEN: the places, in the order drawn, and the top bar's own rows on the top bar. */
-  const numbered = $derived(navPrefs.shape === 'bar' ? flat.main : rail.places);
+  const numbered = $derived(navPrefs.shape === 'bar' ? barPlaces : rail.places);
   /* REMEMBERED, because a rail somebody folded is a rail they want folded on the next page too —
      and `app.html` has always read this cookie before first paint, so a remembered fold costs no
      flash. Nothing wrote it until now. */
@@ -877,6 +882,7 @@
   <div class="shell" data-rail={railIcons ? 'icons' : undefined} data-shape={shape}>
     {#if shape === 'rail'}
       <div class="rail-slot" bind:this={railSlot}>
+        {#if Sidebar}
         <Sidebar
           icons={railIcons}
           ontoggle={toggleRail}
@@ -894,20 +900,21 @@
           {inbox}
           working={workingNow()}
         />
+        {/if}
       </div>
     {:else}
       <div class="bar-slot">
         {#if shape === 'bar'}
-          {#if TopBar}
-            <TopBar
-              entries={flat.main}
-              {behind}
-              record={data.index.name || personName}
-              person={personName}
-              onmore={() => (moreOpen = true)}
-              onfind={() => (palette.open = true)}
-            />
-          {/if}
+          <TopBar
+            entries={barPlaces}
+            {behind}
+            record={data.index.name || personName}
+            person={personName}
+            working={workingNow()}
+            agents={agentsAt}
+            onmore={() => (moreOpen = true)}
+            onfind={() => (palette.open = true)}
+          />
         {:else}
           <!--
             THE MENU SHAPE IS ONE BUTTON AND NOTHING ELSE, which is the whole of what it promises:
@@ -942,7 +949,7 @@
       that carried meaning by moving would have to say it another way as well.
     -->
     {#key page.url.pathname}
-    <main id="main" class="body" data-screen={shape === 'bar' && TopBar === null ? undefined : settled()}>
+    <main id="main" class="body" data-screen={shape === 'rail' && Sidebar === null ? undefined : settled()}>
       <!-- THE QUIET MARK, over the work while something drawn from the local copy is asked again (`CopyMark.svelte`). -->
       {#if CopyMark}<CopyMark />{/if}
       <Pull />
@@ -1255,6 +1262,11 @@
     display: flex;
   }
 
+  /* THE RAIL'S WIDTH, HELD WHILE ITS CHUNK ARRIVES, so the work beside it does not start at the window's edge and jump. */
+  .rail-slot:empty {
+    inline-size: var(--rail, 216px);
+  }
+
   /* THE OTHER TWO SHAPES ARE ONE COLUMN WITH A STRIP ON TOP, and the strip is `auto` for the same
      reason the rail's column is: its height is its own declaration, and this grid never has to know
      which of the two is in it. */
@@ -1264,24 +1276,26 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  /* The strip sits on the ground, lined up with the work under it: the same fluid gutter, so the two share an edge at
-     every width. */
+  /* The menu's strip sits on the ground, lined up with the work under it. */
   .bar-slot {
     box-sizing: border-box;
     inline-size: 100%;
-    max-inline-size: var(--page-max);
     min-inline-size: 0;
-    padding: var(--sp-4) var(--gutter) var(--sp-2);
-  }
-
-  .shell[data-shape='menu'] .bar-slot {
     padding: var(--inset) var(--inset) 0;
   }
 
-  /* THE STRIP'S HEIGHT, HELD WHILE IT ARRIVES. The top bar is asked for after the shell (`TopBar` above), and an empty
-     slot would let the work sit 44 higher for a moment and then drop. 44 is the strip's own floor (`TopBar.svelte`). */
+  /* THE TOP BAR IS THE WINDOW'S WIDTH, on the tile's white with one hairline under it (19 October). Its own gutter lines
+     its edges up with the work under it. The Mac app's title bar is paid here, once: the work under the bar pays none. */
   .shell[data-shape='bar'] .bar-slot {
-    min-block-size: calc(var(--tap) + var(--sp-4) + var(--sp-2));
+    position: relative;
+    z-index: var(--z-palette);
+    padding: var(--shell-inset, 0px) 0 0;
+    background: var(--tile);
+    border-block-end: 1px solid var(--line);
+  }
+
+  .shell[data-shape='bar'] .body {
+    --shell-inset: 0px;
   }
 
   /* One control, at the start of the strip, at the size every other target in the shell is. */

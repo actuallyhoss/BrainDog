@@ -300,7 +300,7 @@
   <div class="wide-only">
     <p class="hint">{copy.navShapeHint}</p>
     <div class="pictures" role="group" aria-label={copy.navShape}>
-      {#each [['rail', copy.navShapeRail, 'rows'], ['bar', copy.navShapeBar, 'grid'], ['menu', copy.navShapeMenu, 'more']] as const as [v, label, icon] (v)}
+      {#each [['bar', copy.navShapeBar, 'grid'], ['rail', copy.navShapeRail, 'rows'], ['menu', copy.navShapeMenu, 'more']] as const as [v, label, icon] (v)}
         <button type="button" class="picture" aria-pressed={navPrefs.shape === v} data-on={navPrefs.shape === v ? '' : undefined} onclick={() => pickShape(v)}>
           <span class="picture-shot" aria-hidden="true">{@render shapeOf(v)}</span>
           <span class="picture-name"><Icon name={icon} size="m" /><span>{label}</span></span>

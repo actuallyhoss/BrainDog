@@ -29,8 +29,9 @@
   Written by CSS alone (`:root:has(...)`), as `--dock-w` is, so nothing has to be cleaned up.
 -->
 <script module lang="ts">
-  /** THE HOLDING PEN'S ROW: how many offers wait. The phone's More sheet says it in the same words (`+layout.svelte`). */
-  export const suggested = (n: number): string => `${n} suggested`;
+  /** THE HOLDING PEN'S ROW: how many offers wait. The phone's More sheet says it in the same words (`design/pen.ts`). */
+  import { suggested } from '../design/pen.ts';
+  export { suggested };
 
   /* edge-cue:start (`sidebar-scroll-58.test.ts` reads the lines between these two marks and runs them) */
   /** How far, in px, the scroller's content fades out at an edge that has more past it. */
@@ -1405,7 +1406,8 @@
     inline-size: 6px;
     block-size: 6px;
     border-radius: var(--r-round);
-    background: var(--status-working);
+    /* THE LIVE COLOUR, as the top bar's dot: red is for late and for what needs you. */
+    background: var(--live-fill);
     animation: rail-pulse calc(var(--d-panel) * 8) var(--ease-standard) infinite;
   }
 

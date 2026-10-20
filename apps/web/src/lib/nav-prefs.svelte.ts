@@ -80,23 +80,26 @@ export type Saved = { from: 'kept' } | { from: 'device' } | { from: 'refused'; f
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
-/** Where the navigation lives when nobody said: the floating rail card (DIRECTION 37), which superseded the top bar. */
-const SHAPE_DEFAULT: NavShape = 'rail';
+/**
+ * Where the navigation lives when nobody said: the top bar of 19 October (his call 1, 20 October), from 900px up. The
+ * side rail stays one choice away in Settings > Navigation.
+ */
+const SHAPE_DEFAULT: NavShape = 'bar';
 
 /**
  * THE RECORD'S WORD FOR THE SIDE RAIL IS `side`, AND ITS `rail` IS NOBODY'S CHOICE. Builds before the top bar led copied
  * the device's shape to the record on first load, so a record holds `rail` whether or not anybody picked it. A rail
- * chosen now is kept as `side`, and a `rail` read back is read as no choice at all, which draws the default: the rail
- * again, so a record that kept one by accident and a record that kept nothing draw the same card.
+ * chosen now is kept as `side`, and a `rail` read back is read as no choice at all, which draws the default (the top bar),
+ * so a record that kept one by accident and a record that kept nothing draw the same frame.
  */
 const shapeKept = (v: unknown): NavShape | undefined => (v === 'side' ? 'rail' : v === 'bar' || v === 'menu' ? v : undefined);
 
 /**
  * THE DEVICE'S COPY OF THE SHAPE, AS A CHOICE OR AS NOTHING, for a record that keeps no shape of its own.
  *
- * ITS `bar` IS THE TOP BAR'S OLD DEFAULT, NOT A CHOICE. Every boot of the builds that led with the top bar wrote the shape
- * they drew into the cookie, `bar` included when nobody had chosen one, so a `bar` here is most often that copy. A top bar
- * somebody chose on a record is kept by the record (`setShape`), and its word stands over this.
+ * ITS `bar` IS THE DEFAULT'S COPY, NOT A CHOICE. Builds that led with the top bar wrote the shape they drew into the
+ * cookie, `bar` included when nobody had chosen one, so a `bar` here reads as nobody's choice, which is the top bar again.
+ * A shape somebody chose on a record is kept by the record (`setShape`), and its word stands over this.
  */
 const deviceChose = (held: NavShape | undefined): NavShape | undefined => (held === 'bar' ? undefined : held);
 
@@ -275,7 +278,7 @@ export class NavPrefs {
   /* ONE CHANGE AT A TIME, so two quick moves arrive in the order they were made. */
   #queue: Promise<unknown> = Promise.resolve();
 
-  /** Where the navigation lives: the shape somebody chose, else the rail card. */
+  /** Where the navigation lives: the shape somebody chose, else the top bar. */
   get shape(): NavShape {
     return this.chosen ?? SHAPE_DEFAULT;
   }

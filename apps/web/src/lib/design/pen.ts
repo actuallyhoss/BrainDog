@@ -144,6 +144,9 @@ export function waiting(shape: ShapeOffer | null, record: readonly PenItem[], go
   return out;
 }
 
+/** THE HOLDING PEN'S ROW: how many offers wait, in the rail's words and the phone's More sheet's alike. */
+export const suggested = (n: number): string => `${n} suggested`;
+
 /**
  * THE ONE COUNT the rail, the Slash page and Settings say: the record's offers still waiting, plus the browser's shape
  * when the record has none of its own. It is `waiting`'s own length, so the number and the list beside it never differ,

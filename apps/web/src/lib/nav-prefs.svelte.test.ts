@@ -106,23 +106,23 @@ test('TWO QUICK MOVES ARRIVE IN THE ORDER THEY WERE MADE', async () => {
   assert.deepEqual(prefs.order, ['/p/b', '/p/a']);
 });
 
-test('NOBODY CHOSE, SO THE RAIL CARD: the default shell is the rail, on a record and off one', () => {
+test('NOBODY CHOSE, SO THE TOP BAR: the default shell is the bar of 19 October, on a record and off one', () => {
   const fresh = new NavPrefs({ order: [], hidden: [] });
-  assert.equal(fresh.shape, 'rail');
+  assert.equal(fresh.shape, 'bar');
   assert.equal(fresh.chosen, undefined);
   fresh.adopt({}, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
-  assert.equal(fresh.shape, 'rail', 'a record that keeps no shape drew something other than the rail');
+  assert.equal(fresh.shape, 'bar', 'a record that keeps no shape drew something other than the top bar');
   assert.equal(fresh.chosen, undefined, 'the default was taken for a choice');
 
   const offline = new NavPrefs({ order: [], hidden: [] });
   offline.adopt(undefined, 'https://app.example', recorder(() => assert.fail('the sample sent a preference')).send);
-  assert.equal(offline.shape, 'rail');
+  assert.equal(offline.shape, 'bar');
 });
 
-test("THE RECORD'S `rail` IS NOBODY'S CHOICE AND DRAWS THE DEFAULT RAIL, and a rail chosen now is kept as `side`", async () => {
+test("THE RECORD'S `rail` IS NOBODY'S CHOICE AND DRAWS THE DEFAULT TOP BAR, and a rail chosen now is kept as `side`", async () => {
   const old = new NavPrefs({ order: [], hidden: [] });
   old.adopt({ 'nav.shape': 'rail' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
-  assert.equal(old.shape, 'rail', "a legacy rail read as the top bar's old default");
+  assert.equal(old.shape, 'bar', 'a legacy rail was read as somebody choosing the rail');
   assert.equal(old.chosen, undefined, 'a rail nobody picked was read as a choice');
 
   const chosen = new NavPrefs({ order: [], hidden: [] });
@@ -144,8 +144,8 @@ test("THE RECORD'S `rail` IS NOBODY'S CHOICE AND DRAWS THE DEFAULT RAIL, and a r
 test('A REFUSED SHAPE PUTS BACK NO CHOICE AT ALL, so the default stays the default', async () => {
   const prefs = new NavPrefs({ order: [], hidden: [] });
   prefs.adopt({}, 'https://app.example', recorder(() => ({ from: 'refused', fix: 'Sign in again.' })).send);
-  assert.deepEqual(await prefs.setShape('bar'), { from: 'refused', fix: 'Sign in again.' });
-  assert.deepEqual([prefs.shape, prefs.chosen], ['rail', undefined]);
+  assert.deepEqual(await prefs.setShape('menu'), { from: 'refused', fix: 'Sign in again.' });
+  assert.deepEqual([prefs.shape, prefs.chosen], ['bar', undefined]);
 });
 
 test("AN UNDO BACK TO NO CHOICE GOES AS THE RECORD'S `rail`, which every device reads as the default again", async () => {
@@ -155,7 +155,7 @@ test("AN UNDO BACK TO NO CHOICE GOES AS THE RECORD'S `rail`, which every device 
   const before = prefs.chosen;
   await prefs.setShape('menu');
   await prefs.setShape(before);
-  assert.deepEqual([prefs.shape, prefs.chosen], ['rail', undefined], 'the undo left a rail somebody picked');
+  assert.deepEqual([prefs.shape, prefs.chosen], ['bar', undefined], 'the undo left a shape somebody picked');
   assert.deepEqual(io.sent, [
     { key: 'nav.shape', value: 'menu' },
     { key: 'nav.shape', value: 'rail' },
@@ -163,7 +163,7 @@ test("AN UNDO BACK TO NO CHOICE GOES AS THE RECORD'S `rail`, which every device 
 
   const other = new NavPrefs({ order: [], hidden: [], shape: 'menu' });
   other.adopt({ 'nav.shape': 'rail' }, 'https://app.example', recorder(() => assert.fail('adopting boot sent a preference')).send);
-  assert.deepEqual([other.shape, other.chosen], ['rail', undefined], 'another device kept the menu it last heard of');
+  assert.deepEqual([other.shape, other.chosen], ['bar', undefined], 'another device kept the menu it last heard of');
 });
 
 test("A LEGACY `rail` IS NOT BROUGHT BACK BY THE COOKIE, AND THE TOP BAR'S OLD `bar` COPY IS NOBODY'S CHOICE", () => {
@@ -188,15 +188,15 @@ test("A LEGACY `rail` IS NOT BROUGHT BACK BY THE COOKIE, AND THE TOP BAR'S OLD `
     const legacy = new NavPrefs();
     assert.equal(legacy.shape, 'menu', "the cookie's copy did not draw the first paint");
     legacy.adopt({ 'nav.shape': 'rail' }, 'https://app.example', quiet());
-    assert.equal(legacy.shape, 'rail', "a legacy rail was read as the cookie's menu");
+    assert.equal(legacy.shape, 'bar', "a legacy rail was read as the cookie's menu");
 
     /* EVERY BOOT OF THE TOP-BAR BUILDS WROTE `bar` into the cookie, chosen or not, and a top bar somebody chose on a
-       record is the record's to say. So a `bar` copy beside a record with no shape is the old default, and goes. */
+       record is the record's to say. So a `bar` copy beside a record with no shape is the default's, and goes. */
     jar('bar');
     const old = new NavPrefs();
     assert.equal(old.shape, 'bar', 'the first paint is still the copy, before the record answers');
     old.adopt({}, 'https://app.example', quiet());
-    assert.deepEqual([old.shape, old.chosen], ['rail', undefined]);
+    assert.deepEqual([old.shape, old.chosen], ['bar', undefined]);
     assert.equal(copy(), undefined, 'the old default stayed in the cookie for the next first paint');
 
     jar('bar');
