@@ -13,8 +13,7 @@
 -->
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { since } from 'braindog-render';
-
+  
   import { apiBase } from '$lib/at.ts';
   import { copy } from '$lib/copy.ts';
   import { actor } from '$lib/record/names.ts';
@@ -25,8 +24,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import { runOf } from '$lib/ui/face.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { daysOf } from './said.ts';
-  import { momentsOf, timelineWords as words } from './timeline.ts';
+  import { agoSaid, daysOf } from './said.ts';
+  import { momentsOf, noteSaid, timelineWords as words } from './timeline.ts';
 
   let {
     on,
@@ -155,7 +154,7 @@
   {@const w = who(line.by)}
   <Face name={w.name} kind={w.kind} run={runOf(line.by)} size="s" />
   <div class="body">
-    <p class="head"><span class="by">{w.name}</span> <time class="when" datetime={line.at}>{since(line.at, now)}</time></p>
+    <p class="head"><span class="by">{w.name}</span> <time class="when" datetime={line.at}>{agoSaid(line.at, now)}</time></p>
     <p class="words" dir="auto">{line.body}</p>
   </div>
 {/snippet}
@@ -193,8 +192,8 @@
           {@const w = who(m.event.by)}
           <li class="event">
             <Face name={w.name} kind={w.kind} run={runOf(m.event.by)} size="s" />
-            <p class="event-line"><span class="by">{m.event.settled ?? w.name}</span> {m.event.note}</p>
-            <time class="when" datetime={m.event.at}>{since(m.event.at, now)}</time>
+            <p class="event-line"><span class="by">{m.event.settled ?? w.name}</span> {noteSaid(m.event.note)}</p>
+            <time class="when" datetime={m.event.at}>{agoSaid(m.event.at, now)}</time>
           </li>
         {:else if m.thread.comment.resolved}
           <!-- FOLDED: the line says how it ended, and opening it shows the whole of it. -->
@@ -204,7 +203,7 @@
             <details>
               <summary class="folded-head tap">
                 <Icon name="check" size="s" />
-                <span>{commentWords.resolvedAs(r.as, who(r.by).name, since(r.at, now))}</span>
+                <span>{commentWords.resolvedAs(r.as, who(r.by).name, agoSaid(r.at, now))}</span>
               </summary>
               <div class="comment">{@render said(c)}</div>
               {#each m.thread.replies as rp (rp.id)}<div class="comment reply">{@render said(rp)}</div>{/each}
@@ -290,6 +289,13 @@
     field-sizing: content;
     max-block-size: 240px;
     transition: background var(--d-state) var(--ease-out);
+  }
+
+  /* UNDER 640 THE BOX IS A THUMB'S TARGET, 44 tall (motion F17). */
+  @media (width < 640px) {
+    .composer-input {
+      min-block-size: var(--tap);
+    }
   }
 
   @media (hover: hover) and (pointer: fine) {

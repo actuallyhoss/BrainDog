@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { momentsOf } from './timeline.ts';
+import { momentsOf, noteSaid } from './timeline.ts';
 
 const event = (at: string, note: string) => ({ by: 'system', note, at });
 const comment = (at: string, body: string) => ({
@@ -38,4 +38,9 @@ test('A COMMENT OUT OF ORDER IS PUT IN ITS PLACE, so a day is never split in two
   const threads = [comment('2026-09-01T10:00:00.000Z', 'first'), comment('2026-09-04T10:00:00.000Z', 'late'), comment('2026-09-02T10:00:00.000Z', 'orphan')];
   const out = momentsOf([event('2026-09-03T12:00:00.000Z', 'paid')], threads).map((m) => (m.kind === 'event' ? m.event.note : m.thread.comment.body));
   assert.deepEqual(out, ['late', 'paid', 'orphan', 'first']);
+});
+
+test('THE FIRST LINE SAYS WHO ADDED THE ROW, "added this", and any other note is the record\'s own', () => {
+  assert.equal(noteSaid('created'), 'added this');
+  assert.equal(noteSaid('state from open to paid'), 'state from open to paid');
 });
