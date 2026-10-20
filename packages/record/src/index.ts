@@ -18,7 +18,7 @@
 import type { Clock, Refusal, Result, Scheduler, Snapshot, Snapshots, Sql } from '@braindog/ports';
 import { PRIMITIVES_VERSION, type KindSpec } from 'braindog-render';
 import { lintRound, pagesCleanReading } from './page-lint.ts';
-import { fileRecordSigns } from './signs.ts';
+import { SIGNS_KEPT, fileRecordSigns, keptNow, keptSigns, type KeptSign } from './signs.ts';
 import { appendReadRefusal } from './append-refusal.ts';
 import { trialsLeft } from './script-try-cap.ts';
 import {
@@ -220,7 +220,6 @@ import { doorFacts, doorIsOff, turnedAway as doorTurnedAway, type DoorFacts } fr
 import { briefTick } from './brief-write.ts';
 import { writtenTick } from './written-brief.ts';
 import type { EngineHealthRead } from './methods/engine.ts';
-import { quietSign } from './methods/signs.ts';
 import { methods as jobMethods } from './jobs.ts';
 import { PEN_DISMISSED_MOST, penFor, penQueued, signatureOf, type PenItem } from './emergent.ts';
 import { methods as censusMethods } from './methods/pages-census.ts';
@@ -8241,10 +8240,31 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const redSigns = (ctx: CallContext): Context['signs'] => {
     if (!readsWhole(ctx)) return [];
-    const read = kernel.signs();
-    if (!read.ok) return [];
+    const red = signsKept();
     const inbox = allows(ctx, 'owner') === null || inboxReached(ctx);
-    return read.value.signs.filter((s) => s.state === 'red').map((s) => (inbox ? s : quietSign(s))).map((s) => ({ name: s.name, said: s.said }));
+    return red.map((s) => ({ name: s.name, said: inbox ? s.said : s.quiet }));
+  };
+
+  /**
+   * THE RED SIGNS NOW, AS THE ALARM KEPT THEM (`keptNow`, W1-D): what `lintTick` read on the record's last alarm, while
+   * that is under a quarter of an hour old. Older or never kept, they are read here and held as every briefing fact is
+   * (`heldFor`), never written: a briefing writes nothing. A record that cannot read its signs briefs none.
+   */
+  const signsRead = new Map<string, Held<KeptSign[]>>();
+  const signsKept = (): KeptSign[] => {
+    const now = clock.now();
+    const kept = keptNow(kernel.prefsOf(LINT_HOLDER)[SIGNS_KEPT], now);
+    if (kept !== null) return kept;
+    return heldFor(signsRead, '', () => {
+      const read = kernel.signs();
+      return read.ok ? keptSigns(read.value.signs, now).red : [];
+    });
+  };
+
+  /** The alarm keeps the red signs (`signsKept`). One that cannot be read keeps nothing, and the briefing reads them itself. */
+  const keepSigns = (): void => {
+    const read = kernel.signs();
+    if (read.ok) kernel.setPref(LINT_HOLDER, SIGNS_KEPT, keptSigns(read.value.signs, clock.now()));
   };
 
   /**
@@ -9374,11 +9394,22 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * on its own data, and the sign `pages-clean` filed through the kernel with the findings as its facts. Once a UTC day
      * at most, and the day is kept before the round, as `slashTick` keeps its own, so a round that throws is not retried
      * until tomorrow. Nothing is observed: a page read by the lint is not a page somebody opened.
+     *
+     * AND ON EVERY ALARM, THE BRIEFING'S RED SIGNS ARE READ AND KEPT (`keepSigns`, W1-D), after the round when there is
+     * one, so `context` reads a pref and not every sign. A read that throws keeps nothing and costs the lint nothing.
      */
     async lintTick(): Promise<{ ran: false; why: 'today' | 'unopened' } | { ran: true; state: 'green' | 'red' | 'none'; findings: number; pages: number }> {
       if (kernel.refused()) return { ran: false, why: 'unopened' };
+      const kept = <T>(out: T): T => {
+        try {
+          keepSigns();
+        } catch {
+          /* The briefing reads the signs itself until one is kept. */
+        }
+        return out;
+      };
       const today = new Date(clock.now()).toISOString().slice(0, 10);
-      if (kernel.prefsOf(LINT_HOLDER)[LINT_LAST] === today) return { ran: false, why: 'today' };
+      if (kernel.prefsOf(LINT_HOLDER)[LINT_LAST] === today) return kept({ ran: false, why: 'today' } as const);
       kernel.setPref(LINT_HOLDER, LINT_LAST, today);
       const round = lintRound({
         pages: () => kernel.pages(),
@@ -9412,7 +9443,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         clock.now(),
       );
       if (signs.refused.length > 0) throw new Error(`signs were not filed: ${signs.refused.join('; ')}`);
-      return { ran: true, state: reading.state, findings: round.findings.length, pages: round.pages };
+      return kept({ ran: true as const, state: reading.state, findings: round.findings.length, pages: round.pages });
     },
 
     /**

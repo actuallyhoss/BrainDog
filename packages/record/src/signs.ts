@@ -16,7 +16,7 @@
  * A READING NAMES THINGS: a repository by its name, a run by what it was doing, a client by its name. Never an id.
  */
 
-import { openHandoffs, type SignReading } from '@braindog/kernel';
+import { openHandoffs, quietSign, type SignReading, type VitalSign } from '@braindog/kernel';
 import type { Result, Sql } from '@braindog/ports';
 
 import type { Build, Context, RecordDeps } from './index.ts';
@@ -507,4 +507,36 @@ export async function fileRecordSigns(
     if (!filed.ok) refused.push(`${id}: ${'refusal' in filed ? filed.refusal.fix : 'the record changed under it'}`);
   }
   return { briefing, tools, arrived, refused };
+}
+
+/* ── the briefing's red signs, kept ────────────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * THE RED SIGNS A BRIEFING CARRIES, READ BY THE ALARM AND KEPT (W1-D). Reading every sign now scans the week's runs, the
+ * series' points and the open questions, about a fifth of what `context` cost on a record his size, and a sign is a
+ * reading of the day: so the record's tick reads them and keeps the red ones under this pref, and `context` reads the
+ * pref. Each is kept in both forms, its own words and the inbox's held back (`quietSign`), so the reader is chosen when
+ * it is read.
+ */
+export const SIGNS_KEPT = 'briefing.signs';
+/** How long a kept reading stands before a briefing reads the signs itself again. */
+export const SIGNS_KEPT_MS = 15 * MIN;
+
+/** One red sign as a briefing names it: its name, its sentence, and its sentence to a reader without the inbox. */
+export type KeptSign = { name: string; said: string; quiet: string };
+/** What is kept: when it was read, and the red signs then. */
+export type KeptSigns = { at: number; red: KeptSign[] };
+
+/** The red signs of a reading, kept as `KeptSigns`. */
+export function keptSigns(signs: readonly VitalSign[], nowMs: number): KeptSigns {
+  return { at: nowMs, red: signs.filter((s) => s.state === 'red').map((s) => ({ name: s.name, said: s.said, quiet: quietSign(s).said })) };
+}
+
+/** The red signs kept, when `value` is a reading in shape and no older than `SIGNS_KEPT_MS`; else `null`, to read them again. */
+export function keptNow(value: unknown, nowMs: number): KeptSign[] | null {
+  if (value === null || typeof value !== 'object') return null;
+  const { at, red } = value as { at?: unknown; red?: unknown };
+  if (typeof at !== 'number' || !(at <= nowMs && nowMs - at <= SIGNS_KEPT_MS) || !Array.isArray(red)) return null;
+  const fine = red.every((s: unknown) => s !== null && typeof s === 'object' && ['name', 'said', 'quiet'].every((k) => typeof (s as Record<string, unknown>)[k] === 'string'));
+  return fine ? (red as KeptSign[]) : null;
 }
