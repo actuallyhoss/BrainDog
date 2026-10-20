@@ -10830,7 +10830,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          another, with its own questions still open behind them. */
       const every = kernel.governance(register, { ...(args?.status === undefined ? {} : { status: String(args.status) }), ...(register === 'suggestion' && (args?.status === undefined || String(args.status) === 'open') ? { order: 'wait' as const } : {}), ...(args?.review === 'only' ? { review: 'only' as const } : {}), every: true, ...after });
       if (!every.ok) return every;
-      return ok(shownRows(every.value).slice(0, rows.value.length));
+      /* AND ONLY THE PAGE IS NAMED (W1-D): each row handed out is named and given its card's facts (`out`), and this
+         named every open question on the record to hand back the first page of them. */
+      const page: (typeof every.value)[number][] = [];
+      for (const r of every.value) {
+        if (page.length >= rows.value.length) break;
+        if (holds(ctx, r)) continue;
+        const o = out(r);
+        if (o !== null) page.push(o);
+      }
+      return ok(page);
     },
 
     /**
