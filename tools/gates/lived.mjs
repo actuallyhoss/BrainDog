@@ -163,8 +163,13 @@ function steppedClock(ms) {
 
 /* ── the cache ─────────────────────────────────────────────────────────── */
 
-/** Where built records are kept: `BRAINDOG_LIVED_CACHE`, or a folder in the machine's temporary space. */
-export const cacheDir = () => env.BRAINDOG_LIVED_CACHE ?? join(tmpdir(), 'braindog-lived');
+/**
+ * Where built records are kept: `BRAINDOG_LIVED_CACHE`, or a folder in the machine's temporary space named for this
+ * checkout, so builders in parallel worktrees never sweep each other's records.
+ */
+export const cacheDir = () =>
+  env.BRAINDOG_LIVED_CACHE ??
+  join(tmpdir(), `braindog-lived-${createHash('sha256').update(ROOT).digest('hex').slice(0, 12)}`);
 
 /**
  * The hash a built record is kept under: the profile's file byte for byte, every document it installs (BrainDog's
