@@ -227,7 +227,7 @@ export const lists = {
   /* THE VERBS A SELECTION IS FOR. A selection with nothing to do with it is a mode you can enter
      and not leave usefully, which is what this one was: implemented, drawn, and consumed by
      nothing. Verb + Noun, like every other action here. */
-  copyIds: 'Copy numbers',
+  copyIds: 'Copy references',
   /* THE REGISTER'S OWN WORD FOR ITS OWN COLUMN. `things` labels its state field **Status**, so a
      hardcoded "Set state" put one field's three names on one screen — `lane` in the schema, Status
      in the header, state on the verb, two of them visible at once. The menu's VALUES already come
@@ -244,7 +244,7 @@ export const lists = {
   /** Said when a key would move that panel off something typed and not saved. */
   rowUnsaved: 'Save what you typed, or close the panel, before you move on.',
   openRow: 'Open',
-  copyId: 'Copy number',
+  copyId: 'Copy reference',
   copyLink: 'Copy link',
   includesExample: 'includes 1 example',
   /* `example`, THE BARE LOWER-CASE WORD, IS THE RECORD'S AND NOT THIS FILE'S. It is the tag a seeded

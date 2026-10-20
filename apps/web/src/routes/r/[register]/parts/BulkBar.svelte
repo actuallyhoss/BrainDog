@@ -10,11 +10,12 @@
   rather than in the stylesheet once swallowed this into the card arm, so a desktop selection raised
   no bulk bar at all. The page draws it whichever body is on the screen.
 
-  IT FLOATS: a bar at the bottom centre of the window, over the list, with the count, the verbs and Esc to let go. It
-  is the tile's colour with a hairline and the second level's shadow, a rectangle and no glass (DIRECTION 39). Its
-  surface is on a pseudo-element, which keeps the bar itself free of anything that would place the state menu inside
-  it rather than on the window. The verbs in it are
-  the quiet buttons.
+  IT TAKES THE TOOLBAR'S PLACE (the UI pass of 20 October, money F7). It floated at the bottom of the window with a
+  border and a shadow, over the rows it acts on, and covered the Due cell of the row under it. While anything is picked
+  it is the tile's first row instead, the toolbar's height, flat: how many are picked, then the verbs, every one the
+  same quiet button, then Clear at the end. ON A PHONE it docks above the tab bar as a flat strip the screen's width,
+  and the list keeps 72px under its last row so the strip never covers it. It arrives as opacity alone, over
+  `--d-swap`.
 
   Every verb is the page's write (`copyIds`, `setPickedState`, `archiveSelected`), and `count` is the
   selection cut to the answer on screen, so what a verb acts on is what the reader is looking at.
@@ -77,6 +78,9 @@
     /** Called once a move has landed or been put back, so the page reads the list again. */
     onmoved?: (() => void) | undefined;
   } = $props();
+
+  /* This part's own words: the short Clear at the bar's end, whose name says what it clears. */
+  const barWords = { clear: 'Clear' } as const;
 
   /* ── MOVE TO… ── */
   const field = $derived(decl ? scopeFieldOf(decl.id) : undefined);
@@ -162,29 +166,28 @@
   }
 </script>
 
-<!-- It wraps rather than scrolls, so the verbs survive a phone. `data-fixed` because it is placed on the window, which
-     the shell's rail slide has to know so it does not carry the bar along with the work (`+layout.svelte`). -->
+<!-- It wraps rather than scrolls, so the verbs survive a narrow tile. On a phone it is placed on the window, above the
+     tab bar, which `data-fixed` tells the shell's rail slide (`+layout.svelte`). -->
 <div class="picked-bar" data-fixed role="toolbar" aria-label="{count} {copy.selected}">
-  <span class="picked-n num">{count}</span>
-  <span class="picked-word">{copy.selected}</span>
-  <Button weight="quiet" onclick={() => copyIds()}>
-    <Icon name="copy" size="s" />{copy.copyIds}
-  </Button>
+  <span class="picked-n"><span class="num">{count}</span> {copy.selected}</span>
   {#if states.length}
     <Menu label={copy.setState(stateLabel)}>
-      {#snippet trigger()}<span class="picked-verb"><Icon name="edit" size="s" />{copy.setState(stateLabel)}</span>{/snippet}
+      {#snippet trigger()}<span class="picked-verb"><Icon name="edit" size="s" />{copy.setState(stateLabel)}<Icon name="chevronDown" size="s" /></span>{/snippet}
       {#each states as state}
-        <button
-          class="mi"
-          role="menuitem"
-          type="button"
-          onclick={() => setPickedState(state)}
-        >
+        <button role="menuitem" type="button" onclick={() => setPickedState(state)}>
           <span class="mi-name">{saidInLine(decl?.state ?? '', state)}</span>
         </button>
       {/each}
     </Menu>
   {/if}
+  {#if archiveSelected}
+    <Button weight="quiet" onclick={() => archiveSelected?.()}>
+      <Icon name="archive" size="s" />{copy.archiveSelected}
+    </Button>
+  {/if}
+  <Button weight="quiet" onclick={() => copyIds()}>
+    <Icon name="copy" size="s" />{copy.copyIds}
+  </Button>
   {#if canMove}
     <Button weight="quiet" onclick={openMove}>
       <Icon name="arrow" size="s" />{words.moveMany}
@@ -195,13 +198,8 @@
       <Icon name="link" size="s" />{words.foldMany}
     </Button>
   {/if}
-  {#if archiveSelected}
-    <Button weight="quiet" onclick={() => archiveSelected?.()}>
-      <Icon name="archive" size="s" />{copy.archiveSelected}
-    </Button>
-  {/if}
-  <button type="button" class="picked-clear tap" aria-label={copy.clear} title={copy.clear} onclick={() => onclear()}>
-    <Icon name="close" size="s" /><span class="picked-esc" aria-hidden="true"><Kbd keys="Esc" /></span>
+  <button type="button" class="picked-clear tap" aria-label={copy.clear} onclick={() => onclear()}>
+    <Icon name="close" size="s" />{barWords.clear}<span class="picked-esc" aria-hidden="true"><Kbd keys="Esc" /></span>
   </button>
 </div>
 
@@ -238,59 +236,92 @@
 {/if}
 
 <style>
-  /* THE FLOATING BAR: bottom centre, 12 above the window's edge twice over, and above the phone's tab bar there. The
-     surface is the `::before`, so the state menu inside it places itself on the window. */
+  /**
+   * THE TOOLBAR'S ROW, FLAT: the tile's own colour, no edge and no shadow, the toolbar's 40px, the count first and Clear
+   * at the end. Every verb is the same quiet button, the state's menu among them.
+   */
   .picked-bar {
-    position: fixed;
-    inset-inline: 0;
-    inset-block-end: calc(env(safe-area-inset-bottom) + var(--inset) * 2);
-    z-index: var(--z-sheet);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
-    inline-size: fit-content;
-    max-inline-size: calc(100vw - 2 * var(--inset));
-    margin-inline: auto;
-    padding: 6px 6px 6px var(--sp-4);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    animation: picked-in var(--d-enter) var(--ease-out);
-  }
-
-  .picked-bar::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: var(--tile);
-    box-shadow: 0 0 0 1px var(--rule), var(--e2);
-    pointer-events: none;
+    gap: var(--sp-2);
+    min-block-size: 40px;
+    color: var(--ink-2);
+    font-size: var(--fs-ctl);
+    animation: picked-in var(--d-swap) var(--ease-out);
   }
 
   @keyframes picked-in {
     from {
-      transform: translateY(12px);
+      opacity: 0;
     }
   }
 
-  .picked-word {
+  .picked-n {
     margin-inline-end: var(--sp-2);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    font-variant-numeric: tabular-nums;
   }
 
+  /* THE STATE'S MENU READS AS THE BUTTONS BESIDE IT: the quiet fill, 32 tall, its chevron after the words. */
   .picked-verb {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-3);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+    transition: background var(--d-state) var(--ease-out);
   }
 
-  .picked-n {
-    color: var(--ink);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
+  @media (hover: hover) and (pointer: fine) {
+    :global(.menu-trigger):hover > .picked-verb {
+      background: var(--hover);
+    }
+  }
+
+  /* LET GO: Clear at the end, with the Esc cap beside it, the key that does the same. */
+  .picked-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    margin-inline-start: auto;
+    padding: 0 var(--sp-3);
+    background: none;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    font: inherit;
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .picked-clear:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+
+  .picked-esc {
+    display: inline-flex;
+  }
+
+  @media (pointer: coarse) {
+    .picked-esc {
+      display: none;
+    }
+
+    .picked-verb {
+      min-block-size: var(--tap);
+    }
   }
 
   /* THE PLACES, as the row page lists them: each the whole of its target and 48 tall, a hairline between two. */
@@ -312,7 +343,7 @@
     inset-block-start: 0;
     inset-inline: var(--sp-3);
     block-size: 1px;
-    background: var(--line);
+    background: var(--rule);
     pointer-events: none;
   }
 
@@ -321,12 +352,12 @@
     align-items: center;
     gap: var(--sp-3);
     inline-size: 100%;
-    min-block-size: var(--sp-7);
+    min-block-size: 48px;
     padding-block: var(--sp-1);
     padding-inline: var(--sp-3);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
     text-align: start;
@@ -336,108 +367,46 @@
 
   @media (hover: hover) and (pointer: fine) {
     .scope-place:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
   .scope-said {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
-  /* LET GO: a close with the Esc cap beside the glyph, the key that does the same. */
-  .picked-clear {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-block-size: var(--ctl-h);
-    padding: 0 var(--sp-2) 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: var(--r-ctl);
-    color: var(--ink2);
-    font: inherit;
-    cursor: pointer;
-    transition: background var(--d-state) var(--ease-out);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .picked-clear:hover {
-      background: var(--field);
-      color: var(--ink);
-    }
-  }
-
-  .picked-esc {
-    display: inline-flex;
-  }
-
-  /* The menu rows: 32 tall with the same wash on hover as every menu row. */
-  .mi {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    inline-size: 100%;
-    min-block-size: 32px;
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-ui);
-    text-align: start;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  /* 44 UNDER A THUMB, measured at 34 on a phone. `13 §7` is the rule. */
-  @media (pointer: coarse) {
-    .mi {
-      min-block-size: var(--tap);
-    }
-
-    .picked-esc {
-      display: none;
-    }
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .mi-name {
-    flex: 1;
-  }
-
-  /* NO RAIL BELOW 900PX, AND THE FLOATING TAB BAR OWNS THE BOTTOM EDGE, so the pill stands over it and over the toast
-     that sits on it. */
-  @media (width < 900px) {
+  /**
+   * ON A PHONE, A STRIP ABOVE THE TAB BAR: the screen's width, flat in the tile's colour, 56 tall above the safe area,
+   * one 1px rule over it where it meets the list. The page keeps 72px under the last row while it shows.
+   */
+  @media (width < 640px) {
     .picked-bar {
-      inset-block-end: calc(var(--tabbar) + var(--inset) * 3 + var(--tap));
+      position: fixed;
+      inset-inline: 0;
+      inset-block-end: var(--tabbar);
+      z-index: var(--z-sheet);
+      flex-wrap: nowrap;
+      gap: var(--sp-1);
+      min-block-size: 56px;
+      padding: 0 var(--sp-3);
+      overflow-x: auto;
+      background: var(--tile);
+      border-block-start: 1px solid var(--rule);
+      scrollbar-width: none;
+    }
+
+    .picked-bar > :global(*) {
+      flex: none;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .picked-bar {
-      animation-name: picked-fade;
-    }
-  }
-
-  @keyframes picked-fade {
-    from {
-      opacity: 0.6;
-    }
-  }
-
-  @media (forced-colors: active) {
-    .picked-bar::before {
-      border: 1px solid CanvasText;
+      animation-duration: 120ms;
     }
   }
 </style>
