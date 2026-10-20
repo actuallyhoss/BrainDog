@@ -771,13 +771,29 @@
     }
 
     /* The phone's name, 22/28, two lines at most and then an ellipsis: a cut name loses its meaning, and two lines never
-       push the count or the actions off the row. */
+       push the count or the actions off the row. THE GLYPH AND THE WORDS IN A GRID (today F9, which the question page
+       drew for itself), so a second line starts under the first and not under the glyph, and the glyph sits on the
+       first line. */
     .page-name {
-      display: -webkit-box;
-      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
       font-size: var(--fs-page-phone);
       line-height: calc(28 / 22);
       letter-spacing: -0.015em;
+    }
+
+    .page-name:has(> :is(.name-icon, .name-well)) {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .page-name > :is(.name-icon, .name-well) {
+      block-size: 1lh;
+    }
+
+    .name-words {
+      display: -webkit-box;
+      overflow: hidden;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
       line-clamp: 2;

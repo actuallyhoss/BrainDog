@@ -2009,16 +2009,9 @@
   }
 
   /* ── the title on a phone (today F9) ──────────────────────────────────
-     THE ICON AND THE QUESTION IN A GRID, so a second line starts under the first and not under the icon, and the ⋯
-     level with the first line. */
+     THE ICON AND THE QUESTION IN A GRID is PageHead's own now, on every page; here only the ⋯ is held level with the
+     question's first line. */
   @media (width < 900px) {
-    .q-head :global(.page-name) {
-      display: grid;
-      grid-template-columns: 28px minmax(0, 1fr);
-      column-gap: var(--sp-3);
-      align-items: start;
-    }
-
     .q-head :global(.page-head .head-actions) {
       align-self: start;
       margin-block-start: var(--sp-1);
