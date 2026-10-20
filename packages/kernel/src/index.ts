@@ -275,7 +275,35 @@ import { openExceptions } from './exceptions.ts';
 import { finders, tidyHour } from './tidy.ts';
 import { sourceModule } from './sources/index.ts';
 export { SOURCE_MODULES, sourceModule, type Source } from './sources/index.ts';
-import { beatRun, workingRuns } from './presence.ts';
+import { beatRun, presentRuns, pulseRun, workingRuns } from './presence.ts';
+/* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (migration 42, `instruction.ts`, `agent-profile.ts`). */
+import {
+  INSTRUCTIONS,
+  INSTRUCTION_KERNEL_WRITTEN,
+  changedSince as instructionsChangedSince,
+  expireInstructions,
+  instruct as instructRun,
+  instructionFor as instructionsFor,
+  instructionOf,
+  replyInstruction as replyToInstruction,
+  runOf as instructedRun,
+  seenBy as instructionSeenBy,
+  seenInstruction as sawInstruction,
+  stampFor as instructionStamp,
+  stopOf as runStopOf,
+  takeInstruction as takeInstructionFor,
+  withdrawInstruction as withdrawInstructionFor,
+  type Delta,
+  type InstructInput,
+  type InstructionDeps,
+  type Instr,
+  type ReplyState,
+  type RunHints,
+  type SeenHow,
+  type Stop,
+} from './instruction.ts';
+import { profileById, profileFor as profileMatching, readProfiles, setProfile as writeProfile, type Profile, type ProfileRow } from './agent-profile.ts';
+import { agentsDataSteps } from './migrations/0042_agents.ts';
 import { agentOf as ladderAgentOf, keysOfStamp, kindOfEvent, kindsOfProposal, madeByIn, personOf, recordReader, shapeIn, tokenOfRun } from './change-kind.ts';
 import { undoApply as applyUndo, undoPlan as planUndo, undoStaged as stageUndo, type UndoApplied, type UndoDeclared, type UndoOptions, type UndoPlan, type UndoScope } from './undo.ts';
 import { understandBackfill, undoBackfill, type BackfillDeps, type BackfillOptions, type Backfilled } from './backfill.ts';
@@ -295,6 +323,7 @@ import {
   leftFreshStep,
   learned,
   opening,
+  openingStamp,
   owned,
   provisionalTitle,
   recordNamed,
@@ -393,6 +422,59 @@ export {
   type RunRow,
   type WorkingRun,
 } from './presence.ts';
+/* LIVE PRESENCE (plan §4.4): the finer words for a session open now, read with the bridge's pulse. */
+export { CALL_MS, GONE_MS, PULSE_MIN_MS, THINKING_MS, isPresent, liveStateOf, presentRuns, type LiveState } from './presence.ts';
+/* INSTRUCTIONS AND SETTINGS ROWS (agents and MCP plan §8.3), the kernel's half of what wave 2 builds on. The functions
+   take the record's `Sql` first; the kernel's own methods of the same names (`instructionFor`, `takeInstruction`, …)
+   are bound to the record's clock and write path. */
+export {
+  EXPIRED_NOTE as INSTRUCTION_EXPIRED_NOTE,
+  INSTRUCTIONS,
+  INSTRUCTION_KERNEL_WRITTEN,
+  INSTRUCTION_KINDS,
+  INSTRUCTION_PREFIX,
+  INSTRUCTION_STATES,
+  INSTRUCTION_TO,
+  INSTRUCTION_WHEN,
+  OPEN_STATES as INSTRUCTION_OPEN_STATES,
+  REPLY_STATES,
+  SAID_MOST,
+  SEEN_HOW,
+  WAIT_MS as INSTRUCTION_WAIT_MS,
+  instructionOf,
+  openInstructions,
+  type Delta,
+  type InstrKind,
+  type InstrState,
+  type InstrTo,
+  type InstrWhen,
+  type Instr,
+  type InstructInput,
+  type ReplyState,
+  type RunHints,
+  type SeenHow,
+  type Stop,
+} from './instruction.ts';
+export {
+  BRIEF_MOST,
+  CEILINGS,
+  CONTEXT_BUDGETS,
+  DEFAULT_PROFILE,
+  DEFAULT_PROFILE_ID,
+  PROFILE_KINDS,
+  mayOf,
+  toolOn,
+  type Ceiling,
+  type ContextBudget,
+  type Profile,
+  type ProfileCaps,
+  type ProfileContext,
+  type ProfileEnforce,
+  type ProfileMatch,
+  type ProfileNotify,
+  type ProfileQuiet,
+  type ProfileRow,
+} from './agent-profile.ts';
 export { OPERATION_METHOD, REACHES, type Approved, type DeviceCode, type DeviceRow, type Exchanged, type Operation, type OperationGrant, type Reach, type ShapeGrant, type VaultGrant, type Waiting } from './device.ts';
 export { shapeGrant };
 export type { SessionHints } from './session.ts';
@@ -1165,6 +1247,8 @@ const navOf = (nav: unknown): { section: string; order: number; place?: number; 
 type Door = {
   decided?: boolean;
   merge?: boolean;
+  /** The kernel's own instruction path (`instruction.ts`), the one writer of an instruction's delivery fields and state. */
+  instructs?: boolean;
   seal?: { field: string; bind: (actor: string, held: string | null) => Result<GrantRow> };
 };
 
@@ -3915,6 +3999,22 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           `A write takes its values as an object of field names, and this one is ${JSON.stringify(patch) ?? 'missing'}.`,
           { at: ref === null ? 'fields' : 'patch' },
         );
+
+      /* AN INSTRUCTION IS A PERSON'S AND THE KERNEL MOVES IT (migration 42, `instruction.ts`): no token makes or edits
+         one, so no agent instructs another, and no caller writes how it was delivered or answered. A person's own
+         write (the app's Undo, a word fixed) reaches only what he said, and only while no run has seen it; `instruct`
+         is the path that also stops a run or redirects one. */
+      if (register === INSTRUCTIONS && !door.instructs) {
+        const named = Object.keys(patch).find((k) => INSTRUCTION_KERNEL_WRITTEN.includes(k));
+        if (named) return no<Entry>('IMMUTABLE_FIELD', `${named} is written by the record itself, and no caller sets it.`, { at: named });
+        if (w.principal?.kind === 'token')
+          return no<Entry>('NEEDS_BROWSER_SESSION', 'Only a person tells an agent, signed in to BrainDog. An agent answers with instructions.', { at: 'register' });
+        const was = ref === null ? null : get(ref, { includeDeleted: true });
+        if (was && was.state !== 'sent' && Object.keys(patch).some((k) => k !== 'deleted_at'))
+          return no<Entry>('FORBIDDEN', 'A run has seen this instruction, so it is changed only by withdrawing it; say the new thing as a new one.', {
+            at: 'register',
+          });
+      }
       /* AND A VERSION IS A WHOLE NUMBER. `version: "4"` never equals 4, so a client that sent its version as
          text was told its row had moved on every attempt, and re-reading could never cure it. */
       if (w.version !== undefined && !Number.isSafeInteger(w.version))
@@ -4374,7 +4474,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
       /* STAMPED AFTER VALIDATION, because these are the kernel's own fields and no declaration
          describes them — running them through the field loop would refuse every one. */
-      if (w.stamp) Object.assign(merged, w.stamp);
+      /* A STAMPED `null` CLEARS THE FIELD, as K2 reads null everywhere else: absent, never a stored null, which the next
+         write's checks would read as a value (an enum "has no value null"). Migration 42's resume clears `stopped` so. */
+      if (w.stamp)
+        for (const [key, v] of Object.entries(w.stamp)) {
+          if (v === null) delete merged[key];
+          else merged[key] = v;
+        }
       /* A run placed through a stamp writes its move as a line of its own, with `project` from and to, so the server's
          undo can put it back like any other edit. */
       if (register === SESSION && current && w.stamp?.project !== undefined && !touched.includes('project')) touched.push('project');
@@ -5049,6 +5155,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         ...(runs.has('wrote') ? { wrote: working ? 1 : 0 } : {}),
         ...(working && runs.has('stretch_at') ? { stretch_at: now } : {}),
         ...(parent === null ? {} : { parent }),
+        /* AND THE WORKTREE IT OPENED IN, the record's to write as `token_id` is (migration 42, `openingStamp`). */
+        ...openingStamp(w.session ?? {}, runs),
       },
       ...(w.batch === undefined ? {} : { batch: w.batch }),
     });
@@ -7873,6 +7981,29 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   }
 
   /**
+   * What `instruction.ts` reads and writes through: the record's clock, an instruction's write through the write path
+   * with the door only it opens (`Door.instructs`), and a run's own fields stamped in place of a patch. Each is a line
+   * in the log, signed as the change says: by him for what he said, by the run for what it saw, took and answered.
+   */
+  function instructionDeps(): InstructionDeps {
+    return {
+      sql,
+      now: clock.now(),
+      write: (id, c) => {
+        const done = writing(
+          INSTRUCTIONS,
+          id,
+          c.patch,
+          { actor: c.actor, cascade: false, stamp: c.stamp, ...(c.note === null ? {} : { note: c.note }) },
+          { instructs: true },
+        );
+        return done.ok ? ok({ id: done.value.id }) : done;
+      },
+      runWrite: (id, stamp, actor, note) => writing(SESSION, id, {}, { actor, cascade: false, stamp, ...(note === null ? {} : { note }) }),
+    };
+  }
+
+  /**
    * The hourly sweep: soft-deleted rows past thirty days, runs not heard from in twelve hours, and steps nobody took in
    * thirty days. The `purge` schedule row and the `purge` method both run this one function.
    *
@@ -7885,6 +8016,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* MIGRATION 28'S DATA STEPS, 200 runs an hour until every run has had them (`runsDataSteps`): the runs the sweep
        wrote off after their sessions closed are ended, and every run's writes and step are counted from the log. */
     transaction(() => runsDataSteps(sql));
+    /* MIGRATION 42'S DATA STEP, once a record: a settings row for each kind of agent its runs have used, at the scope
+       its newest run's token holds, then Defaults (`agentsDataSteps`). */
+    transaction(() => agentsDataSteps(sql, instant(clock.now())));
+    /* AN INSTRUCTION NO RUN TOOK IN ITS TIME expires in the same hour, and one sent to a run that ended before it saw it
+       goes to the next run of that kind there (`instruction.ts`). */
+    transaction(() => expireInstructions(instructionDeps()));
     const sessions = transaction(() =>
       sweepSessions(
         sql,
@@ -11340,6 +11477,85 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           : undefined;
         return dropHandoff(sql, signedBy(w), said, typeof why === 'string' ? why : '', clock.now(), handoffWrite, may);
       });
+    },
+
+    /* ── what he tells an agent, and the settings it works under (agents and MCP plan §8.3, migration 42) ──────────
+
+       THE CONTRACT WAVE 2 BUILDS ON. A run is named by its spoken name (`S883`) or its row id, an instruction by `IN4`
+       or its row id, and every `Instr` carries both (`id` spoken, `row` the entry's). The record's methods decide WHO
+       may call each (a person in a browser for `instruct`, `withdrawInstruction` and `setProfile`; an agent's token,
+       resolved to its own run, for the rest) and hand the kernel the run they resolved: the kernel checks only that
+       the instruction is that run's. Every write is all or nothing (`attempt`). */
+
+    /** He tells an agent (`instruct`): one instruction made, and a stop, pause, resume or redirect applied at once. */
+    instruct: (w: WriteContext, input: InstructInput): Result<Instr> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      if (w.principal?.kind === 'token')
+        return no('NEEDS_BROWSER_SESSION', 'Only a person tells an agent, signed in to BrainDog. An agent answers with instructions.', { at: 'principal' });
+      return attempt(sql, transaction, () => instructRun(instructionDeps(), w.actor, input));
+    },
+    /** He takes back an instruction no run has taken yet. */
+    withdrawInstruction: (w: WriteContext, id: string): Result<Instr> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      if (w.principal?.kind === 'token')
+        return no('NEEDS_BROWSER_SESSION', 'Only the person who told it takes an instruction back, in BrainDog.', { at: 'principal' });
+      return attempt(sql, transaction, () => withdrawInstructionFor(instructionDeps(), w.actor, typeof id === 'string' ? id : ''));
+    },
+    /** The open instructions for run `runId`, a stop or pause first: `instructionFor(hints, runId) → Instr[]`. */
+    instructionFor: (hints: RunHints, runId: string): Instr[] => instructionsFor(sql, hints ?? {}, runId, clock.now()),
+    /** Run `runId` takes instruction `id`, compare and set: `takeInstruction(id, runId) → Result<Instr>`. */
+    takeInstruction: (id: string, runId: string): Result<Instr> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return attempt(sql, transaction, () => takeInstructionFor(instructionDeps(), id, runId));
+    },
+    /** The run that took `id` answers it: `replyInstruction(id, runId, {said, state}) → Result<Instr>`. */
+    replyInstruction: (id: string, runId: string, answer: { said: string; state?: ReplyState | undefined }): Result<Instr> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return attempt(sql, transaction, () => replyToInstruction(instructionDeps(), id, runId, answer));
+    },
+    /** Run `runId` was shown `id`, and how: `seenInstruction(id, runId, how)`. Answers the instruction as it stands. */
+    seenInstruction: (id: string, runId: string, how: SeenHow): Result<Instr> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return attempt(sql, transaction, () => sawInstruction(instructionDeps(), id, runId, how));
+    },
+    /** The runs shown an instruction, and how ("Seen by S883 and S884"). */
+    instructionSeen: (id: string) => instructionSeenBy(sql, id),
+    /** One instruction by `IN4` or its row id, or null. */
+    instruction: (id: string): Instr | null => instructionOf(sql, id),
+    /**
+     * The bridge says run `runId`'s session is open: `pulseRun(runId, at)`, `at` in milliseconds and the record's clock
+     * when left out. Moves `pulse_at` in place, no version and no event; answers whether it moved (`presence.ts`).
+     */
+    pulseRun: (runId: string, at?: number): boolean => {
+      if (schemaRefusal(state)) return false;
+      const run = instructedRun(sql, runId);
+      return run !== null && pulseRun(sql, run.id, at ?? clock.now());
+    },
+    /** What stops run `runId`, or null: `stopOf(runId) → null | {kind, id, said}`. A helper obeys its parent's. */
+    stopOf: (runId: string): Stop | null => runStopOf(sql, runId),
+    /** Run `runId`'s version stamp, which moves with anything for it: `stampFor(runId) → string`. */
+    stampFor: (runId: string): string => instructionStamp(sql, runId, clock.now()),
+    /** What moved for run `runId` since `stamp`: `changedSince(runId, stamp) → Delta`. */
+    changedSince: (runId: string, stamp: string): Delta => instructionsChangedSince(sql, runId, typeof stamp === 'string' ? stamp : '', clock.now()),
+    /** The sessions open now, for `presence` (plan §4.4), newest heard from first. */
+    presentRuns: () => presentRuns(sql, clock.now()),
+    /** The settings row an agent works under: `profileFor({kind, token, host}) → Profile`. */
+    profileFor: (who: { kind?: string | null | undefined; token?: string | null | undefined; host?: string | null | undefined }): Profile =>
+      profileMatching(sql, who ?? {}),
+    /** Every live settings row, Defaults first; retired ones too when asked. */
+    agentProfiles: (retired = false): Profile[] => readProfiles(sql, retired),
+    /** One settings row by id, or null. */
+    agentProfile: (id: string): Profile | null => profileById(sql, id),
+    /** He makes, changes or retires a settings row: `setProfile(row, by) → Result<Profile>`, `by` a person's id. */
+    setProfile: (row: ProfileRow, by: string): Result<Profile> => {
+      const barred = schemaRefusal(state);
+      if (barred) return barred;
+      return writeProfile({ sql, now: instant(clock.now()), mint }, row, by);
     },
     findRun,
     /** Whether a line of the log is the record's own bookkeeping, which a feed leaves out and the log keeps. Reads only. */

@@ -135,6 +135,8 @@ async function filled() {
   everythingElse(sql);
   /* A ROW ITS MAKER KEPT PRIVATE (migration 40), so entry_private travels with the rest. */
   value(k.setPrivate('p_2', 'obligations#2', true));
+  /* A SETTINGS ROW FOR A KIND OF AGENT (migration 42), so agent_profile travels with the governance. */
+  value(k.setProfile({ name: 'Claude Code', match: { kind: 'claude' }, ceiling: 'write' }, 'p_1'));
   return { k, sql };
 }
 
