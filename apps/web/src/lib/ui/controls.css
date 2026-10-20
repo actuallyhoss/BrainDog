@@ -9,7 +9,7 @@
  * A FIELD IS A SOFT WELL: 40 tall, 44 under a thumb, the `--tile-2` fill with no border, radius
  * `--r-ctl`, and its label above it in `--fs-meta` `--ink-2`. Focus is the 2px ink ring offset 2, the same ring every
  * other control takes from the a11y layer. A segmented control is one `--tile-2` rectangle (radius 8), with the chosen
- * segment raised in `--segment-on` (SPEC 2.A.9). A switch, a checkbox and a radio are `--red-fill` when they are on,
+ * segment raised in `--segment-on` (SPEC 2.A.9). A checkbox and a radio are `--red-fill` when they are on (a switch is ink),
  * with a white mark (SPEC 1.1, 2.A.10).
  */
 
@@ -389,8 +389,8 @@
    * is for choosing between named options. The button is the hit area, 44px under a thumb; the track is drawn inside it.
    *
    * 36 BY 20, A 16PX WHITE KNOB. OFF IS `--switch-off`, a grey the theme holds at 3:1 on the tile with the white knob at
-   * 3:1 on it, so an off switch no longer reads as on (it was a dark ink track). ON IS `--red-fill` (his decision: a
-   * switch that is on is the button red), with the knob in `--on-red`, the label colour every red fill is held to.
+   * 3:1 on it, so an off switch no longer reads as on (it was a dark ink track). ON IS `--ink` with the knob in `--tile`
+   * (20 Oct plan: red is kept for late and needs you, so a page of add-ons never reads as a page of alarms).
    * The knob's place says the state without the colour, and the fill says it again. The knob moves over `--d-state`;
    * nothing casts a shadow.
    */
@@ -433,12 +433,12 @@
   }
 
   .switch[aria-checked='true'] .switch-track {
-    background: var(--red-fill);
+    background: var(--ink);
   }
 
   .switch[aria-checked='true'] .switch-track::after {
     translate: 16px 0;
-    background: var(--on-red);
+    background: var(--tile);
   }
 
   /* THE KNOB TRAVELS THE OTHER WAY IN A RIGHT-TO-LEFT PAGE. `translate` is physical, and the knob
