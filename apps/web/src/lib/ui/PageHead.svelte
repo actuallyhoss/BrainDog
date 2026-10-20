@@ -684,25 +684,25 @@
       display: none;
     }
 
-    /* THE ACTIONS STAY ON THE TITLE ROW (batch 5c): the name wraps in its own column and the actions keep their width at
-       its end. They used to wrap under the name and float half way across the second line. */
+    /* THE ACTIONS STAY ON THE TITLE ROW (batch 5c): the name wraps in its own column, which keeps two fifths of the row
+       at least, and the actions keep their width at its end. They used to wrap under the name and float half way across
+       the second line. Only a control too wide for the rest of the row (a page's own switch between views, a search
+       field) still takes a line of its own under the name, at its end, rather than run off the screen. */
     .head-main {
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       gap: var(--sp-2);
     }
 
     .name-row {
       flex: 1 1 0;
       flex-wrap: wrap;
+      min-inline-size: 40%;
     }
 
-    /* LEVEL WITH THE SEARCH BUTTON AND THE FACE: the actions keep to the bar's band at the top of the row, however many
-       lines the name beside them takes. */
     .head-actions {
-      flex: none;
-      flex-wrap: nowrap;
-      align-self: flex-start;
-      min-block-size: var(--sticky);
+      flex: 0 1 auto;
+      flex-wrap: wrap;
+      min-inline-size: 0;
       margin-inline-start: auto;
     }
 
