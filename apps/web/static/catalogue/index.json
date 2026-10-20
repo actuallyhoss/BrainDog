@@ -2013,7 +2013,8 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own."
+          "notes": "Projects now says the month on each card in play, under This month, and draws the three bands under How they are going, while Revenue bands is installed. Both go when it goes, and Projects stays Portfolio's own.",
+          "preview": true
         },
         {
           "version": "2.1.0",
@@ -3053,7 +3054,8 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "The first version: say what a number is called, which measures it reads and how they are put together, and it is worked out once a day."
+          "notes": "The first version: say what a number is called, which measures it reads and how they are put together, and it is worked out once a day.",
+          "preview": true
         }
       ],
       "categories": [
@@ -3140,8 +3142,37 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "founder",
-      "latest": "2.7.0",
+      "latest": "3.0.0",
       "versions": [
+        {
+          "version": "3.0.0",
+          "checksum": "5297fe87aca4585d990e678b118d300d3fdec20ea07092e8c26937d573aa1218",
+          "bytes": 40813,
+          "published_at": "2026-10-20T23:39:55.884Z",
+          "bump": "major",
+          "reach": {
+            "modules": [
+              "portfolio",
+              "people",
+              "money-core",
+              "estate",
+              "work"
+            ],
+            "lists": [],
+            "pages": [
+              "Today",
+              "Dashboard",
+              "{{name}}"
+            ],
+            "rules": [],
+            "examples": 0,
+            "skills": [
+              "datapoint-reporter",
+              "poll-setup"
+            ],
+            "calls_out": []
+          }
+        },
         {
           "version": "2.7.0",
           "checksum": "be6a854da0fe2f7a0570090b47cf37170db8552501c2ac7b488356196dee484f",
