@@ -262,7 +262,7 @@
    */
   /* THE INDEX ONLY (agents F13): Backups and Billing say their own state in their own tiles, and a line on two areas
      alone moved the chooser 32px lower there than on every other. */
-  const SAID_ON = new Set([undefined]);
+  const SAID_ON = new Set<string | undefined>([undefined]);
   let copyLast = $state<CopyState>(null);
   let month = $state<UsageState>(null);
   let faults = $state<Fault[] | null>(null);
