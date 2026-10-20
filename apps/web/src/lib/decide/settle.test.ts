@@ -52,14 +52,14 @@ test('Not now stands in the row with the answers, not at the far end of the form
   assert.match(form, /\.dc-actions > \.dc-later \{\n\s+margin-inline-start: var\(--sp-2\);/u);
 });
 
-test('the question’s own page has a side only with something in it: who asked and why beside the answers on a wide page', () => {
+test('the question’s own page is two tiles on a wide board: the answers, and beside them why, what it changes and the comments (today F9)', () => {
   const gate = src('../../routes/decide/[id]/+page.svelte');
-  /* THE SIDE IS DRAWN WHERE IT HAS SOMETHING TO SAY (`[id]/side.ts`); with nothing, who asked is the line over the answers. */
-  for (const part of ["<div class=\"gate-form\" data-side={sided ? '' : undefined}>", '<div class="gate-side">', '<div class="gate-main">', '{cardWords.askedBy}', '{cardWords.why}'])
+  /* THE SECOND TILE IS DRAWN WHERE IT HAS SOMETHING TO SAY; who asked is the quiet line over the answers either way. */
+  for (const part of ["<div class=\"gate-grid\" data-aside={aside ? '' : undefined}>", '<Tile class="gate-aside">', '{cardWords.askedBy}', '{gate.whyAsked}', '{gate.changes}'])
     assert.ok(gate.includes(part), `the gate no longer draws ${part}`);
-  /* AT LEAST THE CARD'S 280px, and wider on a wide page, only where there is a side. */
-  assert.match(gate, /\.gate-form\[data-side\] \{\n\s+display: grid;\n\s+grid-template-columns: minmax\(0, 1fr\) clamp\(280px, 26cqi, 360px\);/u);
-  assert.ok(gate.indexOf('<div class="gate-side">') < gate.indexOf('<section class="options"'), 'who asked and why are read after the answers');
+  /* TWO THIRDS AND A THIRD FROM 1100px, only where there is a second tile. */
+  assert.match(gate, /@media \(width >= 1100px\) \{\n\s+\.gate-grid\[data-aside\] \{\n\s+grid-template-columns: minmax\(0, 8fr\) minmax\(0, 4fr\);/u);
+  assert.ok(gate.indexOf('<section class="options"') < gate.indexOf('<Tile class="gate-aside">'), 'the answers are no longer read first');
 });
 
 test('a sent answer’s row closes to nothing with the gap under it, so the read that takes it out moves nothing', () => {

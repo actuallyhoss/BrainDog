@@ -75,7 +75,7 @@
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import { sideOf, words as sideWords } from './side.ts';
   import { readFiles, visualsOf } from './option-visual.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { hostedHere } from '../../settings/billing.ts';
   import { goto, invalidateAll } from '$app/navigation';
   /* Imported here and nowhere in the layout, so the client stays out of the entry chunk. */
@@ -92,7 +92,6 @@
   import Tile from '$lib/ui/Tile.svelte';
   import Thread from '$lib/ui/Thread.svelte';
   import Waffle from '$lib/viz/Waffle.svelte';
-  import { WORDS as LEAD } from '../lead.ts';
   import { words as gate } from '../words.ts';
   import Face from '$lib/ui/Face.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
@@ -165,7 +164,8 @@
 
   /* THE CLOCK A BAND IS READ AGAINST, taken when the read answers. Nothing reads it before then: the
      question and every press on it are drawn only once `from` is `live`. */
-  const now = $derived(from === 'live' ? Date.now() : 0);
+  /* ON THE RECORD'S CLOCK, so "asked 9h ago" is the record's morning and never the browser's date. */
+  const now = $derived(from === 'live' ? recordNow() : 0);
 
   /**
    * WHETHER THIS READER MAY ANSWER, WHICH THIS SCREEN ONCE NEVER ASKED.
@@ -322,11 +322,8 @@
      IT OF EVERY ANSWER, AND AN OPTION'S OWN MARK OF THAT ONE (`hard`, the record's `option_costs`): "Keep my page"
      beside "Take the update's page" is a call, and only taking is worded as hard. */
   const hardOption = (key: string | null): boolean => key !== null && question?.options.find((o) => o.key === key)?.hard === true;
-  /* THE ANSWER'S BUTTON SAYS THE ANSWER CHOSEN, in its own words ("Keep the subdomain"), and Answer before one is. */
-  const chosenLabel = $derived.by(() => {
-    const o = question?.options.find((x) => x.key === selectedKey);
-    return o && question ? labelOf(o, question, moves) : null;
-  });
+  /* AN ANSWER THAT CANNOT BE TAKEN BACK, by the question's band or the option's own mark: its press asks first (today F9). */
+  const hardly = (key: string): boolean => question?.band === 'undo' || hardOption(key);
   const pressSaid = (label: string, key: string | null = null): string => (question?.band === 'undo' || hardOption(key) ? queueWords.hard(label) : label);
 
   /* WHO ASKED AND WHEN, the quiet line over the answers, by the name every screen gives them, never a handle. */
@@ -400,10 +397,21 @@
     chosenKey = key;
   }
 
-  /** DECIDE: the answer chosen, given. With none chosen yet the focus goes to the first choice, and nothing is sent. */
-  function commit() {
-    if (selectedKey === null) return void document.getElementById(`opt-${question?.options[0]?.key ?? ''}`)?.focus();
-    choose(selectedKey);
+  /**
+   * THE OPTION CARD'S OWN BUTTON (today F9): one press is the answer. One that cannot be taken back opens a confirm in its
+   * card first, said in words, with the answer and Go back; the focus goes to the answer, and nothing is sent until then.
+   */
+  let confirming = $state<string | null>(null);
+  async function press(key: string) {
+    if (confirming !== key && hardly(key)) {
+      confirming = key;
+      await tick();
+      document.getElementById(`confirm-${key}`)?.focus();
+      return;
+    }
+    confirming = null;
+    chosenKey = key;
+    choose(key);
   }
 
   /**
@@ -836,11 +844,12 @@
       now,
     });
   });
-  /* A QUESTION WITH NOTHING FOR THE SIDE HAS NONE: who asked is the quiet line over the answers, and the tile reads as
-     one centred column at a form's measure, never a blank column beside the choices. A receipt reads the same way. */
-  const sided = $derived(side?.any === true);
-  /** The side's parts under the answers on a phone, beside them on a laptop: the evidence and what is linked. */
+  /** The side's parts in the second tile: the evidence and what is linked. */
   const sideMore = $derived(side !== null && (side.evidence !== null || side.links.length > 0));
+  /* STILL ASKED: not answered here or elsewhere. Only then are why and what it changes said beside it. */
+  const asking = $derived(!settled && !(from === 'live' && live?.closed));
+  /* THE SECOND TILE (today F9): why it is asked, what it changes, the evidence and what is linked, then the comments. */
+  const aside = $derived(from === 'live' || (asking && (Boolean(question?.context) || doesAny || sideMore)));
 
   /**
    * DRAWN ONCE THE READ HAS ANSWERED LIVE. The read is bracketed by `opened()` and `closed()`, so a call
@@ -931,20 +940,23 @@
   <!-- THE QUESTION IS THE PAGE'S TITLE, and a question that gathered several says how many beside it. No sentence under
        it: how many answers there are and which is suggested is what the tile under it shows, and saying it twice was
        the trivia the reset took out (DIRECTION §39). -->
-  <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} actions={!settled && me.owner ? whoMore : undefined} />
+  <div class="q-head">
+    <PageHead icon="decide" kicker={copy.decide} back="/decide" title={spoken(question.title)} count={joined} actions={!settled && me.owner ? whoMore : undefined} />
+  </div>
   {#snippet whoMore()}
     <Button weight="bare" size="sm" aria-expanded={whoOpen} aria-label={whoWords.more} onclick={() => (whoOpen = !whoOpen)}>⋯</Button>
   {/snippet}
 
-  <div class="page" data-plain={sided ? undefined : ''}>
+  <div class="page">
     <!-- HOW FAR AN ACCEPTED ARRANGEMENT GOT LEADS, because it is the news and the reason the options came back. -->
     {#if part && !settled}<Applied partial={part} />{/if}
     <!-- WHO DECIDES THIS ONE, and for the owner the way to name them: its own chunk, read only on an open question. -->
     {#if !settled}{#await import('./Decider.svelte') then m}<m.default {question} owner={me.owner} me={me.person} bind:open={whoOpen} />{/await}{/if}
 
-    <!-- ONE TILE, READ LIKE A FORM (DIRECTION §39): who asked and when, why, the answers as choices, Decide and Not now,
-         then what accepting does as a plain part of the same tile, and the comments under it all. A settled question
-         is its receipt in the same place, and its comments stay under it. -->
+    <!-- TWO TILES ON A WIDE BOARD (today F9): the answers, each option a card with its own button, and beside them why
+         it is asked, what it changes and the comments. One column on a phone, the answers first. A settled question is
+         its receipt in the first tile, and its comments stay beside it. -->
+    <div class="gate-grid" data-aside={aside ? '' : undefined}>
     <Tile class="gate">
       {#if settled}
         <!-- THE RECEIPT, WITH ITS GREEN CHECK: who, when, which option, and the reason as it was written. -->
@@ -1010,38 +1022,13 @@
           <p class="cannot" id="cannot-decide">{whyNot}</p>
         {/if}
 
-        <!-- THE FORM AND ITS SIDE (DIRECTION §39). On a wide tile the answers and what accepting does are the first
-             column, and beside them a side says who asked and when, why, the evidence and what is linked, each only
-             where the record holds it. On a narrow one both are let go of and read in one column:
-             who asked, why, the answers, what accepting does, then the evidence and what is linked. A QUESTION WITH
-             NOTHING FOR THE SIDE HAS NO SIDE: who asked is one quiet line over the answers and the tile is one centred
-             column (`side.ts`). The side's parts are groups with a name, never landmarks of their own. -->
-        {#snippet askedBy(said: boolean)}
-          <p class="gate-by">
-            {#if said}<span class="dc-sr">{cardWords.askedBy}</span>{/if}
-            {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
-            <span class="gate-when">{since(question.opened, now)}</span>
-          </p>
-        {/snippet}
-        <div class="gate-form" data-side={sided ? '' : undefined}>
-          {#if sided}
-            <!-- WHO ASKED AND WHEN, quiet, then WHY it is asked, in the asker's own words, before the answers. -->
-            <div class="gate-side">
-              <div class="gate-part" role="group" aria-labelledby="gate-by-h">
-                <h2 class="gate-side-h" id="gate-by-h">{cardWords.askedBy}</h2>
-                {@render askedBy(false)}
-              </div>
-              {#if question.context}
-                <div class="gate-part" role="group" aria-labelledby="gate-why-h">
-                  <h2 class="gate-side-h" id="gate-why-h">{cardWords.why}</h2>
-                  <p class="gate-why">{symbolText(spoken(question.context))}</p>
-                </div>
-              {/if}
-            </div>
-          {/if}
+        <!-- WHO ASKED AND WHEN, the quiet line over the answers, as a card's by-line is over its question. -->
+        <p class="gate-by">
+          <span class="dc-sr">{cardWords.askedBy}</span>
+          {#if asker}<Face name={asker.name} kind={asker.kind} size="s" /><span class="gate-who">{asker.name}</span>{/if}
+          <span class="gate-when">{since(question.opened, now)}</span>
+        </p>
 
-          <div class="gate-main">
-            {#if !sided}{@render askedBy(true)}{/if}
             <!-- ONE ANSWER'S BUTTON, for the record's own two answers: it says what it does (`press.ts` `labelOf`), Decline for
                  the record's Reject and the amount on Accept when money moves, and the care a hard one asks for in its words.
 
@@ -1083,75 +1070,69 @@
                   {@render later()}
                 </div>
               {:else}
-                <!-- THE ANSWERS AS CHOICES: each a full-width rectangle with its name and what it does, the suggested one
-                     saying so in the accent's words, the one chosen ringed (`form.css`). A press chooses; Needs you gives it. -->
-                <!-- TWO OR THREE SIDE BY SIDE on a wide screen, each with what it does and its drawing; stacked on a phone. -->
-                <ul class="dc-choices" role="radiogroup" aria-label={copy.theOptions} data-across={question.options.length <= 3 ? '' : undefined} style:--across={question.options.length}>
+                <!-- THE ANSWERS AS CARDS (today F9), two or three side by side on a wide tile and stacked on a phone: each its name,
+                     what it does, its drawing, and its own button at the foot. The suggested one's button is the primary, the
+                     rest quiet, and one press decides. One that cannot be taken back asks first, in its own card; where the
+                     suggestion is such a one, no button is red. -->
+                <ul class="dc-options" data-across={question.options.length <= 3 ? '' : undefined} style:--across={question.options.length}>
                   {#each question.options as option}
                     <!-- THE REASON AS IT WAS FILED, so its rows are links (`Cited`), each named by its list; where the body
                          holds no reason, the words `questionOf` made of it. -->
                     {@const because = reasonIn(about?.body, option.key) ?? option.body}
                     {@const shows = visuals.get(option.key)}
                     {@const marked = suggestedKey === option.key}
-                    {@const on = asked === null ? selectedKey === option.key : asked === option.key}
-                    <li role="none">
-                      <div class="dc-choice" data-checked={on ? '' : undefined}>
-                        <span class="dc-ring" aria-hidden="true"></span>
-                        <span class="dc-choice-main">
-                          <!-- WHAT THE OPTION IS LEADS IT, inside its own box and nowhere else: a swatch writes its colour
-                               into `--swatch` on its chip alone, hidden from a screen reader because the name says it. -->
-                          {#if shows && 'swatch' in shows}
-                            <span class="card-visual" data-shows="swatch" aria-hidden="true">
-                              {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
-                            </span>
-                          {:else if shows && 'figure' in shows}
-                            <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
-                          {:else if shows && 'file' in shows}
-                            <!-- A PICTURE SAYS WHICH OPTION IT IS, in the option's own name, for a reader who cannot see it. -->
-                            <span class="card-visual" data-shows="file"
-                              ><img class="card-file" src={shows.file.src} alt={labelOf(option, question, moves)} loading="lazy" decoding="async" /></span
-                            >
-                          {/if}
+                    {@const said = labelOf(option, question, moves)}
+                    {@const on = asked === option.key || (holding?.key ?? null) === option.key}
+                    <li class="dc-option" data-suggested={marked ? '' : undefined} data-checked={on ? '' : undefined}>
+                      <!-- WHAT THE OPTION IS LEADS IT, inside its own card and nowhere else: a swatch writes its colour into
+                           `--swatch` on its chip alone, hidden from a screen reader because the name says it. -->
+                      {#if shows && 'swatch' in shows}
+                        <span class="card-visual" data-shows="swatch" aria-hidden="true">
+                          {#each shows.swatch as colour, s (s)}<span class="card-swatch" style:--swatch={colour}></span>{/each}
+                        </span>
+                      {:else if shows && 'figure' in shows}
+                        <span class="card-visual" data-shows="figure"><span class="card-figure num">{shows.figure}</span></span>
+                      {:else if shows && 'file' in shows}
+                        <!-- A PICTURE SAYS WHICH OPTION IT IS, in the option's own name, for a reader who cannot see it. -->
+                        <span class="card-visual" data-shows="file"><img class="card-file" src={shows.file.src} alt={said} loading="lazy" decoding="async" /></span>
+                      {/if}
+                      {#if marked}<span class="dc-rec">{gate.suggested}</span>{/if}
+                      <h3 class="dc-option-name" dir="auto">{said}</h3>
+                      <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name. -->
+                      {#if because.trim() !== ''}
+                        <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
+                      {/if}
+                      <OptionVisual visual={drawingFor(option.key)} />
+                      <div class="dc-option-foot">
+                        {#if confirming === option.key}
+                          <!-- THE CONFIRM STAYS IN THE CARD, never a dialog over the page: what cannot be undone, then the
+                               answer again and the way back. -->
+                          <p class="dc-confirm" role="status">{gate.confirm(said)}</p>
+                          <div class="dc-option-acts">
+                            <button type="button" class="dc-btn" data-weight="primary" id="confirm-{option.key}" disabled={holding !== null || sending !== null} onclick={() => void press(option.key)}>{said}</button>
+                            <button type="button" class="dc-btn" data-weight="bare" onclick={() => (confirming = null)}>{gate.goBack}</button>
+                          </div>
+                        {:else}
                           <button
                             type="button"
-                            role="radio"
-                            class="dc-choice-hit"
+                            class="dc-btn"
                             id="opt-{option.key}"
                             data-answer={option.key}
                             data-suggested={marked ? '' : undefined}
-                            aria-checked={on}
+                            data-weight={marked && !hardly(option.key) ? 'primary' : undefined}
+                            data-on={on ? '' : undefined}
                             disabled={!answerable || holding !== null}
                             aria-describedby={answerable ? undefined : 'cannot-decide'}
-                            onclick={() => pick(option.key)}
+                            onclick={() => void press(option.key)}
                             onkeydown={(e) => onChoiceKey(e, option.key)}
-                            >{labelOf(option, question, moves)}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}</button
+                            >{said}{#if marked}<span class="dc-sr">, {gate.suggested}</span>{/if}</button
                           >
-                          <!-- AN OPTION WITH NO REASON SHOWS NONE, rather than an empty line under its name. -->
-                          {#if because.trim() !== ''}
-                            <span class="dc-choice-does card-body"><Cited text={because} figures={figuresIn(about?.body)} {now} /></span>
-                          {/if}
-                          <OptionVisual visual={drawingFor(option.key)} />
-                        </span>
-                        {#if marked}<span class="dc-rec" aria-hidden="true">{gate.suggested}</span>{/if}
+                        {/if}
                       </div>
                     </li>
                   {/each}
                 </ul>
-                <div class="dc-actions">
-                  {#if asked === null}
-                    <button
-                      type="button"
-                      class="dc-btn"
-                      data-weight="primary"
-                      id="gate-decide"
-                      aria-disabled={selectedKey === null}
-                      disabled={!answerable || holding !== null || sending !== null}
-                      aria-describedby={answerable ? undefined : 'cannot-decide'}
-                      onclick={commit}>{pressSaid(chosenLabel ?? gate.decide, selectedKey)}</button
-                    >
-                  {/if}
-                  {@render later()}
-                </div>
+                <div class="dc-actions">{@render later()}</div>
               {/if}
 
               <!-- THE ONE LINE THE RECORD ASKS FOR, only when it answers the press with `wants: 'reason'`, with the answer
@@ -1205,13 +1186,23 @@
                 {#if fix}<p class="commit-fix" role="status" data-intent="bad">{fix}</p>{/if}
               </section>
             {/if}
-
-            <!-- WHAT ACCEPTING DOES, A PLAIN PART OF THE SAME TILE under the answers: what an arrangement does, what a
-                 proposal puts in place, the rows to tick, the rows it changes, what it calls out, and what deciding late
-                 costs. Each under its own small heading, open, read before the press and never in the way of it. -->
-            {#if doesAny}
+      {/if}
+    </Tile>
+    {#if aside}
+    <Tile class="gate-aside">
+      <!-- WHY IT IS ASKED, in the asker's own words. -->
+      {#if asking && question.context}
+        <section class="aside-part" aria-labelledby="gate-why-h">
+          <h2 class="gate-h" id="gate-why-h">{gate.whyAsked}</h2>
+          <p class="gate-why">{symbolText(spoken(question.context))}</p>
+        </section>
+      {/if}
+      <!-- WHAT IT CHANGES, beside the answers: what an arrangement does, what a proposal puts in place, the rows to tick,
+           the rows it changes, what it calls out, and what deciding late costs. Each under its own small heading, open, read
+           before the press and never in the way of it. -->
+      {#if asking && doesAny}
               <section class="does" aria-labelledby="does-title">
-                <h2 class="gate-h" id="does-title">{LEAD.does}</h2>
+                <h2 class="gate-h" id="does-title">{gate.changes}</h2>
                 <div class="does-parts">
                   {#if story && !settled}
                     <section class="changed" aria-label={story.lead}>
@@ -1297,13 +1288,10 @@
                 </div>
               </section>
             {/if}
-          </div>
-
-          <!-- THE REST OF THE SIDE, written after the answers so a phone reads it under them: the share the asker gave
-               on the question's body, and the things the reasons name, each a link to it by its own name. What answering
-               changes is not here: it is whole under the answers, at every width, and said once. -->
-          {#if side && sided && sideMore}
-            <div class="gate-side gate-more">
+      <!-- AND THE REST OF THE SIDE: the share the asker gave on the question's body, and the things the reasons name, each
+           a link to it by its own name. -->
+      {#if asking && side && sideMore}
+            <div class="aside-more">
               {#if side.evidence}
                 {@const ev = side.evidence}
                 <div class="gate-part" role="group" aria-labelledby="gate-ev-h">
@@ -1333,11 +1321,8 @@
               {/if}
             </div>
           {/if}
-        </div>
-      {/if}
-
-      <!-- THE QUESTION'S COMMENTS, IN THE SAME TILE, open or settled, since what was said about it is worth as much after
-           the decision as before. On the question and not on each option. A Reads colleague may comment here too. -->
+      <!-- THE QUESTION'S COMMENTS, LAST IN THE SECOND TILE, open or settled, since what was said about it is worth as much
+           after the decision as before. On the question and not on each option. A Reads colleague may comment here too. -->
       {#if from === 'live'}
         <div class="thread">
           {#key threadRead}
@@ -1350,11 +1335,18 @@
         </div>
       {/if}
     </Tile>
+    {/if}
+    </div>
   </div>
 {/if}
 
 <style>
   /* THE GATE IS ONE TILE ON THE BOARD, running the window's width; what is read inside it keeps a form's measure. */
+  /* THE HEAD'S WRAPPER MAKES NO BOX, so the phone's bar still sticks inside the screen as it does on every page. */
+  .q-head {
+    display: contents;
+  }
+
   .page {
     container-type: inline-size;
     display: flex;
@@ -1363,124 +1355,64 @@
     padding: var(--sp-4) var(--gutter) var(--sp-9);
   }
 
-  /* THE TILE IS A FORM'S COLUMN: who asked, why, the answers, the buttons, what accepting does, the comments. */
-  .page :global(.tile.gate) {
+  /* THE FIRST TILE IS THE ANSWERS: who asked, the option cards, Not now, and a receipt once it is answered. */
+  .page :global(.tile.gate),
+  .page :global(.tile.gate-aside) {
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
+    min-inline-size: 0;
   }
 
-  /* ── the form and its side ─────────────────────────────────────────────── */
+  /* ── two tiles on a wide board (today F9) ──────────────────────────────── */
 
-  /* ONE COLUMN, ON A NARROW PAGE: the form and the side are let go of, and their parts are the tile's own, read in the
-     order a question always was: who asked, why, the answers, what accepting does, then the evidence and what is linked. */
-  .gate-form,
-  .gate-side,
-  .gate-main,
-  .gate-part {
-    display: contents;
+  /* ONE COLUMN ON A PHONE AND A NARROW WINDOW, the answers first. From 1100px the answers take two thirds of the board
+     and why, what it changes and the comments the third beside them, both tiles from the top. */
+  .gate-grid {
+    display: grid;
+    gap: var(--tile-gap);
+    align-items: start;
+    min-inline-size: 0;
   }
 
-  /* A QUIET HEADING OVER EACH PART OF THE SIDE, said to a screen reader in one column, where who asked and why sit at
-     the top of the tile as they always did and need no name. */
-  .gate-side-h {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    margin: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    color: var(--dim);
-    font-family: var(--font-ui);
-    font-size: var(--fs-meta);
-    font-weight: var(--fw-medium);
-    line-height: 1.4;
+  @media (width >= 1100px) {
+    .gate-grid[data-aside] {
+      grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    }
   }
 
-  /* THE PARTS UNDER THE ANSWERS KEEP THEIR HEADINGS at every width, since nothing about their place says what they are;
-     each is its heading and what is under it, a step apart. */
-  .gate-more .gate-part {
+  /* EACH PART OF THE SECOND TILE UNDER A HAIRLINE, the first one bare. */
+  .aside-part,
+  .aside-more {
     display: flex;
     flex-direction: column;
     gap: var(--sp-2);
     min-inline-size: 0;
   }
 
-  .gate-more .gate-side-h {
-    position: static;
-    inline-size: auto;
-    block-size: auto;
-    overflow: visible;
-    clip-path: none;
+  :global(.tile.gate-aside) > * + :is(.does, .aside-more, .thread) {
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
   }
 
-  /* TWO COLUMNS, ON A WIDE PAGE WITH SOMETHING FOR THE SIDE: the answers and what accepting does, and beside them a
-     side under quiet headings, a hairline at its start. The side is written in two halves, who asked and why before the
-     answers and the rest after them, so one column reads in order; here both sit in the second column, one under the
-     other, and the answers span them. The page is the container, its tile 40px inside it, so the threshold is the
-     card's (52rem of tile) and the tile's padding. */
-  @container (inline-size >= 55rem) {
-    .gate-form[data-side] {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) clamp(280px, 26cqi, 360px);
-      grid-template-rows: auto 1fr;
-      column-gap: var(--sp-6);
-      align-items: start;
-    }
-
-    .gate-form[data-side] > .gate-main {
-      display: flex;
-      flex-direction: column;
-      gap: var(--sp-4);
-      grid-row: 1 / span 2;
-      grid-column: 1;
-      min-inline-size: 0;
-    }
-
-    .gate-form[data-side] > .gate-side {
-      display: flex;
-      flex-direction: column;
-      gap: var(--sp-5);
-      grid-row: 1;
-      grid-column: 2;
-      align-self: stretch;
-      min-inline-size: 0;
-      padding-inline-start: var(--sp-5);
-      border-inline-start: 1px solid var(--rule);
-    }
-
-    .gate-form[data-side] > .gate-more {
-      grid-row: 2;
-      padding-block-start: var(--sp-5);
-    }
-
-    .gate-form[data-side] .gate-part {
-      display: flex;
-      flex-direction: column;
-      gap: var(--sp-2);
-      min-inline-size: 0;
-    }
-
-    .gate-form[data-side] .gate-side-h {
-      position: static;
-      inline-size: auto;
-      block-size: auto;
-      overflow: visible;
-      clip-path: none;
-    }
-
-    .gate-side .gate-why {
-      max-inline-size: none;
-      margin: 0;
-    }
+  .aside-more {
+    gap: var(--sp-4);
   }
 
-  /* NO SIDE, SO ONE CENTRED COLUMN: the tile still runs the board's width, and what is read inside it (who asked, the
-     answers, what accepting does, a receipt, the comments) keeps a form's measure in its middle, with no blank column
-     beside it. On a narrow page the measure is wider than the tile and nothing moves. */
-  .page[data-plain] :global(.tile.gate) {
-    padding-inline: max(20px, calc((100% - 46rem) / 2));
+  .aside-more .gate-part {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .gate-side-h {
+    margin: 0;
+    color: var(--dim);
+    font-family: var(--font-ui);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 1.4;
   }
 
   /* ── the side's own parts ──────────────────────────────────────────────── */
@@ -1544,8 +1476,8 @@
     font-size: var(--fs-meta);
   }
 
-  /* WITH NO SIDE, WHO ASKED IS THE LINE OVER THE ANSWERS, close over them as a card's by-line is over its question. */
-  .gate-main > .gate-by {
+  /* WHO ASKED IS THE LINE OVER THE ANSWERS, close over them as a card's by-line is over its question. */
+  :global(.tile.gate) > .gate-by {
     margin-block-end: calc(var(--sp-1) * -1);
   }
 
@@ -1561,7 +1493,7 @@
   /* WHY IT IS ASKED, in the asker's words, read and not skimmed: the body's size, its lines kept, at a measure. */
   .gate-why {
     max-inline-size: var(--measure);
-    margin: calc(var(--sp-2) * -1) 0 0;
+    margin: 0;
     color: var(--ink2);
     font-size: var(--fs-body);
     line-height: var(--lh-body);
@@ -1626,13 +1558,11 @@
 
   /* ── what accepting does, a plain part of the tile ─────────────────────── */
 
-  /* A HAIRLINE OVER IT, the one mark between the answers and what they would do. */
+  /* UNDER WHY IT IS ASKED, a hairline over it where something came first. */
   .does {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--rule);
   }
 
   .gate-h {
@@ -1943,10 +1873,18 @@
     gap: var(--sp-2);
   }
 
-  /* THE COMMENTS, UNDER A HAIRLINE IN THE SAME TILE, so what was said is read with the question it is about. */
+  /* THE COMMENTS, LAST IN THE SECOND TILE, under a hairline where something came before them. */
   .thread {
-    padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--rule);
+    min-inline-size: 0;
+  }
+
+  /* NO COMMENT YET IS NOTHING SAID (today F9): only the field, "Add a comment" inside it and a thumb tall. */
+  .thread :global(.thread-quiet:empty) {
+    display: none;
+  }
+
+  .thread :global(.box-input) {
+    min-block-size: var(--tap);
   }
 
   /* THE THREAD'S OWN AIR IS THE TILE'S NOW, and its heading reads as the tile's other heading does. */
@@ -1966,29 +1904,124 @@
     }
   }
 
-  /* ── the options side by side (plan of 20 October) ──────────────────────
-     TWO OR THREE ANSWERS ARE CARDS IN A ROW on a wide screen, each as tall as the tallest, "Suggested" over its name and
-     its drawing under what it does; four or more, and any phone, keep the list. */
-  @media (width >= 1100px) {
-    .dc-choices[data-across] {
-      grid-template-columns: repeat(var(--across), minmax(0, 1fr));
+  /* ── the options as cards (today F9) ──────────────────────────────────
+     TWO OR THREE SIDE BY SIDE where each has 240px, stacked on a phone: the name 17/600, what it does in the second ink,
+     its drawing, and its own button at the foot, the cards of a row as tall as the tallest. */
+  .dc-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .dc-options:not([data-across]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* NOT NOW UNDER THE CARDS, its word level with their edge rather than its button's. */
+  .dc-options + .dc-actions {
+    margin-inline-start: -14px;
+  }
+
+  .dc-option {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+    padding: var(--sp-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-ctl);
+    background: var(--tile);
+  }
+
+  .dc-option[data-checked] {
+    border-color: var(--ink);
+  }
+
+  .dc-option > .dc-rec {
+    margin: 0;
+  }
+
+  .dc-option-name {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 17px;
+    font-weight: var(--fw-semi);
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .dc-option > .dc-choice-does {
+    color: var(--ink2);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+  }
+
+  /* THE BUTTON AT THE FOOT, pushed down so a row of cards has its buttons on one line. */
+  .dc-option-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    margin-block-start: auto;
+    padding-block-start: var(--sp-2);
+  }
+
+  .dc-option-acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .dc-confirm {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    line-height: var(--lh-body);
+  }
+
+  /* ON A PHONE THE CARD'S BUTTON RUNS ITS WIDTH, a thumb's height. */
+  @media (width < 600px) {
+    .dc-option {
+      padding: var(--sp-3);
+    }
+
+    .dc-option-foot,
+    .dc-option-acts {
       align-items: stretch;
     }
 
-    .dc-choices[data-across] > li > .dc-choice {
-      grid-template-columns: auto minmax(0, 1fr);
-      align-content: start;
-      block-size: 100%;
+    .dc-option-foot > .dc-btn,
+    .dc-option-acts > .dc-btn {
+      flex: 1 1 0;
+      min-block-size: var(--tap);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .dc-option[data-checked] {
+      border: 2px solid Highlight;
+    }
+  }
+
+  /* ── the title on a phone (today F9) ──────────────────────────────────
+     THE ICON AND THE QUESTION IN A GRID, so a second line starts under the first and not under the icon, and the ⋯
+     level with the first line. */
+  @media (width < 900px) {
+    .q-head :global(.page-name) {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      column-gap: var(--sp-3);
+      align-items: start;
     }
 
-    .dc-choices[data-across] .dc-rec {
-      grid-row: 1;
-      grid-column: 2;
-      justify-self: start;
-    }
-
-    .dc-choices[data-across] .dc-choice-main {
-      grid-column: 2;
+    .q-head :global(.page-head .head-actions) {
+      align-self: start;
+      margin-block-start: var(--sp-1);
     }
   }
 </style>

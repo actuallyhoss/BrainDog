@@ -65,6 +65,14 @@ export const words = {
   decide: 'Answer',
   /** Putting the question off: opens the step that asks why and until when. */
   notNow: 'Not now',
+  /** The question page's second tile (today F9): why it is asked, in the asker's words. */
+  whyAsked: 'Why this is asked',
+  /** And what answering would change, under it. */
+  changes: 'What it changes',
+  /** The confirm an answer that cannot be taken back opens in its own card: "Retire it? This cannot be undone." */
+  confirm: (answer: string) => `${String(answer).replace(/[.?!]+$/u, '')}? This cannot be undone.`,
+  /** The way back out of that confirm, sending nothing. */
+  goBack: 'Go back',
 
   /** An address naming a question this record does not hold: said without the handle in the address. */
   notHere: 'This question is not in this record.',

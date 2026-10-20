@@ -96,7 +96,7 @@ test('a question with no picture asks the record for nothing', async () => {
   assert.equal(asked, 0);
 });
 
-test('THE OPTIONS STAND SIDE BY SIDE, EACH WITH ITS DRAWING, and the answer button says the one chosen', () => {
+test('THE OPTIONS STAND SIDE BY SIDE, EACH WITH ITS DRAWING, and each card’s own button says its answer (today F9)', () => {
   /* AN OPTION AS IT WAS FILED, carrying the day it sets: the page hands it with its key and draws the date it moves to. */
   const q = queueOf({ id: 'SG2', title: 'Retire Tallow?', band: 'call', opened: '2026-10-01T00:00:00Z', options: [{ key: 'park', title: 'Park it', body: '' }, { key: 'retire', title: 'Retire it', body: '' }] });
   const drawn = drawingOf(q, { id: 'park', key: 'park', due: '2026-11-01' } as { key: string }, { now: Date.parse('2026-10-20T09:00:00Z'), home: null });
@@ -106,6 +106,7 @@ test('THE OPTIONS STAND SIDE BY SIDE, EACH WITH ITS DRAWING, and the answer butt
   const page = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
   assert.match(page, /data-across=\{question\.options\.length <= 3 \? '' : undefined\}/u, 'two or three options are a list again');
   assert.match(page, /<OptionVisual visual=\{drawingFor\(option\.key\)\} \/>/u, 'an option is drawn without its picture');
-  assert.match(page, /grid-template-columns: repeat\(var\(--across\), minmax\(0, 1fr\)\);/u);
-  assert.match(page, /pressSaid\(chosenLabel \?\? gate\.decide, selectedKey\)/u, 'the answer button says Decide over the answer chosen');
+  assert.match(page, /\.dc-options \{\n\s+display: grid;\n\s+grid-template-columns: repeat\(auto-fit, minmax\(240px, 1fr\)\);/u);
+  assert.match(page, /onclick=\{\(\) => void press\(option\.key\)\}\n\s+onkeydown=\{\(e\) => onChoiceKey\(e, option\.key\)\}\n\s+>\{said\}/u, 'a card’s button no longer says its own answer');
+  assert.doesNotMatch(page, /id="gate-decide"/u, 'an Answer button under the cards gives the one chosen again');
 });
