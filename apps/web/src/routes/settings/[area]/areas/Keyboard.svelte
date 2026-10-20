@@ -8,7 +8,7 @@
 <script lang="ts">
   import * as pref from '$lib/pref.ts';
   import { copy } from '$lib/copy.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Keymap from '$lib/ui/Keymap.svelte';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
@@ -41,13 +41,13 @@
   >
 {/snippet}
 
-<Section title={words.shortcuts}>
+<Tile icon="keyboard" title={words.shortcuts}>
   <!-- THE SENTENCE THAT SAYS WHAT THE SWITCH DOES, in the row that holds the switch. It was written, and allow-listed
        in `dead-copy` as *"UNBUILT: `/settings/keyboard` is a heading and two unexplained buttons"*, the gate knowing,
        in those words, that a compound noun and two buttons were all a reader got. `19 §4` calls this the app's WCAG
        2.1.4 conformance; a switch whose effect nobody states is a switch nobody turns on deliberately. -->
   <StateRow icon="keyboard" title={copy.characterKeys} line={copy.characterKeysHint} action={charsSwitch} />
-</Section>
+</Tile>
 <!--
   THE SHEET, ON THE ONE SCREEN THAT CAN STILL REACH IT.
 
@@ -65,6 +65,6 @@
   cookie is written by the effect in the script: reading the cookie would show the previous
   answer until the page reloaded.
 -->
-<Section title={copy.keymap}>
+<Tile icon="rows" title={copy.keymap}>
   <Keymap silenced={!chars} />
-</Section>
+</Tile>

@@ -86,10 +86,10 @@ export const BINDINGS: Binding[] = [
      (`goto.ts`), and `sayGoto` writes `chordOf` of that list into this row before the sheet is drawn, so the sheet
      prints every place's letter. The seven here lead that list and keep their letters. */
   { id: 'goto', scope: 'document', key: 'g then h d i s v p ,', label: 'Go to Today, Needs you, Inbox, Search, Vault, Add-ons, Settings', bare: true },
-  { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'The nth item of your nav, in your order', bare: true },
-  { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Toggle the sidebar', bare: false },
+  { id: 'goto-nav', scope: 'document', key: 'g then 1–9', label: 'Go to page 1 to 9 of your nav', bare: true },
+  { id: 'sidebar', scope: 'document', key: '⌘\\', label: 'Show or hide the side rail', bare: false },
   { id: 'undo', scope: 'document', key: '⌘Z', label: 'Undo the last change', bare: false },
-  { id: 'commit', scope: 'document', key: '⌘↵', label: 'Commit the primary action of whatever is open', bare: false },
+  { id: 'commit', scope: 'document', key: '⌘↵', label: 'Do the main thing on what is open', bare: false },
   { id: 'close', scope: 'document', key: 'Esc', label: 'Close the topmost layer, one per press', bare: false },
   { id: 'help', scope: 'document', key: '?', label: 'This sheet. It is help, not Slash', bare: true },
   { id: 'menu', scope: 'document', key: '⇧F10', label: 'The menu of what has focus', bare: false },

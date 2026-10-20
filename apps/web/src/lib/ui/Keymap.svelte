@@ -57,6 +57,20 @@
   } as const;
 
   const groups = SCOPE_ORDER.map((scope) => [scope, BINDINGS.filter((b) => b.scope === scope)] as const);
+
+  /**
+   * ONE ROW PER PLACE FOR THE `g` CHORD (UI pass 20 Oct, agents F27). "g then h d i s v p ," was one key cap beside
+   * seven names, so which letter went where was left to counting. Split into "g then h" Today, "g then d" Needs you, and
+   * so on, when the letters and the names come out the same in number; anything else stays the one row it was.
+   */
+  function rowsOf(b: { id: string; key: string; label: string }): { key: string; label: string }[] {
+    const head = 'g then ';
+    if (b.id !== 'goto' || !b.key.startsWith(head) || !b.label.startsWith('Go to ')) return [b];
+    const letters = b.key.slice(head.length).split(' ').filter(Boolean);
+    const names = b.label.slice('Go to '.length).split(', ');
+    if (letters.length !== names.length) return [b];
+    return letters.map((l, i) => ({ key: `${head}${l}`, label: `Go to ${names[i]}` }));
+  }
 </script>
 
 {#if silenced}
@@ -77,12 +91,14 @@
         <th class="scope-title" colspan="2" scope="rowgroup"><span class="scope-name"><Icon name={GLYPH[scope]} size="s" />{TITLE[scope]}</span></th>
       </tr>
       {#each bindings as binding}
-        <tr>
-          <td class="key" class:off={silenced && binding.bare}><Kbd keys={binding.key} /></td>
-          <td class="does">
-            {binding.label}{#if silenced && binding.bare}<span class="tag">{copy.keymapRowOff}</span>{/if}
-          </td>
-        </tr>
+        {#each rowsOf(binding) as row}
+          <tr>
+            <td class="key" class:off={silenced && binding.bare}><Kbd keys={row.key} /></td>
+            <td class="does">
+              {row.label}{#if silenced && binding.bare}<span class="tag">{copy.keymapRowOff}</span>{/if}
+            </td>
+          </tr>
+        {/each}
       {/each}
     </tbody>
   {/each}
