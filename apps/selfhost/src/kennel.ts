@@ -278,6 +278,7 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
     }
     case 'submit':
     case 'yank':
+    case 'mine':
     case 'review':
     case 'verdict':
     case 'publisher':
