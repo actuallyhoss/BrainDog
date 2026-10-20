@@ -94,6 +94,7 @@
     whole = false,
     offer,
     opens,
+    between,
   }: {
     /** The page's address, which arranging writes against and a missing page names. */
     slug: string;
@@ -124,6 +125,8 @@
      * own sentence where the page opens on one (`PageBody`'s `opens`). Read only by a `home`.
      */
     opens?: Snippet | undefined;
+    /** What a home draws between its blocks, before the one at an index (`PageBody`'s `between`). Read only by a `home`. */
+    between?: Snippet<[number]> | undefined;
   } = $props();
 
   /* A PAGE IS THE RECORD'S BLOCKS AND NOTHING ELSE; a record that does not answer is its refusal, drawn below. */
@@ -773,6 +776,7 @@
       arrangement={kept ? arrangement : null}
       {onwalk}
       opens={opens ?? null}
+      between={between ?? null}
     />
   </div>
   {#if select && !arranging}<BatchBar {picked} />{/if}

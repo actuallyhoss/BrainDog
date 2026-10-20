@@ -107,6 +107,7 @@
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
+  import { anchorsFor, inPicture, type Placed } from '$lib/home/desk-order.ts';
   import type { BriefingRow } from '$lib/home/briefing.ts';
   import type { MatchedRow } from '$lib/home/matched.ts';
   import type { StaleRow } from '$lib/home/stale.ts';
@@ -456,7 +457,11 @@
   const desked = $derived.by(() => {
     if (!got || got.from !== 'live' || !shaped) return null;
     const blocks = deskWorking ? shaped.blocks.map((b) => (b.source === 'sessions.working' ? { ...b, drawn: false } : b)) : shaped.blocks;
-    return board ? deskFolded(blocks, moreOpen) : { blocks, folded: 0 };
+    /* ON THE DESK THE DOCUMENT HOLDS THE TILES IN THE ORDER THEY ARE SEEN (`desk-order.ts`), so Tab walks the picture. The
+       reader indexes the blocks it is handed, so the order is made here, before it. */
+    if (!board) return { blocks, folded: 0 };
+    const folded = deskFolded(blocks, moreOpen);
+    return { blocks: inPicture(folded.blocks), folded: folded.folded };
   });
   const drawn = $derived.by((): Opened | null => {
     if (!got || got.from !== 'live' || !desked) return got;
@@ -722,6 +727,8 @@
     ].filter(Boolean).length,
   );
   const folds = $derived((desked?.folded ?? 0) + extras);
+  /* WHERE THE DESK'S OWN PARTS AND MORE'S LINE STAND AMONG THE PAGE'S TILES, so the document is in the picture's order. */
+  const anchors = $derived(anchorsFor(board ? (desked?.blocks ?? []) : [], board && reader));
   const moreWords = { open: 'More', shut: 'Show less' } as const;
 
   /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
@@ -817,13 +824,37 @@
 
 <!-- THE DESK'S OWN PARTS: who is working, the live projects as cards and what landed, each left out where it has nothing.
      Height is held while it is on its way where the record has projects. -->
-{#snippet deskPart()}
+{#snippet deskPart(part: 'all' | 'working' | 'projects' | 'landed' = 'all')}
   {#if desk}
     {@const Desk = desk.Part}
-    <Desk cards={desk.cards} working={workingNow()} lines={newLines} lists={data.lists} names={data.names} me={data.me?.person ?? null} now={data.now} />
-  {:else if deskExpected}
+    <Desk cards={desk.cards} working={workingNow()} lines={newLines} lists={data.lists} names={data.names} me={data.me?.person ?? null} now={data.now} {part} />
+  {:else if deskExpected && (part === 'all' || part === 'projects')}
     <div class="desk-held" aria-hidden="true"></div>
   {/if}
+{/snippet}
+
+<!-- THE LINE THAT OPENS EVERYTHING ELSE: a plain line that says how many, and opens them in place. -->
+{#snippet moreLine()}
+  {#if folds > 0}
+    <button type="button" class="more" aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
+      <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
+      {#if !moreOpen}<span class="more-count num">{folds}</span>{/if}
+      <Icon name="chevronDown" size="s" />
+    </button>
+  {/if}
+{/snippet}
+
+<!-- THE DESK'S OWN PARTS AND MORE'S LINE, each where the picture shows it (`desk-order.ts`): before a tile of the page, or
+     after the page. -->
+{#snippet placedParts(list: readonly Placed[])}
+  {#each list as part (part)}
+    {#if part === 'more'}{@render moreLine()}{:else}{@render deskPart(part)}{/if}
+  {/each}
+{/snippet}
+
+{#snippet amid(i: number)}
+  {@const here = anchors.at.get(i)}
+  {#if here}{@render placedParts(here)}{/if}
 {/snippet}
 
 <div class="page">
@@ -880,24 +911,18 @@
     {/if}
 
     <!-- A PAGE THE PERSON KEPT: the desk over it, as before, and their page under it as they laid it out. -->
-    {#if !board}{@render deskPart()}{/if}
+    {#if !board}{@render deskPart('all')}{/if}
 
     <!--
       THE DESK (`board`): one twelve-column board that the desk's parts and the page's blocks are laid out on together,
       each where the 19 October desk puts it, and More under them. A kept page is its own board, with More under it.
     -->
     <div class="body" data-board={board ? '' : undefined}>
-      {#if board}{@render deskPart()}{/if}
-      <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. -->
-      {#if reader}<PageView bind:this={view} {slug} got={drawn} mode="home" {reread} />{/if}
-      <!-- EVERYTHING ELSE, BEHIND ONE MORE: a plain line that says how many, and opens them in place. -->
-      {#if folds > 0}
-        <button type="button" class="more" aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
-          <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
-          {#if !moreOpen}<span class="more-count num">{folds}</span>{/if}
-          <Icon name="chevronDown" size="s" />
-        </button>
-      {/if}
+      <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. On the
+           desk the parts that are the desk's own stand among its tiles, in the order they are seen (`amid`). -->
+      {#if reader}<PageView bind:this={view} {slug} got={drawn} mode="home" {reread} between={board ? amid : undefined} />{/if}
+      <!-- THE PARTS NO TILE OF THE PAGE COMES AFTER, and EVERYTHING ELSE BEHIND ONE MORE. -->
+      {#if board}{@render placedParts(anchors.tail)}{:else}{@render moreLine()}{/if}
       {#if moreOpen && extras > 0}
         <div class="more-body">
           <!--
@@ -1096,7 +1121,7 @@
   }
 
   .body[data-board] > :global([data-working]),
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='working']) {
+  .body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
     order: 2;
   }
 
@@ -1112,11 +1137,13 @@
     order: 5;
   }
 
-  .body[data-board] > :global(:is(.projects, .desk-held)) {
+  .body[data-board] > :global(:is(.projects, .desk-held)),
+  .body[data-board] :global(.home-page > .page > :is(.projects, .desk-held)) {
     order: 6;
   }
 
-  .body[data-board] > :global([data-landed]) {
+  .body[data-board] > :global([data-landed]),
+  .body[data-board] :global(.home-page > .page > [data-landed]) {
     order: 7;
   }
 
@@ -1128,7 +1155,7 @@
     order: 9;
   }
 
-  .body[data-board] > .more {
+  .body[data-board] .more {
     order: 20;
   }
 
@@ -1145,7 +1172,7 @@
     }
 
     .body[data-board] > :global([data-working]),
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='working']) {
+    .body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
       grid-column: span var(--w);
     }
 
@@ -1161,7 +1188,8 @@
       grid-column: span 4;
     }
 
-    .body[data-board] > :global([data-landed]) {
+    .body[data-board] > :global([data-landed]),
+    .body[data-board] :global(.home-page > .page > [data-landed]) {
       grid-column: span var(--a);
     }
 
@@ -1176,12 +1204,14 @@
 
   @container desk (640px <= inline-size < 960px) {
     .body[data-board] > :global([data-working]),
+    .body[data-board] :global(.home-page > .page > [data-working]),
     .body[data-board] :global(.home-page > .page > .block-slot:is([data-key='working'], [data-key='cash'], [data-key='coming-up'], [data-key='faces'])) {
       grid-column: span 6;
     }
 
     /* ONE OF THE PAIR MISSING, the other takes the row. */
     .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) > :global([data-working]),
+    .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) :global(.home-page > .page > [data-working]),
     .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) :global(.home-page > .page > .block-slot[data-key='working']),
     .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']),
     .body[data-board]:not(:has(:global(.block-slot[data-key='faces']))) :global(.home-page > .page > .block-slot[data-key='coming-up']),

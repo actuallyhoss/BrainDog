@@ -22,6 +22,7 @@
     names,
     me,
     now,
+    part = 'all',
   }: {
     cards: Cards | null;
     working: readonly Working[];
@@ -30,6 +31,8 @@
     names: Readonly<Record<string, string>>;
     me: string | null;
     now: number;
+    /** One part of the three, where Today lays them among the page's tiles; `all` is the three in a row. */
+    part?: 'all' | 'working' | 'projects' | 'landed';
   } = $props();
 
   /* A working agent's project lends its card's colour to the dot before its name. */
@@ -38,6 +41,6 @@
   const landed = $derived(landedOf(lines, new Map(lists.map((l) => [l.id, l.name])), me, now, new Map(Object.entries(names))));
 </script>
 
-<WorkingNow {rows} />
-{#if cards}<ProjectCards cards={cards.cards} more={cards.more} list={cards.list} name={cards.name} />{/if}
-<Landed rows={landed} />
+{#if part === 'all' || part === 'working'}<WorkingNow {rows} />{/if}
+{#if cards && (part === 'all' || part === 'projects')}<ProjectCards cards={cards.cards} more={cards.more} list={cards.list} name={cards.name} />{/if}
+{#if part === 'all' || part === 'landed'}<Landed rows={landed} />{/if}

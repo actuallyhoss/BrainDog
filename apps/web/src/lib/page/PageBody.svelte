@@ -68,6 +68,7 @@
     captured = -1,
     under = null,
     opens = null,
+    between = null,
   }: {
     /**
      * `page` is `/p/<slug>`, with its block keys. `home` is a home's body: its blocks that hold nothing are not drawn, a
@@ -122,6 +123,12 @@
      * page opens on one, so that sentence stays under the screen's head, and before the first block otherwise.
      */
     opens?: Snippet | null;
+    /**
+     * What the screen draws in the flow of the blocks, straight before the block at an index (Today's desk: the parts that
+     * are its own sit between the page's tiles in the order they are seen, so the tab order is the visual order). Called
+     * for every block of the list, drawn or not, with its index; a screen that draws nothing there draws nothing.
+     */
+    between?: Snippet<[number]> | null;
   } = $props();
 
   const arranging = $derived(arrangement?.editing ?? false);
@@ -1112,6 +1119,7 @@
   {@const seen = foldable ? foldSeen.get(key) : undefined}
   {@const folds = seen !== undefined && foldOf(block.kind, seen.lines, mode)}
   {@const shut = folds && !foldOpen.has(key)}
+  {#if between}{@render between(slot.i)}{/if}
   <!-- `drawn: false` means the record evaluated `when:` and said no. A page that shows a warning that does not apply
        teaches people to ignore warnings (06 §1). -->
   {#if block.drawn}
