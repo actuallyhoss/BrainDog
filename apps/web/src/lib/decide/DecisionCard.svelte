@@ -82,6 +82,8 @@
   import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import { amountAnswer, moneyRowOf, outcomeOf } from './money-row.ts';
 
   let {
     question,
@@ -221,9 +223,32 @@
     settle(phase === 'answered' ? done : cardEl, from);
   }
 
-  const line = $derived(
-    chosen === null ? '' : mergeLine || answeredLine(card, chosen, person, since(answeredAt || new Date().toISOString(), Date.now())),
-  );
+  /**
+   * A QUESTION ABOUT MONEY THAT FELL DUE IS ONE ROW (today F4): what it is, the amount at the end, how late in red, and
+   * the answer that names the amount. Any other question, and a merge, is the card it always was.
+   */
+  const row = $derived(card.merge === null ? moneyRowOf(card.question, card.ways.map((w) => w.label)) : null);
+
+  /** "Asked by your rule Chase late payments, 16 Jul": who asked, at the row's foot and never leading it. */
+  const askedLine = $derived.by(() => {
+    if (!row) return '';
+    const at = new Date(question.at);
+    const day = Number.isFinite(at.getTime()) ? at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+    const rule = card.by.kind === 'rule' ? card.by.name.replace(/^A rule: /u, '') : null;
+    const who = rule !== null ? cardWords.byRule(rule.charAt(0).toUpperCase() + rule.slice(1)) : card.by.kind === 'you' ? cardWords.byYou : cardWords.by(card.by.name);
+    return day ? `${who}, ${day}` : who;
+  });
+
+  /**
+   * WHAT AN ANSWER DID, said with its object (today F7): "Chased Invoice 2026-041: brand system for £4,800". A proposal
+   * Slash drafted says its history as before, and a merge its own line.
+   */
+  const line = $derived.by(() => {
+    if (chosen === null) return '';
+    if (mergeLine) return mergeLine;
+    if (card.slash) return answeredLine(card, chosen, person, since(answeredAt || new Date().toISOString(), Date.now()));
+    return outcomeOf(chosen.label, row ? { title: row.title, amount: row.amount } : { title: card.question });
+  });
 
   /* A NOTE, AFTER A DECLINE: offered in the line the card became, opened only by its press, and kept with the question as
      a comment on it, in Decide's own words. */
@@ -527,10 +552,38 @@
     >{/if}
 {/snippet}
 
+<!-- THE ANSWERS AS A ROW OF BUTTONS, one press each: the suggested one, or else the first, filled with the accent. On a
+     money row the filled one names the amount ("Chase £4,800"). -->
+{#snippet inlineButtons(amount: string | null)}
+  {#each card.ways as way, i (way.key)}
+    <button
+      type="button"
+      class="queue-act dc-btn"
+      data-weight={way.key === primary ? 'primary' : undefined}
+      data-recommended={way.recommended ? '' : undefined}
+      id={optId(way.key)}
+      data-enter={way.key === card.enter ? '' : undefined}
+      data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
+      aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
+      onclick={() => press(way)}
+      >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
+        ><span class="dc-btn-name">{amount !== null && way.key === primary ? amountAnswer(way.label, amount) : way.label}</span>{wayTail(card, way, primary)}</span
+      >{#if way.recommended}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}</button
+    >
+  {/each}
+{/snippet}
+
+<!-- ASK ME LATER (today F11): a quiet clock at the row's end, opening the question's own page at the step that puts it off. -->
+{#snippet later()}
+  {#if notNow}
+    <a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)} aria-label={queueWords.notNow} title={queueWords.notNow}><Icon name="clock" size="s" /></a>
+  {/if}
+{/snippet}
+
 {#if phase === 'answered' && chosen}
   <!-- ONE LINE, QUIET: what was chosen, by whom and when, where the card was, with Undo while the answer waits. -->
   <p class="qa-done" role="status" tabindex="-1" bind:this={done} data-held={holding || busy || leaving ? '' : undefined}>
-    <Face name={copy.feedYou} you size="s" /><span class="qa-done-words">{line}</span>
+    <Icon name="check" size="s" /><span class="qa-done-words">{line}</span>
     {#if holding}
       <button type="button" class="qa-see qa-undo tap" onclick={undo}>{cardWords.undo}</button>
     {:else if chosen.key === 'reject' && note === 'shut' && !busy}
@@ -550,6 +603,28 @@
       {#if noteFix}<p class="qa-fix" role="status">{noteFix}</p>{/if}
     </form>
   {/if}
+{:else if row}
+  <!-- A MONEY ROW (today F4): the well, what it is and the amount, how late in red, the answers, and who asked at the
+       foot. The question in full is on its own page, which the title opens. -->
+  <article class="queue-card dc dc-row" aria-busy={busy} data-selected={chosenForAll ? '' : undefined} data-compact={compact ? '' : undefined} bind:this={cardEl}>
+    <span class="dr-well"><IconWell name={row.owed ? 'arrowDown' : 'money'} size="l" tone="late" /></span>
+    <h3 class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}>{row.title}</a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</h3>
+    <span class="dr-amount num">{row.amount}</span>
+    <p class="dr-meta"><span class="dr-late">{row.late}</span>{#if row.asks}<span class="dr-asks" dir="auto">{' · '}{row.asks}</span>{/if}</p>
+    {#if answerable}
+      <div class="dc-actions dr-actions" data-inline>
+        {@render inlineButtons(row.amount)}
+        {@render later()}
+      </div>
+    {/if}
+    {#if fix || bulkFix}<p class="qa-fix dr-fix" role="status">{fix || bulkFix}</p>{/if}
+    {#if !compact}<p class="dr-asked" dir="auto">{askedLine}</p>{/if}
+    {#if pick && answerable && !compact}
+      <button type="button" role="checkbox" class="queue-select qa-select tap dr-select" aria-checked={chosenForAll} aria-label={pageWords.pick(card.question)} onclick={() => pick?.toggle(question)}
+        ><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
+      >
+    {/if}
+  </article>
 {:else}
   <article
     class={lead && !compact ? 'queue-card queue-lead dc' : 'queue-card dc'}
@@ -666,22 +741,7 @@
           {#if inline}
             <!-- ONE PRESS DECIDES: the suggested answer, or the first, filled with the accent, the rest quiet. Its name is
                  its own span, so the line it leaves and the queue gate read the name without the care said after it. -->
-            {#each card.ways as way, i (way.key)}
-              <button
-                type="button"
-                class="queue-act dc-btn"
-                data-weight={way.key === primary ? 'primary' : undefined}
-                data-recommended={way.recommended ? '' : undefined}
-                id={optId(way.key)}
-                data-enter={way.key === card.enter ? '' : undefined}
-                data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
-                aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
-                onclick={() => press(way)}
-                >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
-                  ><span class="dc-btn-name">{way.label}</span>{wayTail(card, way, primary)}</span
-                >{#if way.recommended}<span class="dc-sr">{queueWords.suggestedSaid}</span>{/if}</button
-              >
-            {/each}
+            {@render inlineButtons(null)}
           {:else if compact}
             <!-- MORE ANSWERS THAN A ROW HOLDS, OR A MERGE: chosen on the question's own page. -->
             <a class="dc-btn" href={at(card.href)}>{queueWords.choose}</a>
@@ -696,7 +756,7 @@
               onclick={commit}>{pressSaid(card, queueWords.decide, card.ways.find((w) => w.key === selected))}</button
             >
           {/if}
-          {#if notNow}<a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)}>{queueWords.notNow}</a>{/if}
+          {@render later()}
         </div>
       {/if}
       {#if phase === 'asking' && chosen}
@@ -1148,16 +1208,143 @@
     font-size: var(--t-sm);
   }
 
-  /* ONE LINE, QUIET: what was chosen, by whom and when, where the card was. */
+  /* ONE LINE, QUIET (today F7): what the answer did, said with its object, on the second ground at the control radius,
+     with Undo while the answer waits. */
   .qa-done {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--sp-2);
+    gap: var(--sp-1) var(--sp-2);
     align-items: center;
     min-block-size: var(--ctl-h);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    animation: qa-in var(--d-swap) var(--ease-standard);
+  }
+
+  .qa-done > :global(.icon) {
+    flex: none;
+    color: var(--good);
+  }
+
+  @keyframes qa-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .qa-done {
+      animation: none;
+    }
+  }
+
+  /* ── a money row (today F4) ────────────────────────────────────────────────
+     The well over two lines, what it is with the amount at the end, how late in red under it, the answers under that,
+     and who asked at the foot. Every part names its own cell, so the skin's "every part across the card" does not hold. */
+  .dc-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    column-gap: var(--sp-3);
+    row-gap: var(--sp-1);
+    align-items: start;
+  }
+
+  .dc-row > * {
+    grid-column: 2 / -1;
+  }
+
+  .dr-well {
+    grid-row: 1 / span 2;
+    grid-column: 1;
+    align-self: center;
+    display: flex;
+  }
+
+  .dc-row > .dr-title {
+    grid-row: 1;
+    grid-column: 2;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    line-height: 22px;
+  }
+
+  .dr-amount {
+    grid-row: 1;
+    grid-column: 3;
+    justify-self: end;
+    color: var(--ink);
+    font-size: var(--fs-head);
+    font-weight: 600;
+    line-height: 22px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .dr-meta {
+    grid-row: 2;
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .dr-late {
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .dc-row > .dr-actions {
+    margin-block-start: var(--sp-2);
+  }
+
+  .dr-asked {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .dc-row > .dr-select {
+    grid-row: 3;
+    grid-column: 3;
+    justify-self: end;
+    align-self: center;
+  }
+
+  /* ON A WIDE TILE OUTSIDE NEEDS YOU the answers sit at the end of the second line, under the amount, so a money row is
+     two lines tall and the first screen holds more of them. */
+  @container (inline-size >= 34rem) {
+    .dc-row[data-compact] > .dr-actions {
+      grid-row: 2;
+      grid-column: 3;
+      justify-self: end;
+      margin: 0;
+    }
+
+    .dc-row[data-compact] > .dr-meta {
+      grid-column: 2;
+      align-self: center;
+    }
+  }
+
+  /* ASK ME LATER (today F11): a clock, 32 square (44 under a thumb), at the end of the row of answers. */
+  .dc-actions > :global(.dc-later) {
+    inline-size: var(--btn-h);
+    padding: 0;
+    margin-inline-start: auto;
+    color: var(--ink-3);
+  }
+
+  @media (pointer: coarse) {
+    .dc-actions > :global(.dc-later) {
+      inline-size: var(--tap);
+    }
   }
 
   /* A PICTURE OPTION AT A SWATCH'S SIZE (the skin's `.queue-swatch`, 20px), so a choice led by a picture stands where one

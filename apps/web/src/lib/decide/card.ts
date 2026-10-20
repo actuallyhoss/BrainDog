@@ -70,6 +70,10 @@ export const cardWords = {
   more: (n: number) => `and ${n} more, on its page`,
   /** Said to a screen reader before who asked, on the line over the question; the question's own page heads its side with it. */
   askedBy: 'Asked by',
+  /** The foot of a money row (today F4): who asked, never leading it. */
+  by: (name: string) => `Asked by ${name}`,
+  byRule: (name: string) => `Asked by your rule ${name}`,
+  byYou: 'Asked by you',
   /** THE CARD'S SIDE, ON A WIDE TILE (DIRECTION §39): why it is asked and what it changes, each under a quiet heading. */
   why: 'Why it’s asked',
   changes: 'What it changes',

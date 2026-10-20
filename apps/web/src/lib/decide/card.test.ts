@@ -300,7 +300,7 @@ test('ONE HARD ANSWER BESIDE A SAFE ONE: the question is a call, and only the ha
   assert.deepEqual(classic.options.map((o) => o.hard ?? false), [false, true]);
 
   /* AND THE CARD DRAWS IT THROUGH THOSE: the tail on each button by its own way. */
-  assert.match(src('./DecisionCard.svelte'), /<span class="dc-btn-name">\{way\.label\}<\/span>\{wayTail\(card, way, primary\)\}/u);
+  assert.match(src('./DecisionCard.svelte'), /<span class="dc-btn-name">\{amount !== null && way\.key === primary \? amountAnswer\(way\.label, amount\) : way\.label\}<\/span>\{wayTail\(card, way, primary\)\}/u);
 });
 
 test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the suggested or the first filled', () => {
@@ -332,7 +332,7 @@ test('TWO OR THREE ANSWERS THAT ARE ONLY THEIR NAMES ARE A ROW OF BUTTONS, the s
   assert.match(card, /data-weight=\{way\.key === primary \? 'primary' : undefined\}/u);
   assert.match(card, /data-enter=\{way\.key === card\.enter \? '' : undefined\}/u);
   assert.match(card, /onclick=\{\(\) => press\(way\)\}/u);
-  assert.match(card, /<span class="dc-btn-name">\{way\.label\}<\/span>/u, 'the gate and the answered line read the name apart from the care said after it');
+  assert.match(card, /<span class="dc-btn-name">\{amount !== null && way\.key === primary \? amountAnswer\(way\.label, amount\) : way\.label\}<\/span>/u, 'the gate and the answered line read the name apart from the care said after it');
 });
 
 test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a line of what each does', () => {

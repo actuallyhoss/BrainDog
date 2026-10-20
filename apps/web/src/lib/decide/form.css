@@ -459,9 +459,27 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
     margin-inline-start: 0;
   }
 
-  /* A ROW OF SHORT ANSWERS SHARES ONE LINE where they fit ("Chase it", "Not yet"), each growing to fill it, and a long one
-     takes a line of its own. */
+  /* TWO ANSWERS SIDE BY SIDE, HALF EACH (today F8): "Keep the subdomain" and "Move to the apex" share the line as "Chase
+     it" and "Not yet" do, a label wrapping to two lines rather than pushing the other under it. Three or more take a line
+     each. Ask me later keeps its square at the end. */
+  .dc-actions[data-inline] {
+    flex-wrap: nowrap;
+  }
+
   .dc-actions[data-inline] > .dc-btn:not([data-weight='bare']) {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    min-inline-size: 0;
+    min-block-size: var(--tap);
+    padding: 6px 12px;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  .dc-actions[data-inline]:has(> .dc-btn:not([data-weight='bare']):nth-of-type(3)) {
+    flex-wrap: wrap;
+  }
+
+  .dc-actions[data-inline]:has(> .dc-btn:not([data-weight='bare']):nth-of-type(3)) > .dc-btn:not([data-weight='bare']) {
+    flex: 1 1 100%;
   }
 }

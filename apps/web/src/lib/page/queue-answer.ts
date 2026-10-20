@@ -33,8 +33,8 @@ export const queueWords = {
   suggested: 'Suggested',
   /** The button that answers a question of options with the one chosen (DIRECTION §39, "Decide reads like a form"). */
   decide: 'Answer',
-  /** Putting a question off, said as a person says it: the button opens the question's own page at the step. */
-  notNow: 'Not now',
+  /** Putting a question off, said as a person says it (today F11): a clock at the row's end opens its page at the step. */
+  notNow: 'Ask me later',
   /** A button whose answer is hard to take back says so in its own words, not in a chip beside it. */
   hard: (verb: string) => `${verb}${HARD_TAIL}`,
   /** The same care, as the end of a button whose name is drawn on its own. */
