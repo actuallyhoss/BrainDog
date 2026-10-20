@@ -1,0 +1,50 @@
+/**
+ * THE FORM LAYOUT (the UI pass of 20 October, 2.A.26): how a settings form or an editor lays out its fields, said once.
+ *
+ * A screen imports this sheet and wears the classes; nothing here draws a field (`controls.css` does).
+ *
+ *   .form-two     From 1100px up, two columns: the fields at most 640 wide in the first, help or a preview in the second,
+ *                 32 apart. Under 1100 it is one column, as a phone reads it.
+ *   .form-checks  A group of checkboxes, as many 180px columns as fit, 8 between rows and 16 between columns.
+ *   .form-number  A number field, 120 wide: a figure does not need a sentence's width.
+ *   .form-submit  The submit row, inside the tile at its foot, on the start edge under the first column, the primary
+ *                 first and then the quiet one. (A sheet or a dialog keeps its own foot, end-aligned with the primary last:
+ *                 `Sheet.svelte`.)
+ */
+
+@layer components {
+  .form-two {
+    display: grid;
+    gap: var(--sp-5);
+    min-inline-size: 0;
+  }
+
+  @media (width >= 1100px) {
+    .form-two {
+      grid-template-columns: minmax(0, 640px) minmax(0, 1fr);
+      column-gap: var(--sp-6);
+    }
+  }
+
+  .form-checks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--sp-2) var(--sp-4);
+    min-inline-size: 0;
+  }
+
+  .form-number {
+    inline-size: 120px;
+    max-inline-size: 100%;
+  }
+
+  .form-submit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--sp-2);
+    grid-column: 1;
+    margin-block-start: var(--sp-2);
+  }
+}
