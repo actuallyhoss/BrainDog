@@ -121,10 +121,9 @@ test('a new record with nothing noticed and nothing suggested gets one friendly 
   assert.match(screen, /nothingYet\(reading\)/u);
   assert.match(screen, /words\.emptyTitle/u);
 
-  /* The rail's star keeps its name and says what it is in plain words. */
+  /* THE RAIL HAS NO SLASH ROW: the page folded into the palette, the one ask (batch 5d). */
   const rail = readFileSync(new URL('../ui/Sidebar.svelte', import.meta.url), 'utf8');
-  assert.doesNotMatch(rail, /\['\/slash', 'Slash', 'star', '\/slash'\]/u);
-  assert.match(rail, /slashRail/u);
+  assert.doesNotMatch(rail, /href: '\/slash'/u);
 });
 
 test('a description goes to the same press as asked, and is said in the same sentence', async () => {

@@ -31,11 +31,11 @@ test('the page lives at /slash, and there is no /spark folder left to serve an o
   assert.ok(!existsSync(join(SRC, 'routes/spark')), 'routes/spark is still there');
 });
 
-test('the palette offers Slash by its name, at its address', () => {
+test('the palette offers Slash history by its name, at the folded page', () => {
   const row = COMMANDS.find((c) => c.id === 'c-slash');
   assert.ok(row, 'no c-slash row in the palette');
-  assert.equal(row.href, '/slash');
-  assert.equal(row.title, 'Slash');
+  assert.equal(row.href, '/slash?history');
+  assert.equal(row.title, 'Slash history');
   assert.ok(!COMMANDS.some((c) => c.id === 'c-spark'));
 });
 

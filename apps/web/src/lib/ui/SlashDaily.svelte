@@ -76,7 +76,7 @@
     {/snippet}
     <p class="slash-daily-said" id="slash-daily-said">{dailySaid(shown)}</p>
     {#if braked}<p class="slash-daily-brake" data-part="slash-brake">{braked}</p>{/if}
-    {#if link}<a class="slash-daily-link tap" href={at('/slash')}>{words.dailyMore}<Icon name="arrow" size="s" /></a>{/if}
+    {#if link}<a class="slash-daily-link tap" href={at('/slash?history')}>{words.dailyMore}<Icon name="arrow" size="s" /></a>{/if}
   </Tile>
 {/if}
 

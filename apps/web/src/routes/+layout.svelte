@@ -230,7 +230,6 @@
   const USAGE = 'Usage';
   const places = $derived([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? ([['/inbox', said('inbox'), 'inbox']] as const) : []),
-    ['/slash', copy.suggestions, 'slash'],
     ['/automations', copy.automations, 'refresh'],
     ['/jobs', copy.jobs, 'play'],
     ['/packs', copy.packs, 'packs'],
@@ -1032,7 +1031,7 @@
          here would be the sheet's first field, and `Sheet.svelte` puts the caret in the first field,
          so every press of More would raise the keyboard over the list somebody came to read. -->
     <button type="button" class="more-find" onclick={find}>
-      <Icon name="search" size="m" /><span class="more-find-words">{copy.searchRecord}</span>
+      <Icon name="search" size="m" /><span class="more-find-words">{copy.palettePlaceholder}</span>
     </button>
 
     <!-- THE RECORD, AND UNDER IT THE OTHER RECORDS THIS PERSON CAN OPEN. The tile is ink with the

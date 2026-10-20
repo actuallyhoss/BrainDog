@@ -228,12 +228,8 @@ export const shell = {
   diffSeeds: 'Examples',
   diffTouches: 'What you wrote',
   shareSetup: 'Share this setup',
-  /* THE RAIL'S STAR, said in plain words beside its name (`lib/ui/Sidebar.svelte`). */
-  slashRail: 'Slash: suggestions to fit this BrainDog to how you use it',
-  /* THE FLAT NAV'S OWN ROWS (`flatNav` in `lib/nav.ts`): the screen every record opens on, the page it opened on before,
-     and Slash's row under More, named for what it offers rather than by its own name. */
+  /* THE FLAT NAV'S OWN ROW (`flatNav` in `lib/nav.ts`): the screen every record opens on. */
   today: 'Today',
-  suggestions: 'Suggestions',
   /* The phone's More sheet, over what the rail keeps under its own More. */
   otherPages: 'Other pages',
   /* The search button at the head of the rail, which says its two keys where the pointer rests on it. */

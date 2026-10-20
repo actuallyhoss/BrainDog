@@ -272,8 +272,9 @@ export const COMMANDS: readonly Command[] = [
   { id: 'c-inbox', title: copy.inbox, href: '/inbox', group: copy.destinations, icon: 'inbox', aliases: ['mail', 'messages', 'email', 'incoming'] },
   { id: 'c-vault', title: copy.vault, href: '/vault', group: copy.destinations, icon: 'vault', aliases: ['keys', 'secrets', 'passwords', 'tokens'] },
   { id: 'c-packs', title: copy.packs, href: '/packs', group: copy.destinations, icon: 'packs', aliases: ['packs', 'extensions', 'plugins', 'install'] },
-  /* SLASH'S PAGE, what it noticed and suggests; its title is its name, which is why it is not a copy key. */
-  { id: 'c-slash', title: 'Slash', href: '/slash', group: copy.destinations, icon: 'slash', aliases: ['suggestions', 'noticed'] },
+  /* SLASH'S HISTORY, what it noticed, suggested and was asked: the old page, folded into the palette (batch 5d). The bare
+     `/slash` opens the palette itself (`routes/slash/+page.ts`), so this row goes to the history. */
+  { id: 'c-slash', title: 'Slash history', href: '/slash?history', group: copy.destinations, icon: 'slash', aliases: ['suggestions', 'noticed', 'asked'] },
   /* AUTOMATIONS, the canvas an owner and an agent both edit. Reachable only by its address
      until it was here and in the rail. */
   { id: 'c-automations', title: copy.automations, href: '/automations', group: copy.destinations, icon: 'refresh', aliases: ['rules', 'workflows', 'triggers', 'schedules'] },

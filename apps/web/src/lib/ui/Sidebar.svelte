@@ -146,7 +146,7 @@
     unnamed: 'My BrainDog',
     /* The rail's head says the product; the record it opens is the smaller line under it. */
     brand: 'BrainDog',
-    ask: 'Ask, add or find',
+    ask: copy.palettePlaceholder,
     moreLists: (n: number) => `Show ${n} more`,
     fewerLists: 'Show fewer',
     /* The new-list row under the lists, said only here. */
@@ -279,14 +279,12 @@
   const placeHere = (item: FlatItem) => isHere(item, path) && !viewHere(item);
 
   /**
-   * THE TOOLS UNDER MORE, in the order a person reaches for them. Slash's page is Suggestions here, named for what it
-   * offers, with its own name in the tooltip (`copy.slashRail`). Inbox joins them once anything has arrived, by the rule
-   * the spine keeps (`spineOf`).
+   * THE TOOLS UNDER MORE, in the order a person reaches for them. Slash's page is not one: it folded into the palette,
+   * the one ask (batch 5d). Inbox joins them once anything has arrived, by the rule the spine keeps (`spineOf`).
    */
   type Tool = { href: string; label: string; icon: IconName; count?: number; title?: string };
   const tools = $derived<Tool[]>([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? [{ href: '/inbox', label: said('inbox'), icon: 'inbox' as const, count: inbox }] : []),
-    { href: '/slash', label: copy.suggestions, icon: 'slash', title: copy.slashRail },
     { href: '/automations', label: copy.automations, icon: 'refresh' },
     { href: '/jobs', label: copy.jobs, icon: 'play' },
     { href: '/packs', label: copy.packs, icon: 'packs' },
@@ -998,9 +996,14 @@
     white-space: nowrap;
   }
 
+  /* THE KEY, ON HOVER AND FOCUS ONLY: printed at rest it is one more thing to read on every screen. */
   .ask-key {
-    display: inline-flex;
+    display: none;
     flex: none;
+  }
+
+  .ask:is(:hover, :focus-visible) .ask-key {
+    display: inline-flex;
   }
 
   /* A LIST WITHOUT BOXES: rows 1 apart, and the space before each heading says where one group ends. */
