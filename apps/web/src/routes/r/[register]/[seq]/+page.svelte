@@ -41,11 +41,11 @@
   import * as clipboard from '$lib/clipboard.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { currencyFor, dirOf, display, homeCurrency, iconFor, identityOf, labelOf, readableFields, spokenRow, toneOf } from '$lib/record/api.ts';
-  import { REGISTERS } from '$lib/record/held.ts';
+  import { REGISTERS, TITLES } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import Face from '$lib/ui/Face.svelte';
   import AgentFace from '$lib/ui/AgentFace.svelte';
-  import { faceWords, liveOf } from '$lib/ui/face.ts';
+  import { faceWords, liveOf, slotOf } from '$lib/ui/face.ts';
   import { isQuiet } from '@braindog/kernel';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Button from '$lib/ui/Button.svelte';
@@ -377,6 +377,21 @@
   }
 
   /**
+   * THE BOX CLOSES AND THE KEYBOARD GOES BACK TO THE PENCIL THAT OPENED IT (motion F5.2): after Save, Cancel or Esc the
+   * next Tab carries on from the field, not from the top of the page. On a phone, where no pencil is drawn, the value
+   * that was tapped takes it (`data-edit` is on both).
+   */
+  function endEdit() {
+    const was = editing;
+    stopEdit();
+    if (was === null) return;
+    void tick().then(() => {
+      const at = [...document.querySelectorAll<HTMLElement>(`[data-edit="${CSS.escape(was)}"]`)].find((el) => el.offsetParent !== null);
+      at?.focus();
+    });
+  }
+
+  /**
    * The header's own control, "Edit": the row's title is the field somebody means by "edit the row". The title is not
    * listed as a fact while it holds a value, so opening it lists it, with its box, until the edit ends (`listed`).
    */
@@ -386,6 +401,19 @@
     const f = fields.find((x) => x.id === decl?.title && editable(x, id)) ?? fields.find((x) => editable(x, id));
     if (f) startEdit(f);
   }
+
+  /* ESC CLOSES THE BOX it was pressed in, unsaved (motion F5.4), and goes no further: a sheet or panel round the page
+     closes on the next one. */
+  const escCloses = (form: HTMLFormElement) => {
+    const press = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      e.preventDefault();
+      e.stopPropagation();
+      endEdit();
+    };
+    form.addEventListener('keydown', press);
+    return () => form.removeEventListener('keydown', press);
+  };
 
   const changed = (f: FieldDecl): boolean => (f.type === 'bool' ? ticked !== wasTicked : draft.trim() !== was.trim());
 
@@ -428,7 +456,7 @@
        saying a field went from a value to the same value, which is a fact about a press. */
     if (!changed(f)) {
       toasts.push(copy.editNoChange);
-      stopEdit();
+      endEdit();
       return;
     }
     const register = id;
@@ -448,7 +476,7 @@
     if (askedFor !== key) return;
     if (out.ok) {
       got = { from: 'live', entry: out.entry, names: names ?? new Map() };
-      stopEdit();
+      endEdit();
       const version = out.entry.version;
       toasts.push(copy.writeMarkSaved, { undo: () => void putBack(register, n, labelOf(f), putBackOf(before, patch, heldDecl), version) });
       void refreshHistory(register, n);
@@ -659,6 +687,20 @@
   const figureField = $derived(shortFields.find((f) => f.type === 'money'));
   const dueField = $derived(shortFields.find((f) => (f as { deadline?: boolean }).deadline === true));
   const figure = $derived(figureField && row ? amountOf(row.fields[figureField.id]) : null);
+  /**
+   * PART PAID, UNDER THE FIGURE: "Paid £4,000 · £5,190 left" over a 6px track (money F9). The paid amount is the list's
+   * second money field named for it ("Paid so far", which money's `settle` writes), in the figure's currency; a bill
+   * with nothing paid yet, or all of it, draws no track, since its state already says so.
+   */
+  const paidPart = $derived.by(() => {
+    if (!row || !figureField || figure === null || figure <= 0) return null;
+    const field = shortFields.find((f) => f.type === 'money' && f.id !== figureField.id && /^paid/iu.test(f.id));
+    const paid = field ? amountOf(row.fields[field.id]) : null;
+    const currency = currencyOf(row.fields[figureField.id]) ?? '';
+    if (!field || paid === null || paid <= 0 || paid >= figure) return null;
+    if ((currencyOf(row.fields[field.id]) ?? currency) !== currency) return null;
+    return { field: field.id, paid, left: figure - paid, share: Math.round((paid / figure) * 1000) / 10, currency };
+  });
   const leadTone = $derived(row ? (toneOf(id, row, clock) ?? tone) : undefined);
   const due = $derived(dueField && row ? row.fields[dueField.id] : undefined);
   /* LATE OR CLOSE, IN WORDS: "Overdue by 38 days", "Due in 3 days". A finished row is never late, and a date far enough
@@ -676,7 +718,12 @@
      where the row applies, which is the toolbar's chip. */
   const leadIds = $derived(
     new Set(
-      [figure !== null ? figureField?.id : undefined, finishedOn ? decl?.finished : undefined, movable(scopeField) ? scopeField.id : undefined].filter(
+      [
+        figure !== null ? figureField?.id : undefined,
+        paidPart?.field,
+        finishedOn ? decl?.finished : undefined,
+        movable(scopeField) ? scopeField.id : undefined,
+      ].filter(
         (x): x is string => Boolean(x),
       ),
     ),
@@ -720,8 +767,10 @@
   const namedRef = (to: string | undefined, v: unknown): Named | null => {
     const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d+$/u.test(v) ? Number(v) : NaN;
     if (!to || !Number.isInteger(n) || n < 1) return null;
-    const name = names?.get(`${to}#${n}`)?.trim();
-    return name ? { name, href: `/r/${to}/${n}` } : null;
+    /* THE RECORD'S NAMES, else the ones this tab has learnt (`TITLES`), as `display` says the same ref: a row painted
+       from the local copy said "Ada Vine" as words that opened nothing. Where the row has a page, it opens there. */
+    const name = (names ? names.get(`${to}#${n}`) : TITLES.get(to)?.get(n))?.trim();
+    return name ? { name, href: rowHref(`${to}#${n}`) ?? `/r/${to}/${n}` } : null;
   };
   /* WHETHER THE ROW IS THE PERSON WHOSE RECORD THIS IS, by the list's own `self` part. */
   const self = $derived(Boolean(meets?.self && row?.fields[meets.self] === true));
@@ -1025,6 +1074,14 @@
       <Money minor={amountOf(value) ?? 0} currency={currencyOf(value) ?? ''} />
     {:else if f.id === decl.state}
       <Chip label={stateSaid(decl, String(value))} {tone} />
+    {:else if f.type === 'ref' && namedRef(f.to, value)}
+      <!-- A ROW THIS ONE POINTS AT OPENS ITS PAGE, said by its name: who an invoice is for is one press from them. A
+           project wears its 8px dot in its slot before the name (money F9), the dot every list draws it with. -->
+      {@const named = namedRef(f.to, value)!}
+      {@const mark = identityOf(id, f.id, value, names)}
+      <a class="ref-link" href={at(named.href ?? '')}
+        >{#if mark}<span class="ref-dot" data-slot={slotOf(mark.hue)} aria-hidden="true"></span>{/if}{named.name}</a
+      >
     {:else if identityOf(id, f.id, value, names)}
       <IdentityMark identity={identityOf(id, f.id, value, names)!} size="md" />
     {:else if f.type === 'day'}
@@ -1035,9 +1092,6 @@
       <!-- A RUN'S PROJECT IS HELD AS A SPOKEN ID. It reads as the project, and opens it, with the same thumb's target as
            any other fact that opens a row (`.ref-link`): bare, it was 61 by 23 under a thumb. -->
       <a class="ref-link" href={at(spokenRow(value, names)!.href)}>{spokenRow(value, names)!.label}</a>
-    {:else if f.type === 'ref' && namedRef(f.to, value)}
-      <!-- A ROW THIS ONE POINTS AT OPENS ITS PAGE, said by its name: who an invoice is for is one press from them. -->
-      <a class="ref-link" href={at(namedRef(f.to, value)!.href ?? "")}>{namedRef(f.to, value)!.name}</a>
     {:else if f.type === 'enum'}
       <span class="enum-word">{copy.valueWord(display(id, f.id, value, clock, names) ?? '')}</span>
     {:else}
@@ -1064,6 +1118,7 @@
         e.preventDefault();
         void saveEdit(f);
       }}
+      {@attach escCloses}
     >
       {#if f.type === 'bool'}
         <label class="edit-check"><input type="checkbox" bind:checked={ticked} /> {copy.yes}</label>
@@ -1113,7 +1168,7 @@
       {/if}
       <div class="edit-actions">
         <Button type="submit" weight="primary" disabled={saving}>{saving ? copy.writeMarkSaving : copy.editSave}</Button>
-        <Button weight="bare" onclick={stopEdit}>{copy.editCancel}</Button>
+        <Button weight="bare" onclick={endEdit}>{copy.editCancel}</Button>
       </div>
     </form>
     {#if problem}<p class="edit-why">{problem}</p>{/if}
@@ -1136,7 +1191,7 @@
   <!-- THE PENCIL THAT OPENS A FIELD: its own cell in a fact's trailing column, and the heading's control on a tile or a
        group of prose. -->
   {#snippet pencil(f: FieldDecl)}
-    <button type="button" class="edit-field tap" aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
+    <button type="button" class="edit-field tap" data-edit={f.id} aria-label={copy.editValue(labelOf(f))} onclick={() => startEdit(f)}>
       <Icon name="edit" size="s" />
     </button>
   {/snippet}
@@ -1172,13 +1227,11 @@
       <!-- WHERE THE ROW APPLIES, FIRST: the project's chip, or the globe and "Everywhere", which opens the move. -->
       <ScopeMove register={id} {row} {names} live={changes} title={String(row.fields[decl.title] ?? '')} onmoved={() => void rowMoved(id, seq)} />
       <!-- THE ONE PRIMARY (DIRECTION 39), AND THE REST IN THE "…". A row still open on a list that says what finishes
-           it leads with that: "Mark paid" on an invoice, "Mark done" on a task (`finishOf`). Anywhere else the thing to
-           do to a row is edit it, quietly once the row is finished. Edit and Archive stood beside each other at one
-           weight, and neither was what a person opens an unpaid invoice to do. -->
+           it leads with that: "Mark paid" on an invoice, "Mark done" on a task (`finishOf`). Anywhere else there is no
+           primary: a field is edited where it stands, and "Edit" is in the "…" (money F9). Edit and Archive stood beside
+           each other at one weight, and neither was what a person opens an unpaid invoice to do. -->
       {#if finish}
         <Button weight="primary" disabled={saving} data-finish onclick={() => void finishRow(finish)}>{finish.said}</Button>
-      {:else if changes && !archived}
-        <Button weight={done ? 'quiet' : 'primary'} onclick={editTitle}>{copy.editRow}</Button>
       {/if}
       <!-- `Put back` STANDS IN THE HEAD for as long as this tab holds the row it just archived: see `archived` for why
            that moment is the only one it can be offered in. Archive itself is in the "…", the list's own verb on the
@@ -1203,7 +1256,7 @@
               ><Icon name="more" size="l" /><span class="head-vh">{copy.moreOn(String(row.fields[decl.title] ?? '') || decl.one)}</span></span
             >
           {/snippet}
-          {#if finish}<button type="button" class="mi" role="menuitem" onclick={editTitle}>{copy.editRow}</button>{/if}
+          {#if changes && !archived}<button type="button" class="mi" role="menuitem" onclick={editTitle}>{copy.editRow}</button>{/if}
           <button type="button" class="mi" role="menuitem" onclick={() => clipboard.putLink(id, row.seq)}>{copy.copyLink}</button>
           <!-- ONLY THE ROW'S MAKER: the record refuses anybody else, so the verb is not offered to them. -->
           {#if mine && !archived}<button type="button" class="mi" role="menuitem" disabled={saving} onclick={() => void setPrivate(!isPrivate)}>{isPrivate ? copy.rowShareAgain : copy.rowKeepPrivate}</button>{/if}
@@ -1222,11 +1275,10 @@
     {#if archived}
       <p class="archived-note"><Icon name="archive" size="s" /><span>{copy.rowArchivedNote}</span></p>
     {/if}
-    <!-- WHO CAN SEE THIS ROW, in one plain line: the lock when its maker kept it to themselves, else everyone who opens the list. -->
-    {#if live && row}
-      <p class="archived-note seen-by">
-        {#if isPrivate}<Icon name="lock" size="s" /><span>{copy.rowSeenByOnlyYou}</span>{:else}<span>{copy.rowSeenByAll(decl?.name ?? id)}</span>{/if}
-      </p>
+    <!-- ONLY A ROW KEPT TO ITS MAKER SAYS WHO CAN SEE IT, with the lock: "Everyone who can open Bills and invoices can see
+         this." stood over every row and said the ordinary case at the weight of an exception (money F9). -->
+    {#if live && row && isPrivate}
+      <p class="archived-note seen-by"><Icon name="lock" size="s" /><span>{copy.rowSeenByOnlyYou}</span></p>
     {/if}
 
     <div class="board">
@@ -1282,6 +1334,12 @@
                   <p class="figure-value num"><Money minor={figure} currency={currencyOf(row.fields[figureField.id]) ?? ''} weight="strong" /></p>
                   {#if changes && editable(figureField, id)}{@render pencil(figureField)}{/if}
                 </div>
+                {#if paidPart}
+                  <div class="paid-part">
+                    <p class="paid-said num">{rowWords.paidPart(moneySaid(paidPart.paid, paidPart.currency), moneySaid(paidPart.left, paidPart.currency))}</p>
+                    <span class="paid-track" aria-hidden="true"><span class="paid-fill" style:inline-size="{paidPart.share}%"></span></span>
+                  </div>
+                {/if}
               {/if}
             </div>
           {/if}
@@ -1370,11 +1428,12 @@
                     e.preventDefault();
                     void saveEdit(f);
                   }}
+                  {@attach escCloses}
                 >
                   <textarea class="edit-area" rows="10" aria-label={labelOf(f)} bind:value={draft}></textarea>
                   <div class="edit-actions">
                     <Button type="submit" weight="primary" size="sm" disabled={saving}>{saving ? copy.writeMarkSaving : copy.editSave}</Button>
-                    <Button weight="bare" size="sm" onclick={stopEdit}>{copy.editCancel}</Button>
+                    <Button weight="bare" size="sm" onclick={endEdit}>{copy.editCancel}</Button>
                   </div>
                 </form>
                 {#if problem}<p class="edit-why">{problem}</p>{/if}
@@ -1552,8 +1611,62 @@
   /* A FACT THAT OPENS ANOTHER ROW reads as the value it is, in ink, and shows it is a way there under a pointer. */
   .ref-link {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
     color: inherit;
-    text-decoration: none;
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: text-decoration-color var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ref-link:hover {
+      text-decoration-color: currentColor;
+    }
+  }
+
+  /* A PROJECT'S DOT, 8px in its slot, as `ScopeChip` draws it. */
+  .ref-dot {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    background: var(--ph, var(--ink-3, var(--dim)));
+    border-radius: var(--r-round);
+  }
+
+  .ref-dot[data-slot='blue'] {
+    --ph: var(--cat-blue, var(--info));
+  }
+
+  .ref-dot[data-slot='violet'] {
+    --ph: var(--cat-violet, var(--info));
+  }
+
+  .ref-dot[data-slot='pink'] {
+    --ph: var(--cat-pink, var(--ink2));
+  }
+
+  .ref-dot[data-slot='teal'] {
+    --ph: var(--cat-teal, var(--earn));
+  }
+
+  .ref-dot[data-slot='sky'] {
+    --ph: var(--cat-sky, var(--info));
+  }
+
+  .ref-dot[data-slot='yellow'] {
+    --ph: var(--cat-yellow, var(--warn));
+  }
+
+  .ref-dot[data-slot='lime'] {
+    --ph: var(--cat-lime, var(--earn));
+  }
+
+  .ref-dot[data-slot='slate'] {
+    --ph: var(--cat-slate, var(--dim));
   }
 
   /* A THUMB'S TARGET round the one line of words, which stays the height of its text. */
@@ -1649,6 +1762,37 @@
     letter-spacing: -0.02em;
     line-height: 1.15;
     white-space: nowrap;
+  }
+
+  /* WHAT IS PAID OF IT, under the figure: the words at 13 in the second ink, over a 6px track whose fill is the ink. */
+  .paid-part {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    max-inline-size: 360px;
+    margin-block-start: var(--sp-1);
+  }
+
+  .paid-said {
+    margin: 0;
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-meta, var(--t-sm));
+    line-height: 18px;
+  }
+
+  .paid-track {
+    display: block;
+    overflow: hidden;
+    block-size: 6px;
+    background: var(--tile-2, var(--s1));
+    border-radius: var(--r-round);
+  }
+
+  .paid-fill {
+    display: block;
+    block-size: 100%;
+    background: var(--ink);
+    border-radius: inherit;
   }
 
   /* A FIGURE THAT DOES NOT FIT SHRINKS ONE STEP BEFORE ANYTHING ELSE, which on the narrowest phone is what keeps a long
@@ -1750,13 +1894,71 @@
     }
   }
 
-  /* AND FROM 960px OF TILE THE FACTS RUN IN TWO COLUMNS, so a tile as wide as a large window is not a long thin list
-     with its pencils a page-width from their values. Below that one column reads better: two at 750 left a value 200px
-     and broke an address mid-word. Read across, then down. */
-  @container (inline-size >= 960px) {
+  /* AND FROM 600px OF TILE THE FACTS RUN IN TWO COLUMNS (money F9: two at 1100), each a 56px pair with its label over
+     its value, so a wide tile is not a long thin list with a label column and its values a hand's width away. A label
+     column at that width left a value 200px and broke an address mid-word; over its value it has the column's width.
+     Read across, then down. */
+  @container (inline-size >= 600px) {
     .facts {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       column-gap: var(--sp-6);
+    }
+
+    .fact {
+      grid-template-columns: minmax(0, 1fr) var(--tap);
+      grid-template-areas:
+        'label pencil'
+        'value pencil';
+      column-gap: var(--sp-2);
+      min-block-size: 56px;
+    }
+  }
+
+  /* ON A PHONE NO PENCIL IS DRAWN, and the fact itself is what a thumb presses to edit it (money F9): the pencil's
+     button lies over the whole line, its glyph hidden, still named "Edit Who" to a screen reader. A link in the value
+     stays above it, so the name still opens its page. */
+  @media (width < 640px) {
+    .fact,
+    .figure {
+      position: relative;
+    }
+
+    .fact {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        'label'
+        'value';
+    }
+
+    /* `stretch`, since a grid's own `center` would hold the overlay at its content's height. */
+    .fact-pencil {
+      position: absolute;
+      inset: 0;
+      grid-area: auto;
+      align-self: stretch;
+      justify-self: stretch;
+    }
+
+    .fact .edit-field,
+    .figure .edit-field {
+      position: absolute;
+      inset: 0;
+      inline-size: auto;
+      block-size: auto;
+    }
+
+    .fact .edit-field :global(svg),
+    .figure .edit-field :global(svg) {
+      visibility: hidden;
+    }
+
+    .fact .edit-field:active,
+    .figure .edit-field:active {
+      background: var(--hover);
+    }
+
+    .ref-link {
+      z-index: var(--z-raise);
     }
   }
 

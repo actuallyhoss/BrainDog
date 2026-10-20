@@ -22,6 +22,8 @@ export const rowWords = {
   dueTomorrow: 'Due tomorrow',
   dueIn: (days: number): string => `Due in ${days} days`,
   added: (age: string): string => `added ${age}`,
+  /* What is paid of a bill and what is left, under its figure. */
+  paidPart: (paid: string, left: string): string => `Paid ${paid} · ${left} left`,
   /* The title-row sentence of a row the record has just archived, before anything else it says. */
   archived: 'Archived.',
   /* What the fields tile is called to a screen reader, and what it says when the row has answered nothing yet. */
