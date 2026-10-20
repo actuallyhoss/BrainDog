@@ -181,6 +181,75 @@ export function decidedHere(decisions: readonly Decision[], project: string | nu
     .map(({ day, said }) => `Decided ${day!}: ${said}`);
 }
 
+/** How far back "decided lately" looks (plan §3.2, section 7). */
+export const DECIDED_DAYS = 14;
+
+/** A decision as the context plan reads it: its words, when, and whether it answered a question this run asked. */
+export type Lately = { said: string; at: string; mine?: boolean | undefined };
+
+/**
+ * Decided lately: within `days` of `nowMs`, the answers to this run's own questions first, then the newest, at most `n`,
+ * each as "21 Oct: <the choice>" with "(you asked)" on one this run asked. A day that is no day is left out.
+ */
+export function decidedLately(decisions: readonly Lately[], nowMs: number, n = DECIDED, zone = 'UTC', days = DECIDED_DAYS): string[] {
+  const since = nowMs - days * 86_400_000;
+  return decisions
+    .map((d, i) => ({ d, i, ms: Date.parse(d.at), day: dayOfDecision(d.at, zone), said: words(d.said.replace(/^Decided [^:]*:\s*/u, ''), CHOICE) }))
+    .filter(({ ms, day, said }) => Number.isFinite(ms) && ms >= since && day !== null && said !== '')
+    .sort((a, z) => Number(z.d.mine === true) - Number(a.d.mine === true) || z.ms - a.ms || a.i - z.i)
+    .slice(0, Math.max(0, n))
+    .map(({ d, day, said }) => `${day!}: ${said}${d.mine === true ? ' (you asked)' : ''}`);
+}
+
+/* ── the lessons that held ─────────────────────────────────────────────── */
+
+/** A lesson never confirmed and older than this is left out of `context` and suggested for retiring (plan §3.2, 8). */
+export const UNCONFIRMED_DAYS = 60;
+/** A lesson confirmed within this many days leads. */
+export const CONFIRMED_DAYS = 30;
+
+/**
+ * A lesson as the plan ranks it: its handle, kind (`method`, `fact`, `rule`…), whether it is this project's, the day it
+ * was made and the day it was last confirmed (`confirmed_on`), each ISO or a day.
+ */
+export type Lesson = { spoken: string; kind?: string | null | undefined; here?: boolean | undefined; made?: string | null | undefined; confirmed?: string | null | undefined };
+
+/**
+ * The lessons that held, in the order a session reads them: confirmed in the last thirty days first (newest confirmed
+ * first), then this project's before everywhere's, a method before a fact, then the newest made. Rules are not lessons
+ * here (they have their own section) and are left out. A lesson never confirmed and made more than sixty days ago is
+ * left out too, and its handle returned in `retire`, for the caller to suggest with `propose`: the plan files nothing.
+ */
+export function lessonsHeld<T extends Lesson>(lessons: readonly T[], nowMs: number): { rows: T[]; retire: string[] } {
+  const ms = (at: string | null | undefined): number => (typeof at === 'string' && at !== '' ? Date.parse(at.length === 10 ? `${at}T00:00:00Z` : at) : Number.NaN);
+  const old = nowMs - UNCONFIRMED_DAYS * 86_400_000;
+  const fresh = nowMs - CONFIRMED_DAYS * 86_400_000;
+  const retire: string[] = [];
+  const kept: { row: T; i: number; confirmed: number; made: number }[] = [];
+  lessons.forEach((row, i) => {
+    if (row.kind === RULE) return;
+    const confirmed = ms(row.confirmed);
+    const made = ms(row.made);
+    if (!Number.isFinite(confirmed) && Number.isFinite(made) && made < old) {
+      retire.push(row.spoken);
+      return;
+    }
+    kept.push({ row, i, confirmed, made });
+  });
+  const recent = (k: { confirmed: number }): number => (Number.isFinite(k.confirmed) && k.confirmed >= fresh ? 0 : 1);
+  const n = (x: number): number => (Number.isFinite(x) ? x : 0);
+  kept.sort(
+    (a, z) =>
+      recent(a) - recent(z) ||
+      (recent(a) === 0 ? n(z.confirmed) - n(a.confirmed) : 0) ||
+      Number(z.row.here === true) - Number(a.row.here === true) ||
+      Number(z.row.kind === 'method') - Number(a.row.kind === 'method') ||
+      n(z.made) - n(a.made) ||
+      a.i - z.i,
+  );
+  return { rows: kept.map((k) => k.row), retire };
+}
+
 /* ── the rules, and the people ─────────────────────────────────────────── */
 
 /** A learning as the card reads it: its kind, whether it is this project's (`scope`), its state and the day it was made. */
