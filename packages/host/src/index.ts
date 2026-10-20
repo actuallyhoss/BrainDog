@@ -18,6 +18,8 @@
 import type { Conflict, Refusal, Result } from '@braindog/ports';
 import { conflicted, refused } from '@braindog/ports';
 
+import { FIREWALL_FAULT, firewall } from '@braindog/record/sight';
+
 import { crashed } from './crash.ts';
 import { EXTRA_ROUTES } from './routes/index.ts';
 
@@ -258,6 +260,13 @@ export const httpStatus = (r: Result<unknown>): number =>
 export type Handler = (args: Record<string, unknown>, ctx: unknown) => Promise<Result<unknown>>;
 
 /**
+ * Where a handler table built by `handlersFor` says a door's firewall took a hidden field off an answer: the record's
+ * `firewalled`, which raises fault `lens.firewall` naming the method. Kept beside the table and not in it, since every
+ * key of the table is a route.
+ */
+const FIREWALLED = new WeakMap<Record<string, Handler>, (method: string, stripped: readonly string[]) => void>();
+
+/**
  * The handlers, built once from the record's surface.
  *
  * THE WIRING IS SHARED, not just the table. A test could assert that two hosts wire the same routes;
@@ -269,6 +278,8 @@ export type Handler = (args: Record<string, unknown>, ctx: unknown) => Promise<R
  * `record` in the package graph (`31-STACK` §2) and the acyclicity argument still holds.
  */
 export type RecordSurface = {
+  /** Fault `lens.firewall`, raised when a door's firewall took a hidden field off a method's answer (`serveApi`, `serveMcp`). */
+  firewalled?(method: string, stripped: readonly string[]): void;
   boot(ctx: never): Promise<Result<unknown>>;
   version(ctx: never): Promise<Result<unknown>>;
   schema(args: never, ctx: never): Promise<Result<unknown>>;
@@ -535,6 +546,7 @@ export function handlersFor(api: RecordSurface): Record<string, Handler> {
     if (!handlers[route.name]) throw new TypeError(`${route.name} is in the route table and has no handler`);
   for (const name of Object.keys(handlers))
     if (!BY_NAME.has(name)) throw new TypeError(`${name} has a handler and is not in the route table`);
+  FIREWALLED.set(handlers, (method, stripped) => api.firewalled?.(method, stripped));
   return handlers;
 }
 
@@ -712,11 +724,17 @@ export async function serveApi(
    */
   try {
     const out = await handler(args, ctx);
-    return json(httpStatus(out), out);
+    /* THE FIREWALL (sharing plan §2.5 item 6): a field hidden from this caller still on a row of the answer is taken off
+       here and raised as fault `lens.firewall` naming the method, so a path that forgot to mask is found, never leaked. */
+    const held = firewall(ctx, out);
+    if (held.stripped.length > 0) FIREWALLED.get(handlers)?.(name, held.stripped);
+    return json(httpStatus(held.answer), held.answer);
   } catch (e) {
     return json(500, crashed(`/api/${name}`, e));
   }
 }
+
+export { FIREWALL_FAULT };
 
 /**
  * The most an `/api` body may weigh, for every method but `import`: a mebibyte.

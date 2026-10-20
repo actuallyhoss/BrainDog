@@ -11,7 +11,9 @@
  *
  * THE PROPERTIES ARE §4.4's: P1 (no canary or out-of-sight id in any answer) on every path; P2 (non-interference: an
  * answer is the same after changes the caller cannot see), P3 (every count is the visible rows that match) and P4 (a
- * hidden row is refused as a missing one) on the twelve core routes; P5's first half for G1.
+ * hidden row is refused as a missing one) on the twelve core routes; P5's first half for G1. And T6 (§2.14): a filter, a
+ * sort, a search, a count and a preview that name a field hidden from the caller answer as a field the list does not
+ * have, whatever it holds, and the doors' firewall takes nothing off any answer the matrix is given.
  *
  * A KNOWN GAP IS A TODO NAMED FOR IT (`G<n>`, §1.2), so the suite passes and lists what is still open; a leak this
  * matrix found that §1.2 does not name is a todo named `N<n>`. Slice 3 and later remove a todo by closing its gap.
@@ -27,7 +29,7 @@ import { createRecordApi, type CallContext } from '../src/index.ts';
 import { scopeOf } from '../../../apps/web/src/lib/data/local.ts';
 import { leaks } from './leak/canary.ts';
 import { build, personCtx, SHAPES, unseen, variantsOf, type Caller, type Fixture, type RowInfo, type Shape } from './leak/fixture.ts';
-import { argsFor, ask, CORE, handlers, LIST_IDS, READ_ROUTES, walked, type Args } from './leak/routes.ts';
+import { argsFor, ask, CORE, FIREWALLED, handlers, LIST_IDS, READ_ROUTES, walked, type Args } from './leak/routes.ts';
 import { callTool, listResources, readResource, TOOL_NAMES, toolArgs, WRITES } from './leak/mcp.ts';
 
 const FUZZ = Number(process.env.LEAK_FUZZ ?? 2);
@@ -75,6 +77,12 @@ test('THE CANARIES ARE LIVE: the owner\'s answers, held to a contractor\'s sight
   assert.deepEqual(leaks(await ask(h, 'list', { register: 'tasks' }, contractor.ctx), f.out(contractor)), []);
   /* EVERY SHAPE IS ON THE RECORD AS THE HOST WOULD BUILD IT, and the narrowed ones carry their rule. */
   for (const shape of SHAPES.filter((s) => s.narrowed)) assert.ok(personCtx(f.api, shape.person).wheres?.tasks, shape.id);
+  /* AND A FIELD HIDDEN FROM A SHAPE IS A CANARY ON EVERY ROW IT SEES: the owner's tasks carry the notes and rates. */
+  const hid = f.callers.find((c) => c.shape.id === 'hidden-field' && c.variant === 'person')!;
+  const held = leaks(listed, f.out(hid));
+  assert.ok(held.some((l) => l.includes('hidden notes')) && held.some((l) => l.includes('hidden rate')), held.join('\n'));
+  const sorted = (h: Readonly<Record<string, readonly string[]>> | undefined) => Object.fromEntries(Object.entries(h ?? {}).map(([k, v]) => [k, [...v].sort()]));
+  for (const shape of SHAPES.filter((s) => s.hides)) assert.deepEqual(sorted(personCtx(f.api, shape.person).hides), sorted(shape.hides), shape.id);
 });
 
 /* ── P1: no answer carries a canary ─────────────────────────────────────── */
@@ -408,7 +416,126 @@ test('SHAPES: the §4.2 grants made as real shares are in the matrix, each also 
   for (const s of SHAPES.filter((x) => x.shares)) assert.ok(variantsOf(s).includes('see-as'), s.id);
 });
 
-test('SHAPES: the §4.2 grants that wait on later slices', { todo: 'hidden field (Slice 6), outside its hours, once after it ran out, and child tokens (Slice 9)' }, () => {
+test('SHAPES: the §4.2 hidden fields are in the matrix, the rate and notes of tasks, and every amount', () => {
   const built = new Set(SHAPES.map((s: Shape) => s.id));
-  for (const wanted of ['hidden-field', 'hours', 'once', 'child-token']) assert.ok(built.has(wanted), wanted);
+  for (const wanted of ['hidden-field', 'hide-amounts']) assert.ok(built.has(wanted), wanted);
+});
+
+test('SHAPES: the §4.2 grants that wait on later slices', { todo: 'outside its hours, once after it ran out, and child tokens (Slice 9)' }, () => {
+  const built = new Set(SHAPES.map((s: Shape) => s.id));
+  for (const wanted of ['hours', 'once', 'child-token']) assert.ok(built.has(wanted), wanted);
+});
+
+/* ── T6: guessing a hidden value through a filter, a sort, a search, a count or a preview ── */
+
+/** Every caller from whom a field is hidden, with each list and the fields hidden there. */
+const hiders = (f: Fixture) => f.callers.filter((c) => c.shape.hides).flatMap((c) => Object.entries(c.shape.hides!).map(([list, fields]) => ({ c, list, fields })));
+
+/** An answer as text with one word put for another, so two answers that differ only in a name they were asked by compare. */
+const said_as = (answer: unknown, from: string, to: string): string => JSON.stringify(answer).replaceAll(from, to);
+
+test('T6 a filter, a sort and a count by a hidden field answer as a field the list does not have', async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const unlike: string[] = [];
+  for (const { c, list, fields } of hiders(f))
+    for (const field of fields) {
+      const asks: [string, string, (x: string) => Args][] = [
+        ['filter', 'list', (x) => ({ register: list, where: { field: x, present: true } })],
+        ['filter in words', 'list', (x) => ({ register: list, where: `${x} is empty` })],
+        ['sort', 'list', (x) => ({ register: list, order: [{ field: x, dir: 'desc' }] })],
+        ['count by', 'countBy', (x) => ({ register: list, by: x })],
+        ['count with a filter', 'countBy', (x) => ({ register: list, by: 'thing', where: { field: x, present: true } })],
+      ];
+      for (const [what, route, args] of asks) {
+        const hidden = (await ask(h, route, args(field), c.ctx)) as { ok?: boolean; refusal?: { code: string } };
+        const none = await ask(h, route, args('nosuch'), c.ctx);
+        if (hidden.ok !== false) unlike.push(`${c.label} ${what} ${list}.${field} was answered`);
+        else if (said_as(hidden, field, 'nosuch') !== JSON.stringify(none)) unlike.push(`${c.label} ${what} ${list}.${field}: ${JSON.stringify(hidden).slice(0, 160)} | ${JSON.stringify(none).slice(0, 160)}`);
+      }
+      /* AND THE SCHEMA SHE IS HANDED HAS NO SUCH FIELD. */
+      const schema = (await ask(h, 'schema', { register: list }, c.ctx)) as { ok: boolean; value?: { fields: { id: string }[] } };
+      if (schema.ok && schema.value!.fields.some((x) => x.id === field)) unlike.push(`${c.label} schema ${list} names ${field}`);
+    }
+  assert.deepEqual(unlike.slice(0, 12), [], `${unlike.length} answer(s) told a hidden field from a missing one`);
+});
+
+test('T6 a search for what a hidden field holds answers as a search for a word nobody wrote', async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const unlike: string[] = [];
+  const nobody = 'zh00000000';
+  for (const c of f.callers.filter((x) => x.shape.hides?.tasks?.includes('notes')))
+    for (const r of [...f.rows.values()].filter((x) => f.visible(c, x)))
+      for (const held of r.held.filter((x) => x.word)) {
+        const hidden = await ask(h, 'search', { q: held.word }, c.ctx);
+        const none = await ask(h, 'search', { q: nobody }, c.ctx);
+        if (said_as(hidden, held.word!, nobody) !== JSON.stringify(none)) unlike.push(`${c.label} ${r.canary.label}: ${JSON.stringify(hidden).slice(0, 200)}`);
+        /* AND THE SAME OVER MCP. */
+        const tool = await callTool(f, 'search', { q: held.word, format: 'json' }, c.ctx);
+        const toolNone = await callTool(f, 'search', { q: nobody, format: 'json' }, c.ctx);
+        const strip = (x: unknown) => said_as({ ...(x as Record<string, unknown>), id: 0 }, held.word!, nobody);
+        if (strip(tool) !== JSON.stringify({ ...(toolNone as Record<string, unknown>), id: 0 })) unlike.push(`${c.label} mcp ${r.canary.label}`);
+        /* AND THE ROW IS STILL FOUND BY WHAT SHE IS SHOWN OF IT, its title, searched by `contains` and not the index. */
+        const own = (await ask(h, 'search', { q: r.canary.word }, c.ctx)) as { ok: boolean; value?: { hits: { seq: number }[]; matched: Record<string, number> } };
+        if (!own.ok || !own.value!.hits.some((x) => x.seq === r.seq) || own.value!.matched.tasks !== 1) unlike.push(`${c.label} ${r.canary.label} not found by its own word`);
+      }
+  assert.deepEqual(unlike.slice(0, 12), [], `${unlike.length} search(es) told what a hidden field holds`);
+});
+
+test('T6 a preview whose block names a hidden field is held, and answers the same whatever it asks of the field', async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const unlike: string[] = [];
+  for (const { c, list, fields } of hiders(f))
+    for (const field of fields) {
+      const page = (block: Record<string, unknown>) => ({ body: { page: 'probe', title: 'Probe', requires: [`register.${list}`], blocks: [block] } });
+      const bare = { kind: 'table', key: 'probe', source: `register.${list}`, columns: [{ field: list === 'money' ? 'payee' : 'name' }] };
+      const table = (where: unknown) => ({ ...bare, where });
+      const asks: [string, Record<string, unknown>, Record<string, unknown>][] = [
+        ['where present', table({ field, present: true }), table({ field, present: false })],
+        ['column', { ...bare, columns: [{ field }] }, { ...bare, columns: [{ field }, { field: 'thing' }] }],
+        ['order', { ...bare, order: [{ field, dir: 'asc' }] }, { ...bare, order: [{ field, dir: 'desc' }] }],
+      ];
+      if (field === 'notes') {
+        const r = [...f.rows.values()].find((x) => x.list === list && f.visible(c, x) && x.held.some((y) => y.word))!;
+        asks.push(['where contains', table({ field, contains: r.held.find((y) => y.word)!.word }), table({ field, contains: 'zh00000000' })]);
+      }
+      for (const [what, one, other] of asks) {
+        const a = (await ask(h, 'previewPage', page(one), c.ctx)) as { ok: boolean; value?: { blocks: { rows?: unknown[]; refusals?: unknown[] }[] } };
+        const b = await ask(h, 'previewPage', page(other), c.ctx);
+        const block = a.ok ? a.value!.blocks[0] : undefined;
+        if (a.ok && (!block?.refusals?.length || block.rows?.length)) unlike.push(`${c.label} ${what} ${list}.${field} was drawn`);
+        const shell = (x: unknown) => JSON.stringify(x, (k, v) => (k === 'where' || k === 'columns' || k === 'order' || k === 'blocks' ? undefined : v));
+        const blocks = (x: unknown) => JSON.stringify(((x as { value?: { blocks?: { refusals?: unknown; rows?: unknown; matched?: unknown }[] } }).value?.blocks ?? []).map((y) => [y.refusals, y.rows, y.matched]));
+        if (shell(a) !== shell(b) || blocks(a) !== blocks(b)) unlike.push(`${c.label} ${what} ${list}.${field}: ${blocks(a).slice(0, 160)} | ${blocks(b).slice(0, 160)}`);
+      }
+    }
+  assert.deepEqual(unlike.slice(0, 12), [], `${unlike.length} preview(s) told what a hidden field holds`);
+});
+
+test('T6 figures over a list with a hidden field are answered to nobody it is hidden from', async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const told: string[] = [];
+  for (const { c, list } of hiders(f)) {
+    for (const metric of ['tasks-count', 'tasks-rate', 'money-sum'].filter((m) => m.startsWith(list === 'money' ? 'money' : 'tasks'))) {
+      const got = (await ask(h, 'metric', { metric }, c.ctx)) as { ok: boolean };
+      if (got.ok) told.push(`${c.label} metric ${metric}`);
+    }
+    const listed = (await ask(h, 'figures', {}, c.ctx)) as { ok: boolean; value?: { list: string | null }[] };
+    if (listed.ok && listed.value!.some((x) => x.list === list)) told.push(`${c.label} figures name one over ${list}`);
+  }
+  assert.deepEqual(told, []);
+});
+
+/* ── the firewall: nothing it would take off, across the whole matrix ──── */
+
+test('FIREWALL: no answer across the whole matrix had a hidden field taken off at a door, and no fault was raised', async () => {
+  assert.deepEqual(FIREWALLED.slice(0, 12), [], `${FIREWALLED.length} answer(s) carried a hidden field to the door`);
+  for (const f of [await reads(), await writes()]) {
+    const faults = f.api.kernel.faults();
+    assert.ok(faults.ok);
+    assert.deepEqual(faults.value.faults.filter((x) => x.kind === 'lens.firewall'), []);
+  }
 });

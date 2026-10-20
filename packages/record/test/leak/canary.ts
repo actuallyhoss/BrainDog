@@ -3,10 +3,10 @@
  * anything its caller may not see.
  *
  * A ROW CARRIES ITS OWN WORD IN EVERY TEXT FIELD. `zq<hex>` on a row a grantee may be kept from, `zp<hex>` on a row
- * its maker kept private, and a unique prime as its amount. `zh<hex>` is kept for hidden-field values, which nothing
- * builds today (G9). A row is in or out of sight per caller, so the word belongs to the row and the caller decides
- * whether it is a leak: whatever an answer carries of a row out of the caller's sight (its word, its id, its amount)
- * is named by `leaks`.
+ * its maker kept private, and a unique prime as its amount. `zh<hex>` is a task's notes beside its word, the value a
+ * share that hides a field keeps from its grantee (sharing plan §2.7). A row is in or out of sight per caller, so the
+ * word belongs to the row and the caller decides whether it is a leak: whatever an answer carries of a row out of the
+ * caller's sight (its word, its id, its amount), or of a field hidden from them on a row in sight, is named by `leaks`.
  */
 
 /** mulberry32: a seeded PRNG, so every run draws the same cases (as `kernel/test/lens.test.ts` does). */
@@ -75,7 +75,7 @@ export function leaks(answer: unknown, out: readonly Canary[]): string[] {
   const text = JSON.stringify(answer) ?? '';
   const found: string[] = [];
   for (const c of out) {
-    if (text.includes(c.word)) found.push(`${c.label} (its word ${c.word})`);
+    if (c.word !== '' && text.includes(c.word)) found.push(`${c.label} (its word ${c.word})`);
     if (c.id !== undefined && text.includes(c.id)) found.push(`${c.label} (its id)`);
     if (c.amount !== undefined)
       for (const form of amountForms(c.amount))

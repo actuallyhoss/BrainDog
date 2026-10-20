@@ -40,7 +40,7 @@ import { backfillSpeaks } from './speaks.ts';
 import { normaliseChecked, themeBuilt } from './theme-check.ts';
 import { ACCENTS, nextAccentHue } from '@braindog/theme';
 import type { EraseReport, EraseRequest } from '@braindog/kernel';
-import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
+import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, raiseFault, rememberedLine, viewerOfRead, type Remembered } from '@braindog/kernel';
 /* WHAT HE TELLS AN AGENT AND THE SETTINGS IT WORKS UNDER (agents and MCP plan §2, §5, §8.2): the guard reads a token's
    settings row and its run's stop, and the briefing hands on what he told the run, in the words those doors use. */
 import { mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
@@ -243,7 +243,7 @@ import { choiceOf } from './decided.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 import { byWhoOf, passesOf, passFolder, passKept, type ByWho, type UpdatePass } from './update-pass.ts';
 import { docValues } from './row-values.ts';
-import { sight as sightOver, type LineSight } from './sight.ts';
+import { FIREWALL_FAULT, sight as sightOver, type LineSight } from './sight.ts';
 /* THE VERBS THAT RUN, which the page read cuts a block's actions to (`kernel.page`'s `runs`). */
 import { RUNS } from './verbs.ts';
 import { lookThemeFault, looksOf, themeFor, type LookOffer } from './theme-pick.ts';
@@ -276,6 +276,7 @@ export { SKILL_DRAFTS_A_DAY, skillBearings, skillDraftOf, type SkillBearing, typ
 export { calmFaults, PAGE_TILES_FIRST } from './slash.ts';
 export { LATE_DAYS, isWorking, lateAt, nothingWaits, presenceOf, waiting, type Presence, type WaitingNow, type WaitingQuestion, type WaitingReader, type WaitingRun } from './waiting.ts';
 export { headlineAgrees, type Disagrees } from './headlines.ts';
+export { firewall, FIREWALL_FAULT } from './sight.ts';
 /* THE RULE `pages()` DROPS A PAGE BY (PGS-A01), so a reader of the record names the kernel's rule and not a copy of it. */
 export { whollyWithheld } from '@braindog/kernel';
 export { fileRecordSigns, readBriefingSign, readToolsSign, type RecordSignsDeps } from './signs.ts';
@@ -2646,15 +2647,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return held.size === 0 ? out : ok({ ...out.value, rows: out.value.rows.map((r) => (held.has(r.id) ? { ...r, private: true as const } : r)) });
   };
 
-  /** One row marked as `marked` does, and `mine` when the viewer made it: only its maker may keep it private or share it again. */
+  /**
+   * One row marked as `marked` does, and `mine` when the viewer made it: only its maker may keep it private or share it
+   * again. Less the fields hidden from the viewer (`sight.maskRow`, sharing plan §2.7).
+   */
   const markedRow = (ctx: CallContext, row: Entry | null): Entry | null => {
     if (row === null) return row;
     const who = ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : undefined;
-    return {
+    return sight.maskRow(ctx, {
       ...row,
       ...(kernel.privateAmong([row.id]).size > 0 ? { private: true as const } : {}),
       ...(who !== undefined && kernel.madeBy(row.id) === who ? { mine: true as const } : {}),
-    };
+    });
   };
 
   /**
@@ -5249,6 +5253,28 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   /** What a block worked out from a whole list says to a reader whose grant shows them part of that list. */
   const PART: Refusal = { code: 'FORBIDDEN', fix: 'This is worked out from a whole list, and you are shown only part of that list.', at: 'source' };
 
+  /**
+   * A block over a list with a field hidden from this caller (sharing plan §2.7), held back (`PART`) when it names a
+   * hidden field anywhere it was written (a column, its `where`, an order, a sum, a group, a `{{field}}` in prose) or
+   * reads that list any way but as its own rows: a figure is worked out over the hidden field as surely as over the
+   * rows. A block that draws rows and names none of them is drawn, its rows masked by the page (`sight.mask`).
+   */
+  const hiddenHeld = (ctx: CallContext, b: Parameters<Kernel['blockRegisters']>[0]): Refusal | null => {
+    if (!Object.values(ctx.hides ?? {}).some((f) => f.length > 0)) return null;
+    const source = typeof b.source === 'string' && b.source.startsWith('register.') ? b.source.slice('register.'.length) : null;
+    const lists = [...new Set([...kernel.blockRegisters(b, { hostSources: hostSourcesOf({ kernel, ctx, readable }) }), ...alsoReads(b)])];
+    const written: Record<string, unknown> = { ...(b as Record<string, unknown>) };
+    for (const key of ANSWER_KEYS) delete written[key];
+    const said = JSON.stringify(written);
+    for (const list of lists) {
+      const hidden = sight.hidden(ctx, list);
+      if (hidden.size === 0) continue;
+      if (list !== source) return PART;
+      for (const field of hidden) if (said.includes(`"${field}"`) || new RegExp(`\\{\\{\\s*${field}\\s*\\}\\}`, 'u').test(said)) return PART;
+    }
+    return null;
+  };
+
   /** The lists a block reads that this caller's grant narrows to some of their rows (`wheres`). Private rows are left out inside the page read itself (`viewer`), so they need no redraw. */
   const narrowedLists = (ctx: CallContext, b: Parameters<Kernel['blockRegisters']>[0]): string[] =>
     Object.keys(ctx.wheres ?? {}).length === 0 ? [] : [...new Set([...kernel.blockRegisters(b), ...alsoReads(b)])].filter((list) => Object.hasOwn(ctx.wheres ?? {}, list));
@@ -5479,7 +5505,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          she is not shown, and nothing in the answer can be taken off a row at a time. A block whose `source:` is the
          list is not held here: `heldBlock` draws it with her rows alone (`ownRows`), unless it reads the same list a
          second way beside its rows (the steps under its own cards, the row a scope is named from). */
-      (narrowedLists(ctx, b).some((list) => list !== narrowedSource(ctx, b)) || alsoReads(b).some((list) => list === narrowedSource(ctx, b)) ? PART : null);
+      (narrowedLists(ctx, b).some((list) => list !== narrowedSource(ctx, b)) || alsoReads(b).some((list) => list === narrowedSource(ctx, b)) ? PART : null) ??
+      hiddenHeld(ctx, b);
     return { log, beyond };
   };
 
@@ -7002,7 +7029,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          hold it: a token held to the paper jobs read the court jobs' titles and fields off `whatsNew`. */
       if (!row || readable(ctx, row.register) || !seen.admits(row)) return null;
       const title = kernel.register(row.register)?.title;
-      return { ...bare, register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') || null : null };
+      /* AND A LINE ABOUT A FIELD HIDDEN FROM HER IS DROPPED, A CREATE'S `to` LESS THE HIDDEN KEYS (sharing plan §2.7). */
+      return sight.maskLine(ctx, row.register, { ...bare, register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') || null : null });
     }
     if (kind === 'suggestion' || kind === 'decision') {
       const row = kernel.governanceRow(kind, id);
@@ -8452,18 +8480,23 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * answered as a row that is not there.
    */
   const taskInHand = (ctx: CallContext, ref: string): Result<TaskInHand> => {
-    const row = kernel.get(ref);
-    if (row === null || readable(ctx, row.register) !== null || !sight.admits(ctx, row))
+    const got = kernel.get(ref);
+    if (got === null || readable(ctx, got.register) !== null || !sight.admits(ctx, got))
       return no('ROW_UNKNOWN', `There is no task you can read called ${ref}.`, { at: 'task' });
+    /* LESS THE FIELDS HIDDEN FROM HER, and its project only when she is shown it: the plan writes these out as text. */
+    const row = sight.maskRow(ctx, got);
+    const hidden = sight.hidden(ctx, row.register);
     const decl = kernel.register(row.register);
     const scope = decl?.fields.find((f) => f.scope !== undefined && !f.retired);
     const at = scope === undefined ? null : row.fields[scope.id];
-    const project = typeof at === 'string' && at !== '' ? kernel.nameOf(kernel.get(at)?.id ?? at) : null;
+    const placed = typeof at === 'string' && at !== '' ? kernel.get(at) : null;
+    const project = placed !== null && sight.admits(ctx, placed) ? kernel.nameOf(placed.id) : null;
     const history = sql
       .all<{ ts: string; actor: string; kind: string; field: string | null; to_v: string | null; note: string | null }>(
         "SELECT ts, actor, kind, field, to_v, note FROM event WHERE target = ? AND kind NOT IN ('read', 'grant.read') ORDER BY ts DESC, rowid DESC LIMIT 3",
         `entry:${row.id}`,
       )
+      .filter((e) => e.field === null || !hidden.has(e.field))
       .map((e) => {
         const who = e.actor.startsWith('p_') ? personNamed(sql, e.actor) : e.actor;
         const what = e.kind === 'note' ? `noted "${e.note ?? ''}"` : e.kind === 'create' ? 'made it' : e.field !== null ? `set ${e.field}${e.to_v !== null && e.to_v.length <= 60 ? ` to ${e.to_v}` : ''}` : e.kind;
@@ -8778,7 +8811,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       told.budget = effective?.context.budget ?? 700;
       told.enforce = effective?.enforce ?? null;
     }
-    return carded(ctx, told, {
+    /* THE FIELDS HIDDEN FROM HER ARE TAKEN OFF BEFORE THE CARD AND THE PLAN ARE WRITTEN, since both are text drawn from
+       these rows and a mask over the answer cannot reach into a sentence. */
+    return carded(ctx, sight.mask(ctx, told), {
       agent: text(run?.fields.agent) ?? hints.agent ?? null,
       host: tree.host ?? null,
       branch: hints.branch ?? text(run?.fields.branch) ?? null,
@@ -9385,7 +9420,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const { block, note, ...rest } = JSON.parse(d.body) as Record<string, unknown>;
         blocks[d.id] = rest as KindSpec & { title: string; purpose: string };
       }
-      return ok({ ...decl, blocks });
+      /* WITHOUT THE FIELDS HIDDEN FROM HER (sharing plan §2.7), as `list` reads her filters: a list she is shown in part
+         has the fields she is shown, and an order or a state by a hidden one is no order or state of hers. */
+      const hidden = sight.hidden(ctx, args.register);
+      if (hidden.size === 0) return ok({ ...decl, blocks });
+      const { order, state, ...kept } = decl;
+      return ok({
+        ...kept,
+        ...(order === undefined || hidden.has(order.field) ? {} : { order }),
+        ...(state === undefined || hidden.has(state) ? {} : { state }),
+        fields: decl.fields.filter((f) => !hidden.has(f.id)),
+        blocks,
+      } as RegisterDecl & { blocks: typeof blocks });
     },
 
     /**
@@ -9522,19 +9568,26 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          Jobs alone read `ok 0` for a hidden client that exists and `REF_UNKNOWN` for one that does not. */
       /* A SWITCHED-OFF ADD-ON'S LIST IS REFUSED NAMING THE ADD-ON (ruling 298), as a write to it is, not "There is no
          register called tasks", which sends a person looking for a list that is only asleep. */
+      /* HER OWN FILTER AND ORDER ARE READ WITHOUT THE FIELDS HIDDEN FROM HER (sharing plan §2.7), so naming one is a
+         field the list does not have, and the rows come back without them (`sight.mask`). */
       return offRegister(
         args.register,
-        readFrom(
+        sight.mask(
           ctx,
-          marked(kernel.list(
-            {
-              ...args,
-              reads: (register) => readable(ctx, register) === null,
-              /* A HOP GOES ONLY INTO A LIST SHE READS WHOLE (where-hop-49): one her grant narrows would be counted whole. */
-              hops: (register) => readable(ctx, register) === null && kernel.scope(ctx, register) === undefined,
-            },
-            kernel.scope(ctx, args.register),
-          )),
+          readFrom(
+            ctx,
+            marked(kernel.list(
+              {
+                ...args,
+                reads: (register) => readable(ctx, register) === null,
+                /* A HOP GOES ONLY INTO A LIST SHE READS WHOLE (where-hop-49): one her grant narrows would be counted whole,
+                   and one with a field hidden from her could be filtered by it. */
+                hops: (register) => readable(ctx, register) === null && sight.whole(ctx, register) && kernel.scope(ctx, register) === undefined,
+              },
+              kernel.scope(ctx, args.register),
+              [...sight.hidden(ctx, args.register)],
+            )),
+          ),
         ),
       );
     },
@@ -10237,7 +10290,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the titles of projects she may not read, and how many tasks each holds. Her choice on it is dropped and the page
          read again, so a value she was never offered narrows nothing either. */
       /* AND BY A LIST HER GRANT NARROWS TO SOME OF ITS ROWS (`wheres`): the values are counted over every row of it. */
-      const unseen = (f: PageFilter): boolean => f.reads.some((list) => Object.hasOwn(ctx.wheres ?? {}, list) || (!everyList && readable(ctx, list) !== null));
+      /* AND BY A FIELD HIDDEN FROM HER ON A LIST IT READS (sharing plan §2.7): its values are what the field holds. */
+      const unseen = (f: PageFilter): boolean =>
+        f.reads.some((list) => Object.hasOwn(ctx.wheres ?? {}, list) || (!everyList && readable(ctx, list) !== null) || sight.hidden(ctx, list).has(f.field));
       if (out.ok && filter && (out.value.filters as PageFilter[] | undefined)?.some((f) => unseen(f) && Object.hasOwn(filter, f.field))) {
         const kept = { ...filter };
         for (const f of out.value.filters as PageFilter[]) if (unseen(f)) delete kept[f.field];
@@ -10284,13 +10339,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               'SELECT created_at AS at FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0',
               `look.${typeof look.look === 'string' ? look.look : args.slug}`,
             )?.at;
-      return ok({
-        ...out.value,
-        ...(declared ? { declared_version: declared.version } : {}),
-        ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
-        ...(look === undefined ? {} : { look: lookAt === undefined ? look : { ...look, at: lookAt } }),
-        blocks: line === null ? blocks : blocks.map((b, i) => (i === line.at ? { ...b, said: line.text } : b)),
-      });
+      /* THE ROWS A BLOCK SHE IS SHOWN DRAWS COME LESS THE FIELDS HIDDEN FROM HER (`sight.mask`). */
+      return ok(
+        sight.mask(ctx, {
+          ...out.value,
+          ...(declared ? { declared_version: declared.version } : {}),
+          ...(filters ? { filters: filters.map((f) => (unseen(f) ? { ...f, chosen: null, values: [], reads: [] } : f)) } : {}),
+          ...(look === undefined ? {} : { look: lookAt === undefined ? look : { ...look, at: lookAt } }),
+          blocks: line === null ? blocks : blocks.map((b, i) => (i === line.at ? { ...b, said: line.text } : b)),
+        }),
+      );
     },
 
     /**
@@ -10541,7 +10599,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           `A preview answers at most ${PREVIEW_BYTES_MOST.toLocaleString('en-GB')} bytes, and this one came to ${weight.toLocaleString('en-GB')}. Installed, the page has no such ceiling. Preview it with lower table limits or fewer blocks.`,
           { at: 'blocks' },
         );
-      return ok(answer);
+      return ok(sight.mask(ctx, answer));
     },
 
     /** One figure, by the id a `stat` cell names. */
@@ -11372,7 +11430,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         return no('ENUM_VALUE_UNKNOWN', `depth is one of ${CONTEXT_DEPTHS.join(', ')}.`, { at: 'depth', allowed: CONTEXT_DEPTHS });
       if (said.format !== undefined && said.format !== null && said.format !== 'full' && said.format !== 'brief')
         return no('ENUM_VALUE_UNKNOWN', 'format is full or brief.', { at: 'format', allowed: ['full', 'brief'] });
-      if (typeof said.since === 'string') return ok(contextSince(ctx, said.since.trim())) as Out;
+      if (typeof said.since === 'string') return ok(sight.mask(ctx, contextSince(ctx, said.since.trim()))) as Out;
       const depth: ContextDepth = (said.depth as ContextDepth | undefined) ?? (said.format === 'full' ? 'full' : typeof said.task === 'string' ? 'task' : 'brief');
       const asked = depth === 'full' ? { ...ctx, session: { ...(ctx.session ?? {}), format: 'full' } as SessionHints } : ctx;
       if (typeof said.project === 'string') {
@@ -11387,7 +11445,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         task = found.value;
       }
       const told = briefing(asked, { ...(typeof said.project === 'string' ? { project: said.project.trim() } : {}), depth, ...(task === null ? {} : { task }) });
-      return ok({ ...told, depth, ...(task === null ? {} : { task }) }) as Out;
+      return ok(sight.mask(ctx, { ...told, depth, ...(task === null ? {} : { task }) })) as Out;
     },
 
     /* ── PEOPLE ─────────────────────────────── */
@@ -13508,7 +13566,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop } as Result<never>;
       const row = kernel.get({ register: args.register, seq: args.seq });
-      return ok(row && sight.admits(ctx, row) ? withSettling(sql, kernel.history(row.id)) : []);
+      if (!row || !sight.admits(ctx, row)) return ok([]);
+      /* A SHARE THAT SWITCHED HISTORY OFF (`ctx.nots`) SHOWS THE ROW AND NOT ITS PAST. Asked after the row is admitted,
+         so a row she is not shown is still answered as one nobody holds. */
+      if (ctx.nots?.[row.register]?.includes('history')) return no('FORBIDDEN', 'You can see this row, not its past.', { at: 'seq' });
+      /* AND A LINE ABOUT A FIELD HIDDEN FROM HER IS NOT HERS, nor the hidden keys of the line that made the row. */
+      return ok(withSettling(sql, kernel.history(row.id)).flatMap((line) => sight.maskLine(ctx, row.register, line) ?? []));
     },
 
     /**
@@ -13833,7 +13896,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and where the words found fewer
          than five, the rows nearest the query's own meaning fused in (`near.ts`), each marked `by: 'meaning'`. Before the
          reach below, which only drops hits and so keeps the order it is given. */
-      const searched = await byMeaning(sql, deps.meaning, String(args.q ?? ''), found.hits, registers.length === every.length ? {} : { registers });
+      /* NOT BY MEANING OVER A LIST WITH A SEARCHABLE FIELD HIDDEN FROM HER (sharing plan §2.7): a row's vector holds what
+         that field says, so those hits keep the words' order and no row of the list is fused in. */
+      const unmeant = sight.unmeant(ctx);
+      const meant = unmeant.size === 0 ? found.hits : found.hits.filter((h) => !unmeant.has(h.register));
+      const byWords = await byMeaning(sql, deps.meaning, String(args.q ?? ''), meant, registers.length === every.length && unmeant.size === 0 ? {} : { registers: registers.filter((r) => !unmeant.has(r)) });
+      const searched = unmeant.size === 0 ? byWords : { ...byWords, hits: [...byWords.hits, ...found.hits.filter((h) => unmeant.has(h.register))] };
       /* EVERY HIT ASKED AT ONCE (`sight.rows`): a hit by meaning (`near.ts`) is drawn from outside the words' query, so
          it is held here even though the words' hits already were. */
       const read = searched.hits.flatMap((hit) => {
@@ -13856,6 +13924,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         meaning: searched.meaning,
         comments,
       });
+    },
+
+    /**
+     * A door found a field hidden from its caller still in an answer (`firewall`, sharing plan §2.5 item 6), took it off,
+     * and says so here: fault `lens.firewall`, one per method, so the path that did not mask is named to an operator.
+     * Not a route; the doors call it, never a caller.
+     */
+    firewalled(method: string, stripped: readonly string[]): void {
+      raiseFault(sql, `${FIREWALL_FAULT}#${method}`, FIREWALL_FAULT, `${method} answered ${stripped.join(', ')}, hidden from its caller.`, clock.now());
+    },
+
+    /** The list a row named by its spoken id is on, `tasks#3` or `TK3`, or `null`: what the MCP door's firewall reads a row by. */
+    listOf(spoken: string): string | null {
+      return kernel.get(spoken, { includeDeleted: true })?.register ?? null;
     },
 
     /** What this record is at, and what is reading it. `33 §4`, line 356. */

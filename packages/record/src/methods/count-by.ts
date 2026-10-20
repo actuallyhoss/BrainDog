@@ -26,6 +26,7 @@ import type { Json } from '@braindog/kernel';
 import type { Result } from '@braindog/ports';
 
 import type { CallContext } from '../index.ts';
+import { hiddenOf } from '../sight.ts';
 import type { RecordDeps } from './index.ts';
 
 /** The field types a count is answered for. */
@@ -82,7 +83,10 @@ export function methods(deps: RecordDeps, limits: Limits = {}) {
       const decl = kernel.register(args.register);
       if (!decl) return no('REGISTER_UNKNOWN', `There is no list called ${args.register}.`, { at: 'register' });
 
-      const live = decl.fields.filter((f) => f.retired !== true);
+      /* A FIELD HIDDEN FROM HER IS ONE THE LIST DOES NOT HAVE (sharing plan §2.7): not counted by, and not in her filter,
+         which the walk reads without it (`kernel.list`'s `hide`), so no count tells her what it holds. */
+      const hidden = hiddenOf(ctx, args.register);
+      const live = decl.fields.filter((f) => f.retired !== true && !hidden.has(f.id));
       const countable = live.filter((f) => COUNTED.has(f.type) && !held(f)).map((f) => f.id);
       const field = live.find((f) => f.id === args.by);
       if (field === undefined)
@@ -102,7 +106,7 @@ export function methods(deps: RecordDeps, limits: Limits = {}) {
       const rule = kernel.scope(ctx, args.register);
       const fast = tallied();
       const read =
-        fast !== undefined && rule === undefined && readsEveryList?.(ctx) === true
+        fast !== undefined && rule === undefined && hidden.size === 0 && readsEveryList?.(ctx) === true
           ? fromTally(fast({ register: args.register, field: field.id, ...(args.where === undefined ? {} : { where: args.where as never }) }), field.type)
           : walk(args.register, field.id, decl.state === field.id, args.where, rule, ctx);
       if (!read.ok) return read;
@@ -158,6 +162,7 @@ export function methods(deps: RecordDeps, limits: Limits = {}) {
           reads: (r: string) => deps.readable(ctx, r) === null,
         },
         rule,
+        [...hiddenOf(ctx, register)],
       );
       if (!page.ok) return page;
       matched ??= page.value.matched;

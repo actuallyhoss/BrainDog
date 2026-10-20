@@ -24,6 +24,8 @@
  * caller's answer to another.
  */
 
+import { firewall } from '@braindog/record/sight';
+
 import type { McpSurface } from './index.ts';
 import { handle, VERSIONS, type Reply } from './rpc.ts';
 
@@ -281,12 +283,53 @@ async function answered<C>(request: Request, surface: McpSurface<C>, ctx: C | nu
      else 2025-03-26, which the specification tells a server to assume of a request that sends no header. `handle`
      reads it only to decide whether a result says `resultType`, which no client older than 2026-07-28 expects. */
   const version = request.headers.get('mcp-protocol-version') ?? versionIn(meta) ?? OLDEST;
-  const reply = await handle(message, surface, who, options.origin, version, callerOf(options.caller?.(who) ?? request.headers.get('authorization') ?? '', said), options.build);
+  const answer = await handle(message, surface, who, options.origin, version, callerOf(options.caller?.(who) ?? request.headers.get('authorization') ?? '', said), options.build);
+  /* THE FIREWALL (sharing plan §2.5 item 6), as `/api`'s: a field hidden from this caller still on a row of the reply is
+     taken off and raised as fault `lens.firewall` naming the method, a tool by its name and a resource by its address. */
+  const held = walled(who, answer, surface.listOf);
+  if (held.stripped.length > 0) surface.firewalled?.(`mcp ${mcpMethodOf(message)}`, held.stripped);
+  const reply = held.answer;
   if (options.called && reply !== null && !('error' in reply) && isObject(message) && message.method === 'tools/call') {
     const name = isObject(message.params) && typeof message.params.name === 'string' ? message.params.name : '';
     if (name !== '') await options.called(who, name);
   }
   return reply === null ? bare(202) : json(statusOf(reply), reply);
+}
+
+/**
+ * A reply through the firewall (`firewall`): its rows, the structured half included, and a text half that is the same
+ * answer written as JSON, read and written again only when the firewall took something off it. Text written in words is
+ * past any key to take off; the structured half beside it is what finds the path that did not mask.
+ */
+function walled<T>(ctx: unknown, reply: T, listOf?: (spoken: string) => string | null): { answer: T; stripped: string[] } {
+  const held = firewall(ctx, reply, listOf);
+  const result = isObject(held.answer) && isObject(held.answer.result) ? held.answer.result : null;
+  if (result === null || !Array.isArray(result.content)) return held;
+  const stripped = new Set(held.stripped);
+  const content = result.content.map((part: unknown) => {
+    if (!isObject(part) || part.type !== 'text' || typeof part.text !== 'string' || !/^\s*[[{]/u.test(part.text)) return part;
+    let read: unknown;
+    try {
+      read = JSON.parse(part.text);
+    } catch {
+      return part;
+    }
+    const text = firewall(ctx, read, listOf);
+    if (text.stripped.length === 0) return part;
+    for (const s of text.stripped) stripped.add(s);
+    return { ...part, text: JSON.stringify(text.answer, null, 2) };
+  });
+  if (stripped.size === held.stripped.length) return held;
+  return { answer: { ...(held.answer as object), result: { ...result, content } } as T, stripped: [...stripped].sort() };
+}
+
+/** What one message asked, as a fault names it: a tool by its name, a resource by its address, else the method. */
+function mcpMethodOf(message: unknown): string {
+  if (!isObject(message) || typeof message.method !== 'string') return 'unknown';
+  const params = isObject(message.params) ? message.params : {};
+  if (message.method === 'tools/call' && typeof params.name === 'string') return params.name;
+  if (message.method === 'resources/read' && typeof params.uri === 'string') return params.uri;
+  return message.method;
 }
 
 /**

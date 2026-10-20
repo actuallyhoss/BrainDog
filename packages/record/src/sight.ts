@@ -18,6 +18,12 @@
  * on the list is conditional may not change a gate field, the fields some grant's condition reads, so no grantee can
  * move a row into another grantee's view. AFTER IT (`within`): the kernel runs the same clause again in the write's
  * transaction and unwinds a create outside it or an edit that moves the row out (`WriteContext.within`).
+ *
+ * THE FIELDS (Slice 6, `mask` and `firewall`). A share may hide fields of a list from its grantee (`ctx.hides`, the
+ * union over every share covering the list). `mask` takes them off whatever a method answers: a row's `fields`, a log
+ * line about one (a line about a hidden field is dropped, and a create line's `to` loses the hidden keys), and a row's
+ * mirrored state when its state field is hidden. `firewall` is the doors' safety net, the same strip on any row left in
+ * an answer, which a door raises as a fault, so a path that forgot to mask is found and never leaks.
  */
 
 import type { Entry, Json, Kernel, Wheres } from '@braindog/kernel';
@@ -31,8 +37,78 @@ import type { CallContext } from './index.ts';
 export type Sighted = {
   principal: { kind: string; id: string; person?: string };
   wheres?: Readonly<Wheres> | undefined;
+  hides?: Readonly<Record<string, readonly string[]>> | undefined;
   outbound?: true | undefined;
 };
+
+const NONE: ReadonlySet<string> = new Set();
+
+/** The fields of one list hidden from this caller (sharing plan §2.7), none for almost everybody. */
+export const hiddenOf = (ctx: Pick<Sighted, 'hides'>, register: string): ReadonlySet<string> => {
+  const fields = ctx.hides?.[register];
+  return fields === undefined || fields.length === 0 ? NONE : new Set(fields);
+};
+
+/** Whether any field of any list is hidden from this caller. */
+export const hidesAny = (ctx: Pick<Sighted, 'hides'>): boolean => Object.values(ctx.hides ?? {}).some((f) => f.length > 0);
+
+const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** A row as any answer carries one: a list's id beside the row's `fields`. */
+const isRow = (v: Record<string, unknown>): v is { register: string; fields: Record<string, unknown> } => typeof v.register === 'string' && isObj(v.fields);
+
+/** A row as the MCP door shapes one: its spoken id, `tasks#3` or `TK3`, beside its `fields`. */
+const isSpoken = (v: Record<string, unknown>): v is { spoken: string; fields: Record<string, unknown> } => typeof v.register !== 'string' && typeof v.spoken === 'string' && isObj(v.fields);
+
+/** An object less some keys, the same object when it holds none of them. */
+const without = <T extends Record<string, unknown>>(o: T, keys: ReadonlySet<string>): T => {
+  if (!Object.keys(o).some((k) => keys.has(k))) return o;
+  return Object.fromEntries(Object.entries(o).filter(([k]) => !keys.has(k))) as T;
+};
+
+/** The fault a door raises when `firewall` took a hidden field off an answer, its cause `lens.firewall#<method>`. */
+export const FIREWALL_FAULT = 'lens.firewall';
+
+/**
+ * THE DOORS' SAFETY NET (sharing plan §2.5 item 6): every row left in an answer with a field hidden from its caller, the
+ * field taken off, and which `list.field` were found. A pure walk, the same at `/api` and `/mcp`; the door that finds
+ * one raises fault `lens.firewall` naming the method. Never the main control: every method masks its own answer, and a
+ * strip here is a path that did not. `listOf` names the list of a row the MCP door shapes by its spoken id alone.
+ */
+export function firewall<T>(ctx: unknown, answer: T, listOf?: (spoken: string) => string | null): { answer: T; stripped: string[] } {
+  const hides = isObj(ctx) && isObj(ctx.hides) ? (ctx.hides as Record<string, readonly string[]>) : undefined;
+  if (hides === undefined || !hidesAny({ hides })) return { answer, stripped: [] };
+  const stripped = new Set<string>();
+  const walk = (v: unknown, depth: number): unknown => {
+    if (depth > 64) return v;
+    if (Array.isArray(v)) {
+      const out = v.map((x) => walk(x, depth + 1));
+      return out.some((x, i) => x !== v[i]) ? out : v;
+    }
+    if (!isObj(v)) return v;
+    let o: Record<string, unknown> = v;
+    const register = isRow(o) ? o.register : isSpoken(o) ? (listOf?.(o.spoken) ?? null) : null;
+    if (register !== null) {
+      const fields = o.fields as Record<string, unknown>;
+      const hidden = hiddenOf({ hides }, register);
+      const found = Object.keys(fields).filter((k) => hidden.has(k));
+      if (found.length > 0) {
+        for (const k of found) stripped.add(`${register}.${k}`);
+        o = { ...o, fields: without(fields, hidden) };
+      }
+    }
+    let changed = o !== v;
+    const next: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(o)) {
+      const y = k === 'fields' && register !== null ? x : walk(x, depth + 1);
+      if (y !== x) changed = true;
+      next[k] = y;
+    }
+    return changed ? next : v;
+  };
+  const out = walk(answer, 0) as T;
+  return { answer: out, stripped: [...stripped].sort() };
+}
 
 /** A log line as the walk hands it: its target says which row it is about, when it is about one. */
 type Line = { target: string | null; target_kind?: string | null };
@@ -65,8 +141,11 @@ export type LineSight = { row: (id: string) => Entry | null; admits: (row: Entry
 export function readSight(kernel: Kernel) {
   const viewer = (ctx: Sighted): string | undefined => viewerOfRead(ctx);
 
-  /** Whether this caller reads every row of a list: no rule of their own on it. Private rows are still left out by `viewer`. */
-  const whole = (ctx: Sighted, register: string): boolean => whereFor(ctx.wheres, register) === undefined;
+  /**
+   * Whether this caller reads the whole of a list: every row, no rule of their own on it, and every field, none hidden
+   * (sharing plan §2.7), which is who a figure over it is answered to. Private rows are still left out by `viewer`.
+   */
+  const whole = (ctx: Sighted, register: string): boolean => whereFor(ctx.wheres, register) === undefined && hiddenOf(ctx, register).size === 0;
 
   /** Which of these rows of one list the caller is shown: one statement per 500, none when nothing is held back. */
   const admitted = (ctx: Sighted, register: string, ids: readonly string[]): Set<string> =>
@@ -121,13 +200,89 @@ export function readSight(kernel: Kernel) {
   const inScope = (ctx: Sighted, register: string, project: string | null, opts: { limit?: number; open?: boolean } = {}) =>
     kernel.inScope(register, project, { ...opts, grant: ctx.wheres, viewer: viewer(ctx) });
 
-  /** What points at one row, the row itself and every row pointing at it held to the caller's grant and private rows. */
-  const backlinks = (ctx: Sighted, q: Omit<Parameters<Kernel['backlinks']>[0], 'viewer' | 'grant'>) =>
-    kernel.backlinks({ ...q, viewer: viewer(ctx), grant: ctx.wheres });
+  /**
+   * What points at one row, the row itself and every row pointing at it held to the caller's grant and private rows, by
+   * the refs she is shown, each row masked.
+   */
+  const backlinks = (ctx: Sighted, q: Omit<Parameters<Kernel['backlinks']>[0], 'viewer' | 'grant' | 'hide'>) =>
+    mask(ctx, kernel.backlinks({ ...q, viewer: viewer(ctx), grant: ctx.wheres, hide: ctx.hides }));
 
-  /** A search, its hits and `matched` both the rows the caller is shown. */
+  /** A search, its hits and `matched` both the rows the caller is shown, by the fields she is shown. */
   const searchMatched = (ctx: Sighted, q: string, opts: { registers?: readonly string[] | undefined; limit?: number } = {}) =>
-    kernel.searchMatched(q, { ...opts, viewer: viewer(ctx), grant: ctx.wheres });
+    kernel.searchMatched(q, { ...opts, viewer: viewer(ctx), grant: ctx.wheres, hide: ctx.hides });
+
+  /**
+   * The lists a search does not ask by meaning for this caller: one with a searchable field hidden from her, which
+   * `searchMatched` asks by `contains` and never of the index, and which a vector of the whole row would answer by what
+   * that field says.
+   */
+  const unmeant = (ctx: Sighted): Set<string> => {
+    const out = new Set<string>();
+    for (const [register, fields] of Object.entries(ctx.hides ?? {})) {
+      const decl = kernel.register(register);
+      if (decl && decl.fields.some((f) => fields.includes(f.id) && (f as { search?: boolean }).search === true)) out.add(register);
+    }
+    return out;
+  };
+
+  /** A row as this caller is shown it: less the fields hidden from her, and its state when the state field is one. */
+  const maskRow = <T extends { register: string; fields: Record<string, unknown> }>(ctx: Sighted, row: T): T => {
+    const hidden = hiddenOf(ctx, row.register);
+    if (hidden.size === 0) return row;
+    const state = kernel.register(row.register)?.state;
+    const fields = without(row.fields, hidden);
+    const out = fields === row.fields ? row : { ...row, fields };
+    return state !== undefined && hidden.has(state) && (out as { state?: unknown }).state != null ? { ...out, state: null } : out;
+  };
+
+  /**
+   * A line of the log about a row of `register` as this caller is shown it, or `null`: a line about a field hidden from
+   * her is dropped, and the values a line carries whole (a create's `to`, a restore's) lose the hidden keys.
+   */
+  const maskLine = <T extends { kind?: unknown; field?: unknown; from?: unknown; to?: unknown }>(ctx: Sighted, register: string, line: T): T | null => {
+    const hidden = hiddenOf(ctx, register);
+    if (hidden.size === 0) return line;
+    if (typeof line.field === 'string' && hidden.has(line.field)) return null;
+    const state = kernel.register(register)?.state;
+    if (line.kind === 'state' && state !== undefined && hidden.has(state)) return null;
+    const from = isObj(line.from) ? without(line.from, hidden) : line.from;
+    const to = isObj(line.to) ? without(line.to, hidden) : line.to;
+    return from === line.from && to === line.to ? line : { ...line, from, to };
+  };
+
+  /**
+   * An answer as this caller is shown it (sharing plan §2.7): every row in it masked (`maskRow`), and every log line in
+   * it that names its list (`maskLine`) masked or dropped. A walk of the whole answer, asked only of a caller from whom
+   * something is hidden, so everybody else is handed the answer as it was.
+   */
+  const mask = <T>(ctx: Sighted, answer: T): T => {
+    if (!hidesAny(ctx)) return answer;
+    const DROP = Symbol('drop');
+    const walk = (v: unknown, depth: number): unknown => {
+      if (depth > 64) return v;
+      if (Array.isArray(v)) {
+        const out = v.map((x) => walk(x, depth + 1)).filter((x) => x !== DROP);
+        return out.length === v.length && out.every((x, i) => x === v[i]) ? v : out;
+      }
+      if (!isObj(v)) return v;
+      let o: Record<string, unknown> = v;
+      if (isRow(o)) o = maskRow(ctx, o);
+      else if (typeof o.register === 'string' && typeof o.kind === 'string' && ('to' in o || 'from' in o)) {
+        const line = maskLine(ctx, o.register, o);
+        if (line === null) return DROP;
+        o = line;
+      }
+      let changed = o !== v;
+      const next: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(o)) {
+        const y = k === 'fields' && isRow(o) ? x : walk(x, depth + 1);
+        if (y !== x) changed = true;
+        next[k] = y === DROP ? null : y;
+      }
+      return changed ? next : v;
+    };
+    return walk(answer, 0) as T;
+  };
 
   /**
    * Whether one write can change which OLDER lines of the log this caller is shown, which is when a remembered version
@@ -148,12 +303,10 @@ export function readSight(kernel: Kernel) {
     return rule !== undefined && (e.field === null || ruleFields(rule)!.has(e.field));
   };
 
-  return { whole, admitted, admits, rows, lines, moves, clause, inScope, backlinks, searchMatched };
+  return { whole, admitted, admits, rows, lines, moves, clause, inScope, backlinks, searchMatched, unmeant, hidden: hiddenOf, maskRow, maskLine, mask };
 }
 
 /* ── the write half ──────────────────────────────────────────────────────── */
-
-const NONE: ReadonlySet<string> = new Set();
 
 /** A list's name as one of its rows, "task" for Tasks, enough for a sentence about a row. */
 const one = (name: string): string => {
@@ -213,11 +366,17 @@ export function writeSight(deps: SightDeps) {
     return out;
   };
 
-  /** The fields of a list hidden from this caller (sharing plan §2.7). None until Slice 6 hides any. */
-  const hiddenFields = (_ctx: CallContext, _register: string): ReadonlySet<string> => NONE;
+  /** The fields of a list hidden from this caller (sharing plan §2.7): a patch naming one names a field the list lacks. */
+  const hiddenFields = (ctx: CallContext, register: string): ReadonlySet<string> => hiddenOf(ctx, register);
 
-  /** Whether this caller may delete or restore rows of a list. Today the write rung carries delete; Slice 5 splits it. */
-  const mayDelete = (_ctx: CallContext, _register: string): Refusal | null => null;
+  /**
+   * Whether this caller may delete or restore rows of a list: the write rung carries delete unless a share switched it
+   * off there (`ctx.nots`, a share's `caps: { delete: false }`).
+   */
+  const mayDelete = (ctx: CallContext, register: string): Refusal | null =>
+    ctx.nots?.[register]?.includes('delete') === true
+      ? { code: 'FORBIDDEN', fix: `You can change ${listName(register)}, and not delete or bring back what is in it. Ask ${kernel.ownerName() ?? 'the owner'}.`, at: 'deleted_at' }
+      : null;
 
   /** Whether a patch changes what a row holds in one field: a value sent back as it was read is no change. */
   const changes = (row: Entry, field: string, value: unknown): boolean => {

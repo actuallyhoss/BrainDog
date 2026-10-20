@@ -10,8 +10,9 @@
 import { serveMcp } from '../../../mcp/src/http.ts';
 import { TOOLS } from '../../../mcp/src/index.ts';
 import type { CallContext } from '../../src/index.ts';
+import { firewall } from '../../src/sight.ts';
 import type { Fixture } from './fixture.ts';
-import type { Args } from './routes.ts';
+import { FIREWALLED, type Args } from './routes.ts';
 
 export const TOOL_NAMES: readonly string[] = TOOLS.map((t) => t.name);
 export const WRITES: ReadonlySet<string> = new Set(TOOLS.filter((t) => t.writes).map((t) => t.name));
@@ -28,7 +29,11 @@ export async function rpc(f: Fixture, method: string, params: Record<string, unk
   try {
     const res = await serveMcp(request, f.api as never, ctx);
     const raw = await res.text();
-    return raw ? JSON.parse(raw) : { status: res.status };
+    const reply: unknown = raw ? JSON.parse(raw) : { status: res.status };
+    /* `serveMcp` RAISES ITS OWN FIREWALL AS A FAULT (`lens.firewall`); the reply it sent is held to the same check. */
+    const held = firewall(ctx, reply, (spoken) => f.api.listOf(spoken));
+    if (held.stripped.length > 0) FIREWALLED.push(`mcp ${method} ${held.stripped.join(', ')}`);
+    return reply;
   } catch (cause) {
     return { threw: String((cause as Error)?.message ?? cause) };
   }

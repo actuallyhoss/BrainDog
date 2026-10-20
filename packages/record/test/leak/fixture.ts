@@ -13,6 +13,10 @@
  * `kernel/src/share-templates.ts` are emulated by those rows until Slice 5 wires shares (`templateRows`), and each shape
  * runs as the person, their write-scope token and their read-scope token. The shapes with `shares` are made through the
  * share API (Slice 7) on guests, and run as the owner seeing as them too (`seeAs`).
+ *
+ * HIDDEN FIELDS (Slice 6) ARE CANARIES ON ROWS IN SIGHT. A task's notes carry a `zh` word beside its own, and its rate
+ * and a payment's amount are primes; a shape that hides a field (`hides`) must never be answered what the field holds
+ * on any row it sees (`held`, read by `out`).
  */
 
 import assert from 'node:assert/strict';
@@ -114,6 +118,8 @@ export type RowInfo = {
   /** Row ids this row's own fields hold (its project, its assignee): a reader of the row reads those ids with it. */
   refs: string[];
   canary: Canary;
+  /** What each field a share may hide holds on this row: a task's notes (its `zh` word) and rate, a payment's amount. */
+  held: { field: string; word?: string; amount?: number }[];
 };
 
 /** Something an answer can carry that is not a row: an inbox arrival, said by who may read it. */
@@ -138,6 +144,8 @@ export type Shape = {
   shares?: (f: Built) => (Record<string, unknown> & { ended?: true })[];
   /** The shares go to a group the person is in, not to the person. */
   group?: true;
+  /** The fields its shares hide, by list, in plain words (sharing plan §2.7): what it must never be answered on a row it sees. */
+  hides?: Record<string, string[]>;
 };
 
 export type Variant = 'person' | 'write-token' | 'read-token' | 'see-as';
@@ -254,6 +262,23 @@ export const SHAPES: readonly Shape[] = [
     sees: (r) => r.list === 'notes',
   },
   { id: 'group', name: "A group's share", person: 'p_grp', group: true, shares: () => [{ what: { lists: ['money'] }, can: 'view' }], sees: (r) => r.list === 'money' },
+  /* HIDDEN FIELDS (Slice 6): the rate and the notes of every task, and every amount ("Hide amounts"). */
+  {
+    id: 'hidden-field',
+    name: 'Hidden fields (rate and notes on tasks)',
+    person: 'p_hid',
+    shares: () => [{ what: { lists: ['tasks'] }, can: 'view', hide: { tasks: ['rate', 'notes'] } }],
+    sees: (r) => r.list === 'tasks',
+    hides: { tasks: ['rate', 'notes'] },
+  },
+  {
+    id: 'hide-amounts',
+    name: 'Accountant who is not shown amounts',
+    person: 'p_ham',
+    shares: () => [{ what: { lists: { has: 'money' } }, can: 'view', hide: { types: ['money'] } }],
+    sees: (r) => r.list === 'tasks' || r.list === 'money',
+    hides: { tasks: ['rate'], money: ['amount'] },
+  },
   {
     id: 'comment',
     name: 'Comment on Kiln',
@@ -307,8 +332,12 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
     const word = mint.word(info.privateBy ? 'zp' : 'zq');
     const amount = info.amount ? prime() : undefined;
     const thingId = info.thing ? rows.get(info.thing)?.id : undefined;
+    const said = fields(word);
+    /* A TASK'S NOTES CARRY A HIDDEN-FIELD CANARY BESIDE ITS WORD, read by a shape that hides notes. */
+    const hidden = list === 'tasks' && typeof said.notes === 'string' ? mint.word('zh') : undefined;
+    if (hidden !== undefined) said.notes = `${String(said.notes)} ${hidden}`;
     const body = {
-      ...fields(word),
+      ...said,
       ...(info.thing && thingId ? { thing: thingId } : {}),
       ...(info.stage ? { stage: info.stage } : {}),
       ...(amount !== undefined ? { [list === 'money' ? 'amount' : 'rate']: { amount, currency: 'GBP' } } : {}),
@@ -327,6 +356,10 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
       ...(info.privateBy ? { privateBy: info.privateBy } : {}),
       refs,
       canary: { label: `${list}#${made.seq} (${key})`, word, id: made.id, ...(amount === undefined ? {} : { amount }) },
+      held: [
+        ...(hidden === undefined ? [] : [{ field: 'notes', word: hidden }]),
+        ...(amount === undefined ? [] : [{ field: list === 'money' ? 'amount' : 'rate', amount }]),
+      ],
     };
     rows.set(key, row);
     return row;
@@ -465,11 +498,20 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
     return caller.shape.id !== 'adds';
   };
 
-  /** What a caller must never be answered: every row out of their sight, and every extra they may not read. */
+  /**
+   * What a caller must never be answered: every row out of their sight, every extra they may not read, and on a row in
+   * their sight, what a field hidden from them holds.
+   */
   const out = (caller: Caller): Canary[] => {
     const seen = [...rows.values()].filter((r) => visible(caller, r));
     const named = new Set(seen.flatMap((r) => r.refs));
+    const hides = caller.shape.hides ?? {};
     return [
+      ...seen.flatMap((r) =>
+        r.held
+          .filter((h) => hides[r.list]?.includes(h.field))
+          .map((h): Canary => ({ label: `${r.canary.label} hidden ${h.field}`, word: h.word ?? '', ...(h.amount === undefined ? {} : { amount: h.amount }) })),
+      ),
       ...[...rows.values()]
         .filter((r) => !visible(caller, r))
         .map((r): Canary => {
@@ -578,6 +620,7 @@ const probe = (list: string, thing: 'kiln' | 'loom' | null, stage?: 'todo' | 're
   ...(stage ? { stage } : {}),
   refs: [],
   canary: { label: 'probe', word: '' },
+  held: [],
 });
 
 const assertOk = (r: unknown) => assert.ok((r as { ok: boolean }).ok, JSON.stringify(r));

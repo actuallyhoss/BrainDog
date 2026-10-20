@@ -57,7 +57,7 @@ import {
 import { commitAuthors } from './commit-authors.ts';
 import { commitSubjects, cutLine, mayRefreshNext, readNames, type Named, type Open } from './run-reads.ts';
 import { DRAFT_FIELD, firstProjectFields, firstProjectName, formsOnRepeat, nobodysPlace } from './first-project.ts';
-import { project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, type Hit, type Searched } from './fts.ts';
+import { containsMatched, project, projectedText, rebuild, search as ftsSearch, searchMatched as ftsSearchMatched, searchWords, type Hit, type Searched } from './fts.ts';
 import { withDerived, type DeriveResolve } from './derive-rows.ts';
 import { runsDataSteps } from './migrations/0028_runs.ts';
 import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, type SignReading, type VitalSign } from './signs.ts';
@@ -3660,20 +3660,25 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /* THE QUESTION'S SHAPE IS `ListQuery` IN `parts.ts`, with the reasons for each of its keys, so an extension handed
      `list` and this function read one type. */
-  function list(q: ListQuery, grant?: Json): Result<Listed> {
+  /* `hide` IS THE FIELDS OF THIS LIST HIDDEN FROM THE CALLER (sharing plan §2.7): her own filter and order are read
+     against the list less them, so naming one is `FIELD_UNKNOWN` as a field the list does not have is, and no filter or
+     sort can halve its way to a value. The grant's own rule is still read against the whole list. */
+  function list(q: ListQuery, grant?: Json, hide?: readonly string[]): Result<Listed> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
     if (!registers.has(q.register))
       return no('REGISTER_UNKNOWN', `There is no register called ${q.register}.`, { allowed: [...registers.keys()] });
+    const hidden = new Set(hide ?? []);
     /* A LIST'S OWN ORDER WHEN THE READ NAMES NONE (PGS-B06), so the sorted path below sorts and pages by it and its
        cursor comes back to a read that names no order too. The Ledger by its day, newest first, where it came back by
-       last change and opened on 13 July. */
+       last change and opened on 13 July. NOT BY A FIELD HIDDEN FROM HER, whose order would say how its values stand. */
     const own = registers.get(q.register)!.order;
-    if (!q.order?.length && own !== undefined) q = { ...q, order: [{ field: own.field, dir: own.dir ?? 'asc' }] };
+    if (!q.order?.length && own !== undefined && !hidden.has(own.field)) q = { ...q, order: [{ field: own.field, dir: own.dir ?? 'asc' }] };
 
     /* A HOP FROM A READ GOES ONLY WHERE THE READER MAY READ (`hopSchemaOf`): the record's `reads` says no to a list
        its caller may not open or sees narrowed. A declared page's read passes no `reads`; reach checked its lists. */
-    const schema = readerSchemaOf(q.hops ?? q.reads)(q.register)!;
+    const whole = readerSchemaOf(q.hops ?? q.reads)(q.register)!;
+    const schema: Schema = hidden.size === 0 ? whole : { ...whole, fields: Object.fromEntries(Object.entries(whole.fields).filter(([id]) => !hidden.has(id))) };
     const said = predicateOf(q.where, schema, q.reads === undefined ? evalContext() : { ...evalContext(), reads: q.reads });
     if (said.bad.length) return { ok: false, refusal: said.bad[0]! };
 
@@ -3683,7 +3688,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /* AND THE CALLER'S GRANT, when theirs is narrowed to the rows matching one `where` (`CallContext.wheres`): the page,
        its cursor and `matched` all come from the one clause, so a narrowed member is never told how many rows they
        cannot see. */
-    const c = narrowed(compile(said.predicate, schema), grant === undefined ? null : ruleOf(grant, schema, evalContext()));
+    const c = narrowed(compile(said.predicate, schema), grant === undefined ? null : ruleOf(grant, whole, evalContext()));
     if (c.bad.length) return { ok: false, refusal: c.bad[0]! };
 
     /* COERCED AT THE EDGE. These arrive from a query string a stranger wrote: `cursor=5` is a number
@@ -3942,6 +3947,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     viewer?: string | undefined;
     /** The caller's grant (`wheres`): a row its rule leaves out is neither the row asked about nor one that points at it. */
     grant?: Readonly<Wheres> | undefined;
+    /** The fields hidden from the caller, by list (sharing plan §2.7): a ref she cannot see points at nothing she is shown. */
+    hide?: Readonly<Record<string, readonly string[]>> | undefined;
   }): Result<Backlinks> {
     const barred = schemaRefusal(state);
     if (barred) return barred;
@@ -3971,7 +3978,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     for (const decl of [...registers.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
       if (allowed !== null && !allowed.has(decl.id)) continue;
       const fields = [...decl.fields]
-        .filter((f) => f.type === 'ref' && f.to === q.register && !f.retired && named.test(f.id))
+        .filter((f) => f.type === 'ref' && f.to === q.register && !f.retired && named.test(f.id) && !(q.hide?.[decl.id] ?? []).includes(f.id))
         .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
       for (const f of fields) pairs.push({ register: decl.id, field: f.id });
     }
@@ -8790,16 +8797,44 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   function searchMatched(
     q: string,
-    opts: { registers?: readonly string[] | undefined; limit?: number; viewer?: string | undefined; grant?: Readonly<Wheres> | undefined } = {},
+    opts: {
+      registers?: readonly string[] | undefined;
+      limit?: number;
+      viewer?: string | undefined;
+      grant?: Readonly<Wheres> | undefined;
+      hide?: Readonly<Record<string, readonly string[]>> | undefined;
+    } = {},
   ): Searched {
     /* THE CALLER'S GRANT, LIST BY LIST (leak matrix G5): the hits and `matched` both count the rows its rule admits. The
        private rows are `viewer`'s, already in the query, so only a list with a rule of its own is held here. */
-    const { grant, ...asked } = opts;
+    const { grant, hide, ...asked } = opts;
     const admits = Object.keys(grant ?? {}).flatMap((register) => {
       const c = admitClause(register, grant, undefined);
       return c === null ? [] : [{ register, ...c }];
     });
-    const found = ftsSearchMatched(sql, q, { ...asked, admits });
+    /* A LIST WITH A SEARCHABLE FIELD HIDDEN FROM HER IS NOT ASKED OF THE INDEX (sharing plan §2.7), which holds that
+       field's words, so a hit would say what it holds. It is searched by `contains` over the fields she is shown, under
+       the same grant and private rows, its hits after the index's. */
+    const plain = Object.entries(hide ?? {}).flatMap(([register, hidden]) => {
+      const decl = registers.get(register);
+      if (!decl || decl.series === true || (asked.registers !== undefined && !asked.registers.includes(register))) return [];
+      const indexed = decl.fields.filter((f) => !f.retired && ((f as { search?: boolean }).search === true || (f.id === decl.title && !['money', 'day', 'instant'].includes(f.type))));
+      if (!indexed.some((f) => hidden.includes(f.id))) return [];
+      return [{ register, fields: indexed.map((f) => f.id).filter((f) => !hidden.includes(f)) }];
+    });
+    const found =
+      plain.length === 0
+        ? ftsSearchMatched(sql, q, { ...asked, admits })
+        : ftsSearchMatched(sql, q, { ...asked, admits, registers: (asked.registers ?? [...registers.keys()]).filter((r) => !plain.some((p) => p.register === r)) });
+    if (plain.length > 0) {
+      const most = Math.min(Math.max(1, asked.limit ?? 20), 100);
+      const words = searchWords(q);
+      for (const p of plain) {
+        const got = containsMatched(sql, words, { ...p, admit: admitClause(p.register, grant, asked.viewer) }, most);
+        if (got.n > 0) found.matched[p.register] = got.n;
+        found.hits.push(...got.hits.slice(0, Math.max(0, most - found.hits.length)));
+      }
+    }
     if (found.hits.length === 0 && q.trim()) observe(sql, clock.now(), [{ kind: 'search.empty', subject: q.trim().toLowerCase().slice(0, 60) }]);
     return found;
   }

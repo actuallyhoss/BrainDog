@@ -343,3 +343,100 @@ test('LENS SPEED (§2.13): 20 shares and 3 groups, cold at most 3 ms and cached 
   assert.ok(cold <= 3, `cold ${cold.toFixed(3)} ms`);
   assert.ok(cached <= 0.05, `cached ${cached.toFixed(4)} ms`);
 });
+
+/* ── Slice 6: hidden fields, the two switches a share turns off, and the doors' firewall ── */
+
+test('HIDDEN FIELDS (§2.7): a hidden field is in none of her schema, rows, history or filters, and a patch naming it names a field the list lacks', async () => {
+  const { api, sql } = await record();
+  share(sql, 'p_vic', { lists: ['tasks'] }, 'edit', { hide: { tasks: ['rate'] } });
+  api.kernel.accessChanged();
+  const vic = contextOf(api, 'p_vic');
+  assert.deepEqual(vic.hides, { tasks: ['rate'] });
+
+  const schema = value<{ fields: { id: string }[] }>(await api.schema({ register: 'tasks' }, vic));
+  assert.deepEqual(schema.fields.map((f) => f.id), ['what', 'thing', 'stage']);
+  const listed = value<{ rows: { fields: Record<string, unknown> }[] }>(await api.list({ register: 'tasks' }, vic));
+  assert.equal(listed.rows.length, 3);
+  assert.ok(listed.rows.every((r) => !Object.hasOwn(r.fields, 'rate')));
+  const got = value<{ fields: Record<string, unknown> }>(await api.get({ register: 'tasks', seq: 1 }, vic));
+  assert.equal(got.fields.what, 'Glaze test');
+  assert.equal(Object.hasOwn(got.fields, 'rate'), false);
+  const past = value<{ kind: string; field: string | null; to: unknown }[]>(await api.history({ register: 'tasks', seq: 1 }, vic));
+  assert.ok(past.length > 0 && !JSON.stringify(past).includes('4000'), JSON.stringify(past));
+
+  /* HER FILTER AND HER ORDER ARE READ AS IF THE FIELD WERE NOT THERE. */
+  for (const asked of [{ where: { field: 'rate', present: true } }, { order: [{ field: 'rate', dir: 'desc' as const }] }]) {
+    const out = (await api.list({ register: 'tasks', ...asked }, vic)) as { ok: boolean; refusal?: { code: string } };
+    assert.equal(out.refusal?.code, 'FIELD_UNKNOWN', JSON.stringify(asked));
+  }
+
+  /* A PATCH OR A NEW ROW NAMING IT IS REFUSED, AND THE ROW KEEPS WHAT IT HELD. */
+  const patched = (await api.update({ register: 'tasks', seq: 1, patch: { rate: { amount: 1, currency: 'GBP' } } }, vic)) as { ok: boolean; refusal?: { code: string; at?: string } };
+  assert.deepEqual([patched.refusal?.code, patched.refusal?.at], ['FIELD_UNKNOWN', 'rate']);
+  const made = (await api.create({ register: 'tasks', fields: { what: 'New', rate: { amount: 1, currency: 'GBP' } } }, vic)) as { ok: boolean; refusal?: { code: string } };
+  assert.equal(made.refusal?.code, 'FIELD_UNKNOWN');
+  value(await api.update({ register: 'tasks', seq: 1, patch: { what: 'Glaze test, again' } }, vic));
+  assert.deepEqual(value<{ fields: { rate: unknown } }>(await api.get({ register: 'tasks', seq: 1 }, owner)).fields.rate, { amount: 4_000, currency: 'GBP' });
+});
+
+test('NOTS: history off shows the row and not its past, and delete off changes rows and never deletes or restores one', async () => {
+  const { api, sql } = await record();
+  share(sql, 'p_sam', { lists: ['tasks'] }, 'edit', { caps: { history: false, delete: false } });
+  api.kernel.accessChanged();
+  const sam = contextOf(api, 'p_sam');
+  assert.deepEqual(sam.nots, { tasks: ['history', 'delete'] });
+
+  const past = (await api.history({ register: 'tasks', seq: 1 }, sam)) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.deepEqual([past.ok, past.refusal?.fix], [false, 'You can see this row, not its past.']);
+  /* A ROW NOBODY HOLDS IS STILL ANSWERED AS ONE. */
+  assert.deepEqual(value(await api.history({ register: 'tasks', seq: 999 }, sam)), []);
+
+  const gone = (await api.update({ register: 'tasks', seq: 1, patch: { deleted_at: at(NOW) } }, sam)) as { ok: boolean; refusal?: { code: string; at?: string } };
+  assert.deepEqual([gone.ok, gone.refusal?.code, gone.refusal?.at], [false, 'FORBIDDEN', 'deleted_at']);
+  assert.equal(api.kernel.get('tasks#1')?.deleted_at, null);
+  value(await api.update({ register: 'tasks', seq: 1, patch: { stage: 'Done' } }, sam));
+  /* AND THE OWNER, WHO HOLDS EVERY CAPABILITY, STILL DELETES. */
+  value(await api.update({ register: 'tasks', seq: 1, patch: { deleted_at: at(NOW) } }, owner));
+});
+
+test('THE FIREWALL (§2.5 item 6): a hidden field left on a row at either door is taken off, and raised as fault lens.firewall naming the method', async () => {
+  const { handlersFor, serveApi } = await import('../../host/src/index.ts');
+  const { serveMcp } = await import('../../mcp/src/http.ts');
+  const { api, sql } = await record();
+  share(sql, 'p_vic', { lists: ['tasks'] }, 'view', { hide: { tasks: ['rate'] } });
+  api.kernel.accessChanged();
+  const vic = contextOf(api, 'p_vic');
+  const raw = api.kernel.get('tasks#1')!;
+  assert.deepEqual(raw.fields.rate, { amount: 4_000, currency: 'GBP' });
+  const opened = () => value<{ faults: { cause: string; kind: string }[] }>(api.kernel.faults()).faults.filter((f) => f.kind === 'lens.firewall').map((f) => f.cause);
+
+  /* A MASKED PATH RAISES NOTHING. */
+  const handlers = handlersFor(api as never);
+  const fine = (await (await serveApi(new Request('https://brain.dog/api/get?register=tasks&seq=1'), handlers, vic)).json()) as { value: { fields: Record<string, unknown> } };
+  assert.equal(Object.hasOwn(fine.value.fields, 'rate'), false);
+  assert.deepEqual(opened(), []);
+
+  /* A PATH THAT FORGOT TO MASK: the row leaves without the field, and the fault names the method. */
+  handlers.get = async () => ({ ok: true, value: raw });
+  const walled = (await (await serveApi(new Request('https://brain.dog/api/get?register=tasks&seq=1'), handlers, vic)).json()) as { value: { fields: Record<string, unknown> } };
+  assert.equal(walled.value.fields.what, 'Glaze test');
+  assert.equal(Object.hasOwn(walled.value.fields, 'rate'), false);
+  assert.deepEqual(opened(), ['lens.firewall#get']);
+
+  /* AND AT THE MCP DOOR, on the structured half, which names the row by its spoken id. A text half written in words is
+     past any key to take off; the fault is what finds the path. */
+  const leaky = { ...api, get: async () => ({ ok: true, value: raw }) };
+  const request = new Request('https://brain.dog/mcp', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'mcp-protocol-version': '2025-11-25' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get', arguments: { spoken: 'tasks#1', format: 'json' } } }),
+  });
+  const reply = (await (await serveMcp(request, leaky as never, vic)).json()) as { result: { structuredContent: { fields: Record<string, unknown> } } };
+  assert.equal(reply.result.structuredContent.fields.what, 'Glaze test');
+  assert.equal(Object.hasOwn(reply.result.structuredContent.fields, 'rate'), false);
+  assert.deepEqual(opened().sort(), ['lens.firewall#get', 'lens.firewall#mcp get']);
+
+  /* AN OWNER HAS NOTHING HIDDEN, SO NOTHING IS TAKEN OFF HER ANSWER. */
+  const mine = (await (await serveApi(new Request('https://brain.dog/api/get?register=tasks&seq=1'), handlers, owner)).json()) as { value: { fields: Record<string, unknown> } };
+  assert.deepEqual(mine.value.fields.rate, { amount: 4_000, currency: 'GBP' });
+});

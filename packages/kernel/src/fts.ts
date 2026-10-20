@@ -116,6 +116,34 @@ export function ftsQuery(q: string): string | null {
   return words.map((w) => `"${w}"*`).join(' AND ');
 }
 
+/** The words of a search as the index reads them, for a list searched without it (`containsMatched`). */
+export function searchWords(q: string): string[] {
+  const query = ftsQuery(q);
+  return query === null ? [] : [...query.matchAll(/"([^"]+)"\*/gu)].map((m) => m[1]!);
+}
+
+/**
+ * A search over one list by `contains`, not the index (sharing plan §2.7): the rows where every word is inside one of
+ * `fields`, newest first, and how many there are. For a caller from whom a searchable field of the list is hidden, so
+ * the index, which holds that field's words, is never asked and a hit can never say what the hidden field holds. `admit`
+ * is the clause her grant and the private rows hold the list to (`admitClause`). The rank is the hit's place.
+ */
+export function containsMatched(
+  sql: Sql,
+  words: readonly string[],
+  list: { register: string; fields: readonly string[]; admit: { sql: string; params: readonly (string | number)[] } | null },
+  limit: number,
+): { hits: Hit[]; n: number } {
+  if (words.length === 0 || list.fields.length === 0) return { hits: [], n: 0 };
+  const like = (f: string) => `lower(CAST(json_extract(fields, '$.${f}') AS TEXT)) LIKE ? ESCAPE '\\'`;
+  const each = `(${list.fields.map(like).join(' OR ')})`;
+  const where = `register = ? AND deleted_at IS NULL AND ${words.map(() => each).join(' AND ')}${list.admit === null ? '' : ` AND (${list.admit.sql})`}`;
+  const args = [list.register, ...words.flatMap((w) => list.fields.map(() => `%${w.replace(/[\\%_]/gu, (c) => `\\${c}`)}%`)), ...(list.admit?.params ?? [])];
+  const n = Number(sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE ${where}`, ...args)?.n ?? 0);
+  const rows = n === 0 ? [] : sql.all<{ id: string }>(`SELECT id FROM entry WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT ?`, ...args, limit);
+  return { hits: rows.map((r, i) => ({ id: r.id, register: list.register, rank: i + 1 })), n };
+}
+
 export type Hit = { id: string; register: string; rank: number };
 
 /** What a search is asked: the words, the registers the caller may see, and how many hits to draw. */

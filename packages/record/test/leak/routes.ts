@@ -9,7 +9,14 @@
 
 import { ROUTES, handlersFor, type Handler } from '../../../host/src/index.ts';
 import type { CallContext } from '../../src/index.ts';
+import { firewall } from '../../src/sight.ts';
 import { PAGES, type Fixture } from './fixture.ts';
+
+/**
+ * Every answer the doors' firewall would have taken a hidden field off (`firewall`, sharing plan §2.5 item 6), by
+ * method: the matrix asks the handlers as `serveApi` does and the MCP server through `serveMcp`, and holds this empty.
+ */
+export const FIREWALLED: string[] = [];
 
 export type Args = Record<string, unknown>;
 
@@ -38,7 +45,7 @@ export const LIST_IDS = Object.keys(FIELDS);
  */
 export function argsFor(name: string, f: Fixture, lean = false): Args[] {
   const rows = [...f.rows.values()];
-  const words = [...rows.map((r) => r.canary.word), ...f.extras.map((e) => e.canary.word), 'Kiln', 'Loom', 'Sam'];
+  const words = [...rows.map((r) => r.canary.word), ...rows.flatMap((r) => r.held.flatMap((h) => (h.word ? [h.word] : []))), ...f.extras.map((e) => e.canary.word), 'Kiln', 'Loom', 'Sam'];
   const lists = LIST_IDS.map((register) => ({ register }));
   const route = ROUTES.find((r) => r.name === name);
   const takes = Object.keys((route as { takes?: Record<string, unknown> } | undefined)?.takes ?? {});
@@ -62,6 +69,7 @@ export function argsFor(name: string, f: Fixture, lean = false): Args[] {
             { register, order: [{ field, dir: 'desc' }] },
             { register, where: { field, present: true } },
             ...rows.filter((r) => r.list === register).map((r) => ({ register, where: { field, contains: r.canary.word } })),
+            ...rows.filter((r) => r.list === register).flatMap((r) => r.held.filter((h) => h.field === field && h.word).map((h) => ({ register, where: { field, contains: h.word } }))),
           ]),
         ),
         { register: 'tasks', where: { field: 'thing', is: f.built.ids.loom } },
@@ -110,7 +118,10 @@ export async function ask(handlers: Record<string, Handler>, name: string, args:
   const handler = handlers[name];
   if (!handler) return { threw: `no handler for ${name}` };
   try {
-    return await handler(args, ctx);
+    const answer = await handler(args, ctx);
+    const held = firewall(ctx, answer);
+    if (held.stripped.length > 0) FIREWALLED.push(`${name} ${held.stripped.join(', ')}`);
+    return answer;
   } catch (cause) {
     return { threw: String((cause as Error)?.message ?? cause) };
   }

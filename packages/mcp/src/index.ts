@@ -328,6 +328,10 @@ export type McpSurface<C> = {
   heard?(args: { kind: 'hello' | 'listed' | 'called' | 'internal'; n?: number; build?: string; client?: string }, ctx: C): Answer;
   /** The door's own mark (the record's `doorHeard`, unrouted, audit 38-39): hello, listed, called, internal; a key's called also moves its last tool call. `rpc.ts` prefers it to `heard`. */
   doorHeard?(args: { kind: 'hello' | 'listed' | 'called' | 'internal'; n?: number; build?: string; client?: string }, ctx: C): Answer;
+  /** Fault `lens.firewall`, raised when the door's firewall took a field hidden from the caller off an answer (`http.ts`). */
+  firewalled?(method: string, stripped: readonly string[]): void;
+  /** The list a row named by its spoken id is on, `tasks#3` or `TK3`, for the firewall, or `null`. */
+  listOf?(spoken: string): string | null;
   /**
    * The caller's run is still working (the record's `beat`, DATA, AGT-C03): last seen moved in place, at most once a
    * minute, no version and no event. The door beats once for every tool call it admits (`beatOn`), so any client on it

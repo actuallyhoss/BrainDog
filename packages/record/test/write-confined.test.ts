@@ -250,6 +250,7 @@ function infoOf(f: Fixture, row: Entry): RowInfo {
     ...(held ? { privateBy: held.person_id } : {}),
     refs: [],
     canary: { label: row.id, word: '' },
+    held: [],
   };
 }
 

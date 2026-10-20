@@ -12,7 +12,8 @@
     "./automations": "./src/automations.ts",
     "./oauth": "./src/oauth.ts",
     "./card": "./src/card.ts",
-    "./shape": "./src/methods/shape.ts"
+    "./shape": "./src/methods/shape.ts",
+    "./sight": "./src/sight.ts"
   },
   "dependencies": {
     "@braindog/declare": "workspace:*",
