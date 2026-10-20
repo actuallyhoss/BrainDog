@@ -13,8 +13,9 @@
   is spent by a press rather than on load, so a mail scanner that opens it spends nothing. The passkey offered in
   the email field's autofill is asked for on arrival and shows nothing until the field is touched (`offerPasskey`).
 
-  ONE SHEET, THE MARK AT ITS TOP (`Entry.svelte`): the slogan, then every way in straight under it, the lead one the
-  ink pill, and the passkey said in one line under its button. No figure, so no chart and no tile inside the sheet.
+  ONE SHEET UNDER THE BRAND (`Entry.svelte`): "Sign in to BrainDog", one line on what the ways do, then every way in
+  straight under it, the email first and filled, Google and a passkey quiet under it (the UI pass of 20 October, first
+  F7). A state screen is its own heading. No figure, so no chart and no tile inside the sheet.
 -->
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
@@ -52,7 +53,7 @@
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
   import Entry from './Entry.svelte';
   import Human from './Human.svelte';
-  import { words } from './words.ts';
+  import { signupMode, type SignupMode } from '$lib/signup.ts';
 
   const here = support();
 
@@ -393,6 +394,19 @@
     return () => clearInterval(t);
   });
 
+  /** What the line under the ways in says: only the ways that are drawn. */
+  const lede = $derived(doors ? copy.signInLede(doors.magic, doors.passkey) : null);
+
+  /** Who may sign up here, for the foot's one line; `null` until the host says, and then no line is drawn. */
+  let mode = $state<SignupMode | null>(null);
+  /** Whether the first 400ms have passed with the host still out, so "Getting sign-in ready" may show. */
+  let slow = $state(false);
+  onMount(() => {
+    void signupMode().then((m) => (mode = m));
+    const t = setTimeout(() => (slow = true), 400);
+    return () => clearTimeout(t);
+  });
+
   /* The shell is drawn synchronously and says so. While a call is out, `opened()` takes the claim back. */
   $effect(() => drew('ready'));
 </script>
@@ -407,42 +421,54 @@
   {/if}
 {/snippet}
 
-<!-- THE ENTRY FRAME EVERY WAY IN SHARES (`Entry.svelte`): one sheet on the lit ground, the mark at its top, then this column. -->
+<!-- A PASSKEY, ITS NAME EXACTLY `copy.withPasskey` (the `passkey` gate presses it by that name). Said once it is made,
+     not under its button: the explainer went (first F7). -->
+{#snippet passkeyDoor(lead: boolean)}
+  <Button weight={lead ? 'primary' : 'quiet'} onclick={withPasskey} aria-busy={asking === 'passkey'}>
+    <Icon name="key" size="m" />{asking === 'passkey' ? copy.waitingForPasskey : copy.withPasskey}
+  </Button>
+{/snippet}
+
+<!-- THE ENTRY FRAME EVERY WAY IN SHARES (`Entry.svelte`): the brand on the ground, one sheet under it, this column in it. -->
 <Entry>
   <div class="col">
-    <div class="intro">
-      <!-- The slogan, the same five words the README and the marketing site lead with. -->
-      <h1 class="slogan">{copy.tagline}</h1>
-      {#if doors}<p class="lede">{copy.signInLede}</p>{/if}
-    </div>
+    <!-- THE TASK AS THE HEADING, where a way in is offered (or about to be): a state screen ("Check your email", "You're
+         signed in", "BrainDog did not answer") is its own heading instead, and draws no title over it (first F7). -->
+    {#if view.name === 'loading' || (doors && !noDoor)}
+      <div class="intro">
+        <h1 class="entry-title">{copy.signInTitle}</h1>
+        {#if doors && lede}<p class="entry-lede">{lede}</p>{/if}
+      </div>
+    {/if}
 
     <div class="act">
       {#if view.name === 'loading'}
-        <p class="status" role="status">{copy.checkingWays}</p>
+        <!-- NOTHING FOR THE FIRST 400MS, so a host that answers at once never flashes a line (first F15). -->
+        <p class="status" role="status">{slow ? copy.checkingWays : ''}</p>
       {:else if view.name === 'unreachable'}
         <div class="said">
-          <Empty kind="error" title={copy.unreachableTitle} body={retried ? copy.unreachableStill(retried) : copy.unreachableWhy}>
-            {#snippet actions()}<Button onclick={again}>{copy.askAgain}</Button>{/snippet}
+          <Empty kind="error" heading title={copy.unreachableTitle} body={retried ? copy.unreachableStill(retried) : copy.unreachableWhy}>
+            {#snippet actions()}<Button weight="primary" onclick={again}>{copy.askAgain}</Button>{/snippet}
           </Empty>
         </div>
       {:else if view.name === 'no-host'}
         <div class="calm">
           <IconWell name="info" size="l" />
-          <p class="calm-title">{copy.noHostTitle}</p>
+          <h1 class="entry-title">{copy.noHostTitle}</h1>
           <p class="calm-body">{copy.noHostWhy}</p>
         </div>
       {:else if view.name === 'open'}
         <div class="calm">
           <IconWell name="check" size="l" tone="earn" />
-          <p class="calm-title">{copy.openTitle}</p>
+          <h1 class="entry-title">{copy.openTitle}</h1>
           <p class="calm-body">{copy.openWhy}</p>
         </div>
         <!-- A FULL PAGE LOAD, like every way on from this screen: see "Open BrainDog" below. -->
         <div class="doors"><Button weight="primary" href={goTo} data-sveltekit-reload>{copy.openYourRecord}</Button></div>
       {:else if view.name === 'not-configured'}
-        <div class="said"><Empty kind="no-permission" title={copy.notConfiguredTitle} body={copy.notConfiguredWhy} /></div>
+        <div class="said"><Empty kind="no-permission" heading title={copy.notConfiguredTitle} body={copy.notConfiguredWhy} /></div>
       {:else if view.name === 'insecure'}
-        <div class="said"><Empty kind="no-permission" title={copy.insecureTitle} body={copy.insecureWhy} /></div>
+        <div class="said"><Empty kind="no-permission" heading title={copy.insecureTitle} body={copy.insecureWhy} /></div>
       {:else if view.name === 'locked'}
         <div class="said"><Empty kind="no-permission" title={copy.lockedTitle(view.minutes)} body={copy.lockedWhy} /></div>
       {:else if view.name === 'rejected'}
@@ -460,7 +486,7 @@
       {:else if view.name === 'link-sent'}
         <div class="calm" role="status">
           <IconWell name="check" size="l" tone="earn" />
-          <p class="calm-title">{copy.linkSentTitle}</p>
+          <h1 class="entry-title">{copy.linkSentTitle}</h1>
           <p class="calm-body">{copy.linkSentBody(view.email)}</p>
           <!-- THE SECOND LINE, a minute on (`SENT_LATE`): the screen cannot know a letter failed, so it says what fixes one. -->
           {#if view.late}<p class="calm-body">{copy.linkSentLater}</p>{/if}
@@ -475,7 +501,7 @@
       {:else if view.name === 'link-landing'}
         <div class="calm">
           <IconWell name="link" size="l" />
-          <p class="calm-title">{view.link.kind === 'claim' ? copy.claimLandingTitle : copy.linkLandingTitle}</p>
+          <h1 class="entry-title">{view.link.kind === 'claim' ? copy.claimLandingTitle : copy.linkLandingTitle}</h1>
         </div>
         <div class="doors">
           <Button weight="primary" onclick={spend} aria-busy={view.asking}>
@@ -485,9 +511,8 @@
       {:else if view.name === 'signed-in'}
         <div class="calm">
           <IconWell name="check" size="l" tone="earn" />
-          <p class="calm-title">{copy.signedInTitle}</p>
+          <h1 class="entry-title">{copy.signedInTitle}</h1>
           <p class="calm-who">{view.who.email}</p>
-          <p class="calm-body">{copy.signedInReads}</p>
         </div>
         {#if added}<p class="status" role="status">{added}</p>{/if}
         <!-- A LINK PASTED OVER THIS SCREEN IS SAID HERE, because the address no longer says it: `takeLink` cleared the
@@ -513,7 +538,7 @@
       {:else if noDoor}
         <!-- THE FIRST RUN, AND NOTHING CAN SIGN ANYBODY IN YET. The claim link is the way through,
              and it is in the terminal of whoever provisioned the record rather than in an inbox. -->
-        <div class="said"><Empty kind="no-permission" title={copy.firstDoorTitle} body={copy.firstDoorWhy} /></div>
+        <div class="said"><Empty kind="no-permission" heading title={copy.firstDoorTitle} body={copy.firstDoorWhy} /></div>
       {/if}
 
       {#if note}<p class="status" role="status">{note}</p>{/if}
@@ -521,43 +546,17 @@
       {#if fromGoogle && doors}<p class="status" role="status">{copy.googleSaid[fromGoogle]}</p>{/if}
 
       <!-- ONE BLOCK FOR EVERY STATE THAT OFFERS A WAY IN, so moving between signed out, asking and
-           rejected never remounts it: an open server-key block stays open, and a typed email stays. -->
+           rejected never remounts it: an open server-key block stays open, and a typed email stays.
+           THE EMAIL FIRST, THEN GOOGLE, THEN A PASSKEY (first F7): the email is a way in for anybody, and a passkey
+           this device holds still opens in one touch from the field's own autofill. -->
       {#if doors}
         <div class="doors">
-          {#if doors.passkey}
-            <!-- WHAT A PASSKEY IS, IN ONE LINE UNDER ITS BUTTON, and read as the button's description, so its name stays
-                 exactly `copy.withPasskey` (the `passkey` gate presses it by that name). -->
-            <div class="door">
-              <Button
-                weight={doors.lead === 'passkey' ? 'primary' : 'quiet'}
-                onclick={withPasskey}
-                aria-busy={asking === 'passkey'}
-                aria-describedby="in-passkey-why"
-              >
-                <Icon name="key" size="m" />{asking === 'passkey' ? copy.waitingForPasskey : copy.withPasskey}
-              </Button>
-              <p class="why" id="in-passkey-why">{words.passkeyLine}</p>
-            </div>
-          {/if}
-
-          <!-- A LINK AND NOT A PRESS: the host sends the browser to Google and back, and the page is loaded again signed
-               in. The mark is drawn in the ink, as every glyph here is. -->
-          {#if doors.google}
-            <Button href={googleStart(goTo, origin)} data-sveltekit-reload onclick={isApp ? openGoogleInBrowser : undefined}>
-              <svg class="g" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
-                />
-              </svg>{copy.withGoogle}
-            </Button>
-          {/if}
-
           {#if doors.magic}
             {#if fieldShown}
               <!-- `username webauthn`: the address, and this site's passkeys in the same autofill (`offerPasskey`). -->
               <form class="form" onsubmit={send}>
                 <label class="field-label" for="in-email">{copy.emailLabel}</label>
-                <span class="field">
+                <span class="field field-lg">
                   <input
                     id="in-email"
                     class="field-input"
@@ -573,13 +572,29 @@
                 </span>
                 {#if siteKey !== null}<Human {siteKey} bind:answer={human} bind:this={humanBox} />{/if}
                 <Button weight={doors.lead === 'magic' ? 'primary' : 'quiet'} type="submit" aria-busy={asking === 'send'}>
-                  {asking === 'send' ? copy.sendingLink : copy.sendLink}
+                  {asking === 'send' ? copy.sendingLink : copy.emailLink}
                 </Button>
               </form>
             {:else}
               <Button onclick={mail}><Icon name="link" size="m" />{copy.emailLink}</Button>
             {/if}
           {/if}
+
+          {#if doors.passkey && doors.lead === 'passkey'}{@render passkeyDoor(true)}{/if}
+
+          <!-- A LINK AND NOT A PRESS: the host sends the browser to Google and back, and the page is loaded again signed
+               in. The mark is drawn in the ink, as every glyph here is. -->
+          {#if doors.google}
+            <Button href={googleStart(goTo, origin)} data-sveltekit-reload onclick={isApp ? openGoogleInBrowser : undefined}>
+              <svg class="g" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+                />
+              </svg>{copy.withGoogle}
+            </Button>
+          {/if}
+
+          {#if doors.passkey && doors.lead !== 'passkey'}{@render passkeyDoor(false)}{/if}
 
           <!-- THE SELF-HOST'S DOOR, and only a self-host offers it. Open on first run, when no passkey
                exists yet and this is the only way the first person can get in. -->
@@ -618,10 +633,13 @@
         </div>
       {/if}
 
-      <!-- A STRANGER'S WAY TO A RECORD OF THEIR OWN. Not where the server key is offered: that is a self-host,
-           made by its operator, and it has no sign-up to send anybody to. -->
-      {#if doors && !doors.key}
-        <p class="new-here"><a class="new-link" href={at('/signup')} data-sveltekit-reload>{copy.signupNewHere}</a></p>
+      <!-- A STRANGER'S WAY TO A BRAINDOG OF THEIR OWN, BY WHO MAY SIGN UP (first F4): an invite where it is invite only,
+           a BrainDog where it is open, and nothing where it is closed, so nobody is sent to a form they cannot finish.
+           Not where the server key is offered: that is a self-host, made by its operator, with no sign-up. -->
+      {#if doors && !doors.key && (mode === 'invite' || mode === 'open')}
+        <p class="new-here">
+          <a class="new-link" href={at('/signup')} data-sveltekit-reload>{mode === 'invite' ? copy.signupAskInvite : copy.signupCreate}</a>
+        </p>
       {/if}
 
       <!-- NO DEMO PILL. It opened the sample business at `/app/` for anybody not signed in, and there is no
@@ -631,8 +649,8 @@
 </Entry>
 
 <style>
-  /* THE FRAME, THE SHEET AND THE BRAND ARE `Entry.svelte`'s; this is the column inside the sheet, the slogan first and
-     every way in straight under it, all on one start edge. */
+  /* THE FRAME, THE SHEET, THE BRAND AND THE TITLE ARE `Entry.svelte`'s; this is the column inside the sheet, the title
+     first and every way in straight under it, all on one start edge. */
   .col {
     display: flex;
     flex-direction: column;
@@ -646,26 +664,6 @@
     gap: var(--sp-2);
   }
 
-  /* THE SLOGAN IS THE SCREEN'S LEAD LINE: `t-lead`, 34/40 at 600, in Geist like every word. A phone takes
-     the large title's 30/36. */
-  .slogan {
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-lead);
-    font-weight: 600;
-    letter-spacing: -0.025em;
-    line-height: 40px;
-    text-wrap: balance;
-  }
-
-  .lede {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
-    line-height: 24px;
-  }
-
   .act {
     display: flex;
     flex-direction: column;
@@ -676,12 +674,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-  }
-
-  .door {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
   }
 
   .g {
@@ -700,22 +692,13 @@
     text-align: center;
   }
 
-  /* THE PASSKEY IN ONE LINE, under its button: a sentence, so it reads at the body size, quieter in its colour. */
-  .why {
-    margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
-    text-wrap: pretty;
-  }
-
-  /* THE FOOT OF THE SHEET: a hairline, then the one way to a record of your own (the board's "Already have a record?"). */
+  /* THE FOOT OF THE SHEET: a hairline, then the one way to a BrainDog of your own. */
   .new-here {
     margin: 0;
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    border-block-start: 1px solid var(--rule);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 
   /* A 44PX TARGET ON A PHONE, as every way on from this screen is, without making a line of text look like a button. */
@@ -723,46 +706,42 @@
     display: inline-flex;
     align-items: center;
     min-block-size: var(--tap);
-    color: var(--link);
+    color: var(--red);
     font-weight: 500;
   }
 
-  /* SENTENCES, AT THE BODY SIZE AND MEASURE (DIRECTION §37): what is happening, and what a link does. */
+  /* SENTENCES, AT THE BODY SIZE AND MEASURE: what is happening, and what a link does. */
   .status,
   .small {
     margin: 0;
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 
   .status {
-    color: var(--ink2);
+    color: var(--ink-2);
+  }
+
+  /* The loading line holds its one line while it waits its 400ms, so nothing moves when it arrives. */
+  .status:empty {
+    min-block-size: 22px;
   }
 
   .small {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
-  /* A STATE THAT IS NOT A PROBLEM: its glyph in a 32px well (green when it went well), the title at the group size, the
-     body under it. On the slogan's start edge, as `Empty` is everywhere else. */
+  /* A STATE THAT IS THE SCREEN: its glyph in a well (green when it went well), the state's title as the page's heading,
+     the body under it. On the column's start edge, as `Empty` is everywhere else. */
   .calm {
     display: flex;
     flex-direction: column;
     align-items: start;
-    gap: var(--sp-1);
+    gap: var(--sp-2);
   }
 
   .calm :global(.well) {
-    margin-block-end: var(--sp-2);
-  }
-
-  .calm-title {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-group);
-    font-weight: 600;
-    line-height: 24px;
-    text-wrap: balance;
+    margin-block-end: var(--sp-1);
   }
 
   .calm-who {
@@ -776,16 +755,17 @@
   .calm-body {
     margin: 0;
     max-inline-size: 42ch;
-    color: var(--ink2);
-    font-size: var(--t-base);
-    line-height: var(--lh-body);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
     overflow-wrap: anywhere;
   }
 
-  /* `Empty` is the house's refusal, start-aligned as it is everywhere else and as everything around it is here; only
-     its own padding goes, because the column's gap already spaces it. */
+  /* `Empty` stands in the sheet with no tile of its own (a tile never holds a tile), and its padding goes, because the
+     column's gap already spaces it. */
   .said :global(.empty) {
-    padding-block: 0;
+    padding: 0;
+    background: none;
   }
 
   .said :global(.empty-actions) {
@@ -799,7 +779,7 @@
     text-wrap: pretty;
   }
 
-  /* A FIELD: its label above (`.field-label`, 6 under it), the field, a hint 8 under that, and its button 12 under. */
+  /* A FIELD: its label above, the field, a hint 8 under that, and its button 12 under. */
   .form {
     display: flex;
     flex-direction: column;
@@ -808,8 +788,8 @@
 
   .form .hint {
     margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -817,10 +797,10 @@
     margin-block-start: var(--sp-3);
   }
 
-  /* The key is 43 characters of base64url checked glyph for glyph, which is what `--font-id` is for. */
+  /* The key is 43 characters of base64url checked glyph for glyph, which is what the mono face is for. */
   .field-input#in-key {
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
   }
 
   .peek {
@@ -831,10 +811,10 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     cursor: pointer;
     transition: color var(--d-state) var(--ease-out);
@@ -845,8 +825,8 @@
     align-items: center;
     gap: var(--sp-2);
     min-block-size: var(--ctl-h);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     font-weight: 500;
     list-style: none;
     cursor: pointer;
@@ -865,11 +845,17 @@
   }
 
   .own-q :global(svg) {
-    transition: transform var(--d-move) var(--ease-out);
+    transition: transform var(--d-panel) var(--ease-out);
   }
 
   .own[open] .own-q :global(svg) {
     transform: rotate(180deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .own-q :global(svg) {
+      transition: none;
+    }
   }
 
   .own .form {
@@ -881,26 +867,17 @@
     scroll-margin-block: var(--sp-6) var(--sp-8);
   }
 
-  /* UNDER A THUMB EVERY FIELD READS AT 16, the phone's body size, which is also the size below which a
-     phone's browser zooms the page in on focus. The key's mono too. */
+  /* UNDER A THUMB EVERY FIELD READS AT 16, the size below which a phone's browser zooms the page in on focus. */
   @media (pointer: coarse) {
     .form .field-input,
     .field-input#in-key {
-      font-size: var(--t-md);
+      font-size: 16px;
     }
   }
 
   @media (width < 640px) {
     .own-q {
       min-block-size: var(--tap);
-    }
-  }
-
-  @media (width < 900px) {
-    .slogan {
-      font-family: var(--font-display);
-      font-size: var(--t-figure);
-      line-height: 36px;
     }
   }
 </style>

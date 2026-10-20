@@ -59,12 +59,16 @@ test('insecure, because off a secure context no way in can finish, whichever sid
   assert.deepEqual(stateOf(seen({ methods: host({ ...none, why: 'insecure' }) })), { name: 'insecure' });
 });
 
-test('SIGNED OUT LEADS WITH A PASSKEY, and only draws the ways that can act here', () => {
+test('SIGNED OUT LEADS WITH THE EMAIL, and only draws the ways that can act here', () => {
   const s = stateOf(seen());
   assert.equal(s.name, 'signed-out');
   if (s.name !== 'signed-out') return;
-  assert.deepEqual(s.ways, { passkey: true, magic: true, key: false, lead: 'passkey', keyOpen: false });
+  assert.deepEqual(s.ways, { passkey: true, magic: true, key: false, lead: 'magic', keyOpen: false });
   assert.equal(s.note, null);
+
+  /* With no link to send, the passkey leads. */
+  const p = stateOf(seen({ methods: host({ magic: false }) }));
+  assert.ok(p.name === 'signed-out' && p.ways?.lead === 'passkey');
 
   /* No WebAuthn: the passkey is not there at all, and the link leads. */
   const w = stateOf(seen({ webauthn: false }));
@@ -90,7 +94,7 @@ test('a host that offers only passkeys to a browser without WebAuthn says so, ra
 test('asking, while a press is out', () => {
   assert.deepEqual(stateOf(seen({ step: { at: 'asking', how: 'passkey' } })), {
     name: 'asking',
-    ways: { passkey: true, magic: true, key: false, lead: 'passkey', keyOpen: false },
+    ways: { passkey: true, magic: true, key: false, lead: 'magic', keyOpen: false },
     how: 'passkey',
   });
 });

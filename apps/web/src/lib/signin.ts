@@ -94,7 +94,9 @@ function waysOf(it: Methods, webauthn: boolean): Ways | null {
   const first = it.firstRun === true;
   /* No passkey exists yet on first run, so a passkey button could not sign anybody in. */
   const passkey = it.passkey && webauthn && !first;
-  const lead = passkey ? 'passkey' : it.key && first ? 'key' : magic ? 'magic' : it.key ? 'key' : null;
+  /* THE EMAIL LEADS WHERE A LINK CAN GO (first F7): a stranger has no passkey yet, and a returning phone still gets its
+     passkey in one touch from the field's autofill. The first run's key leads where the record holds nobody yet. */
+  const lead = it.key && first ? 'key' : magic ? 'magic' : passkey ? 'passkey' : it.key ? 'key' : null;
   return { passkey, magic, key: it.key, lead, keyOpen: it.key && (first || lead === 'key'), ...(it.google ? { google: true as const } : {}) };
 }
 

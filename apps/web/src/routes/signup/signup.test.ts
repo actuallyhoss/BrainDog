@@ -25,6 +25,7 @@ import {
   SAID_MOST,
   saidFromLink,
   saidKept,
+  signupMode,
   startSignup,
   type Asked,
   type Io,
@@ -190,6 +191,14 @@ test('WHO MAY SIGN UP IS THE HOST\'S mode, and a host a release older that says 
   assert.equal(old.ok && old.value.mode, 'open');
   const shut = await checkName('', host({ ok: true, value: { slug: '', free: false } }).io);
   assert.equal(shut.ok && shut.value.mode, 'closed', 'a host that says nothing is closed');
+});
+
+test('SIGN IN ASKS THE SAME DOOR FOR THE MODE ALONE, and a host that did not answer offers nothing', async () => {
+  for (const mode of ['open', 'invite', 'closed'] as const) {
+    assert.equal(await signupMode(host({ ok: true, value: { slug: '', free: false, mode, open: mode !== 'closed' } }).io), mode);
+  }
+  const down: Io = { fetch: async () => Promise.reject(new TypeError('offline')) };
+  assert.equal(await signupMode(down), null);
 });
 
 test('AN INVITATION\'S CODE IS READ OFF THE ADDRESS AND WIPED, as a mailed link is, and kept for this tab only', () => {

@@ -775,6 +775,15 @@ export async function checkName(slug: string, io: Io = live()): Promise<Asked<Na
 }
 
 /**
+ * WHO MAY SIGN UP HERE, for a screen that needs only that (sign in's foot line, first S8): the same one door sign-up
+ * asks, with no name. `null` when the host did not answer, and the screen then offers no way to a BrainDog of one's own.
+ */
+export async function signupMode(io: Io = live()): Promise<SignupMode | null> {
+  const out = await checkName('', io);
+  return out.ok ? out.value.mode : null;
+}
+
+/**
  * Ask for a record: the host always answers the same for an address, and the mail says the rest. By invitation, the
  * code this tab kept rides along, and a start without a usable one is refused `at: 'code'`. What was said rides along
  * packed (`saidForLink`), and the host puts it in the mailed link's fragment.

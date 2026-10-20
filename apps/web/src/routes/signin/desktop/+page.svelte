@@ -2,12 +2,20 @@
   `/signin/desktop?code=`: where the Mac app lands after Google, in the app's own window. It swaps the one-time code
   and the verifier this window kept for the session cookie (`lib/desktop-signin.ts`), then opens the app. The code is
   taken out of the address on arrival so it is never in history.
+
+  ON THE ENTRY FRAME, AS SIGN IN IS (`../Entry.svelte`, first F12): the layout draws this bare, so the brand stands where
+  it stood on sign in a moment ago. While it works, one status line; when it fails, the error and the way back.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { BASE } from '$lib/at.ts';
   import { swapCode, takeVerifier } from '$lib/desktop-signin.ts';
+  import { titleOf } from '$lib/title.ts';
+  import Button from '$lib/ui/Button.svelte';
+  import Empty from '$lib/ui/Empty.svelte';
   import { drew } from '$lib/ui/screen.svelte.ts';
+  import Entry from '../Entry.svelte';
+  import { words } from '../words.ts';
 
   let failed = $state(false);
 
@@ -29,15 +37,49 @@
   });
 </script>
 
-<svelte:head><title>Signing in</title></svelte:head>
+<svelte:head><title>{titleOf(words.desktopTitle)}</title></svelte:head>
 
-<!-- A SECTION AND NOT A SECOND `main`: the shell's `<main id="main">` is the page's one main landmark. -->
-<section style="padding: 4rem 1rem; text-align: center">
-  <h1>Signing in</h1>
+<Entry>
   {#if failed}
-    <p role="status">That sign-in did not finish. It may have timed out.</p>
-    <p><a class="tap" href="{BASE}/signin">Back to sign in</a></p>
+    <div class="said">
+      <Empty kind="error" heading title={words.desktopFailed} body={words.desktopFailedWhy}>
+        {#snippet actions()}<Button weight="primary" href="/signin">{words.desktopBack}</Button>{/snippet}
+      </Empty>
+    </div>
   {:else}
-    <p role="status">Signing you in...</p>
+    <div class="working">
+      <h1 class="entry-title">{words.desktopTitle}</h1>
+      <p class="status" role="status">{words.desktopWorking}</p>
+    </div>
   {/if}
-</section>
+</Entry>
+
+<style>
+  .working {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .status {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  /* `Empty` stands in the sheet with no tile of its own, and the sheet's padding is its padding. */
+  .said :global(.empty) {
+    padding: 0;
+    background: none;
+  }
+
+  .said :global(.empty-actions) {
+    align-self: stretch;
+  }
+
+  .said :global(.btn) {
+    inline-size: 100%;
+    min-block-size: max(40px, var(--ctl-h));
+  }
+</style>

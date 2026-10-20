@@ -547,9 +547,14 @@ export const account = {
      lockout is something that happened, not something that went wrong. Nothing here names a way in
      the host has not offered, because the screen never draws one. Its own word, `signIn`, is in
      `shell.ts`, because the palette says it too. */
-  signInLede: 'Sign in to open your record.',
-  checkingWays: 'Checking how this server signs you in',
-  withPasskey: 'Sign in with a passkey',
+  /* THE TASK, NOT THE SLOGAN (site 2b): a returning person came to sign in, and the slogan is the site's. */
+  signInTitle: 'Sign in to BrainDog',
+  /* WHAT THE WAYS BELOW DO, naming only the ones drawn: a host with no mail is never promised a link. */
+  signInLede: (magic: boolean, passkey: boolean): string | null =>
+    magic && passkey ? "We'll email you a link, or use your passkey." : magic ? "We'll email you a link." : passkey ? 'Use your passkey.' : null,
+  /* DRAWN ONLY AFTER 400MS (first F15): a host that answers at once shows nothing at all. */
+  checkingWays: 'Getting sign-in ready',
+  withPasskey: 'Use a passkey',
   /* The mechanism and not the gesture: "Use Face ID" is wrong on a laptop, and the browser names the
      gesture itself a moment later. */
   waitingForPasskey: 'Waiting for your passkey',
@@ -568,8 +573,8 @@ export const account = {
   /* THE FIRST DOOR (`routes/signin/first-door.ts`): a record with no way into it yet (`noDoorYet`), and a first run whose
      way in is a letter that cannot go (`mailHeld`). The claim link is handed to whoever provisioned the record and is
      never mailed (`33 §4`), so it is in a terminal and not an inbox. */
-  firstDoorTitle: 'This record has no passkey yet.',
-  firstDoorWhy: 'Open the link you were given when the record was set up. You can add a passkey once you are in.',
+  firstDoorTitle: 'This BrainDog has no passkey yet',
+  firstDoorWhy: 'Open the link you were given when this BrainDog was set up. You can add a passkey once you are in.',
   /* IN PLACE OF `mailDown`, which says "Use a passkey" to somebody who has none yet. */
   firstDoorMailDown: 'Mail is not going out right now, so your sign-in link cannot be sent. Try again in a few minutes.',
   /* THE SENT SCREEN'S SECOND LINE, a minute after the press (LCH-A04): the host answers alike for any address, so the
@@ -578,7 +583,7 @@ export const account = {
   sendAgain: 'Send it again',
   googleSaid: {
     cancelled: 'Google sign-in was cancelled. Nothing changed.',
-    unknown: 'Nobody here signs in with that Google address. Use another way in, or start a record of your own.',
+    unknown: 'Nobody here signs in with that Google address. Use another way in, or create a BrainDog of your own.',
     unverified: 'Google could not vouch for that address. Use another way in.',
     locked: 'Too many tries. Wait a few minutes, then try again.',
     failed: 'Google sign-in did not finish. Try it again.',
@@ -607,9 +612,9 @@ export const account = {
   lockedTitle: (minutes: number) => `Sign-in is paused for ${minutes === 1 ? 'a minute' : `${minutes} minutes`}`,
   lockedWhy: 'There were too many tries. Waiting is the only way through it.',
   linkLandingTitle: 'Your sign-in link is here',
-  claimLandingTitle: 'Your record is ready to claim',
+  claimLandingTitle: 'Your BrainDog is ready to claim',
   useLink: 'Sign in with this link',
-  claimRecord: 'Claim your record',
+  claimRecord: 'Claim your BrainDog',
   linkExpiredTitle: 'That link has expired or was already used',
   linkExpiredWhy: (kind: 'magic' | 'claim', canAsk: boolean) =>
     kind === 'claim'
@@ -617,25 +622,23 @@ export const account = {
       : canAsk
         ? 'A link works once, for fifteen minutes. Ask for a new link below.'
         : 'A link works once, for fifteen minutes. Go back to sign in and ask for a new link.',
-  unreachableTitle: 'The server did not answer',
+  unreachableTitle: 'BrainDog did not answer',
   unreachableWhy: 'Check your connection, then try again.',
   /* After a press of Try again that came back the same, so the press visibly did something. */
   unreachableStill: (at: string) => `Asked again at ${at}, and it still did not answer. Check your connection, then try again.`,
   askAgain: 'Try again',
   noHostTitle: 'There is nothing to sign in to here',
-  noHostWhy: 'This copy of BrainDog runs without a server, so there is no record behind it.',
+  noHostWhy: 'This copy of BrainDog runs without a server, so there is nothing behind it to sign in to.',
   openTitle: 'This server lets you straight in',
-  openWhy: 'It was started without a key, so anyone on this computer can open the record.',
-  openYourRecord: 'Open your record',
+  openWhy: 'It was started without a key, so anyone on this computer can open it.',
+  openYourRecord: 'Open your BrainDog',
   /* What the hosted app says until its sign-in is switched on, to whoever opens it: a fact and a
      promise. */
   notConfiguredTitle: 'Sign-in is not open here yet',
-  notConfiguredWhy: 'When it opens, this is where you will sign in to your record.',
+  notConfiguredWhy: 'When it opens, this is where you will sign in to your BrainDog.',
   insecureTitle: 'Sign-in needs a secure address',
   insecureWhy: "Open this page over https, or at localhost on the server's own computer.",
-  signedInTitle: 'You are signed in',
-  /* Every screen reads the record once somebody is signed in. */
-  signedInReads: 'Every screen now reads this record.',
+  signedInTitle: "You're signed in",
   /* NOT "AS SOMEONE ELSE". The screen cannot tell whose a link is until it is spent, and the owner pasting his own
      sign-in link into a tab he is already in was told he would be someone else. Spending any link needs this screen
      signed out first, whoever it belongs to, so that is all it says. */
@@ -653,7 +656,7 @@ export const account = {
   addingPasskey: 'Waiting for your device',
   passkeyAdded: 'Passkey added. Next time, sign in with it.',
   passkeyNotAdded: 'Nothing was added.',
-  passkeyExists: 'This device already has a passkey for this record.',
+  passkeyExists: 'This device already has a passkey for this BrainDog.',
   passkeyFailed: 'The passkey was not added. Try again.',
   openBrainDog: 'Open BrainDog',
   signedOut: 'You are signed out.',
@@ -699,23 +702,27 @@ export const account = {
   inviteWithdraw: 'Withdraw',
   inviteWithdrawn: (email: string) => `The link for ${email} no longer works.`,
   invitePageTitle: 'Invitation',
-  inviteLanding: 'You have been invited to a record',
+  /* THE RECORD'S NAME, the fact being decided (first F14); "this BrainDog" when the host gave none. */
+  inviteLanding: (record: string | null) => `You're invited to ${record ?? 'this BrainDog'}`,
   inviteFor: (email: string) => `This invitation is for ${email}.`,
   inviteSignedInAs: (email: string) => `You are signed in as ${email}.`,
-  inviteAccept: 'Accept',
-  inviteAccepting: 'Accepting',
-  inviteJoined: 'You are on the record',
+  inviteAccept: (record: string | null) => (record ? `Join ${record}` : 'Join'),
+  inviteAccepting: 'Joining',
+  inviteJoined: (record: string | null) => (record ? `You're in ${record}` : "You're in"),
   inviteKeepWay: 'Add a passkey now, so you can sign in again on this device.',
-  inviteNoLink: 'This invitation link is cut short',
+  inviteNoLink: 'This page needs an invitation link',
   inviteChecking: 'Checking the link',
   inviteFailed: 'That did not work. Open the link again, or ask for a new one.',
-  inviteAskNew: 'Ask the person who sent it for a new link.',
+  inviteAskNew: 'Open the link in your invitation email. If it does not work, ask whoever sent it for a new one.',
+  /* Under a link the host refused: the link was opened, so only a new one helps. */
+  inviteAskAgain: 'Ask whoever sent it for a new link.',
   inviteSignInFirst: 'Sign in',
   /* A new address proves it is somebody's own mailbox before an invitation makes them anybody */
-  inviteNameLabel: 'Your name (optional)',
-  inviteCheckMail: 'Check your mail',
+  inviteNameLabel: 'Your name',
+  inviteOptional: 'Optional',
+  inviteCheckMail: 'Check your email',
   inviteMailSent: (email: string) => `A link to finish accepting is on its way to ${email}. Open it to prove the address is yours. It works once, within a day.`,
-  inviteFromMail: 'You opened the link from your mail. Accept to join the record.',
+  inviteFromMail: 'You opened the link from your email. Join to finish.',
   /* A key taken out of service from the vault screen: the bytes go, its line on the screen stays. */
   keyRevoked: (label: string) => label + ' is out of service. It stays listed, because what it opened is a fact.',
 
@@ -774,7 +781,7 @@ export const account = {
 
   /* Sign-up for a stranger, a record of your own for somebody signed in with none, and the passkey the first run ends on */
   signupClosedTitle: 'Sign-up is not open yet',
-  signupClosedWhy: 'This BrainDog is not taking new records yet. If you already have one, sign in.',
+  signupClosedWhy: 'BrainDog is not taking new sign-ups yet. If you already have one, sign in.',
   signupNameLabel: 'A name for your record',
   signupNameHint: 'Lower-case letters, digits and hyphens. It is part of your record\'s address.',
   signupNameChecking: 'Checking the name',
@@ -783,7 +790,8 @@ export const account = {
   signupHuman: 'A check that you are a person',
   signupFailed: 'That did not go through. Check the address and the name, then send it again.',
   signupLocked: (minutes: number) => `Too many tries from here. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`,
-  signupCheckMail: 'Check your mail',
+  /* THE SAME WORDS AS SIGN IN'S (`linkSentTitle`), so the two letters a person may get are called one thing. */
+  signupCheckMail: 'Check your email',
   signupMailSent: (email: string) => `A link to finish is on its way to ${email}. Open it on this device. It works once, within a day.`,
   signupOtherAddress: 'Use another address',
   signupVerifying: 'Checking the link',
@@ -799,8 +807,11 @@ export const account = {
   signupWaitingWhy: 'Your payment is in. This takes a few seconds.',
   signupWaitingSlow: 'This is taking longer than it should. Your record is made as soon as the payment arrives, so check again in a minute.',
   signupCheckAgain: 'Check again',
-  signupNewHere: 'New here? Make a record',
-  noRecordTitle: 'Make a record of your own',
+  /* SIGN IN'S FOOT, BY WHO MAY SIGN UP (first F4, SF13): invite only asks for an invite, open creates one; closed says
+     nothing, because nobody can be sent anywhere. Never "Make a record". */
+  signupAskInvite: 'New here? Get early access',
+  signupCreate: 'New here? Create your BrainDog',
+  noRecordTitle: 'Create your BrainDog',
   passkeyFirstFailed: 'That did not add a passkey. You can add one later in Settings, under Recovery.',
 
   /* People and invitations. Stop and let back in, an invitation to chosen lists, a new link for one that ran
@@ -818,11 +829,12 @@ export const account = {
     'Adds only on the whole record leaves out Keys, People and anything kept for owners. To give one of those, pick Only some of it.',
   inviteNewLink: 'New link',
   inviteRanOut: (gives: string, on: string) => `${gives} · ran out on ${on}`,
-  inviteOpens: (record: string, what: string) => `${record}: ${what}`,
-  inviteThisRecord: 'This record',
-  inviteEverything: (does: string) => `everything (${does})`,
-  inviteListGives: (list: string, does: string) => `${list} (${does})`,
-  inviteDoes: { owner: 'owns it', decide: 'decides', write: 'edits items', append: 'adds items', read: 'reads' },
+  /* WHAT THE LINK OPENS, ONE LINE A PART (first F14): "Bills and invoices: you can add". The whole BrainDog is
+     "Everything". A level this build has no words for is said as `inviteCanOther`, never the host's own word. */
+  inviteGives: (part: string, can: string) => `${part}: ${can}`,
+  inviteEverything: 'Everything',
+  inviteCan: { owner: 'you own it', decide: 'you can decide', write: 'you can edit', append: 'you can add', read: 'you can read' },
+  inviteCanOther: 'you have access',
   /* One list's grant narrowed to the items where one field holds one value, picked in the exception picker and
      said back under the exception on the person's card. */
   exceptionOnly: 'Only items where',
