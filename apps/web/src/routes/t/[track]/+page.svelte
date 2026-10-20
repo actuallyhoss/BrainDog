@@ -170,13 +170,20 @@
   const healthField = REGISTERS.updates?.fields.find((f) => f.id === 'health');
   let draft = $state('');
   let draftHealth = $state(String(healthField?.values?.[0] ?? ''));
+  /* THE HEALTH IS ASKED ONLY WHERE THE LIST DECLARES ITS CHOICES (proj F11): an empty control is no question. */
+  const choices = $derived(healthChoices(REGISTERS.updates));
   let form = $state<HTMLFormElement>();
+  let area = $state<HTMLTextAreaElement>();
+  let missing = $state(false);
 
   /* THIS SCREEN'S OWN WORDS. `working` is the word beside a working run's face, so its ring is never the only
      sign; `said` is the title row's line after the health. */
   const trackWords = {
     working: 'Working now',
     say: 'Say where it stands',
+    sayOf: (name: string) => `Say where ${name} stands`,
+    placeholder: 'What changed, and what is next',
+    empty: 'Write what changed first.',
     said: (ago: string, who: string) => `said ${ago} by ${who}`,
     unsaid: 'Nobody has said where this stands yet.',
     /* The two fields' names where the record does not declare them, so neither is ever a field with no name. */
@@ -189,7 +196,15 @@
   async function post(e: SubmitEvent) {
     e.preventDefault();
     const words = draft.trim();
-    if (!words || posting || !fromRecord) return;
+    /* POST IS NEVER GREYED OUT FOR WHAT IS MISSING (first F16): pressed with nothing written, it puts the cursor where
+       the words go and says so. */
+    if (!words) {
+      missing = true;
+      area?.focus();
+      return;
+    }
+    missing = false;
+    if (posting || !fromRecord) return;
     /* The thread it is about, read before the write goes, so an update lands on the thread it was
        typed on even if the address moves while the record is answering. */
     const on = seq;
@@ -198,7 +213,7 @@
     writer ??= m.rowWriter(apiBase());
     const out = await writer.create('updates', {
       body: words,
-      health: draftHealth,
+      ...(choices.length > 0 && draftHealth !== '' ? { health: draftHealth } : {}),
       track: on,
       by: 'you',
       at: new Date().toISOString(),
@@ -284,7 +299,7 @@
     kicker={REGISTERS.tracks?.name ?? ''}
     back="/r/tracks"
     title={String(track.fields.name)}
-    icon="rows"
+    icon="activity"
     sentence={health.health || health.state === 'missing' ? standing : undefined}
   />
 
@@ -293,34 +308,46 @@
       <!-- AT THE HEAD OF THE THREAD, WHERE THE UPDATE IT WRITES WILL APPEAR, so the gesture and its outcome are in one
            place on the screen. The two labels are the declaration's own, which is how the rest of this screen names
            things: a renamed field renames them. -->
-      <Tile icon="edit" title={trackWords.say} lead>
+      <Tile icon="edit" title={updates.length === 0 ? trackWords.sayOf(String(track.fields.name)) : trackWords.say} lead>
         <form class="composer" bind:this={form} onsubmit={post}>
           <label class="field-label" for="update-body">{bodyField ? labelOf(bodyField) : trackWords.body}</label>
-          <textarea id="update-body" class="c-area" rows="3" dir="auto" bind:value={draft} {onkeydown}></textarea>
+          <textarea
+            id="update-body"
+            class="c-area"
+            rows="3"
+            dir="auto"
+            placeholder={trackWords.placeholder}
+            aria-describedby={missing ? 'update-missing' : undefined}
+            bind:this={area}
+            bind:value={draft}
+            oninput={() => (missing = false)}
+            {onkeydown}
+          ></textarea>
+          {#if missing}<p class="c-missing" id="update-missing" role="status">{trackWords.empty}</p>{/if}
           <!-- THE HEALTH AS PILLS, NOT THE BROWSER'S MENU: the choices are few and
                declared, so every one is on screen and the chosen one is `[data-on]`, as every segmented control is. -->
           <div class="c-line">
-            <div class="c-health">
-              <p class="field-label" id="update-health">{healthField ? labelOf(healthField) : trackWords.health}</p>
-              <Segmented role="group" aria-labelledby="update-health">
-                {#each healthChoices(REGISTERS.updates) as [v, said] (v)}
-                  <button type="button" class="segment" aria-pressed={draftHealth === v} data-on={draftHealth === v ? '' : undefined} onclick={() => (draftHealth = v)}>{said}</button>
-                {/each}
-              </Segmented>
-            </div>
-            <Button type="submit" weight="primary" kbd="⌘↵" disabled={posting || draft.trim() === ''}>
+            {#if choices.length > 0}
+              <div class="c-health">
+                <p class="field-label" id="update-health">{healthField ? labelOf(healthField) : trackWords.health}</p>
+                <Segmented role="group" aria-labelledby="update-health">
+                  {#each healthChoices(REGISTERS.updates) as [v, said] (v)}
+                    <button type="button" class="segment" aria-pressed={draftHealth === v} data-on={draftHealth === v ? '' : undefined} onclick={() => (draftHealth = v)}>{said}</button>
+                  {/each}
+                </Segmented>
+              </div>
+            {/if}
+            <Button type="submit" weight="primary" kbd="⌘↵" disabled={posting}>
               {posting ? copy.writeMarkSaving : copy.post}
             </Button>
           </div>
         </form>
       </Tile>
 
+      <!-- NOT DRAWN UNTIL SOMEBODY HAS SAID SOMETHING (proj F11): the tile above, headed "Say where it stands", is the one
+           thing a new thread asks, and a second tile saying nothing has been said said it twice. -->
+      {#if updates.length > 0}
       <Section title="What has been said" count={updates.length}>
-      {#if updates.length === 0}
-        <!-- Not an error, and not styled as one. Nobody has written about this thread yet, which is
-             the ordinary state of one somebody started this morning. -->
-        <Empty kind="no-data-yet" title="No update yet" body={copy.threadNoUpdate} />
-      {:else}
         <ol class="thread">
           {#each updates.slice(0, DOM_CAP) as u (u.seq)}
             {@const who = actorOf(String(u.fields.by))}
@@ -345,8 +372,8 @@
           Updates are never edited. A correction is a new update that replaces the one before it, so the
           thread stays the record of what was believed and when.
         </p>
-      {/if}
       </Section>
+      {/if}
     </section>
 
     <aside class="side">
@@ -388,12 +415,9 @@
       <!-- A GROUP ON THE GROUND AND NOT A TILE: an open count on its own is no chart, and the done ones are not in hand
            to draw progress against. Each task leads with its round check, drawn and not pressed: the row is the way to
            the task, where it is ticked. -->
+      <!-- NOT DRAWN WHILE NOTHING IS OPEN (proj F11): a heading over "nothing" is a tile that says nothing. -->
+      {#if tasks.length > 0}
       <Section title="Still open" count={tasks.length}>
-      {#if tasks.length === 0}
-        <!-- `points at` is the schema's word for a `ref`, and the second half reassured the reader
-             that nothing was wrong — the product explaining itself rather than saying the fact. -->
-        <p class="quiet">{copy.threadNoTasks}</p>
-      {:else}
         <ul class="ledger ledger-lead">
           {#each tasks as t (t.seq)}
             <li>
@@ -407,8 +431,8 @@
             </li>
           {/each}
         </ul>
-      {/if}
       </Section>
+      {/if}
     </aside>
   </div>
 {/if}
@@ -510,6 +534,12 @@
     justify-content: space-between;
     gap: var(--sp-3);
     margin-block-start: var(--sp-4);
+  }
+
+  .c-missing {
+    margin: 0;
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   .c-health {
