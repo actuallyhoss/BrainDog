@@ -42,6 +42,7 @@
   import { apiBase, at } from '$lib/at.ts';
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
+  import { MediaQuery } from 'svelte/reactivity';
   import { page } from '$app/state';
   import { since } from 'braindog-render';
   import { titleOf } from '$lib/title.ts';
@@ -113,6 +114,8 @@
   /** Every rule's name by its handle, from the list read, so a dry run's "taken by" says names and never handles. */
   let ruleNames = $state<ReadonlyMap<string, string>>(new Map());
   let fix = $state('');
+  /* THE PHONE'S HEAD (PageHead under 900px). */
+  const phone = new MediaQuery('(width < 900px)', false);
   let tab = $state<'steps' | 'runs' | 'versions' | 'written'>('steps');
   let busy = $state(false);
   /* THE RECORD'S GRAMMAR, read when the editor opens. Over a record older than the app, or one whose grammar could not be
@@ -649,9 +652,13 @@
     <PageHead icon="refresh" kicker={words.heading} back="/automations" {title} sentence={said?.text} needs={said?.needs || undefined}>
       {#snippet actions()}
         {#if row}
-          <Button onclick={() => flow.select('trigger')}>{editWords.rename}</Button>
+          <!-- ON A PHONE THE HEAD HOLDS ONLY THE "⋯" (2.A.20), and Rename is its first line. -->
+          {#if !phone.current}<Button onclick={() => flow.select('trigger')}>{editWords.rename}</Button>{/if}
           <Menu label={editWords.more(title)} align="end" bind:open={menuOpen}>
             {#snippet trigger()}<span class="more-trigger"><Icon name="more" size="m" /><span class="vh">{editWords.more(title)}</span></span>{/snippet}
+            {#if phone.current}
+              <button type="button" class="mi" role="menuitem" onclick={() => ((menuOpen = false), flow.select('trigger'))}>{editWords.rename}</button>
+            {/if}
             {#if owner}
               <button type="button" class="mi" role="menuitem" disabled={switching} onclick={() => void switchTo(!row?.enabled)}>{row.enabled ? editWords.turnOff : editWords.turnOn}</button>
             {/if}
@@ -665,7 +672,7 @@
     </PageHead>
     {#if lockedSay}<p class="locked" role="status">{lockedSay}</p>{/if}
     <div class="page">
-      <Segmented class="tabs" role="group" aria-label={title} full>
+      <Segmented class="tabs" role="group" aria-label={title}>
         <button type="button" class="segment" aria-pressed={tab === 'steps'} data-on={tab === 'steps' ? '' : undefined} onclick={() => (tab = 'steps')}>{words.steps}</button>
         {#if row}
           <button type="button" class="segment" aria-pressed={tab === 'runs'} data-on={tab === 'runs' ? '' : undefined} onclick={() => (tab = 'runs')}>{words.runs}</button>
@@ -945,11 +952,13 @@
     max-inline-size: 100%;
   }
 
-  /* ON A PHONE THE FOUR SHARE THE WIDTH IN ONE ROW (`Segmented`'s `full`), never a ragged second row. */
+  /* ON A PHONE THE FOUR STAY ON ONE ROW, each its whole word, and scroll inside the track if a screen is too narrow
+     for them: a ragged second row read as a second control. */
   @media (width < 640px) {
-    .page :global(.tabs[data-full]) {
-      align-self: stretch;
+    .page :global(.tabs) {
       flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
   }
 
@@ -1106,7 +1115,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--sp-2) var(--sp-3);
+    gap: var(--sp-2);
     padding-block-start: var(--sp-3);
   }
 
@@ -1140,7 +1149,7 @@
   .foot-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--sp-2);
     margin-inline-start: auto;
   }
 
