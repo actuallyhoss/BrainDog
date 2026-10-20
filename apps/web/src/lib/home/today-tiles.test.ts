@@ -36,22 +36,26 @@ import type { DayRow, DueRow, SessionRow, TaskRow } from '../record/today-live.t
 
 const TODAY = '2026-09-29';
 
-test('THE SENTENCE (today F2): what needs you first and red, the late money as its own clause, who is working last; digits always', () => {
+test('THE SENTENCE (today F2, polish 7): short sentences, what needs you first and red, then what is late, then who is working; digits always', () => {
   const late = { owed: '£7,200', bills: null };
-  assert.deepEqual(sentenceOf({ needYou: 8, late, agents: 2 }), { text: '8 need you, £7,200 owed to you is late, and 2 agents are working.', needs: '8 need you' });
+  assert.deepEqual(sentenceOf({ needYou: 8, late, agents: 2 }), { text: '8 need you. £7,200 owed to you is late. 2 agents are working.', needs: '8 need you' });
   assert.deepEqual(sentenceOf({ needYou: 8, late: { owed: '£7,200', bills: '£10,593' }, agents: 2 }), {
-    text: '8 need you, £7,200 owed to you and £10,593 in bills are late, and 2 agents are working.',
+    text: '8 need you. £7,200 owed to you is late, and £10,593 of bills. 2 agents are working.',
     needs: '8 need you',
   });
-  assert.deepEqual(sentenceOf({ needYou: 1, agents: 1 }), { text: '1 needs you, and 1 agent is working.', needs: '1 needs you' });
+  /* EITHER AMOUNT AT NOUGHT DROPS ITS CLAUSE. */
+  assert.equal(sentenceOf({ needYou: 8, late: { owed: null, bills: '£10,593' }, agents: 0 }).text, '8 need you. £10,593 of bills is late.');
+  /* WITH SOMETHING TO ASK AND NOTHING LATE, the line says so, where what is late was read at all. */
+  assert.deepEqual(sentenceOf({ needYou: 1, agents: 1, lateRead: true }), { text: '1 needs you. Nothing is late. 1 agent is working.', needs: '1 needs you' });
+  assert.deepEqual(sentenceOf({ needYou: 26, late: { owed: null, bills: null }, agents: 0 }), { text: '26 need you. Nothing is late.', needs: '26 need you' });
   assert.deepEqual(sentenceOf({ needYou: 26, agents: 0 }), { text: '26 need you.', needs: '26 need you' });
-  /* LATE WITH NO MONEY ON IT is a count of things, said only where no late money is. */
-  assert.deepEqual(sentenceOf({ needYou: 3, lateThings: 2, agents: 0 }), { text: '3 need you, and 2 things are late.', needs: '3 need you' });
-  assert.equal(sentenceOf({ needYou: 3, late, lateThings: 2, agents: 0 }).text, '3 need you, and £7,200 owed to you is late.');
+  /* LATE WITH NO MONEY ON IT is a count, said only where no late money is. */
+  assert.deepEqual(sentenceOf({ needYou: 3, lateThings: 2, agents: 0 }), { text: '3 need you. 2 things are late.', needs: '3 need you' });
+  assert.equal(sentenceOf({ needYou: 3, late, lateThings: 2, agents: 0 }).text, '3 need you. £7,200 owed to you is late.');
   /* NOTHING NEEDS YOU is its own sentence; what is late then carries the red. */
   assert.deepEqual(sentenceOf({ needYou: 0, agents: 0 }), { text: 'Nothing needs you.', needs: '' });
   assert.deepEqual(sentenceOf({ needYou: 0, agents: 2 }), { text: 'Nothing needs you. 2 agents are working.', needs: '' });
-  assert.deepEqual(sentenceOf({ needYou: 0, late, agents: 2 }), { text: 'Nothing needs you. £7,200 owed to you is late, and 2 agents are working.', needs: '£7,200 owed to you is late' });
+  assert.deepEqual(sentenceOf({ needYou: 0, late, agents: 2 }), { text: 'Nothing needs you. £7,200 owed to you is late. 2 agents are working.', needs: '£7,200 owed to you is late' });
   /* SOMETHING IN THE INBOX AND NO QUESTION: never "Nothing needs you". */
   assert.deepEqual(sentenceOf({ needYou: 0, agents: 0, inbox: 4 }), { text: '4 things wait in your inbox.', needs: '' });
   /* NO WORD BESIDE A FIGURE (SF14). */

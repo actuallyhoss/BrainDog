@@ -99,48 +99,64 @@ export type SentenceParts = {
   late?: LateMoney | null;
   /** Late things with no money on them, said only where no late money is. */
   lateThings?: number;
+  /** Whether what is late was read at all, so "Nothing is late" is said only where it was looked for. */
+  lateRead?: boolean;
   /** The agents working now. */
   agents: number;
   /** What waits in the inbox, said in place of "Nothing needs you" when nothing else does. */
   inbox?: number;
 };
 
-/** "A, B and C". */
-const listed = (items: readonly string[]): string => (items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
+/** What the line says, with something to ask, when nothing is late. */
+const NOTHING_LATE = 'nothing is late';
 
 /**
- * "8 need you, £7,200 owed to you is late, and 2 agents are working." (spec 4.1, today F2.) WHAT NEEDS YOU LEADS, as the
- * badge's number and in red; the late money is its own clause, said with its money; who is working closes it, in ink.
+ * "8 need you. £7,200 owed to you is late, and £10,593 of bills. 2 agents are working." (spec 4.1, today F2, and the
+ * Today polish of 20 October: short sentences.) WHAT NEEDS YOU LEADS, as the badge's number and in red; the late money
+ * is its own sentence, or "Nothing is late." with something to ask; who is working closes it, in ink.
  * Numbers are always digits (SF14). With nothing needing you it says so ("Nothing needs you."), and then the late money,
  * when there is some, is the red phrase, since it is the one thing that wants a look.
  *
  * "NOTHING NEEDS YOU" ONLY WHEN NOTHING DOES (EXP-E07): with something in the inbox and no question, the line says that
  * in its place.
  */
-export function sentenceOf({ needYou, late = null, lateThings = 0, agents, inbox = 0 }: SentenceParts): Sentence {
-  const money = [late?.owed ? `${late.owed} owed to you` : null, late?.bills ? `${late.bills} in bills` : null].filter((s): s is string => s !== null);
+export function sentenceOf({ needYou, late = null, lateThings = 0, lateRead = late !== null, agents, inbox = 0 }: SentenceParts): Sentence {
+  /* WHAT IS LATE, ONE SENTENCE: what is owed to you first, then the bills, each left out at nought. */
+  const owed = late?.owed ? `${late.owed} owed to you` : null;
+  const bills = late?.bills ? `${late.bills} of bills` : null;
   const lateClause =
-    money.length > 0 ? `${listed(money)} ${money.length === 1 ? 'is' : 'are'} late` : lateThings > 0 ? `${digits(lateThings)} ${plural(lateThings, 'thing is', 'things are')} late` : null;
+    owed && bills
+      ? `${owed} is late, and ${bills}`
+      : owed
+        ? `${owed} is late`
+        : bills
+          ? `${bills} is late`
+          : lateThings > 0
+            ? `${digits(lateThings)} ${plural(lateThings, 'thing is', 'things are')} late`
+            : null;
   const working = agents === 0 ? null : `${digits(agents)} ${plural(agents, 'agent is', 'agents are')} working`;
   let head: string;
   let needs: string;
+  let rest: (string | null)[];
   if (needYou > 0) {
     head = `${digits(needYou)} ${needYou === 1 ? 'needs' : 'need'} you`;
     needs = head;
+    /* WITH SOMETHING TO ASK, NOTHING LATE IS SAID TOO, so the line answers both questions it raises. */
+    rest = [lateClause ?? (lateRead ? NOTHING_LATE : null), working];
   } else if (inbox > 0 && lateClause === null) {
     head = `${digits(inbox)} ${plural(inbox, 'thing waits', 'things wait')} in your inbox`;
     needs = '';
+    rest = [working];
   } else {
     head = 'Nothing needs you';
     needs = lateClause ?? '';
+    rest = [lateClause, working];
   }
-  if (needYou === 0 && head === 'Nothing needs you') {
-    /* A CALM HEAD STANDS AS ITS OWN SENTENCE, and what is late or working follows as the next one. */
-    const rest = [lateClause, working].filter((s): s is string => s !== null);
-    return { text: rest.length === 0 ? `${head}.` : `${head}. ${upper(rest.length === 1 ? rest[0]! : `${rest[0]}, and ${rest[1]}`)}.`, needs };
-  }
-  const clauses = [head, lateClause, working].filter((s): s is string => s !== null);
-  const text = clauses.length === 1 ? `${head}.` : `${clauses.slice(0, -1).join(', ')}, and ${clauses.at(-1)}.`;
+  /* SHORT SENTENCES, EACH ONE THING (Today polish 7): what needs you, what is late, who is working. */
+  const text = [head, ...rest]
+    .filter((s): s is string => s !== null)
+    .map((s) => `${upper(s)}.`)
+    .join(' ');
   return { text, needs };
 }
 

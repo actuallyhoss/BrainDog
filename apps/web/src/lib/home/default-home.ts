@@ -1324,7 +1324,7 @@ export function sumsSaid(sums: ReadonlyMap<string, number>): string | null {
 }
 
 /**
- * THE PAGE'S LINE (spec 4.1, today F2): "8 need you, £7,200 owed to you is late, and 2 agents are working."
+ * THE PAGE'S LINE (spec 4.1, today F2): "8 need you. £7,200 owed to you is late. 2 agents are working."
  *
  * WHAT NEEDS YOU IS ONE COUNT (SF4): `boot`'s open questions (`waits`), the number the badge and the Needs you tile say,
  * and nothing is added to it. Without `waits` (an older host) it is what the page's queues hold. LATE IS ITS OWN CLAUSE,
@@ -1336,12 +1336,14 @@ function sentenceFrom(blocks: readonly LiveBlock[], today: string, waits: HomeWa
   let counts = waits !== null && (waits.questions > 0 || (waits.inbox ?? 0) > 0);
   let needing = waits?.questions ?? 0;
   let agents = 0;
+  /* WHETHER THE PAGE READ WHAT IS LATE, so "Nothing is late" is said only where it was looked for. */
+  let lateRead = false;
   for (const b of blocks) {
     if (says(b) || !b.drawn) continue;
     if (isQueue(b)) {
       counts = true;
       if (waits === null) needing += asked(b);
-    } else if (isTodo(b) || isDue(b)) counts = true;
+    } else if (isTodo(b) || isDue(b)) counts = lateRead = true;
     else if (isRuns(b)) {
       counts = true;
       agents += b.entries.length;
@@ -1351,7 +1353,7 @@ function sentenceFrom(blocks: readonly LiveBlock[], today: string, waits: HomeWa
   if (waits !== null) agents = waits.working;
   const sums = lateSumsOf(blocks, today);
   const late = { owed: sumsSaid(sums.owed), bills: sumsSaid(sums.bills) };
-  return sentenceOf({ needYou: Math.max(0, needing), late, lateThings: sums.things, agents, inbox: waits?.inbox ?? 0 });
+  return sentenceOf({ needYou: Math.max(0, needing), late, lateThings: sums.things, lateRead, agents, inbox: waits?.inbox ?? 0 });
 }
 
 /**
