@@ -417,7 +417,8 @@ export type { Tried, TriedStep, TryOptions, TrySample } from './flow-try.ts';
    and the runner read (`capabilities.ts`). */
 export { CAPABILITIES, capability, notInThisBuild, serves, type Capability, type Hosts } from './capabilities.ts';
 export { isUlid, ulids, ulidTime } from './ids.ts';
-export { digest, indexesFor, indexName, jcs, registerOfIndex, validate as validateDeclaration, KINDS, REMOVED_WINDOW_DAYS } from './declare.ts';
+export { digest, indexesFor, indexName, registerOfIndex, validate as validateDeclaration, KINDS, REMOVED_WINDOW_DAYS } from './declare.ts';
+export { jcs } from './jcs.ts';
 export { ftsQuery, projectedText } from './fts.ts';
 export { TRAVELS, decode, encode, projection, tables } from './brainl.ts';
 export { BYDAY, REPEAT_READ, atMs, expandRepeat, nextRepeat, offsetMs, remindersFor, shiftFrom } from './schedule.ts';

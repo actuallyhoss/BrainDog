@@ -61,13 +61,13 @@
   import type { Patch } from '$lib/record/page-write.ts';
   import type { BlockBody, PageBody } from '$lib/record/pages-live.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import AddBlock from '$lib/ui/AddBlock.svelte';
+  import type AddBlockView from '$lib/ui/AddBlock.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Sheet from '$lib/ui/Sheet.svelte';
-  import BlockEditor from './BlockEditor.svelte';
+  import type BlockEditorView from './BlockEditor.svelte';
   import { composeWords, type Composed } from './compose.ts';
-  import MakeComponent from './MakeComponent.svelte';
+  import type MakeComponentView from './MakeComponent.svelte';
   import { askedIn, CHANGE_EVENT, holdLine, keyInFocus, slashEntryWords, withoutEntry } from './slash-entry.ts';
   import { listOf, shelfWords, type Declared, type Shelved } from './shelf.ts';
   import type { LookUndo } from '$lib/record/arrange-look.ts';
@@ -443,6 +443,24 @@
     const slot = at === null ? undefined : arrangement.slots?.[at];
     const block = slot ? all[slot.i] : undefined;
     return at !== null && slot && block ? { at, slot, block } : null;
+  });
+
+  /**
+   * THE THREE SHEETS ARRIVE WHEN THEY ARE OPENED, never with the page. Arranging is something an owner does now and
+   * then, and the editor, the picker and Make a component carry block grammar, lists and composing that a page being
+   * read never runs. Each is asked for the first time its sheet is wanted, and draws open when it lands.
+   */
+  let BlockEditor = $state<typeof BlockEditorView | null>(null);
+  let AddBlock = $state<typeof AddBlockView | null>(null);
+  let MakeComponent = $state<typeof MakeComponentView | null>(null);
+  $effect(() => {
+    if (editing !== null && BlockEditor === null) void import('./BlockEditor.svelte').then((m) => (BlockEditor = m.default));
+  });
+  $effect(() => {
+    if (adding && AddBlock === null) void import('$lib/ui/AddBlock.svelte').then((m) => (AddBlock = m.default));
+  });
+  $effect(() => {
+    if (making && MakeComponent === null) void import('./MakeComponent.svelte').then((m) => (MakeComponent = m.default));
   });
 
   /** The sheet is open while a place is being edited, and closing it clears the place, so the next Edit opens afresh. */

@@ -249,7 +249,9 @@ export async function planShared(
   /** A module already here, in the words and targets of the use case being added, or `null` when it gives it none. */
   relabelDoc: (id: string, installed: readonly PackState[], usecase: string) => Promise<Body | null> = async () => null,
 ): Promise<{ ok: true; plan: SharedPlan } | { ok: false; fix: string; code: string | null }> {
-  const { readShared } = await import('@braindog/declare');
+  /* THE SUBPATH AND NOT THE PACKAGE: a dynamic import of the package is its whole namespace, which kept every export of
+     `@braindog/declare` alive beside the few a page reads statically, and put them all in front of Today. */
+  const { readShared } = await import('@braindog/declare/shared');
   const read = await readShared(file.text, { kind: file.source });
   if (!read.ok) return { ok: false, fix: 'refusal' in read ? read.refusal.fix : copy.writeRaced, code: 'refusal' in read ? read.refusal.code : null };
   const withBatch: readonly PackState[] = [

@@ -16,7 +16,7 @@
  */
 
 import { createClient } from '@braindog/client';
-import { handOf, type Hand } from '@braindog/declare';
+import { handOf, type Hand } from '@braindog/declare/hand';
 
 import { copy } from '../copy.ts';
 import { AGENT_NAMES, humanize } from './names.ts';

@@ -7,9 +7,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./catalogue": "./src/catalogue.ts",
+    "./hand": "./src/hand.ts",
     "./job": "./src/job.ts",
     "./kennel": "./src/kennel.ts",
     "./scrub": "./src/scrub.ts",
+    "./shared": "./src/shared.ts",
     "./yaml": "./src/yaml.ts"
   },
   "dependencies": {
