@@ -11,7 +11,7 @@ import { BODY_MOST } from '@braindog/host/abuse';
 import { capFor, guardBody } from '../src/body-cap.ts';
 
 const HOST = 'https://brain.example.test';
-const post = (path: string, body: BodyInit | null, headers: Record<string, string> = {}): Request => new Request(`${HOST}${path}`, { method: 'POST', body, headers });
+const post = (path: string, body: string | ReadableStream<Uint8Array> | null, headers: Record<string, string> = {}): Request => new Request(`${HOST}${path}`, { method: 'POST', body, headers });
 
 test('EACH DOOR HAS ITS CEILING, AND A DOOR WITH ITS OWN CAP HAS NONE HERE', () => {
   assert.equal(capFor('/api/create'), BODY_MOST.api.bytes);

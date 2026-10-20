@@ -47,6 +47,17 @@ export const MAIL_MOST = EMAIL_LIMIT - STAMP_ROOM;
 export type TxtLookup = (name: string) => Promise<string[] | null>;
 
 /**
+ * WHAT TAKING A MESSAGE USES OF Email Routing's own: the part of `ForwardableEmailMessage` read here, written out so this
+ * module is checked under Node's types with its tests (the Worker's `index.ts` hands over the whole object).
+ */
+export interface InboundMail {
+  readonly to: string;
+  readonly rawSize: number;
+  readonly raw: ReadableStream<Uint8Array>;
+  setReject(reason: string): void;
+}
+
+/**
  * Take one message from Email Routing into the record its address names.
  *
  * WHAT THE SENDER HEARS IS THE MAIL PATH'S ANSWER IN SMTP'S WORDS. A stored message is accepted. A mailbox nobody
@@ -54,7 +65,7 @@ export type TxtLookup = (name: string) => Promise<string[] | null>;
  * 404. A message over the ceiling is refused permanently. A spent budget or a record that could not store it throws,
  * which fails the delivery rather than accepting it, so the message is not taken and then lost.
  */
-export async function takeMail(message: ForwardableEmailMessage, door: IngestDoor, lookup: TxtLookup = dohTxt, now: () => number = Date.now): Promise<void> {
+export async function takeMail(message: InboundMail, door: IngestDoor, lookup: TxtLookup = dohTxt, now: () => number = Date.now): Promise<void> {
   const token = tokenOf(message.to);
   if (token === null) {
     message.setReject('There is no mailbox at this address.');
