@@ -26,7 +26,7 @@ import { homedir, hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { Writable } from 'node:stream';
 
-import type { Client, Context } from '@braindog/client';
+import type { Brief, Client, Context } from '@braindog/client';
 import { refused } from '@braindog/ports';
 
 import { CLIENTS } from './clients/index.ts';
@@ -188,8 +188,13 @@ export function startTag(env: Env, home: string, place: Place, top: string | nul
   for (const id of ['skills', 'tools']) {
     const reg = context.registers.find((r) => r.id === id);
     if (reg === undefined) continue;
-    if (reg.truncated) return null;
-    rows.push(id, [...reg.rows, ...reg.inherited].map((r) => [r.spoken, r.version, r.state, r.scope]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+    /* A SKILLS LIST CUT SHORT IS READ WHOLE BY THE SYNC, page by page, so rows it did not show could move unseen. The
+       scan reads only what the context shows, and says so when the list was cut, so a cut tools list is tagged as shown. */
+    if (reg.truncated && id === 'skills') return null;
+    /* A TOOL'S VERSION IS LEFT OUT: the scan itself writes what it saw onto the tools rows at every run, so their
+       versions move with each one and a tag holding them would never hold. Which tools there are, and their state, stay. */
+    const of = (r: Brief): unknown[] => (id === 'tools' ? [r.spoken, r.state, r.scope] : [r.spoken, r.version, r.state, r.scope]);
+    rows.push(id, reg.truncated, [...reg.rows, ...reg.inherited].map(of).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
   }
   const stat = (path: string): unknown[] => {
     try {

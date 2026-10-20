@@ -322,7 +322,13 @@ test('A TAG IS THE RECORD’S ROWS AND THE MACHINE’S FILES: a cut-short list h
   assert.equal(tag(context()), tag(context()), 'the same rows and files are the same tag');
   assert.notEqual(tag(context({ version: 2 })), tag(context()));
   assert.notEqual(tag(context({ project: 'things#4' })), tag(context()));
-  assert.equal(tag(context({ truncated: true })), null, 'a list the context cut short was tagged');
+  assert.equal(tag(context({ truncated: true })), null, 'a skills list the context cut short was tagged');
+  /* THE SCAN'S OWN WRITES MOVE A TOOL'S VERSION AT EVERY RUN, so a tools row is tagged by name and state, cut short or not. */
+  const tools = (version: number, truncated = true) =>
+    ({ ...CONTEXT, registers: [{ id: 'tools', name: 'Tools', truncated, rows: [{ spoken: 'tools#2', version, scope: 'global', state: 'active' }], inherited: [] }] }) as never;
+  assert.match(tag(tools(1)) ?? '', /^[0-9a-f]{32}$/);
+  assert.equal(tag(tools(1)), tag(tools(7)));
+  assert.notEqual(tag(tools(1)), tag(tools(1, false)));
   assert.notEqual(startTag(env, p.home, { ...place1, host: 'https://brain.dog/other' }, null, kiln, context()), tag(context()));
   /* A skill file on this machine moved. */
   mkdirSync(dirname(p.skillFile), { recursive: true });
