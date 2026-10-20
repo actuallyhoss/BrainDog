@@ -71,6 +71,7 @@
   import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
   import { railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
+  import { needYouCount } from '$lib/home/today-tiles.ts';
   import { heardWaits, waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
@@ -201,7 +202,7 @@
   /* WHAT WAITS, AS THE NEWEST `boot` SAID IT (`waits.svelte.ts`): the shell's, and then the poll's re-read of `boot`, so
      the badge moves with the record and says the number Today's header and the sentence in Needs you say. */
   $effect.pre(() => heardWaits({ waits: data.waits ?? null, working: data.working ?? [] }));
-  const open = $derived(waitsNow()?.questions ?? data.open);
+  const open = $derived(needYouCount(waitsNow(), data.open));
   /* THE DOCK BADGE FOLLOWS THE NEEDS YOU COUNT (the PWA badge in a browser that has one); 0 clears it. */
   $effect(() => setBadge(open));
   /* A NEW QUESTION OR HANDOFF RINGS ONCE (`alerts.ts` dedups by id and seeds on the first hearing), never while this
