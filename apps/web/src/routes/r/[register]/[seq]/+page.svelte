@@ -113,7 +113,7 @@
   import MergeSheet from '$lib/ui/MergeSheet.svelte';
   import UsedBy from '$lib/page/panels/UsedBy.svelte';
   import { may } from '$lib/record/may.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import { reachWords } from '../reach.ts';
   import { knownOf, lastDayOf, meetsOf, orgRoleOf, orgSaid, roleFieldOf, seenOf, seenWords, timesSaid, whoParts, type Known, type Named } from '../people.ts';
 
@@ -195,9 +195,10 @@
   /* THE ROW AND ITS HISTORY, IN ONE BRACKET, so `data-screen` never appears between the two reads. An
      answer for a row somebody has already left is dropped. `clock` is the reader's, taken again as
      each row is read. It started at the sample's frozen `NOW` for the row `pending` stamped with that
-     instant; nothing is drawn before a read now, so the wall clock is the only one it needs. */
+     instant; nothing is drawn before a read now. It is the RECORD'S clock (`recordNow`), as the list's is, so a row's days late are
+     the list's Due cell's. */
   let told = $state<Told | null>(null);
-  let clock = $state(Date.now());
+  let clock = $state(recordNow());
   let askedFor = '';
   let reader: RowReader | null = null;
 
@@ -244,7 +245,7 @@
     const unreached = fromCopy && (r.from === 'refused' || h.from === 'refused') && ((page.data as unknown as Shell).offline === true || poll.state === 'offline');
     closed(!current || unreached || (r.from !== 'refused' && h.from !== 'refused'), at);
     if (!current || unreached) return;
-    clock = Date.now();
+    clock = recordNow();
     /* A NUMBER MERGED INTO ANOTHER ROW IS NEVER THE ADDRESS: the answer is the kept row, and the page moves to its number,
        in place of this entry in the history, so Back does not land on the folded one again. */
     if (r.from === 'live' && r.folded !== undefined && r.entry && r.entry.seq !== n) {
@@ -295,7 +296,7 @@
     }
     const [m, w] = await Promise.all([
       earns ? figures.moneyIn(name) : Promise.resolve(null),
-      work && via ? figures.openWork(work, via, `${register}#${n}`, localDay(Date.now())) : Promise.resolve(null),
+      work && via ? figures.openWork(work, via, `${register}#${n}`, localDay(recordNow())) : Promise.resolve(null),
     ]);
     if (askedFor !== key) return;
     moneyIn = m;

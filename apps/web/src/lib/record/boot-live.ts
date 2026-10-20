@@ -239,6 +239,35 @@ export type Shell = ShellBase & {
   upTo: Cursor | null;
 };
 
+/**
+ * THE RECORD'S CLOCK (SF3): what time it is on the record, ticking on from the instant its `boot` said.
+ *
+ * TWO CLOCKS SAID TWO DAYS. The list measured "late" from the record's `now` and a row's own page, the saved view and
+ * Usage from the browser's, so one bill was 64 days late in the list and 111 on its page, and Usage offered October on a
+ * record whose today is 3 September. Every screen that says late, today, this month, a relative time or a next run asks
+ * this one function. It is the record's instant plus the time this tab has run since that answer, so it still ticks;
+ * with no answer yet it is the browser's clock, and nothing else.
+ */
+let bootNow: number | null = null;
+let bootedAt = 0;
+
+/** Keep the record's `now` from a `boot` that just answered. A value that is not a date keeps the clock as it was. */
+export function learnNow(iso: string | null | undefined, at: number = performance.now()): void {
+  const t = typeof iso === 'string' ? Date.parse(iso) : Number.NaN;
+  if (!Number.isFinite(t)) return;
+  bootNow = t;
+  bootedAt = at;
+}
+
+/** The record's time now, in milliseconds: the booted instant plus the time since it landed, else the browser's. */
+export const recordNow = (): number => (bootNow === null ? Date.now() : bootNow + (performance.now() - bootedAt));
+
+/** Forget the record's clock, as `forget` forgets the rest of its answer; the next `boot` sets it again. */
+export function forgetNow(): void {
+  bootNow = null;
+  bootedAt = 0;
+}
+
 let kept: Promise<Booted> | null = null;
 
 /* WHICH RECORD `kept` IS. Since the record is in the address (`/app/<slug>/api/boot`), one tab can ask two records, and
@@ -294,6 +323,8 @@ export function readBoot(base: string, io?: Fetch): Promise<Booted> {
     const out = await client.boot();
     refusal = null;
     if (out.ok) {
+      /* THE RECORD'S CLOCK, set the moment its answer lands (`recordNow`). */
+      learnNow(out.value.now);
       /* THE PAGES' TITLES ARE KEPT WHERE A SCREEN LOOKS A PAGE UP BY SLUG (`held.ts`), which was the sample's copy alone. */
       learnPages(out.value.pages ?? []);
       /* AND WHERE THE RECORD NAMED NO CURRENCY, WHAT ITS MONEY IS IN, asked before the shell is built so the first

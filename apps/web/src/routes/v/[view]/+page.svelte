@@ -65,6 +65,7 @@
   import { chipsOf } from '$lib/record/api.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
   import QueryBuilder from '$lib/query/QueryBuilder.svelte';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import { ADDRESS_OPS, fromChips, fromWhere, offered, toChips, toWhere, type Counted } from '$lib/query/tree.ts';
   import { describeWith, slashAnswers } from '$lib/query/slash.ts';
 
@@ -117,7 +118,7 @@
    * AN ANSWER FOR AN ADDRESS SOMEBODY HAS ALREADY LEFT IS DROPPED, the way the row screen drops one.
    */
   let got = $state<Viewed | null>(null);
-  let clock = $state(Date.now());
+  let clock = $state(recordNow());
   let reader: ViewReader | null = null;
   let askedFor = '';
 
@@ -133,7 +134,7 @@
     if (!current) return;
     /* THE ROWS ARE READ AGAINST THE MOMENT THEY ARRIVED, so a date cell's "in 3 days" is about the
        answer on screen and not about when the tab was opened. */
-    clock = Date.now();
+    clock = recordNow();
     got = out;
   }
 

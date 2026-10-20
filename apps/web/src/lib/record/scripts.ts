@@ -22,6 +22,7 @@ import { createClient, type ClientOptions, type Cursor, type EventLine, type Scr
 import { since } from 'braindog-render';
 
 import { moneyInText } from './money.ts';
+import { recordNow } from './boot-live.ts';
 import { humanize, listName } from './names.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
@@ -234,7 +235,7 @@ export function startsBy(s: Pick<ScriptRow, 'runs'>): string {
 }
 
 /** Where a script stands: one calm sentence, its tone, and whether Resume is offered. Paused is `warn`, refused `bad`. */
-export function stateOf(s: Pick<ScriptRow, 'status' | 'last' | 'next' | 'refused'>, now: number): { line: string; tone: 'warn' | 'bad' | undefined; resume: boolean } {
+export function stateOf(s: Pick<ScriptRow, 'status' | 'last' | 'next' | 'refused'>, now: number = recordNow()): { line: string; tone: 'warn' | 'bad' | undefined; resume: boolean } {
   if (s.status === 'paused') return { line: words.paused(s.refused.pauses_at), tone: 'warn', resume: true };
   const next = s.next === null ? null : since(s.next, now);
   if (s.last === null) return { line: words.notRun(next), tone: undefined, resume: false };

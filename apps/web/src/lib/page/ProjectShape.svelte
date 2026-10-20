@@ -30,6 +30,7 @@
   import { HERO_WORDS, blocksOf, heroOf, isProject, shapeOf, type Block, type Figure } from '$lib/record/project.ts';
   import { figureOf, hueOf } from '$lib/home/project-cards.ts';
   import { rowReader } from '$lib/record/row-live.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import { valueSaid } from '$lib/voice.ts';
   import { money } from 'braindog-render';
   import ProjectBlocks from './ProjectBlocks.svelte';
@@ -118,7 +119,7 @@
           ? [null, null, null, null]
           : await Promise.all([
               ...['project-in-month', 'project-out-month', 'project-owed'].map((m) => quiet(f.scalar(m, name), null)),
-              work && via ? quiet(f.openWork(work, via, `${r}#${n}`, localDay(Date.now())), null) : Promise.resolve(null),
+              work && via ? quiet(f.openWork(work, via, `${r}#${n}`, localDay(recordNow())), null) : Promise.resolve(null),
             ]);
       /* THE MONTH-BY-MONTH SERIES AND THE STORED ROWS, for the visuals; a read that says nothing leaves its visual out. */
       const [inByMonth, outByMonth] = name === '' ? [null, null] : await Promise.all([quiet(f.moneyIn(name), null), quiet(f.moneyOut(name), null)]);

@@ -48,13 +48,14 @@
   import Ring from '$lib/viz/Ring.svelte';
   import Stacked from '$lib/viz/Stacked.svelte';
   import { homeCurrency } from '$lib/record/api.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import { asksOf, daysSaid, heatOf, projectParts, projectsSaid, ringsOf, said as reading, sentenceOf, weekBars, weeksSaid } from './reading.ts';
 
   /* THE MONTH AND THE PROJECT ARE THE ADDRESS'S, so the switcher is two links, Back returns to the month before, and
      a project's "Runs on" can link straight to its slice (`usageHref`). A month the ledger cannot answer is this one. */
-  const month = $derived(monthRange(Date.now(), page.url.searchParams.get('month') ?? undefined).month);
+  const month = $derived(monthRange(recordNow(), page.url.searchParams.get('month') ?? undefined).month);
   const project = $derived(page.url.searchParams.get('project'));
-  const beside = $derived(monthsBeside(Date.now(), month));
+  const beside = $derived(monthsBeside(recordNow(), month));
 
   /**
    * The month, or `null` for a host with no ledger and no run events to count.
@@ -64,7 +65,7 @@
    * `readUsage` reads through the client: the ledger is a host door, not a record method.
    */
   async function usageOf(): Promise<Result<UsageView | Fault | null>> {
-    const out = await readUsage((url, init) => fetch(url, init), Date.now(), '', apiBase(page.url), month, homeCurrency());
+    const out = await readUsage((url, init) => fetch(url, init), recordNow(), '', apiBase(page.url), month, homeCurrency());
     if (out.ok === true) return { ok: true, value: out.view };
     if (out.ok === 'none') return { ok: true, value: null };
     /* AN ANSWER, NOT A REFUSAL: the record was reached, and the fault is this screen's, drawn below as one. */
@@ -87,9 +88,9 @@
   const sliced = $derived(view && project !== null ? view.groups.filter((g) => g.scope === project) : []);
   const groups = $derived(view ? (sliced.length > 0 ? sliced : view.groups) : []);
 
-  /* WHAT THE FIGURES SAY, from `reading.ts`, where the tests hold them. Today is the ledger's day, in UTC, so the heat
+  /* WHAT THE FIGURES SAY, from `reading.ts`, where the tests hold them. Today is the ledger's day on the record's clock (`recordNow`), in UTC, so the heat
      grid draws nothing for a day that has not come. */
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date(recordNow()).toISOString().slice(0, 10);
   /* THE HEAD SITS OUTSIDE THE BOARD'S BOUNDARY, so a sentence that cannot be said is no sentence, and the board says why. */
   const sentence = $derived.by(() => {
     try {
@@ -131,7 +132,7 @@
    * count to glance at, and the month above has already said whether the record could be reached.
    */
   async function countedOf(): Promise<Result<Counted[]>> {
-    const range = monthRange(Date.now(), month);
+    const range = monthRange(recordNow(), month);
     let body: unknown;
     try {
       const res = await fetch(`/account/usage?from=${range.from}&to=${range.to}`, { headers: { accept: 'application/json' }, credentials: 'same-origin', cache: 'no-store' });

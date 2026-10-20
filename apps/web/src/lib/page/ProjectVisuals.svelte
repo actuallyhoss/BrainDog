@@ -14,6 +14,7 @@
 <script lang="ts">
   import Tile from '$lib/ui/Tile.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import { lanesOf, roadmapOf, visualsFor, type Listing, type Months, type Mark } from '$lib/record/visuals.ts';
   import type { DataRow, MoneyLine } from '$lib/record/project.ts';
 
@@ -42,9 +43,9 @@
     moneyRows?: readonly DataRow[];
   } = $props();
 
-  /* THE READER'S DAY, not the server's. */
+  /* THE RECORD'S DAY (`recordNow`), as every other screen's "today", in the reader's zone. */
   const today = $derived.by(() => {
-    const d = new Date();
+    const d = new Date(recordNow());
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   });
   const uid = $props.id();
