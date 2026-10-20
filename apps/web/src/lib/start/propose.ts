@@ -21,6 +21,7 @@
  * A plain `.ts` with relative imports, so `node --test` can hold it; the screen only calls it.
  */
 
+import { MODULE_WORDS } from '@braindog/declare';
 import { AGENTS_PACK } from '@braindog/seed/packs';
 import { moduleOfList } from '@braindog/seed/packs/modules';
 import { alongside, listsOf as caseLists, modulesFor, payDayRow, useCase, USE_CASES, type UseCase } from '@braindog/seed/usecases';
@@ -706,10 +707,15 @@ export function caseBecame(u: UseCase, phrase: string): string {
   return lists.find((n) => [word, plural(word)].includes(n.toLocaleLowerCase())) ?? firstRun.and(lists);
 }
 
-/** The one list a part is said by: its only list (Portfolio's Projects), or its first where that has the part's name (People). */
+/**
+ * The one list a part is said by: its only list, its first where that has the part's name (People), or its first where
+ * that is the only one of its lists a use case can rename (`MODULE_WORDS`). Portfolio's Projects, since 1.19.0 beside
+ * Numbers and the key numbers, which no use case renames: the line still says Projects, and not Portfolio.
+ */
 const leadOf = (id: string): ReturnType<typeof listsOf>[number] | undefined => {
   const own = id === AGENTS_PACK.manifest.id ? [] : listsOf(id);
-  return own.length === 1 || own[0]?.name === moduleName(id) ? own[0] : undefined;
+  const named = own.filter((l) => Object.hasOwn(MODULE_WORDS, l.id));
+  return own.length === 1 || own[0]?.name === moduleName(id) || (named.length === 1 && named[0] === own[0]) ? own[0] : undefined;
 };
 
 /**
