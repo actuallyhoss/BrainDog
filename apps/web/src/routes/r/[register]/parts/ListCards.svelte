@@ -156,15 +156,15 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      inline-size: var(--ctl-h);
+      /* 32 WIDE IN THE THIRD INK (money F8): the card is the target for opening the row and a long press opens the same
+         menu, so this gives the title 12px more and stays the card's full height. */
+      inline-size: 32px;
       flex: none;
       padding: 0;
       background: none;
       border: 0;
-      border-radius: var(--r-md);
-      /* `--ink2`, and it was `--dim`: the one touch route to a row's eight verbs, drawn in the
-         quietest ink the palette has, read as an empty cell beside every card. */
-      color: var(--ink2);
+      border-radius: var(--r-ctl);
+      color: var(--ink-3);
       cursor: pointer;
     }
 
@@ -172,7 +172,7 @@
        hover-only and nothing stuck on hover). */
     @media (hover: hover) and (pointer: fine) {
       .card-more:hover {
-        background: var(--hover-wash);
+        background: var(--hover);
         color: var(--ink);
       }
     }

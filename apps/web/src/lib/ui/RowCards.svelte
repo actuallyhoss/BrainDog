@@ -50,7 +50,7 @@
 <script lang="ts">
   import { apiBase, at } from '../at.ts';
   import type { Snippet } from 'svelte';
-  import { day, leadingCode, shortDay, symbolFigure, TONES } from 'braindog-render';
+  import { day, leadingCode, shortDay, symbolFigure } from 'braindog-render';
   import { copy } from '$lib/copy.ts';
   import { valueSaid } from '$lib/voice.ts';
   import { dirOf, display, identityFor, labelOf, toneOf } from '$lib/record/api.ts';
@@ -62,9 +62,12 @@
   import { afterMove, movesIn, scopeFieldOf, scopeOf, type Landed, type Scope } from '$lib/record/scope-move.ts';
   import { isMoney, type Entry } from '$lib/record/schema.ts';
   import type { Names } from '$lib/record/remote.ts';
+  import { flip } from 'svelte/animate';
   import Face from './Face.svelte';
   import Money from './Money.svelte';
   import ScopeChip from './ScopeChip.svelte';
+  import StatusDot from './StatusDot.svelte';
+  import { rowIn, rowOut, settle } from './motion.ts';
 
   let {
     register,
@@ -180,10 +183,10 @@
     return tone === 'bad' || tone === 'warn' ? tone : undefined;
   };
 
-  /* THE CARD'S OWN WORDS FOR A DEADLINE, as short as a second line has room for. The row page says
-     how many days late ("Overdue by 38 days", `[seq]/said.ts`); a card in a list says that it is. */
+  /* THE CARD'S OWN WORDS FOR A DEADLINE, the table's words (money F6): "64 days late", never "Overdue", so a phone and a
+     laptop say one thing about one bill. */
   const words = {
-    overdue: 'Overdue',
+    late: (days: number): string => `${days} ${days === 1 ? 'day' : 'days'} late`,
     dueToday: 'Due today',
     dueTomorrow: 'Due tomorrow',
     dueIn: (days: number): string => `Due in ${days} days`,
@@ -194,8 +197,8 @@
 
   /* How far off a close deadline is, in calendar days as the row page counts them. */
   const dueSaid = (iso: string, tone: 'bad' | 'warn'): string => {
-    if (tone === 'bad') return words.overdue;
     const days = Math.floor(Date.parse(`${iso}T00:00:00Z`) / DAY_MS) - Math.floor(now / DAY_MS);
+    if (tone === 'bad') return days < 0 ? words.late(-days) : words.dueToday;
     return days <= 0 ? words.dueToday : days === 1 ? words.dueTomorrow : words.dueIn(days);
   };
 
@@ -288,18 +291,45 @@
     const state = decl?.state;
     const done = Boolean(state && decl?.done?.includes(String(e.fields[state] ?? '')));
     const word = tone && typeof due === 'string' ? dueSaid(due, tone) : state ? saidOf(e, state) || null : null;
+    /* AND THE STATE, WHEN THE DEADLINE TOOK ITS PLACE AND IT IS NOT THE FIRST ONE ("64 days late · Part paid"): the phone
+       says what the laptop's Status column says. */
+    const held = state ? String(e.fields[state] ?? '') : '';
+    const first = state ? decl?.fields.find((f) => f.id === state)?.values?.[0] : undefined;
+    const also = tone && state && !done && held !== '' && held !== first ? saidOf(e, state) || null : null;
     const date = done ? (decl?.finished ? daySaid(e.fields[decl.finished]) : null) : daySaid(due);
     const text = detailFields.find((f) => saidOf(e, f) !== '');
     const place: Scope | null | undefined = scoped === undefined ? undefined : afterMove(e, scopeOf(register, e.fields, names), landed[e.seq]).scope;
     const chip = place !== undefined && (decl?.mobile.includes(scoped ?? '') === true || text === undefined);
     /* THE PROJECT'S NAME, where nothing else fills the detail and the project is not already the chip. */
     const thing = !chip && text === undefined ? (markFor(e)?.name ?? null) : null;
-    return { tone, word, date, detail: chip ? undefined : text, place: chip ? (place ?? null) : undefined, chip, thing };
+    return { tone, word, also, date, detail: chip ? undefined : text, place: chip ? (place ?? null) : undefined, chip, thing };
   };
 
   /* ONE LEADING SLOT, KEPT ON EVERY CARD when any card has a face or a word: the face in it on the first line, the
      dot on the second, and the words of both lines start at one x. */
   const slotted = $derived(faced || Boolean(decl?.state || dated));
+
+  /**
+   * THE DOT BESIDE THE WORD (`StatusDot`, 2.A.6): red and filled only for a late row, whose word says "late"; a row due
+   * soon keeps the open ring and says when in ink; otherwise the row's state, a ring while open, half filled when part of
+   * it is done, slate once finished.
+   */
+  const dotOf = (e: Entry, tone: 'bad' | 'warn' | undefined): 'late' | 'open' | 'part' | 'done' => {
+    if (tone === 'bad') return 'late';
+    if (finishedOf(e)) return 'done';
+    const value = decl?.state ? String(e.fields[decl.state] ?? '') : '';
+    return /^part(?:$|[_\s-])/iu.test(value) ? 'part' : 'open';
+  };
+
+  /* THE FIGURES ARE ONE SET (2.A.7): every one without pence where all are whole, and every one with two places where any
+     has pence, so the column reads digit under digit. */
+  const pence = $derived.by(() => {
+    if (!figure) return false;
+    return entries.some((e) => {
+      const v = e.fields[figure];
+      return isMoney(v) && v.amount % 100 !== 0;
+    });
+  });
 </script>
 
 <!-- An amount is drawn with its currency's symbol, or with its code set quiet where it has none. -->
@@ -315,7 +345,9 @@
       {@const title = display(register, decl.mobile[0], e.fields[decl.mobile[0]], now, names)}
       {@const line = lineOf(e)}
       {@const holder = holderOf(e)}
-      <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined}>
+      <!-- A CARD ADDED OR TAKEN AWAY ARRIVES AND LEAVES WITH THE LIST'S MOTION (motion F7.1), and the cards beside it
+           close the gap: no card under it jumps. -->
+      <li class="card-line" data-picked={picked?.has(e.seq) ? '' : undefined} in:rowIn out:rowOut animate:flip={settle()}>
         <a class="card" href={at(to(e))}>
           <!-- THE TITLE FIRST, in the document as well as on the screen, so a screen reader hears
                what the row is before anything about it. ONE THING LEADS IT, the project's mark or, on a
@@ -337,20 +369,19 @@
             {@const value = e.fields[figure]}
             <span class="card-figure" dir={dirOf(register, figure)}>
               {#if figureLabel}<span class="card-figure-label">{figureLabel}</span>{/if}
-              {#if isMoney(value)}<Money minor={value.amount} currency={value.currency} />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
+              {#if isMoney(value)}<Money minor={value.amount} currency={value.currency} form={pence ? 'exact' : 'auto'} />{:else}{display(register, figure, value, now, names) ?? ''}{/if}
             </span>
           {/if}
           <!-- THE DOT AND ITS WORD, THE DATE THE WORD IS ABOUT, AND ONE DETAIL. `data-intent` is on the
                line and not on the dot, because what resolves `--tone-fill` for the dot is `blocks.css`'s
                intent map, and an element with an intent holds its named glyph (`a11y.mjs`). A calm word
                has a quiet dot with no name, since the word says all there is. -->
-          <span class="card-b" data-slot={slotted ? '' : undefined} data-intent={line.tone} data-stand={decl.state ? (finishedOf(e) ? 'done' : 'open') : undefined}>
-            {#if line.tone}
-              <span class="glyph" role="img" aria-label={TONES[line.tone].label}>{TONES[line.tone].glyph}</span>
-            {:else if line.word}
-              <span class="glyph" aria-hidden="true"></span>
+          <span class="card-b" data-slot={slotted ? '' : undefined} data-tone={line.tone} data-stand={decl.state ? (finishedOf(e) ? 'done' : 'open') : undefined}>
+            {#if line.word}
+              <span class="card-dot"><StatusDot state={dotOf(e, line.tone)} /></span>
             {/if}
             {#if line.word}<span class="card-word" data-late={line.tone ? '' : undefined}>{line.word}</span>{/if}
+            {#if line.also}<span aria-hidden="true">{' · '}</span><span class="card-state">{line.also}</span>{/if}
             {#if line.date}{#if line.word}<span aria-hidden="true">{' · '}</span>{/if}<span class="card-date">{line.date}</span>{/if}
             {#if line.chip && pressable}
               <!-- The chip is the move, drawn after the link (below); line two keeps its word and its date. -->
@@ -508,7 +539,7 @@
 
     /* THE DOT HANGS IN THE SLOT the mark takes on the line above, so the word starts where the title
        does and the dot sits just before it. */
-    .card-b .glyph {
+    .card-b .card-dot {
       position: absolute;
       inset-inline-start: 1px;
       /* The line is one line, so the middle of the box is the middle of the line. */
@@ -516,21 +547,20 @@
       translate: 0 -50%;
     }
 
-    /* A CALM WORD'S DOT SAYS WHERE THE ROW STANDS (DIRECTION 39): the accent while it is to do, grey once finished.
-       An intent on the line, late or close, gives the dot its tone instead, through `blocks.css`'s intent map. */
-    .card-b:not([data-intent]) .glyph {
-      background: var(--status-done);
+    .card-b .card-dot {
+      display: flex;
     }
 
-    .card-b:not([data-intent])[data-stand='open'] .glyph {
-      background: var(--status-working);
+    /* A LATE WORD IS RED AND READ FIRST, "64 days late" beside the red dot (money F6): `--red` clears 4.5 on the tile
+       and on the hover wash in both schemes. A row due soon says when in ink, at the same weight, beside its ring. */
+    .card-b[data-tone='bad'] .card-word {
+      color: var(--red);
+      font-weight: var(--fw-medium);
     }
 
-    /* A LATE OR CLOSE WORD IS READ FIRST, in the second ink and not the tone's colour: the dot beside
-       it is the colour channel, and red text on a hovered row fails its contrast pair. */
-    .card-word[data-late] {
-      color: var(--ink2);
-      font-weight: 500;
+    .card-b[data-tone='warn'] .card-word {
+      color: var(--ink);
+      font-weight: var(--fw-medium);
     }
 
     /* A state word is the record's value, raised to sentence case by the stylesheet as the pills are. */
