@@ -53,7 +53,7 @@ export const CLAIMS: readonly Claim[] = [
 
   /* The Slash page (`copy/slash.ts`, its own export `slashPage`, which the ledger reads beside `site`). */
   { id: 'slash-asks-first', said: 'Nothing it makes goes in until you say yes.', where: 'slashPage.head.lead', state: 'true' },
-  { id: 'own-key-no-limit', said: 'or no limit with your own AI key', where: 'slashPage.counted.say', state: 'true' },
+  { id: 'own-key-no-limit', said: 'or no limit with your own AI key', where: 'slashPage.tally.say', state: 'true' },
   { id: 'finding-free', said: 'Finding is free and never spends an ask.', where: 'slashPage.find.body.1', state: 'true' },
   { id: 'own-key-unlimited', said: 'Asks on your own key have no monthly limit.', where: 'slashPage.faq.questions.2.a', state: 'true' },
 

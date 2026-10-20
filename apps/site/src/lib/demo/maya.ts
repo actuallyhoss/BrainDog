@@ -45,7 +45,7 @@ export const CENTS = {
  * with the slot's foreground and its tint (`--cat-<slot>`, `--cat-<slot>-tint` in Look B). Never red or orange, so
  * nothing in a category reads as late.
  */
-export type Slot = 'blue' | 'violet' | 'pink' | 'teal' | 'sky' | 'gold' | 'lime' | 'slate';
+export type Slot = 'blue' | 'violet' | 'pink' | 'teal' | 'sky' | 'amber' | 'lime' | 'slate';
 
 /** The two custom properties a drawing sets to paint something in its slot: `--ph` and `--ph-tint`. */
 export const slotVars = (slot: Slot): string => `--ph:var(--cat-${slot});--ph-tint:var(--cat-${slot}-tint)`;
@@ -59,7 +59,7 @@ export type Project = { name: string; hue: number; slot: Slot; icon: IconName; l
 /** Her four projects, in the order the desk draws them. */
 export const PROJECTS: Record<ProjectId, Project> = {
   tidepool: { name: 'Tidepool', hue: 198, slot: 'sky', icon: 'cloud', lane: 'Building' },
-  ferment: { name: 'Ferment & Co', hue: 32, slot: 'gold', icon: 'box', lane: 'Earning' },
+  ferment: { name: 'Ferment & Co', hue: 32, slot: 'amber', icon: 'box', lane: 'Earning' },
   northbound: { name: 'Northbound', hue: 262, slot: 'violet', icon: 'target', lane: 'Client' },
   pocketlab: { name: 'Pocketlab', hue: 152, slot: 'teal', icon: 'rocket', lane: 'Building' },
 };

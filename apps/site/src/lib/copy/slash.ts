@@ -54,7 +54,7 @@ export const slashPage = {
       'Add it with one press, or say not now and nothing changes. Everything it makes carries its name and can be undone.',
     ],
   },
-  counted: {
+  tally: {
     title: 'How asks are counted',
     say:
       'Each question or draft is one ask, however much reading it takes. Finding things, your brief and the work ' +

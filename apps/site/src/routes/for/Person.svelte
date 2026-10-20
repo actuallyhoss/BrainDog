@@ -15,6 +15,7 @@
   import { forPages } from '$lib/copy/for.ts';
   import { DRAWN_ON, EXAMPLES } from '$lib/examples/index.ts';
   import type { Example } from '$lib/examples/types.ts';
+  import { FOR_SHOWN } from '$lib/launch.ts';
   import EarlyStrip from '$lib/site/EarlyStrip.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
   import Start from '$lib/site/Start.svelte';
@@ -27,8 +28,7 @@
   const example = $derived(EXAMPLES.find((c) => c.id === id));
   const here = $derived(w.moreFor[id].href);
   /* Only the pages a visitor can reach: the others are held (D5), and a link to one would land on the 404. */
-  const SHOWN: readonly Example['id'][] = ['founder', 'team'];
-  const others = $derived(EXAMPLES.filter((c) => c.id !== id && SHOWN.includes(c.id)));
+  const others = $derived(EXAMPLES.filter((c) => c.id !== id && FOR_SHOWN.includes(w.moreFor[c.id].href)));
 
   /**
    * ONE SEGMENT OF ONE OF THE EXAMPLE'S PAGES, as its author wrote it: the text between the segment's `start` and

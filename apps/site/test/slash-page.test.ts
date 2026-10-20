@@ -60,14 +60,14 @@ const NEVER: readonly RegExp[] = [
 test("the page's words are the early access copy, and its one count of asks is the plan table's", () => {
   assert.equal(slashPage.head.title, 'Slash knows your whole business.');
   assert.deepEqual(
-    [slashPage.ask.title, slashPage.find.title, slashPage.make.title, slashPage.counted.title, slashPage.agents.title, slashPage.faq.title],
+    [slashPage.ask.title, slashPage.find.title, slashPage.make.title, slashPage.tally.title, slashPage.agents.title, slashPage.faq.title],
     ['Ask', 'Find', 'Make', 'How asks are counted', 'Slash and your AI tools', 'Questions'],
   );
   assert.ok(!('close' in slashPage), 'the page ends on the early access strip, not a close of its own (site F11)');
   assert.equal(slashPage.faq.questions.length, 4);
   assert.equal(slashPage.agents.lines.length, 4);
   /* No paid plan is named while billing is off: one count, the early access month (site D2). */
-  assert.ok(slashPage.counted.say.includes(`Early access includes ${TABLE.free.credits} asks a month`));
+  assert.ok(slashPage.tally.say.includes(`Early access includes ${TABLE.free.credits} asks a month`));
   for (const plan of [TABLE.hosted.name, TABLE.plus.name]) assert.ok(!strings(slashPage).some((s) => s.includes(plan)), `the page names ${plan}`);
   assert.equal(slashDrawing.modes.ask.note, `One ask per question. Early access has ${TABLE.free.credits} a month.`);
   assert.ok(slashPage.ask.body.some((p) => p.includes('Every figure opens what it came from')));
@@ -225,6 +225,6 @@ test('slash.html has one h1, the three modes, how asks are counted and the first
   for (const h of ['Ask', 'Find', 'Make', 'How asks are counted']) assert.ok(h2s.includes(h), `no "${h}" heading`);
   const said = text(html);
   assert.ok(said.includes(slashPage.head.title));
-  assert.ok(said.includes(slashPage.counted.say), 'how asks are counted is not said in plain text');
+  assert.ok(said.includes(slashPage.tally.say), 'how asks are counted is not said in plain text');
   for (const f of figures(ASKS[0]!.lead)) assert.ok(said.includes(f), `the first answer's ${f} is not in the page`);
 });

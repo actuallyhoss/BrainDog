@@ -56,9 +56,9 @@
 
 <section class="wrap read">
   <div class="facts">
-    <h2>{s.counted.title}</h2>
-    <p>{s.counted.say}</p>
-    <p>{s.counted.after}</p>
+    <h2>{s.tally.title}</h2>
+    <p>{s.tally.say}</p>
+    <p>{s.tally.after}</p>
   </div>
 
   <div class="facts">

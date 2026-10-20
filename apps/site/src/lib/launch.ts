@@ -1,3 +1,8 @@
+import { cases } from './copy/cases.ts';
+
+/** The two pages written for one kind of person that a visitor reaches (D5); the rest are in `HELD`. */
+export const FOR_SHOWN: readonly string[] = ['/for/founders', '/for/teams'];
+
 /**
  * What is true on launch day and not before, one flag per fact.
  *
@@ -34,7 +39,15 @@ export type LaunchFlag = keyof typeof LAUNCH;
  * (`not_found_handling` in `wrangler.jsonc`). `nav.ts` drops it from the header, the footer, the 404's list and the
  * sitemap, and `svelte.config.js` lets the prerender pass over a 404 here and nowhere else.
  */
-export const HELD = ['/changelog', '/changelog.xml', '/packs', '/download', '/for/personal', '/for/students', '/for/new-projects'] as const;
+export const HELD: readonly string[] = [
+  '/changelog',
+  '/changelog.xml',
+  '/packs',
+  '/download',
+  ...Object.values(cases.drawn.moreFor)
+    .map((more) => more.href)
+    .filter((href) => !FOR_SHOWN.includes(href)),
+];
 
 /** Whether the changelog, its feed and the packs are held from visitors, for this set of flags. */
 export const held = (launch: { public: boolean } = LAUNCH): boolean => !launch.public;

@@ -85,7 +85,7 @@ const HANDED = [
   '--band-faq', '--band-faq-tile', '--band-red-tile', '--foot-rule',
   '--desk-board', '--desk-tile', '--desk-tile-2', '--desk-hover', '--desk-rule', '--desk-nav', '--desk-nav-on', '--desk-ink-3',
   '--cat-blue', '--cat-blue-tint', '--cat-violet', '--cat-violet-tint', '--cat-pink', '--cat-pink-tint', '--cat-teal',
-  '--cat-teal-tint', '--cat-sky', '--cat-sky-tint', '--cat-gold', '--cat-gold-tint', '--cat-lime', '--cat-lime-tint',
+  '--cat-teal-tint', '--cat-sky', '--cat-sky-tint', '--cat-amber', '--cat-amber-tint', '--cat-lime', '--cat-lime-tint',
 ];
 
 test('the light block defines every name the site was handed', () => {
