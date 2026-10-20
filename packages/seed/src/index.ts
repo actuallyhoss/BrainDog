@@ -503,7 +503,7 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
         const said = register === 'things' ? PROJECTS_SAID.find((s) => s.things === i + 1) : undefined;
         const planted = said ? Object.fromEntries(Object.entries(entry).filter(([k]) => !said.fields.includes(k))) : entry;
         /* LEDGER POST'S PAYMENTS CAME IN WITH THE STATEMENT, not from a person's hand, so they are BrainDog's to file. */
-        const by = register === 'transactions' && entry.what === 'LEDGER POST' ? STATEMENT : actor;
+        const by = register === 'transactions' && entry.what === HANDLED_FILING.merchant ? STATEMENT : actor;
         const out = register === 'session' ? openRun(kernel, entry, actor) : kernel.create(register, forWrite(register, planted as Fields), { actor: by });
         if (!out.ok) return out;
         rows++;
@@ -583,6 +583,9 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
 /** What brought the payments BrainDog files itself: the bank statement, an import and no person. */
 const STATEMENT = 'ingest:statement';
 
+/** What BrainDog filed itself this morning: every payment to this merchant, under this category. */
+export const HANDLED_FILING = { merchant: 'LEDGER POST', category: 'Software' } as const;
+
 /** Who files the sample's handled batch: the filing rule, which BrainDog may answer for itself. */
 const HANDLED_BY = 'rule:txn-categorise';
 
@@ -592,11 +595,11 @@ const HANDLED_BY = 'rule:txn-categorise';
  * merchants no category names; the other two stay for a person to file.
  */
 export function handledBatch(kernel: Pick<Kernel, 'get'>): { question: string; body_kind: 'rowset'; body: Record<string, unknown> } | null {
-  const at = (ROWS.categories ?? []).findIndex((r) => r.name === 'Software') + 1;
+  const at = (ROWS.categories ?? []).findIndex((r) => r.name === HANDLED_FILING.category) + 1;
   const software = at > 0 ? kernel.get(`categories#${at}`) : null;
   const paid = (ROWS.transactions ?? [])
     .map((r, i) => ({ r, seq: i + 1 }))
-    .filter(({ r }) => r.what === 'LEDGER POST' && r.category === undefined)
+    .filter(({ r }) => r.what === HANDLED_FILING.merchant && r.category === undefined)
     .map(({ seq }) => kernel.get(`transactions#${seq}`))
     .filter((row): row is NonNullable<typeof row> => row !== null && (row.fields.category ?? null) === null)
   if (!software || paid.length === 0) return null;
@@ -671,7 +674,8 @@ export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
       body_kind: 'options',
       body: {
         options: [
-          option('retire', 'Retire it', 'Let the domain lapse, archive the repository, and take it off every page. Irreversible after the drop date.'),
+          /* HARD TO TAKE BACK, as its own words say, so the record bands it so and the question page asks before it is given. */
+          { ...option('retire', 'Retire it', 'Let the domain lapse, archive the repository, and take it off every page. Irreversible after the drop date.'), hard: true },
           option('park', 'Park it another year', 'Keep the name. The only cost is the renewal and the attention.'),
         ],
       },

@@ -23,6 +23,7 @@ import {
   REGISTERS as SEED_REGISTERS,
   METRICS as SEED_METRICS,
   RULES as SEED_RULES,
+  HANDLED_FILING,
   MONEY_HOME_SETTING,
   targetConfigOf,
   day,
@@ -140,6 +141,20 @@ function entriesOf(register: string): Entry[] {
  * be a second answer to what a rule matches. If that sentence changes and this does not, the
  * differential goes red on the next run, which is the check that keeps the two honest.
  */
+/**
+ * AND THE ONE BATCH BRAINDOG FILED ITSELF THIS MORNING (`HANDLED_FILING`), which the seed files through the record and
+ * the record settles as it is filed: every uncategorised payment to that merchant, under that category.
+ */
+function filedItself(rows: Entry[], categories: Entry[]): Entry[] {
+  const to = categories.find((c) => c.fields.name === HANDLED_FILING.category)?.seq;
+  if (to === undefined) return rows;
+  return rows.map((row) => {
+    const already = row.fields.category;
+    if (row.fields.what !== HANDLED_FILING.merchant || (already !== undefined && already !== null && already !== '')) return row;
+    return { ...row, fields: { ...row.fields, category: to } };
+  });
+}
+
 function categorised(rows: Entry[], categories: Entry[]): Entry[] {
   const step = SEED_RULES['txn-categorise']?.then.find((s) => 'link' in s) as
     | { link: { field: string; to: { register: string; by: string; value: string } } }
@@ -203,7 +218,7 @@ export const ROWS: Record<string, Entry[]> = {
   obligations: OBLIGATIONS,
   accounts: entriesOf('accounts'),
   categories: CATEGORIES,
-  transactions: categorised(entriesOf('transactions'), CATEGORIES),
+  transactions: filedItself(categorised(entriesOf('transactions'), CATEGORIES), CATEGORIES),
   recurring: entriesOf('recurring'),
   installments: entriesOf('installments'),
   snapshots: entriesOf('snapshots'),
@@ -383,7 +398,7 @@ export const QUESTIONS: Question[] = [
     opened: stamp(-140),
     entity: 'Tallow',
     options: [
-      { key: 'retire', title: 'Retire it', body: 'Let the domain lapse, archive the repository, and take the row off every screen. Irreversible after the drop date.' },
+      { key: 'retire', title: 'Retire it', body: 'Let the domain lapse, archive the repository, and take it off every page. Irreversible after the drop date.', hard: true },
       { key: 'park', title: 'Park it another year', body: 'Keep the name. The only cost is the renewal and the attention.' },
     ],
   },
