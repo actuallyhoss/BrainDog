@@ -11,26 +11,20 @@ import { FRAME_ROLES, type Built, type Frame, type Scheme } from './build.ts';
 
 /*
  * 2026-10-20, THE FRAME AND NOTHING ELSE (UI pass, SPEC 1). A scheme block writes the names the product paints with
- * (`FRAME_ROLES`, `--scrim`), the identity hue's two constants and the three elevation levels, which are `none`. The
- * dialect's roles (`--bg`, `--danger-text`, `--action` ...) are not written: `tokens.css` aliases each old name to its
- * new one in `@layer tokens`, and a name written here would sit over its alias in the later layer and hold the old
- * value. The washes (`chrome`) go the same way, to `--hover`, `--red-tint` and `--arrived`.
+ * (`FRAME_ROLES`, `--scrim`) and the identity hue's two constants; there is no elevation to write (SPEC 1.9). The
+ * dialect's roles (the older names SPEC 1.10 retired) are not written: nothing paints with them any more. The washes (`chrome`) go the same way, to `--hover`, `--red-tint` and `--arrived`.
  */
 const decls = (f: Frame, indent: string): string =>
   [...FRAME_ROLES.map((role) => `${indent}--${role}: ${f[role]};`), `${indent}--scrim: ${f.scrim};`].join('\n');
 
 function block(built: Built, scheme: Scheme, selector: string, indent = '  '): string {
   const inner = indent + '  ';
-  const e = built.elevation[scheme];
   const m = built.mark[scheme];
   return [
     `${indent}${selector} {`,
     decls(built.frame[scheme], inner),
     `${inner}--mark-l: ${m.L};`,
     `${inner}--mark-c: ${m.C};`,
-    `${inner}--e1: ${e[0]};`,
-    `${inner}--e2: ${e[1]};`,
-    `${inner}--e3: ${e[2]};`,
     `${indent}}`,
   ].join('\n');
 }
@@ -86,32 +80,9 @@ export const forcedColors = (classes: readonly string[]): string => `@media (for
   }`;
 
 /**
- * `--brand`, emitted into the generated stylesheet rather than typed into `tokens.css`.
- *
- * THE LOGO IS NOT THE ACCENT, AND IT USED TO BE THE SAME LITERAL WRITTEN TWICE. `tokens.css` carried
- * `--brand: #cf413a;` by hand, beside a comment explaining that it is deliberately the same value
- * the generator seeds `--accent` from — two copies of one colour, one of them outside the generator,
- * and `colour-grep`'s only `ALLOWED_LINES` exemption existed to let it past.
- *
- * The cost of the copy is not tidiness. `tokens.css` is shared by both apps and every deployment, so
- * a alpha build would have worn the production mark whatever its accent did — the one place where
- * telling the environments apart matters most, wearing the wrong one by construction.
- *
- * IT IS NOT PART OF `toCSS`, AND THAT IS THE POINT. `toCSS` emits what a THEME may set, and a theme
- * a customer installs must not be able to repaint the logo: `04 §7` and `28 §4.5` both put the mark
- * outside the palette a pack may touch. So the mark is emitted alongside, by the build, from a value
- * the build chooses — and a record's theme has no way to reach it.
- *
- * `@layer theme` so it sits with the rest of the generated block and a `tokens.css` rule can still
- * override it locally without a specificity fight.
- */
-export const brand = (colour: string): string =>
-  ['', '@layer theme {', '  html {', `    --brand: ${colour.toLowerCase()};`, '  }', '}', ''].join('\n');
-
-/**
  * THE AGENTS' OWN COLOURS, for the two marks their makers draw in colour (`packages/skin/agent-marks.ts`): Claude's
  * clay and Gemini's blue. The owner asked for the agents' real marks (30 September 2026), and a real mark wears its
- * maker's colour. Emitted beside `--brand` and outside `toCSS` for the same reason the mark is: they are nobody's to
+ * maker's colour. Emitted outside `toCSS`, so they are nobody's to
  * theme, and a record's palette must not be able to repaint somebody else's logo. Both read on either scheme's ground.
  */
 export const AGENT_COLOURS = { claude: '#d97757', gemini: '#3186ff' } as const;

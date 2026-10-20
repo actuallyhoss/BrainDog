@@ -31,7 +31,6 @@ import {
   HIGH_CONTRAST,
   ALPHA,
   ALPHA_HIGH_CONTRAST,
-  brand,
   agentColours,
   toCSS,
   validate,
@@ -45,7 +44,7 @@ const skin = join(import.meta.dirname, '..');
 
 /**
  * The favicon, generated from the same two sources as everything else: `MARK` for the artwork and
- * the deployment's own accent for the colour.
+ * the deployment's own red fill for the colour, the one the page's mark reads.
  *
  * It has to be a literal hex and a real file. A favicon is fetched as its OWN document, outside any
  * page, so it can reach no custom property and no theme - and that is exactly why it kept drifting:
@@ -119,24 +118,20 @@ const mailPalette = (theme) => {
  * separate blocks of code, and a fourth artefact would have been written by one and checked by
  * neither.
  *
- * `--brand` IS EMITTED HERE AND NO LONGER LIVES IN `tokens.css`. It is the one colour that belongs
- * to the product rather than to a meaning, and it was a hand-written literal in the shared token
- * layer - which meant a alpha build painted its logo in the production red, on the single most
- * looked-at element in the app. It is still a separate token from `--accent`, and for the reason
- * `tokens.css` gave: the logo must not change colour when somebody installs a record theme. That
- * property is preserved by WHERE it is emitted rather than by what it is called - `toCSS` does not
- * write it, so `recordTheme`'s adopted block cannot carry it, and only this script can.
+ * THE MARK IS `--red-fill` (SPEC 1.1, wave 4): the logo, the favicon, the BIMI square and the primary button are one
+ * red, so there is no separate mark colour to emit any more. The page's mark reads the token; the favicon and the BIMI square
+ * cannot read a custom property, so they are written here from the same generated value (`frame.light['red-fill']`).
  */
 const ARTEFACTS = [
-  { path: join(skin, 'house.css'), text: toCSS(HOUSE, HIGH_CONTRAST) + brand(HOUSE.schemes.light.accent) + agentColours() },
+  { path: join(skin, 'house.css'), text: toCSS(HOUSE, HIGH_CONTRAST) + agentColours() },
   {
     path: join(skin, 'alpha.css'),
-    text: toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + brand(ALPHA.schemes.light.accent) + agentColours(),
+    text: toCSS(ALPHA, ALPHA_HIGH_CONTRAST) + agentColours(),
   },
-  { path: join(root, 'apps/web/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
-  { path: join(root, 'apps/site/static/mark.svg'), text: favicon(HOUSE.schemes.light.accent) },
-  { path: join(root, 'apps/web/static/mark-alpha.svg'), text: favicon(ALPHA.schemes.light.accent) },
-  { path: join(root, 'apps/site/static/bimi/braindog.svg'), text: bimi(HOUSE.schemes.light.accent, HOUSE.schemes.light.bg) },
+  { path: join(root, 'apps/web/static/mark.svg'), text: favicon(HOUSE.frame.light['red-fill']) },
+  { path: join(root, 'apps/site/static/mark.svg'), text: favicon(HOUSE.frame.light['red-fill']) },
+  { path: join(root, 'apps/web/static/mark-alpha.svg'), text: favicon(ALPHA.frame.light['red-fill']) },
+  { path: join(root, 'apps/site/static/bimi/braindog.svg'), text: bimi(HOUSE.frame.light['red-fill'], HOUSE.frame.light.tile) },
   { path: join(root, 'apps/worker/src/mail-palette.ts'), text: mailPalette(HOUSE) },
 ];
 

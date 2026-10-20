@@ -52,9 +52,6 @@
     --scrim: rgb(16 17 20 / 0.32);
     --mark-l: 0.55;
     --mark-c: 0.09;
-    --e1: none;
-    --e2: none;
-    --e3: none;
   }
   @media (prefers-color-scheme: dark) {
     html:not([data-scheme]) {
@@ -109,9 +106,6 @@
       --scrim: rgb(5 7 12 / 0.6);
       --mark-l: 0.72;
       --mark-c: 0.12;
-      --e1: none;
-      --e2: none;
-      --e3: none;
     }
   }
   html[data-scheme='light'] {
@@ -166,9 +160,6 @@
     --scrim: rgb(16 17 20 / 0.32);
     --mark-l: 0.55;
     --mark-c: 0.09;
-    --e1: none;
-    --e2: none;
-    --e3: none;
   }
   html[data-scheme='dark'] {
     --board: #0F121A;
@@ -222,9 +213,6 @@
     --scrim: rgb(5 7 12 / 0.6);
     --mark-l: 0.72;
     --mark-c: 0.12;
-    --e1: none;
-    --e2: none;
-    --e3: none;
   }
 
   /* prefers-contrast: more swaps the whole palette. On Windows a Contrast Theme reports it
@@ -282,9 +270,6 @@
       --scrim: rgb(16 17 20 / 0.32);
       --mark-l: 0.46;
       --mark-c: 0.11;
-      --e1: none;
-      --e2: none;
-      --e3: none;
     }
     @media (prefers-color-scheme: dark) {
       html:not([data-scheme]) {
@@ -339,9 +324,6 @@
         --scrim: rgb(5 7 12 / 0.6);
         --mark-l: 0.78;
         --mark-c: 0.13;
-        --e1: none;
-        --e2: none;
-        --e3: none;
       }
     }
     html[data-scheme='light'] {
@@ -396,9 +378,6 @@
       --scrim: rgb(16 17 20 / 0.32);
       --mark-l: 0.46;
       --mark-c: 0.11;
-      --e1: none;
-      --e2: none;
-      --e3: none;
     }
     html[data-scheme='dark'] {
       --board: #060910;
@@ -452,9 +431,6 @@
       --scrim: rgb(5 7 12 / 0.6);
       --mark-l: 0.78;
       --mark-c: 0.13;
-      --e1: none;
-      --e2: none;
-      --e3: none;
     }
   }
   html[data-theme='hc'] {
@@ -509,9 +485,6 @@
     --scrim: rgb(16 17 20 / 0.32);
     --mark-l: 0.46;
     --mark-c: 0.11;
-    --e1: none;
-    --e2: none;
-    --e3: none;
   }
   @media (prefers-color-scheme: dark) {
     html[data-theme='hc']:not([data-scheme]) {
@@ -566,9 +539,6 @@
       --scrim: rgb(5 7 12 / 0.6);
       --mark-l: 0.78;
       --mark-c: 0.13;
-      --e1: none;
-      --e2: none;
-      --e3: none;
     }
   }
   html[data-theme='hc'][data-scheme='light'] {
@@ -623,9 +593,6 @@
     --scrim: rgb(16 17 20 / 0.32);
     --mark-l: 0.46;
     --mark-c: 0.11;
-    --e1: none;
-    --e2: none;
-    --e3: none;
   }
   html[data-theme='hc'][data-scheme='dark'] {
     --board: #060910;
@@ -679,15 +646,6 @@
     --scrim: rgb(5 7 12 / 0.6);
     --mark-l: 0.78;
     --mark-c: 0.13;
-    --e1: none;
-    --e2: none;
-    --e3: none;
-  }
-}
-
-@layer theme {
-  html {
-    --brand: #db2527;
   }
 }
 

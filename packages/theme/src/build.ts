@@ -1108,8 +1108,8 @@ function chromeOf(p: Palette, profile: Profile, scheme: Scheme): Chrome {
 /*
  * 2026-10-20, NO ELEVATION AT ALL (the UI pass, SPEC 1.9 and frame 3.8). Separation is the surface colour, the 1px
  * `--rule-strong` edge on anything that floats without a scrim, and the scrim under anything modal. All three levels are
- * `none` in both schemes, so a host that still writes `var(--e2)` draws nothing; the names go in the last wave. Check I
- * refuses a level that casts anything.
+ * `none` in both schemes and no stylesheet writes them (the names went in the last wave). Check I refuses a level that
+ * casts anything.
  */
 function elevationOf(_scheme: Scheme): [string, string, string] {
   return ['none', 'none', 'none'];

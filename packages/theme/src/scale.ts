@@ -6,18 +6,10 @@
  * sheet, so a step changed in `tokens.css` and not here fails, and the book never describes a scale that is not drawn.
  */
 /*
- * 2026-10-20, ONE SCALE (UI pass, SPEC 1.4 to 1.6). The steps are `--fs-*`; the old `--t-*` names point at them, and are
- * listed here as the sheet writes them so the book still names a type step under the prefix it reads (`t-`) and says
- * which new step it is. The radii are the four and round; the old radius names alias to them and are not listed.
+ * 2026-10-20, ONE SCALE (UI pass, SPEC 1.4 to 1.6). The type steps are `--fs-*`, which the book reads, and the radii are
+ * the four and round. The older names went in the last wave of the pass.
  */
 export const SCALE_CSS = String.raw`:root {
-  --t-xs: var(--fs-cap);
-  --t-sm: var(--fs-meta);
-  --t-base: var(--fs-body);
-  --t-group: var(--fs-head);
-  --t-figure: var(--fs-figure);
-  --t-title: var(--fs-page);
-  --t-lead: var(--fs-hero);
   --fs-cap: 12px;
   --fs-meta: 13px;
   --fs-ctl: 14px;
