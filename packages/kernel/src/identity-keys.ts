@@ -484,10 +484,10 @@ function trimmedText(text: string): string {
  * THE WORDS COME BACK TWICE: each as the key folds it, and beside it as the bank wrote it, so the key (`bankKey`) and
  * the name a person reads (`payeeName`) are cut at the same word.
  */
-function payeeWords(raw: string): { words: string[]; shown: string[] } {
+function payeeWords(raw: string, legacy = false): { words: string[]; shown: string[] } {
   let said = raw.trim();
   for (let i = 0; i < 3 && PROCESSORS.test(said); i++) said = said.replace(PROCESSORS, '');
-  said = trimmedText(said);
+  if (!legacy) said = trimmedText(said);
   const words = lower(said).replace(/[*#]/g, ' ').split(/\s+/).filter(Boolean);
   const written = said.trim().replace(/[*#]/g, ' ').split(/\s+/).filter(Boolean);
   /* LOWER CASE NEVER MOVES A SPACE, so the two lists are word for word; were they not, the folded words are shown. */
@@ -524,9 +524,19 @@ function payeeWords(raw: string): { words: string[]; shown: string[] } {
 }
 
 /** The payee's key of a bank text, or `null` when nothing of it is a payee. `keyOf('bank', text)` is this. */
-export function bankKey(raw: string): string | null {
-  const folded = payeeWords(raw).words.join('').replace(WEB_SUFFIX, '').replace(/[^\p{L}\p{N}]/gu, '');
+export function bankKey(raw: string, legacy = false): string | null {
+  const folded = payeeWords(raw, legacy).words.join('').replace(WEB_SUFFIX, '').replace(/[^\p{L}\p{N}]/gu, '');
   return folded === '' ? null : `bank:${folded}`;
+}
+
+/**
+ * THE KEY A PAYEE HAD BEFORE `trimmedText` (the shop name read without its `www.`, card line, page and reference), or
+ * `null` when it is the key it has now. Rules, merges and organisations stored under the old form (`bank:wwwtalabat`)
+ * are found by it when the new key (`bank:talabat`) misses; nothing stored is rewritten, the new key is added beside.
+ */
+export function legacyBankKey(raw: string): string | null {
+  const old = bankKey(raw, true);
+  return old !== null && old !== bankKey(raw) ? old : null;
 }
 
 /** Small words a name writes in lower case after its first word: `Royal Bank of Canada`. */
@@ -670,7 +680,7 @@ function remoteKeyOf(raw: string): string | null {
  * A KEY MAY COME BACK AS ANOTHER KIND: GitHub's private address handed in as an `email` is the login it holds, and that
  * is the identity it is. Any kind not in `KEY_KINDS` is kept as a handle, `provider:name` in lower case.
  */
-export function keyOf(kind: string, raw: string): string | null {
+export function keyOf(kind: string, raw: string, legacy = false): string | null {
   if (typeof raw !== 'string' || raw.trim() === '') return null;
   const k = lower(kind);
   switch (k) {
@@ -681,7 +691,7 @@ export function keyOf(kind: string, raw: string): string | null {
     case 'phone':
       return phoneKey(raw);
     case 'bank':
-      return bankKey(raw);
+      return bankKey(raw, legacy);
     case 'domain': {
       const domain = registrable(raw);
       return domain === null ? null : `domain:${domain}`;
@@ -701,9 +711,9 @@ export function keyOf(kind: string, raw: string): string | null {
  * A key as written anywhere, `email:Ada@X.com` or `github:@Ada`, read again so it is said the one way. `null` for text
  * that is not `kind:value`.
  */
-export function keyFrom(said: string): string | null {
+export function keyFrom(said: string, legacy = false): string | null {
   const m = /^([a-z][a-z0-9.-]*):(.+)$/i.exec(typeof said === 'string' ? said.trim() : '');
-  return m ? keyOf(m[1]!, m[2]!) : null;
+  return m ? keyOf(m[1]!, m[2]!, legacy) : null;
 }
 
 /**
@@ -745,7 +755,7 @@ export type KeyInput = {
 };
 
 /** Every key the input carries, each once, in the order given. */
-export function keysOf(input: KeyInput): string[] {
+export function keysOf(input: KeyInput, legacy = false): string[] {
   const out = new Set<string>();
   const add = (key: string | null): void => void (key !== null && out.add(key));
   const each = (one: unknown, many: unknown, read: (s: string) => string | null): void => {
@@ -753,15 +763,21 @@ export function keysOf(input: KeyInput): string[] {
     if (Array.isArray(many)) for (const s of many) if (typeof s === 'string') add(read(s));
   };
   each(input.email, input.emails, (s) => keyOf('email', s));
-  each(input.handle, input.handles, keyFrom);
-  each(null, input.keys, keyFrom);
+  each(input.handle, input.handles, (s) => keyFrom(s, legacy));
+  each(null, input.keys, (s) => keyFrom(s, legacy));
   each(input.domain, input.domains, (s) => keyOf('domain', s));
   each(input.remote, input.remotes, (s) => keyOf('remote', s));
   each(input.folder, input.folders, (s) => keyOf('folder', s));
   each(input.phone, null, (s) => keyOf('phone', s));
-  each(input.bank, null, (s) => keyOf('bank', s));
+  each(input.bank, null, (s) => keyOf('bank', s, legacy));
   each(input.name, input.names, (s) => keyOf('name', s));
   return [...out];
+}
+
+/** The keys an input had in the old reading of a payee that are not the keys it has now: a lookup's second chance. */
+export function legacyKeysOf(input: KeyInput): string[] {
+  const now = new Set(keysOf(input));
+  return keysOf(input, true).filter((k) => !now.has(k));
 }
 
 /** The kind of a key, `email` of `email:ada@x.com`. */

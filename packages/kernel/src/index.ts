@@ -554,7 +554,7 @@ export type { MeetsFields, OrgFields, RatesFields } from './roles.ts';
 export { meetsRole, ratesRole } from './roles.ts';
 /* THE IDENTITY KEYS (`identity-keys.ts`), for every door that reads who something is about: one normaliser, so a key
    the CLI harvests from a commit and one the record holds are the same string. */
-export { KEY_KINDS, PUBLIC_MAIL, WEAK_KINDS, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, isWeakKey, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, nameWords, parseFrom, payeeName, registrable, sameFold, valueOfKey } from './identity-keys.ts';
+export { KEY_KINDS, PUBLIC_MAIL, WEAK_KINDS, bankKey, githubOfAddress, isMachineIdentity, isOrganisationAddress, isPublicMail, isWeakKey, keyFrom, keyOf, keyOfAny, keysOf, kindOfKey, legacyBankKey, legacyKeysOf, nameWords, parseFrom, payeeName, registrable, sameFold, valueOfKey } from './identity-keys.ts';
 export type { IdentitySaid, KeyInput, KeyKind, SameFold } from './identity-keys.ts';
 export { claimed, entityLists, keyLists, nameKey, noteMention, projectList, sameLists, settledBy } from './entities.ts';
 /* `Claimed` is the scheduler's name here already (`schedule.ts`), so the keys' one goes out as `KeyClaimed`. */

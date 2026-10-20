@@ -61,7 +61,7 @@ import { no, ok } from '@braindog/ports';
 
 import type { Json } from './coerce.ts';
 import { holderOf, holders, nameKey } from './entities.ts';
-import { keyOf, onlyAKind, registrable } from './identity-keys.ts';
+import { keyOf, legacyBankKey, onlyAKind, registrable } from './identity-keys.ts';
 import type { Entry, Patch, RegisterDecl, WriteContext } from './index.ts';
 import { COUNTERPARTY } from './ingest.ts';
 import { instant } from './migrate.ts';
@@ -569,11 +569,15 @@ function ledgerSlice(
      first said as a payee, else the first description. And the keys one word shorter each payee's spellings have. */
   type Seen = { lines: number; sure: boolean; business: boolean; said: string };
   const seen = new Map<string, Seen>();
+  /* THE KEY EACH PAYEE HAD BEFORE ITS SHOP NAME WAS READ BY ITSELF, where it differs: `known` tries it second. */
+  const oldKeys = new Map<string, string>();
   const shorter = new Map<string, Set<string>>();
   for (const ledger of ledgers)
     for (const row of allRows(sql, ledger.register)) {
       const p = payeeOf(ledger, row.fields, readingOf(ledger));
       if (p === null || p.moved || (ledger.transfer !== undefined && row.fields[ledger.transfer] === true)) continue;
+      const old = legacyBankKey(p.said);
+      if (old !== null) oldKeys.set(p.key, old);
       const held = seen.get(p.key);
       seen.set(p.key, {
         lines: (held?.lines ?? 0) + 1,
@@ -589,7 +593,8 @@ function ledgerSlice(
      payee the record does not know. `named` says it was found by its name and holds no such key yet. */
   type Found = { id: string; named: boolean };
   const known = (key: string): Found | null | undefined => {
-    const holder = holderOf(sql, key);
+    /* UNDER ITS OLD KEY TOO (`legacyBankKey`), when the new one is held by nobody. */
+    const holder = holderOf(sql, key) ?? (oldKeys.has(key) ? holderOf(sql, oldKeys.get(key)!) : null);
     if (holder !== null) return holder.register === orgs.register ? { id: holder.id, named: false } : null;
     const named = byName.get(key) ?? [];
     if (named.length > 1) return null;

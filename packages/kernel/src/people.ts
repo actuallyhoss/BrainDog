@@ -71,7 +71,7 @@ import { FOLD_HOPS, holderOf, holders, nameKey, noteMention, sourceKeys } from '
 import type { Proposal } from './govern.ts';
 import { UNVERIFIED } from './ingest.ts';
 import { pairsFor, type Judged, type JudgedBand, type Pair } from './resolve.ts';
-import { domainOrgName, githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
+import { domainOrgName, githubOfAddress, isOrganisationAddress, isPublicMail, keyFrom, keyOf, keysOf, kindOfKey, legacyKeysOf, parseFrom, registrable, valueOfKey } from './identity-keys.ts';
 import { LEGACY, PARTS, meetsRole, plays, type MeetsFields, type OrgFields, type Role, type RoleList } from './roles.ts';
 
 /**
@@ -543,7 +543,8 @@ function meetPerson(deps: PeopleDeps, list: DeclaredList<MeetsFields>, s: Said):
     return ok(mention());
   }
 
-  const found = holders(deps.sql, list.register, keys);
+  /* A PAYEE STORED UNDER ITS OLD KEY (`legacyKeysOf`) IS STILL THE ONE MET; it gains the new key when the meeting is trusted. */
+  const found = holders(deps.sql, list.register, [...keys, ...legacyKeysOf({ email: s.email, handle: s.handle, keys: s.keys })]);
   const hit = found[0] ? rowById(deps.sql, found[0].id) : null;
   /* NOBODY NEW FROM A RULE THAT SAID `only: 'known'`: a sender the record has no reason to know is a sighting, not a
      person, and nothing about them is written onto anybody. */
@@ -773,7 +774,9 @@ function meetOrg(deps: PeopleDeps, s: Said, rerouted: boolean): Result<Met> {
   const said = rerouted ? senderName(s.name, domain) : s.name;
   const name = said ?? domain ?? (keys[0] === undefined ? undefined : valueOfKey(keys[0]));
 
-  let hit = holders(deps.sql, orgs.register, keys)[0];
+  /* A PAYEE STORED UNDER ITS OLD KEY (`bank:wwwtalabat`) IS FOUND WHEN THE NEW ONE MISSES; the new key is added beside it when the meeting is trusted. */
+  const old = legacyKeysOf({ keys: s.keys, domain, email: s.email !== undefined && githubOfAddress(s.email) === null ? s.email : undefined, handle: s.handle });
+  let hit = holders(deps.sql, orgs.register, keys)[0] ?? (old.length === 0 ? undefined : holders(deps.sql, orgs.register, old)[0]);
   if (!hit && name !== undefined) {
     const named = byOrgName(deps.sql, orgs, name);
     if (named) hit = { id: named.id, keys: [] };

@@ -34,7 +34,7 @@ import type { Sql } from '@braindog/ports';
 
 import { claimed, holders, mergeFieldOf, mentionKindOf, nameKey, type EntityList } from './entities.ts';
 import { search } from './fts.ts';
-import { isPublicMail, isWeakKey, keyFrom, keyOf, nameWords } from './identity-keys.ts';
+import { isPublicMail, isWeakKey, keyFrom, keyOf, legacyBankKey, nameWords } from './identity-keys.ts';
 import { isFolderPlace } from './scope.ts';
 
 /**
@@ -353,6 +353,9 @@ export function candidatesFor(deps: AboutDeps, text: string, project: string | n
   const line = text.trim();
   const payee = line.length <= PHRASE && !line.includes('\n') ? keyOf('bank', line) : null;
   if (payee !== null) keys.push(payee);
+  /* AND THE KEY IT HAD BEFORE THE SHOP NAME WAS READ BY ITSELF, for a payee kept under that. */
+  const old = payee === null ? null : legacyBankKey(line);
+  if (old !== null) keys.push(old);
   for (const list of lists) {
     const held = list.role === 'project' ? claimed(deps.sql, list.register, keys) : holders(deps.sql, list.register, keys);
     for (const h of held) hit(h.id, () => RANK.key, 'key');
