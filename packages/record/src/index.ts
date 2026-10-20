@@ -697,7 +697,7 @@ const REVIVED: readonly string[] = KERNEL_REVIVED;
 const POSITION = ['agent', 'host', 'repo', 'remote', 'cwd', 'branch', 'head', 'doing'] as const;
 /** Why `attach` was called: the hook that fired, or the command line. */
 export const SOURCES = ['startup', 'resume', 'clear', 'compact', 'cli'] as const;
-const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session', 'take', 'drop', 'why'] as const;
+const HANDOFF = ['next', 'tried', 'note', 'doing', 'state', 'branch', 'head', 'session', 'take', 'drop', 'why', 'task', 'done'] as const;
 const MEET = ['name', 'email', 'handle', 'keys', 'kind', 'org', 'domain', 'role', 'where', 'source', 'untrusted'] as const;
 /** The kinds `meet` tells apart. A person is never folded into an organisation, nor one into the other. */
 const MEET_KINDS = ['person', 'organisation'] as const;
@@ -1574,7 +1574,7 @@ export type Context = {
   /** The caller's run, when it is a token that has one. */
   session: { spoken: string; state: string | null } | null;
   /** The project the caller stands in, and the rung that placed it. `null` is global. */
-  project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' } | null;
+  project: { spoken: string; name: string; mark: string | null; hue: number | null; how: 'remote' | 'folder' | 'repo' | 'asked' } | null;
   /** Projects that matched at the same strength, which leaves the caller global. */
   ambiguous: string[];
   /**
@@ -1668,7 +1668,52 @@ export type Context = {
    * oldest the door still works with (`Build.min_cli`). `null` for a caller that is no key.
    */
   build?: { cli: string | null; behind: boolean } | null;
+  /**
+   * WHAT STOPS THIS RUN, the whole answer's first line when set (agents and MCP plan §3.2, section 0): his stop or pause,
+   * by the instruction, with the line in his words. `null` while nothing does. Optional on the type only, as the four
+   * below are, so a context drawn by hand still reads; `briefing` always sends them.
+   */
+  stop?: (Stop & { line: string }) | null;
+  /**
+   * WHAT HE TOLD THIS RUN THAT IS STILL OPEN (§3.2, section 1, never cut): a stop or pause first, then oldest first,
+   * each with the line in his voice. A session with no run yet is told what waits for whoever is next where it stands.
+   */
+  told?: Told[];
+  /** The run's version stamp (`stampFor`), which moves with anything for it; `null` before the session has a run. */
+  stamp?: string | null;
+  /** What his settings let this agent do, as one sentence (§3.2, section 3); `null` for a caller who is no agent. */
+  may?: string | null;
+  /** His brief for this kind of agent (§3.2, section 4), from Settings › Agents. */
+  brief?: string | null;
+  /** The context size his settings give this agent, in tokens (400, 700 or 1,200), for the plan that ranks the rest. */
+  budget?: number;
+  /** How much was asked for (`depth`): the card, the brief default, the task, or the full answer. */
+  depth?: ContextDepth;
+  /** The task `context { task }` asked for, whole, so an update needs no `get` (§3.1, §4.3). */
+  task?: TaskInHand | null;
 };
+
+/** What `handoff { task }` or `{ done }` did to the task: its spoken name, its state now, and the question when it was asked. */
+export type HandedTask = { spoken: string; state: string | null; asked?: Asked['asked'] };
+
+/** How much `context` answers (plan §3.1): `brief` is the default. */
+export const CONTEXT_DEPTHS = ['card', 'brief', 'task', 'full'] as const;
+export type ContextDepth = (typeof CONTEXT_DEPTHS)[number];
+
+/** What `context` takes. Every key is optional; `since` answers a delta (`ContextSince`) in place of the briefing. */
+export type ContextArgs = { task?: string; project?: string; depth?: ContextDepth; since?: string; format?: 'full' | 'brief' };
+
+/**
+ * A task as `context { task }` hands it: by its spoken name and version, its fields, its project, and its last three
+ * history lines, newest first.
+ */
+export type TaskInHand = { spoken: string; register: string; list: string; version: number; fields: Record<string, unknown>; project: string | null; history: string[] };
+
+/**
+ * What `context { since }` answers (plan §3.1, §3.4): only what moved for the caller's run since the stamp it holds, as
+ * the lines to say ("Nothing new." when nothing did), what is pending, what stops it, and the stamp now.
+ */
+export type ContextSince = { since: { stamp: string | null; changed: boolean; pending: Told[]; stop: Stop | null; lines: string[] } };
 
 /**
  * `33 §4`, line 356, verbatim: `{ version, format, kernel, primitives, app, slash: boolean }`.
@@ -8086,13 +8131,106 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * she is, neither of which a briefing reads.
    */
   const briefed = new Map<string, Held<Context>>();
-  const briefing = (ctx: CallContext): Context => {
+  const briefing = (ctx: CallContext, where: { project?: string } = {}): Context => {
     const { batch: _batch, provedAt: _proved, ...caller } = ctx;
-    return structuredClone(heldFor(briefed, JSON.stringify(caller), () => briefingNow(ctx)));
+    return structuredClone(heldFor(briefed, JSON.stringify([caller, where]), () => briefingNow(ctx, where)));
+  };
+
+  /**
+   * A project `context { project }` names, by its spoken name, its id or its title, in the list `holder` keeps projects
+   * in, as `resolveProject` answers one: `null` when nothing, or more than one, is called that.
+   */
+  const projectAsked = (holder: RegisterDecl, said: string): { id: string; spoken: string; how: 'asked' } | null => {
+    const row = kernel.get(said.trim());
+    if (row !== null && row.register === holder.id) return { id: row.id, spoken: kernel.nameOf(row.id), how: 'asked' };
+    const titled = sql.all<{ id: string }>(
+      'SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(trim(?)) LIMIT 2',
+      holder.id,
+      `$."${holder.title}"`,
+      said,
+    );
+    return titled.length === 1 ? { id: titled[0]!.id, spoken: kernel.nameOf(titled[0]!.id), how: 'asked' } : null;
+  };
+
+  /**
+   * WHAT WAITS FOR WHOEVER IS NEXT WHERE A SESSION STANDS, before it has a run (plan §2.3 A): an instruction no run took,
+   * to anyone or to this kind of agent, on this project or, with none, in this repository. The kernel's predicates read a
+   * run's own row, and a session that has written nothing has none, so this is their first two rows read over its hints:
+   * a session that has not started yet starts after he said it.
+   */
+  const waitingHere = (kind: string | null, project: string | null, repo: string | null): Instr[] => {
+    const now = clock.now();
+    return openInstructions(sql).filter((i) => {
+      if (i.taken_by !== null || (i.to !== 'anyone' && i.to !== 'agent')) return false;
+      if (i.expires_at !== null && Date.parse(i.expires_at) < now) return false;
+      if (i.to_agent !== null && i.to_agent !== kind) return false;
+      if (i.project !== null) return i.project === project;
+      if (i.repo !== null) return i.repo === repo;
+      return true;
+    });
+  };
+
+  /**
+   * WHAT MOVED FOR THE CALLER'S RUN SINCE A STAMP (`context { since }`, plan §3.4): the instructions for it made, seen,
+   * taken, answered or withdrawn since, and what stops it, as the lines to say, or "Nothing new." A session with no run
+   * has nothing to have moved.
+   */
+  const contextSince = (ctx: CallContext, stamp: string): ContextSince => {
+    const run = ctx.principal.kind === 'token' ? kernel.findRun(ctx.session ?? {}, ctx.principal.id) : null;
+    if (run === null) return { since: { stamp: null, changed: false, pending: [], stop: null, lines: ['Nothing new.'] } };
+    const spoken = `${PREFIX}${String(run.seq)}`;
+    const delta = kernel.changedSince(spoken, stamp);
+    const pending = delta.pending.map((i) => toldOf(sql, i));
+    const held = delta.changed ? stopLine(sql, kernel, delta.stop) : null;
+    const lines = [...(held === null ? [] : [held]), ...pending.filter((i) => i.kind !== 'stop' && i.kind !== 'pause').map((i) => i.line)];
+    return { since: { stamp: delta.stamp, changed: delta.changed, pending, stop: delta.stop, lines: lines.length === 0 ? ['Nothing new.'] : lines } };
+  };
+
+  /**
+   * The state a task moves to when a run takes it (`doing`) or finishes it (`done`), in its list's own words: the first
+   * done state the list declares, or for taking, the first of its states that reads as work under way. `null` when the
+   * list has none, and then the task is put in hand without a move.
+   */
+  const handState = (register: string, to: 'doing' | 'done'): string | null => {
+    const decl = kernel.register(register);
+    if (decl?.state === undefined) return null;
+    const values = (decl.fields.find((f) => f.id === decl.state)?.values ?? []) as readonly string[];
+    const done = decl.done ?? [];
+    if (to === 'done') return done.find((v) => values.includes(v)) ?? done[0] ?? (values.includes('done') ? 'done' : null);
+    /* THE LIST'S OWN WORD FIRST: `hand.taken` is the state it says a task an agent takes is in. */
+    const taken = decl.hand?.taken;
+    if (typeof taken === 'string' && values.includes(taken)) return taken;
+    return ['doing', 'in_progress', 'in-progress', 'active', 'started', 'working'].find((v) => values.includes(v) && !done.includes(v)) ?? null;
+  };
+
+  /**
+   * ONE TASK WHOLE, for `context { task }` (plan §3.1, §4.3): its fields and version, so the update that follows needs no
+   * `get`, its project by spoken name, and its last three history lines, newest first. A row the caller may not read is
+   * answered as a row that is not there.
+   */
+  const taskInHand = (ctx: CallContext, ref: string): Result<TaskInHand> => {
+    const row = kernel.get(ref);
+    if (row === null || readable(ctx, row.register) !== null || !rowAdmitted(ctx, row.register, row.seq))
+      return no('ROW_UNKNOWN', `There is no task you can read called ${ref}.`, { at: 'task' });
+    const decl = kernel.register(row.register);
+    const scope = decl?.fields.find((f) => f.scope !== undefined && !f.retired);
+    const at = scope === undefined ? null : row.fields[scope.id];
+    const project = typeof at === 'string' && at !== '' ? kernel.nameOf(kernel.get(at)?.id ?? at) : null;
+    const history = sql
+      .all<{ ts: string; actor: string; kind: string; field: string | null; to_v: string | null; note: string | null }>(
+        "SELECT ts, actor, kind, field, to_v, note FROM event WHERE target = ? AND kind NOT IN ('read', 'grant.read') ORDER BY ts DESC, rowid DESC LIMIT 3",
+        `entry:${row.id}`,
+      )
+      .map((e) => {
+        const who = e.actor.startsWith('p_') ? personNamed(sql, e.actor) : e.actor;
+        const what = e.kind === 'note' ? `noted "${e.note ?? ''}"` : e.kind === 'create' ? 'made it' : e.field !== null ? `set ${e.field}${e.to_v !== null && e.to_v.length <= 60 ? ` to ${e.to_v}` : ''}` : e.kind;
+        return `${e.ts.slice(0, 16).replace('T', ' ')} ${who} ${what}`;
+      });
+    return ok({ spoken: kernel.nameOf(row.id), register: row.register, list: decl?.name ?? row.register, version: row.version, fields: { ...row.fields }, project, history });
   };
 
   /** The briefing worked out now, held by nothing: `briefing` above holds it, and the sign that checks it reads this. */
-  const briefingNow = (ctx: CallContext): Context => {
+  const briefingNow = (ctx: CallContext, where: { project?: string } = {}): Context => {
     const hints = ctx.session ?? {};
     /* HOW MUCH IS SENT (AGT-B09): five rows a list unless the caller asked for the full answer, twenty of each. */
     const format = (hints as { format?: unknown }).format === 'full' ? 'full' : 'brief';
@@ -8102,7 +8240,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const repo = hints.repo ?? text(run?.fields.repo) ?? undefined;
 
     const holder = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
-    const resolved = holder && !readable(ctx, holder.id) ? kernel.resolveProject(place) : { project: null, ambiguous: [] };
+    /* A PROJECT ASKED FOR BY NAME (`context { project }`) IS WHERE IT STANDS, in place of where its folder places it. */
+    const named = where.project !== undefined && holder && !readable(ctx, holder.id) ? projectAsked(holder, where.project) : null;
+    const resolved: { project: { id: string; spoken: string; how: 'remote' | 'folder' | 'repo' | 'asked' } | null; ambiguous: string[] } = named
+      ? { project: named, ambiguous: [] }
+      : holder && !readable(ctx, holder.id)
+        ? kernel.resolveProject(place)
+        : { project: null, ambiguous: [] };
     const home = resolved.project ? kernel.get(resolved.project.id) : null;
     const identity = (holder as { identity?: { mark?: string; accent?: string } } | undefined)?.identity;
     const mark = identity?.mark === undefined ? undefined : home?.fields[identity.mark];
@@ -8352,6 +8496,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       stale: staleOf(ctx),
       next,
     };
+    /* WHAT STOPS IT AND WHAT HE TOLD IT (plan §3.2, sections 0 and 1, never cut), its stamp, and what his settings let
+       it do and his brief for it (sections 3 and 4): the facts the context plan ranks the rest under. */
+    if (token) {
+      const spoken = run ? `${PREFIX}${String(run.seq)}` : null;
+      const stop = spoken === null ? null : kernel.stopOf(spoken);
+      const kind = text(run?.fields.agent) ?? kindOf(hints).agent ?? null;
+      const open = spoken === null ? waitingHere(kind, project?.spoken ?? null, repo ?? null) : kernel.instructionFor({}, spoken);
+      const effective = effectiveOf(ctx);
+      told.stop = stop === null ? null : { ...stop, line: stopLine(sql, kernel, stop)! };
+      told.told = open.map((i) => toldOf(sql, i));
+      told.stamp = spoken === null ? null : kernel.stampFor(spoken);
+      told.may = effective?.says ?? null;
+      told.brief = effective?.brief ?? null;
+      told.budget = effective?.context.budget ?? 700;
+    }
     return carded(ctx, told, {
       agent: text(run?.fields.agent) ?? hints.agent ?? null,
       host: tree.host ?? null,
@@ -10623,6 +10782,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const found = runFor(ctx, hints, `opened: ${source}`);
       if (!found.ok) return tail(found as Result<never>);
       const { run, spoken, opened } = found.value;
+      /* WHAT HE TOLD THIS RUN IS SEEN AT ITS START (plan §2.3 A), each marked `start` before the briefing that lists it:
+         one sent to the run by name is taken as it is first seen, so the card says it is in hand. */
+      for (const i of kernel.instructionFor({}, spoken)) kernel.seenInstruction(i.id, spoken, 'start');
       /* THE BRIEFING FOR THE RUN JUST NAMED, so the start hook prints it from this one answer. */
       const briefed = (): Context => briefing({ ...ctx, session: { ...hints, spoken } });
       if (opened) return tail(ok({ session: run, spoken, resumed: false, project: projectOf(run), context: briefed() }));
@@ -10666,11 +10828,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         take?: string;
         drop?: string;
         why?: string;
+        task?: string;
+        done?: string;
       },
       ctx: CallContext,
-    ): Promise<Result<Entry | Taken | { left: string; next: string }>> {
+    ): Promise<Result<(Entry & { task?: HandedTask }) | Taken | { left: string; next: string }>> {
       const token = ctx.principal.kind === 'token';
-      const stop = guard(ctx, 'propose', token ? undefined : SESSION);
+      const stop = guard(ctx, 'propose', token ? OWN_RUN : SESSION);
       if (stop) return { ok: false, refusal: stop };
       const said = (args ?? {}) as Record<string, unknown>;
       const wrong = stray(said, HANDOFF);
@@ -10728,8 +10892,44 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       if (typeof said.state === 'string' && !(HANDOFF_STATES as readonly string[]).includes(said.state))
         return no('ENUM_VALUE_UNKNOWN', `state is one of ${HANDOFF_STATES.join(', ')}, or left out.`, { at: 'state', allowed: HANDOFF_STATES });
-      if (Object.keys(lines).length === 0 && said.state === undefined)
-        return no('REQUIRED_MISSING', 'A handoff carries at least one of next, tried, note, doing, state, branch or head.', { at: 'next' });
+      /* A TASK IN HAND, TAKEN OR FINISHED IN THE SAME CALL (plan §4.3): `task` puts it in the run's hand and sets it doing,
+         `done` closes it with the note, so a finished task is one call and not three. An agent's, on its own run. */
+      if (said.task !== undefined && said.done !== undefined) return no('VALUE_MALFORMED', 'Take a task or finish one, not both in one call.', { at: 'done' });
+      const handKey = said.task !== undefined ? 'task' : said.done !== undefined ? 'done' : null;
+      let handed: { row: Entry; spoken: string; to: string | null } | null = null;
+      if (handKey !== null) {
+        if (!token) return no('FORBIDDEN', 'A task in hand is a run’s, so only an agent takes or finishes one. Change the task itself from the app.', { at: handKey });
+        const ref = said[handKey];
+        if (typeof ref !== 'string' || ref.trim() === '') return no('VALUE_MALFORMED', `${handKey} names a task by its handle, such as tasks#396.`, { at: handKey });
+        const row = kernel.get(ref.trim());
+        if (row === null || row.register === SESSION || readable(ctx, row.register) !== null || !rowAdmitted(ctx, row.register, row.seq))
+          return no('ROW_UNKNOWN', `There is no task you can read called ${ref.trim()}.`, { at: handKey });
+        handed = { row, spoken: kernel.nameOf(row.id), to: handState(row.register, handKey === 'done' ? 'done' : 'doing') };
+      }
+      if (Object.keys(lines).length === 0 && said.state === undefined && handed === null)
+        return no('REQUIRED_MISSING', 'A handoff carries at least one of next, tried, note, doing, state, branch, head, task or done.', { at: 'next' });
+
+      /* THE TASK'S OWN WRITE FIRST, through `update` and its ladder, so a task the rung or his settings ask is asked and
+         not moved, and a stopped run is refused here before its run is touched. */
+      let taskSaid: HandedTask | undefined;
+      if (handed !== null) {
+        const decl = kernel.register(handed.row.register);
+        const patch: Patch = handed.to !== null && decl?.state !== undefined && handed.row.fields[decl.state] !== handed.to ? { [decl.state]: handed.to } : {};
+        const noted = handKey === 'done' && lines.note !== undefined ? lines.note : undefined;
+        if (Object.keys(patch).length > 0 || noted !== undefined) {
+          const self = this as unknown as { update: (a: { register: string; seq: number; patch: Patch; version?: number; note?: string }, c: CallContext) => Promise<Result<Entry | Asked>> };
+          const moved = await self.update({ register: handed.row.register, seq: handed.row.seq ?? 0, patch, version: handed.row.version, ...(noted === undefined ? {} : { note: noted }) }, ctx);
+          if (!moved.ok) return moved as Result<never>;
+          taskSaid =
+            'asked' in moved.value
+              ? { spoken: handed.spoken, state: text(handed.row.fields[decl?.state ?? '']), asked: moved.value.asked }
+              : { spoken: handed.spoken, state: text(moved.value.fields[decl?.state ?? '']) };
+        } else taskSaid = { spoken: handed.spoken, state: text(handed.row.fields[decl?.state ?? '']) };
+        if (handKey === 'task' && lines.doing === undefined) {
+          const title = decl === undefined ? null : text(handed.row.fields[decl.title]);
+          if (title !== null) lines.doing = title.length > LINE ? `${title.slice(0, LINE - 1)}…` : title;
+        }
+      }
 
       /**
        * FINDING THE RUN IS PART OF THIS WRITE, NOT A PRELUDE TO IT.
@@ -10791,13 +10991,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
              the same call is the one it leaves. */
           if (typeof said.state === 'string' && RUN.done.includes(said.state) && lines.next === undefined && now.fields.next !== undefined)
             patch.next = null;
-          const written = kernel.update(SESSION, now.id, patch, by);
+          /* THE TASK IN HAND IS THE RUN'S OWN FIELD, the record's to write (migration 42): put there by `task`, and let go
+             by `done` once the task it names is finished, not while it is only asked. */
+          const inHand =
+            handKey === 'task'
+              ? { task: handed!.spoken }
+              : handKey === 'done' && taskSaid?.asked === undefined && now.fields.task === handed!.spoken
+                ? { task: null }
+                : null;
+          const written = kernel.update(SESSION, now.id, patch, inHand === null ? by : { ...by, stamp: inHand });
           if (!written.ok) throw new Unwind(written as Result<never>);
           /* WHAT THE RUN SAYS IT FINISHED is read against its project's open tasks, after its own write has gone in. */
           kernel.readRunWork(by, run.id);
           return written;
         }),
-      ));
+      )).then((out) => (out.ok && taskSaid !== undefined ? ok({ ...out.value, task: taskSaid }) : out));
     },
 
     /**
@@ -10817,10 +11025,41 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * live, what waits on a person, and the rows that apply here with the global ones they inherit. A
      * READ, scoped as `boot` is, and it opens no run: an agent asking where it is has not started yet.
      */
-    async context(_args: Record<string, never> | undefined, ctx: CallContext): Promise<Result<Context>> {
+    /*
+     * IT TAKES WHERE AND HOW MUCH (agents and MCP plan §3.1): `project` stands it in a project by name, `task` hands one
+     * task whole with its version and last history lines, `depth` says how much (`full` is `format: "full"`), and
+     * `since` answers only what moved for its run since a stamp an answer carried: "Nothing new." when nothing did.
+     */
+    async context<A extends ContextArgs | undefined>(args: A, ctx: CallContext): Promise<Result<A extends { since: string } ? ContextSince : Context>> {
+      type Out = Result<A extends { since: string } ? ContextSince : Context>;
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false, refusal: stop };
-      return ok(briefing(ctx));
+      const said = (args ?? {}) as Record<string, unknown>;
+      const wrong = stray(said, ['task', 'project', 'depth', 'since', 'format']);
+      if (wrong) return { ok: false, refusal: wrong };
+      for (const key of ['task', 'project', 'since'] as const)
+        if (said[key] !== undefined && said[key] !== null && (typeof said[key] !== 'string' || (said[key] as string).trim() === '' || (said[key] as string).length > LINE))
+          return no('VALUE_MALFORMED', key === 'since' ? 'since is the stamp an earlier answer carried.' : `${key} is a name or a handle, such as ${key === 'task' ? 'tasks#396' : 'BrainDog'}.`, { at: key });
+      if (said.depth !== undefined && said.depth !== null && !(CONTEXT_DEPTHS as readonly unknown[]).includes(said.depth))
+        return no('ENUM_VALUE_UNKNOWN', `depth is one of ${CONTEXT_DEPTHS.join(', ')}.`, { at: 'depth', allowed: CONTEXT_DEPTHS });
+      if (said.format !== undefined && said.format !== null && said.format !== 'full' && said.format !== 'brief')
+        return no('ENUM_VALUE_UNKNOWN', 'format is full or brief.', { at: 'format', allowed: ['full', 'brief'] });
+      if (typeof said.since === 'string') return ok(contextSince(ctx, said.since.trim())) as Out;
+      const depth: ContextDepth = (said.depth as ContextDepth | undefined) ?? (said.format === 'full' ? 'full' : typeof said.task === 'string' ? 'task' : 'brief');
+      const asked = depth === 'full' ? { ...ctx, session: { ...(ctx.session ?? {}), format: 'full' } as SessionHints } : ctx;
+      if (typeof said.project === 'string') {
+        const holder = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
+        if (!holder || readable(ctx, holder.id) !== null || projectAsked(holder, said.project) === null)
+          return no('ROW_UNKNOWN', `There is no project you can read called ${said.project.trim()}, or more than one.`, { at: 'project' });
+      }
+      let task: TaskInHand | null = null;
+      if (typeof said.task === 'string') {
+        const found = taskInHand(ctx, said.task.trim());
+        if (!found.ok) return found as Result<never>;
+        task = found.value;
+      }
+      const told = briefing(asked, typeof said.project === 'string' ? { project: said.project.trim() } : {});
+      return ok({ ...told, depth, ...(task === null ? {} : { task }) }) as Out;
     },
 
     /* ── PEOPLE ─────────────────────────────── */
