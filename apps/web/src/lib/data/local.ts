@@ -73,8 +73,8 @@
  * first page was asked with, and kept marked `whole` (`RegisterWhole`, by list and order) only when the count still
  * matches the rows walked; once a day, the log keeping it right between. A search, the chips, or both over a list kept
  * whole are answered from it in the browser (`searchKept`): the chips asked as the record would (`answersHere`: no ref,
- * no relative day), every word typed the start of a word in the fields the record's search reads, folded by `find.ts`'s
- * `terms`, a searchable ref read by its row's kept name and left to the record where that name is not kept. It is drawn
+ * no relative day), every word typed a part of a word in the fields the register marks searchable, as the record's box
+ * asks it (`contains`, run by the same `evaluate`); a searchable ref is the record's, which reads it by its id. It is drawn
  * one page of it, in the order the record's answer will have, with a line saying it was found on this device; the line's
  * room is held while the search stands, so the record's answer replacing it moves no row. Money is the record's to search.
  * TODAY AND NEEDS YOU ARE PATCHED AND FOLLOW THE LOG: on open they draw the copy and ask the record once, quietly; on a

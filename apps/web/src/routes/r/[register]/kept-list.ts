@@ -15,10 +15,10 @@
  * filter and a create reach every row of it here.
  */
 
-import type { Predicate } from '@braindog/where';
+import { compile, evaluate, type Predicate, type Schema } from '@braindog/where';
 
 import { answersHere, localWhere, type Lands, type Spot } from '../../../lib/data/local.ts';
-import { terms, tokensOf } from '../../../lib/record/find.ts';
+import { terms } from '../../../lib/record/find.ts';
 import type { Names } from '../../../lib/record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../../../lib/record/schema.ts';
 
@@ -118,68 +118,37 @@ export function spotOf(
   return { list: register, at: ['entries'], by, ...(ask.sort ? {} : { newest: true }), ...(lands ? { lands } : {}) };
 }
 
-/** Field types whose value a kept row holds as the record stored it, so the record's index read the same words. */
-const SAID_AS_STORED = new Set(['text', 'document', 'enum', 'url', 'email', 'int', 'decimal', 'bool', 'duration', 'day', 'instant']);
-/** A title of these is never indexed (ruling 441, `projectedText` in the kernel's `fts.ts`). */
-const UNSPOKEN = new Set(['money', 'day', 'instant']);
+/** The types `contains` reads (`TEXTUAL` in `@braindog/where`) that a kept row holds as the record stored them. */
+const CONTAINED = new Set(['text', 'document', 'url', 'email', 'enum']);
 
 /**
- * The fields the record's search reads, in declared order, as `projectedText` picks them: every `search: true` field and
- * the title, but a title of money or a date. `null` when one is held here in another form than the record indexes (a ref
- * is a number on screen and an id in the record, money an object), so the browser cannot say what the record would.
+ * The fields the record's search box reads, in declared order: the register's `search: true` fields, as `searchable` in
+ * `find.ts` and `treeOf` in `remote.ts` pick them, and the title only if it says so. `null` when one is held here in
+ * another form than the record reads it (a ref is an id there and a number here, a list or money has no `contains`),
+ * so the browser cannot say what the record would.
  */
-export function searchFieldsOf(decl: RegisterDecl, refs = false): string[] | null {
+export function searchFieldsOf(decl: RegisterDecl): string[] | null {
   const out: string[] = [];
   for (const f of decl.fields) {
-    if ((f.search !== true && f.id !== decl.title) || f.retired === true) continue;
-    if (f.id === decl.title && UNSPOKEN.has(f.type)) continue;
-    if (f.type === 'secret') return null;
-    /* A REF, ASKED FOR, IS READ BY THE NAME IT IS DRAWN WITH (`refsSaid`), as the screen shows it and the sample finds it. */
-    const ref = refs && typeof f.to === 'string' && (f.type === 'ref' || (f.type === 'list' && f.of === 'ref'));
-    const plain = ref || (f.type === 'list' ? f.of === 'text' : SAID_AS_STORED.has(f.type));
-    if (!plain) return null;
+    if (f.search !== true || f.retired === true) continue;
+    if (!CONTAINED.has(f.type)) return null;
     out.push(f.id);
   }
   return out;
 }
 
-/**
- * Each ref field's values as the names its rows are drawn with, from the names the list was kept with; `null` when one
- * points at a row whose name is not kept here, which leaves the search to the record.
- */
-function refsSaid(decl: RegisterDecl, fields: readonly string[], values: Record<string, unknown>, names: Names): Record<string, unknown> | null {
-  const out: Record<string, unknown> = { ...values };
-  for (const id of fields) {
-    const f = decl.fields.find((x) => x.id === id);
-    if (!f || typeof f.to !== 'string' || !(f.type === 'ref' || (f.type === 'list' && f.of === 'ref'))) continue;
-    const raw = values[id];
-    if (raw === undefined || raw === null || raw === '') continue;
-    const name = (v: unknown): string | undefined => (typeof v === 'number' ? names.get(`${f.to}#${v}`) : undefined);
-    const said = Array.isArray(raw) ? raw.map(name) : [name(raw)];
-    if (said.some((n) => n === undefined)) return null;
-    out[id] = said.join(' ');
-  }
-  return out;
-}
-
-/** One row's searched text, as the kernel projects it: lists joined by spaces, NFC, whitespace collapsed. */
-function projectedOf(fields: readonly string[], values: Record<string, unknown>): string {
-  const lines: string[] = [];
-  for (const id of fields) {
-    const raw = values[id];
-    if (raw === undefined || raw === null || raw === '') continue;
-    const text = (Array.isArray(raw) ? raw.map((v) => String(v)).join(' ') : String(raw)).normalize('NFC').replace(/\s+/gu, ' ').trim();
-    if (text) lines.push(text);
-  }
-  return lines.join('\n');
+/** The record's box as a `where`: each word is a part of some searched field (`treeOf` in `remote.ts`, same words). */
+function boxTree(fields: readonly string[], want: readonly string[]): Predicate {
+  return { all: want.map((word) => ({ any: fields.map((field) => ({ field, contains: word })) })) } as Predicate;
 }
 
 /**
  * A search, a filter or both answered from a kept whole list: its rows the chips' `where` takes (asked here as the
- * record would, `answersHere`), whose searched text has every typed word as the start of a word, in the order kept (the
- * record's order for the same sort). A searchable ref is read by its row's kept name. `null` when the copy may not hold
- * every row (a next page, a count past the rows, a cut text, a copy kept before its cursor was), when nothing is asked,
- * or when a field or a filter cannot be read as the record does.
+ * record would, `answersHere`), and the box asked as the record asks it: each typed word a part of a word, in some
+ * field the register marks searchable, by the same `evaluate` the record's rules use. Rows in the order kept (the
+ * record's order for the same sort). `null` when the copy may not hold every row (a next page, a count past the rows, a
+ * cut text, a copy kept before its cursor was), when nothing is asked, or when a field or a filter cannot be read as the
+ * record does, a searchable ref among them: the record reads it by an id this copy does not hold.
  */
 export function searchKept(kept: KeptList, q: string, where: Predicate | null = null): { entries: Entry[]; matched: number } | null {
   if (kept.cursor !== null || kept.entries.length !== kept.matched) return null;
@@ -189,19 +158,21 @@ export function searchKept(kept: KeptList, q: string, where: Predicate | null = 
   if (want === null || (!typed && where === null)) return null;
   /* A FILTER THE BROWSER CANNOT ASK (a ref, a relative day) is the record's, never answered here as none. */
   if (where !== null && !localWhere(where, kept.decl)) return null;
-  const fields = typed ? searchFieldsOf(kept.decl, true) : [];
+  const fields = typed ? searchFieldsOf(kept.decl) : [];
   if (fields === null) return null;
-  const names = namesOf(kept);
+  let box: Predicate | null = null;
+  const schema: Schema = { register: kept.decl.id, fields: {} };
+  if (typed) {
+    for (const f of kept.decl.fields) if (fields.includes(f.id)) schema.fields[f.id] = { type: f.type };
+    box = boxTree(fields, want);
+    /* A refusal the record would make (a word past the `contains` cap) is its answer, not an empty one. */
+    if (compile(box, schema).bad.length > 0) return null;
+  }
   const entries: Entry[] = [];
   for (const e of kept.entries) {
     const values = e.fields as Record<string, unknown>;
     if (where !== null && !answersHere(kept.decl.id, kept.decl, where, values)) continue;
-    if (typed) {
-      const said = refsSaid(kept.decl, fields, values, names);
-      if (said === null) return null;
-      const has = tokensOf(projectedOf(fields, said));
-      if (!want.every((w) => has.some((t) => t.startsWith(w)))) continue;
-    }
+    if (box !== null && !evaluate(box, values, schema)) continue;
     entries.push(e);
   }
   return { entries, matched: entries.length };

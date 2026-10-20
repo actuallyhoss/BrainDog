@@ -1,9 +1,12 @@
 /** `kept-list.ts`: a list's first page goes into the local copy as plain JSON and comes back as the same names map. */
 
+import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { countsOf, keptOf, listsOf, namesOf, searchFieldsOf, searchKept, servedWhole, spotOf, walkWhole } from './kept-list.ts';
+import { compile } from '@braindog/where';
+import { terms } from '../../../lib/record/find.ts';
 import type { RegisterDecl } from '../../../lib/record/schema.ts';
 
 const decl = {
@@ -59,22 +62,49 @@ const notes = {
   one: 'note',
   title: 'title',
   fields: [
-    { id: 'title', type: 'text' },
+    { id: 'title', type: 'text', search: true },
     { id: 'body', type: 'text', search: true },
-    { id: 'tags', type: 'list', of: 'text', search: true },
+    { id: 'tags', type: 'list', of: 'text' },
     { id: 'kind', type: 'enum', values: ['a', 'b'] },
   ],
 } as unknown as RegisterDecl;
 const row = (seq: number, fields: Record<string, unknown>) => ({ seq, fields, version: 1, created: '', by: '' }) as never;
 
-test('A SEARCH OVER A WHOLE KEPT LIST: every word the start of a word, in the order kept', () => {
+test("A SEARCH OVER A WHOLE KEPT LIST: every word a part of a word, in the order kept, as the record's box reads it", () => {
   const kept = keptOf(notes, [row(3, { title: 'Renewals due', body: 'call Zürich' }), row(2, { title: 'Children', tags: ['school'] }), row(1, { title: 'Rent' })], 3, new Map() as never, { cursor: null });
   const seqs = (q: string) => searchKept(kept, q)?.entries.map((e) => e.seq);
-  assert.deepEqual(seqs('ren'), [3, 1], 'a prefix, never a middle: not Children');
-  assert.deepEqual(seqs('zurich ren'), [3], 'both words, any order, the accent folded');
-  assert.deepEqual(seqs('sch'), [2], 'a searchable list of words');
-  assert.deepEqual(seqs('a'), [], 'an enum not marked searchable is not searched');
+  assert.deepEqual(seqs('ren'), [3, 2, 1], 'a part of a word, the middle of Children too');
+  assert.deepEqual(seqs('ldr due'), [], 'every word: ldr is in Children but due is not');
+  assert.deepEqual(seqs('ewa call'), [3], 'both words, any field, any order');
+  assert.deepEqual(seqs('zurich'), [], 'only ASCII is folded, as lower() does');
+  assert.deepEqual(seqs('sch'), [], 'a list that is not marked searchable is not searched');
   assert.equal(searchKept(kept, '  -- ')?.entries, undefined, 'nothing typed that survives is no search');
+});
+
+test("THE BROWSER AND THE RECORD GIVE THE SAME HITS: the same words run through the record's SQL over the same rows", () => {
+  const rows = [
+    { title: 'Renewals due', body: 'call Zürich about the kiln', kind: 'a' },
+    { title: 'Children', body: '', kind: 'b' },
+    { title: 'Rent', body: 'Brick-order renewal', kind: 'a' },
+    { title: 'Rates', body: 'ZURICH office', kind: 'b' },
+    { title: 'Kiln', body: 'ren', kind: 'b' },
+    { title: 'Quiet' },
+  ].map((fields, i) => row(i + 1, fields));
+  const kept = keptOf(notes, rows, rows.length, new Map() as never, { cursor: null });
+  const db = new DatabaseSync(':memory:');
+  db.exec('CREATE TABLE entry (seq INTEGER, fields TEXT)');
+  for (const r of rows as unknown as { seq: number; fields: object }[])
+    db.prepare('INSERT INTO entry (seq, fields) VALUES (?, ?)').run(r.seq, JSON.stringify(r.fields));
+  const schema = { register: 'notes', fields: { title: { type: 'text' }, body: { type: 'text' } } };
+  /* The record's tree for the box, as `treeOf` in remote.ts builds it (node cannot load that file). */
+  const record = (q: string): number[] => {
+    const words = terms(q) ?? [];
+    const tree = { all: words.map((w) => ({ any: ['title', 'body'].map((field) => ({ field, contains: w })) })) };
+    const c = compile(tree as never, schema as never);
+    return (db.prepare(`SELECT seq FROM entry WHERE ${c.sql} ORDER BY seq DESC`).all(...c.params) as { seq: number }[]).map((x) => x.seq);
+  };
+  for (const q of ['ren', 'ren due', 'kiln', 'zurich', 'Zürich', 'ewal', 'a', 'brick order', 'nothing here', 'REN'])
+    assert.deepEqual(searchKept(kept, q)?.entries.map((e) => e.seq), record(q), `"${q}"`);
 });
 
 test('A SEARCH IS NOT ANSWERED FROM A COPY THAT MAY NOT HOLD EVERY ROW, or reads a field otherwise than the record', () => {
@@ -85,8 +115,8 @@ test('A SEARCH IS NOT ANSWERED FROM A COPY THAT MAY NOT HOLD EVERY ROW, or reads
   assert.equal(searchKept(keptOf(notes, [{ ...(rows[0] as object), clipped: true } as never], 1, new Map() as never, { cursor: null }), 'ren'), null, 'a cut text');
   const reffed = { ...notes, fields: [...notes.fields, { id: 'project', type: 'ref', to: 'projects', search: true }] } as unknown as RegisterDecl;
   assert.equal(searchFieldsOf(reffed), null, 'a searchable ref');
-  const dated = { ...notes, title: 'due', fields: [{ id: 'due', type: 'day' }, { id: 'body', type: 'text', search: true }] } as unknown as RegisterDecl;
-  assert.deepEqual(searchFieldsOf(dated), ['body'], 'a date title is not indexed');
+  const plain = { ...notes, fields: [{ id: 'title', type: 'text' }, { id: 'body', type: 'text', search: true }, { id: 'old', type: 'text', search: true, retired: true }] } as unknown as RegisterDecl;
+  assert.deepEqual(searchFieldsOf(plain), ['body'], 'a title is searched only if it says so, and a retired field never');
 });
 
 test('A FILTER OVER A WHOLE KEPT LIST is asked here as the record would, with or without words; a ref or a relative day is not', () => {
@@ -98,13 +128,11 @@ test('A FILTER OVER A WHOLE KEPT LIST is asked here as the record would, with or
   assert.equal(seqs('', { field: 'nope', is: 'x' }), undefined, 'not a question the browser asks');
 });
 
-test('A SEARCHABLE REF IS READ BY ITS ROW\'S KEPT NAME, and left to the record where that name is not kept', () => {
+test("A SEARCHABLE REF IS THE RECORD'S TO SEARCH: it reads the stored id, which this copy does not hold", () => {
   const reffed = { ...notes, fields: [...notes.fields, { id: 'project', type: 'ref', to: 'projects', search: true }] } as unknown as RegisterDecl;
   const names = new Map([['projects#4', 'Kiln build']]);
-  const kept = keptOf(reffed, [row(2, { title: 'Order bricks', project: 4 }), row(1, { title: 'Call' })], 2, names as never, { cursor: null });
-  assert.deepEqual(searchKept(kept, 'kiln')?.entries.map((e) => e.seq), [2]);
-  const lost = keptOf(reffed, [row(2, { title: 'Order bricks', project: 5 })], 1, names as never, { cursor: null });
-  assert.equal(searchKept(lost, 'kiln'), null);
+  const kept = keptOf(reffed, [row(2, { title: 'Order bricks', project: 4 })], 1, names as never, { cursor: null });
+  assert.equal(searchKept(kept, 'kiln'), null);
 });
 
 test('THE IDS COME WITH THE NAMES, and the page carries where they are for a create', () => {
