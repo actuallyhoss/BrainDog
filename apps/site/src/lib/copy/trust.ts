@@ -51,10 +51,10 @@ export const trust = {
       description: 'Where to get help with BrainDog, and what to put in a report so it can be answered the first time.',
     },
     title: 'Support',
-    lede: 'Where to get help, and what to put in a report so it can be answered the first time.',
+    lede: 'Write to us and a person answers. A few details help us answer the first time.',
     mail: {
       title: 'Write to us',
-      body: 'Send a question, a fault or a request about your record to the support address.',
+      body: 'Send a question, a fault or a request about your BrainDog to the support address.',
       /* The empty-address twin. Nothing reads mail at an address until the owner routes it. */
       pending: 'The support address will be listed here.',
     },
@@ -71,7 +71,7 @@ export const trust = {
         'What you did, step by step, and what you expected to happen.',
         'What happened instead, with the exact words of any message BrainDog showed.',
         'Where it happened: the address in the browser, or the command you ran.',
-        'Which browser, or which version of the command line, and the name of the record it happened in.',
+        'Which browser, or which version of the command line, and the name of the BrainDog it happened in.',
         'Leave out passwords, keys and tokens. A report never needs one.',
       ],
     },
@@ -80,59 +80,59 @@ export const trust = {
   security: {
     meta: {
       title: 'Security · BrainDog',
-      description: 'How a BrainDog record is kept: one database per record, sealed keys, sealed nightly copies, passkeys and export at any time.',
+      description: 'How your BrainDog is kept safe: its own database, sealed keys, sealed nightly copies, passkeys and export at any time.',
     },
     title: 'Security',
-    lede: 'How your record is kept, and how to tell us about a weakness.',
+    lede: 'How your BrainDog is kept safe, and how to tell us about a weakness.',
     kept: {
-      title: 'How a record is kept',
+      title: 'How your BrainDog is kept',
       /* One tile each on /security: a short name, the glyph its well draws, and the fact as it has always been worded. */
       facts: [
         // docs/12-SECURITY.md §2; apps/worker/src/index.ts (`RECORD`, one Durable Object per record).
         {
           title: 'Its own database',
           glyph: 'server',
-          text: 'Every record is its own database. No table holds two customers, so no query can reach from one record into another.',
+          text: "Every BrainDog is its own database. Nothing is shared between customers, so no one else's search can reach yours.",
         },
         // docs/16-DECISIONS.md ADR-062; apps/worker/src/vault.ts and keys.ts (the host seals, the record stores).
         {
           title: 'Sealed keys',
           glyph: 'key',
-          text: 'The keys to services you connect are sealed before they are stored, and the record never holds one in the clear.',
+          text: "Keys to the services you connect are sealed before they're stored. BrainDog never holds one in the clear.",
         },
         // apps/worker/src/seal.ts and nightly.ts (age to one recipient whose identity is kept outside Cloudflare).
         {
           title: 'Sealed nightly copies',
           glyph: 'lock',
-          text: 'Every night a copy of each record is sealed to a key kept outside Cloudflare, so the stored copy alone opens nothing.',
+          text: 'Every night a copy is sealed to a key kept outside Cloudflare, so the stored copy alone opens nothing.',
         },
         // docs/12-SECURITY.md §3 (passkey primary, email link fallback, no password anywhere).
         {
-          title: 'A passkey, and no password',
+          title: 'A passkey, no password',
           glyph: 'shield',
-          text: 'You sign in with a passkey first, and an emailed link is the fallback. There is no password to steal.',
+          text: 'You sign in with a passkey, or an emailed link. There is no password to steal.',
         },
         // docs/16-DECISIONS.md ADR-060 (scopes read, propose, write; no admin scope; VAULT and erasure stay a browser session).
         {
-          title: "What an agent's token can do",
+          title: 'What an AI tool can do',
           glyph: 'agent',
-          text: "An agent's token can read, propose or write, and nothing more. No token can open your keys, erase data, restore a copy or delete the record: those need you, signed in, in a browser.",
+          text: 'An AI tool can read, suggest and write, and nothing more. Opening keys, erasing data, restoring a copy or deleting everything needs you, signed in.',
         },
         // apps/web/src/routes/settings/[area]/areas/Export.svelte; docs/12-SECURITY.md §8 (the export).
         {
-          title: 'Export at any time',
+          title: 'Export any time',
           glyph: 'download',
-          text: 'You can export the whole record at any time, from Settings, as a file you keep.',
+          text: 'Export everything as one file from Settings, whenever you like.',
         },
       ],
     },
     /* THE DRAWINGS BESIDE THE FACTS. Each says only what its fact says, and each is a picture with its words as its name. */
     drawn: {
-      records: 'Four records side by side, each its own database, with nothing running between them',
-      recordName: (n: number) => `Record ${n}`,
+      records: "Four BrainDogs side by side, yours and three that are someone else's, each its own database, with nothing running between them",
+      recordName: (n: number) => (n === 1 ? 'Yours' : "Someone else's"),
       sealed: ['A key you connect', 'Sealed first', 'Stored, never in the clear'],
       sealedLabel: 'A key you connect is sealed first, then stored, and never kept in the clear',
-      sealedNote: 'Agents and scripts use your keys without ever seeing them.',
+      sealedNote: 'AI tools and scripts use your keys without ever seeing them.',
       /* The pricing table's own figure: `Nightly, last 30 kept` (`copy/pricing.ts`). */
       nights: 'Thirty nights of sealed copies, the newest last',
       nightsFrom: '30 nights ago',
@@ -142,26 +142,28 @@ export const trust = {
       signinLabel: 'Signing in: a passkey first, an emailed link as the fallback, and no password field',
       /* The token's reach, row by row, as ADR-060 draws it: the first three a token may do, the rest only a person. */
       reach: {
-        head: ['What it can do', "An agent's token", 'You, signed in, in a browser'],
+        head: ['What it can do', 'An AI tool', 'You, signed in'],
         rows: [
           ['Read', true],
-          ['Propose', true],
+          ['Suggest changes', true],
           ['Write', true],
           ['Open your keys', false],
           ['Erase data', false],
           ['Restore a copy', false],
-          ['Delete the record', false],
+          ['Delete everything', false],
         ] as [string, boolean][],
         can: 'Can',
         cannot: 'Cannot',
       },
       exportName: 'Everything, in one file',
       exportNote: 'Every list, page and rule in it',
-      exportVerb: 'Export the record',
+      /* A link and not a drawn button (site F18): a drawn button looked pressable and did nothing. */
+      exportLink: 'How export works',
+      exportHref: '/docs/use/export-and-delete',
     },
     report: {
       title: 'Report a vulnerability',
-      body: 'Write to the support address with the steps that show the weakness. Test only against a record that is yours.',
+      body: 'Write to the support address with the steps that show the weakness. Test only against a BrainDog that is yours.',
       /* The empty-address twin, as on /support. */
       pending: 'The address for reporting a weakness will be listed here.',
       /* THE REPOSITORY'S OWN PROMISE, `SECURITY.md` at the root, its table of what happens after a report, word for word

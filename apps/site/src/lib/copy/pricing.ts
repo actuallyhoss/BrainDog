@@ -41,6 +41,32 @@ export const pricing = {
    * `requests` is the calls a record's automations and scripts make out, so it reads "Requests to other services".
    */
   pricing: {
+    /**
+     * THE EARLY ACCESS PAGE (D2, 20 October): what `/pricing` says while `LAUNCH.billing` is off. One plan and no
+     * price but its $0, a tile that says paid plans come later and are not priced, and three questions. The plans below
+     * come back the day billing does, and not before. The figures are `TABLE.free`'s, filled in by the page.
+     */
+    early: {
+      title: 'Free while in early access.',
+      lede: 'BrainDog is invite only for now. Everything in it is free while we open it up.',
+      plan: {
+        name: 'Early access',
+        price: '$0',
+        lines: (f: Figures) => ['The whole app', `${grouped(f.agents)} AI tools connected`, `${grouped(f.credits)} questions to Slash a month`, 'Export any time'],
+      },
+      later: {
+        title: 'Later',
+        say: 'Paid plans add room for more AI tools, more questions and your whole team. They are not priced yet, and nothing you make now will be lost or locked when they arrive.',
+      },
+      faq: {
+        title: 'Questions people ask',
+        questions: [
+          { q: 'What is a question to Slash?', a: 'One question or one draft, however much work it takes. Your brief, filing and your rules never spend one.' },
+          { q: 'What counts as an AI tool?', a: 'Each app you connect. Claude on your laptop is one, Cursor is another.' },
+          { q: 'Can I take my data out?', a: 'Yes, all of it, as one file, whenever you like.' },
+        ],
+      },
+    },
     // A headline with no price in it: `plans.test.ts` checks that "$12 a month" never leads.
     title: 'Free for one person.',
     sub: 'Every plan has the whole app. You pay for room: more agents, more questions, more people.',

@@ -6,8 +6,8 @@
  * The questions in the examples, and every name and figure in an answer, are the made-up record's
  * (`demo/maya.ts`), so none is typed here.
  *
- * EVERY COUNT OF ASKS IS `PLAN_TABLE`'S, through `plans.ts`: Free's 20, Cloud's 80, Cloud Plus's 400. A figure moved
- * there moves on this page, in the card's note and in the close.
+ * EVERY COUNT OF ASKS IS `PLAN_TABLE`'S, through `plans.ts`: early access has Free's 20. No plan name or price is
+ * said here while BrainDog is in early access (site F15, 20 October): one paragraph and no table.
  *
  * TWO LINES CHECKED AGAINST THE PRODUCT (17 October). "In Settings under Agents": the model key is chosen in
  * `SlashModel`, drawn in the Agents area of Settings (`apps/web/src/routes/settings/[area]/areas/Agents.svelte`), and
@@ -23,20 +23,20 @@ const FREE = TABLE.free.credits;
 
 export const slashPage = {
   head: {
-    title: 'Slash knows your whole record.',
+    title: 'Slash knows your whole business.',
     lead:
-      'Press / anywhere in BrainDog and ask in plain words. Slash reads your record, shows what it read, and drafts ' +
-      'what you ask for. Nothing it makes goes in until you say yes.',
+      'Press / anywhere in BrainDog and ask in plain words. Slash answers from what you keep, shows what it read, and ' +
+      'drafts what you ask for. Nothing it makes goes in until you say yes.',
   },
   /** The label a screen reader hears on each list of examples. */
   examples: 'Try typing',
   ask: {
     title: 'Ask',
     body: [
-      'Ask the way you would ask someone who knows your business. Slash looks through your projects, money, people ' +
+      "Ask the way you'd ask someone who knows your business. Slash looks through your projects, money, people " +
         'and notes, and answers in a few lines.',
-      'Every figure opens what it came from, and under the answer you see what Slash read. When nothing in your ' +
-        'record answers, it says so instead of guessing.',
+      'Every figure opens what it came from, and under the answer you see what Slash read. When nothing in ' +
+        'BrainDog answers, it says so instead of guessing.',
     ],
   },
   find: {
@@ -49,7 +49,7 @@ export const slashPage = {
   make: {
     title: 'Make',
     body: [
-      'Ask for a page, a list or a rule, and Slash drafts it from what is already in your record. You see what it ' +
+      'Ask for a page, a list or a rule, and Slash drafts it from what is already in BrainDog. You see what it ' +
         'will look like, what it reads and where it goes.',
       'Add it with one press, or say not now and nothing changes. Everything it makes carries its name and can be undone.',
     ],
@@ -57,22 +57,20 @@ export const slashPage = {
   counted: {
     title: 'How asks are counted',
     say:
-      'Each question or draft is one ask, however much reading it takes. Finding, your brief and the work Slash does ' +
-      'in the background cost nothing.',
-    plans: [TABLE.free.name, TABLE.hosted.name, TABLE.plus.name],
-    month: { label: 'Asks a month', cells: [TABLE.free.credits, TABLE.hosted.credits, TABLE.plus.credits] },
-    key: { label: 'With your own model key', cell: 'No limit' },
+      'Each question or draft is one ask, however much reading it takes. Finding things, your brief and the work ' +
+      `Slash does in the background cost nothing. Early access includes ${FREE} asks a month, or no limit with your ` +
+      'own AI key.',
     after: "When the month's asks run out, Slash says when they come back. Everything else keeps working.",
   },
   agents: {
-    title: 'Slash and your agents',
-    say: 'Slash lives inside BrainDog. Your agents live in Claude, ChatGPT, Codex, Cursor and VS Code. They read the same record.',
-    head: ['Slash', 'Your agents'],
+    title: 'Slash and your AI tools',
+    say: 'Slash lives inside BrainDog. Your AI tools live in Claude, ChatGPT, Codex, Cursor and VS Code. Both read the same BrainDog.',
+    head: ['Slash', 'Your AI tools'],
     lines: [
       ['Where', 'In BrainDog. Press /', 'In the apps you connect'],
-      ['What it reads', 'Your record', 'What you allowed it'],
+      ['What it reads', 'Your BrainDog', 'What you allowed it'],
       ['What it writes', 'Drafts you add with one press', 'Notes and changes, each with an undo'],
-      ['Who pays', "Your plan's asks, or your own key", "Your agent's own plan"],
+      ['Who pays', 'Your included asks, or your own key', "Your AI tool's own plan"],
     ],
   },
   faq: {
@@ -80,11 +78,10 @@ export const slashPage = {
     questions: [
       { q: 'Does Slash change things on its own?', a: 'No. What it makes is a draft until you add it, and anything added can be undone.' },
       { q: 'Can it move money or delete things?', a: 'Never. Money, keys, sharing and deletes always wait for you.' },
-      { q: 'Can I use my own model key?', a: 'Yes, in Settings under Agents. Asks on your own key have no monthly limit.' },
+      { q: 'Can I use my own AI key?', a: 'Yes, in Settings under Agents. Asks on your own key have no monthly limit.' },
       { q: 'Can I turn it off?', a: 'Yes. Set the monthly limit to zero and Slash stays quiet. Finding still works.' },
     ],
   },
-  close: { title: 'Press / and ask.', body: `${TABLE.free.name} comes with ${FREE} asks a month.` },
 } as const;
 
 /** One of Slash's three modes, as the bar and the card name them. */
@@ -102,8 +99,8 @@ export const slashDrawing = {
       tries: 'Try asking',
       empty: 'Ask or change anything',
       enter: 'to ask',
-      think: 'Reading your record',
-      note: `One ask per question. ${TABLE.free.name} has ${FREE} a month.`,
+      think: 'Reading what you keep',
+      note: `One ask per question. Early access has ${FREE} a month.`,
     },
     find: {
       tab: 'Find',

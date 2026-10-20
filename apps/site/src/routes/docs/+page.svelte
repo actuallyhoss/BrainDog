@@ -44,6 +44,19 @@
 <section class="wrap secs">
   <ul class="cards">
     {#each data.sections as section (section.id)}
+      {#if section.id === 'start'}
+        <li class="sec start">
+          <div class="sec-head">
+            <Icon name={section.glyph} size="m" />
+            <h2 class="sec-title">{section.label}</h2>
+          </div>
+          <ul class="start-links">
+            {#each w.start as link (link.href)}
+              <li><a class="sec-page" href={link.href}><span>{link.label}</span><Icon name="chevron-right" size="m" /></a></li>
+            {/each}
+          </ul>
+        </li>
+      {:else}
       {@const first = section.pages[0]?.path ?? null}
       <li class="sec">
         <div class="sec-head">
@@ -66,6 +79,7 @@
           <p class="sec-empty">{w.empty}</p>
         {/if}
       </li>
+      {/if}
     {/each}
   </ul>
 </section>
@@ -90,7 +104,8 @@
   .cards {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
+    align-items: start;
+    gap: 16px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -102,9 +117,29 @@
     align-content: start;
     gap: var(--sp-3);
     min-inline-size: 0;
-    padding: 28px 30px 24px;
+    padding: 28px 28px 24px;
     background: var(--paper);
-    border-radius: 24px;
+    border-radius: 16px;
+  }
+
+  /* START HERE takes the whole first row, its three links side by side at a desk. */
+  .sec.start {
+    grid-column: 1 / -1;
+  }
+
+  .start-links {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (width >= 900px) {
+    .start-links {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   .sec-head {

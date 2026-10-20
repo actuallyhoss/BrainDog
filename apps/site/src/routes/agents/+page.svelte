@@ -1,13 +1,13 @@
 <!--
-  Connect your agent: the door the launch is built around (LAUNCH 103, job 5; DIRECTION §47).
-
-  The prototype's connect page, loop/site-2026-10-17/src/site.html `#agents`: the night head with the page's name, one
-  line and the connect box; then what an agent gets and what it can't do; then the brief an agent starts with, played
-  in a terminal on the made-up record; then the close.
+  Connect your AI tools: the door the launch is built around (LAUNCH 103, job 5), rewritten in the UI pass of 20
+  October (site F14, F20) so anyone reads it: the night head with the page's name, one line and the connect box; then
+  what an AI tool gets and what it can't do, each line with its icon in a well; then the brief an AI tool starts with,
+  played in a terminal on the made-up record; then a row of plain links for developers; then the early access strip.
 
   Every word is `copy/agents.ts`'s and every connect step is `lib/connect/apps.ts`'s. With scripting off the page is
-  whole: each app's lines are in the HTML one under another, and the terminal shows every line at once. The skill an
-  agent installs is still served at `/agents/braindog/SKILL.md`, by its own route beside this page.
+  whole: each app's lines are in the HTML one under another, the terminal shows every line at once, and the address's
+  Copy is drawn only once the script runs. The skill an agent installs is still served at `/agents/braindog/SKILL.md`,
+  by its own route beside this page.
 -->
 <script lang="ts">
   import ConnectBox from '$lib/connect/ConnectBox.svelte';
@@ -17,7 +17,7 @@
   import Term from '$lib/desk/Term.svelte';
   import type { IconName } from '$lib/icons.ts';
   import Icon from '$lib/Icon.svelte';
-  import Close from '$lib/site/Close.svelte';
+  import EarlyStrip from '$lib/site/EarlyStrip.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
 
   const a = agents.agents;
@@ -25,6 +25,22 @@
   /* One glyph a line, in the lists' order: the brief, a person, the undo; then a key, money, the clock of the trail. */
   const GETS: readonly IconName[] = ['today', 'person', 'undo'];
   const CANNOT: readonly IconName[] = ['lock', 'card', 'clock'];
+
+  let live = $state(false);
+  let copied = $state(false);
+  $effect(() => {
+    live = true;
+  });
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(a.dev.address);
+      copied = true;
+      setTimeout(() => (copied = false), 1600);
+    } catch {
+      copied = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -42,40 +58,49 @@
   </div>
 </PageHead>
 
-<section class="wrap">
-  <div class="two-lists">
-    <div>
-      <h2>{a.gets.title}</h2>
-      <ul class="plain">
-        {#each a.gets.lines as item, i (item)}
-          <li><span class="ico"><Icon name={GETS[i] ?? 'check'} size="s" /></span>{item}</li>
-        {/each}
-      </ul>
-    </div>
-    <div>
-      <h2>{a.cannot.title}</h2>
-      <ul class="plain">
-        {#each a.cannot.lines as item, i (item)}
-          <li><span class="ico"><Icon name={CANNOT[i] ?? 'x'} size="s" /></span>{item}</li>
-        {/each}
-      </ul>
-    </div>
+<section class="wrap lists">
+  <div>
+    <h2>{a.gets.title}</h2>
+    <ul class="plain">
+      {#each a.gets.lines as item, i (item)}
+        <li><span class="ico"><Icon name={GETS[i] ?? 'check'} /></span>{item}</li>
+      {/each}
+    </ul>
   </div>
-
-  <div class="story">
-    <article class="card paper">
-      <div class="split">
-        <div class="head">
-          <h2>{a.brief.title}</h2>
-          <p class="say">{a.brief.say}</p>
-        </div>
-        <Term lines={TERM} />
-      </div>
-    </article>
+  <div>
+    <h2>{a.cannot.title}</h2>
+    <ul class="plain">
+      {#each a.cannot.lines as item, i (item)}
+        <li><span class="ico"><Icon name={CANNOT[i] ?? 'x'} /></span>{item}</li>
+      {/each}
+    </ul>
   </div>
 </section>
 
-<Close title={a.close.title} body={a.close.body} />
+<section class="wrap brief">
+  <div class="ftile split">
+    <div>
+      <h2 class="band-h2">{a.brief.title}</h2>
+      <p class="band-say">{a.brief.say}</p>
+    </div>
+    <Term lines={TERM} />
+  </div>
+</section>
+
+<section class="wrap dev" aria-labelledby="dev-title">
+  <h2 id="dev-title">{a.dev.title}</h2>
+  <ul>
+    <li class="mcp">
+      <span>{a.dev.mcp}:</span> <code>{a.dev.address}</code>
+      {#if live}<button type="button" class="btn sm line" onclick={copy}>{copied ? a.dev.copied : a.dev.copy}</button>{/if}
+    </li>
+    {#each a.dev.links as link (link.href)}
+      <li><a href={link.href}>{link.label}<Icon name="arrow-right" size="s" /></a></li>
+    {/each}
+  </ul>
+</section>
+
+<EarlyStrip />
 
 <style>
   .connect {
@@ -83,23 +108,24 @@
     margin-block-start: 40px;
   }
 
-  .two-lists {
+  .lists {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 56px;
-    padding-block-start: 112px;
+    padding-block-start: 96px;
   }
 
-  .two-lists h2 {
-    margin: 0 0 18px;
-    font-size: var(--t-title);
+  .lists h2,
+  .dev h2 {
+    margin: 0 0 20px;
+    font-size: 28px;
     line-height: 1.1;
     letter-spacing: -0.035em;
   }
 
   .plain {
     display: grid;
-    gap: 14px;
+    gap: 16px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -107,39 +133,92 @@
 
   .plain li {
     display: grid;
-    grid-template-columns: 24px minmax(0, 1fr);
-    gap: 10px;
-    font-size: var(--t-site-16-5);
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    color: var(--ink2);
+    font-size: 17px;
     line-height: 1.5;
+  }
+
+  /* AN 18PX ICON IN A 32PX WELL (site F20), as the app's tile heads draw theirs. */
+  .ico {
+    display: grid;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    border-radius: 8px;
+    background: var(--paper);
     color: var(--ink2);
   }
 
-  .ico {
-    display: inline-flex;
-    margin-block-start: 3px;
-    color: var(--muted);
+  .ico :global(.icon) {
+    inline-size: 18px;
+    block-size: 18px;
   }
 
-  .story {
-    display: grid;
-    gap: 20px;
-    padding-block-start: 112px;
+  .brief {
+    padding-block-start: 96px;
   }
 
   .split {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 56px;
+    gap: 48px;
     align-items: center;
+    background: var(--paper);
   }
 
-  .split h2 {
+  .dev {
+    padding-block: 96px;
+  }
+
+  .dev ul {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 32px;
     margin: 0;
-    font-size: clamp(2.3rem, 4.5vw, 3.9rem);
-    line-height: 1;
-    letter-spacing: -0.045em;
-    max-inline-size: 12ch;
-    text-wrap: balance;
+    padding: 0;
+    list-style: none;
+    font-size: 16px;
+  }
+
+  .mcp {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink2);
+  }
+
+  code {
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--ink);
+    font: 500 14px/1.4 var(--mono);
+  }
+
+  .dev a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: 32px;
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .dev a:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  @media (pointer: coarse) {
+    .dev a {
+      min-block-size: var(--tap);
+    }
   }
 
   @media (max-width: 1060px) {
@@ -148,19 +227,25 @@
       gap: 32px;
     }
 
-    .two-lists {
+    .lists {
       grid-template-columns: minmax(0, 1fr);
+      gap: 48px;
     }
   }
 
   @media (max-width: 760px) {
-    .two-lists {
-      padding-block-start: 72px;
+    .lists,
+    .brief {
+      padding-block-start: 64px;
     }
 
-    .story {
-      padding-block-start: 80px;
-      gap: 14px;
+    .dev {
+      padding-block: 64px;
+    }
+
+    .dev ul {
+      flex-direction: column;
+      align-items: flex-start;
     }
   }
 </style>

@@ -12,15 +12,22 @@ export const docsWords = {
   meta: {
     title: 'Docs · BrainDog',
     description:
-      'How to use BrainDog, connect your agents, write pages in the dialect and build packs. Every page is also text an agent can read.',
+      'How to use BrainDog, connect your AI tools, and build on it. Every page is also plain text an AI tool can read.',
     /** A page's own title in the tab. */
     page: (title: string): string => `${title} · BrainDog docs`,
   },
 
   title: 'Docs',
-  lede: 'How to use BrainDog, connect your agents, write pages and build packs. Every page here is also plain text an agent can read.',
+  lede: 'How to use BrainDog, connect your AI tools, and build on it. Every page is also plain text an AI tool can read.',
   /** The link to `/llms.txt`, under the lede. */
-  forAgents: 'The list for agents',
+  forAgents: 'Plain-text index for AI tools',
+
+  /* "START HERE" IS ITS OWN FULL-WIDTH ROW (site F19): three ways in, rather than a one-link card as tall as the rest. */
+  start: [
+    { label: 'Welcome to BrainDog', href: '/docs/start/welcome' },
+    { label: 'Making your BrainDog', href: '/docs/use/first-run' },
+    { label: 'Connect an AI tool', href: '/docs/agents/connect' },
+  ],
 
   /* WHAT EACH SECTION IS ABOUT, in the order of `SECTIONS`. Each names what its section covers, not
      what the product does. */
@@ -29,8 +36,8 @@ export const docsWords = {
     use: { label: 'Using BrainDog', blurb: 'Home, pages, lists, Needs you, Slash, automations, the inbox and sharing.', glyph: 'home' },
     agents: { label: 'Agents', blurb: 'Connecting an agent, its tools, keys and grants, and the command line.', glyph: 'plug' },
     api: { label: 'The API', blurb: 'The HTTP calls a key may make, doors and webhooks, and their limits.', glyph: 'terminal' },
-    dialect: { label: 'The page dialect', blurb: 'Every block a page can draw, each shown beside the text that draws it.', glyph: 'layers' },
-    packs: { label: 'Packs', blurb: 'What a pack declares, and how to write and publish one.', glyph: 'board' },
+    dialect: { label: 'Writing pages', blurb: 'Every block a page can draw, each shown beside the text that draws it.', glyph: 'layers' },
+    packs: { label: 'Add-ons (packs)', blurb: 'What a pack declares, and how to write and publish one.', glyph: 'board' },
   } as const satisfies Record<Section, { label: string; blurb: string; glyph: IconName }>,
 
   /** A section card with no page in it yet. */
@@ -38,7 +45,7 @@ export const docsWords = {
 
   search: {
     label: 'Search the docs',
-    placeholder: 'Try keys, pages or webhooks',
+    placeholder: 'Try invoices, keys or Slash',
     found: (n: number): string => (n === 1 ? '1 page found' : `${n} pages found`),
     none: (query: string): string => `No page mentions "${query}".`,
   },
@@ -71,7 +78,7 @@ export const docsWords = {
       'Each docs page below is the page as dialect text: Markdown with fenced blocks such as stat, steps and comparison that a BrainDog page draws. The address of each is the page address with .md on the end.',
     /* THE SITE'S OWN PAGES, before the docs: each line is the page's name and its search result (`meta` in `lib/copy/shell.ts`). */
     site: 'Site',
-    pages: { home: 'Home', slash: 'Slash', agents: 'Connect your agent', pricing: 'Pricing' },
+    pages: { home: 'Home', slash: 'Slash', agents: 'Connect your AI tools', pricing: 'Pricing' },
     connect: 'Connecting',
     /* `MCP` in `lib/links.ts`, `servesMcp` in `apps/worker/src/route.ts`. The address is code; the words around it are not. */
     address: 'The address agents connect to',

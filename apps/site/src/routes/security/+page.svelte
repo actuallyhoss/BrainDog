@@ -62,7 +62,7 @@
           {#each [1, 2, 3, 4] as n}
             <span class="record" aria-hidden="true">
               <span class="glyph"><Icon name="server" /></span>
-              <span class="record-name">{d.recordName(n)}</span>
+              <span class="record-name" class:mine={n === 1}>{d.recordName(n)}</span>
             </span>
           {/each}
         </div>
@@ -153,8 +153,8 @@
               <span class="export-note">{d.exportNote}</span>
             </span>
           </span>
-          <span class="drawn ink" aria-hidden="true">{d.exportVerb}</span>
         </div>
+        <a class="how" href={d.exportHref}>{d.exportLink}<Icon name="arrow-right" size="s" /></a>
       </section>
     {/if}
 
@@ -202,6 +202,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+    align-items: start;
   }
 
   @media (width >= 900px) {
@@ -250,12 +251,38 @@
     align-content: start;
   }
 
-  @media (width >= 1100px) {
+  /* The database tile's drawing goes under its words at 1200 and under (site F18). */
+  @media (width > 1200px) {
     .split {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       align-items: center;
     }
   }
+
+  .how {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    align-self: flex-start;
+    min-block-size: 32px;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .how:hover {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  @media (pointer: coarse) {
+    .how {
+      min-block-size: var(--tap);
+    }
+  }
+
+
 
   .say-it {
     display: flex;
@@ -363,9 +390,15 @@
     background: var(--tile);
   }
 
+  /* "Yours" in ink, the three "Someone else's" in the muted ink (site F18). */
   .record-name {
-    color: var(--ink);
+    color: var(--muted);
     font-size: var(--t-site-small);
+    font-weight: 500;
+  }
+
+  .record-name.mine {
+    color: var(--ink);
     font-weight: 600;
   }
 

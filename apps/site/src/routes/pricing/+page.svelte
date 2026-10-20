@@ -1,26 +1,27 @@
 <script lang="ts">
   /**
-   * Pricing, the prototype's `#pricing` (`loop/site-2026-10-17/src/site.html`, DIRECTION §47): the night head, the
-   * three plans with Free first and black (§35), what each plan holds, extra use, the questions people ask, and the
-   * close.
+   * Pricing. WHILE BILLING IS OFF it is the one-plan early access page (D2, 20 October, `copy/pricing.ts` `early`):
+   * the night head, the early access card on the night with its $0 and what it holds, a paper tile that says paid
+   * plans come later, three questions, and no close. No paid plan's name or price is drawn.
    *
-   * EVERY FIGURE IS `TABLE`'S (`plans.ts`, held to `PLAN_TABLE` by `plans.test.ts`) and every sentence is
-   * `copy/pricing.ts`'s; `lib/pricing/cards.ts` puts the one into the other, so this page types neither.
-   *
-   * HONEST AT LAUNCH. The paid buttons follow `LAUNCH.billing` (in `Plans.svelte`). Extra use is sold by no checkout,
-   * so its section says it is coming soon and links nothing. "Can I cancel any time?" is asked only while billing is
-   * on: nobody can cancel what nobody sells. Nothing here says a card is charged.
+   * THE DAY `LAUNCH.billing` IS ON it is the plans page again: the three plans with Free first and black (§35), what
+   * each plan holds, extra use and the questions people ask. Every figure is `TABLE`'s (`plans.ts`, held to
+   * `PLAN_TABLE` by `plans.test.ts`) and every sentence is `copy/pricing.ts`'s; `lib/pricing/cards.ts` puts the one
+   * into the other, so this page types neither.
    *
    * NO JAVASCRIPT IS NEEDED TO READ ANY OF IT: the cards, the tables and the answers are finished HTML.
    */
   import { site } from '$lib/copy.ts';
   import { LAUNCH } from '$lib/launch.ts';
+  import { TABLE } from '$lib/plans.ts';
   import Plans from '$lib/pricing/Plans.svelte';
   import { columns, extra, faqFor, holds } from '$lib/pricing/cards.ts';
-  import Close from '$lib/site/Close.svelte';
+  import EarlyStrip from '$lib/site/EarlyStrip.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
+  import Start from '$lib/site/Start.svelte';
 
   const p = site.pricing;
+  const e = p.early;
   const faq = faqFor(LAUNCH);
 </script>
 
@@ -33,6 +34,34 @@
   <meta property="og:description" content={site.meta.pricing.description} />
 </svelte:head>
 
+{#if !LAUNCH.billing}
+  <PageHead title={e.title} lead={e.lede} />
+
+  <section class="wrap early">
+    <div class="pair">
+      <article class="plan">
+        <p class="pname">{e.plan.name} <b class="num">{e.plan.price}</b></p>
+        <ul>
+          {#each e.plan.lines(TABLE.free) as line (line)}<li>{line}</li>{/each}
+        </ul>
+        <div class="go"><Start /></div>
+      </article>
+      <article class="later">
+        <h2>{e.later.title}</h2>
+        <p>{e.later.say}</p>
+      </article>
+    </div>
+
+    <div class="sec" id="questions">
+      <h2>{e.faq.title}</h2>
+      <div class="faq">
+        {#each e.faq.questions as item (item.q)}
+          <div><h3>{item.q}</h3><p>{item.a}</p></div>
+        {/each}
+      </div>
+    </div>
+  </section>
+{:else}
 <PageHead title={p.title} lead={p.sub} />
 
 <section class="wrap">
@@ -88,11 +117,121 @@
   </div>
 </section>
 
-<Close title={p.close.title} body={p.close.body} />
+<EarlyStrip />
+{/if}
 
 <style>
   .sec {
-    padding-block-start: 140px;
+    padding-block-start: 120px;
+  }
+
+  .early {
+    padding-block: 64px 96px;
+  }
+
+  .early .sec {
+    padding-block-start: 96px;
+  }
+
+  .pair {
+    display: grid;
+    grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  /* THE ONE PLAN, on the night: its name and $0, what it holds, and the start button. */
+  .plan {
+    padding: 32px;
+    border-radius: 16px;
+    background: var(--night);
+    color: var(--on-night);
+  }
+
+  .pname {
+    margin: 0;
+    font: 600 28px/1.1 var(--head);
+    letter-spacing: -0.035em;
+  }
+
+  .pname b {
+    margin-inline-start: 8px;
+    color: var(--on-night-2);
+    font-weight: 600;
+  }
+
+  .plan ul {
+    display: grid;
+    gap: 12px;
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 17px;
+  }
+
+  .plan li::before {
+    content: '';
+    display: inline-block;
+    inline-size: 6px;
+    block-size: 6px;
+    margin-inline-end: 12px;
+    border-radius: 50%;
+    background: var(--on-night-2);
+    vertical-align: middle;
+  }
+
+  .plan .go {
+    margin-block-start: 32px;
+  }
+
+  .later {
+    padding: 32px;
+    border-radius: 16px;
+    background: var(--paper);
+  }
+
+  .later h2 {
+    font-size: 28px;
+    letter-spacing: -0.035em;
+  }
+
+  .later p {
+    max-inline-size: 30em;
+    margin: 12px 0 0;
+    color: var(--ink2);
+    font-size: 17px;
+    line-height: 1.55;
+  }
+
+  .early .sec h2 {
+    font-size: clamp(34px, 4.2vw, 48px);
+    line-height: 1;
+    letter-spacing: -0.045em;
+  }
+
+  @media (max-width: 900px) {
+    .pair {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .plan,
+    .later {
+      padding: 24px 20px;
+    }
+
+    .plan .go :global(.btn) {
+      inline-size: 100%;
+    }
+
+    .early {
+      padding-block: 40px 64px;
+    }
+
+    .early .sec {
+      padding-block-start: 64px;
+    }
   }
 
   .sec .say {

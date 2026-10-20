@@ -6,13 +6,13 @@
    *
    *   head       the / key on the night ground, the page's one h1 and its lead.
    *   modes      Ask, Find and Make: plain words beside one drawn answer each, with the questions to try.
-   *   facts      how asks are counted (from `plans.ts`), Slash beside your agents, and four questions.
-   *   close      "Press / and ask."
+   *   facts      how asks are counted (one paragraph, no plan table), Slash beside your AI tools, and four questions.
+   *   strip      the early access strip (site F11).
    *
    * THE WORDS ARE `copy/slash.ts`; the questions and every name and figure in a drawing are the made-up record's
    * (`demo/maya.ts`), and every count of asks is `PLAN_TABLE`'s. Nothing here types a figure.
    */
-  import Close from '$lib/site/Close.svelte';
+  import EarlyStrip from '$lib/site/EarlyStrip.svelte';
   import PageHead from '$lib/site/PageHead.svelte';
   import Mini from '$lib/slash/Mini.svelte';
   import { site } from '$lib/copy.ts';
@@ -58,23 +58,6 @@
   <div class="facts">
     <h2>{s.counted.title}</h2>
     <p>{s.counted.say}</p>
-    <div class="tablebox">
-      <table class="ptable">
-        <thead>
-          <tr><td></td>{#each s.counted.plans as name (name)}<th scope="col">{name}</th>{/each}</tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row">{s.counted.month.label}</th>
-            {#each s.counted.month.cells as n, i (i)}<td>{n.toLocaleString('en-US')}</td>{/each}
-          </tr>
-          <tr>
-            <th scope="row">{s.counted.key.label}</th>
-            {#each s.counted.plans as name (name)}<td>{s.counted.key.cell}</td>{/each}
-          </tr>
-        </tbody>
-      </table>
-    </div>
     <p>{s.counted.after}</p>
   </div>
 
@@ -105,7 +88,7 @@
   </div>
 </section>
 
-<Close title={s.close.title} body={s.close.body} />
+<EarlyStrip />
 
 <style>
   /* THE / KEY on the night ground, above the title (PageHead's `before`). */

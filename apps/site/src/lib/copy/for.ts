@@ -28,15 +28,7 @@ export type Person = {
 
 export const forPages = {
   person: {
-    /* What a screen reader calls the row of the example's pages over the drawn record. */
-    pages: 'Pages in this record',
-    /* FREE LEADS (DIRECTION §35): the close names Free first and the paid plans as more. It keeps
-       `Person.svelte`'s two arguments, the paid plan's figure and unit, so the call does not change; "$12 a month" is
-       never the headline. */
-    price: (_price: string, _unit: string) => 'Free for one person, with the whole app. Cloud and Cloud Plus add colleagues and more.',
-    /* The quiet button beside "Start free" in the page's head (`lib/site/Start.svelte` draws that one). */
-    /* The close's one huge line (`lib/site/Close.svelte`), the home page's own. */
-    close: 'Start your record.',
+    /* The link to the other page shown today (site F13): small businesses link teams, and teams link small businesses. */
     others: 'Written for someone else',
 
     who: {
@@ -109,17 +101,17 @@ export const forPages = {
       },
 
       founder: {
-        nav: 'For founders',
-        title: 'For founders · BrainDog',
+        nav: 'For small businesses',
+        title: 'For small businesses · BrainDog',
         description:
-          'Money, customers and invoices in one record. Late invoices are chased, receipts are filed, and ' +
-          'nothing is sent until you say yes.',
-        tag: 'For founders',
+          'Money, customers and invoices in one place. Late invoices get a reminder drafted for your yes, and ' +
+          'receipts file themselves.',
+        tag: 'For small businesses',
         said: 'I run it on my own. Who owes me, and how long does the money last?',
         /* Automations are `apps/web/src/routes/automations/`; Needs you (once Decide) is `apps/web/src/routes/decide/`. */
         sub:
-          'Keep your money, customers and invoices in one record. Automations chase what is late and file ' +
-          'every receipt, and nothing goes out until you accept it in Needs you.',
+          'Keep your money, customers and invoices in one place. Late invoices get a reminder drafted for your ' +
+          'yes, and receipts file themselves.',
         rows: [
           {
             head: 'Money in and out, month by month',
@@ -143,17 +135,14 @@ export const forPages = {
       },
 
       team: {
-        nav: 'For teams',
-        title: 'For teams · BrainDog',
+        nav: 'For teams and agencies',
+        title: 'For teams and agencies · BrainDog',
         description:
-          'The board, the release and the inbox in one record for the whole team. Colleagues are free, and ' +
-          'every change says who made it.',
-        tag: 'For teams',
-        said: 'We ship every week. What is open, who has it, and what is late?',
-        /* Colleagues are free: `lib/plans.ts`. Every change keeps who made it: docs/20. */
-        sub:
-          'Give your team one record for the board, the release and everything that arrives. Colleagues are ' +
-          'free, and every change says who made it.',
+          "Give each client a project. Everyone sees what's next and what's waiting, and every change says who made it.",
+        tag: 'For teams and agencies',
+        said: "We run projects for clients. What's open, who has it, and what's late?",
+        /* "Colleagues are free" is dropped until early access says who may invite (D3). Every change keeps who made it: docs/20. */
+        sub: "Give each client a project. Everyone sees what's next and what's waiting, and every change says who made it.",
         rows: [
           {
             head: 'The board and the numbers together',

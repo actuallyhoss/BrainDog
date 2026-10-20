@@ -1,31 +1,28 @@
 /**
- * The page that connects an agent, `/agents` (DIRECTION §47, the prototype's connect page): the head, what an agent
- * gets and what it can't do, the brief it starts with, and the close.
+ * The page that connects an AI tool, `/agents`: the head, what an AI tool gets and what it can't do, the brief it
+ * starts with, the row for developers, and the early access strip. Rewritten in the UI pass of 20 October
+ * (`loop/ui-pass-2026-10-20/site.md` 2b) so a reader who is not a developer reads it too, with the developer's detail
+ * one row away.
  *
  * The connect steps themselves are data in `lib/connect/apps.ts`, beside the box that draws them, so the home page and
- * this page say the same lines. The made-up names are the demo record's (`lib/demo/maya.ts`), and the free plan's
- * agents are `TABLE`'s (`lib/plans.ts`), so no figure here is typed by hand.
+ * this page say the same lines. The made-up names are the demo record's (`lib/demo/maya.ts`).
  */
 import { PEOPLE, PROJECTS } from '../demo/maya.ts';
-import { TABLE } from '../plans.ts';
-
-/** A small count in words, the way a sentence says it; a bigger one stays a figure. */
-const COUNTED = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'] as const;
-const inWords = (n: number): string => COUNTED[n] ?? String(n);
+import { DOCS, MCP } from '../links.ts';
 
 const DANA = PEOPLE.dana.name.split(' ')[0] ?? PEOPLE.dana.name;
 const TIDEPOOL = PROJECTS.tidepool.name;
 
 export const agents = {
   agents: {
-    title: 'Connect your agent in one line.',
-    lead: 'Claude, ChatGPT, Codex, Cursor and VS Code can read your record, propose changes and leave notes. You approve it once in the app, and no key is copied anywhere.',
+    title: 'Connect your AI tools in one line.',
+    lead: 'Claude, ChatGPT, Codex, Cursor and VS Code can read your BrainDog, suggest changes and leave notes. You approve each one once, and no key is copied anywhere.',
     gets: {
-      title: 'What your agent gets',
+      title: 'What your AI tool gets',
       lines: [
-        "Your brief first: where things stand, what's next, and what waits on you.",
-        `Names, never ids, so it talks about ${DANA} and ${TIDEPOOL} the way you do.`,
-        'A receipt with an undo for everything it writes.',
+        "Your brief first: where things stand, what's next and what waits on you.",
+        `Names, never codes, so it talks about ${DANA} and ${TIDEPOOL} the way you do.`,
+        'A receipt and an undo for everything it writes.',
       ],
     },
     cannot: {
@@ -38,11 +35,19 @@ export const agents = {
     },
     brief: {
       title: 'It starts with your brief.',
-      say: "Claude knows what's next before you say a word, and tells the record when it's done.",
+      say: "Claude knows what's next before you say a word, and leaves a note when it's done.",
     },
-    close: {
-      title: 'Make your record.',
-      body: `Free for one person, with ${inWords(TABLE.free.agents)} agents.`,
+    dev: {
+      title: 'For developers',
+      mcp: 'MCP address',
+      address: MCP,
+      copy: 'Copy',
+      copied: 'Copied',
+      links: [
+        { label: 'The command line', href: `${DOCS}/agents/cli` },
+        { label: 'Scopes and tokens', href: `${DOCS}/agents/scopes` },
+        { label: 'All agent docs', href: `${DOCS}/agents/connect` },
+      ],
     },
   },
 } as const;

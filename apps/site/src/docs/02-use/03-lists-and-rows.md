@@ -1,4 +1,4 @@
-# Lists and rows
+# Lists
 
 A list holds one kind of thing you keep track of: bills, clients, tasks, subscriptions, domains. Each thing in it is a row, and each row has the fields its list declares. Lists are in the sidebar, and every page reads from them.
 
