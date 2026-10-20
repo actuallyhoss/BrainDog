@@ -1,9 +1,9 @@
 {
   "pack": "portfolio",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "title": "Projects",
   "summary": "The things you run, and the plan for each.",
-  "changes": "A project the record formed from an agent's first session is marked as a draft until you keep it. The line under What each one earns is drawn only once a project in play says what it earned in a year. A project's one line is typed on its card in In play. Each project in play on Projects says how long since anybody worked on it. That line and the line of the work finished on it each week wait until Work is there. Projects counts and answers the questions about your projects.",
+  "changes": "Each project can keep its key numbers: what it is judged by, where each one's values come from, which way is good, a target and by when, and how often a new value should arrive. Numbers, the readings your projects report, is part of Projects now, so any record with projects can hold them. A project can say what kind it is: a business, client work, a product or content.",
   "author": "BrainDog",
   "license": "MIT",
   "requires": { "format": 1, "primitives": 1, "packs": {} },
@@ -25,6 +25,14 @@
       "fields": [
         { "id": "name", "type": "text", "required": true, "search": true },
         { "id": "about", "label": "About", "type": "text", "search": true },
+        {
+          "id": "kind",
+          "label": "Kind",
+          "type": "enum",
+          "values": [ "business", "client", "product", "content" ],
+          "labels": { "business": "Business", "client": "Client work", "product": "Product", "content": "Content" },
+          "index": true
+        },
         {
           "id": "lane",
           "label": "Status",
@@ -56,6 +64,115 @@
         { "id": "repos", "label": "Repositories", "type": "list", "of": "text" },
         { "id": "folders", "label": "Folders", "type": "list", "of": "text" },
         { "id": "domains", "label": "Domains", "type": "list", "of": "text" },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "register": "datapoints",
+      "name": "Numbers",
+      "one": "number",
+      "icon": "observe",
+      "holds": "one number from one project at one moment, reported by the project or polled by the record",
+      "title": "name",
+      "mobile": [ "name", "value", "at" ],
+      "pack": "portfolio",
+      "order": { "field": "at", "dir": "desc" },
+      "fields": [
+        { "id": "name", "label": "Measure", "type": "text", "required": true, "index": true, "search": true },
+        { "id": "value", "label": "Value", "type": "decimal" },
+        { "id": "amount", "label": "Amount", "type": "money" },
+        { "id": "unit", "label": "Unit", "type": "text" },
+        { "id": "thing", "label": "Project", "type": "ref", "to": "things", "index": true },
+        { "id": "at", "label": "When", "type": "instant", "index": true },
+        {
+          "id": "source",
+          "label": "Source",
+          "type": "enum",
+          "values": [ "reported", "polled", "typed", "example" ],
+          "labels": { "reported": "Reported", "polled": "Polled", "typed": "Typed", "example": "Example" },
+          "index": true
+        },
+        { "id": "tags", "type": "list", "of": "text" }
+      ]
+    },
+    {
+      "register": "kpis",
+      "icon": "gauge",
+      "name": "Key numbers",
+      "one": "key number",
+      "holds": "the numbers each project is judged by, where each one's values come from and what good looks like",
+      "title": "name",
+      "mobile": [ "name", "thing", "target" ],
+      "pack": "portfolio",
+      "fields": [
+        { "id": "name", "label": "Name", "type": "text", "required": true, "search": true },
+        { "id": "thing", "label": "Project", "type": "ref", "to": "things", "required": true, "index": true },
+        { "id": "measures", "label": "What it measures", "type": "text" },
+        {
+          "id": "source",
+          "label": "Comes from",
+          "type": "enum",
+          "values": [ "numbers", "figure", "feed", "agent", "typed" ],
+          "labels": {
+            "numbers": "Numbers",
+            "figure": "Worked out from my lists",
+            "feed": "A feed",
+            "agent": "An agent",
+            "typed": "I type it"
+          },
+          "default": "numbers",
+          "index": true
+        },
+        { "id": "measure", "label": "Measure", "type": "text", "index": true },
+        { "id": "figure", "label": "Figure", "type": "text" },
+        { "id": "unit", "label": "Unit", "type": "text" },
+        {
+          "id": "kind",
+          "label": "Shape",
+          "type": "enum",
+          "values": [ "level", "flow", "share", "progress", "count" ],
+          "labels": { "level": "Level", "flow": "Flow", "share": "Share", "progress": "Progress", "count": "Count" }
+        },
+        {
+          "id": "good",
+          "label": "Which way is good",
+          "type": "enum",
+          "values": [ "up", "down" ],
+          "labels": { "up": "Up", "down": "Down" },
+          "default": "up"
+        },
+        { "id": "target", "label": "Target", "type": "decimal" },
+        { "id": "target_amount", "label": "Target amount", "type": "money" },
+        { "id": "target_by", "label": "Target by", "type": "day", "index": true },
+        {
+          "id": "every",
+          "label": "How often",
+          "type": "enum",
+          "values": [ "1h", "1d", "1w", "1m" ],
+          "labels": { "1h": "Every hour", "1d": "Every day", "1w": "Every week", "1m": "Every month" }
+        },
+        { "id": "owner", "label": "Kept by", "type": "text", "index": true },
+        {
+          "id": "today",
+          "label": "Show on Today",
+          "type": "enum",
+          "values": [ "auto", "pinned", "hidden" ],
+          "labels": { "auto": "Auto", "pinned": "Always", "hidden": "Never" },
+          "default": "auto",
+          "index": true
+        },
+        { "id": "headline", "label": "Leads the card", "type": "bool", "default": false },
+        { "id": "order", "label": "Order", "type": "int" },
+        { "id": "draft", "label": "Not kept yet", "type": "bool", "default": false },
+        {
+          "id": "state",
+          "label": "State",
+          "type": "enum",
+          "values": [ "live", "retired" ],
+          "labels": { "live": "Live", "retired": "Retired" },
+          "default": "live",
+          "index": true
+        },
         { "id": "tags", "type": "list", "of": "text" }
       ]
     },
@@ -298,6 +415,34 @@
       "value": { "count": "id" },
       "format": "int",
       "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "kpis-held",
+      "name": "Key numbers kept",
+      "source": "register.kpis",
+      "where": "state is live, draft is false",
+      "value": { "count": "id" },
+      "format": "int",
+      "target": { "gte": 0 },
+      "window": "30d",
+      "compare": "none"
+    },
+    {
+      "metric": "kpi-stale",
+      "name": "Days since it was read",
+      "source": "register.datapoints",
+      "where": {
+        "all": [
+          { "field": "name", "is": "{{it}}" },
+          { "field": "source", "not": "example" },
+          { "field": "at", "before": "tomorrow" }
+        ]
+      },
+      "value": { "age": "at" },
+      "format": "days",
+      "target": { "lte": 14 },
       "window": "30d",
       "compare": "none"
     },
