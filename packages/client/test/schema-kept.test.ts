@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createClient } from '../src/index.ts';
+import { createClient, followDeclarations, wrote } from '../src/index.ts';
 
 function host(answers: { version: number; refuse?: boolean }) {
   const asked: string[] = [];
@@ -57,4 +57,56 @@ test('A WRITE DROPS THE KEPT SCHEMAS, a refusal is never kept, and two hosts or 
   await createClient({ base: 'https://b.example', fetch: s.fetch }).schema('tasks');
   await createClient({ base: 'https://a.example', fetch: s.fetch, token: 'rec_1.x' }).schema('tasks');
   assert.equal(s.schemas(), 3);
+});
+
+test('THE READER’S MARK AND A READ SENT AS A WRITE KEEP THE SCHEMAS: markRead and previewPage declare nothing', async () => {
+  const h = host({ version: 1 });
+  const a = createClient({ base: 'https://a.example', fetch: h.fetch });
+  await a.schema('tasks');
+  await a.markRead();
+  await a.call('previewPage', { body: {} });
+  await a.schema('tasks');
+  assert.equal(h.schemas(), 1);
+});
+
+test('FOLLOWING THE DECLARATIONS, a moved version keeps the schema and a moved token asks again', async () => {
+  const h = host({ version: 1 });
+  let token: string | null = 'd1';
+  followDeclarations(async () => token);
+  try {
+    const a = createClient({ base: 'https://follow.example', fetch: h.fetch });
+    await a.version();
+    await a.schema('tasks');
+    h.answers.version = 2;
+    await a.version();
+    await a.schema('tasks');
+    assert.equal(h.schemas(), 1, 'a row written elsewhere moved the version, and no declaration');
+    token = 'd2';
+    await a.schema('tasks');
+    assert.equal(h.schemas(), 2, 'the log held a declaration');
+    /* NOT CAUGHT UP: kept by the version again, which has not moved since the last ask. */
+    token = null;
+    await a.schema('tasks');
+    assert.equal(h.schemas(), 3);
+    await a.schema('tasks');
+    assert.equal(h.schemas(), 3);
+  } finally {
+    followDeclarations(null);
+  }
+});
+
+test('THE SAME READ OUT AT ONCE IS SENT ONCE, each caller gets its own copy, and a write ends the sharing', async () => {
+  const h = host({ version: 1 });
+  const a = createClient({ base: 'https://fly.example', fetch: h.fetch });
+  const b = createClient({ base: 'https://fly.example', fetch: h.fetch });
+  const [x, y] = await Promise.all([a.get('tasks', 1), b.get('tasks', 1)]);
+  assert.equal(h.asked.filter((s) => s.endsWith(' get')).length, 1);
+  assert.deepEqual(x, y);
+  assert.notEqual(x, y);
+  const wrote0 = wrote();
+  const first = a.get('tasks', 1);
+  await a.create({ register: 'tasks', fields: { name: 'x' } });
+  await Promise.all([first, a.get('tasks', 1)]);
+  assert.equal(h.asked.filter((s) => s.endsWith(' get')).length, 3);
+  assert.equal(wrote(), wrote0 + 1);
 });

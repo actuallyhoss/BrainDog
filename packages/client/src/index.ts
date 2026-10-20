@@ -1267,7 +1267,46 @@ export type DoorHealth = {
 /** How long a list's schema is kept at one version: a host's own install can move it without a version a tab saw. */
 export const SCHEMA_KEPT_MS = 300_000;
 
-type SchemaStore = { version: number | null; lists: Map<string, { version: number | null; at: number; answer: Promise<Result<unknown>> }> };
+/** What a kept schema was kept at: the record's version, or the app's declarations token (`followDeclarations`). */
+type Stamp = number | string | null;
+type SchemaStore = { version: number | null; lists: Map<string, { version: Stamp; at: number; answer: Promise<Result<unknown>> }> };
+
+/**
+ * The app's word on the record's declarations, or `null` where it has none to give.
+ *
+ * A KEPT SCHEMA WENT STALE ON EVERY MOVE OF THE RECORD'S VERSION, and a lived-in record moves it with every row an agent
+ * writes, so each move asked every list's schema again though no declaration had changed. An app that follows the
+ * record's change log (the web's local copy) knows when one did: it hands a token here that moves only when the log
+ * holds a line it cannot place on a row, a declaration among them. While it answers a token, a schema kept under that
+ * token stays kept across version moves; `null` (not following, not caught up) keeps a schema by version, as before.
+ * The token is asked before every `schema`, so the app may hold it until its follow has caught up with the version.
+ */
+let FOLLOW: (() => Promise<string | null>) | null = null;
+
+/** Keep schemas by the app's declarations token from now on, or by the record's version again (`null`). */
+export function followDeclarations(token: (() => Promise<string | null>) | null): void {
+  FOLLOW = token;
+}
+
+/**
+ * The writes that can never change a declaration or a row's name: the reader's own mark, their own settings and a note.
+ * Every other write drops the kept schemas, since it may have declared something; these left Today's leave (`markRead`)
+ * asking every list's schema again on the next screen.
+ */
+const POST_READS = new Set(ROUTES.filter((r) => (r as { postRead?: true }).postRead === true).map((r) => r.name));
+/* AND A READ SENT AS A WRITE (`postRead`): Today's body is `previewPage`, and every read of it dropped every schema. */
+const UNDECLARING = new Set(['markRead', 'setPref', 'log', ...POST_READS]);
+
+/** How many writes this tab has sent that may have changed what a read answers (`UNDECLARING` aside). */
+let WROTE = 0;
+/** A number that moves whenever this tab sends a write that may change a row, a name or a declaration. */
+export const wrote = (): number => WROTE;
+
+/**
+ * The same read, out at once, is sent once (`call`): by the fetch it goes through, then its address and token. A screen
+ * and a tile asking `get(obligations, 3)` together, or two readers walking one list, shared nothing.
+ */
+let FLYING = new WeakMap<object, Map<string, Promise<Result<unknown>>>>();
 
 /**
  * Every client's kept schemas, by the fetch it sends through, then its host and its token.
@@ -1281,6 +1320,7 @@ let SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
 /** Drop every kept schema, as the app's `forget` does on a record switch and a sign-out, so the next ask goes out. */
 export function forgetSchemas(): void {
   SCHEMAS = new WeakMap();
+  FLYING = new WeakMap();
 }
 
 export function createClient(options: ClientOptions) {
@@ -1347,6 +1387,28 @@ export function createClient(options: ClientOptions) {
     const sent = writes ? JSON.stringify(args) : undefined;
     const outlives = how.outlive === true && sent !== undefined && new TextEncoder().encode(sent).length < KEEPALIVE_CEILING;
 
+    /* A READ ALREADY OUT IS NOT SENT TWICE (`FLYING`). The first caller gets the answer itself and every other one its
+       own copy, so a reader that sorts or trims the rows it was handed cannot reach into another's. */
+    if (sent === undefined) {
+      let byFetch = FLYING.get(doFetch);
+      if (byFetch === undefined) FLYING.set(doFetch, (byFetch = new Map()));
+      const key = `${url.toString()} ${options.token ?? ''}`;
+      const out = byFetch.get(key);
+      if (out !== undefined) return out.then((r) => structuredClone(r) as Result<T>);
+      const flight = send<T>(name, url, writes, sent, outlives);
+      const flights = byFetch;
+      flights.set(key, flight as Promise<Result<unknown>>);
+      void flight.finally(() => {
+        if (flights.get(key) === flight) flights.delete(key);
+      });
+      return flight;
+    }
+    /* A WRITE GOING OUT ENDS THE SHARING: a read asked after it must not be handed one sent before it. */
+    if (WRITES.has(name) && !POST_READS.has(name)) FLYING.get(doFetch)?.clear();
+    return send<T>(name, url, writes, sent, outlives);
+  }
+
+  async function send<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
     let res: Response;
     try {
       res = await doFetch(url.toString(), {
@@ -1370,8 +1432,12 @@ export function createClient(options: ClientOptions) {
     }
 
     const out = answered<T>(res.status, body);
-    /* A WRITE THIS CLIENT SENT MAY HAVE DECLARED SOMETHING, and the version it moved is not seen until the next poll. */
-    if (WRITES.has(name)) schemas().lists.clear();
+    /* A WRITE THIS CLIENT SENT MAY HAVE DECLARED SOMETHING, and the version it moved is not seen until the next poll.
+       Counted after it answered, so a read sent while it was out is not kept as though it saw the write. */
+    if (WRITES.has(name) && !UNDECLARING.has(name)) {
+      WROTE += 1;
+      schemas().lists.clear();
+    }
     return out;
   }
 
@@ -1529,13 +1595,19 @@ export function createClient(options: ClientOptions) {
       return out;
     },
     /** A list's schema, asked once a version for the whole tab (`SCHEMAS`). A refusal is not kept. */
-    schema: (register: string) => {
+    schema: async (register: string) => {
+      /* THE APP'S DECLARATIONS TOKEN FIRST (`FOLLOW`), which may wait for its follow of the log to catch up. */
+      const token = FOLLOW ? await FOLLOW().catch(() => null) : null;
       const store = schemas();
       const now = Date.now();
       const was = store.lists.get(register);
-      if (was !== undefined && was.version === store.version && now - was.at < SCHEMA_KEPT_MS && now >= was.at) return was.answer;
+      /* KEPT AT THE TOKEN, or at the version the record is at now, which a token then carries on past its moves. */
+      if (was !== undefined && (was.version === store.version || (token !== null && was.version === token)) && now - was.at < SCHEMA_KEPT_MS && now >= was.at) {
+        if (token !== null) was.version = token;
+        return was.answer;
+      }
       const answer = call<unknown>('schema', { register });
-      const entry = { version: store.version, at: now, answer };
+      const entry: { version: Stamp; at: number; answer: Promise<Result<unknown>> } = { version: token ?? store.version, at: now, answer };
       store.lists.set(register, entry);
       void answer.then((r) => {
         if (!r.ok && store.lists.get(register) === entry) store.lists.delete(register);
