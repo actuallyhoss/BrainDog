@@ -326,7 +326,11 @@ export function write(change: Pref & Sync): Pref & Sync {
  */
 export function apply(key: 'scheme' | 'text' | 'density', value: string | null): Promise<Kept> {
   if (typeof document === 'undefined') return Promise.resolve({ from: 'device' });
-  put(key, value);
+  /* THE SCHEME IS ONE EVEN CHANGE (motion F15): the whole window swaps in one view transition, with every other
+     transition off for that frame (`app.css` `data-retheme`). Text size and density move the layout, so they change
+     in place. */
+  if (key === 'scheme') retheme(() => put(key, value));
+  else put(key, value);
   /* `system` IS SENT AS A WORD, NOT AS `null`. `null` takes the key off the record, and another device would then keep
      the dark it last heard of; `system` is an answer every device reads as "match this screen". */
   return keep(LOOK_KEYS[key], key === 'scheme' ? (value ?? 'system') : value);
@@ -352,8 +356,27 @@ function put(key: 'scheme' | 'text' | 'density', value: string | null): void {
  */
 export function contrast(on: boolean): Promise<Kept> {
   if (typeof document === 'undefined') return Promise.resolve({ from: 'device' });
-  putContrast(on);
+  retheme(() => putContrast(on));
   return keep('look.contrast', on);
+}
+
+/**
+ * A CHANGE OF PALETTE AS ONE PICTURE (motion F15): `data-retheme` turns every element's own transition off, and the old
+ * picture of the window fades off over the new one. Where the browser has no view transitions, or the person asked for
+ * less motion, the change is made at once. The cookie is written inside `set`, so it lands in the same frame either way.
+ */
+function retheme(set: () => void): void {
+  const root = document.documentElement;
+  const vt = (document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<unknown> } }).startViewTransition;
+  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof vt !== 'function' || still) {
+    set();
+    return;
+  }
+  root.dataset.retheme = '';
+  vt.call(document, set)
+    .finished.catch(() => undefined)
+    .finally(() => delete root.dataset.retheme);
 }
 
 function putContrast(on: boolean): void {
