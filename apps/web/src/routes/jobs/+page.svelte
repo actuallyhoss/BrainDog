@@ -332,7 +332,7 @@
                               class="dot"
                               aria-hidden="true"
                             ></span>{/if}{state.word}</span
-                        >{#each detailOf(r) as part, k (k)}<span class="sep" aria-hidden="true">·</span><span>{part}</span>{/each}
+                        >{#each detailOf(r) as part, k (k)}<span class="sep" aria-hidden="true">{' · '}</span><span>{part}</span>{/each}
                       </span>
                     </span>
                     <span class="took num" data-live={isLive(r.status) ? '' : undefined}>{took ?? ''}</span>

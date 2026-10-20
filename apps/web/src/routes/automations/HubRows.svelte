@@ -67,7 +67,7 @@
       <span class="line-title name">{r.name}</span>
     {/if}
     <span class="line-detail meta">
-      {#if r.what}<span class="what">{r.what}</span>{#if r.said}<span class="sep"> · </span>{/if}{/if}
+      {#if r.what}<span class="what">{r.what}</span>{#if r.said}<span class="sep">{' · '}</span>{/if}{/if}
       {#if r.said}<span class="said" data-dot={r.dot ?? undefined}>{r.said}</span>{/if}
     </span>
   </span>
@@ -126,7 +126,7 @@
           <span class="line-main">
             <span class="line-title name">{fam.name}</span>
             <span class="line-detail meta"
-              ><span class="what">{familyWords.count(fam.count)}</span>{#if said}<span class="sep"> · </span><span class="said">{said}</span>{/if}</span
+              ><span class="what">{familyWords.count(fam.count)}</span>{#if said}<span class="sep">{' · '}</span><span class="said">{said}</span>{/if}</span
             >
           </span>
           <span class="aside turn" data-open={shown ? '' : undefined}><Icon name="chevronDown" size="s" /></span>

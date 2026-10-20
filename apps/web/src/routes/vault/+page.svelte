@@ -626,7 +626,7 @@
                 <span class="line-title who-name">{d.label ?? copy.unnamedMachine}</span>
                 <span class="line-detail who-detail"
                   ><span class="state"><span class="dot" data-tone="warn" role="img" aria-label={TONES.warn.label}></span>{tileWords.waiting}</span
-                  ><span class="sep" aria-hidden="true">·</span>{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">·</span>{words.days(
+                  ><span class="sep" aria-hidden="true">{' · '}</span>{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">{' · '}</span>{words.days(
                     daysFor(d.scope),
                   )}</span
                 >
@@ -819,7 +819,7 @@
             <span class="line-main">
               <span class="line-title who-name">{d.label ?? copy.unnamedMachine}</span>
               <span class="line-detail who-detail"
-                >{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">·</span>{d.last_used
+                >{scopeName(d.scope, names)}<span class="sep" aria-hidden="true">{' · '}</span>{d.last_used
                   ? copy.usedWhen(since(d.last_used, Date.now()))
                   : copy.neverUsed}</span
               >

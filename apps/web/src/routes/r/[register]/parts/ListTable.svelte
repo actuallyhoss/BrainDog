@@ -230,7 +230,7 @@
   <!-- ANY OTHER VALUE: an amount as the column draws it, and a late row's deadline with how late it is before the day. -->
   {#snippet plainSaid(row: TableRow, field: string, value: string)}
     {@const late = lateSaid(row, field)}
-    {#if late}<span class="late-word">{late}</span><span class="late-sep" aria-hidden="true"> · </span>{/if}{figureCell(field, value)}
+    {#if late}<span class="late-word">{late}</span><span class="late-sep" aria-hidden="true">{' · '}</span>{/if}{figureCell(field, value)}
   {/snippet}
   <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
        without it, so eight header buttons over a single row, each announcing
@@ -758,10 +758,6 @@
   /* HOW LATE, BEFORE THE DAY, at the cell's weight plus one, so the words read first and the days still line up at the
      column's end. */
   /* The dot between how late and the day keeps its air where the cell lays its words out in a row. */
-  .late-sep {
-    margin-inline: 0.35em;
-  }
-
   .late-word {
     font-weight: var(--fw-medium);
   }
