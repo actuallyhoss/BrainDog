@@ -1878,8 +1878,10 @@ export function blockOf(
     });
   });
   /* AND THE CHIP EACH OF THOSE CELLS WEARS: the project's mark in its hue, or the globe for everywhere. A
-     run's project is where it was placed, and a run placed nowhere is not "everywhere", so an agent's runs draw words. */
-  const scopeCells = live ? undefined : scopeCellsOf(b.columns ?? [], rows, scopeMarked);
+     run's project is where it was placed, and a run placed nowhere is not "everywhere": its cell stays empty, so it
+     draws nothing. A run that names a project wears its dot as a row of that project does, "on ● Kiln" in the card's
+     meta line (the UI pass of 20 October, agents F7), where it was a fact under a label. */
+  const scopeCells = scopeCellsOf(b.columns ?? [], rows, scopeMarked);
   /* EACH CARD'S NEXT STEP IS THE RECORD'S ANSWER, `nexts`, written into the cell and never into the row, unlike a ring.
      The column names a field of the STEPS list, and the card's own list may hold a field of the same name: the measured
      desk's areas have a `what` of their own, so merged into the row it would also have replaced the card's `what` in
