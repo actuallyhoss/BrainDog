@@ -63,9 +63,10 @@
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { ALIKE, SAMPLES_MOST, groupsOf, type Group } from './shapes.ts';
   import { builderPath } from '$lib/pattern/draft.ts';
-  import { words as patternWords } from '$lib/pattern/words.ts';
   import Section from '$lib/ui/Section.svelte';
   import Segmented from '$lib/ui/Segmented.svelte';
+  import Menu from '$lib/ui/Menu.svelte';
+  import { recordNow } from '$lib/record/boot-live.ts';
   import Face from '$lib/ui/Face.svelte';
   import { actor, listName } from '$lib/record/names.ts';
   import type { Pattern, Series, SettledItem, Tally } from './series.ts';
@@ -79,8 +80,13 @@
    * sentence here that named the allowance would be wrong the day the door moves it.
    */
   const words = {
-    askPattern: 'Ask Slash for a pattern',
-    asking: 'Slash is drafting a pattern',
+    /** The press that asks for a rule drafted from a sender's alike messages (today F14): no internal name in it. */
+    askPattern: 'Suggest a rule',
+    asking: 'Drafting a rule',
+    /** And making the rule by hand from them, the quiet second. */
+    makeOne: 'Make one myself',
+    /** The head's "⋯" on a phone, where Select waits. */
+    more: 'More on Inbox',
     unfiled: 'Slash drafted nothing to decide from these.',
     unreached: 'BrainDog could not reach Slash. Nothing was drafted.',
     series: 'Show',
@@ -186,11 +192,15 @@
   const groups = $derived(groupsOf(INBOX.slice(0, DOM_CAP), shapes));
   /* THE ROWS BY DAY, and the alike groups that could be learned once. `shown` is the rows in the order the days draw
      them, which is the order the cursor walks and the next row opens in. */
-  const days = $derived(daysOf(INBOX.filter((i) => !heldHere.has(i.id)).slice(0, DOM_CAP), Date.now()));
+  const days = $derived(daysOf(INBOX.filter((i) => !heldHere.has(i.id)).slice(0, DOM_CAP), recordNow()));
   const alike = $derived(groups.filter((g) => g.items.length > 1));
   const shown = $derived(days.flatMap((d) => d.items));
   const place = $derived(new Map(shown.map((item, i) => [item.id, i])));
-  const clock = $derived(Date.now());
+  /* ON THE RECORD'S CLOCK, so "7w ago" is never the browser's date against a record's morning. */
+  const clock = $derived(recordNow());
+  /* THE WINDOW'S WIDTH: under 640 the head is a phone's (today F14), its switch under the sentence and Select in a "⋯". */
+  let viewWidth = $state(1024);
+  const phone = $derived(viewWidth < 640);
   const answered = $derived(live !== null);
 
   let open = $state<string | null>(null);
@@ -639,7 +649,7 @@
 </script>
 
 <svelte:head><title>{titleOf(said('inbox'))}</title></svelte:head>
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} bind:innerWidth={viewWidth} />
 
 {#snippet fileInto(where: 'bar' | 'row')}
   <!-- THE LIST A FILING GOES INTO, a pill in the toolbar, where it stays in view while the list scrolls. A phone's head
@@ -656,35 +666,60 @@
 
 {#snippet toolbar()}
   {#if answered && !unrouted && !refused}
-    <!-- FILED AND UNFILED AS ONE SERIES, three states of the same arrivals, so what was filed stays where it can be
-         seen and put back rather than vanishing from the screen it left. The chosen one is the white pill. -->
-    {#if !never}
-    <Segmented class="series" role="group" aria-label={words.series}>
-      {#each segments as s (s.v)}
-        <button
-          type="button"
-          class="segment"
-          aria-pressed={view === s.v}
-          data-on={view === s.v ? '' : undefined}
-          onclick={() => show(s.v)}
-        >{s.label}{#if s.n}<span class="segment-n num">{s.n}</span>{/if}</button>
-      {/each}
-    </Segmented>
+    {#if !phone}
+      {#if !never}{@render seriesSwitch(false)}{/if}
+      {#if view === 'waiting' && INBOX.length > 0}
+        <!-- WHERE A FILING GOES, AND SELECTING, ONLY WHILE SOMETHING WAITS: over an empty inbox both are controls for
+             nothing. -->
+        {@render fileInto('bar')}
+        <span class="select-toggle">
+          <Button
+            aria-pressed={selecting}
+            onclick={() => {
+              selecting = !selecting;
+              if (!selecting) picked = new Set();
+            }}>{selecting ? copy.decideSelectDone : copy.decideSelect}</Button
+          >
+        </span>
+      {/if}
+    {:else if view === 'waiting' && INBOX.length > 0}
+      <!-- ON A PHONE SELECT WAITS IN THE "⋯" (today F14), and where a filing goes is said in the open row. -->
+      <Menu label={words.more} align="end">
+          {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="isr">{words.more}</span></span>{/snippet}
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={selecting}
+            onclick={() => {
+              selecting = !selecting;
+              if (!selecting) picked = new Set();
+            }}>{copy.decideSelect}</button
+          >
+        </Menu>
     {/if}
-    {#if view === 'waiting' && INBOX.length > 0}
-      <!-- WHERE A FILING GOES, AND SELECTING, ONLY WHILE SOMETHING WAITS: over an empty inbox both are controls for
-           nothing. -->
-      {@render fileInto('bar')}
-      <span class="select-toggle">
-        <Button
-          aria-pressed={selecting}
-          onclick={() => {
-            selecting = !selecting;
-            if (!selecting) picked = new Set();
-          }}>{selecting ? copy.decideSelectDone : copy.decideSelect}</Button
-        >
-      </span>
-    {/if}
+  {/if}
+{/snippet}
+
+{#snippet seriesSwitch(full: boolean)}
+  <!-- FILED AND UNFILED AS ONE SERIES, three states of the same arrivals, so what was filed stays where it can be seen and
+       put back rather than vanishing from the screen it left. The chosen one is the white pill. On a phone it is a row of
+       three equal segments under the sentence. -->
+  <Segmented class="series" role="group" aria-label={words.series} {full}>
+    {#each segments as s (s.v)}
+      <button
+        type="button"
+        class="segment"
+        aria-pressed={view === s.v}
+        data-on={view === s.v ? '' : undefined}
+        onclick={() => show(s.v)}
+      >{s.label}{#if s.n}<span class="segment-n num">{s.n}</span>{/if}</button>
+    {/each}
+  </Segmented>
+{/snippet}
+
+{#snippet underHead()}
+  {#if answered && !unrouted && !refused && !never}
+    {@render seriesSwitch(true)}
   {/if}
 {/snippet}
 
@@ -696,6 +731,7 @@
   sentence={sentence?.text}
   needs={sentence?.needs}
   actions={toolbar}
+  below={phone ? underHead : undefined}
 />
 
 <div class="page">
@@ -977,7 +1013,7 @@
                       {asking === group.shape ? words.asking : words.askPattern}
                     </Button>
                   {/if}
-                  <Button size="sm" href={builderPath(group.items.slice(0, SAMPLES_MOST).map((i) => i.id))}>{patternWords.fromInbox}</Button>
+                  <Button size="sm" weight="bare" href={builderPath(group.items.slice(0, SAMPLES_MOST).map((i) => i.id))}>{words.makeOne}</Button>
                 </span>
               </div>
             </li>
@@ -986,9 +1022,10 @@
       </Section>
     {/if}
 
-    <div class="days">
+    <!-- ONE TILE FOR ALL THAT WAITS (today F14), each day a quiet subhead over its rows and no rule above it. -->
+    <Section title={words.waiting} count={INBOX.length}>
       {#each days as d (d.day)}
-        <Section title={d.label} count={d.items.length}>
+        <h3 class="day-h">{d.label}</h3>
           <ul class="ledger arrivals" data-picking={picking ? '' : undefined}>
             {#each d.items as item (item.id)}
               {@const i = place.get(item.id) ?? -1}
@@ -1047,9 +1084,8 @@
               </li>
             {/each}
           </ul>
-        </Section>
       {/each}
-    </div>
+    </Section>
     <CapLine shown={Math.min(INBOX.length, DOM_CAP)} total={INBOX.length} />
     {#if live && live.cursor !== null}
       <div class="older">
@@ -1166,6 +1202,26 @@
   /* `Select` IS A PHONE'S AND A THUMB'S, for the reason `selecting` gives. */
   .select-toggle {
     display: none;
+  }
+
+  /* THE "⋯" IN A PHONE'S HEAD: a quiet square, a tap wide. Its name is said to a screen reader and not drawn. */
+  .head-more {
+    display: inline-grid;
+    place-items: center;
+    inline-size: var(--tap);
+    block-size: var(--tap);
+    background: var(--field);
+    border-radius: var(--r-ctl);
+    color: var(--ink2);
+  }
+
+  .isr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* ── the layout ───────────────────────────────────────────────────────── */
@@ -1449,12 +1505,29 @@
    * side, so the wash is the list item's, round the lot: the cursor row and a hovered one take `--hover-wash`, and a
    * picked one `--selected`. The row button draws no fill of its own, or the two would stack.
    */
+  /* EACH DAY A QUIET SUBHEAD IN THE ONE TILE (today F14): 13/600 in the quiet ink, 16 above, no rule. */
+  .day-h {
+    margin: var(--sp-4) 0 var(--sp-1);
+    color: var(--dim);
+    font-family: var(--font-ui);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-semi);
+    line-height: 1.4;
+  }
+
+  .day-h:first-child {
+    margin-block-start: 0;
+  }
+
+  /* ONE GRID FOR AN OPEN ROW AND A SHUT ONE (today F14): the check, the words, and the time at the end of the third
+     column always, so every row's time and hairline end at the same place. */
   .arrival {
+    --row-wash: var(--hover-wash);
     position: relative;
     display: grid;
-    grid-template-columns: var(--well-l) minmax(0, 1fr) auto;
+    grid-template-columns: 28px minmax(0, 1fr) 72px;
     align-items: center;
-    padding-inline-start: var(--sp-3);
+    padding-inline: var(--sp-3);
     border-radius: var(--r-md);
     scroll-margin-block: var(--sp-7);
     transition: background var(--d-state) var(--ease-out);
@@ -1465,6 +1538,7 @@
   }
 
   .arrival:has(.pick[data-on]) {
+    --row-wash: var(--selected);
     background: var(--selected);
   }
 
@@ -1485,28 +1559,38 @@
     opacity: 0;
   }
 
+  /* THE CHECK STARTS WHERE THE DAY'S SUBHEAD DOES. */
   .arrival > .pick {
     grid-column: 1;
     grid-row: 1;
-    justify-self: center;
+    justify-self: start;
   }
 
-  /* The row is a `<button>`, at every width: it opens and closes. SUBJECT AND DETAIL, THEN WHEN. */
+  /* The row is a `<button>`, at every width: it opens and closes. SUBJECT AND DETAIL, THEN WHEN, over the second and
+     third columns, so the time is the third's. */
   .arrival > .line {
-    grid-column: 2;
+    grid-column: 2 / 4;
     grid-row: 1;
-    grid-template-columns: minmax(0, 1fr) 9ch;
+    grid-template-columns: minmax(0, 1fr) 72px;
+    column-gap: var(--sp-3);
     inline-size: 100%;
+    padding-inline: var(--sp-3) 0;
     background: none;
     border: 0;
     font: inherit;
     cursor: pointer;
   }
 
+  /* THE ROW'S VERBS FLOAT AT THE END OF ITS WORDS, before the time, on the row's own wash, so they move nothing when
+     they show. */
   .arrival > .line-verbs {
-    grid-column: 3;
-    grid-row: 1;
-    padding-inline-end: var(--sp-3);
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-end: calc(var(--sp-3) + 72px + var(--sp-3));
+    padding-inline-start: var(--sp-3);
+    background-color: var(--tile);
+    background-image: linear-gradient(var(--row-wash), var(--row-wash));
+    transform: translateY(-50%);
   }
 
   /* An open row says its verbs in full in its body, so the row's own go. */
@@ -1539,11 +1623,12 @@
     white-space: nowrap;
   }
 
-  /* THE BODY SITS UNDER THE SUBJECT, on the ground: space opens it, not a slab. */
+  /* THE BODY SITS UNDER THE SUBJECT, on the ground: space opens it, not a slab. Its buttons stay in the words' column. */
   .body {
-    grid-column: 2 / -1;
+    grid-column: 2;
     grid-row: 2;
-    padding: 0 var(--sp-3) var(--sp-5);
+    min-inline-size: 0;
+    padding: 0 0 var(--sp-5) var(--sp-3);
   }
 
   .raw {
@@ -1663,7 +1748,7 @@
    */
   @media (pointer: coarse) {
     .arrival {
-      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-columns: auto minmax(0, 1fr) 72px;
       padding-inline-start: 0;
     }
 
@@ -1705,10 +1790,6 @@
       display: none;
     }
 
-    .arrival > .line {
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
-
     .arrival .line-main {
       grid-column: 1;
       grid-row: 1;
@@ -1718,6 +1799,12 @@
       grid-column: 2;
       grid-row: 1;
       align-self: start;
+    }
+
+    /* AN OPEN ROW'S BODY AND BUTTONS TAKE THE CARD'S WIDTH ON A PHONE, under the time as well. */
+    .body {
+      grid-column: 1 / -1;
+      padding-inline-start: 0;
     }
 
     .arrival .line-detail {
