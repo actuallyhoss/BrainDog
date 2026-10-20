@@ -23,6 +23,7 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { navPrefs, TABS_MOST, type Saved } from '$lib/nav-prefs.svelte.ts';
   import { arrange } from '$lib/nav.ts';
+  import { PLACES } from '$lib/nav/rail.ts';
   import type { IconName } from '$lib/ui/icons.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
@@ -81,7 +82,8 @@
    * fifth is refused in words beside its switch rather than silently dropping three.
    */
   const NEEDS = '/decide';
-  const FIVE = ['orders', 'shop', 'projects', 'money', 'agents'];
+  /* THE SAME FIVE `tabsOf` READS (`lib/nav.ts` `FIVE`), from the one list of places, never spelled here. */
+  const FIVE = PLACES.filter((name) => name !== 'work' && name !== 'people');
   type BarRow = { href: string; title: string; icon: IconName; section?: string | undefined };
   const barRows = $derived<BarRow[]>([
     { href: NEEDS, title: voiceSaid('decide'), icon: 'inbox' },

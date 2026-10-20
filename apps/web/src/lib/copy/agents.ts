@@ -33,9 +33,7 @@ export const agents = {
   keyCopied: 'Key copied',
 
   /* WHAT IS CONNECTED: every machine, key and app on one list (`record/device.ts` `connected`). */
-  connectedTitle: 'Connected',
   connectedNone: 'No agent is connected yet',
-  connectYourAgent: 'Connect your agent',
   /* IT NAMES WHAT FILLS THE LIST, not where on the screen the ways to fill it are. */
   connectedNoneWhy: 'Connect one and it shows here with what it did.',
   agentOn: (agent: string, machine: string) => `${agent} on ${machine}`,

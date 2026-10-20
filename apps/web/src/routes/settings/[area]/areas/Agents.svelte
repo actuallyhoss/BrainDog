@@ -25,12 +25,13 @@
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
-    RUNS_READ, connectLines, connected, heardFrom, nameOf, projectsOf, reachKey, reachOf, reportKeyOf,
+    RUNS_READ, connectLines, connected, heardFrom, nameOf, reachKey, reachOf, reportKeyOf,
     runName, runsOf, standing, waiting, type Connection, type DeviceRow, type Heard, type HeardScope, type Run, type TokenRow,
   } from '$lib/record/device.ts';
   import { recordNow } from '$lib/record/boot-live.ts';
   import { agentKey, agentName } from '$lib/record/hand.ts';
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
+  import { placesIn } from '$lib/record/scope-move.ts';
   import { words as askWords } from '$lib/ui/slash-asks.ts';
   import { page } from '$app/state';
   import { lineOf, partsOf } from '$lib/record/apps.ts';
@@ -123,10 +124,20 @@
     if (!devices.ok) return devices;
     const keys = await c.listTokens();
     const runs = await c.list({ register: 'session', limit: RUNS_READ, order: [{ field: 'last_seen', dir: 'desc' }] });
-    /* THE PROJECTS A RUN WAS PLACED IN, by name, so a row says "on Kiln" and never `things#1`. A record without the list
-       is a row with no project, never a refusal. */
-    const things = await c.list({ register: 'things', limit: 200 }).catch(() => null);
-    const projects: Map<string, HeardScope> = things?.ok ? projectsOf('things', things.value.rows) : new Map();
+    /* THE PROJECTS A RUN WAS PLACED IN, by name, so a row says "on Kiln" and never its ref. The list is read off the
+       refs the runs hold (`<list>#<n>`), through the one reader of places (`scope-move.ts`); one it cannot read leaves
+       the row with no project, never a refusal. */
+    const projects = new Map<string, HeardScope>();
+    const lists = new Set<string>();
+    for (const r of runs.ok ? runs.value.rows : []) {
+      const said = (r as { fields?: { project?: unknown } }).fields?.project;
+      if (typeof said === 'string' && said.includes('#')) lists.add(said.slice(0, said.indexOf('#')));
+    }
+    for (const list of lists)
+      for (const p of (await placesIn(apiBase(), list).catch(() => null)) ?? []) {
+        projects.set(p.ref, p);
+        projects.set(p.spoken, p);
+      }
     const presence = new Map<number, RunPresence>();
     /* THE RECORD'S CLOCK (`recordNow`), so "3 min ago" is the record's and not this browser's. */
     const now = recordNow();

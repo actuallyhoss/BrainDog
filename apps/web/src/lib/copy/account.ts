@@ -15,10 +15,6 @@
 export const account = {
   shownInNav: (title: string) => `${title} is back in your nav.`,
   showAgain: 'Show again',
-  hiddenPages: 'Hidden from your nav',
-  hiddenPagesHint: 'A hidden page stays in the record, in search and in the palette. Show it again and it returns to the place it had.',
-  hiddenNone: 'Nothing is hidden',
-  hiddenNoneWhy: 'Hide a page from Settings, under Navigation or Pages.',
   perPerson: 'Kept for you on this record, on every device you sign in on.',
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
 
@@ -362,7 +358,6 @@ export const account = {
 
   /* notifications: `09` specifies the mechanism and one setting, the quiet hours, so the rest of this reports */
   whenWeInterrupt: 'When this record interrupts you',
-  batchByDefault: 'Most things wait for your summary. Only urgent ones interrupt.',
   /* QUIET HOURS ARE THE RECORD'S AND AN OWNER SETS THEM (`09 §5` rule 3). One sentence with the two times in it
      and a switch beside it; a member reads the same sentence with no control. A summary due inside them waits for
      their end, and an urgent notice never does. */
@@ -374,11 +369,6 @@ export const account = {
   quietOff: 'Off. Your summary goes when it is due, day or night.',
   quietOwner: 'Only an owner can change these.',
   quietDefault: 'Put back 21:00 to 08:00',
-  urgentKinds: 'Urgent',
-  interruptCap: 'At most',
-  interruptCapIs: 'One urgent interruption an hour.',
-  unreadCount: 'Unread',
-  unreadCountIs: 'One number, on the record, in one place.',
 
   /* notifications on this device: Web Push, drawn only where the host has a key.
      THE LINE NEVER SAYS WHAT HAPPENED, because a push passes through a push service nobody here runs (`09 §3`). */

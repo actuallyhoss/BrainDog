@@ -157,10 +157,9 @@ export function currencyPackOf(packs: readonly Read[]): PackConfig | null {
 /**
  * WHETHER A MONEY ADD-ON IS SWITCHED ON, whatever it declares (UI pass 20 Oct, agents F4). The area said "Turn on Money in
  * Add-ons" on a record whose Money was on, because the seed's money add-on keeps no currency setting. An add-on counts
- * as Money by its id or by holding the transactions list.
+ * as Money by its id, the word the area itself names it by.
  */
-export const moneyOn = (packs: readonly Read[]): boolean =>
-  packs.some((p) => p.state.disabled_at === null && (/^money(?:-|$)/u.test(p.state.id) || (p.state.registers ?? []).includes('transactions')));
+export const moneyOn = (packs: readonly Read[]): boolean => packs.some((p) => p.state.disabled_at === null && /^money(?:-|$)/u.test(p.state.id));
 
 /** The home currency a pack holds, as the kernel reads it: three letters in capitals, else none. */
 export const currencyIn = (s: PackConfig | null): string => {

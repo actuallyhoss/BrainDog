@@ -77,7 +77,6 @@
     upWord: 'Move up',
     downWord: 'Move down',
     hideWord: 'Hide',
-    showWord: 'Show',
     open: 'Open',
     more: (title: string) => `More for ${title}`,
     layout: 'Edit layout',
@@ -394,7 +393,7 @@
       <span class="line-when line-verbs page-acts">
         {#if hidden}
           <!-- A HIDDEN PAGE'S ONE PRESS, drawn and not in a menu: the way back. -->
-          <span class="moves"><Button size="sm" onclick={() => toggleHidden(p, title)}>{words.showWord}</Button></span>
+          <span class="moves"><Button size="sm" onclick={() => toggleHidden(p, title)}>{copy.showAgain}</Button></span>
         {:else if p.inNav && !p.app}
           <!-- MOVE AND HIDE ARE ALWAYS DRAWN (agents F18), 32px, 44 under a thumb; below 640px they live in the menu. -->
           <span class="moves" data-moves="">

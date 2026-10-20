@@ -162,11 +162,11 @@ test('the home currency is written where the kernel reads it: the first pack on,
 });
 
 test('Money counts as on when its add-on is on, even one that keeps no currency setting (agents F4)', () => {
-  const bare = (id: string, registers: string[] = [], off = false): Read => ({ state: { ...state(id, off), registers }, settings: { id, version: null, config: {}, values: {} } });
-  assert.equal(moneyOn([bare('money-core', ['accounts', 'transactions'])]), true);
-  assert.equal(moneyOn([bare('house', ['transactions'])]), true);
-  assert.equal(moneyOn([bare('money-core', [], true)]), false);
-  assert.equal(moneyOn([bare('people', ['people'])]), false);
+  const bare = (id: string, off = false): Read => ({ state: state(id, off), settings: { id, version: null, config: {}, values: {} } });
+  assert.equal(moneyOn([bare('money-core')]), true);
+  assert.equal(moneyOn([bare('money')]), true);
+  assert.equal(moneyOn([bare('money-core', true)]), false);
+  assert.equal(moneyOn([bare('moneyball')]), false);
   const src = readFileSync(new URL('./areas/Words.svelte', import.meta.url), 'utf8');
   /* "TURN ON MONEY" ONLY WHEN NO MONEY ADD-ON IS ON, and the lists are always drawn. */
   assert.match(src, /!on \? words\.noMoney/u);

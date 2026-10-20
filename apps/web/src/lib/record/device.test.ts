@@ -120,7 +120,7 @@ test('the words on this screen carry no em dash and no schema word', () => {
   const words = [
     ...Object.values(copy.deviceState), ...Object.values(copy.reachMeans), ...Object.values(copy.keyCan),
     copy.approveTitle, copy.codeLabel, copy.codeGo, copy.codeEmpty, copy.codeOther, copy.codeWrong, copy.codeTries,
-    copy.codeExpired, copy.signInAgainWhy, copy.signInAgain, copy.connectedTitle, copy.connectedNone,
+    copy.codeExpired, copy.signInAgainWhy, copy.signInAgain, copy.connectedNone,
     copy.connectedNoneWhy, copy.connectTitle, copy.doorKeyLabel, copy.doorKeyGo, copy.tokenOnce, copy.copyKey,
     copy.connectDone, copy.unnamedMachine, copy.unnamedKey,
   ];
@@ -296,7 +296,7 @@ test('a client that is not one reads as no client, and the words carry no em das
 test('the agents that work here come from every run, one per agent, newest first, named by project', () => {
   const now = Date.parse('2026-09-03T12:00:00Z');
   const run = (seq: number, agent: string, last_seen: string, project?: string) => ({ seq, fields: { agent, last_seen, ...(project ? { project } : {}) } });
-  const projects = device.projectsOf('things', [{ seq: 1, fields: { name: 'Kiln', mark: '◼', hue: 265 } }]);
+  const projects = new Map([['things#1', { spoken: 'kiln', name: 'Kiln', mark: '◼', hue: 265 }]]);
   const heard = device.heardFrom(
     [
       run(1, 'claude', '2026-09-03T11:57:00Z', 'things#1'),
