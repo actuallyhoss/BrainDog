@@ -83,6 +83,8 @@
   const fine = $derived(pairs.length - shown.length);
   const ok = $derived(saveable(pairs, refused));
   const palette = $derived(drawn ? drawn.house.schemes[scheme] : null);
+  /* THE SPECIMEN PAINTS BY THE PAGE'S NAMES (SPEC 1.10): the solved frame over the solver's roles. */
+  const painted = $derived(drawn && palette ? { ...palette, ...drawn.house.frame[scheme] } : null);
   /* Whether the page is in a look of the record's own, kept here because the module that knows is not reactive. */
   let hasOwnLook = $state(drawnNow() !== null);
 
@@ -431,7 +433,7 @@
               <button type="button" class="segment" aria-pressed={scheme === s} data-on={scheme === s ? '' : undefined} onclick={() => (scheme = s)}>{label}</button>
             {/each}
           </Segmented>
-          <Specimen {palette} {draft} />
+          {#if painted}<Specimen palette={painted} {draft} />{/if}
         </div>
       </div>
     </div>
@@ -531,8 +533,8 @@
     block-size: var(--tap);
     padding: 0;
     background: var(--swatch);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-xs);
     cursor: pointer;
   }
 
@@ -612,15 +614,15 @@
     padding: 0 var(--sp-3);
     background: var(--pair-bg);
     color: var(--pair-fg);
-    border-radius: var(--r-sm);
-    font-size: var(--text);
+    border-radius: var(--r-xs);
+    font-size: var(--fs-body);
   }
 
   .pair-bar {
     inline-size: var(--sp-7);
     block-size: var(--sp-2);
     background: var(--pair-fg);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   .pair-words {

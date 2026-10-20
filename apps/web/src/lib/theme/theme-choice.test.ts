@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 
 import { choicesOf, pickIn, previewOf, styleOf } from './theme-choice.ts';
 
-const LIGHT = { tile: '#FFFFFF', ink: '#14161A', action: '#C8322B', 'r-lg': '12px' };
-const DARK = { tile: '#1B1D22', ink: '#F1F2F4', action: '#E5554D', 'r-lg': '12px' };
+const LIGHT = { tile: '#FFFFFF', ink: '#14161A', action: '#C8322B', 'r-tile': '12px' };
+const DARK = { tile: '#1B1D22', ink: '#F1F2F4', action: '#E5554D', 'r-tile': '12px' };
 
 /* A BOOT WITH TWO ADD-ON LOOKS and no look of the record's own, as `looksOf` would answer it. */
 const boot = (pick?: string) => ({
@@ -60,6 +60,6 @@ test('with no record look the preview is the fallback’s other scheme, and with
 test('a token that is not a colour or a pixel size never reaches the style attribute', () => {
   const b = { theme: { light: LIGHT, dark: { tile: '#1B1D22', ink: 'red; } body { x: y', 'Bad Name': '#000000' } } };
   assert.deepEqual(previewOf(b, 'light'), { tile: '#1B1D22' });
-  assert.equal(styleOf({ tile: '#1B1D22', 'r-lg': '12px' }), '--tile: #1B1D22; --r-lg: 12px;');
+  assert.equal(styleOf({ tile: '#1B1D22', 'r-tile': '12px' }), '--tile: #1B1D22; --r-tile: 12px;');
   assert.equal(styleOf(null), '');
 });

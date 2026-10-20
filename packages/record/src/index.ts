@@ -1227,9 +1227,10 @@ export type Boot = {
    * is what passed. Only the house profile's roles travel: a reader who turned on more contrast keeps the house's
    * high-contrast palette, because a record's look must never take away the palette that reader needs.
    *
-   * AND THE CORNERS AND THE ROW HEIGHT TRAVEL BESIDE THE ROLES, as `r-sm`, `r-md`, `r-lg` and `row-h`, when the
+   * AND THE CORNERS AND THE ROW HEIGHT TRAVEL BESIDE THE ROLES, as `r-xs`, `r-pop`, `r-tile` and `row-h`, when the
    * declaration's `scale` names them: a look is its colours, its corners and its density, and the app draws all three
-   * from one place.
+   * from one place. The colours are the frame's names (`frame`, SPEC 1.10) over the solver's roles, so the page paints
+   * the look; the solver's roles ride along for the editor, which re-seeds from `accent`.
    */
   theme: { light: Record<string, string>; dark: Record<string, string> } | null;
   /** The looks this record holds, the record's own first and then each add-on's (`looksOf`), for Appearance's chooser. */
@@ -7522,7 +7523,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const built = await themeBuilt(row.id, body);
       if (built === null) return null;
       const scale = themeScale(body);
-      return { light: { ...built.house.schemes.light, ...scale }, dark: { ...built.house.schemes.dark, ...scale } };
+      return {
+        light: { ...built.house.schemes.light, ...built.house.frame.light, ...scale },
+        dark: { ...built.house.schemes.dark, ...built.house.frame.dark, ...scale },
+      };
     })();
     themeKept = { key, drawn };
     return drawn;
@@ -7542,9 +7546,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (scale === null || typeof scale !== 'object') return out;
     const { radius, density } = scale as { radius?: unknown; density?: unknown };
     if (radius !== null && typeof radius === 'object')
-      for (const step of ['sm', 'md', 'lg'] as const) {
+      for (const [step, token] of [['sm', 'r-xs'], ['md', 'r-pop'], ['lg', 'r-tile']] as const) {
         const r = (radius as Record<string, unknown>)[step];
-        if (typeof r === 'number' && Number.isInteger(r) && r >= 0 && r <= 24) out[`r-${step}`] = `${r}px`;
+        if (typeof r === 'number' && Number.isInteger(r) && r >= 0 && r <= 24) out[token] = `${r}px`;
       }
     const rows: Record<string, string> = { compact: '32px', comfortable: '36px', roomy: '44px' };
     if (typeof density === 'string' && Object.hasOwn(rows, density)) out['row-h'] = rows[density]!;

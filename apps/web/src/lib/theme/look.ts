@@ -165,11 +165,20 @@ function laid(built: Built, roles: Draft['roles']): Built {
 
 export const drawOf = (base: Base, draft: Draft): Drawn => ({ house: laid(base.house, draft.roles), contrast: laid(base.contrast, draft.roles) });
 
-/** The look a draft draws, in `Boot.theme`'s shape, so a save can be drawn at once without waiting for the next `boot`. */
+/**
+ * The look a draft draws, in `Boot.theme`'s shape, so a save can be drawn at once without waiting for the next `boot`.
+ *
+ * BY THE NAMES THE PAGE PAINTS WITH (SPEC 1.10): the solved frame over the solver's own roles, so the record's red fill
+ * reaches every button, and the corners as the three radii a look moves (`--r-xs`, `--r-pop`, `--r-tile`). The solver's
+ * roles travel too, because `draftFrom` re-seeds from the light `accent`; nothing paints with them.
+ */
 export function lookFrom(drawn: Drawn, draft: Draft): Look {
   const r = CORNERS[draft.corners];
-  const scale = { 'r-sm': `${r.sm}px`, 'r-md': `${r.md}px`, 'r-lg': `${r.lg}px`, 'row-h': `${ROW_H[draft.density]}px` };
-  return { light: { ...drawn.house.schemes.light, ...scale }, dark: { ...drawn.house.schemes.dark, ...scale } };
+  const scale = { 'r-xs': `${r.sm}px`, 'r-pop': `${r.md}px`, 'r-tile': `${r.lg}px`, 'row-h': `${ROW_H[draft.density]}px` };
+  return {
+    light: { ...drawn.house.schemes.light, ...drawn.house.frame.light, ...scale },
+    dark: { ...drawn.house.schemes.dark, ...drawn.house.frame.dark, ...scale },
+  };
 }
 
 /* ── The three ways to change a colour ───────────────────────────────────── */
@@ -431,7 +440,7 @@ export const OWN = 'own';
 export function draftFrom(look: Look | null): Draft {
   const accent = look?.light.accent ?? HOUSE_SEED.accent;
   const px = (v: string | undefined): number | null => (v && /^\d+px$/u.test(v) ? Number.parseInt(v, 10) : null);
-  const md = px(look?.light['r-md']);
+  const md = px(look?.light['r-pop']);
   const corners: Corners = md === null ? 'soft' : md <= CORNERS.square.md ? 'square' : md >= CORNERS.round.md ? 'round' : 'soft';
   const row = px(look?.light['row-h']);
   const density = densityOf(row);
@@ -530,9 +539,9 @@ export function varsOf(palette: Record<string, string>, draft: Draft): string {
   const r = CORNERS[draft.corners];
   return [
     ...Object.entries(palette).map(([role, value]) => `--${role}: ${value}`),
-    `--r-sm: ${r.sm}px`,
-    `--r-md: ${r.md}px`,
-    `--r-lg: ${r.lg}px`,
+    `--r-xs: ${r.sm}px`,
+    `--r-pop: ${r.md}px`,
+    `--r-tile: ${r.lg}px`,
     `--row-h: ${ROW_H[draft.density]}px`,
   ].join('; ');
 }

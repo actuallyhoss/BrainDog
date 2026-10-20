@@ -4,7 +4,7 @@
   DRAWN BY THE REAL CONTROLS, NOT BY PICTURES OF THEM. The buttons, the chip, the field and the switch are the app's own,
   and every one reads its colours through `var(--x)`. The wrapper sets each role as a custom property on itself, so
   everything inside resolves to the edited value and nothing outside it moves. The derived tokens `tokens.css` mixes
-  from the roles at the root (`--selected`, `--on`, `--hover-wash` and the rest) are mixed again here, because a mix
+  from the roles at the root (`--red-tint`, `--red-fill`, `--hover` and the rest) are mixed again here, because a mix
   computed at the root has already taken the house values by the time it is inherited.
 
   INERT, because it is a sample: nothing in it can be pressed or reached by Tab, and a screen reader is told the same
@@ -86,27 +86,25 @@
 <style>
   /* THE PAGE IN MINIATURE: the ground, the panel, the hairlines and the mixes the root would have made. */
   .specimen {
-    --selected: color-mix(in srgb, var(--ink) 8%, var(--bg));
-    --on: var(--ink);
-    --on-ink: var(--bg);
-    --link: var(--ink);
-    --hover-wash: color-mix(in srgb, var(--ink) 6%, transparent);
-    --focus-halo: color-mix(in srgb, var(--ink) 14%, transparent);
-    --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
-    --primary-hover: color-mix(in srgb, var(--ink) 88%, var(--bg));
+    --red-tint: color-mix(in srgb, var(--ink) 8%, var(--tile));
+    --red-fill: var(--ink);
+    --on-red: var(--tile);
+    --red: var(--ink);
+    --hover: color-mix(in srgb, var(--ink) 6%, transparent);
+    --red-fill-hover: color-mix(in srgb, var(--ink) 88%, var(--tile));
     display: grid;
     gap: var(--sp-4);
     padding: var(--sp-4);
-    background: var(--bg);
+    background: var(--tile);
     color: var(--ink);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-lg);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--r-tile);
     min-inline-size: 0;
   }
 
   .spec-head {
     margin: 0;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -122,7 +120,7 @@
     justify-content: space-between;
     gap: var(--sp-3);
     min-block-size: var(--row-h);
-    border-block-end: 1px solid var(--line-soft);
+    border-block-end: 1px solid var(--rule);
   }
 
   .spec-row-title {
@@ -133,8 +131,8 @@
   }
 
   .spec-row-when {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     white-space: nowrap;
   }
 
@@ -142,28 +140,28 @@
     display: grid;
     gap: var(--sp-2);
     padding: var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    background: var(--tile-2);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-pop);
   }
 
   .spec-note {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     line-height: var(--lh-body);
   }
 
   .spec-quiet {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* Faint is kept for large type, and the sample obeys the rule it illustrates. */
   .spec-faint {
     margin: 0;
-    color: var(--faint);
-    font-size: var(--t-title);
+    color: var(--ink-3);
+    font-size: var(--fs-page);
   }
 
   .spec-intents {
@@ -176,11 +174,11 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .spec-intent[data-tone='earn'] {
-    color: var(--earn);
+    color: var(--good);
   }
 
   .spec-intent[data-tone='warn'] {
@@ -188,7 +186,7 @@
   }
 
   .spec-intent[data-tone='danger'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .spec-intent[data-tone='info'] {
@@ -203,23 +201,23 @@
   .spec-fill {
     inline-size: var(--sp-6);
     block-size: var(--sp-3);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   .spec-fill[data-tone='earn'] {
-    background: var(--earn-fill);
+    background: var(--good);
   }
 
   .spec-fill[data-tone='warn'] {
-    background: var(--warn-fill);
+    background: var(--warn);
   }
 
   .spec-fill[data-tone='danger'] {
-    background: var(--danger-fill);
+    background: var(--red-fill);
   }
 
   .spec-fill[data-tone='info'] {
-    background: var(--info-fill);
+    background: var(--info);
   }
 
   .spec-figure {
@@ -228,12 +226,12 @@
   }
 
   .spec-figure-label {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .spec-figure-value {
-    font-size: var(--t-lg);
+    font-size: var(--fs-head);
     font-weight: 600;
   }
 
@@ -251,8 +249,8 @@
     padding: 0 var(--sp-4);
     background: var(--swatch);
     color: var(--swatch-ink);
-    border-radius: var(--r-pill);
-    font-size: var(--t-sm);
+    border-radius: var(--r-ctl);
+    font-size: var(--fs-meta);
   }
 
   .spec-field {
