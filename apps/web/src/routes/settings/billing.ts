@@ -110,7 +110,7 @@ export type SoldPlan = { id: string; name: string; price: string };
 export type SoldPack = { id: string; credits: number; price: string };
 
 /** The whole answer: each owned record, whether this host takes payment at all, and the plans and packs it sells. */
-export type BillingAnswer = { records: BilledRecord[]; open: boolean; plans: SoldPlan[]; packs: SoldPack[] };
+export type BillingAnswer = { records: BilledRecord[]; open: boolean; plans: SoldPlan[]; packs: SoldPack[]; teamsHeld: boolean };
 
 /** The one fetch these calls need, so a test hands in its own and nothing here reaches for the page's. */
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -164,6 +164,7 @@ export function billingOf(v: unknown): BillingAnswer | null {
   return {
     records: v.records.map(billedOf).filter((r): r is BilledRecord => r !== null),
     open: v.open === true,
+    teamsHeld: v.teams_held === true,
     plans: Array.isArray(v.plans) ? v.plans.map(soldOf).filter((p): p is SoldPlan => p !== null) : [],
     packs: Array.isArray(v.packs) ? v.packs.map(packOf).filter((p): p is SoldPack => p !== null) : [],
   };

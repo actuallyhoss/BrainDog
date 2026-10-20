@@ -403,6 +403,8 @@
            that off, for a host that seals nothing. Set here or with
            `--var PROVISION_WITHOUT_KEYS:yes` on the deploy. */
         "PROVISION_WITHOUT_KEYS": "",
+        /* Teams held until member-row write rules and private rows ship; remove this var when sharing ships. */
+        "TEAMS_HELD": "1",
         /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
            browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
            and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the
@@ -642,6 +644,8 @@
            that off, for a host that seals nothing. Set here or with
            `--var PROVISION_WITHOUT_KEYS:yes` on the deploy. */
         "PROVISION_WITHOUT_KEYS": "",
+        /* Teams held until member-row write rules and private rows ship; remove this var when sharing ships. */
+        "TEAMS_HELD": "1",
         /* WEB PUSH'S PUBLIC KEY, AND EMPTY IS NO PUSH. It is a var and not a secret because the app hands it to every
            browser that subscribes. The private half is the secret `VAPID_PRIVATE` (the note at the end of this file),
            and `notify.push` is leased only when both are set (`delivers` in `src/deliver.ts`), so one without the

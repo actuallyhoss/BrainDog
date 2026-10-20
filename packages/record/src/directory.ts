@@ -709,6 +709,8 @@ const PLUS = PLAN_TABLE.plus.name;
 /* TEAMS ARE A PLUS FEATURE (DIRECTION §42): the plain line an owner reads when an invitation is refused, and the one the
    person holding the link reads. Each says why and offers the way on. The gate is off while the host sells no plan. */
 export const FREE_ONE_PERSON = `Teams are part of ${PLUS}, so nobody else can join this record yet. Move it to ${PLUS} in Settings to invite colleagues.`;
+/* TEAMS HELD (the Worker var `TEAMS_HELD`): sharing is not open yet, on any plan, so the sentence names no plan. */
+export const TEAMS_HELD_SAID = 'Inviting colleagues opens soon. Nobody else can join this record yet.';
 export const FREE_JOIN_REFUSED = `This record is not on ${PLUS}, so nobody else can join it yet. Ask its owner to move it to ${PLUS}, then open this link again.`;
 /* THE SAME TWO ON A HOST THAT SELLS NO PLAN, where naming a plan to move to names a door that is not there. */
 export const FREE_ONE_PERSON_SHORT = `Teams are part of ${PLUS}, so nobody else can join this record.`;
@@ -1285,7 +1287,7 @@ async function emailLinkHash(key: ReturnType<typeof crypto.subtle.importKey>, to
  * `/account/billing` answers it as `open`): `false` and a refusal on Free names no plan to move to. Absent is a host
  * that did not say, and the sentence stays the one that names Cloud.
  */
-export type DirectoryHost = { sells?: boolean | undefined };
+export type DirectoryHost = { sells?: boolean | undefined; teamsHeld?: boolean | undefined };
 
 /**
  * The Directory over one `Sql`.
@@ -1358,6 +1360,10 @@ export function createDirectory(sql: Sql, clock: Clock, auth?: AuthConfig, host:
    */
   const joinable = (record: string, person: string): Refusal | null => {
     const row = sql.one<{ plan: string }>('SELECT plan FROM dir_record WHERE id = ?', record);
+    /* HELD: nobody new joins, on any plan; somebody already on the record is let through. */
+    if (host.teamsHeld === true) {
+      return sql.one('SELECT 1 AS x FROM dir_member WHERE record = ? AND person = ?', record, person) ? null : { code: 'FORBIDDEN', fix: TEAMS_HELD_SAID, at: 'plan' };
+    }
     /* OFF WHILE THE HOST SELLS NOTHING (LAUNCH: Free only until charging starts), so teams can be built and tried. */
     if (row === undefined || host.sells === false || PLAN_TABLE[planOf(row.plan)].teams) return null;
     if (sql.one('SELECT 1 AS x FROM dir_member WHERE record = ? AND person = ?', record, person)) return null;

@@ -39,7 +39,7 @@ import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
 import { teamsOn } from '@braindog/record/plans';
-import { FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
+import { TEAMS_HELD_SAID, FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SeenAnswers, SeenCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
@@ -242,6 +242,8 @@ type Env = {
    * keyless for as long as it exists.
    */
   PROVISION_WITHOUT_KEYS?: string;
+  /** `"1"` holds teams: nobody who is not already a member can be invited or join. Self-host leaves it unset. */
+  TEAMS_HELD?: string;
   /**
    * The root key agents' keys are wrapped under, `12 §6`: 32 bytes written as 64 hex characters or base64url, put with
    * `wrangler secret put KEK --env <environment>`, or a Secrets Store binding of the same name. A different value per
@@ -719,6 +721,7 @@ export class Record$ extends DurableObject<Env> {
     const invite = api.invite.bind(api);
     api.invite = async (args, ctx) => {
       const member = typeof args?.person === 'string' && api.kernel.members().some((m) => m.person_id === args.person);
+      if (!member && this.env.TEAMS_HELD === '1') return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: TEAMS_HELD_SAID, at: 'plan' } };
       if (!member && sells(this.env) && !teamsOn(await this.#planOf(api))) return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: sells(this.env) ? FREE_ONE_PERSON : FREE_ONE_PERSON_SHORT, at: 'plan' } };
       return invite(args, ctx);
     };
@@ -2174,7 +2177,7 @@ export class Directory$ extends DurableObject<Env> {
           }
         : undefined,
       /* WHETHER A REFUSAL ON FREE MAY NAME A PLAN TO MOVE TO, the answer `/account/billing` gives as `open`. */
-      { sells: sells(this.env) },
+      { sells: sells(this.env), teamsHeld: this.env.TEAMS_HELD === '1' },
     );
     /* `createDirectory` imported its own copy, so this was the last one held as bytes. */
     mac?.fill(0);
@@ -4593,6 +4596,7 @@ function invites(env: Env): InviteDoor {
       const found = await recordOf(inviteToken);
       if (!found) return gone;
       /* A FREE RECORD IS ONE PERSON, SAID WHEN THE LINK IS OPENED, before a new address is sent a proof it cannot use. */
+      if (env.TEAMS_HELD === '1') return { ok: false, refusal: { code: 'FORBIDDEN', fix: TEAMS_HELD_SAID, at: 'plan' } };
       if (sells(env) && !teamsOn(await directory.planFor(found.id))) return { ok: false, refusal: { code: 'FORBIDDEN', fix: sells(env) ? FREE_JOIN_REFUSED : FREE_JOIN_REFUSED_SHORT, at: 'plan' } };
       return (await found.stub.acceptInvite({ token: inviteToken })) as unknown as Awaited<ReturnType<InviteDoor['look']>>;
     },

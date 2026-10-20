@@ -691,6 +691,8 @@ export const account = {
   inviteEmailLabel: 'Their email',
   inviteLevelLabel: 'What they can do',
   inviteMaking: 'Making a link',
+  /* Same words as `TEAMS_HELD_SAID` in the record's directory; a test holds them equal. */
+  inviteHeld: 'Inviting colleagues opens soon. Nobody else can join this record yet.',
   inviteNoMail: 'No email is sent. Copy the link and send it to them yourself.',
   inviteLinkReady: (email: string) => `This link is for ${email}. It is shown once, so copy it now.`,
   inviteCopyLink: 'Copy link',

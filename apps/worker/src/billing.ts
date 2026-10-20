@@ -633,7 +633,7 @@ export function billingDoors(env: BillingEnv, deps: BillingDeps): BillingDoors {
     const sold = PLAN_IDS.filter((p) => priceOf(env, p) !== null).map((p) => ({ id: p, name: planName(p), price: planPrice(p) }));
     const open = sells(env);
     const canMake = signupMode(env) !== 'closed' && !records.some((r) => r.plan === 'free');
-    return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), canMake });
+    return ok({ records, open, plans: open ? sold : [], packs: packsOnSale(env), canMake, teams_held: (env as { TEAMS_HELD?: string }).TEAMS_HELD === '1' });
   };
 
   /* ── POST /account/billing/checkout ───────────────────────────────────── */

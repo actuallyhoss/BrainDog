@@ -114,3 +114,11 @@ test('the words a person reads carry no em dash and no id', () => {
   const said = [words.buyCredits, words.packButton(100, '$5'), words.packSaid(100, '$5'), words.creditsLeft(100), words.gift('Cloud'), words.giftUntil('1 December')];
   for (const s of said) assert.doesNotMatch(s, /—|credits-100|rec_/u);
 });
+
+test('THE BILLING ANSWER CARRIES TEAMS HELD, and the invite sentence is the record\'s own', async () => {
+  const { TEAMS_HELD_SAID } = await import('@braindog/record/directory');
+  const { copy } = await import('../../lib/copy.ts');
+  assert.equal(copy.inviteHeld, TEAMS_HELD_SAID);
+  assert.equal(answer([]).teamsHeld, false);
+  assert.equal(answer([], { teams_held: true }).teamsHeld, true);
+});

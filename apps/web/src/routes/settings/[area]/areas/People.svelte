@@ -33,6 +33,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { namesHeld, personSaid, secondSaid } from '../people-said.ts';
+  import { hostedHere, readBilling } from '../../billing.ts';
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import Links from '../Links.svelte';
   import { createClient } from '@braindog/client';
@@ -56,6 +57,12 @@
       return;
     }
     void readShareable(createClient({ base: apiBase() })).then((v) => (linksOn = v.can));
+  });
+  /* TEAMS HELD: the Cloud says so in `/account/billing` (`teams_held`), and the invite form gives way to the sentence. */
+  let teamsHeld = $state(false);
+  $effect(() => {
+    if (!hostedHere(shell)) return;
+    void readBilling().then((out) => (teamsHeld = out.ok && out.value.teamsHeld));
   });
   const people = $derived(s.people);
   const peopleFrom = $derived(s.peopleFrom);
@@ -763,7 +770,11 @@
   NOTHING IS SAID IN ITS PLACE, because the section above it is already saying it. The record's
   own refusal is on this screen, in the record's own words, over the list this form adds to.
 -->
-{#if anOwner}
+{#if anOwner && teamsHeld}
+<Section title={copy.inviteTitle}>
+  <p class="hint">{copy.inviteHeld}</p>
+</Section>
+{:else if anOwner}
 <Section title={copy.inviteTitle}>
   <p class="hint">{copy.inviteHow}</p>
   <!-- NO MAIL LEAVES THIS HOST, and the sentence says so beside the control rather than after the press:

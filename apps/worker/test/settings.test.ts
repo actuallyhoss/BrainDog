@@ -113,6 +113,7 @@ const CASES: Record<string, Case> = {
     env: SIGNUP_ON,
     said: '/auth/methods in apps/worker/src/index.ts answers magic false with no why: add "Sign-in links are off on this host: AUTH_MAIL_FROM is not set."',
   },
+  TEAMS_HELD: { kind: 'quiet', door: HEALTH, why: 'unset holds nothing: teams work as the plan allows, as on a self-host' },
   MAIL_FROM: { kind: 'quiet', door: HEALTH, why: 'empty falls back to AUTH_MAIL_FROM' },
   SUPPORT_ADDRESS: { kind: 'quiet', door: HEALTH, why: 'empty is the generic footer, naming no address' },
   SUPPORT_FORWARD: { kind: 'quiet', door: HEALTH, why: 'unset, mail to the support address is refused at the door' },
