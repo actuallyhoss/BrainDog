@@ -64,9 +64,9 @@
   .group-title {
     margin: 0 0 var(--sp-2);
     padding-block-end: var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
@@ -96,8 +96,8 @@
     column-gap: 10px;
     min-block-size: var(--rail-item-h);
     padding-inline: var(--sp-1) var(--sp-2);
-    border-radius: var(--r-md);
-    color: var(--ink2);
+    border-radius: var(--r-pop);
+    color: var(--ink-2);
     text-decoration: none;
     transition:
       background var(--d-state) var(--ease-out),
@@ -127,7 +127,7 @@
   .name {
     display: block;
     overflow: hidden;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     text-overflow: ellipsis;
@@ -139,7 +139,7 @@
   .area-line,
   .go {
     display: none;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .go:dir(rtl) {
@@ -156,7 +156,7 @@
   /* TWO CLASSES AND THE ATTRIBUTE, so this outranks the ground's white well (`settings.css`) wherever the row is. */
   .area-row[aria-current='page'] .area-icon :global(.well.well) {
     background: transparent;
-    color: var(--action);
+    color: var(--red);
   }
 
   .area-row[aria-current='page'] .name {
@@ -165,7 +165,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .area-row:not([aria-current]):hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }
@@ -187,7 +187,7 @@
       margin: 0 0 var(--sp-1);
       padding: 0;
       border: 0;
-      color: var(--dim);
+      color: var(--ink-3);
       font-size: var(--fs-meta);
       font-weight: var(--fw-medium);
       line-height: 18px;
@@ -238,7 +238,7 @@
       inset-block-start: 0;
       inset-inline: calc(var(--sp-1) + var(--well-l) + var(--sp-3)) var(--sp-2);
       block-size: 1px;
-      background: var(--line);
+      background: var(--rule);
       pointer-events: none;
     }
 
@@ -255,14 +255,14 @@
     }
 
     .name {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
       line-height: 22px;
     }
 
     .area-line {
       display: block;
       overflow: hidden;
-      font-size: var(--t-sm);
+      font-size: var(--fs-meta);
       line-height: 18px;
       text-overflow: ellipsis;
       white-space: nowrap;

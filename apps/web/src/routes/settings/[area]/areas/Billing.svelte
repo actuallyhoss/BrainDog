@@ -272,7 +272,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
     line-height: 34px;
@@ -285,20 +285,20 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .reading [data-needs] {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -320,7 +320,7 @@
   }
 
   .bill + .bill {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .bill-main {
@@ -343,22 +343,22 @@
     min-inline-size: 0;
     overflow-wrap: anywhere;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
 
   .bill-plan {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
   .bill-state {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -366,7 +366,7 @@
      The sentence says it too, so the colour is never the only sign. */
   .bill-state[data-state='past_due'],
   .bill-state[data-state='lapsed'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .bill-actions {

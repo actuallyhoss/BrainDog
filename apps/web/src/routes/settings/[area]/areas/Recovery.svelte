@@ -189,15 +189,15 @@
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .name-label {
     display: block;
     margin-block: var(--sp-3) var(--sp-1);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .name-field {
@@ -209,7 +209,7 @@
   .name-field .field-input {
     flex: 1;
     min-inline-size: 0;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   /* WRAPPING, for the reason `/audit`'s segmented bar already wraps: two buttons that do not fit

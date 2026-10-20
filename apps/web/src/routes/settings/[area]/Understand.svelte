@@ -122,12 +122,12 @@
     min-inline-size: 0;
     margin: 0;
     max-inline-size: var(--measure);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
   .u-hint {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .u-said {
@@ -153,7 +153,7 @@
   .u-row {
     padding-block: var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }
@@ -165,8 +165,8 @@
   .u-note {
     margin: var(--sp-2) 0 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 

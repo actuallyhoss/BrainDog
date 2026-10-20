@@ -952,7 +952,7 @@
   }
 
   .who + .who {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* THE NAME, WHAT IS KNOWN ABOUT IT UNDER THE NAME, AND THE CONTROL AT THE END OF BOTH. The head was
@@ -993,8 +993,8 @@
      name's line, and below about 520px the whole clause wraps instead of truncating an email
      address in the middle, which is where they stop being recognisable. */
   .who-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1030,8 +1030,8 @@
 
   .means {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* The ladder is five levels and a sixth answer, so its segments take the least padding in the
@@ -1050,7 +1050,7 @@
     gap: var(--sp-1);
     margin: 0;
     padding: 0 0 0 var(--sp-3);
-    border-inline-start: 2px solid var(--line);
+    border-inline-start: 2px solid var(--rule);
     list-style: none;
   }
 
@@ -1083,7 +1083,7 @@
   .ex-list {
     color: var(--ink);
     font-weight: 600;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* AND IT IS SET APART FROM THE LADDER. Five rungs and a sixth thing that is not one of them,
@@ -1100,14 +1100,14 @@
     position: absolute;
     inset-block: var(--sp-2);
     inset-inline-end: calc(-0.5 * var(--sp-3) - 1px);
-    border-inline-end: 1px solid var(--line);
+    border-inline-end: 1px solid var(--rule);
     pointer-events: none;
   }
 
   /* The ladder word, which is what one exception is compared against another by. */
   .ex-word {
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .ex-add {
@@ -1130,8 +1130,8 @@
   }
 
   .ex-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* WHICH ROWS: the field and its value side by side beside the list and level on a wide screen, and on a phone a
@@ -1166,15 +1166,15 @@
   /* The rows a narrowed grant reaches, said on a line of its own under the exception it narrows. */
   .ex-only {
     grid-column: 1 / -1;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* The invitations still waiting: a row per address, the control at the end of the line. */
   .invites-head {
     margin: var(--sp-3) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .invites {
@@ -1194,7 +1194,7 @@
   }
 
   .invite + .invite {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .invite-who {
@@ -1204,8 +1204,8 @@
 
   .invite-when {
     flex: 1 1 20ch;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .ex-select {
@@ -1214,16 +1214,16 @@
     max-inline-size: 100%;
     padding: 0 var(--sp-3);
     background: var(--s3);
-    border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .ex-level {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* THE INVITATION'S FORM. Its label, field and button are `settings.css`'s field row, which puts the
@@ -1238,8 +1238,8 @@
   }
 
   .code-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* THE INVITATION'S FORM IS ONE COLUMN, capped at a reading width so the address field is not a
@@ -1277,7 +1277,7 @@
   }
 
   .invite-lists li + li {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .invite-list-name {
@@ -1315,8 +1315,8 @@
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -1357,7 +1357,7 @@
   .danger-title {
     margin: 0 0 var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
@@ -1387,7 +1387,7 @@
   }
 
   .mate + .mate {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .mate-words {
@@ -1399,7 +1399,7 @@
   .mate-name {
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     text-overflow: ellipsis;
@@ -1407,14 +1407,14 @@
   }
 
   .mate-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .mate-level {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -1423,8 +1423,8 @@
   .reading {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 

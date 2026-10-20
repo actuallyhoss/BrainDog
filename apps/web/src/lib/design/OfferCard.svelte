@@ -107,14 +107,14 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
   }
 
   .offer-mark {
     display: inline-flex;
     flex: none;
-    color: var(--action-text);
+    color: var(--red);
   }
 
   /* THE FOLDED LINE: a tile one line tall, the board's own radius, body text in the quiet ink. A whole row to press,
@@ -129,7 +129,7 @@
     border: 0;
     border-radius: var(--r-lg);
     background: var(--bg);
-    color: var(--dim);
+    color: var(--ink-3);
     font: inherit;
     font-size: var(--fs-body);
     text-align: start;
@@ -152,7 +152,7 @@
     display: inline-flex;
     flex: none;
     margin-inline-start: auto;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .offer-turn[data-up] {
@@ -192,7 +192,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--sp-2);
     padding: var(--sp-2);
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     background: var(--board);
   }
 
@@ -235,7 +235,7 @@
     flex: 1;
     block-size: 6px;
     border-radius: 3px;
-    background: var(--line);
+    background: var(--rule);
   }
 
   .offer-lines i:last-child {

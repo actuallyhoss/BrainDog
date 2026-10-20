@@ -464,13 +464,13 @@
     gap: var(--sp-2);
     margin: 0 0 var(--sp-3);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
   /* LATE IS A WORD AS WELL AS A COLOUR: the deeper red of late, and the word Late before the sentence. */
   .last-copy[data-late] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .late-word {
@@ -490,20 +490,20 @@
 
   .means {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* What failed is read, not skimmed past, so it takes the second ink rather than the date's dim. */
   .why-failed {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -520,14 +520,14 @@
      as the next step of the group rather than a note. */
   .confirm {
     padding-block-start: var(--sp-3);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .confirm-said {
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
@@ -544,8 +544,8 @@
     display: flex;
     justify-content: space-between;
     gap: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     line-height: 16px;
     font-variant-numeric: tabular-nums;
   }
@@ -560,15 +560,15 @@
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .policy {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 

@@ -374,8 +374,8 @@
   }
 
   .code-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* A FORWARDING ADDRESS HAS NO SPACES IN IT, and one long word must not push the page sideways:
@@ -391,9 +391,9 @@
     margin: 0;
     padding: var(--sp-2) var(--sp-3);
     background: var(--bg);
-    border-radius: var(--r-md);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    border-radius: var(--r-pop);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
   }
 
   /* THE STEPS: a number in a fixed track, then the step. No box around a step or the list;
@@ -417,8 +417,8 @@
   }
 
   .step-n {
-    color: var(--dim);
-    font-size: var(--t-md);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: var(--lh-tight);
   }
@@ -430,7 +430,7 @@
   .step-title {
     margin: 0 0 var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: var(--lh-tight);
   }
@@ -441,15 +441,15 @@
 
   .code-said {
     margin: 0;
-    color: var(--tone, var(--ink2));
-    font-size: var(--t-sm);
+    color: var(--tone, var(--ink-2));
+    font-size: var(--fs-meta);
   }
 
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -473,7 +473,7 @@
   }
 
   .door + .door {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .door-words {
@@ -485,14 +485,14 @@
   .door-name {
     overflow-wrap: anywhere;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
 
   .door-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -500,8 +500,8 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -510,8 +510,8 @@
     content: '';
     inline-size: 6px;
     block-size: 6px;
-    border-radius: var(--r-pill);
-    background: var(--dim);
+    border-radius: var(--r-ctl);
+    background: var(--ink-3);
   }
 
   .door-state[data-state='on'] {
@@ -519,20 +519,20 @@
   }
 
   .door-state[data-state='on']::before {
-    background: var(--earn);
+    background: var(--good);
   }
 
   /* OFF IS AN EMPTY RING, so the two states differ by shape as well as colour. */
   .door-state[data-state='off']::before {
     background: none;
-    box-shadow: inset 0 0 0 1.5px var(--dim);
+    box-shadow: inset 0 0 0 1.5px var(--ink-3);
   }
 
   .reading {
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 

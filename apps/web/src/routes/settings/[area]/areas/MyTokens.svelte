@@ -182,8 +182,8 @@
   .mine-why,
   .mine-step {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     max-inline-size: var(--measure);
   }
 
@@ -207,17 +207,17 @@
     flex: 1 1 16ch;
     min-inline-size: 0;
     overflow-wrap: anywhere;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .mine-said {
     margin: 0;
     min-block-size: 1lh;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .mine-said[data-intent='bad'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* ROWS ON THE GROUND WITH A HAIRLINE BETWEEN THEM, each led by its key's well, as the owner's Connected
@@ -246,7 +246,7 @@
     inset-block-start: 0;
     inset-inline: calc(var(--well-l) + var(--sp-3)) 0;
     block-size: 1px;
-    background: var(--line);
+    background: var(--rule);
   }
 
   .mine-main {
@@ -258,7 +258,7 @@
 
   .mine-name {
     overflow: hidden;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -268,8 +268,8 @@
     display: flex;
     flex-wrap: wrap;
     column-gap: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* REVOKE KEEPS A THUMB'S TARGET: the button's own height is `--ctl-h`, 44px with a coarse pointer, and the column

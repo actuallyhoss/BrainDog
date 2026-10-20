@@ -47,7 +47,8 @@ test('the sub-nav draws "here" as the rail does: the tile under the row and the 
   assert.doesNotMatch(here, /--selected/u, 'the current area still wears the tinted wash');
   const glyph = /\.area-row\[aria-current='page'\] \.area-icon :global\(\.well\.well\) \{([^}]*)\}/u.exec(index)?.[1] ?? '';
   assert.match(glyph, /background: transparent;/u);
-  assert.match(glyph, /color: var\(--action\);/u);
+  /* THE RED AS A MARK (UI pass 20 Oct, SPEC 1.1): the selection's glyph is `--red`, the fill is for buttons. */
+  assert.match(glyph, /color: var\(--red\);/u);
   assert.doesNotMatch(index, /tone=\{a\.id === current \? 'ink'/u, 'the current area still wears an ink well');
   /* A ROW IS 44 UNDER A THUMB. */
   assert.match(index, /@media \(pointer: coarse\) \{\s*\.area-row \{\s*min-block-size: var\(--tap\);/u);

@@ -449,8 +449,8 @@
   .look-editing {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -462,8 +462,8 @@
   .look-wrong {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -490,7 +490,7 @@
 
   .look-title {
     margin: var(--sp-3) 0 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -501,7 +501,7 @@
   }
 
   .role {
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   .role-line {
@@ -520,8 +520,8 @@
 
   .role-changed {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A SWATCH IS THE COLOUR and 44 on both axes, so a thumb can press either scheme's without a second try. */
@@ -580,7 +580,7 @@
 
   .enter-label {
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .enter .field {
@@ -602,7 +602,7 @@
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
     padding-block-end: var(--sp-3);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   .pair-sample {
@@ -626,8 +626,8 @@
   .pair-words {
     flex: 1 1 14rem;
     min-inline-size: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -635,12 +635,12 @@
     display: inline-flex;
     align-items: center;
     gap: var(--sp-1);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .verdict[data-verdict='fails'] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .verdict[data-verdict='tight'] {
@@ -648,7 +648,7 @@
   }
 
   .verdict[data-verdict='fine'] {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .look-save {

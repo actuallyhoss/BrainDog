@@ -558,7 +558,7 @@
   .fault-fix {
     margin: var(--sp-2) 0 0;
     max-inline-size: var(--measure);
-    color: var(--danger-text);
+    color: var(--red);
     font-size: var(--fs-body);
   }
 
@@ -597,13 +597,13 @@
   }
 
   .fault-when {
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-body);
   }
 
   /* THE RECORD'S RAW ERROR, the self-hosted owner's alone: it may be one long word, so it breaks anywhere. */
   .fault-error {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
@@ -684,8 +684,8 @@
 
   /* The line under every area whose controls are kept on this device, and only under those. */
   .mock {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
   }
 
   /* FROM 900PX UP, THE INDEX BESIDE THE AREA, narrower than the rail at 200 with its rows at the meta step, so two

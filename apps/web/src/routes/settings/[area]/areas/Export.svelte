@@ -242,7 +242,7 @@
   .last-export {
     margin: 0 0 var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
   }
 
@@ -252,7 +252,7 @@
 
   .hint.checked {
     margin-block-start: var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .hint.checked .glyph {
@@ -262,8 +262,8 @@
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 </style>

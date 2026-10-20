@@ -112,14 +112,14 @@
 <style>
   .links-lead {
     margin: 0 0 var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .links-refused {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   .links {
@@ -147,7 +147,7 @@
     inset-block-start: 0;
     inset-inline: calc(var(--well-l) + var(--sp-3)) 0;
     block-size: 1px;
-    background: var(--line);
+    background: var(--rule);
   }
 
   .link-text {
@@ -159,7 +159,7 @@
 
   .link-title {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     overflow-wrap: anywhere;
@@ -167,12 +167,12 @@
 
   /* A CLOSED LINK IS HISTORY: its title steps back to the second ink. */
   .link:not([data-open]) .link-title {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .link-when {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 

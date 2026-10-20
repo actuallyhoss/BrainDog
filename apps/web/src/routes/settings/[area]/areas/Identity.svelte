@@ -675,8 +675,8 @@
 
   .fact-key {
     grid-column: 2;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -699,7 +699,7 @@
   .fact-value {
     grid-column: 2;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     overflow-wrap: anywhere;
@@ -707,12 +707,12 @@
 
   /* "THIS ONE" IS WHERE YOU ARE, said in the meta ink; every other record's row goes somewhere, and says so. */
   .here {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .go {
     display: inline-flex;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .go:dir(rtl) {
@@ -722,8 +722,8 @@
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -760,7 +760,7 @@
   .person-name {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
     overflow-wrap: anywhere;
@@ -768,8 +768,8 @@
 
   .person-email {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -784,29 +784,29 @@
 
   .identity-label {
     margin-block-end: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* 16px TEXT IN EVERY INPUT, at every width, so a phone never zooms into the field. */
   .rename-field .field-input {
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   /* THE FIELD'S EDGE IN `--danger`: a field has no border, so the edge is drawn inside it. */
   .rename-bad {
-    box-shadow: inset 0 0 0 1.5px var(--danger);
+    box-shadow: inset 0 0 0 1.5px var(--red);
   }
 
   .identity-help {
     margin: var(--sp-1) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .identity-bad {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .rename-actions {
@@ -818,8 +818,8 @@
 
   .sheet-said {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-md);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     overflow-wrap: anywhere;
   }

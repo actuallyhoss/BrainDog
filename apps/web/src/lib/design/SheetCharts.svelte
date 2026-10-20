@@ -287,14 +287,14 @@
 
   .band-name {
     margin: 0 0 var(--sp-2);
-    font-size: var(--t-lg);
+    font-size: var(--fs-head);
     font-weight: 600;
   }
 
   .band-line {
     margin: 0 0 var(--sp-4);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .tiles {
@@ -324,13 +324,13 @@
     flex-wrap: wrap;
     gap: 0 var(--sp-2);
     margin: 0 0 var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .how {
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
   }
 
   .faces {
@@ -353,7 +353,7 @@
   }
 
   .face-name {
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 </style>
