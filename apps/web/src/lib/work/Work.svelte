@@ -12,7 +12,8 @@
   Undo, n goes to the capture line, Enter opens and Esc closes. They are listed in the ? sheet and printed nowhere.
 
   THIS FILE KEEPS THE READ, as `/p/[slug]` does for any other page: the record read with the reader's filter, its
-  `opened()` and `closed()` bracket, the re-read after a write, and listening for the record to move. The screen as it
+  `opened()` and `closed()` bracket, the re-read after a write, and listening for the record to move. A first open with
+  nothing in the tab draws the local copy's page at once, asked behind it as `/p/work` is (`lib/data/local.ts`). The screen as it
   was is at `/?work&classic` (`WorkClassic.svelte`) until the page has parity, and on a record with no Work page.
 -->
 <script lang="ts">
@@ -21,6 +22,10 @@
   import { apiBase } from '$lib/at.ts';
   import { keep, keptAnswer } from '$lib/data/kept.ts';
   import { live } from '$lib/data/live.svelte.ts';
+  import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { pageKey } from '$lib/record/kept-pages.ts';
+  import { pageLists } from '$lib/record/page-lists.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { pageReader, type Opened } from '$lib/record/page-live.ts';
   import PageView from '$lib/page/PageView.svelte';
@@ -53,6 +58,23 @@
   /* A RE-READ OF THE PAGE'S OWN, after one of its writes, counted so the record moving does not read it a second time. */
   let own = 0;
 
+  /**
+   * THE PAGE AS THE LOCAL COPY LAST HELD IT (`lib/data/local.ts`), kept `always` under the key `/p/work` keeps it under,
+   * so either draws what the other read: drawn at once while the record is asked, marked, and kept through an offline
+   * refusal. `copied` is up while what is drawn is the copy's.
+   */
+  const PAGE_COPY = 'Page';
+  let copied = $state(false);
+  $effect(() => {
+    if (!copied) return;
+    return untrack(() => holdCopyMark());
+  });
+  const localKey = (asked: Readonly<Record<string, string>>) => pageKey(apiBase(), WORK_PAGE, asked);
+  function keepPage(asked: Readonly<Record<string, string>>, out: Opened, mark: number) {
+    if (out.from !== 'live') return;
+    keepLocal(PAGE_COPY, localKey(asked), pageLists(out.page.blocks), out, mark, {}, { always: true });
+  }
+
   /* A FIRST READ BLANKS THE PAGE; A NEW CHOICE OF FILTER DOES NOT, so the strip stays under the finger that chose. */
   /* THE PAGE AS IT WAS LAST DRAWN IN THIS TAB IS DRAWN AT ONCE (`kept.ts`): at the same version nothing is asked, at
      another it is asked over it without blanking. A visit read the whole tasks list again, five times over nine screens. */
@@ -71,17 +93,32 @@
     if (blank) got = null;
     reader ??= pageReader(apiBase());
     const mine = ++started;
+    const mark = localTicket();
+    /* NOTHING DRAWN: THE LOCAL COPY'S PAGE, not waited on, so the record's answer is never held up by it. */
+    if (got === null)
+      void nearLocal<Opened>(PAGE_COPY, localKey(asked), apiBase()).then((near) => {
+        if (near === null || near.value.from !== 'live' || got !== null || mine !== started) return;
+        got = near.value;
+        copied = true;
+      });
     const out = await reader.read(WORK_PAGE, asked);
     /* A later read already drew over this one; with nothing drawn yet, this is drawn, so a re-read that did not land
        live never leaves the page waiting. */
     if (mine !== started && got !== null) return closed(true, at);
+    /* OFFLINE OVER THE COPY'S PAGE, IT STAYS, until the record answers again. */
+    if (out.from === 'refused' && copied && (data.offline === true || live.state === 'offline')) return closed(true, at);
     got = out;
-    if (out.from === 'live') keep(WORK_PAGE, key, version, { ok: true, value: out });
+    copied = false;
+    if (out.from === 'live') {
+      keep(WORK_PAGE, key, version, { ok: true, value: out });
+      keepPage(asked, out, mark);
+    }
     closed(out.from !== 'refused', at);
   }
 
   $effect(() => {
-    if (view !== 'page' || data.refused) return;
+    /* OFFLINE THE PAGE STILL ASKS, so the local copy is drawn under the refusal of a host nobody reached. */
+    if (view !== 'page' || (data.refused && !data.offline)) return;
     const asked = filter;
     untrack(() => void readLive(asked, got === null || got.from !== 'live'));
   });
@@ -92,10 +129,14 @@
     const mine = ++started;
     try {
       const version = live.version;
-      const out = await reader.read(WORK_PAGE, filter);
+      const asked = filter;
+      const mark = localTicket();
+      const out = await reader.read(WORK_PAGE, asked);
       if (mine === started && out.from === 'live') {
         got = out;
-        keep(WORK_PAGE, workKey(apiBase(), filter), version, { ok: true, value: out });
+        copied = false;
+        keep(WORK_PAGE, workKey(apiBase(), asked), version, { ok: true, value: out });
+        keepPage(asked, out, mark);
       }
     } finally {
       own -= 1;
@@ -129,7 +170,7 @@
   });
 
   /* AN ADDRESS NAMING NO RECORD IS THE SHELL'S REFUSAL, drawn as every page draws one. */
-  const shown = $derived<Opened | null>(data.refused ? { from: 'refused', fix: data.refused.fix } : got);
+  const shown = $derived<Opened | null>(data.refused && !(data.offline && got?.from === 'live') ? { from: 'refused', fix: data.refused.fix } : got);
 </script>
 
 <svelte:window
