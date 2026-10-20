@@ -1,10 +1,16 @@
 <!--
   The end of the first run, and the first of the five minutes: the BrainDog is made, and the person connects their agent.
 
-  ONE LINE PER APP, each with the exact command or address for THIS record and a Copy (`first-connect.ts`), and under
-  them the live sign: "Waiting for your agent…" until the record hears its first session, then "Connected: Claude Code
-  on MacBook". It asks the way the connect sheet does (`listenFor`, `poll`, every two seconds while the tab is shown),
-  and stops asking once it has heard. "Skip for now" and "Go to Today" both go to Today, so nobody is held here.
+  ONE APP AT A TIME (the UI pass of 20 October, first F1). A segmented control of the five apps, Claude Code first and
+  chosen, each with its maker's mark; under it that app's steps only, numbered where there are two, each step's command
+  or address in its own block with its own Copy (`CodeLine`). All of it in one tile at most 720 wide, on the frame's
+  start edge. Under the tile the live sign: "Waiting for your agent…" beside a grey dot until the record hears its
+  first session, then "Connected: Claude Code on MacBook" beside a green one. It asks the way the connect sheet does
+  (`listenFor`, `poll`, every two seconds while the tab is shown), and stops asking once it has heard. "Skip for now"
+  and "Go to Today" both go to Today, so nobody is held here.
+
+  `.cmd`, NEVER `.line`: the ledger's global `.line` (`rows.css`) is a four-column grid, and it broke every command
+  into a 120px column with its Copy a whole window away (SF5).
 
   NO KEY IS SHOWN: an MCP app signs in by OAuth and `braindog setup` signs in itself.
 
@@ -16,18 +22,26 @@
   import { createClient } from '@braindog/client';
   import { markOf } from '@braindog/skin/agent-marks.ts';
   import { apiBase } from '$lib/at.ts';
-  import * as clipboard from '$lib/clipboard.ts';
-  import { copy } from '$lib/copy.ts';
   import { heardOf, poll, type Heard } from '$lib/agents/connect.ts';
-  import { appLines, firstWords, signOf } from '$lib/agents/first-connect.ts';
+  import { appLines, firstWords, signOf, type AppLine } from '$lib/agents/first-connect.ts';
   import { listenFor } from '$lib/agents/listen.ts';
   import { INSTALL_LINES, osOf } from '$lib/device.ts';
   import { connectLines } from '$lib/record/device.ts';
   import { step } from '$lib/funnel.ts';
   import Button from '$lib/ui/Button.svelte';
+  import CodeLine from '$lib/ui/CodeLine.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
 
   let made: { modules?: readonly string[] | null | undefined } = $props();
   void made;
+
+  /* This screen's own words. The sub-line says what connecting does, and no longer asks anybody to paste "its line". */
+  const words = {
+    sub: 'Pick the app you use. Your agent can then read and update this BrainDog.',
+    apps: 'Your app',
+    install: 'Install BrainDog',
+    connect: 'Connect this BrainDog',
+  } as const;
 
   let heading = $state<HTMLHeadingElement | undefined>(undefined);
   onMount(() => {
@@ -39,6 +53,23 @@
   /* THIS RECORD'S LINES: the bare host, and the record's own address where the shell names it. */
   const slug = $derived(page.data.live === true ? (page.data.index?.slug ?? null) : null);
   const apps = $derived(appLines(connectLines(page.url.origin, slug), INSTALL_LINES[osOf(typeof navigator === 'undefined' ? undefined : navigator)]));
+
+  /* CLAUDE CODE FIRST AND CHOSEN, the app a person reading this is likeliest to have. */
+  let chosenId = $state<string | null>(null);
+  const chosen = $derived(apps.find((a) => a.id === chosenId) ?? apps[0]);
+
+  /** An app's steps: install, then connect, where it needs the command line first; else its one place to paste. */
+  const stepsOf = (a: AppLine): { said: string; line: string }[] =>
+    a.before !== null ? [{ said: words.install, line: a.before }, { said: words.connect, line: a.line }] : [{ said: a.what, line: a.line }];
+
+  /* THE FUNNEL HEARS A COPY, which `CodeLine` does on its own: a press on any Copy in the steps counts once. */
+  function countCopies(el: HTMLElement) {
+    const on = (e: Event) => {
+      if (e.target instanceof Element && e.target.closest('button')) step('copied_line');
+    };
+    el.addEventListener('click', on);
+    return () => el.removeEventListener('click', on);
+  }
 
   let heard = $state<Heard[]>([]);
   const sign = $derived(signOf(heard));
@@ -61,34 +92,40 @@
 </script>
 
 <section class="made" aria-labelledby="made-h">
-  <header class="head">
-    <h1 class="made-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
-    <p class="sub">{firstWords.sub}</p>
-  </header>
+  <div class="made-tile">
+    <header class="head">
+      <h1 class="entry-title" id="made-h" tabindex="-1" bind:this={heading}>{firstWords.title}</h1>
+      <p class="entry-lede">{words.sub}</p>
+    </header>
 
-  <ul class="apps">
-    {#each apps as a (a.id)}
-      {@const m = markOf(a.mark)}
-      <li class="app">
-        <svg class="mark" data-tone={m.tone} viewBox="0 0 24 24" aria-hidden="true" focusable="false"
-          ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule} /></svg
-        >
-        <div class="words">
-          <span class="name">{a.name}</span>
-          <span class="what">{a.what}</span>
-          {#if a.before !== null}<code class="line mono">{a.before}</code>{/if}
-          <code class="line mono">{a.line}</code>
-        </div>
-        <Button size="sm" onclick={() => {
-            step('copied_line');
-            const whole = a.before === null ? a.line : `${a.before}\n${a.line}`;
-            void clipboard.put(whole, whole, copy.lineCopied);
-          }}>{a.button}</Button>
-      </li>
-    {/each}
-  </ul>
+    <Segmented full role="group" aria-label={words.apps}>
+      {#each apps as a (a.id)}
+        {@const m = markOf(a.mark)}
+        {@const on = a.id === chosen?.id}
+        <button type="button" class="segment" data-on={on ? '' : undefined} aria-pressed={on} onclick={() => (chosenId = a.id)}>
+          <svg class="mark" data-tone={m.tone} viewBox="0 0 24 24" aria-hidden="true" focusable="false"
+            ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule} /></svg
+          >{a.name}
+        </button>
+      {/each}
+    </Segmented>
 
-  <p class="sign" role="status" data-on={sign.connected ? '' : undefined}>{sign.said}</p>
+    {#if chosen}
+      {@const steps = stepsOf(chosen)}
+      <ol class="steps" data-numbered={steps.length > 1 ? '' : undefined} {@attach countCopies}>
+        {#each steps as s, i (s.said)}
+          <li class="cmd-step">
+            <p class="cmd-said">
+              {#if steps.length > 1}<span class="cmd-n" aria-hidden="true">{i + 1}</span>{/if}{s.said}
+            </p>
+            <div class="cmd"><CodeLine text={s.line} label={s.said} /></div>
+          </li>
+        {/each}
+      </ol>
+    {/if}
+  </div>
+
+  <p class="sign" role="status" data-on={sign.connected ? '' : undefined}><span class="dot" aria-hidden="true"></span>{sign.said}</p>
 
   <div class="go">
     {#if sign.connected}
@@ -102,8 +139,27 @@
 <style>
   .made {
     display: grid;
+    justify-items: start;
     gap: var(--sp-4);
     min-inline-size: 0;
+  }
+
+  /* ONE TILE, AT MOST 720, on the frame's start edge: 24 in, 20 on a phone. */
+  .made-tile {
+    display: grid;
+    gap: var(--sp-5);
+    box-sizing: border-box;
+    inline-size: min(720px, 100%);
+    min-inline-size: 0;
+    padding: var(--sp-5);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  @media (width < 640px) {
+    .made-tile {
+      padding: 20px;
+    }
   }
 
   .head {
@@ -111,84 +167,101 @@
     gap: var(--sp-2);
   }
 
-  .made-title {
-    margin: 0;
-    color: var(--ink);
-    font-size: var(--t-title);
-    font-weight: 600;
-    line-height: 1.2;
-  }
-
-  .made-title:focus {
-    /* focus-ok: the heading takes focus only by script (tabindex -1) as the screen arrives, so a reader is told where
-       it is; nobody tabs to it, and a ring round the title would read as a control. */
-    outline: none;
-  }
-
-  .sub {
-    margin: 0;
-    color: var(--ink2);
-  }
-
-  .apps {
-    display: grid;
-    gap: var(--sp-3);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .app {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--sp-3);
-    align-items: start;
-    min-inline-size: 0;
+  /* THE APP'S MARK BEFORE ITS NAME in the segment, 16 at the label's ink, or its maker's colour. */
+  .segment {
+    gap: var(--sp-2);
   }
 
   .mark {
     flex: none;
-    inline-size: var(--icon-l);
-    block-size: var(--icon-l);
+    inline-size: 16px;
+    block-size: 16px;
     fill: currentColor;
-    color: var(--ink);
   }
 
   .mark[data-tone='claude'] {
     fill: var(--agent-claude);
   }
 
-  .words {
+  .steps {
     display: grid;
-    gap: var(--sp-1);
+    gap: var(--sp-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cmd-step {
+    display: grid;
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
 
-  .name {
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  .what {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  /* A long line breaks anywhere so it never pushes the page sideways at 390px. */
-  .line {
-    overflow-wrap: anywhere;
-    color: var(--ink);
-    font-size: var(--t-sm);
-  }
-
-  .sign {
+  .cmd-said {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 22px;
+  }
+
+  /* THE STEP'S NUMBER in a 24 well of the quiet fill: a count of steps is not an alarm, so never red. */
+  .cmd-n {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    background: var(--tile-2);
+    border-radius: var(--r-round);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cmd {
+    min-inline-size: 0;
+  }
+
+  /* WAITING IN THE QUIET INK beside a grey dot; connected in ink beside the live green one. */
+  .sign {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .dot {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-round);
+    background: var(--ink-3);
+    transition: background var(--d-state) var(--ease-out);
   }
 
   .sign[data-on] {
     color: var(--ink);
     font-weight: 600;
+  }
+
+  .sign[data-on] .dot {
+    background: var(--live);
+  }
+
+  .go :global(.btn) {
+    min-block-size: max(40px, var(--ctl-h));
+  }
+
+  .go :global(.btn[data-weight='bare']) {
+    margin-inline-start: calc(-1 * var(--sp-3));
   }
 
   @media (forced-colors: active) {
