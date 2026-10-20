@@ -101,6 +101,9 @@ const GATES = [
      the record, so the group in `ROUTES` gates nothing at runtime; it was ADMIN on a method guarded
      `read`, and the answer to that method carries every colleague's email. */
   ['guards', call(join(here, 'guards.mjs'))],
+  /* AND WHETHER EACH READ OF THE KERNEL'S ROWS SITS BEHIND A SIGHT CHECK (sharing plan §2.5): `guards` holds a method to
+     its group, this holds the rows inside it to the caller. Report mode until Slice 3: it lists every call site and passes. */
+  ['sight', call(join(here, 'sight.mjs'))],
   /* AND THE OTHER TWENTY-TWO CLOSED LISTS. 30 §2: a list enforced only by a validator is a list one
      code path forgets, which holds only while the CHECK and the document agree about what it is. */
   ['closed-lists', call(join(here, 'closed-lists.mjs'))],

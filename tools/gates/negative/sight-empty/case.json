@@ -1,0 +1,8 @@
+{
+  "gate": "sight",
+  "rule": "an empty root is a skip, not a pass",
+  "expect": "nothing was checked",
+  "findings": 1,
+  "skip": true,
+  "why": "The gate is in report mode until Slice 3, so no open call site turns it red yet. What it can already get wrong is reading nothing: a tree with no packages/record/src is what a mistyped BRAINDOG_GATE_ROOT looks like, and the gate exits 3 naming the root rather than passing."
+}
