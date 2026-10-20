@@ -49,8 +49,27 @@
       "author": "BrainDog",
       "license": "MIT",
       "audience": "addon",
-      "latest": "1.7.1",
+      "latest": "1.7.2",
       "versions": [
+        {
+          "version": "1.7.2",
+          "checksum": "e3df2e2166665db8aba645b74a5d9f3c4cd244c658dc8530230e852ef0589736",
+          "bytes": 60753,
+          "published_at": "2026-10-20T21:58:59.166Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [],
+            "pages": [],
+            "rules": [],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "Nothing it reads or writes changed. It is left out of every listing, as an add-on for one bank is, and still installs by its name."
+        },
         {
           "version": "1.7.1",
           "checksum": "58eda914d2219b913d05f0b6014f93c16f73c4c439f156ad8ce475401419e12c",
@@ -190,7 +209,8 @@
         "kind": "braindog",
         "id": "braindog",
         "name": "BrainDog"
-      }
+      },
+      "unlisted": true
     },
     {
       "kind": "pack",

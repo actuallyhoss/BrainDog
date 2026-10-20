@@ -1,9 +1,10 @@
 {
   "pack": "bank-hsbc-eg",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "title": "HSBC Egypt alerts",
   "summary": "Reads HSBC Egypt alert mails and text messages into Money as transactions, each with the balance it prints, and a message that only prints a balance as a balance check.",
-  "changes": "Nothing it reads or writes changed. Two like movements a day apart stay two when each prints its own balance or its own InstaPay reference, and the mail and the text of one movement stay one. A balance can come back to a figure it printed before, as when one sum is withdrawn, paid back in and withdrawn again on the same day: the second withdrawal is then held as a repeat that names the one it looks like, and “It is a second one” files it.",
+  "changes": "Nothing it reads or writes changed. It is left out of every listing, as an add-on for one bank is, and still installs by its name.",
+  "unlisted": true,
   "author": "BrainDog",
   "license": "MIT",
   "requires": {

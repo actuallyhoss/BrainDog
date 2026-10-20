@@ -199,9 +199,9 @@ const moneysPayee = (): unknown =>
    a bank door is the 1.6.0 lesson above, refused the day Money or a second bank declares it too.
    1.7.1 IS A PATCH: the twin test below said two movements never leave one balance, which a withdrawal, a deposit and
    a withdrawal of one sum on one day disprove. The pack's note now says so, and nothing a record reads moved. */
-test('THE FILE IS bank-hsbc-eg 1.7.1, on money-core 3.10.0 or later before 4.0.0, with the fifteen', () => {
+test('THE FILE IS bank-hsbc-eg 1.7.2, on money-core 3.10.0 or later before 4.0.0, with the fifteen', () => {
   const doc = file();
-  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.7.1']);
+  assert.deepEqual([doc.pack, doc.version], ['bank-hsbc-eg', '1.7.2']);
   assert.deepEqual(doc.extends, { 'register.transactions': { fields: [{ id: 'hsbc_reference', label: 'HSBC reference', type: 'text' }] } }, 'the pack lays more than its reference, or lays the payee Money declares');
   assert.equal((moneysPayee() as { type?: string } | undefined)?.type, 'text', 'Money declares no payee field to write');
   const frozen = JSON.parse(readFileSync(new URL('./bank-hsbc-eg-1.3.1.json', import.meta.url), 'utf8')) as { version: string; requires: { packs: unknown } };
@@ -270,7 +270,7 @@ test('INSTALLED FROM THE FILE: fifteen patterns, nothing refused, and the same f
   assert.deepEqual(diff.conflicts, []);
   assert.deepEqual(diff.adds.map((a) => a.id).sort(), FIFTEEN);
   await put(api, file());
-  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.7.1');
+  assert.equal(api.kernel.packs().find((p) => p.id === 'bank-hsbc-eg')?.version, '1.7.2');
   const opened = said<{ pack: { manifest: { pack: string } } }>(await readPackFile(readFileSync(PACK_FILE, 'utf8')));
   assert.equal(opened.pack.manifest.pack, 'bank-hsbc-eg');
   sql.close();
