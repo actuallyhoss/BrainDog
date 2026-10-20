@@ -25,7 +25,8 @@ import { INSTRUCTIONS, VERSIONS } from '@braindog/mcp/rpc';
 import { openKeyStore, recordKeys } from '../../selfhost/src/keys.ts';
 import { start } from '../../selfhost/src/server.ts';
 import { cacheFile, readDoorCache, writeDoorCache } from '../src/bridge-cache.ts';
-import { mayHaveLeft, readTools, serveBridge, UNREACHABLE_MAYBE, type BridgeIo } from '../src/bridge.ts';
+import { attaches, mayHaveLeft, readTools, serveBridge, UNREACHABLE_MAYBE, type BridgeIo } from '../src/bridge.ts';
+import { readSession, sessionPath, writeSession } from '../src/hooks.ts';
 import type { Target } from '../src/http.ts';
 import { UNREACHABLE_FIX } from '../src/surface.ts';
 
@@ -95,7 +96,7 @@ function watched(change?: (sent: Sent, real: () => Promise<Response>, signal: Ab
 }
 
 /** A bridge over two pipes, and a way to ask it something and read the line that answers. */
-function bridge(target: Target, home: string, fetch: typeof globalThis.fetch, more: Partial<BridgeIo> = {}) {
+function bridge(target: Target, home: string, fetch: typeof globalThis.fetch, more: Partial<BridgeIo> = {}, run: Record<string, string> = {}) {
   const input = new PassThrough();
   const output = new PassThrough();
   const lines: Rpc[] = [];
@@ -111,6 +112,7 @@ function bridge(target: Target, home: string, fetch: typeof globalThis.fetch, mo
     'x-braindog-agent': 'claude',
     ...(client.name ? { 'x-braindog-client-name': client.name } : {}),
     ...(client.version ? { 'x-braindog-client-version': client.version } : {}),
+    ...run,
   });
   const done = serveBridge({ input, output, home, fetch, ms: 5_000, say: (l) => void said.push(l), ...more }, target, hints);
   let next = 0;
@@ -461,4 +463,119 @@ test('A CACHE WITH A HANDSHAKE AND NO LIST: the app listed the bundled tools, so
   };
   assert.equal(await run(false), 1, 'the bundled list was taken for the host\'s because the builds matched');
   assert.equal(await run(true), 0, 'the cached list of the same build was said to change');
+});
+
+/* ── the end, when the app closes the server ───────────────────────────── */
+
+/** An agent's own key on the stack's record, as `braindog login` would hold one. */
+async function agentKey(s: { base: string; serverKey: string }): Promise<string> {
+  const made = (await fetch(`${s.base}/api/createToken`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${s.serverKey}` },
+    body: JSON.stringify({ scope: 'write', label: 'Claude Code, studio-mac' }),
+  }).then((r) => r.json())) as { ok: boolean; value: { bearer: string } };
+  assert.ok(made.ok, JSON.stringify(made));
+  return made.value.bearer;
+}
+
+/** The record's runs as the owner reads them: spoken id and state, by client id. */
+async function runs(s: { base: string; serverKey: string }): Promise<Record<string, string | null>> {
+  const said = (await fetch(`${s.base}/api/list?register=session`, { headers: { authorization: `Bearer ${s.serverKey}` } }).then((r) => r.json())) as {
+    ok: boolean;
+    value: { rows: { state: string | null; fields: { client_id?: string } }[] };
+  };
+  assert.ok(said.ok, JSON.stringify(said));
+  return Object.fromEntries(said.value.rows.map((r) => [r.fields.client_id ?? '-', r.state]));
+}
+
+const ends = (w: { sent: Sent[] }) => w.sent.filter((x) => x.url.endsWith('/api/end'));
+
+test('THE INPUT CLOSING ENDS THE RUN THE BRIDGE ATTACHED, once and by its host session id; a bridge that attached none sends no end', async (t) => {
+  const s = await stack(t);
+  const target = { key: s.base, base: s.base, token: await agentKey(s) };
+  const cwd = mkdtempSync(join(tmpdir(), 'bridge-end-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const io = { env: { XDG_CONFIG_HOME: join(cwd, 'config') }, cwd };
+
+  const w = watched();
+  const b = bridge(target, s.dir, w.fetch, io, { 'x-braindog-client': 'cc-window-1' });
+  await b.ask('initialize', HELLO);
+  const wrote = await b.ask('tools/call', { name: 'create', arguments: { register: 'things', fields: { name: 'Glaze' } } });
+  assert.notEqual(wrote.result?.isError, true, textOf(wrote));
+  assert.equal((await runs(s))['cc-window-1'], 'active');
+  await b.end();
+  assert.equal(ends(w).length, 1, 'the end went more or fewer than once');
+  assert.equal(ends(w)[0]!.headers.get('x-braindog-client'), 'cc-window-1');
+  assert.equal(ends(w)[0]!.headers.get('authorization'), `Bearer ${target.token}`);
+  assert.equal(ends(w)[0]!.headers.get('origin'), null);
+  assert.equal((await runs(s))['cc-window-1'], 'done');
+  assert.ok(b.said.includes('The app closed this session, so its run in BrainDog was ended.'), b.said.join('\n'));
+
+  /* NO HOST SESSION ID: the run its calls landed in may be another app's in the same folder, so nothing is ended. */
+  const w2 = watched();
+  const anon = bridge(target, s.dir, w2.fetch, io);
+  await anon.ask('initialize', HELLO);
+  await anon.ask('tools/call', { name: 'list', arguments: { register: 'things' } });
+  await anon.end();
+  assert.equal(ends(w2).length, 0);
+
+  /* A HANDSHAKE AND A LIST ATTACH NOTHING, even with an id, so a session that only listed its tools ends nothing. */
+  const w3 = watched();
+  const idle = bridge(target, s.dir, w3.fetch, io, { 'x-braindog-client': 'cc-window-2' });
+  await idle.ask('initialize', HELLO);
+  await idle.ask('tools/list', {});
+  await idle.end();
+  assert.equal(ends(w3).length, 0);
+});
+
+test('A RUN THE START HOOK ATTACHED IS LEFT TO THE END HOOK when it comes, and ended by the bridge when it does not', async (t) => {
+  const s = await stack(t);
+  const target = { key: s.base, base: s.base, token: await agentKey(s) };
+  const cwd = mkdtempSync(join(tmpdir(), 'bridge-end-hook-'));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const env = { XDG_CONFIG_HOME: join(cwd, 'config') };
+  const io = { env, cwd, endGraceMs: 300 };
+
+  /* The start hook's attach, as the record makes it, and the session file it writes. */
+  const attach = async (client: string) => {
+    const said = (await fetch(`${s.base}/api/attach`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${target.token}`, 'x-braindog-client': client, 'x-braindog-agent': 'claude' },
+      body: JSON.stringify({ source: 'startup', client_id: client }),
+    }).then((r) => r.json())) as { ok: boolean; value: { spoken: string } };
+    assert.ok(said.ok, JSON.stringify(said));
+    writeSession(sessionPath(env, cwd, client), { host: s.base, spoken: said.value.spoken, client_id: client, head_at_start: null, at: new Date().toISOString() });
+    return said.value.spoken;
+  };
+
+  /* THE END HOOK CAME: it wrote `seen` before the grace ran out, so the bridge sends no end of its own. */
+  const one = await attach('cc-hooked');
+  const w = watched();
+  const b = bridge(target, s.dir, w.fetch, io, { 'x-braindog-client': 'cc-hooked', 'x-braindog-session': one });
+  await b.ask('initialize', HELLO);
+  await b.ask('tools/call', { name: 'list', arguments: { register: 'things' } });
+  const file = sessionPath(env, cwd, 'cc-hooked');
+  const ending = b.end();
+  setTimeout(() => writeSession(file, { ...readSession(file)!, seen: new Date().toISOString() }), 100);
+  await ending;
+  assert.equal(ends(w).length, 0, 'the bridge ended the run before the end hook could');
+
+  /* NO END HOOK (a killed window, a -p run): the grace runs out and the bridge ends the run. */
+  const two = await attach('cc-killed');
+  const w2 = watched();
+  const k = bridge(target, s.dir, w2.fetch, io, { 'x-braindog-client': 'cc-killed', 'x-braindog-session': two });
+  await k.ask('initialize', HELLO);
+  await k.ask('tools/call', { name: 'list', arguments: { register: 'things' } });
+  await k.end();
+  assert.equal(ends(w2).length, 1);
+  assert.equal(ends(w2)[0]!.headers.get('x-braindog-session'), two);
+  assert.equal((await runs(s))['cc-killed'], 'done');
+});
+
+test('ATTACHED MEANS A HOST SESSION ID AND A TOOL CALL, or the run the start hook named', () => {
+  assert.equal(attaches('tools/call', { 'x-braindog-client': 'c1' }), true);
+  assert.equal(attaches('tools/list', { 'x-braindog-client': 'c1' }), false);
+  assert.equal(attaches('initialize', { 'x-braindog-client': 'c1', 'x-braindog-session': 'S4' }), true);
+  assert.equal(attaches('tools/call', { 'x-braindog-session': 'S4' }), false);
+  assert.equal(attaches(undefined, {}), false);
 });

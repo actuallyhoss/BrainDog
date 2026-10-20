@@ -43,6 +43,8 @@
  * A HOST AWAY AT THE START is served from the cache (`bridge-cache.ts`): its last good handshake and tool list, every
  * tool refusing with the sentence. With no cache the bundled server answers the handshake, as it does signed out.
  *
+ * THE INPUT CLOSING ENDS THE RUN (`endOnClose`), once, and only a run this bridge attached by its host session's id.
+ *
  * STDOUT CARRIES THE PROTOCOL AND NOTHING ELSE, and no line written anywhere holds the bearer.
  */
 
@@ -55,8 +57,9 @@ import { agreed, handle, VERSIONS, type Reply } from '@braindog/mcp/rpc';
 
 import { readDoorCache, writeDoorCache, type DoorCache } from './bridge-cache.ts';
 import { BUDGET_MS, type Target } from './http.ts';
+import { readSession, sessionPath } from './hooks.ts';
 import { loginCommand } from './login.ts';
-import { cliBuild, type ClientInfo } from './position.ts';
+import { cliBuild, positionOf, type ClientInfo } from './position.ts';
 import { signedOutSurface } from './signed-out.ts';
 import { helloOf } from './stdio.ts';
 import { UNREACHABLE_FIX, type Ctx } from './surface.ts';
@@ -74,7 +77,19 @@ export type BridgeIo = {
   fetch?: typeof globalThis.fetch | undefined;
   /** The sentence a call refuses with once the host has said the sign-in ended. Left out, the one written here. */
   signedOut?: string | undefined;
+  /** The environment the session files are found by (`hostsPath`), this process's own unless a test names another. */
+  env?: Record<string, string | undefined> | undefined;
+  /** The folder the app started this server in, where its session files and its repository are: this process's own. */
+  cwd?: string | undefined;
+  /** How long the end waits for Claude Code's end hook to take the run (`END_GRACE_MS`). */
+  endGraceMs?: number | undefined;
 };
+
+/** How long the bridge waits, once its input closed, for the session's end hook to say it is ending the run itself. */
+export const END_GRACE_MS = 1_500;
+
+/** The most the end itself may take, inside the two seconds an app gives a server between closing it and stopping it. */
+export const END_MS = 3_000;
 
 /**
  * The session headers for a request, given what the app said it is in its hello: `sessionHeaders` in `position.ts`,
@@ -279,6 +294,10 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   /* THE TOOLS THAT ONLY READ, from the same list: a lost answer to one of them cannot have written anything. */
   let reads = readTools(cache?.tools);
 
+  /* THE RUN THIS BRIDGE WORKED AS, by the session headers of the last request the host answered that named its host
+     session by id: a tool call, or any call naming the run the start hook attached. `null` while it attached none. */
+  let ran: Record<string, string> | null = null;
+
   const open = new Map<Id, AbortController>();
   const inFlight = new Set<Promise<void>>();
   /* Settled by the write's own callback, which is what makes "flushed" true on a Windows pipe. */
@@ -313,6 +332,7 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       return { kind: 'away', maybe: mayHaveLeft(err) };
     }
     const seen = res.headers.get('braindog-build');
+    if (res.status !== 401 && res.status < 500 && attaches(method, session)) ran = session;
     if (res.status === 401) {
       await res.body?.cancel().catch(() => undefined);
       return { kind: 'signed-out' };
@@ -497,6 +517,71 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
   }
 
   while (inFlight.size > 0) await Promise.all(inFlight);
+  if (ran !== null && refusing === null) await endOnClose(io, target, ran, () => hints(client), go);
+}
+
+/**
+ * Whether a request the host answered attached this bridge to a run: it named its host session by id, and it was a tool
+ * call, which opens the run when it writes, or it named the run the start hook attached (`x-braindog-session`).
+ *
+ * BY ID ONLY. A run named without a host session id came from the folder's session file, which may be another app's run
+ * in the same folder, and ending that would end a session still working.
+ */
+export const attaches = (method: string | undefined, headers: Record<string, string>): boolean =>
+  typeof headers['x-braindog-client'] === 'string' && (method === 'tools/call' || typeof headers['x-braindog-session'] === 'string');
+
+/**
+ * THE RUN ENDS WHEN THE APP CLOSES THIS SERVER (plan §4.4). 842 of 888 runs on the owner's record were never ended:
+ * SessionEnd does not fire for a window that was killed, a `-p` run or a subagent, and an app with no hooks has none.
+ * The app closing standard input is the one end every session has, so the bridge sends `end` then, once.
+ *
+ * AS THE RUN IT WORKED AS. The session headers are read again, so a window that cleared ends the run it holds now, and
+ * a read that no longer names a host session by id ends the run the last answered request named.
+ *
+ * AFTER THE END HOOK, NEVER BEFORE IT. A run the start hook attached has an end hook too, which meets the session's
+ * people and sends its command lines before it ends the run; a write after an end brings the run back and starts a new
+ * stretch, which would drop the step it left. So the bridge waits up to `END_GRACE_MS` for that hook to write `seen` on
+ * the session's file, and leaves the end to it when it does. Nothing here throws or prints on the protocol.
+ */
+async function endOnClose(io: BridgeIo, target: Target, ran: Record<string, string>, now: () => Promise<Record<string, string>>, go: typeof globalThis.fetch): Promise<void> {
+  const say = io.say ?? (() => undefined);
+  try {
+    const fresh = await now().catch(() => ({}) as Record<string, string>);
+    const headers = typeof fresh['x-braindog-client'] === 'string' ? fresh : ran;
+    const env = io.env ?? process.env;
+    const cwd = io.cwd ?? process.cwd();
+    const spoken = headers['x-braindog-session'];
+    if (spoken !== undefined && (await hookEnding(env, cwd, headers['x-braindog-client'] ?? null, spoken, io.endGraceMs ?? END_GRACE_MS))) return;
+    const at = await positionOf(cwd);
+    const body = { ...(at.branch === null ? {} : { branch: at.branch }), ...(at.head === null ? {} : { head: at.head }) };
+    const sent = new Headers({ 'content-type': 'application/json', accept: 'application/json', 'x-braindog-cli': cliBuild() });
+    if (target.token) sent.set('authorization', `Bearer ${target.token}`);
+    for (const [name, value] of Object.entries(headers)) sent.set(name, value);
+    const res = await go(`${target.base}/api/end`, { method: 'POST', headers: sent, body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(END_MS) });
+    const said = (await res.json().catch(() => null)) as { ok?: unknown } | null;
+    if (said?.ok === true) say('The app closed this session, so its run in BrainDog was ended.');
+  } catch {
+    /* A host away or slow at the close leaves the run to the record's sweep, as before. The error could quote anything. */
+  }
+}
+
+/**
+ * Whether Claude Code's end hook is ending this run itself: within `ms`, a session file in this folder that names the
+ * run says an end hook heard from it (`seen`) since its start hook wrote it. Every start hook writes the file without
+ * `seen` and the end hook adds it first, before it sends anything, so `seen` is this session's end and no earlier one.
+ * Polled, because the hook is a process of its own that may start after this one saw its input close.
+ */
+export async function hookEnding(env: Record<string, string | undefined>, cwd: string, client: string | null, spoken: string, ms: number): Promise<boolean> {
+  const files = [...(client === null ? [] : [sessionPath(env, cwd, client)]), sessionPath(env, cwd)];
+  const until = Date.now() + ms;
+  for (;;) {
+    for (const file of files) {
+      const held = readSession(file);
+      if (held !== null && held.spoken === spoken && held.seen !== undefined && Date.parse(held.seen) >= (Date.parse(held.at) || 0)) return true;
+    }
+    if (Date.now() >= until) return false;
+    await new Promise((done) => setTimeout(done, 100));
+  }
 }
 
 /** The sentence every call answers once the host has said this machine's sign-in ended, in `signedOutFix`'s words. */
