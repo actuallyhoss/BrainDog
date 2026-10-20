@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { REGISTERS } from '@braindog/seed';
 
 import { kpis as words } from '../copy/kpis.ts';
-import { draftOf, faultsOf, FIGURES, firstFault, newDraft, patchOf, rowOf, saysMore, sourcesFor, SOURCES, undoOf, withFigure, withSource, type KpiDraft } from './sheet.ts';
+import { draftOf, everyFor, faultsOf, FIGURES, firstFault, newDraft, patchOf, rowOf, saysMore, sourcesFor, SOURCES, undoOf, withFigure, withSource, type KpiDraft } from './sheet.ts';
 
 /* THE LIST AS PORTFOLIO DECLARES IT: its fields, and the values each choice may hold. */
 const KPIS = REGISTERS.kpis!;
@@ -93,6 +93,9 @@ test('A FIGURE BRINGS ITS UNIT AND WHICH WAY IS GOOD: a cost is money in the rec
   assert.equal(row.figure, 'project-last-worked');
   assert.equal(row.measure, null);
   for (const f of FIGURES) assert.match(f.id, /^project-[a-z0-9-]+$/u);
+  /* A number with no name takes the figure's; one with a name keeps it. */
+  assert.equal(withFigure({ ...newDraft(AT), source: 'figure' }, 'project-owed', none, AT).name, words.kpiFigureOwed);
+  assert.equal(cost.name, 'Costs');
   /* Worked out with nothing picked will not do. */
   assert.deepEqual(faultsOf({ ...withSource(named(), 'figure', none, AT), figure: '' }), { figure: words.kpiNoFigure });
 });
@@ -151,15 +154,18 @@ test('A NUMBER ALREADY KEPT READS BACK AS TYPED, keeps reading Numbers, and open
   const d = draftOf(KEPT);
   assert.equal(d.source, 'numbers');
   assert.equal(d.measure, 'Players, Sketchpad');
-  assert.equal(d.target, '5000');
+  assert.equal(d.target, '5,000');
   assert.equal(d.today, 'pinned');
   assert.ok(sourcesFor(d).includes('numbers'));
   assert.ok(!sourcesFor(newDraft(AT)).includes('numbers'));
+  /* Daily, weekly, monthly; hourly only for a number that already has it. */
+  assert.deepEqual(everyFor(newDraft(AT)), ['1d', '1w', '1m']);
+  assert.deepEqual(everyFor({ every: '1h' }), ['1h', '1d', '1w', '1m']);
   assert.ok(saysMore(d, AT));
   assert.ok(!saysMore(named(), AT));
   /* A money target reads back in its currency's own units, and a name in Numbers equal to its name follows a rename. */
   const money = draftOf({ name: 'MRR', thing: 4, source: 'typed', measure: 'MRR', target_amount: { amount: 875_000, currency: 'USD' } });
-  assert.equal(money.target, '8750');
+  assert.equal(money.target, '8,750');
   assert.equal(money.unit, 'USD');
   assert.equal(money.measure, '');
 });

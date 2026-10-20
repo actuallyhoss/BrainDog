@@ -99,11 +99,15 @@ export function withSource(draft: KpiDraft, source: KpiSource, touched: Touched,
   return next;
 }
 
-/** The figure picked, and the unit and the way it is good that come with it, where nobody set them by hand. */
+/**
+ * The figure picked, and the unit and the way it is good that come with it, where nobody set them by hand. A number
+ * with no name yet takes the figure's, so picking "Still to come in" is enough to add it.
+ */
 export function withFigure(draft: KpiDraft, id: string, touched: Touched, at: Context = {}): KpiDraft {
   const next: KpiDraft = { ...draft, figure: id };
   const f = figureOf(id);
   if (!f) return next;
+  if (next.name.trim() === '') next.name = f.label;
   if (!touched.has('good')) next.good = f.good;
   if (!touched.has('unit')) next.unit = f.unit === 'money' ? (at.home ?? '') : f.unit;
   return next;
@@ -122,8 +126,8 @@ export function newDraft(at: Context = {}): KpiDraft {
 const text = (v: unknown): string => (typeof v === 'string' ? v : '');
 const oneOf = <T extends string>(v: unknown, of: readonly T[], or: T): T => (typeof v === 'string' && (of as readonly string[]).includes(v) ? (v as T) : or);
 
-/** A figure as a person reads it in a box: `1200` is "1200", `0.5` is "0.5", never "5e-1". */
-const typedOf = (n: number): string => String(Number(n.toFixed(6)));
+/** A figure as a person reads it in a box and types it back: `10000` is "10,000", `0.5` is "0.5", never "5e-1". */
+const typedOf = (n: number): string => n.toLocaleString('en-US', { maximumFractionDigits: 6, useGrouping: true });
 
 /** What a number already kept reads back as. A name in Numbers that is its own name reads as empty, so it follows a rename. */
 export function draftOf(fields: Fields): KpiDraft {
@@ -152,6 +156,9 @@ export function draftOf(fields: Fields): KpiDraft {
     headline: fields.headline === true,
   };
 }
+
+/** The cadences a sheet offers: daily, weekly and monthly, and hourly too for a number that already has it. */
+export const everyFor = (draft: Pick<KpiDraft, 'every'>): readonly KpiEvery[] => (draft.every === '1h' ? EVERY : EVERY.filter((e) => e !== '1h'));
 
 /** The sources a sheet offers this draft: the four, and `numbers` too when the number already reads Numbers. */
 export const sourcesFor = (draft: Pick<KpiDraft, 'source'>): readonly KpiSource[] => (draft.source === 'numbers' ? [...SOURCES, 'numbers'] : SOURCES);
