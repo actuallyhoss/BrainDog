@@ -53,6 +53,11 @@ export const sharing = {
   sharingSeeAs: 'See as...',
   sharingSeeAsHint: 'Open the record as one person sees it. Nothing you do there counts.',
   sharingSeeAsPick: 'Choose who',
+  sharingSeen: 'Seen and changed',
+  sharingSeenTitle: (who: string) => `What ${who} saw and changed`,
+  sharingSeenLead: 'The last 30 days, under the share that let them.',
+  sharingSeenReading: 'Reading what they saw',
+  sharingSeenNone: (who: string) => `${who} hasn't opened or changed anything here in the last 30 days.`,
 
   /* ── the person a share let in ── */
   sharingYouCanSee: 'What you can see here',

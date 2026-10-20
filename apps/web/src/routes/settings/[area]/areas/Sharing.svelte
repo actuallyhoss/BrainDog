@@ -8,7 +8,8 @@
 
   EVERY SENTENCE IS THE RECORD'S. `sharing` says each share in one line with names in it, and this area only decides
   where each is drawn (`lib/sharing/sharing.ts`, `sharingSections`). Tapping one asks the Share sheet to open on it,
-  by an event the sheet listens for; Stop asks once, in place, and ends it at once.
+  by an event the sheet listens for (`ShareHost.svelte`, which loads it the first time); Stop asks once, in place, and
+  ends it at once. Each person's "Seen and changed" opens in a drawer, read from `shareActivity` when it opens (§2.10).
 
   AN OWNER'S OR AN ADMIN'S, as the record's methods are. Anybody else here holds shares rather than giving them, so the
   area says what they can see instead (§3.4), from `myShares`.
@@ -26,6 +27,8 @@
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
+  import ShareHost from '$lib/sharing/ShareHost.svelte';
   import {
     SHARED_EVENT,
     askSeeAs,
@@ -33,6 +36,7 @@
     endedAt,
     groupMember,
     makeGroup,
+    readActivity,
     readGroups,
     readMine,
     readSharing,
@@ -40,7 +44,9 @@
     sharingSections,
     stopShare,
     stopWords,
+    type ActivityLine,
     type Bunch,
+    type Got,
     type GroupRow,
     type MyShare,
     type SharingRow,
@@ -127,6 +133,20 @@
     if (who) askSeeAs({ person: who.id, name: who.name });
   }
 
+  /* ── Seen and changed: one person's last 30 days, read when their drawer opens (§2.10) ── */
+
+  let seenOf = $state<{ id: string; name: string } | null>(null);
+  let seenOpen = $state(false);
+  let seen = $state<Got<ActivityLine[]> | null>(null);
+
+  async function openSeen(id: string, name: string): Promise<void> {
+    seenOf = { id, name };
+    seen = null;
+    seenOpen = true;
+    const got = await readActivity(client(), id);
+    if (seenOf?.id === id) seen = got;
+  }
+
   /* ── groups ── */
 
   let groupName = $state('');
@@ -209,6 +229,14 @@
         </li>
       {/each}
     </ul>
+    {#if b.kind === 'person' && !ended}
+      <!-- SEEN AND CHANGED, in a drawer of its own: what this person read and changed, and through which share. -->
+      <div class="share-do">
+        <Button weight="bare" aria-label={copy.sharingSeenTitle(b.name)} onclick={() => void openSeen(b.key.slice('person:'.length), b.name)}
+          ><Icon name="eye" size="s" />{copy.sharingSeen}</Button
+        >
+      </div>
+    {/if}
   </li>
 {/snippet}
 
@@ -334,6 +362,30 @@
       <ul class="bunches">{#each sections.ended as b (b.key)}{@render bunchOf(b, true)}{/each}</ul>
     {/if}
   </Section>
+
+  {#if seenOf}
+    <Sheet bind:open={seenOpen} title={copy.sharingSeenTitle(seenOf.name)} subtitle={copy.sharingSeenLead}>
+      {#if seen === null}
+        <p class="none" role="status">{copy.sharingSeenReading}</p>
+      {:else if !seen.ok}
+        <Empty kind="error" title={seen.fix} />
+      {:else if seen.value.length === 0}
+        <p class="none">{copy.sharingSeenNone(seenOf.name)}</p>
+      {:else}
+        <ul class="shares">
+          {#each seen.value as l, i (i)}
+            <li class="share" data-ended="">
+              <p class="share-when">{l.via}</p>
+              <p class="share-said">{l.said}</p>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </Sheet>
+  {/if}
+
+  <!-- THE SHARE SHEET, ASKED FOR BY EVENT from the lines above, and loaded the first time it is. -->
+  <ShareHost />
 {/if}
 
 <style>
