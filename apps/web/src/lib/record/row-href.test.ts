@@ -74,14 +74,14 @@ const ASK = {
 };
 
 test('a missing value of a row said by its id is filled on that row', () => {
-  assert.equal(holePlaceIn('tasks#4.due', null, ASK), '/r/tasks/4');
-  assert.equal(holePlaceIn('tasks#4.project.name', null, ASK), '/r/tasks/4');
+  assert.equal(holePlaceIn('tasks#4.due', null, ASK), '/r/tasks/4?fields=1');
+  assert.equal(holePlaceIn('tasks#4.project.name', null, ASK), '/r/tasks/4?fields=1');
   assert.equal(holePlaceIn('nonesuch#4.due', null, ASK), null);
 });
 
 test('on a page drawn for one row, a field of that row is filled on the row', () => {
-  assert.equal(holePlaceIn('budget', { register: 'things', seq: 3 }, ASK), '/r/things/3');
-  assert.equal(holePlaceIn('budget.currency', { register: 'things', seq: 3 }, ASK), '/r/things/3');
+  assert.equal(holePlaceIn('budget', { register: 'things', seq: 3 }, ASK), '/r/things/3?fields=1');
+  assert.equal(holePlaceIn('budget.currency', { register: 'things', seq: 3 }, ASK), '/r/things/3?fields=1');
   /* NOT A FIELD OF IT, and no page is drawn for a row: nothing to open. */
   assert.equal(holePlaceIn('colour', { register: 'things', seq: 3 }, ASK), null);
   assert.equal(holePlaceIn('budget', null, ASK), null);
@@ -100,7 +100,7 @@ test('a list and a state opens the list, and a path that names nothing opens now
 });
 
 test('on this record a hole asks the lists and figures the tab holds', () => {
-  assert.equal(holePlace('tasks#4.due'), '/r/tasks/4');
+  assert.equal(holePlace('tasks#4.due'), '/r/tasks/4?fields=1');
   assert.equal(holePlace('tasks.late'), '/r/tasks');
   assert.equal(holePlace('nonesuch.figure'), null);
 });

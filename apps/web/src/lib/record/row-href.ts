@@ -65,6 +65,30 @@ export const learnRowPages = (pages: readonly PageAbout[] | null | undefined): v
 /** Where a spoken id opens on the record this tab is on, or `null` where it names no row of a list the tab holds. */
 export const rowHref = (spoken: string): string | null => rowHrefIn(spoken, (register) => REGISTERS[register] !== undefined, learnt);
 
+/* ── a row with a page of its own ─────────────────────────────────────────── */
+
+/**
+ * THE WORD THAT KEEPS A ROW ON ITS OWN SCREEN. A row whose list made it a page opens on that page (`ownPageIn`), since
+ * the page is where it is read; its fields are still written on the row's screen, so the way there carries this word.
+ */
+export const FIELDS = 'fields';
+
+/** The row's own screen, where its fields are written, whatever page its list made for it. */
+export const rowScreen = (register: string, seq: number): string => `/r/${register}/${seq}?${FIELDS}=1`;
+
+/**
+ * Where the row's screen sends a reader instead (the plan of 20 October, batch 3d): the page its list made for it, or
+ * `null` to stay, for a row with no page and for an address that asks for the row's fields. Record-relative.
+ */
+export function ownPageIn(register: string, seq: number, search: URLSearchParams, pages: ReadonlyMap<string, string>): string | null {
+  if (search.has(FIELDS) || !Number.isInteger(seq) || seq < 1) return null;
+  const slug = pages.get(keyOf(register, seq));
+  return slug === undefined ? null : `/p/${encodeURIComponent(slug)}`;
+}
+
+/** `ownPageIn` on the pages the record last said. */
+export const ownPage = (register: string, seq: number, search: URLSearchParams): string | null => ownPageIn(register, seq, search, learnt);
+
 /* ── a hole ──────────────────────────────────────────────────────────────── */
 
 /** What `holePlaceIn` asks of the record: the lists and fields a tab holds, and where a figure's rows are. */
@@ -80,7 +104,8 @@ export type HoleAsk = {
  * Where the value a path names lives, for a path the record answered with nothing: the place a person goes to fill it.
  *
  * A HOLE IS A TASK, AND THE FIRST THING TO TRY IS THE PLACE ITSELF. `{{tasks#4.due}}` with no day is filled on that
- * task's screen, where its fields are written (its own page, where it has one, draws no field to fill). On a page drawn
+ * task's screen, where its fields are written (its own page, where it has one, draws no field to fill), so the address
+ * keeps the row's screen (`rowScreen`) rather than following the row to its page. On a page drawn
  * for one row, `{{budget}}` is a field of that row. `{{owed}}` and `{{money.owed}}` are a figure, whose rows are one
  * address (`hrefFor`). `{{tasks.late}}` is the list. `null` for a path that names none of these, and the host then
  * offers to find it out.
@@ -89,8 +114,8 @@ export function holePlaceIn(path: string, row: { register: string; seq: number }
   const parts = path.trim().split('.');
   const head = parts[0] ?? '';
   const spoken = spokenOf(head);
-  if (spoken !== null) return ask.held(spoken.register) ? `/r/${spoken.register}/${spoken.seq}` : null;
-  if (row && ask.held(row.register) && ask.field(row.register, head)) return `/r/${row.register}/${row.seq}`;
+  if (spoken !== null) return ask.held(spoken.register) ? rowScreen(spoken.register, spoken.seq) : null;
+  if (row && ask.held(row.register) && ask.field(row.register, head)) return rowScreen(row.register, row.seq);
   /* A FIGURE BY ITS OWN ID, THEN AS A MODULE SAYS IT (`<module>.<figure>`). A list is asked before the second, since
      `tasks.late` is a list and a state and no module is called what a list is. */
   const whole = ask.figure(path.trim()) ?? ask.figure(head);
