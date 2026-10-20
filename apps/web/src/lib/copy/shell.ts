@@ -59,6 +59,9 @@ const notReached = 'Nothing was saved. Check your connection, then try again.';
 export const SUPPORT_EMAIL = 'support@brain.dog';
 
 export const shell = {
+  /* THE ONE ASK, IN HIS WORDS (19 October): the top bar's field, the rail's, the phone's More sheet and the palette's
+     own field say the same five words. Here and not in palette.ts because the frame draws it before the palette loads. */
+  palettePlaceholder: 'Ask or change anything',
   /* the product */
   product: 'BrainDog',
 

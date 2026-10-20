@@ -32,9 +32,6 @@ export const palette = {
      model the assistant is not there rather than greyed out. `dead-copy` files it under the offline
      surface, which would have it waiting on a socket it has nothing to do with. */
   stopped: 'Stopped.',
-  /* THE ONE ASK, IN HIS WORDS (19 October): the top bar's field, the rail's, the phone's More sheet and the palette's
-     own field say the same five words. */
-  palettePlaceholder: 'Ask or change anything',
   noMatches: 'Nothing matches',
   commands: 'Actions',
   destinations: 'Go to',
