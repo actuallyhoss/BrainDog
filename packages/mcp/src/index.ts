@@ -422,25 +422,18 @@ const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   ...(required.length > 0 ? { required } : {}),
 });
 
-/**
- * Every read's last argument: `full` answers the JSON in the text as well, where it otherwise travels only in
- * `structuredContent`. NO DESCRIPTION, because the instructions say it once and the one word says the rest.
- *
- * `brief` WENT FROM THE ENUM TO PAY FOR `understand`: it is what a read answers when `format` is left out, so naming
- * it told an agent nothing, and the layer strips `format` before anything reads it, so a call that still sends it is
- * answered as before.
- */
-const FORMAT = { enum: ['full'] } as const;
+/* `format: "full"` on a read is said once, in the instructions, and the layer takes it off every call before anything
+   reads it, so no tool's schema lists it: nine times six tokens. */
 
 export const TOOLS: readonly Tool[] = [
   {
     name: 'record_index',
-    title: 'See what is kept here',
+    title: 'See what is kept',
     /* AND ITS FIGURES, BECAUSE NOTHING ELSE AN AGENT CALLS NAMES ONE. With the one tool
        that read figures gone, the probe called all nine reads with their most helpful arguments and not one answer
        named a figure the record holds; they were resources, and a client that reads no resources had none. */
-    description: 'Its registers with how many entries each, and its figures.',
-    input: obj({ format: FORMAT }),
+    description: 'Registers with entry counts, and figures.',
+    input: obj({}),
     writes: false,
   },
   {
@@ -450,16 +443,16 @@ export const TOOLS: readonly Tool[] = [
        is what comes back, and since the card it is the card's five slots, in the order the card says them. */
     description:
       'Run, project, next step, what waits, what was learned.',
-    input: obj({ format: FORMAT }),
+    input: obj({}),
     writes: false,
   },
   {
     name: 'schema',
     title: 'See the fields',
-    description: 'One register\'s fields, their types and what each may take.',
+    description: 'One register\'s fields and types.',
     /* `register` IS SAID BY NAME, as on `list` and `create`: where the ids are is `record_index`'s own description, and
        the twelve tokens went to `handoff`'s take and drop (AGT-C05). */
-    input: obj({ register: { type: 'string' }, format: FORMAT }, ['register']),
+    input: obj({ register: { type: 'string' } }, ['register']),
     writes: false,
   },
   {
@@ -477,18 +470,18 @@ export const TOOLS: readonly Tool[] = [
     input: obj(
       /* SHORTER BY TEN TOKENS FOR `handoff`'s take and drop (AGT-C05): "from record_index" is what that tool's own
          description says of its figures, and a ref field's value is a row id by what it is. */
-      { spoken: str('register#number, an id such as S42 or a ref field holds, or a figure.'), format: FORMAT },
+      { spoken: str('register#number, such as S42, or a figure.') },
       ['spoken'],
     ),
     writes: false,
   },
   {
     name: 'list',
-    title: 'Browse what is kept',
+    title: 'Browse entries',
     /* "NARROWED BY A PREDICATE. THE PREDICATE IS A TREE" SAID "PREDICATE" TWICE; saying it once paid for most of
        `fields` below. The list measured 2,720 before `fields` and 2,751 after, of the 2,760 `budget.test.ts` holds. */
     description:
-      'Rows of one register, newest first, narrowed by a predicate tree: {"field":"state","is":"open"}, or {"all":[...]}.',
+      'Rows of one register, newest first. where is a predicate tree: {"field":"state","is":"open"}.',
     input: obj(
       {
         register: { type: 'string' },
@@ -511,7 +504,6 @@ export const TOOLS: readonly Tool[] = [
         /* THE ONE WAY PAST THE CUT, said where it is used. A row's long text stops at 280 characters and the row says
            `clipped: true`, so an agent that needs the whole write-up names its field here or reads the row with `get`. */
         fields: { type: 'array', items: { type: 'string' }, description: 'Text fields kept whole.' },
-        format: FORMAT,
       },
       ['register'],
     ),
@@ -520,59 +512,58 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'search',
     title: 'Search everything',
-    description: 'Rows whose text matches, in every register you see. Each word is a prefix.',
+    description: 'Rows matching your words in every register. Each word is a prefix.',
     /* AND 100, NOT THE 50 THIS SAID, for `list`'s reason one tool up. `ftsSearch` is
        `Math.min(Math.max(1, opts.limit ?? 20), 100)` (`packages/kernel/src/fts.ts:116`). Measured over
        130 rows all matching one word: `limit: 80` answered 80 hits, which an agent reading this was
        told it could not ask for. The default of 20 was right and is unchanged. */
     /* "WHAT TO LOOK FOR" IS WHAT `q` BESIDE "ROWS WHOSE TEXT MATCHES" ALREADY SAYS, and its five tokens went to `propose`. */
-    input: obj({ q: { type: 'string' }, limit: int('1 to 100. Default 20.'), format: FORMAT }, ['q']),
+    input: obj({ q: { type: 'string' }, limit: int('1 to 100. Default 20.') }, ['q']),
     writes: false,
   },
   {
     name: 'history',
-    title: 'See how one thing changed',
-    description: 'Every write to one entry, in order, with who and when.',
-    input: obj({ spoken: str('As get takes it.'), format: FORMAT }, ['spoken']),
+    title: 'See its history',
+    description: 'Every write to one entry, with who and when.',
+    input: obj({ spoken: str('As get takes it.') }, ['spoken']),
     writes: false,
   },
   {
     name: 'activity',
     title: 'See recent changes',
     description:
-      'What changed lately, newest first, and by whom.',
+      'What changed lately, newest first, by whom.',
     /* A CURSOR NOW, AND TWENTY BY DEFAULT. It took a limit alone, up to the record's 200 and 50 when asked for none, so
        the default read on the owner's record was 13 KB with 70 row ids in it, and a session that wanted the page below
        had no way to ask. Paged as `list` is, the closing line says what is left and the call that reads it. */
     /* ITS LIMIT IS `list`'s, 1 to 100 and 20 by default, and no longer said here: the eight tokens went to `handoff`'s take
        and drop (AGT-C05), and an answer at the cap still says what is left and the call that reads it. */
-    input: obj({ limit: { type: 'integer' }, cursor: { type: 'string' }, everything: { type: 'boolean' }, format: FORMAT }),
+    input: obj({ limit: { type: 'integer' }, cursor: { type: 'string' }, everything: { type: 'boolean' } }),
     writes: false,
   },
   {
     name: 'governance',
-    title: 'See questions and decisions',
+    title: 'See decisions',
     description:
-      'Open questions, what was decided and why, and predictions.',
+      'Open questions, decisions with reasons, and predictions.',
     input: obj({
       register: { enum: ['suggestion', 'decision', 'prediction'] },
-      id: str('One by its SG or D number.'),
+      id: str('An SG or D number.'),
       status: { enum: ['open', 'resolved', 'all'] },
       /* `list`'s limit, said there and not again here, as `activity`'s: its tokens went to `handoff`'s take and drop. */
       limit: { type: 'integer' },
       cursor: { type: 'string' },
-      format: FORMAT,
     }),
     writes: false,
   },
   {
     name: 'propose',
     /* "ASK THE OWNER TO DECIDE", five tokens shorter than "Suggest a change for the owner", for `handoff`'s take and drop. */
-    title: 'Ask the owner to decide',
+    title: 'Ask the owner',
     /* WHEN TO REACH FOR IT IS THE INSTRUCTIONS' SECOND RULE, and was said again here: "an agent never decides, lay out
        options with propose" and "to change something you may not change yourself, propose it" were the two clauses
        this description carried, in the same payload, a line apart. Where the person decides is said once, here. */
-    description: 'Ask the person, with what you would do. It changes nothing; they decide in BrainDog.',
+    description: 'Ask the person, with what you would do. Nothing changes until they decide in BrainDog.',
     /* `cause` AND `withdraw` (AGT-C07). A key is asked once: a second proposal with an open question's cause files
        nothing and is answered "Already waiting as SG90.". `withdraw` takes one back, a branch and not an eighteenth tool
        for `script_try`'s reason: the list was at its ceiling to the token, and a tool measured 76 where this is 21.
@@ -581,7 +572,7 @@ export const TOOLS: readonly Tool[] = [
        others that said a thing twice (`update`'s version, which its `version` says, among them): 2,760 after. */
     input: obj(
       {
-        question: str('One sentence a person can answer.'),
+        question: str('One answerable sentence.'),
         body_kind: { enum: ['options', 'rowset', 'pattern', 'change', 'pack', 'settings', 'arrange'] },
         /* THE change EXAMPLE WAS ONE THE RECORD REFUSES. Sent as written it answered `REQUIRED_MISSING` at
            `body.declaration_id`, and it taught the whole-declaration form for adding a field, which meant copying every
@@ -594,10 +585,10 @@ export const TOOLS: readonly Tool[] = [
         body: {
           type: 'object',
           description:
-            'options: {"options":[...]}, two or more, each with id, label and because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change adds fields: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or to is a whole declaration of that id with the from_version you read. automation, as a change: {"sentence":"When a bill is due in 3 days, tell me."}. Others: braindog:grammar/proposals.',
+            'options: {"options":[...]}, two or more, each with id, label, because. rowset: {"rows":[{"at":"skills#3","version":1,"patch":{...}}]}. change: {"declaration_id":"register.things","to":{"add":{"fields":[{"id":"domain","type":"url"}]}}}, or a whole declaration with the from_version you read. automation: a change with {"sentence":"..."}. Others: braindog:grammar/proposals.',
         },
-        cause: str('A short key for what this is about, so it is asked once.'),
-        again: str('One sentence on what changed since the person declined this or picked an option. Only then is it asked again, with this under it.'),
+        cause: str('A short key, so it is asked once.'),
+        again: str('What changed since the person declined or chose.'),
         withdraw: str('Alone, takes back an SG you asked.'),
       },
     ),
@@ -606,7 +597,7 @@ export const TOOLS: readonly Tool[] = [
   {
     name: 'create',
     title: 'Add something',
-    description: 'Add an entry; it answers its number.',
+    description: 'Add an entry; answers its number.',
     /* MONEY IS SAID WHERE IT IS WRITTEN. The instructions carried it as their second rule, read on every call; it
        matters on the two calls that write a value, and a brief answer now says every amount as a person reads it. */
     input: obj(
@@ -616,7 +607,7 @@ export const TOOLS: readonly Tool[] = [
            and takes the account's, and a row's code is kept for good, refused as CURRENCY_FIXED when a write changes it. */
         fields: {
           type: 'object',
-          description: "Field ids to values. Money is an amount in minor units and its currency: GBP 2 decimals, JPY 0, KWD 3. A ledger amount may omit currency and take its account's for good (CURRENCY_FIXED).",
+          description: "Field ids to values. Money is minor units and a currency: GBP 2 decimals, JPY 0, KWD 3.",
         },
         note: { type: 'string' },
         /* A WRITE THAT CAN BE SENT AGAIN (AGT-B05): the record replays a write by its operation id, so a call sent once
@@ -640,7 +631,7 @@ export const TOOLS: readonly Tool[] = [
       {
         spoken: str('As get takes it.'),
         patch: { type: 'object', description: 'As create takes fields; null clears one, deleted_at true deletes.' },
-        version: int("The entry's version when you read it."),
+        version: int('The version you read.'),
         note: { type: 'string' },
         op_id: { type: 'string' },
       },
@@ -659,7 +650,7 @@ export const TOOLS: readonly Tool[] = [
        a log tool elsewhere does in one. Left out, the note goes on the caller's own session, and `log` in `tools`
        below says how. */
     input: obj(
-      { spoken: str('As get takes it. Omit for your own run.'), note: str('One sentence.') },
+      { spoken: str('As get takes it. Omit for your run.'), note: { type: 'string' } },
       ['note'],
     ),
     writes: true,
@@ -671,9 +662,9 @@ export const TOOLS: readonly Tool[] = [
        read on every call of every tool. Each field's own rule stays beside the field. */
     /* TAKE AND DROP ARE A CALL OF THEIR OWN (AGT-C05), on a step another run left: `take` picks it up, and the second of
        two sessions racing for it is told in the record's words who has it; `drop` closes one that is no longer true. */
-    description: "Keep your run's handoff true: doing once you know the task, next before you stop, each dead end in tried (it and note append). take or drop a run's step alone; drop with why.",
+    description: "Keep your run's handoff true: doing once you know the task, next before you stop, each dead end in tried. take or drop a run's step alone, drop with why.",
     input: obj({
-      next: str('One concrete step.'),
+      next: str('One step.'),
       tried: { type: 'string' },
       note: { type: 'string' },
       /* `doing`, the kernel's own field: `title` is a reserved field id, and the record refuses it. */
@@ -695,7 +686,7 @@ export const TOOLS: readonly Tool[] = [
      `op_id` on `create` and `update`. */
   {
     name: 'meet',
-    title: 'Note someone you met',
+    title: 'Note a person',
     /* WHEN TO CALL IT IS THE INSTRUCTIONS' LINE AGAIN, "meet everyone you work with or are told about", and the
        description says what a call does with what it is given: a key (an address, a handle, a bank payee, a domain)
        matches or adds, and a name alone is only noted, because the record never makes a person out of a name
@@ -706,18 +697,18 @@ export const TOOLS: readonly Tool[] = [
        one on its own, and an agent's own run, `session in <repo>`, is what the record does believe. An agent that wrote
        its own run for what it read in a mail would be lending the mail its trust. */
     description:
-      'A person or organisation, matched by email, handle or key. A name alone is only noted. Mail, commits and the web are not believed alone: say where honestly. Your own run is session in <repo>.',
+      'A person or organisation. A name alone is only noted. Mail, commits and the web are not believed alone: say where honestly. Your run is session in <repo>.',
     input: obj(
       {
         name: { type: 'string' },
         kind: { enum: ['person', 'organisation'] },
         email: str('Only as seen.'),
         handle: { type: 'string' },
-        keys: { type: 'array', items: { type: 'string' }, description: 'Such as domain:acme.com.' },
+        keys: { type: 'array', items: { type: 'string' } },
         org: { type: 'string' },
         domain: { type: 'string' },
         role: { type: 'string' },
-        where: str('Such as commit 4464966 in braindog.'),
+        where: { type: 'string' },
       },
       ['where'],
     ),
@@ -733,7 +724,7 @@ export const TOOLS: readonly Tool[] = [
        `ignore` says nothing beside its name, because "or set it aside" in the description already has.
        AND ITS ARGUMENTS SAY LESS. The seven are the record's, and the two that only go with `back` and the note that only
        goes with `register` are named and left to the record's sentence, which says when each is taken. */
-    description: 'File one arrival from the inbox as an entry, or set it aside.',
+    description: 'File an inbox arrival as an entry, or set it aside.',
     input: obj(
       {
         arrival: str('Its id in braindog:inbox.'),
@@ -751,12 +742,12 @@ export const TOOLS: readonly Tool[] = [
   },
   {
     name: 'undo',
-    title: 'Take back my change',
+    title: 'Undo a change',
     /* THE LAST ONE, FOR THE RECEIPTS: every write answers a batch and this takes it back. Only the caller's own run's
        writes go back; the owner's Undo in the app stays the owner's. It deletes nothing it did not make, so it is not
        destructive in the spec's sense. */
-    description: 'Put back one of your own writes, by the batch its receipt gave. Refused for anyone else\'s.',
-    input: obj({ batch: str('The batch in the receipt.'), dry: { type: 'boolean' } }, ['batch']),
+    description: 'Put back your own write, by its receipt\'s batch. Refused for anyone else\'s.',
+    input: obj({ batch: { type: 'string' }, dry: { type: 'boolean' } }, ['batch']),
     writes: true,
     idempotent: true,
   },

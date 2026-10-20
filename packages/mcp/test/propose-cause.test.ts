@@ -121,7 +121,7 @@ test('WITHDRAW GOES ALONE, and a surface without the record\'s `withdraw` answer
 
 test('THE TOOL TEACHES BOTH: `propose` takes cause and withdraw, and nothing about them is required', () => {
   const input = TOOLS.find((t) => t.name === 'propose')?.input as { properties: Record<string, { description?: string }>; required?: string[] };
-  assert.equal(input.properties.cause?.description, 'A short key for what this is about, so it is asked once.');
+  assert.equal(input.properties.cause?.description, 'A short key, so it is asked once.');
   assert.match(input.properties.withdraw?.description ?? '', /takes back/u);
   assert.equal(input.required, undefined, 'a withdrawal sends no question, so propose requires none');
 });

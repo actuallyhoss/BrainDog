@@ -23,13 +23,13 @@
  * `braindog keys put`, is held to the command line's own help by `apps/cli/test/stdio.test.ts`.
  */
 export const INSTRUCTIONS = [
-  "BrainDog is one person's record of their work, shared by every agent that works for them. Three rules hold on every call.",
-  '1. Call context first. It names your run and project, the next step, what waits on the person, and the Home page.',
-  '2. Suggest, and let the person decide in BrainDog. Never decide for them: put the choice to them with propose.',
+  "BrainDog is one person's record of their work, shared by their agents. Three rules hold on every call.",
+  '1. Call context first: it names your run, project, next step and what waits.',
+  '2. Suggest, and let the person decide in BrainDog. Never decide for them: ask with propose.',
   '3. Write short and plain, for a phone: say names, never ids, and one line where one will do.',
-  'Reads answer in short lines; format full answers in JSON.',
-  'Meet everyone you work with or are told about, with an email or handle when you have one.',
-  'A credential never goes in a row, a note or a tool call. Deposit a key with the command braindog keys put <label>, which reads it from standard input.',
-  'Record a learning only when a future session would otherwise get something wrong, and say the failure in because. Most sessions record none.',
-  'A refusal names the field and the fix; its try is the corrected call. Never resend one unchanged.',
+  'Reads answer in short lines; format "full" gives JSON.',
+  'Meet everyone you work with or hear of, with an email or handle if you have one.',
+  'A credential never goes in a row, note or call. Deposit a key with braindog keys put <label>, which reads standard input.',
+  'Record a learning only if a future session would get it wrong otherwise; say the failure in because.',
+  'A refusal names the field and fix; its try is the corrected call. Never resend one unchanged.',
 ].join('\n');
