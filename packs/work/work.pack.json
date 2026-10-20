@@ -79,6 +79,7 @@
           "id": "health",
           "type": "enum",
           "values": [ "on_track", "at_risk", "off_track" ],
+          "labels": { "on_track": "On track", "at_risk": "At risk", "off_track": "Off track" },
           "index": true,
           "required": true
         },
@@ -158,8 +159,7 @@
       "pack": "work",
       "header": {
         "count": { "metric": "open-tasks" },
-        "action": { "verb": "row.create", "label": "Add" },
-        "search": { "param": "q" }
+        "action": { "verb": "row.create", "label": "Add" }
       },
       "filters": [
         { "field": "thing", "control": "chips", "when": { "holds": [ "things" ] } }
@@ -188,18 +188,6 @@
         },
         { "kind": "capture", "heading": "What needs doing?", "icon": "plus", "span": 12, "register": "tasks" },
         {
-          "kind": "todo",
-          "heading": "Late",
-          "icon": "alert",
-          "span": 12,
-          "source": "register.tasks",
-          "where": "state is open or doing, agent is empty, by before today",
-          "columns": [ { "field": "what" }, { "field": "by" } ],
-          "order": [ { "field": "priority", "dir": "asc" }, { "field": "by", "dir": "asc" } ],
-          "limit": 12,
-          "when": { "metric": "tasks-late-yours", "gt": 0 }
-        },
-        {
           "kind": "queue",
           "heading": "Questions for you",
           "icon": "ask",
@@ -211,33 +199,16 @@
           "when": { "metric": "questions-open-in:tasks", "gt": 0 }
         },
         {
-          "kind": "stat",
-          "heading": "At a glance",
-          "icon": "gauge",
-          "span": 12,
-          "when": { "metric": "open-tasks", "gt": 0 },
-          "cells": [
-            { "metric": "open-tasks", "label": "Open" },
-            { "metric": "tasks-due-7d", "label": "Due this week" },
-            {
-              "metric": "tasks-done-7d",
-              "label": "Done this week",
-              "trend": "7d",
-              "note": "{{tasks-done-7d-agents}} of them by an agent"
-            }
-          ]
-        },
-        {
           "kind": "todo",
-          "heading": "This week",
+          "heading": "Late and this week",
           "icon": "calendar-days",
           "span": 4,
           "source": "register.tasks",
-          "where": "state is open or doing, agent is empty, by after yesterday, by before +8d",
-          "columns": [ { "field": "what" }, { "field": "by" } ],
+          "where": "state is open or doing, agent is empty, by before +8d",
+          "columns": [ { "field": "what" }, { "field": "by" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
           "order": [ { "field": "by", "dir": "asc" }, { "field": "priority", "dir": "asc" } ],
           "limit": 12,
-          "when": { "metric": "tasks-this-week-yours", "gt": 0 }
+          "when": { "any": [ { "metric": "tasks-late-yours", "gt": 0 }, { "metric": "tasks-this-week-yours", "gt": 0 } ] }
         },
         {
           "kind": "todo",
@@ -246,7 +217,7 @@
           "span": 4,
           "source": "register.tasks",
           "where": "state is open or doing, agent is set",
-          "columns": [ { "field": "what" }, { "field": "agent" } ],
+          "columns": [ { "field": "what" }, { "field": "agent" }, { "field": "by" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
           "order": [ { "field": "by", "dir": "asc" } ],
           "limit": 8,
           "working": true,
@@ -259,7 +230,7 @@
           "span": 4,
           "source": "register.tasks",
           "where": "state is review or blocked",
-          "columns": [ { "field": "what" }, { "field": "note" }, { "field": "by" }, { "field": "changed" } ],
+          "columns": [ { "field": "what" }, { "field": "note" }, { "field": "by" }, { "field": "thing", "when": { "holds": [ "things" ] } } ],
           "order": [ { "field": "by", "dir": "asc" } ],
           "limit": 8,
           "when": { "metric": "tasks-waiting", "gt": 0 }
@@ -268,7 +239,7 @@
           "kind": "section",
           "heading": "Not this week",
           "icon": "archive",
-          "span": 12,
+          "span": 4,
           "fold": true,
           "when": { "metric": "tasks-not-this-week", "gt": 0 }
         },
@@ -312,7 +283,7 @@
           "kind": "section",
           "heading": "Needs a project",
           "icon": "inbox",
-          "span": 12,
+          "span": 4,
           "fold": true,
           "when": { "metric": "tasks-no-project", "gt": 0 }
         },
@@ -332,7 +303,7 @@
           "kind": "section",
           "heading": "Done lately",
           "icon": "check",
-          "span": 12,
+          "span": 4,
           "fold": true,
           "when": { "metric": "tasks-done-7d", "gt": 0 }
         },

@@ -38,6 +38,7 @@ type Block = {
   where?: unknown;
   first?: number;
   cells?: { metric: string; trend?: string }[];
+  columns?: { field?: string; as?: string }[];
 };
 type Drawn = Block & { drawn?: boolean; refusals?: unknown[]; queue?: unknown[]; feed?: { who?: string | null }[]; rows?: unknown[] };
 
@@ -58,7 +59,9 @@ const LISTED = new Set(['cards', 'table', 'todo', 'timeline', 'params']);
  * and Projects 1). People then has no figure to draw; Projects keeps its splits, which draw from five in play, so a
  * record with a project or two draws none. The other parts are held as before.
  */
-const NO_FIGURES_TILE: ReadonlySet<string> = new Set(['people', 'portfolio']);
+/* AND WORK, SINCE the UI pass of 20 October (proj F10): At a glance spread three bare numbers across the page, the first
+   of them the head's own count, and the line says what is late and what waits on you. */
+const NO_FIGURES_TILE: ReadonlySet<string> = new Set(['people', 'portfolio', 'work']);
 
 /** The five parts, each as the test on one block that says it is that part. */
 const PARTS: Record<string, (b: Block, list: string) => boolean> = {
@@ -66,10 +69,12 @@ const PARTS: Record<string, (b: Block, list: string) => boolean> = {
   queue: (b, list) =>
     b.kind === 'queue' && b.source === 'governance.open' && b.where === `list is ${list}` && b.when?.metric === `questions-open-in:${list}` && b.when.gt === 0 && Object.keys(b.when).length === 2,
   figures: (b) => (b.kind === 'stat' && (b.cells ?? []).length > 0) || CHARTS.has(b.kind),
-  /* AN AGENT AT WORK: the runs that changed the list, from the log, or the rows of it an agent holds. */
+  /* AN AGENT AT WORK: the runs that changed the list, from the log, or the rows of it an agent holds, or, SINCE the UI
+     pass of 20 October (proj F5), the list's own cards saying the agent on each, as Projects' In play does. */
   agents: (b, list) =>
     (b.kind === 'agents' && b.source === 'activity' && typeof b.where === 'string' && b.where.startsWith('list is ') && b.where.slice(8).split(' or ').includes(list)) ||
-    (b.source === `register.${list}` && typeof b.where === 'string' && /\bagent is set\b/u.test(b.where)),
+    (b.source === `register.${list}` && typeof b.where === 'string' && /\bagent is set\b/u.test(b.where)) ||
+    (b.kind === 'cards' && b.source === `register.${list}` && (b.columns ?? []).some((c) => c.field === 'agent' && c.as === 'who')),
   list: (b, list) => LISTED.has(b.kind) && b.source === `register.${list}`,
 };
 
@@ -121,7 +126,7 @@ test('EACH MODULE PAGE DECLARES THE FIVE PARTS: its line, one queue over its own
     const blocks = blocksOf(slug);
     assert.ok(PARTS.lead!(blocks[0]!, list), `${slug} does not open on its line`);
     for (const [part, is] of Object.entries(PARTS)) {
-      if (part === 'figures' && slug === 'people') continue;
+      if (part === 'figures' && NO_FIGURES_TILE.has(slug)) continue;
       assert.ok(blocks.some((b) => is(b, list)), `${slug} carries no ${part}`);
     }
     assert.equal(blocks.filter((b) => b.kind === 'queue').length, 1, `${slug} carries one queue`);

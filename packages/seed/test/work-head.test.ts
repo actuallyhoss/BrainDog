@@ -73,27 +73,29 @@ function project(k: Kernel, name: string): string {
   return value<{ id: string }>(k.create('things', fields as never, { actor: 'p_1' }), `adding ${name}`).id;
 }
 
-test('WORK DECLARES A HEAD: its open count, one Add and a search word, and the kernel’s own check passes it', () => {
+/* NO SEARCH WORD, SINCE the UI pass of 20 October (proj F10): "Search this page" floated between the name and the line with
+   no field round it, and the frame's own search is one press away. The head is the count and Add. */
+test('WORK DECLARES A HEAD: its open count and one Add, no search word, and the kernel’s own check passes it', () => {
   const header = (PAGES.work as { header?: unknown }).header;
-  assert.deepEqual(header, { count: { metric: 'open-tasks' }, action: { verb: 'row.create', label: 'Add' }, search: { param: 'q' } });
+  assert.deepEqual(header, { count: { metric: 'open-tasks' }, action: { verb: 'row.create', label: 'Add' } });
   assert.equal(headerFault(header, { figures: new Set(Object.keys(METRICS)), fields: null }), null);
   /* THE COUNT IS WORK'S OWN FIGURE, the one its At a glance calls Open. */
   assert.equal((METRICS['open-tasks'] as { name?: string }).name, 'Open');
 });
 
-test('ON A FRESH RECORD THE HEAD IS ANSWERED: the count, Add for its owner, and the search word', async () => {
+test('ON A FRESH RECORD THE HEAD IS ANSWERED: the count and Add for its owner, and no search word', async () => {
   const { k, close } = await fresh();
   try {
     const page = work(k);
     for (const b of page.blocks) assert.deepEqual(b.refusals, [], `${b.heading ?? b.kind} refused on a fresh record`);
     assert.deepEqual(page.head?.count?.value, 0);
-    assert.deepEqual(page.head?.search, { param: 'q' });
+    assert.equal(page.head?.search, undefined);
     assert.deepEqual([page.head?.action?.verb, page.head?.action?.label], ['row.create', 'Add']);
     /* AND A READER WHO MAY ONLY READ IS SHOWN NO ADD, with the count and the search left as they are. */
     const reader = k.page('work');
     assert.ok(reader.ok, sayOf(reader));
     const head = (reader.value as { head?: Head }).head;
-    assert.deepEqual([head?.action, head?.search, head?.count?.value], [undefined, { param: 'q' }, 0]);
+    assert.deepEqual([head?.action, head?.search, head?.count?.value], [undefined, undefined, 0]);
     value(k.create('tasks', { what: 'Mend the gate latch' }, { actor: 'p_1' }), 'adding a task');
     assert.equal(work(k).head?.count?.value, 1, 'the head does not count the task just added');
   } finally {

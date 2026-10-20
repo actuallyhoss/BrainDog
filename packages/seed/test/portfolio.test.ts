@@ -58,15 +58,10 @@ test('THE PORTFOLIO OVERVIEW DRAWS WHAT THE PROJECTS EARN, in a block over the r
   const draws = (kind: string) => blocks.filter((b) => b.kind === kind && (b.columns ?? []).some((c) => c.field === 'revenue'));
   /* A SPLIT SINCE portfolio 1.6.0, one track cut into each project's share, where it was a bar a project: the same two
      columns over the same rows, drawn as parts of one whole. */
-  /* DECLARED TWICE AND DRAWN ONCE, SINCE portfolio 1.15.0: under the open heading while four projects or fewer are under
-     it and under the folded one past four, the two on one figure, so a record reads exactly one (`projects.test.ts`
-     opens both). The two are one declaration, word for word, but for the key the open one declares so that the folded
-     one keeps the key it had. */
+  /* DECLARED ONCE, ALONE, SINCE the UI pass of 20 October (proj F5): the open and folded headings over it went with what
+     agents hold, what is coming up and the parked and finished, which every card now says. */
   const tracks = draws('split');
-  assert.equal(tracks.length, 2, 'no track on the Overview puts one project’s money against another’s, so the page says a total and nothing under it');
-  const { key: openKey, ...open } = tracks[0] as (typeof tracks)[number] & { key?: string };
-  assert.equal(openKey, 'open-earns');
-  assert.deepEqual(open, tracks[1], 'what each one earns is declared two ways');
+  assert.equal(tracks.length, 1, 'no track on the Overview puts one project’s money against another’s, so the page says a total and nothing under it');
   assert.equal(draws('cards').length, 1, 'the In play cards do not say what a project earns, so the money on the page is a total nobody can attribute');
 
   /* EVERY ONE OF THEM STILL READS PROJECTS ALONE. The pack needs nothing (`first-party.test.ts` holds
@@ -221,7 +216,8 @@ test('AND A PROJECT THAT STATED LAST YEAR AND NOTHING THIS YEAR DOES NOT PRINT A
 test('WHAT EACH ONE EARNS IS DRAWN ONLY WHILE A PROJECT SAYS IT, so a total of nothing cannot be read as a year', () => {
   const earns = blocksOf('portfolio').find((b) => b.kind === 'split' && (b.columns ?? []).some((c) => c.field === 'revenue')) as (Block & { when?: unknown }) | undefined;
   assert.ok(earns, 'no block on the Overview draws what each project earns');
-  assert.deepEqual(earns.when, { metric: 'projects-earning-said', gt: 0 }, 'the split draws over projects that said nothing about what they earn');
+  /* AND ONLY WHILE TWO OR MORE SAY IT, SINCE the UI pass of 20 October (proj F5): a split of one part says nothing. */
+  assert.deepEqual(earns.when, { metric: 'projects-earning-said', gt: 1 }, 'the split draws over projects that said nothing about what they earn');
   assert.ok(METRICS['projects-earning-said'], 'projects-earning-said is not declared, so the split is drawn on a figure the record cannot answer');
 });
 

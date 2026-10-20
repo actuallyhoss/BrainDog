@@ -444,8 +444,9 @@ test('PROJECTS ASKS ITS OWN QUESTIONS: a queue of the questions about projects, 
 
 /* FIVE SINCE 1.18.0: the In play and earning strip is gone, so Where they are leads, over How they are going, and the page is at
    the most a page shows before its fold (`calm-pages.test.ts`). */
-test('FIVE TILES BEFORE THE FOLD AT 1440, the lanes first, the questions under In play and before the open tile', () => {
-  assert.deepEqual(beforeTheFold(projectsPage()), ['Where they are', 'How they are going', 'In play', 'Waiting on you', 'Earnings, agents and dates']);
+/* AND NO OPEN TILE SINCE the UI pass of 20 October (proj F5): What each one earns stands alone under the questions. */
+test('FIVE TILES BEFORE THE FOLD AT 1440, the lanes first, the questions under In play and what each earns last', () => {
+  assert.deepEqual(beforeTheFold(projectsPage()), ['Where they are', 'How they are going', 'In play', 'Waiting on you', 'What each one earns']);
 });
 
 test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT PROJECTS: nothing at nought, two at two, and not the one about a task', async () => {

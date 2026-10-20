@@ -233,7 +233,9 @@ export const WORK_REGISTERS: Record<string, WorkRegister> = {
     pack: 'work',
     fields: [
       { id: 'body', label: 'Update', type: 'document', required: true, search: true },
-      { id: 'health', type: 'enum', values: ['on_track', 'at_risk', 'off_track'], index: true, required: true },
+      /* SAID IN SENTENCE CASE, SINCE the UI pass of 20 October (proj F11): a thread's composer offers On track, At risk and
+         Off track, the words a project says its health in. */
+      { id: 'health', type: 'enum', values: ['on_track', 'at_risk', 'off_track'], labels: { on_track: 'On track', at_risk: 'At risk', off_track: 'Off track' }, index: true, required: true },
       { id: 'track', label: 'Thread', type: 'ref', to: 'tracks', index: true, required: true },
       /* TEXT, AND IT WAS A CLOSED LIST OF FOUR VENDORS until Work 1.7.0: `claude`, `codex`, `cursor` and `you` were the only
          authors an update could have, so one written by Gemini, a teammate or a script was refused `ENUM_VALUE_UNKNOWN` at
@@ -843,10 +845,11 @@ export const WORK_PAGES: Record<string, SeedPage> = {
        with its name, its count and the two things done first on it. The count is Open's own figure; the search is held
        in the address as `q`, and narrowing the page by it is the page read's. BEFORE `filters`, which a record without
        Projects goes without, so the page's keys keep one order whether the strip is there or not. */
+    /* NO SEARCH BOX, SINCE the UI pass of 20 October (proj F10): "Search this page" floated between the name and the line
+       with no field round it, and the frame's own search is one press away on every screen. */
     header: {
       count: { metric: 'open-tasks' },
       action: { verb: 'row.create', label: 'Add' },
-      search: { param: 'q' },
     },
     filters: [{ field: 'thing', control: 'chips' }],
     blocks: [
@@ -911,26 +914,6 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         register: 'tasks',
       },
       {
-        /* A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ. The host wires the tick onto
-           every `todo` row. Late and This week are yours, cut at today and at a week, Late ordered by tier and then by
-           day.
-
-           A STRIP THE WHOLE WIDTH, SINCE work 1.15.0: beside This week it was a tile as tall as the longer list holding
-           one line, and it is the one band here that is already wrong. `span: 12` IS WRITTEN AND MEANT: a wide screen
-           set it beside At a glance as half a row, 235px tall over one task (the second design review's fix 3), and a
-           width an author wrote down is theirs to keep. */
-        kind: 'todo',
-        heading: 'Late',
-        icon: 'alert',
-        span: 12,
-        source: 'register.tasks',
-        where: `${YOURS}, by before today`,
-        columns: [{ field: 'what' }, { field: 'by' }],
-        order: TIER_THEN_DUE,
-        limit: 12,
-        when: { metric: 'tasks-late-yours', gt: 0 },
-      },
-      {
         /* WHAT A RULE OR AN AGENT ASKED ABOUT A TASK, SINCE work 1.19.0 (PGS-C18), answered here, three at a time, one
            tile each, and the rest in Decide: the questions whose row is on tasks (`list is tasks`), counted by
            `questions-open-in:tasks`, and drawn only while that is above nought, so a quiet day has no band for it.
@@ -949,39 +932,24 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         when: { metric: 'questions-open-in:tasks', gt: 0 },
       },
       {
-        /* THE FIGURES, AS ONE STRIP, SINCE work 1.15.0, under what is late, which the page leads with when anything is
-           (`compose.ts`): how much is open, how much falls due in the week, and how much was finished in it, with its last
-           seven nights as a line (`snapshot` on `tasks-done-7d`). How fast it moves
-           was a tile of its own under Done lately, folded shut. Late and waiting on you are the line's, and not said
-           again here. Only while something is open, since with nothing open the line says so and nothing else is drawn. */
-        kind: 'stat',
-        heading: 'At a glance',
-        icon: 'gauge',
-        span: 12,
-        when: { metric: 'open-tasks', gt: 0 },
-        cells: [
-          { metric: 'open-tasks', label: 'Open' },
-          { metric: 'tasks-due-7d', label: 'Due this week' },
-          { metric: 'tasks-done-7d', label: 'Done this week', trend: '7d', note: '{{tasks-done-7d-agents}} of them by an agent' },
-        ],
-      },
-      {
-        /* TODAY AND THE REST OF THE WEEK, SINCE work 1.15.0, BY THE DAY FIRST, so what is due today heads it and says
-           "today" on its day. Today was a band of its own the whole width, and the page held a seventh tile above its
-           fold. A THIRD OF THE ROW, beside what agents hold and what waits on you. */
+        /* LATE AND THIS WEEK, ONE THIRD OF THE ROW, SINCE the UI pass of 20 October (proj F10): what is late first, then
+           what falls due by the day, beside what agents hold and what waits on you. Late was a strip the whole width for
+           one task, and At a glance spread three bare numbers across the page, the first of them the head's count.
+           A `todo` AND NOT A `table`, SO THAT A TASK CAN BE FINISHED WHERE IT IS READ; its second line is when it is due,
+           then its project. */
         kind: 'todo',
-        heading: 'This week',
+        heading: 'Late and this week',
         icon: 'calendar-days',
         span: 4,
         source: 'register.tasks',
-        where: `${YOURS}, by after yesterday, by before +8d`,
-        columns: [{ field: 'what' }, { field: 'by' }],
+        where: `${YOURS}, by before +8d`,
+        columns: [{ field: 'what' }, { field: 'by' }, { field: 'thing' }],
         order: [
           { field: 'by', dir: 'asc' },
           { field: 'priority', dir: 'asc' },
         ],
         limit: 12,
-        when: { metric: 'tasks-this-week-yours', gt: 0 },
+        when: { any: [{ metric: 'tasks-late-yours', gt: 0 }, { metric: 'tasks-this-week-yours', gt: 0 }] },
       },
       {
         /* WHAT AGENTS HOLD NOW, with the dot on the one an agent is on this minute. Not what they handed back: that
@@ -992,7 +960,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         span: 4,
         source: 'register.tasks',
         where: `${IN_HAND}, agent is set`,
-        columns: [{ field: 'what' }, { field: 'agent' }],
+        /* THE AGENT FIRST, THEN WHEN AND WHICH PROJECT, so every task on the page says its project. */
+        columns: [{ field: 'what' }, { field: 'agent' }, { field: 'by' }, { field: 'thing' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         working: true,
@@ -1010,7 +979,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         span: 4,
         source: 'register.tasks',
         where: WAITING,
-        columns: [{ field: 'what' }, { field: 'note' }, { field: 'by' }, { field: 'changed' }],
+        /* THE REASON IT WAITS, THEN WHEN AND WHICH PROJECT (the UI pass of 20 October, proj F10). */
+        columns: [{ field: 'what' }, { field: 'note' }, { field: 'by' }, { field: 'thing' }],
         order: [{ field: 'by', dir: 'asc' }],
         limit: 8,
         when: { metric: 'tasks-waiting', gt: 0 },
@@ -1022,7 +992,8 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         kind: 'section',
         heading: 'Not this week',
         icon: 'archive',
-        span: 12,
+        /* A THIRD OF THE ROW, SINCE the UI pass of 20 October (proj F10): the three folded groups are one row of three. */
+        span: 4,
         fold: true,
         when: { metric: 'tasks-not-this-week', gt: 0 },
       },
@@ -1070,7 +1041,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         kind: 'section',
         heading: 'Needs a project',
         icon: 'inbox',
-        span: 12,
+        span: 4,
         fold: true,
         when: { metric: 'tasks-no-project', gt: 0 },
       },
@@ -1083,7 +1054,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         /* `check`, SINCE work 1.12.0: a folded heading draws only the glyphs the app ships with, and `circle-check` drew
            nothing there. */
         icon: 'check',
-        span: 12,
+        span: 4,
         fold: true,
         when: { metric: 'tasks-done-7d', gt: 0 },
       },

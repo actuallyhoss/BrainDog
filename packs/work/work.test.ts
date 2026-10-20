@@ -313,7 +313,7 @@ test('ITS VERSION IS THE MODULE\'S, ONE MINOR STEP ABOVE THE RELEASED ONE, and i
   assert.equal(firstPartyDocument('work')!.config, undefined);
 });
 
-test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty parts wait, each on one of the two', () => {
+test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty-three parts wait, each on one of the two', () => {
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'Work installs on a record with no other add-on');
   assert.deepEqual(firstPartyManifest('work').requires, [], 'and so does the module');
@@ -322,6 +322,10 @@ test('PROJECTS AND PEOPLE ARE ASKED FOR ONLY WHERE THEY ARE READ: twenty parts w
     { at: '"Tasks", "Owner"', holds: [PEOPLE] },
     { at: '"Tasks", "Project"', holds: [PROJECTS] },
     { at: '"Work", "thing"', holds: [PROJECTS] },
+    /* EVERY TASK SAYS ITS PROJECT UNDER IT, SINCE the UI pass of 20 October (proj F10), and the column waits for Projects. */
+    { at: '"Work", "Late and this week", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "With an agent", "thing"', holds: [PROJECTS] },
+    { at: '"Work", "Waiting on you", "thing"', holds: [PROJECTS] },
     { at: '"Work", "No due day", "thing"', holds: [PROJECTS] },
     { at: '"Work", "Later", "thing"', holds: [PROJECTS] },
     /* OPEN WORK WITH NO PROJECT ASKS FOR PROJECTS WHOLE, SINCE work 1.19.0: its sentence is about the project. */
@@ -633,8 +637,10 @@ test('WORK ASKS ITS OWN QUESTIONS: a queue of the questions about tasks, three d
   for (const l of lines) assert.match(l.body!, /\{\{questions-open-in:tasks\}\} question\(s\) for you/u);
 });
 
-test('SIX TILES BEFORE THE FOLD AT 1440, the questions under Late', () => {
-  assert.deepEqual(beforeTheFold(workPage()), ['Late', 'Questions for you', 'At a glance', 'This week', 'With an agent', 'Waiting on you']);
+/* FOUR SINCE the UI pass of 20 October (proj F10): the questions, then one row of three lists, Late and this week, With an
+   agent and Waiting on you; At a glance went, its Open the head's count. */
+test('FOUR TILES BEFORE THE FOLD AT 1440, the questions over one row of three lists', () => {
+  assert.deepEqual(beforeTheFold(workPage()), ['Questions for you', 'Late and this week', 'With an agent', 'Waiting on you']);
 });
 
 test('ON A RECORD, THE QUEUE AND THE LINE SAY THE QUESTIONS ABOUT TASKS: nothing at nought, two at two, and not the one about a person', async () => {

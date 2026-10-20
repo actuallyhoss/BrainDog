@@ -122,12 +122,15 @@ export const THINGS: Fields[] = [
      an invoice whose terms ran out 38 days ago. Portage started in May of this year and has earned nothing
      either year. Tallow earned in the year before and nothing since, which is what "park it or retire it"
      looks like as a pair of numbers, and it is out of every figure below because it is out of play. */
+  /* EACH ONE'S COLOUR IS A CATEGORY SLOT AND ITS MARK AN ICON, SINCE the UI pass of 20 October (1.3): Kiln blue (265),
+     Marlow & Co pink (352), Portage teal (185) and Tallow yellow (90), each a slot's own hue so no two read alike, and
+     marks the app draws as glyphs (tag, board, globe, archive) where the wells drew a letter. */
   /* AND WHAT EACH ONE IS, IN A LINE, since portfolio 1.6.0: the words under a project's name on the Overview's cards, so a
      list of names says which is the type family and which is the client's site without opening any of them. */
-  { name: 'Kiln', about: 'A variable type family, licensed direct', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), earned_before: gbp(1_412_000), since: '2024-03-11', mark: '◆', hue: 214, note: KILN_NOTE, repos: ['https://git.kiln.example/type/kiln-type.git', 'git@git.kiln.example:type/kiln-site.git'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'], domains: ['kiln.example', 'kilnfonts.example'] },
-  { name: 'Marlow & Co', about: 'A brand system and site, made for a client', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), earned_before: gbp(510_000), since: '2023-01-08', mark: '▲', hue: 305, repos: ['https://git.marlow.example/brand/marlow-site.git'], folders: ['/Users/studio/Clients/marlow'], domains: ['marlow.example'] },
-  { name: 'Portage', about: 'A newsletter, and the site it sends from', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), earned_before: gbp(0), since: '2026-05-02', mark: '●', hue: 176, repos: ['portage'], folders: ['D:\\Studio\\portage'], domains: ['portage.example'] },
-  { name: 'Tallow', about: 'A display face that never shipped', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), earned_before: gbp(21_000), since: '2025-02-20', mark: '◼', hue: 261, repos: ['git@git.kiln.example:type/tallow.git'] },
+  { name: 'Kiln', about: 'A variable type family, licensed direct', lane: 'earning', health: 'at_risk', next: 'Settle how Kiln is licensed, before the September issue announces it', progress: 60, aim: day(17), agent: 'claude', revenue: gbp(1_840_000), earned_before: gbp(1_412_000), since: '2024-03-11', mark: 'tag', hue: 265, note: KILN_NOTE, repos: ['https://git.kiln.example/type/kiln-type.git', 'git@git.kiln.example:type/kiln-site.git'], folders: ['/Users/studio/Code/kiln-type', '/Users/studio/Code/kiln-site'], domains: ['kiln.example', 'kilnfonts.example'] },
+  { name: 'Marlow & Co', about: 'A brand system and site, made for a client', lane: 'earning', health: 'on_track', next: 'Chase Halden on invoice 2026-041 once its terms run out', progress: 85, agent: 'cursor', revenue: gbp(420_000), earned_before: gbp(510_000), since: '2023-01-08', mark: 'board', hue: 352, repos: ['https://git.marlow.example/brand/marlow-site.git'], folders: ['/Users/studio/Clients/marlow'], domains: ['marlow.example'] },
+  { name: 'Portage', about: 'A newsletter, and the site it sends from', lane: 'building', health: 'off_track', next: 'Choose where the newsletter sends from, then wire the domain', progress: 35, aim: day(28), revenue: gbp(0), earned_before: gbp(0), since: '2026-05-02', mark: 'globe', hue: 185, repos: ['portage'], folders: ['D:\\Studio\\portage'], domains: ['portage.example'] },
+  { name: 'Tallow', about: 'A display face that never shipped', lane: 'parked', next: 'Retire it or park it another year', revenue: gbp(0), earned_before: gbp(21_000), since: '2025-02-20', mark: 'archive', hue: 90, repos: ['git@git.kiln.example:type/tallow.git'] },
 ];
 
 /**
@@ -690,16 +693,9 @@ export const PORTFOLIO_RULES: Record<string, SeedRule> = {
   },
 };
 
-const PROJECT = { field: 'name', label: 'Project', width: 'minmax(14ch,1fr)' } as const;
 
 /** What was finished on a project in the last seven days, and how that moved over four weeks: At a glance's last figure. */
 const PROJECT_DONE_CELL = { metric: 'project-done-7d:{{name}}', label: 'Done this week', trend: '4w' } as const;
-
-/**
- * HOW MANY PROJECTS A TILE OF THE OVERVIEW HOLDS OPEN, since portfolio 1.15.0: past this many it folds shut. Four, the
- * number past which How they are going is drawn, so the page changes shape once, when it stops being short.
- */
-const FOLD_PAST = 4;
 
 /* THE TILES UNDER THE OVERVIEW'S TWO HEADINGS, each written once and drawn under whichever heading is: the open one
    while the list is short and the folded one when it is long (`PORTFOLIO_PAGES.portfolio`). */
@@ -724,65 +720,13 @@ const EARNS = {
   columns: [{ field: 'name' }, { field: 'revenue' }],
   order: [{ field: 'revenue', dir: 'desc' }],
   limit: 8,
-  when: { metric: 'projects-earning-said', gt: 0 },
+  /* ONLY WHILE TWO OR MORE EARN, SINCE the UI pass of 20 October (proj F5): a split of one part says nothing a card
+     does not. Drawn alone, the whole width, in each project's own colour. */
+  when: { metric: 'projects-earning-said', gt: 1 },
 };
 
 /* NO LINE COUNTING HOW MANY SAY WHAT THEY EARNED, SINCE portfolio 1.18.0: "3 of 3 projects in play say what they earned in a
    year" in a grey box beside the split, which the split says by being drawn. */
-
-/* WHAT AGENTS HOLD, and what each one is doing next on it. An agent takes a project by setting itself as its agent. */
-const WITH_AGENT = {
-  kind: 'table',
-  heading: 'With an agent',
-  icon: 'session',
-  span: 12,
-  source: 'register.things',
-  where: `${LIVE}, agent is set`,
-  columns: [
-    PROJECT,
-    { field: 'agent', label: 'Agent', width: '10ch' },
-    { field: 'next', label: 'Next', width: 'minmax(20ch,2fr)' },
-    { field: 'changed', label: 'Changed by', width: '16ch' },
-  ],
-  order: [{ field: 'name', dir: 'asc' }],
-  limit: 12,
-  when: { metric: 'projects-with-agent', gt: 0 },
-};
-
-const COMING_UP = {
-  kind: 'table',
-  heading: 'Coming up',
-  icon: 'calendar-clock',
-  span: 12,
-  source: 'register.things',
-  where: `${LIVE}, aim is set`,
-  columns: [
-    PROJECT,
-    { field: 'progress', label: 'How far along', width: '14ch', align: 'end' },
-    { field: 'aim', label: 'Aiming for', width: '14ch', align: 'end' },
-  ],
-  order: [{ field: 'aim', dir: 'asc' }],
-  limit: 8,
-  when: { metric: 'projects-aiming', gt: 0 },
-};
-
-const NOT_IN_PLAY = {
-  kind: 'table',
-  heading: 'Not in play',
-  icon: 'archive',
-  span: 12,
-  source: 'register.things',
-  where: 'lane is parked or retired',
-  columns: [
-    PROJECT,
-    { field: 'lane', label: 'Status', width: '10ch' },
-    { field: 'next', label: 'Next', width: 'minmax(18ch,2fr)' },
-    { field: 'changed', label: 'Changed by', width: '16ch' },
-  ],
-  order: [{ field: 'name', dir: 'asc' }],
-  limit: 20,
-  when: { metric: 'projects-not-in-play', gt: 0 },
-};
 
 export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
   /**
@@ -913,7 +857,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         icon: 'rocket',
         span: 12,
         source: 'register.things',
-        where: LIVE,
+        /* THE PARKED TOO, SINCE the UI pass of 20 October (proj F5): the app draws this block's heading as a lane bar, In
+           play, Earning, Building and Parked, and Parked shows its cards in the same grid, where a one-row table under
+           Parked and finished said it. A finished project is not here. */
+        where: 'lane is not retired',
         /* EACH CARD WEARS THE PROJECT'S OWN MARK IN ITS OWN HUE, SINCE portfolio 1.6.0, the identity the list declares
            (`identity: { mark, accent }`), and says what the project is under its name (`about`, drawn as the quieter
            line under a title). Neither is a fact, so the three facts below are unchanged.
@@ -947,9 +894,9 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         ],
         order: [{ field: 'name', dir: 'asc' }],
         limit: 12,
-        /* DRAWN ONLY WHILE ONE IS IN PLAY, SINCE portfolio 1.13.0: its empty line, the one thing to do on a page with no
-           project, is the line's now. */
-        when: { metric: 'projects-live', gt: 0 },
+        /* DRAWN ONLY WHILE ONE IS IN PLAY OR PARKED, SINCE portfolio 1.13.0 and the UI pass of 20 October: its empty line,
+           the one thing to do on a page with no project, is the line's now, and a parked one is a lane of these cards. */
+        when: { any: [{ metric: 'projects-live', gt: 0 }, { metric: 'projects-parked', gt: 0 }] },
       },
       {
         /* WHAT A RULE OR AN AGENT ASKED ABOUT A PROJECT, SINCE portfolio 1.17.0 (PGS-C18), answered here, three at a time,
@@ -968,72 +915,10 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         tiles: true,
         when: { metric: 'questions-open-in:things', gt: 0 },
       },
-      /* WHAT EACH EARNS, WHAT AGENTS HOLD AND WHAT IS COMING UP, OPEN WHILE SHORT AND FOLDED WHEN LONG, SINCE portfolio
-         1.15.0. Two headings on one figure, as the page's two lines are, and a heading whose `when:` says no hides the
-         tiles under it (`readPage`), so exactly one set is ever read. */
-      {
-        /* ONE OPEN TILE (`box`), its parts on one surface, while four projects or fewer are under it. No `when:` of
-           more than nought: a boxed heading with nothing drawn under it is not drawn either, so a fresh Projects still
-           ends on In play. */
-        kind: 'section',
-        heading: 'Earnings, agents and dates',
-        icon: 'rows',
-        span: 12,
-        box: true,
-        /* A KEY OF ITS OWN, AND ONE ON EACH TILE UNDER IT: a block with none is keyed by its kind, list and heading, and
-           the second of two alike takes `-2`. The folded ones are the ones a record already holds, so they keep the
-           keys they had and whatever a person pinned, moved or hid on a long Projects still names the same tile. */
-        key: 'open-earnings',
-        when: { metric: 'projects-looked-up', lte: FOLD_PAST },
-      },
-      { ...EARNS, key: 'open-earns' },
-      /* SIDE BY SIDE, HALF EACH, in the open tile, and a half holds three columns. So what an agent holds leaves its
-         next step out here: with four projects or fewer every one of them is a card straight above, and a card says
-         its next step. Who holds it and who changed it last stay, since no card says who last said where it stands. One
-         of the two tables alone takes the row. */
-      { ...WITH_AGENT, key: 'open-with-agent', span: 6, columns: WITH_AGENT.columns.filter((c) => c.field !== 'next'), limit: FOLD_PAST },
-      { ...COMING_UP, key: 'open-coming-up', span: 6, limit: FOLD_PAST },
-      {
-        /* FOLDED SHUT PAST FOUR, AS IT WAS SINCE portfolio 1.8.0: the page a person reads is the line, how the
-           projects are going and the projects themselves, and by then those are two rows of cards or more. */
-        kind: 'section',
-        heading: 'Earnings, agents and dates',
-        /* A GLYPH THE APP DRAWS ON A FOLDED HEADING, SINCE portfolio 1.10.0: `layout-list` drew nothing there. */
-        icon: 'rows',
-        span: 12,
-        fold: true,
-        when: { metric: 'projects-looked-up', gt: FOLD_PAST },
-      },
+      /* WHAT EACH ONE EARNS, ALONE, SINCE the UI pass of 20 October (proj F5): the heading Earnings, agents and dates, what
+         agents hold, what is coming up and the parked and finished went. Every card says its agent, how far along it is
+         and the day it aims for, and Parked is a lane of the cards. */
       EARNS,
-      WITH_AGENT,
-      COMING_UP,
-      {
-        /* THE PARKED AND FINISHED, OPEN WHILE FOUR OR FEWER, SINCE portfolio 1.15.0: one tile under its heading, the
-           table in it with no heading of its own, since the tile's says what they are. Shut by its own rule when
-           there is none (`emptyBoxesShut`). */
-        kind: 'section',
-        heading: 'Parked and finished',
-        icon: 'archive',
-        span: 12,
-        box: true,
-        when: { metric: 'projects-not-in-play', lte: FOLD_PAST },
-      },
-      (({ heading: _heading, icon: _icon, ...table }) => ({ ...table, limit: FOLD_PAST }))(NOT_IN_PLAY),
-      {
-        /* A COUNT, SINCE portfolio 1.13.0: the heading says how many are folded under it, which the record answers with
-           the whole match whatever it reads (`matched`), so one project is read where it read up to fifty, each with
-           its notes. The projects themselves are the table under it. FOLDED ONLY PAST FOUR since portfolio 1.15.0. */
-        kind: 'section',
-        heading: 'Parked and finished',
-        icon: 'thing',
-        span: 12,
-        fold: true,
-        source: 'register.things',
-        where: 'lane is parked or retired',
-        limit: 1,
-        when: { metric: 'projects-not-in-play', gt: FOLD_PAST },
-      },
-      NOT_IN_PLAY,
     ],
   },
 

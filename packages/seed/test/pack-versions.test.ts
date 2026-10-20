@@ -1612,10 +1612,11 @@ const DECLARED: Record<string, Version> = {
       register.things
       rule.project-past-aim
     `,
-    declares: 'e732ff9ab12f1828',
+    declares: 'a98b386902474a38',
     history: [
       "`register.things` gains the field `draft` (a yes or no, Not kept yet, no by default), which marks a project the record formed from an agent's first session until its owner keeps it; no id added or taken away -> 174811f66edd1c77",
       "Inside the unreleased 1.18.0 (batch 6, the look of Projects): `page.portfolio` drops the In play and earning strip, which said what the line says, and the note counting how many in play say what they earned, open and folded; their figures stay declared; no id added or taken away -> e732ff9ab12f1828",
+      "Inside the unreleased 1.18.0 (the UI pass of 20 October, proj F5): `page.portfolio` drops the headings Earnings, agents and dates and Parked and finished, open and folded, with With an agent, Coming up and Not in play under them, since every card says its agent, progress, day and lane; In play reads every project not finished (`lane is not retired`), drawn while one is in play or parked, so Parked is a lane of its cards; What each one earns is drawn alone while two or more say what they earn (`gt: 1`); the figures stay declared, no id added or taken away -> a98b386902474a38",
     ],
   },
   /* THE EARNINGS LINE ONLY WHILE ONE SAYS (seed-58, the look of 13 October, fault J). 1.16.0 IS RELEASED. The same ids
@@ -1672,7 +1673,7 @@ const DECLARED: Record<string, Version> = {
       metric.tasks-week-yours metric.tasks-with-agents page.work page.work-board register.tasks register.tracks
       register.updates rule.close_follow_ups rule.start_with_parent script.close_follow_ups script.start_with_parent
     `,
-    declares: 'cda5ad94ed61f9bc',
+    declares: 'd6f1ff76bff97f7a',
     history: [
       "`register.tracks`: Status has six values (idea and planned before open) with their labels and the declared moves between them, and gains `target`, the day a thread aims for, a deadline reminded on the day; `script.start_with_parent` copies each of project, thread, owner and agent the follow-up left empty, and is titled Start a follow-up where its parent is; no id added or taken away -> 8299f07c756e0e85",
       "Inside the unreleased 1.19.0 (work-moves-62-63, audit 61 claim 6; integrate 63; commit 63423720, the deployed build, holds 1.18.0): on `register.tracks` holding leads to done, and `script.start_with_parent` no longer copies the agent; no id added or taken away -> 424cfe3512924e3b",
@@ -1682,6 +1683,7 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 1.19.0 (waiting-work-projects-99, PGS-C18; batch 99; commit 63423720, the deployed build, holds 1.18.0): `page.work` draws the questions about its own list (`list is tasks`) as a queue, Questions for you, gated on `questions-open-in:tasks`, with a clause in the line; a block added, nothing taken away, no id added or taken away -> a5e781318a2c7ef7",
       "Inside the unreleased 1.19.0 (work-head-and-no-project-101, AGT-D14 job 1 and PGS-A14; batch 101; commit 63423720, the deployed build, holds 1.18.0): `page.work` declares a head (count open-tasks, Add, search q) and lists open tasks with no project under a fold of its own, Needs a project, over a new figure `metric.tasks-no-project`; one figure and two blocks added, nothing taken away -> 98e297748df7a157",
       "Inside the unreleased 1.19.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 1.18.0): `page.work` says its place on the rail, `nav.place` 10, lowest first; no id added or taken away -> cda5ad94ed61f9bc",
+      "Inside the unreleased 1.19.0 (the UI pass of 20 October, proj F10 and F11): `page.work` drops its head's search word and At a glance, draws Late and This week as one list a third of the row, Late and this week (`any` of `tasks-late-yours` and `tasks-this-week-yours`), with each task's day and project under it, as With an agent and Waiting on you now do in place of who changed it last, and lays Not this week, Needs a project and Done lately a third of the row each; `register.updates` labels its health On track, At risk and Off track; no id added or taken away -> d6f1ff76bff97f7a",
     ],
   },
 };

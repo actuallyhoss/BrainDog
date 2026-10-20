@@ -1,5 +1,8 @@
 /**
- * Work's Waiting on you draws when each task falls due and who changed it last, under the reason it waits.
+ * Work's Waiting on you draws when each task falls due and which project it is on, under the reason it waits.
+ *
+ * THE PROJECT AND NOT WHO CHANGED IT LAST, SINCE the UI pass of 20 October (proj F10): every task on Work says its
+ * project in the line under it, "7 Sep · Kiln", and who changed it last is on the task's own page.
  *
  * Commit c6e2a331 widened `todo` to four cells, the last two
  * drawn as one quiet line under the title, and said that Waiting on you got its due day back. It did not: the block
@@ -52,7 +55,7 @@ function openSqlite(): Sql & { close(): void } {
   };
 }
 
-test('WAITING ON YOU DRAWS THE DUE DAY AND WHO CHANGED IT LAST, as the two facts under the reason it waits', async () => {
+test('WAITING ON YOU DRAWS THE DUE DAY AND THE PROJECT, as the two facts under the reason it waits', async () => {
   const sql = openSqlite();
   const k: Kernel = await openRecord(sql, { now: () => NOW });
   const seeded = await installSeed(k);
@@ -67,18 +70,13 @@ test('WAITING ON YOU DRAWS THE DUE DAY AND WHO CHANGED IT LAST, as the two facts
 
   /* THE TITLE, THE DETAIL, THEN THE TWO FACTS, because the third and fourth cells are the ones drawn as the quiet line. */
   const columns = (waiting.columns ?? []).map((c) => String(c.field));
-  assert.deepEqual(columns, ['what', 'note', 'by', 'changed'], `Waiting on you draws ${columns.join(', ')}`);
+  assert.deepEqual(columns, ['what', 'note', 'by', 'thing'], `Waiting on you draws ${columns.join(', ')}`);
 
   assert.ok(waiting.rows.length > 1, 'the sample needs waiting tasks for this to bite');
   const undated = waiting.rows.filter((r) => typeof r.fields.by !== 'string' || r.fields.by === '').map((r) => String(r.fields.what));
   assert.deepEqual(undated, [], 'a waiting task of the sample draws no due day');
 
-  const changes = waiting.changes ?? [];
-  assert.equal(changes.length, waiting.rows.length, 'the record did not say who changed each waiting task');
-  assert.deepEqual(
-    changes.flatMap((c, i) => (c === null ? [String(waiting.rows[i]?.fields.what)] : [])),
-    [],
-    'a waiting task with nobody named as its last change',
-  );
+  const placed = waiting.rows.filter((r) => r.fields.thing !== undefined && r.fields.thing !== null && r.fields.thing !== '');
+  assert.ok(placed.length > 0, 'no waiting task of the sample says its project');
   sql.close();
 });

@@ -1,0 +1,928 @@
+{
+  "portfolio": {
+    "page": {
+      "page": "portfolio",
+      "title": "Projects",
+      "nav": {
+        "section": "Projects",
+        "order": 5,
+        "place": 30
+      },
+      "icon": "thing",
+      "requires": [
+        "register.things"
+      ],
+      "pack": "portfolio",
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "projects-live",
+            "is": 0
+          },
+          "body": "No project is in play. Add one, or set a parked one building."
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "projects-need-you",
+            "gt": 0
+          },
+          "body": "{{questions-open-in:things}} question(s) for you, {{projects-need-you.names}} need(s) a push, {{projects-on-track.names}} is on track"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "projects-need-you",
+            "is": 0
+          },
+          "body": "Nothing needs a push, {{questions-open-in:things}} question(s) for you"
+        },
+        {
+          "kind": "split",
+          "heading": "Where they are",
+          "icon": "thing",
+          "span": 12,
+          "key": "where-they-are",
+          "source": "metric.projects-by-lane",
+          "when": {
+            "metric": "projects-live",
+            "gt": 4
+          }
+        },
+        {
+          "kind": "split",
+          "heading": "How they are going",
+          "icon": "activity",
+          "span": 12,
+          "source": "metric.projects-by-health",
+          "unset": "Not said yet",
+          "tones": {
+            "on_track": "good",
+            "at_risk": "warn",
+            "off_track": "bad"
+          },
+          "when": {
+            "all": [
+              {
+                "metric": "projects-live",
+                "gt": 4
+              },
+              {
+                "metric": "projects-with-health",
+                "gt": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "cards",
+          "heading": "In play",
+          "icon": "rocket",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning",
+          "columns": [
+            {
+              "field": "name",
+              "as": "title"
+            },
+            {
+              "field": "mark",
+              "as": "mark"
+            },
+            {
+              "field": "hue",
+              "as": "hue"
+            },
+            {
+              "field": "about",
+              "as": "reply",
+              "edit": true
+            },
+            {
+              "field": "progress",
+              "label": "",
+              "as": "ring"
+            },
+            {
+              "field": "health",
+              "label": "",
+              "as": "fact"
+            },
+            {
+              "field": "revenue",
+              "as": "fact"
+            },
+            {
+              "field": "next",
+              "label": "Next step",
+              "as": "fact"
+            },
+            {
+              "field": "agent",
+              "label": "Agent",
+              "as": "who"
+            },
+            {
+              "metric": "project-done-by-week:{{name}}",
+              "as": "trend"
+            },
+            {
+              "metric": "project-last-worked:{{name}}",
+              "as": "when",
+              "label": "Worked on"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "when": {
+            "metric": "projects-live",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "queue",
+          "heading": "Waiting on you",
+          "icon": "ask",
+          "span": 12,
+          "source": "governance.open",
+          "where": "list is things",
+          "limit": 3,
+          "tiles": true,
+          "when": {
+            "metric": "questions-open-in:things",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "section",
+          "heading": "Earnings, agents and dates",
+          "icon": "rows",
+          "span": 12,
+          "box": true,
+          "key": "open-earnings",
+          "when": {
+            "metric": "projects-looked-up",
+            "lte": 4
+          }
+        },
+        {
+          "kind": "split",
+          "heading": "What each one earns",
+          "icon": "coins",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning, revenue is set",
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "revenue"
+            }
+          ],
+          "order": [
+            {
+              "field": "revenue",
+              "dir": "desc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "projects-earning-said",
+            "gt": 0
+          },
+          "key": "open-earns"
+        },
+        {
+          "kind": "table",
+          "heading": "With an agent",
+          "icon": "session",
+          "span": 6,
+          "source": "register.things",
+          "where": "lane is building or earning, agent is set",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "agent",
+              "label": "Agent",
+              "width": "10ch"
+            },
+            {
+              "field": "changed",
+              "label": "Changed by",
+              "width": "16ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 4,
+          "when": {
+            "metric": "projects-with-agent",
+            "gt": 0
+          },
+          "key": "open-with-agent"
+        },
+        {
+          "kind": "table",
+          "heading": "Coming up",
+          "icon": "calendar-clock",
+          "span": 6,
+          "source": "register.things",
+          "where": "lane is building or earning, aim is set",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "progress",
+              "label": "How far along",
+              "width": "14ch",
+              "align": "end"
+            },
+            {
+              "field": "aim",
+              "label": "Aiming for",
+              "width": "14ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "aim",
+              "dir": "asc"
+            }
+          ],
+          "limit": 4,
+          "when": {
+            "metric": "projects-aiming",
+            "gt": 0
+          },
+          "key": "open-coming-up"
+        },
+        {
+          "kind": "section",
+          "heading": "Earnings, agents and dates",
+          "icon": "rows",
+          "span": 12,
+          "fold": true,
+          "when": {
+            "metric": "projects-looked-up",
+            "gt": 4
+          }
+        },
+        {
+          "kind": "split",
+          "heading": "What each one earns",
+          "icon": "coins",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning, revenue is set",
+          "columns": [
+            {
+              "field": "name"
+            },
+            {
+              "field": "revenue"
+            }
+          ],
+          "order": [
+            {
+              "field": "revenue",
+              "dir": "desc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "projects-earning-said",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "With an agent",
+          "icon": "session",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning, agent is set",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "agent",
+              "label": "Agent",
+              "width": "10ch"
+            },
+            {
+              "field": "next",
+              "label": "Next",
+              "width": "minmax(20ch,2fr)"
+            },
+            {
+              "field": "changed",
+              "label": "Changed by",
+              "width": "16ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "when": {
+            "metric": "projects-with-agent",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Coming up",
+          "icon": "calendar-clock",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is building or earning, aim is set",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "progress",
+              "label": "How far along",
+              "width": "14ch",
+              "align": "end"
+            },
+            {
+              "field": "aim",
+              "label": "Aiming for",
+              "width": "14ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "aim",
+              "dir": "asc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "projects-aiming",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "section",
+          "heading": "Parked and finished",
+          "icon": "archive",
+          "span": 12,
+          "box": true,
+          "when": {
+            "metric": "projects-not-in-play",
+            "lte": 4
+          }
+        },
+        {
+          "kind": "table",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is parked or retired",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "lane",
+              "label": "Status",
+              "width": "10ch"
+            },
+            {
+              "field": "next",
+              "label": "Next",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "changed",
+              "label": "Changed by",
+              "width": "16ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 4,
+          "when": {
+            "metric": "projects-not-in-play",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "section",
+          "heading": "Parked and finished",
+          "icon": "thing",
+          "span": 12,
+          "fold": true,
+          "source": "register.things",
+          "where": "lane is parked or retired",
+          "limit": 1,
+          "when": {
+            "metric": "projects-not-in-play",
+            "gt": 4
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "Not in play",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.things",
+          "where": "lane is parked or retired",
+          "columns": [
+            {
+              "field": "name",
+              "label": "Project",
+              "width": "minmax(14ch,1fr)"
+            },
+            {
+              "field": "lane",
+              "label": "Status",
+              "width": "10ch"
+            },
+            {
+              "field": "next",
+              "label": "Next",
+              "width": "minmax(18ch,2fr)"
+            },
+            {
+              "field": "changed",
+              "label": "Changed by",
+              "width": "16ch"
+            }
+          ],
+          "order": [
+            {
+              "field": "name",
+              "dir": "asc"
+            }
+          ],
+          "limit": 20,
+          "when": {
+            "metric": "projects-not-in-play",
+            "gt": 0
+          }
+        }
+      ]
+    }
+  },
+  "work": {
+    "page": {
+      "page": "work",
+      "title": "Work",
+      "nav": {
+        "section": "Work",
+        "order": 10,
+        "place": 10
+      },
+      "icon": "task",
+      "requires": [
+        "register.tasks"
+      ],
+      "pack": "work",
+      "header": {
+        "count": {
+          "metric": "open-tasks"
+        },
+        "action": {
+          "verb": "row.create",
+          "label": "Add"
+        },
+        "search": {
+          "param": "q"
+        }
+      },
+      "filters": [
+        {
+          "field": "thing",
+          "control": "chips"
+        }
+      ],
+      "blocks": [
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "open-tasks",
+            "is": 0
+          },
+          "body": "Nothing is open right now"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "tasks-late-yours",
+            "gt": 0
+          },
+          "body": "{{questions-open-in:tasks}} question(s) for you, {{tasks-late-yours}} late, {{tasks-waiting}} waiting on you"
+        },
+        {
+          "kind": "note",
+          "lead": true,
+          "span": 12,
+          "when": {
+            "metric": "tasks-late-yours",
+            "is": 0
+          },
+          "body": "Nothing is late, {{questions-open-in:tasks}} question(s) for you, {{tasks-waiting}} waiting on you"
+        },
+        {
+          "kind": "capture",
+          "heading": "What needs doing?",
+          "icon": "plus",
+          "span": 12,
+          "register": "tasks"
+        },
+        {
+          "kind": "todo",
+          "heading": "Late",
+          "icon": "alert",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is empty, by before today",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "by"
+            }
+          ],
+          "order": [
+            {
+              "field": "priority",
+              "dir": "asc"
+            },
+            {
+              "field": "by",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "when": {
+            "metric": "tasks-late-yours",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "queue",
+          "heading": "Questions for you",
+          "icon": "ask",
+          "span": 12,
+          "source": "governance.open",
+          "where": "list is tasks",
+          "limit": 3,
+          "tiles": true,
+          "when": {
+            "metric": "questions-open-in:tasks",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "stat",
+          "heading": "At a glance",
+          "icon": "gauge",
+          "span": 12,
+          "when": {
+            "metric": "open-tasks",
+            "gt": 0
+          },
+          "cells": [
+            {
+              "metric": "open-tasks",
+              "label": "Open"
+            },
+            {
+              "metric": "tasks-due-7d",
+              "label": "Due this week"
+            },
+            {
+              "metric": "tasks-done-7d",
+              "label": "Done this week",
+              "trend": "7d",
+              "note": "{{tasks-done-7d-agents}} of them by an agent"
+            }
+          ]
+        },
+        {
+          "kind": "todo",
+          "heading": "This week",
+          "icon": "calendar-days",
+          "span": 4,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is empty, by after yesterday, by before +8d",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "by"
+            }
+          ],
+          "order": [
+            {
+              "field": "by",
+              "dir": "asc"
+            },
+            {
+              "field": "priority",
+              "dir": "asc"
+            }
+          ],
+          "limit": 12,
+          "when": {
+            "metric": "tasks-this-week-yours",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "todo",
+          "heading": "With an agent",
+          "icon": "session",
+          "span": 4,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is set",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "agent"
+            }
+          ],
+          "order": [
+            {
+              "field": "by",
+              "dir": "asc"
+            }
+          ],
+          "limit": 8,
+          "working": true,
+          "when": {
+            "metric": "tasks-with-agents",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "todo",
+          "heading": "Waiting on you",
+          "icon": "hourglass",
+          "span": 4,
+          "source": "register.tasks",
+          "where": "state is review or blocked",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "note"
+            },
+            {
+              "field": "by"
+            },
+            {
+              "field": "changed"
+            }
+          ],
+          "order": [
+            {
+              "field": "by",
+              "dir": "asc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "tasks-waiting",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "section",
+          "heading": "Not this week",
+          "icon": "archive",
+          "span": 12,
+          "fold": true,
+          "when": {
+            "metric": "tasks-not-this-week",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "todo",
+          "heading": "After this week",
+          "icon": "calendar-days",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is empty, by after +7d",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "by"
+            }
+          ],
+          "order": [
+            {
+              "field": "by",
+              "dir": "asc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "tasks-after-week-yours",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "todo",
+          "heading": "No due day",
+          "icon": "circle-dashed",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is open or doing, agent is empty, by is empty",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "thing"
+            }
+          ],
+          "order": [
+            {
+              "field": "by",
+              "dir": "asc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "tasks-undated-yours",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "todo",
+          "heading": "Later",
+          "icon": "archive",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is backlog",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "thing"
+            }
+          ],
+          "order": [
+            {
+              "field": "by",
+              "dir": "asc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "tasks-later",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "section",
+          "heading": "Needs a project",
+          "icon": "inbox",
+          "span": 12,
+          "fold": true,
+          "when": {
+            "metric": "tasks-no-project",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "table",
+          "heading": "With no project",
+          "icon": "folder",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is not backlog or done or dropped, thing is empty",
+          "columns": [
+            {
+              "field": "what",
+              "width": "minmax(20ch,1fr)"
+            },
+            {
+              "field": "by",
+              "label": "Due",
+              "width": "13ch",
+              "align": "end"
+            }
+          ],
+          "order": [
+            {
+              "field": "created_at",
+              "dir": "desc"
+            }
+          ],
+          "limit": 5
+        },
+        {
+          "kind": "section",
+          "heading": "Done lately",
+          "icon": "check",
+          "span": 12,
+          "fold": true,
+          "when": {
+            "metric": "tasks-done-7d",
+            "gt": 0
+          }
+        },
+        {
+          "kind": "todo",
+          "heading": "Done recently",
+          "icon": "circle-check",
+          "span": 12,
+          "source": "register.tasks",
+          "where": "state is done, done_on after -8d",
+          "columns": [
+            {
+              "field": "what"
+            },
+            {
+              "field": "done_on"
+            },
+            {
+              "field": "agent"
+            }
+          ],
+          "order": [
+            {
+              "field": "done_on",
+              "dir": "desc"
+            }
+          ],
+          "limit": 8,
+          "when": {
+            "metric": "tasks-done-7d",
+            "gt": 0
+          }
+        }
+      ]
+    },
+    "updatesHealth": {
+      "id": "health",
+      "type": "enum",
+      "values": [
+        "on_track",
+        "at_risk",
+        "off_track"
+      ],
+      "index": true,
+      "required": true
+    }
+  }
+}

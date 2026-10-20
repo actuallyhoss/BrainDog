@@ -65,13 +65,14 @@ const block = (p: PageResult, heading: string) => {
   return b;
 };
 
-/** The table of parked and finished projects as the Overview drew it: the block straight under the heading it drew. */
-const notInPlay = (p: PageResult) => {
-  const at = p.blocks.findIndex((x) => x.heading === 'Parked and finished' && x.drawn !== false);
-  assert.ok(at >= 0, 'the Overview draws no Parked and finished');
-  const b = p.blocks[at + 1]!;
-  assert.deepEqual([b.kind, b.drawn !== false, b.refusals], ['table', true, []]);
-  return b;
+/**
+ * THE PARKED PROJECTS AS THE OVERVIEW DRAWS THEM, SINCE the UI pass of 20 October (proj F5): the cards of In play whose lane
+ * is parked, which the app draws under the lane bar's Parked, where a table under Parked and finished listed them.
+ */
+const parkedOf = (p: PageResult) => {
+  const b = block(p, 'In play');
+  assert.deepEqual([b.kind, b.drawn !== false], ['cards', true]);
+  return b.rows.filter((r) => r.fields.lane === 'parked');
 };
 
 const names = (rows: readonly { fields: Record<string, unknown> }[]) => rows.map((r) => String(r.fields.name));
@@ -117,11 +118,12 @@ test('THE OVERVIEW AND EVERY PROJECT PAGE OPEN ON THE SAMPLE WITH NO BLOCK REFUS
   const parts = byHealth.value.groups ?? [];
   assert.equal(parts.reduce((n, g) => n + Number(g.value), 0), THINGS.filter(inPlay).length, 'every project in play is a part');
   assert.deepEqual((block(overview, 'How they are going') as { tones?: unknown }).tones, { on_track: 'good', at_risk: 'warn', off_track: 'bad' }, 'the record hands each part its intent to the page');
-  assert.deepEqual(names(notInPlay(overview).rows), ['Tallow']);
+  assert.deepEqual(names(parkedOf(overview)), ['Tallow']);
 
-  /* WHO SAID IT: the agent on a project, where it wrote where the project stands. */
-  const held = block(overview, 'With an agent');
-  assert.deepEqual(held.rows.map((r, i) => [r.fields.name, held.changes?.[i]?.by]), [['Kiln', 'agent'], ['Marlow & Co', 'agent']]);
+  /* WHO HOLDS IT IS ON ITS CARD, SINCE the UI pass of 20 October (proj F5), where a table With an agent said it again. */
+  assert.ok(!overview.blocks.some((b) => b.heading === 'With an agent'), 'With an agent says again what the cards say');
+  const held = block(overview, 'In play').rows.filter((r) => typeof r.fields.agent === 'string' && r.fields.agent !== '');
+  assert.deepEqual(held.map((r) => [r.fields.name, r.fields.agent]), [['Kiln', 'claude'], ['Marlow & Co', 'cursor']]);
 });
 
 test('AN AGENT TAKES A PROJECT, SAYS IT IS OFF TRACK, AND A PERSON PUTS IT RIGHT, and the page says who did each', async () => {
@@ -133,22 +135,14 @@ test('AN AGENT TAKES A PROJECT, SAYS IT IS OFF TRACK, AND A PERSON PUTS IT RIGHT
 
   /* TAKE, AND SAY WHERE IT STANDS. */
   assert.ok(k.update('things', ref, { agent: 'codex', health: 'off_track', next: 'Halden says nothing is due yet. Ask when their terms end.', progress: 80 }, agent).ok);
-  let overview = opened(k, 'portfolio');
-  const holds = block(overview, 'With an agent');
-  const held = holds.rows.findIndex((r) => r.fields.name === 'Marlow & Co');
-  assert.ok(held >= 0, 'the project is not under With an agent');
-  assert.equal(holds.rows[held]!.fields.agent, 'codex');
-  assert.deepEqual([holds.changes?.[held]?.by, holds.changes?.[held]?.who], ['agent', 'agent:codex']);
+  /* THE CARD SAYS WHO HOLDS IT AND HOW IT IS GOING (proj F5); who wrote each is the row's history. */
   const card = () => block(opened(k, 'portfolio'), 'In play').rows.find((r) => r.fields.name === 'Marlow & Co');
+  assert.equal(card()?.fields.agent, 'codex', 'the agent that took it is not on its card');
   assert.equal(card()?.fields.health, 'off_track', 'what the agent said is not on its card');
 
-  /* A PERSON READS IT AND SAYS IT IS ON TRACK: its card says so, and the page names them. */
+  /* A PERSON READS IT AND SAYS IT IS ON TRACK: its card says so. */
   assert.ok(k.update('things', ref, { health: 'on_track' }, person).ok);
-  overview = opened(k, 'portfolio');
   assert.equal(card()?.fields.health, 'on_track');
-  const after = block(overview, 'With an agent');
-  const now = after.rows.findIndex((r) => r.fields.name === 'Marlow & Co');
-  assert.deepEqual([after.changes?.[now]?.by, after.changes?.[now]?.who], ['you', 'p_1']);
 
   /* AND THE PROJECT'S OWN PAGE SAYS WHERE IT STANDS. */
   const stands = block(opened(k, 'marlow-co'), 'Where it stands');
@@ -173,11 +167,9 @@ test('AN AGENT PROPOSES PARKING A PROJECT, NOTHING CHANGES UNTIL A PERSON ACCEPT
   const decided = k.decide(filed.value.id, { decide: { option: 'accept', reason: 'Nothing moves on it until the domain is chosen' } }, 'p_1');
   assert.ok(decided.ok, sayOf(decided));
   const overview = opened(k, 'portfolio');
-  assert.ok(!names(block(overview, 'In play').rows).includes('Portage'));
-  const parked = notInPlay(overview);
-  assert.deepEqual(names(parked.rows), ['Portage', 'Tallow']);
-  const at = parked.rows.findIndex((r) => r.fields.name === 'Portage');
-  assert.deepEqual([parked.changes?.[at]?.by, parked.changes?.[at]?.who], ['you', 'p_1'], 'the change is the person’s who accepted it');
+  /* PARKED IS A LANE OF THE CARDS (proj F5): Portage is drawn under it, and no longer in play. */
+  assert.ok(!block(overview, 'In play').rows.some((r) => r.fields.name === 'Portage' && r.fields.lane !== 'parked'), 'Portage is still in play');
+  assert.deepEqual(names(parkedOf(overview)), ['Portage', 'Tallow']);
 });
 
 /**
@@ -185,7 +177,7 @@ test('AN AGENT PROPOSES PARKING A PROJECT, NOTHING CHANGES UNTIL A PERSON ACCEPT
  * without reading it. "Every project in play is on track" was the line over a page with none, while In play said its own
  * empty line under it; and the section read every parked project whole, notes and all, for the one number it draws.
  */
-test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and Parked and finished is a count', async () => {
+test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and the parked are the cards', async () => {
   const k = await seeded();
   for (const [n, t] of THINGS.entries()) if (inPlay(t)) assert.ok(k.update('things', `things#${n + 1}`, { lane: 'parked' }, { actor: 'p_1' }).ok);
   const overview = opened(k, 'portfolio');
@@ -199,99 +191,50 @@ test('WITH NOTHING IN PLAY THE LINE SAYS SO AND HOW TO START, and Parked and fin
   assert.equal(leads[2]!.body, 'Nothing needs a push, {{questions-open-in:things}} question(s) for you', 'the quiet line is not the one that leaves In play to the strip');
   const first = leads.find((b) => b.drawn !== false);
   assert.doesNotMatch(String(first?.body), /\{\{/u, `the nightly line is asked of a line of noughts: ${first?.body}`);
-  assert.equal(block(overview, 'In play').drawn, false, 'In play is drawn over nothing');
+  /* THE PARKED ARE THE CARDS UNDER THE LANE BAR'S PARKED, SINCE the UI pass of 20 October (proj F5), so a page with
+     nothing in play still shows what could be set building. */
+  assert.equal(parkedOf(overview).length, THINGS.length);
+  assert.ok(!overview.blocks.some((b) => b.heading === 'Parked and finished'), 'Parked and finished is drawn again');
 
-  /* FOUR OR FEWER ARE AN OPEN TILE, SINCE portfolio 1.15.0, the projects themselves and no count over them. */
-  assert.equal(THINGS.length, 4, 'the sample is no longer four projects, so the open tile is not what this opens');
-  assert.equal(notInPlay(overview).rows.length, THINGS.length);
-
-  /* PAST FOUR THE HEADING FOLDS AND COUNTS, reading one project where it read every one whole. */
+  /* A FINISHED PROJECT IS ON NO CARD. */
   assert.ok(k.create('things', { name: 'Fathom', lane: 'retired' } as never, { actor: 'p_1' }).ok);
   const longer = opened(k, 'portfolio');
-  const parked = block(longer, 'Parked and finished');
-  assert.equal((parked as { fold?: unknown }).fold, true, 'five parked projects are not folded');
-  assert.equal(parked.matched, THINGS.length + 1, 'the count is not every project parked or finished');
-  assert.ok(parked.rows.length <= 1, `the section read ${parked.rows.length} projects to say one number`);
-  assert.equal(notInPlay(longer).rows.length, THINGS.length + 1, 'the projects themselves are the table under it');
+  assert.equal(parkedOf(longer).length, THINGS.length);
+  assert.ok(!names(block(longer, 'In play').rows).includes('Fathom'), 'a finished project is drawn as a card');
 });
 
 /**
- * NO FOLDED HEADING OVER A SHORT LIST, SINCE portfolio 1.15.0 (the second design review's fix 6). The sample's Projects
- * ended on two headings 56px tall, each a name and a Show button, over 240px of empty page. With four projects or fewer
- * under it a heading is an open tile (`box`), and past four it folds as it did. One figure decides each, so a record
- * reads one heading of the pair and the tiles under it, never both and never neither.
+ * WHAT EACH ONE EARNS ALONE, AND NO FOLD, SINCE the UI pass of 20 October (proj F5). The Overview held the cards, then a
+ * heading over what each earns, what agents hold and what is coming up, then the parked and finished as a table: every
+ * one of those is on a card now (who holds it, how far along, the day it aims for, and Parked as a lane), so the page is
+ * the cards and the split, the split only while two or more say what they earn.
  */
-test('PROJECTS OPENS WHAT IT HOLDS WHILE IT IS SHORT, and folds it only past four projects', async () => {
+test('PROJECTS IS THE CARDS AND WHAT EACH EARNS, with no heading over them and nothing folded, short or long', async () => {
   const k = await seeded();
-  type Read = PageResult['blocks'][number] & { fold?: unknown; box?: unknown; span?: number };
-  const pair = (p: PageResult, heading: string) => p.blocks.filter((b) => b.heading === heading) as Read[];
-  const under = (p: PageResult, heading: string): Read[] => {
-    const at = p.blocks.findIndex((b) => b.heading === heading && b.drawn !== false);
-    const rest = p.blocks.slice(at + 1);
-    const end = rest.findIndex((b) => b.kind === 'section');
-    return (end < 0 ? rest : rest.slice(0, end)) as Read[];
-  };
-
-  /* THE SAMPLE: three projects in play and one parked, so both are open tiles and nothing on the page is folded. */
+  const gone = ['Earnings, agents and dates', 'With an agent', 'Coming up', 'Parked and finished', 'Not in play'];
   const short = opened(k, 'portfolio');
   for (const b of short.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
-  for (const heading of ['Earnings, agents and dates', 'Parked and finished']) {
-    const [open, folded] = pair(short, heading);
-    assert.deepEqual([open!.drawn !== false, open!.box, open!.fold], [true, true, undefined], `${heading}: not an open tile`);
-    assert.deepEqual([folded!.drawn, folded!.fold], [false, true], `${heading}: folded over a short list`);
-  }
-  assert.ok(!short.blocks.some((b) => b.drawn !== false && (b as Read).fold === true), 'a short Projects still ends on a folded heading');
-  /* THE FOLDED TILES KEEP THE KEYS THEY HAD BEFORE 1.15.0, which a look a person saved names them by: the open ones
-     declare their own, so no folded tile is the second of two alike and takes `-2`. */
-  const keyOf = (b: unknown) => String((b as { key?: unknown }).key);
-  const twice = short.blocks.filter((b) => ['Earnings, agents and dates', 'What each one earns', 'With an agent', 'Coming up'].includes(String(b.heading)));
-  assert.deepEqual(twice.filter((b) => keyOf(b).startsWith('open-')).map(keyOf), ['open-earnings', 'open-earns', 'open-with-agent', 'open-coming-up']);
-  assert.deepEqual(twice.filter((b) => /-\d+$/u.test(keyOf(b))).map(keyOf), [], 'a folded tile lost its key to the open one');
-  const looked = under(short, 'Earnings, agents and dates');
-  assert.deepEqual(looked.map((b) => [b.heading, b.drawn !== false, b.span]), [
-    /* NO LINE UNDER IT SINCE BATCH 6: "3 of 3 projects in play say what they earned" was the split said again in a grey box. */
-    ['What each one earns', true, 12],
-    ['With an agent', true, 6],
-    ['Coming up', true, 6],
-  ]);
-  assert.deepEqual(names(looked[0]!.rows).sort(), THINGS.filter((t) => inPlay(t) && t.revenue !== undefined && t.revenue !== null).map((t) => String(t.name)).sort());
-  /* HALF A ROW HOLDS THREE COLUMNS: the project, who holds it and who changed it last. Its next step is on its card. */
-  assert.deepEqual(looked[1]!.columns?.map((c) => c.field), ['name', 'agent', 'changed']);
-  /* THE PARKED ARE THE TABLE ITSELF, under the tile's heading and none of its own. */
-  assert.deepEqual(under(short, 'Parked and finished').map((b) => [b.kind, b.heading, names(b.rows)]), [['table', undefined, ['Tallow']]]);
-  /* AND WHAT THE FOLDED HEADINGS HELD IS NOT READ AT ALL: a tile nobody sees costs no query. */
-  const hidden = short.blocks.filter((b) => b.drawn === false && ['What each one earns', 'With an agent', 'Coming up', 'Not in play'].includes(String(b.heading)));
-  assert.deepEqual(hidden.map((b) => [b.heading, b.rows.length]), [['What each one earns', 0], ['With an agent', 0], ['Coming up', 0], ['Not in play', 0]]);
+  assert.deepEqual(short.blocks.filter((b) => gone.includes(String(b.heading))).map((b) => b.heading), [], 'a tile the cards say is declared again');
+  assert.ok(!short.blocks.some((b) => b.drawn !== false && (b as { fold?: unknown }).fold === true), 'Projects ends on a folded heading');
+  const earns = block(short, 'What each one earns') as PageResult['blocks'][number] & { span?: number };
+  assert.equal(earns.drawn !== false, true);
+  assert.deepEqual(names(earns.rows).sort(), THINGS.filter((t) => inPlay(t) && t.revenue !== undefined && t.revenue !== null).map((t) => String(t.name)).sort());
 
-  /* PAST FOUR, EACH FOLDS AS IT DID: two more in play that say what they earn, and four more parked. */
+  /* PAST FOUR, STILL NOTHING FOLDS: the cards are the page however many there are. */
   for (const name of ['Fathom', 'Quire']) assert.ok(k.create('things', { name, lane: 'building', aim: TODAY } as never, { actor: 'p_1' }).ok);
   for (const name of ['Ember', 'Latch', 'Marrow', 'Nettle']) assert.ok(k.create('things', { name, lane: 'parked' } as never, { actor: 'p_1' }).ok);
   const long = opened(k, 'portfolio');
   for (const b of long.blocks) assert.deepEqual(b.refusals, [], String(b.heading));
-  for (const heading of ['Earnings, agents and dates', 'Parked and finished']) {
-    const [open, folded] = pair(long, heading);
-    assert.equal(open!.drawn, false, `${heading}: an open tile over a long list`);
-    assert.deepEqual([folded!.drawn !== false, folded!.fold], [true, true], `${heading}: not folded past four`);
-  }
-  assert.deepEqual(under(long, 'Earnings, agents and dates').map((b) => [b.heading, b.drawn !== false, b.span]), [
-    ['What each one earns', true, 12],
-    ['With an agent', true, 12],
-    ['Coming up', true, 12],
-  ]);
-  assert.deepEqual(under(long, 'Parked and finished').map((b) => [b.heading, b.rows.length]), [['Not in play', 5]]);
-  assert.equal(block(long, 'Parked and finished').matched, 5);
+  assert.ok(!long.blocks.some((b) => b.drawn !== false && (b as { fold?: unknown }).fold === true), 'a long Projects folds its cards');
+  assert.equal(parkedOf(long).length, 5);
 
-  /* WITH NOTHING UNDER EITHER, neither heading is drawn, open or folded. From portfolio 1.16.0 the open tile of
-     earnings, agents and dates still was, holding one line that none of the projects in play says what it earned.
-     SINCE 1.17.0 that line is drawn only while one says, so with none saying the tile has nothing under it. */
+  /* WITH NONE SAYING WHAT IT EARNS, NO SPLIT IS DRAWN. */
   const bare = await seeded();
   for (const n of THINGS.keys()) assert.ok(bare.update('things', `things#${n + 1}`, { lane: 'building', revenue: null, agent: null, aim: null } as never, { actor: 'p_1' }).ok);
   const ends = opened(bare, 'portfolio');
   assert.equal(block(ends, 'In play').rows.length, THINGS.length);
-  assert.deepEqual(pair(ends, 'Parked and finished').map((b) => b.drawn), [false, false], 'Parked and finished: a heading over nothing');
-  assert.deepEqual(pair(ends, 'Earnings, agents and dates').map((b) => b.drawn !== false), [false, false]);
-  /* AND THE LINE IT HELD IS GONE, SINCE BATCH 6: no block of the page counts how many say what they earned. */
-  const said = (ends.blocks as (Read & { body?: string })[]).filter((b) => typeof b.body === 'string' && b.body.includes('say what they earned'));
+  assert.equal(block(ends, 'What each one earns').drawn, false, 'a split of nothing is drawn');
+  const said = (ends.blocks as (PageResult['blocks'][number] & { body?: string })[]).filter((b) => typeof b.body === 'string' && b.body.includes('say what they earned'));
   assert.deepEqual(said, [], 'the page declares the line again');
 });
 

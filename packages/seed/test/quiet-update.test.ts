@@ -234,6 +234,8 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
         const { layout: _layout, ...page } = d;
         const blocks = (page.blocks as Body[])
           .filter((b) => (b.when as { metric?: string } | undefined)?.metric !== 'tasks-this-week-yours')
+          /* AND THE LIST DRAWN ON IT AND ON WHAT IS LATE (Late and this week, the UI pass of 20 October). */
+          .filter((b) => !((b.when as { any?: { metric?: string }[] } | undefined)?.any ?? []).some((w) => w.metric === 'tasks-this-week-yours'))
           /* AND RUNS OUT AS IT WAS BEFORE money-core 3.12.0: the count of days, with no day to draw and no line under it. */
           .map((b) => (Array.isArray(b.cells) ? { ...b, cells: (b.cells as Body[]).map((c) => (c.metric === 'runs-out-on' ? { metric: 'runway-days', label: c.label } : c)) } : b))
           .map(({ area: _area, ...b }) => ({ ...b, span: 12 }));
@@ -261,8 +263,8 @@ test('AN UPDATE THAT ONLY REARRANGES A PAGE GOES IN ON ITS OWN, and asks nothing
   /* AND THE PAGES ARE THIS BUILD'S: Money's side column, and This week drawn on the new figure. */
   const page = value<{ layout?: unknown; blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('money'));
   assert.deepEqual(page.layout, { rail: 4 });
-  const work = value<{ blocks: { heading?: string; when?: { metric?: string } }[] }>(k.page('work'));
-  assert.equal(work.blocks.find((b) => b.heading === 'This week')?.when?.metric, 'tasks-this-week-yours');
+  const work = value<{ blocks: { heading?: string; when?: { any?: { metric?: string }[] } }[] }>(k.page('work'));
+  assert.deepEqual(work.blocks.find((b) => b.heading === 'Late and this week')?.when?.any?.map((w) => w.metric), ['tasks-late-yours', 'tasks-this-week-yours']);
   /* AND LASTS DRAWS THE DAY, over the figure the update brought with it (money-core 3.12.0). */
   const runs = (page.blocks as { heading?: string; cells?: { metric: string }[] }[]).find((b) => b.heading === 'Lasts');
   assert.deepEqual(runs?.cells?.map((c) => c.metric), ['runs-out-on', 'lasts-no-income']);
@@ -604,6 +606,35 @@ const withoutPlans = (doc: Body): Body => ({
 const withoutCashStale = (doc: Body): Body => ({ ...doc, declarations: (doc.declarations as Body[]).filter((d) => d.rule !== 'cash-stale') });
 /** Work as 1.18.0 released it, the frozen document (`fixtures/released/`), which holds the follow-up script as it was. */
 const WORK_1_18 = JSON.parse(readFileSync(new URL('./fixtures/released/work-1.18.0.json', import.meta.url), 'utf8')) as Body;
+
+/**
+ * PROJECTS' AND WORK'S PAGES AS THEY WERE THE MORNING OF 20 OCTOBER, before the UI pass changed them inside the unreleased
+ * portfolio 1.18.0 and work 1.19.0 (proj F5, F10, F11): the Overview with its open and folded headings, Work with Late,
+ * At a glance, This week and its search word, and a thread's health with no labels. Frozen from that morning's build, so
+ * the steps below undo the pass first and then the ones before it, as each version was released.
+ */
+const BEFORE_UI_PASS = JSON.parse(readFileSync(new URL('./fixtures/before-ui-pass-20-oct.json', import.meta.url), 'utf8')) as {
+  portfolio: { page: Body };
+  work: { page: Body; updatesHealth: Body };
+};
+
+/** A document with the UI pass of 20 October taken off its pages, as the morning's build declared them. */
+const beforeUiPass = (doc: Body, id: 'portfolio' | 'work'): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[]).map((d) => {
+    /* ITS PLACE ON THE RAIL AS THE DOCUMENT SAYS IT, which an older step may have taken off. */
+    if (id === 'portfolio' && d.page === 'portfolio') return { ...BEFORE_UI_PASS.portfolio.page, nav: d.nav };
+    if (id === 'work' && d.page === 'work') {
+      /* A RECORD WITHOUT PROJECTS DRAWS NO PROJECT COLUMN, as the document it was made with says. */
+      const linked = (doc.declarations as Body[]).some((x) => x.register === 'tasks' && (x.fields as Body[]).some((f) => f.id === 'thing'));
+      const page = { ...BEFORE_UI_PASS.work.page, nav: d.nav };
+      return linked ? page : { ...page, filters: undefined, blocks: (page.blocks as Body[]).map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => c.field !== 'thing') } : b)) };
+    }
+    if (id === 'work' && d.register === 'updates' && Array.isArray(d.fields))
+      return { ...d, fields: (d.fields as Body[]).map((f) => (f.id === 'health' ? BEFORE_UI_PASS.work.updatesHealth : f)) };
+    return d;
+  }),
+});
 /**
  * AND BATCH 71'S BOOKS (book-fill-71, book-figures-71, book-page-71; REC-A09 steps 1 to 3), folded into the same
  * unreleased step: the three rules that file a thing in its account's book go with the script they start, the seven
@@ -890,8 +921,10 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
   portfolio: {
     version: '1.15.0',
     released: '982f163d9d8ab76f',
-    undo: (raw) =>
-      withPage(
+    undo: (fresh) => {
+      /* THE UI PASS OF 20 OCTOBER COMES OFF FIRST, inside the unreleased 1.18.0. */
+      const raw = beforeUiPass(fresh, 'portfolio');
+      return withPage(
         {
           ...raw,
           /* AND THE `draft` FIELD comes off with it, added in portfolio 1.18.0: a project the record formed from a first session. */
@@ -918,14 +951,17 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
                 : b,
             ),
         (d) => d.metric !== 'project-said' && d.metric !== 'projects-with-health' && d.metric !== 'projects-lane-earning',
-      ),
+      );
+    },
   },
   /* A CARD NAMED ITS PROJECT, where it says its day and who holds it. A record without Projects had no third column. */
   /* AND WORK 1.18.0'S COUNT OF WHAT WAS WORKED ON A PROJECT THIS WEEK comes off first. */
   work: {
     version: '1.16.0',
     released: 'b27c59050f32684d',
-    undo: (raw) => {
+    undo: (fresh) => {
+      /* THE UI PASS OF 20 OCTOBER COMES OFF FIRST, inside the unreleased 1.19.0. */
+      const raw = beforeUiPass(fresh, 'work');
       /* WORK 1.19.0'S THREADS AND FOLLOW-UPS COME OFF BEFORE THAT (W061, REC-C10): a thread's Status back to its four
          values with no labels and no declared moves, the day it aims for gone, and the script that starts a follow-up
          back to the title and source 1.18.0 released, read from its frozen document. */
@@ -1149,14 +1185,10 @@ test('THE SECOND DESIGN REVIEW’S PAGE FIXES GO IN ON THEIR OWN over the versio
   /* THE ONLY TABLES ARE THE LINES OF EVERYONE AND THE ORGANISATIONS, SINCE BATCH 6, which are the people and not a list over their cards. */
   assert.deepEqual(people.filter((b) => b.kind === 'table').map((b) => b.heading), ['Everyone', 'Organisations']);
   for (const id of ['metric.people-in-touch-90d', 'metric.people-in-touch-12w']) assert.ok(k.packClaims('people').includes(id), `${id} is not on the record`);
-  /* AND PROJECTS HOLDS EACH HEADING TWICE, open while four or fewer are under it and folded past four. */
+  /* AND PROJECTS HOLDS NO HEADING OVER ITS CARDS, SINCE the UI pass of 20 October (proj F5): what each earns alone, and
+     the parked a lane of the cards. */
   const sections = blocks('portfolio').filter((b) => b.kind === 'section');
-  assert.deepEqual(sections.map((b) => [b.heading, b.box === true ? 'open' : 'folded', b.when?.lte ?? b.when?.gt]), [
-    ['Earnings, agents and dates', 'open', 4],
-    ['Earnings, agents and dates', 'folded', 4],
-    ['Parked and finished', 'open', 4],
-    ['Parked and finished', 'folded', 4],
-  ]);
+  assert.deepEqual(sections.map((b) => b.heading), []);
 
   /* AND ONCE IN, THE NEXT RUN HAS NOTHING TO DO. */
   assert.deepEqual(await updateFirstParty(port), []);
