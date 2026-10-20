@@ -33,7 +33,7 @@ const FUZZ = Number(process.env.LEAK_FUZZ ?? 2);
 
 /**
  * The gaps §1.2 names, and the ones this matrix found that it does not (`N<n>`), by the test they hold open.
- * Each line is the todo's own sentence, so the run lists it. Slice 4 closed G1 (`sight-write.ts`), slice 3 G2 to G6 and N1 to N3 (`sight-read.ts`).
+ * Each line is the todo's own sentence, so the run lists it. Slices 3 and 4 closed G1 to G6 and N1 to N3 (`sight.ts`).
  */
 const GAP = {
   G7: 'G7 the local copy\'s fingerprint (scopeOf) omits rules, so narrowing a colleague leaves the copy as it was',

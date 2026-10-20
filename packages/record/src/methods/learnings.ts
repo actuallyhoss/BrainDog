@@ -44,7 +44,7 @@ import type { Entry } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
-import { readSight } from '../sight-read.ts';
+import { readSight } from '../sight.ts';
 import { fadeDays, fadeOf } from '../agent-lists.ts';
 import { PROMOTED_WHY, promotionQuestion, promotionsFor, type Lesson, type Promotion } from '../learning-promote.ts';
 

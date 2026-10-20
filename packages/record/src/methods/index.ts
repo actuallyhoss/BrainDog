@@ -102,8 +102,8 @@ export type RecordDeps = {
    * `nameOf` hands it), or `null` when she may not see it or it is not there (`index.ts`, `sightOf`).
    */
   sightOf: (ctx: CallContext, target: string) => string | null;
-  /** Writes held to the row (`sight-write.ts`): whether a row is one the caller may write. Absent, every row is. */
-  sight?: import('../sight-write.ts').WriteSight | undefined;
+  /** The sight module (`sight.ts`): which rows the caller is shown, and which they may write (`mayWrite`). */
+  sight: import('../sight.ts').Sight;
   /** An owner in a browser, and no token of any kind. */
   admin: (ctx: CallContext, reads?: string, method?: string) => Refusal | null;
   /** The vault's gate: an owner in a browser, proved within `FRESH`. */

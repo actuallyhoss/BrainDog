@@ -15,7 +15,7 @@ import { SEEN_HOW, agentOf, liveStateOf, sessionDeclaration, type ArrivalSettled
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 import { listFor } from '../agent-lists.ts';
-import { readSight } from '../sight-read.ts';
+import { readSight } from '../sight.ts';
 import { OWN_RUN, stopLine, toldOf, type Told } from './instructions.ts';
 
 /** One run's use of a key or a tool: the run by its spoken id, its agent and machine, when it last used it, and how often. */

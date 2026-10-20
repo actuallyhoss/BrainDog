@@ -37,7 +37,7 @@ import type { Result } from '@braindog/ports';
 import { listFor } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
-import { readSight } from '../sight-read.ts';
+import { readSight } from '../sight.ts';
 
 /** The lesson's field that names the skill it bears on ("Skill or topic it bears on"). */
 const TOPIC = 'topic';

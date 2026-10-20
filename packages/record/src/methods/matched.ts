@@ -38,7 +38,7 @@ import { LADDER_RULE, MET_CAP, SLASH, foldFill, identityFloor, shapeIn } from '@
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
-import { readSight } from '../sight-read.ts';
+import { readSight } from '../sight.ts';
 
 /** How many folds one answer holds at most, and what `limit` may ask for. */
 export const MATCHED_MOST = 50;

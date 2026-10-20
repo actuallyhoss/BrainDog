@@ -488,15 +488,14 @@ export function methods(deps: RecordDeps) {
       if (actors.length === 0) return nothing();
       /* EVERY ROW IT WOULD PUT BACK IS ONE THE CALLER MAY STILL WRITE (sharing plan §2.6). A row since moved out of her
          rule, or kept private by its maker, is answered as a batch that wrote nothing, so the undo proves nothing. */
-      if (sight !== undefined)
-        for (const { target } of sql.all<{ target: string }>(
-          "SELECT DISTINCT target FROM event WHERE (batch = ? OR (batch IS NULL AND id = ?)) AND target LIKE 'entry:%'",
-          batch,
-          batch,
-        )) {
-          const row = kernel.get(target.slice('entry:'.length), { includeDeleted: true });
-          if (row !== null && !sight.admitted(ctx, row.register, row.id)) return nothing();
-        }
+      for (const { target } of sql.all<{ target: string }>(
+        "SELECT DISTINCT target FROM event WHERE (batch = ? OR (batch IS NULL AND id = ?)) AND target LIKE 'entry:%'",
+        batch,
+        batch,
+      )) {
+        const row = kernel.get(target.slice('entry:'.length), { includeDeleted: true });
+        if (row !== null && !sight.mayWrite(ctx, row.register, row.id)) return nothing();
+      }
       const own = actors.some((x) => x !== null && mine.has(x));
       const foreign = actors.some((x) => x === null || (!mine.has(x) && !x.startsWith('rule:')));
       if (!own || foreign)

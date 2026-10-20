@@ -148,7 +148,7 @@ export function methods(deps: RecordDeps) {
       if (at === null) return no('REF_UNKNOWN', NOTHING, { at: 'on' });
       /* AND A ROW SHE MAY COMMENT ON (sharing plan §2.6): seen is not enough once a grant reads more than it writes, and
          one she may not comment on is answered as one that is not there. */
-      if (at.list !== null && sight !== undefined && !sight.admitted(ctx, at.list, at.target.slice('entry:'.length)))
+      if (at.list !== null && !sight.mayWrite(ctx, at.list, at.target.slice('entry:'.length)))
         return no('REF_UNKNOWN', NOTHING, { at: 'on' });
       /* THE KERNEL'S OWN MOST (`COMMENT_MOST`), asked here first so the refusal says how many over (HD.381), counted by
          character as the kernel counts; the kernel still asks it again, so the two cannot let a long one through. */

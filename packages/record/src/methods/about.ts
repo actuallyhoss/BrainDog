@@ -38,7 +38,7 @@ import { aboutOfRow, candidatesFor, entityLists, ftsQuery, nameWords, type About
 import type { CallContext } from '../index.ts';
 import { scrubbed } from '../scrub.ts';
 import type { RecordDeps } from './index.ts';
-import { readSight } from '../sight-read.ts';
+import { readSight } from '../sight.ts';
 
 /** One thing as `about` answers it: the kernel's reading, and where the row is, by its list and its number there. */
 export type AboutSaid = About & { register: string; seq: number | null };
@@ -72,7 +72,7 @@ export function methods(deps: RecordDeps) {
     reads: (register) => readable(ctx, register) === null,
   });
 
-  /** Whether a narrowed grant still admits one row, and the rows kept private from the caller are left out (`sight-read.ts`). */
+  /** Whether a narrowed grant still admits one row, and the rows kept private from the caller are left out (`sight.ts`). */
   const sight = readSight(kernel);
 
   /** Every word a row holds, as a name is compared: its text fields and its lists of text, and nothing of a ref. */

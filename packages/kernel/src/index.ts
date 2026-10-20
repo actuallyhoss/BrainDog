@@ -2048,7 +2048,15 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   const admitClause = (register: string, grant: Readonly<Wheres> | undefined, viewer: string | undefined): { sql: string; params: (string | number)[] } | null => {
     const rule = scopeFor(grant, register, viewer, anyHiddenFrom(viewer, register));
-    if (rule === undefined) return null;
+    return rule === undefined ? null : scopeClause(register, rule);
+  };
+
+  /**
+   * ONE COMPILE OF A SCOPE, for reads and writes alike: the clause a row of one list meets to be inside `rule` (a read
+   * scope, or `WriteContext.within`). `admitClause` and `admits` both ask it, so what a reader is shown and what a writer
+   * may write are the same SQL. A rule that cannot be read, or a list that is not there, admits no row.
+   */
+  const scopeClause = (register: string, rule: Json): { sql: string; params: (string | number)[] } => {
     if (!registers.has(register)) return { sql: '0', params: [] };
     const c = ruleOf(rule, schemaOf(register), evalContext());
     return c.bad.length ? { sql: '0', params: [] } : { sql: c.sql, params: c.params as (string | number)[] };
@@ -2093,8 +2101,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * who may write no row already there (one who adds to a list she cannot read).
    */
   const admits = (register: string, within: Json, id: string): boolean => {
-    if (within === null || !registers.has(register)) return false;
-    const c = narrowed({ sql: '(1)', params: [], bad: [] }, ruleOf(within, schemaOf(register), evalContext()));
+    if (within === null) return false;
+    const c = scopeClause(register, within);
     return sql.one(`SELECT 1 AS y FROM entry WHERE id = ? AND register = ? AND (${c.sql})`, id, register, ...c.params) !== undefined;
   };
 

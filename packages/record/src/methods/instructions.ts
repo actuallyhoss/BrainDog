@@ -38,7 +38,7 @@ import {
 } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
-import { readSight, type Sight } from '../sight-read.ts';
+import { readSight } from '../sight.ts';
 import { tellFinished } from '../push.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -109,7 +109,7 @@ export type Receipts = { run: string; batches: ReceiptBatch[]; changes: number; 
 /** The most batches a receipt names, newest first. */
 export const RECEIPT_BATCHES = 20;
 
-export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string, ctx: CallContext, sight: Sight): Receipts | null {
+export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string, ctx: CallContext, sight: ReturnType<typeof readSight>): Receipts | null {
   if (i.taken_by === null || i.taken_at === null) return null;
   const run = kernel.get(i.taken_by, { includeDeleted: true });
   /* A RUN SHE IS NOT SHOWN HAS NO RECEIPT FOR HER, and its writes are named only where she is shown the row. */

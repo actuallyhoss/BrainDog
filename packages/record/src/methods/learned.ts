@@ -29,7 +29,7 @@ import { SLASH, type Entry } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
-import { readSight } from '../sight-read.ts';
+import { readSight } from '../sight.ts';
 
 /** How many lines one answer holds at most, and what `limit` may ask for. */
 export const LEARNED_MOST = 50;

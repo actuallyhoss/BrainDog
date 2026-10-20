@@ -34,8 +34,8 @@ const COULD_NOT_RUN = 3;
 export const READS = ['list', 'get', 'inScope', 'backlinks', 'history', 'searchMatched', 'metric', 'block', 'eventsBefore'];
 
 /**
- * What a function calls to be gated: the scope a reader hands the kernel, the sight module (`sight-read.ts`), or one of
- * the three record helpers that ask the sight module themselves for what they hand on: `sightOf` (a comment's target),
+ * What a function calls to be gated: the scope a reader hands the kernel, the sight module (`sight.ts`, read and write
+ * halves alike: a write path that asks `sight.mayWrite` of the row it read is held to it), or one of the three record helpers that ask the sight module themselves for what they hand on: `sightOf` (a comment's target),
  * `lineOf` (a log line) and `heldBlock` (a drawn block). `rowAdmitted` was the per-row check Slice 3 replaced.
  */
 const GATED = /\bkernel\.scope\(|\bsight\.\w+\(|\b(?:sightOf|lineOf|heldBlock)\(/u;
@@ -54,10 +54,10 @@ const R = 'packages/record/src';
 const SYSTEM = 'The record itself, with no caller: ';
 const OWNER = 'The owner alone: ';
 const NONE = 'Answers no row: ';
-const WRITE = "A write path, whose row checks are Slice 4's (`sight.writable`): ";
+const WRITE = "A write path Slice 4 did not hold to the row (`sight.writable`, `sight.mayWrite`): ";
 export const ALLOWED = [
   /* THE SIGHT MODULE ITSELF. */
-  { file: `${R}/sight-read.ts`, fn: '*', why: "The sight module: each read here is handed the caller's `wheres` and viewer, or reads the rows it then admits in one batch." },
+  { file: `${R}/sight.ts`, fn: '*', why: "The sight module: each read here is handed the caller's `wheres` and viewer, or reads the rows it then admits in one batch." },
 
   /* SYSTEM: the nightly ticks, Slash's own looks (read as NOBODY), installs and bookkeeping. */
   { file: `${R}/index.ts`, fn: 'markOwnRow', why: `${SYSTEM}the nightly step that marks the owner's own row in People, for a host holding the kernel.` },
@@ -107,15 +107,12 @@ export const ALLOWED = [
   { file: `${R}/preview-change.ts`, fn: 'walkCost', why: `${NONE}how many rows and currencies a walk would read, to refuse one too costly to preview.` },
   { file: `${R}/row-values.ts`, fn: 'docValues', why: 'Fills the `{{path}}`s of a document on a row `get` already admitted, each block held by `hold` (`heldBlock`).' },
 
-  /* WRITE PATHS, Slice 4's. */
-  { file: `${R}/index.ts`, fn: 'update', why: `${WRITE}the row being written, read at its version.` },
-  { file: `${R}/index.ts`, fn: 'log', why: `${WRITE}the row a note is written on.` },
-  { file: `${R}/index.ts`, fn: 'makePrivate', why: `${WRITE}the row its maker keeps private; \`setPrivate\` refuses anybody but the maker.` },
+  /* WRITE PATHS NOT YET HELD TO THE ROW. `update`, `log`, `handoff` and `makePrivate` ask `sight.mayWrite` and are gated. */
   { file: `${R}/index.ts`, fn: 'metOnLadder', why: `${WRITE}what an agent's \`meet\` asserted about a row the kernel matched, read to put it on the ladder.` },
   { file: `${R}/index.ts`, fn: 'assertedOn', why: `${WRITE}the row one meeting wrote onto, read back after the write.` },
   { file: `${R}/index.ts`, fn: 'mentioned', why: `${WRITE}the caller's own run and its project, to keep a mention where the agent was.` },
   { file: `${R}/index.ts`, fn: 'meeting', why: `${WRITE}the row \`meet\` just wrote or matched, said back to the agent that met it.` },
-  { file: `${R}/methods/same-one.ts`, fn: 'sameOne', why: `${WRITE}the people a "same person?" question names, filed for the owner (propose refs).` },
+  { file: `${R}/methods/same-one.ts`, fn: 'sameOne', why: 'The people a "same person?" question names, each asked of `admitted` (its own `kernel.scope` read) before it is filed.' },
 ];
 
 const READ_CALL = new RegExp(`^(?:${READS.join('|')})$`, 'u');

@@ -23,7 +23,7 @@ import { ACROSS as READS_ACROSS, ANY_LIST, touches, type Kernel, type Tried } fr
 import { BODY_DEPTH, deeperThan, pathOf, subjectOf } from '../automations.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
-import { readSight } from '../sight-read.ts';
+import { readSight } from '../sight.ts';
 
 type Body = Record<string, unknown>;
 
