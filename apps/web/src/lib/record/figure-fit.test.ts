@@ -174,9 +174,9 @@ const SHEETS = [
   /* THE SHIPPED FONT, REACHABLE. `tokens.css` asks for `/fonts/geist.woff2`, which resolves against
      nothing at all in a page built from a string, so the `@font-face` failed and the whole
      measurement was a fallback face. This is the shipped declaration with the shipped file inlined:
-     same weight range, same unicode-range, same swap. */
+     same weight range, same unicode-range, same swap. The address's `?v=` goes with it. */
   read('packages/skin/tokens.css').replace(
-    '/fonts/geist.woff2',
+    /\/fonts\/geist\.woff2(?:\?v=[0-9a-f]+)?/u,
     `data:font/woff2;base64,${readFileSync(new URL('apps/web/static/fonts/geist.woff2', ROOT)).toString('base64')}`,
   ),
   read('packages/skin/house.css'),

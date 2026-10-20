@@ -36,7 +36,7 @@ test('tokens.css names Lexend as the display face and declares no Poppins face',
   assert.ok(families.includes('Lexend'), 'a Lexend face');
   assert.ok(!families.includes('Poppins'), 'no Poppins face');
   const lexend = faces[families.indexOf('Lexend')] ?? '';
-  assert.match(lexend, /url\('\/fonts\/lexend-600\.woff2'\)/u);
+  assert.match(lexend, /url\('\/fonts\/lexend-600\.woff2\?v=[0-9a-f]{4}'\)/u);
   assert.match(lexend, /font-weight:\s*600;/u);
   assert.match(tokens, /--font-display:\s*'Lexend',/u);
   assert.doesNotMatch(tokens, /Poppins/u);

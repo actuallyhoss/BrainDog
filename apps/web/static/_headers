@@ -2,7 +2,15 @@
 #
 # A hashed file never changes under its name, so a browser keeps it for a year and never asks again.
 # The app is served under `/app` on `brain.dog`, so its hashed files are too.
-# Everything else (the shell, the fonts, the marks) keeps the platform's default, so a deploy is seen
-# on the next load.
+#
+# THE FONTS ARE HASHED BY THEIR ADDRESS. `tokens.css` and the shell ask for each one with `?v=` and
+# the first four hex of the file's SHA-256 (`src/lib/fonts.test.ts` holds them equal), so a new font
+# is a new address and the old one may be kept for a year like a chunk.
+#
+# Everything else (the shell, the marks) keeps the platform's default, so a deploy is seen on the
+# next load.
 /app/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/app/fonts/*
   Cache-Control: public, max-age=31536000, immutable

@@ -45,11 +45,15 @@
      face, geometric where Geist is neutral, and it never touches a table.
 
      The identifier face is the system monospace stack and costs zero bytes. It is the ROLE that
-     makes #125 and D41 read as identifiers, not a chosen face (13 §3.1). */
+     makes #125 and D41 read as identifiers, not a chosen face (13 §3.1).
+
+     EACH ADDRESS CARRIES ITS FILE'S HASH, `?v=` and the first four hex of its SHA-256, so a font is cached for a year
+     and never asked again (`static/_headers`), and a new file is a new address. `apps/web/src/lib/fonts.test.ts`
+     holds every `?v=` equal to the file in both apps, and the shell's preload lines equal to these. */
 
   @font-face {
     font-family: 'Geist';
-    src: url('/fonts/geist.woff2') format('woff2');
+    src: url('/fonts/geist.woff2?v=494f') format('woff2');
     font-weight: 300 800;
     font-display: swap;
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+2074, U+20AC,
@@ -60,7 +64,7 @@
      a page that draws one of those. */
   @font-face {
     font-family: 'Geist Mono';
-    src: url('/fonts/geist-mono.woff2') format('woff2');
+    src: url('/fonts/geist-mono.woff2?v=684a') format('woff2');
     font-weight: 400 500;
     font-display: swap;
     unicode-range: U+0000-00FF, U+2000-206F, U+2190-21FF, U+2318, U+2325, U+238B, U+23CE;
@@ -68,7 +72,7 @@
 
   @font-face {
     font-family: 'Plex';
-    src: url('/fonts/plex-arabic.woff2') format('woff2');
+    src: url('/fonts/plex-arabic.woff2?v=6010') format('woff2');
     font-weight: 400 600;
     font-display: swap;
     /* All-or-nothing per file and evaluated per page, so an English-only session never fetches
@@ -78,12 +82,16 @@
 
   @font-face {
     font-family: 'Lexend';
-    src: url('/fonts/lexend-600.woff2') format('woff2');
+    src: url('/fonts/lexend-600.woff2?v=7865') format('woff2');
     font-weight: 600;
     font-display: swap;
     /* The title characters only (apps/web/scripts/fonts.mjs): anything else falls back to Geist. */
     unicode-range: U+0020-007E, U+00B7, U+2013, U+2018-2019, U+201C-201D, U+2026;
   }
+
+  /* THE FALLBACKS SIZED TO THESE FACES, 'Geist Fallback' and 'Lexend Fallback' in the stacks below, are declared in
+     the web app's shell (`apps/web/src/app.html`), where they exist from the first frame and cost the entry stylesheet
+     nothing. A page without them, the site's, skips the name and draws the next family, as before. */
 
   /* ── THE BOARD (DIRECTION §39) ─────────────────────────────────────────────
      The reset of the look, in one place, so every screen builds on the same few names.
@@ -168,8 +176,8 @@
   }
 
   :root {
-    --font-ui: 'Geist', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
-    --font-display: 'Lexend', 'Geist', 'Plex', system-ui, sans-serif;
+    --font-ui: 'Geist', 'Geist Fallback', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Lexend', 'Lexend Fallback', 'Geist', 'Geist Fallback', 'Plex', system-ui, sans-serif;
     /* The design system names Geist Mono for key caps, addresses, code and times: `geist-mono.woff2` in both apps'
        `static/fonts`, declared above. */
     --font-id: 'Geist Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
