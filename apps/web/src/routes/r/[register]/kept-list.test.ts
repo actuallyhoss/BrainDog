@@ -89,7 +89,8 @@ test("THE BROWSER AND THE RECORD GIVE THE SAME HITS: the same words run through 
     { title: 'Rates', body: 'ZURICH office', kind: 'b' },
     { title: 'Kiln', body: 'ren', kind: 'b' },
     { title: 'Quiet' },
-  ].map((fields, i) => row(i + 1, fields));
+  /* KEPT IN THE RECORD'S OWN ORDER, last row first, as a list is kept: the order the SQL below sorts by. */
+  ].map((fields, i) => row(i + 1, fields)).reverse();
   const kept = keptOf(notes, rows, rows.length, new Map() as never, { cursor: null });
   const db = new DatabaseSync(':memory:');
   db.exec('CREATE TABLE entry (seq INTEGER, fields TEXT)');
