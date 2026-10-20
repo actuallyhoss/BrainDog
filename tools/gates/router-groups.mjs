@@ -215,6 +215,9 @@ export default function routerGroups(
        coming back from Google can arrive no other way; the state cookie the start wrote is what the callback is
        answered against (`apps/worker/src/google.ts`). */
     const GOOGLE_FLOWS = ['google.start', 'google.callback'];
+    /* THE MAC APP'S THIRD ROUTE IS A POST, the one place a Google route changes who is signed in: it spends the one-time
+       code and sets the cookie (`/auth/google/desktop`, docs/55). It is on the Worker only, like the other two. */
+    const GOOGLE_POST = ['google.desktop'];
 
     const READS = ['methods', 'session', 'passkeys', 'sessions', 'signup.name'];
     const paths = new Set();
@@ -224,13 +227,14 @@ export default function routerGroups(
       if (!['GET', 'POST'].includes(r.method)) findings.push(`${r.path} is a ${r.method}, and a sign-in route is a GET or a POST`);
       if (!['both', 'selfhost', 'worker'].includes(r.on)) findings.push(`${r.path} is served on ${r.on}, which is not a host`);
       if (!['nothing', 'session', 'operator'].includes(r.needs)) findings.push(`${r.path} needs ${r.needs}, which no host can check`);
-      if (r.flow !== 'provision' && !SIGNUP_FLOWS.includes(r.flow) && !GOOGLE_FLOWS.includes(r.flow) && !flows.includes(r.flow))
+      if (r.flow !== 'provision' && !SIGNUP_FLOWS.includes(r.flow) && !GOOGLE_FLOWS.includes(r.flow) && !GOOGLE_POST.includes(r.flow) && !flows.includes(r.flow))
         findings.push(`${r.path} names ${r.flow}, which is not in the AuthCall union`);
       if (UNROUTED_FLOWS.includes(r.flow)) findings.push(`${r.path} routes ${r.flow}, which only /auth/invite may reach`);
       const named = r.flow === 'key.exchange' ? '/auth/token' : `/auth/${r.flow.replaceAll('.', '/')}`;
       if (r.path !== named) findings.push(`${r.flow} is served at ${r.path}, and the rule names it ${named}`);
       if (r.needs === 'operator' && (r.on !== 'worker' || r.method !== 'POST')) findings.push(`${r.path} is an operator route, and those are POSTs on the Worker only`);
       if (GOOGLE_FLOWS.includes(r.flow) && (r.on !== 'worker' || r.method !== 'GET')) findings.push(`${r.path} is a Google route, and those are GETs on the Worker only`);
+      if (GOOGLE_POST.includes(r.flow) && (r.on !== 'worker' || r.method !== 'POST')) findings.push(`${r.path} is the Google desktop route, and it is a POST on the Worker only`);
       if (r.method === 'GET' && !READS.includes(r.flow) && !GOOGLE_FLOWS.includes(r.flow)) findings.push(`${r.path} changes who is signed in, and it is a GET`);
     }
     for (const flow of flows) {
