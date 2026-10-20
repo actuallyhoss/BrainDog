@@ -112,77 +112,11 @@
 
      THE COLOURS ARE GENERATED, AND NEVER A LITERAL. `packages/theme` writes every one of them into `house.css`, for
      both schemes and for high contrast, and its check T holds every pair SPEC 1.2 names. What is left here is mixed
-     from them, the same in both schemes: the chart ramp, and the aliases below.
+     from them, the same in both schemes: the chart ramp.
 
-     THE OLD NAMES ALIAS TO THE NEW (SPEC 1.10, frame 3.9), one line each, so a screen that still writes `--bg` or
-     `--danger-text` draws the frame's colour until its owner moves it, and the last wave deletes these. The palette
-     writes none of the old names, because a name written in `@layer theme` would sit over its alias here and hold
-     its old value. */
+     THE OLD NAMES ARE GONE (SPEC 1.10, frame 3.9). They aliased to these for three waves and the last one moved every
+     screen onto the new names and deleted them; `apps/web/src/lib/old-names.test.ts` keeps them gone. */
   :root {
-    /* Surfaces */
-    --sunk: var(--board);
-    --bg: var(--tile);
-    --s1: var(--tile-2);
-    --s2: var(--tile-2);
-    --s3: var(--tile-2);
-    --field: var(--tile-2);
-    --soft: var(--tile-2);
-    --hold-wash: var(--tile-2);
-    --hover-wash: var(--hover);
-    --field-hover: var(--hover);
-    --line: var(--rule);
-    --rule2: var(--rule);
-    --line-soft: var(--rule);
-    --edge: var(--rule-strong);
-
-    /* Text */
-    --ink2: var(--ink-2);
-    --dim: var(--ink-3);
-    --faint: var(--ink-3);
-    --muted: var(--ink-3);
-    --focus-in: var(--focus);
-    --focus-out: var(--tile);
-
-    /* Red: two tokens, and every other red maps to one of them (SPEC 0.1 item 2). */
-    --action: var(--red-fill);
-    --on: var(--red-fill);
-    --danger-fill: var(--red-fill);
-    --accent: var(--red-fill);
-    --action-hover: var(--red-fill-hover);
-    --primary-hover: var(--red-fill-hover);
-    --accent-hover: var(--red-fill-hover);
-    --accent-press: var(--red-fill-press);
-    --action-text: var(--red);
-    --link: var(--red);
-    --danger-text: var(--red);
-    --accent-text: var(--red);
-    --red-ink: var(--red);
-    --danger: var(--red);
-    --accent-edge: var(--red);
-    --status-late: var(--red);
-    --on-action: var(--on-red);
-    --on-ink: var(--on-red);
-    --accent-ink: var(--on-red);
-    --action-tint-1: var(--red-tint);
-    --selected: var(--red-tint);
-    --action-tint-2: var(--red-tint-2);
-
-    /* Status */
-    --earn: var(--good);
-    --earn-fill: var(--good);
-    --status-ok: var(--good);
-    --warn-fill: var(--warn);
-    --status-waiting: var(--warn);
-    --chart-risk: var(--warn);
-    --warn-wash: var(--warn-tint);
-    --info-fill: var(--info);
-    --live-fill: var(--live);
-    --arrived-wash: var(--arrived);
-    /* AN OPEN THING IS A NEUTRAL RING, NEVER RED (SPEC 0.1 item 3, 2.A.6): red is for late and needs you only. */
-    --status-working: var(--ink-2);
-    --status-done: var(--chart-other);
-    --status-idle: var(--chart-other);
-
     /* A CHART IS INK, OR THE PROJECT'S HUE INSIDE A PROJECT (SPEC 1.3, SF8), and red only where something is late or
        below zero, always with its word (and its hatch, `--chart-late-hatch` in `blocks-charts.css`). Series that are
        projects, agents or people take their slot (`--cat-*`); any other series takes this ramp. A project's scope
@@ -194,7 +128,6 @@
     --chart-other: var(--cat-slate);
     --chart-late: var(--red);
 
-    --tile-r: var(--r-tile);
     /* A tile's padding: 20, 24 on the lead tile (`--tile-pad-lead`), 16 below 640px (frame 3.3). */
     --tile-pad: 20px;
     --tile-pad-lead: 24px;
@@ -246,28 +179,8 @@
     --font-ui: 'Geist', 'Geist Fallback', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-display: 'Lexend', 'Lexend Fallback', 'Geist', 'Geist Fallback', 'Plex', system-ui, sans-serif;
     /* GEIST MONO for ids people type, times in a feed, key caps and code (SPEC 1.4): `geist-mono.woff2` in both apps'
-       `static/fonts`, declared above. `--font-id` is its old name. */
+       `static/fonts`, declared above. */
     --font-mono: 'Geist Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
-    --font-id: var(--font-mono);
-
-    /* THE OLD STEPS, ON THE ONE SCALE (frame 3.9, F12). Sixteen became 15 and 20 and 24 became 17 and 22: the scale
-       above is the whole of it. The body steps (`--t-base`, `--t-row`, `--t-md`, `--t-ui`, `--text`) are `--fs-body`,
-       so they follow the reader's Text setting with it. */
-    --t-xs: var(--fs-cap);
-    --t-sm: var(--fs-meta);
-    --t-base: var(--fs-body);
-    --t-row: var(--fs-body);
-    --t-md: var(--fs-body);
-    --t-ui: var(--fs-body);
-    --text: var(--fs-body);
-    --t-group: var(--fs-head);
-    --t-lg: var(--fs-head);
-    --t-figure: var(--fs-figure);
-    --t-xl: var(--fs-figure);
-    --t-title: var(--fs-page);
-    --t-2xl: var(--fs-page);
-    --t-lead: var(--fs-hero);
-    --t-3xl: var(--fs-hero);
 
     --lh-tight: 1.22;
     /* About 1.55 for running text at 15, which gives a two-line row title and a paragraph room between lines. */
@@ -287,16 +200,8 @@
     --sp-8: 64px;
     --sp-9: 96px;
 
-    /* THE OLD RADII, ON THE FOUR (frame 3.9, F13): 6 is 4, 9 is 8, and 12 and 16 keep their names' new homes. */
-    --r-sm: var(--r-xs);
-    --r-well: var(--r-ctl);
-    --r-pill: var(--r-ctl);
-    --r-md: var(--r-pop);
-    --r-lg: var(--r-tile);
-
-    /* NO ELEVATION (SPEC 1.9). `--e1` to `--e3` are `none` in every scheme block of the palette, and go in the last
-       wave. Anything that floats without a scrim takes `1px solid var(--rule-strong)`; a modal sits on `--scrim`; a
-       tile takes neither. */
+    /* NO ELEVATION (SPEC 1.9), and no names for it. Anything that floats without a scrim takes
+       `1px solid var(--rule-strong)`; a modal sits on `--scrim`; a tile takes neither. */
 
     /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
        never the pixels (13 §4.2). */
@@ -396,20 +301,20 @@
      * two facts, and 12 is the strength every hue uses too: an intent is never transient, so there
      * is no hover-weight version of one.
      *
-     * THE HUE IS THE TEXT ROLE, NOT THE `-fill` ONE. `--warn-fill` is solved for an OPAQUE chip or
+     * THE HUE IS THE TEXT ROLE, NOT A FILL. A fill is solved for an OPAQUE chip or
      * bar at 3:1 (`13 §2.4` check D), which in the dark scheme puts it BELOW `--warn` in
      * lightness, and 12% of it over a dark page is close to no tint at all. The plain role is the
      * one solved to be seen against the surface in both schemes, which is the job a wash has.
      *
      * TWELVE AND NOT FOURTEEN, MEASURED. `Chip` paints `color: var(--tone)` on top of its own
-     * intent wash, and `--danger` over a 12% danger tint on `--bg` is 4.10:1 in the light scheme:
+     * intent wash, and `--red` over a 12% danger tint on `--tile` is 4.10:1 in the light scheme:
      * already under the body floor before any of this, because the theme's proof certifies a role
      * against the five DECLARED surfaces and a surface mixed at the call site is not one of them.
      * `blocks.css:1030` hit the same wall on the selected row and answered it correctly, by
      * dropping the colour and keeping the glyph. Fourteen would have taken that chip to 3.98, so
      * the wash holds at the strength the product already shipped and the chip's own text colour is
-     * the thing that has to move. IT HAS: `bad`'s `--tone` is red's words now, `--danger-text` (`blocks.css`), at
-     * 4.90:1 on that wash over `--bg`.
+     * the thing that has to move. IT HAS: `bad`'s `--tone` is red's words now, `--red` (`blocks.css`), at
+     * 4.90:1 on that wash over `--tile`.
      *
      * `--tone-wash` IS BELOW, ON `[data-intent]`, AND IT CANNOT LIVE UP HERE. A custom property's
      * `var()`s are substituted where the property is DECLARED, so a `--tone-wash` written on
@@ -418,42 +323,23 @@
      *
      * AND THERE IS NO `--earn-wash` OR `--danger-wash`, ON PURPOSE. Nothing paints one. An element
      * that declares its intent gets all four through `--tone-wash`, and the only reason
-     * `--warn-wash` is named is the line that says the app is offline (`Pull.svelte`), which is warn
+     * `--warn-tint` is named is the line that says the app is offline (`Pull.svelte`), which is warn
      * by construction and has no attribute for an intent to hang on. A chart's hole row was the
      * other, until it took the neutral field fill. This file already argues, over `--raise`, that a value
      * nobody paints is the same defect as a flag nothing reads. The day a second construction-warn
      * element appears it gets a token beside this one, not a tenth percentage.
      */
-    /* `--hover-wash`, `--selected` AND `--arrived-wash` ARE ALIASES NOW (above): to `--hover`, `--red-tint` and
-       `--arrived`, which the palette generates for every scheme. The lavender arrival is gone; a row that lands wears
-       the neutral wash (SPEC 0.2). */
     /* THE SOFT RING ROUND A FOCUSED FIELD IS GONE (frame F4): a field focuses with the one ring, on its wrapper. */
 
-    /* THE GLASS AND THE GROUND'S LIGHT, RETIRED (DIRECTION §39). Chrome was `background: var(--glass);
-       backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--e2)`, and those names stay so the hosts
-       that still write them draw something sane. Safari reads the same `--glass-blur` in a block of its own and never a
-       literal (`@supports (-webkit-backdrop-filter: none)`), because the build folds a prefixed and an unprefixed
-       declaration in one rule into one; `glass-motion.test.ts` holds the skin to it. */
-    /* NONE NOW (DIRECTION §39): the board is one flat colour. The names stay for the hosts that still paint them: the
-       ground's light is none, its glow is transparent (a `radial-gradient(…, var(--ground-glow), transparent)` draws
-       nothing rather than dropping the whole background), and the blur is none, since the palette no longer emits
-       glass or its saturation and a blur through the opaque tile would draw nothing anyway. */
-    --ground-light: none;
-    --ground-glow: transparent;
-    --glass-blur: none;
-    /* NO GLASS (DIRECTION §39). Chrome that still names the glass gets the opaque tile (`base.css`) and this one hairline,
-       which is what keeps a menu or a popover off the content it opens over in the dark. */
-    --glass-edge: 0 0 0 1px var(--rule-strong);
-
-    /* ON, A LINK, THE RULE, THE PRIMARY'S HOVER AND THE WARN WASH ARE ALIASES NOW (above): `--red-fill`, `--red`,
-       the generated `--rule`, `--red-fill-hover` and `--warn-tint`. */
+    /* NO GLASS AND NO LIGHT ON THE GROUND (DIRECTION §39, SPEC 1.9). The board is one flat colour, and anything that
+       floats is the opaque `--tile` with a 1px `--rule-strong` edge; nothing blurs what is behind it. */
 
     /* A leading and a tracking for the top of the type scale (`--lh-3xl`, `--tr-tight`) stood here, and so did a tint
        of the accent as a ground (`--accent-ground`), an accent wash, a size for the identity mark and a name for the
        first chart series. Nothing named any of them, so they went. */
 
     /* THE PRESS IS A FILL CHANGE (SPEC 2.A.1, F24 with its delta): a control takes its pressed fill, a row or a tab
-       `--tile-2`, over `--d-press`. Nothing scales and nothing dims; `--press-dim` read as disabled and is gone. */
+       `--tile-2`, over `--d-press`. Nothing scales and nothing dims, which read as disabled. */
 
     /**
      * MOTION IS ONE SCALE, and every step of it is under 300ms (DIRECTION §37: fluid, and never in the way). Motion
@@ -462,7 +348,7 @@
      *   press 70 · exit 90 · enter 110 · menu 120 · swap 160 · rows 180 · page 200 · recompose 220 · panel 240
      *
      * One step is one token, and each names a thing on screen:
-     *   --d-press      a control taking a press (the dip; it lets go in `--d-release`)
+     *   --d-press      a control taking a press (its fill; it lets go in `--d-menu`)
      *   --d-exit       anything leaving: a menu closing, a toast going, a line fading back to rest
      *   --d-enter      anything arriving small: a line, a hint, the by-line's time, a toast
      *   --d-menu       a menu, a popover or a tooltip opening
@@ -485,13 +371,11 @@
      *   --ease-emphasis   swift-out, for anything arriving: most of the distance in the first frames, then a long settle,
      *                     so a menu or an answer is there at once and calm by the time it is read.
      * Three more are kept for one job each: leaving accelerates away (`--ease-in`), the panel and a sheet ride the sheet
-     * curve (`--ease-sheet`), and `--ease-push` is the in curve's old name.
+     * curve (`--ease-sheet`), and `--ease-out` is the emphasis curve by the name a transition reads.
      *
-     * THE OLDER NAMES STAY, ON THE SCALE, so nothing that already names one changes meaning: `--d-state` is a
-     * hover fill or a row's state (the exit's 90), `--d-release` a press letting go (120), `--d-move` what
-     * travels with the panel, the page title collapsing included (240), and `--d-panel-out` the panel's way out
-     * (the rows' 180). `--ease-out` is the emphasised curve and `--ease-fade` the standard one. They are written as
-     * the step they are, so `a11y.css` changes the whole scale by changing its nine steps.
+     * TWO MORE NAMES SIT ON THE SCALE: `--d-state` is a hover fill or a row's state (the exit's 90), and `--d-panel-out`
+     * the panel's way out (the rows' 180). They are written as the step they are, so `a11y.css` changes the whole scale
+     * by changing its nine steps.
      */
     --d-press: 70ms;
     --d-exit: 90ms;
@@ -503,47 +387,26 @@
     --d-recompose: 220ms;
     --d-panel: 240ms;
     --d-state: var(--d-exit);
-    --d-release: var(--d-menu);
-    --d-move: var(--d-panel);
     /* The panel, a sheet and an action sheet going back the way they came: a step quicker than they arrived (180). */
     --d-panel-out: var(--d-rows);
 
-    /* THE SPRING AND THE PUSH ARE ALIASES (SPEC 1.7), to the emphasis and the in curve, until the last wave deletes
-       them: nothing overshoots, and a press is a fill. */
-    --ease-spring: var(--ease-emphasis);
     /* The two named curves, then the three kept for one job each. Platform conventions, not anyone's identity. */
     --ease-standard: cubic-bezier(0.2, 0, 0, 1);
     --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-out: var(--ease-emphasis);
-    --ease-fade: var(--ease-standard);
     --ease-in: cubic-bezier(0.4, 0, 1, 0.5);
-    --ease-push: var(--ease-in);
     --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 
-    /* The mark is GENERATED now, and this note is where it went.
-       Not a role and not an identity accent: the one colour in the product that belongs to the
-       product rather than to a meaning. It paints the logo and nothing else, which is why it is a
-       token and not a literal in an SVG (22 §7 gate 2), and why a theme a customer installs must
-       not be able to reach it (04 §7, 28 §4.5).
-
-       IT WAS WRITTEN HERE BY HAND, beside a comment observing that it is deliberately the same
-       value the generator seeds `--accent` from — which is to say: two copies of one colour, one of
-       them outside the generator, and `colour-grep` carried an exemption so the literal could
-       stay. The cost was not tidiness. This file is shared by both apps and every deployment and it
-       `@import`s `house.css` above, so this rule won — a alpha build would have worn the
-       production mark whatever its accent did, in the one place where telling two deployments apart
-       matters most.
-
-       `packages/theme`'s `brand()` emits it into `house.css` and `alpha.css`. It sits outside
-       `toCSS`, which is what keeps it out of a record's reach: `toCSS` emits what a THEME may set,
-       and the mark is not one of those things. */
+    /* THE MARK IS `--red-fill` (SPEC 1.1): the BrainDog mark, the favicon and the primary button are one red. The
+       favicon cannot read a custom property, so `packages/skin/scripts/theme.mjs` writes it from the same generated
+       value. */
   }
 
   /* THE INTENT WASH, and it is one rule rather than four tokens because `blocks.css` has already
      done the hard half: its intent map is the only place an author's word becomes a hue, and it
      leaves the answer in `--tone`. This turns that hue into the same 12% every other wash is, so
      an intent capsule reaches for a token like everything else and the map keeps its monopoly.
-     It sits on the attribute and not on `:root` for the reason argued over `--hover-wash`: a
+     It sits on the attribute and not on `:root` for the reason argued over `--hover`: a
      custom property resolves its own `var()`s where it is declared, and `:root` has no `--tone`. */
   [data-intent] { --tone-wash: color-mix(in srgb, var(--tone) 12%, transparent); }
 
@@ -581,23 +444,9 @@
   /* A runtime type assertion on every semantic colour role, so a malformed installed token fails
      loudly instead of inheriting. It does NOT rescue `var(--fain)` — a typo resolves to the
      inherited value, not to `initial-value`, measured (28 §2.3). The lint gate stays load-bearing. */
-  @property --sunk { syntax: '<color>'; inherits: true; initial-value: #000; }
-  @property --bg { syntax: '<color>'; inherits: true; initial-value: #000; }
-  @property --s1 { syntax: '<color>'; inherits: true; initial-value: #000; }
-  @property --s2 { syntax: '<color>'; inherits: true; initial-value: #000; }
-  @property --s3 { syntax: '<color>'; inherits: true; initial-value: #000; }
   @property --ink { syntax: '<color>'; inherits: true; initial-value: #fff; }
-  @property --ink2 { syntax: '<color>'; inherits: true; initial-value: #fff; }
-  @property --dim { syntax: '<color>'; inherits: true; initial-value: #fff; }
-  @property --faint { syntax: '<color>'; inherits: true; initial-value: #fff; }
-  @property --line { syntax: '<color>'; inherits: true; initial-value: #888; }
-  @property --edge { syntax: '<color>'; inherits: true; initial-value: #888; }
-  @property --earn { syntax: '<color>'; inherits: true; initial-value: #0a0; }
   @property --warn { syntax: '<color>'; inherits: true; initial-value: #a80; }
-  @property --danger { syntax: '<color>'; inherits: true; initial-value: #c00; }
-  @property --danger-text { syntax: '<color>'; inherits: true; initial-value: #c00; }
   @property --info { syntax: '<color>'; inherits: true; initial-value: #06c; }
-  @property --accent { syntax: '<color>'; inherits: true; initial-value: #06c; }
   @property --live { syntax: '<color>'; inherits: true; initial-value: #06c; }
   @property --board { syntax: '<color>'; inherits: true; initial-value: #000; }
   @property --tile { syntax: '<color>'; inherits: true; initial-value: #000; }
@@ -607,6 +456,6 @@
   @property --rule { syntax: '<color>'; inherits: true; initial-value: #888; }
   @property --rule-strong { syntax: '<color>'; inherits: true; initial-value: #888; }
   @property --good { syntax: '<color>'; inherits: true; initial-value: #0a0; }
-  @property --red { syntax: '<color>'; inherits: true; initial-value: #c00; }
-  @property --red-fill { syntax: '<color>'; inherits: true; initial-value: #c00; }
+  @property --red { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --red-fill { syntax: '<color>'; inherits: true; initial-value: #000; }
 }

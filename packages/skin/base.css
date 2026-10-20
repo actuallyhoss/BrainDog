@@ -22,13 +22,6 @@
   html {
     /* 2.4.11: keyboard focus must not land under the sticky header. Paid once, here. */
     scroll-padding-block-start: calc(var(--sticky) + var(--sp-2));
-
-    /* THE GLASS IS RETIRED (DIRECTION §39: "no glass, no gradients"), and the palette no longer emits it. Every piece of
-       chrome that still names `--glass` or `--glass-strong` gets the opaque tile, so nothing is seen through and
-       nothing is blurred. The washes and the flat resting tile are the palette's own now (`packages/theme`, `chromeOf`
-       and `elevationOf`), so a record's colour re-solves them with everything else. */
-    --glass: var(--tile);
-    --glass-strong: var(--tile);
   }
 
   body {
@@ -90,7 +83,7 @@
    * `<select>` and `/signin`'s token box at 13px. Ten controls at 15 and two at 13, and the only
    * two that clear the threshold are the palette and the settings code field at 17.
    *
-   * `max(16px, var(--text))` AND NOT `16px`, BECAUSE `--text` IS THE READER'S OWN SETTING. Text:
+   * `max(16px, var(--fs-body))` AND NOT `16px`, BECAUSE `--fs-body` IS THE READER'S OWN SETTING. Text:
    * Large is 17px and a flat floor would take a whole step away from the reader who asked for a
    * bigger one. This is a floor and not a size: Small and Normal come up to 16, Large stays at 17.
    *

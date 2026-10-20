@@ -279,24 +279,13 @@ test('NO OVERLAY OR CHROME WRITES A DURATION OR A CURVE OF ITS OWN', () => {
 });
 
 /**
- * AND EVERY GLASS IS GIVEN TO SAFARI IN A BLOCK OF ITS OWN: the build folds a prefixed and an unprefixed declaration in
- * one rule into one value, and a Safari that knows only the prefixed one drew the chrome unblurred. The block reads the
- * skin's `--glass-blur` and never a literal: `blur(24px) saturate(1.6)` written out gave dark glass light's colour and
- * kept it through less transparency.
- *
- * DIRECTION §39 RETIRES THE GLASS one surface at a time (the menus, the tab bar and the phone's head bar are flat
- * already), so a file with none left has nothing to give Safari and is passed over.
+ * AND NO OVERLAY OR CHROME BLURS WHAT IS BEHIND IT (SPEC 1.9): the glass is gone, in both spellings, and a floating layer
+ * is the opaque tile with a 1px edge. `lib/no-glass.test.ts` holds the whole app to it; this names the overlays.
  */
-test('every glass in the overlays and the chrome has a Safari block after it, reading the skin', () => {
+test('no overlay or chrome blurs what is behind it', () => {
   const files = ['Panel.svelte', 'Toasts.svelte', 'Button.svelte', 'PageHead.svelte', 'controls.css', '../shell/TabBar.svelte', 'Sidebar.svelte', '../../routes/+layout.svelte'];
   for (const file of files) {
     const code = readFileSync(new URL(file, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
-    const glass = code.match(/(?<!-webkit-)backdrop-filter:\s*var\(--glass-blur\)/gu)?.length ?? 0;
-    const safari = code.match(/@supports \(-webkit-backdrop-filter: none\)/gu)?.length ?? 0;
-    if (glass === 0) continue;
-    assert.ok(safari >= glass, `${file} has ${glass} glass rules and ${safari} Safari blocks`);
-    for (const [, value = ''] of code.matchAll(/^\s*-webkit-backdrop-filter:\s*([^;]+);/gmu)) {
-      assert.match(value.trim(), /^(var\(--glass-blur\)|none)$/u, `${file}: Safari's glass writes ${value.trim()}`);
-    }
+    assert.doesNotMatch(code, /backdrop-filter|--glass/u, `${file} still blurs or names the glass`);
   }
 });

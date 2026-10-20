@@ -60,7 +60,7 @@
      a forced duration none of them can stretch a fade past what a reader asked for. Colour changes are not in the
      list, so a hover fill or a chosen row changes at once, as it did before.
 
-     THE SCALE FOLLOWS (`--d-state`, `--d-release`, `--d-move` and `--d-panel-out` are written in `tokens.css` as the
+     THE SCALE FOLLOWS (`--d-state`, `--d-menu`, `--d-panel` and `--d-panel-out` are written in `tokens.css` as the
      step they are), so a delay or a wait a script reads from any of them is no longer than the fade.
 
      NO INFINITE ANIMATION (frame 3.6): every keyframe plays once and ends at once, so the live dot is still.
@@ -117,49 +117,10 @@
     }
   }
 
-  /* ── glass that cannot, or should not, be seen through ────────────────────
-     EVERY GLASS SURFACE IS PAINTED FROM FOUR TOKENS: `--glass` or `--glass-strong` for its fill, `--glass-blur` for
-     what is behind it and `--glass-edge` for its hairlines. So the a11y layer answers for all of them here, on the
-     tokens, and no component has to remember; a layer above the theme wins over the palette's own values. */
-
-  /* NO BACKDROP FILTER AT ALL, and a translucent fill with nothing blurred behind it lays the page's words under the
-     chrome's, so the chrome is solid. (Before the media query below, which sets the same two: `css-rules` reads a rule
-     under `@supports` as a bare one.) The build adds the `-webkit-` spelling to this query, so a Safari that knows
-     only the prefixed property keeps its glass. */
-  @supports not (backdrop-filter: none) {
-    :root {
-      --glass: var(--tile);
-      --glass-strong: var(--tile);
-    }
-  }
-
-  /* ASKED FOR LESS TRANSPARENCY, glass is the tile's own opaque surface, with nothing blurred behind it.
-
-     SAFARI'S SPELLING GOES WITH IT, AND SO DOES ANY LITERAL. Safari's block reads `--glass-blur` too (`tokens.css`),
-     so `none` reaches it on the token. The rule below is the floor for a host that still writes a blur in so many
-     words, which no token can reach. Important in this layer, because the a11y layer sits under the components one
-     and only an important declaration here wins over theirs. */
-  @media (prefers-reduced-transparency: reduce) {
-    :root {
-      --glass: var(--tile);
-      --glass-strong: var(--tile);
-      --glass-blur: none;
-    }
-
-    @supports (-webkit-backdrop-filter: none) {
-      * {
-        -webkit-backdrop-filter: none !important;
-      }
-    }
-  }
-
-  /* ASKED FOR MORE CONTRAST, the edge of anything that floats becomes a 1px ink outline round it: a menu or a popover
-     is then as plainly a layer as a sheet on its scrim. */
-  @media (prefers-contrast: more) {
-    :root {
-      --glass-edge: 0 0 0 1px var(--ink);
-    }
-  }
+  /* ── nothing is seen through ─────────────────────────────────────────────
+     NO GLASS AND NO BLUR (SPEC 1.9): every floating layer is the opaque `--tile` with a 1px `--rule-strong` edge, so
+     less transparency has nothing left to take away, and more contrast reaches the edge through the high-contrast
+     palette's own `--rule-strong`. */
 
   /* Under forced colours the UA overrides every colour property and `box-shadow` computes to
      `none`, so sunk, bg, s1, s2 and s3 all become Canvas: a five-level ladder becomes one level and
