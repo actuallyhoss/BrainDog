@@ -21,14 +21,21 @@
 
   ONLY OVER THE WHOLE LIST, which is the page's to know (`whole`): a total of the rows in hand, printed as the list's,
   is a false count. The split by state also goes while the list is filtered, where it would only restate the filter.
-  Not drawn below 900px, where the rows themselves come first.
+  ONE COLOUR FOR LATE (the UI pass of 20 October, money F2): an open state's bar in the second ink, a part-paid one in
+  slate, a finished one in the lightest step of the ink ramp, and at the start of the open bar the part that is late in
+  the one red, with "2 late · £10,540" in red at the end of that line. THE TILE IS "Money" ON A LIST OF AMOUNTS, with
+  no well (money F7): the page's own icon says what it is.
+
+  ON A PHONE IT IS COMPACT, NEVER GONE (money F8): the phone shows the facts the laptop does. One 50% cell a side ("Out
+  £119,124", "In £49,670") at 20, one 6px stacked bar (late, open, part paid, paid) and the late line under it.
 -->
 <script lang="ts">
   import { labelOf } from '$lib/record/api.ts';
   import type { Entry, RegisterDecl } from '$lib/record/schema.ts';
+  import StatusDot from '$lib/ui/StatusDot.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { valueSaid } from '$lib/voice.ts';
-  import { byStateOf, figureParts, figureSaid, figureSplit, stateReading, standOf, wholeMoney, type Figured, type Stand } from './list.ts';
+  import { byStateOf, dotOf, figureParts, figureSaid, figureSplit, isLate, stateReading, wholeMoney, type Figured } from './list.ts';
 
   let {
     decl,
@@ -55,7 +62,11 @@
     byState: 'By state',
     largest: 'Largest',
     unset: 'Not set',
+    money: 'Money',
     share: (n: number) => `${n}%`,
+    late: (n: number, said: string | null) => (said ? `${n} late · ${said}` : `${n} late`),
+    out: 'Out',
+    in: 'In',
   } as const;
 
   const stateField = $derived(decl.state ? decl.fields.find((x) => x.id === decl.state) : undefined);
@@ -74,8 +85,15 @@
   const whole = $derived(fig !== null && wholeMoney(decl, entries).has(fig.field.id));
   const said = (f: Figured, n: number): string => figureSaid(f, n, whole);
 
-  type Line = { key: string; label: string; count: number | null; value: number | null; stand: Stand | null; tint: boolean; share: number };
-  type Side = { key: string; label: string | null; total: number | null; lines: Line[] };
+  type Dot = 'open' | 'part' | 'done';
+  type Line = { key: string; label: string; count: number | null; value: number | null; stand: Dot | null; tint: boolean; share: number; late: { count: number; value: number; share: number } | null };
+  type Side = { key: string; label: string | null; total: number | null; lines: Line[]; late: { count: number; value: number } | null };
+
+  /** What of these rows is late: how many, and their part of the side's number. */
+  const lateOf = (rows: readonly Entry[]): { count: number; value: number } | null => {
+    const late = rows.filter((e) => isLate(decl, e, now));
+    return late.length === 0 ? null : { count: late.length, value: fig ? late.reduce((n, e) => n + (fig.valueOf(e) ?? 0), 0) : late.length };
+  };
 
   /**
    * THE LINES OF ONE SIDE: each state that holds rows, with its count and, where the list has a number, that state's
@@ -90,17 +108,19 @@
       .map((p) => {
         const held = rows.filter((e) => String(e.fields[decl.state!] ?? '') === p.value);
         const value = fig ? held.reduce((n, e) => n + (fig.valueOf(e) ?? 0), 0) : null;
+        const late = lateOf(held);
         return {
           key: p.value,
           label: sentenceCase(stateLabel(p.value)),
           count: p.count,
           value,
-          stand: standOf(decl, p.value, false),
+          stand: dotOf(decl, p.value),
           tint: false,
           share: all > 0 ? (value ?? p.count) / all : 0,
+          late: late && all > 0 ? { ...late, share: late.value / all } : null,
         };
       })
-      /* THE FIRST PART STILL TO DO IN THE ACCENT, the others in its tint, so two open states are told apart. */
+      /* A SECOND OPEN STATE TAKES THE NEXT STEP OF THE INK, so two open states are told apart. */
       .map((l, at, rest) => ({ ...l, tint: l.stand === 'open' && rest.findIndex((x) => x.stand === 'open') !== at }));
   }
 
@@ -113,17 +133,19 @@
         label: p.value === null ? words.unset : valueSaid(figured.by!, p.value),
         total: p.total,
         lines: stateLines(p.entries, p.total),
+        late: byState ? lateOf(p.entries) : null,
       }));
     }
     const lines = stateLines(entries, fig?.total ?? null);
-    if (lines.length > 0 || !split) return [{ key: '', label: null, total: fig?.total ?? null, lines }];
+    if (lines.length > 0 || !split) return [{ key: '', label: null, total: fig?.total ?? null, lines, late: byState ? lateOf(entries) : null }];
     const all = fig?.total ?? 0;
     return [
       {
         key: '',
         label: null,
         total: all,
-        lines: split.items.map((i, at) => ({ key: `${at}`, label: i.label, count: null, value: i.value, stand: null, tint: at > 0, share: all > 0 ? i.value / all : 0 })),
+        lines: split.items.map((i, at) => ({ key: `${at}`, label: i.label, count: null, value: i.value, stand: null, tint: at > 0, share: all > 0 ? i.value / all : 0, late: null })),
+        late: null,
       },
     ];
   });
@@ -135,28 +157,59 @@
   const one = $derived(sides.length === 1 && sides[0]!.label === null ? sides[0]! : null);
   const lead = $derived(fig !== null || reading !== '');
   const shown = $derived(fig !== null || sides.some((x) => x.lines.length >= 2));
+  /* The late line of a side, in the list's own figures: "2 late · £10,540". */
+  const lateSaid = (late: { count: number; value: number }): string => words.late(late.count, fig ? said(fig, late.value) : null);
+  /* A side's short name on a phone: "Out" and "In" for the two ways money goes, else the side's own name. */
+  const shortOf = (side: Side): string | null => {
+    if (side.label === null || !figured?.by) return side.label;
+    const at = (figured.by.values ?? []).indexOf(side.key);
+    return at === 0 ? words.out : at === 1 ? words.in : side.label;
+  };
 </script>
 
-{#snippet lineList(lines: readonly Line[], label: string)}
+{#snippet lineList(lines: readonly Line[], label: string, late: { count: number; value: number } | null)}
+  {@const first = lines.findIndex((x) => x.stand === 'open')}
   <ul class="sum-lines" aria-label={label}>
-    {#each lines as l (l.key)}
+    {#each lines as l, at (l.key)}
       <li class="sum-line" data-stand={l.stand ?? undefined} data-tint={l.tint ? '' : undefined}>
-        <span class="sum-name">{#if l.stand}<span class="sum-dot" aria-hidden="true"></span>{/if}<span class="sum-label" dir="auto">{l.label}</span></span>
+        <span class="sum-name">{#if l.stand}<StatusDot state={l.stand} />{/if}<span class="sum-label" dir="auto">{l.label}</span></span>
         <span class="sum-count num">{l.count ?? ''}</span>
         <span class="sum-value num">{#if fig && l.value !== null}{said(fig, l.value)}{:else}{words.share(Math.round(l.share * 100))}{/if}</span>
-        <span class="sum-bar" aria-hidden="true"><span class="sum-fill" style:inline-size="{Math.max(l.share * 100, l.share > 0 ? 1.5 : 0)}%"></span></span>
+        <span class="sum-bar" aria-hidden="true"
+          ><span class="sum-fill" style:inline-size="{Math.max(l.share * 100, l.share > 0 ? 1.5 : 0)}%"
+            >{#if l.late}<span class="sum-late" style:inline-size="{l.share > 0 ? Math.min(100, (l.late.share / l.share) * 100) : 0}%"></span>{/if}</span
+          ></span
+        >
+        <!-- WHAT IS LATE, SAID ONCE A SIDE, at the end of its first open line, in the one red. -->
+        <span class="sum-late-said num">{#if late && at === (first >= 0 ? first : 0)}{lateSaid(late)}{/if}</span>
       </li>
     {/each}
   </ul>
 {/snippet}
 
 {#if shown}
-  <Tile
-    class="list-figures"
-    icon={fig ? (fig.field.type === 'money' ? 'money' : 'observe') : 'board'}
-    title={fig ? labelOf(fig.field) : words.byState}
-    count={fig ? undefined : entries.length}
-  >
+  <Tile class="list-figures" data-figured={fig ? '' : undefined} title={fig ? (fig.field.type === 'money' ? words.money : labelOf(fig.field)) : words.byState} count={fig ? undefined : entries.length}>
+    <!-- THE PHONE'S FORM: a cell a side, its figure at 20, one stacked bar, and what is late under it. -->
+    {#if fig}
+      <div class="compact" style:--sides={sides.length}>
+        {#each sides as side (side.key)}
+          {@const all = side.total ?? 0}
+          <section class="cell" aria-label={side.label ?? undefined}>
+            <p class="cell-head">{#if shortOf(side)}<span class="cell-name">{shortOf(side)}</span>{' '}{/if}<span class="cell-figure num">{said(fig, all)}</span></p>
+            {#if side.lines.length >= 1}
+              <span class="stack" aria-hidden="true">
+                {#each side.lines as l (l.key)}
+                  {#if l.late}<span class="stack-part" data-late style:inline-size="{l.late.share * 100}%"></span>{/if}
+                  <span class="stack-part" data-stand={l.stand ?? undefined} data-tint={l.tint ? '' : undefined} style:inline-size="{Math.max(0, l.share - (l.late?.share ?? 0)) * 100}%"></span>
+                {/each}
+              </span>
+            {/if}
+            {#if side.late}<p class="cell-late num">{lateSaid(side.late)}</p>{/if}
+          </section>
+        {/each}
+      </div>
+    {/if}
+    <div class="full">
     {#if one}
       <div class="sum" data-split={lead && one.lines.length >= 2 ? '' : undefined}>
         <!-- THE LEFT HALF: the number and its line, or on a list with no number, the line alone at the headline's size.
@@ -168,7 +221,7 @@
             {#if reading}<p class="reading" data-alone={fig ? undefined : ''}>{reading}</p>{/if}
           </div>
         {/if}
-        {#if one.lines.length >= 2}{@render lineList(one.lines, states ? words.byState : words.largest)}{/if}
+        {#if one.lines.length >= 2}{@render lineList(one.lines, states ? words.byState : words.largest, one.late)}{/if}
       </div>
     {:else if fig}
       <!-- A SIDE FOR EACH WAY THE MONEY GOES, each with its own sum and its own lines, and nothing adding them. -->
@@ -179,12 +232,13 @@
               <p class="side-name">{side.label}</p>
               <p class="figure num">{said(fig, side.total ?? 0)}</p>
             </div>
-            {#if side.lines.length >= 2}{@render lineList(side.lines, `${side.label}, ${words.byState.toLowerCase()}`)}{/if}
+            {#if side.lines.length >= 2}{@render lineList(side.lines, `${side.label}, ${words.byState.toLowerCase()}`, side.late)}{/if}
           </section>
         {/each}
       </div>
       {#if reading}<p class="reading">{reading}</p>{/if}
     {/if}
+    </div>
   </Tile>
 {/if}
 
@@ -270,7 +324,7 @@
    */
   .sum-lines {
     display: grid;
-    grid-template-columns: minmax(0, max-content) max-content max-content minmax(64px, 1fr);
+    grid-template-columns: minmax(0, max-content) max-content max-content minmax(64px, 1fr) max-content;
     column-gap: var(--sp-4);
     row-gap: var(--sp-2);
     align-items: center;
@@ -303,18 +357,6 @@
     white-space: nowrap;
   }
 
-  .sum-dot {
-    flex: none;
-    inline-size: 8px;
-    block-size: 8px;
-    background: var(--status-working);
-    border-radius: var(--r-round);
-  }
-
-  .sum-line[data-stand='done'] .sum-dot {
-    background: var(--status-done);
-  }
-
   .sum-count {
     color: var(--dim);
     font-size: var(--fs-meta);
@@ -330,8 +372,9 @@
     text-align: end;
   }
 
-  /* THE SHARE, A THIN BAR ON ITS TRACK: the accent for the first part still to do, its tint for the next, grey once
-     done. */
+  /* THE SHARE, A THIN BAR ON ITS TRACK (money F2): an open state in the second ink, a second open state a step
+     lighter, part paid in slate, a finished state in the lightest step of the ink ramp; and at the start of the bar the
+     part that is late, in the one red. */
   .sum-bar {
     display: block;
     block-size: 8px;
@@ -341,9 +384,10 @@
   }
 
   .sum-fill {
-    display: block;
+    display: flex;
     block-size: 100%;
-    background: var(--chart-1);
+    overflow: hidden;
+    background: var(--ink-2);
     border-radius: inherit;
     transition: inline-size var(--d-recompose) var(--ease-standard);
   }
@@ -352,14 +396,125 @@
     background: var(--chart-2);
   }
 
-  .sum-line[data-stand='done'] .sum-fill {
+  .sum-line[data-stand='part'] .sum-fill {
     background: var(--chart-other);
+  }
+
+  .sum-line[data-stand='done'] .sum-fill {
+    background: var(--chart-3);
+  }
+
+  .sum-late {
+    display: block;
+    flex: none;
+    block-size: 100%;
+    background: var(--red);
+  }
+
+  .sum-late-said {
+    color: var(--red);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-semi);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   @media (prefers-reduced-motion: reduce) {
     .sum-fill {
       transition: none;
     }
+  }
+
+  /* THE PHONE'S FORM IS DRAWN BELOW 900, and the full one from 900; a list with no number keeps its lines for the
+     laptop only, where the rows come second. */
+  .compact {
+    display: none;
+  }
+
+  @media (width < 900px) {
+    :global(section.tile.list-figures:not([data-figured])) {
+      display: none;
+    }
+
+    .full {
+      display: none;
+    }
+
+    .compact {
+      display: grid;
+      grid-template-columns: repeat(var(--sides, 2), minmax(0, 1fr));
+      gap: var(--sp-4);
+    }
+  }
+
+  .cell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .cell-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--sp-2);
+    margin: 0;
+  }
+
+  .cell-name {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  /* 20 AT 600 IN THE DISPLAY FACE: a figure read at a glance, on one line. */
+  .cell-figure {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: calc(var(--fs-figure) - 2px);
+    font-weight: var(--fw-semi);
+    line-height: 28px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ONE 6px STACKED BAR: late, open, part paid, paid, in the colours of the lines on a laptop. */
+  .stack {
+    display: flex;
+    block-size: 6px;
+    overflow: hidden;
+    background: var(--chart-track);
+    border-radius: var(--r-round);
+  }
+
+  .stack-part {
+    display: block;
+    flex: none;
+    block-size: 100%;
+    background: var(--ink-2);
+  }
+
+  .stack-part[data-late] {
+    background: var(--red);
+  }
+
+  .stack-part[data-tint] {
+    background: var(--chart-2);
+  }
+
+  .stack-part[data-stand='part'] {
+    background: var(--chart-other);
+  }
+
+  .stack-part[data-stand='done'] {
+    background: var(--chart-3);
+  }
+
+  .cell-late {
+    margin: 0;
+    color: var(--red);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-semi);
   }
 
   @media (width < 1100px) {
@@ -369,10 +524,4 @@
     }
   }
 
-  /* THE ROWS COME FIRST ON A PHONE: the list is what the screen is for. */
-  @media (width < 900px) {
-    :global(section.tile.list-figures) {
-      display: none;
-    }
-  }
 </style>

@@ -63,19 +63,19 @@ const gbp = (amount: number) => ({ amount, currency: 'GBP' });
 
 const WHOLE = { whole: true, filtered: false, matched: 0, total: 0 };
 
-test('the sentence says what is open, what is late in red, and when the next thing falls due', () => {
+test('the sentence says what is still to settle, what is late in red, and when the next thing falls due (money F16)', () => {
   const rows = [
     row({ what: 'Rent', amount: gbp(120_000), due: '2026-09-20', state: 'open' }),
     row({ what: 'Water', amount: gbp(4_000), due: '2026-09-30', state: 'sent' }),
     row({ what: 'Power', amount: gbp(9_000), due: '2026-10-08', state: 'open' }),
     row({ what: 'Phone', amount: gbp(3_000), due: '2026-09-01', state: 'paid' }),
   ];
-  assert.deepEqual(readingOf(bills, rows, NOW, WHOLE), { before: '3 open, ', needs: '1 late', after: ', the next due tomorrow.' });
+  assert.deepEqual(readingOf(bills, rows, NOW, WHOLE), { before: '3 to settle, ', needs: '1 late', after: ', the next due tomorrow.' });
 });
 
 test('nothing late is said calmly, with no phrase in red', () => {
   const rows = [row({ what: 'Power', due: '2026-10-02', state: 'open' }), row({ what: 'Gas', due: '2026-11-20', state: 'open' })];
-  assert.deepEqual(readingOf(bills, rows, NOW, WHOLE), { before: '2 open, none late, the next due in 3 days.', needs: '', after: '' });
+  assert.deepEqual(readingOf(bills, rows, NOW, WHOLE), { before: '2 to settle, none late, the next due in 3 days.', needs: '', after: '' });
   const done = [row({ what: 'Gas', due: '2026-09-01', state: 'paid' })];
   assert.deepEqual(readingOf(bills, done, NOW, WHOLE)?.before, 'Nothing is open.');
 });

@@ -219,6 +219,68 @@ export function dropChip(p: URLSearchParams, at: number): void {
 }
 
 /**
+ * THE QUICK FILTER: the slices a list with a deadline and finished states is looked at by, in one segmented control
+ * over its rows (the UI pass of 20 October, money F7): "All 38 · Late 4 · Due soon 2 · Paid 10". Each is a set of the
+ * address's own chips, so a link, Back and a saved view read it as any filter; the segment is on when the chips on its
+ * two fields (the state and the deadline) are exactly its own. Counted over the whole list only (`counted`), since a
+ * count of the rows in hand is a false one while the list is still paging.
+ */
+export type Quick = { key: 'all' | 'late' | 'soon' | 'done'; label: string; chips: readonly string[]; count: number | null };
+
+/** The chip a filter is written as in the address, `field:op:a,b`. */
+export const chipText = (f: Filter): string => `${f.field}:${f.op}:${f.values.join(',')}`;
+
+export function quickOf(decl: RegisterDecl | undefined, entries: readonly Entry[], now: number, counted: boolean): Quick[] {
+  const dated = deadlineOf(decl);
+  const field = decl?.state ? decl.fields.find((f) => f.id === decl.state) : undefined;
+  const values = field?.type === 'enum' ? (field.values ?? []) : [];
+  const done = values.filter((v) => decl?.done?.includes(v));
+  const open = values.filter((v) => !decl?.done?.includes(v));
+  if (!decl?.state || !dated || done.length === 0 || open.length === 0) return [];
+  const openChip = `${decl.state}:in:${open.join(',')}`;
+  const soonOf = (e: Entry): boolean => {
+    const v = e.fields[dated];
+    if (typeof v !== 'string' || !DAY_RE.test(v) || isDone(decl, e)) return false;
+    const days = (Date.parse(`${v}T12:00:00Z`) - now) / DAY_MS;
+    return days >= 0 && days < SOON_DAYS;
+  };
+  const first = done[0]!;
+  const n = (keep: (e: Entry) => boolean): number | null => (counted ? entries.filter(keep).length : null);
+  return [
+    { key: 'all', label: words.quickAll, chips: [], count: counted ? entries.length : null },
+    { key: 'late', label: words.quickLate, chips: [openChip, `${dated}:before:today`], count: n((e) => isLate(decl, e, now)) },
+    { key: 'soon', label: words.quickSoon, chips: [openChip, `${dated}:after:yesterday`, `${dated}:before:+${SOON_DAYS}d`], count: n(soonOf) },
+    { key: 'done', label: field ? labelOfValue(field, first) : first, chips: [`${decl.state}:in:${first}`], count: n((e) => String(e.fields[decl.state!] ?? '') === first) },
+  ];
+}
+
+/** "Due soon" is what the list's tone calls it: due within two weeks (`toneOf`'s `warn`). */
+const SOON_DAYS = 14;
+
+const labelOfValue = (f: FieldDecl, v: string): string => {
+  const said = f.labels?.[v] ?? v.replace(/_/gu, ' ');
+  return said.charAt(0).toUpperCase() + said.slice(1);
+};
+
+/** Which quick slice the address is on: the one whose chips are exactly those on its fields, else none. */
+export function quickOn(quick: readonly Quick[], filters: readonly Filter[], decl: RegisterDecl | undefined): Quick['key'] | null {
+  if (quick.length === 0) return null;
+  const fields = new Set([decl?.state, deadlineOf(decl)].filter(Boolean));
+  const held = filters.filter((f) => fields.has(f.field)).map(chipText).sort();
+  const found = quick.find((q) => q.chips.length === held.length && [...q.chips].sort().every((c, i) => c === held[i]));
+  return found?.key ?? null;
+}
+
+/** The address on a quick slice: every chip on the state and the deadline taken off, and the slice's own put on. */
+export function setQuickIn(p: URLSearchParams, quick: readonly Quick[], key: Quick['key'], decl: RegisterDecl | undefined): void {
+  const fields = [decl?.state, deadlineOf(decl)].filter((f): f is string => Boolean(f));
+  const rest = p.getAll('f').filter((v) => !fields.some((f) => v.startsWith(`${f}:`)));
+  p.delete('f');
+  for (const v of rest) p.append('f', v);
+  for (const c of quick.find((q) => q.key === key)?.chips ?? []) p.append('f', c);
+}
+
+/**
  * WHICH BOX A TYPE TAKES IN A CELL. The types this grid already edited keep the boxes they had; the ones it gains
  * take the row page's, so a value new to the grid is typed here the way it is typed there.
  *
@@ -448,6 +510,16 @@ export function standOf(decl: RegisterDecl | undefined, value: string, late: boo
   return late ? 'late' : 'open';
 }
 
+/**
+ * A STATE AS ITS DOT (`StatusDot`, the UI pass of 20 October, 2.A.6): a finished state is the filled slate, a state that
+ * says part of it is done ("Part paid") the half-filled ring, and every other open state the hollow ring. NEVER RED: a
+ * row's lateness is said where the date is, in the word "late" beside a red dot, and not in its state's colour.
+ */
+export function dotOf(decl: RegisterDecl | undefined, value: string): 'open' | 'part' | 'done' {
+  if (decl?.done?.includes(value)) return 'done';
+  return /^part(?:$|[_\s-])/iu.test(value) ? 'part' : 'open';
+}
+
 /** Whether a row is in one of the list's finished states ("Paid", "Done"). */
 export const isDone = (decl: RegisterDecl | undefined, e: Entry): boolean =>
   Boolean(decl?.state && decl.done?.includes(String(e.fields[decl.state] ?? '')));
@@ -498,6 +570,7 @@ const counted = (decl: RegisterDecl, n: number): string => `${n} ${(n === 1 ? de
 /* This module's own words, the sentence and the tile's reading lines. */
 const words = {
   open: (n: number) => `${n} open`,
+  toSettle: (n: number) => `${n} to settle`,
   nothingOpen: 'Nothing is open',
   late: (n: number) => `${n} late`,
   noneLate: 'none late',
@@ -522,6 +595,9 @@ const words = {
   whole: (label: string) => `${label} holds all of it.`,
   largest: (title: string, pct: number) => `${title} is the largest, ${pct}% of the total.`,
   only: (title: string) => `${title} is the whole of it.`,
+  quickAll: 'All',
+  quickLate: 'Late',
+  quickSoon: 'Due soon',
 } as const;
 
 /** The sentence under the title, cut round the phrase that needs him, which `PageHead` draws in red. */
@@ -556,7 +632,10 @@ export function readingOf(
   }
   const open = entries.filter((e) => !isDone(decl, e));
   if (open.length === 0) return plain(`${words.nothingOpen}.`);
-  const lead = decl.state ? words.open(open.length) : counted(decl, open.length);
+  /* "TO SETTLE" ON A LIST OF AMOUNTS (money F16): "28 open" read against a board's "Open 22", which counts one state; a
+     bill part paid is still to settle, and the words say what the number counts. */
+  const settles = decl.fields.some((f) => f.type === 'money') && Boolean(decl.done?.length);
+  const lead = decl.state ? (settles && dated ? words.toSettle(open.length) : words.open(open.length)) : counted(decl, open.length);
   if (!dated) return plain(`${lead}.`);
   const late = open.filter((e) => isLate(decl, e, now)).length;
   const next = open
