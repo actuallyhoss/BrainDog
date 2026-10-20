@@ -30,7 +30,7 @@
           <span class="r-who">
             <b class="r-name">{r.agent}</b>
             {#if r.project}
-              <span class="r-project"><span class="r-dot" data-hued={r.hue === null ? undefined : ''} style={r.hue === null ? undefined : `--hue:${r.hue}`} aria-hidden="true"></span>{r.project}</span>
+              <span class="r-project"><span class="r-dot" style={r.slot === null ? undefined : `--dot:var(--cat-${r.slot})`} aria-hidden="true"></span>{r.project}</span>
             {/if}
           </span>
           {#if r.doing}<span class="r-doing" dir="auto">{r.doing}</span>{/if}
@@ -112,11 +112,8 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: 50%;
-    background: var(--ink-3);
-  }
-
-  .r-dot[data-hued] {
-    background: oklch(var(--mark-l) var(--mark-c) var(--hue));
+    /* THE PROJECT'S SLOT, as its card draws it (SPEC 1.3); no card, the quiet ink. */
+    background: var(--dot, var(--ink-3));
   }
 
   .r-doing {

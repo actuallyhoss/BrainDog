@@ -26,6 +26,7 @@ test('an agent is said by name, with its project, its words and how long', () =>
   assert.equal(r?.run, 'S82');
   assert.equal(r?.project, 'Larkspur');
   assert.equal(r?.hue, 210);
+  assert.equal(r?.slot, 'sky', 'the dot takes the slot the card is drawn in (SPEC 1.3), not the stored hue');
   assert.equal(r?.doing, 'Fixing the booking page');
   assert.match(r?.began ?? '', /min/u);
   assert.equal(r?.live, 'working');
@@ -35,6 +36,7 @@ test('a run with no project, words or number says none of them, and a quiet one 
   const [r] = workingRows([run({ seq: null, project: null, doing: null, since: null, quiet: true })], new Map(), NOW);
   assert.equal(r?.project, null);
   assert.equal(r?.hue, null);
+  assert.equal(r?.slot, null);
   assert.equal(r?.doing, null);
   assert.equal(r?.run, '');
   assert.equal(r?.began, '');
