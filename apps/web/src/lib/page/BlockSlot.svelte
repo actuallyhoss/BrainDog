@@ -49,6 +49,7 @@
   import Empty from '$lib/ui/Empty.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
+  import Figure from '$lib/ui/Figure.svelte';
   import Actions from './panels/Actions.svelte';
   import ActionRows from './panels/ActionRows.svelte';
   import Reporting from './panels/Reporting.svelte';
@@ -61,7 +62,7 @@
   import AddStep from './AddStep.svelte';
   import Hole from './Hole.svelte';
   import { foldOf } from './home.ts';
-  import { headCount, headIcon, headTone } from './tile-head.ts';
+  import { headCount, headIcon } from './tile-head.ts';
   import HomeRows from '$lib/home/HomeRows.svelte';
   import { lateDoors, lateWhere, lateWords, linesIn, moneyListOf, type WithRows } from '$lib/home/home-rows.ts';
   import { words } from './words.ts';
@@ -423,11 +424,9 @@
   const count = $derived(headCount({ kind: block.kind, total: block.total, refused: !!drawn.refusal || block.cannot !== undefined }));
 
   /* HOME'S OWN LIST, where Home drew the block as one (`home/home-rows.ts`): what is late as one list, what comes up by
-     day. Its well says late in the red, as a block whose rows are late does anywhere (`headTone`). */
+     day. THE HEADING'S WELL IS NEUTRAL on every tile (2.A.5): a heading names a group, and a group is not late or good;
+     the rows that are late say so in their own red. */
   const homeRows = $derived((block as WithRows).homeRows);
-  const tone = $derived(
-    headTone({ kind: block.kind, icon: block.icon, tone: block.tone, where: block.where, late: homeRows?.kind === 'late' }),
-  );
   const homeFold = $derived(homeRows && fold ? foldOf('todo', linesIn(homeRows), open) : null);
 
   /**
@@ -569,9 +568,9 @@
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
-    {#if glyph && isGlyph(glyph)}<IconWell name={glyph} {tone} />{/if}
+    {#if glyph && isGlyph(glyph)}<IconWell name={glyph} />{/if}
     <svelte:element this={level === 3 ? 'h3' : 'h2'} class="block-name"
-      ><span id="{ids}h-{i + 1}"><Text nodes={inline(block.heading, { icon })} opts={{ icon }} /></span>{#if count !== null}<span class="block-count num">{count}</span>{/if}</svelte:element
+      ><span id="{ids}h-{i + 1}"><Text nodes={inline(block.heading, { icon })} opts={{ icon }} /></span>{#if count !== null}<span class="block-count num"><Figure value={count} /></span>{/if}</svelte:element
     >
     {#if source}
       <!-- THE LIST'S NAME, not its id, and A DOOR THAT WAITS FOR THE POINTER (DIRECTION §35: secondary controls appear on
@@ -788,6 +787,9 @@
         <a class="tap" href={inApp(to)}>{copy.openTheRest(source)}</a>
       {/if}
     </p>
+  {:else if door && block.key === 'faces' && headingText}
+    <!-- TODAY'S PEOPLE END ON THEIR LIST'S DOOR, "All people →", at the tile's foot. -->
+    <a class="block-more block-all tap" href={inApp(door)}>{copy.allOf(headingText)}<Icon name="arrow" size="s" /></a>
   {:else if door}
     <a class="block-more tap" href={inApp(door)}>{words.more(block.total - block.shown)}</a>
   {:else}
@@ -985,6 +987,17 @@
   /* AS A DOOR, it is as wide as its words, so the row beside it is not a link too. */
   a.block-more {
     display: inline-block;
+  }
+
+  /* THE LIST'S DOOR, "All people →": the tile link's own look, 13/500 in the second ink with its arrow, no underline. */
+  a.block-all {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--sp-1);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
   }
 
   /* TWO DOORS UNDER ONE LIST sit on one line with room between them, and fold under each other where they do not fit. */

@@ -19,6 +19,8 @@ export const home = {
      cannot see it and `dead-copy` cannot count it. */
   rightNow: 'Right now',
   sinceAway: 'Since you were away',
+  /* THE DOOR AT THE FOOT OF TODAY'S PEOPLE, to the whole list: "All people". */
+  allOf: (name: string) => `All ${name.toLocaleLowerCase('en-GB')}`,
   nothingNeedsYou: 'Nothing needs you today',
   /* THE `cleared` STATE FOR THE FEED, which is a feed you have worked through rather than a record
      with nothing in it. `19 §6` gives this state no action, because there is nothing to do. */
