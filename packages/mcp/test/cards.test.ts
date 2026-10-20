@@ -12,7 +12,7 @@ test('a projects row becomes a project card from the fields the list declares', 
   const card = projectCard(
     { spoken: 'projects#4', fields: { name: 'Nook', about: 'Rooms for friends.', next: 'Ship the iOS build', hue: 210, lane: 'building', revenue: { amount: 120000, currency: 'GBP' }, agent: 'Claude' } },
     'https://brain.dog/',
-    'sam',
+    'mara',
   );
   assert.deepEqual(card, {
     kind: 'project',
@@ -23,7 +23,7 @@ test('a projects row becomes a project card from the fields the list declares', 
     next: 'Ship the iOS build',
     money: 'GBP 1,200',
     working: 'Claude',
-    href: 'https://brain.dog/app/sam',
+    href: 'https://brain.dog/app/mara',
   });
 });
 
@@ -103,12 +103,12 @@ test('a rule proposal draws a rule card: what it would do, what it was tried aga
       },
     ],
   };
-  const card = ruleCard(rows, 'https://brain.dog', 'sam');
+  const card = ruleCard(rows, 'https://brain.dog', 'mara');
   assert.equal(card?.does, 'Files an emailed invoice in Money.');
   assert.equal(card?.tried, 'Tried against a sample: 12 matched, and it would take 9 of them.');
   assert.equal(card?.options[0]?.suggested, true);
   assert.equal(card?.answerTool, null);
-  assert.equal(card?.href, 'https://brain.dog/app/sam');
+  assert.equal(card?.href, 'https://brain.dog/app/mara');
   assert.equal(cardOf('governance', { id: 'SG7' }, rows)?.kind, 'rule');
 });
 

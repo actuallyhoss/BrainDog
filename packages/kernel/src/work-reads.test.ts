@@ -60,7 +60,7 @@ describe('what a commit subject says', () => {
 describe('when a project next step follows the newest run', () => {
   it('follows after a machine wrote it, and leaves a hand edit alone', () => {
     expect(mayRefreshNext('Old step', 'S12', 'S')).toBe(true);
-    expect(mayRefreshNext('Old step', 'sam', 'S')).toBe(false);
+    expect(mayRefreshNext('Old step', 'mara', 'S')).toBe(false);
     expect(mayRefreshNext('Typed at creation', null, 'S')).toBe(false);
     expect(mayRefreshNext('', null, 'S')).toBe(true);
     expect(byMachine('rule:handled', 'S')).toBe(true);

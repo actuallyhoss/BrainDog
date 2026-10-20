@@ -6,9 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { arrivalSure } from './ingest.ts';
-import { openRecord, type Arrived, type Declaration, type Json, type Kernel } from './index.ts';
-import { fixedClock, openSqlite, type NodeSql } from '../test/sqlite.ts';
+import { arrivalSure } from '../src/ingest.ts';
+import { openRecord, type Arrived, type Declaration, type Json, type Kernel } from '../src/index.ts';
+import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 import { BANKS, CARD_TAILS } from '../../../fixtures/names.ts';
 
 const NOW = Date.UTC(2026, 8, 25, 12);
