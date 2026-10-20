@@ -464,6 +464,40 @@ export function newListGrants(deps: ShareWriteDeps, catalog: Catalog, added: rea
   return n;
 }
 
+/** The note a share's own end is said with in the ledger (§2.8), by the nightly pass and nowhere else. */
+export const ENDED_ON_ITS_DATE = 'Ended on its date';
+
+/**
+ * WHEN SHARES END ON THEIR OWN (§2.8): one `access.revoke` per share whose date has passed, its note "Ended on its
+ * date", so the log says when access stopped, IN THE CALLER'S TRANSACTION. A share's end is its `until`, or a day after
+ * its first use for a once share, whichever is sooner. The row is left as it is: the lens already reads it as over, and
+ * an owner may still give it a later date. So it is said once for each end: a share whose event already stands at or
+ * after its end is not said again, and one given a later date and run out again is. Answers the ids said.
+ */
+export function endedShares(deps: ShareWriteDeps, nowMs: number): string[] {
+  const rows = deps.sql.all<KeptRow>(
+    `SELECT ${KEPT} FROM share s WHERE s.revoked_at IS NULL AND (s.ends_at IS NOT NULL OR (s.once = 1 AND s.first_used_at IS NOT NULL)) ORDER BY s.id`,
+  );
+  const out: string[] = [];
+  for (const row of rows) {
+    const ends = [row.ends_at === null ? NaN : Date.parse(row.ends_at), row.once === 1 && row.first_used_at !== null ? Date.parse(row.first_used_at) + 86_400_000 : NaN].filter(Number.isFinite);
+    if (ends.length === 0) continue;
+    const end = Math.min(...ends);
+    if (end > nowMs) continue;
+    const said_ = deps.sql.one(
+      "SELECT 1 AS y FROM event WHERE target = ? AND kind = 'access.revoke' AND note = ? AND ts >= ? LIMIT 1",
+      `share:${row.id}`,
+      ENDED_ON_ITS_DATE,
+      new Date(end).toISOString(),
+    );
+    if (said_ !== undefined) continue;
+    const kept = keptOf(row);
+    shareEvent(deps, 'system', 'access.revoke', row.id, kept ? granteeOf(kept) : `${row.who_kind}:${row.who}`, kept ? said(kept) : null, null, ENDED_ON_ITS_DATE);
+    out.push(row.id);
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------------- people not on the record yet (slice 8) */
 
 /**

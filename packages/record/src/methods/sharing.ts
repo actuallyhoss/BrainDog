@@ -19,6 +19,7 @@
 import {
   checkShare,
   instant,
+  SHARE_TEMPLATES,
   lensOf,
   shareMeOf,
   shareSentenceOf,
@@ -81,6 +82,16 @@ export type Shared = { id: string; version: number; sentence: string };
 
 /** What `sharePreview` answers: the sentence, and how many rows of each list the share reaches now. */
 export type SharePreview = { sentence: string; lists: { list: string; name: string; rows: number }[] };
+
+/**
+ * One line of "Seen and changed" (§2.10, §3.2): who, through which share, and what they did in plain words, such as
+ * `{ who: 'Priya', via: 'Accountant', said: 'Money, 2 times. Opened M14.' }`. Names, never ids.
+ */
+export type ShareActivityLine = { who: string; via: string; said: string };
+
+/** How far back "Seen and changed" reads by default, and at most, in days: the read counters are kept 400. */
+export const SHARE_ACTIVITY_DAYS = 30;
+export const SHARE_ACTIVITY_DAYS_MOST = 400;
 
 /** One of the caller's own shares, as "What you can see here" lists it (§3.4). */
 export type MyShare = { id: string; sentence: string; can: ShareRung; until: string | null; onward: boolean; live: boolean };
@@ -320,7 +331,122 @@ export function methods(deps: RecordDeps) {
   /** A group as the Sharing page draws it: names, never ids, beside the ids it is changed by. */
   const groupOf = (g: GroupKept) => ({ id: g.id, name: g.name, people: g.people.map((p) => ({ id: p, name: personName(sql, p) ?? null })), shares: g.shares });
 
+  /* ------------------------------------------------------------------------------------- seen and changed (§2.10) */
+
+  /** A share as a line names it: its template's name, else its sentence. Never its id. */
+  const shareName = (id: string, catalog: LensCatalog): string => {
+    const s = kernel.shareKept(id);
+    if (s === null) return 'a share since removed';
+    if (s.template !== null) return SHARE_TEMPLATES.find((t) => t.id === s.template)?.name ?? s.template;
+    return sentence(s, catalog);
+  };
+
+  /** Names said as a person says them: "M14", "M14 and M15", "M14, M15, M16 and 4 more". */
+  const together = (names: readonly string[], most = 5): string => {
+    if (names.length <= 1) return names[0] ?? '';
+    if (names.length > most) return `${names.slice(0, most).join(', ')} and ${names.length - most} more`;
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  };
+
+  /** How many times, in words. */
+  const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? '2 times' : `${n} times`);
+
+  /** A row as a line names it, `M14` or `tasks#3`, and never its id once it is gone. */
+  const rowName = (id: string): string => {
+    const name = kernel.nameOf(id);
+    return name === id ? 'a row since removed' : name;
+  };
+
   return {
+    /**
+     * "SEEN AND CHANGED" (§2.10): what somebody who is not an owner read and changed in the last `days` days (30 unless
+     * asked, at most 400), for one person (`person`) or everybody, one line for each person and the shares that allowed
+     * it, in plain words, such as "Money, 2 times. Opened M14." through the Accountant share. Names, never ids. Read off
+     * the counters (`access_seen`) and the writes' lines (`access_via`), and an owner's or an Admin's in a browser.
+     */
+    async shareActivity(args: { person?: unknown; days?: unknown } | undefined, ctx: CallContext): Promise<Result<{ lines: ShareActivityLine[] }>> {
+      const stop = team(ctx, 'see what was seen and changed');
+      if (stop) return { ok: false, refusal: stop };
+      const asked = args?.days;
+      if (asked !== undefined && !(typeof asked === 'number' && Number.isSafeInteger(asked) && asked >= 1 && asked <= SHARE_ACTIVITY_DAYS_MOST))
+        return refuse('OUT_OF_BOUNDS', `days is a whole number from 1 to ${SHARE_ACTIVITY_DAYS_MOST}.`, 'days');
+      if (args?.person !== undefined && typeof args.person !== 'string') return refuse('VALUE_MALFORMED', 'person is the id of somebody on the record.', 'person');
+      const person = typeof args?.person === 'string' && args.person !== '' ? args.person : null;
+      const since = instant(clock.now() - (typeof asked === 'number' ? asked : SHARE_ACTIVITY_DAYS) * DAY_MS);
+      const only = person === null ? '' : ' AND who = ?';
+      const by = person === null ? [] : [person];
+      const seen = sql.all<{ who: string; via: string; what: string; n: number }>(
+        `SELECT who, via, what, SUM(n) AS n FROM access_seen WHERE day >= ?${only} GROUP BY who, via, what ORDER BY who, via, MIN(last_at), what`,
+        since.slice(0, 10),
+        ...by,
+      );
+      const wrote = sql.all<{ batch: string; who: string; via: string }>(`SELECT batch, who, via FROM access_via WHERE at >= ?${only} ORDER BY at, batch`, since, ...by);
+
+      type Group = { who: string; via: string[]; lists: Map<string, number>; rows: string[]; searched: number; pages: Map<string, number>; tools: Map<string, number>; as: Map<string, number>; changed: string[] };
+      const groups = new Map<string, Group>();
+      const viaOf = (text: string): string[] => {
+        try {
+          const v = JSON.parse(text) as unknown;
+          return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').sort() : [];
+        } catch {
+          return [];
+        }
+      };
+      const groupOf = (who: string, viaText: string): Group => {
+        const via = viaOf(viaText);
+        const key = `${who}\u0000${via.join(',')}`;
+        let g = groups.get(key);
+        if (g === undefined) {
+          g = { who, via, lists: new Map(), rows: [], searched: 0, pages: new Map(), tools: new Map(), as: new Map(), changed: [] };
+          groups.set(key, g);
+        }
+        return g;
+      };
+      const bump = (m: Map<string, number>, k: string, n: number) => m.set(k, (m.get(k) ?? 0) + n);
+      for (const r of seen) {
+        const g = groupOf(r.who, r.via);
+        const n = Number(r.n);
+        const colon = r.what.indexOf(':');
+        const kind = colon < 0 ? r.what : r.what.slice(0, colon);
+        const of = colon < 0 ? '' : r.what.slice(colon + 1);
+        if (kind === 'list') bump(g.lists, of, n);
+        else if (kind === 'row') {
+          const name = rowName(of);
+          if (!g.rows.includes(name)) g.rows.push(name);
+        } else if (kind === 'search') g.searched += n;
+        else if (kind === 'page') bump(g.pages, of, n);
+        else if (kind === 'mcp') bump(g.tools, of, n);
+        else if (kind === 'preview') bump(g.as, of, n);
+      }
+      for (const w of wrote) {
+        const g = groupOf(w.who, w.via);
+        /* A WRITE'S FIRST LINE MAY CARRY NO BATCH OF ITS OWN, ITS ID BEING THE BATCH, as Undo reads it. */
+        for (const t of sql.all<{ target: string }>("SELECT target FROM event WHERE (batch = ? OR id = ?) AND target LIKE 'entry:%' GROUP BY target ORDER BY MIN(rowid)", w.batch, w.batch)) {
+          const name = rowName(t.target.slice('entry:'.length));
+          if (!g.changed.includes(name)) g.changed.push(name);
+        }
+      }
+
+      const catalog = kernel.catalog();
+      const listName = (id: string): string => catalog.lists.find((l) => l.id === id)?.name ?? 'A list since removed';
+      const lines: ShareActivityLine[] = [];
+      for (const g of groups.values()) {
+        const said: string[] = [];
+        for (const [list, n] of g.lists) said.push(`${listName(list)}, ${times(n)}.`);
+        if (g.rows.length) said.push(`Opened ${together(g.rows)}.`);
+        if (g.searched > 0) said.push(`Searched ${times(g.searched)}.`);
+        for (const [slug, n] of g.pages) said.push(`The ${slug} page, ${times(n)}.`);
+        if (g.tools.size) said.push(`Their agent: ${together([...g.tools].map(([tool, n]) => `${tool} ${times(n)}`), 8)}.`);
+        for (const [as, n] of g.as) said.push(`Saw the record as ${personName(sql, as) ?? 'somebody no longer here'}, ${times(n)}.`);
+        if (g.changed.length) said.push(`Changed ${together(g.changed)}.`);
+        if (said.length === 0) continue;
+        const via = g.via.length > 0 ? together(g.via.map((id) => shareName(id, catalog)), 8) : g.as.size > 0 ? 'See as' : 'Their own access';
+        lines.push({ who: personName(sql, g.who) ?? 'Somebody no longer here', via, said: said.join(' ') });
+      }
+      lines.sort((a, b) => a.who.localeCompare(b.who) || a.via.localeCompare(b.via));
+      return ok({ lines });
+    },
+
     /** Every share on the record, live and ended in the last 30 days, each said as one sentence (§3.2). */
     async sharing(_args: unknown, ctx: CallContext): Promise<Result<SharingRow[]>> {
       const stop = team(ctx, 'see what this record shares');

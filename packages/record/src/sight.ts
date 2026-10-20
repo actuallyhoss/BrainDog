@@ -257,6 +257,10 @@ export function readSight(kernel: Kernel) {
    */
   const mask = <T>(ctx: Sighted, answer: T): T => {
     if (!hidesAny(ctx)) return answer;
+    /* AND A REFUSAL'S `allowed` NAMES NO HIDDEN FIELD: a block or a lint naming a field nobody declared was answered with
+       every field of the list as the choices, the hidden ones among them. Every list's hidden names are taken off, so a
+       name hidden on one list is never offered on another either. */
+    const unnamed = new Set(Object.values(ctx.hides ?? {}).flat());
     const DROP = Symbol('drop');
     const walk = (v: unknown, depth: number): unknown => {
       if (depth > 64) return v;
@@ -266,6 +270,8 @@ export function readSight(kernel: Kernel) {
       }
       if (!isObj(v)) return v;
       let o: Record<string, unknown> = v;
+      if (typeof o.code === 'string' && Array.isArray(o.allowed) && o.allowed.some((x) => typeof x === 'string' && unnamed.has(x)))
+        o = { ...o, allowed: o.allowed.filter((x) => !(typeof x === 'string' && unnamed.has(x))) };
       if (isRow(o)) o = maskRow(ctx, o);
       else if (typeof o.register === 'string' && typeof o.kind === 'string' && ('to' in o || 'from' in o)) {
         const line = maskLine(ctx, o.register, o);

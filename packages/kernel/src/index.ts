@@ -64,7 +64,7 @@ import { SIGNS_KEY, fileSignReading, nextSignsDue, readSigns, runSignsNight, typ
 import { scanKeys } from './key-scan.ts';
 import { carriedIn } from './run-carried.ts';
 import { markHand } from './hold.ts';
-import { countLists, deadPaths } from './night-counts.ts';
+import { accessNight, countLists, deadPaths } from './night-counts.ts';
 import { actionsBlocking } from './signs-actions.ts';
 import { DOOR_KINDS, DOOR_WINDOW_DAYS, doorMarks as readDoorMarks, markDoor, sweepDoorMarks, type DoorMark, type DoorSigns } from './door.ts';
 import { openFaults, type Fault } from './fault.ts';
@@ -101,8 +101,8 @@ import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
-import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
-import type { Catalog } from './lens.ts';
+import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, meOf, saysMe, sharesFor as heldSharesOf, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
+import { activeAt, shareReach, type Cap as LensCapOf, type Catalog } from './lens.ts';
 import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, type Wheres } from './members.ts';
 import { stopped as stoppedOf, type Suspended } from './members.ts';
 import {
@@ -678,7 +678,7 @@ export { whereFor, scopeFor, NOBODY, viewerOfPrincipal, viewerOfRead, WHERE_MAX_
 export {
   activeAt, CAPS as LENS_CAPS, checkShare, fold as foldLens, gateFields, lensOf, nextEdge as shareNextEdge, ONCE_MS as SHARE_ONCE_MS,
   PARAMS_MAX as SHARE_PARAMS_MAX, paramsOf as shareParamsOf, paramsOn as shareParamsOn, ROWS_MAX as SHARE_ROWS_MAX, RUNGS as SHARE_RUNGS,
-  schemaOf as lensSchemaOf, shareFault, targetReaches as shareTargetReaches, targetWhole as shareTargetWhole, WHERE_MAX_DEPTH as SHARE_WHERE_MAX_DEPTH, WHERE_MAX_LEAVES as SHARE_WHERE_MAX_LEAVES, whereFault as shareWhereFault,
+  schemaOf as lensSchemaOf, shareFault, shareReach, targetReaches as shareTargetReaches, targetWhole as shareTargetWhole, WHERE_MAX_DEPTH as SHARE_WHERE_MAX_DEPTH, WHERE_MAX_LEAVES as SHARE_WHERE_MAX_LEAVES, whereFault as shareWhereFault,
 } from './lens.ts';
 export type {
   Cap as LensCap, Catalog as LensCatalog, CatalogField as LensCatalogField, CatalogList as LensCatalogList, Caps as ShareCaps,
@@ -1138,6 +1138,14 @@ export type WriteContext = {
    */
   within?: Json | undefined;
   /**
+   * WHO WROTE THIS, FOR THE AUDIT (sharing plan §2.10), handed only for a writer who is not an owner: the person, and
+   * whether it is their agent. The write keeps one `access_via` row for its batch, IN ITS OWN TRANSACTION, naming the
+   * shares whose write predicate admits the row it leaves (one SELECT per covering share), so "Priya changed M14 through
+   * the Accountant share" can be said later. Like `within`, it holds for the one list the write names and never for what
+   * the rules pass writes after it.
+   */
+  via?: { who: string; agent?: boolean } | undefined;
+  /**
    * For a proposal: whether a row its body names is one the proposer may see (sharing plan §2.6). A row it does not
    * admit is answered as a row that is not there. Absent, every row is.
    */
@@ -1300,6 +1308,8 @@ type Door = {
   seal?: { field: string; bind: (actor: string, held: string | null) => Result<GrantRow> };
   /** `WriteContext.within`, taken off the context at the door so the rules pass's own writes never carry it. */
   within?: Json;
+  /** `WriteContext.via`, taken off the same way. */
+  via?: { who: string; agent?: boolean };
 };
 
 /* ── the record ──────────────────────────────────────────────────────────── */
@@ -2125,6 +2135,42 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     if (within === null) return false;
     const c = scopeClause(register, within);
     return sql.one(`SELECT 1 AS y FROM entry WHERE id = ? AND register = ? AND (${c.sql})`, id, register, ...c.params) !== undefined;
+  };
+
+  /**
+   * WHICH SHARES ADMIT ONE ROW FOR ONE CAPABILITY (sharing plan §2.10, `via`): of the live allows a person holds, their
+   * own and their groups', the ones whose part of the lens reaches the row, asked by `admits`, one SELECT per covering
+   * share and none for a share that reaches the whole list. `id` null asks of the list. An agent carries no allow its
+   * person switched agents off for. A role or a member row admits rows too, and is no share: `[]` says so.
+   */
+  const shareVia = (person: string, register: string, id: string | null, cap: LensCapOf, agent = false): string[] => {
+    const held = heldSharesOf(sql, person);
+    if (held === null || held.length === 0) return [];
+    const l = catalogNow().lists.find((x) => x.id === register);
+    if (l === undefined) return [];
+    const now = clock.now();
+    const tz = recordTz();
+    const live = held.filter((s) => s.effect === 'allow' && activeAt(s, now, tz) && (!agent || s.caps?.agents !== false));
+    const me = saysMe(live) ? meOf(sql, person, meetsRole(registers.values())?.register ?? null) : [];
+    const out: string[] = [];
+    for (const s of live) {
+      const p = shareReach(s, l, cap, me);
+      if (p === false) continue;
+      if (id === null || p === true || admits(register, p as Json, id)) out.push(s.id);
+    }
+    return out.sort();
+  };
+
+  /**
+   * The audit's line for one write by somebody who is not an owner (§2.10): its batch, who, and which shares' write
+   * predicate admits the row it leaves. IN THE WRITE'S TRANSACTION, and once a batch: a replay, or a second write the
+   * same batch carries, adds nothing.
+   */
+  const accessVia = (register: string, row: Entry, by: { who: string; agent?: boolean }): void => {
+    const batch = row.batch;
+    if (batch === undefined || batch === '' || row.replayed === true) return;
+    const via = shareVia(by.who, register, row.id, 'write', by.agent === true);
+    sql.exec('INSERT OR IGNORE INTO access_via (batch, who, via, at) VALUES (?, ?, ?, ?)', batch, by.who, JSON.stringify(via), instant(clock.now()));
   };
 
   /** The name of the person who owns this record, as a refusal tells somebody to ask them, or `null` when it has none. */
@@ -4159,10 +4205,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /* THE ROWS THIS WRITER MAY WRITE GO ON THE DOOR AND OFF THE CONTEXT, so the pre-image check below reads them and
        the rules pass's writes, handed `w`, never hold another list's rows to them. */
-    const { within, ...rest } = w;
-    if (within !== undefined) {
+    const { within, via, ...rest } = w;
+    if (within !== undefined || via !== undefined) {
       w = rest;
-      door = { ...door, within };
+      door = { ...door, ...(within === undefined ? {} : { within }), ...(via === undefined ? {} : { via }) };
     }
     /* A SEALING WRITE BINDS A GRANT PART-WAY THROUGH ITS PERSIST STEP, so a refusal after that rolls
        back to a savepoint rather than trusting that nothing was written before it. AND A WRITE HELD TO ITS WRITER'S
@@ -4170,10 +4216,15 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
        still one of them: a create outside them, or an edit that moves the row out, is unwound whole, the rules pass
        with it. */
     const out =
-      door.seal || within !== undefined
+      door.seal || within !== undefined || via !== undefined
         ? attempt(sql, transaction, () => {
             const made = writing(register, ref, patch, w, door);
-            if (!made.ok || within === undefined || admits(register, within, made.value.id)) return made;
+            if (made.ok && (within === undefined || admits(register, within, made.value.id))) {
+              /* THE AUDIT'S LINE FOR THIS WRITE, in its transaction: which shares admitted the row it leaves (§2.10). */
+              if (via !== undefined) accessVia(register, made.value, via);
+              return made;
+            }
+            if (!made.ok) return made;
             return no<Entry>(
               'FORBIDDEN',
               ref === null ? `That would put it outside what you can edit. ${askOwner()}` : `That would move it out of what you can edit. ${askOwner()}`,
@@ -8623,6 +8674,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         } catch (e) {
           observe(sql, clock.now(), [{ kind: 'write.refused', subject: `night.paths:${e instanceof Error ? e.name : 'Error'}` }]);
         }
+        /* AND THE AUDIT'S NIGHT (sharing plan §2.8, §2.10): read counters past 400 days pruned, and each share whose
+           date passed said once in the ledger. On its own, as the counts are. */
+        try {
+          transaction(() => accessNight(sql, clock.now(), mint));
+        } catch (e) {
+          observe(sql, clock.now(), [{ kind: 'write.refused', subject: `night.access:${e instanceof Error ? e.name : 'Error'}` }]);
+        }
         return nextSignsDue(clock.now(), tz);
       }
       /* THE LEDGER'S NIGHT COMES THROUGH THE SAME DOOR, and the payload is what tells them apart: a
@@ -10164,6 +10222,28 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
     /** The gate fields of one list (§2.6): what any active share condition names, and its scope field under a project share. */
     gateFields: (list: string): string[] => gateFieldsOf(sql, catalogNow(), list, clock.now(), recordTz()),
+
+    /**
+     * THE AUDIT (sharing plan §2.10). `shareVia`: which of a person's live shares admit one row (or, `id` null, reach a
+     * list) for one capability. `accessSeen`: one read by somebody who is not an owner, counted on today's row for what
+     * they read and through which shares. `accessNight`: the night's pass, the old counters pruned and each share whose
+     * date passed said once in the ledger.
+     */
+    shareVia: (person: string, register: string, id: string | null, cap: LensCapOf = 'read', agent = false): string[] => shareVia(person, register, id, cap, agent),
+    accessSeen: (who: string, via: readonly string[], what: string): void => {
+      const nowMs = clock.now();
+      const day = dayIn(nowMs, recordTz());
+      sql.exec(
+        `INSERT INTO access_seen (day, who, via, what, n, last_at) VALUES (?, ?, ?, ?, 1, ?)
+         ON CONFLICT (day, who, via, what) DO UPDATE SET n = n + 1, last_at = excluded.last_at`,
+        day,
+        who,
+        JSON.stringify([...via].sort()),
+        what,
+        instant(nowMs),
+      );
+    },
+    accessNight: (): { pruned: number; ended: string[] } => transaction(() => accessNight(sql, clock.now(), mint)),
 
     /**
      * Who owns this record, by id.

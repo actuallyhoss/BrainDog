@@ -122,9 +122,10 @@ test('a list of 127 learnings, each superseding the last, reads each register it
     asked.splice(0);
     const page = await call(surface, owner, 'list', { register: 'learnings', limit: 500, ...(cursor === undefined ? {} : { cursor }) });
     rows.push(...rowsOf(page));
-    /* THE DOOR'S OWN ASKS ARE NOT THE LIST'S: `beat` is the run's heartbeat (`beatOn`), `whoami` the caller's settings and
-       `context` what waits for its run (`rpc.ts`, plan §2.3 B), each once a call whatever the tool. */
-    costs.push(asked.filter((m) => m !== 'beat' && m !== 'whoami' && m !== 'context'));
+    /* THE DOOR'S OWN ASKS ARE NOT THE LIST'S: `beat` is the run's heartbeat (`beatOn`), `whoami` the caller's settings,
+       `context` what waits for its run (`rpc.ts`, plan §2.3 B), and `toolSeen` the audit's count of the call, each once a
+       call whatever the tool. */
+    costs.push(asked.filter((m) => m !== 'beat' && m !== 'whoami' && m !== 'context' && m !== 'toolSeen'));
     cursor = typeof page.value.cursor === 'string' ? page.value.cursor : undefined;
   } while (cursor !== undefined && costs.length < 5);
   assert.equal(rows.length, 127);

@@ -756,16 +756,15 @@ const SEE_AS_MOST = 64;
  * for them), so every answer is theirs; `preview` makes it read-only twice over (the router and `allows`) and makes the
  * viewer nobody, so no row they keep private is shown. `provedAt` stays the viewer's.
  *
- * `seen` IS THE AUDIT HOOK: called once per call seen as somebody, with the viewer and the person, for the sharing
- * plan's slice 12 to record as `preview:<person>`. Absent, nothing is recorded yet.
+ * `previewBy` IS WHO IS SEEING, the session's own person, for the audit (sharing plan §2.10): the record counts each
+ * read made this way as `preview:<person>` against them, and never as the person's own.
  */
 export async function seeAs<L extends string>(
   asked: string | null,
   who: Who,
   held: HeldAccess<L>,
   accessOf: (person: string) => Promise<HeldAccess<L> | null> | HeldAccess<L> | null,
-  seen?: (viewer: string, as: string) => void,
-): Promise<{ ctx: ReturnType<typeof sessionContext<L>> & { preview: string } } | { refusal: Refusal } | null> {
+): Promise<{ ctx: ReturnType<typeof sessionContext<L>> & { preview: string; previewBy: string } } | { refusal: Refusal } | null> {
   const as = asked?.trim() ?? '';
   if (as === '') return null;
   if (held.level !== 'owner' && held.level !== 'decide')
@@ -773,8 +772,7 @@ export async function seeAs<L extends string>(
   const theirs = as.length > SEE_AS_MOST ? null : await accessOf(as);
   if (theirs === null) return { refusal: { code: 'FORBIDDEN', fix: 'That person is not on this record, so there is nothing to see as them.', at: 'as' } };
   if (theirs.level === 'owner') return { refusal: { code: 'FORBIDDEN', fix: 'An owner sees everything. See as somebody else.', at: 'as' } };
-  seen?.(who.person, as);
-  return { ctx: { ...sessionContext({ ...who, person: as }, theirs), confirmable: false, preview: as } };
+  return { ctx: { ...sessionContext({ ...who, person: as }, theirs), confirmable: false, preview: as, previewBy: who.person } };
 }
 
 /** What the operator's provisioning made, before the claim link is minted for it. */

@@ -52,8 +52,6 @@ export type Deps = {
    * cookie opens (a file, an OAuth consent) is ever answered as somebody else. Absent, the header is not read.
    */
   seeAs?: true;
-  /** The audit hook for a call seen as somebody, for slice 12's `preview:<person>`. Absent, nothing is recorded yet. */
-  seen?: (record: string, viewer: string, as: string) => void;
 };
 
 export type Door =
@@ -116,7 +114,7 @@ export async function doorOf(request: Request, deps: Deps, slug: string | null =
     let ctx = sessionContext(out.body, held) as CallContext;
     /* SEE AS SOMEBODY: an owner's or an Admin's cookie, never as an owner, read-only (`seeAs`). */
     if (deps.seeAs === true) {
-      const as = await seeAs(request.headers.get(SEE_AS_HEADER), out.body, held, (person) => deps.access(record, person), (viewer, person) => deps.seen?.(record, viewer, person));
+      const as = await seeAs(request.headers.get(SEE_AS_HEADER), out.body, held, (person) => deps.access(record, person));
       if (as !== null && 'refusal' in as) return { door: 'refused', status: 403, refusal: as.refusal, ...carried };
       if (as !== null) ctx = as.ctx as CallContext;
     }

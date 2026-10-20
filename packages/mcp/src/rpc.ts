@@ -815,6 +815,14 @@ async function dispatch<C>(
       const answered = await mcp.answer(name, args, ctx);
       const out = ownWords(name, args, answered);
       if (refused(out.result) && out.result.refusal.code === 'INTERNAL') hear(surface, ctx, { kind: 'internal' });
+      /* AND ONE READ COUNTED FOR THE AUDIT (sharing plan §2.10), `mcp:<tool>`, for an answered call: never awaited, never failing it. */
+      if (out.result.ok && typeof surface.toolSeen === 'function') {
+        try {
+          surface.toolSeen({ tool: params.name }, ctx);
+        } catch {
+          /* One call uncounted. */
+        }
+      }
       /* THE CARD'S DATA RIDES BESIDE THE ANSWER, only when this answer is one the card can draw. */
       let drawn = out.result.ok ? cardOf(params.name, args, out.structured, origin) : null;
       /* THE RECORD'S SLUG IS ASKED ONLY FOR AN ANSWER A CARD DRAWS, so the link lands on this record and not the app's front door. */

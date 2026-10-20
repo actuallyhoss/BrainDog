@@ -798,6 +798,21 @@ function ctxOf(lens: Omit<Lens, 'ctx'>, sources: LensSources, catalog: Catalog, 
   return ctx;
 }
 
+/* -------------------------------------------------------------------------------------------------------- via (§2.10) */
+
+/**
+ * What ONE allow reaches on one list for one capability, as a condition, TRUE, or FALSE: the share's own part of the
+ * lens, for the audit's `via` (which share admitted a write or a read). A deny, a share whose condition no longer
+ * compiles, and a capability its rung or its switches leave out reach nothing. The caller has asked whether it is active.
+ */
+export function shareReach(s: HeldShare, l: CatalogList, cap: Cap, me: readonly string[]): Pred {
+  if (s.effect !== 'allow' || !compiles(s.what, l)) return false;
+  const cover = coverOf(s.what, l, me);
+  if (cover.cond === false) return false;
+  const caps = capsOf(s).filter((c) => !cover.only || cover.only.includes(c));
+  return caps.includes(cap) ? fold(cover.cond) : false;
+}
+
 /* ------------------------------------------------------------------------------------------------------ gate fields */
 
 /**

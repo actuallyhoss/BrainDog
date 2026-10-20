@@ -12,7 +12,10 @@
  * document with (record `methods/pages-census.ts`): `pathsOf` finds the paths, a field of the row's own list is named,
  * and the record's own read (`unnamed`) says which of the rest name nothing.
  *
- * BOTH ARE THE RECORD WRITING OF ITSELF, so the points carry the source `night.counts` or `night.paths`, and an arrival's
+ * `accessNight`: the audit's night (sharing plan §2.8, §2.10). The read counters in `access_seen` past 400 days are
+ * pruned, as the daily counters are, and every share whose date passed is said once in the ledger, "Ended on its date".
+ *
+ * BOTH COUNTS ARE THE RECORD WRITING OF ITSELF, so the points carry the source `night.counts` or `night.paths`, and an arrival's
  * numbers are never these (`signs.ts`, its numbers sign). Only `index.ts` imports this file: it reads `pages.ts`, which
  * reaches `metrics.ts`, so the figures' words live in `built-in-figures.ts` and come in from there.
  */
@@ -21,6 +24,8 @@ import { unprivate } from '@braindog/where';
 import type { Sql } from '@braindog/ports';
 
 import { DEAD_PATHS_SERIES, countsSeries } from './built-in-figures.ts';
+import { instant } from './migrate.ts';
+import { endedShares } from './shares.ts';
 import { pathsOf, type PageBlock } from './pages.ts';
 
 /** The source the night's counts are written under. */
@@ -195,4 +200,19 @@ export function deadPaths(deps: DeadPathsDeps, cursor: number | null = null, mos
   const dead = s.found.reduce((n, f) => n + f[1], 0);
   if (s.passes > 0) keep(sql, DEAD_PATHS_SERIES, dayIn(deps.nowMs, deps.tz), dead, rows.length, NIGHT_PATHS_SOURCE, deps.nowMs);
   return { read: rows.length, dead, finished, next: s.after };
+}
+
+/** How long a read counter is kept, in days (§2.10: "as observations are"). */
+export const ACCESS_SEEN_DAYS = 400;
+
+/**
+ * The audit's night, IN THE CALLER'S TRANSACTION: the read counters older than `ACCESS_SEEN_DAYS` pruned, and one
+ * `access.revoke` "Ended on its date" per share whose date has passed and is not said yet (`endedShares`). Answers how
+ * many counters went and which shares were said.
+ */
+export function accessNight(sql: Sql, nowMs: number, mint: () => string): { pruned: number; ended: string[] } {
+  const old = new Date(nowMs - ACCESS_SEEN_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const pruned = Number(sql.one<{ n: number }>('SELECT count(*) AS n FROM access_seen WHERE day < ?', old)?.n ?? 0);
+  if (pruned > 0) sql.exec('DELETE FROM access_seen WHERE day < ?', old);
+  return { pruned, ended: endedShares({ sql, at: instant(nowMs), mint }, nowMs) };
 }

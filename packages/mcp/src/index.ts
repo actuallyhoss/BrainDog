@@ -95,6 +95,7 @@
 
 import { codeOf, conflicted, refused, type Refusal, type Result } from '@braindog/ports';
 import type { HANDOFF_STATES as RecordHandoffStates } from '@braindog/record';
+import { firewall } from '@braindog/record/sight';
 
 import { SCRIPT_GRAMMAR } from '../grammars/script.ts';
 import { ANSWERED_GRAMMAR, AUTOMATION_GRAMMAR } from './automations.ts';
@@ -332,6 +333,8 @@ export type McpSurface<C> = {
   firewalled?(method: string, stripped: readonly string[]): void;
   /** The list a row named by its spoken id is on, `tasks#3` or `TK3`, for the firewall, or `null`. */
   listOf?(spoken: string): string | null;
+  /** One tool call answered, counted for the audit as `mcp:<tool>` for a caller who is not an owner (sharing plan §2.10). */
+  toolSeen?(args: { tool: string }, ctx: C): void;
   /**
    * The caller's run is still working (the record's `beat`, DATA, AGT-C03): last seen moved in place, at most once a
    * minute, no version and no event. The door beats once for every tool call it admits (`beatOn`), so any client on it
@@ -3359,6 +3362,19 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     beatOn(surface, ctx);
     const done = await tool(sent, asked, turn);
     let result = done.result;
+    /* THE FIREWALL BEFORE A WORD IS WRITTEN (sharing plan §2.5 item 6): a field hidden from the caller still on a row of
+       the answer is taken off here and raised as fault `lens.firewall`, and then BOTH HALVES ARE DRAWN FROM WHAT IS LEFT.
+       The words the tool had ready (`done.say`) are past any key to take off, so an answer the firewall touched is written
+       from the masked answer itself, as JSON, and never in those words. */
+    let walled = false;
+    {
+      const held = firewall(ctx, result, typeof surface.listOf === 'function' ? (spoken) => surface.listOf!(spoken) : undefined);
+      if (held.stripped.length > 0) {
+        result = held.answer;
+        walled = true;
+        surface.firewalled?.(`mcp ${name}`, held.stripped);
+      }
+    }
     if (refused(result)) {
       /* THE LIST'S TITLE FIRST: `name` is otherwise handed the field spelled most like it, which is rarely the title. */
       const titled = await titleFor(name, sent, result.refusal, ctx);
@@ -3376,7 +3392,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
       const register = current && typeof current.spoken === 'string' ? registerOf(current.spoken, sent) : undefined;
       const stale = staleOf(result.conflict, look, callOf(name, { ...sent, version: result.conflict.version }));
       const fitted = fittedJson(stale);
-      return { result, text: capped(full ? JSON.stringify(fitted) : conflictBrief(result.conflict, register, look)), structured: fitted };
+      return { result, text: capped(full || walled ? JSON.stringify(fitted) : conflictBrief(result.conflict, register, look)), structured: fitted };
     }
     const value = result.ok ? result.value : undefined;
     /* THE LOOK'S OWN READS, a `boot` for the people and one of the runs, are made only for an answer said in words. */
@@ -3384,7 +3400,7 @@ export function tools<C>(surface: McpSurface<C>, origin?: string) {
     const receipted = (s: Said, line: string | null, inText: boolean): Said =>
       line === null ? s : { ...s, ...(inText ? { text: `${s.text}\n${line}` } : {}), structured: { ...s.structured, receipt: line } };
     const receiptOn = (line: string): string | null => (RECEIPTED.has(name) ? line : null);
-    if (full || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), false);
+    if (full || walled || !done.say) return receipted(said(result), receiptOn(receiptOf(name, '', turn, value)), false);
     const body = done.say(await lookOf(ctx, turn, done.names));
     return receipted(said(result, body), receiptOn(receiptOf(name, body, turn, value)), true);
   };

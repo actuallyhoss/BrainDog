@@ -3453,7 +3453,7 @@ async function recordApi(request: Request, env: Env, slug: string | null): Promi
       session: (sid, slug) => directory.auth({ flow: 'session', sid, ...(slug === undefined ? {} : { slug }) }) as unknown as Promise<AuthResult<Who>>,
       access: (record, person) => held(env, record, (object) => object.access(person)),
       stopped: (record, person) => held(env, record, (object) => object.memberStopped(person)),
-      /* SEE AS (sharing plan §3.3) is this door's alone; slice 12 records it as `preview:<person>` through `seen`. */
+      /* SEE AS (sharing plan §3.3) is this door's alone; the record counts each read made so as `preview:<person>` (`previewBy`). */
       seeAs: true,
     }, slug);
 

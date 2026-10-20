@@ -549,6 +549,12 @@ export type CallContext = {
   preview?: string | undefined;
 
   /**
+   * Who is seeing as somebody (`preview`): the owner or Admin whose session it is, for the audit's `preview:<person>`
+   * (sharing plan §2.10). Set only by a host, beside `preview`.
+   */
+  previewBy?: string | undefined;
+
+  /**
    * Whether this person can confirm it is them with a passkey, inline (sharing plan §6, default 1): a share that widens
    * asks for a fresh proof only then. Set only by a host, from the Directory's session answer.
    */
@@ -6184,14 +6190,32 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * an agent's write is the attribution the ladder replaces. Anybody else signs as themselves, which is
    * how a person in a browser is never a run.
    */
-  const writerOf = (ctx: CallContext): Pick<WriteContext, 'actor' | 'principal' | 'session'> =>
-    ctx.principal.kind === 'token'
+  const writerOf = (ctx: CallContext): Pick<WriteContext, 'actor' | 'principal' | 'session' | 'via'> => {
+    /* AND WHO IS AUDITED FOR IT (sharing plan §2.10): a writer who is not an owner, whose write keeps an `access_via`
+       line naming the shares that admitted it. */
+    const audited = auditedOf(ctx);
+    const via = audited === null ? {} : { via: audited.agent ? { who: audited.who, agent: true } : { who: audited.who } };
+    return ctx.principal.kind === 'token'
       ? {
           actor: agentOf(ctx),
           principal: { kind: 'token', token: ctx.principal.id },
           ...(ctx.session === undefined ? {} : { session: ctx.session }),
+          ...via,
         }
-      : { actor: ctx.principal.id };
+      : { actor: ctx.principal.id, ...via };
+  };
+
+  /**
+   * WHO A CALL IS AUDITED AS (sharing plan §2.10): a person who is not an owner, or the person an agent acts for when they
+   * are not one. An owner, the system, a link, a runner and a call seen as somebody (counted as `preview:`) are not.
+   */
+  const auditedOf = (ctx: CallContext): { who: string; agent: boolean } | null => {
+    if (ctx.preview !== undefined) return null;
+    const p = ctx.principal;
+    if (p.kind === 'person') return p.level === 'owner' ? null : { who: p.id, agent: false };
+    if (p.kind === 'token') return p.level === 'owner' ? null : { who: p.person, agent: true };
+    return null;
+  };
 
   /**
    * A token call as the ladder reads it (`ladder.ts`), or `null` for anybody who is not an agent on a grant the record
@@ -9341,7 +9365,70 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return ok({ url: asked, text: read.text, bytes: read.bytes });
   };
 
-  return {
+  /* ── the audit's reads (sharing plan §2.10) ──────────────────────────── */
+
+  /**
+   * WHAT ONE READ IS COUNTED AS, after it was answered: `list:<id>`, `row:<entry id>` (get, history, backlinks), `search`
+   * and `page:<slug>`, each with the shares that allowed it, or `null` for a read that showed nothing to count. A row
+   * is counted only when the caller is shown it (`sight.admits`), so a refusal or a row nobody holds counts nothing.
+   */
+  const seenWhat = (method: string, args: Record<string, unknown>, ctx: CallContext, out: unknown, who: { who: string; agent: boolean } | null) => {
+    if (out === null || typeof out !== 'object' || (out as { ok?: unknown }).ok !== true) return null;
+    const value = (out as { value?: unknown }).value;
+    const grantVia = (): string[] => [...(ctx.grant?.via ?? [])];
+    const rowVia = (row: Entry): string[] => (who === null ? [] : kernel.shareVia(who.who, row.register, row.id, 'read', who.agent));
+    switch (method) {
+      case 'list': {
+        const register = typeof args.register === 'string' ? args.register : null;
+        if (register === null) return null;
+        return { what: `list:${register}`, via: who === null ? [] : kernel.shareVia(who.who, register, null, 'read', who.agent) };
+      }
+      case 'get': {
+        const row = value !== null && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'string' ? kernel.get((value as { id: string }).id) : null;
+        return row && sight.admits(ctx, row) ? { what: `row:${row.id}`, via: rowVia(row) } : null;
+      }
+      case 'history':
+      case 'backlinks': {
+        if (typeof args.register !== 'string' || typeof args.seq !== 'number') return null;
+        const row = kernel.get({ register: args.register, seq: args.seq });
+        return row && sight.admits(ctx, row) ? { what: `row:${row.id}`, via: rowVia(row) } : null;
+      }
+      case 'search':
+        return { what: 'search', via: grantVia() };
+      case 'page':
+        return typeof args.slug === 'string' ? { what: `page:${args.slug}`, via: grantVia() } : null;
+      default:
+        return null;
+    }
+  };
+
+  /**
+   * ONE COUNTER A CALL, for somebody who is not an owner (§2.10): the read upserted on today's `access_seen` row for what
+   * it was and through which shares. A call seen as somebody counts once as `preview:<person>` against whoever was
+   * seeing, and never as that person's own read. The owner's reads write nothing. A counter that cannot be kept never
+   * costs the answer.
+   */
+  const seenCall = (method: string, args: unknown, ctx: CallContext, out: unknown): void => {
+    try {
+      if (ctx === null || typeof ctx !== 'object' || ctx.principal === undefined) return;
+      const said = args !== null && typeof args === 'object' ? (args as Record<string, unknown>) : {};
+      if (ctx.preview !== undefined) {
+        if (typeof ctx.previewBy === 'string' && ctx.previewBy !== '' && seenWhat(method, said, ctx, out, null) !== null) kernel.accessSeen(ctx.previewBy, [], `preview:${ctx.preview}`);
+        return;
+      }
+      const who = auditedOf(ctx);
+      if (who === null) return;
+      const seen = seenWhat(method, said, ctx, out, who);
+      if (seen !== null) kernel.accessSeen(who.who, seen.via, seen.what);
+    } catch {
+      /* The answer goes as it was; a counter missed is one read uncounted. */
+    }
+  };
+
+  /** The methods a read is counted for (`seenWhat`), each wrapped once the record is built. */
+  const SEEN_METHODS = ['list', 'get', 'history', 'backlinks', 'search', 'page'] as const;
+
+  const api = {
     /**
      * What this record is: its registers, and how many rows each holds.
      *
@@ -10433,7 +10520,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (fault) {
         let text = JSON.stringify(fault);
         for (const { back } of renamed) for (const [name, was] of back) text = text.replaceAll(name, was);
-        return { ok: false as const, refusal: JSON.parse(text) as typeof fault };
+        /* AND NO HIDDEN FIELD AMONG ITS CHOICES (`sight.mask`, sharing plan §2.7). */
+        return sight.mask(ctx, { ok: false as const, refusal: JSON.parse(text) as typeof fault });
       }
 
       /* WHAT ONE PREVIEW MAY COST, ASKED OF THE BLOCKS BEFORE ANY IS DRAWN. The lint holds a
@@ -13935,6 +14023,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       raiseFault(sql, `${FIREWALL_FAULT}#${method}`, FIREWALL_FAULT, `${method} answered ${stripped.join(', ')}, hidden from its caller.`, clock.now());
     },
 
+    /**
+     * One tool an agent called at the MCP door and was answered, counted as `mcp:<tool>` for whoever it acts for when
+     * they are not an owner (sharing plan §2.10). Not a route; the door calls it, never a caller.
+     */
+    toolSeen(args: { tool?: unknown } | undefined, ctx: CallContext): void {
+      const tool = typeof args?.tool === 'string' ? args.tool.slice(0, 64) : '';
+      const who = tool === '' || ctx?.principal === undefined ? null : auditedOf(ctx);
+      if (who === null) return;
+      try {
+        kernel.accessSeen(who.who, [...(ctx.grant?.via ?? [])], `mcp:${tool}`);
+      } catch {
+        /* One call uncounted, and the answer already went. */
+      }
+    },
+
     /** The list a row named by its spoken id is on, `tasks#3` or `TK3`, or `null`: what the MCP door's firewall reads a row by. */
     listOf(spoken: string): string | null {
       return kernel.get(spoken, { includeDeleted: true })?.register ?? null;
@@ -13979,6 +14082,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       { heldBlock, shellOf, heldBy, unplaced, whereHeld, seesPage, readsEveryList },
     ),
   };
+
+  /* THE SEEN-WRAPPER (§2.10): each counted read answers as it did, and is then counted for whoever is not an owner. */
+  for (const name of SEEN_METHODS) {
+    const method = api[name] as unknown as (this: unknown, args: unknown, ctx: CallContext) => Promise<unknown>;
+    (api as Record<string, unknown>)[name] = async function (this: unknown, args: unknown, ctx: CallContext) {
+      const out = await method.call(this, args, ctx);
+      seenCall(name, args, ctx, out);
+      return out;
+    };
+  }
+  return api;
 }
 
 /**

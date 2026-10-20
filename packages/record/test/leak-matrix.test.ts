@@ -529,6 +529,38 @@ test('T6 figures over a list with a hidden field are answered to nobody it is hi
   assert.deepEqual(told, []);
 });
 
+test('T6 the MCP door writes its words from the masked answer: a row a path forgot to mask leaves no hidden value in the text', async () => {
+  const { serveMcp } = await import('../../mcp/src/http.ts');
+  /* A RECORD OF ITS OWN, so the faults this raises on purpose are not the whole matrix's (the FIREWALL test below). */
+  const f = await build();
+  const told: string[] = [];
+  let n = 0;
+  for (const { c, list } of hiders(f)) {
+    for (const r of [...f.rows.values()].filter((x) => x.list === list && f.visible(c, x))) {
+      const spoken = f.spoken(r);
+      const raw = f.api.kernel.get(spoken);
+      assert.ok(raw, spoken);
+      /* THE PATH THAT FORGOT: `get` hands back the row whole, hidden fields and all. */
+      const leaky = { ...f.api, get: async () => ({ ok: true, value: raw }) };
+      for (const args of [{ spoken }, { spoken, format: 'json' }]) {
+        const request = new Request('https://brain.dog/mcp', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'mcp-protocol-version': '2025-11-25' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: ++n, method: 'tools/call', params: { name: 'get', arguments: args } }),
+        });
+        const reply = (await (await serveMcp(request, leaky as never, c.ctx)).json()) as { result?: { content?: { text?: string }[] } };
+        const text = reply.result?.content?.map((p) => p.text ?? '').join('\n') ?? '';
+        if (!text.includes(r.canary.word)) told.push(`${c.label} ${spoken}: the row itself is not in the text`);
+        for (const l of leaks(reply, f.out(c))) told.push(`${c.label} ${spoken} ${args.format ?? 'words'}: ${l}`);
+      }
+    }
+  }
+  assert.deepEqual(told.slice(0, 12), [], `${told.length} MCP answer(s) carried a hidden value past the door`);
+  /* AND THE DOOR SAID SO: the path is named as a fault, `mcp get`. */
+  const faults = f.api.kernel.faults();
+  assert.ok(faults.ok && faults.value.faults.some((x) => x.kind === 'lens.firewall' && x.cause === 'lens.firewall#mcp get'));
+});
+
 /* ── the firewall: nothing it would take off, across the whole matrix ──── */
 
 test('FIREWALL: no answer across the whole matrix had a hidden field taken off at a door, and no fault was raised', async () => {
