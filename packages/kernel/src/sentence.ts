@@ -99,11 +99,13 @@ const GENERIC = /^(?:row|entry|item|thing|record|something|anything|line)s?$/u;
  * list's word.
  */
 const JOINS = new Set(['and', 'or', 'of', 'the', 'a', 'an', 'to', 'for', 'in', 'on', '&']);
+/** The words of a list's name, each in the singular, with no joining word: "bill" and "invoice" for Bills and invoices. */
+const nameWords = (l: SentenceList): string[] => l.name.split(/[\s,/]+/u).filter((w) => w !== '' && !JOINS.has(lower(w))).map(one);
 function listFor(noun: string, lists: readonly SentenceList[]): SentenceList | 'many' | null {
   const said = one(noun);
   if (said === '') return null;
   const names = (l: SentenceList): string[] => [l.name, l.id, l.one ?? ''].filter((x) => x !== '').map(one);
-  const words = (l: SentenceList): string[] => l.name.split(/[\s,/]+/u).filter((w) => w !== '' && !JOINS.has(lower(w))).map(one);
+  const words = nameWords;
   const last = one(said.split(' ').at(-1) ?? '');
   for (const pass of [(l: SentenceList) => names(l).includes(said), (l: SentenceList) => names(l).includes(last), (l: SentenceList) => words(l).includes(last)]) {
     const found = lists.filter(pass);
@@ -312,9 +314,12 @@ function triggerOf(text: string, world: SentenceWorld, implied: SentenceDoor | n
     if (extra !== null && 'why' in extra) return extra;
     if (extra !== null && /, or /u.test(extra.when)) return { why: 'A date condition can only be joined to others with "and".' };
     const window = timed.late ? `${f.id} before today` : `${f.id} after yesterday, ${f.id} before +${(timed.within ?? 0) + 1}d`;
-    const noun = list.one ?? one(list.name);
+    /* THE THING AS IT WAS SAID, where the list's own singular is a word for anything ("item") and what was said is a
+       word of its name: "When a bill is due", never "When a item". "an" before a vowel. */
+    const saidOne = one(timed.noun.replace(ARTICLE, '').split(' ').at(-1) ?? '');
+    const noun = list.one && !GENERIC.test(lower(list.one)) ? list.one : saidOne !== '' && nameWords(list).includes(saidOne) ? saidOne : (list.one ?? one(list.name));
     const phrase = phraseOf(name, timed.late, timed.within ?? 0);
-    const parts: Part[] = [{ kind: 'text', text: 'a ' }];
+    const parts: Part[] = [{ kind: 'text', text: /^[aeiou]/iu.test(noun) ? 'an ' : 'a ' }];
     const thing = parts.length;
     parts.push({ kind: 'thing', text: noun });
     parts.push({ kind: 'text', text: ' ' });
