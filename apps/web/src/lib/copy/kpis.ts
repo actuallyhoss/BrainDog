@@ -49,7 +49,7 @@ export const kpis = {
   kpiTarget: 'Target',
   kpiTargetPlaceholder: '10,000',
   kpiUnit: 'Unit',
-  kpiUnitPlaceholder: 'USD, players, %',
+  kpiUnitPlaceholder: 'USD or %',
   kpiBy: 'By when',
 
   kpiMore: 'More',
@@ -58,7 +58,7 @@ export const kpis = {
   kpiMeasures: 'What it measures',
   kpiMeasuresPlaceholder: 'Paying customers each month, after refunds',
   kpiMeasure: 'Name in Numbers',
-  kpiMeasureHelp: 'Values saved in Numbers under this name count toward it. Leave it empty to use the name above.',
+  kpiMeasureHelp: 'Values saved in Numbers under this name count toward it.',
 
   kpiGood: 'Which way is good',
   kpiGoodUp: 'Up',
@@ -104,7 +104,7 @@ export const kpis = {
   kpiNoName: 'Give it a name.',
   kpiLongName: 'Keep the name under 80 letters.',
   kpiNoFigure: 'Pick what it is worked out as.',
-  kpiNotDigits: (typed: string): string => `“${typed}” is not a number. Write it in digits, like 1,200 or 3.5.`,
+  kpiNotDigits: (typed: string): string => `“${typed}” is not a number. Use digits, like 1,200.`,
   kpiShareOver: 'A share is out of 100.',
   kpiLongUnit: 'Keep the unit short, like USD, players or %.',
   kpiBadDay: 'Pick a day.',
