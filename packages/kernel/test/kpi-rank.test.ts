@@ -191,7 +191,7 @@ test('stale: the fix is chosen by source', () => {
   assert.equal(kpiFix({ source: 'feed' }), 'check-feed');
   assert.equal(kpiFix({ source: 'numbers' }), 'set-up');
   assert.equal(kpiFix({ source: 'numbers', owner: '  ' }), 'set-up');
-  assert.equal(kpiFix({ source: 'numbers', owner: 'Sam' }), 'add-value');
+  assert.equal(kpiFix({ source: 'numbers', owner: 'Maya' }), 'add-value');
   assert.equal(kpiFix({}), 'set-up');
   assert.equal(kpiFix({ source: 'figure' }), null);
 });
@@ -283,13 +283,13 @@ test('today: pins first in his order, absent order last, then by name; pins win 
 
 test('today: one auto KPI per project, the best of them; a pin takes no project place', () => {
   const list = [
-    kpi('fan-rest', { thing: 'encore' }),
-    kpi('fan-off', { thing: 'encore', verdict: 'missed' }),
-    kpi('fan-stale', { thing: 'encore', newest: NOW - 30 * DAY }),
-    kpi('fan-pin', { thing: 'encore', today: 'pinned' }),
-    kpi('bake-rest', { thing: 'bake' }),
+    kpi('kiln-rest', { thing: 'kiln' }),
+    kpi('kiln-off', { thing: 'kiln', verdict: 'missed' }),
+    kpi('kiln-stale', { thing: 'kiln', newest: NOW - 30 * DAY }),
+    kpi('kiln-pin', { thing: 'kiln', today: 'pinned' }),
+    kpi('portage-rest', { thing: 'portage' }),
   ];
-  assert.deepEqual(ids(kpisForToday(list, AT)), ['fan-pin', 'fan-off', 'bake-rest']);
+  assert.deepEqual(ids(kpisForToday(list, AT)), ['kiln-pin', 'kiln-off', 'portage-rest']);
 });
 
 test('today: hidden, retired and draft never show; a pin shows though its project is out of play', () => {
@@ -348,30 +348,30 @@ test('today: the input is not reordered or changed', () => {
 
 test('headline: the KPI marked headline leads, by his order when more than one is marked', () => {
   const list = [
-    kpi('off', { thing: 'bake', verdict: 'missed' }),
-    kpi('mrr', { thing: 'bake', headline: true, order: 2, unit: 'USD' }),
-    kpi('dau', { thing: 'bake', headline: true, order: 1 }),
+    kpi('off', { thing: 'portage', verdict: 'missed' }),
+    kpi('mrr', { thing: 'portage', headline: true, order: 2, unit: 'USD' }),
+    kpi('dau', { thing: 'portage', headline: true, order: 1 }),
   ];
-  assert.deepEqual(kpiHeadline(list, 'bake', AT), { kpi: list[2], why: 'rest' });
+  assert.deepEqual(kpiHeadline(list, 'portage', AT), { kpi: list[2], why: 'rest' });
 });
 
 test('headline: a retired or draft KPI marked headline is passed over', () => {
   const list = [
-    kpi('old', { thing: 'bake', headline: true, state: 'retired' }),
-    kpi('new', { thing: 'bake', headline: true, draft: true }),
-    kpi('dau', { thing: 'bake' }),
+    kpi('old', { thing: 'portage', headline: true, state: 'retired' }),
+    kpi('new', { thing: 'portage', headline: true, draft: true }),
+    kpi('dau', { thing: 'portage' }),
   ];
-  assert.equal(kpiHeadline(list, 'bake', AT)?.kpi.id, 'dau');
+  assert.equal(kpiHeadline(list, 'portage', AT)?.kpi.id, 'dau');
 });
 
 test('headline: else the top KPI by the Today score, hidden and out-of-play ones counted', () => {
   const list = [
-    kpi('rest', { thing: 'sketchpad', inPlay: false }),
-    kpi('money', { thing: 'sketchpad', inPlay: false, unit: 'GBP' }),
-    kpi('stale', { thing: 'sketchpad', inPlay: false, today: 'hidden', newest: NOW - 40 * DAY }),
-    kpi('elsewhere', { thing: 'bake', verdict: 'missed' }),
+    kpi('rest', { thing: 'marlow', inPlay: false }),
+    kpi('money', { thing: 'marlow', inPlay: false, unit: 'GBP' }),
+    kpi('stale', { thing: 'marlow', inPlay: false, today: 'hidden', newest: NOW - 40 * DAY }),
+    kpi('elsewhere', { thing: 'portage', verdict: 'missed' }),
   ];
-  const pick = kpiHeadline(list, 'sketchpad', AT);
+  const pick = kpiHeadline(list, 'marlow', AT);
   assert.equal(pick?.kpi, list[2]);
   assert.equal(pick?.why, 'stale');
 });
@@ -382,9 +382,9 @@ test('headline: a pin leads the card when nothing is marked', () => {
 });
 
 test('headline: none for a project with no live KPI, or no KPI at all', () => {
-  assert.equal(kpiHeadline([], 'bake', AT), null);
-  assert.equal(kpiHeadline([kpi('x', { thing: 'other' })], 'bake', AT), null);
-  assert.equal(kpiHeadline([kpi('x', { thing: 'bake', state: 'retired' }), kpi('y', { thing: 'bake', draft: true })], 'bake', AT), null);
+  assert.equal(kpiHeadline([], 'portage', AT), null);
+  assert.equal(kpiHeadline([kpi('x', { thing: 'other' })], 'portage', AT), null);
+  assert.equal(kpiHeadline([kpi('x', { thing: 'portage', state: 'retired' }), kpi('y', { thing: 'portage', draft: true })], 'portage', AT), null);
 });
 
 test('headline: a tie between calm KPIs goes to his order, then the name', () => {
