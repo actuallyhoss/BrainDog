@@ -337,10 +337,12 @@ test('and a colour restore drops is not written over the record', async () => {
  */
 test('HOUSE PAINTS THE WORKING RED, AND A SWATCH MOVES THE BUTTONS BUT NOT LATE', () => {
   const house = readFileSync(fileURLToPath(new URL('../../../../packages/skin/house.css', import.meta.url)), 'utf8');
-  /* The first scheme block is light: the fill, its pressed red under the pointer, and late in the deeper red. */
-  assert.match(house, /--action: #CF413A;/u, 'house.css does not paint the buttons BrainDog red');
-  assert.match(house, /--action-hover: #B3322C;/u, 'house.css does not press to the deeper red');
-  assert.match(house, /--danger: #B3322C;/u, 'late is not the deeper red in house.css');
+  /* The first scheme block is light (SPEC 1.1): the fill BrainDog red, pressed deeper under the pointer, a white label,
+     and red as words and marks the deeper #C2362F (C1). */
+  assert.match(house, /--red-fill: #CF413A;/u, 'house.css does not paint the buttons BrainDog red');
+  assert.match(house, /--red-fill-hover: #B3322C;/u, 'house.css does not press to the deeper red');
+  assert.match(house, /--on-red: #FFFFFF;/u, 'the label on the red fill is not white');
+  assert.match(house, /--red: #C2362F;/u, 'late is not the deeper red in house.css');
   assert.doesNotMatch(house, /#2563EB|#6EA8FE/u, 'the old blue is still in house.css');
 
   const sheets = browser();
@@ -350,8 +352,8 @@ test('HOUSE PAINTS THE WORKING RED, AND A SWATCH MOVES THE BUTTONS BUT NOT LATE'
   for (const { name, hex } of accent.ACCENTS) {
     accent.adopt(name);
     const css = sheets()[0]?.text ?? '';
-    assert.match(css, new RegExp(`--action: ${hex.toUpperCase()};`, 'u'), `${name} did not move the buttons`);
-    assert.doesNotMatch(css, /--action: #CF413A;/u, `${name} kept the house red on the buttons`);
-    assert.match(css, /--danger: #B3322C;/u, `${name} moved late off the deeper red`);
+    assert.match(css, new RegExp(`--red-fill: ${hex.toUpperCase()};`, 'u'), `${name} did not move the buttons`);
+    assert.doesNotMatch(css, /--red-fill: #CF413A;/u, `${name} kept the house red on the buttons`);
+    assert.match(css, /--red: #C2362F;/u, `${name} moved late off the deeper red`);
   }
 });

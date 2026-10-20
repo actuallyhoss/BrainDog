@@ -30,10 +30,13 @@
  * words from the chosen colour (`Seed.action` in `@braindog/theme`: the house's working red is pinned only beside the
  * house mark), so picking Moss turns the buttons Moss, in light exactly the swatch and in dark a lighter step of it.
  *
- * 2026-10-08, HOUSE IS RED NOW (DIRECTION §42). The house's working accent is BrainDog red, #CF413A in light with #B3322C
- * under the pointer and #E05148 in dark, where it was a blue. So `apply(null)` puts the red buttons back, and a person
- * who picks a swatch moves them off red; late stays the house's deeper red whatever they pick, because `danger` is
- * solved at its own anchor and not from this colour.
+ * 2026-10-08, HOUSE IS RED NOW (DIRECTION §42). So `apply(null)` puts the red buttons back, and a person who picks a
+ * swatch moves them off red.
+ *
+ * 2026-10-20, THE FRAME'S NAMES (UI pass, SPEC 1). The sheet writes `--red-fill`, its hover and pressed steps, `--on-red`
+ * and the two tints a chosen thing wears, from the picked colour (`frameOf` in `@braindog/theme`); the house's are
+ * #CF413A in light and #C2362F in dark, always with a white label. Red as words and marks, `--red`, stays the
+ * product's red whatever they pick: it says late and needs you, and a record's colour does not get to say that.
  */
 
 import { ACCENTS, recordTheme } from '@braindog/theme';
