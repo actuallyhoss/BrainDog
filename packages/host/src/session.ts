@@ -1,7 +1,7 @@
 /**
  * What an agent says about its run, read off a request and checked.
  *
- * TEN HINTS, EACH WITH ITS GRAMMAR (`44 §4.2`). A value that
+ * EACH HINT WITH ITS GRAMMAR (`44 §4.2`). A value that
  * fails is dropped, never corrected and never refused: these are hints, and a call whose hint is
  * wrong is still a call the record answers. The kernel writes what reaches it into a row as given,
  * so this is the one place a stranger's text is held to a shape first.
@@ -16,6 +16,11 @@ export type SessionHints = {
   client_id?: string | undefined;
   host?: string | undefined;
   repo?: string | undefined;
+  /**
+   * The linked worktree's own folder, `builder-2`, kept apart from `repo`, which a builder's worktree shares with
+   * its lead (agents and MCP plan §4.4). The record stamps it on the run as the run opens, and no caller writes it after.
+   */
+  worktree?: string | undefined;
   remote?: string | undefined;
   cwd?: string | undefined;
   agent?: string | undefined;
@@ -48,6 +53,8 @@ export const HINTS: Readonly<Record<Key, { header: string; grammar: RegExp }>> =
   host: { header: 'x-braindog-host', grammar: /^[A-Za-z0-9._-]{1,128}$/ },
   /* A name and never a path (`26 §5`), so never `..`. */
   repo: { header: 'x-braindog-repo', grammar: /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/ },
+  /* A FOLDER'S NAME AND NEVER A PATH, held to `repo`'s grammar, as the command line sends it (`position.ts`). */
+  worktree: { header: 'x-braindog-worktree', grammar: /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/ },
   remote: { header: 'x-braindog-remote', grammar: printable(256) },
   cwd: { header: 'x-braindog-cwd', grammar: printable(512) },
   /* The `agent` field's seven values since migration 22. Anything else would refuse the run the ladder opens. */
