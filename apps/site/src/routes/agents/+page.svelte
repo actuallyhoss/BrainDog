@@ -118,7 +118,7 @@
   .lists h2,
   .dev h2 {
     margin: 0 0 20px;
-    font-size: 28px;
+    font-size: var(--t-site-28);
     line-height: 1.1;
     letter-spacing: -0.035em;
   }
@@ -137,7 +137,7 @@
     gap: 12px;
     align-items: center;
     color: var(--ink2);
-    font-size: 17px;
+    font-size: var(--t-site-17);
     line-height: 1.5;
   }
 
@@ -181,7 +181,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 16px;
+    font-size: var(--t-site-16);
   }
 
   .mcp {

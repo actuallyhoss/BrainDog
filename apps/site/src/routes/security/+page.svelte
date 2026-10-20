@@ -267,7 +267,7 @@
     align-self: flex-start;
     min-block-size: 32px;
     color: var(--ink);
-    font-size: 15px;
+    font-size: var(--t-site-15);
     font-weight: 600;
     text-decoration: none;
   }

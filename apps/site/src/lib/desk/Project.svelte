@@ -53,7 +53,7 @@
   </div>
 
   <div class="t s3 hide-phone">
-    <p class="thd"><span class="well"><Icon name="people" /></span>{PROJECT.people.head}</p>
+    <p class="thd"><span class="well"><Icon name="users" /></span>{PROJECT.people.head}</p>
     <div class="list">
       {#each PROJECT.people.who as id}
         {@const who = PEOPLE[id]}
@@ -116,11 +116,11 @@
     padding: 8px 12px;
     border-radius: 8px;
     background: var(--tile);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .stands {
-    font-size: 17px;
+    font-size: var(--t-site-17);
     line-height: 1.5;
     margin: 0;
     text-wrap: pretty;
@@ -138,7 +138,7 @@
 
   .up {
     color: var(--good);
-    font-size: 13px;
+    font-size: var(--t-site-13);
     font-weight: 500;
   }
 
@@ -189,7 +189,7 @@
 
   @media (max-width: 760px) {
     .stands {
-      font-size: 16px;
+      font-size: var(--t-site-16);
     }
 
     .next {

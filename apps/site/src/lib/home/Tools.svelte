@@ -86,13 +86,13 @@
 
   .note p {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--t-site-15);
   }
 
   .note .meta {
     margin-block-start: 2px;
     color: var(--on-night-2);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .agent {
@@ -112,7 +112,7 @@
     min-block-size: 32px;
     margin-block-start: 16px;
     color: var(--on-night-2);
-    font-size: 15px;
+    font-size: var(--t-site-15);
     text-decoration: none;
   }
 

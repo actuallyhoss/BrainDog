@@ -224,7 +224,7 @@
   .go :global(.btn) {
     block-size: 40px;
     padding-inline: 16px;
-    font-size: 15px;
+    font-size: var(--t-site-15);
   }
 
   @media (pointer: coarse) {
@@ -313,7 +313,7 @@
     .go :global(.btn) {
       block-size: 34px;
       padding-inline: 12px;
-      font-size: 14px;
+      font-size: var(--t-site-14);
     }
 
     .menu {
@@ -326,7 +326,7 @@
   .site-foot {
     padding: 48px 0 calc(28px + env(safe-area-inset-bottom, 0px));
     border-block-start: 1px solid var(--foot-rule);
-    font-size: 15px;
+    font-size: var(--t-site-15);
   }
 
   .foot {
@@ -380,7 +380,7 @@
   @media (max-width: 760px) {
     .foot {
       gap: 24px 12px;
-      font-size: 14px;
+      font-size: var(--t-site-14);
     }
   }
 

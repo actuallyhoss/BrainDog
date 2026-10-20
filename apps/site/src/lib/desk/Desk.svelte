@@ -137,7 +137,7 @@
     background: var(--board);
     box-shadow: var(--win-shadow);
     overflow: hidden;
-    font-size: 14px;
+    font-size: var(--t-site-14);
     line-height: 1.45;
     color: var(--ink);
     text-align: start;
@@ -376,7 +376,7 @@
   .win :global(.thd .r) {
     margin-inline-start: auto;
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-site-13);
     font-weight: 500;
   }
 
@@ -425,7 +425,7 @@
 
   .win :global(.sub) {
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .win :global(.late-word) {
@@ -474,7 +474,7 @@
   .win :global(.grow span) {
     display: block;
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   /* AN AGENT'S FACE (SPEC 2.A.5): a 28px disc with the maker's mark, and an 8px live dot cut out of its corner. */
@@ -548,7 +548,7 @@
     all: unset;
     cursor: pointer;
     color: var(--ink2);
-    font-size: 13px;
+    font-size: var(--t-site-13);
     font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -625,7 +625,7 @@
     .phone-date {
       display: block;
       color: var(--muted);
-      font-size: 13px;
+      font-size: var(--t-site-13);
     }
 
     .working {
@@ -652,7 +652,7 @@
       padding: 0;
       border-radius: 0;
       color: var(--muted);
-      font-size: 12px;
+      font-size: var(--t-site-12);
       font-weight: 500;
     }
 

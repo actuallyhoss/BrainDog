@@ -194,7 +194,7 @@
   .propose .sub { flex: 1; min-width: 11em; }
   .propose .said { flex: 1; }
   .ok { display: inline-flex; color: var(--good); }
-  .undo { all: unset; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--red); }
+  .undo { all: unset; cursor: pointer; font-size: var(--t-site-13); font-weight: 500; color: var(--red); }
   .undo:hover { text-decoration: underline; }
   .undo:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
   @media (pointer: coarse) {

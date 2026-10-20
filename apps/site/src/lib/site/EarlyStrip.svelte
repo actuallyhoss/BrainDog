@@ -32,7 +32,7 @@
   p {
     margin: 0;
     color: var(--ink2);
-    font-size: 17px;
+    font-size: var(--t-site-17);
     line-height: 1.5;
   }
 

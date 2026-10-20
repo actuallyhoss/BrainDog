@@ -61,7 +61,7 @@
     gap: 12px;
     padding: 6px 0;
     border-block-start: 1px solid var(--rule);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .rows span {
@@ -74,7 +74,7 @@
     gap: 12px;
     align-items: center;
     padding: 6px 0;
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .bar {

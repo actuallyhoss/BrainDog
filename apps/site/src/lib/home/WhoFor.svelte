@@ -1,7 +1,7 @@
 <!--
   "Who it's for" (site F2, 2a section 2): three readers, three tiles, each with its own fill, a real icon in a 40px
   well, a title, one line, a small drawing that differs per tile, and the way on. Fills are category slots, not status
-  hues (SPEC 0.2): gold for a small business, the night for building with AI, blue for a team. The words are
+  hues (SPEC 0.2): amber for a small business, the night for building with AI, blue for a team. The words are
   `copy/home.ts`; the names in the drawings are Maya's (`demo/maya.ts`).
 -->
 <script lang="ts">
@@ -20,7 +20,7 @@
   <div class="wrap reveal">
     <h2 id="who-title" class="band-h2">{w.title}</h2>
     <div class="cols trio">
-      <article class="ftile c4 gold">
+      <article class="ftile c4 amber">
         <span class="fwell"><Icon name="store" /></span>
         <h3>{w.small.title}</h3>
         <p class="say">{w.small.say}</p>
@@ -44,7 +44,7 @@
       </article>
 
       <article class="ftile c4 blue">
-        <span class="fwell"><Icon name="people" /></span>
+        <span class="fwell"><Icon name="users" /></span>
         <h3>{w.team.title}</h3>
         <p class="say">{w.team.say}</p>
         <div class="draw">
@@ -71,11 +71,11 @@
     min-inline-size: 0;
   }
 
-  .gold {
-    background: var(--cat-gold-tint);
+  .amber {
+    background: var(--cat-amber-tint);
     color: var(--ink);
-    --well: color-mix(in srgb, var(--cat-gold) 16%, transparent);
-    --well-ink: var(--cat-gold);
+    --well: color-mix(in srgb, var(--cat-amber) 16%, transparent);
+    --well-ink: var(--cat-amber);
   }
 
   .night {
@@ -109,14 +109,14 @@
 
   h3 {
     margin-block-start: 4px;
-    font-size: 24px;
+    font-size: var(--t-site-24);
     line-height: 1.15;
     letter-spacing: -0.03em;
   }
 
   .say {
     margin: 0;
-    font-size: 15px;
+    font-size: var(--t-site-15);
     line-height: 1.5;
     color: var(--ink2);
   }
@@ -142,18 +142,18 @@
 
   .cash .l {
     fill: none;
-    stroke: var(--cat-gold);
+    stroke: var(--cat-amber);
     stroke-width: 2;
   }
 
   .cash .a {
-    fill: color-mix(in srgb, var(--cat-gold) 14%, transparent);
+    fill: color-mix(in srgb, var(--cat-amber) 14%, transparent);
   }
 
   .fig {
     margin-block-start: 8px !important;
     color: var(--ink2);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .fig b {
@@ -200,7 +200,7 @@
   .moved {
     margin-block-start: 8px !important;
     color: var(--ink2);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .go {
@@ -210,7 +210,7 @@
     align-self: flex-start;
     min-block-size: 32px;
     color: inherit;
-    font-size: 15px;
+    font-size: var(--t-site-15);
     font-weight: 600;
     text-decoration: none;
   }
@@ -246,7 +246,7 @@
 
     h3 {
       margin: 0;
-      font-size: 22px;
+      font-size: var(--t-site-22);
     }
 
     .say,

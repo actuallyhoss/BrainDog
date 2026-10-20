@@ -34,7 +34,7 @@
   .aside {
     margin: 16px 0 0;
     color: var(--ink2);
-    font-size: 16px;
+    font-size: var(--t-site-16);
   }
 
   .aside a {
@@ -61,7 +61,7 @@
     min-block-size: 56px;
     padding: 0 20px;
     cursor: pointer;
-    font-size: 17px;
+    font-size: var(--t-site-17);
     font-weight: 600;
     list-style: none;
   }
@@ -93,7 +93,7 @@
     padding: 0 20px 20px;
     max-inline-size: 40em;
     color: var(--ink2);
-    font-size: 16px;
+    font-size: var(--t-site-16);
     line-height: 1.55;
   }
 

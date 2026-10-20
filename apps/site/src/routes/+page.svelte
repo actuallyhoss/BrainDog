@@ -117,7 +117,7 @@
     max-inline-size: 30em;
     margin: 24px 0 0;
     color: var(--on-night-2);
-    font-size: 20px;
+    font-size: var(--t-site-20);
     line-height: 1.5;
     text-wrap: pretty;
   }
@@ -132,7 +132,7 @@
   .early {
     margin: 16px 0 0;
     color: var(--on-night-2);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .early b {
@@ -147,7 +147,7 @@
     gap: 8px 16px;
     margin: 24px 0 0;
     color: var(--on-night-2);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .maker {
@@ -191,7 +191,7 @@
     }
 
     .lead {
-      font-size: 18px;
+      font-size: var(--t-site-18);
     }
 
     .hero-mark {

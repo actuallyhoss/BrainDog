@@ -46,7 +46,7 @@
   }
 
   h3 {
-    font-size: 28px;
+    font-size: var(--t-site-28);
     line-height: 1.1;
     letter-spacing: -0.035em;
   }
@@ -68,7 +68,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    font-size: 17px;
+    font-size: var(--t-site-17);
   }
 
   .well {
@@ -96,7 +96,7 @@
     margin-block-start: auto;
     padding-block-start: 24px;
     color: var(--ink);
-    font-size: 15px;
+    font-size: var(--t-site-15);
     font-weight: 600;
     text-decoration: none;
   }
@@ -114,7 +114,7 @@
   .say {
     margin: 12px 0 0;
     color: var(--on-night-2);
-    font-size: 16px;
+    font-size: var(--t-site-16);
     line-height: 1.5;
   }
 
@@ -132,7 +132,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 17px;
+    font-size: var(--t-site-17);
   }
 
   .figs b {
@@ -143,7 +143,7 @@
   .figs span {
     max-inline-size: 11em;
     color: var(--on-night-2);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .go-btn {
@@ -164,11 +164,11 @@
 
   @media (max-width: 760px) {
     h3 {
-      font-size: 24px;
+      font-size: var(--t-site-24);
     }
 
     .mine li {
-      font-size: 16px;
+      font-size: var(--t-site-16);
     }
 
     .figs {
@@ -176,7 +176,7 @@
     }
 
     .figs b {
-      font-size: 22px;
+      font-size: var(--t-site-22);
     }
 
     .figs span {

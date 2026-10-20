@@ -138,7 +138,7 @@
   .date {
     margin: 0;
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .hello {
@@ -157,7 +157,7 @@
 
   .line {
     margin: 0;
-    font-size: 17px;
+    font-size: var(--t-site-17);
     line-height: 1.45;
     color: var(--ink2);
     text-wrap: pretty;
@@ -197,7 +197,7 @@
   .bh {
     margin: 0 0 4px;
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .evr {
@@ -206,7 +206,7 @@
     gap: 12px;
     margin: 0;
     padding: 4px 0;
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .dtiles {
@@ -249,7 +249,7 @@
   }
 
   .end .fig {
-    font-size: 15px;
+    font-size: var(--t-site-15);
   }
 
   .done {
@@ -259,7 +259,7 @@
     padding: 10px 0 0;
     border-block-start: 1px solid var(--rule);
     color: var(--ink2);
-    font-size: 13px;
+    font-size: var(--t-site-13);
     animation: land 200ms ease-out both;
   }
 
@@ -345,7 +345,7 @@
 
   .pname span {
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   /* "1 late" (SPEC 0.2): a red dot and a 13/600 red word, no fill. */
@@ -354,7 +354,7 @@
     align-items: center;
     gap: 6px;
     color: var(--red);
-    font-size: 13px;
+    font-size: var(--t-site-13);
     font-weight: 600;
     white-space: nowrap;
   }
@@ -430,7 +430,7 @@
     gap: 8px;
     margin: 12px 0 0;
     color: var(--ink2);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .rd :global(.icon) {
@@ -476,7 +476,7 @@
     }
 
     .greet {
-      font-size: 22px;
+      font-size: var(--t-site-22);
     }
 
     .hello {
@@ -484,7 +484,7 @@
     }
 
     .line {
-      font-size: 16px;
+      font-size: var(--t-site-16);
     }
 
     .dtiles {

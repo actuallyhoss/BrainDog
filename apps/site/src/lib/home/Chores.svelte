@@ -168,7 +168,7 @@
 
   .by {
     color: var(--muted);
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .kind {
@@ -177,13 +177,13 @@
   }
 
   .q {
-    font-size: 16px;
+    font-size: var(--t-site-16);
     font-weight: 600;
   }
 
   .why {
     color: var(--ink2);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .acts {
@@ -195,7 +195,7 @@
 
   .empty {
     color: var(--muted);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   /* WHAT GOT DONE, on the red ground itself; each reason on its own line at 13px, full white (site F23). */
@@ -215,7 +215,7 @@
     gap: 12px;
     padding: 8px 0;
     border-block-end: 1px solid var(--red-rule);
-    font-size: 15px;
+    font-size: var(--t-site-15);
   }
 
   .item p {
@@ -226,7 +226,7 @@
   .why2 {
     display: block;
     margin-block-start: 2px;
-    font-size: 13px;
+    font-size: var(--t-site-13);
     font-weight: 400;
   }
 
@@ -234,7 +234,7 @@
     all: unset;
     cursor: pointer;
     color: var(--on-red);
-    font-size: 14px;
+    font-size: var(--t-site-14);
     font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -267,7 +267,7 @@
     margin-block-start: 24px;
     padding-block-start: 20px;
     border-block-start: 1px solid var(--red-rule);
-    font-size: 17px;
+    font-size: var(--t-site-17);
     line-height: 1.5;
   }
 

@@ -44,6 +44,16 @@
     --t-site-18: 18px;
     --t-site-19: 19px;
     --t-site-21: 21px;
+    /* The steps the bands, the desk and the early access pages read (UI pass, 20 October). */
+    --t-site-13: 13px;
+    --t-site-14: 14px;
+    --t-site-17: 17px;
+    --t-site-20: 20px;
+    --t-site-22: 22px;
+    --t-site-24: 24px;
+    --t-site-28: 28px;
+    /* A slot's tint, set inline by `slotVars` (`demo/maya.ts`); the tile until one is. */
+    --ph-tint: var(--tile);
     /* The one stacking step the site's own pages need above the shared `--z-raise`. */
     --z-site-lift: 2;
     /* The app's two smallest steps, read here where they are still the app's, for the drawings. */
@@ -794,7 +804,7 @@
     max-inline-size: 34em;
     margin: 16px 0 0;
     color: var(--ink2);
-    font-size: 18px;
+    font-size: var(--t-site-18);
     line-height: 1.5;
     text-wrap: pretty;
   }
@@ -869,7 +879,7 @@
     }
 
     .band-say {
-      font-size: 16px;
+      font-size: var(--t-site-16);
     }
   }
 

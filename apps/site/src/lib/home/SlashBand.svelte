@@ -118,7 +118,7 @@
     border-radius: 12px;
     background: var(--band-slash-tile);
     color: var(--ink);
-    font-size: 15px;
+    font-size: var(--t-site-15);
     transition: background var(--d-state, 90ms) ease-out;
   }
 
@@ -142,7 +142,7 @@
     min-block-size: 32px;
     margin-block-start: 20px;
     color: var(--ink);
-    font-size: 15px;
+    font-size: var(--t-site-15);
     font-weight: 600;
     text-decoration: none;
   }
@@ -170,7 +170,7 @@
     border-radius: 12px 12px 0 0;
     background: var(--tile);
     box-shadow: inset 0 0 0 1.5px var(--red);
-    font-size: 16px;
+    font-size: var(--t-site-16);
   }
 
   .sl {
@@ -216,7 +216,7 @@
     margin: 0;
     padding: 12px 4px;
     color: var(--muted);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .thinking i {

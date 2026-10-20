@@ -169,7 +169,7 @@
     margin: 24px 0 0;
     padding: 0;
     list-style: none;
-    font-size: 17px;
+    font-size: var(--t-site-17);
   }
 
   .plan li::before {
@@ -194,7 +194,7 @@
   }
 
   .later h2 {
-    font-size: 28px;
+    font-size: var(--t-site-28);
     letter-spacing: -0.035em;
   }
 
@@ -202,7 +202,7 @@
     max-inline-size: 30em;
     margin: 12px 0 0;
     color: var(--ink2);
-    font-size: 17px;
+    font-size: var(--t-site-17);
     line-height: 1.55;
   }
 

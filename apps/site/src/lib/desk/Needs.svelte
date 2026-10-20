@@ -68,13 +68,13 @@
   }
 
   .ask {
-    font-size: 16px;
+    font-size: var(--t-site-16);
     font-weight: 600;
   }
 
   .why {
     color: var(--ink2);
-    font-size: 14px;
+    font-size: var(--t-site-14);
   }
 
   .facts {
@@ -89,7 +89,7 @@
     justify-content: space-between;
     gap: 12px;
     padding: 4px 0;
-    font-size: 13px;
+    font-size: var(--t-site-13);
   }
 
   .facts span {
