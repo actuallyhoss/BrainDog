@@ -86,6 +86,7 @@ export const FROM = {
   code: 'code',
   bell: 'bell',
   history: 'history',
+  mail: 'mail',
 };
 
 const ENTRY = /^  (?:'([a-z-]+)'|([A-Za-z]+)): '(<[^']*>)',$/;

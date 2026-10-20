@@ -23,7 +23,7 @@ const SET = {
   projects: '<rect x="3.75" y="3.75" width="9.5" height="7" rx="2"/><rect x="15.25" y="3.75" width="5" height="7" rx="2"/><rect x="3.75" y="12.75" width="5" height="7.5" rx="2"/><rect x="10.75" y="12.75" width="9.5" height="7.5" rx="2"/>',
   money: '<path d="M18.5 7.25V5.9a1.4 1.4 0 0 0-1.75-1.36L6 7.25"/><rect x="3.75" y="7.25" width="16.5" height="12.5" rx="3"/><path d="M20.25 11.5h-3.5a2 2 0 0 0 0 4h3.5"/>',
   activity: '<path d="M3 12.5h3.75l2.5-6 4.5 11 2.5-5h4.75"/>',
-  decide: '<path d="M12 20.5v-6.25L6.25 8.5"/><path d="M12 14.25l5.75-5.75"/><path d="M6.25 13V8.5h4.5"/><path d="M17.75 13V8.5h-4.5"/>',
+  decide: '<path d="M3.75 13.25 6.4 5.9a2 2 0 0 1 1.88-1.15h7.44a2 2 0 0 1 1.88 1.15l2.65 7.35"/><path d="M3.75 13.25v4.5a2.5 2.5 0 0 0 2.5 2.5h11.5a2.5 2.5 0 0 0 2.5-2.5v-4.5h-5l-1.5 2.5h-3.5l-1.5-2.5z"/>',
   settings: '<path d="M4 6.5h9M17 6.5h3M4 12h3M11 12h9M4 17.5h11M19 17.5h1"/><circle cx="15" cy="6.5" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/>',
   search: '<circle cx="10.75" cy="10.75" r="6.5"/><path d="M20 20l-4.6-4.6"/>',
   slash: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M14.25 7.75l-4.5 8.5"/>',
@@ -69,6 +69,7 @@ const SET = {
   code: '<path d="M8.5 7.5 4 12l4.5 4.5M15.5 7.5 20 12l-4.5 4.5M13.5 5l-3 14"/>',
   bell: '<path d="M6.25 16.75V11a5.75 5.75 0 0 1 11.5 0v5.75l1.5 1.75H4.75z"/><path d="M10 20.5a2.1 2.1 0 0 0 4 0"/>',
   history: '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 8.75"/><path d="M4.5 5.25v3.5h3.5"/><path d="M12 8v4l2.75 1.75"/>',
+  mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4 7 8 6 8-6"/>',
   /* icons:end */
   /* The icon set's shapes the app does not draw, kept by hand. One the app comes to draw moves up, into the script's table. */
   minus: '<path d="M5.25 12h13.5"/>',
@@ -94,7 +95,6 @@ const SET = {
   branch: '<circle cx="6.5" cy="5.75" r="2.25"/><circle cx="6.5" cy="18.25" r="2.25"/><circle cx="17.5" cy="10" r="2.25"/><path d="M6.5 8v8"/><path d="M15.25 10H11a4.5 4.5 0 0 0-4.5 4.5"/>',
   book: '<path d="M4 5.25a1.5 1.5 0 0 1 1.5-1.5H11a1 1 0 0 1 1 1v15.5a2 2 0 0 0-2-2H4z"/><path d="M20 5.25a1.5 1.5 0 0 0-1.5-1.5H13a1 1 0 0 0-1 1v15.5a2 2 0 0 1 2-2h6z"/>',
   message: '<path d="M4.25 6.75a3 3 0 0 1 3-3h9.5a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H10l-4.25 3.5v-3.5h-.5a1 1 0 0 1-1-1z"/>',
-  mail: '<rect x="3" y="5.25" width="18" height="13.5" rx="3"/><path d="m3.75 7.5 8.25 5.75 8.25-5.75"/>',
   phone: '<rect x="6.25" y="2.75" width="11.5" height="18.5" rx="3"/><path d="M10.75 18h2.5"/>',
   server: '<ellipse cx="12" cy="6" rx="7.25" ry="2.75"/><path d="M4.75 6v12c0 1.5 3.25 2.75 7.25 2.75s7.25-1.25 7.25-2.75V6"/><path d="M4.75 12c0 1.5 3.25 2.75 7.25 2.75s7.25-1.25 7.25-2.75"/>',
   cpu: '<rect x="6.25" y="6.25" width="11.5" height="11.5" rx="2"/><path d="M9.5 3.5v2.75M14.5 3.5v2.75M9.5 17.75v2.75M14.5 17.75v2.75M3.5 9.5h2.75M3.5 14.5h2.75M17.75 9.5h2.75M17.75 14.5h2.75"/><rect x="9.75" y="9.75" width="4.5" height="4.5" rx=".75"/>',
