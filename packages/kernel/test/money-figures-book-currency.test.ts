@@ -133,10 +133,13 @@ test('EACH BOOK’S PART OF CASH NOW BY BOOK IS IN THE BOOK’S CURRENCY, so no 
   for (const decl of [CASH_BY_BOOK, HELD_BY_BOOK]) {
     const by = read(k, decl);
     const parts = Object.fromEntries((by.groups ?? []).map((g) => [g.label, { value: g.value, parts: g.parts }]));
+    /* CASH NOW BY BOOK SAYS A BOOK OF TWO CURRENCIES IN EACH (the audit of 20 October): Quartz's E£50,000.00 beside its
+       $4,000.00, never turned into $1,000.00 and added, so the part reads as the Accounts tile beside it does. */
+    const quartz = decl === CASH_BY_BOOK ? [{ currency: 'EGP', amount: 5_000_000 }, { currency: 'USD', amount: 400_000 }] : [{ currency: 'USD', amount: 500_000 }];
     assert.deepEqual(
       parts,
       {
-        Quartz: { value: null, parts: [{ currency: 'USD', amount: 500_000 }] },
+        Quartz: { value: null, parts: quartz },
         Personal: { value: null, parts: [{ currency: 'EGP', amount: 7_000_000 }] },
         Studio: { value: null, parts: [{ currency: 'EGP', amount: 5_000_000 }] },
       },

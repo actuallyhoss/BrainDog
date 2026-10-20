@@ -130,12 +130,12 @@ test('ALL IN THE HOME CURRENCY, every account keeps a plain value, largest first
   sql.close();
 });
 
-test('AN ACCOUNT HOLDING POUNDS AND DOLLARS is converted into the home currency, as it was', async () => {
+test('AN ACCOUNT HOLDING POUNDS AND DOLLARS says each, never one turned into the other and added (the audit of 20 October)', async () => {
   const { k, sql, accounts } = await record('USD');
-  /* $100.00 OUT OF THE POUND ACCOUNT after its balance was stated: at eighty pence it is £80.00 less. */
+  /* $100.00 OUT OF THE POUND ACCOUNT after its balance was stated: the pounds it holds and the dollars that left it. */
   assert.ok(k.create('transactions', { what: 'Hosting', account: accounts[CURRENT]!, on: '2026-10-01', amount: money(10_000, 'USD'), direction: 'out' }, OWNER).ok);
   const by = byName(read(k, CASH_BY_ACCOUNT));
-  assert.deepEqual(by[CURRENT], { value: null, parts: [{ currency: 'GBP', amount: 300_000 - 8_000 }] });
+  assert.deepEqual(by[CURRENT], { value: null, parts: [{ currency: 'GBP', amount: 300_000 }, { currency: 'USD', amount: -10_000 }] });
   assert.deepEqual(by[DOLLARS], { value: null, parts: [{ currency: 'USD', amount: 294_795 }] });
   sql.close();
 });
