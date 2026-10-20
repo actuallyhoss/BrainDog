@@ -10,12 +10,10 @@
   spans the record; this keeps each list whole with its own count, because a person who has come here
   has already decided the ranked answer was not the one they wanted.
 
-  GROUPED UNDER META HEADINGS, AS THE PALETTE GROUPS THEM. Each list that matched is a
-  quiet heading in the meta step with its count, and its rows sit on the ground under it: a 32px well
-  with the glyph of what it is, the title, and one line saying where it sits or why it matched. The
-  row is drawn here and not through the palette's `Result`, which is an option inside glass; here it
-  is a link on the ground. When the matches span two lists or more, one tile says where they are, as
-  bars, with the line that reads them.
+  ONE TILE A LIST (the UI pass of 20 October, money F12). Each list that matched is a tile with its name and count,
+  and its rows sit in it: a 32px well with the glyph of what it is, the title with the matched letters at 600, and one
+  line that tells it from the next (`second.ts`). Over the lists, the best match on its own. The row is drawn here and
+  not through the palette's `Result`, which is an option inside glass.
 
   THE ANSWER IS THE RECORD'S, through `search-live.ts`, and a record that turns the search away says why.
 
@@ -38,7 +36,15 @@
   import type { SearchResult } from '$lib/record/api.ts';
   import { searcher, type Found, type Searcher } from '$lib/record/search-live.ts';
   import { shownState } from './shown.ts';
-  import { byMeaningOf, meaningLine, sentenceOf, topOf, whereSaid } from './shown.ts';
+  import { bestOf, byMeaningOf, marked, meaningLine, sentenceOf } from './shown.ts';
+  import { secondOf, type Second } from './second.ts';
+  import { homeCurrency } from '$lib/record/api.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { symbolText } from '$lib/record/money.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
+  import { daySaid } from '../r/[register]/[seq]/said.ts';
+  import type { Entry } from '$lib/record/schema.ts';
+  import { money, readable } from 'braindog-render';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Waiting from '$lib/ui/Waiting.svelte';
@@ -46,7 +52,6 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import Bars from '$lib/viz/Bars.svelte';
   import Face from '$lib/ui/Face.svelte';
   import { isGlyph, type IconName } from '$lib/ui/icons.ts';
   import { createClient } from '@braindog/client';
@@ -58,8 +63,7 @@
   /* THIS SCREEN'S OWN WORDS, beside it rather than in the copy aggregate, which this unit does not hold. */
   const words = {
     showAll: (n: number) => `Show all ${n.toLocaleString('en')}`,
-    where: 'Where it matched',
-    whereSubject: 'Matches by list',
+    best: 'Best match',
     jumpTo: 'Jump to',
     lists: 'Lists',
     recent: 'Changed lately',
@@ -159,8 +163,47 @@
       ? meaningLine(q, { total: found.total, byMeaning: byMeaningOf(found) }, answer?.from === 'live' ? answer.meaning : undefined)
       : null,
   );
-  const top = $derived(topOf(found.groups));
-  const bars = $derived(found.groups.map((g) => ({ label: g.kind, value: g.total, tone: g === top ? 'ink' : undefined })));
+  /* THE BEST MATCH, over the lists in a tile of its own (money F12), and still in its list below. */
+  const best = $derived(shown === 'hits' ? bestOf(found.hits, q) : null);
+
+  /**
+   * THE SECOND LINES THAT TELL HITS APART (`second.ts`). The record's search answers a row's list, number and title and
+   * nothing else, so three "Kiln storefront payout" lines read the same; the rows on screen are read once per list,
+   * after the answer, and each line then says its day and amount, or its list's Due cell. Read for the query they were
+   * asked for, and dropped for any other.
+   */
+  let rowsFor = $state.raw<{ q: string; rows: ReadonlyMap<string, Entry> }>({ q: '', rows: new Map() });
+  const ROW_HREF = /^\/r\/([a-z][a-z0-9_]*)\/([1-9]\d*)$/u;
+  async function readSeconds(want: string, groups: SearchResult['groups']) {
+    const by = new Map<string, number[]>();
+    for (const g of groups)
+      for (const h of g.hits.slice(0, PER_LIST)) {
+        const m = ROW_HREF.exec(h.href);
+        if (m) by.set(m[1]!, [...(by.get(m[1]!) ?? []), Number(m[2])]);
+      }
+    if (by.size === 0) return;
+    const client = createClient({ base: apiBase() });
+    const rows = new Map<string, Entry>();
+    await Promise.all(
+      [...by].map(async ([register, seqs]) => {
+        const out = await client.list({ register, where: { field: 'seq', in: seqs }, limit: seqs.length }).catch(() => null);
+        if (out?.ok) for (const r of out.value.rows as Entry[]) rows.set(`/r/${register}/${r.seq}`, r);
+      }),
+    );
+    if (q === want) rowsFor = { q: want, rows };
+  }
+  $effect(() => {
+    if (shown !== 'hits' || answeredFor === null) return;
+    const want = answeredFor;
+    const groups = found.groups;
+    untrack(() => void readSeconds(want, groups));
+  });
+  const moneySaid = (minor: number, currency: string): string => symbolText(money(minor, currency), homeCurrency(), true);
+  const secondFor = (href: string): Second | null => {
+    const row = rowsFor.q === q ? rowsFor.rows.get(href) : undefined;
+    const m = ROW_HREF.exec(href);
+    return row && m ? secondOf(REGISTERS[m[1]!], row, recordNow(), moneySaid) : null;
+  };
 
   /* TEN A LIST. Enough to recognise the one you meant, few enough that nine matching lists is a page
      rather than a scroll, and every list carries the way to its own remainder. */
@@ -224,6 +267,20 @@
 </script>
 
 <svelte:head><title>{titleOf(q || copy.search)}</title></svelte:head>
+
+<!-- A TITLE AS A PERSON WRITES IT (`readable`: a bank's capitals in sentence case), the letters the query matched at 600. -->
+{#snippet titled(title: string)}{#each marked(readable(title), q) as piece, i (i)}{#if piece.hit}<b class="matched">{piece.text}</b>{:else}{piece.text}{/if}{/each}{/snippet}
+
+{#snippet second(hit: SearchResult['hits'][number])}
+  {@const told = secondFor(hit.href)}
+  <span class="line-detail" dir="auto" data-late={told?.late ? '' : undefined}>{told?.text ?? hit.why ?? (hit.detail || hit.kind)}</span>
+{/snippet}
+
+<!-- THE BEST MATCH'S MARK: a person's face where the hit is somebody, else the well its list draws. -->
+{#snippet lead(hit: SearchResult['hits'][number])}
+  {@const list = ROW_HREF.exec(hit.href)?.[1]}
+  {#if list && (REGISTERS[list] as { meets?: unknown } | undefined)?.meets}<Face name={hit.title} size="m" />{:else}<IconWell name={hit.icon} size="l" />{/if}
+{/snippet}
 
 {#snippet meaningBelow()}<p class="reading">{meaningSaid}</p>{/snippet}
 
@@ -308,8 +365,8 @@
                   <li>
                     <a class="place" href={at(r.href)}>
                       <span class="place-lead" aria-hidden="true"><Icon name={r.icon} size="m" /></span>
-                      <span class="place-name">{r.title}</span>
-                      <span class="place-n">{r.list}</span>
+                      <span class="place-name">{readable(r.title)}</span>
+                      <span class="place-n">{daySaid(r.at.slice(0, 10), recordNow())}</span>
                     </a>
                   </li>
                 {/each}
@@ -337,65 +394,58 @@
     </Empty>
     {#if meaningSaid}<p class="reading">{meaningSaid}</p>{/if}
   {:else}
-    <div class="results" data-split={found.groups.length >= 2 ? '' : undefined}>
-      <!-- WHERE IT MATCHED, ONLY WHEN THERE IS A WHERE: a single list is its own heading already. The list holding
-           most is the ink bar and the rest are greys; a tie at the top highlights none. First in the order a phone
-           reads, and beside the lists from a desk's width. -->
-      {#if found.groups.length >= 2}
-        <div class="side">
-          <Tile icon="search" title={words.where} count={found.total.toLocaleString('en')}>
-            <Bars items={bars} subject={words.whereSubject} />
-            <p class="reading">{whereSaid(found)}</p>
-          </Tile>
-        </div>
+    <div class="results">
+      <!-- THE BEST MATCH FIRST, ON ITS OWN (money F12): the one line most likely to be what was meant, at 56 with its mark,
+           before the lists. "Where it matched" stood beside the lists as bars of what the headings already count. -->
+      {#if best}
+        <Tile title={words.best}>
+          <a class="line hit best" href={at(best.href)}>
+            {@render lead(best)}
+            <span class="line-main">
+              <span class="line-title" dir="auto">{@render titled(best.title)}</span>
+              {@render second(best)}
+            </span>
+          </a>
+        </Tile>
       {/if}
 
-      <div class="groups">
-        {#each found.groups as group, gi (group.kind)}
-          {@const all = isWhole(group.kind)}
-          <section class="group" aria-labelledby="search-group-{gi}">
-            <div class="group-head">
-              <h2 class="group-title" id="search-group-{gi}">
-                {group.kind}<span class="group-count num">{group.total.toLocaleString('en')}</span>
-              </h2>
-              <!--
-                EVERY CAPPED GROUP OFFERS THE REST, whether or not it has a screen of its own.
+      {#each found.groups as group (group.kind)}
+        {@const all = isWhole(group.kind)}
+        <!-- EACH LIST IN A TILE OF ITS OWN, its name and count the tile's heading and the way to the rest its action. -->
+        <Tile title={group.kind} count={group.total.toLocaleString('en')}>
+          {#snippet actions()}
+            <!--
+              EVERY CAPPED GROUP OFFERS THE REST, whether or not it has a screen of its own.
 
-                This was `group.href && group.total > PER_LIST`, and the questions group's `href` is `null`
-                by construction, because `/decide` is not a filtered list. So with fourteen matching
-                decisions the page drew *Decide 14*, ten rows, and nothing: four rows dropped in silence, on
-                the screen built because the palette dropped rows in silence.
-
-                A list's rest is that list, filtered by what was typed, which also holds the rows past the
-                record's ceiling on a search. The decisions and the pages are all in hand, so theirs opens
-                here, and the count on the button is what it will draw.
-              -->
-              {#if group.href && group.total > PER_LIST}
-                <Button weight="bare" size="sm" href={group.href}>{words.showAll(group.total)}</Button>
-              {:else if !group.href && !all && group.hits.length > PER_LIST}
-                <Button weight="bare" size="sm" onclick={() => openGroup(group.kind)}>{words.showAll(group.hits.length)}</Button>
-              {/if}
-            </div>
-            <ul class="ledger ledger-lead hits">
-              {#each all ? group.hits : group.hits.slice(0, PER_LIST) as hit (hit.href)}
-                <li>
-                  <!-- THE ROW SAYS WHY IT IS HERE. `nordhaven` draws four services named after none of it, because
-                       `services.provider` is declared searchable, and the reason is what makes that readable. A row
-                       the record sends with nothing beside its title says the list it is in, which is what a person
-                       calls it. -->
-                  <a class="line line-tall hit" href={at(hit.href)}>
-                    <IconWell name={hit.icon} size="l" />
-                    <span class="line-main">
-                      <span class="line-title" dir="auto">{hit.title}</span>
-                      <span class="line-detail" dir="auto">{hit.why ?? (hit.detail || hit.kind)}</span>
-                    </span>
-                  </a>
-                </li>
-              {/each}
-            </ul>
-          </section>
-        {/each}
-      </div>
+              This was `group.href && group.total > PER_LIST`, and the questions group's `href` is `null` by construction,
+              because `/decide` is not a filtered list. So with fourteen matching decisions the page drew *Decide 14*, ten
+              rows, and nothing: four rows dropped in silence, on the screen built because the palette dropped rows in
+              silence. A list's rest is that list, filtered by what was typed; the decisions and the pages are all in hand,
+              so theirs opens here, and the count on the button is what it will draw.
+            -->
+            {#if group.href && group.total > PER_LIST}
+              <Button weight="bare" size="sm" href={group.href}>{words.showAll(group.total)}</Button>
+            {:else if !group.href && !all && group.hits.length > PER_LIST}
+              <Button weight="bare" size="sm" onclick={() => openGroup(group.kind)}>{words.showAll(group.hits.length)}</Button>
+            {/if}
+          {/snippet}
+          <ul class="ledger ledger-lead hits">
+            {#each all ? group.hits : group.hits.slice(0, PER_LIST) as hit (hit.href)}
+              <li>
+                <!-- THE ROW SAYS WHAT TELLS IT APART: its day and amount, or its Due cell (`second.ts`), else why it
+                     matched, else the list it is in. -->
+                <a class="line line-tall hit" href={at(hit.href)}>
+                  <IconWell name={hit.icon} size="l" />
+                  <span class="line-main">
+                    <span class="line-title" dir="auto">{@render titled(hit.title)}</span>
+                    {@render second(hit)}
+                  </span>
+                </a>
+              </li>
+            {/each}
+          </ul>
+        </Tile>
+      {/each}
     </div>
   {/if}
 </div>
@@ -437,10 +487,11 @@
   }
 
   /* FOUR ACROSS WHERE THERE IS ROOM, two on a narrow desk, one on a phone: the tiles keep a readable width and fill
-     the row, measured on the page's own width so a docked panel narrows it. */
+     the row (`auto-fit`, so three tiles take the row rather than leaving a fourth's hole), measured on the page's own
+     width so a docked panel narrows it. */
   .jump-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
     gap: var(--tile-gap);
     align-items: start;
   }
@@ -530,32 +581,12 @@
     box-shadow: none;
   }
 
-  /* ONE COLUMN, the tile first and the lists under it. From a desk's width the lists take the room and the tile stands
-     beside them, held in view while they scroll. Measured on the page's own width, so a docked panel narrows it too. */
+  /* ONE COLUMN OF TILES: the best match, then each list. */
   .results {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-5);
-    align-items: start;
-  }
-
-  @container (inline-size >= 820px) {
-    .results[data-split] {
-      grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-      column-gap: var(--sp-6);
-    }
-
-    .results[data-split] .side {
-      position: sticky;
-      inset-block-start: calc(var(--inset) + 56px);
-      grid-column: 2;
-      grid-row: 1;
-    }
-
-    .results[data-split] .groups {
-      grid-column: 1;
-      grid-row: 1;
-    }
+    display: flex;
+    flex-direction: column;
+    gap: var(--tile-gap);
+    min-inline-size: 0;
   }
 
   /* THE ONE LINE THAT READS THE CHART, under it, and the quiet line about meaning in the same voice. */
@@ -566,41 +597,19 @@
     line-height: 20px;
   }
 
-  .groups {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-5);
-    min-inline-size: 0;
+  /* THE LETTERS THE QUERY MATCHED, at 600 in the title's own ink. */
+  .matched {
+    font-weight: 600;
   }
 
-  /* A META HEADING OVER EACH LIST, AS THE PALETTE HEADS ITS GROUPS: the meta step at 500 in the lowest text
-     ink, its count beside it, and the way to the rest at the far end. */
-  .group-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    min-block-size: var(--ctl-h-sm);
-    margin-block-end: var(--sp-1);
+  /* THE BEST MATCH, one 56px line. */
+  .best {
+    min-block-size: 56px;
   }
 
-  .group-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--sp-2);
-    min-inline-size: 0;
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    line-height: 18px;
-  }
-
-  .group-count {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .group-head :global(.btn) {
-    margin-inline-start: auto;
+  /* A LATE ROW'S DUE CELL, in red as its list says it. */
+  .line-detail[data-late] {
+    color: var(--danger-text);
   }
 
   /* A HIT IS A ROW ON THE GROUND: its well, its title over its line, and the rounded wash under the pointer. The shared

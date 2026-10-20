@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { BY_MEANING } from '../../lib/record/search-live.ts';
-import { byMeaningOf, meaningLine, sentenceOf, shownState, topOf, whereSaid } from './shown.ts';
+import { bestOf, byMeaningOf, marked, meaningLine, sentenceOf, shownState, topOf, whereSaid } from './shown.ts';
 
 const page = readFileSync(fileURLToPath(new URL('./+page.svelte', import.meta.url)), 'utf8');
 const answered = (total: number) => ({ from: 'live' as const, value: { hits: [], total, groups: [] } });
@@ -108,4 +108,23 @@ test('the screen draws the line under the sentence and under the empty state', (
   assert.match(page, /meaningLine\(q, \{ total: found\.total, byMeaning: byMeaningOf\(found\) \}/u);
   assert.match(page, /below=\{shown === 'hits' && meaningSaid \? meaningBelow : undefined\}/u);
   assert.match(page, /<\/Empty>\s*\{#if meaningSaid\}<p class="reading">\{meaningSaid\}<\/p>\{\/if\}/u);
+});
+
+test('THE MATCHED LETTERS ARE MARKED wherever each word of the query stands, case aside', () => {
+  assert.deepEqual(marked('Send the specimen proofs to Kiln', 'kiln'), [
+    { text: 'Send the specimen proofs to ', hit: false },
+    { text: 'Kiln', hit: true },
+  ]);
+  assert.deepEqual(marked('kilnfonts.example', 'KILN'), [
+    { text: 'kiln', hit: true },
+    { text: 'fonts.example', hit: false },
+  ]);
+  assert.deepEqual(marked('Rent', ''), [{ text: 'Rent', hit: false }]);
+});
+
+test('THE BEST MATCH is the title that is the query, then one that starts with it, then the first', () => {
+  const hits = [{ title: 'Does Kiln licence per-seat?' }, { title: 'kiln.example' }, { title: 'Kiln' }];
+  assert.equal(bestOf(hits, 'kiln')?.title, 'Kiln');
+  assert.equal(bestOf(hits.slice(0, 2), 'kiln')?.title, 'kiln.example');
+  assert.equal(bestOf(hits.slice(0, 1), 'kiln'), null);
 });

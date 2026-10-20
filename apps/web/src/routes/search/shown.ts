@@ -139,3 +139,38 @@ export function meaningLine(q: string, found: { total: number; byMeaning: number
   if (meaning === 'failed') return 'Searched by its words only: the model did not answer this time.';
   return null;
 }
+
+/**
+ * THE LETTERS THE QUERY MATCHED, so the title can set them at 600 (money F12): each word of the query, wherever it
+ * stands in the title, case aside. Pieces in order; joined, they are the title as it came.
+ */
+export function marked(text: string, q: string): { text: string; hit: boolean }[] {
+  const wanted = q
+    .toLowerCase()
+    .split(/\s+/u)
+    .filter((w) => w.length > 0);
+  if (wanted.length === 0 || text === '') return [{ text, hit: false }];
+  const lower = text.toLowerCase();
+  const on = new Array<boolean>(text.length).fill(false);
+  for (const w of wanted) {
+    for (let at = lower.indexOf(w); at !== -1; at = lower.indexOf(w, at + w.length)) on.fill(true, at, at + w.length);
+  }
+  const out: { text: string; hit: boolean }[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const last = out.at(-1);
+    if (last && last.hit === on[i]) last.text += text[i];
+    else out.push({ text: text[i] ?? '', hit: on[i] ?? false });
+  }
+  return out;
+}
+
+/**
+ * THE BEST MATCH, drawn on its own over the lists: a hit whose title is the query, else one that starts with it, else
+ * the record's first. `null` for one hit or none, which is its own best match already.
+ */
+export function bestOf<T extends { title: string }>(hits: readonly T[], q: string): T | null {
+  const want = q.trim().toLowerCase();
+  if (hits.length < 2 || want === '') return null;
+  const said = (h: T): string => h.title.trim().toLowerCase();
+  return hits.find((h) => said(h) === want) ?? hits.find((h) => said(h).startsWith(want)) ?? hits[0] ?? null;
+}
