@@ -1,11 +1,15 @@
 <!--
-  The rail: the board's left column (DIRECTION §39). From the top, the record switcher, the ask field, the places, how
-  many agents are working, each project, the lists, and at the foot More and the person.
+  The rail: the left column, for somebody who chose it in Settings > Navigation (frame F8, 2.A.22). From the top, the
+  record switcher, the ask field, the places, each project, the lists and More, and at the foot one row: the person.
 
-  FLAT, AND THE BOARD'S OWN COLOUR. It was a floating glass card with a shadow, which made the navigation the loudest
-  thing on every screen. It is now the left 240 of the board, with no edge, no fill and no shadow, and the place you
-  are on is the one thing on it drawn as a tile: the tile's own white (or the dark tile), so "here" is the same surface
-  as the work it opens.
+  A FLAT COLUMN ON THE NAV'S OWN SURFACE, 240 wide and the window's height, with a hairline on its end edge in light and
+  none in dark. No card, no wells: each place is a 36px row, its 16px glyph in the second ink, its name at 14/500, and
+  the place you are on is the nav's selected fill with its name and glyph in ink at 600. A project is an 8px dot of its
+  own colour. The one red is Needs you's count, the one `Count`.
+
+  NOTHING SITS UNDER THE FOOT. The "2 working" card and "2 suggested" went (the top bar's chip and Agents say who is
+  working; what waits is Needs you's count), and the list ends 64 above the foot with the 24px fade, where a chevron and
+  two hairlines cut it before.
 
   THE PLACES ARE SEVEN (`railOf` in `lib/nav/rail.ts`): Today, Needs you, Work, Projects, Money, People and Agents on a
   record that has them, every other section after them, and what does not fit under More. Under them, each section's
@@ -17,12 +21,6 @@
 
   THE ASK FIELD IS THE PALETTE'S DOOR, drawn as the field it opens, with its `/` key. It is a button and not an input:
   the palette owns the typing.
-
-  WHO IS WORKING IS ONE ROW, "2 working", with a pulsing dot, and it opens Agents. It was a group of its own, one line a
-  run with how long each had gone ("11 h 52"), which repeated the Agents page and disagreed with it on the time ("3 min
-  ago" there, for the same run). The runs and their times are Agents' to draw; the rail only says that some are at it,
-  counted from what `boot` sends (`working`, the record's one clock), so it says the number Today and Agents say. It
-  counts what it is given and nothing of its own. Absent while nobody works.
 
   THE PAGE BESIDE IT MUST NOT JUMP, SO THE RAIL SAYS ITS WIDTH ON THE ROOT. `--rail-w` is the rail's width at whichever
   width it is drawn, and `--rail-d` and `--rail-ease` the time and curve the shell slides the work on when it changes.
@@ -79,13 +77,12 @@
   import { said } from '../voice.svelte.ts';
   import { isHere, orderLists, placeOf, type FlatItem } from '../nav.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
-  import { penCount, type PenItem } from '../design/pen.ts';
+  import type { PenItem } from '../design/pen.ts';
   import * as pref from '../pref.ts';
   import type { NavEntry } from '../record/api.ts';
-  import AgentMark from './AgentMark.svelte';
+  import Count from './Count.svelte';
   import Icon, { type IconName } from './Icon.svelte';
   import { hueFor } from './hue.ts';
-  import { agentsHref } from '../nav/rail.ts';
   import Kbd from './Kbd.svelte';
   import Mark from './Mark.svelte';
   import { palette } from '../palette/open.svelte.ts';
@@ -134,7 +131,7 @@
     /** The spine as `spineOf` reads it: whether Inbox has been used, which puts its row under More. */
     spine?: readonly SpineKey[] | undefined;
     inbox?: number | undefined;
-    /** The agents at work now, as `boot` sends them (`working`); the rail says how many, and nothing while this is empty. */
+    /** The agents at work now, as `boot` sends them. Kept for the caller: the top bar and Agents say who is working. */
     working?: readonly Working[] | undefined;
     /** The narrow rail: glyphs, with the names on hover and on focus. Per device, `pref.sidebar`. */
     icons?: boolean | undefined;
@@ -342,8 +339,8 @@
   /* THE EDGE CUE: a rail that scrolls says so. The foot fades while there is more below, and the head while there is
      more above (`edgeCue`), measured on every scroll and whenever the rail's height or what is in it changes (a group
      folding, a project arriving). It was a scrollbar drawn only under the pointer, so the last group was cut off
-     mid-row with nothing to say it went on. THE FOOT ALSO DRAWS A HAIRLINE AND A SMALL CHEVRON (`.more-below`): a fade
-     over the gap between two groups fades nothing, and a mark that is painted is seen whatever sits under it. */
+     mid-row with nothing to say it went on. The fade is the whole cue: the chevron and two hairlines that cut the list
+     at the foot went (frame F8). */
   let edges = $state({ above: false, below: false });
   function measure() {
     if (!scroller) return;
@@ -402,11 +399,6 @@
     if (by !== 0) scroller.scrollTop += by;
   }
 
-  /* WHERE "2 WORKING" GOES: the Agents place, among the seven or under More (`agentsHref`). */
-  const agentsAt = $derived(agentsHref([...places, ...more]));
-  /** The makers of the agents at work, each once, three at most: the marks the working tile wears. */
-  const crew = $derived([...new Set(working.map((w) => w.kind))].slice(0, 3));
-
   /**
    * THE WORDS COME BACK AS THE RAIL WIDENS. The rail takes its new width in one frame (the shell slides the work beside
    * it, `+layout.svelte`), and the names fade in over the same step, so a word is never drawn half cut over a column
@@ -459,10 +451,7 @@
       {#snippet trigger()}
         <span class="record" data-label={recordName}>
           <Mark height={20} />
-          <span class="record-name">
-            {words.brand}
-            {#if recordName.toLowerCase() !== words.brand.toLowerCase()}<small>{recordName}</small>{/if}
-          </span>
+          <span class="record-name">{recordName || words.brand}</span>
           <Icon name="chevronDown" size="s" />
         </span>
       {/snippet}
@@ -540,7 +529,7 @@
   {#snippet pageLineDrawn(headed: boolean)}
     {#if naming}
       <form class={['item page-name', !headed && 'view']} onsubmit={(e) => (e.preventDefault(), void makePage())}>
-        {#if headed}<span class="rail-glyph"><Icon name="plus" size="l" /></span>{/if}
+        {#if headed}<span class="rail-glyph"><Icon name="plus" size="m" /></span>{/if}
         <input
           bind:this={nameBox}
           bind:value={pageTitle}
@@ -558,7 +547,7 @@
       </form>
     {:else}
       <button type="button" class={['item tap', !headed && 'view']} data-page-line data-label={headed ? pageWord : undefined} onclick={() => void startPage()}>
-        {#if headed}<span class="rail-glyph"><Icon name="plus" size="l" /></span>{/if}
+        {#if headed}<span class="rail-glyph"><Icon name="plus" size="m" /></span>{/if}
         <span class="item-name">{pageWord}</span>
       </button>
     {/if}
@@ -577,12 +566,8 @@
       {#each places as item (item.key)}
         <li>
           <a class="item tap" href={at(item.href)} data-nav data-label={item.label} aria-current={placeHere(item) ? 'page' : undefined}>
-            <span class="rail-glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
-            {#if item.count}<span
-                class="tally num"
-                data-waiting={item.key === 'decide' ? '' : undefined}
-                aria-label={item.key === 'decide' ? `${item.count} ${copy.openQuestions}` : undefined}>{item.count}</span
-              >{/if}
+            <span class="rail-glyph"><Icon name={item.icon as IconName} size="m" /></span><span class="item-name">{item.label}</span>
+            {#if item.count && item.key === 'decide'}<span class="tally" data-waiting><Count n={item.count} label={`${item.count} ${copy.openQuestions}`} /></span>{:else if item.count}<span class="tally num">{item.count}</span>{/if}
           </a>
           {@render viewsOf(item)}
           {@render pageLineOf(item)}
@@ -609,9 +594,9 @@
             <li>
               <a class="item tap" href={at(entry.href)} data-nav data-label={entry.title} aria-current={under(entry.href) ? 'page' : undefined}>
                 <span class="rail-glyph">
-                  <!-- ALWAYS ITS OWN BADGE, never a glyph: its initial on the hue the record sent, else the one its name
-                       is drawn in, so a project does not change face between one load and the next. -->
-                  <span class="hue" style="--hue:{entry.hue ?? hueFor(entry.title)}" aria-hidden="true">{entry.title.trim().slice(0, 1).toUpperCase()}</span>
+                  <!-- ITS OWN DOT, 8px in its colour: the hue the record sent, else the one its name is drawn in, so a
+                       project does not change colour between one load and the next. -->
+                  <span class="hue" style="--hue:{entry.hue ?? hueFor(entry.title)}" aria-hidden="true"></span>
                 </span>
                 <span class="item-name">{entry.title}</span>
               </a>
@@ -648,7 +633,7 @@
         {#each listsShown as r}
           <li>
             <a class="item tap" href={at(`/r/${r.id}`)} data-nav data-label={r.name} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
-              <span class="rail-glyph"><Icon name={r.icon} size="l" /></span>
+              <span class="rail-glyph"><Icon name={r.icon} size="m" /></span>
               <span class="item-name">{r.name}</span>
               {#if !r.guessed}<span class="tally num">{r.count}</span>{/if}
             </a>
@@ -663,14 +648,14 @@
         {#if listsFold}
           <li>
             <button type="button" class="item tap" aria-expanded={listsAll} onclick={() => (listsAll = !listsAll)}>
-              <span class="rail-glyph"><Icon name="more" size="l" /></span>
+              <span class="rail-glyph"><Icon name="more" size="m" /></span>
               <span class="item-name">{listsAll ? words.fewerLists : words.moreLists(listsHidden)}</span>
             </button>
           </li>
         {/if}
         <li>
           <a class="item tap" href={at('/r/_new?make')} data-label={words.newList} aria-current={path === '/r/_new' ? 'page' : undefined}>
-            <span class="rail-glyph"><Icon name="plus" size="l" /></span><span class="item-name">{words.newList}</span>
+            <span class="rail-glyph"><Icon name="plus" size="m" /></span><span class="item-name">{words.newList}</span>
           </a>
         </li>
       </ul>
@@ -691,7 +676,7 @@
         {#each more as item (item.key)}
           <li>
             <a class="item tap" href={at(item.href)} data-nav data-label={item.label} aria-current={placeHere(item) ? 'page' : undefined}>
-              <span class="rail-glyph"><Icon name={item.icon as IconName} size="l" /></span><span class="item-name">{item.label}</span>
+              <span class="rail-glyph"><Icon name={item.icon as IconName} size="m" /></span><span class="item-name">{item.label}</span>
             </a>
             {@render viewsOf(item)}
             {@render pageLineOf(item)}
@@ -700,7 +685,7 @@
         {#each tools as t (t.href)}
           <li>
             <a class="item tap" href={at(t.href)} data-label={t.label} title={t.title} aria-current={under(t.href) ? 'page' : undefined}>
-              <span class="rail-glyph"><Icon name={t.icon} size="l" /></span><span class="item-name">{t.label}</span>
+              <span class="rail-glyph"><Icon name={t.icon} size="m" /></span><span class="item-name">{t.label}</span>
               {#if t.count}<span class="tally num">{t.count}</span>{/if}
             </a>
           </li>
@@ -709,7 +694,7 @@
           <!-- THE WAY BACK, WHERE THE PAGE WAS. A page hidden from the nav is findable from the nav. -->
           <li>
             <a class="item tap" href={at('/settings/navigation#hidden')} data-label={copy.hiddenCount(hidden)} data-hidden-row>
-              <span class="rail-glyph"><Icon name="eye" size="l" /></span>
+              <span class="rail-glyph"><Icon name="eye" size="m" /></span>
               <span class="item-name">{copy.hiddenCount(hidden)}</span>
               <span class="pen-action">{copy.showHidden}</span>
             </a>
@@ -719,39 +704,7 @@
     </section>
   </div>
 
-  <!-- THE FOOT'S CUE, PAINTED: a hairline across the rail and a small chevron on it while rows wait below, outside the
-       scroller so its fade does not take the mark with it. No height of its own, so nothing moves when it comes and
-       goes. `aria-hidden`: the rows themselves are all there for a screen reader. -->
-  <span class="more-below" aria-hidden="true" data-on={edges.below ? '' : undefined}>
-    <span class="more-mark"><Icon name="chevronDown" size="s" /></span>
-  </span>
-
-  <!-- WHO IS WORKING, AS ONE TILE AT THE FOOT: their makers' marks, how many, what the first is doing, and a dot that
-       breathes while they are at it. It opens Agents. Nothing while nobody is. -->
-  {#if working.length > 0}
-    <a class="crew tap" href={at(agentsAt)} data-label={words.working(working.length)} title={words.workingOpen}>
-      <span class="crew-marks" aria-hidden="true">
-        {#each crew as kind (kind)}<span class="crew-mark"><AgentMark {kind} size="s" /></span>{/each}
-      </span>
-      <span class="crew-words">
-        <span class="crew-count">{words.working(working.length)}</span>
-        {#if working[0]?.doing}<span class="crew-doing" dir="auto">{working[0].doing}</span>{/if}
-      </span>
-      <span class="pulse" aria-hidden="true"></span>
-    </a>
-  {/if}
-
-  {#if penCount(pen, null, (id) => navPrefs.isDismissed(id))}
-    <!-- A holding pen: an update that adds a page lands hidden and nothing moves until somebody keeps it. Outside the
-         fold, because it is the one thing at the foot that is news. -->
-    <a class="item pen tap" href={at('/settings/navigation')} data-label={words.suggested(penCount(pen, null, (id) => navPrefs.isDismissed(id)))}>
-      <span class="rail-glyph"><Icon name="alert" size="l" /></span>
-      <span class="item-name">{words.suggested(penCount(pen, null, (id) => navPrefs.isDismissed(id)))}</span>
-      <span class="pen-action">{copy.review}</span>
-    </a>
-  {/if}
-
-  <!-- THE PERSON: a face, the name, and the way to their account and settings. -->
+  <!-- THE FOOT, ONE 56px ROW: the person's face, their name, and the way to their account and settings. -->
   <div class="me">
     <span class="me-face" aria-hidden="true">{person.slice(0, 1)}</span>
     <span class="me-name">{person}</span>
@@ -796,9 +749,9 @@
    */
   .rail {
     --fly-x: var(--rail-w);
-    /* The tile's own fill, for the place you are on, and a lighter step of it under the pointer. */
-    --rail-here: var(--tile);
-    --rail-over: color-mix(in srgb, var(--rail-here) 55%, transparent);
+    /* THE NAV'S SELECTED FILL for the place you are on, and the hover step under the pointer. */
+    --rail-here: var(--board);
+    --rail-over: var(--hover-wash);
 
     position: relative;
     display: flex;
@@ -808,7 +761,9 @@
     /* THE WINDOW'S HEIGHT, NOT `100%`: the shell's row is `auto`, so a percentage never resolved, the open list's own
        height set the row, and `.scroll` never had less room than it wanted. The foot went off the bottom with it. */
     block-size: 100dvh;
-    padding: var(--sp-3) var(--sp-3) var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) 0;
+    background: var(--tile);
+    border-inline-end: 1px solid var(--rule);
   }
 
   .top {
@@ -826,13 +781,13 @@
   .record {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--sp-2);
     min-block-size: 40px;
     padding: 0 var(--sp-2);
     border-radius: var(--r-ctl);
     color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 600;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
     transition: background var(--d-state) var(--ease-out);
   }
 
@@ -891,16 +846,6 @@
     line-height: 1;
   }
 
-  .record-name {
-    font-family: var(--font-display);
-  }
-
-  .record-name small {
-    display: block;
-    color: var(--dim);
-    font: 500 var(--t-xs) var(--font-ui);
-  }
-
   .mi-name,
   .record-name {
     flex: 1;
@@ -911,7 +856,7 @@
   }
 
   .mi-level {
-    padding: 1px 6px;
+    padding: 0 var(--sp-1);
     background: var(--s1);
     border-radius: var(--r-sm);
     color: var(--dim);
@@ -976,9 +921,9 @@
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    min-block-size: 34px;
+    min-block-size: 32px;
     margin-block: var(--sp-2) var(--sp-3);
-    padding: 0 6px 0 10px;
+    padding: 0 var(--sp-2) 0 var(--sp-3);
     background: var(--rail-here);
     border: 0;
     border-radius: var(--r-ctl);
@@ -1010,7 +955,7 @@
   .group {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 0;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1037,6 +982,8 @@
     scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent;
     /* A row scrolled to by the browser (a focus, a find) stops clear of the fades. */
     scroll-padding-block: var(--edge);
+    /* THE LAST ROW STOPS 64 ABOVE THE FOOT, so nothing ever sits under the person's row. */
+    padding-block-end: var(--sp-8);
   }
 
   /* THE EDGE CUE (`edgeCue`): the rows fade out at an edge with more past it. A mask on the rows, not a painted band,
@@ -1055,72 +1002,6 @@
     mask-image: linear-gradient(to bottom, transparent, var(--ink) var(--edge-above), var(--ink) calc(100% - var(--edge-below)), transparent);
   }
 
-  /* THE FOOT'S PAINTED CUE: a hairline the rail's width where the rows are cut, and a chevron sitting on it over a
-     notch of the board's own colour. It has its own 16px under the scroller and lies over no row, so the last row is
-     never covered by the chevron. Drawn by `data-on` (`edgeCue`'s `below`). */
-  .more-below {
-    position: relative;
-    display: flex;
-    flex: none;
-    justify-content: center;
-    block-size: 16px;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .more-below[data-on] {
-    opacity: 1;
-  }
-
-  .more-below::before {
-    position: absolute;
-    inset-inline: 0;
-    inset-block-end: 0;
-    border-block-start: 1px solid var(--rule);
-    content: '';
-  }
-
-  .more-mark {
-    position: absolute;
-    inset-block-end: 0;
-    display: grid;
-    place-items: center;
-    inline-size: 28px;
-    block-size: 16px;
-    background: var(--board);
-    border-radius: var(--r-ctl) var(--r-ctl) 0 0;
-    color: var(--ink2);
-  }
-
-  /* WHERE THE BROWSER CAN READ THE SCROLLER'S PLACE ITSELF, IT DRAWS THE MARK WITH NO SCRIPT AT ALL: there from the
-     first paint, gone over the last of the way down, and no timeline (so only `data-on`, which is off) when everything
-     fits. The measure above is still what a browser without scroll timelines has, and what fades the rows. */
-  @supports (animation-timeline: scroll()) and (timeline-scope: none) {
-    .rail {
-      timeline-scope: --rail-scroll;
-    }
-
-    .scroll {
-      scroll-timeline: --rail-scroll block;
-    }
-
-    .more-below {
-      animation: foot-cue linear both;
-      animation-timeline: --rail-scroll;
-    }
-  }
-
-  @keyframes foot-cue {
-    from,
-    97% {
-      opacity: 1;
-    }
-
-    to {
-      opacity: 0;
-    }
-  }
-
   /* AN AUTHOR RULE, because `hidden` is a user-agent one and loses to any `display` written here. */
   .group[data-shut] {
     display: none;
@@ -1134,8 +1015,8 @@
   .sub {
     display: flex;
     align-items: center;
-    margin: 0 0 2px;
-    padding-inline: 10px;
+    margin: 0;
+    padding-inline: var(--sp-2);
     min-block-size: 28px;
     color: var(--dim);
     font-size: var(--t-sm);
@@ -1163,7 +1044,7 @@
     align-items: center;
     gap: var(--sp-1);
     min-block-size: 28px;
-    padding: 0 6px 0 10px;
+    padding: 0 var(--sp-1) 0 var(--sp-2);
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
@@ -1196,72 +1077,52 @@
     transform: rotate(-90deg);
   }
 
-  /* A PLACE: 34 tall, an 18px glyph in `--dim`, the name 14/500 in `--ink2`, and a count at the end. */
+  /* A PLACE: 36 tall, radius 8, a 16px glyph in the second ink with no well, 12 to the name at 14/500, and a count at
+     the end. */
   .item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-block-size: 38px;
-    padding: 0 10px 0 5px;
-    border-radius: var(--r-md);
+    gap: var(--sp-3);
+    min-block-size: 36px;
+    padding: 0 var(--sp-2);
+    border-radius: var(--r-ctl);
     color: var(--ink2);
-    font-size: calc(var(--t-sm) + 1px);
-    font-weight: 500;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
     text-decoration: none;
     transition:
       background var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out);
   }
 
-  /* THE GLYPH IN ITS WELL: a small tile of its own on the board, as a tile's heading wears one, so the rail reads as
-     the board's index and not a list of grey words. 16 in a 28 well, and every name starts on one line. */
+  /* THE GLYPH WITH NO WELL: 16 in a 16 slot, in the second ink, so every name starts on one line. */
   .rail-glyph {
     display: grid;
     place-items: center;
     flex: none;
-    inline-size: 28px;
-    block-size: 28px;
-    background: var(--tile);
-    border-radius: var(--r-ctl);
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
     color: var(--ink2);
-    transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out);
+    transition: color var(--d-state) var(--ease-out);
   }
 
-  .rail-glyph :global(.icon) {
-    inline-size: 16px;
-    block-size: 16px;
-  }
-
-  /* A THING'S OWN BADGE where a place's well would be: its initial on its own colour, so a project is told from its
-     neighbours at a glance and by more than a dot. */
-  .rail-glyph:has(> .hue) {
-    background: none;
-  }
-
+  /* A PROJECT'S DOT, 8px in its own colour, where a place's glyph would be. */
   .hue {
-    display: grid;
-    place-items: center;
-    inline-size: 22px;
-    block-size: 22px;
-    border-radius: var(--r-sm);
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-round);
     background: oklch(var(--mark-l) var(--mark-c) var(--hue));
-    color: var(--on-action);
-    font-size: var(--t-xs);
-    font-weight: 600;
   }
 
-  /* "HERE" IS A TILE: the tile's own fill under the name and the glyph in ink. Never a pill, never the red. */
+  /* "HERE" IS THE NAV'S SELECTED FILL, and ink at 600, glyph and name. Never a pill, never the red. */
   .item[aria-current='page'] {
     background: var(--rail-here);
     color: var(--ink);
+    font-weight: var(--fw-semi);
   }
 
-  /* AND ITS WELL FILLED WITH THE ACCENT, the working colour's one use on the rail. A project keeps its own colour. */
-  .item[aria-current='page'] .rail-glyph:not(:has(> .hue)) {
-    background: var(--action);
-    color: var(--on-action);
+  .item[aria-current='page'] .rail-glyph {
+    color: var(--ink);
   }
 
   .item-name {
@@ -1274,9 +1135,8 @@
 
   /* Indented to where a glyph would end, so a saved view reads as belonging to the list above it. */
   .item.view {
-    padding-inline-start: calc(5px + 28px + 10px);
-    font-size: var(--t-sm);
-    font-weight: 400;
+    padding-inline-start: calc(var(--sp-2) + var(--icon-m) + var(--sp-3));
+    font-weight: var(--fw-regular);
   }
 
   /* THE NEW-PAGE LINE reads as an offer and not as a page already there, so it is drawn in `--dim`. */
@@ -1287,7 +1147,7 @@
   /* ITS BOX, WHERE THE LINE WAS: the row's own height and indent, flat, with the focus ring the board draws. 16px, so a
      phone does not zoom the rail to it. */
   .page-name {
-    padding-inline-end: 5px;
+    padding-inline-end: var(--sp-1);
   }
 
   /* The box is the surface here, so the line around it takes no hover of its own. */
@@ -1298,9 +1158,9 @@
   .page-box {
     flex: 1;
     min-inline-size: 0;
-    block-size: 30px;
-    padding: 0 8px;
-    margin-inline-start: -8px;
+    block-size: 32px;
+    padding: 0 var(--sp-2);
+    margin-inline-start: calc(-1 * var(--sp-2));
     border: 0;
     border-radius: var(--r-sm, 8px);
     background: var(--tile);
@@ -1317,16 +1177,9 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* THE ONE RED ON THE RAIL: Decide's count, because it is what needs him, as a count's own small badge. */
+  /* THE ONE RED ON THE RAIL: Needs you's count, the one `Count`. */
   .tally[data-waiting] {
-    min-inline-size: 20px;
-    padding: 2px 6px;
-    border-radius: var(--r-round);
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
-    color: var(--danger-text);
-    font-size: var(--t-xs);
-    font-weight: 600;
-    text-align: center;
+    display: inline-flex;
   }
 
   .pen-action {
@@ -1336,118 +1189,29 @@
     font-weight: 500;
   }
 
-  .pen {
-    margin-block-start: var(--sp-2);
-  }
-
-  /* ── Who is working ─────────────────────────────────────────────────── */
-
-  /* THE WORKING TILE: the one surface on the rail besides the place you are on. */
-  .crew {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-block-size: 48px;
-    margin-block-start: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--tile);
-    border-radius: var(--r-md);
-    color: var(--ink);
-    text-decoration: none;
-  }
-
-  .crew-marks {
-    display: flex;
-  }
-
-  /* Each maker's mark on a round of the board's own colour, the next one tucked a little under the last. */
-  .crew-mark {
-    display: grid;
-    place-items: center;
-    inline-size: 26px;
-    block-size: 26px;
-    background: var(--bg);
-    border-radius: var(--r-round);
-    box-shadow: 0 0 0 2px var(--tile);
-  }
-
-  .crew-mark + .crew-mark {
-    margin-inline-start: -6px;
-  }
-
-  .crew-words {
-    display: grid;
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  .crew-count {
-    font-size: var(--t-sm);
-    font-weight: 600;
-  }
-
-  .crew-doing {
-    overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .rail[data-icons] :is(.crew-marks, .crew-words) {
-    display: none;
-  }
-
-  .rail[data-icons] .crew {
-    justify-content: center;
-  }
-
-  /* A 6px DOT IN THE WORKING COLOUR, breathing while the agents are at it. Its opacity moves and nothing else: no ring,
-     no glow, no change of size that would nudge the name beside it. */
-  .pulse {
-    flex: none;
-    inline-size: 6px;
-    block-size: 6px;
-    border-radius: var(--r-round);
-    /* THE LIVE COLOUR, as the top bar's dot: red is for late and for what needs you. */
-    background: var(--live-fill);
-    animation: rail-pulse calc(var(--d-panel) * 8) var(--ease-standard) infinite;
-  }
-
-  @keyframes rail-pulse {
-    50% {
-      opacity: 0.35;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .pulse {
-      animation: none;
-    }
-  }
-
   /* ── The foot ─────────────────────────────────────────────────────────── */
 
   .me {
     display: flex;
+    flex: none;
     align-items: center;
-    gap: 10px;
-    min-block-size: 40px;
-    margin-block-start: var(--sp-2);
-    padding: 0 var(--sp-1) 0 6px;
+    gap: var(--sp-3);
+    min-block-size: 56px;
+    padding: 0 var(--sp-1) 0 var(--sp-1);
   }
 
+  /* THE FACE, 28: the person's letter on the field's fill, as the top bar's. */
   .me-face {
     display: grid;
     place-items: center;
     flex: none;
-    inline-size: 24px;
-    block-size: 24px;
-    background: var(--ink);
+    inline-size: 28px;
+    block-size: 28px;
+    background: var(--field);
     border-radius: var(--r-round);
-    color: var(--on-ink);
-    font-size: var(--t-xs);
-    font-weight: 600;
+    color: var(--ink);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-semi);
     line-height: 1;
   }
 
@@ -1456,8 +1220,8 @@
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: calc(var(--t-sm) + 1px);
-    font-weight: 500;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1570,15 +1334,8 @@
      in the row's name. */
   .rail[data-icons] .item .tally[data-waiting] {
     position: absolute;
-    inset-block-start: var(--sp-2);
-    inset-inline-end: var(--sp-2);
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    background: var(--danger);
-    border-radius: var(--r-round);
-    overflow: hidden;
-    text-indent: 100%;
-    white-space: nowrap;
+    inset-block-start: var(--sp-1);
+    inset-inline-end: var(--sp-1);
   }
 
   .rail[data-icons] .view {
@@ -1594,8 +1351,8 @@
     z-index: var(--z-hint);
     padding: var(--sp-1) var(--sp-3);
     background: var(--tile);
+    border: 1px solid color-mix(in srgb, var(--ink) 16%, var(--tile));
     border-radius: var(--r-sm);
-    box-shadow: var(--glass-edge), var(--e2);
     color: var(--ink);
     font-size: var(--t-sm);
     white-space: nowrap;

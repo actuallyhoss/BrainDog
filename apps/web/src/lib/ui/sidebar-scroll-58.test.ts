@@ -131,18 +131,15 @@ test('the size watch is on the scroller and on every group in it, so rows that g
   assert.match(WATCH, /new MutationObserver\(\(\) => \{\s*watch\(\);\s*measure\(\);/);
 });
 
-test('the foot draws a painted mark as well as the fade, off until there is more below', () => {
-  assert.match(SOURCE, /<span class="more-below" aria-hidden="true" data-on=\{edges\.below \? '' : undefined\}>/);
-  const rule = /\n  \.more-below \{([^}]*)\}/.exec(SOURCE)?.[1] ?? '';
-  assert.match(rule, /opacity: 0;/);
-  assert.match(rule, /block-size: 16px;/, 'it has its own room under the scroller, so it never covers the last row, and nothing moves when it comes and goes');
-  assert.match(SOURCE, /\.more-below\[data-on\] \{\s*opacity: 1;/);
-  assert.match(SOURCE, /\.more-below::before \{[^}]*border-block-start: 1px solid var\(--rule\);/);
+test("the fade is the foot's whole cue: no painted chevron or hairline cuts the list (frame F8)", () => {
+  assert.doesNotMatch(SOURCE, /class="more-below"/, 'the chevron and its hairline are drawn again over the foot');
+  assert.doesNotMatch(SOURCE, /\.more-below/, 'a rule for the painted mark is left behind');
+  /* The fade still says there is more, at either edge, as far as `edgeCue` clears. */
+  assert.match(SOURCE, /\.scroll\[data-more-above\],\s*\.scroll\[data-more-below\] \{\s*mask-image: linear-gradient/);
 });
 
-test('the painted mark names roles, never a colour', () => {
-  const from = SOURCE.indexOf("/* THE FOOT'S PAINTED CUE");
-  const css = SOURCE.slice(from, SOURCE.indexOf('/* AN AUTHOR RULE', from));
-  assert.ok(from > 0 && css.length > 0);
-  assert.doesNotMatch(css, /#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(/i);
+test('the last row stops 64 above the foot, so nothing sits under the person', () => {
+  const rule = /\n  \.scroll \{([^}]*)\}/.exec(SOURCE)?.[1] ?? '';
+  assert.match(rule, /padding-block-end: var\(--sp-8\);/);
+  assert.doesNotMatch(SOURCE, /class="crew tap"/, 'the working card is back at the foot');
 });
