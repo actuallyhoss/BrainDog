@@ -61,6 +61,78 @@ export function rawIn(text) {
 }
 
 /**
+ * EVERY RUN OF TEXT ON THE SCREEN AS THE BOXES IT IS DRAWN IN, run inside the page (`page.evaluate`). Only what a person
+ * sees: a node hidden, transparent or skipped is left out, and each box is cut to the boxes of the elements that clip
+ * it, so a label cut short by its ellipsis is the part still drawn, while a scroller clips nothing, since what it holds is
+ * read by scrolling. Inside `main`, the screen and not the frame, and the whole of it, not only the first screen.
+ */
+export function textBoxesIn() {
+  const root = document.querySelector('main') ?? document.body;
+  const clips = new Map();
+  /* THE PART OF THE WINDOW AN ELEMENT'S TEXT MAY BE SEEN IN: its clipping ancestors' boxes, met. */
+  const clipOf = (el) => {
+    if (el === null || el === root.parentElement) return { l: -Infinity, t: -Infinity, r: Infinity, b: Infinity };
+    if (clips.has(el)) return clips.get(el);
+    const up = clipOf(el.parentElement);
+    const cs = getComputedStyle(el);
+    let c = up;
+    /* WHAT A SCROLLER HOLDS IS STILL THERE TO READ, so only an element that cuts its text off clips it. */
+    const cuts = (o) => o === 'hidden' || o === 'clip';
+    if (cuts(cs.overflowX) || cuts(cs.overflowY) || cs.contain.includes('paint')) {
+      const r = el.getBoundingClientRect();
+      c = { l: Math.max(up.l, r.left), t: Math.max(up.t, r.top), r: Math.min(up.r, r.right), b: Math.min(up.b, r.bottom) };
+    }
+    clips.set(el, c);
+    return c;
+  };
+  const out = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = 0;
+  for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+    const text = (n.nodeValue ?? '').trim();
+    const el = n.parentElement;
+    if (text === '' || el === null || el.closest('svg') !== null) continue;
+    if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+    node += 1;
+    const c = clipOf(el);
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    for (const r of range.getClientRects()) {
+      const l = Math.max(r.left, c.l);
+      const t = Math.max(r.top, c.t);
+      const w = Math.min(r.right, c.r) - l;
+      const h = Math.min(r.bottom, c.b) - t;
+      if (w >= 3 && h >= 3) out.push({ node, text: text.slice(0, 40), x: Math.round(l), y: Math.round(t), w: Math.round(w), h: Math.round(h) });
+    }
+  }
+  return out;
+}
+
+/**
+ * WHERE TWO RUNS OF TEXT CROSS (the plan of 20 October, batch 3b: the roadmap read "Proofing press 5 of 8Invoice
+ * 2026-049"). Two boxes of different runs cross when they share more than 2px across and at least `share` of the
+ * shorter one's height, so two lines that only touch at a tall font's ascent are not a fault. Each pair once, by text.
+ */
+export function crossings(boxes, share = 0.4) {
+  const out = [];
+  const seen = new Set();
+  for (let i = 0; i < boxes.length; i += 1)
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i];
+      const b = boxes[j];
+      if (a.node === b.node) continue;
+      const across = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const down = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (across <= 2 || down < share * Math.min(a.h, b.h)) continue;
+      const key = `${a.text}\u0000${b.text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ a: a.text, b: b.text, at: [Math.max(a.x, b.x), Math.max(a.y, b.y)] });
+    }
+  return out;
+}
+
+/**
  * THE SCREENS A SOURCE NAMES ITSELF (`source.screens`, a board's: `tools/look/board.mjs`), in place of a set's. An
  * entry is a screen as `screensOf` hands one back, `{ key, name, path, why }`, drawn as given (a board's own page), or
  * a key of the named sets, drawn as the record picks it. A key no set knows is said as missing, never dropped.
@@ -162,6 +234,8 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
       })),
     }))
     .catch(() => ({ overflow: 0, text: '', marked: [] }));
+  /* TEXT THAT CROSSES TEXT, over the whole page and not only the first screen: a fault the look fails on. */
+  const crossed = crossings(await page.evaluate(textBoxesIn).catch(() => []));
   const base = `${screen.key}-${width}-${theme}`;
   await page.screenshot({ path: join(out, `${base}.png`) });
   await page.screenshot({ path: join(out, `${base}-full.png`), fullPage: true });
@@ -187,6 +261,7 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
     refused: blocked,
     overflowPx: Math.max(0, facts.overflow),
     raw: rawIn(facts.text),
+    overlaps: { count: crossed.length, e: crossed.slice(0, 5) },
     marked: facts.marked,
     lint: null,
   };
@@ -254,9 +329,14 @@ export default async function capture({ origin, app, set, out, source }) {
   }
   said.look.closed = new Date().toISOString();
   const stuck = said.shots.filter((s) => s.settled === null || s.settled === 'refused');
-  said.look.verdict = stuck.length === 0 ? 'every screen drew' : `${stuck.length} of ${said.shots.length} pictures show a screen that never settled or refused`;
+  const crossing = said.shots.filter((s) => s.overlaps.count > 0);
+  said.look.verdict = [
+    stuck.length === 0 ? 'every screen drew' : `${stuck.length} of ${said.shots.length} pictures show a screen that never settled or refused`,
+    ...(crossing.length > 0 ? [`${crossing.length} show text crossing text (${crossing.map((s) => `${s.screen} ${s.width} ${s.theme}`).join(', ')})`] : []),
+  ].join('; ');
   write();
+  for (const s of crossing) console.log(`  text crosses text on ${s.screen} ${s.width} ${s.theme}: ${s.overlaps.e.map((o) => `"${o.a}" and "${o.b}"`).join('; ')}`);
   console.log(`  look: ${said.shots.length} pictures, ${said.missing.length + cannot.length} screens not drawn, in ${out}`);
-  if (stuck.length > 0 || ready.nothingDrawn() !== null) process.exitCode = 1;
+  if (stuck.length > 0 || crossing.length > 0 || ready.nothingDrawn() !== null) process.exitCode = 1;
   return said;
 }
