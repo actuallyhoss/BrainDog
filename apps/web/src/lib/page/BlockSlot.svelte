@@ -66,7 +66,12 @@
   import { words } from './words.ts';
   import { blockWords } from '$lib/record/block-edit.ts';
   import ProjectCard from '$lib/ui/ProjectCard.svelte';
-  import { agentsOn, cardsOf, trendsOf, type CardDecl } from '$lib/home/project-cards.ts';
+  import { agentsOn, cardFactsOf, cardsOf, trendsOf, type CardDecl } from '$lib/home/project-cards.ts';
+  import Segmented from '$lib/ui/Segmented.svelte';
+  import { valueSaid } from '$lib/voice.ts';
+  import { flip } from 'svelte/animate';
+  import { FADE, ms, settle, still } from '$lib/ui/motion.ts';
+  import { quartOut } from 'svelte/easing';
   import { isProject } from '$lib/record/project.ts';
   import { workingNow } from '$lib/home/waits.svelte.ts';
 
@@ -486,16 +491,43 @@
     const d = list ? REGISTERS[list] : undefined;
     if (block.kind !== 'cards' || block.group || drawn.refusal || !list || !d || !isProject(d)) return null;
     const rows = (block.entries ?? []).flatMap((e) => (typeof e.seq === 'number' && typeof e.fields === 'object' && e.fields !== null ? [{ seq: e.seq, fields: e.fields }] : []));
-    const { cards } = cardsOf({ ...(d as unknown as CardDecl), id: list }, rows, rows.length, true);
+    const { cards } = cardsOf({ ...(d as unknown as CardDecl), id: list }, rows, rows.length, true, true);
     if (cards.length === 0) return null;
     const seg = drawn.segments.find((x) => x.type === 'block' && x.kind === 'cards');
     const trends = seg && seg.type === 'block' ? trendsOf(seg.rows) : new Map();
+    const facts = seg && seg.type === 'block' ? cardFactsOf(seg.rows) : new Map();
     const working = workingNow();
     return cards.map((c) => {
       const f = c.figure ? fieldDecl(list, c.figure.field) : undefined;
-      return { card: c, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
+      const said = facts.get(c.seq);
+      return { card: { ...c, late: said?.late ?? 0, worked: said?.worked ?? null }, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
     });
   });
+
+  /* ── the lane bar ──────────────────────────────────────────────────────────
+     THE CARDS' OWN HEADING IS A SEGMENTED LANE BAR (proj F5): "In play 3", then each lane the cards hold with its count,
+     Parked last. In play is every lane but parked; a lane shows its own. The block's heading stays, for a screen reader. */
+  let lane = $state('play');
+  const LANE_ORDER = ['earning', 'building', 'parked'];
+  const lanes = $derived.by(() => {
+    if (!projectCards) return [];
+    const list = block.register ? REGISTERS[block.register] : undefined;
+    const state = list?.state ? list.fields.find((x) => x.id === list.state) : undefined;
+    const counts = new Map<string, number>();
+    for (const p of projectCards) counts.set(p.card.lane, (counts.get(p.card.lane) ?? 0) + 1);
+    const inPlay = projectCards.filter((p) => p.card.lane !== 'parked').length;
+    const named = [...counts.keys()].sort((a, b) => (LANE_ORDER.indexOf(a) + 1 || 9) - (LANE_ORDER.indexOf(b) + 1 || 9));
+    return [
+      { id: 'play', label: 'In play', count: inPlay },
+      ...named.map((id) => ({ id, label: state ? valueSaid(state as Parameters<typeof valueSaid>[0], id) : id, count: counts.get(id) ?? 0 })),
+    ];
+  });
+  /* A CARD COMING INTO A LANE settles in from 98% over `--d-recompose`; one leaving fades over `--d-exit` (proj F9). */
+  const cardIn = (_: Element) => (still() ? { duration: FADE, css: (t: number) => `opacity:${t}` } : { duration: ms('--d-recompose', 220), easing: quartOut, css: (t: number) => `opacity:${t};transform:scale(${0.98 + 0.02 * t})` });
+  const cardOut = (_: Element) => ({ duration: still() ? FADE : ms('--d-exit', 90), css: (t: number) => `opacity:${t}` });
+  /* THE LANE DRAWN: the one chosen while it holds a card, else the first that does, so nothing in play shows the parked. */
+  const shownLane = $derived(lanes.some((l) => l.id === lane && l.count > 0) ? lane : (lanes.find((l) => l.count > 0)?.id ?? 'play'));
+  const laneCards = $derived(projectCards ? projectCards.filter((p) => (shownLane === 'play' ? p.card.lane !== 'parked' : p.card.lane === shownLane)) : []);
 
   /* WHETHER THE BLOCK IS DRAWN AS MORE THAN ONE RUN OF ROWS. Such a block is read run by run: each run is handed its
      place, and a row is marked as arrived only when no other run of the block held it (`marked` in `page-writes.ts`).
@@ -509,7 +541,7 @@
   <!-- A PAGE'S LEAD QUESTION HAS NO VISIBLE BAR outside arranging: the question is the heading a reader sees, and the bar
        ("Waiting on you") is kept for a screen reader, clipped, not removed, so the region keeps its name in the
        heading list. While arranging it shows, since that is the label a block is moved by. -->
-  <header class="block-bar" data-quiet={block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging ? '' : undefined}>
+  <header class="block-bar" data-quiet={(block.kind === 'queue' && (block as { lead?: unknown }).lead === true && !arranging) || (projectCards && lanes.length > 1 && !arranging) ? '' : undefined}>
     <!-- THE TILE'S HEADING ROW: the block's own glyph in its well when it declares one, the name, and the door to where
          its rows live at the right. AN AUTHORED HEADING IS READ AS TEXT, so `{{icon:rocket}} shipped` draws the rocket
          rather than its braces. -->
@@ -599,8 +631,21 @@
   </div>
   {#if most !== null}<button type="button" class="block-more tap" data-queue-more onclick={(e) => void unfold(e, most)}>{words.more(every.length - most)}</button>{/if}
 {:else if projectCards}
+  <!-- THE CARDS ON THE BOARD, NOT IN A TILE (proj F5): the slot's fill and padding go (`:has(> .project-cards)` below),
+       its heading is the lane bar, and the cards take the one grid every screen lays them in. -->
+  {#if lanes.length > 1}
+    <div class="lane-bar">
+      <Segmented role="group" aria-label={headingText ?? 'Lanes'} full>
+        {#each lanes as l (l.id)}
+          <button type="button" class="segment" data-on={shownLane === l.id ? '' : undefined} aria-pressed={shownLane === l.id} onclick={() => (lane = l.id)}
+            >{l.label} <span class="num">{l.count}</span></button
+          >
+        {/each}
+      </Segmented>
+    </div>
+  {/if}
   <ul class="project-cards">
-    {#each projectCards as p (p.card.key)}<li><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} inset /></li>{/each}
+    {#each laneCards as p (p.card.key)}<li class="pc-cell" in:cardIn out:cardOut animate:flip={settle()}><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} /></li>{/each}
   </ul>
 {:else}
   {#each drawing as item, run}
@@ -946,13 +991,48 @@
     }
   }
 
-  /* AS MANY AS HOLD 15rem, one column on a phone, as Today's desk lays the same cards. */
+  /* THE CARDS STAND ON THE BOARD (proj F5): a slot holding them is no tile, so a card is the white card Today draws and
+     never a grey one inside a white one. */
+  :global(.block-slot:has(> .project-cards)) {
+    padding: 0;
+    background: none;
+  }
+
+  .lane-bar {
+    margin-block-end: 12px;
+  }
+
+  /* ONE GRID FOR THE ONE CARD (proj section 4): four across from 1280, three from 1024, two from 640, one below, gap 12.
+     Fewer cards than columns leave the row short: a card is the same width on every screen and in every lane. */
   .project-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
-    gap: var(--sp-3);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .pc-cell {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  @media (width >= 640px) {
+    .project-cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (width >= 1024px) {
+    .project-cards {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (width >= 1280px) {
+    .project-cards {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
   }
 </style>

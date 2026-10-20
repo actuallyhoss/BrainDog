@@ -98,7 +98,9 @@ test('an enum reads as words, not as an identifier', () => {
   assert.equal(display('tasks', 'state', 'done'), 'done');
   /* A VALUE WITH NO LABEL LOSES ITS UNDERSCORES. This was `obligations.state`'s `written_off` until money-core 3.0.0
      labelled that list's values, which the next line holds. */
-  assert.equal(display('updates', 'health', 'at_risk'), 'at risk');
+  assert.equal(display('services', 'cycle', 'two_yearly'), 'two yearly');
+  /* `updates.health` WAS THE CASE HERE until the UI pass of 20 October labelled it, as its chips and composer said it. */
+  assert.equal(display('updates', 'health', 'at_risk'), 'At risk');
   assert.equal(display('obligations', 'state', 'written_off'), 'Written off');
   /* AND A DECLARED LABEL WINS, where the value has one: money in and money out, not who owes whom. */
   assert.equal(display('obligations', 'direction', 'owed_to_me'), 'Money in');
