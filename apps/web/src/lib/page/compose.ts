@@ -36,7 +36,7 @@ export const composeWords = {
   make: 'Make a component',
   title: 'Make a component',
   field: 'Say what to draw',
-  hint: 'Payroll as a calendar. Cash for the next 90 days as a line chart. Open tasks as a board. Spend by owner as bars.',
+  hint: 'Renewals as a calendar. Cash for the next 90 days as a line chart. Open tasks as a board. Spend by owner as bars.',
   go: 'Draw it',
   draft: 'Drawn as a draft on the page. Keep it, put it on your shelf, or throw it away.',
   keep: 'Keep',

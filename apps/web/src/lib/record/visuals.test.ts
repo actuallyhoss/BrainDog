@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { calendarOf, paydaysOf, roadmapOf, trendOf, visualsFor, type ListDecl, type Listing } from './visuals.ts';
+import { calendarOf, duesOf, roadmapOf, trendOf, visualsFor, type ListDecl, type Listing } from './visuals.ts';
 
 const TODAY = '2026-10-20';
 const say = (n: number, c: string) => `${c} ${n}`;
@@ -59,25 +59,25 @@ const line = (what: string, due: string, every: string, direction = 'out', statu
 
 test('PAYDAYS FOLLOW THE CADENCE, A MISSED ONE IS LATE, AND MONEY IN OR ENDED LINES ARE NOT PAYDAYS', () => {
   const rows = [line('Pay', '2026-10-25', 'monthly'), line('Late pay', '2026-10-15', 'yearly'), line('Fees', '2026-10-21', 'monthly', 'in'), line('Old', '2026-10-22', 'monthly', 'out', 'ended')];
-  const days = paydaysOf([{ decl: repDecl, rows }], TODAY);
+  const days = duesOf([{ decl: repDecl, rows }], TODAY);
   assert.deepEqual(days.filter((d) => d.what === 'Pay').map((d) => d.day), ['2026-10-25', '2026-11-25', '2026-12-25']);
   assert.deepEqual(days.filter((d) => d.what === 'Late pay').map((d) => [d.day, d.late]), [['2026-10-15', true]]);
   assert.equal(days.some((d) => d.what === 'Old' || d.what === 'Fees'), false);
 });
 
 test('TWICE A MONTH LANDS ON THE FIRST AND THE FIFTEENTH', () => {
-  const days = paydaysOf([{ decl: repDecl, rows: [line('Run', '2026-10-21', 'twice_monthly')] }], TODAY).map((d) => d.day);
+  const days = duesOf([{ decl: repDecl, rows: [line('Run', '2026-10-21', 'twice_monthly')] }], TODAY).map((d) => d.day);
   assert.deepEqual(days.slice(0, 3), ['2026-10-21', '2026-11-01', '2026-11-15']);
 });
 
-test('A LIST WITHOUT A DIRECTION AND A CADENCE IS NOT PAYROLL', () => {
-  assert.deepEqual(paydaysOf([tasks(task('a', '2026-10-25'))], TODAY), []);
+test('A LIST WITHOUT A DIRECTION AND A CADENCE IS NOT DUES', () => {
+  assert.deepEqual(duesOf([tasks(task('a', '2026-10-25'))], TODAY), []);
 });
 
 test('THE CALENDAR OPENS ON THE MONTH OF THE EARLIEST LATE DAY AND KEEPS THREE MONTHS', () => {
-  const cal = calendarOf(paydaysOf([{ decl: repDecl, rows: [line('Pay', '2026-09-28', 'monthly')] }], TODAY), TODAY);
+  const cal = calendarOf(duesOf([{ decl: repDecl, rows: [line('Pay', '2026-09-28', 'monthly')] }], TODAY), TODAY);
   assert.deepEqual(cal.map((m) => m.key), ['2026-09', '2026-10', '2026-11']);
-  assert.equal(cal[0]!.paydays.get(28)!.late, true);
+  assert.equal(cal[0]!.dues.get(28)!.late, true);
   assert.equal(cal[0]!.days, 30);
   assert.deepEqual(calendarOf([], TODAY), []);
 });
@@ -96,6 +96,6 @@ test('VISUALS ARE CHOSEN BY WHAT THE PROJECT HAS, NOTHING DRAWN EMPTY', () => {
   assert.deepEqual(visualsFor({ fields: {}, decl: undefined }, base), []);
   const months = (...v: number[]) => ({ currency: 'GBP', total: v.reduce((a, b) => a + b, 0), months: v.map((value, i) => ({ key: `2026-0${i + 1}`, value, partial: false })) });
   const got = visualsFor({ fields: {}, decl: undefined }, { ...base, inByMonth: months(5, 7), outByMonth: months(3), listings: [{ decl: repDecl, rows: [line('Pay', '2026-10-25', 'monthly')] }] });
-  assert.deepEqual(got.map((v) => v.kind), ['in', 'payroll']);
+  assert.deepEqual(got.map((v) => v.kind), ['in', 'dues']);
   assert.equal(got[0]!.rows[0]!.detail, 'GBP 5');
 });

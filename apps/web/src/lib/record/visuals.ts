@@ -2,7 +2,7 @@
  * The drawings a project's page carries inside it: its roadmap, and the few visuals its own data earns.
  *
  * CHOSEN BY WHAT THE PROJECT HAS, never by which project it is: money in and out by month when the record answers those
- * figures, a payroll calendar when a repeating list declaring a direction and a cadence holds outgoings pointing at the
+ * figures, a dues calendar when a repeating list declaring a direction and a cadence holds outgoings pointing at the
  * project, a revenue trend when the project declares two earned amounts. A visual with nothing to draw is not returned,
  * so nothing is drawn empty. Pure and relative-imported so `visuals.test.ts` can hold the rules without a component.
  */
@@ -90,10 +90,10 @@ export function roadmapOf(listings: readonly Listing[], today: string): Roadmap 
   return { marks: kept.map((m) => ({ ...m, at: at(ms(m.day)) })), today, todayAt: at(ms(today)) };
 }
 
-/* ── payroll ───────────────────────────────────────────────────────────────── */
+/* ── dues ───────────────────────────────────────────────────────────────── */
 
-export type Payday = { day: string; late: boolean; what: string };
-export type Month = { key: string; lead: number; days: number; paydays: ReadonlyMap<number, { late: boolean; what: string }> };
+export type Due = { day: string; late: boolean; what: string };
+export type Month = { key: string; lead: number; days: number; dues: ReadonlyMap<number, { late: boolean; what: string }> };
 
 const STEP_DAYS: Record<string, number> = { weekly: 7, fortnightly: 14 };
 const STEP_MONTHS: Record<string, number> = { monthly: 1, quarterly: 3, yearly: 12 };
@@ -127,9 +127,9 @@ function lands(next: string, every: string, until: string): string[] {
  * a day it is next due; its rows count when they go out and are not ended. A line already past its day is late, and is the
  * one dot in the accent; the rest follow from it by the cadence over the months the calendar opens on.
  */
-export function paydaysOf(listings: readonly Listing[], today: string): Payday[] {
+export function duesOf(listings: readonly Listing[], today: string): Due[] {
   const until = plusMonths(`${today.slice(0, 8)}01`, CALENDAR_MONTHS);
-  const out: Payday[] = [];
+  const out: Due[] = [];
   for (const l of listings) {
     const d = l.decl;
     const due = d?.fields.find((f) => f.deadline === true && f.type === 'day')?.id;
@@ -145,23 +145,23 @@ export function paydaysOf(listings: readonly Listing[], today: string): Payday[]
   return out.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
 }
 
-/** The paydays as the months a calendar draws: how many blank cells lead, how many days, and which carry a dot. */
-export function calendarOf(paydays: readonly Payday[], today: string): Month[] {
-  if (paydays.length === 0) return [];
-  const first = paydays[0]!.day < today ? paydays[0]!.day : today;
+/** The dues as the months a calendar draws: how many blank cells lead, how many days, and which carry a dot. */
+export function calendarOf(dues: readonly Due[], today: string): Month[] {
+  if (dues.length === 0) return [];
+  const first = dues[0]!.day < today ? dues[0]!.day : today;
   const months: Month[] = [];
   for (let n = 0; n < CALENDAR_MONTHS; n++) {
     const start = plusMonths(`${first.slice(0, 8)}01`, n);
     const key = start.slice(0, 7);
     const t = ms(start);
     const map = new Map<number, { late: boolean; what: string }>();
-    for (const p of paydays) {
+    for (const p of dues) {
       if (!p.day.startsWith(key)) continue;
       const at = +p.day.slice(8, 10);
       const held = map.get(at);
       map.set(at, { late: p.late || held?.late === true, what: held ? `${held.what}, ${p.what}` : p.what });
     }
-    months.push({ key, lead: (new Date(t).getUTCDay() + 6) % 7, days: new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7), 0)).getUTCDate(), paydays: map });
+    months.push({ key, lead: (new Date(t).getUTCDay() + 6) % 7, days: new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7), 0)).getUTCDate(), dues: map });
   }
   return months;
 }
@@ -193,14 +193,14 @@ export function trendOf(p: Project): Trend | null {
 export type Visual =
   | { kind: 'revenue'; title: string; trend: Trend; rows: DataRow[] }
   | { kind: 'in' | 'out'; title: string; months: Months; rows: DataRow[] }
-  | { kind: 'payroll'; title: string; calendar: Month[]; paydays: Payday[]; rows: DataRow[] };
+  | { kind: 'dues'; title: string; calendar: Month[]; dues: Due[]; rows: DataRow[] };
 
 const label = (key: string): string => new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, 1)).toLocaleString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 
 const monthRows = (kind: string, m: Months, format: VisualData['format']): DataRow[] =>
   m.months.map((x) => ({ key: `${kind}#${x.key}`, title: label(x.key), detail: format(x.value, m.currency), href: null }));
 
-/** The visuals this project earns, in one order: revenue, money in, money out, payroll. Those with nothing to draw are absent. */
+/** The visuals this project earns, in one order: revenue, money in, money out, dues. Those with nothing to draw are absent. */
 export function visualsFor(project: Project, data: VisualData): Visual[] {
   const out: Visual[] = [];
   const trend = trendOf(project);
@@ -218,15 +218,15 @@ export function visualsFor(project: Project, data: VisualData): Visual[] {
   /* A SERIES NEEDS TWO MONTHS TO BE A SHAPE: one bar says what the money block already says. */
   if (data.inByMonth && data.inByMonth.total > 0 && data.inByMonth.months.length >= 2) out.push({ kind: 'in', title: 'Money in by month', months: data.inByMonth, rows: monthRows('in', data.inByMonth, data.format) });
   if (data.outByMonth && data.outByMonth.total > 0 && data.outByMonth.months.length >= 2) out.push({ kind: 'out', title: 'Money out by month', months: data.outByMonth, rows: monthRows('out', data.outByMonth, data.format) });
-  const paydays = paydaysOf(data.listings, data.today);
-  const calendar = calendarOf(paydays, data.today);
-  if (paydays.length > 0) {
+  const dues = duesOf(data.listings, data.today);
+  const calendar = calendarOf(dues, data.today);
+  if (dues.length > 0) {
     out.push({
-      kind: 'payroll',
-      title: 'Payroll',
+      kind: 'dues',
+      title: 'Coming due',
       calendar,
-      paydays,
-      rows: paydays.slice(0, 12).map((p, i) => ({ key: `payroll#${i}`, title: p.what, detail: p.late ? `${p.day}, late` : p.day, href: null })),
+      dues,
+      rows: dues.slice(0, 12).map((p, i) => ({ key: `dues#${i}`, title: p.what, detail: p.late ? `${p.day}, late` : p.day, href: null })),
     });
   }
   return out;

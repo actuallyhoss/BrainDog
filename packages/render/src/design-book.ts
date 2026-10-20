@@ -88,7 +88,7 @@ const EXAMPLES: Readonly<Record<Exclude<Kind, (typeof SHEET_KINDS)[number]>, str
   queue: null,
   capture: null,
   inputs: null,
-  calendar: fence('calendar | Dates', ['Payroll | 2026-10-28', 'Quote due | 2026-10-21']),
+  calendar: fence('calendar | Dates', ['Renewal | 2026-10-28', 'Quote due | 2026-10-21']),
   lanes: fence('lanes | Spans', ['Launch | 2026-10-05 | 2026-10-19', 'Review | 2026-10-12 | 2026-10-23']),
   link: fence('link | Open', ['The site | https://example.com | home']),
   gallery: null,

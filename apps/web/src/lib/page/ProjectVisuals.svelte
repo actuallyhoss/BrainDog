@@ -1,6 +1,6 @@
 <!--
   What a project's page draws beside its shape blocks: a roadmap of its dated tasks, and the visuals its data earns
-  (`visuals.ts`): money in and out by month as small bars, a payroll calendar, a revenue trend.
+  (`visuals.ts`): money in and out by month as small bars, a dues calendar, a revenue trend.
 
   NOTHING DRAWN EMPTY: a roadmap needs two dated tasks, a visual needs its data, and each is a tile only while it has
   something to say. Each has "Show the data" under it, as the blocks above do. The roadmap is a horizontal line of time
@@ -66,7 +66,7 @@
     const share = Math.round((Math.abs(now - before) / before) * 100);
     return share === 0 ? 'The same as the period before.' : `${share}% ${now > before ? 'above' : 'below'} the period before.`;
   };
-  const ICON = { revenue: 'money', in: 'money', out: 'money', payroll: 'calendar' } as const;
+  const ICON = { revenue: 'money', in: 'money', out: 'money', dues: 'calendar' } as const;
   const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 </script>
 
@@ -141,7 +141,7 @@
                     {#each DAYS as d, i (i)}<li class="dow" aria-hidden="true">{d}</li>{/each}
                     {#each { length: c.lead } as _, i (i)}<li aria-hidden="true"></li>{/each}
                     {#each { length: c.days } as _, i (i)}
-                      {@const p = c.paydays.get(i + 1)}
+                      {@const p = c.dues.get(i + 1)}
                       <li class="d" data-pay={p ? (p.late ? 'late' : 'on') : undefined} title={p ? `${i + 1} ${monthName(c.key)}: ${p.what}${p.late ? ', late' : ''}` : undefined}>{i + 1}</li>
                     {/each}
                   </ol>
@@ -174,7 +174,7 @@
     }
 
     .vis.wide,
-    .vis[data-kind='payroll'] {
+    .vis[data-kind='dues'] {
       grid-column: 1 / -1;
     }
   }
@@ -422,7 +422,7 @@
     background: var(--dim);
   }
 
-  /* PAYROLL: a small month at a time, a dot under each payday, the missed ones in the accent. */
+  /* DUES: a small month at a time, a dot under each due day, the missed ones in the accent. */
   .cals {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
