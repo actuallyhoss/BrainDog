@@ -14,6 +14,9 @@
   import RowMenu from '$lib/ui/RowMenu.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Kbd from '$lib/ui/Kbd.svelte';
+  import StatusDot from '$lib/ui/StatusDot.svelte';
+  import { rowsAsCards } from '$lib/ui/body.svelte.ts';
+  import { dotOf } from './list.ts';
 
   let {
     open,
@@ -61,6 +64,12 @@
     /** How the row a hand leaves lands back on the grid (`landRow`), on a live record only. */
     onhanded?: ((entry: Entry) => void) | undefined;
   } = $props();
+
+  /* THE STATE THE ROW IS IN NAMES ITS FIELD ("Status: Open"), so it never reads as the menu's first verb, Open. */
+  const stateName = $derived.by(() => {
+    const f = decl?.fields.find((x) => x.id === decl.state);
+    return f ? (f.label ?? f.id.charAt(0).toUpperCase() + f.id.slice(1)) : '';
+  });
 </script>
 
 <RowMenu {open} at={rect} label={copy.rowMenu} {onclose} hand={row && onhanded ? { register, row, decl, onhanded } : null}>
@@ -87,25 +96,42 @@
          id, Copy link and Select, so the verbs that change an invoice were below the tab bar on an
          844px phone when the menu opened from the first card, while two developer verbs sat above
          them. The copy verbs now come last, before Archive, which keeps its own rule. -->
+    <!-- EACH STATE WITH ITS OWN DOT, THE ONE IT IS IN TICKED AT THE END (money F8): a tick beside every "Set to" read as
+         "this is on". The one it is in is said and does nothing when pressed. -->
     {#if states.length > 0}
+      {@const now = String(rowAt(seq)?.fields[decl.state ?? ''] ?? '')}
       <hr class="mi-rule" />
-      {#each states.filter((v) => v !== rowAt(seq)?.fields[decl.state ?? '']) as state}
-        <button class="mi" role="menuitem" type="button" onclick={() => setRowState(seq, state)}>
-          <Icon name="check" size="s" />
-          <span class="mi-name">{copy.setTo(saidInLine(decl?.state ?? '', state))}</span>
+      {#each states as state}
+        {@const word = saidInLine(decl?.state ?? '', state)}
+        <button
+          class="mi"
+          role="menuitemradio"
+          aria-checked={state === now ? 'true' : 'false'}
+          type="button"
+          onclick={() => {
+            if (state !== now) setRowState(seq, state);
+            onclose();
+          }}
+        >
+          <span class="mi-dot"><StatusDot state={dotOf(decl, state)} /></span>
+          <span class="mi-name">{state === now ? `${stateName}: ${word}` : copy.setTo(word)}</span>
+          {#if state === now}<span class="mi-on"><Icon name="check" size="s" /></span>{/if}
         </button>
       {/each}
       <hr class="mi-rule" />
     {/if}
-    <button class="mi" role="menuitem" type="button" onclick={() => peek(seq)}>
-      <Icon name="eye" size="s" />
-      <span class="mi-name">{copy.peek}</span><Kbd keys="p" />
-    </button>
+    <!-- PREVIEW ONLY WITH A MOUSE: on a phone Open does the same, a screen away. -->
+    {#if !rowsAsCards()}
+      <button class="mi" role="menuitem" type="button" onclick={() => peek(seq)}>
+        <Icon name="eye" size="s" />
+        <span class="mi-name">{copy.peek}</span><Kbd keys="p" />
+      </button>
+    {/if}
     <!-- AND THE ONE VERB THAT UNLOCKS THE OTHER FOUR. Selection was `x` alone, so the bulk bar
          (copy ids, set state, archive them) could not be reached at all without a keyboard. One
          row selected is enough to make it appear, and the bar takes it from there. -->
     <button class="mi" role="menuitem" type="button" onclick={() => toggleSelect(seq, false)}>
-      <Icon name="check" size="s" />
+      <span class="mi-box" data-on={selected.has(seq) ? '' : undefined} aria-hidden="true">{#if selected.has(seq)}<Icon name="check" size="s" />{/if}</span>
       <span class="mi-name">{selected.has(seq) ? copy.deselect : copy.select}</span><Kbd keys="x" />
     </button>
     <button class="mi" role="menuitem" type="button" onclick={() => copyId(seq)}>
@@ -133,57 +159,57 @@
 </RowMenu>
 
 <style>
-  /* The menu rows: 32 tall with an icon, a word and a key cap, the wash on hover, and each printing the key
-     it stands in for, so using the menu teaches the key that replaces it. */
-  .mi {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    inline-size: 100%;
-    min-block-size: 32px;
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-ui);
-    text-align: start;
-    text-decoration: none;
-    cursor: pointer;
+  /* THE ROWS ARE `Menu`'s (2.A.13): 36 tall, 48 in the phone's sheet, a 16px icon in a 20px slot. What is this file's is
+     the state's dot in that slot, the tick at the end of the one the row is in, and Select's box. */
+  .mi-name {
+    flex: 1;
   }
 
-  /* THE MENU IS A KEYBOARD CHEAT SHEET ON A DEVICE WITH NO KEYBOARD. Six of its nine items printed a
-     chip, `Enter`, `p`, `y`, `Shift+Y`, `x` and the delete glyph, to somebody holding a phone.
-     `/start` hid its digit badges under a coarse pointer for exactly this reason in the thirtieth
-     pass and the same rule was never applied here. The bindings are untouched; what goes is the
-     advertisement to a reader who cannot press them. */
+  .mi-dot {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 20px;
+    flex: none;
+  }
+
+  .mi-on {
+    display: inline-flex;
+    color: var(--ink);
+  }
+
+  /* SELECT'S BOX, the list's picker in small: 14 square, radius 4, the button red once ticked. */
+  .mi-box {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    inline-size: 14px;
+    block-size: 14px;
+    margin-inline: 3px;
+    border: 1.5px solid var(--ink-2);
+    border-radius: var(--r-xs);
+    color: var(--on-red);
+  }
+
+  .mi-box :global(svg) {
+    inline-size: 10px;
+    block-size: 10px;
+  }
+
+  .mi-box[data-on] {
+    background: var(--red-fill);
+    border-color: var(--red-fill);
+  }
+
+  /* THE MENU IS A KEYBOARD CHEAT SHEET ON A DEVICE WITH NO KEYBOARD: under a thumb the key caps go. */
   @media (pointer: coarse) {
     .mi :global(kbd) {
       display: none;
     }
   }
 
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .mi-name {
-    flex: 1;
-  }
-
   .mi-rule {
-    margin: 4px 0;
+    margin: var(--sp-1) 0;
     border: 0;
-    border-block-start: 1px solid var(--line);
-  }
-
-  /* 44 UNDER A THUMB: `.mi` is 34 and lives inside a menu the layout gate does not open. `13 §7`. */
-  @media (pointer: coarse) {
-    .mi {
-      min-block-size: var(--tap);
-    }
+    border-block-start: 1px solid var(--rule);
   }
 </style>

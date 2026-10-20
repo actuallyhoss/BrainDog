@@ -27,6 +27,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Money from '$lib/ui/Money.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
+  import { rowIn, rowOut } from '$lib/ui/motion.ts';
   import { deadlineOf, dueOf, isDone, laneFieldOf, lanesOf, type Receipt } from './list.ts';
 
   let {
@@ -136,12 +137,15 @@
   <!-- THE DRAG IS THE POINTER'S WAY BETWEEN LANES, and "Set to" in the card's menu is everybody's. -->
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <li
+    in:rowIn
+    out:rowOut
     class="bcard"
+    data-mode={mode}
     data-row-seq={e.seq}
     data-picked={selected.has(e.seq) ? '' : undefined}
     data-cursor={cursor === e.seq ? '' : undefined}
     data-done={isDone(decl, e) ? '' : undefined}
-    data-arrived={arrived.has(`${register}#${e.seq}`) ? '' : undefined}
+    data-arrived={arrived.has(`${register}#${e.seq}`) || fresh.has(e.seq) ? '' : undefined}
     draggable={setRowState && mode === 'board' ? 'true' : undefined}
     ondragstart={(ev) => {
       if (!setRowState || mode !== 'board') return;
@@ -203,11 +207,21 @@
 {#if mode === 'board'}
   <!-- A REGION THAT SCROLLS SIDEWAYS, so a keyboard can reach it and a screen reader can name it. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-  <div class="board" role="region" aria-label={words.board(decl.name, laneField ? labelOf(laneField) : 'state')} tabindex="0">
-    {#each lanes as lane (lane.value ?? '')}
+  <!-- A LANE WITH NOTHING IN IT IS NOT DRAWN (money F16): "Written off 0, Nothing here" took a quarter of the width.
+       While a card is dragged it comes back as a 120px column, a place to drop on. -->
+  {@const drawn = lanes.filter((l) => l.entries.length > 0 || dragging !== null)}
+  <div
+    class="board"
+    role="region"
+    aria-label={words.board(decl.name, laneField ? labelOf(laneField) : 'state')}
+    tabindex="0"
+    style:--lanes={drawn.map((l) => (l.entries.length > 0 ? 'minmax(264px, 1fr)' : '120px')).join(' ')}
+  >
+    {#each drawn as lane (lane.value ?? '')}
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <section
         class="lane"
+        data-empty={lane.entries.length === 0 ? '' : undefined}
         aria-label={laneSaid(lane.value)}
         data-over={dragging !== null && over === lane.value && lane.value !== null ? '' : undefined}
         ondragover={(ev) => {
@@ -257,6 +271,7 @@
   .board {
     display: grid;
     grid-auto-flow: column;
+    grid-template-columns: var(--lanes, none);
     grid-auto-columns: minmax(264px, 1fr);
     gap: var(--sp-3);
     align-items: start;
@@ -333,9 +348,33 @@
 
   /* ── the cards: one grid, as many across as fit ─────────────────────────── */
 
+  /* THREE TO A ROW AT 1512 (money F16): five narrow cards a row was a grid of identical cards, every title wrapping. */
   .bgrid {
-    grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
     gap: var(--sp-3);
+  }
+
+  /* ON A CARD OF THE GRID THE AMOUNT HAS A LINE OF ITS OWN, at 20 in the display face, and when it is due is the third. */
+  .bcard[data-mode='cards'] .bcard-title {
+    grid-column: 1 / -1;
+  }
+
+  .bcard[data-mode='cards'] .bcard-figure {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    font-family: var(--font-display);
+    font-size: calc(var(--fs-figure) - 2px);
+    font-weight: var(--fw-semi);
+    line-height: 28px;
+  }
+
+  .bcard[data-mode='cards'] .bcard-meta {
+    grid-row: 3;
+  }
+
+  /* A LANE THAT IS ONLY A PLACE TO DROP, while a card is dragged: its name and its nought, nothing under them. */
+  .lane[data-empty] .lane-empty {
+    display: none;
   }
 
   /* ── a card: a tile on the board, flat, told from the board by its fill (DIRECTION 39) ── */
@@ -416,7 +455,7 @@
 
   /* "2 DAYS LATE", THE CARD'S ONE RED, carried by its words at 500. */
   .bcard-due[data-late] {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
@@ -540,26 +579,16 @@
     }
   }
 
-  /* THE MARK OF A ROW JUST ADDED: a dot in the info ink before its title, as the table draws it. */
+  /* THE MARK OF A ROW JUST ADDED is how the page finds it; the eye finds it by the neutral arrival wash on the card. */
   .fresh {
-    display: inline-block;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    margin-inline-end: var(--sp-2);
-    background: var(--action);
-    border-radius: var(--r-round);
-    vertical-align: middle;
-    animation: fresh-in var(--d-enter) var(--ease-out);
-  }
-
-  @keyframes fresh-in {
-    from {
-      opacity: 0;
-    }
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .fresh,
     .bcard[data-arrived] {
       animation-timing-function: step-end;
     }
