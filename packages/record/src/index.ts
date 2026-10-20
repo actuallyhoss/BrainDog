@@ -59,6 +59,7 @@ import {
   type QueueQuestion,
   isQuiet,
   isStale,
+  STALE_MS,
   runAge,
   exponentOf,
   openRecord,
@@ -6078,6 +6079,41 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * The runs in one of `states` heard from lately, newest heard from first, at most `most` of them: an INDEX READ on
+   * `last_seen` (`entry_i_session__last_seen`), from a day before the stale mark on.
+   *
+   * WHY. His record holds 888 runs and 842 of them never ended, so "every open run, newest first" sorted all 842 on each
+   * `context` and `boot` to keep the few heard from in the last 45 minutes. Every reader of this drops a run older than
+   * the stale mark (`isStale`, or the working mark, which is nearer), so a run older than that and a day more is never
+   * one of theirs. The day is room for a `last_seen` written in another offset, which sorts as text. Of those, only the
+   * runs inside the stale mark by the clock are read whole, so a day of runs gone quiet costs an index entry each.
+   */
+  const heardSince = (states: readonly string[], nowMs: number, most: number): Entry[] => {
+    const from = new Date(nowMs - STALE_MS - 86_400_000).toISOString();
+    /* NAMED, because a store that was never analysed reads the whole register by `entry_made` instead and sorts it. A
+       record without the index (none is made without migration 0002, but a copy could lose it) reads as before. */
+    const read = (indexed: string) =>
+      sql.all<{ id: string; seen: unknown }>(
+        `SELECT id, json_extract(fields, '$.last_seen') AS seen FROM entry ${indexed}
+         WHERE register = '${SESSION}' AND deleted_at IS NULL AND json_extract(fields, '$.last_seen') >= ?
+           AND json_extract(fields, '$.${RUN.state}') IN (SELECT value FROM json_each(?))
+         ORDER BY json_extract(fields, '$.last_seen') DESC, updated_at DESC LIMIT ?`,
+        from,
+        JSON.stringify(states),
+        most,
+      );
+    let heard: { id: string; seen: unknown }[];
+    try {
+      heard = read(`INDEXED BY entry_i_${SESSION}__last_seen`);
+    } catch {
+      heard = read('');
+    }
+    return heard
+      .filter(({ seen }) => typeof seen === 'string' && Date.parse(seen) >= nowMs - STALE_MS)
+      .flatMap(({ id }) => ((row) => (row === null || row === undefined ? [] : [row]))(kernel.get(id)));
+  };
+
+  /**
    * The runs that are live now, newest heard from first, with what is worked out when they are read.
    *
    * STALE AND QUIET ARE DERIVED AND NEVER STORED: a run that crashed never says so, so the clock is compared with
@@ -6098,20 +6134,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * answers every run as it is.
    */
   const live = (ctx: CallContext): LiveRun[] => {
-    const rows = kernel.list({
-      register: SESSION,
-      where: { all: [{ field: RUN.state, in: LIVE }, { field: 'last_seen', present: true }] } as Predicate,
-      order: [{ field: 'last_seen', dir: 'desc' }],
-      limit: 50,
-    });
-    if (!rows.ok) return [];
     const now = clock.now();
+    const rows = heardSince(LIVE, now, 50);
     /* THE SAME TREE, NOT THE SAME FOLDER NAME (`sameTree`, AGT-B08): the same machine and repository, and neither run
        working for the other. "Same repo" was the folder's name on any machine, so a session on the laptop was warned
        about one on the desktop in a folder of the same name, and about its own helpers. The caller is read from its
        hints, its spoken name included, so its own run and its helpers are never in its tree. */
     const self: TreeRun | null = ctx.session === undefined ? null : { spoken: ctx.session.spoken, fields: ctx.session as Record<string, JsonValue> };
-    return rows.value.rows
+    return rows
       .filter((row) => !isStale(row, now))
       .map((row) => ({
         ...row,
@@ -6129,15 +6159,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * The runs that may be working: active and heard from, most recently heard from first. `isWorking` then keeps the ones
    * inside the kernel's quiet mark, so the clock is compared in one place (`waiting.ts`).
    */
-  const activeRuns = (): Entry[] => {
-    const rows = kernel.list({
-      register: SESSION,
-      where: { all: [{ field: RUN.state, is: 'active' }, { field: 'last_seen', present: true }] } as Predicate,
-      order: [{ field: 'last_seen', dir: 'desc' }],
-      limit: 200,
-    });
-    return rows.ok ? rows.value.rows : [];
-  };
+  const activeRuns = (): Entry[] => heardSince(['active'], clock.now(), 200);
 
   /**
    * WHAT WAITS ON A READER, COUNTED ONCE (`waiting()`): `boot`, Home's line and the queue's counts all read this.
