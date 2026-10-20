@@ -1,28 +1,27 @@
 <!--
-  An agent's run, as a face: the agent's own mark (`AgentMark`) inside a disc, and a ring while the run is open.
+  An agent's run, as a face: the agent's own mark (`AgentMark`) inside a disc, and a dot while the run is working (the UI
+  pass of 20 October, 2.A.5, frame F16).
 
-  A NAMED AGENT WEARS ITS MAKER'S MARK on a plain disc, because the owner asked for the real ones: Claude's clay
-  starburst, Codex's knot, Cursor's cube. A maker's logo on a washed disc is two colours arguing, so the run's hue is kept for
-  the faces that wear the app's own glyph (a runner, an agent nobody names), where it is still what tells two apart.
+  ONE DISC FOR EVERY AGENT: `--tile-2`, the mark 16px inside it. A named agent wears its maker's mark: Claude's clay
+  starburst in `--agent-claude`, Gemini's in `--agent-gemini`, and the marks drawn in black or white (Codex, Cursor) in
+  `--ink`, so they keep their shape and only the ink turns over with the scheme. An agent with no maker's colour (a
+  runner, one nobody names) wears the app's glyph in a category slot, picked by its run (`runHue` in `face.ts`), so two
+  runners at once are told apart.
 
-  ON A GLYPH'S FACE, THE GLYPH SAYS WHAT AND THE HUE SAYS WHICH. Two runners at once share a glyph, so the colour comes
-  from the run's number (`runHue` in `face.ts`), and the disc keeps it after the run stops; only the ring goes. Two
-  Claude runs side by side are told apart by what each line says beside them: the project, the run's own words.
+  WORKING IS A DOT, NOT A RING: an 8px `--live` dot at the disc's bottom end corner, cut out of the disc by a 2px ring of
+  the ground it stands on (`--face-ground`, the tile unless a caller says). Gone quiet but still open is the same dot
+  hollow. Stopped is no dot. A shape and not a colour alone, so the three read apart in both schemes.
 
-  THE RING IS WHERE THE RUN IS, in `--live`: solid while it works, dashed once it has gone quiet but is still open, and
-  absent when it has stopped. A shape and not a colour, so the three read the same in both schemes and to a reader who does not
-  see the hue.
+  A DOOR TO THE RUN. A face that names a run is a link to the run's own page; its name is what it does and where the
+  run is, since the dot is not read out. A face that names no run is decoration, and hidden, because the agent's name
+  sits beside it.
 
-  A DOOR TO THE RUN. A face that names a run is a link to the run's own page, which reads as a handoff (`r/[register]/
-  [seq]`, the session header). Its name is what it does and where the run is, since the ring is not read out; a face
-  that names no run is decoration, and hidden, because the agent's name sits beside it.
-
-  TWO SIZES: `m` is 32px, a list's or a card's, and `s` is 24px, a line of text's. The ring is two pixels at
-  both, with a hair of the ground inside it, so at 390px it is still a ring and not a heavier disc.
+  THREE SIZES: `s` is 28px, the face on a card, Today and a list; `m` is 32px, a row's leading mark; `xs` is 24px, for a
+  line of text beside a person's face.
 -->
 <script lang="ts">
   import { at } from '../at.ts';
-  import { agentKindOf, faceWords, runHue, runSeq, type RunLive } from './face.ts';
+  import { agentKindOf, faceWords, runHue, runSeq, slotOf, type RunLive } from './face.ts';
   import { isMarked } from '@braindog/skin/agent-marks.ts';
   import AgentMark from './AgentMark.svelte';
 
@@ -31,38 +30,36 @@
     run,
     live,
     project = null,
-    size = 'm',
+    size = 's',
   }: {
     /** The kind of agent, as its id (`claude`), signature (`agent:claude`) or name (`Claude`); null when nobody said. */
     agent: string | null;
-    /** The run, as it signs (`S42`); a run that is not one draws the face with no hue and no door. */
+    /** The run, as it signs (`S42`); a run that is not one draws the face with no slot and no door. */
     run: string;
     live: RunLive;
-    /** The project the run was placed in, as its mark and hue, worn as a badge on the list size. */
+    /** The project the run was placed in, as its mark and hue, worn as a badge at the top corner on the larger sizes. */
     project?: { mark: string | null; hue: number | null } | null | undefined;
-    size?: 's' | 'm' | undefined;
+    size?: 'xs' | 's' | 'm' | undefined;
   } = $props();
 
   const kind = $derived(agentKindOf(agent));
   const seq = $derived(runSeq(run));
   const marked = $derived(isMarked(kind));
-  /* The run's hue washes only a face with no maker's mark in it (see above). */
-  const hue = $derived(seq === null || marked ? null : runHue(seq));
-  /* THE BADGE ONLY ON THE LIST SIZE: at 24px a second mark in the corner is a smudge, and the line beside it names the
+  /* A SLOT ONLY FOR A FACE WITH NO MAKER'S MARK IN IT, so a maker's logo never sits on a second colour. */
+  const slot = $derived(seq === null || marked ? undefined : slotOf(runHue(seq)));
+  /* THE BADGE ONLY FROM 28 UP: at 24 a second mark in the corner is a smudge, and the line beside it names the
      project in words anyway. */
-  const badge = $derived(size === 'm' && project?.mark ? project : null);
+  const badge = $derived(size !== 'xs' && project?.mark ? project : null);
+  const badgeSlot = $derived(badge ? slotOf(badge.hue) : undefined);
 </script>
 
 {#snippet inside()}{#if kind === 'slash'}<svg class="agent-face-slash" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5 8.5 19.5" /></svg
-  >{:else}<AgentMark {kind} size="s" />{/if}{#if badge}<span
-      class="agent-face-project"
-      data-hued={badge.hue === null ? undefined : ''}
-      style={badge.hue === null ? undefined : `--project-hue:${badge.hue}`}
-      aria-hidden="true">{badge.mark}</span
-    >{/if}{/snippet}
+  >{:else}<AgentMark {kind} size={size === 'xs' ? 's' : 'm'} />{/if}{#if badge}<span class="agent-face-project" data-slot={badgeSlot} aria-hidden="true"
+      >{badge.mark}</span
+    >{/if}{#if live !== 'stopped'}<span class="agent-face-live" data-live={live} aria-hidden="true"></span>{/if}{/snippet}
 
 {#if seq !== null}
-  <!-- `.tap`: the disc is 24 or 32px, and a door a thumb presses is 44 either way (design 6.6), so the hit box grows
+  <!-- `.tap`: the disc is 24 to 32px, and a door a thumb presses is 44 either way (design 6.6), so the hit box grows
        round it and the drawing stays the size the line needs. -->
   <a
     class="face agent-face tap"
@@ -70,68 +67,81 @@
     data-agent={kind}
     data-live={live}
     data-size={size}
-    data-hued={hue === null ? undefined : ''}
+    data-slot={slot}
     data-marked={marked ? '' : undefined}
-    style={hue === null ? undefined : `--run-hue:${hue}`}
     aria-label="{faceWords.openRun}, {faceWords.live[live]}">{@render inside()}</a
   >
 {:else}
-  <span class="face agent-face" data-agent={kind} data-live={live} data-size={size} data-marked={marked ? '' : undefined} aria-hidden="true">{@render inside()}</span>
+  <span class="face agent-face" data-agent={kind} data-live={live} data-size={size} data-marked={marked ? '' : undefined} aria-hidden="true"
+    >{@render inside()}</span
+  >
 {/if}
 
 <style>
   .agent-face {
+    /* THE GROUND THE FACE STANDS ON, which the working dot is cut out of: the tile, unless a caller says otherwise. */
+    --face-ground: var(--tile);
+
     position: relative;
     display: grid;
     flex: none;
     place-items: center;
     box-sizing: border-box;
-    inline-size: 32px;
-    block-size: 32px;
-    background: var(--s1);
-    border: 2px solid transparent;
+    inline-size: 28px;
+    block-size: 28px;
+    background: var(--tile-2, var(--s1));
     border-radius: var(--r-round);
     color: var(--ink);
     text-decoration: none;
+    transition: opacity var(--d-state) var(--ease-out);
   }
 
-  .agent-face[data-size='s'] {
+  .agent-face[data-size='xs'] {
     inline-size: 24px;
     block-size: 24px;
   }
 
-  /* THE RUN'S HUE, WASHED INTO THE GROUND as a person's is (`Face.svelte`), so the glyph stays in ink and reads the
-     same on every hue and in both schemes. */
-  .agent-face[data-hued] {
-    background: color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg));
+  .agent-face[data-size='m'] {
+    inline-size: 32px;
+    block-size: 32px;
   }
 
-  /* THE RING IS `--live`, the one hue that means "alive": an agent working right now wears it, solid, and
-     one gone quiet wears it dashed. A hair of the tile inside it, so it reads as a ring round the disc and not as a
-     darker disc. A glyph's disc keeps the run's own hue, which is what tells two runs apart. */
-  .agent-face[data-live='working'],
-  .agent-face[data-live='quiet'] {
-    border-color: var(--live);
-    box-shadow: inset 0 0 0 1px var(--bg);
-  }
-
-  .agent-face[data-live='quiet'] {
-    border-style: dashed;
-  }
-
-  /* A MAKER'S MARK SITS ON A PLAIN DISC: the tile's white with a hairline, so the mark keeps its own colours and the disc
-     still reads as a face on a white tile. */
-  .agent-face[data-marked] {
-    background: var(--bg);
-  }
-
-  .agent-face[data-marked]:not([data-live='working'], [data-live='quiet']) {
-    box-shadow: inset 0 0 0 1px var(--line);
+  /* A DOOR ANSWERS THE POINTER, quietly: the face dims a step, and nothing moves. */
+  @media (hover: hover) and (pointer: fine) {
+    a.agent-face:hover {
+      opacity: 0.8;
+    }
   }
 
   .agent-face:focus-visible {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--focus, var(--focus-in));
     outline-offset: 2px;
+  }
+
+  /* AN AGENT WITH NO MAKER'S COLOUR, IN ITS RUN'S SLOT: the slot's tint under its colour. */
+  .agent-face[data-slot] {
+    background: var(--ph-tint);
+    color: var(--ph);
+  }
+
+  .agent-face-live {
+    position: absolute;
+    inset-block-end: -1px;
+    inset-inline-end: -1px;
+    inline-size: 8px;
+    block-size: 8px;
+    background: var(--live);
+    border-radius: var(--r-round);
+    /* THE CUT-OUT: a ring of the ground the face stands on, so the dot reads as set into the disc's corner. */
+    box-shadow: 0 0 0 2px var(--face-ground);
+  }
+
+  /* GONE QUIET, STILL OPEN: the same dot, hollow. */
+  .agent-face-live[data-live='quiet'] {
+    background: var(--face-ground);
+    box-shadow:
+      inset 0 0 0 2px var(--live),
+      0 0 0 2px var(--face-ground);
   }
 
   .agent-face-slash {
@@ -143,26 +153,73 @@
     stroke-linecap: round;
   }
 
-  /* THE PROJECT'S MARK IN ITS CORNER, square as a project's mark always is, so it is not read as a second face. */
+  /* THE PROJECT'S MARK AT THE TOP CORNER, square as a project's mark always is, in its slot, so it is not read as a
+     second face and never sits where the working dot does. */
   .agent-face-project {
     position: absolute;
-    inset-block-end: -4px;
+    inset-block-start: -4px;
     inset-inline-end: -4px;
     display: grid;
     place-items: center;
     min-inline-size: 14px;
     block-size: 14px;
     padding-inline: 2px;
-    background: var(--s2);
-    border: 1px solid var(--bg);
-    border-radius: var(--r-sm);
-    color: var(--ink);
-    font-size: var(--t-xs);
-    font-weight: 600;
+    background: var(--ph-tint, var(--tile-2, var(--s2)));
+    border-radius: var(--r-xs, var(--r-sm));
+    box-shadow: 0 0 0 1px var(--face-ground);
+    color: var(--ph, var(--ink));
+    font-size: var(--fs-cap, var(--t-xs));
+    font-weight: var(--fw-semi);
     line-height: 1;
   }
 
-  .agent-face-project[data-hued] {
-    background: color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--project-hue)) 36%, var(--bg));
+  [data-slot='blue'] {
+    --ph: var(--cat-blue, var(--ink));
+    --ph-tint: var(--cat-blue-tint, var(--s1));
+  }
+
+  [data-slot='violet'] {
+    --ph: var(--cat-violet, var(--ink));
+    --ph-tint: var(--cat-violet-tint, var(--s1));
+  }
+
+  [data-slot='pink'] {
+    --ph: var(--cat-pink, var(--ink));
+    --ph-tint: var(--cat-pink-tint, var(--s1));
+  }
+
+  [data-slot='teal'] {
+    --ph: var(--cat-teal, var(--ink));
+    --ph-tint: var(--cat-teal-tint, var(--s1));
+  }
+
+  [data-slot='sky'] {
+    --ph: var(--cat-sky, var(--ink));
+    --ph-tint: var(--cat-sky-tint, var(--s1));
+  }
+
+  [data-slot='gold'] {
+    --ph: var(--cat-gold, var(--ink));
+    --ph-tint: var(--cat-gold-tint, var(--s1));
+  }
+
+  [data-slot='lime'] {
+    --ph: var(--cat-lime, var(--ink));
+    --ph-tint: var(--cat-lime-tint, var(--s1));
+  }
+
+  [data-slot='slate'] {
+    --ph: var(--cat-slate, var(--ink));
+    --ph-tint: var(--cat-slate-tint, var(--s1));
+  }
+
+  @media (forced-colors: active) {
+    .agent-face {
+      border: 1px solid CanvasText;
+    }
+
+    .agent-face-live {
+      background: CanvasText;
+    }
   }
 </style>

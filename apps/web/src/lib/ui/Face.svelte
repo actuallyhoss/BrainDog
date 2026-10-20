@@ -10,6 +10,9 @@
   which knows what signed the write. A caller that hands a name alone still gets the right face for
   the words `names.ts` itself says (`faceKindOf`), and a monogram for any other name.
 
+  A PERSON IS THEIR SLOT (the UI pass of 20 October, 2.A.5): their hue picks one of the eight category slots, the disc
+  is its tint and the letter its colour.
+
   AN INITIAL, NOT A PHOTO. `20 §6` refuses avatar stacks on a business record, and a letter in a
   disc is a face without inventing one. It is `aria-hidden` because the name always sits beside it.
 
@@ -23,7 +26,7 @@
 -->
 <script lang="ts">
   import type { ActorKind } from '../record/names.ts';
-  import { faceKindOf, hueFor, initialOf, initialsOf, type RunLive } from './face.ts';
+  import { faceKindOf, hueFor, initialOf, initialsOf, slotOf, type RunLive } from './face.ts';
   import AgentFace from './AgentFace.svelte';
   import Icon from './Icon.svelte';
   import Mark from './Mark.svelte';
@@ -56,6 +59,8 @@
   const drawn = $derived<ActorKind | 'project' | 'record'>(of ?? (you ? 'you' : (kind ?? faceKindOf(name))));
   /* THE SQUARE FOR A THING, THE CIRCLE FOR WHOEVER ACTS. BrainDog is the record speaking, so it is a thing's shape. */
   const square = $derived(drawn === 'project' || drawn === 'record' || drawn === 'system' || drawn === 'sample');
+  /* A PERSON'S, A PROJECT'S OR A RECORD'S SLOT: the category its hue snaps to, the same on every screen. */
+  const slot = $derived(slotOf(hue ?? hueFor(name)));
   /* THE MARK A LITTLE UNDER HALF THE DISC, in the height `Mark` takes, so its width (which follows the artwork) stays inside it. */
   const markHeight = $derived(size === 's' ? 8 : size === 'l' ? 14 : 10);
 </script>
@@ -66,8 +71,8 @@
      down a log would spend. AN AGENT IS `AgentFace`: its maker's mark, or its kind's glyph in its run's hue, where the caller
      names the run, at the size a line of text takes and the list size for a page's own. -->
 {#if drawn === 'agent'}
-  <AgentFace agent={name} run={run ?? ''} {live} size={size === 'l' ? 'm' : 's'} />
-{:else}<span class="face" data-kind={drawn} data-size={size} data-shape={square ? 'square' : 'circle'} style="--hue:{hue ?? hueFor(name)}" aria-hidden="true"
+  <AgentFace agent={name} run={run ?? ''} {live} size={size === 'l' ? 'm' : 'xs'} />
+{:else}<span class="face" data-kind={drawn} data-size={size} data-shape={square ? 'square' : 'circle'} data-slot={slot} aria-hidden="true"
   >{#if drawn === 'automation' || drawn === 'rule'}<Icon name="refresh" size={size === 's' ? 's' : 'm'} />{:else if drawn === 'slash'}<svg
       class="face-slash"
       viewBox="0 0 24 24"><path d="M15.5 4.5 8.5 19.5" /></svg
@@ -81,11 +86,11 @@
     place-items: center;
     inline-size: 24px;
     block-size: 24px;
-    background: var(--s1);
+    background: var(--tile-2, var(--s1));
     border-radius: var(--r-round);
-    color: var(--ink2);
-    font-size: var(--t-xs);
-    font-weight: 600;
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-cap, var(--t-xs));
+    font-weight: var(--fw-semi);
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
@@ -98,32 +103,71 @@
   .face[data-size='l'] {
     inline-size: 32px;
     block-size: 32px;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* A THING'S SQUARE: the corner a small well has at each size, so a project's face and an icon well beside it are
      one family of shape. */
   .face[data-shape='square'] {
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs, var(--r-sm));
   }
 
   .face[data-shape='square'][data-size='l'] {
-    border-radius: var(--r-well);
+    border-radius: var(--r-ctl);
   }
 
-  /* A PERSON, A PROJECT OR A RECORD ON ITS OWN HUE: the theme's mark lightness and chroma at that hue, washed into the
-     tile, with the letters in ink. The letters are never drawn in the hue itself, so they read the same in both
-     schemes whichever hue they sit on. */
+  /* A PERSON, A PROJECT OR A RECORD IN ITS SLOT (the UI pass of 20 October, 1.3): the slot's tint for the disc and its
+     colour for the letter, a pair solved to 4.5:1 in light and in dark. */
   .face:is([data-kind='person'], [data-kind='project'], [data-kind='record']) {
-    background: color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--hue)) 36%, var(--bg));
-    color: var(--ink);
+    background: var(--ph-tint);
+    color: var(--ph);
   }
 
-  /* YOU ARE THE INK DISC, NOT THE ACCENT ONE. The brand colour is kept for the mark and "needs you", and a face
-     repeated down a log is a badge, which is neither. */
+  .face[data-slot='blue'] {
+    --ph: var(--cat-blue, var(--ink));
+    --ph-tint: var(--cat-blue-tint, var(--s1));
+  }
+
+  .face[data-slot='violet'] {
+    --ph: var(--cat-violet, var(--ink));
+    --ph-tint: var(--cat-violet-tint, var(--s1));
+  }
+
+  .face[data-slot='pink'] {
+    --ph: var(--cat-pink, var(--ink));
+    --ph-tint: var(--cat-pink-tint, var(--s1));
+  }
+
+  .face[data-slot='teal'] {
+    --ph: var(--cat-teal, var(--ink));
+    --ph-tint: var(--cat-teal-tint, var(--s1));
+  }
+
+  .face[data-slot='sky'] {
+    --ph: var(--cat-sky, var(--ink));
+    --ph-tint: var(--cat-sky-tint, var(--s1));
+  }
+
+  .face[data-slot='gold'] {
+    --ph: var(--cat-gold, var(--ink));
+    --ph-tint: var(--cat-gold-tint, var(--s1));
+  }
+
+  .face[data-slot='lime'] {
+    --ph: var(--cat-lime, var(--ink));
+    --ph-tint: var(--cat-lime-tint, var(--s1));
+  }
+
+  .face[data-slot='slate'] {
+    --ph: var(--cat-slate, var(--ink));
+    --ph-tint: var(--cat-slate-tint, var(--s1));
+  }
+
+  /* YOU ARE THE INK DISC, NOT THE RED ONE. The red is kept for the mark and "needs you", and a face repeated down a log
+     is a badge, which is neither. */
   .face[data-kind='you'] {
     background: var(--ink);
-    color: var(--on-ink);
+    color: var(--tile);
   }
 
   /* SLASH AND BRAINDOG IN INK on the neutral fill, so neither is mistaken for you. */
