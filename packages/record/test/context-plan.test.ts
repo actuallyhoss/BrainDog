@@ -26,14 +26,14 @@ const who = (over: Partial<CardParts> = {}): CardParts => ({
   also: null,
   next: 'Next     Build wave 2 of the agents plan. (Claude Code, 2h ago, check before acting)',
   signs: 'Signs    1 read red here: Runs end as they ended',
-  waiting: 'Waiting  1 on Sam, first: Add 12 tools for use everywhere?',
+  waiting: 'Waiting  1 on Mara, first: Add 12 tools for use everywhere?',
   learned: 'Learned  Money is minor units plus currency.',
   update: null,
   step: null,
   ...over,
 });
 
-const IN4: ToldFact = { id: 'IN4', said: 'Merge wave 1, then stop', by: 'Sam', at: iso(AT - 5 * 60_000), kind: 'tell', when: 'now', to: 'run', state: 'sent', taken_by: null };
+const IN4: ToldFact = { id: 'IN4', said: 'Merge wave 1, then stop', by: 'Mara', at: iso(AT - 5 * 60_000), kind: 'tell', when: 'now', to: 'run', state: 'sent', taken_by: null };
 
 /** A lesson, `days` old, confirmed `confirmed` days ago or never. */
 const lesson = (n: number, days: number, over: Partial<LessonFact> = {}): LessonFact => ({
@@ -73,7 +73,7 @@ function his(over: Partial<ContextFacts> = {}): ContextFacts {
     branch: 'worktree-agent-a21c',
     now: AT,
     stamp: 'v1234',
-    extra: { keys: Array.from({ length: 176 }, (_, i) => `KEY_${String(i)}`), tools: ['granola', 'xcode'], people: ['Priya', 'Mateo'], signs: ['68 of 73 runs this week did not end normally'] },
+    extra: { keys: Array.from({ length: 176 }, (_, i) => `KEY_${String(i)}`), tools: ['granola', 'xcode'], people: ['Teodor', 'Priya'], signs: ['68 of 73 runs this week did not end normally'] },
     ...over,
   };
 }
@@ -91,7 +91,7 @@ test('ON A RECORD THE SIZE OF HIS, the default answer is 700 tokens or less, and
 test('IT LEADS WITH WHAT HE TOLD IT, in his voice, with the call that takes it, then the card', () => {
   const text = planText(planContext(his()));
   const first = lines(text)[0]!;
-  assert.match(first, /^Told {5}Sam said in BrainDog \(IN4\): "Merge wave 1, then stop", 5m ago\. Take it: instructions \{take:"IN4"\}\.$/u);
+  assert.match(first, /^Told {5}Mara said in BrainDog \(IN4\): "Merge wave 1, then stop", 5m ago\. Take it: instructions \{take:"IN4"\}\.$/u);
   assert.equal(lines(text)[1], 'Claude Code on MacBook, working on BrainDog');
 });
 
@@ -124,9 +124,9 @@ test('TOLD YOU IS NEVER CUT, past any budget: a long instruction is said whole',
 });
 
 test('A STOP IS THE FIRST LINE, in his voice, and what still works', () => {
-  const plan = planContext(his({ stop: { kind: 'pause', id: 'IN7', said: 'Hold until I check the deploy' }, owner: 'Sam' }));
+  const plan = planContext(his({ stop: { kind: 'pause', id: 'IN7', said: 'Hold until I check the deploy' }, owner: 'Mara' }));
   const first = lines(planText(plan))[0]!;
-  assert.match(first, /^Stop {5}Sam paused you in BrainDog \(IN7\): "Hold until I check the deploy"\. Wait: only instructions, handoff and log/u);
+  assert.match(first, /^Stop {5}Mara paused you in BrainDog \(IN7\): "Hold until I check the deploy"\. Wait: only instructions, handoff and log/u);
 });
 
 test('A CUT SECTION SAYS HOW MANY IT LEFT AND THE EXACT CALL', () => {
@@ -210,8 +210,8 @@ test('A WORKTREE BUILDER: its lead first, with what the lead was told, and not t
 });
 
 test('NO PROJECT HERE: the card says so and names the projects worked on last', () => {
-  const plan = planContext(his({ who: who({ who: 'Claude Code on MacBook, no project yet: say which with handoff', placed: false, next: null }), recent: ['BrainDog', 'Encore', 'Nook'], lane: [] }));
-  assert.equal(lines(plan.card)[0], 'Claude Code on MacBook. No project here. Lately: BrainDog, Encore and Nook; say which with handoff.');
+  const plan = planContext(his({ who: who({ who: 'Claude Code on MacBook, no project yet: say which with handoff', placed: false, next: null }), recent: ['Lanternfish', 'Copperleaf', 'Quietcart'], lane: [] }));
+  assert.equal(lines(plan.card)[0], 'Claude Code on MacBook. No project here. Lately: Lanternfish, Copperleaf and Quietcart; say which with handoff.');
 });
 
 test('A SCRIPT KEY is told only what it was told and what it may do', () => {
@@ -226,16 +226,16 @@ test('SINCE A STAMP, only what changed, and "nothing new" is one line', () => {
   assert.equal(none.stamp, 'v1234');
   const one = planText(planContext(his({ since: { stamp: 'v1240', told: [IN4], runs: ['S889 Claude Code started: W2-D hooks'] } })));
   assert.equal(one.split('\n').length, 2, one);
-  assert.ok(one.startsWith('Told     Sam said in BrainDog (IN4)'), one);
+  assert.ok(one.startsWith('Told     Mara said in BrainDog (IN4)'), one);
 });
 
 test('WITH A TASK, the task whole with its version, then its needs; no lane', () => {
-  const task = { name: 'Send the refund email', spoken: 'tasks#396', version: 4, state: 'open', fields: { Due: '24 Oct' }, note: 'Jennifer asked twice.', history: ['21 Oct: moved to open', '20 Oct: made'], keys: ['STRIPE_KEY'], people: ['Jennifer'] };
+  const task = { name: 'Send the refund email', spoken: 'tasks#396', version: 4, state: 'open', fields: { Due: '24 Oct' }, note: 'Ines asked twice.', history: ['21 Oct: moved to open', '20 Oct: made'], keys: ['STRIPE_KEY'], people: ['Ines'] };
   const plan = planContext(his({ task }));
   const text = planText(plan);
   assert.ok(text.includes('Task     Send the refund email (tasks#396 v4) · open'), text);
-  assert.ok(text.includes('Note: Jennifer asked twice.'));
-  assert.ok(text.includes('Needs    People: Jennifer'), text);
+  assert.ok(text.includes('Note: Ines asked twice.'));
+  assert.ok(text.includes('Needs    People: Ines'), text);
   assert.ok(!plan.sections.some((s) => s.id === 'lane'));
 });
 
@@ -264,7 +264,7 @@ test('FROM THE SEED’S OWN CONTEXT: the plan is under budget, leads with the ca
   const plan = planContext(facts);
   const text = planText(plan);
   assert.ok(plan.tokens <= PLAN_BUDGET, text);
-  assert.ok(text.startsWith('Told     Sam said in BrainDog (IN4)'), text);
+  assert.ok(text.startsWith('Told     Mara said in BrainDog (IN4)'), text);
   assert.match(lines(text)[1]!, /^Claude Code on MacBook, working on Kiln$/u);
   assert.ok(plan.sections.some((s) => s.id === 'lane'), text);
   assert.ok(!text.includes('call context for the full picture'), text);

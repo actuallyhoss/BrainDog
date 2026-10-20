@@ -16,7 +16,7 @@
  *   5 Working here now   other live runs in this repo (worktrees are the same repo); a run on your branch is warned of
  *   6 Your lane here     open tasks handed to this kind of agent, then ones nobody holds: 5 rows
  *   7 Decided lately     the last 14 days here, answers to this run's own questions first: 3 rows
- *   8 Lessons            lessons that held: confirmed lately, here before everywhere, method before fact: 3 rows
+ *   8 Held               lessons that held: confirmed lately, here before everywhere, method before fact: 3 rows
  *   9 On request only    keys, tools, people and signs, at depth "full"
  *
  * Every section cut says `and N more: <exact call>`. The teaching lines are said once a run, on its first call
@@ -30,6 +30,7 @@ import type { InstrKind, InstrState, InstrTo, InstrWhen, Stop } from '@braindog/
 
 import { TWO_SESSIONS, agentName, cardParts, cutTo, labeled, oneLine, since, wordCount, words, type CardAt, type CardParts } from './card.ts';
 import { decidedLately, lessonsHeld, restCall, RULE, type Lately, type Lesson } from './context-caps.ts';
+import { listFor } from './agent-lists.ts';
 import type { Context } from './index.ts';
 
 /* ── the budget ────────────────────────────────────────────────────────── */
@@ -54,7 +55,7 @@ export type Depth = 'card' | 'brief' | 'task' | 'full';
 /* ── the facts ─────────────────────────────────────────────────────────── */
 
 /**
- * One open instruction, as the record hands it: `id` spoken (`IN4`), what he said, who said it by name ("Sam"), when
+ * One open instruction, as the record hands it: `id` spoken (`IN4`), what he said, who said it by name ("Mara"), when
  * (ISO), and where it stands. `taken_by` is the run that took it, spoken; this run is `ContextFacts.run`.
  */
 export type ToldFact = {
@@ -164,7 +165,7 @@ export type ContextFacts = {
   run?: string | null | undefined;
   agent?: string | null | undefined;
   branch?: string | null | undefined;
-  /** The record's person by name ("Sam"), whose voice a stop is said in. */
+  /** The record's person by name ("Mara"), whose voice a stop is said in. */
   owner?: string | null | undefined;
   /** The instant the plan is drawn at, ms. */
   now: number;
@@ -225,7 +226,7 @@ const span = (s: number | undefined): string | null => {
 /** A name and a list as a person says it: "Tasks", "Tasks and Learnings", "Tasks, Notes and Learnings". */
 const and = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`);
 
-/** His words as an agent reads them, always marked as his (plan §10.2): `Sam said in BrainDog (IN4): "…"`. */
+/** His words as an agent reads them, always marked as his (plan §10.2): `Mara said in BrainDog (IN4): "…"`. */
 const voice = (who: string, id: string, said: string, verb = 'said'): string => `${who} ${verb} in BrainDog (${id}): "${oneLine(said)}"`;
 
 /** The answer's first line when the run is stopped or paused, and what still works. */
@@ -275,8 +276,8 @@ const laneLine = (t: LaneRow): string =>
   `${words(t.name, 70)} (${t.spoken}${typeof t.version === 'number' ? ` v${String(t.version)}` : ''})${t.state ? ` · ${words(t.state, 16)}` : ''} · ${t.mine ? 'yours' : 'free'}`;
 
 /** The lane's call: the tasks handed to this kind of agent, or that nobody holds. */
-const laneCall = (agent: string | null | undefined): string =>
-  `list({ register: "tasks", where: {"field":"agent","is":${JSON.stringify(agent && agent.trim() ? agent.trim() : 'claude')}} })`;
+const laneCall = (list: string, agent: string | null | undefined): string =>
+  `list({ register: ${JSON.stringify(list)}, where: {"field":"agent","is":${JSON.stringify(agent && agent.trim() ? agent.trim() : 'claude')}} })`;
 
 /* ── the card ──────────────────────────────────────────────────────────── */
 
@@ -425,7 +426,7 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
 
   /* 6 YOUR LANE: handed to this kind of agent first, then free. */
   const lane = [...f.lane].sort((a, z) => Number(z.mine) - Number(a.mine));
-  if (depth !== 'task' && lane.length > 0) fill('lane', 'Lane', lane.map(laneLine), ROWS.lane * times, calls.lane ?? laneCall(f.agent), { total: totals.lane ?? 0 });
+  if (depth !== 'task' && lane.length > 0) fill('lane', 'Lane', lane.map(laneLine), ROWS.lane * times, calls.lane ?? laneCall(/^([a-z][a-z0-9_]*)#/u.exec(lane[0]!.spoken)?.[1] ?? 'list', f.agent), { total: totals.lane ?? 0 });
 
   /* 7 DECIDED LATELY. */
   const decided = decidedLately(f.decided, f.now, Number.POSITIVE_INFINITY);
@@ -433,7 +434,7 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
 
   /* 8 LEARNED HERE: after the one the card leads with. */
   if (depth !== 'task' && lessons.length > 1)
-    fill('learned', 'Lessons', lessons.slice(1).map((l) => words(l, 100)), ROWS.learned * times, calls.learned ?? restCall('learnings'), { total: Math.max(0, (totals.learned ?? 0) - 1) });
+    fill('learned', 'Held', lessons.slice(1).map((l) => words(l, 100)), ROWS.learned * times, calls.learned ?? restCall('learnings'), { total: Math.max(0, (totals.learned ?? 0) - 1) });
 
   /* THE TEACHING LINES, once a run. */
   if (f.first === true && (f.teach ?? []).length > 0) fill('teach', 'How', (f.teach ?? []).map(oneLine), (f.teach ?? []).length, 'context({ depth: "full" })');
@@ -467,7 +468,7 @@ const LABELS: Record<SectionId, string> = {
   here: 'Here now',
   lane: 'Lane',
   decided: 'Decided',
-  learned: 'Lessons',
+  learned: 'Held',
   task: 'Task',
   needs: 'Needs',
   teach: 'How',
@@ -501,11 +502,10 @@ const str = (x: unknown): string | null => (typeof x === 'string' && x.trim() !=
 export function factsFromContext(c: Context, at: FactsAt): ContextFacts {
   const run = at.run === undefined ? (c.session?.spoken ?? null) : at.run;
   const me = (at.agent ?? '').trim().toLowerCase().replace(/^agent:/u, '');
-  const kept = new Set(['session', 'learnings', 'credentials', 'skills', 'tools']);
-  const work = c.registers.filter((r) => !kept.has(r.id) && r.role === undefined);
-  const tasks = work.find((r) => r.id === 'tasks');
+  /* THE WORK LISTS ARE THE ONES THAT PLAY NONE OF THE AGENTS' PARTS (a role), runs aside: what the card's Next reads. */
+  const work = c.registers.filter((r) => r.id !== 'session' && r.role === undefined);
+  const tasks = work.find((r) => [...r.rows, ...r.inherited].some((row) => typeof row.agent === 'string')) ?? work[0];
   const lane: LaneRow[] = (tasks ? [...tasks.rows, ...tasks.inherited] : [])
-    .filter((row) => row.state !== 'done')
     .map((row) => {
       const agent = typeof row.agent === 'string' ? row.agent.trim().toLowerCase().replace(/^agent:/u, '') : '';
       const name = Object.entries(row).find(([k, v]) => !['spoken', 'scope', 'state', 'version', 'agent', 'created_at'].includes(k) && typeof v === 'string' && v.trim())?.[1];
@@ -513,7 +513,7 @@ export function factsFromContext(c: Context, at: FactsAt): ContextFacts {
     })
     .filter(({ agent }) => agent === '' || agent === me)
     .map(({ row, agent, name }) => ({ name, spoken: row.spoken, version: row.version, state: row.state, mine: agent !== '' && agent === me }));
-  const learnings = c.registers.find((r) => r.role === 'learnings' || r.id === 'learnings');
+  const learnings = ((id) => (id === null ? undefined : c.registers.find((r) => r.id === id)))(listFor('learnings', c.registers));
   const learned: LessonFact[] = (learnings ? [...learnings.rows, ...learnings.inherited] : [])
     .filter((row) => row.state === null || row.state === 'active')
     .map((row) => ({
