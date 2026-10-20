@@ -150,5 +150,6 @@ test("A DECLARED PAGE DRAWS THE OFFER AFTER ITS BLOCKS, never between its header
 
   const route = source('../../routes/p/[slug]/+page.svelte');
   assert.match(route, /<OfferCard item=\{offer\}[^>]*\bcompact\b[^>]*\/>/u, 'the page passes the compact form');
-  assert.match(route, /<PageView [^>]*offer=\{offer \? offerCard : undefined\}/u);
+  /* WHAT EVERY AGENT IS TOLD RIDES THE SAME PLACE ON AGENTS (today F19), after the blocks too. */
+  assert.match(route, /<PageView [^>]*offer=\{offer \|\| lessons \? offerCard : undefined\}/u);
 });
