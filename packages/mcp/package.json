@@ -7,7 +7,8 @@
   "dependencies": {
     "@braindog/kernel": "workspace:*",
     "@braindog/ports": "workspace:*",
-    "@braindog/record": "workspace:*"
+    "@braindog/record": "workspace:*",
+    "@braindog/theme": "workspace:*"
   },
   "scripts": {
     "test": "node --test test/*.test.ts",

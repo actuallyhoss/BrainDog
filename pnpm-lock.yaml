@@ -331,6 +331,9 @@ importers:
       '@braindog/record':
         specifier: workspace:*
         version: link:../record
+      '@braindog/theme':
+        specifier: workspace:*
+        version: link:../theme
 
   packages/ports: {}
 

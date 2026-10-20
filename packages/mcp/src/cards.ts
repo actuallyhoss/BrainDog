@@ -1,4 +1,5 @@
 import { briefFromNote } from '@braindog/kernel';
+import { LOOK_B_CSS } from '@braindog/theme/look-b.ts';
 
 /**
  * The cards BrainDog draws inside an agent's app (DIRECTION §45 decision 7): a project, a decision and a rule, as MCP Apps UI
@@ -256,13 +257,13 @@ export function cardOf(
 }
 
 /**
- * Look B's tokens, copied from packages/theme/look-b.css (light, then dark by scheme), only those the cards use. The
- * system faces stand in for Lexend and Geist because a sandboxed widget may load no font file.
+ * Look B's tokens, taken from `@braindog/theme` as a string because a sandboxed widget can import no stylesheet. The
+ * system faces stand in for Lexend and Geist because it may load no font file. Only the mark's lightness and chroma are
+ * set here, and they are numbers.
  */
-const CSS = `
-:root{--page:#FFFFFF;--ink:#101114;--ink2:#3B4048;--muted:#686E77;--rule:#E3E5E9;--soft:#F5F6F8;--red:#CF413A;--red-fill:#CF413A;--red-press:#B3322C;--on-red:#FFFFFF;--live:#2E9E5B;--tile:#FFFFFF;
---head:"Lexend","Geist",ui-sans-serif,system-ui,sans-serif;--ui:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,monospace;--mark-l:0.55;--mark-c:0.09;--hue:oklch(var(--mark-l) var(--mark-c) var(--h,0));color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--page:#0A0B0D;--ink:#ECEEF1;--ink2:#C3C8CF;--muted:#8F96A0;--rule:#242A31;--soft:#1A1F26;--red:#E05148;--red-fill:#C2362F;--red-press:#EA6A61;--tile:#161A20;--mark-l:0.72;--mark-c:0.12;color-scheme:dark}}
+const CSS = `${LOOK_B_CSS}
+:root{--mark-l:0.55;--mark-c:0.09;--hue:oklch(var(--mark-l) var(--mark-c) var(--h,0))}
+@media (prefers-color-scheme:dark){:root{--mark-l:0.72;--mark-c:0.12}}
 *{box-sizing:border-box}
 body{margin:0;background:transparent;color:var(--ink);font:14px/1.45 var(--ui)}
 .card{background:var(--tile);border:1px solid var(--rule);border-radius:12px;padding:16px;max-width:480px}
