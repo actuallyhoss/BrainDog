@@ -20,7 +20,10 @@ export type WorkingRow = {
   project: string | null;
   hue: number | null;
   doing: string | null;
-  /** "12 min ago", or empty where the record did not say when it began. */
+  /**
+   * How long it has been at it, for a run that is working (today F18): "for 32 min", "since 08:40", "since 2 Sep"; for a
+   * run gone quiet, when it was last heard ("12h ago"). Empty where the record did not say when it began.
+   */
   began: string;
 };
 
@@ -36,6 +39,17 @@ export function workingRows(working: readonly Working[], hues: ReadonlyMap<strin
     project: w.project && w.project.trim() !== '' ? w.project.trim() : null,
     hue: w.project ? (hues.get(w.project.trim()) ?? null) : null,
     doing: w.doing && w.doing.trim() !== '' ? w.doing.trim() : null,
-    began: w.since ? since(w.since, now) : '',
+    began: w.since ? (w.quiet ? since(w.since, now) : forSaid(w.since, now)) : '',
   }));
+}
+
+/** How long a working run has been at it: minutes within the hour, then the clock it began at, then its day. */
+export function forSaid(iso: string, now: number): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const mins = Math.max(1, Math.round((now - t) / 60_000));
+  if (mins < 60) return `for ${mins} min`;
+  const at = new Date(t);
+  if (now - t < 24 * 3_600_000) return `since ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+  return `since ${at.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][at.getMonth()]}`;
 }

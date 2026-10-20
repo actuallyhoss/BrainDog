@@ -36,11 +36,13 @@
             </span>
             {#if r.doing}<span class="r-doing" dir="auto">{r.doing}</span>{/if}
           </span>
-          <span class="r-time num">{r.live === 'quiet' ? words.quiet : r.began}</span>
+          <span class="r-time num" data-live={r.live === 'working' && r.began ? '' : undefined}>{r.live === 'quiet' ? words.quiet : r.began}</span>
         </li>
       {/each}
     </ol>
     {#if rows.length > shown.length}<p class="r-more">{words.more(rows.length - shown.length)}</p>{/if}
+    <!-- ON A PHONE, HALF A ROW (today F8): only the faces, under the heading that already says how many. -->
+    <p class="wn-strip" aria-hidden="true">{#each shown as r (r.key)}<AgentFace agent={r.agent} run={r.run} live={r.live} size="s" />{/each}</p>
   </Tile>
 {/if}
 
@@ -106,9 +108,27 @@
   }
 
   .r-time {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     white-space: nowrap;
+  }
+
+  /* WORKING THIS MINUTE: a still live dot before how long (frame F22: one pulse on a change, never a loop). */
+  .r-time[data-live]::before {
+    content: '';
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: var(--r-round);
+    background: var(--live);
+  }
+
+  .wn-strip {
+    display: none;
+    margin: 0;
+    gap: var(--sp-1);
   }
 
   .r-more {

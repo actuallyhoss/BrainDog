@@ -55,7 +55,7 @@
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
   import { apiBase } from '$lib/at.ts';
-  import { onAppendOnly, type Fetch, type Shell } from '$lib/record/boot-live.ts';
+  import { onAppendOnly, recordNow, type Fetch, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
   import { heard, homePage, said } from '$lib/voice.svelte.ts';
@@ -76,6 +76,7 @@
   import { holdsOf, voiceOf } from '$lib/page/home-arrange.ts';
   import {
     FIRST_TODAY_MOST,
+    NEEDS_YOU_LIMIT_PHONE,
     TELL_LINE,
     deskFolded,
     drawsAny,
@@ -93,6 +94,9 @@
   } from '$lib/home/default-home.ts';
   import { addedByHand, showTell, tellLists, wantMore } from '$lib/home/first-today.ts';
   import TellOne from '$lib/home/TellOne.svelte';
+  import NeedsFoot from '$lib/home/NeedsFoot.svelte';
+  import WorkingNow from '$lib/home/WorkingNow.svelte';
+  import { workingRows } from '$lib/home/desk.ts';
   import WantMore from '$lib/home/WantMore.svelte';
   import { read as readPref } from '$lib/pref.ts';
   import { REGISTERS, TITLES } from '$lib/record/held.ts';
@@ -456,7 +460,8 @@
      nothing beside it, or nothing in it, is one column. On the desk, what it does not show at rest is folded. */
   const desked = $derived.by(() => {
     if (!got || got.from !== 'live' || !shaped) return null;
-    const blocks = deskWorking ? shaped.blocks.map((b) => (b.source === 'sessions.working' ? { ...b, drawn: false } : b)) : shaped.blocks;
+    /* ON A PHONE NEEDS YOU SHOWS TWO (today F8), and its count still says how many wait: the rest are "N more". */
+    const blocks = board && phone.current ? shaped.blocks.map((b) => (b.key === 'needs-you' && b.queue && b.queue.length > NEEDS_YOU_LIMIT_PHONE ? { ...b, queue: b.queue.slice(0, NEEDS_YOU_LIMIT_PHONE) } : b)) : shaped.blocks;
     /* ON THE DESK THE DOCUMENT HOLDS THE TILES IN THE ORDER THEY ARE SEEN (`desk-order.ts`), so Tab walks the picture. The
        reader indexes the blocks it is handed, so the order is made here, before it. */
     if (!board) return { blocks, folded: 0 };
@@ -482,6 +487,8 @@
      row there, it stood between "Today" and the line that says what today holds. Drawn once, in one place or the other.
      NOT ON THE DESK ON A PHONE, where it pushed what needs you off the first screen: a task is added from the ask bar. */
   const wide = new MediaQuery('(width >= 900px)', true);
+  /* A PHONE, where Needs you shows two questions and not three (today F8). */
+  const phone = new MediaQuery('(width < 600px)', false);
 
   /**
    * THE THREE READS AROUND THE PAGE, each with the part that draws it: the briefing (`briefing.ts`), what went stale
@@ -502,12 +509,9 @@
   type StalePart = typeof import('./Stale.svelte').default;
   type FaultsPart = typeof import('./TextFaults.svelte').default;
   type FaultsFound = import('./text-faults.ts').TextFaults;
-  type HandledPart = typeof import('./Handled.svelte').default;
   type HandledFound = import('./handled.ts').Handled;
   type LearnedPart = typeof import('./Learned.svelte').default;
   type LearnedFound = import('./learned.ts').Learned;
-  type ToldPart = typeof import('./Told.svelte').default;
-  type ToldTile = import('./told.ts').LessonsTile;
   type NamedPart = typeof import('./NamedTwice.svelte').default;
   type NamedFound = import('./named-twice.ts').NamedTile;
   type HuesPart = typeof import('./Hues.svelte').default;
@@ -521,12 +525,10 @@
   let stale = $state.raw<{ rows: readonly StaleRow[]; Part: StalePart } | null>(null);
   /* WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES, kept only when there is something: nought draws nothing. */
   let faults = $state.raw<{ found: FaultsFound; Part: FaultsPart } | null>(null);
-  /* WHAT BRAINDOG ARRANGED BY ITSELF TODAY, kept only when there is something: nought draws nothing. */
-  let handled = $state.raw<{ found: HandledFound; Part: HandledPart } | null>(null);
+  /* WHAT BRAINDOG DID BY ITSELF TODAY, said as one line at the foot of Needs you (today F6); nought says nothing. */
+  let handled = $state.raw<HandledFound | null>(null);
   /* WHAT THE ANSWERS TAUGHT, kept only when there is something: nought draws nothing. */
   let learned = $state.raw<{ found: LearnedFound; Part: LearnedPart } | null>(null);
-  /* WHAT EVERY AGENT IS TOLD, kept only when there is something: nought draws nothing. */
-  let agentsTold = $state.raw<{ tile: ToldTile; Part: ToldPart } | null>(null);
   /* WHAT MAY BE ONE, kept only when there is something: nought draws nothing. */
   let named = $state.raw<{ found: NamedFound; Part: NamedPart } | null>(null);
   /* WHAT HAS NO COLOUR OF ITS OWN, kept only when there is something: nought draws nothing. */
@@ -627,10 +629,40 @@
   });
 
   /**
-   * THE PAGE'S OWN WORKING TABLE GIVES WAY TO THE DESK'S where the desk draws who is working, so no agent is drawn twice.
-   * Applied to what the reader draws only: the head's line was worked out from the blocks before this.
+   * WHAT BRAINDOG DID BY ITSELF TODAY, read beside the page and not after it, since its line is part of the first tile:
+   * read late, it pushed the board down as it landed. Kept for the next visit like the desk (`today-kept.ts`).
    */
-  const deskWorking = $derived(desk !== null && workingNow().length > 0);
+  $effect(() => {
+    if (data.refused) return;
+    const ver = asOf();
+    const base = apiBase();
+    let here = true;
+    if (untrack(() => handled) === null) handled = keptPart<HandledFound>('handled', base);
+    void import('./handled.ts').then(
+      async (m) => {
+        const found = await tileOnce('handled', base, ver, () => m.loadHandled(base)).catch(() => null);
+        if (here) keepPart('handled', base, (handled = found && found.rows.length > 0 ? found : null));
+      },
+      () => undefined,
+    );
+    return () => {
+      here = false;
+    };
+  });
+  const handledCount = $derived(handled ? handled.rows.length + handled.more : 0);
+
+  /**
+   * WHO IS WORKING, FROM `boot` AND AT ONCE (today F1): Today's own body declares no table of runs, so nothing is drawn
+   * twice and nothing fades out over the board; the tile stands from the first paint, its project dots coloured once the
+   * desk's cards land. On the record's own clock (`recordNow`), so "for 32 min" is the record's time.
+   */
+  const workingTile = $derived.by(() => {
+    const hues = new Map((desk?.cards?.cards ?? []).map((c) => [c.name, c.hue] as const));
+    return workingRows(workingNow(), hues, recordNow());
+  });
+
+  /* WHETHER THE PAGE DRAWS ITS NEEDS YOU QUESTIONS, so the foot is the tile's lower part, or the whole tile at nought. */
+  const needsDrawn = $derived((desked?.blocks ?? []).some((b) => b.key === 'needs-you' && b.drawn));
 
   /**
    * THE BOARD'S LAST TILES WAIT FOR THE PAGE. They are out of the screen's bracket, and landing late they move nothing
@@ -658,20 +690,10 @@
       const found = await m.textFaultsOnce(base, io);
       if (here) faults = found && found.count > 0 ? { found, Part: part.default } : null;
     }, () => undefined));
-    /* AND WHAT BRAINDOG ARRANGED BY ITSELF TODAY, with an Undo each, out of the bracket the same way. */
-    tiles.push(() => Promise.all([import('./handled.ts'), import('./Handled.svelte')]).then(async ([m, part]) => {
-      const found = await tileOnce('handled', base, ver, () => m.loadHandled(base, io));
-      if (here) handled = found && found.rows.length > 0 ? { found, Part: part.default } : null;
-    }, () => undefined));
     /* AND AFTER IT, WHAT THE ANSWERS TAUGHT, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./learned.ts'), import('./Learned.svelte')]).then(async ([m, part]) => {
       const found = await tileOnce('learned', base, ver, () => m.loadLearned(base, io));
       if (here) learned = found && found.rows.length > 0 ? { found, Part: part.default } : null;
-    }, () => undefined));
-    /* AND AFTER IT, WHAT EVERY AGENT IS TOLD, out of the bracket the same way. */
-    tiles.push(() => Promise.all([import('./told.ts'), import('./Told.svelte')]).then(async ([m, part]) => {
-      const tile = m.lessonsTile(await tileOnce('told', base, ver, () => m.loadLessons(base, io)));
-      if (here) agentsTold = tile ? { tile, Part: part.default } : null;
     }, () => undefined));
     /* AND THEN WHAT MAY BE ONE, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
@@ -711,16 +733,17 @@
      rest, and the head's sentence says what it led with. */
   const reader = $derived((drawn !== null && (!calm || Boolean(shaped?.capture))) || !settled);
 
+  /* THE BRIEFING IS NOT DRAWN WHILE ITS MODEL IS PAUSED (today F19): it would only say Late's lines again. */
+  const briefShown = $derived((brief?.cards.length ?? 0) > 0 && !brief?.paused);
+
   /* WHAT MORE HOLDS: the page's blocks the desk folds, and each tile Home draws around the page that has something. */
   const extras = $derived(
     [
-      (brief?.cards.length ?? 0) > 0,
+      briefShown,
       (stale?.rows.length ?? 0) > 0,
       (matched?.rows.length ?? 0) > 0,
       faults,
-      handled,
       learned,
-      agentsTold,
       named,
       hues,
       imported,
@@ -809,7 +832,7 @@
   kicker={today}
   sentence={tell ? TELL_LINE : slashed ? slashSaid : lead?.text}
   needs={tell || slashed ? undefined : lead?.needs || undefined}
-  actions={capture && wide.current ? headCapture : undefined}
+  actions={capture && wide.current && !board ? headCapture : undefined}
   below={capture && !wide.current && !board ? headCapture : undefined}
 />
 
@@ -845,9 +868,12 @@
 <!-- THE DESK'S OWN PARTS: who is working, the live projects as cards and what landed, each left out where it has nothing.
      Height is held while it is on its way where the record has projects. -->
 {#snippet deskPart(part: 'all' | 'working' | 'projects' | 'landed' = 'all')}
-  {#if desk}
+  {#if part === 'working'}
+    <!-- WHO IS WORKING, from `boot`, standing from the first paint. -->
+    <WorkingNow rows={workingTile} />
+  {:else if desk}
     {@const Desk = desk.Part}
-    <Desk cards={desk.cards} working={workingNow()} lines={newLines} lists={data.lists} names={data.names} me={data.me?.person ?? null} now={data.now} {part} />
+    <Desk cards={desk.cards} working={workingNow()} lines={newLines} lists={data.lists} names={data.names} me={data.me?.person ?? null} now={data.now} {part} review={waits?.inbox ?? 0} />
   {:else if deskExpected && (part === 'all' || part === 'projects')}
     <div class="desk-held" aria-hidden="true"></div>
   {/if}
@@ -855,7 +881,7 @@
 
 <!-- THE LINE THAT OPENS EVERYTHING ELSE: a plain line that says how many, and opens them in place. -->
 {#snippet moreLine()}
-  {#if folds > 0}
+  {#if folds > 0 && desked}
     <button type="button" class="more" aria-expanded={moreOpen} onclick={() => (moreOpen = !moreOpen)}>
       <span>{moreOpen ? moreWords.shut : moreWords.open}</span>
       {#if !moreOpen}<span class="more-count num">{folds}</span>{/if}
@@ -864,11 +890,18 @@
   {/if}
 {/snippet}
 
+<!-- THE FOOT OF NEEDS YOU: the late bills and what BrainDog did itself, or the whole tile with nothing to ask. -->
+{#snippet needsFoot()}
+  {#if shaped}
+    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={shaped.lateBills} handled={handledCount} calm={words.nothingNeedsYou} />
+  {/if}
+{/snippet}
+
 <!-- THE DESK'S OWN PARTS AND MORE'S LINE, each where the picture shows it (`desk-order.ts`): before a tile of the page, or
      after the page. -->
 {#snippet placedParts(list: readonly Placed[])}
   {#each list as part (part)}
-    {#if part === 'more'}{@render moreLine()}{:else}{@render deskPart(part)}{/if}
+    {#if part === 'more'}{@render moreLine()}{:else if part === 'needs'}{@render needsFoot()}{:else}{@render deskPart(part)}{/if}
   {/each}
 {/snippet}
 
@@ -951,7 +984,7 @@
             TOP TO BOTTOM AS `homeReads` SAYS: the briefing, what went stale, who was matched, each keyed by its part so a
             read that lands late is put in its place and moves nothing drawn. The page is on the board, over More.
           -->
-          {#each homeReads(brief?.cards.length ?? 0, matched?.rows.length ?? 0, stale?.rows.length ?? 0) as part (part)}
+          {#each homeReads(briefShown ? (brief?.cards.length ?? 0) : 0, matched?.rows.length ?? 0, stale?.rows.length ?? 0) as part (part)}
             {#if part === 'briefing'}
               <!-- WHAT MATTERS TODAY, with who wrote it. -->
               {@render briefed()}
@@ -965,12 +998,8 @@
           {/each}
           <!-- WHAT THE RECORD FOUND WRONG IN ITS OWN PAGES AND NOTES. -->
           {#if faults}<faults.Part found={faults.found} lists={data.lists} />{/if}
-          <!-- WHAT BRAINDOG ARRANGED BY ITSELF TODAY, with an Undo each. -->
-          {#if handled}<handled.Part found={handled.found} />{/if}
           <!-- WHAT THE ANSWERS TAUGHT: what the record will not ask again. -->
           {#if learned}<learned.Part found={learned.found} />{/if}
-          <!-- WHAT EVERY AGENT IS TOLD. -->
-          {#if agentsTold}<agentsTold.Part tile={agentsTold.tile} />{/if}
           <!-- WHAT MAY BE ONE: a pair he can put to Decide. -->
           {#if named}<named.Part found={named.found} />{/if}
           <!-- WHAT HAS NO COLOUR OF ITS OWN: one press gives each its own. -->
@@ -1102,11 +1131,6 @@
     --w: 5;
   }
 
-  .body[data-board]:not(:has(:global(.block-slot[data-key='needs-you']))) {
-    --w: 7;
-    --c: 5;
-  }
-
   .body[data-board]:not(:has(:global(.block-slot[data-key='faces']))) {
     --a: 8;
     --u: 4;
@@ -1138,8 +1162,25 @@
     order: 30;
   }
 
-  .body[data-board] :global(.home-page > .page > .block-slot[data-key='needs-you']) {
+  .body[data-board] :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot])) {
     order: 1;
+  }
+
+  /* NEEDS YOU AND ITS FOOT ARE ONE TILE (today F3, F6): the foot butts the queue's lower edge, the corners between them
+     square, and the queue keeps only a step of air under its last line. With nothing to ask the foot is the tile. */
+  .body[data-board]:has(:global([data-needs-foot]:not([data-alone]))) :global(.home-page > .page > .block-slot[data-key='needs-you']) {
+    padding-block-end: var(--sp-3);
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  .body[data-board] :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
+    margin-block-start: calc(var(--tile-gap) * -1);
+  }
+
+  /* THE FIRST ROW ENDS ON ONE LINE (today F5): Needs you, who is working and cash stretch to the tallest. */
+  .body[data-board] :global(.home-page > .page > :is(.block-slot:is([data-key='needs-you'], [data-key='cash']), [data-working], [data-needs-foot][data-alone])) {
+    align-self: stretch;
   }
 
   .body[data-board] > :global([data-working]),
@@ -1189,17 +1230,31 @@
      has on the desk (`recompose.ts` `frameOf`), so nothing here holds it anywhere. */
 
   @container desk (inline-size >= 960px) {
-    .body[data-board] :global(.home-page > .page > .block-slot[data-key='needs-you']) {
-      grid-column: span var(--n);
+    /* THE FIRST ROW IS PLACED, so the foot under Needs you stays in Needs you's columns and the two tiles beside it run
+       down past it to the foot's lower edge. */
+    .body[data-board] :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot][data-alone])) {
+      grid-row: 1;
+      grid-column: 1 / span var(--n);
+    }
+
+    .body[data-board] :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
+      grid-row: 2;
+      grid-column: 1 / span var(--n);
     }
 
     .body[data-board] > :global([data-working]),
     .body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
+      grid-row: 1;
       grid-column: span var(--w);
     }
 
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
+      grid-row: 1;
       grid-column: span var(--c);
+    }
+
+    .body[data-board]:has(:global([data-needs-foot]:not([data-alone]))) :global(.home-page > .page > :is([data-working], .block-slot:is([data-key='working'], [data-key='cash']))) {
+      grid-row: 1 / span 2;
     }
 
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
@@ -1240,6 +1295,102 @@
     .body[data-board]:not(:has(:global(.block-slot[data-key='coming-up']))) :global(.home-page > .page > .block-slot[data-key='faces']) {
       grid-column: 1 / -1;
     }
+  }
+
+  /* ON A PHONE, WHO IS WORKING AND CASH SHARE ONE ROW AS TWO HALVES (today F8): the faces under "Working now 2", and the
+     cash figure with how long it lasts; each heading still opens its whole tile's page. */
+  @container desk (inline-size < 640px) {
+    .body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='cash'])) {
+      grid-column: span 6;
+    }
+
+    .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) :global(.home-page > .page > [data-working]),
+    .body[data-board]:not(:has(:global([data-working]))) :global(.home-page > .page > .block-slot[data-key='cash']) {
+      grid-column: 1 / -1;
+    }
+
+    .body[data-board] :global([data-working] :is(.runs, .r-more, .tile-aside)) {
+      display: none;
+    }
+
+    .body[data-board] :global([data-working] .wn-strip) {
+      display: flex;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='cash'] :is(.cell:not(:first-child), .cell-trend, .cell-label, .glyph)) {
+      display: none;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='cash'] .grid) {
+      display: block;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='cash'] .cell) {
+      display: grid;
+      gap: var(--sp-1);
+      padding: 0;
+      border: 0;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='cash'] .cell-figure) {
+      font-size: var(--fs-figure);
+      line-height: 26px;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='cash'] .cell-note) {
+      color: var(--ink-3);
+      font-size: var(--fs-meta);
+    }
+  }
+
+  /* PEOPLE, ONE LINE EACH (today F17): the face, the name, and the organisation after it in the quiet ink, never a form's
+     label and value. */
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-item) {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    column-gap: var(--sp-2);
+    min-inline-size: 0;
+    text-align: start;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-head) {
+    flex: none;
+    max-inline-size: 60%;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-facts) {
+    display: contents;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-fact) {
+    display: block;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-fact dt) {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-fact dd) {
+    display: inline;
+    margin: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-fact dd::before) {
+    content: '· ';
   }
 
   /* MORE: one plain line across the board, a full target, the count in the quiet ink, the chevron turned when open. */
@@ -1340,17 +1491,18 @@
     }
   }
 
-  /* ON A PHONE A QUESTION IS A STEP UNDER THE HEADLINE, not level with it: at 20 and 24 bold the questions under the
-     28px line read as the headline, and the page opened on three of them. The first question keeps one step over the
-     rest, as `queue lead` does at every width. */
+  /* ON A PHONE A QUESTION IS A STEP UNDER THE HEADLINE, not level with it (today F8): 15/600, and the first one step
+     over the rest at 17/600, so the first screen holds the line, two questions and the strip under them. */
   @media (width < 900px) {
     .body :global(.queue-question) {
-      font-size: var(--t-group);
+      font-size: var(--fs-body);
       font-weight: 600;
+      line-height: var(--lh-body, 22px);
     }
 
-    .body :global(.queue-lead > .queue-question) {
-      font-size: var(--t-lg);
+    .body :global(.queue > .qa:first-child .queue-question) {
+      font-size: var(--fs-head);
+      line-height: var(--lh-head, 24px);
     }
   }
 </style>

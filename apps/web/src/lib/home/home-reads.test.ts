@@ -72,7 +72,7 @@ test('WHAT WENT STALE STANDS UNDER THE PAGE AND OVER WHO WAS MATCHED, and only w
 });
 
 test('what went stale is drawn once, from its own read, between the page and who was matched', () => {
-  assert.match(home, /\{#each homeReads\(brief\?\.cards\.length \?\? 0, matched\?\.rows\.length \?\? 0, stale\?\.rows\.length \?\? 0\) as part \(part\)\}/u);
+  assert.match(home, /\{#each homeReads\(briefShown \? \(brief\?\.cards\.length \?\? 0\) : 0, matched\?\.rows\.length \?\? 0, stale\?\.rows\.length \?\? 0\) as part \(part\)\}/u);
   assert.equal(home.split('<stale.Part').length - 1, 1, 'what went stale is drawn once');
   assert.match(home, /\{:else if part === 'stale'\}\s*\{#if stale\}<stale\.Part rows=\{stale\.rows\} \/>\{\/if\}/u);
   /* IN THE FILE AS ON THE SCREEN IT IS AFTER THE BRIEFING; the page is the each's last branch, placed by the helper. */
@@ -84,7 +84,7 @@ test('what went stale is drawn once, from its own read, between the page and who
 });
 
 test('the template draws from the helper, each part once and keyed, so a read landing late moves nothing drawn', () => {
-  assert.match(home, /\{#each homeReads\([^)]*\) as part \(part\)\}/u);
+  assert.match(home, /\{#each homeReads\(.*\) as part \(part\)\}/u);
   assert.equal(home.split('<brief.Part').length - 1, 1, 'the briefing is drawn once');
   assert.equal(home.split('<matched.Part').length - 1, 1, 'who was matched is drawn once');
   assert.equal(home.split('<PageView').length - 1, 1, 'the page is drawn once');

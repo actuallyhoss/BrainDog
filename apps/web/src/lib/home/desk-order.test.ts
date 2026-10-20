@@ -22,13 +22,13 @@ test('EVERY KEY THE DESK SHOWS AT REST HAS A PLACE IN THE ORDER', () => {
   for (const key of DESK_KEYS) assert.ok(rankOf({ key }) < 30, key);
 });
 
-test('WHO IS WORKING STANDS BEFORE CASH, THE PROJECTS AND WHAT LANDED BEFORE WHAT IS COMING UP, AND MORE BEFORE WHAT IT OPENS', () => {
+test('THE FOOT OF NEEDS YOU AND WHO IS WORKING STAND BEFORE CASH, THE PROJECTS AND WHAT LANDED BEFORE WHAT IS COMING UP, AND MORE BEFORE WHAT IT OPENS', () => {
   const blocks = inPicture([b('needs-you'), b('cash'), b('week-due'), b('coming-up'), b('faces'), b(), b()]);
   const { at, tail } = anchorsFor(blocks, true);
   assert.deepEqual(
     [...at],
     [
-      [1, ['working']],
+      [1, ['needs', 'working']],
       [3, ['projects', 'landed']],
       [5, ['more']],
     ],
@@ -39,10 +39,10 @@ test('WHO IS WORKING STANDS BEFORE CASH, THE PROJECTS AND WHAT LANDED BEFORE WHA
 test('A PART WITH NOTHING AFTER IT FOLLOWS THE READER, and an undrawn block is never what a part stands before', () => {
   const blocks = inPicture([b('needs-you'), b('cash', false), b('coming-up'), b('x', false)]);
   const { at, tail } = anchorsFor(blocks, true);
-  assert.deepEqual([...at], [[2, ['working', 'projects', 'landed']]]);
+  assert.deepEqual([...at], [[2, ['needs', 'working', 'projects', 'landed']]]);
   assert.deepEqual(tail, ['more']);
 });
 
 test("WITHOUT A READER EVERY PART FOLLOWS IT, in the picture's order", () => {
-  assert.deepEqual(anchorsFor([b('needs-you')], false).tail, ['working', 'projects', 'landed', 'more']);
+  assert.deepEqual(anchorsFor([b('needs-you')], false).tail, ['needs', 'working', 'projects', 'landed', 'more']);
 });

@@ -37,7 +37,7 @@ test('HOME DRAWS ITS BODY, DESK AND BRIEFING FROM WHAT IT KEPT, and asks each ti
   const home = readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8');
   assert.match(home, /keptPart<KeptBody>\('body', key\)/u);
   assert.match(home, /keptPart<NonNullable<typeof desk>>\('desk', base\)/u);
-  for (const tile of ['briefing', 'matched', 'stale', 'desk', 'handled', 'learned', 'told', 'named', 'hues', 'imported'])
+  for (const tile of ['briefing', 'matched', 'stale', 'desk', 'handled', 'learned', 'named', 'hues', 'imported'])
     assert.match(home, new RegExp(`tileOnce\\('${tile}', base, ver,`, 'u'), `${tile} is asked again at the same version`);
   /* THE KEPT BODY SETTLES THE SCREEN AT ONCE, and the read behind it is not bracketed. */
   assert.match(home, /const at = was \? null : untrack\(opened\);/u);

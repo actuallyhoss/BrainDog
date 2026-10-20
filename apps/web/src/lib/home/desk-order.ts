@@ -26,8 +26,10 @@ const RANKS: Readonly<Record<string, number>> = {
 export const REST = 30;
 
 /** Home's own parts, with the place each holds among the blocks. */
-export type Placed = 'working' | 'projects' | 'landed' | 'more';
+export type Placed = 'needs' | 'working' | 'projects' | 'landed' | 'more';
 const PLACES: readonly (readonly [Placed, number])[] = [
+  /* THE FOOT OF NEEDS YOU, right under its questions (or the whole tile with none to ask). */
+  ['needs', 1],
   ['working', 2],
   ['projects', 6],
   ['landed', 7],
