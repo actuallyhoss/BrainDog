@@ -656,13 +656,13 @@ function dayIn(b: LiveBlock, fields: Record<string, unknown>): string | null {
 }
 
 /** A question about money, as Needs you groups it (`routes/decide/views.ts` `aboutMoney`): it writes an amount, or names one. */
-export const aboutMoney = (q: Pick<QueueQuestion, 'money' | 'question'>): boolean => (Array.isArray(q.money) && q.money.length > 0) || namesAmount(q.question);
+export const aboutMoney = (q: QueueQuestion): boolean => (Array.isArray(q.money) && q.money.length > 0) || namesAmount(q.question);
 
 /**
  * TODAY'S NEEDS YOU IN NEEDS YOU'S OWN ORDER (today F3): the questions about money first, then the quick ones, the oldest
  * first inside each, so the two invoices to chase lead the first screen as they lead Needs you's Money column.
  */
-export function needsYouOrder<Q extends Pick<QueueQuestion, 'money' | 'question' | 'at'>>(queue: readonly Q[]): Q[] {
+export function needsYouOrder<Q extends QueueQuestion>(queue: readonly Q[]): Q[] {
   const rank = (q: Q): number => (aboutMoney(q) ? 0 : 1);
   return [...queue].sort((a, b) => rank(a) - rank(b) || String(a.at ?? '').localeCompare(String(b.at ?? '')));
 }

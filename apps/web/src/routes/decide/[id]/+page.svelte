@@ -1390,7 +1390,7 @@
     min-inline-size: 0;
   }
 
-  :global(.tile.gate-aside) > * + :is(.does, .aside-more, .thread) {
+  .gate-grid :global(.tile.gate-aside > * + :is(.does, .aside-more, .thread)) {
     padding-block-start: var(--sp-4);
     border-block-start: 1px solid var(--rule);
   }
@@ -1477,7 +1477,7 @@
   }
 
   /* WHO ASKED IS THE LINE OVER THE ANSWERS, close over them as a card's by-line is over its question. */
-  :global(.tile.gate) > .gate-by {
+  .gate-grid :global(.tile.gate > .gate-by) {
     margin-block-end: calc(var(--sp-1) * -1);
   }
 
@@ -1948,7 +1948,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: 17px;
+    font-size: var(--fs-head);
     font-weight: var(--fw-semi);
     line-height: 1.3;
     overflow-wrap: anywhere;

@@ -3,7 +3,7 @@
 
   - The late bills with no question about them, as one line in red with its money: "4 bills are late, £10,593 in all",
     opening the late work (`/?work&late`). The questions about money owed to you lead the tile above it.
-  - What BrainDog did by itself today: "BrainDog did 15 things itself today. Review", opening Needs you's Handled.
+  - What BrainDog did by itself today: "BrainDog handled 15 itself today. Review", opening Needs you's Handled.
 
   DRAWN AS THE TILE'S LOWER PART, under the queue the page's reader draws (Home lays the two together on the board), so
   the tile reads as one. WITH NOTHING TO ASK (`alone`) it is the whole tile: the heading, a calm mark, "Nothing needs
@@ -13,6 +13,7 @@
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { at } from '$lib/at.ts';
+  import { WORK } from '$lib/nav.ts';
 
   let {
     alone = false,
@@ -35,7 +36,7 @@
 
   const words = {
     late: (n: number, said: string) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'bill is' : 'bills are'} late, ${said} in all`,
-    handled: (n: number) => `BrainDog did ${n.toLocaleString('en-GB')} ${n === 1 ? 'thing' : 'things'} itself today.`,
+    handled: (n: number) => `BrainDog handled ${n.toLocaleString('en-GB')} itself today.`,
     review: 'Review',
   } as const;
 
@@ -55,7 +56,7 @@
       <ul class="nf-lines">
         {#if late && late.count > 0}
           <li>
-            <a class="nf-line nf-late" href={at('/?work&late')}>
+            <a class="nf-line nf-late" href={at(`${WORK}&late`)}>
               <Icon name="clock" size="s" /><span class="nf-words">{words.late(late.count, late.said)}</span><Icon name="chevron" size="s" />
             </a>
           </li>
