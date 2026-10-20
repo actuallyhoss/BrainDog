@@ -54,6 +54,8 @@ export const cardWords = {
   undo: 'Undo',
   /** What accepting writes, when money moves. */
   moves: (amount: string) => `Moves ${amount}`,
+  /** What accepting writes, when every amount is on an entry it adds: recorded, and no money moves (`records`). */
+  records: (amount: string) => `Records ${amount}`,
   /** Between what a change was and what it becomes, said where the eye reads an arrow. */
   to: 'to',
   /** A value that was empty before, or is emptied. */
@@ -506,7 +508,7 @@ export function cardOf(q: QueueQuestion, ctx: CardContext): Card {
     cost,
     band: cost && cost !== 'call' ? queueCost(cost) : '',
     moves,
-    money: said === '' ? '' : cardWords.moves(said),
+    money: said === '' ? '' : field(q, 'records') === true ? cardWords.records(said) : cardWords.moves(said),
     shifts: read.lines.map(({ what, before, after }) => ({ what, before, after })),
     lines: read.lines,
     more: read.more,

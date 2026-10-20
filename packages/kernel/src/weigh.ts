@@ -84,10 +84,13 @@ const retypes = (to: unknown): boolean => {
  * again, so the record keeps the way back and the band says so: an update weighs what a new row weighs. A row removed
  * is the same (`patch.deleted_at`): it is kept and marked, and Put back restores it (`undo.ts`).
  *
- * MONEY IS THE ONE WRITE THAT IS. A figure a row carries is read by a balance, a report and whoever was told the
- * number the moment it lands, and putting the row back does not un-tell them. `movesMoney` is the rule `waitOf` reads
- * below, on a new row or a patch alike, and one such row is enough: `decide` applies a rowset all-or-nothing
- * (`govern.ts`), so it cannot be taken separately.
+ * MONEY CHANGED ON A ROW THAT EXISTS IS THE ONE WRITE THAT IS. A figure a row carries is read by a balance, a report
+ * and whoever was told the number the moment it lands, and putting the row back does not un-tell them (`patchesMoney`).
+ * One such row is enough: `decide` applies a rowset all-or-nothing (`govern.ts`), so it cannot be taken separately.
+ *
+ * A NEW ROW THAT CARRIES AN AMOUNT IS NOT (20 Oct). A bank text added to the Ledger was "Accept EGP 34,620, can't be
+ * undone easily": the row records what the bank already moved, moves nothing itself, and is deleted or put back like any
+ * other new row. It still waits as `soon`, which `waitOf` reads off `movesMoney`, a new row and a patch alike.
  *
  * AND SO IS A VALUE THE HISTORY WITHHOLDS (batch 60). A field any version of its list has typed `secret` or `money`,
  * or marked `redact: true`, is written to the history as `--redacted--`, and Put back says of such a line that it
@@ -96,7 +99,7 @@ const retypes = (to: unknown): boolean => {
  * body says is weighed, as `waitOf` does without its own.
  */
 function rowsetCost(body: Record<string, unknown>, rows?: CostRows): Cost {
-  if (movesMoney(body) || patchesWithheld(body, rows)) return 'undo';
+  if (patchesMoney(body) || patchesWithheld(body, rows)) return 'undo';
   return arr(body.rows).length >= MANY_ROWS ? 'shape' : 'rows';
 }
 
@@ -240,10 +243,18 @@ const movesMoneySql = (src: string, path: string): string => `EXISTS (SELECT 1 F
       AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3)`;
 
 /**
- * `movesMoney` as SQL over a `suggestion` row. It stands above `COST_SQL` and `WAIT_SQL`, which both read it, and
- * `kernel/index.ts`'s `BAND_SQL` is `COST_SQL`; its caller has already seen that `$.rows` is an array.
+ * `movesMoney` as SQL over a `suggestion` row, for `WAIT_SQL`; its caller has already seen that `$.rows` is an array.
  */
 const MOVES_MONEY_SQL = movesMoneySql('body', '$.rows');
+
+/**
+ * `patchesMoney` as SQL over a `suggestion` row: money in an update's patch, and none on a new row. It stands above
+ * `COST_SQL`, and `kernel/index.ts`'s `BAND_SQL` is `COST_SQL`; its caller has already seen that `$.rows` is an array.
+ */
+const PATCHES_MONEY_SQL = `EXISTS (SELECT 1 FROM json_each(body, '$.rows') AS r, json_each(CASE
+      WHEN r.type = 'object' AND json_type(r.value, '$.at') IS NOT NULL AND json_type(r.value, '$.patch') = 'object' THEN json_extract(r.value, '$.patch') END) AS f
+    WHERE f.type = 'object' AND json_type(f.value, '$.amount') = 'integer' AND json_type(f.value, '$.currency') = 'text'
+      AND json_extract(f.value, '$.currency') GLOB '[A-Z][A-Z][A-Z]' AND length(json_extract(f.value, '$.currency')) = 3)`;
 
 /**
  * What `costOf` reads of the record: the fields of a list whose values the history withholds, and whether a list
@@ -363,7 +374,7 @@ const OPTION_UNDO_SQL = `(COALESCE(json_type(o.value, '$.hard'), '') = 'true' OR
 export const COST_SQL = `(CASE
   WHEN json_valid(body) AND json_type(body) = 'object' THEN (CASE body_kind
     WHEN 'rowset' THEN (CASE
-      WHEN json_type(body, '$.rows') = 'array' AND (${MOVES_MONEY_SQL} OR ${PATCHES_WITHHELD_SQL}) THEN 'undo'
+      WHEN json_type(body, '$.rows') = 'array' AND (${PATCHES_MONEY_SQL} OR ${PATCHES_WITHHELD_SQL}) THEN 'undo'
       WHEN COALESCE(json_array_length(body, '$.rows'), 0) >= ${MANY_ROWS} THEN 'shape'
       ELSE 'rows' END)
     WHEN 'change' THEN (CASE
@@ -475,6 +486,15 @@ const isMoney = (v: unknown): boolean => {
 function movesMoney(body: Record<string, unknown>): boolean {
   return arr(body.rows).some((r) => {
     if (r === null || typeof r !== 'object' || Array.isArray(r)) return false;
+    const w = writeOf(r as Record<string, unknown>);
+    return w !== null && Object.values(w).some(isMoney);
+  });
+}
+
+/** Whether an update in a rowset writes money onto a row that exists: what `rowsetCost` holds hard to undo. */
+function patchesMoney(body: Record<string, unknown>): boolean {
+  return arr(body.rows).some((r) => {
+    if (r === null || typeof r !== 'object' || Array.isArray(r) || (r as Record<string, unknown>).at === undefined) return false;
     const w = writeOf(r as Record<string, unknown>);
     return w !== null && Object.values(w).some(isMoney);
   });

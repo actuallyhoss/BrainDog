@@ -122,6 +122,8 @@ test('MOVES IS SAID ONE CURRENCY AT A TIME, and two currencies are never added',
   /* A PAYMENT OUT AND A REFUND IN ARE TWO MOVEMENTS, never netted to less. */
   assert.equal(movesSaid([{ amount: -1000, currency: 'GBP' }, { amount: 400, currency: 'GBP' }]), 'Moves GBP 14.00');
   assert.equal(movesSaid({ amount: 1500, currency: 'JPY' }), 'Moves JPY 1,500');
+  /* AN AMOUNT ON A ROW ACCEPTING ADDS IS RECORDED: a bank text added to the Ledger moves no money (20 Oct). */
+  assert.equal(movesSaid({ amount: 3462000, currency: 'EGP' }, true), 'Records EGP 34,620.00');
   /* NOTHING MOVES: no money, zero, or an amount that is not whole minor units. */
   assert.equal(movesSaid(undefined), null);
   assert.equal(movesSaid({ amount: 0, currency: 'GBP' }), null);

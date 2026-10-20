@@ -1043,7 +1043,7 @@ export function proposedBrief(filed: Record<string, unknown>, question: string, 
   const at = typeof filed.decide === 'string' ? ` at ${filed.decide}` : '';
   return [
     `Asked ${look.decider}: ${clip(plainOf(question, look), 160)}${id}`,
-    movesSaid(filed.money),
+    movesSaid(filed.money, filed.records === true),
     changesSaid(filed.changes, look),
     `${sentence(look.decider)} decides in BrainDog${at}.`,
   ]
@@ -1061,12 +1061,13 @@ function movedOf(v: unknown): { amount: number; currency: string } | null {
 
 /**
  * `Moves GBP -17.98 and USD 7.00`: the money accepting writes, one amount a currency, or `null` when none moves.
+ * `Records` in its place where every amount is on a row accepting adds (`records`), which moves no money.
  *
  * THE DECISION CARD'S RULE (`apps/web/src/lib/decide/card.ts` `movesOf`), so the agent and the person read one account of
  * it: amounts in one currency are one figure, their sum where they all go one way and what moves in all where they do not,
  * since a payment out and a refund in are two movements and never netted to less; two currencies are never added.
  */
-export function movesSaid(v: unknown): string | null {
+export function movesSaid(v: unknown, records = false): string | null {
   const by = new Map<string, { net: number; moved: number }>();
   for (const m of (Array.isArray(v) ? v : [v]).map(movedOf)) {
     if (m === null) continue;
@@ -1075,7 +1076,8 @@ export function movesSaid(v: unknown): string | null {
   }
   if (by.size === 0) return null;
   const each = [...by].map(([currency, { net, moved }]) => money(Math.abs(net) === moved ? net : moved, currency));
-  return `Moves ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(each)}`;
+  /* AN AMOUNT ON A ROW ACCEPTING ADDS IS RECORDED, NOT MOVED (`records`): a bank text added to the Ledger moves nothing. */
+  return `${records ? 'Records' : 'Moves'} ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(each)}`;
 }
 
 /** The most changes a proposal's answer names; the question's own page in BrainDog says all of them. */

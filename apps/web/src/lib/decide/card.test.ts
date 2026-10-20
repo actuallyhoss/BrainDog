@@ -57,6 +57,11 @@ test('THE SUGGESTION STAYS, AND NO KEY ANSWERS, WHERE IT IS HARD TO UNDO OR MONE
   assert.equal(paying.enter, null, 'Enter never accepts money');
   assert.equal(paying.decline, 'reject');
   assert.equal(paying.seeWhole, true);
+
+  /* AN AMOUNT ON AN ENTRY ACCEPTING ADDS IS RECORDED, NOT MOVED (20 Oct): a bank text added to the Ledger said "Moves". */
+  const adding = cardOf(ask({ kind: 'rowset', options: [], cost: 'rows', money: { amount: 1298, currency: 'GBP' }, records: true }), { now, home: 'GBP' });
+  assert.equal(adding.money, 'Records £12.98');
+  assert.ok(adding.ways.every((w) => !/undone/u.test(pressSaid(adding, w.label, w))), 'an added entry said it cannot be undone');
 });
 
 test('TWO CURRENCIES ARE NEVER ADDED, and amounts pointing both ways name what moves', () => {

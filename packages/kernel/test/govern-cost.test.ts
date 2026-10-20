@@ -74,12 +74,15 @@ test('A PATCH OF A WITHHELD FIELD COMES BACK HARD TO UNDO, which its body alone 
   sql.close();
 });
 
-test('A QUESTION THAT MOVES MONEY COMES BACK HARD TO UNDO, set or cleared', async () => {
+test('A QUESTION THAT CHANGES MONEY ON A ROW COMES BACK HARD TO UNDO, set or cleared, and one that adds a bill does not', async () => {
   const { k, sql, bill } = await record();
-  const set = value<{ id: string }>(k.propose(rowset('File the gas bill?', [{ what: 'Gas', amount: { amount: 4200, currency: 'GBP' } }]), 'p_1')).id;
+  const filed = value<{ id: string }>(k.propose(rowset('File the gas bill?', [{ what: 'Gas', amount: { amount: 4200, currency: 'GBP' } }]), 'p_1')).id;
+  const set = value<{ id: string }>(k.propose(rowset('Raise the rent?', [{ at: bill, version: 1, patch: { amount: { amount: 130000, currency: 'GBP' } } }]), 'p_1')).id;
   const cleared = value<{ id: string }>(k.propose(rowset('Clear the amount?', [{ at: bill, version: 1, patch: { amount: null } }]), 'p_1')).id;
 
   const rows = open(k);
+  /* A NEW BILL RECORDS ITS AMOUNT AND MOVES NONE (20 Oct), and is deleted like any new row. */
+  assert.equal(rows.get(filed)?.cost, 'rows');
   assert.equal(rows.get(set)?.cost, 'undo');
   assert.equal(rows.get(cleared)?.cost, 'undo');
   sql.close();

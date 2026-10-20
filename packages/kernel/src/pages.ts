@@ -674,9 +674,15 @@ export type QueueQuestion = {
   drafted_by?: string;
   /**
    * The money accepting writes, one value a row it writes: integer minor units with a currency, never added up here. A
-   * question that moves money, or hits the ladder's money floor, is always `cost: undo`, so Enter never accepts it.
+   * question that changes money on a row, or hits the ladder's money floor there, is always `cost: undo`, so Enter never
+   * accepts it.
    */
   money?: { amount: number; currency: string }[];
+  /**
+   * `true` when every amount in `money` is on a row accepting adds: the question records an amount, as an entry in a
+   * ledger does, and moves none, so it is deleted or put back like any new row and is not `cost: undo` for it.
+   */
+  records?: true;
   /** What accepting changes on the one row a question updates: each field, its name, what it holds now and what it will. */
   changes?: { field: string; label?: string; before: Json | null; after: Json | null }[];
   /** The kinds of change it is (`change-kind.ts`'s keys, `tasks:move:done`), dearest first, as the ladder counts it. */
@@ -696,7 +702,7 @@ export type QueueQuestion = {
  * change it is. The same facts a queue's question carries, so a card drawn outside a page's queue says what the queue's
  * says.
  */
-export type QuestionFacts = Pick<QueueQuestion, 'run' | 'drafted_by' | 'money' | 'changes' | 'kinds'>;
+export type QuestionFacts = Pick<QueueQuestion, 'run' | 'drafted_by' | 'money' | 'records' | 'changes' | 'kinds'>;
 
 /** One name a merge question is about: its handle (`people#4`), its name, where it was seen, and whether it is kept. */
 export type QueueCandidate = { at: string; name: string; seen: string[]; kept?: true };

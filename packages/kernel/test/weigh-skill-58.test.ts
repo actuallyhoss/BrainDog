@@ -61,11 +61,13 @@ test('a row changed is put back from its history, so it weighs what a row added 
   assert.equal(costOf('rowset', { register: 'tasks', rows: Array.from({ length: MANY_ROWS }, () => update) }), 'shape');
 });
 
-test('money moved is hard to undo, in a new row or in a change to one', () => {
-  assert.equal(costOf('rowset', { register: 'bills', rows: [{ title: 'Rent', fee }] }), 'undo');
+test('money changed on a row is hard to undo, and a new row that records an amount is not', () => {
   assert.equal(costOf('rowset', { register: 'bills', rows: [{ at: 'bills#2', version: 1, patch: { fee } }] }), 'undo');
-  /* ONE SUCH ROW AMONG MANY IS ENOUGH: a rowset lands whole. */
-  assert.equal(costOf('rowset', { register: 'bills', rows: [{ title: 'A' }, { title: 'B' }, { title: 'Rent', fee }] }), 'undo');
+  /* A NEW ROW RECORDS AN AMOUNT AND MOVES NONE (20 Oct): a bank text added to the Ledger is deleted like any row. */
+  assert.equal(costOf('rowset', { register: 'bills', rows: [{ title: 'Rent', fee }] }), 'rows');
+  assert.equal(costOf('rowset', { register: 'bills', rows: [{ title: 'A' }, { title: 'B' }, { title: 'Rent', fee }] }), 'rows');
+  /* ONE CHANGE AMONG NEW ROWS IS ENOUGH: a rowset lands whole. */
+  assert.equal(costOf('rowset', { register: 'bills', rows: [{ title: 'A' }, { title: 'Rent', fee }, { at: 'bills#2', version: 1, patch: { fee } }] }), 'undo');
   /* A FIGURE THAT IS NOT MONEY IS NOT: an amount with no currency, or a currency that is not three capitals. */
   assert.equal(costOf('rowset', { register: 'bills', rows: [{ title: 'Rent', fee: { amount: 12_500 } }] }), 'rows');
   assert.equal(costOf('rowset', { register: 'bills', rows: [{ title: 'Rent', fee: { amount: 12_500, currency: 'egp' } }] }), 'rows');

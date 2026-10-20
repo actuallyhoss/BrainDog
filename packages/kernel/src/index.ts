@@ -6529,9 +6529,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       kind,
       question: nameSpoken(questionOf(sql, String(r.id)) ?? ''),
       why: typeof body.context === 'string' ? body.context : '',
-      /* MONEY IS ALWAYS HARD TO UNDO, so a card that moves it is never accepted with Enter (`BAND_SQL` ranks it so, as
-         `costOf` does). The floor is asked as well, since it reads a money field cleared, which no body spells. */
-      cost: facts.money !== undefined || movesMoney(r, kind, body) ? 'undo' : costOf(kind, body, costRows(sql)),
+      /* MONEY CHANGED ON A ROW IS ALWAYS HARD TO UNDO, so a card that moves it is never accepted with Enter (`BAND_SQL`
+         ranks it so, as `costOf` does). The floor is asked as well, since it reads a money field cleared, which no body
+         spells. A new row that records an amount (`records`) moves nothing and is deleted like any row, so it is not. */
+      cost: (facts.money !== undefined && facts.records !== true) || movesMoney(r, kind, body) ? 'undo' : costOf(kind, body, costRows(sql)),
       options,
       ...(typeof body.about === 'string' && body.about !== '' ? { about: body.about } : {}),
       body_kind: kind,
@@ -6554,7 +6555,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    * opened it: a money amount set, changed or cleared. Only a rowset writes rows, so only one is read.
    */
   const movesMoney = (r: Record<string, unknown>, kind: string, body: Record<string, unknown>): boolean =>
-    kind === 'rowset' && kindsOfProposal(kind, body, recordReader(sql, String(r.opened_by ?? ''))).some((k) => k.floor === 'money');
+    kind === 'rowset' && kindsOfProposal(kind, body, recordReader(sql, String(r.opened_by ?? ''))).some((k) => k.floor === 'money' && k.verb !== 'add');
 
   /** A value that is money: a whole number of minor units with a three-letter currency. */
   const moneyIn = (v: unknown): { amount: number; currency: string } | null => {
@@ -6601,6 +6602,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const writes = rows.map((x) => ('at' in x ? x.patch : x)).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x));
     const money = writes.flatMap((w) => Object.values(w).flatMap((v) => moneyIn(v) ?? []));
     if (money.length > 0) out.money = money;
+    /* AND WHETHER IT IS ALL ON ROWS ACCEPTING ADDS: an entry that records what the bank already moved, moving nothing. */
+    const patched = rows.some((x) => 'at' in x && x.patch !== null && typeof x.patch === 'object' && Object.values(x.patch as Record<string, unknown>).some((v) => moneyIn(v) !== null));
+    if (money.length > 0 && !patched) out.records = true;
     const [only] = rows;
     if (!every || rows.length !== 1 || only === undefined || typeof only.at !== 'string' || writes.length !== 1) return out;
     const row = get(only.at, { includeDeleted: true });
