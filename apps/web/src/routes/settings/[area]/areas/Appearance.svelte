@@ -11,8 +11,10 @@
   text size, the density and the colour were four sections, the scheme drawn as three large pictures of the app, and a
   person changing how the product reads scrolled past a screen of chrome to find the next choice. They are one column of
   short choices now, beside a preview that is the app itself in small: drawn from the same tokens every screen reads, so
-  every press changes it the moment it is made, in the scheme, size, row height and colour chosen, and one toast says
-  it with an Undo.
+  every press changes it the moment it is made, in the scheme, size, row height and colour chosen. NO TOAST SAYS IT
+  (motion F15): the whole screen already shows the change, and the control beside it is its undo. Only a refusal speaks.
+
+  ONE WAY TO MORE CONTRAST (agents F26): the More contrast switch. "High contrast" is no longer a look beside House.
 
   AND THE SCHEME IS STILL A THREE-WAY CHOICE, not a toggle offering the opposite. The predecessor's had three states and
   a one-way UI: once a person chose light or dark, only clearing local storage restored "match the system". "Match the
@@ -34,10 +36,10 @@
   import { onMount, untrack } from 'svelte';
   import { drawn, drawSaved, lookOf, redraw } from '$lib/theme/draw.ts';
   import { follow } from '$lib/theme/follow.ts';
-  import { CONTRAST, choicesOf, lookWords, otherScheme, previewOf, styleOf, type Look } from '$lib/theme/theme-choice.ts';
+  import { CONTRAST, choicesOf, lookWords, previewOf, styleOf, type Look } from '$lib/theme/theme-choice.ts';
   /* THE HOUSE'S OWN SEED AND THE EDITOR'S SOLVER, both already in this screen's chunk (`LookEditor`), so the house's
      other scheme is solved here without a new export from the module every screen loads. */
-  import { HOUSE_SEED } from '@braindog/theme';
+  import { HOUSE_FRAME, HOUSE_SEED } from '@braindog/theme';
   import { baseOf } from '$lib/theme/look.ts';
   import LookEditor from '$lib/theme/LookEditor.svelte';
   import { takeFix } from '$lib/theme/staged.ts';
@@ -61,6 +63,9 @@
     /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */
     said: 'Three things need you today,',
     needs: 'one is late.',
+    light: 'Light',
+    dark: 'Dark',
+    houseRed: 'House red',
   };
 
   /* A THEME REFUSED AT INSTALL, handed over by the add-on screen's Fix and install. Taken once, so a reload of this
@@ -111,7 +116,9 @@
       if (out.ok) return { from: 'kept' };
       return { from: 'refused', fix: copy.accentRefused(ACCENTS.find((a) => a.hex === hex)?.name ?? String(hex), out.codes) };
     },
-    toasts,
+    /* ONLY A REFUSAL IS SAID (motion F15). A change the whole screen already shows is not said again, and the segment or
+       swatch beside it is the way back. */
+    toasts: { push: (text, opts) => (opts?.intent === 'warn' ? toasts.push(text, opts) : 0) },
     shown: (key, value) => {
       if (key === 'scheme') scheme = (value ?? 'system') as typeof scheme;
       else if (key === 'text') text = (value ?? 'base') as typeof text;
@@ -149,7 +156,9 @@
   let picking = $state(false);
   /* THE CHOICE IS LISTED ONCE THE RECORD HAS SAID WHAT IT HOLDS, so it never marks House on a record drawn in its own. */
   let answered = $state(false);
-  const choices = $derived(choicesOf(booted, moreContrast));
+  /* THE LOOKS BESIDE HOUSE, without High contrast: that is the switch below, the one way to more contrast. With nothing
+     beside House there is no choice to draw. */
+  const choices = $derived(choicesOf(booted, false).filter((c) => c.id !== CONTRAST));
 
   const recordBoot = async (): Promise<unknown> => {
     const [{ createClient }, { apiBase }] = await Promise.all([import('@braindog/client'), import('$lib/at.ts')]);
@@ -210,11 +219,32 @@
 
   /* WHAT THE OTHER SCHEME WOULD DRAW, in the order the page stacks its sheets: a person's own colour over everything
      (`accent.ts`), High contrast over the record's look (`draw.ts`), then the record's look, then the house. */
-  const preview = $derived.by(() => {
+  const other = $derived.by(() => {
     const own = solvedFor(accent);
     const fallback = own && (moreContrast ? own.contrast : own.house);
     return previewOf(accent !== null || moreContrast ? null : booted, inUse, fallback);
   });
+
+  /* TWO PREVIEWS FROM 1100PX, LIGHT THEN DARK (agents F26): the scheme in use is the page's own tokens, and the other is
+     solved. On a phone one, the scheme picked. Where the other cannot be solved truly it is not drawn. */
+  const previews = $derived(
+    (['light', 'dark'] as const)
+      .map((s) => ({ scheme: s, style: s === inUse ? '' : other ? frameOf(s, other) : null, here: s === inUse }))
+      .filter((p): p is { scheme: 'light' | 'dark'; style: string; here: boolean } => p.style !== null),
+  );
+
+  /* THE OTHER SCHEME'S FRAME BY ITS NEW NAMES (`HOUSE_FRAME`: board, tile, inks, reds), then the solved look's own
+     tokens over it, and a person's own colour as the fill: the solver still speaks the older names, and a preview that
+     set only those left every new-named surface in the page's scheme. */
+  function frameOf(scheme: 'light' | 'dark', solved: Record<string, string>): string {
+    const frame = Object.entries(HOUSE_FRAME[scheme]).filter(([, v]) => /^#[0-9A-Fa-f]{6}$/u.test(v));
+    const fill = accent !== null && solved.action ? ` --red-fill: ${solved.action};` : '';
+    return `${frame.map(([k, v]) => `--${k}: ${v};`).join(' ')} ${styleOf(solved)}${fill}`;
+  }
+
+  /* THE HOUSE SWATCH IS THE HOUSE'S OWN RED, whatever colour the page is drawn in now. */
+  const houseHex = HOUSE_SEED.accent;
+  const accentName = $derived(accent === null ? words.houseRed : (ACCENTS.find((a) => a.hex === accent)?.name ?? ''));
 
   /* SCREENSHOT MODE, AS THIS SCREEN SHOWS IT NOW: the mark the mode puts on the page, so the switch never claims a mode the
      screen is not in. The press is the palette's and the key's (`customise-apply.ts`), kept as the person's `look.shot`. */
@@ -289,7 +319,7 @@
     <div class="choices">
       <!-- EVERY LOOK THE RECORD HOLDS, ONE PRESS EACH: House, High contrast, the record's own, one for each add-on. The
            one drawn now carries a tick as well as its fill, so the state is never colour alone. -->
-      {#if answered}
+      {#if answered && choices.length > 1}
         <div class="choice">
           <span class="choice-name" id="choice-look">{lookWords.title}</span>
           <span class="choice-line">{accent === null ? lookWords.line : lookWords.ownOnTop}</span>
@@ -300,7 +330,7 @@
                 class="look-pick"
                 aria-pressed={c.on}
                 data-on={c.on ? '' : undefined}
-                disabled={picking && c.id !== CONTRAST}
+                disabled={picking}
                 onclick={() => void pickLook(c.id)}>{#if c.on}<Icon name="check" size="s" />{/if}{c.name}</button
               >
             {/each}
@@ -310,7 +340,7 @@
 
       <div class="choice">
         <span class="choice-name" id="choice-scheme">{copy.scheme}</span>
-        <Segmented role="group" aria-labelledby="choice-scheme">
+        <Segmented full role="group" aria-labelledby="choice-scheme">
           {#each SCHEMES as [v, label, icon] (v)}
             <button type="button" class="segment" aria-pressed={scheme === v} data-on={scheme === v ? '' : undefined} onclick={() => pickScheme(v)}
               ><Icon name={icon} size="s" />{label}</button
@@ -321,7 +351,7 @@
 
       <div class="choice">
         <span class="choice-name" id="choice-text">{copy.textSize}</span>
-        <Segmented role="group" aria-labelledby="choice-text">
+        <Segmented full role="group" aria-labelledby="choice-text">
           {#each TEXTS as [v, label] (v)}
             <button
               type="button"
@@ -336,7 +366,7 @@
 
       <div class="choice">
         <span class="choice-name" id="choice-density">{copy.density}</span>
-        <Segmented role="group" aria-labelledby="choice-density">
+        <Segmented full role="group" aria-labelledby="choice-density">
           {#each DENSITIES as [v, label] (v)}
             <button
               type="button"
@@ -360,7 +390,20 @@
       <div class="choice">
         <span class="choice-name" id="choice-accent">{copy.accentTitle}</span>
         <span class="choice-line">{copy.accentHint}</span>
+        <!-- A SWATCH PER COLOUR, HOUSE FIRST AND RED LIKE THE OTHERS (2.A.11): the chosen one ringed in red a gap away
+             with a tick badge at its corner, and its name under the row. -->
         <div class="swatches" role="group" aria-labelledby="choice-accent">
+          <button
+            type="button"
+            class="swatch"
+            aria-pressed={accent === null}
+            data-on={accent === null ? '' : undefined}
+            style="--swatch:{houseHex}"
+            aria-label={words.houseRed}
+            onclick={() => pickAccent(null)}
+          >
+            {#if accent === null}<span class="tick" aria-hidden="true"><Icon name="check" size="s" /></span>{/if}
+          </button>
           {#each ACCENTS as a (a.hex)}
             <button
               type="button"
@@ -369,22 +412,13 @@
               data-on={accent === a.hex ? '' : undefined}
               style="--swatch:{a.hex}"
               aria-label={a.name}
-              title={a.name}
               onclick={() => pickAccent(a.hex)}
             >
-              {#if accent === a.hex}<Icon name="check" size="m" />{/if}
+              {#if accent === a.hex}<span class="tick" aria-hidden="true"><Icon name="check" size="s" /></span>{/if}
             </button>
           {/each}
-          <button
-            type="button"
-            class="swatch swatch-off"
-            aria-pressed={accent === null}
-            data-on={accent === null ? '' : undefined}
-            onclick={() => pickAccent(null)}
-          >
-            {#if accent === null}<Icon name="check" size="s" />{/if}{copy.accentHouse}
-          </button>
         </div>
+        {#if accentName}<p class="swatch-name">{accentName}</p>{/if}
         {#if accentWrong}<p class="wrong" role="alert">{accentWrong}</p>{/if}
       </div>
     </div>
@@ -395,11 +429,13 @@
       list drawn the way every list is drawn, at the chosen row height and text size. Shapes and sample words, never a
       control, so it is hidden from a screen reader: the choices beside it say what they are.
     -->
-    <div class="preview" aria-hidden="true">
-      <p class="preview-name">{preview ? lookWords.preview(otherScheme(inUse)) : copy.densityPreview}</p>
-      <!-- THE OTHER SCHEME, FROM ITS OWN SOLVED COLOURS: the page is already the scheme in use, so the preview is the one a
-           person cannot see without switching, drawn from the tokens the record would draw it in. -->
-      <div class="pv" style={styleOf(preview)}>
+    <div class="previews" aria-hidden="true">
+    {#each previews as p (p.scheme)}
+    <div class="preview" data-other={p.here ? undefined : ''}>
+      <p class="preview-name">{p.scheme === 'light' ? words.light : words.dark}</p>
+      <!-- THE SCHEME IN USE IS THE PAGE'S OWN TOKENS; THE OTHER IS DRAWN FROM ITS OWN SOLVED COLOURS, the tokens the record
+           would draw it in, so neither is a picture of a choice but the choice itself. -->
+      <div class="pv" style={p.style}>
         <div class="pv-bar">
           <span class="pv-mark"></span>
           <span class="pv-place" data-on></span>
@@ -426,6 +462,8 @@
           </ul>
         </div>
       </div>
+    </div>
+    {/each}
     </div>
   </div>
 
@@ -465,8 +503,8 @@
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -479,20 +517,33 @@
     margin-block-end: var(--sp-4);
   }
 
-  .preview {
+  .previews {
     order: -1;
+    display: grid;
+    gap: var(--sp-4);
+  }
+
+  /* ON A PHONE ONE PREVIEW, THE SCHEME PICKED: the other is drawn only beside it, where there is room for both. */
+  .preview[data-other] {
+    display: none;
   }
 
   @media (width >= 1100px) {
     .looks {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: start;
     }
 
-    .preview {
+    .previews {
       order: 0;
+      grid-auto-flow: column;
+      grid-auto-columns: 280px;
       position: sticky;
       inset-block-start: var(--sp-6);
+    }
+
+    .preview[data-other] {
+      display: block;
     }
   }
 
@@ -512,14 +563,21 @@
 
   .choice-name {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
   }
 
   .choice-line {
     margin-block-start: calc(var(--sp-1) * -1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  /* A CHOICE ON A PHONE IS THE COLUMN'S WIDTH, so a full segmented control shares it evenly (2.A.9). */
+  @media (width < 640px) {
+    .choice {
+      align-items: stretch;
+    }
   }
 
   /* ── the segments ── */
@@ -538,7 +596,8 @@
   .segment :global(svg),
   .aa,
   .spacing {
-    color: var(--dim);
+    flex: none;
+    color: var(--ink-3);
   }
 
   .segment[data-on] :global(svg),
@@ -553,15 +612,15 @@
   }
 
   .aa[data-size='sm'] {
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
   }
 
   .aa[data-size='base'] {
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
   }
 
   .aa[data-size='md'] {
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
   }
 
   .spacing {
@@ -595,55 +654,64 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3);
+    padding: var(--sp-1);
   }
 
-  /* A SWATCH IS THE COLOUR, round, and the tick is drawn ON it rather than beside it: a selected state that lives
-     outside the thing selected is a state people read as belonging to the next one. Chosen, it is ringed in ink a gap
-     away. */
+  /* A SWATCH IS THE COLOUR, 32 ROUND (2.A.11): chosen, a 2px red ring a gap away and a 20px red tick badge at its top end
+     corner, so the state is a shape and never the colour alone. 44 of target under a thumb, the colour still 32. */
   .swatch {
+    position: relative;
     display: inline-grid;
     place-items: center;
-    inline-size: var(--ctl-h);
-    block-size: var(--ctl-h);
+    inline-size: 32px;
+    block-size: 32px;
     padding: 0;
-    background: var(--swatch, var(--s1));
-    /* THE LABEL ON A FILL, which is the token the theme solves for exactly this: a tick drawn in
-       white on an ochre swatch is the one place a literal would be wrong twice over. */
-    color: var(--accent-ink);
+    background: var(--swatch, var(--tile-2));
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
     cursor: pointer;
-    transition: box-shadow var(--d-state) var(--ease-out);
   }
 
   .swatch[data-on] {
-    box-shadow:
-      0 0 0 2px var(--sunk),
-      0 0 0 4px var(--ink);
+    outline: 2px solid var(--red);
+    outline-offset: 2px;
   }
 
-  /* HOUSE IS A WORD, the product's own colour: a quiet pill on the ground. */
-  .swatch-off {
-    gap: 6px;
-    grid-auto-flow: column;
-    inline-size: auto;
-    padding-inline: var(--sp-4);
-    background: var(--hover-wash);
-    box-shadow: none;
-    color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 500;
+  .tick {
+    position: absolute;
+    inset-block-start: -8px;
+    inset-inline-end: -8px;
+    display: inline-grid;
+    place-items: center;
+    inline-size: 20px;
+    block-size: 20px;
+    border-radius: var(--r-round);
+    background: var(--red-fill);
+    box-shadow: 0 0 0 2px var(--tile);
+    color: var(--on-red);
+  }
+
+  .tick :global(svg) {
+    inline-size: 12px;
+    block-size: 12px;
+  }
+
+  .swatch-name {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   @media (pointer: coarse) {
-    .swatch {
-      inline-size: var(--tap);
-      block-size: var(--tap);
+    .swatches {
+      gap: var(--sp-3);
     }
 
-    .swatch-off {
-      inline-size: auto;
+    .swatch::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
     }
   }
 
@@ -660,22 +728,22 @@
   .look-pick {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sp-2);
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-4);
     border: 0;
     border-radius: var(--r-ctl);
-    background: var(--field);
+    background: var(--tile-2);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-ctl);
     font-weight: 500;
     cursor: pointer;
   }
 
   .look-pick[data-on] {
-    background: var(--action-tint-1);
-    color: var(--action-text);
+    outline: 2px solid var(--red);
+    outline-offset: 2px;
   }
 
   .look-pick:disabled {
@@ -693,8 +761,8 @@
   .wrong {
     margin: var(--sp-1) 0 0;
     max-inline-size: var(--measure);
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
@@ -702,8 +770,8 @@
 
   .preview-name {
     margin: 0 0 var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -725,27 +793,27 @@
     gap: var(--sp-3);
     padding: var(--sp-2) var(--sp-3);
     border-radius: var(--r-ctl);
-    background: var(--field);
+    background: var(--nav);
   }
 
   /* THE MARK WEARS THE RECORD'S COLOUR, which is where a person sees the colour they chose. */
   .pv-mark {
     inline-size: 18px;
     block-size: 14px;
-    border-radius: 4px;
-    background: var(--accent);
+    border-radius: var(--r-xs);
+    background: var(--red-fill);
     transition: background var(--d-state) var(--ease-out);
   }
 
   .pv-place {
     inline-size: 36px;
     block-size: 6px;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-round);
     background: color-mix(in srgb, var(--ink) 18%, transparent);
   }
 
   .pv-place[data-on] {
-    background: var(--action);
+    background: var(--ink);
   }
 
   .pv-tile {
@@ -765,26 +833,26 @@
 
   .pv-title {
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   /* THE SENTENCE AND THE ROWS READ `--text`, the size chosen, and the rows `--row-h` through the list they sit in. */
   .pv-said {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--text);
     line-height: var(--lh-body);
     transition: font-size var(--d-state) var(--ease-out);
   }
 
   .pv-needs {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
   .pv-row {
-    color: var(--ink2);
+    color: var(--ink-2);
     font-size: var(--text);
     transition: font-size var(--d-state) var(--ease-out);
   }
