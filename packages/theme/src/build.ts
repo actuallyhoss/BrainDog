@@ -10,6 +10,7 @@
 import {
   clipped,
   contrast,
+  oklabToRgb,
   fromHex,
   gamutMap,
   quantise,
@@ -192,6 +193,8 @@ export type Profile = {
    */
   prefer: Record<Scheme, Record<(typeof INTENTS)[number], number>>;
   weight: Record<(typeof INTENTS)[number], number>;
+  /** The floors the frame is held to (`FrameFloors`, check T), and that high contrast re-solves the frame to. */
+  frame: FrameFloors;
 };
 
 /**
@@ -378,6 +381,11 @@ export const HOUSE_PROFILE: Profile = {
     light: { earn: 4.5, warn: 7, danger: 5.5, info: 5.5 },
   },
   weight: { earn: 1, warn: 1, danger: 2.5, info: 1 },
+  /* THE FRAME'S FLOORS (SPEC 1.2): every word at AA, and the body ink at AAA, which the frame clears by three and more
+     everywhere (its least is 10.85, on a dark selection). Not the dialect's 13: the frame's dark ink on `tile-2` is
+     12.90 and on `nav-selected` 12.03, his values, both far past what a reader needs. The second ink keeps the
+     dialect's 6.5. */
+  frame: { ink: [7, 6.5, 4.5], text: 4.5, mark: 3, boundary: null },
 };
 
 /**
@@ -433,6 +441,9 @@ export const HIGH_CONTRAST_PROFILE: Profile = {
     light: { earn: 5, warn: 7, danger: 5.5, info: 6 },
   },
   weight: { earn: 1, warn: 1, danger: 2.5, info: 1 },
+  /* The dialect's own high-contrast floors, on the frame's names: the three inks at 16, 12.5 and 9.5, every other word
+     at 5, a mark and the edge of a floating layer at 4.5. */
+  frame: { ink: [16, 12.5, 9.5], text: 5, mark: 4.5, boundary: 4.5 },
 };
 
 export type Seed = {
@@ -517,8 +528,10 @@ export type Built = {
   mark: Record<Scheme, { L: number; C: number }>;
   /** The elevation ladder, three levels, fixed geometry, alphas per scheme (28 §1). */
   elevation: Record<Scheme, [string, string, string]>;
-  /** The row washes and the arrival tint, per scheme. Not roles: see `CHROME`. */
+  /** The row washes and the arrival tint, per scheme. Not roles: see `CHROME`. Solved and checked, no longer emitted. */
   chrome: Record<Scheme, Chrome>;
+  /** What the stylesheet paints with, per scheme (`FRAME_ROLES`, `frameOf`). */
+  frame: Record<Scheme, Frame>;
   radius: { sm: number; md: number; lg: number };
   space: number;
   density: Seed['density'];
@@ -1047,22 +1060,11 @@ export function buildScheme(seed: Seed, profile: Profile, scheme: Scheme): Palet
   };
 }
 
-/**
- * The translucent paints that are left: the shadows and the row wash, each an OKLCH colour or white or black, at an
- * alpha.
- *
- * `SHADE` is the design system's cool near-black, rgb(16 24 40): the colour of a light-scheme shadow. The dark scheme's
- * shadows are plain black, as the design system writes them.
- */
-type Paint = 'white' | 'black' | Required<Aim>;
-const SHADE: Paint = { L: 0.2099, C: 0.0341, H: 263.4 };
-
+/** A colour's three channels as `rgb()` writes them: the row wash is the ink at an alpha. */
 const channels = (hexColour: string) => {
   const c = fromHex(hexColour);
   return [c.r, c.g, c.b].map((v) => Math.round(v * 255)).join(' ');
 };
-const paint = (p: Paint, alpha: number) =>
-  `rgb(${p === 'white' ? '255 255 255' : p === 'black' ? '0 0 0' : channels(toHex(quantise(p)))} / ${alpha})`;
 
 /**
  * The arrival tint, at the design system's `arrive` and held inside the surface band.
@@ -1103,30 +1105,413 @@ function chromeOf(p: Palette, profile: Profile, scheme: Scheme): Chrome {
   };
 }
 
-/**
- * The design system's depth, three levels and no more: the ground (none), tiles (`--e1`), and chrome and floating things
- * (`--e2`). `--e3` is the sheet, which the design system puts at level 2 too, so it is `--e2`'s value under the name the sheets
- * already read.
- *
- * 2026-10-07, A RESTING TILE IS FLAT (DIRECTION §39: "flat, opaque, no border, no shadow"). `--e1` is one shadow of no
- * alpha in both schemes, so a tile is told from the board by its colour alone, and the dark tile's 1px top highlight,
- * the last of the ground's light, went with the light. `--e2` and `--e3` stay for what truly floats: a menu, the
- * palette, a sheet.
- *
- * A DROP AND NOT NOTHING, because a card that lifts to `--e2` on hover or when chosen eases from one shadow list into
- * another only where each pair is inset on both sides or on neither, and `--e2` is a drop. Check I reads the first
- * shadow's alpha, 0, under chrome's, so it still reads two levels.
- *
- * `--glass-edge` IS NOT IN HERE. It is the hairline around chrome and belongs to chrome rather than to a level: a
- * sheet is a tile at level 2 and has no edge of its own. Chrome writes `var(--glass-edge), var(--e2)`.
+/*
+ * 2026-10-20, NO ELEVATION AT ALL (the UI pass, SPEC 1.9 and frame 3.8). Separation is the surface colour, the 1px
+ * `--rule-strong` edge on anything that floats without a scrim, and the scrim under anything modal. All three levels are
+ * `none` in both schemes, so a host that still writes `var(--e2)` draws nothing; the names go in the last wave. Check I
+ * refuses a level that casts anything.
  */
-function elevationOf(scheme: Scheme): [string, string, string] {
-  if (scheme === 'dark') {
-    const two = `0 16px 40px -12px ${paint('black', 0.6)}`;
-    return [`0 0 0 0 ${paint('black', 0)}`, two, two];
+function elevationOf(_scheme: Scheme): [string, string, string] {
+  return ['none', 'none', 'none'];
+}
+
+/* ── THE FRAME (UI pass, 20 Oct) ─────────────────────────────────────────────────────────────────────────────────────
+ *
+ * The names the product paints with, emitted into every scheme block (`toCSS`): the surfaces, the three inks, the
+ * status hues and their tints, the two reds (a fill and red as words and marks), the eight category slots, and the
+ * three control colours the switch and the segmented control need. SPEC 1.1, which is frame 3.1 with the red rows
+ * replaced, at its own values.
+ *
+ * THE ROLES ABOVE STAY THE THEME'S DIALECT. A theme declaration, a look and a record's colour still speak in `bg`,
+ * `danger-text`, `action` and the rest, the solver still solves them and checks A to S still hold them. The frame is
+ * read off them where a seed brings its own colour (the fill family, below) and is the design's own values everywhere
+ * else, so the surfaces and inks are the product's whatever colour a record picks, as the ground always was.
+ *
+ * HIGH CONTRAST IS RE-SOLVED FROM THESE NAMES (`profile.frame`): the grounds come down in dark until the profile's ink
+ * floor can stand on the lightest of them, and every word and mark moves along its own lightness, in its own hue, only
+ * as far as its floors ask. Check T holds every pair in `FRAME_PAIRS` at the profile's floors.
+ */
+
+/**
+ * The eight category slots, in the order a series takes them (frame 3.4).
+ *
+ * THE SIXTH IS `yellow`, WHERE FRAME 3.4 NAMES IT FOR THE PRECIOUS METAL. That word is a use case, and the core may name
+ * none (`tools/gates/shell-words.mjs`): the gate reads every literal and every `.svelte` style here and in the apps,
+ * so `--cat-<metal>` would be refused in this file and in every screen that paints a project with it. Same values.
+ */
+export const CATS = ['blue', 'violet', 'pink', 'teal', 'sky', 'yellow', 'lime', 'slate'] as const;
+
+export const FRAME_ROLES = [
+  'board',
+  'tile',
+  'tile-2',
+  'hover',
+  'nav',
+  'nav-selected',
+  'rule',
+  'rule-strong',
+  'toast',
+  'on-toast',
+  'ink',
+  'ink-2',
+  'ink-3',
+  'focus',
+  'good',
+  'good-tint',
+  'warn',
+  'warn-tint',
+  'info',
+  'info-tint',
+  'live',
+  'switch-off',
+  /* The switch's knob and the chosen segment: white in light, and a raised step above the track in dark (frame F23). */
+  'knob',
+  'segment-on',
+  /* The wash a row or a figure wears for 1.5s after it lands: neutral, the ink a step into the tile (SPEC 0.2). */
+  'arrived',
+  'red-fill',
+  'red-fill-hover',
+  'red-fill-press',
+  'on-red',
+  'red',
+  'red-tint',
+  'red-tint-2',
+  ...CATS.flatMap((c) => [`cat-${c}`, `cat-${c}-tint`] as const),
+] as const;
+
+export type FrameRole = (typeof FRAME_ROLES)[number];
+/** Every frame role, and `scrim`, the one value with an alpha (it sits over the page, never under a word). */
+export type Frame = Record<FrameRole, string> & { scrim: string };
+
+/**
+ * The floors the frame is held to, per profile. `ink` is the three inks in order; `text` every other word (a status,
+ * red, a category, the toast's, the words on a selection); `mark` a dot, a running mark, an off switch; `boundary` the
+ * 1px edge of a floating layer, which the house leaves to the eye (`--rule-strong` is a hairline, frame 3.8) and high
+ * contrast holds. A label on a red fill is 4.5 and a fill or the focus ring against what is round it 3 in every profile.
+ */
+export type FrameFloors = { ink: [number, number, number]; text: number; mark: number; boundary: number | null };
+
+/**
+ * The red as words in light, C1 (SPEC 0.3). His value is #CF413A, the fill; it is 4.27:1 on the board, 4.11 on tile-2,
+ * 4.31 on hover and 4.06 on the red tint, and check T refuses all four. #C2362F, the dark fill's own hex, clears every
+ * one (4.94, 4.76, 4.98, 4.70). This one line takes it back if he takes the failing pairs instead; the check will say so.
+ */
+export const RED_WORDS_LIGHT = '#C2362F';
+
+const CAT_VALUES: Record<Scheme, Record<(typeof CATS)[number], [string, string]>> = {
+  light: {
+    blue: ['#2F5BD3', '#E8EEFC'],
+    violet: ['#6A4FD6', '#EFEAFD'],
+    pink: ['#B42F78', '#FBE8F2'],
+    teal: ['#0C7168', '#DFF3F1'],
+    sky: ['#0B6E95', '#E0F1F8'],
+    yellow: ['#7E6300', '#FAF1D2'],
+    lime: ['#437010', '#EDF5DF'],
+    slate: ['#5A6475', '#EEF0F3'],
+  },
+  dark: {
+    blue: ['#7AA7FF', '#1A2747'],
+    violet: ['#B29BFF', '#2A2348'],
+    pink: ['#F28DC4', '#3A1D30'],
+    teal: ['#4FD1C5', '#12322F'],
+    sky: ['#5CC8F0', '#10303D'],
+    yellow: ['#E8C34F', '#33290F'],
+    lime: ['#A6D45F', '#222E12'],
+    slate: ['#A9B3C4', '#262C38'],
+  },
+};
+
+const cats = (scheme: Scheme) =>
+  Object.fromEntries(
+    CATS.flatMap((c) => [
+      [`cat-${c}`, CAT_VALUES[scheme][c][0]],
+      [`cat-${c}-tint`, CAT_VALUES[scheme][c][1]],
+    ]),
+  );
+
+/** SPEC 1.1: frame 3.1's surfaces, text and status, and the two reds as he decided them (0.1 item 2, 0.2, C1). */
+export const HOUSE_FRAME: Record<Scheme, Frame> = {
+  light: {
+    board: '#F3F4F6',
+    tile: '#FFFFFF',
+    'tile-2': '#EEF0F3',
+    hover: '#F4F5F7',
+    nav: '#FFFFFF',
+    'nav-selected': '#F0F1F4',
+    rule: '#E3E5E9',
+    'rule-strong': '#D5D9DF',
+    scrim: 'rgb(16 17 20 / 0.32)',
+    toast: '#1B1E24',
+    'on-toast': '#F3F4F6',
+    ink: '#101114',
+    'ink-2': '#3B4048',
+    'ink-3': '#5F6670',
+    focus: '#101114',
+    good: '#1F7A47',
+    'good-tint': '#E4F3EA',
+    warn: '#9A5800',
+    'warn-tint': '#FBF0DD',
+    info: '#2F5BD3',
+    'info-tint': '#E8EEFC',
+    live: '#1F8A55',
+    'switch-off': '#8A919C',
+    knob: '#FFFFFF',
+    'segment-on': '#FFFFFF',
+    /* The ink 6% into the tile in OKLab; `frameOf` mixes it again from the ink and the tile it is given. */
+    arrived: '#EEEFEF',
+    'red-fill': '#CF413A',
+    'red-fill-hover': '#B3322C',
+    'red-fill-press': '#A12A25',
+    'on-red': '#FFFFFF',
+    red: RED_WORDS_LIGHT,
+    'red-tint': '#FBEBE9',
+    'red-tint-2': '#F5D9D8',
+    ...cats('light'),
+  } as Frame,
+  dark: {
+    board: '#0F121A',
+    tile: '#181C27',
+    'tile-2': '#222837',
+    hover: '#1E2331',
+    nav: '#171B33',
+    'nav-selected': '#272B4A',
+    rule: '#2A3141',
+    'rule-strong': '#384054',
+    scrim: 'rgb(5 7 12 / 0.6)',
+    toast: '#2B3144',
+    'on-toast': '#EDF0F7',
+    ink: '#EDF0F7',
+    'ink-2': '#BAC2D0',
+    'ink-3': '#8D96A8',
+    focus: '#EDF0F7',
+    good: '#5FD08F',
+    'good-tint': '#14301F',
+    warn: '#F0A64B',
+    'warn-tint': '#36260F',
+    info: '#7AA7FF',
+    'info-tint': '#18264A',
+    live: '#47D486',
+    'switch-off': '#646D82',
+    knob: '#FFFFFF',
+    'segment-on': '#2E3446',
+    arrived: '#292E39',
+    'red-fill': '#C2362F',
+    'red-fill-hover': '#CF3F37',
+    'red-fill-press': '#B02F29',
+    'on-red': '#FFFFFF',
+    red: '#EA645B',
+    'red-tint': '#3B1E22',
+    'red-tint-2': '#55262A',
+    ...cats('dark'),
+  } as Frame,
+};
+
+export type FrameFloor = 'ink' | 'ink2' | 'ink3' | 'text' | 'mark' | 'label' | 'fill' | 'boundary';
+export type FramePair = { fg: FrameRole; bg: FrameRole; floor: FrameFloor; what: string };
+
+/* Where words sit: the page, a tile, a well or a field, a hovered row, the bar. */
+const WORDS_ON = ['board', 'tile', 'tile-2', 'hover', 'nav'] as const satisfies readonly FrameRole[];
+
+/**
+ * EVERY PAIR THE FRAME MUST HOLD (SPEC 1.2): frame 3.1's contrast table, the label on all three fills, red as words on
+ * every ground it is drawn on and as a mark on a tile, each status on its own tint, every category on the tile and on
+ * its own tint. And the words a chosen row and a selection carry (check S's argument, on the frame's own tint), the
+ * chosen segment's label, and the switch's two marks.
+ *
+ * NOT HELD, ON PURPOSE: red words on `nav-selected` (4.23 in dark; red never sits on the current place); the red
+ * fill on `tile-2` (a primary button stands on the board or a tile); and the ring and the knob against a red fill. The
+ * ring stands 2px off what it rings, so what it is read against is the ground round it, which is held; and the knob on
+ * an on switch is the label on the fill (`--on-red`, `controls.css`), which is held at 4.5. In the house the ring
+ * measures 4.02 against the light fill and 4.77 against the dark one all the same.
+ */
+export const FRAME_PAIRS: readonly FramePair[] = [
+  ...([...WORDS_ON, 'nav-selected', 'red-tint', 'segment-on', 'arrived'] as const).map((bg) => ({ fg: 'ink' as const, bg, floor: 'ink' as const, what: 'body text' })),
+  { fg: 'ink', bg: 'red-tint-2', floor: 'text', what: 'text in a selection' },
+  ...([...WORDS_ON, 'nav-selected', 'red-tint', 'arrived'] as const).map((bg) => ({ fg: 'ink-2' as const, bg, floor: 'ink2' as const, what: 'second text' })),
+  { fg: 'ink-2', bg: 'red-tint-2', floor: 'text', what: 'text in a selection' },
+  ...([...WORDS_ON, 'nav-selected', 'red-tint', 'arrived'] as const).map((bg) => ({ fg: 'ink-3' as const, bg, floor: 'ink3' as const, what: 'quiet text' })),
+  ...(['good', 'warn', 'info'] as const).flatMap((k) =>
+    ([...WORDS_ON, 'red-tint', `${k}-tint`] as const).map((bg) => ({ fg: k, bg: bg as FrameRole, floor: 'text' as const, what: `${k} as words` })),
+  ),
+  ...([...WORDS_ON, 'red-tint'] as const).map((bg) => ({ fg: 'red' as const, bg, floor: 'text' as const, what: 'red as words' })),
+  { fg: 'red', bg: 'tile', floor: 'mark', what: 'red as a mark' },
+  ...CATS.flatMap((c) =>
+    (['tile', `cat-${c}-tint`] as const).map((bg) => ({ fg: `cat-${c}` as FrameRole, bg: bg as FrameRole, floor: 'text' as const, what: `the ${c} slot` })),
+  ),
+  { fg: 'on-toast', bg: 'toast', floor: 'text', what: 'a toast' },
+  ...(['red-fill', 'red-fill-hover', 'red-fill-press'] as const).map((bg) => ({ fg: 'on-red' as const, bg, floor: 'label' as const, what: 'the label on a red fill' })),
+  ...(['board', 'tile'] as const).map((bg) => ({ fg: 'red-fill' as const, bg, floor: 'fill' as const, what: 'a primary button' })),
+  ...(['board', 'tile'] as const).map((bg) => ({ fg: 'live' as const, bg, floor: 'mark' as const, what: 'the running dot' })),
+  ...(['board', 'tile'] as const).map((bg) => ({ fg: 'focus' as const, bg, floor: 'fill' as const, what: 'the focus ring' })),
+  { fg: 'switch-off', bg: 'tile', floor: 'mark', what: 'an off switch' },
+  { fg: 'knob', bg: 'switch-off', floor: 'fill', what: 'the knob on an off switch' },
+  { fg: 'rule-strong', bg: 'tile', floor: 'boundary', what: 'the edge of a floating layer' },
+];
+
+export const frameFloor = (floors: FrameFloors, floor: FrameFloor): number | null =>
+  floor === 'ink'
+    ? floors.ink[0]
+    : floor === 'ink2'
+      ? floors.ink[1]
+      : floor === 'ink3'
+        ? floors.ink[2]
+        : floor === 'label'
+          ? 4.5
+          : floor === 'fill'
+            ? 3
+            : floor === 'boundary'
+              ? floors.boundary
+              : floors[floor];
+
+/* The grounds a high-contrast dark scheme brings down together, so they keep their order and their steps. */
+const FRAME_GROUNDS = [
+  'board',
+  'tile',
+  'tile-2',
+  'hover',
+  'nav',
+  'nav-selected',
+  'rule',
+  'segment-on',
+  'red-tint',
+  'red-tint-2',
+  'good-tint',
+  'warn-tint',
+  'info-tint',
+  ...CATS.map((c) => `cat-${c}-tint` as const),
+] as const satisfies readonly FrameRole[];
+
+/* What moves to meet a floor: every word and mark, never a ground, a fill or the label on a fill. */
+const FRAME_MOVES = ['ink', 'ink-2', 'ink-3', 'good', 'warn', 'info', 'red', 'live', 'switch-off', 'rule-strong', 'on-toast', ...CATS.map((c) => `cat-${c}` as const)] as const satisfies readonly FrameRole[];
+
+const passes = (fg: string, pairs: [string, number][]) => pairs.every(([bg, f]) => contrast(rgb(fg), rgb(bg)) >= f);
+
+/** The least move along lightness, in the colour's own hue and chroma, that clears every floor it is held to. */
+function lift(colour: string, pairs: [string, number][], dir: 'up' | 'down'): string {
+  if (passes(colour, pairs)) return colour;
+  const c = rgbToLch(rgb(colour));
+  const at = (L: number) => toHex(quantise({ L, C: c.C, H: c.H }));
+  let near = c.L;
+  let far = dir === 'up' ? 1 : 0;
+  for (let i = 0; i < 30; i++) {
+    const mid = (near + far) / 2;
+    if (passes(at(mid), pairs)) far = mid;
+    else near = mid;
   }
-  const two = `0 2px 4px ${paint(SHADE, 0.04)}, 0 16px 40px -16px ${paint(SHADE, 0.22)}`;
-  return [`0 0 0 0 ${paint(SHADE, 0)}`, two, two];
+  return at(far);
+}
+
+/** A colour laid over another at `a`, as `color-mix(in srgb, …)` would. */
+const over = (top: string, under: string, a: number) => {
+  const t = rgb(top);
+  const u = rgb(under);
+  return toHex({ r: t.r * a + u.r * (1 - a), g: t.g * a + u.g * (1 - a), b: t.b * a + u.b * (1 - a) });
+};
+
+/**
+ * The frame of one scheme.
+ *
+ * THE HOUSE'S RED IS PINNED; ANY OTHER SEED'S FILL IS ITS OWN. Beside the house mark (`Seed.action`) the four fills
+ * are his values. A record's colour, or alpha's, moves the fill, its two states, its label and the two tints a chosen
+ * thing wears, read off the solved `action` roles, so the picked colour is the colour of the buttons and the selection.
+ * Red as words and marks stays the product's red, because red there means late and needs you, and a record's colour
+ * does not get to say that.
+ */
+export function frameOf(seed: Seed, profile: Profile, scheme: Scheme, p: Palette): Frame {
+  const f: Frame = { ...HOUSE_FRAME[scheme] };
+  const pinned = seed.action && toHex(rgb(seed.action.accent)) === toHex(rgb(seed.accent));
+  const floors = profile.frame;
+  const dir = away(scheme);
+
+  /* 1 · THE GROUNDS, brought down together in dark until the lightest ground a word sits on leaves room for the
+     profile's ink floor under white, with a hair over. Light grounds are left where they are: the floors are met by
+     the words moving. */
+  if (scheme === 'dark') {
+    const need = Math.max(...FRAME_PAIRS.filter((q) => q.fg.startsWith('ink')).map((q) => frameFloor(floors, q.floor) ?? 0)) * 1.01;
+    const heaviest = FRAME_PAIRS.filter((q) => q.fg.startsWith('ink') && q.floor !== 'text' && (FRAME_GROUNDS as readonly string[]).includes(q.bg)).map((q) => q.bg);
+    const scaled = (k: number) =>
+      Object.fromEntries(FRAME_GROUNDS.map((g) => {
+        const c = rgbToLch(rgb(HOUSE_FRAME[scheme][g]));
+        return [g, toHex(quantise({ L: c.L * k, C: c.C, H: c.H }))];
+      })) as Record<(typeof FRAME_GROUNDS)[number], string>;
+    const fits = (k: number) => heaviest.every((g) => contrast(rgb('#FFFFFF'), rgb(scaled(k)[g as (typeof FRAME_GROUNDS)[number]])) >= need);
+    if (!fits(1)) {
+      let lo = 0.3;
+      let hi = 1;
+      for (let i = 0; i < 30; i++) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid)) lo = mid;
+        else hi = mid;
+      }
+      Object.assign(f, scaled(lo));
+    }
+  }
+
+  /* 2 · THE FILL FAMILY, from the seed's own working accent where it is not the house's. */
+  if (!pinned) {
+    f['red-fill'] = p.action;
+    f['red-fill-hover'] = p['action-hover'];
+    f['on-red'] = p['on-action'];
+    const hov = rgbToLch(rgb(p['action-hover']));
+    const labelLight = rgbToLch(rgb(p['on-action'])).L > 0.5;
+    f['red-fill-press'] =
+      [0.03, 0.05, 0.07]
+        .map((d) => toHex(quantise({ ...hov, L: Math.min(0.98, Math.max(0.02, hov.L + (labelLight ? -d : d))) })))
+        .find((c) => contrast(rgb(c), rgb(p['on-action'])) >= 4.5) ?? p['action-hover'];
+    /* As strong as the words it carries allow, each at its own floor, stepping down a percent at a time. */
+    const tint = (want: number, words: [FrameRole, FrameFloor][]) => {
+      const held = words.map(([w, fl]) => [f[w], frameFloor(floors, fl) ?? 4.5] as [string, number]);
+      for (let a = want; a > 0.005; a -= 0.01) {
+        const t = over(p.action, f.tile, a);
+        if (held.every(([w, fl]) => contrast(rgb(w), rgb(t)) >= fl)) return t;
+      }
+      return f.tile;
+    };
+    f['red-tint'] = tint(scheme === 'light' ? 0.1 : 0.12, [
+      ['ink', 'ink'],
+      ['ink-2', 'ink2'],
+      ['ink-3', 'ink3'],
+      ['good', 'text'],
+      ['warn', 'text'],
+      ['info', 'text'],
+      ['red', 'text'],
+    ]);
+    f['red-tint-2'] = tint(scheme === 'light' ? 0.2 : 0.22, [
+      ['ink', 'text'],
+      ['ink-2', 'text'],
+    ]);
+  }
+
+  /* 2b · THE ARRIVAL WASH: the ink mixed into the tile in OKLab, 6% in light and 10% in dark (SPEC 1.1), as
+     `color-mix(in oklab, var(--ink) 6%, var(--tile))` would draw it, solved here so the words on it are measured. */
+  {
+    const i = rgbToOklab(rgb(f.ink));
+    const t = rgbToOklab(rgb(f.tile));
+    const at = (a: number) => {
+      const m = oklabToRgb(i.L * a + t.L * (1 - a), i.a * a + t.a * (1 - a), i.b * a + t.b * (1 - a));
+      const c = (v: number) => Math.min(1, Math.max(0, v));
+      return toHex({ r: c(m.r), g: c(m.g), b: c(m.b) });
+    };
+    /* WHERE THE INK FLOOR IS HIGH (high contrast) the wash is only as strong as leaves the floor standing: the words
+       on it move to meet it in step 3, and the wash is what keeps that possible, as the grounds did in step 1. */
+    const ext = scheme === 'light' ? '#000000' : '#FFFFFF';
+    const need = floors.ink[0] * 1.01;
+    let a = scheme === 'light' ? 0.06 : 0.1;
+    while (a > 0.02 && contrast(rgb(ext), rgb(at(a))) < need) a -= 0.01;
+    f.arrived = at(a);
+  }
+
+  /* 3 · EVERY WORD AND MARK, moved only as far as its floors ask on the grounds as they now stand. The house's own
+     values clear their floors, so in the house this changes nothing; high contrast is where it works. */
+  for (const role of FRAME_MOVES) {
+    const pairs = FRAME_PAIRS.filter((q) => q.fg === role)
+      .map((q) => [f[q.bg], frameFloor(floors, q.floor)] as const)
+      .filter((q): q is readonly [string, number] => q[1] !== null)
+      .map(([bg, floor]) => [bg, floor] as [string, number]);
+    f[role] = lift(f[role], pairs, dir);
+  }
+  f.focus = f.ink;
+  return f;
 }
 
 export function build(seed: Seed, profile: Profile = HOUSE_PROFILE, id = 'house'): Built {
@@ -1149,6 +1534,7 @@ export function build(seed: Seed, profile: Profile = HOUSE_PROFILE, id = 'house'
     mark: profile.mark,
     elevation: { dark: elevationOf('dark'), light: elevationOf('light') },
     chrome: { dark: chromeOf(schemes.dark, profile, 'dark'), light: chromeOf(schemes.light, profile, 'light') },
+    frame: { dark: frameOf(seed, profile, 'dark', schemes.dark), light: frameOf(seed, profile, 'light', schemes.light) },
     radius: seed.radius,
     space: seed.space,
     density: seed.density,

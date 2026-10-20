@@ -7,12 +7,17 @@
  * the focus ring, the forced-colors overrides or the target floor, because they are in a later layer.
  */
 
-import type { Built, Palette, Scheme } from './build.ts';
+import { FRAME_ROLES, type Built, type Frame, type Scheme } from './build.ts';
 
-const decls = (p: Palette, indent: string): string =>
-  Object.entries(p)
-    .map(([role, value]) => `${indent}--${role}: ${value};`)
-    .join('\n');
+/*
+ * 2026-10-20, THE FRAME AND NOTHING ELSE (UI pass, SPEC 1). A scheme block writes the names the product paints with
+ * (`FRAME_ROLES`, `--scrim`), the identity hue's two constants and the three elevation levels, which are `none`. The
+ * dialect's roles (`--bg`, `--danger-text`, `--action` ...) are not written: `tokens.css` aliases each old name to its
+ * new one in `@layer tokens`, and a name written here would sit over its alias in the later layer and hold the old
+ * value. The washes (`chrome`) go the same way, to `--hover`, `--red-tint` and `--arrived`.
+ */
+const decls = (f: Frame, indent: string): string =>
+  [...FRAME_ROLES.map((role) => `${indent}--${role}: ${f[role]};`), `${indent}--scrim: ${f.scrim};`].join('\n');
 
 function block(built: Built, scheme: Scheme, selector: string, indent = '  '): string {
   const inner = indent + '  ';
@@ -20,12 +25,9 @@ function block(built: Built, scheme: Scheme, selector: string, indent = '  '): s
   const m = built.mark[scheme];
   return [
     `${indent}${selector} {`,
-    decls(built.schemes[scheme], inner),
+    decls(built.frame[scheme], inner),
     `${inner}--mark-l: ${m.L};`,
     `${inner}--mark-c: ${m.C};`,
-    /* The row washes and the arrival tint. Generated values that are not roles, emitted where the palette is so
-       they swap with the scheme and with high contrast in the same block. */
-    ...Object.entries(built.chrome[scheme]).map(([k, v]) => `${inner}--${k}: ${v};`),
     `${inner}--e1: ${e[0]};`,
     `${inner}--e2: ${e[1]};`,
     `${inner}--e3: ${e[2]};`,

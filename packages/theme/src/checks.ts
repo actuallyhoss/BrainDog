@@ -23,6 +23,9 @@ import {
   type Deficiency,
 } from './color.ts';
 import {
+  FRAME_PAIRS,
+  FRAME_ROLES,
+  frameFloor,
   GROUNDS,
   HUE_FLOOR,
   hueGap,
@@ -475,6 +478,8 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
     pair(ink, 'action-tint-1', 4.5, 'action-tint-1', 'text on a chosen row');
   for (const ink of ['ink', 'ink2'] as const) pair(ink, 'action-tint-2', 4.5, 'action-tint-2', 'text on a selection');
 
+  out.push(...checkFrame(built, scheme));
+
   /* K · hue-only encoding. A link must differ in LIGHTNESS from the two things it is most likely to
      be confused with: body ink, and red words (`danger-text`) — which in a theme whose accent is a
      red mark are the same hue as the link by construction.
@@ -549,17 +554,66 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
 }
 
 /**
- * I · the elevation ladder only goes up, in both schemes — a theme is what breaks it (28 §4.4).
+ * T · THE FRAME (UI pass, 20 Oct): every name the stylesheet paints with, and every pair in `FRAME_PAIRS` at the
+ * profile's frame floors (SPEC 1.2). The dialect's roles above are what a theme is written in; these are what a reader
+ * sees, so a palette that clears A to S and ships a frame under its floors is refused here, naming the pair.
  *
- * ON THE ALPHA, NOT ON THE PIXELS. This took the largest `\d+px` of each shadow, and those numbers
- * are literals in the generator — 2, 14, 40, the same three in every theme there will ever be — so
- * the check compared `2 < 14 < 40` and could not fail. What actually varies per scheme, and what a
- * theme sets, is the opacity ladder: inverting the light scheme's to `0.9 → 0.5 → 0.01` visibly
- * turns the ladder back on itself and produced no finding at all.
- *
- * THE FIRST ALPHA OF EACH LEVEL, because a level is one or two shadows and the first is the near
- * one that carries the step. A ladder is monotone in what a reader perceives as depth, and depth
- * here is darkness.
+ * And red words beside body ink, at K's 8 L*: a link and a late date are read against the sentence they sit in.
+ */
+export function checkFrame(built: Built, scheme: Scheme): Finding[] {
+  const f = built.frame[scheme];
+  const out: Finding[] = [];
+  const at = (role: string) => address(built.id, scheme, role);
+  let shaped = true;
+  for (const role of FRAME_ROLES)
+    if (!HEX.test(f[role])) {
+      shaped = false;
+      out.push({
+        check: 'T',
+        scheme,
+        level: 'refuse',
+        code: 'THEME_VALUE_INVALID',
+        at: at(role),
+        fix: `theme: ${role} is "${f[role]}", which is not a colour the frame can paint.`,
+      });
+    }
+  if (shaped) out.push({ check: 'T', scheme, level: 'pass', measured: FRAME_ROLES.length });
+  for (const q of FRAME_PAIRS) {
+    const floor = frameFloor(built.profile.frame, q.floor);
+    const got = contrast(rgb(f[q.fg]), rgb(f[q.bg]));
+    /* A PAIR THE PROFILE DOES NOT HOLD IS STILL MEASURED AND REPORTED, as K reports its one exempt pair: the house's
+       floating edge is a hairline by design, and the number stays on the record. */
+    if (floor !== null && got < floor)
+      out.push({
+        check: 'T',
+        scheme,
+        level: 'refuse',
+        code: 'CONTRAST_FLOOR',
+        measured: r2(got),
+        at: at(q.fg),
+        fix: `theme: ${q.what} (${q.fg} on ${q.bg}) is ${r2(got)}:1 in ${scheme}. It needs ${floor}:1. Move ${q.fg}.`,
+      });
+    else out.push({ check: 'T', scheme, level: 'pass', measured: r2(got) });
+  }
+  const dL = Math.abs(rgbToCielab(rgb(f.red)).L - rgbToCielab(rgb(f.ink)).L);
+  if (dL < 8)
+    out.push({
+      check: 'T',
+      scheme,
+      level: 'refuse',
+      code: 'CONTRAST_FLOOR',
+      measured: r2(dL),
+      at: at('red'),
+      fix: `theme: red words and body text are ${r2(dL)} L* apart in ${scheme}. Colour alone cannot carry the difference; they need 8.`,
+    });
+  else out.push({ check: 'T', scheme, level: 'pass', measured: r2(dL) });
+  return out;
+}
+
+/**
+ * I · NO LEVEL CASTS ANYTHING (UI pass, 20 Oct; SPEC 1.9). It held a ladder that only went up; there is no ladder now,
+ * separation is the surface colour and a 1px edge, and each level is `none` in both schemes. A theme that brings a
+ * shadow back is refused.
  *
  * AND NO `at`, WHICH IS THE ONE PLACE IN THIS FILE THE ANSWER IS GENUINELY NOTHING. Every other
  * check reads a role out of `roles.<scheme>`, a key a theme author writes; elevation is generated
@@ -570,39 +624,20 @@ export function checkScheme(built: Built, scheme: Scheme): Finding[] {
 export function checkElevation(built: Built): Finding[] {
   const out: Finding[] = [];
   for (const scheme of ['dark', 'light'] as Scheme[]) {
-    const alphas = built.elevation[scheme].map((s) => Number(/\/\s*([\d.]+)\s*\)/.exec(s)?.[1] ?? NaN));
     let ok = true;
-    for (const [i, a] of alphas.entries())
-      if (!Number.isFinite(a)) {
+    for (const [i, level] of built.elevation[scheme].entries())
+      if (level.trim() !== 'none') {
         ok = false;
         out.push({
           check: 'I',
           scheme,
           level: 'refuse',
           code: 'THEME_LADDER_ORDER',
-          fix: `theme: elevation level ${i + 1} in ${scheme} carries no readable opacity, so its depth cannot be compared.`,
+          fix: `theme: elevation level ${i + 1} in ${scheme} casts "${level}". Nothing in the product casts a shadow; separate it by its surface and a 1px edge.`,
         });
       }
-    /* 2026-09-29: LEVEL 3 MAY EQUAL LEVEL 2, AND LEVEL 2 MUST STILL CLEAR LEVEL 1. The design system has three levels, the
-       ground, tiles and chrome, and puts the sheet (`--e3`) at chrome's level, so the one step that may be flat is
-       the last. A ladder that goes DOWN is still refused at either step. */
-    for (let i = 1; i < alphas.length; i++)
-      if (i === 1 ? !(alphas[i]! > alphas[i - 1]!) : !(alphas[i]! >= alphas[i - 1]!)) {
-        ok = false;
-        out.push({
-          check: 'I',
-          scheme,
-          level: 'refuse',
-          code: 'THEME_LADDER_ORDER',
-          fix: `theme: elevation level ${i + 1} is not above level ${i} in ${scheme}.`,
-        });
-      }
-    /* ONE PASS ROW PER SCHEME, and it is the row that makes I auditable at all. The ladder was
-       compared on the pixel geometry for a long time, where the three numbers are literals in the
-       generator and the comparison could not fail; a check that never speaks is a check nobody
-       notices has stopped. The measurement is the total climb in alpha, which is the depth the
-       ladder actually spans. */
-    if (ok) out.push({ check: 'I', scheme, level: 'pass', measured: r2(alphas.at(-1)! - alphas[0]!) });
+    /* ONE PASS ROW PER SCHEME, so I still says it ran. The measurement is the number of levels it read. */
+    if (ok) out.push({ check: 'I', scheme, level: 'pass', measured: built.elevation[scheme].length });
   }
   return out;
 }

@@ -22,6 +22,9 @@ import { ALPHA, ALPHA_SEED, HOUSE, HIGH_CONTRAST, HOUSE_SEED } from './index.ts'
 import { ACCENTS, recordTheme } from './record.ts';
 import {
   BRAND_RED,
+  FRAME_PAIRS,
+  HOUSE_FRAME,
+  type FrameRole,
   hueGap,
   INKS,
   INTENT_TEXT,
@@ -343,7 +346,7 @@ test('and the checks would SAY so — a floor nothing measures is not a floor', 
 
 /* ── the shape of the result, and not only its refusals ─────────────────── */
 
-test('EVERY CHECK REPORTS, PASS OR FAIL: 206 rows per scheme, counted here and nowhere quoted', () => {
+test('EVERY CHECK REPORTS, PASS OR FAIL: 292 rows per scheme, counted here and nowhere quoted', () => {
   /**
    * 39 §6.1 SPECIFIED 90 RESULTS PER SCHEME AND THE CODE RETURNED 6 IN DARK AND 4 IN LIGHT.
    *
@@ -370,6 +373,9 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 206 rows per scheme, counted here and n
    * 204 UNTIL 2026-10-08, when the working accent went red (DIRECTION §42): its words are a link too, so check K measures
    * `action-text` against body ink and red words as it does `accent-text`. Two rows; the second is the one pair K
    * reports and does not refuse (`K_EXEMPT`).
+   *
+   * 206 UNTIL 2026-10-20, when the frame arrived (the UI pass, SPEC 1): check T holds every name the stylesheet paints
+   * with, one row for their shape, one per pair in `FRAME_PAIRS` and one for red words beside body ink.
    */
   const PER_CHECK: Record<string, number> = {
     A: 24, // three inks that are not `faint`, each on eight grounds
@@ -390,9 +396,15 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 206 rows per scheme, counted here and n
     R: 8, //  the accent fill against the eight grounds it can be painted on
     S: 25, // the working accent: its label at rest and on hover, the fill on three grounds, its words on eight grounds
     //        and two tints, three inks and five state words on the first tint, and two inks on the second
+    T: 86, // the frame: one row for the shape of its names, then its pairs (body text on nine grounds and a selection;
+    //        second text on eight and a selection; quiet text on eight; good, warn and info each on five grounds, the
+    //        red tint and their own tint; red as words on six and as a mark; the eight slots on the tile and their tint;
+    //        the toast; the label on three fills; the fill on two grounds; the running dot on two; the ring on two; the
+    //        off switch and its knob; the floating edge), then red words beside body ink
   };
   const PER_SCHEME = Object.values(PER_CHECK).reduce((a, b) => a + b, 0);
-  assert.equal(PER_SCHEME, 206, 'the per-letter table no longer sums to the number the checks report');
+  assert.equal(PER_SCHEME, 292, 'the per-letter table no longer sums to the number the checks report');
+  assert.equal(FRAME_PAIRS.length, 84, 'the frame holds a different number of pairs than the table above says');
 
   for (const built of [HOUSE, HIGH_CONTRAST])
     for (const scheme of ['dark', 'light'] as const) {
@@ -411,30 +423,30 @@ test('EVERY CHECK REPORTS, PASS OR FAIL: 206 rows per scheme, counted here and n
 
   /* THE POINT OF ALL OF IT: a letter that goes missing is now visible in the output. */
   const spoke = new Set(whole.map((f) => f.check));
-  for (const letter of 'ABCDEFGHIJKLMNOPQRS')
+  for (const letter of 'ABCDEFGHIJKLMNOPQRST')
     assert.ok(spoke.has(letter), `check ${letter} said nothing at all, so nothing can tell it apart from a deleted check`);
 });
 
 /* ── the checks that could not fail ──────────────────────────────────────── */
 
-test('CHECK I MEASURES THE LADDER THAT VARIES, which is the alpha and not the pixels', () => {
-  /* It took the largest `\d+px` of each shadow, and those are literals in the generator — 2, 14, 40,
-     the same three in every theme there will ever be — so it compared `2 < 14 < 40` and could not
-     fail. Inverting the light scheme's opacities visibly turns the ladder back on itself. */
-  const inverted: Built = {
+test('CHECK I REFUSES A SHADOW, because nothing in the product casts one (SPEC 1.9)', () => {
+  /* It held a ladder of shadows that only went up. There is no ladder now: every level is `none`, and a theme that
+     brings a drop back is refused at each level that casts one. */
+  const lifted: Built = {
     ...HOUSE,
     elevation: {
       ...HOUSE.elevation,
-      light: ['0 1px 2px rgb(0 0 0 / 0.9)', '0 2px 4px rgb(0 0 0 / 0.5)', '0 4px 8px rgb(0 0 0 / 0.01)'],
+      light: ['none', '0 16px 40px -16px rgb(16 24 40 / 0.22)', '0 16px 40px -16px rgb(16 24 40 / 0.22)'],
     },
   };
-  const found = refusals(checkElevation(inverted));
-  assert.equal(found.length, 2, 'a ladder that goes down was reported as going up');
-  assert.match(found[0]?.fix ?? '', /not above/);
+  const found = refusals(checkElevation(lifted));
+  assert.equal(found.length, 2, 'a level that casts a shadow was let through');
+  assert.match(found[0]?.fix ?? '', /casts "0 16px/);
 });
 
-test('and the house ladder still goes up, in both schemes', () => {
+test('and the house casts nothing, in both schemes', () => {
   assert.deepEqual(refusals(checkElevation(HOUSE)), []);
+  for (const scheme of ['dark', 'light'] as const) assert.deepEqual(HOUSE.elevation[scheme], ['none', 'none', 'none']);
 });
 
 test('CHECK F KNOWS THE HUE FLOOR, which only the generator knew', () => {
@@ -924,15 +936,60 @@ test('THE BOARD (DIRECTION §39): exact colours, no glass, no light, a flat tile
   assert.equal(HOUSE.chrome.light['hover-wash'], 'rgb(16 17 20 / 0.05)');
   assert.equal(HOUSE.chrome.light.selected, HOUSE.schemes.light['action-tint-1']);
   assert.equal(HOUSE.chrome.light['arrived-wash'], '#EEF0FF');
-  for (const scheme of ['light', 'dark'] as const) {
-    assert.match(HOUSE.elevation[scheme][0], /^0 0 0 0 rgb\([\d ]+\/ 0\)$/u, `a resting ${scheme} tile casts a shadow`);
-    assert.equal(HOUSE.elevation[scheme][2], HOUSE.elevation[scheme][1], 'a sheet is at level 2');
-  }
+  /* 2026-10-20 (SPEC 1.9): nothing casts a shadow, a resting tile, a menu or a sheet. */
+  for (const scheme of ['light', 'dark'] as const) assert.deepEqual(HOUSE.elevation[scheme], ['none', 'none', 'none']);
   const css = toCSS(HOUSE, HIGH_CONTRAST);
   for (const name of ['glass', 'glass-strong', 'glass-rim', 'glass-hair', 'glass-sat', 'ground-glow'])
     assert.equal(css.split(`--${name}:`).length - 1, 0, `--${name} is still emitted`);
-  for (const name of ['board', 'tile', 'field', 'action', 'action-hover', 'action-tint-1', 'action-tint-2', 'action-text', 'on-action', 'live', 'hover-wash', 'selected', 'arrived-wash', 'danger-text'])
+  /* 2026-10-20 (SPEC 1): the stylesheet writes the frame's names, in every scheme block, and none of the dialect's,
+     which `tokens.css` aliases to the frame so a name written here would hold its old value over the alias. */
+  for (const name of ['board', 'tile', 'tile-2', 'hover', 'nav', 'red-fill', 'red-fill-hover', 'red-tint', 'red', 'on-red', 'live', 'arrived', 'scrim', 'cat-blue', 'cat-slate-tint'])
     assert.equal(css.split(`--${name}:`).length - 1, 12, `--${name} is not in every scheme block`);
+  for (const name of ['bg', 'sunk', 's1', 'field', 'action', 'action-text', 'on-action', 'danger-text', 'hover-wash', 'selected', 'arrived-wash', 'edge', 'dim'])
+    assert.equal(css.split(`--${name}:`).length - 1, 0, `--${name} is still written, over its alias`);
+});
+
+test('THE FRAME (UI pass, 20 Oct): his values exactly, the two reds as decided, and high contrast re-solved', () => {
+  /* SPEC 1.1: frame 3.1's surfaces, inks and status, the reds as he decided them (fill #CF413A light and #C2362F dark,
+     always a white label; red as words and marks #C2362F light, C1, and #EA645B dark). */
+  for (const scheme of ['light', 'dark'] as const)
+    for (const [role, value] of Object.entries(HOUSE_FRAME[scheme])) assert.equal(HOUSE.frame[scheme][role as FrameRole] ?? HOUSE.frame[scheme].scrim, value, `house ${scheme} ${role}`);
+  assert.deepEqual(
+    (['red-fill', 'red-fill-hover', 'red-fill-press', 'on-red', 'red'] as const).map((r) => HOUSE.frame.light[r]),
+    ['#CF413A', '#B3322C', '#A12A25', '#FFFFFF', '#C2362F'],
+  );
+  assert.deepEqual(
+    (['red-fill', 'red-fill-hover', 'red-fill-press', 'on-red', 'red'] as const).map((r) => HOUSE.frame.dark[r]),
+    ['#C2362F', '#CF3F37', '#B02F29', '#FFFFFF', '#EA645B'],
+  );
+  /* Dark red as words on the tile: at least 4.5 (the plan's own check). */
+  assert.ok(contrast(fromHex(HOUSE.frame.dark.red), fromHex(HOUSE.frame.dark.tile)) >= 4.5);
+  /* High contrast moves the words, never the reds' fills or their label, and holds its own floors. */
+  for (const scheme of ['light', 'dark'] as const) {
+    assert.equal(HIGH_CONTRAST.frame[scheme]['red-fill'], HOUSE.frame[scheme]['red-fill']);
+    assert.equal(HIGH_CONTRAST.frame[scheme]['on-red'], '#FFFFFF');
+    for (const ground of ['board', 'tile', 'tile-2'] as const)
+      assert.ok(contrast(fromHex(HIGH_CONTRAST.frame[scheme].ink), fromHex(HIGH_CONTRAST.frame[scheme][ground])) >= 16, `high contrast ${scheme} ink on ${ground}`);
+  }
+  /* The dark grounds come down together, so they keep their order. */
+  const lum = (hex: string) => relLuminance(fromHex(hex));
+  const d = HIGH_CONTRAST.frame.dark;
+  assert.ok(lum(d.board) < lum(d.tile) && lum(d.tile) < lum(d.hover) && lum(d.hover) < lum(d['tile-2']), 'the high-contrast dark grounds lost their order');
+  /* A record's colour moves the fill and the selection, never red as words. */
+  const moss = recordTheme('#41815F');
+  assert.ok(moss.ok);
+  if (moss.ok) {
+    assert.equal(moss.value.built.frame.light['red-fill'], '#41815F');
+    assert.equal(moss.value.built.frame.light.red, HOUSE.frame.light.red);
+    assert.equal(moss.value.built.frame.dark.red, HOUSE.frame.dark.red);
+  }
+  /* And the refusal names the pair: his red as words in light, on the board, is the C1 pair that fails. */
+  const his: Built = { ...HOUSE, frame: { ...HOUSE.frame, light: { ...HOUSE.frame.light, red: '#CF413A' } } };
+  const found = refusals(checkScheme(his, 'light')).filter((f) => f.check === 'T');
+  assert.deepEqual(
+    found.map((f) => f.fix?.match(/\(red on ([a-z0-9-]+)\)/u)?.[1]),
+    ['board', 'tile-2', 'hover', 'red-tint'],
+  );
 });
 
 test('A RECORD’S COLOUR DRIVES THE WORKING ACCENT, and the house pin holds only beside the house red', () => {
@@ -993,23 +1050,11 @@ test('THE LIGHT LADDER: TILES, WELLS AND CHROME STAND APART AS THEY DO IN DARK',
   assert.ok(dE(p.board, p.tile) >= 2.4, `a tile is ${dE(p.board, p.tile).toFixed(2)} from the board`);
 });
 
-test('A TILE EASES INTO THE CHROME’S LEVEL, in both schemes', () => {
-  /* A card lifts from `--e1` to `--e2` on hover or when chosen, and a browser eases one shadow list into another only
-     where each pair is inset on both sides or on neither. One mixed pair and the lift jumps, which the dark tile's
-     highlight did on its own (`elevationOf`). */
-  const inset = (list: string) => list.split(', ').map((shadow) => shadow.startsWith('inset '));
-  for (const scheme of ['light', 'dark'] as const) {
-    const [one, two] = [inset(HOUSE.elevation[scheme][0]), inset(HOUSE.elevation[scheme][1])];
-    for (let i = 0; i < Math.min(one.length, two.length); i++)
-      assert.equal(one[i], two[i], `${scheme} --e1 and --e2 differ at shadow ${i + 1}, so a card lifting between them jumps`);
-  }
-});
-
 test('CHECK H AND CHECK I HOLD THE DESIGN SYSTEM’S SHAPE, and still refuse the wrong one', () => {
   /* A light tile-2 above the white tile is a ladder turned back on itself. */
   const turned: Built = { ...HOUSE, schemes: { ...HOUSE.schemes, light: { ...HOUSE.schemes.light, s2: '#FFFFFF' } } };
   assert.ok(refusals(checkScheme(turned, 'light')).some((f) => f.check === 'H'));
-  /* A tile's shadow as deep as the chrome's is one level, not two. */
-  const flat: Built = { ...HOUSE, elevation: { ...HOUSE.elevation, light: [HOUSE.elevation.light[1], HOUSE.elevation.light[1], HOUSE.elevation.light[1]] } };
-  assert.equal(refusals(checkElevation(flat)).length, 1);
+  /* A resting tile that casts anything is refused (SPEC 1.9): there are no levels now. */
+  const raised: Built = { ...HOUSE, elevation: { ...HOUSE.elevation, light: ['0 1px 2px rgb(16 24 40 / 0.06)', 'none', 'none'] } };
+  assert.equal(refusals(checkElevation(raised)).length, 1);
 });
