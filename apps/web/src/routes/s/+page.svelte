@@ -161,7 +161,8 @@
       <Mark height={20} />
       <span class="wordmark">{copy.product}</span>
     </span>
-    <span class="what"><Icon name="eye" size="s" /><span class="what-word">{words.sharedChip}</span></span>
+    <!-- ONLY OVER A PAGE THAT IS SHARED (today F15): a dead link says so in its body, under no chip saying it is shared. -->
+    {#if got?.from === 'live'}<span class="what"><Icon name="eye" size="s" /><span class="what-word">{words.sharedChip}</span></span>{/if}
   </header>
 
   {#if got === null || head === null}
