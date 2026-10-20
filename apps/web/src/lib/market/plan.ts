@@ -110,7 +110,7 @@ export type SectionKey =
   | 'page-adds'
   | 'settings'
   | 'examples'
-  | 'skills'
+  | 'teaches'
   | 'spawns'
   | 'interrupts'
   | 'worth';
@@ -266,7 +266,7 @@ function diffPart(d: Body, name: (id: string) => string, fieldOf?: FieldName): {
         return row(text(c.key).replace(/_/gu, ' '), c.from === 'kept' || c.from === 'given' ? words.settingKept(value) : c.from === 'default' ? words.settingDefault(value) : words.settingNone);
       })),
       ...section('examples', words.examples, count(seeds.count) === 0 ? [] : [row(words.examplesLine(count(seeds.count)), seedRows.map((r) => `${name(`register.${text(r.register)}`)} ${words.examplesIn(count(r.rows))}`).join(', ') || null)]),
-      ...section('skills', words.skills, list(d.skills).map((s) => row(text(s.name).replace(/-/gu, ' '), words.skillLine(text(s.trigger), text(s.what))))),
+      ...section('teaches', words.skills, list(d.skills).map((s) => row(text(s.name).replace(/-/gu, ' '), words.skillLine(text(s.trigger), text(s.what))))),
       ...section('spawns', words.spawns, list(d.spawns).map((s) => row(name(`rule.${text(s.rule)}`), words.spawnLine(name(`register.${text(s.register)}`), count(s.bound), text(s.when))))),
       ...section('interrupts', words.interrupts, strings(d.interrupts).map((r) => row(name(`rule.${r}`)))),
       ...section('worth', words.worth, worth),

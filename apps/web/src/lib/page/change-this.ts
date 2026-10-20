@@ -96,7 +96,6 @@ const SAID_AS: Readonly<Record<string, string>> = {
   split: 'split',
   timeline: 'timeline',
   feed: 'feed',
-  steps: 'steps',
   tree: 'tree',
 };
 
@@ -192,7 +191,8 @@ export function askedOf(i: AskIn): Edited | null {
   /* WHAT IT IS DRAWN AS: "show it as a calendar", "as a chart". The kind must be one `kindsFor` allows for these cells. */
   const as = /\b(?:show|see|draw|display|view)?\s*(?:it|this|them)?\s*\bas\s+(?:an?\s+|the\s+)?(.+)$/u.exec(t);
   if (as) {
-    const kind = SAID_AS[as[1]!.trim()] ?? SAID_AS[as[1]!.trim().replace(/s$/u, '')];
+    const said = as[1]!.trim();
+    const kind = SAID_AS[said] ?? SAID_AS[said.replace(/s$/u, '')] ?? [said, said.replace(/s$/u, '')].find((k) => i.kinds.includes(k));
     if (!kind) return null;
     const patch = kindPatch(block, kind, i.kinds);
     if (!patch) return null;

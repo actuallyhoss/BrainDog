@@ -99,7 +99,7 @@ test('the skills an add-on gives the agents are named before it installs, by nam
     },
     pack,
   );
-  const section = sheet?.parts[0]?.sections.find((s) => s.key === 'skills');
+  const section = sheet?.parts[0]?.sections.find((s) => s.key === 'teaches');
   assert.equal(section?.title, 'Skills it gives your agents');
   assert.deepEqual(
     section?.rows.map((r) => [r.text, r.detail]),
@@ -108,5 +108,5 @@ test('the skills an add-on gives the agents are named before it installs, by nam
       ['plain', 'A skill your agents can use'],
     ],
   );
-  assert.equal(sheetOf(plain, pack)?.parts[0]?.sections.some((s) => s.key === 'skills'), false);
+  assert.equal(sheetOf(plain, pack)?.parts[0]?.sections.some((s) => s.key === 'teaches'), false);
 });

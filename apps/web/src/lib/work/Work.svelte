@@ -88,7 +88,7 @@
       const was = keptAnswer<Opened>(WORK_PAGE, key, version);
       if (was !== null && was.got.ok) {
         got = was.got.value;
-        painted('work', 'memory');
+        painted(WORK_PAGE, 'memory');
         if (was.fresh) return closed(true, at);
         blank = false;
       }
@@ -104,7 +104,7 @@
         if (near === null || near.value.from !== 'live' || got !== null || mine !== started) return;
         got = near.value;
         copied = true;
-        painted('work', 'copy');
+        painted(WORK_PAGE, 'copy');
       };
       void nearLocal<Opened>(PAGE_COPY, localKey(asked), apiBase(), draw).then(draw);
     }
@@ -117,7 +117,7 @@
     got = out;
     copied = false;
     if (out.from === 'live') {
-      painted('work', 'network');
+      painted(WORK_PAGE, 'network');
       keep(WORK_PAGE, key, version, { ok: true, value: out });
       keepPage(asked, out, mark);
     }
