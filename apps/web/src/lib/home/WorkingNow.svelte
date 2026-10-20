@@ -26,23 +26,19 @@
     <ol class="runs">
       {#each shown as r (r.key)}
         <li class="run">
-          <AgentFace agent={r.agent} run={r.run} live={r.live} size="s" />
-          <span class="r-main">
-            <span class="r-who">
-              <b>{r.agent}</b>
-              {#if r.project}
-                <span class="r-project"><span class="r-dot" data-hued={r.hue === null ? undefined : ''} style={r.hue === null ? undefined : `--hue:${r.hue}`} aria-hidden="true"></span>{r.project}</span>
-              {/if}
-            </span>
-            {#if r.doing}<span class="r-doing" dir="auto">{r.doing}</span>{/if}
+          <span class="r-face"><AgentFace agent={r.agent} run={r.run} live={r.live} size="s" /></span>
+          <span class="r-who">
+            <b class="r-name">{r.agent}</b>
+            {#if r.project}
+              <span class="r-project"><span class="r-dot" data-hued={r.hue === null ? undefined : ''} style={r.hue === null ? undefined : `--hue:${r.hue}`} aria-hidden="true"></span>{r.project}</span>
+            {/if}
           </span>
+          {#if r.doing}<span class="r-doing" dir="auto">{r.doing}</span>{/if}
           <span class="r-time num" data-live={r.live === 'working' && r.began ? '' : undefined}>{r.live === 'quiet' ? words.quiet : r.began}</span>
         </li>
       {/each}
     </ol>
     {#if rows.length > shown.length}<p class="r-more">{words.more(rows.length - shown.length)}</p>{/if}
-    <!-- ON A PHONE, HALF A ROW (today F8): only the faces, under the heading that already says how many. -->
-    <p class="wn-strip" aria-hidden="true">{#each shown as r (r.key)}<AgentFace agent={r.agent} run={r.run} live={r.live} size="s" />{/each}</p>
   </Tile>
 {/if}
 
@@ -55,38 +51,61 @@
     list-style: none;
   }
 
+  /* ONE AGENT, TWO LINES, AT EVERY WIDTH (Today polish 4): the face, who and the project, and how long at that line's
+     end; what it is on under it in the second ink, the whole width of the words, so a phone does not wrap it. */
   .run {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--sp-3);
-    padding-block: var(--sp-2);
+    grid-template-areas:
+      'face who time'
+      'face doing doing';
+    align-items: baseline;
+    column-gap: var(--sp-3);
+    row-gap: 2px;
+    padding-block: var(--sp-3);
+  }
+
+  .run:first-child {
+    padding-block-start: 0;
+  }
+
+  .run:last-child {
+    padding-block-end: 0;
   }
 
   .run + .run {
     border-block-start: 1px solid var(--rule);
   }
 
-  .r-main {
-    display: grid;
-    gap: 2px;
-    min-inline-size: 0;
+  .r-face {
+    grid-area: face;
+    align-self: start;
+    display: flex;
+    padding-block-start: 2px;
   }
 
   .r-who {
+    grid-area: who;
     display: flex;
     align-items: baseline;
     flex-wrap: wrap;
     gap: 0 var(--sp-2);
-    font-size: var(--t-base);
+    min-inline-size: 0;
+  }
+
+  .r-name {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-semi);
+    line-height: 22px;
   }
 
   .r-project {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    gap: 6px;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .r-dot {
@@ -101,13 +120,17 @@
   }
 
   .r-doing {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    line-height: 1.4;
+    grid-area: doing;
+    min-inline-size: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
     overflow-wrap: anywhere;
   }
 
   .r-time {
+    grid-area: time;
+    justify-self: end;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -125,15 +148,9 @@
     background: var(--live);
   }
 
-  .wn-strip {
-    display: none;
-    margin: 0;
-    gap: var(--sp-1);
-  }
-
   .r-more {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-sm);
   }
 </style>
