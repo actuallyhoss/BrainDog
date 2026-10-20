@@ -41,10 +41,10 @@ const rootOf = (at: string): string => at.split(/[.[]/u)[0]!;
 
 /**
  * The calls in the walk that the record answers with an internal error today, found by this walk and not the door's to
- * fix: `governance` hands a limit that is not a number to SQL (`datatype mismatch`), and `propose` calls `trim` on a
- * question that is not text (`kernel/src/govern.ts`). Each is a defect of its own; one fixed comes off this list.
+ * fix. None now: `governance {limit: "many"}` and `propose {question: 42}` were the last, and the record refuses both
+ * at the field (W2-A). Each one found comes onto this list until it is fixed, and off it again.
  */
-const KNOWN_INTERNAL: readonly string[] = ['governance {"limit":"many"}', 'propose {"question":42}', 'propose {"question":{}}'];
+const KNOWN_INTERNAL: readonly string[] = [];
 
 /** The one rule, said once: where it points and what it says. */
 function holds(name: string, sent: Record<string, unknown>, said: Said): void {

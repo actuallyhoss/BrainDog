@@ -11171,6 +11171,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     async governance(args: { register?: string; id?: string; status?: string; limit?: number; cursor?: string; review?: 'only' }, ctx: CallContext) {
       const stop = scoped(ctx, 'read');
       if (stop) return { ok: false as const, refusal: stop };
+      /* A LIMIT IS A WHOLE NUMBER, said before it reaches SQL: `limit: "many"` was a datatype mismatch, a 500 an agent
+         could do nothing with (W1-B's walk, `refusal-at.test.ts`). */
+      const limit: unknown = args?.limit;
+      if (limit !== undefined && limit !== null && !(typeof limit === 'number' && Number.isSafeInteger(limit) && limit >= 1))
+        return no('VALUE_MALFORMED', 'limit is a whole number of rows, from 1.', { at: 'limit' });
       const register = (args?.register ?? 'suggestion') as GovernRegister;
       /* A HANDLE IN IS TURNED BACK INTO ITS NUMBER BEFORE ANY CHECK BELOW, so a hidden question named by handle meets the
          same `holds` and answers the same `null` or the same sentence as one named by number, and a handle naming no
@@ -11251,6 +11256,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const named = args?.body_kind === 'rowset' ? (args.body as { register?: unknown })?.register : undefined;
       const stop = guard(ctx, 'propose', typeof named === 'string' ? named : undefined);
       if (stop) return { ok: false as const, refusal: stop };
+      /* THE QUESTION IS TEXT, said here: a number or an object reached the kernel's `trim` and threw, a 500 in place of
+         the one fix (W1-B's walk, `refusal-at.test.ts`). */
+      const question: unknown = (args as { question?: unknown } | undefined)?.question;
+      if (question !== undefined && question !== null && typeof question !== 'string')
+        return no('VALUE_MALFORMED', 'question is the sentence a person answers, as text.', { at: 'question' });
       /* AN AUTOMATION IN A SENTENCE: a `change` whose whole body is `{ sentence }` is turned into the rule it means by the
          same parser the app uses, and filed as the ordinary change, so the person decides it in Decide as any other. */
       const sentence = args?.body_kind === 'change' && args.body !== null && typeof args.body === 'object' && Object.keys(args.body).join() === 'sentence' ? (args.body as { sentence?: unknown }).sentence : undefined;
