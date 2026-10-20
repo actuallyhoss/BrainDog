@@ -1418,8 +1418,15 @@
       display: none;
     }
 
+    /* WHAT IT OPENS ON A LINE OF ITS OWN TOO, with no dot before it: wrapped, the dot ended the scope's line by itself
+       ("All projects ·"). Where it applies, what it opens, its state: three lines, no separators. */
     .key-meta .key-opens {
+      flex-basis: 100%;
       white-space: normal;
+    }
+
+    .key-meta .sep:has(+ .key-opens) {
+      display: none;
     }
 
     /* THE STATE ON A LINE OF ITS OWN ON A PHONE, with no dot before it: wrapped, the dot began a line by itself. */
