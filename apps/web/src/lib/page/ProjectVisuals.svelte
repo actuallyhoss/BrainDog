@@ -2,6 +2,11 @@
   What a project's page draws beside its shape blocks: a roadmap of its dated tasks, and the visuals its data earns
   (`visuals.ts`): money in and out by month as small bars, a dues calendar, a revenue trend.
 
+  ROW 2 OF A PROJECT IS ITS PATH AND ITS MONEY (the plan of 20 October, batch 3b): the roadmap at eight columns of
+  twelve and money at four from 1100px, money's lines with its first month-by-month bars under them, each bar at most
+  24px wide with a rounded top, in the project's colour (`hue`), its value on hover and three months named under them.
+  The rest of the visuals follow, half a row each.
+
   NOTHING DRAWN EMPTY: a roadmap needs two dated tasks, a visual needs its data, and each is a tile only while it has
   something to say. Each has "Show the data" under it, as the blocks above do. The roadmap is a horizontal line of time
   from 640px and the same marks as a list below it, so a phone reads it top to bottom. Both themes, from the tokens.
@@ -10,7 +15,7 @@
   import Tile from '$lib/ui/Tile.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import { lanesOf, roadmapOf, visualsFor, type Listing, type Months, type Mark } from '$lib/record/visuals.ts';
-  import type { DataRow } from '$lib/record/project.ts';
+  import type { DataRow, MoneyLine } from '$lib/record/project.ts';
 
   let {
     fields,
@@ -19,6 +24,9 @@
     outByMonth = null,
     listings,
     format,
+    money = [],
+    hue = null,
+    moneyRows = [],
   }: {
     fields: Readonly<Record<string, unknown>>;
     decl: Parameters<typeof visualsFor>[0]['decl'];
@@ -26,6 +34,12 @@
     outByMonth?: Months | null;
     listings: readonly Listing[];
     format: (minor: number, currency: string) => string;
+    /** The project's money this month, as the shape reads it (`moneyLines`): the lines over the Money tile's bars. */
+    money?: readonly MoneyLine[];
+    /** The project's own hue, which the bars and the path's finished stops are drawn in; none draws them in ink. */
+    hue?: number | null;
+    /** The rows behind the money lines, for the Money tile's "Show the data". */
+    moneyRows?: readonly DataRow[];
   } = $props();
 
   /* THE READER'S DAY, not the server's. */
@@ -36,7 +50,14 @@
   const uid = $props.id();
 
   const road = $derived(roadmapOf(listings, today));
-  const visuals = $derived(visualsFor({ fields, decl }, { inByMonth, outByMonth, listings, today, format }));
+  const all = $derived(visualsFor({ fields, decl }, { inByMonth, outByMonth, listings, today, format }));
+  /* THE FIRST MONTH-BY-MONTH BARS GO UNDER MONEY'S LINES, in row 2; the rest follow as tiles of their own. */
+  const bars0 = $derived(all.find((v): v is Extract<typeof v, { kind: 'in' | 'out' }> => v.kind === 'in' || v.kind === 'out') ?? null);
+  /* AND WHAT IT EARNED AGAINST THE PERIOD BEFORE: money is one tile, not three. */
+  const rev = $derived(all.find((v): v is Extract<typeof v, { kind: 'revenue' }> => v.kind === 'revenue') ?? null);
+  const visuals = $derived(all.filter((v) => v !== bars0 && v !== rev));
+  const hasMoney = $derived(money.length > 0 || bars0 !== null || rev !== null);
+  const MONEY: Record<MoneyLine['key'], string> = { in: 'In this month', out: 'Out this month', owed: 'Still to come in' };
 
   /* The marks with a "now" step among them in time order, so the phone's list and the line read the same. */
   type Step = (Mark & { now?: false }) | { now: true; key: string; at: number };
@@ -114,23 +135,33 @@
 {/snippet}
 
 {#snippet bars(m: Months, tone: string)}
+  {@const ticks = new Set([0, Math.floor((m.months.length - 1) / 2), m.months.length - 1])}
   <ol class="months" data-tone={tone} aria-label="{monthName(m.months[0]!.key)} to {monthName(m.months.at(-1)!.key)}">
-    {#each m.months as x (x.key)}
+    {#each m.months as x, n (x.key)}
       <li title="{monthLong(x.key)}: {format(x.value, m.currency)}">
+        <span class="mval num" aria-hidden="true">{format(x.value, m.currency)}</span>
         <span class="col" data-partial={x.partial} style:block-size="{Math.max(x.value > 0 ? 4 : 1, Math.round((x.value / peak(m)) * 100))}%"></span>
-        <span class="mname">{monthName(x.key).charAt(0)}</span>
+        <span class="mname">{ticks.has(n) ? monthName(x.key) : ''}</span>
       </li>
     {/each}
   </ol>
   <p class="quiet">{format(m.total, m.currency)} over {m.months.length} months</p>
 {/snippet}
 
-{#if road || visuals.length > 0}
-  <div class="visuals">
+{#snippet earned(w: Extract<(typeof all)[number], { kind: 'revenue' }>)}
+  <ul class="trend">
+    <li><span class="t-name">This period</span><span class="t-amount num">{format(w.trend.now, w.trend.currency)}</span><span class="t-bar"><span style:inline-size="{Math.max(4, Math.round((w.trend.now / Math.max(w.trend.now, w.trend.before, 1)) * 100))}%"></span></span></li>
+    <li><span class="t-name">The period before</span><span class="t-amount num">{format(w.trend.before, w.trend.currency)}</span><span class="t-bar" data-before="true"><span style:inline-size="{Math.max(w.trend.before > 0 ? 4 : 0, Math.round((w.trend.before / Math.max(w.trend.now, w.trend.before, 1)) * 100))}%"></span></span></li>
+  </ul>
+  <p class="quiet">{change(w.trend.before, w.trend.now)}</p>
+{/snippet}
+
+{#if road || hasMoney || visuals.length > 0}
+  <div class="visuals" data-hued={hue === null ? undefined : ''} style={hue === null ? undefined : `--hue:${hue}`}>
     {#if road}
-      <div class="vis wide">
-        <Tile icon="task" title="Roadmap">
-          <ol class="road" aria-label="Roadmap" bind:this={roadEl} style:--lanes={laneCount}>
+      <div class="vis path" data-alone={hasMoney ? undefined : ''}>
+        <Tile icon="task" title="Path">
+          <ol class="road" aria-label="Path" bind:this={roadEl} style:--lanes={laneCount}>
             {#each steps as s (s.key)}
               {#if 'now' in s && s.now}
                 <li class="step now" style:--at={s.at}><span class="dot" aria-hidden="true"></span><span class="what">Now</span></li>
@@ -144,7 +175,26 @@
               {/if}
             {/each}
           </ol>
-          {@render disclosure('road', roadRows, 'Roadmap')}
+          {@render disclosure('road', roadRows, 'Path')}
+        </Tile>
+      </div>
+    {/if}
+    {#if hasMoney}
+      <div class="vis money" data-alone={road ? undefined : ''}>
+        <Tile icon="money" title="Money">
+          {#if money.length > 0}
+            <ul class="lines">
+              {#each money as m (m.key)}
+                <li><span class="t-name">{MONEY[m.key]}</span><span class="t-amount num">{format(m.value, m.currency)}</span></li>
+              {/each}
+            </ul>
+          {/if}
+          {#if rev}{@render earned(rev)}{/if}
+          {#if bars0}
+            <p class="bars-name">{bars0.title}</p>
+            {@render bars(bars0.months, bars0.kind)}
+          {/if}
+          {@render disclosure('money', [...moneyRows, ...(rev?.rows ?? []), ...(bars0?.rows ?? [])], 'Money')}
         </Tile>
       </div>
     {/if}
@@ -154,12 +204,6 @@
         <Tile icon={ICON[w.kind]} title={w.title}>
           {#if w.kind === 'in' || w.kind === 'out'}
             {@render bars(w.months, w.kind)}
-          {:else if w.kind === 'revenue'}
-            <ul class="trend">
-              <li><span class="t-name">This period</span><span class="t-amount num">{format(w.trend.now, w.trend.currency)}</span><span class="t-bar"><span style:inline-size="{Math.max(4, Math.round((w.trend.now / Math.max(w.trend.now, w.trend.before, 1)) * 100))}%"></span></span></li>
-              <li><span class="t-name">The period before</span><span class="t-amount num">{format(w.trend.before, w.trend.currency)}</span><span class="t-bar" data-before="true"><span style:inline-size="{Math.max(w.trend.before > 0 ? 4 : 0, Math.round((w.trend.before / Math.max(w.trend.now, w.trend.before, 1)) * 100))}%"></span></span></li>
-            </ul>
-            <p class="quiet">{change(w.trend.before, w.trend.now)}</p>
           {:else if w.kind === 'dues'}
             <div class="cals">
               {#each w.calendar as c (c.key)}
@@ -193,7 +237,16 @@
   }
 
   .vis {
+    display: grid;
     min-inline-size: 0;
+  }
+
+  .visuals {
+    --ph: var(--ink);
+  }
+
+  .visuals[data-hued] {
+    --ph: oklch(var(--mark-l) var(--mark-c) var(--hue));
   }
 
   @media (width >= 640px) {
@@ -201,10 +254,60 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .vis.wide,
+    .vis.path,
     .vis[data-kind='dues'] {
       grid-column: 1 / -1;
     }
+  }
+
+  /* ROW 2 ON A WIDE SCREEN: the path at eight of twelve and money at four, and either alone across the row. */
+  @media (width >= 1100px) {
+    .visuals {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .vis {
+      grid-column: span 6;
+    }
+
+    .vis.path {
+      grid-column: span 8;
+    }
+
+    .vis.money {
+      grid-column: span 4;
+    }
+
+    .vis.path[data-alone],
+    .vis[data-kind='dues'] {
+      grid-column: 1 / -1;
+    }
+
+    .vis.money[data-alone] {
+      grid-column: span 6;
+    }
+  }
+
+  .lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin: 0 0 var(--sp-3);
+    padding: 0;
+    list-style: none;
+  }
+
+  .lines li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+  }
+
+  .bars-name {
+    margin: var(--sp-4) 0 var(--sp-2);
+    color: var(--dim);
+    font-size: var(--t-sm);
   }
 
   .quiet {
@@ -254,7 +357,8 @@
   }
 
   .step[data-state='done'] .dot {
-    background: var(--ink);
+    border-color: var(--ph);
+    background: var(--ph);
   }
 
   .step[data-state='later'] .dot {
@@ -374,20 +478,44 @@
     display: flex;
     flex: 1 1 0;
     flex-direction: column;
+    align-items: center;
     justify-content: flex-end;
     gap: 2px;
     min-inline-size: 0;
   }
 
+  /* AT MOST 24px WIDE WITH A ROUNDED TOP, in the project's colour; what went out a step lighter of the same. */
   .col {
     display: block;
+    inline-size: 100%;
+    max-inline-size: 24px;
     min-block-size: 1px;
-    border-radius: 2px 2px 0 0;
-    background: var(--ink);
+    border-radius: 4px 4px 0 0;
+    background: var(--ph);
   }
 
   [data-tone='out'] .col {
-    background: var(--dim);
+    background: color-mix(in oklab, var(--ph) 60%, var(--field));
+  }
+
+  /* THE VALUE ON HOVER, over its bar; the bar's title says it to a pointer that stays, and the data says it to everyone. */
+  .mval {
+    position: absolute;
+    inset-block-start: -18px;
+    padding: 0 var(--sp-1);
+    border-radius: 4px;
+    background: var(--tile);
+    color: var(--ink);
+    font-size: var(--t-xs);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .months li:hover .mval {
+      opacity: 1;
+    }
   }
 
   .col[data-partial='true'] {
@@ -396,10 +524,12 @@
 
   .mname {
     flex: none;
+    min-block-size: 12px;
     color: var(--dim);
     font-size: var(--t-xs);
     line-height: 12px;
     text-align: center;
+    white-space: nowrap;
   }
 
   .months li {
@@ -444,11 +574,11 @@
     display: block;
     block-size: 100%;
     border-radius: 3px;
-    background: var(--ink);
+    background: var(--ph);
   }
 
   .t-bar[data-before='true'] span {
-    background: var(--dim);
+    background: color-mix(in oklab, var(--ph) 45%, var(--field));
   }
 
   /* DUES: a small month at a time, a dot under each due day, the missed ones in the accent. */

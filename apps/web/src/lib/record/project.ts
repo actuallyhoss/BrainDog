@@ -251,6 +251,90 @@ export function spans(blocks: readonly Block[]): Record<string, 1 | 2> {
   return out;
 }
 
+/* ── the hero band ─────────────────────────────────────────────────────── */
+
+/** One run of a hero sentence: words, a figure drawn a step heavier, or the late phrase drawn in the red. */
+export type HeroPart = { text: string; figure?: true; late?: true };
+
+/** One of the hero's three figures: what it pays, its open work as a ring, and who is on it now. */
+export type HeroFigure =
+  | { key: 'money'; label: string; minor: number; currency: string }
+  | { key: 'open'; label: string; total: number; agents: number; late: number; atLeast: boolean }
+  | { key: 'working'; label: string; now: readonly AtWork[]; note: string | null };
+
+export type Hero = { sentences: HeroPart[][]; figures: HeroFigure[] };
+
+/** What the hero is worked out from, besides the shape's facts. */
+export type HeroSource = {
+  facts: Facts;
+  /** The figure the project's card leads with (`figureOf`), with its field's label. */
+  figure: { minor: number; currency: string; label: string } | null;
+  /** Its open work, and how much of it an agent holds (`openWorkOf`). */
+  open: { total: number; agents: number; late: number; atLeast: boolean } | null;
+  /** What the open work is called, in the plural and lower case: "tasks". */
+  noun: string;
+  format: (minor: number, currency: string) => string;
+};
+
+export const HERO_WORDS = {
+  money: { in: 'came in this month', out: 'went out this month', owed: 'is still to come in' },
+  figure: { in: 'In this month', out: 'Out this month', owed: 'Still to come in' },
+  open: 'Open',
+  working: 'Working now',
+  on: (name: string, doing: string | null): string => (doing ? `${name} is on ${doing}` : `${name} is working on it`),
+  both: (names: readonly string[]): string => `${names.slice(0, -1).join(', ')} and ${names.at(-1)} are working on it`,
+  late: (late: number, total: number, noun: string): string => `${late} of ${total} open${noun ? ` ${noun}` : ''} ${late === 1 ? 'is' : 'are'} late`,
+  split: (you: number, agents: number): string => `${you} you, ${agents} agent${agents === 1 ? '' : 's'}`,
+  runs: (n: number): string => (n === 1 ? '1 run on it' : `${n} runs on it`),
+  nobody: 'Nobody right now',
+} as const;
+
+/* A sentence ends on a stop, and keeps the one it was written with. */
+const stopped = (s: string): string => (/[.!?…]$/u.test(s) ? s : `${s}.`);
+
+/**
+ * THE HERO BAND (the plan of 20 October, batch 3a): two or three plain sentences and three figures, from what the page
+ * already read. The brief first, as the project says what it is; then its money, each amount a figure; then who is on it
+ * and what is late. Never the next step, which the page's own sentence says once. A sentence or a figure with nothing to
+ * say is left out, so a project with nothing written and no money draws only what it has.
+ */
+export function heroOf(s: HeroSource): Hero {
+  const { facts } = s;
+  const sentences: HeroPart[][] = [];
+  const brief = facts.brief.join(' ').trim();
+  if (brief !== '') sentences.push([{ text: stopped(brief) }]);
+  const money = facts.money.map((m): HeroPart[] => [{ text: s.format(m.value, m.currency), figure: true }, { text: ` ${HERO_WORDS.money[m.key]}` }]);
+  if (money.length > 0) {
+    const parts: HeroPart[] = [];
+    money.forEach((m, i) => {
+      if (i > 0) parts.push({ text: i === money.length - 1 ? ' and ' : ', ' });
+      parts.push(...m);
+    });
+    parts.push({ text: '.' });
+    sentences.push(parts);
+  }
+  const now = facts.agents.now;
+  const who = now.length === 0 ? null : now.length === 1 ? HERO_WORDS.on(now[0]!.name, now[0]!.doing) : HERO_WORDS.both([...new Set(now.map((w) => w.name))]);
+  const late = s.open && s.open.late > 0 ? HERO_WORDS.late(s.open.late, s.open.total, s.noun) : null;
+  if (who && late) sentences.push([{ text: `${who}, and ` }, { text: late, late: true }, { text: '.' }]);
+  else if (who) sentences.push([{ text: `${who}.` }]);
+  else if (late) sentences.push([{ text: late.charAt(0).toUpperCase() + late.slice(1), late: true }, { text: '.' }]);
+
+  const figures: HeroFigure[] = [];
+  const lead = s.figure ?? (() => {
+    const m = facts.money.find((x) => x.key === 'in') ?? facts.money.find((x) => x.key === 'owed');
+    return m ? { minor: m.value, currency: m.currency, label: HERO_WORDS.figure[m.key] } : null;
+  })();
+  if (lead) figures.push({ key: 'money', label: lead.label, minor: lead.minor, currency: lead.currency });
+  if (s.open && s.open.total > 0) figures.push({ key: 'open', label: HERO_WORDS.open, ...s.open });
+  if (now.length > 0 || facts.agents.runs.length > 0) {
+    const first = now[0];
+    const note = first ? (first.doing ?? null) : HERO_WORDS.runs(facts.agents.runs.length);
+    figures.push({ key: 'working', label: HERO_WORDS.working, now, note });
+  }
+  return { sentences: sentences.slice(0, 3), figures };
+}
+
 /** What a project's shape is made from, as the row's page and a declared page scoped to the row both hold it. */
 export type Source = {
   /** The project row's fields, and the title field its list declares. */

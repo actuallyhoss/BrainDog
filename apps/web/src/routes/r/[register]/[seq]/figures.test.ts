@@ -156,6 +156,16 @@ test('OPEN WORK IS COUNTED BY STATE IN THE DECLARED ORDER, with what is past its
   assert.equal(openWorkOf([row('done')], via, '2026-09-29', false), null, 'nothing open draws no tile');
 });
 
+test('THE OPEN WORK SAYS HOW MUCH AN AGENT HOLDS, by the field its hand names, and none where it names none', () => {
+  const held = { ...TASKS, hand: { agent: 'agent' }, fields: [...TASKS.fields, { id: 'agent', type: 'text' }] };
+  const via = viaOf(held, 'things')!;
+  assert.equal(via.agent, 'agent');
+  const w = openWorkOf([{ fields: { state: 'open', agent: 'claude' } }, { fields: { state: 'doing', agent: ' ' } }, { fields: { state: 'open' } }], via, '2026-09-29', false)!;
+  assert.equal(w.agents, 1);
+  assert.equal(viaOf(TASKS, 'things')!.agent, null);
+  assert.equal(viaOf({ ...TASKS, hand: { agent: 'nobody' } }, 'things')!.agent, null, 'a hand naming no field of the list is none');
+});
+
 test('PAST THREE STATES THE REST ARE COUNTED TOGETHER', () => {
   const via = viaOf(TASKS, 'things')!;
   const w = openWorkOf(['open', 'open', 'doing', 'doing', 'review', 'blocked', 'backlog'].map((state) => ({ fields: { state } })), via, '2026-09-29', false)!;

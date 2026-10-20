@@ -154,17 +154,27 @@ export function moneyInSaid(m: MoneyIn, now: number, format: Format): string {
 export const WORK_READ = 500;
 
 type StateDecl = { id: string; values?: readonly string[]; labels?: Readonly<Record<string, string>> };
-type WorkDecl = { state?: string | undefined; done?: readonly string[] | undefined; fields: readonly { id: string; type: string; to?: string | undefined; deadline?: boolean | undefined }[] };
+type WorkDecl = {
+  state?: string | undefined;
+  done?: readonly string[] | undefined;
+  hand?: unknown;
+  fields: readonly { id: string; type: string; to?: string | undefined; deadline?: boolean | undefined }[];
+};
 
-/** Which field of the work list points at a row of `register`, and how the list says its state and its deadline. */
-export type Via = { field: string; state: StateDecl; done: readonly string[]; deadline: string | null };
+/**
+ * Which field of the work list points at a row of `register`, how the list says its state and its deadline, and the
+ * field an agent who holds a row signs in (its `hand:`), or `null` where it says none.
+ */
+export type Via = { field: string; state: StateDecl; done: readonly string[]; deadline: string | null; agent: string | null };
 
 export function viaOf(work: WorkDecl | undefined, register: string): Via | null {
   if (!work?.state) return null;
   const field = work.fields.find((f) => f.type === 'ref' && f.to === register);
   const state = work.fields.find((f) => f.id === work.state) as StateDecl | undefined;
   if (!field || !state?.values?.length) return null;
-  return { field: field.id, state, done: work.done ?? [], deadline: work.fields.find((f) => f.deadline === true)?.id ?? null };
+  const hand = typeof work.hand === 'object' && work.hand !== null ? (work.hand as { agent?: unknown }).agent : undefined;
+  const agent = typeof hand === 'string' && work.fields.some((f) => f.id === hand) ? hand : null;
+  return { field: field.id, state, done: work.done ?? [], deadline: work.fields.find((f) => f.deadline === true)?.id ?? null, agent };
 }
 
 /** The predicate one read of the open work asks: pointing here by its spoken id, and not finished. */
@@ -172,7 +182,8 @@ export const openWhere = (via: Via, spoken: string): string =>
   via.done.length > 0 ? `${via.field} is ${spoken}, ${via.state.id} is not ${via.done.join(' or ')}` : `${via.field} is ${spoken}`;
 
 export type WorkPart = { value: string; label: string; count: number };
-export type OpenWork = { total: number; atLeast: boolean; late: number; parts: WorkPart[] };
+/** The open work: how much, whether there is more than was read, how much is late and how much an agent holds. */
+export type OpenWork = { total: number; atLeast: boolean; late: number; agents: number; parts: WorkPart[] };
 
 /**
  * The open rows counted by state, in the order the list declares its states, and how many are past their day.
@@ -184,6 +195,7 @@ export function openWorkOf(rows: readonly { fields?: unknown }[], via: Via, toda
   const counts = new Map<string, number>();
   let late = 0;
   let total = 0;
+  let agents = 0;
   for (const row of rows) {
     const f = (typeof row.fields === 'object' && row.fields !== null ? row.fields : {}) as Record<string, unknown>;
     const value = typeof f[via.state.id] === 'string' ? (f[via.state.id] as string) : '';
@@ -192,6 +204,7 @@ export function openWorkOf(rows: readonly { fields?: unknown }[], via: Via, toda
     counts.set(value, (counts.get(value) ?? 0) + 1);
     const day = via.deadline ? f[via.deadline] : undefined;
     if (typeof day === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(day) && day.slice(0, 10) < today) late++;
+    if (via.agent && typeof f[via.agent] === 'string' && (f[via.agent] as string).trim() !== '') agents++;
   }
   if (total === 0) return null;
   const order = [...(via.state.values ?? []), ...[...counts.keys()].filter((v) => !(via.state.values ?? []).includes(v))];
@@ -199,7 +212,7 @@ export function openWorkOf(rows: readonly { fields?: unknown }[], via: Via, toda
     const count = counts.get(value) ?? 0;
     return count > 0 ? [{ value, label: value ? valueSaid(via.state, value) : figureWords.noState, count }] : [];
   });
-  return { total, atLeast, late, parts };
+  return { total, atLeast, late, agents, parts };
 }
 
 /** "5 to do, 3 doing and 1 to check." The largest three states, then how many more; the late clause is the page's. */

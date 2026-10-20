@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, repeatOf, rowsOf, runsOnSet, saysNext, thingName, withoutRepeats, shapeOf, spans, type Facts } from './project.ts';
+import { HERO_WORDS, agentsOf, blockOf, heroOf, blocksOf, briefOf, isProject, moneyLines, repeatOf, rowsOf, runsOnSet, saysNext, thingName, withoutRepeats, shapeOf, spans, type Facts } from './project.ts';
 
 const none: Facts = { brief: [], next: null, money: [], people: [], agents: { now: [], runs: [] }, runsOn: [] };
 const row = { key: '1', title: 'Kiln', detail: '', href: null };
@@ -150,4 +150,33 @@ test('A SECTION WHOSE BLOCKS ALL WENT DRAWS NO HEADING ALONE BEFORE AN UNRELATED
   /* A SECTION WITH A BLOCK OF ITS OWN BEFORE THE REPEATS KEEPS ITS HEADING. */
   const own = [page[0]!, page[3]!, page[1]!];
   assert.deepEqual(drawn(own), [true, true, false]);
+});
+
+const pounds = (minor: number): string => `£${(minor / 100).toLocaleString('en-GB')}`;
+const said = (parts: readonly { text: string }[]): string => parts.map((p) => p.text).join('');
+const claude = { agent: 'claude', project: 'Kiln', doing: 'Variable axis QA', key: 'S1', name: 'Claude', run: 'S1', live: 'working' as const };
+
+test('THE HERO SAYS WHAT IT IS, ITS MONEY AND WHO IS ON IT, and never the next step', () => {
+  const facts: Facts = { ...none, brief: ['A variable type family, licensed direct'], next: 'Settle the licence', money: moneyLines({ in: { value: 120000, currency: 'GBP' }, owed: { value: 405000, currency: 'GBP' } }), agents: { now: [claude], runs: [row] } };
+  const hero = heroOf({ facts, figure: { minor: 1840000, currency: 'GBP', label: 'Earned in a year' }, open: { total: 7, agents: 3, late: 2, atLeast: false }, noun: 'tasks', format: pounds });
+  assert.deepEqual(hero.sentences.map(said), [
+    'A variable type family, licensed direct.',
+    '£1,200 came in this month and £4,050 is still to come in.',
+    'Claude is on Variable axis QA, and 2 of 7 open tasks are late.',
+  ]);
+  assert.ok(!hero.sentences.flat().some((p) => p.text.includes('Settle')), 'the next step is the page sentence, said once');
+  assert.deepEqual(hero.sentences[1]!.filter((p) => p.figure).map((p) => p.text), ['£1,200', '£4,050'], 'each amount is a figure');
+  assert.deepEqual(hero.sentences[2]!.filter((p) => p.late).map((p) => p.text), ['2 of 7 open tasks are late'], 'only the late phrase is red');
+  assert.deepEqual(hero.figures.map((f) => f.key), ['money', 'open', 'working']);
+  assert.deepEqual(hero.figures[0], { key: 'money', label: 'Earned in a year', minor: 1840000, currency: 'GBP' });
+});
+
+test('A HERO WITH LITTLE TO SAY DRAWS ONLY WHAT IT HAS', () => {
+  const quiet = heroOf({ facts: none, figure: null, open: null, noun: 'tasks', format: pounds });
+  assert.deepEqual(quiet, { sentences: [], figures: [] });
+  const owed = heroOf({ facts: { ...none, money: moneyLines({ owed: { value: 500, currency: 'GBP' } }), agents: { now: [], runs: [row, row] } }, figure: null, open: { total: 1, agents: 0, late: 1, atLeast: false }, noun: 'tasks', format: pounds });
+  assert.deepEqual(owed.sentences.map(said), ['£5 is still to come in.', '1 of 1 open tasks is late.']);
+  assert.deepEqual(owed.figures.map((f) => f.key), ['money', 'open', 'working']);
+  assert.equal(owed.figures[0]!.label, HERO_WORDS.figure.owed);
+  assert.equal(owed.figures[2]!.key === 'working' && owed.figures[2]!.note, '2 runs on it');
 });

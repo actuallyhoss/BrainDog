@@ -20,8 +20,11 @@
     nextHref = null,
     data,
     format,
+    omit = [],
   }: {
     facts: Facts;
+    /** Blocks another part of the page says already: a project's page says its brief in its hero and its money in row 2. */
+    omit?: readonly Block[];
     /** Where the next step opens, when it came from a task. */
     nextHref?: string | null;
     /** The rows behind each block. A block with none has no button. */
@@ -29,7 +32,7 @@
     format: (minor: number, currency: string) => string;
   } = $props();
 
-  const blocks = $derived(blocksOf(facts));
+  const blocks = $derived(blocksOf(facts).filter((b) => !omit.includes(b)));
   const span = $derived(spans(blocks));
   const uid = $props.id();
 
