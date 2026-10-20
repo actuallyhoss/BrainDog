@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { Refusal, Result } from '@braindog/ports';
+import { guarded, type Refusal, type Result } from '@braindog/ports';
 import { noteMention, type Entry } from '@braindog/kernel';
 
 import { createRecordApi, type CallContext } from '../src/index.ts';
@@ -176,4 +176,17 @@ test('A READ: nothing is written or asked, and a call that names nothing is refu
   assert.equal(refusal(await about(api, { name: '   ' }, owner)).at, 'name');
   assert.equal(refusal(await about(api, { row: { register: 'things' } }, owner)).at, 'row');
   sql.close();
+});
+
+test('A PROJECT NAMED IN A SENTENCE IS FOUND: the name-range read is one statement', async () => {
+  /* THE PRODUCTION GUARD, which the test database does not apply: `'name;'` read as a second statement. */
+  const raw = openSqlite();
+  const sql = guarded(raw);
+  const api = await createRecordApi({ sql, clock: fixedClock(NOW) });
+  value(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }));
+  value(await api.kernel.install([THINGS, NOTES] as never));
+  value<Entry>(api.kernel.create('things', { name: 'Kiln' } as never, { actor: 'p_1' }));
+  const out = value<Answer>(await about(api, { name: 'kiln' }, owner));
+  assert.equal(out.is?.name, 'Kiln');
+  raw.close();
 });

@@ -232,7 +232,7 @@ function answering(deps: AboutDeps, list: EntityList, grams: readonly string[], 
   if (list.role === 'project') {
     const held = deps.sql.all<{ key: string; row_id: string }>(
       `SELECT k.key, k.row_id FROM entity_key k JOIN entry e ON e.id = k.row_id
-        WHERE k.register = ? AND k.key >= 'name:' AND k.key < 'name;' AND e.deleted_at IS NULL ORDER BY k.row_id`,
+        WHERE k.register = ? AND k.key >= 'name:' AND k.key < 'name' || char(59) AND e.deleted_at IS NULL ORDER BY k.row_id`,
       list.register,
     );
     ids = [...new Set(held.filter((k) => said(k.key.slice('name:'.length).split(SHARED)[0]!)).map((k) => k.row_id))];
