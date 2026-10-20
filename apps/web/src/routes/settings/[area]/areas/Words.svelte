@@ -36,7 +36,10 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { moduleName } from '@braindog/seed/usecases/names';
   import { TONES } from 'braindog-render';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import { at } from '$lib/at.ts';
+  import { homeCurrency } from '$lib/record/api.ts';
   import Button from '$lib/ui/Button.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
@@ -49,6 +52,7 @@
     currencyIn,
     currencyPackOf,
     listed,
+    moneyOn,
     oneFor,
     strandedBy,
     undoOf,
@@ -68,6 +72,10 @@
     currency: 'Home currency',
     currencyWhy: 'Sums in other currencies are added up in this one, where there is a rate.',
     noMoney: 'Turn on Money in Add-ons to choose one.',
+    /* MONEY IS ON AND KEEPS NO CURRENCY SETTING (the seed's): the currency its sums are in, said as what it is. */
+    kept: (code: string) => `Your money is kept in ${code}.`,
+    renameWith: 'A use case lets you rename them.',
+    browse: 'Browse use cases',
     currencyNow: (code: string) => (code ? `Home currency is now ${code}.` : 'No home currency now.'),
     called: 'Called',
     /* NO "a" OR "an" BEFORE A WORD NOBODY HAS TYPED YET: "One is a update" and "One is a item" were on this screen. */
@@ -157,6 +165,10 @@
   /* ── the currency ──────────────────────────────────────────────────────── */
 
   const code = $derived(currencyIn(money));
+  /** A money add-on is on, whether or not it keeps a currency setting of its own. */
+  const on = $derived(moneyOn(packs));
+  /** What the money is in where no add-on keeps the code: the record's own read of its money (`api.ts`). */
+  const keptIn = $derived(code || homeCurrency() || '');
   /* THE ORDER IS THE SAVED CODE'S, as on the add-on's page: handed the draft, every pick moved itself to the front. */
   const choices = $derived(currencyChoices(code));
   let busy = $state(false);
@@ -315,7 +327,7 @@
 {#if from === 'waiting' || from === 'refused'}
   <ReadState state={from} {refusal} onretry={() => void load()} />
 {:else}
-  <Section title={words.money}>
+  <Tile icon="money" title={words.money}>
     {#if money && owner}
       <div class="pick">
         <IconWell name="money" />
@@ -338,9 +350,9 @@
         <p class="hint">{words.currencyWhy}</p>
       {/if}
     {:else}
-      <StateRow icon="money" title={words.currency} line={money || !owner ? code || copy.currencyNone : words.noMoney} />
+      <StateRow icon="money" title={words.currency} line={money ? code || copy.currencyNone : !on ? words.noMoney : keptIn ? words.kept(keptIn) : copy.currencyNone} />
     {/if}
-  </Section>
+  </Tile>
 
   {#if spoken && voice && all.length > 0}
     <p class="hint">{owner ? words.whose(voiceName) : words.ownerOnly(voiceName)}</p>
@@ -348,7 +360,7 @@
     {#if owner}
       <form class="words" bind:this={form} onsubmit={submit} novalidate>
         {#if spoken.lists.length > 0}
-          <Section title={said('lists')} count={spoken.lists.length}>
+          <Tile icon="rows" title={said('lists')} count={spoken.lists.length}>
             <div class="lists">
               {#each spoken.lists as l (l.list)}
                 <div class="list-words">
@@ -396,11 +408,11 @@
                 </div>
               {/each}
             </div>
-          </Section>
+          </Tile>
         {/if}
 
         {#if spoken.tabs.length + spoken.lines.length > 0}
-          <Section title={words.says}>
+          <Tile icon="tag" title={words.says}>
             <div class="lines">
               {#each spoken.tabs as w (w.setting)}{@render field(w, TAB_MOST)}{/each}
               {#each shown as w (w.setting)}{@render field(w, undefined)}{/each}
@@ -410,7 +422,7 @@
                 <Button weight="bare" onclick={() => (unfolded = !unfolded)}>{unfolded ? words.fewer : words.more(spoken.lines.length)}</Button>
               </div>
             {/if}
-          </Section>
+          </Tile>
         {/if}
 
         <div class="save">
@@ -419,14 +431,14 @@
       </form>
     {:else}
       {#if spoken.lists.length > 0}
-        <Section title={said('lists')} count={spoken.lists.length}>
+        <Tile icon="rows" title={said('lists')} count={spoken.lists.length}>
           {#each spoken.lists as l (l.list)}
             <StateRow icon={iconOf(l.list)} title={l.name?.value ?? nameOf(l.list)} line={l.one ? words.oneOf(l.one.value) : undefined} />
           {/each}
-        </Section>
+        </Tile>
       {/if}
       {#if spoken.tabs.length + spoken.lines.length > 0}
-        <Section title={words.says}>
+        <Tile icon="tag" title={words.says}>
           <dl class="said">
             {#each spoken.tabs as w (w.setting)}{@render held(w)}{/each}
             {#each shown as w (w.setting)}{@render held(w)}{/each}
@@ -436,9 +448,22 @@
               <Button weight="bare" onclick={() => (unfolded = !unfolded)}>{unfolded ? words.fewer : words.more(spoken.lines.length)}</Button>
             </div>
           {/if}
-        </Section>
+        </Tile>
       {/if}
     {/if}
+  {/if}
+
+  <!-- THE LISTS ARE ALWAYS DRAWN (agents F4): with no use case speaking they are read-only names, and one line says what
+       would let them be renamed. The area is never one row. -->
+  {#if !(spoken && voice && all.length > 0) && shell.index.registers.length > 0}
+    <Tile icon="rows" title={said('lists')} count={shell.index.registers.length}>
+      <ul class="list-lines">
+        {#each shell.index.registers as r (r.id)}
+          <li><Icon name={r.icon} size="s" /><span dir="auto">{r.name}</span></li>
+        {/each}
+      </ul>
+      <p class="hint">{words.renameWith} <a class="link" href={at('/packs/browse')}>{words.browse}</a></p>
+    </Tile>
   {/if}
 
   <!-- Always in the document: a live region inserted with its first sentence is not reliably announced. -->
@@ -559,6 +584,43 @@
     margin: 0;
     color: var(--ink);
     font-size: var(--t-base);
+  }
+
+  /* THE LISTS AS NAMES, a column of them at 390 and as many as fit at 1512, each its glyph and its name. */
+  .list-lines {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--sp-1) var(--sp-4);
+    margin: 0 0 var(--sp-3);
+    padding: 0;
+    list-style: none;
+  }
+
+  .list-lines li {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    min-block-size: 32px;
+    min-inline-size: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+  }
+
+  .list-lines li > :global(.icon) {
+    flex: none;
+    color: var(--ink-2);
+  }
+
+  .list-lines li > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .link {
+    color: var(--red);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .refused {

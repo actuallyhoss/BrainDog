@@ -9,7 +9,7 @@ import { test } from 'node:test';
 
 import type { PackConfig, PackState } from '../../../lib/record/packs.ts';
 import { AREAS, DEFAULT_GROUPS } from './place.ts';
-import { HOME_CURRENCY, changesOf, currencyIn, currencyPackOf, listed, oneFor, strandedBy, undoOf, wordsOf, type Read } from './words-money.ts';
+import { HOME_CURRENCY, changesOf, currencyIn, currencyPackOf, listed, moneyOn, oneFor, strandedBy, undoOf, wordsOf, type Read } from './words-money.ts';
 
 const team: PackConfig = {
   id: 'usecase-team',
@@ -159,6 +159,18 @@ test('the home currency is written where the kernel reads it: the first pack on,
   assert.equal(currencyIn(keeps('z', ' egp ').settings), 'EGP');
   assert.equal(currencyIn(keeps('z', 'pounds').settings), '');
   assert.equal(currencyIn(null), '');
+});
+
+test('Money counts as on when its add-on is on, even one that keeps no currency setting (agents F4)', () => {
+  const bare = (id: string, registers: string[] = [], off = false): Read => ({ state: { ...state(id, off), registers }, settings: { id, version: null, config: {}, values: {} } });
+  assert.equal(moneyOn([bare('money-core', ['accounts', 'transactions'])]), true);
+  assert.equal(moneyOn([bare('house', ['transactions'])]), true);
+  assert.equal(moneyOn([bare('money-core', [], true)]), false);
+  assert.equal(moneyOn([bare('people', ['people'])]), false);
+  const src = readFileSync(new URL('./areas/Words.svelte', import.meta.url), 'utf8');
+  /* "TURN ON MONEY" ONLY WHEN NO MONEY ADD-ON IS ON, and the lists are always drawn. */
+  assert.match(src, /!on \? words\.noMoney/u);
+  assert.match(src, /\{#if !\(spoken && voice && all\.length > 0\) && shell\.index\.registers\.length > 0\}/u);
 });
 
 test('the area is on the index, in the record\'s group, with a mark of its own, and the page draws it', () => {
