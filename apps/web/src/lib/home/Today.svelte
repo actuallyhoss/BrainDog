@@ -385,7 +385,7 @@
   const lateDays = $derived(
     [...tasks.filter((x) => x.why === 'late' && x.due).map((x) => x.due!), ...bills.filter((b) => b.late && b.due).map((b) => b.due!)].sort(),
   );
-  const said = $derived(t ? sentenceOf(needYou + lateDays.length, lateDays, waits?.working ?? t.runs.length, day, lateDays.length, waits?.inbox ?? 0) : null);
+  const said = $derived(t ? sentenceOf({ needYou, lateThings: lateDays.length, agents: waits?.working ?? t.runs.length, inbox: waits?.inbox ?? 0 }) : null);
 
   /* ── the next two weeks ────────────────────────────────────────────────────── */
 

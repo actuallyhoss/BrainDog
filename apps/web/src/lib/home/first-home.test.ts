@@ -117,7 +117,7 @@ test("TODAY'S FIRST BLOCKS ON A SHOP are what is due this week and the money in;
   const order = body.blocks.map((b) => b.heading ?? b.kind);
   assert.deepEqual(order.slice(0, 3), ['note', 'Orders due this week', MONEY_WEEK]);
   const rest = body.blocks.slice(3).map((b) => b.source);
-  assert.deepEqual(rest, ['governance.open', 'deadlines', 'sessions.working', 'deadlines', 'activity']);
+  assert.deepEqual(rest, ['governance.open', 'deadlines', 'deadlines', 'activity']);
   /* THEIR OWN WORDS name their own things, never an id or a list's place. */
   for (const b of body.blocks.slice(1, 3)) {
     assert.doesNotMatch(`${b.heading} ${b.empty ?? ''}`, /\brow\b|—|#/u);
@@ -157,7 +157,7 @@ test('A FRESH SHOP RECORD OPENS ON THE CARD under its line, with no next step ye
 /** The order "Nadia wants 3 vanilla jars for Friday, paid 900 on InstaPay" adds, as the record answers it. */
 const NADIA = { who: 'people#2', what: '3 vanilla jars', how_many: 3, due: FRIDAY, paid: { amount: 90_000, currency: 'EGP' }, state: 'new' };
 
-test('AFTER A CAPTURE OF THREE ENTRIES the line and the first two blocks read them: "One order is due Friday. Nadia paid EGP 900."', () => {
+test('AFTER A CAPTURE OF THREE ENTRIES the line and the first two blocks read them: "1 order is due Friday. Nadia paid EGP 900."', () => {
   /* A CLIENT, AN ORDER AND WHAT SHE PAID: the card goes, and the next steps take its place. */
   const told = bootOf(SHOP, { [people!]: 2, orders: 1 });
   assert.equal(showTell(told), false);
@@ -174,7 +174,7 @@ test('AFTER A CAPTURE OF THREE ENTRIES the line and the first two blocks read th
         : answer(b),
   );
   const drawn = homeDrawn(live, NOW, undefined, undefined, null, week);
-  assert.deepEqual(drawn.sentence, { text: 'One order is due Friday. Nadia paid EGP 900.', needs: '' });
+  assert.deepEqual(drawn.sentence, { text: '1 order is due Friday. Nadia paid EGP 900.', needs: '' });
   assert.deepEqual(
     drawn.blocks.filter((b) => b.drawn).map((b) => b.heading),
     ['Orders due this week', MONEY_WEEK],
@@ -194,12 +194,12 @@ test('ON A SHOP THAT KEEPS ITS BOOKS the line reads the tile: one payment by who
     homeDrawn(body.blocks.map((b, n) => (n === at ? tile(b, cells) : n === 1 ? answer(b, orders) : answer(b))), NOW, undefined, undefined, null, week).sentence?.text;
   const order = { fields: NADIA, cells: ['Nadia', '3 vanilla jars', 'Fri'] };
   /* WHO PAID ONLY WHERE AN ORDER DUE THIS WEEK WAS PAID THAT VERY AMOUNT: a ledger payment of another amount is just money in. */
-  assert.equal(lineOf({ 'received-7d': 'EGP 900.00' }, [order]), 'One order is due Friday. Nadia paid EGP 900.');
-  assert.equal(lineOf({ 'received-7d': 'EGP 1,200.50' }, [order]), 'One order is due Friday. EGP 1,200.50 came in this week.');
+  assert.equal(lineOf({ 'received-7d': 'EGP 900.00' }, [order]), '1 order is due Friday. Nadia paid EGP 900.');
+  assert.equal(lineOf({ 'received-7d': 'EGP 1,200.50' }, [order]), '1 order is due Friday. EGP 1,200.50 came in this week.');
   assert.equal(lineOf({ 'received-7d': 'EGP 900.00' }), 'EGP 900 came in this week.');
   /* TWO CURRENCIES, AND THE TWO FIGURES, are said side by side and never added, each figure by the tile's name for it. */
   assert.equal(lineOf({ 'received-7d': 'EGP 900.00 · USD 40.00' }), 'EGP 900 and USD 40 came in this week.');
-  assert.equal(lineOf({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }, [order]), 'One order is due Friday. EGP 900 was paid, and EGP 150 came in this week.');
+  assert.equal(lineOf({ 'settled-in-7d': 'EGP 900.00', 'received-7d': 'EGP 150.00' }, [order]), '1 order is due Friday. EGP 900 was paid, and EGP 150 came in this week.');
   /* NOTHING IN: the house line stands, with no "0 came in". */
   assert.doesNotMatch(lineOf({ 'settled-in-7d': 'EGP 0.00', 'received-7d': '0' }) ?? '', /came in|paid/u);
   assert.equal(amountSpoken(90_000, 'EGP'), 'EGP 900');
@@ -220,7 +220,7 @@ test('A LATE ORDER IS SAID FIRST, in red with its word, as its own count, and dr
   });
   const drawn = homeDrawn(live, NOW, undefined, undefined, null, week);
   assert.match(String(body.blocks[1]!.where), /due after -1d, due before \+8d$/u);
-  assert.deepEqual(drawn.sentence, { text: 'One order is late. One more is due Friday.', needs: 'One order is late' });
+  assert.deepEqual(drawn.sentence, { text: '1 order is late. 1 more is due Friday.', needs: '1 order is late' });
   assert.ok(drawn.sentence!.text.includes(drawn.sentence!.needs), 'the red phrase is in the line, with its word');
   assert.doesNotMatch(drawn.sentence!.text, /thing/u, 'and it is said once: the house line does not count it again');
   assert.deepEqual(drawn.blocks.filter((b) => b.drawn).map((b) => [b.heading, b.entries.length]), [['Orders due this week', 1], ['Late', 1]]);

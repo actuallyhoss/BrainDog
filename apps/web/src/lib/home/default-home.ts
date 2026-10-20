@@ -21,7 +21,12 @@
  */
 
 import { clausesOf, resolveDay } from '@braindog/where';
-import { MISSING, exponentOf, money } from 'braindog-render';
+import { MISSING, exponentOf, money, writeAmount } from 'braindog-render';
+
+import type { QueueQuestion } from '@braindog/kernel';
+
+import { homeCurrency } from '../record/api.ts';
+import { namesAmount } from '../record/money.ts';
 
 import type { FieldDecl, PageBlock, RegisterDecl } from '../record/schema.ts';
 import type { LiveBlock } from '../record/page-live.ts';
@@ -79,8 +84,17 @@ export const COMING_UP_DAYS = 14;
  */
 export const COMING_UP_LIMIT = 5;
 
-/** How many questions "What needs you" draws before its count becomes the door to Decide. Tiles are big, so three. */
+/** How many questions Needs you draws before its count becomes the door to Decide. Tiles are big, so three. */
 export const NEEDS_YOU_LIMIT = 3;
+
+/** On a phone, two (today F8): the first screen then holds the sentence, two questions, and cash and who is working. */
+export const NEEDS_YOU_LIMIT_PHONE = 2;
+
+/**
+ * HOW MANY OPEN QUESTIONS TODAY ASKS THE RECORD FOR, so it can put the money first (`needsYouOrder`) before it shows the
+ * few it shows: the record ranks by the cost of being wrong, and Today leads with what costs money.
+ */
+export const NEEDS_YOU_READ = 40;
 
 
 /** Not finished: what every one of Today's work blocks reads. */
@@ -477,7 +491,9 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
          who is working keep their order after them. */
       ...(holds.week ? weekBlocks(holds.week) : []),
       /* ANSWERED WHERE THEY ARE SHOWN: the page's writes are on, so a queue draws `QueueAnswer`. */
-      { kind: 'queue', ...keyed('needs-you'), span: 5, heading: voice.needsYou, icon: 'ask', source: 'governance.open', limit: NEEDS_YOU_LIMIT, empty: voice.nothingWaiting, ...TILES },
+      /* ASKED FOR WHOLE (`NEEDS_YOU_READ`), so Home can lead with the money (`needsYouOrder`); the tile still shows
+         `NEEDS_YOU_LIMIT` and the rest are its count. */
+      { kind: 'queue', ...keyed('needs-you'), span: 5, heading: voice.needsYou, icon: 'inbox', source: 'governance.open', limit: NEEDS_YOU_READ, empty: voice.nothingWaiting, ...TILES },
       /* WHAT IS WRONG WITH THE RECORD ITSELF, said only while a vital sign reads red: under what needs you, since it
          needs a look too, and over the work, which it may be the reason for. */
       ...(holds.health ? signsLine() : []),
@@ -485,27 +501,25 @@ export function todayHome(holds: Holds, voice: HomeVoice = HOUSE): HomeBody {
          unwell, and over the work, which a feed that stopped may be the reason for. Not drawn when nothing is quiet. */
       ...(holds.quiet ? [quietTile()] : []),
       ...(holds.tasks ? work : [lateMoney]),
-      /* THE RUNS WORKING NOW, one line each with the agent's face; not drawn when none is. Which runs those are is the
-         record's one word for it (`sessions.working`, heard from inside its own clock), so this table takes no `where:`
-         and no `order:`, and a run that went quiet this morning is not working until midnight. */
-      {
-        kind: 'table',
-        ...keyed('working'),
-        span: 4,
-        heading: voice.workingNow,
-        icon: 'session',
-        source: 'sessions.working',
-        columns: [
-          { field: 'agent', label: 'Agent' },
-          { field: 'doing', label: 'Doing' },
-          { field: 'last_seen', label: 'Last seen' },
-        ],
-        limit: 6,
-        empty: words.noneWorking,
-      },
-      /* CASH NOW AND ITS TWELVE WEEKS, read from the Money page's own figure, where that page is. */
+      /* WHO IS WORKING IS NOT A BLOCK OF TODAY'S OWN BODY: Home draws it from `boot`'s own answer (`WorkingNow.svelte`),
+         so it stands at once and is never drawn twice (today F1). A page the record keeps may still declare one. */
+      /* CASH AHEAD (today F5): the cash now over its twelve weeks, how long it lasts, and what comes in and goes out in
+         the next thirty days, read from the Money page's own figures, where that page is. */
       ...(holds.money
-        ? [{ kind: 'stat', ...keyed('cash'), span: 3, heading: words.money, icon: 'wallet', cells: [{ metric: 'cash-now', label: words.cashNow, trend: '12w' }] } as PageBlock]
+        ? [
+            {
+              kind: 'stat',
+              ...keyed('cash'),
+              span: 3,
+              heading: words.money,
+              icon: 'wallet',
+              cells: [
+                { metric: 'cash-now', label: words.cashNow, trend: '12w', note: words.lastsTo },
+                { metric: 'arriving-30d', label: words.comingIn },
+                { metric: 'leaving-30d', label: words.goingOut },
+              ],
+            } as PageBlock,
+          ]
         : []),
       /* THE NEXT FEW THINGS THAT FALL DUE ACROSS EVERY LIST, from today on, read on their own so what is late never
          takes their place; a task already drawn in a block above is not drawn again. */
@@ -641,6 +655,18 @@ function dayIn(b: LiveBlock, fields: Record<string, unknown>): string | null {
   return null;
 }
 
+/** A question about money, as Needs you groups it (`routes/decide/views.ts` `aboutMoney`): it writes an amount, or names one. */
+export const aboutMoney = (q: Pick<QueueQuestion, 'money' | 'question'>): boolean => (Array.isArray(q.money) && q.money.length > 0) || namesAmount(q.question);
+
+/**
+ * TODAY'S NEEDS YOU IN NEEDS YOU'S OWN ORDER (today F3): the questions about money first, then the quick ones, the oldest
+ * first inside each, so the two invoices to chase lead the first screen as they lead Needs you's Money column.
+ */
+export function needsYouOrder<Q extends Pick<QueueQuestion, 'money' | 'question' | 'at'>>(queue: readonly Q[]): Q[] {
+  const rank = (q: Q): number => (aboutMoney(q) ? 0 : 1);
+  return [...queue].sort((a, b) => rank(a) - rank(b) || String(a.at ?? '').localeCompare(String(b.at ?? '')));
+}
+
 /** Home's page as drawn, the line lifted out of it, and the sentence worked out from it. */
 export type HomeDrawn = {
   blocks: LiveBlock[];
@@ -653,6 +679,8 @@ export type HomeDrawn = {
   capture: LiveBlock | null;
   /** The line worked out from what is drawn, or `null` on a page that holds nothing it can be counted from. */
   sentence: Sentence | null;
+  /** The bills past their day, how many and their money as a display figure says it, for the foot of Needs you (today F3). */
+  lateBills: { count: number; said: string } | null;
   /**
    * The model's line for Home as the record sent it on the page's lead note (`said`, from Slash's `headline.home`) when
    * the block still carries it, unread: `homeLineOf` (`home-line.ts`) judges it. `undefined` when the block does not.
@@ -779,6 +807,12 @@ export function homeDrawn(
       shaped.push(gone === 0 && late.length === 0 ? b : pick(b, rest, undefined, rest.length === 0 ? 0 : b.total - gone - late.length));
       continue;
     }
+    /* NEEDS YOU LEADS WITH THE MONEY (today F3), oldest first in each group, and its count is the badge's (SF4). */
+    if (isQueue(b) && b.key === 'needs-you' && b.queue) {
+      const total = waits ? waits.questions : b.total;
+      shaped.push({ ...b, queue: needsYouOrder(b.queue), total });
+      continue;
+    }
     /* WHO IS WORKING IS `boot`'S: a run the page drew that has gone quiet is not drawn as working. */
     if (waits && isRuns(b) && aligned(b)) {
       const at = where(b, (_, seq) => waits.seqs.includes(seq));
@@ -810,7 +844,10 @@ export function homeDrawn(
       out[n] = { ...b, homeRows: { kind: 'days', days: dayGroups(b, today) } } as WithRows;
   /* THE WEEK'S LATE ONES ARE THE WEEK'S TO SAY, by their own name: the house line counts what is late without them. */
   const house = sentenceFrom(week ? shaped.map((b) => lessWeekLate(b, week, today)) : shaped, today, waits ?? null);
-  return { blocks: out, lead, capture, sentence: week ? weekSentence(shaped, today, week, house) : house, slash };
+  const sums = lateSumsOf(shaped, today);
+  const billsSaid = sumsSaid(sums.bills);
+  const lateBills = sums.billCount > 0 && billsSaid !== null ? { count: sums.billCount, said: billsSaid } : null;
+  return { blocks: out, lead, capture, sentence: week ? weekSentence(shaped, today, week, house) : house, slash, lateBills };
 }
 
 /* ── the week's line ───────────────────────────────────────────────────── */
@@ -823,9 +860,8 @@ const isWeekDue = (b: LiveBlock, w: Week): boolean =>
 const isWeekMoney = (b: LiveBlock): boolean => b.kind === 'stat' && (b.metrics ?? []).some((m) => (WEEK_IN as readonly string[]).includes(m.id));
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const OPENING = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
-/** A count that opens a sentence, spelled to ten, so no sentence starts on a figure. */
-const opening = (n: number): string => OPENING[n] ?? n.toLocaleString('en-GB');
+/** A count in a sentence: digits always (SF14), never a word beside a figure. */
+const opening = (n: number): string => n.toLocaleString('en-GB');
 
 /** A day this week as a sentence says it: "today", "tomorrow", "Friday", and the short day past the week. */
 function dueNamed(day: string, today: string): string {
@@ -980,17 +1016,19 @@ function weekSentence(blocks: readonly LiveBlock[], today: string, w: Week, hous
     const many = w.due.name.toLowerCase();
     const next = days.find((d) => d >= today);
     if (late > 0) {
-      needs = late === 1 ? `One ${one} is late` : `${opening(late)} ${many} are late`;
-      const more = rest === 0 ? '' : rest === 1 ? ` One more is due${next ? ` ${dueNamed(next, today)}` : ' this week'}.` : ` ${opening(rest)} more are due this week${next ? `, the first ${dueNamed(next, today)}` : ''}.`;
+      needs = late === 1 ? `1 ${one} is late` : `${opening(late)} ${many} are late`;
+      const more = rest === 0 ? '' : rest === 1 ? ` 1 more is due${next ? ` ${dueNamed(next, today)}` : ' this week'}.` : ` ${opening(rest)} more are due this week${next ? `, the first ${dueNamed(next, today)}` : ''}.`;
       parts.push(`${needs}.${more}`);
-    } else if (rest === 1) parts.push(`One ${one} is due${next ? ` ${dueNamed(next, today)}` : ' this week'}.`);
+    } else if (rest === 1) parts.push(`1 ${one} is due${next ? ` ${dueNamed(next, today)}` : ' this week'}.`);
     else parts.push(`${opening(rest)} ${many} are due this week${next ? `, the first ${dueNamed(next, today)}` : ''}.`);
   }
   const came = weekInSaid(blocks, due, w);
   if (came) parts.push(came);
   if (parts.length === 0) return house;
   const own = parts.join(' ');
-  return house && house.needs ? { text: `${own} ${house.text}`, needs: needs || house.needs } : { text: own, needs };
+  /* THE HOUSE'S CALM HEAD IS NOT SAID IN THE MIDDLE OF THE WEEK'S LINE: only what it says is late follows. */
+  const tail = house?.text.replace(/^Nothing needs you\. /u, '') ?? '';
+  return house && house.needs ? { text: `${own} ${tail}`, needs: needs || house.needs } : { text: own, needs };
 }
 
 /** Each house line Today's body writes that a voice may say its own way, by its key. */
@@ -1200,63 +1238,101 @@ function lateBeyond(b: LiveBlock, today: string): number {
  * twelve are what a later block over the same list draws when it draws a late one (Urgent's oldest, a deadline that is
  * a task): such a row is one of the twelve, and is not counted again, late or as needing the reader.
  */
-/* WITH `boot`'S `waits` the questions and the agents are its counts, every open question and every run at work, never
-   the few a queue or a table drew; and what waits in the inbox is said when nothing else is (`sentenceOf`). */
+/**
+ * THE LATE MONEY ON THE PAGE, by which way it goes and by currency (never added across currencies): every row of what
+ * fell due that is past its day and carries an amount. `owed` is money owed to you (`direction: in`), `bills` money you
+ * owe; `bills` counts the bills. Read from the rows the record answered, drawn or folded, once each.
+ */
+export type LateSums = { owed: Map<string, number>; bills: Map<string, number>; billCount: number; things: number };
+
+export function lateSumsOf(blocks: readonly LiveBlock[], today: string): LateSums {
+  const out: LateSums = { owed: new Map(), bills: new Map(), billCount: 0, things: 0 };
+  const seen = new Set<string>();
+  /* THE LATE ROWS A LIST'S BLOCK HOLDS PAST ITS LIMIT, by list: a later block that draws one of them (a deadline that is
+     one of Late's undrawn tasks) does not count it again. */
+  const past = new Map<string, number>();
+  const lateRow = (list: string | null): void => {
+    const left = list === null ? 0 : (past.get(list) ?? 0);
+    if (left === 0) out.things += 1;
+    else past.set(list!, left - 1);
+  };
+  for (const b of blocks) {
+    if (says(b) || !b.drawn) continue;
+    if (isTodo(b)) {
+      for (const e of b.entries) {
+        const day = dayIn(b, e.fields as Record<string, unknown>);
+        if (day !== null && day < today) lateRow(listOf(b));
+      }
+      const beyond = lateBeyond(b, today);
+      out.things += beyond;
+      const list = listOf(b);
+      if (list !== null && beyond > 0) past.set(list, (past.get(list) ?? 0) + beyond);
+      continue;
+    }
+    if (!isDue(b)) continue;
+    for (const e of b.entries) {
+      const fields = e.fields as Record<string, unknown>;
+      const day = dueDay(fields);
+      if (day === null || day >= today) continue;
+      const key = typeof fields.row === 'string' ? fields.row : `${b.source}#${e.seq}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const amount = fields.amount;
+      if (!isMoney(amount)) {
+        lateRow(typeof fields.row === 'string' ? fields.row.split('#')[0]! : null);
+        continue;
+      }
+      const into = fields.direction === 'in' ? out.owed : out.bills;
+      if (fields.direction !== 'in') out.billCount += 1;
+      into.set(amount.currency, (into.get(amount.currency) ?? 0) + Math.abs(amount.amount));
+    }
+    out.things += lateBeyond(b, today);
+  }
+  return out;
+}
+
+/** Sums by currency as a display figure says them, whole and per currency: "£7,200", "£7,200 and $400 USD". */
+export function sumsSaid(sums: ReadonlyMap<string, number>): string | null {
+  const home = homeCurrency();
+  const parts = [...sums.entries()]
+    .filter(([, minor]) => minor !== 0)
+    .map(([currency, minor]) => {
+      const exp = exponentOf(currency);
+      const whole = Math.round(minor / 10 ** exp) * 10 ** exp;
+      return writeAmount({ minor: whole, currency }, home, 'read')?.text ?? amountSpoken(whole, currency);
+    });
+  return parts.length === 0 ? null : andOf(parts);
+}
+
+/**
+ * THE PAGE'S LINE (spec 4.1, today F2): "8 need you, £7,200 owed to you is late, and 2 agents are working."
+ *
+ * WHAT NEEDS YOU IS ONE COUNT (SF4): `boot`'s open questions (`waits`), the number the badge and the Needs you tile say,
+ * and nothing is added to it. Without `waits` (an older host) it is what the page's queues hold. LATE IS ITS OWN CLAUSE,
+ * said with its money (`lateSumsOf`), and where no late thing carries money, as a count of things. WHO IS WORKING is
+ * `boot`'s too. `null` when the page holds none of those blocks and nothing waits, so a page of figures says its own line.
+ */
 function sentenceFrom(blocks: readonly LiveBlock[], today: string, waits: HomeWaits | null = null): Sentence | null {
   /* SOMETHING WAITING IS ALWAYS SAID; with nothing waiting a page's own line (a use case's) may stand, as before. */
   let counts = waits !== null && (waits.questions > 0 || (waits.inbox ?? 0) > 0);
   let needing = waits?.questions ?? 0;
   let agents = 0;
-  let lateCount = 0;
-  const late: string[] = [];
-  /* THE LATE ROWS EACH LIST'S BLOCKS HOLD PAST THEIR LIMITS AND NO BLOCK HAS DRAWN YET, by list. */
-  const owed = new Map<string, number>();
-  const lateRow = (list: string | null, day: string): void => {
-    late.push(day);
-    const left = list === null ? 0 : (owed.get(list) ?? 0);
-    if (left === 0) {
-      lateCount += 1;
-      return;
-    }
-    owed.set(list!, left - 1);
-    needing -= 1;
-  };
   for (const b of blocks) {
     if (says(b) || !b.drawn) continue;
     if (isQueue(b)) {
       counts = true;
       if (waits === null) needing += asked(b);
-    } else if (isTodo(b)) {
-      counts = true;
-      const list = listOf(b);
-      /* THE BLOCK'S TOTAL already holds the rows past its limit, the late ones among them. */
-      needing += b.total;
-      for (const e of b.entries) {
-        const day = dayIn(b, e.fields as Record<string, unknown>);
-        if (day !== null && day < today) lateRow(list, day);
-      }
-      const beyond = lateBeyond(b, today);
-      lateCount += beyond;
-      if (list !== null && beyond > 0) owed.set(list, (owed.get(list) ?? 0) + beyond);
-    } else if (isDue(b)) {
-      counts = true;
-      for (const e of b.entries) {
-        const fields = e.fields as Record<string, unknown>;
-        const day = dueDay(fields);
-        if (day === null || day > today) continue;
-        needing += 1;
-        if (day < today) lateRow(typeof fields.row === 'string' ? fields.row.split('#')[0]! : null, day);
-      }
-      const beyond = lateBeyond(b, today);
-      needing += beyond;
-      lateCount += beyond;
-    } else if (isRuns(b)) {
+    } else if (isTodo(b) || isDue(b)) counts = true;
+    else if (isRuns(b)) {
       counts = true;
       agents += b.entries.length;
     }
   }
+  if (!counts) return null;
   if (waits !== null) agents = waits.working;
-  return counts ? sentenceOf(Math.max(0, needing), late.sort(), agents, today, lateCount, waits?.inbox ?? 0) : null;
+  const sums = lateSumsOf(blocks, today);
+  const late = { owed: sumsSaid(sums.owed), bills: sumsSaid(sums.bills) };
+  return sentenceOf({ needYou: Math.max(0, needing), late, lateThings: sums.things, agents, inbox: waits?.inbox ?? 0 });
 }
 
 /**

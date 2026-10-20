@@ -41,9 +41,10 @@ const shown = (blocks: readonly LiveBlock[]): LiveBlock[] => blocks.filter((b) =
 
 test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks, no line to add without the right, no cash without Money', () => {
   const kinds = (b: { blocks: { kind: string; source?: string }[] }) => b.blocks.map((x) => x.source ?? x.kind);
-  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'sessions.working', 'stat', 'deadlines', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'sessions.working', 'deadlines', 'activity']);
-  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'sessions.working', 'deadlines', 'activity']);
+  /* WHO IS WORKING IS NOT A BLOCK OF TODAY'S OWN BODY (today F1): Home draws it from `boot`, once. */
+  assert.deepEqual(kinds(DEFAULT_HOME), ['note', 'capture', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'stat', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: false, adds: false, money: false })), ['note', 'governance.open', 'deadlines', 'deadlines', 'activity']);
+  assert.deepEqual(kinds(todayHome({ tasks: true, adds: false, money: false })), ['note', 'governance.open', 'register.tasks', 'deadlines', 'register.tasks', 'register.tasks', 'deadlines', 'activity']);
   /* WHAT IS LATE AND WHAT COMES UP ARE TWO READS, so the late ones never use up the next few's rows. */
   const due = DEFAULT_HOME.blocks.filter((b) => b.source === 'deadlines') as unknown as { where?: string; limit?: number }[];
   assert.deepEqual(due.map((b) => [b.where, b.limit]), [['day before today', 8], ['day after -1d', COMING_UP_LIMIT]]);
@@ -56,7 +57,7 @@ test('THE BODY IS BUILT FROM WHAT THE RECORD HOLDS: no work blocks without tasks
   assert.equal(raw.find((b) => b.kind === 'queue')?.tiles, true);
   assert.equal(DEFAULT_HOME.layout, undefined);
   assert.deepEqual(raw.filter((b) => b.area !== undefined), []);
-  assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [['needs-you', 5], ['working', 4], ['cash', 3], ['coming-up', 3]]);
+  assert.deepEqual(raw.filter((b) => b.key !== undefined).map((b) => [b.key, b.span]), [['needs-you', 5], ['cash', 3], ['coming-up', 3]]);
 });
 
 test('THE DESK FOLDS WHAT IT DOES NOT SHOW AT REST, at its place, and More opens it', () => {
@@ -168,8 +169,8 @@ test('A ROW IS DRAWN ONCE: a late urgent task is in the first block, and a deadl
     ['Late', [2]],
     ['', [3]],
   ]);
-  /* THE LINE COUNTS WHAT IS DRAWN: three tasks and a late bill, the oldest from Tuesday. */
-  assert.deepEqual(out.sentence, { text: 'Two things are late, the oldest by three days. Two more need you.', needs: 'Two things are late' });
+  /* THE LINE COUNTS WHAT IS LATE: a late task and a late bill with no amount. Nothing is a question, so nothing needs you. */
+  assert.deepEqual(out.sentence, { text: 'Nothing needs you. 2 things are late.', needs: '2 things are late' });
 });
 
 test('WHAT CHANGED IS ONLY WHAT IS NEW, and a block with nothing to show is not drawn', () => {
@@ -184,7 +185,7 @@ test('WHAT CHANGED IS ONLY WHAT IS NEW, and a block with nothing to show is not 
   const queue = block({ kind: 'queue', source: 'governance.open', queue: [] });
   const out = homeDrawn([queue, runs, feed], NOW);
   assert.deepEqual(shown(out.blocks).map((b) => [b.kind, b.rows.length]), [['feed', 1]]);
-  assert.deepEqual(out.sentence, { text: 'Nothing needs you, and no agent is working.', needs: '' });
+  assert.deepEqual(out.sentence, { text: 'Nothing needs you.', needs: '' });
   const read = homeDrawn([{ ...feed, seen: '2026-10-02T08:45:00Z' }], NOW);
   assert.equal(shown(read.blocks).length, 0);
 });
@@ -366,15 +367,15 @@ test('THE HEAD SAYS SLASH`S LINE WHEN THE RECORD SENT ONE, red only where it say
     const out = page(said);
     return homeLineOf(out.sentence!, slashLineOf(out, today), NOW);
   };
-  const rules = { text: 'One thing is two days late. One more needs you.', needs: 'two days late', by: 'rules' };
+  const rules = { text: 'Nothing needs you. 1 thing is late.', needs: '1 thing is late', by: 'rules' };
 
   /* NO LINE FROM THE RECORD: the rules' line and its red phrase, exactly as before. */
   assert.equal(slashLineOf(page(), true), undefined);
   assert.deepEqual(head(), rules);
   /* SLASH'S LINE IS SAID, its red phrase the rules' own words in it, a count in digits or spelled. */
-  assert.deepEqual(head('The Kiln invoice is two days late; 2 things need you.'), {
-    text: 'The Kiln invoice is two days late; 2 things need you.',
-    needs: 'two days late',
+  assert.deepEqual(head('The Kiln invoice: 1 thing is late, two days.'), {
+    text: 'The Kiln invoice: 1 thing is late, two days.',
+    needs: '1 thing is late',
     by: 'slash',
   });
   /* WORDED ITS OWN WAY, it is drawn in ink throughout: no red the rules did not choose. */
@@ -398,10 +399,10 @@ test('TODAY INSTALLED AS `home` SAYS THE MODEL`S LINE WHEN ITS READ CARRIES ONE,
      lead note, which the page reader draws as the note's words. */
   const installed = (lead?: Partial<LiveBlock>) => homeDrawn([block({ kind: 'note', lead: true, body: TODAY_LEAD, ...lead }), tasks], NOW);
   const head = (out: ReturnType<typeof homeDrawn>) => homeLineOf(out.sentence!, slashLineOf(out, false), NOW);
-  const rules = { text: 'One thing is two days late. One more needs you.', needs: 'two days late', by: 'rules' };
+  const rules = { text: 'Nothing needs you. 1 thing is late.', needs: '1 thing is late', by: 'rules' };
 
-  const line = 'The Kiln invoice is two days late; start there.';
-  assert.deepEqual(head(installed({ body: line, said: line } as Partial<LiveBlock>)), { text: line, needs: 'two days late', by: 'slash' });
+  const line = 'The Kiln invoice: 1 thing is late; start there.';
+  assert.deepEqual(head(installed({ body: line, said: line } as Partial<LiveBlock>)), { text: line, needs: '1 thing is late', by: 'slash' });
   /* WITH NO LINE ON THE READ, the rules' sentence, red phrase and all. */
   assert.deepEqual(head(installed()), rules);
   /* AND A LINE THE RECORD KEPT YESTERDAY is not today's. */
@@ -414,11 +415,11 @@ test('LATE IS COUNTED FROM WHAT THE LATE BLOCK HOLDS, not from the eight it draw
   const lateTasks = (over: Partial<LiveBlock> = {}) =>
     block({ kind: 'todo', source: 'register.tasks', where: 'state is not done or dropped, by before +1d', columns: day('by') as never, total: 20, ...over }, days.map((by) => ({ by })), days.map((_, n) => n + 1));
   const out = homeDrawn([lateTasks()], NOW);
-  assert.deepEqual(out.sentence, { text: 'Twenty things are late, the oldest by two months.', needs: 'Twenty things are late' });
+  assert.deepEqual(out.sentence, { text: 'Nothing needs you. 20 things are late.', needs: '20 things are late' });
 
   /* AN URGENT TASK PAST LATE'S EIGHT IS ONE OF ITS TWENTY, so it is not counted again, late or as needing you. */
   const urgent = block({ kind: 'todo', source: 'register.tasks', where: 'state is not done or dropped, priority is urgent', columns: day('by') as never }, [{ by: '2026-09-28' }, { by: '2026-10-09' }], [30, 31]);
-  assert.equal(homeDrawn([lateTasks(), urgent], NOW).sentence?.text, 'Twenty things are late, the oldest by two months. One more needs you.');
+  assert.equal(homeDrawn([lateTasks(), urgent], NOW).sentence?.text, 'Nothing needs you. 20 things are late.');
 
   /* WITH ONE DRAWN ROW ONLY DUE TODAY, what stands past the limit is due today too and is not called late. */
   const today = block(
@@ -426,11 +427,11 @@ test('LATE IS COUNTED FROM WHAT THE LATE BLOCK HOLDS, not from the eight it draw
     [{ by: '2026-09-30' }, { by: '2026-10-02' }],
     [1, 2],
   );
-  assert.equal(homeDrawn([today], NOW).sentence?.text, 'One thing is two days late. Four more need you.');
+  assert.equal(homeDrawn([today], NOW).sentence?.text, 'Nothing needs you. 1 thing is late.');
 
-  /* A LIST WITH NO BOUND OF ITS OWN may hold next month's work past its limit: that needs you, and is not late. */
+  /* A LIST WITH NO BOUND OF ITS OWN may hold next month's work past its limit: that is not late. */
   const unbounded = block({ kind: 'todo', source: 'register.tasks', where: 'priority is urgent', columns: day('by') as never, total: 9 }, [{ by: '2026-09-30' }], [1]);
-  assert.equal(homeDrawn([unbounded], NOW).sentence?.text, 'One thing is two days late. Eight more need you.');
+  assert.equal(homeDrawn([unbounded], NOW).sentence?.text, 'Nothing needs you. 1 thing is late.');
 
   /* LATE MONEY PAST ITS LIMIT is late too, as Late's own total says, and needs you. */
   const money = block({ kind: 'spec', source: 'deadlines', where: 'day before today', total: 6 }, [
@@ -438,15 +439,15 @@ test('LATE IS COUNTED FROM WHAT THE LATE BLOCK HOLDS, not from the eight it draw
     { row: 'obligations#3', day: '2026-09-29' },
   ]);
   const paid = homeDrawn([money], NOW);
-  assert.equal(paid.sentence?.text, 'Six things are late, the oldest by three months.');
+  assert.equal(paid.sentence?.text, 'Nothing needs you. 6 things are late.');
   assert.equal(shown(paid.blocks)[0]!.total, 6);
   /* WHAT FALLS DUE WITH NO BOUND OF ITS OWN reads a fortnight ahead, so what stands past its limit may not have fallen due. */
   const ahead = homeDrawn([block({ kind: 'spec', source: 'deadlines', total: 12 }, [{ row: 'obligations#2', day: '2026-07-01' }, { row: 'obligations#3', day: '2026-09-29' }])], NOW);
-  assert.equal(ahead.sentence?.text, 'Two things are late, the oldest by three months.');
+  assert.equal(ahead.sentence?.text, 'Nothing needs you. 2 things are late.');
 
   /* A DEADLINE THAT IS ONE OF LATE'S UNDRAWN TASKS is not a second late thing. */
   const due = block({ kind: 'timeline', source: 'deadlines' }, [{ row: 'tasks#15', day: '2026-09-28' }, { row: 'obligations#2', day: '2026-09-29' }]);
-  assert.equal(homeDrawn([lateTasks(), due], NOW).sentence?.text, '21 things are late, the oldest by two months.');
+  assert.equal(homeDrawn([lateTasks(), due], NOW).sentence?.text, 'Nothing needs you. 21 things are late.');
 });
 
 test('THE LINE A TASK IS TYPED INTO IS NAMED BY THE LIST`S OWN SINGULAR, with the article chosen for it', () => {
@@ -472,7 +473,7 @@ test('A HOME INSTALLED FROM TODAY KEEPS SPEAKING IN THE VOICE: a heading still i
   /* KEPT BY THE ARRANGE MODE'S FIRST DONE in the house voice, and one heading the author wrote. */
   const installed = [
     block({ kind: 'capture', heading: 'Add a task', register: 'tasks' }),
-    block({ kind: 'queue', heading: 'What needs you', source: 'governance.open', empty: 'Nothing is waiting on you.', queue: [{ id: 'SG1' }] as never, total: 1 }),
+    block({ kind: 'queue', heading: 'Needs you', source: 'governance.open', empty: 'Nothing is waiting on you.', queue: [{ id: 'SG1' }] as never, total: 1 }),
     block({ kind: 'todo', heading: 'Late', source: 'register.tasks', columns: day('by') as never }, [{ by: '2026-09-30' }], [4]),
     block({ kind: 'todo', heading: 'My own list', source: 'register.tasks', columns: day('by') as never }, [{ by: '' }], [9]),
     block({ kind: 'timeline', heading: 'Coming up', source: 'deadlines' }, [{ row: 'obligations#2', day: '2026-10-08' }]),
@@ -529,9 +530,9 @@ test('WITH boot’S waits HOME SAYS THE BADGE’S NUMBER: every open question an
   const queue = block({ kind: 'queue', source: 'governance.open', queue: [] });
   const waits = { questions: 25, inbox: 32, working: 0, seqs: [] };
   /* 25 QUESTIONS, NOT THE NONE THE QUEUE DREW: the line says what the rail's badge says. */
-  assert.equal(homeDrawn([queue], NOW, undefined, undefined, waits).sentence?.text, '25 things need you.');
+  assert.equal(homeDrawn([queue], NOW, undefined, undefined, waits).sentence?.text, '25 need you.');
   /* NO QUESTION BUT 32 ARRIVALS: never "Nothing needs you". */
-  assert.equal(homeDrawn([queue], NOW, undefined, undefined, { ...waits, questions: 0 }).sentence?.text, '32 things wait in your inbox, and no agent is working.');
+  assert.equal(homeDrawn([queue], NOW, undefined, undefined, { ...waits, questions: 0 }).sentence?.text, '32 things wait in your inbox.');
   /* NOTHING WAITING: a page's own line stands, as before. */
   const calm = homeDrawn([block({ kind: 'note', lead: true, body: 'Calm.' })], NOW, undefined, undefined, { questions: 0, inbox: 0, working: 0, seqs: [] });
   assert.equal(calm.sentence, null);
@@ -560,15 +561,15 @@ test('THIS WEEK STARTS TODAY AND LATE IS ITS OWN CLAUSE: an order due yesterday,
     return block(base);
   });
   const drawn = homeDrawn(answered([JARS]), NOW, undefined, undefined, null, WEEK);
-  assert.deepEqual(drawn.sentence, { text: 'One order is late. Two more are due this week, the first today.', needs: 'One order is late' });
+  assert.deepEqual(drawn.sentence, { text: '1 order is late. 2 more are due this week, the first today.', needs: '1 order is late' });
   assert.doesNotMatch(drawn.sentence!.text, /thing/u, 'the late order is said once, by its own name');
   /* THE TILE HOLDS THE TWO, AND LATE THE ONE: the three are never one count. */
   assert.deepEqual(shown(drawn.blocks).map((b) => [b.heading, b.entries.length]), [['Orders due this week', 2], ['Late', 1]]);
   /* SOMETHING ELSE LATE IS STILL THE HOUSE'S TO SAY, after the orders and without them. */
   const bill = answered([{ row: 'obligations#4', title: 'Rent', day: '2026-09-30' }, JARS]);
-  assert.equal(homeDrawn(bill, NOW, undefined, undefined, null, WEEK).sentence?.text, 'One order is late. Two more are due this week, the first today. One thing is two days late.');
+  assert.equal(homeDrawn(bill, NOW, undefined, undefined, null, WEEK).sentence?.text, '1 order is late. 2 more are due this week, the first today. 1 thing is late.');
   /* NOTHING LATE: the line is the week's, as it was. */
-  assert.deepEqual(homeDrawn(answered([]), NOW, undefined, undefined, null, WEEK).sentence, { text: 'Two orders are due this week, the first today.', needs: '' });
+  assert.deepEqual(homeDrawn(answered([]), NOW, undefined, undefined, null, WEEK).sentence, { text: '2 orders are due this week, the first today.', needs: '' });
 });
 
 test('TWELVE LATE ORDERS ARE TWELVE LATE only where Late says it holds orders alone, and what stands past eight orders is never guessed to be orders', () => {
@@ -583,17 +584,17 @@ test('TWELVE LATE ORDERS ARE TWELVE LATE only where Late says it holds orders al
      eight orders it can see and the house line counts the four as things (with none of them drawn their oldest day
      cannot be named, so they need you and are not said late again). Never "12 orders are late", and never dropped. */
   const every = homeDrawn([late(orders(8), 12, 'day before today')], NOW, undefined, undefined, null, WEEK);
-  assert.deepEqual(every.sentence, { text: 'Eight orders are late. Four things need you.', needs: 'Eight orders are late' });
+  assert.deepEqual(every.sentence, { text: '8 orders are late. 4 things are late.', needs: '8 orders are late' });
   /* TWO LISTS IN THE CLAUSE is not the week's list alone, and neither is another list's. */
   for (const where of ['list is orders or obligations, day before today', 'list is obligations, day before today'])
-    assert.equal(homeDrawn([late(orders(8), 12, where)], NOW, undefined, undefined, null, WEEK).sentence!.text, 'Eight orders are late. Four things need you.', where);
+    assert.equal(homeDrawn([late(orders(8), 12, where)], NOW, undefined, undefined, null, WEEK).sentence!.text, '8 orders are late. 4 things are late.', where);
   /* A BILL AMONG THE EIGHT: what stands past them may be bills, so the seven drawn are the orders and the rest are things. */
   const mixed = homeDrawn([late([{ row: 'obligations#4', title: 'Rent', day: '2026-09-01' }, ...orders(7)], 12, 'day before today')], NOW, undefined, undefined, null, WEEK);
-  assert.equal(mixed.sentence!.text, 'Seven orders are late. Five things are late, the oldest by four weeks.');
+  assert.equal(mixed.sentence!.text, '7 orders are late. 5 things are late.');
   assert.doesNotMatch(mixed.sentence!.text, /1[12] orders/u);
   /* WITH NO DAY BOUND OF ITS OWN what stands past the limit may not have fallen due, and is not counted. */
   const ahead = homeDrawn([block({ kind: 'spec', source: 'deadlines', where: 'list is orders', total: 12 }, orders(8))], NOW, undefined, undefined, null, WEEK);
-  assert.equal(ahead.sentence?.text, 'Eight orders are late.');
+  assert.equal(ahead.sentence?.text, '8 orders are late.');
 });
 
 test('PAID AND CAME IN OF ONE AMOUNT ARE TWO MONEYS, said side by side, and are said once only where one entry backs both', () => {
@@ -618,19 +619,24 @@ test('PAID AND CAME IN OF ONE AMOUNT ARE TWO MONEYS, said side by side, and are 
 
 /* ── working means working ─────────────────────────────────────────────── */
 
-/** Today's table of the runs at work, as the house body declares it. */
-const workingNow = () => DEFAULT_HOME.blocks.find((b) => b.heading === 'Working now')!;
+/** The table of the runs at work, as a page the record keeps may declare it; Today's own body draws `boot`'s instead. */
+const workingNow = () => ({
+  kind: 'table',
+  heading: 'Working now',
+  icon: 'session',
+  source: 'sessions.working',
+  columns: [
+    { field: 'agent', label: 'Agent' },
+    { field: 'doing', label: 'Doing' },
+    { field: 'last_seen', label: 'Last seen' },
+  ],
+  limit: 6,
+  empty: 'No agent is working.',
+});
 
-test('WORKING NOW READS THE ONE WORD THE RECORD HAS FOR WORKING, and spells no rule of its own', () => {
-  const b = workingNow();
-  assert.equal(b.source, 'sessions.working');
-  /* WHICH RUNS AND IN WHAT ORDER ARE THE CLOCK'S: a page that chose its own would count another "working". */
-  assert.equal('where' in b, false);
-  assert.equal('order' in b, false);
-  assert.deepEqual(b.columns?.map((c) => c.field), ['agent', 'doing', 'last_seen']);
-  /* IN EVERY BODY TODAY BUILDS, whatever the record holds. */
+test('TODAY`S OWN BODY DECLARES NO WORKING TABLE: who is working is drawn once, from boot (today F1)', () => {
   for (const holds of [{ tasks: false, adds: false, money: false }, { tasks: true, adds: false, money: true }])
-    assert.deepEqual(todayHome(holds).blocks.filter((x) => x.source?.startsWith('sessions.')).map((x) => [x.source, x.where, x.order]), [['sessions.working', undefined, undefined]]);
+    assert.deepEqual(todayHome(holds).blocks.filter((x) => x.source?.startsWith('sessions.')), []);
 });
 
 test('A RUN QUIET FOR 20 MINUTES IS NOT WORKING NOW, though it is active and was heard from today', async () => {
@@ -679,12 +685,12 @@ async function emptyRecord() {
   return { k: await openRecord(sql, { now: () => Date.parse('2026-10-02T12:00:00Z') }), db };
 }
 
-test('TODAY SAYS HOW MANY VITAL SIGNS NEED A LOOK, after what needs you and before who is working, in a person`s grammar', () => {
+test('TODAY SAYS HOW MANY VITAL SIGNS NEED A LOOK, after what needs you and before the work, in a person`s grammar', () => {
   const body = todayHome({ tasks: true, adds: true, money: true, health: true });
   const at = body.blocks.flatMap((b, n) => (b.when?.metric === 'signs-red' ? [n] : []));
   assert.equal(at.length, 2, 'one for one sign and one for more, so the count reads as a person says it');
   assert.ok(at[0]! > body.blocks.findIndex((b) => b.kind === 'queue'), 'after the questions');
-  assert.ok(at[1]! < body.blocks.findIndex((b) => b.heading === 'Working now'), 'before who is working');
+  assert.ok(at[1]! < body.blocks.findIndex((b) => b.source === 'register.tasks'), 'before the work');
   const [one, many] = signNotes();
   assert.deepEqual([one!.kind, one!.when, one!.body], ['note', { metric: 'signs-red', is: 1 }, '[One vital sign needs a look](/p/health).']);
   assert.deepEqual([many!.kind, many!.when, many!.body], ['note', { metric: 'signs-red', gt: 1 }, '[{{signs-red}} vital signs need a look](/p/health).']);

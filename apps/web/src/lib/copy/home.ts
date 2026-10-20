@@ -13,7 +13,7 @@ export const home = {
   /* home */
   /* THE LINES A USE CASE'S VOICE MAY REPLACE reach Home through `lib/voice.ts`, which reads each one as the house
      line, so that file is the only one naming them. They are Home's words all the same, so they live here. */
-  needsYou: 'What needs you',
+  needsYou: 'Needs you',
   /* THE BAND OF FIGURES, AND IT WAS A LITERAL IN THE SCREEN. Every other title on this page comes
      from here; this one was typed as `title="Right now"` in the markup, where `19 §9`'s vocabulary
      cannot see it and `dead-copy` cannot count it. */

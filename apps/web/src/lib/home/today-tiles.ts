@@ -72,10 +72,8 @@ export { needYouCount } from './need-you.ts';
 /** The sentence under the title, and the one phrase in it that needs him, drawn red; `''` when nothing does. */
 export type Sentence = { text: string; needs: string };
 
-const OPENERS = [...SPELLED, 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty'];
-
-/** A count that opens a sentence, spelled out to twenty with its capital, so no sentence starts on a figure. */
-const opening = (n: number): string => upper(OPENERS[n] ?? n.toLocaleString('en-GB'));
+/** A count in a sentence: always digits (SF14), so "8 need you" never stands beside "Seven" in one line. */
+const digits = (n: number): string => n.toLocaleString('en-GB');
 
 /** How far past its day something is, in words: "a day", "five days", "three weeks", "two months". */
 export function lateBy(due: string, today: string): string {
@@ -88,39 +86,62 @@ export function lateBy(due: string, today: string): string {
 }
 
 /**
- * "Seven things are late, the oldest by two months. Twelve more need you." THE LATE WORK LEADS, and it is the one
- * phrase drawn red: "late" is said once, and how late is the oldest. What else needs him follows as a count. With
- * nothing late the count is the line, and with nothing needing him it says who is working, in ink, because a calm
- * morning is not an alarm. Counts are words to ten, as a person writes them.
+ * THE LATE MONEY A SENTENCE SAYS, already written as a person reads it ("£7,200"), by which way it goes: what is owed to
+ * you and is late, and the bills you owe that are late. Either may be `null`; per currency, never added across.
+ */
+export type LateMoney = { owed: string | null; bills: string | null };
+
+/** What the line under Today's title is made of (`sentenceOf`). */
+export type SentenceParts = {
+  /** The one count of what needs you (`needYouCount`): the badge's number, the tile's and this line's. */
+  needYou: number;
+  /** The late money the board draws at rest, by which way it goes. */
+  late?: LateMoney | null;
+  /** Late things with no money on them, said only where no late money is. */
+  lateThings?: number;
+  /** The agents working now. */
+  agents: number;
+  /** What waits in the inbox, said in place of "Nothing needs you" when nothing else does. */
+  inbox?: number;
+};
+
+/** "A, B and C". */
+const listed = (items: readonly string[]): string => (items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
+
+/**
+ * "8 need you, £7,200 owed to you is late, and 2 agents are working." (spec 4.1, today F2.) WHAT NEEDS YOU LEADS, as the
+ * badge's number and in red; the late money is its own clause, said with its money; who is working closes it, in ink.
+ * Numbers are always digits (SF14). With nothing needing you it says so ("Nothing needs you."), and then the late money,
+ * when there is some, is the red phrase, since it is the one thing that wants a look.
  *
- * `late` is the late work drawn, oldest first, as `YYYY-MM-DD`; `lateCount` how much is late in all, the rows a late
- * block holds past its limit included, so twenty late tasks drawn eight at a time read "Twenty things are late" and not
- * "Eight things are late. Twelve more need you." It is never fewer than the days drawn, and with no day drawn nothing
- * is said to be late, since the oldest could not be named. `agents` is the runs working now.
+ * "NOTHING NEEDS YOU" ONLY WHEN NOTHING DOES (EXP-E07): with something in the inbox and no question, the line says that
+ * in its place.
  */
-/*
- * "NOTHING NEEDS YOU" ONLY WHEN NOTHING DOES (EXP-E07): no question, and nothing in the inbox. `inbox` is what waits
- * there, as `boot` says it; with something in it and nothing else, the line says so in place of the calm one.
- */
-export function sentenceOf(needing: number, late: readonly string[], agents: number, today: string, lateCount = late.length, inbox = 0): Sentence {
-  const working = agents === 0 ? 'no agent is working' : agents === 1 ? 'one agent is working' : `${counted(agents)} agents are working`;
-  const lates = late.length === 0 ? 0 : Math.max(lateCount, late.length);
-  if (needing === 0 && lates === 0 && inbox > 0) {
-    const head = `${opening(inbox)} ${plural(inbox, 'thing waits', 'things wait')} in your inbox`;
-    return { text: `${head}, and ${working}.`, needs: '' };
+export function sentenceOf({ needYou, late = null, lateThings = 0, agents, inbox = 0 }: SentenceParts): Sentence {
+  const money = [late?.owed ? `${late.owed} owed to you` : null, late?.bills ? `${late.bills} in bills` : null].filter((s): s is string => s !== null);
+  const lateClause =
+    money.length > 0 ? `${listed(money)} ${money.length === 1 ? 'is' : 'are'} late` : lateThings > 0 ? `${digits(lateThings)} ${plural(lateThings, 'thing is', 'things are')} late` : null;
+  const working = agents === 0 ? null : `${digits(agents)} ${plural(agents, 'agent is', 'agents are')} working`;
+  let head: string;
+  let needs: string;
+  if (needYou > 0) {
+    head = `${digits(needYou)} ${needYou === 1 ? 'needs' : 'need'} you`;
+    needs = head;
+  } else if (inbox > 0 && lateClause === null) {
+    head = `${digits(inbox)} ${plural(inbox, 'thing waits', 'things wait')} in your inbox`;
+    needs = '';
+  } else {
+    head = 'Nothing needs you';
+    needs = lateClause ?? '';
   }
-  if (needing === 0 && lates === 0) return { text: `Nothing needs you, and ${working}.`, needs: '' };
-  if (lates > 0) {
-    const how = lateBy(late[0]!, today);
-    const red = lates === 1 ? `${how} late` : `${opening(lates)} things are late`;
-    const lead = lates === 1 ? `One thing is ${red}.` : `${red}, the oldest by ${how}.`;
-    const rest = Math.max(0, needing - lates);
-    const more = rest === 0 ? '' : rest === 1 ? ' One more needs you.' : ` ${opening(rest)} more need you.`;
-    return { text: `${lead}${more}`, needs: red };
+  if (needYou === 0 && head === 'Nothing needs you') {
+    /* A CALM HEAD STANDS AS ITS OWN SENTENCE, and what is late or working follows as the next one. */
+    const rest = [lateClause, working].filter((s): s is string => s !== null);
+    return { text: rest.length === 0 ? `${head}.` : `${head}. ${upper(rest.length === 1 ? rest[0]! : `${rest[0]}, and ${rest[1]}`)}.`, needs };
   }
-  const head = `${opening(needing)} ${plural(needing, 'thing needs', 'things need')} you`;
-  if (agents === 0) return { text: `${head}.`, needs: head };
-  return { text: `${head}, and ${working}.`, needs: head };
+  const clauses = [head, lateClause, working].filter((s): s is string => s !== null);
+  const text = clauses.length === 1 ? `${head}.` : `${clauses.slice(0, -1).join(', ')}, and ${clauses.at(-1)}.`;
+  return { text, needs };
 }
 
 /* ── the week strip ─────────────────────────────────────────────────────── */

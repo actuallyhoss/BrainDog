@@ -10,7 +10,7 @@
 export const words = {
   /* THE HOUSE HOME'S HEADINGS, in the order the page draws them. */
   rightNow: 'Right now',
-  needsYou: 'What needs you',
+  needsYou: 'Needs you',
   workingNow: 'Working now',
   comingUp: 'Coming up',
   overdue: 'Late',
@@ -23,8 +23,12 @@ export const words = {
   lateOrToday: 'Late or due today',
   toCheck: 'Handed back to you',
   urgent: 'Urgent',
-  money: 'Money',
+  money: 'Cash ahead',
   cashNow: 'Cash now',
+  /** Under the cash figure: the day it runs out on what is due, from the Money page's own figure. */
+  lastsTo: 'Lasts to {{runs-out-on}}',
+  comingIn: 'Coming in, 30 days',
+  goingOut: 'Going out, 30 days',
 
   /* EACH BLOCK'S OWN EMPTY LINE, for the blocks that stay drawn when they hold nothing. */
   nothingWaiting: 'Nothing is waiting on you.',
@@ -45,5 +49,7 @@ export const words = {
 
   /* A RECORD WITH LISTS AND NOTHING PINNED, WAITING OR DUE: one calm sentence and one line on what fills the page. */
   nothingNow: 'Nothing needs you right now.',
+  /** Needs you's tile on Today with nothing to ask (today F13). */
+  nothingNeedsYou: 'Nothing needs you',
   fillsWith: 'Questions waiting on you, what falls due and what changed while you were away show up here as your lists fill.',
 } as const;

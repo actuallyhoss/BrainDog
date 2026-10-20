@@ -36,28 +36,26 @@ import type { DayRow, DueRow, SessionRow, TaskRow } from '../record/today-live.t
 
 const TODAY = '2026-09-29';
 
-test('THE SENTENCE: the late work first and red, said once, then what else needs him; who is working when nothing does', () => {
-  assert.deepEqual(sentenceOf(4, ['2026-09-27'], 3, TODAY), { text: 'One thing is two days late. Three more need you.', needs: 'two days late' });
-  assert.deepEqual(sentenceOf(1, ['2026-09-28'], 0, TODAY), { text: 'One thing is a day late.', needs: 'a day late' });
-  assert.deepEqual(sentenceOf(5, ['2026-09-20', '2026-09-27'], 0, TODAY), { text: 'Two things are late, the oldest by nine days. Three more need you.', needs: 'Two things are late' });
-  assert.deepEqual(sentenceOf(2, ['2026-09-20', '2026-09-27'], 0, TODAY), { text: 'Two things are late, the oldest by nine days.', needs: 'Two things are late' });
-  assert.deepEqual(sentenceOf(3, ['2026-09-20', '2026-09-27'], 0, TODAY).text, 'Two things are late, the oldest by nine days. One more needs you.');
-  assert.deepEqual(sentenceOf(19, ['2026-07-29', '2026-08-01', '2026-08-09', '2026-08-25', '2026-09-01', '2026-09-20', '2026-09-27'], 0, TODAY), {
-    text: 'Seven things are late, the oldest by two months. Twelve more need you.',
-    needs: 'Seven things are late',
+test('THE SENTENCE (today F2): what needs you first and red, the late money as its own clause, who is working last; digits always', () => {
+  const late = { owed: '£7,200', bills: null };
+  assert.deepEqual(sentenceOf({ needYou: 8, late, agents: 2 }), { text: '8 need you, £7,200 owed to you is late, and 2 agents are working.', needs: '8 need you' });
+  assert.deepEqual(sentenceOf({ needYou: 8, late: { owed: '£7,200', bills: '£10,593' }, agents: 2 }), {
+    text: '8 need you, £7,200 owed to you and £10,593 in bills are late, and 2 agents are working.',
+    needs: '8 need you',
   });
-  assert.deepEqual(sentenceOf(4, [], 3, TODAY), { text: 'Four things need you, and three agents are working.', needs: 'Four things need you' });
-  assert.deepEqual(sentenceOf(4, [], 0, TODAY), { text: 'Four things need you.', needs: 'Four things need you' });
-  assert.deepEqual(sentenceOf(0, [], 0, TODAY), { text: 'Nothing needs you, and no agent is working.', needs: '' });
-  assert.deepEqual(sentenceOf(0, [], 1, TODAY), { text: 'Nothing needs you, and one agent is working.', needs: '' });
-  assert.equal(sentenceOf(12, [], 0, TODAY).text, 'Twelve things need you.');
-  assert.equal(sentenceOf(23, [], 0, TODAY).text, '23 things need you.');
-  /* THE WHOLE LATE COUNT, past the days drawn: twenty late with eight drawn is twenty late, the rest the count left. */
-  const eight = ['2026-07-29', '2026-08-01', '2026-08-09', '2026-08-25', '2026-09-01', '2026-09-20', '2026-09-27', '2026-09-28'];
-  assert.deepEqual(sentenceOf(23, eight, 0, TODAY, 20), { text: 'Twenty things are late, the oldest by two months. Three more need you.', needs: 'Twenty things are late' });
-  /* NEVER FEWER THAN THE DAYS DRAWN, and nothing late without a day to say the oldest by. */
-  assert.equal(sentenceOf(3, ['2026-09-20', '2026-09-27'], 0, TODAY, 1).text, 'Two things are late, the oldest by nine days. One more needs you.');
-  assert.equal(sentenceOf(4, [], 0, TODAY, 3).text, 'Four things need you.');
+  assert.deepEqual(sentenceOf({ needYou: 1, agents: 1 }), { text: '1 needs you, and 1 agent is working.', needs: '1 needs you' });
+  assert.deepEqual(sentenceOf({ needYou: 26, agents: 0 }), { text: '26 need you.', needs: '26 need you' });
+  /* LATE WITH NO MONEY ON IT is a count of things, said only where no late money is. */
+  assert.deepEqual(sentenceOf({ needYou: 3, lateThings: 2, agents: 0 }), { text: '3 need you, and 2 things are late.', needs: '3 need you' });
+  assert.equal(sentenceOf({ needYou: 3, late, lateThings: 2, agents: 0 }).text, '3 need you, and £7,200 owed to you is late.');
+  /* NOTHING NEEDS YOU is its own sentence; what is late then carries the red. */
+  assert.deepEqual(sentenceOf({ needYou: 0, agents: 0 }), { text: 'Nothing needs you.', needs: '' });
+  assert.deepEqual(sentenceOf({ needYou: 0, agents: 2 }), { text: 'Nothing needs you. 2 agents are working.', needs: '' });
+  assert.deepEqual(sentenceOf({ needYou: 0, late, agents: 2 }), { text: 'Nothing needs you. £7,200 owed to you is late, and 2 agents are working.', needs: '£7,200 owed to you is late' });
+  /* SOMETHING IN THE INBOX AND NO QUESTION: never "Nothing needs you". */
+  assert.deepEqual(sentenceOf({ needYou: 0, agents: 0, inbox: 4 }), { text: '4 things wait in your inbox.', needs: '' });
+  /* NO WORD BESIDE A FIGURE (SF14). */
+  for (const n of [1, 7, 8, 12, 26]) assert.doesNotMatch(sentenceOf({ needYou: n, agents: n }).text, /\b(one|two|three|seven|eight|twelve)\b/iu);
 });
 
 test('HOW LATE, IN WORDS: a day, then days, weeks and months, counted in words to ten', () => {
