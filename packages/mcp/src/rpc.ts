@@ -22,6 +22,7 @@ export { INSTRUCTIONS };
 import { CARD_OF_TOOL, cardHtml, cardMeta, cardOf, cardResource, cardResources } from './cards.ts';
 import { HOUR, MINUTE, TEMPLATES, TOOLS, tools, ttlOf, type McpSurface, type Said, type Tool } from './index.ts';
 import { refusalBrief } from './brief.ts';
+import { atIn, unsaid } from './words.ts';
 
 /**
  * Newest first. `initialize` answers with one of these, as `negotiate` picks it.
@@ -128,6 +129,31 @@ const render = (said: Said) => ({
   content: [{ type: 'text', text: said.text }],
   structuredContent: said.structured,
 });
+
+/**
+ * A refusal said in the called tool's own words: its `at` one of the tool's fields or a key the caller sent, and its
+ * sentence with no `undefined` where a value was meant (`atIn` and `unsaid` in `words.ts`). Any other answer as it came.
+ *
+ * AT THE DOOR, AFTER EVERYTHING ELSE, because every refusal an agent reads passes here and the record's sentences are
+ * written for every caller of a method: `update`'s write filed by the ladder as a proposal is refused in the proposal's
+ * terms, `body.rows[0].patch`, which `update` cannot send. `refusal-at.test.ts` walks the refusals the door gives and
+ * holds every `at` to the called tool. The text is drawn again from the refusal, as `index.ts` draws it, only when a
+ * word changed.
+ */
+function ownWords(name: string, args: Record<string, unknown>, out: Said, sent: Record<string, unknown> = args): Said {
+  if (!refused(out.result)) return out;
+  const was = out.result.refusal as unknown as Record<string, unknown>;
+  const tool = TOOLS.find((t) => t.name === name);
+  const takes = Object.keys((tool?.input as { properties?: Record<string, unknown> } | undefined)?.properties ?? {});
+  const at = tool === undefined ? (typeof was.at === 'string' ? was.at : undefined) : atIn(was.at, takes, sent);
+  const fix = typeof was.fix === 'string' ? unsaid(was.fix, at) : was.fix;
+  if (at === was.at && fix === was.fix) return out;
+  const refusal = Object.fromEntries(
+    Object.entries(was).flatMap(([k, v]): [string, unknown][] => (k === 'at' ? (at === undefined ? [] : [[k, at]]) : [[k, k === 'fix' ? fix : v]])),
+  );
+  const text = args.format === 'full' ? JSON.stringify(refusal) : refusalBrief(refusal);
+  return { result: { ok: false, refusal: refusal as never }, text, structured: refusal };
+}
 
 /**
  * A tool as `tools/list` lists it: its name, the title a host shows a person, what it does, its arguments, and what it
@@ -597,8 +623,8 @@ async function dispatch<C>(
       /* THE REVISION SENDS `inputResponses` ON A RETRY OF THE ORIGINAL REQUEST, and a client may put it in the request's
          params or among the tool's arguments, so both places are read. */
       if (params.name === 'propose' && (Object.hasOwn(params, 'inputResponses') || Object.hasOwn(args, 'inputResponses')))
-        return said(render({ result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }));
-      const out = await mcp.answer(params.name, args, ctx);
+        return said(render(ownWords('propose', args, { result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }, { ...params, ...args })));
+      const out = ownWords(params.name, args, await mcp.answer(params.name, args, ctx));
       if (refused(out.result) && out.result.refusal.code === 'INTERNAL') hear(surface, ctx, { kind: 'internal' });
       /* THE CARD'S DATA RIDES BESIDE THE ANSWER, only when this answer is one the card can draw. */
       let drawn = out.result.ok ? cardOf(params.name, args, out.structured, origin) : null;

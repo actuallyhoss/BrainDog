@@ -427,3 +427,45 @@ export function gist(question: string, title?: (spoken: string) => string | unde
     .trim();
   return amounts.length === 0 ? words : `${words} | ${amounts.join(' ')}`;
 }
+
+/* ── a refusal in the called tool's own words ─────────────────────────── */
+
+/**
+ * Where a refusal points, said in the fields of the tool that was called, or `undefined` when none of them is it.
+ *
+ * A REFUSAL NAMED ANOTHER BODY'S INSIDES. On the owner's record `update {spoken, patch: {}}` was turned into a
+ * proposal by the ladder and refused `VALUE_MALFORMED at body.rows[0].patch`: `update` has no `body` and no `rows`,
+ * so the agent was pointed at a field it cannot send. The path is read from its left, and it is taken from the first
+ * part that is a field of the tool (`takes`) or a key the caller sent: `body.rows[0].patch` is `patch` to `update` and
+ * stays itself to `propose`, whose `body` it is. A path with no such part is no place the caller can go, so it is left
+ * out, and the sentence says what to do.
+ */
+export function atIn(at: unknown, takes: readonly string[], sent: Readonly<Record<string, unknown>>): string | undefined {
+  if (typeof at !== 'string' || at === '') return undefined;
+  const parts = at.match(/[^.[\]]+|\[[^\]]*\]/gu) ?? [];
+  const ours = (part: string): boolean => !part.startsWith('[') && (takes.includes(part) || Object.hasOwn(sent, part));
+  const from = parts.findIndex(ours);
+  if (from === -1) return undefined;
+  return parts
+    .slice(from)
+    .map((part, i) => (part.startsWith('[') || i === 0 ? part : `.${part}`))
+    .join('');
+}
+
+/**
+ * A refusal's sentence with no `undefined` written in where a value was meant to be.
+ *
+ * THE RECORD WRITES WHAT IT WAS SENT INTO ITS SENTENCE, so a value never sent came out as a word of code: `propose`
+ * with no `body_kind` answered "undefined is not a kind of proposal", and `list` with no register "There is no register
+ * called undefined". The shape "X is not a kind of Y" becomes "Say which kind of Y this is, in `at`", "There is no Y
+ * called X" becomes "Say which Y you mean", and any other `undefined` reads "nothing", which is what was sent. `null`
+ * is left alone outside those shapes, because a sentence's JSON example may hold one on purpose.
+ */
+export function unsaid(fix: string, at: string | undefined): string {
+  const where = (word: string): string => (at === undefined || at === word ? '' : `, in ${at}`);
+  const kind = /^(?:undefined|null) is not (?:a|an) (.+?)\.(\s.*)?$/su.exec(fix);
+  if (kind !== null) return `Say which ${kind[1]!} this is${at === undefined ? '' : `, in ${at}`}.${kind[2] ?? ''}`;
+  const called = /^There is no (\w+) called (?:undefined|null)\.(\s.*)?$/su.exec(fix);
+  if (called !== null) return `Say which ${called[1]!} you mean${where(called[1]!)}.${called[2] ?? ''}`;
+  return fix.replace(/\bundefined\b/gu, 'nothing');
+}
