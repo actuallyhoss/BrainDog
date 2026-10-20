@@ -47,7 +47,7 @@
   min-block-size: var(--btn-h);
   margin: 0;
   padding: var(--sp-3) 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   border-radius: var(--r-ctl);
   background: var(--tile);
   box-shadow: none;
@@ -70,16 +70,16 @@
 
 @media (hover: hover) and (pointer: fine) {
   .dc-choice:hover:not(:disabled) {
-    background: var(--field);
-    border-color: var(--edge);
+    background: var(--tile-2);
+    border-color: var(--rule-strong);
   }
 }
 
 /* THE ONE CHOSEN: the accent's edge and its first tint, and its ring filled. A shape as well as a shade. */
 .dc-choice[aria-checked='true'],
 .dc-choice[aria-checked='true']:hover {
-  background: var(--action-tint-1);
-  border-color: var(--action);
+  background: var(--red-tint);
+  border-color: var(--red-fill);
 }
 
 .dc-choice:disabled {
@@ -94,14 +94,14 @@
   inline-size: 16px;
   block-size: 16px;
   margin-block-start: calc((1lh - 16px) / 2);
-  border: 1.5px solid var(--edge);
+  border: 1.5px solid var(--switch-off);
   border-radius: var(--r-round);
   background: var(--tile);
 }
 
 .dc-choice[aria-checked='true'] .dc-ring {
-  border-color: var(--action);
-  background: var(--action);
+  border-color: var(--red-fill);
+  background: var(--red-fill);
 }
 
 .dc-choice[aria-checked='true'] .dc-ring::after {
@@ -109,7 +109,7 @@
   inline-size: 6px;
   block-size: 6px;
   border-radius: var(--r-round);
-  background: var(--on-action);
+  background: var(--on-red);
 }
 
 /* WHAT IT DOES RUNS UNDER "SUGGESTED" TOO. The words are laid on the choice's own grid rather than in a column of their
@@ -157,7 +157,7 @@
 
 /* WHAT IT DOES, one line under its name in the second ink, at the body's size so it is read and not skimmed. */
 .dc-choice-does {
-  color: var(--ink2);
+  color: var(--ink-2);
   font-size: var(--fs-body);
   line-height: var(--lh-body);
 }
@@ -166,7 +166,7 @@
 .dc-rec {
   align-self: start;
   margin-block-start: calc((1lh - 1em) / 2 - 1px);
-  color: var(--action-text);
+  color: var(--red);
   font-size: var(--fs-meta);
   font-weight: var(--fw-medium);
   line-height: 1.3;
@@ -228,7 +228,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 }
 
 .dc-choice:has(> .dc-choice-main > .dc-choice-hit:focus-visible) {
-  outline: 2px solid var(--focus-in);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -239,13 +239,13 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
 .dc-choice[data-checked],
 .dc-choice[data-checked]:hover {
-  background: var(--action-tint-1);
-  border-color: var(--action);
+  background: var(--red-tint);
+  border-color: var(--red-fill);
 }
 
 .dc-choice[data-checked] .dc-ring {
-  border-color: var(--action);
-  background: var(--action);
+  border-color: var(--red-fill);
+  background: var(--red-fill);
 }
 
 .dc-choice[data-checked] .dc-ring::after {
@@ -253,7 +253,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   inline-size: 6px;
   block-size: 6px;
   border-radius: var(--r-round);
-  background: var(--on-action);
+  background: var(--on-red);
 }
 
 .dc-choice:has(> .dc-choice-main > .dc-choice-hit:disabled) {
@@ -262,8 +262,8 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
 @media (hover: hover) and (pointer: fine) {
   div.dc-choice:has(> .dc-choice-main > .dc-choice-hit:not(:disabled)):hover:not([data-checked]) {
-    background: var(--field);
-    border-color: var(--edge);
+    background: var(--tile-2);
+    border-color: var(--rule-strong);
   }
 }
 
@@ -289,12 +289,12 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 }
 
 .queue-option[data-recommended] > .dc-choice[data-press] {
-  border-color: var(--action);
+  border-color: var(--red-fill);
 }
 
 .dc-choice[data-press]:active {
-  background: var(--action-tint-1);
-  border-color: var(--action);
+  background: var(--red-tint);
+  border-color: var(--red-fill);
 }
 
 /* SAID TO A SCREEN READER WITH THE NAME, where the eye reads it at the end of the line. */
@@ -350,7 +350,7 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
   padding: 0 14px;
   border: 0;
   border-radius: var(--r-ctl);
-  background: var(--field);
+  background: var(--tile-2);
   box-shadow: none;
   color: var(--ink);
   font: inherit;
@@ -371,13 +371,13 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 }
 
 .dc-btn[data-weight='primary'] {
-  background: var(--action);
-  color: var(--on-action);
+  background: var(--red-fill);
+  color: var(--on-red);
 }
 
 .dc-btn[data-weight='bare'] {
   background: none;
-  color: var(--ink2);
+  color: var(--ink-2);
 }
 
 /* NOT NOW STANDS IN THE ROW WITH THE ANSWERS, a step further off than they are from each other and in words only, so
@@ -389,21 +389,21 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
 /* A NUMBER KEY ON THE FILLED BUTTON is in the button's own ink: the skin's dim cap vanished into the accent. */
 .dc-btn[data-weight='primary'] .queue-key {
-  border-color: color-mix(in srgb, var(--on-action) 45%, transparent);
-  color: var(--on-action);
+  border-color: color-mix(in srgb, var(--on-red) 45%, transparent);
+  color: var(--on-red);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .dc-btn:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--field-hover);
+    background: var(--hover);
   }
 
   .dc-btn[data-weight='primary']:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--action-hover);
+    background: var(--red-fill-hover);
   }
 
   .dc-btn[data-weight='bare']:hover:not(:disabled, [aria-disabled='true']) {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 }
@@ -411,8 +411,8 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 /* NOTHING CHOSEN YET, OR A READER WHO MAY NOT: the fill goes with the label, so it never reads as live. */
 .dc-btn:disabled,
 .dc-btn[aria-disabled='true'] {
-  background: var(--field);
-  color: var(--dim);
+  background: var(--tile-2);
+  color: var(--ink-3);
   cursor: not-allowed;
 }
 
@@ -422,8 +422,8 @@ div.dc-choice:has(> .dc-choice-main > .dc-choice-hit) {
 
 /* The answer the record's one line is for, while it is open: the chosen tint and the accent's edge. */
 .dc-btn[data-on] {
-  background: var(--action-tint-1);
-  box-shadow: inset 0 0 0 1px var(--action);
+  background: var(--red-tint);
+  box-shadow: inset 0 0 0 1px var(--red-fill);
   color: var(--ink);
 }
 

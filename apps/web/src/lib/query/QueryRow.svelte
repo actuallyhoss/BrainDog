@@ -144,8 +144,8 @@
      fill and no edge: a broken line is kept for a chart and for a place to drop while dragging. */
   .q-row[data-proposed] {
     padding: var(--sp-2);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
   }
 
   .q-ask {
@@ -157,7 +157,7 @@
   .q-field,
   .q-op {
     min-inline-size: 0;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .q-value {
@@ -174,12 +174,12 @@
     min-inline-size: 0;
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);
-    background: var(--bg);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-md);
+    background: var(--tile);
+    border: 1px solid var(--switch-off);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .q-days {
@@ -194,8 +194,8 @@
 
   .q-unit,
   .q-help {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .q-picks {
@@ -208,17 +208,17 @@
   .q-pick {
     min-block-size: var(--ctl-h);
     padding-inline: var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font: inherit;
     font-weight: 500;
     cursor: pointer;
   }
 
   .q-pick[data-on] {
-    background: var(--selected);
+    background: var(--red-tint);
     color: var(--ink);
   }
 
@@ -234,8 +234,8 @@
   }
 
   .q-proposed {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .q-act,
@@ -247,8 +247,8 @@
     padding-inline: var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-sm);
-    color: var(--ink2);
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
     font: inherit;
     font-weight: 500;
     cursor: pointer;
@@ -258,7 +258,7 @@
     .q-act:hover,
     .q-remove:hover,
     .q-pick:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }

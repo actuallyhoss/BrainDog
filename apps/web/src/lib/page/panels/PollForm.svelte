@@ -182,7 +182,7 @@
   .poll-head {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -190,13 +190,13 @@
   .poll-note,
   .poll-said {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     text-wrap: pretty;
   }
 
   .poll-note {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .poll-form {
@@ -207,20 +207,20 @@
   .poll-label {
     margin-block-start: var(--sp-2);
     padding: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .poll-select {
     justify-self: start;
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--s1);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
+    background: var(--tile-2);
+    border: 1px solid var(--switch-off);
+    border-radius: var(--r-xs);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .poll-rows {
@@ -278,6 +278,6 @@
   .poll-fault {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 </style>

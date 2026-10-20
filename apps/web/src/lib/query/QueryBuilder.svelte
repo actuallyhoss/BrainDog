@@ -285,8 +285,8 @@
   }
 
   .qb-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -301,18 +301,18 @@
     min-inline-size: 0;
     min-block-size: var(--ctl-h);
     padding: var(--sp-1) var(--sp-3);
-    background: var(--bg);
-    border: 1px solid var(--edge);
-    border-radius: var(--r-md);
+    background: var(--tile);
+    border: 1px solid var(--switch-off);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .qb-note {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A MISREAD LEAVES THE LAST GOOD ROWS WHERE THEY ARE, greyed, so what still applies is visible under the line. */
@@ -326,7 +326,7 @@
 
   .qb-summary {
     min-block-size: var(--ctl-h);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: 500;
     line-height: var(--ctl-h);
     cursor: pointer;
@@ -340,8 +340,8 @@
 
   .qb-misread {
     margin: var(--sp-1) 0 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   /* THE COUNT AND DONE STAY AT THE FOOT, pinned to the bottom of whatever scrolls the builder, so the answer to the
@@ -355,16 +355,16 @@
     justify-content: space-between;
     gap: var(--sp-3);
     padding-block: var(--sp-3);
-    background: var(--s1);
-    border-block-start: 1px solid var(--line-soft);
+    background: var(--tile-2);
+    border-block-start: 1px solid var(--rule);
   }
 
   .qb-count {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .qb-count[data-counting] {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 </style>

@@ -223,8 +223,8 @@
 <style>
   .display-note {
     margin-block-end: var(--sp-4);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .filter-groups {
@@ -242,8 +242,8 @@
   .filter-legend {
     margin-block-end: var(--sp-2);
     padding: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -263,8 +263,8 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
+    border-radius: var(--r-pop);
+    color: var(--ink-2);
     font: inherit;
     text-align: start;
     cursor: pointer;
@@ -282,7 +282,7 @@
   }
 
   .filter-value:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -297,23 +297,23 @@
     inline-size: 17px;
     block-size: 17px;
     flex: none;
-    border: 1px solid var(--edge);
-    border-radius: var(--r-sm);
-    color: var(--on-ink);
-    font-size: var(--t-xs);
+    border: 1px solid var(--switch-off);
+    border-radius: var(--r-xs);
+    color: var(--on-red);
+    font-size: var(--fs-cap);
     line-height: 1;
   }
 
   .filter-value[data-on] .filter-box {
-    background: var(--action);
-    border-color: var(--action);
-    color: var(--on-action);
+    background: var(--red-fill);
+    border-color: var(--red-fill);
+    color: var(--on-red);
   }
 
   .locked {
     margin-inline-start: auto;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
   }
 
   /* The direction sits under the choice it qualifies, as its own short track. The track is `Segmented`'s own element,
@@ -330,7 +330,7 @@
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .keep-line {
@@ -339,8 +339,8 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   @media (width < 640px) {
