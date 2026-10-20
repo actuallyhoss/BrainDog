@@ -18,6 +18,7 @@
  */
 
 import { cases } from '../copy/cases.ts';
+import { HELD } from '../launch.ts';
 
 /** Where the count goes: this origin's own door, which the site's Worker hands to the app. */
 export const SEEN = '/api/seen';
@@ -25,15 +26,19 @@ export const SEEN = '/api/seen';
 /**
  * EVERY PAGE THE SITE SERVES, by the path a reader opens. A page under a dynamic segment counts as its section (a docs
  * page as `/docs`, a legal text as `/legal`), and the 404 page and the held pages are not here. The pages written for
- * each kind of person are read from the drawn app's "More for" links, the addresses those pages are built at.
+ * each kind of person are read from the drawn app's "More for" links, the addresses those pages are built at, less
+ * the ones held (`launch.ts`).
  * `test/seen.test.ts` reads the route tree and holds this list equal to it.
  */
 export const PAGES: readonly string[] = [
   '/',
   '/agents',
   '/docs',
-  ...Object.values(cases.drawn.moreFor).map((more) => more.href),
+  ...Object.values(cases.drawn.moreFor)
+    .map((more) => more.href)
+    .filter((href) => !(HELD as readonly string[]).includes(href)),
   '/legal',
+  '/pricing',
   '/security',
   '/slash',
   '/support',
