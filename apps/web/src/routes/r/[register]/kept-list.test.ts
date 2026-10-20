@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { countsOf, keptOf, listsOf, namesOf, servedWhole, spotOf } from './kept-list.ts';
+import { countsOf, keptOf, listsOf, namesOf, searchFieldsOf, searchKept, servedWhole, spotOf } from './kept-list.ts';
 import type { RegisterDecl } from '../../../lib/record/schema.ts';
 
 const decl = {
@@ -51,4 +51,40 @@ test("THE PAGE'S SPOT: asked by its chips, its sort and its counted pills; a sea
   assert.equal(spotOf('tasks', { ...ask, q: 'bank' }, []).by, null);
   assert.equal(spotOf('tasks', { ...ask, twice: true }, []).by, null);
   assert.equal(spotOf('tasks', { ...ask, sort: undefined }, []).newest, true);
+});
+
+const notes = {
+  id: 'notes',
+  name: 'Notes',
+  one: 'note',
+  title: 'title',
+  fields: [
+    { id: 'title', type: 'text' },
+    { id: 'body', type: 'text', search: true },
+    { id: 'tags', type: 'list', of: 'text', search: true },
+    { id: 'kind', type: 'enum', values: ['a', 'b'] },
+  ],
+} as unknown as RegisterDecl;
+const row = (seq: number, fields: Record<string, unknown>) => ({ seq, fields, version: 1, created: '', by: '' }) as never;
+
+test('A SEARCH OVER A WHOLE KEPT LIST: every word the start of a word, in the order kept', () => {
+  const kept = keptOf(notes, [row(3, { title: 'Renewals due', body: 'call Zürich' }), row(2, { title: 'Children', tags: ['school'] }), row(1, { title: 'Rent' })], 3, new Map() as never, { cursor: null });
+  const seqs = (q: string) => searchKept(kept, q)?.entries.map((e) => e.seq);
+  assert.deepEqual(seqs('ren'), [3, 1], 'a prefix, never a middle: not Children');
+  assert.deepEqual(seqs('zurich ren'), [3], 'both words, any order, the accent folded');
+  assert.deepEqual(seqs('sch'), [2], 'a searchable list of words');
+  assert.deepEqual(seqs('a'), [], 'an enum not marked searchable is not searched');
+  assert.equal(searchKept(kept, '  -- ')?.entries, undefined, 'nothing typed that survives is no search');
+});
+
+test('A SEARCH IS NOT ANSWERED FROM A COPY THAT MAY NOT HOLD EVERY ROW, or reads a field otherwise than the record', () => {
+  const rows = [row(1, { title: 'Rent' })];
+  assert.equal(searchKept(keptOf(notes, rows, 1, new Map() as never, { cursor: 'next' }), 'ren'), null, 'a next page');
+  assert.equal(searchKept(keptOf(notes, rows, 1, new Map() as never), 'ren'), null, 'kept before its cursor was');
+  assert.equal(searchKept(keptOf(notes, rows, 4, new Map() as never, { cursor: null }), 'ren'), null, 'counted past the rows');
+  assert.equal(searchKept(keptOf(notes, [{ ...(rows[0] as object), clipped: true } as never], 1, new Map() as never, { cursor: null }), 'ren'), null, 'a cut text');
+  const reffed = { ...notes, fields: [...notes.fields, { id: 'project', type: 'ref', to: 'projects', search: true }] } as unknown as RegisterDecl;
+  assert.equal(searchFieldsOf(reffed), null, 'a searchable ref');
+  const dated = { ...notes, title: 'due', fields: [{ id: 'due', type: 'day' }, { id: 'body', type: 'text', search: true }] } as unknown as RegisterDecl;
+  assert.deepEqual(searchFieldsOf(dated), ['body'], 'a date title is not indexed');
 });

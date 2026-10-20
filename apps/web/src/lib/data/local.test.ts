@@ -337,6 +337,18 @@ test('CREATE: a row the filter takes lands at the head, counted, with its id and
   assert.equal(out.matched, 2);
 });
 
+test('CREATE: the new row says who made it, and is mine when the reader the copy is kept for made it', () => {
+  const row = stored(listed([task(1, { title: 'a', state: 'open' })]), [LIST]);
+  type Made = Listed['entries'][number] & { by?: string; mine?: true };
+  const mine = (patched(row, [make('c', 2, { title: 'b', state: 'open' }, { actor: 'p_ada' })], 'p_ada') as Listed).entries[0] as Made;
+  assert.equal(mine.by, 'p_ada');
+  assert.equal(mine.mine, true);
+  const theirs = (patched(row, [make('c', 2, { title: 'b', state: 'open' }, { actor: 'run_7' })], 'p_ada') as Listed).entries[0] as Made;
+  assert.equal(theirs.by, 'run_7');
+  assert.equal(theirs.mine, undefined, 'an agent run is not the reader, as far as the browser can tell');
+  assert.equal(((patched(row, [make('c', 2, { title: 'b', state: 'open' })]) as Listed).entries[0] as Made).by, '', 'no actor logged');
+});
+
 test('CREATE: a row the filter leaves out is not news when the filter is the question, and drops the answer when it is not', () => {
   const row = stored(listed([task(1, { title: 'a', state: 'open' })]), [LIST]);
   assert.deepEqual((patched(row, [make('c', 2, { title: 'b', state: 'done' })]) as Listed).entries.map((e) => e.seq), [1]);

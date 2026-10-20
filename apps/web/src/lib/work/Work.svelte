@@ -23,6 +23,8 @@
   import { keep, keptAnswer } from '$lib/data/kept.ts';
   import { live } from '$lib/data/live.svelte.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { painted } from '$lib/data/timing.ts';
+  import type { Near } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { pageKey } from '$lib/record/kept-pages.ts';
   import { pageLists } from '$lib/record/page-lists.ts';
@@ -86,6 +88,7 @@
       const was = keptAnswer<Opened>(WORK_PAGE, key, version);
       if (was !== null && was.got.ok) {
         got = was.got.value;
+        painted('work', 'memory');
         if (was.fresh) return closed(true, at);
         blank = false;
       }
@@ -94,13 +97,17 @@
     reader ??= pageReader(apiBase());
     const mine = ++started;
     const mark = localTicket();
-    /* NOTHING DRAWN: THE LOCAL COPY'S PAGE, not waited on, so the record's answer is never held up by it. */
-    if (got === null)
-      void nearLocal<Opened>(PAGE_COPY, localKey(asked), apiBase()).then((near) => {
+    /* NOTHING DRAWN: THE LOCAL COPY'S PAGE, not waited on, so the record's answer is never held up by it. One later than
+       the wait is drawn when it lands, while nothing is: `got` is the record's answer once it has one. */
+    if (got === null) {
+      const draw = (near: Near<Opened> | null) => {
         if (near === null || near.value.from !== 'live' || got !== null || mine !== started) return;
         got = near.value;
         copied = true;
-      });
+        painted('work', 'copy');
+      };
+      void nearLocal<Opened>(PAGE_COPY, localKey(asked), apiBase(), draw).then(draw);
+    }
     const out = await reader.read(WORK_PAGE, asked);
     /* A later read already drew over this one; with nothing drawn yet, this is drawn, so a re-read that did not land
        live never leaves the page waiting. */
@@ -110,6 +117,7 @@
     got = out;
     copied = false;
     if (out.from === 'live') {
+      painted('work', 'network');
       keep(WORK_PAGE, key, version, { ok: true, value: out });
       keepPage(asked, out, mark);
     }

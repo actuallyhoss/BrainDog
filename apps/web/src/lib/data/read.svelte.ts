@@ -21,7 +21,8 @@ import { keep, keptAnswer } from './kept.ts';
 import { live } from './live.svelte.ts';
 import { holdCopyMark } from './copy-mark.svelte.ts';
 import { keepLocal, localTicket, nearLocal } from './local-tab.ts';
-import type { Spot } from './local.ts';
+import type { Near, Spot } from './local.ts';
+import { painted } from './timing.ts';
 import { reader, type Resource, type Result, type Snapshot } from './read.ts';
 
 export type { Phase, Resource, Result } from './read.ts';
@@ -61,6 +62,8 @@ export function read<T>(
   const asking = $derived(key());
   /* The name the local copy keeps this read's answers under. */
   const localName = opts.local ? (opts.local.name ?? opts.kept) : undefined;
+  /* What the dev timing hook calls this screen (`timing.ts`). */
+  const screen = localName ?? opts.kept ?? 'read';
 
   /** `opened()` tokens for the calls still out, by ticket, so a screen that goes away can close what it opened. */
   const out = new Map<number, number>();
@@ -76,16 +79,25 @@ export function read<T>(
       const drawn = m.ask(k, false);
       if (drawn !== null) m.answer(drawn, was.got);
       now = m.now();
+      painted(screen, 'memory');
       if (was.fresh) return;
       quiet = true;
     } else if (opts.local !== undefined && localName !== undefined && k !== null && !quiet) {
       /* NOTHING IN MEMORY: THE LOCAL COPY, drawn at once. Current, nothing is asked; else it is asked quietly behind it. */
-      const near = await nearLocal<T>(localName, k, opts.local.base());
+      /* A COPY LATER THAN THE WAIT fills the screen if the record has still not answered (`fill`), and nothing else. */
+      const late = (got: Near<T>) => {
+        if (gone || untrack(() => asking) !== k || !m.fill(k, got.value)) return;
+        now = m.now();
+        stale = true;
+        painted(screen, 'copy');
+      };
+      const near = await nearLocal<T>(localName, k, opts.local.base(), late);
       if (gone || untrack(() => asking) !== k) return;
       if (near !== null) {
         const drawn = m.ask(k, false);
         if (drawn !== null) m.answer(drawn, { ok: true, value: near.value });
         now = m.now();
+        painted(screen, 'copy');
         stale = !near.current;
         if (near.current) {
           if (opts.kept !== undefined) keep(opts.kept, k, version, { ok: true, value: near.value });
@@ -107,6 +119,7 @@ export function read<T>(
       if (took && opts.kept !== undefined && k !== null) keep(opts.kept, k, version, got);
       if (took && got.ok) {
         stale = false;
+        painted(screen, 'network');
         const l = opts.local;
         if (l !== undefined && localName !== undefined && k !== null)
           keepLocal(localName, k, l.lists(got.value), l.shrink ? l.shrink(got.value) : got.value, mark, {}, { ...(l.spots ? { spots: l.spots(got.value) } : {}), ...(l.always ? { always: true } : {}) });

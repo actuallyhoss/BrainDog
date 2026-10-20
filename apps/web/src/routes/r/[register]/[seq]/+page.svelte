@@ -79,6 +79,8 @@
   import Hole from '$lib/page/Hole.svelte';
   import { linkReader, type Linked, type LinkReader } from '$lib/record/links-live.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { painted } from '$lib/data/timing.ts';
+  import type { Near } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { live as poll } from '$lib/data/live.svelte.ts';
   import { keptRowOf, rowFrom, rowLists, type KeptRow } from './kept-row.ts';
@@ -217,14 +219,17 @@
     links ??= linkReader(apiBase());
     /* THE LOCAL COPY'S PAGE AT ONCE, the three reads together, while the record is asked as ever (`kept-row.ts`). */
     const mark = localTicket();
-    void nearLocal<KeptRow>(ROW_COPY, key, apiBase()).then((near) => {
+    /* One later than the wait is drawn when it lands, while the record has not answered: `got` is its answer once it has. */
+    const draw = (near: Near<KeptRow> | null) => {
       if (near === null || askedFor !== key || got !== null) return;
       const drawn = rowFrom(near.value);
       got = drawn.got;
       told = drawn.told;
       linked = drawn.linked;
       fromCopy = true;
-    });
+      painted('row', 'copy');
+    };
+    void nearLocal<KeptRow>(ROW_COPY, key, apiBase(), draw).then(draw);
     /* THREE READS IN ONE BRACKET, for the reason the two were: `data-screen` must not appear between
        them, and what points at a row is part of the row's screen rather than a thing that arrives
        after it. */
@@ -250,6 +255,7 @@
     told = h;
     linked = l;
     fromCopy = false;
+    if (r.from === 'live') painted('row', 'network');
     const kept = keptRowOf(r, h, l);
     /* `always`: the history is the log itself, so this copy is only ever drawn while the page asks again. */
     if (kept) keepLocal(ROW_COPY, key, rowLists(register, REGISTERS[register], kept.linked), kept, mark, {}, { always: true });

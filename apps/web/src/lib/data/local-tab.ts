@@ -131,18 +131,29 @@ export function wipeLocal(): Promise<void> {
  * BEFORE THE SHELL HAS CLAIMED IT, the copy answers only the last reader (`lastReader`), so a cold open draws at once
  * and a browser somebody else signed in to draws nothing of the last reader's. The declarations it was read under are
  * put back for a tab that has not learnt them, so a screen drawn from it reads its lists as the record said.
+ *
+ * A COPY LATER THAN THE WAIT IS HANDED TO `late` WHEN IT LANDS: the screen draws it only if the record has not answered
+ * yet, so a slow database still beats a slower record and never replaces what the record said.
  */
-export async function nearLocal<T>(name: string, key: string, base: string): Promise<Near<T> | null> {
+export async function nearLocal<T>(name: string, key: string, base: string, late?: (near: Near<T>) => void): Promise<Near<T> | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), patient ? OFFLINE_MS : NEAR_MS)));
-  try {
-    const asked = lastReader(base).then((person) => tab().answer<T>(name, key, base, person)).catch(() => null);
-    const near = await Promise.race([asked, late]);
-    if (near) for (const [id, decl] of Object.entries(near.decls)) REGISTERS[id] ??= decl as RegisterDecl;
+  let waited = false;
+  const learn = (near: Near<T>): Near<T> => {
+    for (const [id, decl] of Object.entries(near.decls)) REGISTERS[id] ??= decl as RegisterDecl;
     return near;
-  } finally {
-    clearTimeout(timer);
-  }
+  };
+  const wait = new Promise<null>((resolve) => {
+    timer = setTimeout(() => {
+      waited = true;
+      resolve(null);
+    }, patient ? OFFLINE_MS : NEAR_MS);
+  });
+  const asked = lastReader(base).then((person) => tab().answer<T>(name, key, base, person)).catch(() => null);
+  const near = await Promise.race([asked, wait]);
+  clearTimeout(timer);
+  if (near) return learn(near);
+  if (waited && late) void asked.then((got) => got && late(learn(got)), () => undefined);
+  return null;
 }
 
 /** The rail the copy can draw for `person` on `base` (`railOf`): for an offline open with no shell copy. */

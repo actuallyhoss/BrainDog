@@ -58,6 +58,8 @@
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { painted } from '$lib/data/timing.ts';
+  import type { Near } from '$lib/data/local.ts';
   import { QUESTIONS } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { live as poll } from '$lib/data/live.svelte.ts';
@@ -122,13 +124,17 @@
     reading = true;
     client ??= createClient({ base: apiBase() });
     const mark = localTicket();
-    if (got === null)
-      void nearLocal<KeptDecide>(DECIDE_COPY, apiBase(), apiBase()).then((near) => {
-        if (near === null || got !== null || near.value.got.from !== 'live') return;
+    /* One later than the wait is drawn when it lands, while the read is out and nothing is drawn. */
+    if (got === null) {
+      const draw = (near: Near<KeptDecide> | null) => {
+        if (near === null || got !== null || !reading || near.value.got.from !== 'live') return;
         got = near.value.got;
         calls = near.value.calls;
         fromCopy = true;
-      });
+        painted('decide', 'copy');
+      };
+      void nearLocal<KeptDecide>(DECIDE_COPY, apiBase(), apiBase(), draw).then(draw);
+    }
     try {
       const [out, called] = await Promise.all([storedDecide().then((body) => readDecide(apiBase(), body)), readCalls(client)]);
       /* THE CALLS ARE THE PAGE'S COMPANY, NOT ITS CONDITION: a refusal of them keeps what was drawn before. */
@@ -142,6 +148,7 @@
       } else if (out.from === 'live' || got === null || (fromCopy && !offlineNow())) {
         got = out;
         fromCopy = false;
+        if (out.from === 'live') painted('decide', 'network');
       }
       if (out?.from === 'live') keepLocal(DECIDE_COPY, apiBase(), [QUESTIONS], { got: out, calls: called.from === 'live' ? called.value : calls }, mark, {}, { always: true });
       return out?.from === 'live' || (fromCopy && offlineNow());

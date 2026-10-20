@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, overlays, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, heldTwiceOn, iconFor, isRows, joinOf, labelOf, toRows, TWICE, twiceOf, twiceWords, type Filter, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, heldTwiceOn, iconFor, isRows, joinOf, labelOf, toRows, TWICE, twiceOf, twiceWords, type Filter, type Join, whereOf } from '$lib/record/api.ts';
   import { createClient } from '@braindog/client';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, rowsHeldTwice, treeOf, type Names } from '$lib/record/remote.ts';
@@ -34,7 +34,8 @@
   import { live } from '$lib/data/live.svelte.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
-  import { countsOf, keptOf, listsOf, namesOf, servedWhole, spotOf, type KeptList } from './kept-list.ts';
+  import { countsOf, keptOf, listsOf, namesOf, searchKept, servedWhole, spotOf, type KeptList } from './kept-list.ts';
+  import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
@@ -531,6 +532,7 @@
     }
     refusal = null;
     stale = false;
+    searchedHere = false;
     void ask(said, id, filters, q, sort, join, twiceAsked);
     /* AND THE RECEIPTS GO WITH THE ANSWER THEY WERE ABOUT. A chip saying `archived` beside a row
        the reader has just filtered TO is a chip about a different screen: the receipt exists to
@@ -618,23 +620,46 @@
    * AND AN ANSWER FOR A QUESTION THAT HAS MOVED ON IS DROPPED, whole, which is why the state is
    * written at the end rather than as each part arrives.
    */
-  async function ask(said: string, register: string, typed: Filter[], text: string, order: typeof sort, joined: typeof join, wantsTwice = false): Promise<void> {
+  async function ask(said: string, register: string, typed: Filter[], text: string, order: typeof sort, joined: Join, wantsTwice = false): Promise<void> {
     busy = true;
     const mark = localTicket();
+    /* The record has answered this asking: a copy landing later than the wait is not drawn over it. */
+    let done = false;
     await read(async () => {
       /* NOTHING DRAWN YET: THE LOCAL COPY'S FIRST PAGE AT ONCE, marked `fromCopy` and with no cursor to page from, and
-         the record is asked behind it as ever (`lib/data/local.ts`). */
+         the record is asked behind it as ever (`lib/data/local.ts`). One later than the wait is drawn when it lands, if
+         the record has still not answered: the same rows in the same place the record's answer would put them. */
       let near: Near<KeptList> | null = null;
       if (pages.length === 0) {
-        near = await nearLocal<KeptList>(LIST_COPY, said, apiBase());
-        if (near !== null && asked === said && pages.length === 0) {
-          declared = { register, decl: near.value.decl };
-          pages = [near.value.entries];
-          named = namesOf(near.value);
+        const draw = (got: Near<KeptList>): boolean => {
+          if (done || asked !== said || pages.length !== 0 || refusal !== null) return false;
+          declared = { register, decl: got.value.decl };
+          pages = [got.value.entries];
+          named = namesOf(got.value);
           cursor = null;
-          matched = near.value.matched;
+          matched = got.value.matched;
           fromCopy = true;
-        } else near = null;
+          painted('list', 'copy');
+          return true;
+        };
+        const timely = await nearLocal<KeptList>(LIST_COPY, said, apiBase(), (got) => void draw(got));
+        if (timely !== null && draw(timely)) near = timely;
+      }
+      /* A SEARCH OVER A LIST THIS DEVICE KEEPS WHOLE is answered from it at once, marked as this device's, and the record's
+         own answer replaces it when it lands (`searchKept`). Only the search box alone: chips and the people held twice
+         are the record's to answer. */
+      if (near === null && text !== '' && typed.length === 0 && !wantsTwice) {
+        const whole = await nearLocal<KeptList>(LIST_COPY, JSON.stringify([register, [], '', order ?? null, joined ?? null, false]), apiBase());
+        const found = whole === null ? null : searchKept(whole.value, text);
+        if (whole !== null && found !== null && asked === said && !done) {
+          declared = { register, decl: whole.value.decl };
+          pages = [found.entries];
+          named = namesOf(whole.value);
+          cursor = null;
+          matched = found.matched;
+          fromCopy = true;
+          searchedHere = true;
+        }
       }
       const src = await open();
       const [b, s] = await Promise.all([src.boot(), src.schema(register)]);
@@ -687,6 +712,7 @@
       ]);
       if (asked !== said) return true;
       if (!answer.ok) return fromCopy && answer.refusal.code === 'UNREACHABLE' ? true : refuse(answer.refusal);
+      painted('list', 'network');
       declared = { register, decl: s.value };
       twiceHeld = rows ? { register, rows } : null;
       twiceMany = many === null ? null : { register, n: many };
@@ -697,9 +723,11 @@
       counted = facets.counts;
       uncounted = facets.withheld;
       fromCopy = false;
+      searchedHere = false;
       keepList(said, register, s.value, answer.value, { filters: chips, q: text, sort: order, twice: rows !== null, join: joined }, bar ? facets : null, mark);
       return true;
     });
+    done = true;
     if (asked === said) busy = false;
   }
 
@@ -712,7 +740,7 @@
     register: string,
     d: RegisterDecl,
     got: { entries: Entry[]; matched: number; names: Names; cursor: string | null },
-    ask: { filters: Filter[]; q: string; sort: typeof sort; twice: boolean; join: typeof join },
+    ask: { filters: Filter[]; q: string; sort: typeof sort; twice: boolean; join: Join },
     facets: Tally | null,
     mark: number,
   ) {
@@ -755,6 +783,8 @@
   let stale = $state(false);
   /** The rows on screen came from the local copy and the record has not answered yet. */
   let fromCopy = $state(false);
+  /** And they are a search this device answered over the list it keeps whole (`searchKept`), said in a line. */
+  let searchedHere = $state(false);
   /* The quiet mark over the work while they are (`copy-mark.svelte.ts`). */
   $effect(() => {
     if (!fromCopy) return;
@@ -847,6 +877,7 @@
     counted = facets.counts;
     uncounted = facets.withheld;
     fromCopy = false;
+    searchedHere = false;
     /* AND KEPT AGAIN, so the next open draws the list as it now is. */
     keepList(said, register, decl, answer.value, { filters: chips, q: text, sort: order, twice: chips.some(isRows), join: joined }, counted.size > 0 || uncounted ? facets : null, mark);
   }
@@ -870,7 +901,7 @@
    * read "Open 0, Paid 0" over a list that opened full. The refusal comes back beside the counts as `withheld`, and
    * the screen says it in a line under the bar.
    */
-  async function countAll(register: string, d: RegisterDecl, chips: Filter[], text: string, joined: typeof join): Promise<Tally> {
+  async function countAll(register: string, d: RegisterDecl, chips: Filter[], text: string, joined: Join): Promise<Tally> {
     const src = await open();
     return tally(
       await Promise.all(
@@ -2750,6 +2781,9 @@
         <span>{copy.stale}</span>
         <Button onclick={refresh}>{copy.tryAgain}</Button>
       </p>
+    {:else if searchedHere && fromCopy}
+      <!-- A SEARCH THIS DEVICE ANSWERED, said as that until the record's own answer replaces it. -->
+      <p class="stale" data-from-device role="status">{copy.foundHere}</p>
     {/if}
 
     <!-- THE OFFER, WHERE SHE IS: one at most, above the list's figures and its entries, and none while the list is

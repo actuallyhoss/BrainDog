@@ -93,6 +93,11 @@ export type Reader<T> = {
   answer(ticket: Ticket, got: Result<T>): boolean;
   /** The call threw instead of answering. `false` when it was dropped. */
   failed(ticket: Ticket, why: string): boolean;
+  /**
+   * A local copy landed while `key` is asked and nothing is drawn: draw it, and let the call out fail quietly over it.
+   * `false` when something is drawn already, the record's answer included, or the screen asks something else now.
+   */
+  fill(key: string, value: T): boolean;
   /** The record's version, as the poll last heard it. `true` when it moved and there is a question to ask again. */
   heard(version: number | null): boolean;
 };
@@ -155,6 +160,14 @@ export function reader<T>(empty?: (value: T) => boolean, version: number | null 
          `UNREACHABLE`), so a throw here is a screen's own `fetch` failing, which is the network. The sentence the
          person reads is the offline one; what actually threw sits under Details, so nobody is misled about which it was. */
       snap = { state: 'offline', value: null, refusal: why };
+      return true;
+    },
+    fill(at, value) {
+      /* ONLY OVER WAITING, so a copy never replaces what the record said, nor a refusal it drew. */
+      if (asked === null || asked.key !== at || snap.state !== 'waiting') return false;
+      snap = settle<T>({ ok: true, value }, empty);
+      /* The call out is now asking behind a drawn answer: its failure keeps the copy, as a quiet ask's does. */
+      quietly = asked.n;
       return true;
     },
     heard(next) {

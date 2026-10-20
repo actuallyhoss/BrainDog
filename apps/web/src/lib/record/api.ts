@@ -859,7 +859,9 @@ export const chipsOf = (params: URLSearchParams): Filter[] =>
  * typo, or no word at all open the list they always opened rather than a refusal on a link that
  * worked yesterday. `whereOf` below and `treeOf` in `remote.ts` take what this answers.
  */
-export const joinOf = (params: URLSearchParams): 'any' | undefined => (params.get('join') === 'any' ? 'any' : undefined);
+export const joinOf = (params: URLSearchParams): Join => (params.get('join') === 'any' ? 'any' : undefined);
+/** What `joinOf` reads: "or", or nothing, which is the plain "and". */
+export type Join = 'any' | undefined;
 
 /**
  * The address word that narrows a list of people to the ones who may be held twice: `twice=1`.

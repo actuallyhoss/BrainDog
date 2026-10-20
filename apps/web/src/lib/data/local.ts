@@ -37,6 +37,9 @@
  *   take is not news when the filter is the whole question (`exact`), else the answer goes. A field the row cannot be
  *   drawn with as logged (a ref is a number on screen and an id in the log, a redacted value) drops it too, and so do
  *   pills over a narrowed question, which count rows the filter leaves out.
+ * - A ROW IT TAKES SAYS WHO MADE IT: `by` is the line's actor, and it is `mine` when that is the person the copy is
+ *   kept for (the reader boot named), so it is not drawn blank until the record answers. A run's actor is not `mine`
+ *   here, since only the record can say whose token a run holds.
  * - A create already in the answer is skipped. A restore, or a create or delete with no `Lands`, drops it as before.
  *
  * THE LAST READER, SIGNED (`local-mark.ts`). A live boot leaves a marker naming who read; a cold open before the shell
@@ -47,6 +50,11 @@
  * a count only where an unnarrowed list kept one, and the declared pages it holds where their nav put them.
  *
  * WHO DRAWS FROM IT. The classic Work screen and a list's first page are patched and, when current, skip the record.
+ * A search over a list kept whole (its first page with no next one, every row it counted held, none cut) is answered
+ * from it in the browser (`searchKept` in `kept-list.ts`): every word typed the start of a word in the fields the
+ * record's search reads, folded by `find.ts`'s `terms`, which is held against the record's own index. It is drawn with
+ * a line saying it was found on this device, and the record's answer replaces it; a list with a searchable ref or
+ * money field is the record's to search.
  * Today, a row's page (row, history, what points at it), declared pages (People, Money and the rest under `/p/`, and
  * the live Work page, under the same key `/p/work` keeps) and Needs you are kept `always`: drawn at once, and asked
  * again every time. Needs you and a row's page offer no write while they are the copy's; anywhere else a write from a
@@ -55,7 +63,13 @@
  *
  * OPENED BESIDE BOOT. The layout starts the database opening before it waits on anything (`warmLocal`), and the store
  * and the marker's key share one connection, so a screen's 60 ms wait (`NEAR_MS`) meets an open database rather than a
- * cold one, and no paint ever waits on it: a copy that is late is simply not drawn, and the record answers.
+ * cold one, and no paint ever waits on it. A copy later than the wait is handed to the screen when it lands
+ * (`nearLocal`'s `late`), and drawn only while nothing is: never over the record's answer, nor over a refusal. It fills
+ * the screen's own waiting frame, so the layout does not move, only its content arrives.
+ *
+ * MEASURED BY HAND (`timing.ts`). With `localStorage['braindog.timing']` at `1`, each screen logs to the console how
+ * long it took from open (the navigation, or the page load) to its first paint from the copy, from memory and from the
+ * network, against the targets: 0.3 s, 0.1 s and 1 s. Off by default, and it only logs.
  *
  * FORGOTTEN ON ASKING. Settings > Sessions says how much is kept here and forgets it (`forgetLocal`): the copy, its
  * signed marker, the last shell and the offline cache. A live open keeps it again, as after a sign-out.
@@ -180,6 +194,8 @@ export type Line = {
   from?: unknown;
   to?: unknown;
   batch?: string | null;
+  /** Who wrote it: a person's `p_` id, or a run's. */
+  actor?: string;
 };
 
 type Said<T> = { ok: true; value: T } | { ok: false; refusal?: { code: string } } | { ok: false; conflict: unknown };
@@ -542,7 +558,7 @@ function createdFields(decl: unknown, to: unknown): Record<string, unknown> | nu
 }
 
 /** Place a create on one spot of `value`; `false` drops the answer. */
-function landCreate(value: unknown, spot: Spot, decl: unknown, l: Line, writes: Map<string, 'placed' | 'in'>): boolean {
+function landCreate(value: unknown, spot: Spot, decl: unknown, l: Line, writes: Map<string, 'placed' | 'in'>, me: string | null): boolean {
   const lands = spot.lands;
   if (!lands || typeof l.seq !== 'number') return false;
   const rows = dig(value, spot.at);
@@ -577,7 +593,9 @@ function landCreate(value: unknown, spot: Spot, decl: unknown, l: Line, writes: 
   /* PAST THE LAST ROW HELD, with more pages, it is on a later page: counted, not drawn. */
   if (at < rows.length || !beyond(value, lands)) {
     const id = typeof l.target === 'string' && l.target !== '' ? l.target.replace(/^entry:/u, '') : null;
-    rows.splice(at, 0, { ...(id ? { id } : {}), seq: l.seq, fields, version: 1, created: l.ts ?? '', by: '' });
+    /* WHO MADE IT, from the line and the reader the copy is kept for, so the row is not drawn blank until the record answers. */
+    const by = typeof l.actor === 'string' ? l.actor : '';
+    rows.splice(at, 0, { ...(id ? { id } : {}), seq: l.seq, fields, version: 1, created: l.ts ?? '', by, ...(me !== null && by === me ? { mine: true } : {}) });
     const moved = spot.moved ? dig(value, spot.moved) : undefined;
     if (typeof moved === 'object' && moved !== null && typeof l.ts === 'string') (moved as Record<number, string>)[l.seq] = l.ts;
   }
@@ -608,9 +626,9 @@ function landDelete(value: unknown, spot: Spot, l: Line): boolean {
 /**
  * `row`'s answer with `lines` (oldest first, as `inOrder` gives them) placed on it, or `undefined` when one cannot be
  * placed and the answer must go. The rules are the design note's, top of this file. Lines about lists the answer was
- * not read from are not its business and pass by.
+ * not read from are not its business and pass by. `me` is the person the copy is kept for: a row they made is `mine`.
  */
-export function patched(row: Stored, lines: readonly Line[]): unknown {
+export function patched(row: Stored, lines: readonly Line[], me: string | null = null): unknown {
   const spots = row.spots ?? [];
   const value: unknown = structuredClone(row.value);
   /* Each write on a row is one `version`: placed once, or found already in. A write that is both is not one answer's. */
@@ -636,7 +654,7 @@ export function patched(row: Stored, lines: readonly Line[]): unknown {
 
     if (l.kind === 'note') continue;
     if (l.kind === 'create' || l.kind === 'delete') {
-      for (const spot of held) if (!(l.kind === 'create' ? landCreate(value, spot, decl, l, writes) : landDelete(value, spot, l))) return undefined;
+      for (const spot of held) if (!(l.kind === 'create' ? landCreate(value, spot, decl, l, writes, me) : landDelete(value, spot, l))) return undefined;
       continue;
     }
     if (!VALUES.has(l.kind) || typeof l.seq !== 'number' || typeof l.field !== 'string') return undefined;
@@ -800,7 +818,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       const order = inOrder(events, m.cursorId);
       await store
         .rewrite(hit.lists, (row) => {
-          const value = row.spots && row.spots.length > 0 ? patched(row, order) : undefined;
+          const value = row.spots && row.spots.length > 0 ? patched(row, order, m.owner.person) : undefined;
           return value === undefined ? null : { ...row, value };
         })
         .catch(() => store.drop(hit.lists).catch(() => undefined));

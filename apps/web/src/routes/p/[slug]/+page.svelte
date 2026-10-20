@@ -42,6 +42,8 @@
   import { pageKey } from '$lib/record/kept-pages.ts';
   import { pageLists } from '$lib/record/page-lists.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { painted } from '$lib/data/timing.ts';
+  import type { Near } from '$lib/data/local.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { live } from '$lib/data/live.svelte.ts';
 
@@ -129,11 +131,14 @@
     return untrack(() => holdCopyMark());
   });
   function fromLocal(asked: string, choice: Record<string, string>) {
-    void nearLocal<Opened>(PAGE_COPY, pageKey(apiBase(), asked, choice), apiBase()).then((near) => {
+    /* One later than the wait is drawn when it lands, while the record has not answered: `got` is its answer once it has. */
+    const draw = (near: Near<Opened> | null) => {
       if (near === null || near.value.from !== 'live' || (route.params.slug ?? '') !== asked || got !== null) return;
       answered(asked, near.value);
       copied = asked;
-    });
+      painted('page', 'copy');
+    };
+    void nearLocal<Opened>(PAGE_COPY, pageKey(apiBase(), asked, choice), apiBase(), draw).then(draw);
   }
   /** Keep a live answer in the local copy, `always`, so it is only ever drawn while the page asks again. */
   function keepPage(asked: string, choice: Record<string, string>, out: Opened, mark: number) {
@@ -150,8 +155,10 @@
     const keptCopy = reader.kept(asked, filtered);
     const choice = filtered;
     const mark = localTicket();
-    if (keptCopy) answered(asked, keptCopy);
-    else fromLocal(asked, choice);
+    if (keptCopy) {
+      answered(asked, keptCopy);
+      painted('page', 'memory');
+    } else fromLocal(asked, choice);
     waited = 0;
     clearTimeout(holdTimer);
     holdTimer = setTimeout(() => (waited = HOLD_MS), HOLD_MS);
@@ -168,6 +175,7 @@
     }
     answered(asked, out);
     copied = null;
+    if (out.from === 'live') painted('page', 'network');
     keepPage(asked, choice, out, mark);
     reading = false;
     closed(out.from !== 'refused', at);

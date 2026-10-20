@@ -6,11 +6,15 @@
  *
  * WHAT LETS IT SKIP THE RECORD. A copy that is current, holds the page's cursor and holds the counts the bar draws is
  * the screen whole, so the list draws it and asks nothing (`servedWhole`). One without them is drawn and asked behind.
+ *
+ * A SEARCH OVER A LIST KEPT WHOLE is answered here too (`searchKept`), as the record's search box would, and drawn
+ * marked as this device's until the record's own answer replaces it.
  */
 
 import type { Predicate } from '@braindog/where';
 
 import type { Lands, Spot } from '../../../lib/data/local.ts';
+import { terms, tokensOf } from '../../../lib/record/find.ts';
 import type { Names } from '../../../lib/record/remote.ts';
 import type { Entry, Filter, RegisterDecl } from '../../../lib/record/schema.ts';
 
@@ -90,4 +94,57 @@ export function spotOf(
           tally: ['counted'],
         };
   return { list: register, at: ['entries'], by, ...(ask.sort ? {} : { newest: true }), ...(lands ? { lands } : {}) };
+}
+
+/** Field types whose value a kept row holds as the record stored it, so the record's index read the same words. */
+const SAID_AS_STORED = new Set(['text', 'document', 'enum', 'url', 'email', 'int', 'decimal', 'bool', 'duration', 'day', 'instant']);
+/** A title of these is never indexed (ruling 441, `projectedText` in the kernel's `fts.ts`). */
+const UNSPOKEN = new Set(['money', 'day', 'instant']);
+
+/**
+ * The fields the record's search reads, in declared order, as `projectedText` picks them: every `search: true` field and
+ * the title, but a title of money or a date. `null` when one is held here in another form than the record indexes (a ref
+ * is a number on screen and an id in the record, money an object), so the browser cannot say what the record would.
+ */
+export function searchFieldsOf(decl: RegisterDecl): string[] | null {
+  const out: string[] = [];
+  for (const f of decl.fields) {
+    if ((f.search !== true && f.id !== decl.title) || f.retired === true) continue;
+    if (f.id === decl.title && UNSPOKEN.has(f.type)) continue;
+    if (f.type === 'secret') return null;
+    const plain = f.type === 'list' ? f.of === 'text' : SAID_AS_STORED.has(f.type);
+    if (!plain) return null;
+    out.push(f.id);
+  }
+  return out;
+}
+
+/** One row's searched text, as the kernel projects it: lists joined by spaces, NFC, whitespace collapsed. */
+function projectedOf(fields: readonly string[], values: Record<string, unknown>): string {
+  const lines: string[] = [];
+  for (const id of fields) {
+    const raw = values[id];
+    if (raw === undefined || raw === null || raw === '') continue;
+    const text = (Array.isArray(raw) ? raw.map((v) => String(v)).join(' ') : String(raw)).normalize('NFC').replace(/\s+/gu, ' ').trim();
+    if (text) lines.push(text);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * A search answered from a kept whole list: its rows whose searched text has every typed word as the start of a word,
+ * in the order kept (the record's order for the same sort). `null` when the copy may not hold every row (a next page,
+ * a count past the rows, a cut text, a copy kept before its cursor was) or its fields cannot be read as the record does.
+ */
+export function searchKept(kept: KeptList, q: string): { entries: Entry[]; matched: number } | null {
+  if (kept.cursor !== null || kept.entries.length !== kept.matched) return null;
+  if (kept.entries.some((e) => e.clipped === true)) return null;
+  const want = terms(q);
+  const fields = searchFieldsOf(kept.decl);
+  if (want === null || fields === null) return null;
+  const entries = kept.entries.filter((e) => {
+    const has = tokensOf(projectedOf(fields, e.fields as Record<string, unknown>));
+    return want.every((w) => has.some((t) => t.startsWith(w)));
+  });
+  return { entries, matched: entries.length };
 }

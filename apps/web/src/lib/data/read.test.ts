@@ -147,3 +147,31 @@ test('a quiet ask the record moving made keeps a good answer on screen when it f
   m.answer(loud, no('FORBIDDEN', 'Ask the owner for access.'));
   assert.equal(m.now().state, 'refused', 'a re-read somebody asked for still shows its refusal');
 });
+
+test('a late copy fills a question still waiting, a failure behind it keeps it, and an answer replaces it', () => {
+  const m = reader<string>();
+  const t = m.ask('today');
+  assert.ok(t);
+  assert.equal(m.fill('elsewhere', 'copy'), false, 'another question');
+  assert.equal(m.fill('today', 'copy'), true);
+  assert.deepEqual(m.now(), { state: 'ready', value: 'copy', refusal: null });
+  assert.equal(m.answer(t, no('UNREACHABLE', 'offline')), true);
+  assert.equal(m.now().value, 'copy', 'the record not reached keeps the copy');
+  const again = m.ask('today');
+  assert.ok(again);
+  assert.equal(m.answer(again, yes('record')), true);
+  assert.equal(m.now().value, 'record');
+});
+
+test('a late copy never replaces the record', () => {
+  const m = reader<string>();
+  const t = m.ask('today');
+  assert.ok(t);
+  m.answer(t, yes('record'));
+  assert.equal(m.fill('today', 'copy'), false);
+  assert.equal(m.now().value, 'record');
+  const r = m.ask('other');
+  assert.ok(r);
+  m.answer(r, no('FORBIDDEN', 'No.'));
+  assert.equal(m.fill('other', 'copy'), false, 'nor a refusal');
+});

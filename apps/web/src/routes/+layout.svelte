@@ -56,6 +56,7 @@
   import { follow, live } from '$lib/data/live.svelte.ts';
   import { claimLocal } from '$lib/data/local-tab.ts';
   import { copyMark } from '$lib/data/copy-mark.svelte.ts';
+  import { timingOpened } from '$lib/data/timing.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette carries its commands, its search and Slash's drawing, so importing them
      here put all of that in front of the first screen and in the entry's preload list. They are
@@ -459,6 +460,8 @@
      unless each row closed it by hand. */
   beforeNavigate(() => {
     leaving();
+    /* The dev timing hook measures the next screen from here (`timing.ts`); off, it does nothing. */
+    timingOpened();
     moreOpen = false;
     switching = false;
   });
