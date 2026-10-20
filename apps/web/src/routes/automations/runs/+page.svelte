@@ -30,7 +30,9 @@
   import { openActions, type ActionRow } from '$lib/record/actions.ts';
   import { readScripts, type Script } from '$lib/record/scripts.ts';
   import HubRows from '../HubRows.svelte';
-  import { clockOf, heatReading, hubWords as w, kindIcon, runDays, runHeat, runLines, type HubRow, type RunLine } from '../hub.ts';
+  import { clockOf, heatReading, hubWords as w, kindIcon, runDays, runHeat, runLines, type Counted, type HubRow, type RunLine } from '../hub.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
+  import Button from '$lib/ui/Button.svelte';
   import { hubHead } from '../hub-head.ts';
 
   /* HOW MANY AUTOMATIONS HAVE THEIR OWN RUNS READ, newest last run first. Past these a rule is its last run alone, so a
@@ -42,6 +44,8 @@
   let from = $state<'reading' | 'ready' | 'refused'>('reading');
   let lines = $state<RunLine[]>([]);
   let short = $state(false);
+  /* HOW MANY AUTOMATIONS THERE ARE, for the sentence an empty Runs tab says. */
+  let rules = $state(0);
   let fix = $state('');
 
   const io = (url: string, init?: RequestInit) => fetch(url, init);
@@ -62,9 +66,11 @@
       scripts.ok || scriptsAbsent ? null : 'refusal' in scripts ? scripts.refusal.fix : '',
     ].filter((f): f is string => f !== null);
 
+    /* A RULE THAT RAN, by its last run or by the record's count of it (`last_at`), when it keeps no last run. */
+    const lastOf = (a: AutomationRow): number => Date.parse(a.last?.at ?? (a as Counted).last_at ?? '');
     const deep = autoRows
-      .filter((a) => a.last !== null)
-      .sort((a, b) => Date.parse(b.last!.at) - Date.parse(a.last!.at))
+      .filter((a) => Number.isFinite(lastOf(a)))
+      .sort((a, b) => lastOf(b) - lastOf(a))
       .slice(0, DEEP);
     const runs = new Map<string, readonly RunRow[]>();
     const each = await Promise.all(deep.map((a) => autos.source.automation(a.id, { limit: EACH })));
@@ -79,7 +85,8 @@
       from = 'refused';
       return;
     }
-    lines = runLines(autoRows, runs, actionRows, scriptRows, Date.now());
+    lines = runLines(autoRows, runs, actionRows, scriptRows, recordNow());
+    rules = autoRows.length;
     short = failed.length > 0;
     from = 'ready';
   }
@@ -96,9 +103,10 @@
   const head = hubHead();
   $effect(() => {
     head.runs = from === 'ready' ? lines.length : undefined;
+    head.runsSaid = from === 'ready' && lines.length === 0 ? w.runsNoneSaid(rules) : undefined;
   });
 
-  const now = Date.now();
+  const now = recordNow();
 
   const rowOf = (l: RunLine): HubRow => ({
     key: l.key,
@@ -122,7 +130,9 @@
   {#if from === 'refused'}
     <Empty kind="error" heading title={fix} />
   {:else if from === 'ready' && lines.length === 0}
-    <Empty kind="no-data-yet" title={w.runsNone} body={w.runsWhy} agentPrompt={w.runsPrompt} />
+    <Empty kind="no-data-yet" glyph="refresh" title={w.runsNone} body={w.runsWhy} agentPrompt={w.runsPrompt}>
+      {#snippet actions()}<Button weight="primary" href="/automations/new">{w.makeOne}</Button>{/snippet}
+    </Empty>
   {:else if from === 'ready'}
     {#if heat}
       <Tile icon="history" title={w.recentRuns} meta={w.latestRuns}>

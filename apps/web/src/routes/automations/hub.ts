@@ -89,7 +89,10 @@ export const hubWords = {
   scriptsMore: 'Logs, versions and what each script may read, write and fetch are on the scripts screen.',
   scriptsOpen: 'Open the scripts screen',
   runsNone: 'Nothing has run yet',
-  runsWhy: 'Every run of an automation, a scheduled action or a script is listed here, newest first, with what it said.',
+  runsWhy: 'Each run of an automation, a schedule or a script shows here, newest first.',
+  /* THE PAGE'S SENTENCE WHILE NOTHING HAS RUN, so the empty screen still says what it holds. */
+  runsNoneSaid: (n: number) => (n === 0 ? 'Nothing has run yet.' : `${n.toLocaleString('en')} ${n === 1 ? 'automation' : 'automations'}, none has run yet.`),
+  makeOne: 'Make an automation',
   runsPrompt: 'read my record, then propose an automation that runs every morning and tells me what changed yesterday',
   /* THE LIST IS WHAT EACH THING KEEPS TO HAND, and says so, so a quiet list is not read as a quiet record. */
   runsReach: 'The newest runs each automation and script keeps, and the last run of each scheduled action. Open one to see all of its runs.',
@@ -128,6 +131,11 @@ export const hubWords = {
   /* WHAT A RULE HAS DONE, from the record's whole count: how often and the day it last did, or never. */
   ranCount: (n: number, when: string) => `Ran ${times(n)}${when ? `${n === 1 ? ', ' : ', last '}${when}` : ''}.`,
   neverRan: 'Never ran.',
+  neverRanShort: 'Never ran',
+  offShort: 'Off',
+  /* A GROUP'S HEADING SAYS HOW MANY OF ITS ROWS A SWITCH TURNED THE OTHER WAY, while they stay where they were. */
+  turnedOff: (n: number) => `${n.toLocaleString('en')} off`,
+  turnedOn: (n: number) => `${n.toLocaleString('en')} on`,
   thisWeek: (n: number) => (n === 0 ? 'None this week.' : `${n.toLocaleString('en')} this week.`),
 
   /* ── the tiles above the lists, each a chart and the one line saying what it means ────────────── */
@@ -293,6 +301,30 @@ export function lastLine(row: Counted, now: number): string {
   if (count === '') return lastSaid(row, now);
   const tail = row.last && row.last.state !== 'done' ? lastSaid(row, now) : '';
   return [count, tail].filter(Boolean).join(' ');
+}
+
+/**
+ * AN AUTOMATION'S ROW, SHORT (agents F11): what starts it in a few words, then what it has done as a date, "When Bills
+ * and invoices change · Ran 17 times, last 3 Sep" or "· Never ran". Why one that never ran has not is the automation's
+ * own page's to say, and a sentence of it on each of thirty rows made the list a wall of the same words.
+ */
+export function rowWhat(full: string): string {
+  const changed = /^When an item in (.+?) is added or changed(?:,.*)?$/u.exec(full);
+  if (changed) return `When ${changed[1]} ${/s$|\band\b/u.test(changed[1]!) ? 'change' : 'changes'}`;
+  const added = /^When an item in (.+?) is added(?:,.*)?$/u.exec(full);
+  if (added) return `When something is added to ${added[1]}`;
+  return full.replace(/,\s*only when .*$/u, '');
+}
+
+export function rowSaid(row: Counted, now: number): string {
+  if (!row.enabled) return hubWords.offShort;
+  if (typeof row.fired !== 'number') return lastLine(row, now).replace(/\.$/u, '');
+  if (row.fired <= 0) return hubWords.neverRanShort;
+  const when = row.last_at ? onDay(row.last_at, now).replace(/^on /u, '') : '';
+  const ran = `Ran ${times(row.fired)}${when === '' ? '' : row.fired === 1 ? `, ${/^\d/u.test(when) ? `on ${when}` : when}` : `, last ${when}`}`;
+  /* A FAILED LAST RUN FOLLOWS, the part that needs him. */
+  const tail = row.last && row.last.state === 'failed' ? lastSaid(row, now).replace(/\.$/u, '') : '';
+  return [ran, tail].filter(Boolean).join('. ');
 }
 
 /**
@@ -628,6 +660,12 @@ export function runLines(
       }
     } else if (a.last) {
       out.push({ key: `a:${a.id}:last`, kind: 'automation', name: a.name, at: a.last.at, said: saidOf(a.last.state, a.last.at, a.last.say, now), bad: BAD.has(a.last.state), path });
+    } else {
+      /* A RULE THE RECORD COUNTS AND KEEPS NO RUN OF STILL RAN (agents F2): "Ran 17 times, last on 3 Sep" on its row
+         beside "Nothing has run yet" here was two answers to one question. Its last firing is its line, with the count. */
+      const c = a as Counted;
+      if (typeof c.fired === 'number' && c.fired > 0 && typeof c.last_at === 'string' && Number.isFinite(Date.parse(c.last_at)))
+        out.push({ key: `a:${a.id}:count`, kind: 'automation', name: a.name, at: c.last_at, said: hubWords.ranCount(c.fired, onDay(c.last_at, now)), bad: false, path });
     }
   }
   for (const s of actions) {

@@ -22,12 +22,14 @@ export type HubHead = {
   said: Sentence | null;
   /** How many runs are listed, once read. */
   runs: number | undefined;
+  /** The Runs tab's sentence: said only while nothing has run, so the empty screen still says what it holds. */
+  runsSaid?: string | undefined;
 };
 
 const KEY = Symbol('hub-head');
 
 /** A head with nothing read yet. */
-export const emptyHead = (): HubHead => ({ automations: undefined, said: null, runs: undefined });
+export const emptyHead = (): HubHead => ({ automations: undefined, said: null, runs: undefined, runsSaid: undefined });
 
 /**
  * Nothing read yet, on the head the pages already hold. THE HEAD OUTLIVES THE PAGE UNDER IT, so a figure read on one
@@ -39,6 +41,7 @@ export function clearHead(head: HubHead): HubHead {
   head.automations = undefined;
   head.said = null;
   head.runs = undefined;
+  head.runsSaid = undefined;
   return head;
 }
 
@@ -61,6 +64,6 @@ export function tabHere(routeId: string | null, params: URLSearchParams): Tab | 
 /** What the head shows for a tab: the count beside the name and the sentence under it. */
 export function headFor(tab: Tab, head: HubHead): { count: number | undefined; sentence: string | undefined; needs: string | undefined } {
   if (tab === 'automations') return { count: head.automations, sentence: head.said?.text, needs: head.said?.needs || undefined };
-  if (tab === 'runs') return { count: head.runs, sentence: undefined, needs: undefined };
+  if (tab === 'runs') return { count: head.runs, sentence: head.runsSaid, needs: undefined };
   return { count: undefined, sentence: undefined, needs: undefined };
 }

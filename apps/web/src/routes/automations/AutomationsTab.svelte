@@ -35,7 +35,6 @@
   import type { IconName } from '$lib/ui/icons.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Empty from '$lib/ui/Empty.svelte';
-  import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
   import { Bars, Ring } from '$lib/viz/index.ts';
   import { closed, drew, opened } from '$lib/ui/screen.svelte.ts';
@@ -48,7 +47,8 @@
     endedSplit,
     hubSentence,
     hubWords as w,
-    lastLine,
+    rowSaid,
+    rowWhat,
     monthBars,
     monthReading,
     nextOf,
@@ -119,8 +119,8 @@
   const rowOf = (r: AutomationRow): HubRow => ({
     key: r.id,
     name: r.name,
-    what: rowTrigger(r, listSaid),
-    said: lastLine(r, now),
+    what: rowWhat(rowTrigger(r, listSaid)),
+    said: rowSaid(r, now),
     dot: !r.enabled ? 'off' : r.last?.state === 'failed' ? 'bad' : null,
     path: `/automations/${encodeURIComponent(r.id)}`,
     icon: triggerIcon(r.trigger, listIcon(r.register)),
@@ -131,6 +131,12 @@
 
   const on = $derived(rows.filter((r) => placed.get(r.id) ?? r.enabled).map(rowOf));
   const off = $derived(rows.filter((r) => !(placed.get(r.id) ?? r.enabled)).map(rowOf));
+  /* A GROUP COUNTS WHAT IS IN IT NOW (agents F11c): a row switched off keeps its place until the next visit, and the
+     heading says "30" and "1 off" rather than "31". */
+  const onCount = $derived(rows.filter((r) => (placed.get(r.id) ?? r.enabled) && r.enabled).length);
+  const onMoved = $derived(on.length - onCount);
+  const offCount = $derived(rows.filter((r) => !(placed.get(r.id) ?? r.enabled) && !r.enabled).length);
+  const offMoved = $derived(off.length - offCount);
 
   /**
    * One press of a row's switch. THE ROW ANSWERS AT ONCE and the record is asked after; a refusal puts the switch back
@@ -190,14 +196,14 @@
   {/if}
 
   {#if on.length > 0}
-    <Section title={w.on} count={on.length}>
+    <Tile class="section" data-surface="tile" title={w.on} count={onCount || undefined} meta={onMoved > 0 ? w.turnedOff(onMoved) : undefined}>
       <HubRows rows={on} ontoggle={turn} busy={turning} />
-    </Section>
+    </Tile>
   {/if}
   {#if off.length > 0}
-    <Section title={w.off} count={off.length}>
+    <Tile class="section" data-surface="tile" title={w.off} count={offCount || undefined} meta={offMoved > 0 ? w.turnedOn(offMoved) : undefined}>
       <HubRows rows={off} dim ontoggle={turn} busy={turning} />
-    </Section>
+    </Tile>
   {/if}
 {/if}
 

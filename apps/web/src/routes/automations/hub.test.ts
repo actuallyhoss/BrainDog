@@ -39,6 +39,8 @@ import {
   runDays,
   runHeat,
   ruleSaid,
+  rowSaid,
+  rowWhat,
   spell,
   triggerIcon,
   type RunLine,
@@ -411,4 +413,24 @@ test('THE LAYOUT CLEARS THE HEAD WHEN THE TAB CHANGES, BEFORE THE PAGE UNDER IT 
   /* It follows the tab alone. Read off the whole address, a sheet opening (`?new=`) would blank a count still true. */
   const clear = /\$effect\.pre\(\(\) => \{[\s\S]*?\}\);/u.exec(layout)?.[0] ?? '';
   assert.doesNotMatch(clear, /page\./u);
+});
+
+test('an automation row is short: what starts it in a few words, then what it did as a date', () => {
+  assert.equal(rowWhat('When an item in Bills and invoices is added or changed'), 'When Bills and invoices change');
+  assert.equal(rowWhat('When an item in Ledger is added or changed, only when amount is more than 500'), 'When Ledger changes');
+  assert.equal(rowWhat('When an item in Plans is added'), 'When something is added to Plans');
+  assert.equal(rowWhat('When anything arrives'), 'When anything arrives');
+  const counted = (fired: number, last_at: string | null, over: Partial<AutomationRow> = {}) => ({ ...auto('Chase', over), fired, last_at, why_idle: 'No entry has been added since it was turned on.' });
+  assert.equal(rowSaid(counted(0, null), NOW), 'Never ran', 'why it never ran is the automation page\'s to say');
+  assert.equal(rowSaid(counted(17, iso(at(2026, 9, 3, 14))), NOW), 'Ran 17 times, last 3 Sep');
+  assert.equal(rowSaid(counted(1, iso(at(2026, 9, 3, 14))), NOW), 'Ran once, on 3 Sep');
+  assert.equal(rowSaid(counted(4, iso(at(2026, 9, 3, 14)), { enabled: false }), NOW), 'Off');
+});
+
+test('A RULE THE RECORD COUNTS AND KEEPS NO RUN OF STILL HAS ITS LAST FIRING ON THE RUNS TAB', () => {
+  const counted = { ...auto('Categorise what cleared'), fired: 17, last_at: iso(at(2026, 9, 3, 14)) };
+  const lines = runLines([counted, auto('Never')], new Map(), [], [], NOW);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0]?.name, 'Categorise what cleared');
+  assert.match(lines[0]?.said ?? '', /^Ran 17 times/u);
 });
