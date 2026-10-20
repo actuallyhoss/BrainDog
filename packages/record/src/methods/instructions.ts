@@ -38,6 +38,7 @@ import {
 } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
+import { readSight, type Sight } from '../sight-read.ts';
 import { tellFinished } from '../push.ts';
 import type { RecordDeps } from './index.ts';
 
@@ -108,9 +109,11 @@ export type Receipts = { run: string; batches: ReceiptBatch[]; changes: number; 
 /** The most batches a receipt names, newest first. */
 export const RECEIPT_BATCHES = 20;
 
-export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string): Receipts | null {
+export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string, ctx: CallContext, sight: Sight): Receipts | null {
   if (i.taken_by === null || i.taken_at === null) return null;
   const run = kernel.get(i.taken_by, { includeDeleted: true });
+  /* A RUN SHE IS NOT SHOWN HAS NO RECEIPT FOR HER, and its writes are named only where she is shown the row. */
+  if (run !== null && !sight.admits(ctx, run)) return null;
   const until = i.replied_at ?? nowIso;
   const rows = sql.all<{ batch: string | null; id: string; ts: string; target: string | null }>(
     `SELECT batch, id, ts, target FROM event
@@ -133,7 +136,7 @@ export function receiptsOf(sql: Sql, kernel: Kernel, i: Instr, nowIso: string): 
     was.changes += 1;
     if (r.ts > was.at) was.at = r.ts;
     const id = typeof r.target === 'string' && r.target.startsWith('entry:') ? r.target.slice('entry:'.length) : null;
-    const target = id === null ? null : kernel.nameOf(id);
+    const target = id === null || !sight.admits(ctx, kernel.get(id, { includeDeleted: true })) ? null : kernel.nameOf(id);
     if (id !== null && target !== null && !was.rows.includes(target) && was.rows.length < 10) {
       was.rows.push(target);
       was.names.push(kernel.titleOfRow(id) ?? target);
@@ -225,6 +228,7 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !
 export function methods(deps: RecordDeps) {
   const { kernel, sql, guard, no, tail, clock } = deps;
   const nowIso = (): string => new Date(clock.now()).toISOString();
+  const sight = readSight(kernel);
 
   /** Done and Needs you ring his phones per the run's settings row, once per state (`tellFinished`); never fails the reply. */
   const tellDone = (i: Instr, runId: string): void => {
@@ -253,27 +257,36 @@ export function methods(deps: RecordDeps) {
    * A project as runs hold it, by its spoken name (`things#23`), from the spoken name, the row's id or its title. `null`
    * with no such project, or more than one by that title.
    */
-  const projectNamed = (said: string): string | null => {
+  const projectNamed = (ctx: CallContext, said: string): string | null => {
     const list = projectsList();
     if (list === null) return null;
     const row = kernel.get(said);
-    if (row !== null && row.register === list.id) return kernel.nameOf(row.id);
-    const titled = sql.all<{ id: string }>(
-      `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(trim(?)) LIMIT 2`,
-      list.id,
-      `$."${list.title}"`,
-      said,
-    );
-    return titled.length === 1 ? kernel.nameOf(titled[0]!.id) : null;
+    if (row !== null && row.register === list.id) return sight.admits(ctx, row) ? kernel.nameOf(row.id) : null;
+    /* ONLY A PROJECT THE CALLER IS SHOWN IS MATCHED BY ITS TITLE, so a title never says another one exists. */
+    const titled = [
+      ...sight.admitted(
+        ctx,
+        list.id,
+        sql
+          .all<{ id: string }>(
+            `SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(trim(?)) LIMIT 50`,
+            list.id,
+            `$."${list.title}"`,
+            said,
+          )
+          .map((r) => r.id),
+      ),
+    ];
+    return titled.length === 1 ? kernel.nameOf(titled[0]!) : null;
   };
 
   /** A row's project as runs hold it: its scope field read off the row, by spoken name, or `null`. */
-  const projectOfRow = (register: string, fields: Record<string, unknown>): string | null => {
+  const projectOfRow = (ctx: CallContext, register: string, fields: Record<string, unknown>): string | null => {
     const decl = kernel.register(register);
     const f = decl?.fields.find((field) => field.scope !== undefined && !field.retired);
     const v = f === undefined ? undefined : fields[f.id];
     if (typeof v !== 'string' || v.trim() === '') return null;
-    return projectNamed(v) ?? kernel.nameOf(v);
+    return projectNamed(ctx, v) ?? ((row) => (row === null ? kernel.nameOf(v) : sight.admits(ctx, row) ? kernel.nameOf(row.id) : null))(kernel.get(v));
   };
 
   /** Who a person's call is by, for the kernel's instruction path. */
@@ -361,14 +374,14 @@ export function methods(deps: RecordDeps) {
       if (typeof a.waits_ms === 'number') input.waits_ms = a.waits_ms;
       const project = text(a.project);
       if (project !== null) {
-        const named = projectNamed(project);
+        const named = projectNamed(ctx, project);
         if (named === null) return no('ROW_UNKNOWN', `There is no project called ${project}, or more than one.`, { at: 'project' });
         input.project = named;
       }
       const task = text(a.task);
       if (task !== null) {
         const row = kernel.get(task);
-        if (row === null) return no('ROW_UNKNOWN', `There is no task called ${task}.`, { at: 'task' });
+        if (row === null || !sight.admits(ctx, row)) return no('ROW_UNKNOWN', `There is no task called ${task}.`, { at: 'task' });
         input.task = kernel.nameOf(row.id);
         /* THE TASK'S LANE AND PROJECT, when he named neither: "hand this to Claude" reaches Claude where the task is. */
         const lane = kernel.register(row.register)?.hand?.agent;
@@ -376,7 +389,7 @@ export function methods(deps: RecordDeps) {
         const kind = laneSaid?.toLowerCase().replace(/^agent:/u, '') ?? null;
         if (input.to_agent === undefined && kind !== null && (PROFILE_KINDS as readonly string[]).includes(kind)) input.to_agent = kind;
         if (input.project === undefined) {
-          const at = projectOfRow(row.register, row.fields);
+          const at = projectOfRow(ctx, row.register, row.fields);
           if (at !== null) input.project = at;
         }
       }
@@ -419,12 +432,12 @@ export function methods(deps: RecordDeps) {
       if (cursor !== null && (typeof cursor !== 'string' || !/^IN[1-9][0-9]*$/u.test(cursor)))
         return no('VALUE_MALFORMED', 'A cursor is the last instruction the page above answered with, as IN4.', { at: 'cursor' });
       const project = text(a.project);
-      const projectSaid = project === null ? null : (projectNamed(project) ?? project);
+      const projectSaid = project === null ? null : (projectNamed(ctx, project) ?? project);
       const task = text(a.task);
-      const taskRow = task === null ? null : kernel.get(task);
+      const taskRow = task === null ? null : ((r) => (r !== null && sight.admits(ctx, r) ? r : null))(kernel.get(task));
       const taskSaid = task === null ? null : taskRow === null ? task : kernel.nameOf(taskRow.id);
       const run = text(a.run);
-      const runRow = run === null ? null : kernel.get(run, { includeDeleted: true });
+      const runRow = run === null ? null : ((r) => (r !== null && sight.admits(ctx, r) ? r : null))(kernel.get(run, { includeDeleted: true }));
       const runSaid = run === null ? null : runRow === null ? run : kernel.nameOf(runRow.id);
 
       const where: string[] = ["register = 'instructions'", 'deleted_at IS NULL'];
@@ -456,7 +469,7 @@ export function methods(deps: RecordDeps) {
       const now = nowIso();
       const rows = seqs.slice(0, limit).flatMap(({ seq }) => {
         const i = kernel.instruction(`IN${String(seq)}`);
-        return i === null ? [] : [{ ...toldOf(sql, i), seen: kernel.instructionSeen(i.id), receipts: receiptsOf(sql, kernel, i, now) }];
+        return i === null ? [] : [{ ...toldOf(sql, i), seen: kernel.instructionSeen(i.id), receipts: receiptsOf(sql, kernel, i, now, ctx, sight) }];
       });
       return ok({ rows, cursor: seqs.length > limit ? `IN${String(seqs[limit - 1]!.seq)}` : null });
     },
@@ -509,7 +522,7 @@ export function methods(deps: RecordDeps) {
         });
         if (!answered.ok) return tail(answered as Result<never>);
         tellDone(answered.value, run.value);
-        return tail(ok(mineOf(run.value, { instruction: toldOf(sql, answered.value), receipts: receiptsOf(sql, kernel, answered.value, nowIso()) })));
+        return tail(ok(mineOf(run.value, { instruction: toldOf(sql, answered.value), receipts: receiptsOf(sql, kernel, answered.value, nowIso(), ctx, sight) })));
       }
       const ids = Array.isArray(a.seen) ? (a.seen as string[]) : pendingFor(run.value).map((i) => i.id);
       markSeen(ids, run.value, how);

@@ -1,0 +1,7 @@
+{
+  "gate": "sight",
+  "rule": "a read of rows with no sight check and no reason",
+  "expect": "no sight check and no reason in ALLOWED",
+  "findings": 1,
+  "why": "THE SHAPE EVERY READ GAP HAD. `peekRow` answers what `kernel.get` finds and asks nothing of sight, where `seenRow` asks `sight.admits` and `ownedRow` the owner's gate. One open site among three is what proves the gate tells them apart, now that it is enforcing (Slice 3)."
+}

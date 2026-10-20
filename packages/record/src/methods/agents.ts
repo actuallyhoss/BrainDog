@@ -15,6 +15,7 @@ import { SEEN_HOW, agentOf, liveStateOf, sessionDeclaration, type ArrivalSettled
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
 import { listFor } from '../agent-lists.ts';
+import { readSight } from '../sight-read.ts';
 import { OWN_RUN, stopLine, toldOf, type Told } from './instructions.ts';
 
 /** One run's use of a key or a tool: the run by its spoken id, its agent and machine, when it last used it, and how often. */
@@ -380,11 +381,18 @@ export function methods(deps: RecordDeps) {
         if (a[key] !== undefined && a[key] !== null && (typeof a[key] !== 'string' || (a[key] as string).trim() === ''))
           return no('VALUE_MALFORMED', `${key} is a name.`, { at: key });
       const now = clock.now();
-      const rows = kernel.presentRuns();
+      /* THE RUNS SHE IS SHOWN, under her grant on the runs list and never one kept private from her. */
+      const sight = readSight(kernel);
+      const present = kernel.presentRuns();
+      const shown = sight.admitted(ctx, RUN.id, present.map((r) => r.id));
+      const rows = present.filter((r) => shown.has(r.id));
       const of = (f: Record<string, unknown>, key: string): string | null => (typeof f[key] === 'string' && (f[key] as string).trim() !== '' ? (f[key] as string) : null);
       const spoken = (r: { seq: number }): string => `${RUN.seq_prefix}${String(r.seq)}`;
       /* THE PROJECT AS RUNS HOLD IT, by spoken name; one named by title or id is read to it first. */
-      const projectSaid = typeof a.project === 'string' ? ((row) => (row === null ? (a.project as string).trim() : kernel.nameOf(row.id)))(kernel.get((a.project as string).trim())) : null;
+      const projectSaid =
+        typeof a.project === 'string'
+          ? ((row) => (row === null || !sight.admits(ctx, row) ? (a.project as string).trim() : kernel.nameOf(row.id)))(kernel.get((a.project as string).trim()))
+          : null;
       const repoSaid = typeof a.repo === 'string' ? a.repo.trim() : null;
       const helpersOf = new Map<string, string[]>();
       for (const r of rows) {

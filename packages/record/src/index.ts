@@ -2514,7 +2514,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const f = kernel.register(register)?.fields.find((field) => field.scope !== undefined && !field.retired);
       if (f !== undefined) {
         const said = Object.hasOwn(patch, f.id) ? patch[f.id] : self?.fields[f.id];
-        const row = typeof said === 'string' && said !== '' ? kernel.get(said) : null;
+        /* A PROJECT HER GRANT LEAVES OUT IS NO PROJECT HERE, so the reason never says one she is not shown exists. */
+        const row = typeof said === 'string' && said !== '' ? ((r) => (r !== null && sight.admits(ctx, r) ? r : null))(kernel.get(said)) : null;
         const names = row === null ? [] : [row.id, kernel.nameOf(row.id), String(row.fields[kernel.register(row.register)?.title ?? ''] ?? '').toLowerCase()];
         const inside = p.projects.some((q) => names.includes(q) || names.includes(q.toLowerCase()) || (kernel.get(q)?.id ?? null) === row?.id);
         if (!inside) return `${where} lets this agent change ${new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(p.projects)} only, so a change ${row === null ? 'on no project' : 'outside them'} is asked.`;
@@ -6432,7 +6433,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * Every reader of this drops a stale run, or keeps only a working one, which is nearer, so the rest are never theirs.
    * The clock is asked of `presence.ts` alone (`isStale`, the `one-clock` gate).
    */
-  const heardSince = (states: readonly string[], nowMs: number, most: number): Entry[] => {
+  const heardSince = (ctx: CallContext | null, states: readonly string[], nowMs: number, most: number): Entry[] => {
     /* NAMED, because a store that was never analysed reads the whole register by `entry_made` instead and sorts it. A
        record without the index (none is made without migration 0002, but a copy could lose it) reads as before. */
     const read = (indexed: string) =>
@@ -6450,9 +6451,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     } catch {
       heard = read('');
     }
-    return heard
+    const rows = heard
       .filter((r) => !isStale({ fields: { last_seen: r.seen }, updated_at: r.updated_at }, nowMs))
       .flatMap(({ id }) => ((row) => (row === null || row === undefined ? [] : [row]))(kernel.get(id)));
+    /* UNDER THE CALLER'S GRANT ON THE RUNS AND WITHOUT A RUN KEPT PRIVATE FROM HER; `null` is the record itself. */
+    return ctx === null ? rows : sight.rows(ctx, rows);
   };
 
   /**
@@ -6478,7 +6481,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const live = (ctx: CallContext): LiveRun[] => {
     const now = clock.now();
     /* UNDER HER GRANT ON THE RUNS AND WITHOUT A RUN KEPT PRIVATE FROM HER, as `list` reads them for her (`kernel.scope`). */
-    const rows = sight.rows(ctx, heardSince(LIVE, now, 50));
+    const rows = heardSince(ctx, LIVE, now, 50);
     /* THE SAME TREE, NOT THE SAME FOLDER NAME (`sameTree`, AGT-B08): the same machine and repository, and neither run
        working for the other. "Same repo" was the folder's name on any machine, so a session on the laptop was warned
        about one on the desktop in a folder of the same name, and about its own helpers. The caller is read from its
@@ -6502,7 +6505,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * The runs that may be working: active and heard from, most recently heard from first. `isWorking` then keeps the ones
    * inside the kernel's quiet mark, so the clock is compared in one place (`waiting.ts`).
    */
-  const activeRuns = (): Entry[] => heardSince(['active'], clock.now(), 200);
+  const activeRuns = (ctx: CallContext | null): Entry[] => heardSince(ctx, ['active'], clock.now(), 200);
 
   /**
    * WHAT WAITS ON A READER, COUNTED ONCE (`waiting()`): `boot`, Home's line and the queue's counts all read this.
@@ -6519,7 +6522,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       nowMs: clock.now(),
       questions: rows.map((row) => ({ opened_at: String(row.opened_at ?? ''), body_kind: String(row.body_kind ?? ''), body: row.body })),
       inbox: told ? kernel.inboxWaiting() : null,
-      runs: ctx === null ? activeRuns() : readable(ctx, SESSION) ? [] : sight.rows(ctx, activeRuns()),
+      runs: ctx !== null && readable(ctx, SESSION) ? [] : activeRuns(ctx),
       /* THE QUEUE'S OWN RULE FOR A WITHHELD FIELD (`BAND_SQL`), so `waits.hard` and the queue's count are one number. */
       withheld: costNow().withheld,
       held: costNow().held,
@@ -6541,8 +6544,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const title = kernel.titleOfRow(row.id);
       return title === null ? null : (scrubbed(title) ?? null);
     };
-    return sight
-      .rows(ctx, activeRuns())
+    return activeRuns(ctx)
       .filter((row) => isWorking(row, now))
       .slice(0, WORKING_MOST)
       .map((row) => ({
@@ -7332,7 +7334,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const list = asked.register;
       const held = asked.rows.some((r: unknown) => {
         const row = (r ?? {}) as Record<string, unknown>;
-        const self = typeof row.at === 'string' ? kernel.get(row.at) : null;
+        const self = typeof row.at === 'string' ? ((r) => (r !== null && sight.admits(ctx, r) ? r : null))(kernel.get(row.at)) : null;
         const patch = typeof row.at === 'string' ? ((row.patch ?? {}) as Record<string, unknown>) : row;
         return settingsAsk(ctx, list, patch, self) !== null;
       });
@@ -8225,11 +8227,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         ...cardAt,
         now,
         stop: told.stop ? { kind: told.stop.kind, id: told.stop.id, said: told.stop.said } : null,
-        told: (told.told ?? []).map(toldFact),
+        told: (told.told ?? []).map((i) => toldFact(ctx, i)),
         may: told.may ?? null,
         brief: told.brief ?? null,
         ...(told.stamp ? { stamp: told.stamp } : {}),
-        ...(where.task ? { task: taskFact(where.task) } : {}),
+        ...(where.task ? { task: taskFact(ctx, where.task) } : {}),
         ...(where.depth === 'card' ? {} : { kpis: kpisKept(ctx, told.project, at.agent) }),
       }),
       { budget: told.budget, depth: where.depth },
@@ -8287,8 +8289,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** One instruction as the plan reads it: who said it by name, where it stands, and the task it is about by its words. */
-  const toldFact = (i: Told): ToldFact => {
-    const task = i.task === null ? null : kernel.get(i.task);
+  const toldFact = (ctx: CallContext, i: Told): ToldFact => {
+    /* THE TASK BY ITS WORDS ONLY WHEN SHE IS SHOWN IT; otherwise as he named it in the instruction. */
+    const task = i.task === null ? null : ((r) => (r !== null && readable(ctx, r.register) === null && sight.admits(ctx, r) ? r : null))(kernel.get(i.task));
     return {
       id: i.id,
       said: i.said,
@@ -8305,12 +8308,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** The task `context { task }` hands whole, as the plan says it: its words, its other fields by label, its history. */
-  const taskFact = (t: TaskInHand): TaskFact => {
+  const taskFact = (ctx: CallContext, t: TaskInHand): TaskFact => {
     const decl = kernel.register(t.register);
     const shown = (v: unknown): string | null => {
       if (v === null || v === undefined || v === '' || typeof v === 'object') return null;
       if (typeof v !== 'string') return String(v);
       const row = kernel.get(v);
+      /* A ROW THE TASK POINTS AT THAT SHE IS NOT SHOWN IS LEFT OUT, never named and never its id. */
+      if (row !== null && (readable(ctx, row.register) !== null || !sight.admits(ctx, row))) return null;
       return row === null ? v : (kernel.titleOfRow(row.id) ?? v);
     };
     const fields: Record<string, string> = {};
