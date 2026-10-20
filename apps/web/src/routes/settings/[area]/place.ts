@@ -67,19 +67,18 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
       area('/settings/agents', 'Agents', 'session', 'Machines and agents that work here'),
     ],
   },
-  /* THE REST UNDER MORE: signing in, sharing, what comes in, what the record keeps and costs, and, last, the one
-     irreversible act, so deleting the record is the last row of the last group and never a neighbour of the colour scheme. */
+  /* THE REST UNDER MORE, EIGHT SINCE THE UI PASS OF 20 OCTOBER (agents F14): signing in (who you are, passkeys, where you
+     are signed in and the records you can open, which were three half-empty areas), sharing, what comes in, the keys, what
+     the record keeps and costs, and, last, the one irreversible act, so deleting the record is the last row of the last
+     group and never a neighbour of the colour scheme. Pages is Navigation's now: the phone bar, the order and every page. */
   {
     title: 'More',
     icon: 'archive',
     areas: [
-      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
-      area('/settings/pages', 'Pages', 'doc', 'Every page, and the one that opens first'),
-      area('/settings/identity', 'Identity', 'user-check', 'Who you are, and your records'),
-      area('/settings/recovery', 'Recovery', 'key', 'Passkeys, and getting back in'),
-      area('/settings/sessions', 'Sessions', 'monitor', 'Where you are signed in'),
+      area('/settings/signing-in', 'Signing in', 'key', 'You, your passkeys and where you are signed in'),
       area('/settings/people', 'People & sharing', 'user-plus', 'Who can see this record, and invites'),
       area('/settings/ingest', 'What comes in', 'inbox', 'Mail and sources that feed this record'),
+      area('/settings/keyboard', 'Keyboard', 'keyboard', 'Character keys and shortcuts'),
       /* ITS OWN GLYPH, NOT ITS GROUP'S: a copy to go back to is the clock turned back. */
       area('/settings/backups', 'Backups', 'history', 'Copies of this record to restore from'),
       area('/settings/billing', 'Billing', 'money', 'What this record costs'),
@@ -92,11 +91,24 @@ export const DEFAULT_GROUPS: readonly AreaGroup[] = [
 ];
 
 /**
- * THE DESIGN BOOK IS NOT A SETTING, SINCE BATCH 6 (call 6). Look is a reference for designers and agents, every control and
- * chart as drawn, and sat beside Appearance as if it were a choice. It is on no index and no chooser, and still opens at
- * its address, so a link to it lands and the agents that read it lose nothing.
+ * THE DESIGN BOOK IS NOT A SETTING, SINCE BATCH 6 (call 6), AND NOT UNDER SETTINGS SINCE THE UI PASS OF 20 OCTOBER (agents
+ * F29): it lives at `/design`, reached from the index's "⋯ › Design book", and `/settings/look` goes there.
  */
-export const OFF_INDEX: readonly Area[] = [area('/settings/look', 'Design book', 'eye', 'Every control and chart, as drawn')];
+export const OFF_INDEX: readonly Area[] = [];
+
+/**
+ * ADDRESSES THAT MOVED, each to the area that holds it now: a link somebody shared, or a menu that still says the old
+ * address, lands on the area it means. Identity, Recovery and Sessions are Signing in; Pages is Navigation.
+ */
+export const MOVED: ReadonlyMap<string, string> = new Map([
+  ['identity', 'signing-in'],
+  ['recovery', 'signing-in'],
+  ['sessions', 'signing-in'],
+  ['pages', 'navigation'],
+]);
+
+/** The area an id names, a moved one by where it lives now. */
+export const areaOf = (id: string): Area | undefined => AREAS.get(MOVED.get(id) ?? id);
 
 /** Every area this build draws, by id, whatever a declared index lists. */
 export const AREAS: ReadonlyMap<string, Area> = new Map([...DEFAULT_GROUPS.flatMap((g) => g.areas), ...OFF_INDEX].map((a) => [a.id, a] as const));
@@ -125,7 +137,8 @@ export function indexBody(groups: readonly AreaGroup[] = DEFAULT_GROUPS): IndexB
       kind: 'link',
       heading: g.title,
       icon: g.icon,
-      span: 12,
+      /* HALF THE PAGE EACH (agents F28): You and More side by side where the page is wide, one under another on a phone. */
+      span: 6,
       authored: g.areas.map((a) => ({ cells: [a.label, `${AREA_AT}${a.id}`, a.line, a.icon] })),
     })),
   };
@@ -140,7 +153,7 @@ export type IndexBlock = { kind: string; heading?: string; icon?: string; drawn?
 function areaAt(address: unknown): Area | undefined {
   if (typeof address !== 'string') return undefined;
   const m = /\/settings\/([a-z-]+)\/?(?:[?#].*)?$/u.exec(address.trim());
-  return m ? AREAS.get(m[1]!) : undefined;
+  return m ? areaOf(m[1]!) : undefined;
 }
 
 /**
@@ -179,5 +192,5 @@ export function groupsOf(blocks: readonly IndexBlock[]): readonly AreaGroup[] {
 /** The label an area is drawn under on this index, the person's name for it where they gave one. */
 export function labelIn(groups: readonly AreaGroup[], id: string): string | undefined {
   for (const g of groups) for (const a of g.areas) if (a.id === id) return a.label;
-  return AREAS.get(id)?.label;
+  return areaOf(id)?.label;
 }

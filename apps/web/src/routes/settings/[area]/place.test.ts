@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { AREAS, AREA_AT, DEFAULT_GROUPS, ONLY_WIDE, SETTINGS_INDEX, SETTINGS_PAGE, groupsOf, indexBody, labelIn, type IndexBlock } from './place.ts';
+import { AREAS, AREA_AT, DEFAULT_GROUPS, areaOf, ONLY_WIDE, SETTINGS_INDEX, SETTINGS_PAGE, groupsOf, indexBody, labelIn, type IndexBlock } from './place.ts';
 
 const ids = (groups: ReturnType<typeof groupsOf>) => groups.map((g) => [g.title, g.areas.map((a) => a.id)]);
 const link = (heading: string, rows: string[][], more: Partial<IndexBlock> = {}): IndexBlock => ({
@@ -81,7 +81,9 @@ test('what is not an area is left out, an area listed twice is drawn once, and a
 });
 
 test('an address with the base path in front, or a query behind, still names its area', () => {
-  assert.deepEqual(ids(groupsOf([link('X', [['Pages', '/app/settings/pages?from=rail']])])), [['X', ['pages']]]);
+  assert.deepEqual(ids(groupsOf([link('X', [['Keys', '/app/settings/keyboard?from=rail']])])), [['X', ['keyboard']]]);
+  /* AND A MOVED ONE NAMES THE AREA THAT HOLDS IT NOW (UI pass 20 Oct, agents F14): Pages is Navigation's. */
+  assert.deepEqual(ids(groupsOf([link('X', [['Pages', '/app/settings/pages?from=rail']])])), [['X', ['navigation']]]);
 });
 
 test('an index that names no area at all is read as the house one, so nobody is stranded in one area', () => {
@@ -114,10 +116,15 @@ test('every area this build declares has an arm in the page that draws it', () =
   for (const id of AREAS.keys()) assert.ok(route.includes(`area === '${id}'`), `the index offers ${id} and no arm draws it`);
 });
 
-test('FIVE AREAS STAND ON TOP AND THE REST UNDER MORE, and the design book is on no index but still opens', () => {
+test('FIVE AREAS STAND ON TOP AND EIGHT UNDER MORE, and the design book is on no index but still opens at /design', () => {
   assert.deepEqual(DEFAULT_GROUPS.map((g) => g.title), ['You', 'More']);
   assert.deepEqual(DEFAULT_GROUPS[0]!.areas.map((a) => a.id), ['appearance', 'navigation', 'words', 'notifications', 'agents']);
+  assert.deepEqual(DEFAULT_GROUPS[1]!.areas.map((a) => a.id), ['signing-in', 'people', 'ingest', 'keyboard', 'backups', 'billing', 'export', 'delete']);
   assert.ok(!DEFAULT_GROUPS.some((g) => g.areas.some((a) => a.id === 'look')), 'the design book is a setting again');
-  assert.ok(AREAS.has('look'), 'a link to the design book no longer lands');
+  const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
+  assert.match(route, /asked === 'look'\) void goto\(at\('\/design'\)/u, 'a link to the design book no longer lands');
+  /* THE OLD ADDRESSES LAND ON WHAT HOLDS THEM NOW. */
+  for (const [from, to] of [['identity', 'signing-in'], ['recovery', 'signing-in'], ['sessions', 'signing-in'], ['pages', 'navigation']] as const)
+    assert.equal(areaOf(from)?.id, to, from);
   assert.ok(!SETTINGS_INDEX.blocks.some((b) => (b.authored ?? []).some((r) => String(r.cells[1]).endsWith('/look'))));
 });

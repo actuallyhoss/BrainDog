@@ -21,7 +21,11 @@
   let { shell }: AreaProps = $props();
 
   /* THIS AREA'S OWN WORDS: the group the ways back in sit under. */
-  const words = { wayBack: 'Getting back in' };
+  const words = {
+    wayBack: 'Getting back in',
+    /* ONE SENTENCE FOR THE EMPTY TILE (first table): what is missing and what it costs, where a mailed link exists. */
+    noPasskey: (magic: boolean) => (magic ? 'No passkey yet. Without one, an email link is your only way back in.' : copy.noPasskeys),
+  };
 
   /* THE HOST'S ANSWER ABOUT SIGNING IN IS SHARED with Identity, where signing out changes it
      (`settings-state.svelte.ts`). The names below are the ones this markup reads. */
@@ -93,7 +97,7 @@
     {#if liveKeys === null}
       <p class="hint">{copy.passkeysUnread}</p>
     {:else if liveKeys.length === 0}
-      <Empty kind="no-data-yet" title={copy.noPasskeys} body={copy.noPasskeysWhy(livePasskeys.magic !== false)} />
+      <Empty kind="no-data-yet" title={words.noPasskey(livePasskeys.magic !== false)} body={livePasskeys.magic !== false ? undefined : copy.noPasskeysWhy(false)} />
     {:else}
       <ul class="ledger ledger-lead">
         {#each liveKeys as k (k.id)}
@@ -151,15 +155,15 @@
   <p class="hint">{copy.passkeyHow}</p>
   <Empty
     kind="no-data-yet"
-    title={copy.noPasskeys}
-    body={copy.noPasskeysWhy(hostAuth.magic !== false)}
+    title={words.noPasskey(hostAuth.magic !== false)}
+    body={hostAuth.magic !== false ? undefined : copy.noPasskeysWhy(false)}
     actions={hostAuth.passkey && !hostAuth.me ? signInToAdd : undefined}
   />
 </Section>
 {/if}
 
 {#snippet signInToAdd()}
-  <Button href={signinFor(page.url)}>{copy.signIn}</Button>
+  <Button href={signinFor(page.url)}>{copy.addPasskey}</Button>
 {/snippet}
 
 <!-- THE WAYS BACK IN, IN THE ORDER THEY ARE NEEDED: one passkey lost, all of them lost, and too many tries. -->

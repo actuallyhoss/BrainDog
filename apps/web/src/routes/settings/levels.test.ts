@@ -25,7 +25,8 @@ import { OWNER_CONTROLS, ownsRecord, words } from './levels.ts';
 
 /** Every area the rail offers, in the order the page draws them. */
 const AREAS = [
-  'appearance', 'look', 'keyboard', 'navigation', 'pages', 'people', 'recovery', 'sessions', 'identity',
+  /* THE DESIGN BOOK LEFT FOR `/design` (UI pass 20 Oct); Signing in is Identity, Recovery and Sessions, read each. */
+  'appearance', 'keyboard', 'navigation', 'pages', 'people', 'recovery', 'sessions', 'identity', 'signingIn',
   'agents', 'ingest', 'notifications', 'backups', 'billing', 'delete', 'export',
 ];
 

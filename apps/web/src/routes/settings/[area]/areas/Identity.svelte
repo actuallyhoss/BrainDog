@@ -24,7 +24,10 @@
   import { bareOrigin, settingsState, type AreaProps } from '../settings-state.svelte.ts';
   import { hostedHere } from '../../billing.ts';
 
-  let { shell }: AreaProps = $props();
+  /* `part` DRAWS HALF OF IT inside Signing in (agents F14): `you` is who you are and how you sign in, `records` the
+     records you can open and closing your account, so the passkeys and the places you are signed in sit between them.
+     With no part it is all of it, in its old order. */
+  let { shell, part }: AreaProps & { part?: 'you' | 'records' | undefined } = $props();
 
   /* THE MEMBERS AND THE SIGN-IN ARE SHARED: People reads the same list and Recovery the same host
      answer (`settings-state.svelte.ts`). The names below are the ones this markup reads. */
@@ -335,6 +338,8 @@
   }
 </script>
 
+{#if part !== 'records'}
+
 <!--
   THE AREA OPENS WITH THE PERSON: their face, their name and how they sign in, never an id.
   The name is the record's `renamePerson`, which the host carries into every other record they
@@ -425,7 +430,7 @@
         <li class="fact-act">
           <IconWell name="key" /><span class="fact-key">{copy.identityPasskeysWay}</span>
           <span class="fact-value">{(s.liveKeys?.length ?? 0) === 0 ? copy.identityPasskeys(0) : keysSaid.line}</span>
-          {#if keysSaid.short}<span class="fact-do"><Button href={at('/settings/recovery')}>{copy.addPasskey}</Button></span>{/if}
+          {#if keysSaid.short}<span class="fact-do"><Button href={at('/settings/signing-in')}>{copy.addPasskey}</Button></span>{/if}
         </li>
       {/if}
       {#if passkeysHere && (s.liveKeys?.length ?? 0) > 0}
@@ -494,7 +499,9 @@
     {:else}
       <!-- WITH A WAY BACK HERE. A bare `/signin` sent the person to the app's front door after
            signing in, which is the tab's kept sample. -->
-      <Button href={signinFor(page.url)}>{copy.signIn}</Button>
+      <!-- "ADD A PASSKEY", NOT "SIGN IN" (agents F14): nothing here is a second sign-in, and inside Signing in the
+           Passkeys tile right under this offers it, so it is drawn only on its own. -->
+      {#if part === undefined}<Button href={signinFor(page.url)}>{copy.addPasskey}</Button>{/if}
     {/if}
   </div>
   {#if outSaid}<p class="hint" role="status">{outSaid}</p>{/if}
@@ -534,6 +541,9 @@
   {/snippet}
 </Sheet>
 
+{/if}
+
+{#if part !== 'you'}
 <!-- "RECORDS YOU CAN OPEN" OVER TWO ROWS YOU COULD NOT OPEN. A heading that names an action
      above a list that does not offer it is the plainest kind of lie a screen can tell, and
      this one told it about the one thing the section exists for.
@@ -625,6 +635,8 @@
       {/if}
     {/snippet}
   </Sheet>
+{/if}
+
 {/if}
 
 <style>

@@ -51,22 +51,19 @@
     type Sign,
     type UsageState,
   } from './health.ts';
-  import { AREAS, DEFAULT_GROUPS, SETTINGS_INDEX, SETTINGS_PAGE, groupsOf, labelIn, type AreaGroup } from './place.ts';
+  import { AREAS, DEFAULT_GROUPS, SETTINGS_INDEX, SETTINGS_PAGE, areaOf, groupsOf, labelIn, type AreaGroup } from './place.ts';
+  import Menu from '$lib/ui/Menu.svelte';
   import { openSettings } from './settings-state.svelte.ts';
   import SettingsIndex from './SettingsIndex.svelte';
   /* THE ROWS EVERY AREA SHARES, scoped under `.settings-place` below; the file says why it is global. */
   import './settings.css';
   /* EVERY AREA TAKES `{ shell, area }` AND NOTHING ELSE, so each arm of the chain below is the same line. */
   import Appearance from './areas/Appearance.svelte';
-  import Identity from './areas/Identity.svelte';
-  import Recovery from './areas/Recovery.svelte';
-  import Sessions from './areas/Sessions.svelte';
+  import SigningIn from './areas/SigningIn.svelte';
   import People from './areas/People.svelte';
   import Ingest from './areas/Ingest.svelte';
   import Keyboard from './areas/Keyboard.svelte';
-  import Look from './areas/Look.svelte';
   import Navigation from './areas/Navigation.svelte';
-  import Pages from './areas/Pages.svelte';
   import Notifications from './areas/Notifications.svelte';
   import Backups from './areas/Backups.svelte';
   import Billing from './areas/Billing.svelte';
@@ -92,7 +89,7 @@
   openSettings(() => shell);
 
   /* NO AREA IS THE INDEX: `/settings` draws this file with nothing in the address. */
-  const area = $derived(page.params.area);
+  const asked = $derived(page.params.area);
 
   /**
    * WHETHER THIS IS AN AREA AT ALL, which nothing asked.
@@ -106,7 +103,14 @@
    *
    * EVERY AREA THIS BUILD DRAWS, whatever the index lists: an area somebody left out of their index still opens.
    */
-  const known = $derived(area === undefined ? undefined : AREAS.get(area));
+  const known = $derived(asked === undefined ? undefined : areaOf(asked));
+  /* THE AREA BY ITS ID, NOT ITS ADDRESS: a moved address (`place.ts` `MOVED`) is the area that holds it now. */
+  const area = $derived(known?.id ?? asked);
+
+  /* THE DESIGN BOOK MOVED TO `/design` (agents F29): its old address goes there, so a link to it still lands. */
+  $effect(() => {
+    if (asked === 'look') void goto(at('/design'), { replaceState: true });
+  });
 
   /* ── the index, declared ─────────────────────────────────────────────────
      THE RECORD'S OWN `settings` PAGE WHERE IT HOLDS ONE, else the house body, drawn by the record (`previewPage`) as
@@ -164,7 +168,9 @@
 
   /* THIS SCREEN'S OWN WORDS: the index's one tool, and its line where the record has no health to say. */
   const words = {
-    arrange: 'Arrange',
+    arrange: 'Reorder the areas',
+    more: 'More',
+    designBook: 'Design book',
     lead: (name: string) => `How ${name || 'BrainDog'} looks and opens, who can reach it, and what it keeps.`,
   } as const;
 
@@ -404,7 +410,9 @@
 
 <svelte:head><title>{titleOf(label, copy.settings)}</title></svelte:head>
 
-{#if area !== undefined && !known}
+{#if asked === 'look'}
+  <!-- On its way to `/design`. -->
+{:else if area !== undefined && !known}
   <div class="gone">
     <Empty
       kind="error"
@@ -418,14 +426,22 @@
 {:else}
 <!-- AN AREA'S HEAD LINKS BACK TO THE INDEX: the kicker at 1440, the back link in the phone's bar. The
      index's own head is the one word, with nowhere above it to go back to, and its one tool. -->
+<!-- THE INDEX'S "⋯" (agents F28, F29): reordering the areas, the owner's, and the design book. Nothing else sits on the
+     head, so the list under it is the first thing read. -->
 {#snippet indexTools()}
-  <Button weight="bare" disabled={arranging} aria-busy={arranging} onclick={() => void arrangeIndex()}>
-    <Icon name="edit" size="s" />
-    {words.arrange}
-  </Button>
+  <Menu label={words.more} align="end">
+    {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="isr">{words.more}</span></span>{/snippet}
+    {#if mayArrange}
+      <button type="button" role="menuitem" disabled={arranging} aria-busy={arranging} onclick={() => void arrangeIndex()}
+        ><Icon name="edit" size="s" />{words.arrange}</button
+      >
+    {/if}
+    <a role="menuitem" href={at('/design')}><Icon name="eye" size="s" />{words.designBook}</a>
+  </Menu>
 {/snippet}
 {#if known}
-  <PageHead icon="settings" kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} below={fault ? faultTools : undefined} />
+  <!-- EACH AREA UNDER ITS OWN GLYPH (agents F28): the sun for Appearance, the bell for Notifications. -->
+  <PageHead icon={known.icon} kicker={copy.settings} back="/settings" title={label ?? known.label} sentence={health ? healthLine : undefined} below={fault ? faultTools : undefined} />
 {:else}
   <!-- THE INDEX OPENS ON A LEAD TILE, as a declared page does: its name and Arrange ride over the top of the tile and the
        line under them is the headline. Arrange waits for the pointer or the keyboard to reach the tile. `display:
@@ -436,7 +452,7 @@
       title={copy.settings}
       sentence={health ? healthLine : words.lead(shell.refused ? '' : shell.index.name)}
       below={fault ? faultTools : undefined}
-      actions={mayArrange ? indexTools : undefined}
+      actions={indexTools}
     />
   </div>
 {/if}
@@ -465,20 +481,12 @@
       <Appearance {shell} {area} />
     {:else if area === 'keyboard'}
       <Keyboard {shell} {area} />
-    {:else if area === 'look'}
-      <Look {shell} {area} />
     {:else if area === 'navigation'}
       <Navigation {shell} {area} />
-    {:else if area === 'pages'}
-      <Pages {shell} {area} />
     {:else if area === 'people'}
       <People {shell} {area} />
-    {:else if area === 'recovery'}
-      <Recovery {shell} {area} />
-    {:else if area === 'sessions'}
-      <Sessions {shell} {area} />
-    {:else if area === 'identity'}
-      <Identity {shell} {area} />
+    {:else if area === 'signing-in'}
+      <SigningIn {shell} {area} />
     {:else if area === 'agents'}
       <!-- AGENTS BY `import()`: its tiles are the panels a page may host too (trust, Slash reads, the reader's keys), so
            drawn from both places their styles are chunks of their own, and listed here they pushed the entry script
@@ -599,6 +607,16 @@
 
   .index-head {
     display: contents;
+  }
+
+  /* THE "⋯"'S NAME, said to a screen reader and not drawn. */
+  .isr {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* THE INDEX IS ONE COLUMN, the page's own, as Home's body is: its tiles carry their spans. */
