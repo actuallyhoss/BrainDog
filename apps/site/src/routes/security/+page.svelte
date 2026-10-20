@@ -197,12 +197,13 @@
     background: var(--board);
   }
 
-  /* TWELVE COLUMNS AT A DESK, a tile saying how many it takes; one column below 900. */
+  /* TWELVE COLUMNS AT A DESK, a tile saying how many it takes; one column below 900. Tiles in a row share its height
+     and their words start at the top (site F18), so no row leaves a hole. */
   .facts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
   }
 
   @media (width >= 900px) {
@@ -255,7 +256,7 @@
   @media (width > 1200px) {
     .split {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      align-items: center;
+      align-items: start;
     }
   }
 

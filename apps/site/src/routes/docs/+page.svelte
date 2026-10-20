@@ -22,6 +22,17 @@
   let { data }: PageProps = $props();
 
   const w = docsWords;
+
+  /* THE CARDS IN COLUMNS, so a short card never leaves a hole beside a long one (site F19): Start here across the
+     top, then the sections as three columns of about the same height at a desk, each column's cards one under another.
+     A section not named here goes in the last column. */
+  const COLUMNS: readonly (readonly string[])[] = [['start'], ['use', 'api'], ['agents', 'dialect'], ['packs']];
+  const groups = $derived.by(() => {
+    const named = new Set(COLUMNS.flat());
+    const out = COLUMNS.map((ids) => data.sections.filter((s) => ids.includes(s.id)));
+    out.at(-1)!.push(...data.sections.filter((s) => !named.has(s.id)));
+    return out.filter((g) => g.length > 0);
+  });
 </script>
 
 <svelte:head>
@@ -42,8 +53,10 @@
 
 <!-- No name of its own: the head above is the region the page title names, and this one named the same was a second landmark with that name. -->
 <section class="wrap secs">
-  <ul class="cards">
-    {#each data.sections as section (section.id)}
+  <div class="cards">
+    {#each groups as group, gi (gi)}
+    <ul class="col" class:top={group[0]?.id === 'start'}>
+    {#each group as section (section.id)}
       {#if section.id === 'start'}
         <li class="sec start">
           <div class="sec-head">
@@ -81,7 +94,9 @@
       </li>
       {/if}
     {/each}
-  </ul>
+    </ul>
+    {/each}
+  </div>
 </section>
 
 <style>
@@ -100,15 +115,24 @@
     padding-block: 56px 96px;
   }
 
-  /* THREE CARDS A ROW AT A DESK, two between, one on a phone. */
+  /* THREE COLUMNS OF CARDS AT A DESK, two between, one on a phone; Start here across the top. */
   .cards {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
     gap: 16px;
+  }
+
+  .col {
+    display: grid;
+    gap: 16px;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .col.top {
+    grid-column: 1 / -1;
   }
 
   /* A CARD: flat --paper, radius 24, no edge and no shadow, as the design's plans are. */
@@ -118,15 +142,12 @@
     gap: var(--sp-3);
     min-inline-size: 0;
     padding: 28px 28px 24px;
+    border-block-end: 0;
     background: var(--paper);
     border-radius: 16px;
   }
 
-  /* START HERE takes the whole first row, its three links side by side at a desk. */
-  .sec.start {
-    grid-column: 1 / -1;
-  }
-
+  /* START HERE's three links sit side by side at a desk. */
   .start-links {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

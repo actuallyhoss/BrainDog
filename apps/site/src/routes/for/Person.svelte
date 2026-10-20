@@ -127,7 +127,10 @@
     margin: 0;
   }
 
+  /* The drawing sits on the paper tile, so its own raised surfaces (a rule's steps) take the page's ground, or they
+     vanish into the tile. */
   .drawing {
+    --s1: var(--page);
     min-inline-size: 0;
   }
 
