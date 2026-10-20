@@ -875,7 +875,7 @@
     untrack(() => {
       void import('$lib/data/local-tab.ts').then((m) => m.claimLocal(base, me));
       /* AND THE ACCESS EPOCH IT BOOTED WITH, which the version poll compares: a move boots the tab again (§2.8). */
-      followGrant(me.grant?.epoch ?? null);
+      followGrant(me.grant?.epoch ?? null, () => invalidate('braindog:boot'));
     });
   });
 

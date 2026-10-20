@@ -49,10 +49,14 @@ export const live = $state<{ state: LiveState; version: number | null; from: num
  * answers. `undefined` until a live shell says it, so a poll that starts first re-boots nothing.
  */
 let known: number | null | undefined;
+/* HOW THE TAB BOOTS AGAIN, handed in by the layout with the epoch: its own `invalidate`. Importing `$app/navigation`
+   here by `import()` kept every one of its exports in the entry script (`bundle` gate). */
+let again: (() => Promise<void>) | null = null;
 
-/** The epoch the live shell booted with, or `null` for somebody no share let in. */
-export function followGrant(epoch: number | null): void {
+/** The epoch the live shell booted with, or `null` for somebody no share let in, and how to boot the tab again. */
+export function followGrant(epoch: number | null, boot: (() => Promise<void>) | null = null): void {
   known = epoch;
+  again = boot;
 }
 
 /**
@@ -61,9 +65,9 @@ export function followGrant(epoch: number | null): void {
  * answer and never the old one.
  */
 async function reboot(): Promise<void> {
-  const [boot, nav] = await Promise.all([import('$lib/record/boot-live.ts'), import('$app/navigation')]);
-  boot.forget();
-  await nav.invalidate('braindog:boot');
+  if (again === null) return;
+  (await import('$lib/record/boot-live.ts')).forget();
+  await again();
 }
 
 /**

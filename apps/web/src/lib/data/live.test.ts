@@ -329,7 +329,7 @@ test('an ended refusal wipes both copies and draws the ended screen; the worker 
   const layout = read('../../routes/+layout.svelte');
   assert.match(layout, /data\.refused\?\.at === 'access'/, 'a boot refused the same way draws the same screen');
   assert.match(layout, /<AccessEnded said=\{endedSaid\} \/>/);
-  assert.match(layout, /followGrant\(me\.grant\?\.epoch \?\? null\)/, 'the layout tells the poll the epoch it booted with');
+  assert.match(layout, /followGrant\(me\.grant\?\.epoch \?\? null, \(\) => invalidate\('braindog:boot'\)\)/, 'the layout tells the poll the epoch it booted with, and how to boot again');
   const worker = read('../../service-worker.ts');
   assert.match(worker, /res\.status === 401 \|\| accessEnded\(res\.headers\)/, 'the worker deletes its copy on the header');
   assert.equal(accessEnded(new Headers({ 'x-braindog-access': 'ended' })), true);
