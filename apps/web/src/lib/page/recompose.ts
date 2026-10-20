@@ -138,9 +138,22 @@ function ms(style: CSSStyleDeclaration, token: string, fallback: number): number
   return Math.min(280, Math.max(0, got));
 }
 
+/**
+ * THE ELEMENT A COPY IS LAID AGAINST: the page itself, or, where the page has no box of its own (`display: contents`, as
+ * on Today's desk, where the page's blocks are tiles of the board), the nearest ancestor that is positioned, which is
+ * the box an absolutely placed copy is placed in. Measured against the page's empty box a copy stood where the window
+ * said, and had to be pinned to the window to look right.
+ */
+export function frameOf(page: HTMLElement): HTMLElement {
+  if (typeof getComputedStyle !== 'function' || getComputedStyle(page).display !== 'contents') return page;
+  let up = page.parentElement;
+  while (up && getComputedStyle(up).position === 'static') up = up.parentElement;
+  return up ?? page;
+}
+
 /** Each drawn block's element and box, by key, measured against the page's own box. */
 function measure(page: HTMLElement): Map<string, { el: HTMLElement; box: Box }> {
-  const origin = page.getBoundingClientRect();
+  const origin = frameOf(page).getBoundingClientRect();
   const out = new Map<string, { el: HTMLElement; box: Box }>();
   for (const el of page.querySelectorAll<HTMLElement>(SLOTS)) {
     /* A GHOST STILL FADING is not a block of the page. */
@@ -252,7 +265,7 @@ export function recomposer(): {
     }
     return () => {
       const now = measure(page);
-      const plan = planOf(boxes(was), boxes(now), page.getBoundingClientRect().width);
+      const plan = planOf(boxes(was), boxes(now), frameOf(page).getBoundingClientRect().width);
       const style = getComputedStyle(page);
       const less = still();
       const ease = (token: string, fallback: string) => style.getPropertyValue(token).trim() || fallback;

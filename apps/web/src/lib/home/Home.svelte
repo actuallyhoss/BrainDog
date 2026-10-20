@@ -1136,11 +1136,8 @@
     order: 40;
   }
 
-  /* A TILE LEAVING THE BOARD FADES WHERE IT STOOD. The reader lays its copy against the page's own box, and on the desk
-     the page has none, so the copy is measured against the window; it is held to the window for the length of the fade. */
-  .body[data-board] :global(.home-page > .page > [data-leaving]) {
-    position: fixed !important;
-  }
+  /* A TILE LEAVING THE BOARD FADES WHERE IT STOOD: the reader lays its copy against the board, which is the box the page
+     has on the desk (`recompose.ts` `frameOf`), so nothing here holds it anywhere. */
 
   @container desk (inline-size >= 960px) {
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='needs-you']) {
