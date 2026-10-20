@@ -24,6 +24,7 @@
     "svelte": "5.57.0"
   },
   "devDependencies": {
+    "@braindog/record": "workspace:*",
     "@braindog/skin": "workspace:*",
     "@sveltejs/adapter-static": "3.0.10",
     "@sveltejs/kit": "2.70.3",
