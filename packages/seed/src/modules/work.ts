@@ -992,8 +992,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         kind: 'section',
         heading: 'Not this week',
         icon: 'archive',
-        /* A THIRD OF THE ROW, SINCE the UI pass of 20 October (proj F10): the three folded groups are one row of three. */
-        span: 4,
+        span: 12,
         fold: true,
         when: { metric: 'tasks-not-this-week', gt: 0 },
       },
@@ -1041,7 +1040,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         kind: 'section',
         heading: 'Needs a project',
         icon: 'inbox',
-        span: 4,
+        span: 12,
         fold: true,
         when: { metric: 'tasks-no-project', gt: 0 },
       },
@@ -1054,7 +1053,7 @@ export const WORK_PAGES: Record<string, SeedPage> = {
         /* `check`, SINCE work 1.12.0: a folded heading draws only the glyphs the app ships with, and `circle-check` drew
            nothing there. */
         icon: 'check',
-        span: 4,
+        span: 12,
         fold: true,
         when: { metric: 'tasks-done-7d', gt: 0 },
       },

@@ -121,10 +121,10 @@ test('WORK’S OVERVIEW LEADS WITH WHAT IS DUE, AS LISTS THAT TICK, and no task 
     ],
     headings.join(', '),
   );
-  /* NO HALF-EMPTY TILE: the three lists a third each, one row, and the three folded groups a third each under them. */
+  /* NO HALF-EMPTY TILE: the three lists a third each, one row, and the three folded groups each a heading across the page, as a section is. */
   const spans = Object.fromEntries((PAGES.work!.blocks as { heading?: string; span?: number }[]).filter((b) => b.heading).map((b) => [b.heading, b.span]));
   assert.deepEqual([spans['Late and this week'], spans['With an agent'], spans['Waiting on you']], [4, 4, 4]);
-  assert.deepEqual([spans['Not this week'], spans['Needs a project'], spans['Done lately']], [4, 4, 4]);
+  assert.deepEqual([spans['Not this week'], spans['Needs a project'], spans['Done lately']], [12, 12, 12]);
   assert.ok(!('Today' in spans), 'Today is a band of its own again');
   /* THE LINE TO TYPE INTO IS THE HEADER'S, SINCE work 1.16.0, which a page says by where it puts it: the first block the
      record draws after the page's sentence, a capture into tasks, with no heading or surface round it and nothing
