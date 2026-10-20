@@ -6,7 +6,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { DESK_MOST, cardsOf, projectsOf, type CardDecl } from './project-cards.ts';
+import { REGISTERS } from '../record/held.ts';
+import { learnRowPages } from '../record/row-href.ts';
+import type { RegisterDecl } from '../record/schema.ts';
+import { DESK_MOST, agentsOn, cardsOf, trendsOf, projectsOf, type CardDecl } from './project-cards.ts';
 
 const decl: CardDecl = {
   id: 'ventures',
@@ -85,4 +88,50 @@ test('the next step and one money figure are kept where the row has them', () =>
 test('a list with no state keeps every named project', () => {
   const bare: CardDecl = { ...decl, state: undefined };
   assert.equal(cardsOf(bare, [row(1, { name: 'A', lane: 'retired' })]).cards.length, 1);
+});
+
+test('a card opens the project\'s own page where its list made one, and its row screen stays one press away', () => {
+  REGISTERS.ventures = decl as unknown as RegisterDecl;
+  learnRowPages([{ slug: 'earn', about: { register: 'ventures', seq: 5 } }]);
+  try {
+    const { cards } = cardsOf(decl, [row(5, { name: 'Earn', lane: 'earning' }), row(6, { name: 'Other', lane: 'earning' })]);
+    assert.deepEqual(
+      cards.map((c) => [c.href, c.row]),
+      [
+        ['/p/earn', '/r/ventures/5?fields=1'],
+        ['/r/ventures/6', '/r/ventures/6?fields=1'],
+      ],
+    );
+  } finally {
+    learnRowPages([]);
+    delete REGISTERS.ventures;
+  }
+});
+
+test('a page that ordered its own cards keeps that order', () => {
+  const rows = [row(3, { name: 'B', lane: 'building' }), row(1, { name: 'A', lane: 'earning' })];
+  assert.deepEqual(
+    cardsOf(decl, rows, rows.length, true).cards.map((c) => c.name),
+    ['B', 'A'],
+  );
+});
+
+test('the agents on a card are the ones working on that project now, once each, by the name a person reads', () => {
+  const working = [
+    { agent: 'claude', project: 'Kiln' },
+    { agent: 'claude', project: 'Kiln' },
+    { agent: 'codex', project: 'Portage' },
+  ];
+  assert.deepEqual(agentsOn('Kiln', working), [{ agent: 'claude', name: 'Claude' }]);
+  assert.deepEqual(agentsOn('', working), []);
+});
+
+test('a declared card\'s line is read off its drawing by its column, with three points or more and a label', () => {
+  const rows = [
+    { cells: ['title', 'trend: Done a week'] },
+    { cells: ['Kiln', '1 2 3 4'], ref: { seq: 3 } },
+    { cells: ['Portage', '1 2'], ref: { seq: 4 } },
+  ];
+  assert.deepEqual([...trendsOf(rows)], [[3, { values: [1, 2, 3, 4], label: 'Done a week' }]]);
+  assert.equal(trendsOf([{ cells: ['title', 'trend'] }, rows[1]!]).size, 0, 'a bare line says nothing');
 });

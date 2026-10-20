@@ -6,7 +6,11 @@
  * a card; the lane is whatever the list's state field holds. Pure, so `project-cards.test.ts` holds the rules.
  */
 
+import { cardLayout, trendOf } from 'braindog-render';
+
 import { briefFromNote } from '../record/brief.ts';
+import { actor } from '../record/names.ts';
+import { rowHref, rowScreen } from '../record/row-href.ts';
 
 /** What of a list's declaration decides its cards. */
 export type CardDecl = {
@@ -31,7 +35,10 @@ export type ProjectCard = {
   brief: string | null;
   next: string | null;
   figure: { minor: number; currency: string; field: string } | null;
+  /** Where the card opens: the project's own page where its list made one, else the row's screen. */
   href: string;
+  /** The row's own screen, where its fields are written and a draft is deleted, whatever page it has. */
+  row: string;
   /** The row's number in its list, which the two presses on a draft write by. */
   seq: number;
   /** The record formed this from the agent's first session and the person has not kept it (`draft` on the row). */
@@ -63,7 +70,8 @@ const said = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 /* Lanes that earn come first, then those being built, then anything else the list calls a lane. */
 const RANK: Readonly<Record<string, number>> = { earning: 0, building: 1 };
 
-function moneyOf(decl: CardDecl, fields: Readonly<Record<string, unknown>>): ProjectCard['figure'] {
+/** The figure a project leads with: its first money field holding more than nothing, the same on its card and its page. */
+export function figureOf(decl: Pick<CardDecl, 'fields'>, fields: Readonly<Record<string, unknown>>): ProjectCard['figure'] {
   for (const f of decl.fields) {
     if (f.type !== 'money') continue;
     const v = fields[f.id];
@@ -77,14 +85,17 @@ function moneyOf(decl: CardDecl, fields: Readonly<Record<string, unknown>>): Pro
 }
 
 /** The row's hue where it holds a number, else `null`; an empty field is not hue 0. */
-function hueOf(decl: CardDecl, fields: Readonly<Record<string, unknown>>): number | null {
+export function hueOf(decl: Pick<CardDecl, 'identity'>, fields: Readonly<Record<string, unknown>>): number | null {
   const v = fields[decl.identity?.accent ?? 'hue'];
   const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : Number.NaN;
   return Number.isFinite(n) ? n : null;
 }
 
-/** The cards for the desk, in order: earning, building, the rest, each by number; and how many were left off the end. */
-export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MOST): { cards: ProjectCard[]; more: number } {
+/**
+ * The cards for the desk, in order: earning, building, the rest, each by number; and how many were left off the end.
+ * `kept` keeps the rows in the order they came, for a page whose own block already ordered them (Projects' In play).
+ */
+export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MOST, kept = false): { cards: ProjectCard[]; more: number } {
   const live = rows.flatMap((r) => {
     const name = said(r.fields[decl.title]);
     const lane = decl.state ? said(r.fields[decl.state]) : '';
@@ -92,7 +103,7 @@ export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MO
   });
   /* A DRAFT COMES FIRST: it is the one thing on the desk waiting for a press. */
   const drafty = (r: CardRow): number => (r.fields.draft === true ? 0 : 1);
-  live.sort((a, b) => drafty(a.r) - drafty(b.r) || (RANK[a.lane] ?? 2) - (RANK[b.lane] ?? 2) || a.r.seq - b.r.seq);
+  if (!kept) live.sort((a, b) => drafty(a.r) - drafty(b.r) || (RANK[a.lane] ?? 2) - (RANK[b.lane] ?? 2) || a.r.seq - b.r.seq);
   const cards = live.slice(0, most).map(({ r, name, lane }): ProjectCard => {
     const f = r.fields;
     const about = said(f.about);
@@ -104,12 +115,39 @@ export function cardsOf(decl: CardDecl, rows: readonly CardRow[], most = DESK_MO
       lane,
       brief: about !== '' ? about : (briefFromNote(said(f.note), name, 1)[0] ?? null),
       next: said(f.next) || null,
-      figure: moneyOf(decl, f),
-      href: `/r/${decl.id}/${r.seq}`,
+      figure: figureOf(decl, f),
+      /* THE PROJECT'S PAGE, where its path, money and work are drawn (the plan of 20 October, batch 3d), never its row. */
+      href: rowHref(`${decl.id}#${r.seq}`) ?? `/r/${decl.id}/${r.seq}`,
+      row: rowScreen(decl.id, r.seq),
       seq: r.seq,
       draft: f.draft === true,
       made: typeof r.created_at === 'string' ? r.created_at : null,
     };
   });
   return { cards, more: Math.max(0, live.length - cards.length) };
+}
+
+/** The agents working on a project now, once each: the kind its mark is drawn from and the name a person reads. */
+export function agentsOn(name: string, working: readonly { agent: string; project: string | null }[]): { agent: string; name: string }[] {
+  const out = new Map<string, { agent: string; name: string }>();
+  for (const w of working) if (name !== '' && w.project === name && !out.has(w.agent)) out.set(w.agent, { agent: w.agent, name: actor(w.agent).name });
+  return [...out.values()];
+}
+
+/**
+ * THE LINE EACH CARD OF A DECLARED CARDS BLOCK DRAWS (`as: trend`), by the row's number: its numbers, oldest first, and
+ * its column's label. The block's drawing names what each column is in its first row (`cardLayout`), so the line is
+ * read where the page put it. Only a labelled line with three points or more, since a bare line says nothing.
+ */
+export function trendsOf(rows: readonly { cells: readonly string[]; ref?: { seq: number } | null | undefined }[]): Map<number, { values: number[]; label: string }> {
+  const out = new Map<number, { values: number[]; label: string }>();
+  const L = cardLayout([...(rows[0]?.cells ?? [])]);
+  const label = L.trend >= 0 ? (L.labels[L.trend] ?? '').trim() : '';
+  if (label === '') return out;
+  for (const r of rows.slice(1)) {
+    const t = r.ref ? trendOf(r.cells[L.trend] ?? '') : null;
+    const values = (t?.said ?? []).map((v) => Number(v.replace(/−/gu, '-').replace(/,/gu, ''))).filter((n) => Number.isFinite(n));
+    if (r.ref && values.length >= 3) out.set(r.ref.seq, { values, label });
+  }
+  return out;
 }

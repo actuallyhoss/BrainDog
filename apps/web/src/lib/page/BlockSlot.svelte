@@ -31,7 +31,7 @@
   import { page as route } from '$app/state';
   import { copy } from '$lib/copy.ts';
   import { said as voiceSaid } from '$lib/voice.svelte.ts';
-  import { homeCurrency } from '$lib/record/api.ts';
+  import { decl as fieldDecl, homeCurrency, labelOf } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import { symbolText } from '$lib/record/money.ts';
   import { draw, saidPlainly, walkTables } from '$lib/record/blocks.ts';
@@ -65,6 +65,10 @@
   import { lateDoors, lateWhere, lateWords, linesIn, moneyListOf, type WithRows } from '$lib/home/home-rows.ts';
   import { words } from './words.ts';
   import { blockWords } from '$lib/record/block-edit.ts';
+  import ProjectCard from '$lib/ui/ProjectCard.svelte';
+  import { agentsOn, cardsOf, trendsOf, type CardDecl } from '$lib/home/project-cards.ts';
+  import { isProject } from '$lib/record/project.ts';
+  import { workingNow } from '$lib/home/waits.svelte.ts';
 
   let {
     block,
@@ -472,6 +476,27 @@
       : null,
   );
   const drawing = $derived<Opening<(typeof drawn.segments)[number]>[]>(grouped ?? drawn.segments.map((segment) => ({ kind: 'segment', segment })));
+  /* ── projects as cards ─────────────────────────────────────────────────────
+     A CARDS BLOCK OVER THE PROJECTS LIST IS DRAWN AS THE ONE PROJECT CARD (`ui/ProjectCard.svelte`), the card Today's desk
+     draws (the plan of 20 October: one card everywhere). The list is found by what it declares (`scopes`), never by its
+     name; the block's own rows, order and limit stand, and its line is read off its drawing (`trendsOf`). Not a block in
+     groups, which draws its groups' heads. */
+  const projectCards = $derived.by(() => {
+    const list = block.register;
+    const d = list ? REGISTERS[list] : undefined;
+    if (block.kind !== 'cards' || block.group || drawn.refusal || !list || !d || !isProject(d)) return null;
+    const rows = (block.entries ?? []).flatMap((e) => (typeof e.seq === 'number' && typeof e.fields === 'object' && e.fields !== null ? [{ seq: e.seq, fields: e.fields }] : []));
+    const { cards } = cardsOf({ ...(d as unknown as CardDecl), id: list }, rows, rows.length, true);
+    if (cards.length === 0) return null;
+    const seg = drawn.segments.find((x) => x.type === 'block' && x.kind === 'cards');
+    const trends = seg && seg.type === 'block' ? trendsOf(seg.rows) : new Map();
+    const working = workingNow();
+    return cards.map((c) => {
+      const f = c.figure ? fieldDecl(list, c.figure.field) : undefined;
+      return { card: c, label: f ? labelOf(f) : '', trend: trends.get(c.seq) ?? null, agents: agentsOn(c.name, working) };
+    });
+  });
+
   /* WHETHER THE BLOCK IS DRAWN AS MORE THAN ONE RUN OF ROWS. Such a block is read run by run: each run is handed its
      place, and a row is marked as arrived only when no other run of the block held it (`marked` in `page-writes.ts`).
      A BLOCK WHOSE GROUPS OPEN IN PLACE STILL MARKS NONE: the cards a press unfolds are new to their run and were in no
@@ -569,6 +594,10 @@
       />{/if}{/each}
     {#if asked.more > 0}<a class="queue-more" href={inApp('/decide')}>{compact ? queueWords.moreOnDecide(asked.more) : queueMore(asked.more)}</a>{/if}
   </div>
+{:else if projectCards}
+  <ul class="project-cards">
+    {#each projectCards as p (p.card.key)}<li><ProjectCard card={p.card} label={p.label} trend={p.trend} agents={p.agents} inset /></li>{/each}
+  </ul>
 {:else}
   {#each drawing as item, run}
     {#if item.kind === 'open'}
@@ -911,5 +940,15 @@
     .block-where {
       display: none;
     }
+  }
+
+  /* AS MANY AS HOLD 15rem, one column on a phone, as Today's desk lays the same cards. */
+  .project-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+    gap: var(--sp-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 </style>
