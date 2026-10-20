@@ -214,8 +214,11 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
     const ratio = (d.value as { ratio?: { per?: object } } | undefined)?.ratio;
     return ratio !== undefined && ratio.per !== undefined && 'distinct' in ratio.per;
   };
-  const drawn = Object.entries(METRICS).filter(([, d]) => !isTemplate(d) && unreadable(d).length === 0 && d.source !== 'register.books' && !silentWhenNone(d));
-  /* THE SAMPLE KEEPS NO BOOK, so a figure over books has no row to open and the palette rightly gives it no door. */
+  const drawn = Object.entries(METRICS).filter(
+    ([, d]) => !isTemplate(d) && unreadable(d).length === 0 && d.source !== 'register.books' && d.source !== 'register.kpis' && !silentWhenNone(d),
+  );
+  /* THE SAMPLE KEEPS NO BOOK, so a figure over books has no row to open and the palette rightly gives it no door. NOR
+     ANY KEY NUMBER, Portfolio's since 1.19.0, for the same reason. */
   assert.ok(drawn.length >= 5, 'the figures group would be all but empty');
   for (const [id, decl] of drawn) {
     const read = metric(id);
@@ -240,9 +243,10 @@ test('AND IT REACHES THE FIGURES, which no search could reach before', () => {
   /* AND THE ONES IT DROPS REALLY ARE UNREADABLE, so the filter is not throwing away rows that work. */
   for (const [id, decl] of Object.entries(METRICS))
     if (isTemplate(decl)) {
-      /* A walk's parameter is in its legs and its opening and not in a `where` (`book-lasts-until`). */
+      /* A walk's parameter is in its legs and its opening and not in a `where` (`book-lasts-until`), and a tree's is in
+         the tree (`kpi-stale`). */
       const walk = decl as { legs?: unknown; opening?: unknown };
-      assert.match(`${decl.where ?? ''}${JSON.stringify([walk.legs ?? null, walk.opening ?? null])}`, /\{\{/u, `${id} is dropped as a template and carries no parameter`);
+      assert.match(JSON.stringify([decl.where ?? null, walk.legs ?? null, walk.opening ?? null]), /\{\{/u, `${id} is dropped as a template and carries no parameter`);
     }
 });
 

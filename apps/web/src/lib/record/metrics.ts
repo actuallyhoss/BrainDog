@@ -445,14 +445,15 @@ export function hrefFor(decl: MetricDecl): string | null {
  * wrote, and the record still checks it against the register, so `project-owed:Atlantis` is refused
  * by name rather than reported as nothing owed.
  */
-/* A WHERE MAY BE A PREDICATE TREE and not a sentence (one sentence cannot mix a comma with an `or`), and a tree is
-   never a template, so only a sentence is searched. */
+/* A WHERE MAY BE A PREDICATE TREE and not a sentence (one sentence cannot mix a comma with an `or`), and a tree can be
+   a template too since portfolio 1.19.0: `kpi-stale` names its measure in one, since a measure's name may hold a comma.
+   So the tree is searched as well as a sentence. */
 /* A WALK'S HOLE IS IN ITS LEGS AND IN THE FIGURE IT OPENS FROM (book-walk-opening-76): `book-lasts-until` has no `where`
    and opens from `book-cash:{{it}}`. Read by `where` alone it was a figure with nothing to fill, offered in the palette
    and read bare, where the record refuses it and asks for it by name. */
 export const isTemplate = (decl: MetricDecl): boolean => {
   const walk = decl as { legs?: unknown; opening?: unknown };
-  return (typeof decl.where === 'string' && decl.where.includes('{{')) || JSON.stringify([walk.legs ?? null, walk.opening ?? null]).includes('{{');
+  return JSON.stringify([decl.where ?? null, walk.legs ?? null, walk.opening ?? null]).includes('{{');
 };
 
 /** The ten aggregations this build reads. `08` §2.2 publishes eleven; the rest are post-v1. */
