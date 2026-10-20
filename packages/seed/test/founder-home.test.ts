@@ -201,7 +201,8 @@ test("FROM THE SENTENCE ALONE A FOUNDER'S FIRST DAY HOLDS PROJECTS, MONEY AND IT
   /* WHAT AN EMPTY RECORD HOLDS OF ITS OWN (the kernel's lists) is left out: it is there whatever was said. */
   const bare = held(await openRecord(openSqlite(), fixedClock(NOW)));
   const lists = held(k).filter((l) => !bare.includes(l));
-  assert.deepEqual(lists.sort(), [...listsOf('portfolio'), ...listsOf('money-core'), 'datapoints'].sort());
+  /* NUMBERS IS PROJECTS' OWN SINCE portfolio 1.19.0, and its key numbers with it. */
+  assert.deepEqual(lists.sort(), [...listsOf('portfolio'), ...listsOf('money-core')].sort());
   for (const list of ['services', 'tasks', 'people', 'organisations']) assert.ok(!lists.includes(list), `day 0 holds ${list}, and nothing said points at it`);
   assert.ok(lists.length < 18, `day 0 opens on ${lists.length} lists`);
 });
@@ -210,7 +211,7 @@ test("ITS TODAY NAMES ONLY THE LISTS IT HOLDS, opens on the money, and draws wit
   const { k } = await fresh(SAID);
   const holds = held(k);
   assert.deepEqual(namedLists(k, 'home-founder').filter((l) => !holds.includes(l)), [], 'Today names a list the record does not hold');
-  const own = [...listsOf('portfolio'), ...listsOf('money-core'), 'datapoints'];
+  const own = [...listsOf('portfolio'), ...listsOf('money-core')];
   assert.deepEqual(namedLists(k, 'home-founder').filter((l) => !own.includes(l)), [], 'Today reads a list that is not the use case\'s own or one it needs');
   const blocks = value<{ blocks: (Drawn & { drawn?: boolean })[] }>(k.page('home-founder')).blocks;
   assert.deepEqual(blocks.filter((b) => (b.refusals ?? []).length > 0).map((b) => b.heading), [], 'a block on Today was refused');
@@ -233,36 +234,21 @@ test('WORDS THAT NAME DOMAINS BRING SERVICES ON THE FIRST DAY, and Today keeps L
 });
 
 /**
- * A RECORD MADE BEFORE KEEPS EVERYTHING IT HOLDS. 2.7.0 declares what the published 2.6.0 declares, word for word (the
- * frozen file in the catalogue), so a record on 2.6.0, with every module, takes it as a version and nothing else. The
- * update is planned in the order the record plans one (`planFile` in `packages/record/src/usecase.ts`): what the use
- * case stands on that the record lacks, which is nothing here, then its pack cut to what the record holds (`fitted`),
- * which holds every list the pack reads and so is the pack whole.
+ * WHAT A RECORD MADE BEFORE HOLDS IS WHAT 3.0.0 DECLARES, LESS NUMBERS. 2.7.0 declared what the published 2.6.0 declares,
+ * word for word (the frozen file in the catalogue). 3.0.0 declares the same, but for Numbers, which it hands to Portfolio
+ * 1.19.0 (`hands`) under the same id, laying back on it the organisation and the service a reading is about (`extends`),
+ * so every field 2.6.0 declared is still on the list. A record on 2.7.0 taking the update with every reading kept is
+ * `portfolio-kpis.test.ts`'s.
  */
-test('A RECORD ON 2.6.0 TAKES 2.7.0 AND LOSES NOTHING, in the order the record plans an update', async () => {
-  const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/founder/2.6.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: unknown } };
-  const u = useCase('founder')!;
-  const next = useCaseDocument('founder', TODAY)!;
+test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfolio with its two links laid back', () => {
+  type List = { register?: string; fields?: { id: string }[] };
+  const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/founder/2.6.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: List[] } };
+  const next = useCaseDocument('founder', TODAY)! as { declarations: unknown[]; hands: Record<string, string>; extends: Record<string, { fields: { id: string }[] }> };
   assert.equal(frozen.version, '2.6.0');
-  assert.deepEqual(next.declarations, frozen.pack.declarations, '2.7.0 declares what the published 2.6.0 declares');
-
-  const k = await founder('2.6.0');
-  assert.equal(k.packs().find((p) => p.id === 'usecase-founder')?.version, '2.6.0');
-  const lists = held(k).sort();
-  const pages = k.declarations().filter((d) => d.kind === 'page').map((d) => d.id).sort();
-  const rows = Object.fromEntries(lists.map((l) => [l, k.count(l)]));
-
-  assert.deepEqual(standsOn(u).filter((m) => !k.packs().some((p) => p.id === m)), [], 'nothing it stands on is missing, so no module is planned');
-  const doc = fitted(next, new Set(held(k)));
-  assert.deepEqual(doc, next, 'the record holds every list the pack reads, so nothing is cut');
-  const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
-  const diff = await plan(pack, stateOf(k));
-  assert.equal(diff.installed_version, '2.6.0');
-  assert.deepEqual({ adds: diff.adds.length, changes: diff.changes.length, retires: diff.retires.length, conflicts: diff.conflicts.length }, { adds: 0, changes: 0, retires: 0, conflicts: 0 });
-  value(await install(pack, diff, hostFor(k), diff.planHash));
-
-  assert.equal(k.packs().find((p) => p.id === 'usecase-founder')?.version, '2.7.0');
-  assert.deepEqual(held(k).sort(), lists, 'every list is still held');
-  assert.deepEqual(k.declarations().filter((d) => d.kind === 'page').map((d) => d.id).sort(), pages, 'every page is still there');
-  assert.deepEqual(Object.fromEntries(lists.map((l) => [l, k.count(l)])), rows, 'every row is still there');
+  assert.deepEqual(next.declarations, frozen.pack.declarations.filter((d) => d.register !== 'datapoints'), '3.0.0 declares what the published 2.6.0 declares, but Numbers');
+  assert.equal(next.hands['register.datapoints'], 'portfolio');
+  const was = frozen.pack.declarations.find((d) => d.register === 'datapoints')!.fields!;
+  const laid = next.extends['register.datapoints']!.fields;
+  const own = (moduleDocument(null, 'portfolio', { today: TODAY })!.declarations as List[]).find((d) => d.register === 'datapoints')!.fields!;
+  assert.deepEqual([...own, ...laid].map((f) => f.id).sort(), was.map((f) => f.id).sort(), 'every field 2.6.0 declared on Numbers is still on it');
 });

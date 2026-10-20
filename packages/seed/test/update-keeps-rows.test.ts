@@ -36,7 +36,7 @@ import { createRecordApi, type CallContext } from '../../record/src/index.ts';
 
 import { fillFeed } from '../../../packs/live-feed/fill.ts';
 import { fillRates } from '../../../packs/rates-poll/fill.ts';
-import { FIRST_PARTY, NOW, PAGES, firstPartyDocument } from '../src/index.ts';
+import { FIRST_PARTY, NOW, PAGES, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 
 type Body = Record<string, unknown>;
 type Doc = Body & { pack: string; version: string; requires?: { packs?: Record<string, string> }; declarations: Body[]; extends?: Record<string, unknown> };
@@ -179,8 +179,30 @@ const READINGS: Doc = {
         { id: 'unit', label: 'Unit', type: 'text' },
         { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
         { id: 'at', label: 'When', type: 'instant', index: true },
-        { id: 'source', label: 'Source', type: 'text' },
+        /* THE FOUNDER'S OWN VALUES, which Portfolio 1.19.0 declares when it takes the list over: a text field here would be
+           a retype of every reading written under it. */
+        { id: 'source', label: 'Source', type: 'enum', values: ['reported', 'polled', 'typed', 'example'], index: true },
       ],
+    },
+  ],
+} as never;
+
+/**
+ * AND THE SAME PACK ONCE PORTFOLIO DECLARES THE LIST ITSELF (portfolio 1.19.0, which takes Numbers over): it hands the
+ * list on (`hands`), as founder 3.0.0 does, and keeps a page over it, so Portfolio's update takes the list over with every
+ * reading in it rather than meeting a second owner.
+ */
+const READINGS_HANDED: Doc = {
+  ...READINGS,
+  version: '1.1.0',
+  hands: { 'register.datapoints': 'portfolio' },
+  declarations: [
+    {
+      page: 'kept-readings',
+      title: 'Readings',
+      icon: 'observe',
+      requires: ['register.datapoints'],
+      blocks: [{ kind: 'table', heading: 'Readings', icon: 'list', span: 12, source: 'register.datapoints', columns: [{ field: 'name' }, { field: 'at' }] }],
     },
   ],
 } as never;
@@ -423,6 +445,7 @@ async function journey(subject: string, from: Doc, o: { to?: Doc; plant?: Plant 
   assert.ok(before.points.length > 0, 'two nights passed and no point of any night was kept');
 
   const next = (id: string): Doc => (id === subject && o.to ? ready(o.to) : current(id));
+  if (firstPartyManifest('portfolio').provides.includes('register.datapoints')) await take(rec, READINGS_HANDED, `${subject} updated, handing the readings on`);
   for (const id of order(subject, next)) await take(rec, next(id), `${subject} updated`, id === subject ? o.plant : undefined);
   return { rec, before, after: picture(rec), wrote };
 }

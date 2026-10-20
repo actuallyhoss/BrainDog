@@ -16,7 +16,7 @@ import { install, normalise, plan, type Host, type Installed, type Pack } from '
 import { openRecord, type Entry, type Kernel } from '@braindog/kernel';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
-import { NOW, firstPartyManifest } from '../src/index.ts';
+import { NOW, firstPartyDocument, firstPartyManifest } from '../src/index.ts';
 import { modulesFor, useCase } from '../src/usecases/index.ts';
 import { carriedDocument, dayOf, moduleDocument } from '../src/usecases/install.ts';
 
@@ -79,9 +79,10 @@ const number = (k: Kernel, name: string, days: number): void =>
 const names = (k: Kernel, extra: Record<string, unknown> = {}): string[] =>
   value<{ rows: Entry[] }>(k.list({ register: 'datapoints', ...extra })).rows.map((r) => String(r.fields.name));
 
-test('THE FOUNDER DECLARES NUMBERS NEWEST FIRST BY at, the shape the Ledger declares', () => {
-  const decl = (useCase('founder')!.pack!.declarations as Record<string, unknown>[]).find((d) => d.register === 'datapoints');
-  assert.ok(decl, 'the founder holds no Numbers list');
+/* PORTFOLIO'S SINCE 1.19.0, which took Numbers over from the founder with its order. */
+test('NUMBERS IS DECLARED NEWEST FIRST BY at, the shape the Ledger declares', () => {
+  const decl = (firstPartyDocument('portfolio')!.declarations as Record<string, unknown>[]).find((d) => d.register === 'datapoints');
+  assert.ok(decl, 'Projects holds no Numbers list');
   assert.deepEqual(decl.order, { field: 'at', dir: 'desc' });
   assert.ok((decl.fields as { id: string; type: string }[]).some((f) => f.id === 'at' && f.type === 'instant'), 'Numbers dates a number by `at`');
 });

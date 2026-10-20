@@ -147,6 +147,17 @@ type Body = Record<string, unknown>;
  * `usecase-versions.test.ts`'s DECLARED table pins for that version, so this file trusts them rather than
  * re-deriving them, and a constant that drifts from what shipped is caught at its own assertion, not here.
  */
+/**
+ * PROJECTS AS IT WAS BEFORE IT TOOK NUMBERS OVER (portfolio 1.19.0): the same document without Numbers, Key numbers and
+ * the two figures over them, at the version before, so a founder's own Numbers is the founder's, as on a record of then.
+ */
+const portfolioBeforeNumbers = (doc: Body): Body => ({
+  ...doc,
+  version: '1.18.0',
+  declarations: (doc.declarations as Body[]).filter((d) => !['datapoints', 'kpis'].includes(String(d.register)) && !['kpis-held', 'kpi-stale'].includes(String(d.metric))),
+  ...(Array.isArray(doc.seeds) ? { seeds: (doc.seeds as Body[]).filter((s) => !['datapoints', 'kpis'].includes(String(s.register))) } : {}),
+});
+
 async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown> }> {
   const u = useCase('founder')!;
   assert.equal(shippedFingerprint(FOUNDER_SHIPPED_1_5_0), 'b3550baded7ee204', 'founder-shipped.ts’s 1.5.0 is not the 1.5.0 that shipped');
@@ -158,7 +169,7 @@ async function onEarlier(): Promise<{ k: Kernel; before: Record<string, unknown>
   for (const m of ['portfolio', 'people', 'money-core', 'work']) {
     const holds = new Set([...held(k), ...firstPartyManifest(m as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice(9)] : []))]);
     const doc = moduleDocument(u, m, { today: TODAY, holds, examples: true });
-    await put(k, m === 'people' ? peopleBefore3(doc as Body) : doc);
+    await put(k, m === 'people' ? peopleBefore3(doc as Body) : m === 'portfolio' ? portfolioBeforeNumbers(doc as Body) : doc);
   }
   await put(k, before);
   assert.ok(!held(k).includes('services'), 'a record on 1.3.2 holds no services');
@@ -201,10 +212,13 @@ test('A RECORD ON 1.3.2 IS OFFERED ESTATE THEN THE CURRENT VERSION, and neither 
      for an organisation, which only People 3.0.0 declares, and its Dashboard reads the organisations as People 3.0.0
      lays them, so it cannot go first. */
   const hands = (next as { hands?: Record<string, string> }).hands ?? {};
-  const people = value<Pack>(await normalise(moduleDocument(u, 'people', { today: TODAY, holds: new Set(held(k)), examples: false }), { kind: 'local' }));
-  const state = stateOf(k);
-  const diff = await plan(people, { ...state, handed: { ...state.handed, ...hands } });
-  value(await install(people, diff, hostFor(k), diff.planHash));
+  /* AND PROJECTS, TOLD THE SAME, SINCE founder 3.0.0: Portfolio 1.19.0 takes Numbers over, which the use case hands it. */
+  for (const m of ['portfolio', 'people']) {
+    const module = value<Pack>(await normalise(moduleDocument(u, m, { today: TODAY, holds: new Set(held(k)), examples: false }), { kind: 'local' }));
+    const state = stateOf(k);
+    const diff = await plan(module, { ...state, handed: { ...state.handed, ...hands } });
+    value(await install(module, diff, hostFor(k), diff.planHash));
+  }
   await put(k, next);
 
   assert.equal(k.packs().find((p) => p.id === 'usecase-founder')?.version, u.version);

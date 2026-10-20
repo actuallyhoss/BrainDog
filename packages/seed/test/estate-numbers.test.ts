@@ -132,9 +132,11 @@ const shown = (k: Kernel): string[] => {
 const server = (k: Kernel, name: string): string =>
   value<{ id: string }>(k.create('services', { name, provider: 'Fenwick Cloud', kind: 'server', cycle: 'monthly', state: 'live' }, OWNER)).id;
 
+/* LAID BY THE FOUNDER ON PORTFOLIO'S NUMBERS SINCE founder 3.0.0, which handed the list to Projects and keeps the two
+   links it holds the figures and blocks of (`extends`). */
 test('NUMBERS HAS A SERVICE, a link to Services after its Organisation, and a number need not say one', () => {
-  const doc = useCaseDocument('founder', TODAY) as { declarations: { register?: string; fields?: Field[] }[] };
-  const fields = doc.declarations.find((d) => d.register === 'datapoints' && Array.isArray(d.fields))!.fields!;
+  const doc = useCaseDocument('founder', TODAY) as { extends?: Record<string, { fields?: Field[] }> };
+  const fields = doc.extends?.['register.datapoints']?.fields ?? [];
   const service = fields.find((f) => f.id === 'about_service');
   assert.ok(service, `Numbers holds ${fields.map((f) => f.id).join(', ')} and no service`);
   assert.deepEqual([service.label, service.type, service.to], ['Service', 'ref', 'services']);
@@ -231,7 +233,9 @@ test('A RECORD WITH NO NUMBER ABOUT A SERVICE DRAWS NO BLOCK, whatever its proje
 
 test('RENEWALS IS STILL ESTATE\'S OWN PAGE: it reads on a record with no Numbers, gave up no block, and stays under the ceiling', async () => {
   const k = await modulesOnly();
-  assert.ok(!held(k).includes('datapoints'), 'this record holds no Numbers');
+  /* NUMBERS IS PROJECTS' SINCE portfolio 1.19.0, and says no service until the founder lays one. */
+  const numbers = (k.declarations() as { id: string; body: string }[]).find((d) => d.id === 'register.datapoints');
+  assert.ok(!numbers || !(JSON.parse(numbers.body) as { fields: Field[] }).fields.some((f) => f.id === 'about_service'), "this record's Numbers says no service");
   assert.equal(renewals(k).some((b) => b.heading === HEADING), false);
   const own = ESTATE_PAGES.estate!.blocks as { heading?: string }[];
   assert.equal(own.length, 11, 'Renewals holds the eleven blocks it held');

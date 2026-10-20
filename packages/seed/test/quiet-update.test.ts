@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
-import { handedOf, install, normalise, plan, type Diff, type Host, type Installed, type Pack } from '@braindog/declare';
+import { handedOf, install, normalise, normaliseUseCase, plan, useCasePack, type Diff, type Host, type Installed, type Pack, type UseCase } from '@braindog/declare';
 import { openRecord, type Kernel } from '@braindog/kernel';
 import { losses, shippedVersion, updateFirstParty, type QuietPort, type QuietQuestion } from '@braindog/seed/packs/quiet';
 import type { Result } from '@braindog/ports';
@@ -289,7 +289,8 @@ test("A USE CASE'S UPDATE THAT ONLY TONES A TILE LOSES NOTHING, and goes in over
     const now = carriedDocument(u, TODAY)!;
     assert.deepEqual(stands(now).tones, { at_risk: 'warn', off_track: 'bad' }, `${id}: on track wears no mark`);
     const [major, minor] = u.version.split('.').map(Number);
-    const before = `${major}.${minor! - 1}.0`;
+    /* A MAJOR STEP'S VERSION BEFORE IS THE LAST MAJOR'S, founder 3.0.0's a 2.x. */
+    const before = minor! > 0 ? `${major}.${minor! - 1}.0` : `${major! - 1}.99.0`;
     const earlier: Body = {
       ...now,
       version: before,
@@ -890,6 +891,19 @@ const ORGANISATIONS_CARDS: Body = {
 };
 const peopleBefore6 = (b: Body): Body => (b.heading === 'Everyone' ? EVERYONE_CARDS : b.heading === 'Organisations' ? ORGANISATIONS_CARDS : b);
 
+/**
+ * PROJECTS AS IT WAS BEFORE portfolio 1.19.0 (the KPI plan of 21 October, K1-A): no Numbers, which it took over from the
+ * founder use case, no Key numbers, no figures over them, and no kind on a project.
+ */
+const KPI_LISTS: ReadonlySet<string> = new Set(['datapoints', 'kpis']);
+const KPI_FIGURES: ReadonlySet<string> = new Set(['kpis-held', 'kpi-stale']);
+const beforeKpis = (doc: Body): Body => ({
+  ...doc,
+  declarations: (doc.declarations as Body[])
+    .filter((d) => !KPI_LISTS.has(String(d.register)) && !KPI_FIGURES.has(String(d.metric)))
+    .map((d) => (d.register === 'things' && Array.isArray(d.fields) ? { ...d, fields: (d.fields as Body[]).filter((f) => f.id !== 'kind') } : d)),
+});
+
 const LATEST: Record<string, { version: string; released: string; undo: (doc: Body) => Body }> = {
   /* AN ACCOUNT'S DIGITS SAID THE LAST FOUR. */
   'money-core': {
@@ -922,8 +936,8 @@ const LATEST: Record<string, { version: string; released: string; undo: (doc: Bo
     version: '1.15.0',
     released: '982f163d9d8ab76f',
     undo: (fresh) => {
-      /* THE UI PASS OF 20 OCTOBER COMES OFF FIRST, inside the unreleased 1.18.0. */
-      const raw = beforeUiPass(fresh, 'portfolio');
+      /* THE UI PASS OF 20 OCTOBER COMES OFF FIRST, inside the unreleased 1.18.0, after 1.19.0's key numbers. */
+      const raw = beforeUiPass(beforeKpis(fresh), 'portfolio');
       return withPage(
         {
           ...raw,
@@ -1211,8 +1225,20 @@ const DONE_BY_WEEK: Body = {
  * was finished this week as its last figure. Founder's row had no such figure; Team's, made up from its tasks, had it
  * with no line asked for (`trend`).
  */
+/**
+ * AND THE FOUNDER AS 2.7.0 DECLARED IT, BEFORE 3.0.0 HANDED NUMBERS TO PORTFOLIO AND LAID ITS TWO LINKS ON IT: the
+ * published 2.7.0 file, which declares what this build's 3.0.0 does but for Numbers (`founder-home.test.ts`), with its
+ * settings. Undone first, so every version before is still the one released.
+ */
+const FOUNDER_2_7 = (() => {
+  const file = JSON.parse(readFileSync(new URL('../../../apps/web/static/catalogue/usecases/founder/2.7.0.usecase.json', import.meta.url), 'utf8')) as unknown;
+  return useCasePack(value<UseCase>(normaliseUseCase(file)))!;
+})();
+const handedBefore = (doc: Body, id: string): Body =>
+  id !== 'founder' ? doc : (({ extends: _laid, ...rest }) => ({ ...rest, declarations: FOUNDER_2_7.declarations, config: FOUNDER_2_7.config, hands: FOUNDER_2_7.hands }))(doc);
+
 const projectBefore = (doc: Body, id: string): Body =>
-  withPage(workingBefore(numbersBefore(standsBefore(lookBefore(doc, id)), id), id), 'project', (now) =>
+  withPage(workingBefore(numbersBefore(standsBefore(lookBefore(handedBefore(doc, id), id)), id), id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
       /* TOOLS AND SERVERS LISTED EVERYBODY'S TOOLS until batch 60 (sketchpad-60), where it now reads the project's own. */
@@ -1370,16 +1396,20 @@ test("A USE CASE'S UPDATE THAT FOLDS A CHART INTO A FIGURE LOSES NOTHING, and go
 
     const sql = openSqlite();
     const k = await openRecord(sql, fixedClock(NOW));
-    for (const m of modulesFor(u, ['people', ...u.modules])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
+    for (const m of modulesFor(u, ['people', ...u.modules])) if (m !== 'agents') await put(k, sql, moduleBefore(k, m, id));
     const now = carriedDocument(u, TODAY)!;
     await put(k, sql, { ...projectBefore(now, id), version: was.version });
     const pack = `usecase-${id}`;
     assert.equal(k.packs().find((p) => p.id === pack)?.version, was.version);
 
+    /* PROJECTS FIRST ON A FOUNDER'S RECORD, AS THE NIGHT AND THE USE CASE'S OWN UPDATE TAKE THEM, SINCE portfolio 1.19.0:
+       it takes Numbers over from the use case, which then lays its organisation and service on it. */
+    if (id === 'founder') await put(k, sql, documentFor(k, 'portfolio')!);
     const next = value<Pack>(await normalise(now, { kind: 'local' }));
     const diff = await plan(next, stateOf(k, sql));
     assert.deepEqual(losses(diff), [], `${id}: nothing would be lost`);
-    assert.deepEqual([diff.adds.length, diff.retires.length, diff.conflicts.length], [id === 'founder' ? 4 : id === 'team' ? 5 : 0, 0, 0], `${id}: only a page changed, and the founder's figures since (service-numbers the fourth, estate-numbers-61), and the team's three rules and two scripts (team-cycle-follows-100)`);
+    /* NUMBERS IS HANDED TO PORTFOLIO, NOT RETIRED, SINCE founder 3.0.0: a hand is no loss, so it is not counted here. */
+    assert.deepEqual([diff.adds.length, diff.retires.filter((r) => r.to === undefined).length, diff.conflicts.length], [id === 'founder' ? 4 : id === 'team' ? 5 : 0, 0, 0], `${id}: only a page changed, and the founder's figures since (service-numbers the fourth, estate-numbers-61), and the team's three rules and two scripts (team-cycle-follows-100)`);
     value(await install(next, diff, hostFor(k), diff.planHash));
     assert.equal(k.packs().find((p) => p.id === pack)?.version, u.version);
     const held = (k.declarations() as { id: string; body: unknown }[]).find((d) => d.id === 'page.project')!;
@@ -1442,12 +1472,19 @@ const agentsBefore = (): Body => {
   };
 };
 
+/**
+ * A MODULE AS A RECORD ON THE USE CASE BEFORE HOLDS IT: Projects before 1.19.0 under a founder before 3.0.0, which held
+ * Numbers itself; every other module as this build ships it.
+ */
+const moduleBefore = (k: Kernel, m: string, id: string): Body =>
+  id === 'founder' && m === 'portfolio' ? { ...beforeKpis(documentFor(k, m)!), version: '1.18.0' } : documentFor(k, m)!;
+
 /** A record holding a use case at the version before this build's, the modules under it, and the agents pack at 1.7.0. */
 async function onUseCaseBefore(id: string): Promise<{ k: Kernel; sql: NodeSql }> {
   const u = useCase(id)!;
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
-  for (const m of modulesFor(u, ['people', ...u.modules])) if (m !== 'agents') await put(k, sql, documentFor(k, m)!);
+  for (const m of modulesFor(u, ['people', ...u.modules])) if (m !== 'agents') await put(k, sql, moduleBefore(k, m, id));
   await put(k, sql, agentsBefore());
   await put(k, sql, { ...projectBefore(carriedDocument(u, TODAY)!, id), version: USECASE_BEFORE[id]!.version });
   return { k, sql };
@@ -1472,6 +1509,8 @@ test('THE NIGHT UPDATES THE AGENTS PACK AND THE USE CASE A RECORD HOLDS, after i
     assert.deepEqual(
       steps,
       [
+        /* PROJECTS FIRST ON A FOUNDER'S RECORD, SINCE portfolio 1.19.0: it takes Numbers over from the use case before it. */
+        ...(id === 'founder' ? [{ pack: 'portfolio', from: '1.18.0', to: FIRST_PARTY_VERSIONS.portfolio, did: 'updated' }] : []),
         { pack: 'agents', from: '1.7.0', to: AGENTS_PACK.manifest.version, did: 'updated' },
         { pack, from: USECASE_BEFORE[id]!.version, to: u.version, did: 'updated' },
       ],
