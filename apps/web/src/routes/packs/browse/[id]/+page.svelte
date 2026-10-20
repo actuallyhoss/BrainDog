@@ -60,6 +60,10 @@
   import { hostedHere } from '../../../settings/billing.ts';
   import { listWords, moduleTitle, oneOf } from '../../sharing.ts';
   import Preview from '../Preview.svelte';
+  import { miniOf } from '../mini.ts';
+  import { glyphOf as placeGlyph } from '../../glyph.ts';
+  import { isGlyph } from '$lib/ui/icons.ts';
+  import { firstPartyModules } from '@braindog/seed/packs/modules';
   import { catalogueText, keepFirstKey, readHostCatalogue, signedWords, trustForEntry, trustLine, trustThisKey } from '../catalogue.ts';
   import { recordKeys } from '../known-keys.ts';
   import { FIXABLE, hasTheme, stageFix } from '$lib/theme/staged.ts';
@@ -90,6 +94,23 @@
   const u = $derived(listing?.kind === 'usecase' && listing.source === 'bundled' ? useCase(listing.id) : undefined);
   const latest = $derived(listing ? latestOf(listing) : null);
   const action = $derived(listing && states ? actionOf(listing, states) : null);
+
+  /**
+   * ITS OWN GLYPH (agents F25): a built-in wears the place it brings (`glyph.ts`), a built-in use case its Home's or its
+   * first list's (`mini.ts`), and anything else its category's. It was the add-ons cube on every listing.
+   */
+  const glyph = $derived.by((): IconName => {
+    if (!listing) return 'packs';
+    if (listing.kind === 'module') {
+      const g = placeGlyph(firstPartyModules().find((m) => m.id === listing!.id)?.pages, page.data.nav ?? []);
+      if (g !== 'packs') return g;
+    }
+    if (u) {
+      const g = miniOf(u, () => null).glyph;
+      if (g && isGlyph(g)) return g;
+    }
+    return glyphOf(listing);
+  });
 
   /* ── the file, verified ─────────────────────────────────────────────────── */
 
@@ -395,6 +416,9 @@
             ? words.installed
             : words.install(listing?.title ?? ''),
   );
+  /* SOMETHING TO PRESS: the phone's bar is drawn only then (S5), and never to say "Installed" over the last tile. */
+  const doable = $derived(listing !== null && listing !== undefined && filed === null && action?.kind !== 'installed' && (trust?.kind === 'changed' || !untrusted));
+
   const publisherWords = $derived(
     !listing
       ? ''
@@ -406,11 +430,11 @@
   );
 </script>
 
-<svelte:head><title>{titleOf(listing?.title ?? copy.browseTitle)}</title></svelte:head>
+<svelte:head><title>{titleOf(listing?.title, copy.packs)}</title></svelte:head>
 
 <!-- THE WAY BACK IS THE HEAD'S: a kicker at 1440 and the back link in the phone's bar, on the gutter like every detail
      page's, where a bare button above the lead sat off it. -->
-<PageHead icon="packs" kicker={copy.browseTitle} back="/packs/browse" title={listing?.title ?? copy.browseTitle} />
+<PageHead icon={glyph} kicker={copy.packs} back="/packs/browse" title={listing?.title ?? copy.packs} />
 
 {#snippet act()}
   {#if filed !== null}
@@ -424,7 +448,7 @@
   {/if}
 {/snippet}
 
-<div class="page">
+<div class="page" data-bar={doable ? '' : undefined}>
   {#if !listing}
     {#if looked}
       <Empty kind="no-results" title={words.missing} body={words.missingBody}>
@@ -438,7 +462,7 @@
       <!-- THE LEAD TILE: what it does, whether it is vouched for, and its one button. Who made it heads
            the tile; its version, licence and signature are the Details tile's. -->
       <div class="lead-cell">
-        <Tile lead icon={glyphOf(listing)} title={copy.useCaseFor} meta={words.kinds[listing.kind]} aria-label={copy.useCaseFor}>
+        <Tile lead icon={glyph} title={copy.useCaseFor} meta={words.kinds[listing.kind]} aria-label={copy.useCaseFor}>
           <p class="summary">{listing.summary}</p>
           <p class="byline with-icon">
             <Icon name={listing.source === 'bundled' || latest?.signature || latest?.reviewed ? 'check' : 'info'} size="s" />{publisherWords}
@@ -539,13 +563,13 @@
         </div>
       {/if}
 
-      <div class="third-cell">
+      <div class="third-cell versions-cell">
         <Tile icon="history" title={words.versions} count={listing.versions.length}>
           <ol class="log versions">
             {#each listing.versions as v (v.version)}
               <li class="log-row" data-yanked={v.yanked ? '' : undefined}>
-                <span class="v num">{v.version}</span>
-                <span class="quiet">{v.bump ? words.bump[v.bump] : words.first}{#if v.published_at}{' · '}{words.published(v.published_at)}{/if}</span>
+                <!-- THE VERSION AND ITS TAG ON ONE LINE: "1.13.0  New · Published 2 Sep". -->
+                <span class="v-line"><span class="v num">{v.version}</span><span class="quiet">{v.bump ? words.bump[v.bump] : words.first}{#if v.published_at}{' · '}{words.published(v.published_at)}{/if}</span></span>
                 {#if v.notes}<span class="notes">{v.notes}</span>{/if}
                 {#if v.yanked}<span class="quiet">{words.yanked(v.yanked.reason)}</span>{/if}
                 {#if listing.source === 'kennel'}<span class="quiet">{signedWords(v.signature)}</span>{/if}
@@ -555,7 +579,7 @@
         </Tile>
       </div>
 
-      <div class="third-cell">
+      <div class="third-cell details-cell">
         <Tile icon="info" title={words.details}>
           <dl class="facts">
             {#if latest}<dt>{words.version}</dt><dd class="num">{latest.version}</dd>{/if}
@@ -607,7 +631,7 @@
       {/if}
     {/snippet}
 
-    <div class="act narrow-only">{@render act()}</div>
+    {#if doable}<div class="act narrow-only">{@render act()}</div>{/if}
   {/if}
 </div>
 
@@ -627,43 +651,43 @@
   .tiles {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    align-items: start;
+    gap: var(--tile-gap);
     min-inline-size: 0;
   }
 
+  /* EACH TILE AS TALL AS WHAT IT HOLDS (agents F25): Details stretched to the height of Versions left 700px of nothing. */
   .tiles > * {
     display: flex;
+    flex-direction: column;
     min-inline-size: 0;
-  }
-
-  .tiles > * > :global(.tile) {
-    flex: 1;
   }
 
   @media (width >= 900px) {
+    /* TWO COLUMNS, 7 TO 5, ON EVERY ROW: the lead beside what it adds, then Versions beside Details. What it calls out
+       to, when it calls anywhere, sits over Details in the narrow column. */
     .tiles {
-      grid-template-columns: repeat(12, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      grid-auto-flow: row dense;
     }
 
-    .lead-cell {
-      grid-column: span 7;
+    .lead-cell,
+    .third-cell:not(.calls-cell, .details-cell) {
+      grid-column: 1;
     }
 
-    .adds-cell {
-      grid-column: span 5;
+    .adds-cell,
+    .calls-cell,
+    .details-cell {
+      grid-column: 2;
     }
 
     .wide-cell {
       grid-column: 1 / -1;
     }
 
-    /* The last row shares the width between however many tiles it holds: three, or two when nothing calls out. */
-    .third-cell {
-      grid-column: span 6;
-    }
-
-    .tiles:has(.calls-cell) .third-cell {
-      grid-column: span 4;
+    .tiles:has(.calls-cell) .versions-cell {
+      grid-row: span 2;
     }
   }
 
@@ -671,7 +695,7 @@
   .summary {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     line-height: 24px;
     text-wrap: pretty;
   }
@@ -685,22 +709,22 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .byline {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .quiet-part {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .quiet,
   .said {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .with-icon {
@@ -712,7 +736,7 @@
   /* THE TRUST LINE: its dot in the intent's fill and its words in ink; a loud one at 500, and a key revoked or a
      signature lost in the danger ink as well, since it is the one thing on the page that needs him first. */
   .trust {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* AN UPDATE IS READY: a plain block in the ink, the changes as a short list under the author's note. */
@@ -739,7 +763,7 @@
     margin: 0;
     padding-inline-start: var(--sp-4);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -750,7 +774,7 @@
 
   .trust[data-intent='bad'],
   .refused {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
@@ -775,27 +799,27 @@
     column-gap: var(--sp-3);
     align-items: start;
     padding-block: var(--sp-2);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .plan-row + .plan-row {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* THE GLYPH SITS ON THE FIRST LINE, level with the kind and its count, however many lines the names take. */
   .plan-row > :global(.icon) {
     margin-block-start: 4px;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .plan-label {
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 24px;
   }
 
   .plan-n {
     color: var(--ink);
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 24px;
     font-variant-numeric: tabular-nums;
@@ -803,9 +827,9 @@
 
   .plan-names {
     min-inline-size: 0;
-    padding-block-start: 3px;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    padding-block-start: var(--sp-1);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -822,12 +846,19 @@
     flex-direction: column;
     gap: 2px;
     padding-block: var(--sp-2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
+  .v-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-1) var(--sp-3);
+  }
+
   .log-row + .log-row {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .loud {
@@ -837,20 +868,20 @@
   }
 
   .versions .log-row[data-yanked] .v {
-    color: var(--dim);
+    color: var(--ink-3);
     text-decoration: line-through;
   }
 
   /* A VERSION IS A FIGURE, in tabular figures of the body face and never the identifier face. */
   .v {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .notes {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -860,12 +891,12 @@
     gap: var(--sp-2) var(--sp-4);
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .facts dt {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .facts dd {
@@ -882,7 +913,7 @@
   }
   .told-h {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-meta);
     font-weight: 500;
   }
@@ -899,7 +930,7 @@
   }
   .told-note {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--fs-body);
   }
 
@@ -936,15 +967,21 @@
       display: none;
     }
 
-    /* THE BUTTON STICKS TO THE BOTTOM OF THE SCREEN, above the floating tab bar and the home indicator (`--tabbar`),
-       for as long as the page scrolls: it is last in the page so a sticky bottom holds it there, and settles under the
-       last tile. No bar round it: the ink pill is the thing that floats. */
+    /* THE BUTTON STICKS TO THE BOTTOM OF THE SCREEN, above the tab bar and the home indicator (`--tabbar`), on a bar of
+       the board's colour with one hairline over it (S5), and only while there is something to press. The page ends a
+       bar's height plus the tab bar further down, so no tile ends underneath it. */
     .narrow-only {
       position: sticky;
       inset-block-end: var(--tabbar, env(safe-area-inset-bottom));
       display: flex;
-      inline-size: 100%;
-      padding-block: var(--sp-2);
+      margin-inline: calc(-1 * var(--gutter));
+      padding: var(--sp-3) var(--gutter);
+      background: var(--board);
+      box-shadow: inset 0 1px 0 var(--rule);
+    }
+
+    .page[data-bar] {
+      padding-block-end: var(--sp-4);
     }
 
     .narrow-only > :global(*) {
