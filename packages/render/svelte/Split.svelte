@@ -7,7 +7,7 @@
 -->
 <script lang="ts">
   import { headlineFigure, inline, text, TONES, MISSING, type Block, type Row, type RenderOptions } from '../src/index.ts';
-  import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence } from '../src/split.ts';
+  import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from '../src/split.ts';
   import { signedOf } from '../src/bridge.ts';
   import Text from './Text.svelte';
 
@@ -57,7 +57,7 @@
       {/if}
       {#each plan.parts as p}
         {@const tone = rows[p.at]?.tone}
-        <rect class="split-seg" data-step={p.step} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late}) var(--chart-late, currentColor)` : undefined} x={p.x} y="0" width={p.width} height="100"
+        <rect class="split-seg" data-step={p.step} data-slot={splitSlot(rows[p.at]?.cells[3])} data-intent={tone} style={tone === 'bad' ? `fill:url(#${late}) var(--chart-late, currentColor)` : undefined} x={p.x} y="0" width={p.width} height="100"
         ></rect>
       {/each}
       {#if plan.cuts}<path class="split-cut" d={plan.cuts} vector-effect="non-scaling-stroke"></path>{/if}
@@ -70,7 +70,7 @@
         <!-- A part at nought is left out of the legend (`splitListed`); the fold below still says it. -->
         {#if splitListed(plan, values[i] ?? NaN)}
         <li class="split-item" data-intent={row.tone}>
-          <span class="split-dot" data-step={part?.step} aria-hidden="true"></span>
+          <span class="split-dot" data-step={part?.step} data-slot={splitSlot(row.cells[3])} aria-hidden="true"></span>
           <span class="split-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
           <span class="split-value num"><Text nodes={inline(headlineFigure(row.cells[1] || MISSING, opts.home), opts)} {opts} /></span>
           {#if part}<span class="split-share num">{part.share}</span>{/if}

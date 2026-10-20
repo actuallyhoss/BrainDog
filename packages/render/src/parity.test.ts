@@ -61,7 +61,7 @@ const decode = (s: string): string => s.replace(/&(amp|lt|gt|quot|#39|#x27);/gu,
  * its own). Every id must be one of a kind and every `url(#…)` must name a pattern drawn, or the two are not one tree.
  */
 function lateIds(html: string): string {
-  const ids = [...html.matchAll(/<pattern [^>]*id="([^"]+)"/gu)].map((m) => m[1]!);
+  const ids = [...html.matchAll(/<(?:pattern|linearGradient) [^>]*id="([^"]+)"/gu)].map((m) => m[1]!);
   assert.equal(new Set(ids).size, ids.length, `a pattern id is used twice: ${ids.join(', ')}`);
   for (const [, ref] of html.matchAll(/url\(#([^)]+)\)/gu)) assert.ok(ids.includes(ref!), `url(#${ref}) names no pattern`);
   /* THE MIRROR'S PAINT NAMES THE LATE RED AFTER ITS PATTERN (`lateFill`), because its ids repeat across two calls; the

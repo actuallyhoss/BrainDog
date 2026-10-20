@@ -79,6 +79,19 @@ export const splitListed = (plan: SplitPlan, value: number): boolean => plan.emp
 export const splitSentence = (parts: readonly { label: string; share: string }[]): string =>
   parts.map((p) => `${p.label || SPLIT_PART} ${p.share}`).join(', ');
 
+/** The eight category slots a part may name as its identity (SPEC 1.3): a project's, an agent's or a person's colour. */
+export const SPLIT_SLOTS = ['blue', 'violet', 'pink', 'teal', 'sky', 'yellow', 'lime', 'slate'] as const;
+export type SplitSlot = (typeof SPLIT_SLOTS)[number];
+
+/**
+ * A PART THAT IS A PROJECT, AN AGENT OR A PERSON WEARS ITS OWN COLOUR (proj F6): a row's fourth cell, when it names one
+ * of the slots, is drawn as that slot's hue on the track and its dot. Any other part takes the chart's series in order.
+ */
+export const splitSlot = (cell: string | undefined): SplitSlot | undefined => {
+  const word = (cell ?? '').trim().toLowerCase();
+  return (SPLIT_SLOTS as readonly string[]).includes(word) ? (word as SplitSlot) : undefined;
+};
+
 /** The renderer's own words, as `cards.ts` keeps `CARDS_NONE`: it imports nothing from the app. */
 export const SPLIT_ZERO = 'Every part is zero, so there is nothing to divide yet.';
 export const SPLIT_PART = 'Part';

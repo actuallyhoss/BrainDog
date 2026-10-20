@@ -43,6 +43,7 @@
     FORECAST_LATE,
     FORECAST_MOVE,
     FORECAST_NONE,
+    FORECAST_NOW,
     FORECAST_NUMBERS,
     FORECAST_PAINT,
     FORECAST_RESET,
@@ -334,15 +335,23 @@
     onpointercancel={() => (scrub = null)}
   >
     <svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label={p.sentence}>
+      <!-- THE LINE IS INK ABOVE £0 AND RED UNDER IT, one stroke cut at the zero rule by a hard stop, so the part a person
+           must act on is the only red on the chart (the money review, F2). Drawn only where the walk goes under. -->
+      {#if p.below}<defs
+          ><linearGradient class="forecast-split" id="{uid}-under" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="100"
+            ><stop class="forecast-above" offset="{p.zero}%"></stop><stop class="forecast-under" offset="{p.zero}%"></stop></linearGradient
+          ></defs
+        >{/if}
       {#if p.grid}<path class="forecast-grid" {...FORECAST_PAINT.grid} d={p.grid} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.area}<path class="forecast-area" {...FORECAST_PAINT.area} d={p.area} vector-effect="non-scaling-stroke"></path>{/if}
       {#if p.below}<path class="forecast-area" data-below="" {...FORECAST_PAINT.area} d={p.below} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-zero" d="M0 {p.zero}H1000" vector-effect="non-scaling-stroke"></path>
       {#if p.cross}<path class="forecast-cross-rule" {...FORECAST_PAINT.rule} d={p.cross.rule} vector-effect="non-scaling-stroke"></path>{/if}
+      <path class="forecast-today" d={p.now.rule} vector-effect="non-scaling-stroke"></path>
       {#if p.base}<path class="forecast-base" d={p.base} vector-effect="non-scaling-stroke"></path>{/if}
-      {#if p.past}<path class="forecast-past" d={p.past} vector-effect="non-scaling-stroke"></path>{/if}
-      {#if p.walk}<path class="forecast-walk" {...FORECAST_PAINT.walk} d={p.walk} vector-effect="non-scaling-stroke"></path>{/if}
-      {#if p.future}<path class="forecast-future" d={p.future} vector-effect="non-scaling-stroke"></path>{/if}
+      {#if p.past}<path class="forecast-past" style={p.below ? `stroke:url(#${uid}-under)` : undefined} d={p.past} vector-effect="non-scaling-stroke"></path>{/if}
+      {#if p.walk}<path class="forecast-walk" style={p.below ? `stroke:url(#${uid}-under)` : undefined} {...FORECAST_PAINT.walk} d={p.walk} vector-effect="non-scaling-stroke"></path>{/if}
+      {#if p.future}<path class="forecast-future" style={p.below ? `stroke:url(#${uid}-under)` : undefined} d={p.future} vector-effect="non-scaling-stroke"></path>{/if}
       <path class="forecast-low" d={p.low} vector-effect="non-scaling-stroke"></path>
       <path class="forecast-now" {...FORECAST_PAINT.now} d={p.now.d} vector-effect="non-scaling-stroke"></path>
       {#if p.cross}<path class="forecast-cross" d={p.cross.d} vector-effect="non-scaling-stroke"></path>{/if}
@@ -352,7 +361,7 @@
     <!-- TODAY'S BALANCE BESIDE TODAY'S DOT, where the line starts, hidden like the axis: the chart's name says it. -->
     <!-- A CROSSING NEAR TODAY SETS THE TWO LABELS APART: the balance under its dot, the flag's day after its rule. -->
     <span class="forecast-now-label num" data-near-flag={p.cross?.near ? '' : undefined} style="--at:{p.now.at};--y:{p.now.y}" aria-hidden="true"
-      >{p.now.label}</span
+      ><span class="forecast-now-word">{FORECAST_NOW}</span><span class="forecast-now-figure">{p.now.label}</span></span
     >
     <!-- THE VALUE AXIS, its round steps down one side, zero among them; hidden, because the chart's name says the walk.
          Where zero is off it, its end nearest zero carries a break beside the real amount, and the name says where it starts. -->
@@ -544,7 +553,12 @@
             aria-controls="{uid}-knobs"
             onclick={() => (knobsOpen = !knobsOpen)}>{FORECAST_ADJUST}</button
           >{/if}
-        <button type="button" class="forecast-tool" onclick={openFull}>{FORECAST_FULL}</button>
+        <!-- FULL SCREEN IS AN ICON, named for a screen reader, beside Adjust in the tile's head (the money review, F17). -->
+        <button type="button" class="forecast-tool" data-full="" aria-label={FORECAST_FULL} onclick={openFull}
+          ><svg class="forecast-tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+            ><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg
+          ></button
+        >
       </div>
     {/if}
     <!-- THE KNOBS COME AFTER THE CHART, and only once asked for, so the answer is read before the questions a reader may ask of it. -->

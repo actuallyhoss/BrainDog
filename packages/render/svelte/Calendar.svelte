@@ -26,7 +26,11 @@
   import { getContext } from 'svelte';
   import {
     CALENDAR_DAY,
+    CALENDAR_FEW,
     CALENDAR_NONE,
+    CALENDAR_VIEWS,
+    CALENDAR_VIEW_LIST,
+    CALENDAR_VIEW_MONTH,
     CALENDAR_TODAY,
     CALENDAR_WEEK_NONE,
     WEEKDAYS,
@@ -37,6 +41,7 @@
     calendarStripPlan,
   } from '../src/calendar.ts';
   import { roadmapToday } from '../src/roadmap.ts';
+  import { barFigures } from '../src/format.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -51,6 +56,14 @@
   const plan = $derived(calendarPlan(block.rows, roadmapToday(opts.now), mark));
   const skippedOf = (at: readonly number[]): string => (at.length ? calendarSkipped(at.map((i) => said(block.rows[i]!, 0) || MISSING)) : '');
   const skipped = $derived(skippedOf(strip ? strip.skipped : plan.skipped));
+  /* EACH ROW'S AMOUNT, its third cell, as one set (`barFigures`), said in the agenda after its title. */
+  const amounts = $derived(barFigures(block.rows.map((r) => (r.cells[2] ?? '').trim()), opts.home));
+  const amountOf = (r: Row): string => amounts[block.rows.indexOf(r)] ?? '';
+  /* A FEW ENTRIES ARE A LIST (`CALENDAR_FEW`), and where the host can act the reader may ask for the month instead. The
+     choice is this drawing's alone, so the tree with nothing chosen is the twin's. */
+  const few = $derived(plan.days.reduce((n, d) => n + d.items.length, 0) <= CALENDAR_FEW);
+  let view = $state<'month' | 'list' | null>(null);
+  const listed = $derived(view === null ? few : view === 'list');
 
   /* THE MARKED DAY IN VIEW, once for each day asked: a re-read of the page draws the same day again and does not move
      the reader, and a second link on the same page moves them to its day. */
@@ -74,7 +87,7 @@
         nodes={inline(title.text ?? '', opts)}
         {opts}
       /></span
-    >{#if r.tone}<span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}</li
+    >{#if amountOf(r)}<span class="calendar-amount num">{amountOf(r)}</span>{/if}{#if r.tone}<span class="glyph" role="img" aria-label={TONES[r.tone].label}>{TONES[r.tone].glyph}</span>{/if}</li
   >
 {/snippet}
 
@@ -107,7 +120,14 @@
     {#if skipped}<p class="calendar-skipped">{skipped}</p>{/if}
   </div>
 {:else}
-  <div class="calendar" bind:this={root}>
+  <div class="calendar" data-few={few ? '' : undefined} data-view={view ?? undefined} bind:this={root}>
+    {#if opts.scenario}
+      <!-- MONTH OR LIST, a choice in the tile's head where the host can act (the money review, F5). -->
+      <div class="segmented calendar-views" role="group" aria-label={CALENDAR_VIEWS}>
+        <button type="button" class="segment" data-on={listed ? undefined : ''} aria-pressed={!listed} onclick={() => (view = 'month')}>{CALENDAR_VIEW_MONTH}</button>
+        <button type="button" class="segment" data-on={listed ? '' : undefined} aria-pressed={listed} onclick={() => (view = 'list')}>{CALENDAR_VIEW_LIST}</button>
+      </div>
+    {/if}
     {#each plan.months as m}
       <table class="calendar-month">
         <caption class="calendar-caption">{m.label}</caption>
@@ -149,7 +169,7 @@
      GLOBAL, as `Cards.svelte`'s are: a scoped rule marks the cells it matches, and the twin's tree would differ by the
      mark. An outline and not a border, so the week does not move by its width. */
   :global(.calendar-cell[aria-current='date']) {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--red);
     outline-offset: -2px;
     border-radius: var(--r-sm);
     scroll-margin-block: var(--sp-8);

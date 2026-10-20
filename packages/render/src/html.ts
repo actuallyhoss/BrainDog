@@ -25,7 +25,7 @@ import { SPARKLINE_POINT, TONES, sectionTone, type KindSpec } from './kinds.ts';
 import { kindSpec } from './kind-spec.ts';
 import { cellNamesNothing, inline, magnitudeOfCell, text as plain, type Inline, type InlineOptions } from './inline.ts';
 import { glyphPath } from './inline.ts';
-import { MISSING, barFigure, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
+import { MISSING, barFigure, barFigures, day, figureChars, headlineFigure, leadingCode, symbolFigure, symbolText, valueWord } from './format.ts';
 import { CARDS_NEXT, CARDS_NONE, cardsCount, helpersOf, type Helpers, FOLD_HIDE, FOLD_SHOW, RUN_OPEN, TREND, agentMarkFill, cardLayout, cardTrend, counted, type AgentMark, initialOf, isDimmed, isQuiet, markGlyphOf, markOf, ringDash, ringOf, runFaceOf, runMarkOf, runTokens, trendOf, type RunCell, type RunFace } from './cards.ts';
 import { FEED_DAY, FEED_EARLIER, feedBurst, feedCasedNodes, feedFold, feedNew, feedPlan } from './feed.ts';
 import { FILTERS_ALL, filtersMore, filtersPlan, type Filter } from './filters.ts';
@@ -35,23 +35,23 @@ import { INPUTS_NONE, inputsPlan } from './inputs.ts';
 import { captureNowhere, capturePlan, capturePromptFor } from './capture.ts';
 import { takeWorking, WORKING_GLYPH, WORKING_LABEL } from './working.ts';
 import { TODO_META_JOIN, todoMeta as metaCells } from './todo.ts';
-import { rowsCell, timelineCell, timelineDays } from './timeline.ts';
+import { rowsCell, timelineCell, timelineDays, timelineTitle } from './timeline.ts';
 import { CHOICE_KEYS, rowKey } from './cursor.ts';
 import { TABLE_CHUNK, TABLE_ROWS_LABEL, ariaSort, chunkRows, comparisonPlan, glyphColumn, intrinsicRows, tableCellBody } from './table.ts';
 import { AGENTS_EARLIER, agentsPlan } from './agents.ts';
-import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence } from './split.ts';
+import { SPLIT_AMOUNT, SPLIT_PART, SPLIT_SHARE, SPLIT_ZERO, splitListed, splitPlan, splitSentence, splitSlot } from './split.ts';
 import { BRIDGE_AMOUNT, BRIDGE_STEP, bridgePlanOf, bridgeSentence, bridgeWritten, signedOf } from './bridge.ts';
-import { SERIES_NET, SERIES_NONE, seriesPlan, type SeriesPlan } from './series.ts';
+import { SERIES_NET, SERIES_NONE, SERIES_UNDER, seriesPlan, type SeriesPlan } from './series.ts';
 import { LINES_AGAINST, LINES_NONE, LINES_NUMBERS, linesOnly, linesPlan } from './lines.ts';
 import { linesTrend } from './lines-trend.ts';
 import { PROGRESS_NONE, PROGRESS_OF, PROGRESS_TOTAL, progressPlan, progressRangeSaid, progressSentence, progressSpentSaid, rangePlan, rangeSentence } from './progress.ts';
 import { AMOUNT_SPACE, writeFigure, type AmountSetting, type WrittenAmount } from './money.ts';
-import { FORECAST_AXIS_BREAK, FORECAST_AXIS_BREAK_STYLE, FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, scenario, underNote } from './forecast.ts';
+import { FORECAST_AXIS_BREAK, FORECAST_AXIS_BREAK_STYLE, FORECAST_BALANCE, FORECAST_MOVE, FORECAST_NONE, FORECAST_NOW, FORECAST_NUMBERS, FORECAST_PAINT, FORECAST_WHAT, FORECAST_WHEN, baseKnobs, forecastEveryday, forecastFigure, forecastModel, forecastPlan, listedSteps, scenario, underNote } from './forecast.ts';
 import { DIFF_GLYPHS, DIFF_WORDS, diffFolded, diffPlan, type DiffLine } from './diff.ts';
 import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, roadmapLegend, roadmapLines, roadmapPlan, roadmapRow, roadmapSentence, roadmapShare, roadmapSkipped, roadmapToday } from './roadmap.ts';
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_SHARE_HEAD, HEAT_SHARE_LINE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
-import { CALENDAR_NONE, CALENDAR_TODAY, CALENDAR_WEEK_NONE, WEEKDAYS, calendarMore, calendarOutside, calendarPlan, calendarSkipped, calendarStripPlan } from './calendar.ts';
+import { CALENDAR_FEW, CALENDAR_NONE, CALENDAR_TODAY, CALENDAR_WEEK_NONE, WEEKDAYS, calendarMore, calendarOutside, calendarPlan, calendarSkipped, calendarStripPlan } from './calendar.ts';
 import { LANES_NONE, LANES_NOW, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from './lanes.ts';
 import { LINKS_NONE, linkPlan } from './links.ts';
 import { GALLERY_NONE, galleryPlan, pictureSrc } from './gallery.ts';
@@ -597,15 +597,18 @@ function proportional(b: Block, o: RenderOptions): string {
   }
   const scale = Math.max(0, ...b.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite));
   /* A BAR WHOSE FIGURE NAMES NOTHING IS LEFT OUT (`drawnRows`); one with no value yet keeps its dash and its hole. */
-  const body = drawnRows(b, o)
-    .map(({ row: r }) => {
+  const listed = drawnRows(b, o);
+  /* THE BARS' FIGURES ARE ONE SET (`barFigures`): all whole, or all to the same places. */
+  const figures = barFigures(listed.map(({ row: r }) => r.cells[1] ?? MISSING), o.home);
+  const body = listed
+    .map(({ row: r }, i) => {
       const v = numeric(r);
       /* A NEGATIVE VALUE LOSES ITS BAR, like a value that is not a number. The scale has one
          side, so the only bar it could draw for a credit is a bar of length zero, and a bar at zero
          claims the value IS zero. The number is still printed, with its sign. */
       const drawable = Number.isFinite(v) && v >= 0 && !r.hole && scale > 0;
       const track = drawable ? `<span class="prop-track" style="--magnitude:${magnitude(v / scale)}"></span>` : '';
-      const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${drawn(barFigure(r.cells[1] ?? MISSING, o.home))}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
+      const inner = `${cell('prop-label', r.cells[0], o)}${track}<span class="prop-value num">${drawn(figures[i] ?? MISSING)}</span>${cell('prop-note', r.cells[2], o)}${toneGlyph(r.tone)}`;
       return r.hole
         /* A HOLE ROW IS A CONTROL ONLY WHERE THE HOST CAN ACT ON IT — the same rule as an inline
            hole, for the same reason. This was a `<button>` with no handler on either side of the
@@ -665,7 +668,7 @@ function list(b: Block, o: RenderOptions): string {
            detail instead, so the two renderers differed on every timeline row that carried a tone, and
            no shape here was a timeline with one. */
         const marker = grouped ? '<span class="item-marker num"></span>' : cell('item-marker num', timelineCell(r.cells[0], o.now), o);
-        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', r.cells[1], o, '', toneGlyph(r.tone))}${cell('item-detail', timelineCell(r.cells[2], o.now), o)}</li>`;
+        return `${head}<li class="item"${toneAttrs(r.tone)}${key}>${marker}${cell('item-title', timelineTitle(r.cells[1]), o, '', toneGlyph(r.tone))}${cell('item-detail', timelineCell(r.cells[2], o.now), o)}</li>`;
       }
       return `<li class="item"${key}>${cell('item-title', r.cells[0], o)}${cell('item-detail', r.cells[1], o)}${cell('item-state', r.cells[2], o)}</li>`;
     })
@@ -897,6 +900,12 @@ function media(b: Block): string {
  * A LEGEND'S FIGURE IS A TILE'S, SAID SHORT (`headlineFigure`): Accounts read `£24,000.00 GBP 71%` beside a bar that
  * already says the share, and the fold of numbers under it keeps every penny.
  */
+/** A split part's identity slot as an attribute, from its fourth cell (`splitSlot`). */
+const slotAttr = (r: Row): string => {
+  const slot = splitSlot(r.cells[3]);
+  return slot ? ` data-slot="${slot}"` : '';
+};
+
 function split(b: Block, o: RenderOptions): string {
   const rows = b.rows.filter((r) => !r.hole);
   const holes = b.rows.filter((r) => r.hole);
@@ -915,7 +924,7 @@ function split(b: Block, o: RenderOptions): string {
       )}">${late ? latePattern(late, 10, 60) : ''}${plan.parts
         .map(
           (p) =>
-            `<rect class="split-seg" data-step="${p.step}"${toneAttrs(rows[p.at]!.tone)}${rows[p.at]!.tone === LATE ? ` style="${lateFill('fill', late)}"` : ''} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`,
+            `<rect class="split-seg" data-step="${p.step}"${slotAttr(rows[p.at]!)}${toneAttrs(rows[p.at]!.tone)}${rows[p.at]!.tone === LATE ? ` style="${lateFill('fill', late)}"` : ''} x="${p.x}" y="0" width="${p.width}" height="100"></rect>`,
         )
         .join('')}${plan.cuts ? `<path class="split-cut" d="${plan.cuts}" vector-effect="non-scaling-stroke"></path>` : ''}</svg>`;
   const legend = rows.length
@@ -924,7 +933,7 @@ function split(b: Block, o: RenderOptions): string {
           /* A part at nought is left out of the legend (`splitListed`); the fold below still says it. */
           if (!splitListed(plan, values[i]!)) return '';
           const part = partOf(i);
-          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(headlineFigure(r.cells[1] || MISSING, o.home), o), o)}</span>${part ? `<span class="split-share num">${escape(part.share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
+          return `<li class="split-item"${toneAttrs(r.tone)}><span class="split-dot"${part ? ` data-step="${part.step}"` : ''}${slotAttr(r)} aria-hidden="true"></span>${cell('split-label', r.cells[0], o)}<span class="split-value num">${renderInline(inline(headlineFigure(r.cells[1] || MISSING, o.home), o), o)}</span>${part ? `<span class="split-share num">${escape(part.share)}</span>` : ''}${cell('split-note', r.cells[2], o)}${toneGlyph(r.tone)}</li>`;
         })
         .join('')}</ul>`
     : '';
@@ -1589,7 +1598,7 @@ function series(b: Block, o: RenderOptions): string {
   const legend = keyed
     ? `<ul class="series-legend">${plan.series
         .map((s) => `<li class="series-key" data-dir="${s.dir}" data-step="${s.step}"><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${escape(s.label)}</span></li>`)
-        .join('')}${net ? `<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_NET}</span></li>` : ''}</ul>`
+        .join('')}${net ? `<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_NET}</span></li>` : ''}${plan.buckets.some((k) => k.under) ? `<li class="series-key" data-under=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">${SERIES_UNDER}</span></li>` : ''}</ul>`
     : '';
   const tip = (k: SeriesPlan['buckets'][number]): string =>
     `<span class="series-tip"><span class="series-tip-label">${escape(k.label)}${k.said ? ` ${escape(k.said)}` : ''}</span>${plan.series
@@ -1606,7 +1615,7 @@ function series(b: Block, o: RenderOptions): string {
           .join('')}</ol><ol class="series-cols" aria-hidden="true">${plan.buckets
           .map(
             (k, i) =>
-              `<li class="series-col"${k.state ? ` data-state="${k.state}"` : ''}${i >= plan.buckets.length / 2 ? ' data-flip=""' : ''}>${plan.bars
+              `<li class="series-col"${k.state ? ` data-state="${k.state}"` : ''}${k.under ? ' data-under=""' : ''}${i >= plan.buckets.length / 2 ? ' data-flip=""' : ''}>${plan.bars
                 .filter((bar) => bar.bucket === i)
                 .map(
                   (bar) =>
@@ -1668,7 +1677,13 @@ function forecast(b: Block, o: RenderOptions): string {
         }${escape(a.label)}</li>`,
     )
     .join('')}</ol>`;
-  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-base', plan.base)}${path('forecast-past', plan.past)}${path('forecast-walk', plan.walk, painted(FORECAST_PAINT.walk))}${path('forecast-future', plan.future)}${path('forecast-low', plan.low)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num"${near} style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true">${escape(plan.now.label)}</span>${axis}${
+  /* THE LINE IS INK ABOVE £0 AND RED UNDER IT, one stroke cut at the zero rule, as `Forecast.svelte` draws it. */
+  const under = plan.below ? `${lateId(b)}-under` : '';
+  const split = under
+    ? `<defs><linearGradient class="forecast-split" id="${under}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="100"><stop class="forecast-above" offset="${plan.zero}%"></stop><stop class="forecast-under" offset="${plan.zero}%"></stop></linearGradient></defs>`
+    : '';
+  const cutLine = under ? ` style="stroke:url(#${under})"` : '';
+  const chart = `<div class="forecast-plot"><svg class="forecast-chart" viewBox="0 0 1000 100" preserveAspectRatio="none" role="img" aria-label="${escape(plan.sentence)}">${split}${path('forecast-grid', plan.grid, painted(FORECAST_PAINT.grid))}${path('forecast-area', plan.area, painted(FORECAST_PAINT.area))}${path('forecast-area', plan.below, ` data-below=""${painted(FORECAST_PAINT.area)}`)}${path('forecast-zero', `M0 ${plan.zero}H1000`)}${plan.cross ? path('forecast-cross-rule', plan.cross.rule, painted(FORECAST_PAINT.rule)) : ''}${path('forecast-today', plan.now.rule)}${path('forecast-base', plan.base)}${path('forecast-past', plan.past, cutLine)}${path('forecast-walk', plan.walk, `${painted(FORECAST_PAINT.walk)}${cutLine}`)}${path('forecast-future', plan.future, cutLine)}${path('forecast-low', plan.low)}${path('forecast-now', plan.now.d, painted(FORECAST_PAINT.now))}${plan.cross ? path('forecast-cross', plan.cross.d) : ''}</svg><span class="forecast-now-label num"${near} style="--at:${plan.now.at};--y:${plan.now.y}" aria-hidden="true"><span class="forecast-now-word">${escape(FORECAST_NOW)}</span><span class="forecast-now-figure">${escape(plan.now.label)}</span></span>${axis}${
     plan.cross ? `<span class="forecast-pin"${plan.cross.near ? ' data-side="end"' : ''} style="--at:${plan.cross.at}" aria-hidden="true">${TONES.warn.glyph} ${escape(plan.cross.day)}</span>` : ''
   }</div>`;
   const ticks = `<ol class="forecast-ticks" aria-hidden="true">${plan.ticks
@@ -1909,8 +1924,15 @@ function calendar(b: Block, o: RenderOptions): string {
   const plan = calendarPlan(b.rows, roadmapToday(o.now), o.day);
   const skipped = plan.skipped.length ? `<p class="calendar-skipped">${escape(calendarSkipped(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
   if (plan.empty) return `<div class="calendar"><p class="calendar-empty">${escape(CALENDAR_NONE)}</p>${skipped}</div>`;
-  const item = (r: Row): string => `<li class="calendar-item"${toneAttrs(r.tone)}>${cell('calendar-title', r.cells[0] || MISSING, o)}${toneGlyph(r.tone)}</li>`;
+  /* EACH ROW'S AMOUNT, its third cell, as one set (`barFigures`), said in the agenda after its title. */
+  const amounts = barFigures(b.rows.map((r) => (r.cells[2] ?? '').trim()), o.home);
+  const amount = (r: Row): string => {
+    const a = amounts[b.rows.indexOf(r)];
+    return a ? `<span class="calendar-amount num">${escape(a)}</span>` : '';
+  };
+  const item = (r: Row): string => `<li class="calendar-item"${toneAttrs(r.tone)}>${cell('calendar-title', r.cells[0] || MISSING, o)}${amount(r)}${toneGlyph(r.tone)}</li>`;
   const items = (rows: readonly Row[]): string => (rows.length ? `<ul class="calendar-items">${rows.map(item).join('')}</ul>` : '');
+  const few = plan.days.reduce((n, d) => n + d.items.length, 0) <= CALENDAR_FEW ? ' data-few=""' : '';
   const head = `<thead><tr>${WEEKDAYS.map((d) => `<th scope="col" abbr="${d.long}">${d.short}</th>`).join('')}</tr></thead>`;
   const months = plan.months
     .map(
@@ -1934,7 +1956,7 @@ function calendar(b: Block, o: RenderOptions): string {
   const agenda = `<ol class="calendar-agenda">${plan.days
     .map((d) => `<li class="calendar-day"${d.today ? ' data-today=""' : ''}><span class="calendar-date num">${escape(d.said)}</span>${items(d.items)}</li>`)
     .join('')}</ol>`;
-  return `<div class="calendar">${months}${agenda}${skipped}</div>`;
+  return `<div class="calendar"${few}>${months}${agenda}${skipped}</div>`;
 }
 
 /**
@@ -1944,7 +1966,12 @@ function calendar(b: Block, o: RenderOptions): string {
 function calendarStrip(b: Block, o: RenderOptions, weeks: number): string {
   const said = (r: Row, i: number): string => plain(inline(r.cells[i] ?? '', o));
   const plan = calendarStripPlan(b.rows, roadmapToday(o.now), weeks, o.day);
-  const item = (r: Row): string => `<li class="calendar-item"${toneAttrs(r.tone)}>${cell('calendar-title', r.cells[0] || MISSING, o)}${toneGlyph(r.tone)}</li>`;
+  const amounts = barFigures(b.rows.map((r) => (r.cells[2] ?? '').trim()), o.home);
+  const amount = (r: Row): string => {
+    const a = amounts[b.rows.indexOf(r)];
+    return a ? `<span class="calendar-amount num">${escape(a)}</span>` : '';
+  };
+  const item = (r: Row): string => `<li class="calendar-item"${toneAttrs(r.tone)}>${cell('calendar-title', r.cells[0] || MISSING, o)}${amount(r)}${toneGlyph(r.tone)}</li>`;
   const items = (rows: readonly Row[]): string => (rows.length ? `<ul class="calendar-items">${rows.map(item).join('')}</ul>` : '');
   const skipped = plan.skipped.length ? `<p class="calendar-skipped">${escape(calendarSkipped(plan.skipped.map((i) => said(b.rows[i]!, 0) || MISSING)))}</p>` : '';
   const outside = plan.outside.length ? `<p class="calendar-skipped">${escape(calendarOutside(plan.outside.length))}</p>` : '';

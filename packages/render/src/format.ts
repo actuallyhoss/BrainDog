@@ -306,6 +306,26 @@ export function barFigure(text: string, home?: Home): string {
 }
 
 /**
+ * A BAR CHART'S FIGURES AS ONE SET (2.A.7, the money review's S3): each through `barFigure`, then, when any of them
+ * keeps a fraction, every figure is written with the same number of places, so "£6,140" never stands over "£2,473.33"
+ * and the digits line up down the column. Whole sets stay whole. Never rounded; a cell that is not one figure is left
+ * as it was.
+ */
+export function barFigures(texts: readonly string[], home?: Home): string[] {
+  const out = texts.map((t) => barFigure(t, home));
+  const placesOf = (t: string, s: string): number => (figureParts(t) ? (/\d\.(\d+)/u.exec(s)?.[1]?.length ?? 0) : 0);
+  /* ONE CURRENCY TO A SET: a figure's mark, its words with the numerals taken out, says which set it is in. */
+  const markOf = (s: string): string => s.replace(/[\d.,−+-]/gu, '').trim();
+  const places = new Map<string, number>();
+  out.forEach((s, i) => places.set(markOf(s), Math.max(places.get(markOf(s)) ?? 0, placesOf(texts[i]!, s))));
+  return out.map((s, i) => {
+    const want = places.get(markOf(s)) ?? 0;
+    if (want === 0 || !figureParts(texts[i]!) || placesOf(texts[i]!, s) === want) return s;
+    return s.replace(/(\d)(?![\d,])/u, `$1.${'0'.repeat(want)}`);
+  });
+}
+
+/**
  * A FIGURE STANDING ON ITS OWN, AS A HEADLINE SAYS IT: `GBP 33,850.00` is `£33,850`, `EGP 412,300.00` is `EGP 412,300`.
  *
  * A headline is read at a glance, so `.00` under it is width that says nothing a round figure does not; a fraction that

@@ -880,7 +880,7 @@ export type ForecastPlan = {
   area: string;
   below: string;
   /** Today's dot, where its balance is said (shares across and down), and the balance as a headline says it. */
-  now: { d: string; at: string; y: string; label: string };
+  now: { d: string; at: string; y: string; label: string; rule: string };
   base: string;
   /** Where the solid rule is drawn: zero where the axis holds it, and else the end of the axis nearest zero. */
   zero: string;
@@ -1157,6 +1157,9 @@ export function forecastPlan(model: ForecastModel, shown: Scenario, base: Scenar
       at: at(nowAt),
       y: String(Math.round(Number(y(model.opening)) * 100) / 10_000),
       label: forecastFigure(model, model.opening, 'read'),
+      /* TODAY IS A HAIRLINE DOWN THE WHOLE CHART as well as a dot, named "Today" with the balance under the word, so the
+         eye finds where the remembered line ends and the walk begins (the money review, F2). */
+      rule: `M${x(model.today)} 0V100`,
     },
     base: base ? line(base.days) : '',
     zero: y(floor),
@@ -1227,6 +1230,8 @@ export const FORECAST_WHAT = 'What';
 export const FORECAST_MOVE = 'In and out';
 export const FORECAST_BALANCE = 'Balance';
 export const FORECAST_TODAY = 'today';
+/** The word over today's balance, on the hairline at today. */
+export const FORECAST_NOW = 'Today';
 export const FORECAST_HORIZON = 'Horizon';
 export const FORECAST_LATE = 'Money in arrives late by';
 export const FORECAST_SPEND = "Spending the record doesn't know";
@@ -1265,7 +1270,7 @@ export const forecastSold = (labels: readonly string[]): string => `${labels.joi
 export const FORECAST_RESET = 'Reset';
 /** The one quiet control for every knob: it opens them under the chart where the block has the room, and in a sheet where it does not. */
 export const FORECAST_ADJUST = 'Adjust';
-export const FORECAST_FULL = 'Open full screen';
+export const FORECAST_FULL = 'Full screen';
 export const FORECAST_CLOSE = 'Close';
 export const FORECAST_SHOW_IN = 'Show in';
 export const FORECAST_TO_END = 'To the end';

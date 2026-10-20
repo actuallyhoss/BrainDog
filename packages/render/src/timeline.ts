@@ -12,7 +12,7 @@
  * day for are on the same day. A blank day starts no group, and its row sits under the day above it.
  */
 
-import { zeroFigure } from './format.ts';
+import { readable, zeroFigure } from './format.ts';
 
 /** For each row, the day to say over it, or null where it carries on the day above it (or the timeline is not grouped). */
 export function timelineDays(rows: readonly { cells: readonly string[] }[]): (string | null)[] {
@@ -51,6 +51,14 @@ export function dayThisYear(text: string, now: number = Date.now()): string {
  */
 export const timelineCell = (text: string | undefined, now?: number): string =>
   text === undefined ? '' : zeroFigure(text) ? '' : dayThisYear(text, now);
+
+/**
+ * A `timeline` title as it is drawn, for both renderers: a bank's line in capitals reads as words (`readable`, 2.A.8),
+ * "GRANGEMOOR EVENTS, STAND DEPOSIT" as "Grangemoor Events, Stand Deposit". A cell that carries markup (a link, a hole)
+ * is the author's, and is left as written.
+ */
+export const timelineTitle = (text: string | undefined): string =>
+  text === undefined ? '' : /[[\]{}()`*_<>]/u.test(text) ? text : readable(text);
 
 /**
  * A `rows` cell as it is drawn: the same, except that only money MOVING by nothing (`−£0`, `+£0`) is left out. A

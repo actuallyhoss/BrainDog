@@ -17,7 +17,7 @@
 -->
 <script lang="ts">
   import { inline, magnitudeOfCell, text, trendOf, SPARKLINE_POINT, TREND, TONES, MISSING, type Block, type Row, type RenderOptions } from '../../src/index.ts';
-  import { barFigure } from '../../src/format.ts';
+  import { barFigures } from '../../src/format.ts';
   import { drawnRows, gaugeFigure } from '../../src/html.ts';
   import Text from '../Text.svelte';
   import Trend from '../Trend.svelte';
@@ -53,6 +53,9 @@
   const depth = $derived(Math.max(0, ...runs.map((r) => r.said.length)));
 
   const scale = $derived(Math.max(0, ...block.rows.filter((r) => !r.hole).map(numeric).filter(Number.isFinite)));
+  /* THE BARS' FIGURES ARE ONE SET (`barFigures`): all whole, or all to the same places. */
+  const shown = $derived(drawnRows(block, opts).map(({ row: r }) => r));
+  const figures = $derived(barFigures(shown.map((r) => r.cells[1] ?? MISSING), opts.home));
   const gauge = $derived.by(() => {
     const r = block.rows[0];
     if (!r) return 0;
@@ -121,16 +124,16 @@
     </div>
   {:else}
     <!-- One body, two containers. Written once so the pressable and the plain row cannot drift. -->
-    {#snippet cells(row: Row, v: number, drawable: boolean)}
+    {#snippet cells(row: Row, v: number, drawable: boolean, figure: string)}
       <span class="prop-label"><Text nodes={inline(row.cells[0] ?? '', opts)} {opts} /></span>
       {#if drawable}<span class="prop-track" style="--magnitude:{fixed(v / scale)}"></span>{/if}
-      <span class="prop-value num"><Text nodes={inline(barFigure(row.cells[1] ?? MISSING, opts.home), opts)} {opts} /></span>
+      <span class="prop-value num"><Text nodes={inline(figure, opts)} {opts} /></span>
       <span class="prop-note"><Text nodes={inline(row.cells[2] ?? '', opts)} {opts} /></span>
       {#if row.tone}
         <span class="glyph" role="img" aria-label={TONES[row.tone].label}>{TONES[row.tone].glyph}</span>
       {/if}
     {/snippet}
-    {#each drawnRows(block, opts).map(({ row: r }) => r) as row}
+    {#each shown as row, i}
       {@const v = numeric(row)}
       {@const drawable = Number.isFinite(v) && v >= 0 && !row.hole && scale > 0}
       <!-- A HOLE ROW IS A CONTROL ONLY WHERE THE HOST CAN ACT ON IT. It was a `<button>` with no
@@ -144,11 +147,11 @@
            these two files exist as a pair. `fill()` guards the call. -->
       {#if row.hole && opts.hole}
         <button type="button" class="prop-row" data-hole data-intent={row.tone} onclick={() => fill()}>
-          {@render cells(row, v, drawable)}
+          {@render cells(row, v, drawable, figures[i] ?? MISSING)}
         </button>
       {:else}
         <div class="prop-row" data-hole={row.hole ? '' : undefined} data-intent={row.tone}>
-          {@render cells(row, v, drawable)}
+          {@render cells(row, v, drawable, figures[i] ?? MISSING)}
         </div>
       {/if}
     {/each}

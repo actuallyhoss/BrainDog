@@ -527,7 +527,12 @@ test('TODAY IS A DOT WITH ITS BALANCE, and the crossing flag is tied to the line
   assert.match(html, /<path class="forecast-area" data-below="" fill="currentColor"/u);
   assert.match(html, /<path class="forecast-walk" fill="none" stroke="currentColor" stroke-width="2"/u);
   assert.match(html, /<path class="forecast-cross-rule" /u);
-  assert.match(html, /<span class="forecast-now-label num" style="--at:[\d.]+;--y:[\d.]+" aria-hidden="true">£1,000<\/span>/u);
+  assert.match(
+    html,
+    /<span class="forecast-now-label num" style="--at:[\d.]+;--y:[\d.]+" aria-hidden="true"><span class="forecast-now-word">Today<\/span><span class="forecast-now-figure">£1,000<\/span><\/span>/u,
+  );
+  assert.equal(plan.now.rule, `M${/^M([\d.]+)/u.exec(plan.now.d)![1]} 0V100`, 'and a hairline down the chart at today');
+  assert.match(html, /<path class="forecast-walk" [^>]*style="stroke:url\(#[^)]+-under\)"/u, 'the line is cut at zero: ink above, red under');
 });
 
 test('THE SENTENCE IS LEFT OFF WHERE THE HEADLINE SAYS WHEN IT RUNS OUT, the flag kept, and back once a knob moves the walk', () => {

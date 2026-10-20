@@ -37,7 +37,7 @@
   import { kindSpec } from '../../src/kind-spec.ts';
   import { moveTick, nextTicks, tickState } from '../../src/ticks.ts';
   import { TODO_META_JOIN, todoMeta } from '../../src/todo.ts';
-  import { timelineCell, timelineDays } from '../../src/timeline.ts';
+  import { timelineCell, timelineDays, timelineTitle } from '../../src/timeline.ts';
   import { rowAt, rowKey } from '../../src/cursor.ts';
   import Agents from '../Agents.svelte';
   import Feed from '../Feed.svelte';
@@ -303,7 +303,7 @@
         {/if}
       </li>
     {:else if block.kind === 'timeline'}
-      {@const title = takeWorking(row.cells[1] ?? '')}
+      {@const title = takeWorking(timelineTitle(row.cells[1]))}
       {@const day = days[i] ?? null}
       <!-- A GROUPED TIMELINE SAYS EACH DAY ONCE, as a small heading over its rows, and the rows under it leave their own
            date blank (`../../src/timeline.ts`). The heading is an item, so the list stays a list of its children. -->

@@ -7,7 +7,7 @@
 <script lang="ts">
   import { inline, text, type Block, type RenderOptions } from '../src/index.ts';
   import { MISSING } from '../src/format.ts';
-  import { SERIES_NET, SERIES_NONE, seriesPlan } from '../src/series.ts';
+  import { SERIES_NET, SERIES_NONE, SERIES_UNDER, seriesPlan } from '../src/series.ts';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
 
@@ -24,6 +24,7 @@
         <li class="series-key" data-dir={s.dir} data-step={s.step}><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{s.label}</span></li>
       {/each}
       {#if net}<li class="series-key" data-net=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{SERIES_NET}</span></li>{/if}
+      {#if plan.buckets.some((k) => k.under)}<li class="series-key" data-under=""><span class="series-swatch" aria-hidden="true"></span><span class="series-name">{SERIES_UNDER}</span></li>{/if}
     </ul>
   {/if}
   {#if plan.empty}
@@ -41,7 +42,7 @@
       </ol>
       <ol class="series-cols" aria-hidden="true">
         {#each plan.buckets as k, i}
-          <li class="series-col" data-state={k.state || undefined} data-flip={i >= plan.buckets.length / 2 ? '' : undefined}>
+          <li class="series-col" data-state={k.state || undefined} data-under={k.under ? '' : undefined} data-flip={i >= plan.buckets.length / 2 ? '' : undefined}>
             {#each plan.bars.filter((bar) => bar.bucket === i) as bar}
               <span class="series-bar" data-dir={bar.dir} data-step={bar.step} data-state={bar.state || undefined} data-end={bar.end ? '' : undefined} style="--y:{bar.y};--h:{bar.height}"></span>
             {/each}

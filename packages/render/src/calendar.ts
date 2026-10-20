@@ -34,6 +34,15 @@ export const calendarSkipped = (titles: readonly string[]): string => `Not on th
 export const CALENDAR_TODAY = 'Today';
 /** What a strip's week with nothing on it says, where a narrow screen lists only the days that hold something. */
 export const CALENDAR_WEEK_NONE = 'Nothing this week.';
+/**
+ * A FEW ENTRIES ARE A LIST, NOT A MONTH (the money review, F5): five bills on a five-week grid spent 520px on empty days
+ * and said no amount. A calendar of this many rows or fewer is marked `data-few`, and the host shows its agenda, with
+ * each row's amount, in the grid's place; "Month" brings the grid back where the host draws the choice.
+ */
+export const CALENDAR_FEW = 8;
+export const CALENDAR_VIEWS = 'Show as';
+export const CALENDAR_VIEW_MONTH = 'Month';
+export const CALENDAR_VIEW_LIST = 'List';
 /** What a strip says of the rows whose day falls before or after its weeks, which it draws on no day. */
 export const calendarOutside = (n: number): string =>
   `${n} ${n === 1 ? 'thing falls' : 'things fall'} outside these weeks and ${n === 1 ? 'is' : 'are'} not drawn.`;
