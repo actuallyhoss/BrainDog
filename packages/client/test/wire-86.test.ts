@@ -11,12 +11,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { handlersFor, serveApi } from '@braindog/host';
-import { endpointModel, SLASH_BRIEF_INSTRUCTIONS } from '@braindog/host/slash';
+import { endpointModel, SLASH_BRIEF_INSTRUCTIONS, SLASH_WRITTEN_INSTRUCTIONS } from '@braindog/host/slash';
 import { backgroundMeter, BACKGROUND_JOBS_MONTH } from '@braindog/host/model-jobs';
 
 import { createClient, type Briefing } from '../src/index.ts';
 import { slashRecordMeter } from '../../host/src/slash-ask.ts';
-import { BRIEF_NO_ANSWER, createRecordApi, type CallContext } from '../../record/src/index.ts';
+import { BRIEF_NO_ANSWER, WRITTEN_QUIET_MS, createRecordApi, type CallContext } from '../../record/src/index.ts';
 import { createSlash } from '../../slash/src/index.ts';
 import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 
@@ -206,10 +206,19 @@ test('A MATCH SOMEBODY SAID YES TO IS NOT ONE THE RECORD MADE: `isFold` is asked
 
 /* ── the briefing a model wrote ──────────────────────────────────────────── */
 
-type Sent = { instructions: string; input: { facts?: { h: string; title: string }[] } };
+/** The read once the brief is written as sentences: the cards stand beside it, and `paused` says why none was written. */
+type WrittenBriefing = Briefing & { written?: { sentences: { parts: { text: string; row: string | null }[] }[] } | null; paused?: string | null };
 
-/** The host's own chat-completions adapter, over a request that is answered here. `answer` may fail the briefing ask. */
-function model(answer: 'cards' | 'down') {
+type Sent = { instructions: string; input: { facts?: { h: string; title: string; figures?: Record<string, string> }[] } };
+
+/**
+ * The host's own chat-completions adapter, over a request that is answered here. `answer` may fail the briefing ask.
+ *
+ * `written` IS WHETHER THE MODEL ALSO WRITES THE BRIEF AS SENTENCES. The host's adapter does, and a record whose model
+ * does is asked for sentences when its rows change, instead of for cards by the slot of the day; one without writes the
+ * cards, which is the road the first three tests below keep.
+ */
+function model(answer: 'cards' | 'down', written = false) {
   const sent: Sent[] = [];
   const send = async (_url: URL, init: RequestInit): Promise<Response> => {
     const body = JSON.parse(String(init.body)) as { messages: { content: string }[] };
@@ -217,15 +226,21 @@ function model(answer: 'cards' | 'down') {
     const input = JSON.parse(body.messages[1]!.content) as Sent['input'];
     sent.push({ instructions, input });
     const briefing = instructions === SLASH_BRIEF_INSTRUCTIONS;
-    if (briefing && answer === 'down') return new Response('busy', { status: 503 });
-    const said = briefing ? { cards: (input.facts ?? []).map((f) => ({ h: f.h, line: `Look at ${f.title} first` })) } : { drafts: [], lines: {} };
+    const sentences = instructions === SLASH_WRITTEN_INSTRUCTIONS;
+    if ((briefing || sentences) && answer === 'down') return new Response('busy', { status: 503 });
+    const said = briefing
+      ? { cards: (input.facts ?? []).map((f) => ({ h: f.h, line: `Look at ${f.title} first` })) }
+      : sentences
+        ? { sentences: (input.facts ?? []).filter((f) => f.figures?.days !== undefined).map((f) => `${f.title} is {{${f.h}.days}} late.`) }
+        : { drafts: [], lines: {} };
     return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: JSON.stringify(said) } }] }), { status: 200 });
   };
-  return { sent, model: endpointModel({ url: 'http://localhost:11434/v1/chat/completions', model: 'small', key: async () => 'not-a-key', send }) };
+  const { written: sentences, ...cards } = endpointModel({ url: 'http://localhost:11434/v1/chat/completions', model: 'small', key: async () => 'not-a-key', send });
+  return { sent, model: (written ? { ...cards, written: sentences } : cards) as never };
 }
 
 /** A record with a bill late since yesterday, a model behind the host's adapter and the host's meter over Slash's ledger. */
-async function briefed(answer: 'cards' | 'down') {
+async function briefed(answer: 'cards' | 'down', written = false) {
   const sql = openSqlite();
   const ledger = openSqlite();
   const clock = fixedClock(NOW - HOUR);
@@ -236,16 +251,16 @@ async function briefed(answer: 'cards' | 'down') {
     record: new Proxy({}, { get: () => { throw new Error('the record was read by the package'); } }) as never,
   });
   assert.ok(engine.configure({ ask_cap: 20 }, owner as never).ok);
-  const m = model(answer);
+  const m = model(answer, written);
   const api = await createRecordApi({ sql, clock, slashModel: m.model, slashMeter: slashRecordMeter({ sql: ledger, clock, engine: async () => engine, model: 'small' }) });
   value(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }));
   value(await api.kernel.install([BILLS] as never));
   value(api.kernel.create('bills', { name: 'Studio rent', due: '2026-10-13' } as never, { actor: 'p_1' }));
   clock.set(NOW);
-  const asks = () => m.sent.filter((s) => s.instructions === SLASH_BRIEF_INSTRUCTIONS);
+  const asks = () => m.sent.filter((s) => s.instructions === (written ? SLASH_WRITTEN_INSTRUCTIONS : SLASH_BRIEF_INSTRUCTIONS));
   const spent = (): number => ledger.one<{ n: number }>("SELECT count(*) AS n FROM slash_call WHERE spends = 'background' AND purpose = 'headline'")?.n ?? 0;
   const his = (): number => ledger.one<{ n: number }>("SELECT count(*) AS n FROM slash_call WHERE spends = 'person'")?.n ?? 0;
-  return { sql, ledger, api, asks, spent, his, mine: clientOver(api, owner) };
+  return { sql, ledger, api, clock, asks, spent, his, mine: clientOver(api, owner) };
 }
 
 test('THE BRIEFING A MODEL WROTE, THROUGH THE CLIENT: the tick asks the host’s adapter on the background allowance, and the read answers its cards', async () => {
@@ -306,6 +321,52 @@ test('WITH THE HEADLINES’ SHARE OF THE MONTH SPENT THE MODEL IS NOT ASKED: the
   assert.ok(brief.cards.length > 0 && brief.cards.every((c) => c.by === 'rule'));
   assert.match(brief.said ?? '', /spent until 2026-11-01/u);
   assert.doesNotMatch(brief.said ?? '', /[0-9A-HJKMNP-TV-Z]{26}|—/u);
+  r.sql.close();
+  r.ledger.close();
+});
+
+test('THE BRIEF A MODEL WRITES AS SENTENCES, THROUGH THE CLIENT: asked once the rows have stood still, on the background allowance, and the read answers it filled from the record', async () => {
+  const r = await briefed('cards', true);
+  /* BEFORE ANY ASK the rules' cards speak, and a read asks nobody. */
+  const rules = value<WrittenBriefing>(await r.mine.briefing());
+  assert.ok(rules.cards.length > 0 && rules.cards.every((c) => c.by === 'rule'), JSON.stringify(rules));
+  assert.equal(rules.written ?? null, null);
+  assert.equal(r.asks().length, 0, 'a read asked a model');
+
+  /* THE FIRST TICK ONLY NOTES THAT THE ROWS MOVED; THE ASK WAITS FOR THEM TO STAND STILL. */
+  assert.ok((await r.api.slashTick()).ran);
+  assert.equal(r.asks().length, 0, 'the first tick asked before the rows stood still');
+  r.clock.advance(WRITTEN_QUIET_MS + 1_000);
+  await r.api.slashTick();
+  assert.equal(r.asks().length, 1, 'the tick asks once');
+  assert.ok(r.asks()[0]!.input.facts!.some((f) => f.title === 'Studio rent'));
+  assert.doesNotMatch(JSON.stringify(r.asks()[0]!.input), /bills#|rec_|p_1/u);
+  const counted = r.spent();
+  assert.ok(counted >= 1, 'the ask was not counted in the ledger');
+  assert.equal(r.his(), 0);
+
+  const brief = value<WrittenBriefing>(await r.mine.briefing());
+  assert.equal(brief.written?.sentences.map((x) => x.parts.map((p) => p.text).join('')).join(' '), 'Studio rent is 1 day late.');
+  assert.equal(brief.paused ?? null, null);
+  /* A SECOND TICK WITH NOTHING MOVED ASKS NOTHING. */
+  r.clock.advance(WRITTEN_QUIET_MS + 1_000);
+  await r.api.slashTick();
+  assert.equal(r.asks().length, 1);
+  assert.equal(r.spent(), counted);
+  r.sql.close();
+  r.ledger.close();
+});
+
+test('A MODEL THAT WRITES NO SENTENCES LEAVES THE RULES’ CARDS, and the read says the written brief is paused', async () => {
+  const r = await briefed('down', true);
+  await r.api.slashTick();
+  r.clock.advance(WRITTEN_QUIET_MS + 1_000);
+  await r.api.slashTick();
+  assert.equal(r.asks().length, 1);
+  const brief = value<WrittenBriefing>(await r.mine.briefing());
+  assert.ok(brief.cards.length > 0 && brief.cards.every((c) => c.by === 'rule'), JSON.stringify(brief));
+  assert.equal(brief.written ?? null, null);
+  assert.match(brief.paused ?? '', /^The written brief is paused/u);
   r.sql.close();
   r.ledger.close();
 });
