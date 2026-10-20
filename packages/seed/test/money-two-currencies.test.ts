@@ -115,7 +115,9 @@ function write(k: Kernel, side: Side, kiln: { book: string; thing: string; categ
   make('obligations', { what: `Invoice paid this week in ${side.word}`, direction: 'owed_to_me', amount: at(700), due: day(-3), settled: day(-2), state: 'paid' });
   make('recurring', { what: `Rent in ${side.word}`, direction: 'out', amount: at(40_000), every: 'monthly', next_due: day(6), state: 'live', category: kiln.category });
   make('recurring', { what: `Retainer in ${side.word}`, direction: 'in', amount: at(7_000), every: 'monthly', next_due: day(12), state: 'live' });
-  make('installments', { what: `Laptop in ${side.word}`, plan: `Laptop in ${side.word}`, direction: 'out', amount: at(1_200), due: day(8), state: 'open' });
+  /* THE LAPTOP HAS A PART AFTER THIS ONE, so what is left once this is paid is not nought (`installments-after-next-by-plan`,
+     which reads the greatest `left_after` of a plan's open parts and would otherwise read nothing in either currency). */
+  make('installments', { what: `Laptop in ${side.word}`, plan: `Laptop in ${side.word}`, direction: 'out', amount: at(1_200), due: day(8), state: 'open', left_after: at(800) });
   /* AND TWO PARTS OF THE PLAN CALLED KILN, one paid and one open, for the figures of one plan (`plan-paid`, `plan-left`,
      money-core 3.17.0). */
   make('installments', { what: `Kiln, part 1 in ${side.word}`, plan: KILN, number: 1, direction: 'out', amount: at(900), due: day(-20), state: 'paid' });
@@ -176,12 +178,16 @@ const worth = (stands: Stands, code: string): number | null =>
  * Why one money answer is wrong, or nothing. `raw` is what each currency's rows alone answer on a record with no home
  * currency, in that currency; `bare` is what the same rows answer with the dollars written as pounds.
  */
-function moneyFaults(said: Answer, raw: Record<string, number>, bare: Answer | undefined, stands: Stands): string[] {
+function moneyFaults(said: Answer, raw: Record<string, number>, bare: Answer | undefined, stands: Stands, greatest = false): string[] {
   const out: string[] = [];
   const held = Object.keys(raw).filter((c) => raw[c] !== 0);
   /* A MINOR UNIT A ROW, since each amount is converted and rounded on its own before they are added. */
   const near = (a: number, b: number): boolean => Math.abs(a - b) <= Math.max(1, said.rows);
-  const atHome = (codes: string[]): number => codes.reduce((sum, c) => sum + raw[c]! * (worth(stands, c) ?? Number.NaN), 0);
+  /* A SUM ADDS EACH CURRENCY'S ROWS AT HOME, and a figure that reads the greatest of its rows (`max`) is the greatest of them at home. */
+  const atHome = (codes: string[]): number => {
+    const each = codes.map((c) => raw[c]! * (worth(stands, c) ?? Number.NaN));
+    return greatest ? Math.max(...each) : each.reduce((sum, n) => sum + n, 0);
+  };
   const isBare = held.length > 1 && typeof bare?.value === 'number' && said.value === bare.value;
   if (said.parts !== undefined) {
     if (said.value !== null) out.push(`answers ${said.value} and parts at once`);
@@ -231,14 +237,15 @@ function figureFaults(f: Figure, said: Read, alone: Alone, bare: Read | undefine
     }
     return out;
   }
-  const out = moneyFaults(said, rawOf((r) => r), bare, stands).map((why) => `${f.metric} ${why}`);
+  const greatest = 'max' in ((f.value ?? {}) as object);
+  const out = moneyFaults(said, rawOf((r) => r), bare, stands, greatest).map((why) => `${f.metric} ${why}`);
   /* A FIGURE THAT CANNOT ADD UP NAMES THE RATE IT LACKS, since that is what a person can do about it. */
   if (said.parts !== undefined && stands.home !== null)
     for (const code of Object.keys(alone).filter((c) => worth(stands, c) === null && rawOf((r) => r)[c] !== 0))
       if (!said.fx?.missing.includes(`${code} to ${stands.home}`)) out.push(`${f.metric} does not say it lacks the rate from ${code} to ${stands.home}`);
   for (const g of said.groups ?? []) {
     const name = g.label ?? g.key;
-    out.push(...moneyFaults({ ...g, unit: said.unit }, rawOf((r) => groupOf(r, name)), groupOf(bare, name), stands).map((why) => `${f.metric}, ${name}, ${why}`));
+    out.push(...moneyFaults({ ...g, unit: said.unit }, rawOf((r) => groupOf(r, name)), groupOf(bare, name), stands, greatest).map((why) => `${f.metric}, ${name}, ${why}`));
   }
   return out;
 }

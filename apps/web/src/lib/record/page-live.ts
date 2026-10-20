@@ -20,7 +20,7 @@
 
 import { createClient, type ClientOptions } from '@braindog/client';
 import { COSTS, isBucket, isQuiet, type Bars, type FxRead, type MeasureSeries, type Part, type QueueQuestion, type TargetIn } from '@braindog/kernel';
-import { MISSING, UNNAMED, integer, money, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
+import { MISSING, UNNAMED, integer, money, moneyWhole, quantity, since, day as fmtDay, type Resolve } from 'braindog-render';
 
 import { copy } from '../copy.ts';
 import { presenceSaid, type RunPresence } from '../ui/presence-words.ts';
@@ -1195,6 +1195,33 @@ const unnamedOf = (b: Answered): string[] | undefined => {
 const SOURCE_DRAWN: ReadonlySet<string> = new Set(['table', 'list', 'rows']);
 const END_TYPES: ReadonlySet<string> = new Set(['money', 'int', 'count', 'decimal']);
 
+/**
+ * THE NEXT UNPAID PART OF EACH PLAN, SAID UNDER ITS BAR ("Next £1,875 on 3 Sep"), from the three figures Money's
+ * Instalments tile reads after its two counts (`figures/plans.ts`): the day of the earliest open part, what is left to
+ * pay, and what is left once that part is paid. The part's amount is the second less the third, which keeps one figure
+ * from reading a row's amount by another row's day.
+ *
+ * A PLAN THE FIGURES CANNOT SAY IT FOR SAYS LESS, NEVER A GUESS: with no day it says nothing, and with no amount (the
+ * script that writes what is left after each part has not reached this plan) it says the day alone. The year is left
+ * off a day in this year. Returns the sentence for a plan's key, or `''`.
+ */
+function nextPart(cells: readonly { reading?: { value?: unknown; unit?: unknown; groups?: { key: string; value: number | null }[] } | null }[], now: number): (key: string) => string {
+  const [days, left, after] = cells.map((c) => new Map((c.reading?.groups ?? []).map((g) => [String(g.key), g.value])));
+  const unit = cells[1]?.reading?.unit;
+  if (!days || !left || !after) return () => '';
+  return (key) => {
+    const at = days.get(key);
+    if (typeof at !== 'number' || !Number.isFinite(at)) return '';
+    const iso = new Date(at * 86_400_000).toISOString().slice(0, 10);
+    const year = new Date(now).getUTCFullYear();
+    const on = fmtDay(iso).replace(new RegExp(` ${year}$`, 'u'), '');
+    const l = left.get(key);
+    const a = after.get(key);
+    const part = typeof l === 'number' && typeof a === 'number' && l > a && typeof unit === 'string' && /^[A-Z]{3}$/u.test(unit) ? moneyWhole(l - a, unit, homeCurrency()) : null;
+    return part ? `Next ${part.text} on ${on}` : `Next on ${on}`;
+  };
+}
+
 /** Whether a run the page read is at work, gone quiet or stopped, as a card of runs says it (`face.ts` `liveOf`). */
 const liveOfRun = (run: Readonly<Record<string, unknown>>, now: number): RunCell['live'] =>
   liveOf(run.state, run.state === 'active' && isQuiet({ fields: run as never }, now));
@@ -1499,12 +1526,17 @@ export function blockOf(
      AND WHAT WAS LEFT OUT IS EVERY PLAN NOT DRAWN, the ones past the record's own cap on a figure's parts among them
      (`more` on the second figure, which is the one that names every plan): `total` less `shown` is what the page says.
      A figure that was refused, or that came with no parts at all, falls through to the tiles below, which say why. */
-  if (kind === 'progress' && b.cells?.length === 2 && readings?.length === 2 && readings.every((c) => Array.isArray(c.reading?.groups))) {
+  if (kind === 'progress' && (b.cells?.length === 2 || b.cells?.length === 5) && readings?.length === b.cells.length && readings.every((c) => Array.isArray(c.reading?.groups))) {
     const [first, second] = readings.map((c) => c.reading!.groups!);
     const done = new Map(first!.map((g) => [String(g.key), typeof g.value === 'number' ? g.value : 0]));
-    const plans = second!.map((g) => ({ name: labelled(g) ?? String(g.key), paid: done.get(String(g.key)) ?? 0, parts: typeof g.value === 'number' ? g.value : 0 }));
+    /* WHAT EACH TRACK SAYS UNDER ITS BAR, from the three figures after the two counts when the tile reads them. */
+    const next = nextPart(readings.slice(2), now);
+    const plans = second!.map((g) => ({ key: String(g.key), name: labelled(g) ?? String(g.key), paid: done.get(String(g.key)) ?? 0, parts: typeof g.value === 'number' ? g.value : 0 }));
     const open = (p: (typeof plans)[number]): boolean => p.paid < p.parts;
-    const tracks = [...plans.filter(open), ...plans.filter((p) => !open(p))].slice(0, 6).map((p) => ({ cells: [p.name, String(p.paid), String(p.parts)] }));
+    const tracks = [...plans.filter(open), ...plans.filter((p) => !open(p))].slice(0, 6).map((p) => {
+      const said = open(p) ? next(p.key) : '';
+      return { cells: said ? [p.name, String(p.paid), String(p.parts), said] : [p.name, String(p.paid), String(p.parts)] };
+    });
     const past = readings[1]!.reading!.more;
     return { ...shell, authored: tracks, shown: tracks.length, total: plans.length + (typeof past === 'number' && past > 0 ? past : 0) };
   }

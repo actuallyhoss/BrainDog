@@ -12,7 +12,11 @@ export const INSTALMENTS: Record<string, unknown>[] = [
        out of the walk, and money coming in by parts is not what this asks, so only what goes out is counted. A plan
        with nothing paid yet is in the second figure and not in the first, and reads nought of its parts.
 
-       THE ORDER IS THE DRAWING'S: the first figure is what fills each track and the second is what it fills toward. */
+       THE ORDER IS THE DRAWING'S: the first figure is what fills each track and the second is what it fills toward.
+
+       THE THREE AFTER THEM SAY WHAT IS NEXT UNDER EACH BAR, "Next £1,875 on 3 Sep": the day of the earliest open part, what
+       is left to pay and what is left once that part is paid, the amount being the second less the third. They fill and
+       fill toward nothing, so a host that reads two cells draws the tracks as it did (`page-live.ts` `nextPart`). */
     kind: 'progress',
     heading: 'Instalments',
     icon: 'credit-card',
@@ -20,6 +24,9 @@ export const INSTALMENTS: Record<string, unknown>[] = [
     cells: [
       { metric: 'installments-paid-by-plan', label: 'Paid' },
       { metric: 'installments-total-by-plan', label: 'Parts' },
+      { metric: 'installments-next-due-by-plan', label: 'Next due' },
+      { metric: 'installments-left-by-plan', label: 'Left' },
+      { metric: 'installments-after-next-by-plan', label: 'Left after' },
     ],
     when: { metric: 'installments-left', gt: 0 },
     empty: 'Nothing is being paid in parts.',

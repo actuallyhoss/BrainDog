@@ -1151,3 +1151,23 @@ test('A CALENDAR STRIP OF TWO WEEKS, A THING TODAY AND ONE NEXT WEEK, draws one 
   assert.match(html, /calendar-strip/u);
   assert.match(html, /<span class="calendar-today">Today<\/span>/u);
 });
+
+/* ── a calendar's amount column ────────────────────────────────────────────── */
+
+test('A CALENDAR ROW\'S AMOUNT, ITS THIRD CELL, draws one tree in both renderers, in the months and in the strip', () => {
+  /* A fence takes two columns: a host hands the rows over a list with the third (`calendar` in the kernel). */
+  const base = page('```calendar\nRent | 2026-10-15\n```');
+  const rows = [
+    { cells: ['Rent', '2026-10-15', '£1,875.00'] },
+    { cells: ['Phone', '2026-10-15', '£42.50'] },
+    { cells: ['Parking', '2026-10-20', ''] },
+  ];
+  for (const more of [{}, { weeks: 2 }]) {
+    const block = { ...base, ...more, rows } as BlockSegment;
+    const [svelte, html] = both(block, { now: Date.UTC(2026, 9, 15, 12) });
+    assert.equal(svelte, html);
+    /* THE GRID'S CELLS CARRY THEM TOO (a stylesheet hides them there), so each figure is said once or twice; none is empty. */
+    const said = [...html.matchAll(/<span class="calendar-amount num">([^<]*)<\/span>/gu)].map((m) => m[1]);
+    assert.deepEqual([...new Set(said)], ['£1,875.00', '£42.50']);
+  }
+});

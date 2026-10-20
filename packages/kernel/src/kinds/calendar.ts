@@ -2,7 +2,9 @@
  * `calendar`: the rows of a list on the days they fall, a few whole months at a time.
  *
  * OVER A LIST it names two columns, the title and the day (`columns: [title, due]`), and the day is a `day` or an
- * `instant` field. It may instead write its rows out, each `{ cells: [title, day] }`. `back:` and `ahead:` are how many
+ * `instant` field. A THIRD COLUMN IS THE ROW'S AMOUNT (`columns: [title, due, amount]`), said at the right of its line in
+ * the list the host draws, in the money writer's figure (`packages/render/src/money.ts`); it is a field of the list, any
+ * type, and a row whose field is empty says none. It may instead write its rows out, each `{ cells: [title, day] }`. `back:` and `ahead:` are how many
  * whole months it shows before and after this one, up to `MONTHS_MOST` each, `BACK` and `AHEAD` when it says neither.
  *
  * OR A STRIP OF WEEKS: `weeks:` is how many whole weeks it shows from the Monday of this one, 1 to `WEEKS_MOST`, read
@@ -237,7 +239,7 @@ export const calendar: KindModule & { across: readonly string[] } = {
     const shape = listedFault(
       across ? { ...block, source: undefined, authored: [] } : block,
       'calendar',
-      { fewest: 2, most: 2, said: 'two columns, the title and the day each row falls on, such as columns: [title, due]' },
+      { fewest: 2, most: 3, said: 'two or three columns, the title, the day each row falls on and, if it is to say one, an amount, such as columns: [title, due, amount]' },
       ctx.stage,
     );
     if (shape) return shape;

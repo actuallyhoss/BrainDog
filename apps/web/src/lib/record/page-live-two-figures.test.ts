@@ -259,3 +259,68 @@ test('Money’s tile, answered by a real kernel, leads with the plans still bein
   assert.equal(block.total - block.shown, parts.size - 6);
   assert.ok(block.total > block.shown, 'the page has plans to say it left out');
 });
+
+/* ── What is next, under each bar ────────────────────────────────────────── */
+
+const DAY = (iso: string): number => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;
+const NEXT_IDS = ['installments-next-due-by-plan', 'installments-left-by-plan', 'installments-after-next-by-plan'];
+
+/** The tile as Money now declares it: the two counts, then the day of the next part, what is left and what is left after it. */
+const withNext = (rows: { day?: Group[]; left?: Group[]; after?: Group[]; unit?: string | null }, total: Group[], paid: Group[]) =>
+  blockOf(
+    {
+      kind: 'progress',
+      heading: 'Instalments',
+      cells: [{ metric: 'installments-paid-by-plan' }, { metric: 'installments-total-by-plan' }, ...NEXT_IDS.map((metric) => ({ metric }))],
+      readings: [
+        { metric: 'installments-paid-by-plan', reading: counted(paid) },
+        { metric: 'installments-total-by-plan', reading: counted(total) },
+        { metric: NEXT_IDS[0], reading: { ...counted(rows.day), unit: null } },
+        { metric: NEXT_IDS[1], reading: { ...counted(rows.left), unit: rows.unit === undefined ? 'GBP' : rows.unit } },
+        { metric: NEXT_IDS[2], reading: { ...counted(rows.after), unit: rows.unit === undefined ? 'GBP' : rows.unit } },
+      ],
+      rows: [],
+      matched: 0,
+      refusals: [],
+    } as never,
+    new Map(),
+    now,
+  );
+
+test('each plan with a part left says its next part under its bar: the amount, and the day without this year', () => {
+  const block = withNext(
+    {
+      day: [{ key: 'Flat', value: DAY('2026-11-03') }, { key: 'Car', value: DAY('2027-01-05') }],
+      left: [{ key: 'Flat', value: 562_500 }, { key: 'Car', value: 900_000 }],
+      after: [{ key: 'Flat', value: 375_000 }, { key: 'Car', value: 450_000 }],
+    },
+    [{ key: 'Flat', value: 6 }, { key: 'Car', value: 4 }],
+    [{ key: 'Flat', value: 4 }, { key: 'Car', value: 2 }],
+  );
+  const drawn = tracks(block);
+  /* £1,875.00 and £4,500.00 are the part's own amount, the second figure less the third, said in whole units (the code
+     stands after it only while the record has chosen no home currency, as here). */
+  assert.match(drawn[0]![3]!, /^Next £1,875(\p{Z}GBP)? on 3 Nov$/u);
+  assert.match(drawn[1]![3]!, /^Next £4,500(\p{Z}GBP)? on 5 Jan 2027$/u, 'a day in another year says its year');
+  assert.deepEqual(drawn.map((t) => t.slice(0, 3)), [['Flat', '4', '6'], ['Car', '2', '4']]);
+  assert.equal(block.metrics, undefined);
+});
+
+test('a plan paid off says no next, and one the figures cannot say the amount for says its day alone', () => {
+  const block = withNext(
+    { day: [{ key: 'Flat', value: DAY('2026-11-03') }], left: [{ key: 'Flat', value: 562_500 }], after: [] },
+    [{ key: 'Flat', value: 6 }, { key: 'Desk', value: 2 }],
+    [{ key: 'Flat', value: 4 }, { key: 'Desk', value: 2 }],
+  );
+  assert.deepEqual(tracks(block), [
+    ['Flat', '4', '6', 'Next on 3 Nov'],
+    ['Desk', '2', '2'],
+  ]);
+});
+
+test('a plan with no day says nothing under its bar, and two cells draw the tracks as they were', () => {
+  const none = withNext({ day: [], left: [], after: [] }, [{ key: 'Flat', value: 6 }], [{ key: 'Flat', value: 4 }]);
+  assert.deepEqual(tracks(none), [['Flat', '4', '6']]);
+  const two = tile([{ key: 'Flat', value: 4 }], [{ key: 'Flat', value: 6 }]);
+  assert.deepEqual(tracks(two), [['Flat', '4', '6']]);
+});

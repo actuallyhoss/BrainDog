@@ -1459,7 +1459,7 @@ const DECLARED: Record<string, Version> = {
       register.plans rule.part-counts-plan script.plans_from_names
       rule.plan-links-parts page.money-plan metric.plan-parts-paid metric.plan-parts metric.plan-paid metric.plan-left
       metric.plan-next-due metric.plan-last-due metric.installments-paid-by-plan metric.installments-total-by-plan
-      metric.budget-passed-on
+      metric.budget-passed-on metric.installments-next-due-by-plan metric.installments-left-by-plan metric.installments-after-next-by-plan
       rule.entry-takes-book rule.repeat-takes-book rule.part-takes-book script.book_from_account
       metric.book-in-month metric.book-out-month metric.book-net-month
       metric.ledger-in-no-book metric.repeating-in-no-book metric.instalments-in-no-book metric.bills-in-no-book
@@ -1474,7 +1474,7 @@ const DECLARED: Record<string, Version> = {
       rule.payment-unsettles script.unsettle
       metric.lasts-no-income
     `,
-    declares: '66a1947e5a2f77ab',
+    declares: '7b5fd9f2a5b81a29',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1511,6 +1511,7 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 3.17.0 (money-days-word): `page.money`'s first line says days after the count of how long the cash lasts with no income, `day(s)`; no id added or taken away -> ce04c1a199af2266",
       "Inside the unreleased 3.17.0 (batch 6, the look of Money): `page.money`'s Ledger line says the day's count alone, `{{filed-today}} filed today.`, where it said it beside a second count of 30 days that read as a contradiction; no id added or taken away -> 432c185b62df186d",
       "Inside the unreleased 3.17.0 (the UI pass of 20 October, money F3 and F5): `page.money`'s Lasts tile says two cells, With what is due over `runs-out-on` and If nothing comes in over `lasts-no-income`, and the three lead notes no longer end on how long the cash lasts with no income; Heads up's two late lines say `{{bad:late}}` where they said past their due date, and drop still; no id added or taken away -> 66a1947e5a2f77ab",
+      "Inside the unreleased 3.17.0 (the UI pass of 20 October, money F5): Instalments says what is next under each bar, 'Next £1,875 on 3 Sep', from three figures by plan after its two counts, `metric.installments-next-due-by-plan`, `metric.installments-left-by-plan` and `metric.installments-after-next-by-plan`; and Coming and going's calendar of what falls due names a third column, `amount`, so each line says its figure; three ids added and none taken away -> 7b5fd9f2a5b81a29",
     ],
   },
   'work@1.17.0': {

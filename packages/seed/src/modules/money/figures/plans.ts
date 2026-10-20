@@ -148,3 +148,52 @@ export const PLANS_FIGURES: Record<string, SeedMetric> = {
     ...ONCE,
   },
 };
+
+/**
+ * THE NEXT UNPAID PART OF EVERY PLAN, FOR THE SAME TILE ("Next £1,875 on 3 Sep"): three figures by plan that the tile
+ * reads together, because no figure here reads one row's amount by another row's day. Their own export, declared last
+ * in Money (`figures/index.ts`), so every figure a record already holds keeps its place in the document.
+ */
+export const NEXT_PART_FIGURES: Record<string, SeedMetric> = {
+  /* THE DAY is the earliest part still open, as `plan-next-due` is, so it is a day already gone when that part is late.
+
+     THE AMOUNT is what is left to pay, less what is left once the next part is paid. `left_after` of a part is the
+     plan's open parts due after it (`lists/installments.ts`), so it falls as the parts go and the greatest of the open
+     parts' is the earliest one's. Added up beside the sum of the open parts, the two leave that part's own amount without
+     a figure that reads one row by another. Only what goes out, as the rest of the tile. */
+  'installments-next-due-by-plan': {
+    metric: 'installments-next-due-by-plan',
+    name: 'Next part due, by plan',
+    source: 'register.installments',
+    where: 'state is open, direction is out',
+    value: { min: 'due' },
+    group_by: 'plan',
+    format: 'day',
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  'installments-left-by-plan': {
+    metric: 'installments-left-by-plan',
+    name: 'Left to pay, by plan',
+    source: 'register.installments',
+    where: 'state is open, direction is out',
+    value: { sum: 'amount' },
+    group_by: 'plan',
+    format: MONEY,
+    target: { gte: 0 },
+    ...ONCE,
+  },
+
+  'installments-after-next-by-plan': {
+    metric: 'installments-after-next-by-plan',
+    name: 'Left once the next part is paid, by plan',
+    source: 'register.installments',
+    where: 'state is open, direction is out',
+    value: { max: 'left_after' },
+    group_by: 'plan',
+    format: MONEY,
+    target: { gte: 0 },
+    ...ONCE,
+  },
+};

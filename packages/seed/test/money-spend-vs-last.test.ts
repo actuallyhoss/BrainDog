@@ -110,8 +110,9 @@ test('MONEY DECLARES THE FOUR, after every figure it already held, and a fresh r
   for (const id of FOUR) assert.equal(METRICS[id]!.format, 'money', `${id} names a currency or is no money figure`);
   /* LAST IN THE DOCUMENT, in this order, so no figure a record already holds moves. Twenty-three came after them by
      batch 74, which took `plan-share-left` out again (plan-lead-one-figure-74), and twenty-four by batch 76, with
-     `book-lasts-until` (book-lasts-until-76). */
-  assert.deepEqual(Object.keys(MONEY_METRICS).slice(-FOUR.length - 24, -24), [...FOUR]);
+     `book-lasts-until` (book-lasts-until-76), and twenty-seven by the UI pass of 20 October, which put the three of the
+     next unpaid part of each plan last. */
+  assert.deepEqual(Object.keys(MONEY_METRICS).slice(-FOUR.length - 27, -27), [...FOUR]);
   const { k } = await fresh();
   for (const id of FOUR) assert.ok(k.declarations().some((d) => d.id === `metric.${id}`), `money-core installed without ${id}`);
 });

@@ -287,6 +287,9 @@ export const INSTALLMENTS: Fields[] = [
     amount: gbp(187_500),
     due: day(-30 * (5 - n)),
     state: n <= 4 ? 'paid' : 'open',
+    /* WHAT IS LEFT ONCE THIS PART IS PAID, as Money's script writes it: the open parts due after it. Parts one to four have
+       the four open ones (five to eight) still to come; the last has nothing. Instalments' next-part line reads it. */
+    left_after: gbp(187_500 * (n <= 4 ? 4 : 8 - n)),
     ...(n <= 4 ? { settled: day(-30 * (5 - n) + 1) } : {}),
     account: 1,
     category: 8,
@@ -306,6 +309,7 @@ export const INSTALLMENTS: Fields[] = [
     amount: gbp(240_000),
     due: day(-90 * (3 - n)),
     state: n <= 2 ? 'paid' : 'open',
+    left_after: gbp(240_000 * (n <= 2 ? 2 : 4 - n)),
     ...(n <= 2 ? { settled: day(-90 * (3 - n) + 45) } : {}),
     account: 1,
     party: 1,

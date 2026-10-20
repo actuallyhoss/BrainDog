@@ -777,8 +777,22 @@ const LATE_WORDS_UI: readonly (readonly [string, string])[] = [
   ['Invoices {{bad:late}}: {{late-in}} to come in.', 'Invoices {{bad:past their due date}}: {{late-in}} still to come in.'],
   ['Bills {{bad:late}}: {{overdue}} to pay.', 'Bills {{bad:past their due date}}: {{overdue}} still to pay.'],
 ];
-const withoutUiPass = (doc: Body): Body =>
-  withPage(doc, 'money', (now) => now.map((b) => (typeof b.body === 'string' ? { ...b, body: LATE_WORDS_UI.reduce((body, [is, was]) => (body === is ? was : body), b.body) } : b)));
+/**
+ * AND THE SAME PASS'S F5, undone with it: Instalments says what is next under each bar from three figures after its two
+ * counts, and Coming and going's calendar of what falls due names a third column, the amount. Both go, and so do the
+ * three figures, the last of the pack's.
+ */
+const NEXT_PART: ReadonlySet<string> = new Set(['installments-next-due-by-plan', 'installments-left-by-plan', 'installments-after-next-by-plan']);
+const withoutUiPass = (doc: Body): Body => {
+  const page = withPage(doc, 'money', (now) =>
+    now.map((b) => {
+      if (b.heading === 'Instalments' && Array.isArray(b.cells)) return { ...b, cells: (b.cells as Body[]).filter((c) => !NEXT_PART.has(String(c.metric))) };
+      if (b.heading === 'Due in the next 30 days' && Array.isArray(b.columns)) return { ...b, columns: (b.columns as Body[]).slice(0, 2) };
+      return typeof b.body === 'string' ? { ...b, body: LATE_WORDS_UI.reduce((body, [is, was]) => (body === is ? was : body), b.body) } : b;
+    }),
+  );
+  return { ...page, declarations: (page.declarations as Body[]).filter((d) => !NEXT_PART.has(String(d.metric))) };
+};
 const WHERE_IT_WENT_100: ReadonlySet<string> = new Set(['Where it went', 'This month, by category', 'No category yet, by who was paid']);
 const noAxis = ({ axis: _axis, ...rest }: Body): Body => rest;
 const withoutBatch100 = (doc: Body): Body => {

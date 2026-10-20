@@ -14,7 +14,7 @@ import { FLOW_FIGURES } from './flow.ts';
 import { BOOK_FIGURES } from './books.ts';
 import { BUDGET_FIGURES } from './budgets.ts';
 import { INSTALMENTS_FIGURES } from './instalments.ts';
-import { PLAN_FIGURES, PLANS_FIGURES } from './plans.ts';
+import { NEXT_PART_FIGURES, PLAN_FIGURES, PLANS_FIGURES } from './plans.ts';
 import { RUNWAY_FIGURES } from './runway.ts';
 import { SIGNS_FIGURES } from './signs.ts';
 import { SPEND_VS_LAST_FIGURES, SPENDING_FIGURES } from './spending.ts';
@@ -68,6 +68,11 @@ const DECLARED_METRICS: Record<string, SeedMetric> = {
      left, read once per book, and a count a list of what no book holds. LAST, so every figure above keeps its place in
      the document. */
   ...BOOK_FIGURES,
+
+  /* THE NEXT UNPAID PART OF EACH PLAN, SINCE money-core 3.17.0 (the UI pass of 20 October, money F5): the day, what is left
+     and what is left once that part is paid, which Instalments says under each bar. LAST, so every figure above keeps its
+     place in the document. */
+  ...NEXT_PART_FIGURES,
 };
 
 /* EACH FIGURE WHOSE TARGET A PERSON CHANGES LATER NAMES ITS SETTING (`MONEY_TARGET_SETTINGS`), wherever Money is declared. */

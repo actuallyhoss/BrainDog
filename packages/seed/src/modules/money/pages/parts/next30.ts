@@ -57,7 +57,7 @@ export const NEXT_30: Record<string, unknown>[] = [
     span: 12,
     source: 'register.obligations',
     where: DUE_30D,
-    columns: [{ field: 'what' }, { field: 'due' }],
+    columns: [{ field: 'what' }, { field: 'due' }, { field: 'amount' }],
     back: 0,
     ahead: 1,
     when: { metric: 'due-items-30d', gt: 0 },

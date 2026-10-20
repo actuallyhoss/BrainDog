@@ -138,7 +138,53 @@ test('it is the one tile it was: its heading, its icon, the full width, and only
     [block!.kind, block!.heading, block!.icon, block!.span, block!.when],
     ['progress', 'Instalments', 'credit-card', 12, { metric: 'installments-left', gt: 0 }],
   );
-  assert.deepEqual((block!.cells as { metric: string }[]).map((c) => c.metric), [PAID, TOTAL]);
+  assert.deepEqual((block!.cells as { metric: string }[]).map((c) => c.metric), [PAID, TOTAL, ...NEXT]);
+});
+
+/** The three figures after the two counts, which say what is next under each bar (`NEXT_PART_FIGURES`). */
+const NEXT = ['installments-next-due-by-plan', 'installments-left-by-plan', 'installments-after-next-by-plan'];
+
+/** What the tile's cell for `id` reads, plan by plan. */
+function byPlan(block: Block, id: string): Record<string, number | null> {
+  const cell = (block.readings ?? []).find((c) => c.metric === id);
+  assert.ok(cell, `the tile reads ${id}`);
+  assert.equal(cell.refusal, undefined, JSON.stringify(cell.refusal));
+  return Object.fromEntries((cell.reading?.groups ?? []).map((g) => [g.key, g.value]));
+}
+
+/** Days since 1970 of a day, as a `day` figure holds it. */
+const daysOf = (iso: string): number => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;
+
+test('the tile reads the day of each plan\'s next unpaid part, what is left, and what is left once that part is paid', async () => {
+  const k = await moneyCore();
+  write(k, 'Flat', ['paid', 'paid', 'open', 'open', 'open', 'open']);
+  write(k, 'Desk', ['open', 'open']);
+  /* WHAT IS LEFT AFTER EACH PART is written by Money's script a run after the part is (`left_after`); here it is typed, since this
+     test asks the figures and not the script (`money-plan-page.test.ts` measures the column). */
+  const after = (plan: string, number: number, parts: number): void => {
+    const row = value<{ rows: { id: string; version: number; fields: Fields }[] }>(k.list({ register: 'installments', limit: 50 })).rows.find((r) => r.fields.plan === plan && r.fields.number === number)!;
+    value(k.update('installments', row.id, { left_after: { amount: 4_600_000 * parts, currency: 'EGP' } }, { ...OWNER, version: row.version }));
+  };
+  [3, 4, 5, 6].forEach((n) => after('Flat', n, 6 - n));
+  [1, 2].forEach((n) => after('Desk', n, 2 - n));
+  const block = tile(k);
+
+  /* THE EARLIEST OPEN PART'S DAY: the third of Flat, the first of Desk. */
+  assert.deepEqual(byPlan(block, NEXT[0]!), { Flat: daysOf('2027-03-01'), Desk: daysOf('2027-01-01') });
+  assert.deepEqual(byPlan(block, NEXT[1]!), { Flat: 4 * 4_600_000, Desk: 2 * 4_600_000 });
+  /* AND THE GREATEST LEFT-AFTER OF A PLAN'S OPEN PARTS IS THE NEXT PART'S, so the part's own amount is the two less each other. */
+  assert.deepEqual(byPlan(block, NEXT[2]!), { Flat: 3 * 4_600_000, Desk: 4_600_000 });
+});
+
+test('a part paid is no longer the next, and a plan all paid has no next', async () => {
+  const k = await moneyCore();
+  write(k, 'Flat', ['paid', 'open', 'open']);
+  write(k, 'Desk', ['paid', 'paid']);
+  const block = tile(k);
+  assert.deepEqual(byPlan(block, NEXT[0]!), { Flat: daysOf('2027-02-01') });
+  /* Money coming in by parts is not drawn either. */
+  write(k, 'Sold the van', ['open'], 'in');
+  assert.deepEqual(Object.keys(byPlan(tile(k), NEXT[0]!)), ['Flat']);
 });
 
 test('Money holds no more blocks than it did', () => {
