@@ -93,84 +93,151 @@
      the web app's shell (`apps/web/src/app.html`), where they exist from the first frame and cost the entry stylesheet
      nothing. A page without them, the site's, skips the name and draws the next family, as before. */
 
-  /* ── THE BOARD (DIRECTION §39) ─────────────────────────────────────────────
-     The reset of the look, in one place, so every screen builds on the same few names.
+  /* ── THE FRAME (UI pass, 20 Oct; SPEC 1) ───────────────────────────────────
+     One set of names, and the old ones pointed at it.
 
-       Surfaces     --board (the page), --tile (every block on it), --field (a control's fill inside or beside a tile),
-                    --field-hover
-       Tile         --tile-r 16, --tile-pad 20, --tile-gap 12, on a 12-column grid (--cols)
-       Type         --fs-meta 13, --fs-body 15, --fs-ctl 14, --fs-head 17, --fs-figure 22, --fs-page 28 (22 on a phone,
-                    --fs-page-phone); weights --fw-regular 400, --fw-medium 500, --fw-semi 600; `.num` for tabular figures
-       Accent       --action (selection, primary buttons, links, charts), --action-hover, --action-tint-1 (a selected
-                    fill), --action-tint-2 (a stronger one, a chart's second series), --action-text (words in the
-                    accent on a tile or a tint), --on-action (a label on the accent fill)
-       Status dots  --status-working, --status-late, --status-ok, --status-waiting, --status-done, --status-idle
-       Charts       --chart-1, --chart-2, --chart-3, --chart-other, --chart-late, --chart-risk, --chart-track
-       Controls     --btn-h 32 (40 under a thumb), --btn-h-sm 28, --r-ctl 8 (a button, a field, a segmented control),
-                    --r-round (a count, a dot, a face: the only round thing), --r-tile 16
+       Surfaces     --board (the page), --tile (every tile, sheet, menu, palette, panel), --tile-2 (a field, a well, a
+                    track, a quiet button on a tile, the press), --hover, --nav and --nav-selected (the bar and the rail),
+                    --rule (hairlines), --rule-strong (the 1px edge of anything that floats), --scrim, --toast, --on-toast
+       Text         --ink, --ink-2, --ink-3, nothing else; --focus is the ring
+       Red          --red-fill (a primary button, a count, a switch that is on, a checked box), its --red-fill-hover and
+                    --red-fill-press, --on-red (any label on it, white), --red (red as words and marks: links, late,
+                    "needs you", a late dot, the selection outline), --red-tint (a chosen row), --red-tint-2 (a selection)
+       Status       --good, --warn, --info, each with its --*-tint; --live is the running dot only, never words
+       Categories   --cat-blue, -violet, -pink, -teal, -sky, -yellow, -lime, -slate, each with its -tint (a project, an agent,
+                    a person, a chart series)
+       Charts       --chart-1 (series one outside a project: ink), --chart-2 and --chart-3 (the ink ramp), --chart-track,
+                    --chart-other, --chart-late (red, always with its word)
+       Wash         --arrived, the 1.5s neutral wash on a row or a figure that just landed
 
-     THE COLOURS ARE THE THEME'S ROLES, AND NEVER A LITERAL. `packages/theme` generates every colour the product has and
-     `colour-grep` holds everything else to naming them. `--board`, `--tile`, `--field`, `--action`, `--action-hover`,
-     the two `--action-tint`s, `--action-text` and `--on-action` are generated roles (`house.css`), at the design's own
-     values (light board #F3F4F6 and tile #FFFFFF, dark #0D1014 and #161A20; the accent BrainDog red, #CF413A in light
-     with #B3322C under the pointer, and #E05148 in dark, DIRECTION §42) and proven by the theme's check S: a label on
-     the fill, the fill on the board, the accent's words on every ground and both tints, and every word a chosen row carries on its tint, at AA. So they are not written here, where
-     the theme layer would only paint over them. A record's own colour (`apps/web/src/lib/accent.ts`) re-solves all of
-     them, so the colour a person picks is the colour of their buttons, links, selection and charts.
+     THE COLOURS ARE GENERATED, AND NEVER A LITERAL. `packages/theme` writes every one of them into `house.css`, for
+     both schemes and for high contrast, and its check T holds every pair SPEC 1.2 names. What is left here is mixed
+     from them, the same in both schemes: the chart ramp, and the aliases below.
 
-     What is left here is mixed from those roles, the same in both schemes: a field under the pointer, the status dots
-     and the chart steps.
-
-     RED IS THE WORKING COLOUR, AND LATE IS A DEEPER RED THAT ALWAYS SAYS SO (DIRECTION §42, which replaced §39's blue).
-     `--action` is BrainDog red; `--danger` (late, "needs you") is the deeper #B3322C in light, and is never told from the
-     working red by colour alone: a late thing carries its word or its dot, and a late bar its hatch
-     (`--chart-late-hatch`). `--accent` stays the mark's red, for the logo. */
+     THE OLD NAMES ALIAS TO THE NEW (SPEC 1.10, frame 3.9), one line each, so a screen that still writes `--bg` or
+     `--danger-text` draws the frame's colour until its owner moves it, and the last wave deletes these. The palette
+     writes none of the old names, because a name written in `@layer theme` would sit over its alias here and hold
+     its old value. */
   :root {
-    --field-hover: color-mix(in srgb, var(--ink) 6%, var(--field));
+    /* Surfaces */
+    --sunk: var(--board);
+    --bg: var(--tile);
+    --s1: var(--tile-2);
+    --s2: var(--tile-2);
+    --s3: var(--tile-2);
+    --field: var(--tile-2);
+    --soft: var(--tile-2);
+    --hold-wash: var(--tile-2);
+    --hover-wash: var(--hover);
+    --field-hover: var(--hover);
+    --line: var(--rule);
+    --rule2: var(--rule);
+    --line-soft: var(--rule);
+    --edge: var(--rule-strong);
 
-    --tile-r: 16px;
+    /* Text */
+    --ink2: var(--ink-2);
+    --dim: var(--ink-3);
+    --faint: var(--ink-3);
+    --muted: var(--ink-3);
+    --focus-in: var(--focus);
+    --focus-out: var(--tile);
+
+    /* Red: two tokens, and every other red maps to one of them (SPEC 0.1 item 2). */
+    --action: var(--red-fill);
+    --on: var(--red-fill);
+    --danger-fill: var(--red-fill);
+    --accent: var(--red-fill);
+    --action-hover: var(--red-fill-hover);
+    --primary-hover: var(--red-fill-hover);
+    --accent-hover: var(--red-fill-hover);
+    --accent-press: var(--red-fill-press);
+    --action-text: var(--red);
+    --link: var(--red);
+    --danger-text: var(--red);
+    --accent-text: var(--red);
+    --red-ink: var(--red);
+    --danger: var(--red);
+    --accent-edge: var(--red);
+    --status-late: var(--red);
+    --on-action: var(--on-red);
+    --on-ink: var(--on-red);
+    --accent-ink: var(--on-red);
+    --action-tint-1: var(--red-tint);
+    --selected: var(--red-tint);
+    --action-tint-2: var(--red-tint-2);
+
+    /* Status */
+    --earn: var(--good);
+    --earn-fill: var(--good);
+    --status-ok: var(--good);
+    --warn-fill: var(--warn);
+    --status-waiting: var(--warn);
+    --chart-risk: var(--warn);
+    --warn-wash: var(--warn-tint);
+    --info-fill: var(--info);
+    --live-fill: var(--live);
+    --arrived-wash: var(--arrived);
+    /* AN OPEN THING IS A NEUTRAL RING, NEVER RED (SPEC 0.1 item 3, 2.A.6): red is for late and needs you only. */
+    --status-working: var(--ink-2);
+    --status-done: var(--chart-other);
+    --status-idle: var(--chart-other);
+
+    /* A CHART IS INK, OR THE PROJECT'S HUE INSIDE A PROJECT (SPEC 1.3, SF8), and red only where something is late or
+       below zero, always with its word (and its hatch, `--chart-late-hatch` in `blocks-charts.css`). Series that are
+       projects, agents or people take their slot (`--cat-*`); any other series takes this ramp. A project's scope
+       sets `--chart-1: var(--ph)` and the two mixes of it over the tile. */
+    --chart-1: var(--ink);
+    --chart-2: color-mix(in srgb, var(--ink) 40%, var(--tile));
+    --chart-3: color-mix(in srgb, var(--ink) 20%, var(--tile));
+    --chart-track: var(--tile-2);
+    --chart-other: var(--cat-slate);
+    --chart-late: var(--red);
+
+    --tile-r: var(--r-tile);
+    /* A tile's padding: 20, 24 on the lead tile (`--tile-pad-lead`), 16 below 640px (frame 3.3). */
     --tile-pad: 20px;
+    --tile-pad-lead: 24px;
     --tile-gap: 12px;
     --cols: 12;
 
+    /* ONE TYPE SCALE (SPEC 1.4, frame 3.2): 12, 13, 14, 15, 17, 22, 28, 34.
+         --fs-cap     12/16   tab-bar captions, the count pill, key caps and chart axis ticks. Nothing else.
+         --fs-meta    13/18   meta lines, menu group heads, field labels, table heads
+         --fs-ctl     14/20   buttons, bar and rail places, chips, segments, toasts
+         --fs-body    15/22   body, rows, menu items, inputs; the reader's Text setting moves this and nothing else
+         --fs-head    17/24   the page sentence, empty-state and sheet titles, the sticky bar title
+         --fs-figure  22/26   a tile's figure, the phone page name (Lexend 600)
+         --fs-page    28/34   a page name at 900px and up (Lexend 600)
+         --fs-hero    34/40   Today's greeting, a project's name in its hero; 28/34 on a phone (Lexend 600) */
+    --fs-cap: 12px;
     --fs-meta: 13px;
     --fs-ctl: 14px;
     --fs-body: 15px;
     --fs-head: 17px;
     --fs-figure: 22px;
     --fs-page: 28px;
-    --fs-page-phone: 22px;
+    --fs-hero: 34px;
+    --fs-page-phone: var(--fs-figure);
+    --fs-hero-phone: var(--fs-page);
     --fw-regular: 400;
     --fw-medium: 500;
     --fw-semi: 600;
     --lh-head: 1.4;
     --lh-figure: 1.15;
 
-    /* A STATUS IS A SMALL DOT AND ITS WORD, never the fill of a whole row. Working is the accent, late is the deeper red,
-       done and idle are greys, so the eye finds the two that ask for something. Working and late are both red now, so the
-       word beside the dot is what tells them apart, and is never left out. */
-    --status-working: var(--action);
-    --status-late: var(--danger);
-    --status-ok: var(--earn-fill);
-    --status-waiting: var(--warn-fill);
-    --status-done: color-mix(in srgb, var(--ink) 35%, var(--tile));
-    --status-idle: color-mix(in srgb, var(--ink) 20%, var(--tile));
-
-    /* A CHART IS THE ACCENT AND ITS TINTS, the deeper red, striped, only for late or over, grey only for "other". */
-    --chart-1: var(--action);
-    --chart-2: color-mix(in srgb, var(--action) 55%, var(--tile));
-    --chart-3: color-mix(in srgb, var(--action) 28%, var(--tile));
-    --chart-other: color-mix(in srgb, var(--ink) 18%, var(--tile));
-    --chart-late: var(--danger);
-    /* A LATE SERIES IS STRIPED AS WELL AS RED: `--chart-late-hatch` lives in `blocks-charts.css`, which every page that
-       draws a chart or a lane loads, so the stripe costs the entry stylesheet nothing. */
-    /* AT RISK IS AMBER: not late yet, and not going to plan. The status dot's own colour, so a plan bar and its dot agree. */
-    --chart-risk: var(--status-waiting);
-    --chart-track: var(--field);
-
     --btn-h: 32px;
     --btn-h-sm: 28px;
+    /* RADII (SPEC 1.6, frame 3.5): 4, 8, 12, 16 and round, and nothing else.
+         --r-xs     4    a key cap, a small mark, a segment inside its track, a chart bar's end
+         --r-ctl    8    a button, a field, a menu row, a chip, a segmented track, a toast, a well up to 40px
+         --r-pop    12   a menu, a popover, a banner, a card inside a sheet, a well at 48
+         --r-tile   16   a tile, a sheet, a dialog, the palette, the docked panel, a well at 56
+         --r-round       a count, a face, a dot, a switch: the only round things
+       The focus ring takes the element's own. */
+    --r-xs: 4px;
     --r-ctl: 8px;
+    --r-pop: 12px;
     --r-tile: 16px;
     --r-round: 999px;
   }
@@ -178,60 +245,33 @@
   :root {
     --font-ui: 'Geist', 'Geist Fallback', 'Plex', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --font-display: 'Lexend', 'Lexend Fallback', 'Geist', 'Geist Fallback', 'Plex', system-ui, sans-serif;
-    /* The design system names Geist Mono for key caps, addresses, code and times: `geist-mono.woff2` in both apps'
-       `static/fonts`, declared above. */
-    --font-id: 'Geist Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+    /* GEIST MONO for ids people type, times in a feed, key caps and code (SPEC 1.4): `geist-mono.woff2` in both apps'
+       `static/fonts`, declared above. `--font-id` is its old name. */
+    --font-mono: 'Geist Mono', ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+    --font-id: var(--font-mono);
 
-    /* Eight steps, fixed. A theme never sets type; the reader's Text setting picks the body step
-       among three of them. Raising the scale is not a fix for a hard-to-read screen — the fault is
-       in what it says and how it is arranged (13 §7). */
-    --t-xs: 12px;
-    /* THE FLOOR FOR WORDS. Nothing a person reads is set under 13; `--t-xs` is for a chart's axis and a mark. */
-    --t-sm: 13px;
-    /* 15, AND IT WAS 14 (DIRECTION §36: "larger, steadier type", read on a laptop at arm's length). At 14 under a
-       1.5 leading a page of rows read as a dense tool. A ledger keeps its density through weight, ink and the row's
-       height, not through a smaller face. The reader's three Text steps are `--t-sm`, this and `--t-md`, and they
-       stay three different sizes, which `tools/gates/prefs.mjs` asserts; `--t-md` is also the floor a stat figure
-       fits down to (`kinds/stat.css`). */
-    --t-base: 15px;
-    --t-md: 16px;
-    --t-lg: 20px;
-    --t-xl: 24px;
-    --t-2xl: 32px;
-    --t-3xl: 40px;
-    /* The design system's own steps, beside the scale rather than in place of it: a row title (15/20, 500; a tile
-       heading at 600), a group heading on the ground and the panel's title (17/24, 600), the figure in a tile (30/34),
-       the page title (28/34) and a lead sentence or figure (34/40). Meta is `--t-sm` and body `--t-base`. */
-    --t-row: 15px;
-    --t-group: 17px;
-    --t-title: 28px;
-    /* 22 (DIRECTION §39): a tile's figure is read beside its heading, not shouted over it. */
-    --t-figure: 22px;
-    --t-lead: 34px;
-    --text: var(--t-base);
+    /* THE OLD STEPS, ON THE ONE SCALE (frame 3.9, F12). Sixteen became 15 and 20 and 24 became 17 and 22: the scale
+       above is the whole of it. The body steps (`--t-base`, `--t-row`, `--t-md`, `--t-ui`, `--text`) are `--fs-body`,
+       so they follow the reader's Text setting with it. */
+    --t-xs: var(--fs-cap);
+    --t-sm: var(--fs-meta);
+    --t-base: var(--fs-body);
+    --t-row: var(--fs-body);
+    --t-md: var(--fs-body);
+    --t-ui: var(--fs-body);
+    --text: var(--fs-body);
+    --t-group: var(--fs-head);
+    --t-lg: var(--fs-head);
+    --t-figure: var(--fs-figure);
+    --t-xl: var(--fs-figure);
+    --t-title: var(--fs-page);
+    --t-2xl: var(--fs-page);
+    --t-lead: var(--fs-hero);
+    --t-3xl: var(--fs-hero);
 
     --lh-tight: 1.22;
     /* About 1.55 for running text at 15, which gives a two-line row title and a paragraph room between lines. */
     --lh-body: 1.55;
-
-    /* The chrome reads at the body size, not below it. 15 is the body step, and the chrome is body;
-       the reader who wants more sets Text to Large.
-
-       AND `--text` IS THE BODY STEP, WHICH IS THE WHOLE POINT OF IT. This read `var(--t-base)` — a
-       constant — so the Settings → Text control set `data-text`, lit its segment, wrote the cookie,
-       and moved nothing. Measured: 0 of 182 elements shift on Home between Small and Large, and 0
-       of 94 on the screen the control itself lives on. Full-page screenshots at all three settings
-       are byte-identical.
-
-       `13 §7` says what the setting does and it is narrower than it sounds: "the reader's Text
-       setting picks the BODY STEP among `t-sm` / `t-base` / `t-md`". Not the scale, not the
-       headings, not the captions — the body step, and the chrome is body. `--t-xs` labels and
-       `--t-lg` headings stay where they are, deliberately: "if a screen is hard to read, the fault
-       is in what it says and how it is arranged."
-
-       There is no `data-text` axis in the 128-configuration gate matrix, which is why a control
-       that changed nothing kept CI green for the life of the build. */
-    --t-ui: var(--text);
 
     /* Space is one base multiplied, and it goes further than it used to. The old scale stopped at
        48 and every gap between sections was 24 or 32, which is what made a screen of five groups
@@ -247,29 +287,16 @@
     --sp-8: 64px;
     --sp-9: 96px;
 
-    /* Softer than they were (4 / 6 / 8), which read as a spreadsheet's cells. A control or a card
-       is a thing you can pick up, and a pill is the shape of a choice or a single action.
-
-       WHAT TAKES WHICH, ONCE. `--r-pill` is everything you press or choose: a button of
-       any weight, a segmented track and its segments, a chip, an answer option, a toast.
-       `--r-md` is a field, a select, a menu and a card; `--r-lg` a sheet, a dialog and the palette;
-       `--r-sm` the focus ring and small marks.
-
-       The design system's radii: a tile, the rail card, the docked panel, a sheet and the palette are 22; a row's wash,
-       a field, a menu and a card inside chrome are 12; a key cap is 6; and an icon well is 9, the fifth radius. */
-    --r-sm: 6px;
-    --r-well: 9px;
-    --r-md: 12px;
-    /* 16 (DIRECTION §39): a tile, the panel, a sheet and the palette. */
-    --r-lg: 16px;
-    /* THE PILL IS RETIRED AS A SHAPE (DIRECTION §39, "pills only for counts"). The name stays so the hundred-odd
-       buttons, chips and tracks that ask for it become the 8px rectangle in one step; a thing that must be round (a count,
-       a dot, a face, a switch) names `--r-round`. */
+    /* THE OLD RADII, ON THE FOUR (frame 3.9, F13): 6 is 4, 9 is 8, and 12 and 16 keep their names' new homes. */
+    --r-sm: var(--r-xs);
+    --r-well: var(--r-ctl);
     --r-pill: var(--r-ctl);
+    --r-md: var(--r-pop);
+    --r-lg: var(--r-tile);
 
-    /* THE ELEVATION LADDER IS THE THEME'S (`--e1` to `--e3`, generated per scheme and checked monotonic in both by
-       `packages/theme`). A resting tile names `--e1` itself; the alias that used to stand for it here (`--raise`) had
-       no reader left, and a token nobody paints is the same defect as a flag nothing reads. */
+    /* NO ELEVATION (SPEC 1.9). `--e1` to `--e3` are `none` in every scheme block of the palette, and go in the last
+       wave. Anything that floats without a scrim takes `1px solid var(--rule-strong)`; a modal sits on `--scrim`; a
+       tile takes neither. */
 
     /* Density is the reader's, labelled Compact / Comfortable / Roomy. A theme sets the enum,
        never the pixels (13 §4.2). */
@@ -342,34 +369,8 @@
     --z-toast: 30;
     --z-hint: 40;
 
-    /**
-     * What sits behind an overlay — one value, because there is one kind of *behind*.
-     *
-     * It was written twice, in the two components that draw one: `color-mix(in srgb, black 52%,
-     * transparent)` in the palette and `… 46% …` in the sheet. Two scrims over the same page at two
-     * different strengths, six per cent apart, which nobody chose — the second was written from
-     * memory of the first. `13 §6`: a component may name only the semantic layer.
-     *
-     * `colour-grep` could not see either of them. It knew hex, `rgb()` and `oklch()`, and a colour
-     * with a NAME went straight through — which is the plainest way there is to write one.
-     *
-     * A SCRIM IS THE PAGE'S OWN DARKEST INK AT LOW ALPHA, NOT BLACK. `--sunk` is the theme's
-     * deepest surface and it moves with the scheme, so the layer separates on both halves rather
-     * than putting black over a near-black page in the dark.
-     *
-     * AND IT SAID `--ink`, WHICH IS THE OPPOSITE OF WHAT THE PARAGRAPH ABOVE ARGUES FOR. `--ink` is
-     * the TEXT role and in the dark scheme it is near-white, so the layer behind the command
-     * palette and behind the phone's sheet went nineteen times BRIGHTER than the page rather than
-     * dimmer: measured on the shipped palette, a background of relative luminance 0.014 came out at
-     * 0.267, with the panel sitting on it as a dark box on a pale field. In the light scheme it
-     * dimmed, and landed on a mid grey over cream, which is the "black over the page" this comment
-     * says it avoids. `--sunk` is 0.011 in the dark and moves with the scheme, which is the whole
-     * sentence above. One identifier.
-     *
-     * NOTHING COULD SEE IT. The theme validator is handed the generated document and `tokens.css`
-     * is not in it, and there is no `scrim` role for a contrast pair to be checked against.
-     */
-    --scrim: color-mix(in srgb, var(--sunk) 52%, transparent);
+    /* `--scrim` IS GENERATED (frame 3.1): rgb(16 17 20 / 0.32) in light and rgb(5 7 12 / 0.6) in dark, a dim of the
+       page in both, which the sunk mix it was could not be in dark. */
 
     /**
      * THE WASHES, AND THERE WERE NINE STRENGTHS OF ONE OF THEM.
@@ -423,19 +424,10 @@
      * nobody paints is the same defect as a flag nothing reads. The day a second construction-warn
      * element appears it gets a token beside this one, not a tenth percentage.
      */
-    /* `--hover-wash`, `--selected` AND `--arrived-wash` ARE GENERATED. The wash is the ink at 5%, a chosen row the
-       working accent's first tint, and the arrival an opaque lavender, which no one `color-mix` of an ink writes in
-       both schemes. `packages/theme` emits all three into every scheme block of the palette sheet, so a record's
-       colour re-solves them with everything else. */
-    /* THE SOFT RING ROUND A FOCUSED TEXT FIELD, outside its `--ink2` edge (a11y.css, controls.css). One
-       value, so every field in the product focuses the same way.
-
-       INK AND NOT THE ACCENT, AND THIS IS WHERE THE PRODUCT STOPPED READING AS A WARNING. The accent
-       is the brand's red and sits at danger's own hue, so a focused field wore a red edge and a red
-       glow before anything had been typed, which is exactly what a validation error looks like.
-       Focus is a place, not a verdict. */
-    --focus-halo: color-mix(in srgb, var(--ink) 14%, transparent);
-    --hold-wash: color-mix(in srgb, var(--ink) 12%, transparent);
+    /* `--hover-wash`, `--selected` AND `--arrived-wash` ARE ALIASES NOW (above): to `--hover`, `--red-tint` and
+       `--arrived`, which the palette generates for every scheme. The lavender arrival is gone; a row that lands wears
+       the neutral wash (SPEC 0.2). */
+    /* THE SOFT RING ROUND A FOCUSED FIELD IS GONE (frame F4): a field focuses with the one ring, on its wrapper. */
 
     /* THE GLASS AND THE GROUND'S LIGHT, RETIRED (DIRECTION §39). Chrome was `background: var(--glass);
        backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--e2)`, and those names stay so the hosts
@@ -451,64 +443,17 @@
     --glass-blur: none;
     /* NO GLASS (DIRECTION §39). Chrome that still names the glass gets the opaque tile (`base.css`) and this one hairline,
        which is what keeps a menu or a popover off the content it opens over in the dark. */
-    --glass-edge: 0 0 0 1px var(--rule);
+    --glass-edge: 0 0 0 1px var(--rule-strong);
 
-    /**
-     * THE STATE ROLES: WHAT IS ON, WHAT IS CURRENT AND WHAT IS A LINK.
-     *
-     * Each of these was the accent, and each for a reason that sounded right on its own: a checked
-     * switch is "on", the rail's item is "here", a link is "go". Together they put the brand's red
-     * on every control that has a state, beside the same red on an overdue dot, so nothing on a
-     * screen could say "wrong" any more. The accent now lives on the mark, the record
-     * tile, /start, /signin and `::selection`, and these roles carry the rest in ink.
-     *
-     * `--selected` WAS HERE, opaque, ink mixed into `--bg`, because the old light ladder put `s1` to
-     * `s3` above the page and a selected segment vanished. The design system's light ladder steps
-     * DOWN from a white tile, and the design system's selection is its wash, so it is generated beside
-     * `--hover-wash` now.
-     *
-     * `--on-ink` IS THE GROUND, BECAUSE THE MARK ON AN INK FILL IS A HOLE IN IT: the thumb of a
-     * checked switch, the tick in a checked box and the dot in a checked radio all read as the page
-     * showing through.
-     *
-     * They sit on `:root` for the reason `--hover-wash` does: every one resolves its `var()`s against
-     * the palette on `html`, which is the element `:root` is.
-     */
-    /* ON AND A LINK ARE THE WORKING ACCENT NOW (DIRECTION §39, red since §42): BrainDog red says "chosen" and "go", and
-       "late" is the deeper red with its word or its mark beside it. `--on-ink` stays the ground, for a mark on an ink
-       fill. */
-    --on: var(--action);
-    --on-ink: var(--bg);
-    --link: var(--action-text);
-    /* A divider between rows of one list, softer than a boundary. */
-    /* A hairline that reads on the ground as well as on a tile: `--line` is tuned for the tile and all but
-       vanishes on the ground (1.05:1). Rows and group headings draw their rule with this. */
-    --rule: color-mix(in srgb, var(--ink) 10%, transparent);
-    --line-soft: color-mix(in srgb, var(--line) 60%, transparent);
-    /* A primary action is the working accent's fill (DIRECTION §39), and this is its hover. */
-    --primary-hover: var(--action-hover);
-    --warn-wash: color-mix(in srgb, var(--warn) 12%, transparent);
+    /* ON, A LINK, THE RULE, THE PRIMARY'S HOVER AND THE WARN WASH ARE ALIASES NOW (above): `--red-fill`, `--red`,
+       the generated `--rule`, `--red-fill-hover` and `--warn-tint`. */
 
     /* A leading and a tracking for the top of the type scale (`--lh-3xl`, `--tr-tight`) stood here, and so did a tint
        of the accent as a ground (`--accent-ground`), an accent wash, a size for the identity mark and a name for the
        first chart series. Nothing named any of them, so they went. */
 
-    /**
-     * THE PRESS, WHICH FOUR CONTROLS IN THE WHOLE APP HAD.
-     *
-     * A count of `:active` rules across `apps/web/src` returns four. The product it is measured
-     * against has twenty-eight, and every one of them changes two things rather than one.
-     *
-     * TWO PROPERTIES, AND NOT FOR EMPHASIS. `a11y.css` does not soften movement under
-     * `prefers-reduced-motion`, it DELETES it: only opacity may still transition there, so a press
-     * expressed as a scale is not damped for those readers, it is gone. Opacity is a state rather
-     * than a movement and still lands, as a short fade. A control that answers a finger for some readers and not
-     * others is worse than one that never answers, because the ones it ignores cannot tell that
-     * from a tap the product missed.
-     */
-    --press-scale: 0.98;
-    --press-dim: 0.62;
-    --ease-push: cubic-bezier(0.4, 0, 1, 1);
+    /* THE PRESS IS A FILL CHANGE (SPEC 2.A.1, F24 with its delta): a control takes its pressed fill, a row or a tab
+       `--tile-2`, over `--d-press`. Nothing scales and nothing dims; `--press-dim` read as disabled and is gone. */
 
     /**
      * MOTION IS ONE SCALE, and every step of it is under 300ms (DIRECTION §37: fluid, and never in the way). Motion
@@ -540,7 +485,7 @@
      *   --ease-emphasis   swift-out, for anything arriving: most of the distance in the first frames, then a long settle,
      *                     so a menu or an answer is there at once and calm by the time it is read.
      * Three more are kept for one job each: leaving accelerates away (`--ease-in`), the panel and a sheet ride the sheet
-     * curve (`--ease-sheet`), and a press dips on `--ease-push` (above).
+     * curve (`--ease-sheet`), and `--ease-push` is the in curve's old name.
      *
      * THE OLDER NAMES STAY, ON THE SCALE, so nothing that already names one changes meaning: `--d-state` is a
      * hover fill or a row's state (the exit's 90), `--d-release` a press letting go (120), `--d-move` what
@@ -563,17 +508,16 @@
     /* The panel, a sheet and an action sheet going back the way they came: a step quicker than they arrived (180). */
     --d-panel-out: var(--d-rows);
 
-    /* A SPRING, as `linear()`: the step response of zeta 0.7467 and omega 6.56, which peaks at 1.03 and settles by
-       1.214s, sampled at twelve even stops to two places (it was twenty-four to four, and no frame at 300ms or less
-       can show the difference). The last stop is exactly 1: a spring that settles at 0.998 leaves a one-pixel gap
-       on every panel forever. */
-    --ease-spring: linear(0, 0.18, 0.49, 0.76, 0.92, 1, 1.03, 1.03, 1.02, 1.01, 1, 1);
+    /* THE SPRING AND THE PUSH ARE ALIASES (SPEC 1.7), to the emphasis and the in curve, until the last wave deletes
+       them: nothing overshoots, and a press is a fill. */
+    --ease-spring: var(--ease-emphasis);
     /* The two named curves, then the three kept for one job each. Platform conventions, not anyone's identity. */
     --ease-standard: cubic-bezier(0.2, 0, 0, 1);
     --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-out: var(--ease-emphasis);
     --ease-fade: var(--ease-standard);
     --ease-in: cubic-bezier(0.4, 0, 1, 0.5);
+    --ease-push: var(--ease-in);
     --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 
     /* The mark is GENERATED now, and this note is where it went.
@@ -603,10 +547,19 @@
      custom property resolves its own `var()`s where it is declared, and `:root` has no `--tone`. */
   [data-intent] { --tone-wash: color-mix(in srgb, var(--tone) 12%, transparent); }
 
-  /* The reader's Text setting picks the body step. Three, not a slider: Normal is `--text` as `:root` sets it, so only
-     Small and Large are written. */
-  html[data-text='sm'] { --text: var(--t-sm); }
-  html[data-text='md'] { --text: var(--t-md); }
+  /* The reader's Text setting moves `--fs-body` to 13 or 17, and nothing else (frame 3.9). Three, not a slider: Normal
+     is the 15 `:root` sets, so only Small and Large are written. */
+  html[data-text='sm'] { --fs-body: 13px; }
+  html[data-text='md'] { --fs-body: 17px; }
+
+  /* A TILE PADS 16 ON A PHONE, and a hero name steps down to the page size (frame 3.2, 3.3). */
+  @media (width < 640px) {
+    :root {
+      --tile-pad: 16px;
+      --tile-pad-lead: 16px;
+      --fs-hero: var(--fs-hero-phone);
+    }
+  }
 
 
   /* SIZE follows the pointer, never the width. A small laptop window is not a phone, and a width
@@ -646,4 +599,14 @@
   @property --info { syntax: '<color>'; inherits: true; initial-value: #06c; }
   @property --accent { syntax: '<color>'; inherits: true; initial-value: #06c; }
   @property --live { syntax: '<color>'; inherits: true; initial-value: #06c; }
+  @property --board { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --tile { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --tile-2 { syntax: '<color>'; inherits: true; initial-value: #000; }
+  @property --ink-2 { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --ink-3 { syntax: '<color>'; inherits: true; initial-value: #fff; }
+  @property --rule { syntax: '<color>'; inherits: true; initial-value: #888; }
+  @property --rule-strong { syntax: '<color>'; inherits: true; initial-value: #888; }
+  @property --good { syntax: '<color>'; inherits: true; initial-value: #0a0; }
+  @property --red { syntax: '<color>'; inherits: true; initial-value: #c00; }
+  @property --red-fill { syntax: '<color>'; inherits: true; initial-value: #c00; }
 }
