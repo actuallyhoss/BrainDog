@@ -566,7 +566,7 @@ test('A CARD IS THE AGENT AND WHAT IT SAID: a finished run is under Today or Ear
   run({ doing: 'Ended last week and wrote nothing', agent: 'codex', state: 'abandoned' }, { last_seen: ago(WEEK), wrote: 0 });
   run({ doing: 'A helper of last week', agent: 'codex', state: 'done' }, { last_seen: ago(WEEK), wrote: 5, parent: 'S2' });
 
-  type Card = Drawn & { drawn?: boolean; columns?: { field: string; as?: string }[] };
+  type Card = Drawn & { drawn?: boolean; where?: string; columns?: { field: string; as?: string }[] };
   const page = opened(k, 'agents') as Card[];
   for (const b of page) assert.deepEqual(b.refusals, [], `${String(b.heading)}: ${JSON.stringify(b.refusals)}`);
   const cards = page.filter((b) => b.kind === 'cards');
