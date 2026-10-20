@@ -368,7 +368,7 @@
   .mname {
     flex: none;
     color: var(--dim);
-    font-size: 10px;
+    font-size: var(--t-xs);
     line-height: 12px;
     text-align: center;
   }
@@ -447,7 +447,7 @@
     position: relative;
     padding-block: 3px 8px;
     color: var(--dim);
-    font-size: 11px;
+    font-size: var(--t-xs);
     line-height: 14px;
     text-align: center;
   }

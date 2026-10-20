@@ -1362,7 +1362,7 @@
   .offline-line {
     margin: 0;
     padding: var(--sp-3) var(--gutter) 0;
-    color: var(--faint);
+    color: var(--dim);
   }
 
   .body {

@@ -127,8 +127,8 @@
   }
 
   .d-said {
-    color: var(--ink-2, inherit);
-    font-size: var(--fs-s, 0.875rem);
+    color: var(--ink2);
+    font-size: var(--t-sm);
   }
 
   .d-acts {
@@ -142,16 +142,16 @@
     background: none;
     border: 0;
     padding: 0;
-    color: var(--ink-2, inherit);
+    color: var(--ink2);
     font: inherit;
-    font-size: var(--fs-s, 0.875rem);
+    font-size: var(--t-sm);
     text-decoration: underline;
     cursor: pointer;
   }
 
   .d-fail {
-    color: var(--bad, inherit);
-    font-size: var(--fs-s, 0.875rem);
+    color: var(--danger);
+    font-size: var(--t-sm);
   }
 
   .projects {

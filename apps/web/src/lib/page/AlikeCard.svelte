@@ -84,7 +84,7 @@
     display: grid;
     gap: 8px;
     padding: 16px;
-    border-radius: var(--r-card, 12px);
+    border-radius: var(--r-md);
     background: var(--field);
   }
   .q {
@@ -108,7 +108,7 @@
   }
   .members ul {
     margin: 8px 0 0;
-    padding-left: 18px;
+    padding-inline-start: 18px;
     color: var(--ink2);
   }
 </style>
