@@ -88,6 +88,10 @@ export function withoutRepeats<T extends Declared>(
         const next = blocks[at]!;
         if ((next.area === 'rail' ? 'rail' : 'main') !== area) continue;
         if (next.kind === 'section') break;
+        /* ITS BLOCKS END WHERE AN UNRELATED TILE STARTS: once a block that repeats the shape has been seen under the
+           heading, the first block still drawn that repeats nothing is no part of the section, so it cannot keep the
+           heading on the page by standing after it. Decided by the blocks' sources, never their titles. */
+        if (under.some((u) => gone[u] === true) && gone[at] !== true && next.drawn !== false && repeatOf(next.source) === null) break;
         under.push(at);
       }
       out = under.length > 0 && under.every((at) => gone[at] === true || blocks[at]!.drawn === false);

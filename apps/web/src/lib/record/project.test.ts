@@ -123,3 +123,17 @@ test('A SECTION HEADING ONLY A LEFT-OUT NEXT STEP GOES WITH IT', () => {
   const page = [{ kind: 'section', area: 'rail' }, { kind: 'cards', columns: [{ field: 'next' }], area: 'rail' }];
   assert.deepEqual(withoutRepeats(page, ['next'], null, { next: 'Ship it' }).map((b) => (b as { drawn?: boolean }).drawn !== false), [false, false]);
 });
+
+test('A SECTION WHOSE BLOCKS ALL WENT DRAWS NO HEADING ALONE BEFORE AN UNRELATED TILE, by their sources and not their titles', () => {
+  const page = [
+    { kind: 'section', heading: 'Runs on', area: 'main' },
+    { kind: 'cards', source: 'runs_on', area: 'main' },
+    { kind: 'cards', source: 'runs_on', area: 'main' },
+    { kind: 'table', source: 'register.things', area: 'main' },
+  ];
+  const drawn = (p: typeof page) => withoutRepeats(p, ['runs-on'], null).map((b) => (b as { drawn?: boolean }).drawn !== false);
+  assert.deepEqual(drawn(page), [false, false, false, true]);
+  /* A SECTION WITH A BLOCK OF ITS OWN BEFORE THE REPEATS KEEPS ITS HEADING. */
+  const own = [page[0]!, page[3]!, page[1]!];
+  assert.deepEqual(drawn(own), [true, true, false]);
+});
