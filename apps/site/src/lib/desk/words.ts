@@ -23,7 +23,7 @@ export const DESK = {
     empty: 'Nothing needs you. Everything else is handled.',
   },
   money: { cash: 'Cash ahead' },
-  agents: { connected: 'Connected', working: 'Working now' },
+  agents: { connected: 'Connected', working: 'Working now', terminal: 'A terminal, with Claude working on Tidepool' },
 } as const;
 
 export type Tab = keyof typeof DESK.tabs;

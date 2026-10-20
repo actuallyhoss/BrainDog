@@ -151,8 +151,9 @@ test("the desk's asks start open in the record order, and Today, Needs you and t
   needs.undo(ids[0]!);
   assert.deepEqual(needs.open, [ids[0]]);
   assert.deepEqual(needs.done, []);
-  needs.open.push('a copy');
-  assert.equal(needs.open.includes('a copy'), false, 'a reader gets a copy, never the state itself');
+  /* Read afresh through `shared`, which the asserts above have not narrowed. */
+  shared.needs.open.push('a copy');
+  assert.equal(shared.needs.open.includes('a copy'), false, 'a reader gets a copy, never the state itself');
   /* The chores band's questions are their own: answering one leaves the desk's alone. */
   assert.deepEqual(asked.open, ASKED.map((n) => n.id));
   asked.answer(ASKED[0]!.id, true);
