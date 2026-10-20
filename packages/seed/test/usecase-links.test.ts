@@ -35,7 +35,9 @@ test('EVERY LINK NAMES A REF FIELD AND TWO EXAMPLE ROWS THE USE CASE REALLY SEED
       counted += 1;
       /* A LIST A MODULE HOLDS COUNTS TOO: a team's tickets are Work's tasks. */
       const decl = [...(pack.declarations ?? []), ...u.modules.flatMap((m) => (firstPartyDocument(m)?.declarations ?? []) as Body[])].find((d) => d.register === l.register && d.page === undefined);
-      const field = (decl?.fields as Body[] | undefined)?.find((f) => f.id === l.field);
+      /* AND A FIELD THE USE CASE LAYS ON A MODULE'S LIST (`extends`): the founder's organisation on Projects' Numbers, since 3.0.0. */
+      const laid = ((pack as { extends?: Record<string, { fields?: Body[] }> }).extends?.[`register.${l.register}`]?.fields ?? []) as Body[];
+      const field = [...((decl?.fields as Body[] | undefined) ?? []), ...laid].find((f) => f.id === l.field);
       if (l.list) assert.equal(`${String(field?.type)} of ${String(field?.of)}`, 'list of ref', `${u.usecase}: ${l.register}.${l.field}`);
       else assert.equal(field?.type, 'ref', `${u.usecase}: ${l.register}.${l.field}`);
       assert.equal(field?.to, l.to, `${u.usecase}: ${l.register}.${l.field} points at ${String(field?.to)}`);

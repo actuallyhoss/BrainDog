@@ -28,6 +28,10 @@ export const USE_CASE_CHANGES: Readonly<Record<string, readonly UseCaseChange[]>
   student: [{ version: '1.5.1', notes: NAMED('Courses') }],
   founder: [
     {
+      version: '3.0.0',
+      notes: 'Numbers, the readings your projects report, moves to Projects, which keeps them from now on along with each project\'s key numbers. Every number you hold stays where it is, and the Dashboard, Today and each project page draw them as before. A new founder record no longer starts with an example number.',
+    },
+    {
       version: '2.7.0',
       notes: 'A new founder record starts with Projects and Money. Services comes when you mention domains or renewals, People when you name someone, and Work when you mention tasks, or any of them when you add it. A record you already have keeps everything it holds, and nothing on its pages changes.',
     },

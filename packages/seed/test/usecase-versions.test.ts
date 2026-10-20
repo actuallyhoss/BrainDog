@@ -1581,6 +1581,32 @@ const DECLARED: Record<string, Version> = {
       "Cut beside the frozen 2.6.0 for `needs` (usecase-needs-102, USE-B08 job 5): a fresh record installs Projects and Money and what the words point at, Services for domains or renewals; `page.home-founder` already leads from Money and `register.datapoints`, and Lapsing and `metric.lapsing-30d` over a list the record does not hold are cut at install; nothing declared, taken away or reworded -> 8a82770e8f8c8827",
     ],
   },
+  /* NUMBERS HANDED TO PORTFOLIO (the KPI plan of 21 October, K1-A): 2.7.0 IS PUBLISHED AND FROZEN, and a list this pack
+     declared goes, so a major step, as 2.0.0 was when organisations went to People. */
+  'founder@3.0.0': {
+    holds: `
+      adds.page.estate.5 adds.page.portfolio.4 adds.page.relation.1 adds.page.relation.2 adds.page.relation.3
+      adds.page.relation.6 adds.page.someone.7 hands.register.datapoints.portfolio hands.register.organisations.people
+      extends.register.datapoints.organisation extends.register.datapoints.about_service
+      metric.datapoints-30d metric.datapoints-7d metric.datapoints-held metric.datapoints-reported metric.due-this-week
+      metric.lapsing-30d metric.late-money metric.organisations-held metric.project-numbers-7d metric.projects-earning-silent
+      metric.service-numbers page.dashboard page.home-founder page.project
+      setting.label_accounts setting.label_books setting.label_categories
+      setting.label_installments setting.label_obligations setting.label_people setting.label_recurring
+      setting.label_services setting.label_tasks setting.label_things setting.label_tracks setting.label_transactions
+      setting.label_updates setting.one_accounts setting.one_books setting.one_categories
+      setting.one_installments setting.one_obligations setting.one_people setting.one_recurring setting.one_services
+      setting.one_tasks setting.one_things setting.one_tracks setting.one_transactions setting.one_updates
+      setting.shared_version setting.speaks setting.voice_coming_up setting.voice_fills_with setting.voice_home
+      setting.voice_inbox_clear setting.voice_lists setting.voice_needs_you setting.voice_no_questions
+      setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
+      setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
+    `,
+    declares: '0507ca88190ea60f',
+    history: [
+      "`register.datapoints` is handed to Portfolio 1.19.0 (`hands.register.datapoints.portfolio`), which declares it under the same id, and its organisation and service, links to People's and Estate's lists, stay this pack's, laid on it (`extends.register.datapoints.organisation`, `extends.register.datapoints.about_service`); `setting.label_datapoints` and `setting.one_datapoints` go with the list and the example number leaves the pack's own seeds for the module examples; every figure, page and addition over Numbers stays -> 0507ca88190ea60f",
+    ],
+  },
   'team@2.19.0': {
     holds: `
       metric.tickets-blocked metric.tickets-done-by-agents metric.tickets-due-else metric.tickets-in-flight

@@ -3,8 +3,8 @@
  * reports or is polled for.
  *
  * IT BUILDS ON FIVE FIRST-PARTY MODULES. Projects, People, Money, Estate and Work are installed first, and
- * this pack adds what they do not hold: datapoints, one number from one project at one moment, written by the project
- * itself over the API or by a poll the record runs.
+ * this pack adds what they do not hold: the pages over Numbers (datapoints), one number from one project at one moment,
+ * written by the project itself over the API or by a poll the record runs. The list itself is Portfolio's since 3.0.0.
  *
  * THE ORGANISATIONS ARE PEOPLE'S SINCE 2.0.0 (People 3.0.0), under the same id, so a founder's rows stay where they are:
  * every record meets companies, and `meet` writes them there. This pack hands the list over (`hands`), and adds the
@@ -428,8 +428,13 @@ export const FOUNDER = {
      and the numbers, this pack's own list; a block over a list the record does not hold is cut at install (`fitted`),
      Lapsing among them. 2.6.0 is published in the catalogue and frozen, and the file it shares changes (`needs`), so
      this is a version beside it. Nothing is declared, taken away or reworded, so a record on 2.6.0 keeps every list and
-     page it holds. */
-  version: '2.7.0',
+     page it holds.
+
+     3.0.0, THE KPI PLAN OF 21 OCTOBER (K1-A): Numbers is handed to Portfolio (`hands`), which declares `datapoints` under
+     the same id and fields from 1.19.0 and keeps each project's key numbers over it. Every figure, page and addition
+     here still reads it, and a founder's readings stay where they are. A list this pack declared is taken away, so the
+     step is a major one, as 2.0.0 was when organisations went to People; 2.7.0 is published and frozen. */
+  version: '3.0.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
   author: 'BrainDog',
@@ -474,49 +479,9 @@ export const FOUNDER = {
     pack: 'usecase-founder',
     requires: { format: 1, primitives: 1, packs: {} },
     declarations: [
-      {
-        register: 'datapoints',
-        /* "NUMBERS" AND NOT "DATAPOINTS", which is a word from a database and not from a founder. The list's id stays
-           `datapoints`, because every door, poll and figure already writes to it by that id. */
-        name: 'Numbers',
-        one: 'number',
-        icon: 'observe',
-        holds: 'one number from one project at one moment, reported by the project or polled by the record',
-        title: 'name',
-        mobile: ['name', 'value', 'at'],
-        /* NEWEST FIRST BY THE MOMENT A NUMBER IS FOR, IN THE SAME UNRELEASED 2.6.0 (PGS-B06), as the Ledger opens on its
-           newest day (`modules/money/lists/transactions.ts`). A list that names no order came back newest written first,
-           so a feed polled late, or a week of numbers typed in one sitting, opened Numbers on whatever was written last.
-           `at` is the moment the number is for; the kernel breaks a tie by the row's id. */
-        order: { field: 'at', dir: 'desc' },
-        fields: [
-          { id: 'name', label: 'Measure', type: 'text', required: true, index: true, search: true },
-          /* A NUMBER OR AN AMOUNT, SINCE 2.5.0: money is written as `amount`, integer minor units and its currency,
-             and leaves `value` empty, so a feed of revenue never has the record guess a currency from a unit of text. */
-          { id: 'value', label: 'Value', type: 'decimal' },
-          { id: 'amount', label: 'Amount', type: 'money' },
-          { id: 'unit', label: 'Unit', type: 'text' },
-          { id: 'thing', label: 'Project', type: 'ref', to: 'things', index: true },
-          { id: 'organisation', label: 'Organisation', type: 'ref', to: 'organisations', index: true },
-          /* THE SERVICE A READING IS ABOUT, SINCE 2.6.0 (REC-C12): how full a server's disk is has no project, and with
-             no field for the service it sat in Numbers tied to nothing. Never required: a project's number says none.
-             `about_service`, NOT `service`: a field id one add-on alone declares is a name the core may not spell
-             (`tools/gates/core-names.mjs`), and that word is in two dozen places of it already. */
-          { id: 'about_service', label: 'Service', type: 'ref', to: 'services', index: true },
-          { id: 'at', label: 'When', type: 'instant', index: true },
-          {
-            id: 'source',
-            label: 'Source',
-            type: 'enum',
-            /* `example` IS THE SEED'S, so the dashboards leave it out of every tile and chart while it still shows,
-               marked, in the lists of latest numbers. */
-            values: ['reported', 'polled', 'typed', 'example'],
-            labels: { reported: 'Reported', polled: 'Polled', typed: 'Typed', example: 'Example' },
-            index: true,
-          },
-          { id: 'tags', type: 'list', of: 'text' },
-        ],
-      },
+      /* NO NUMBERS LIST OF ITS OWN SINCE 3.0.0: Portfolio 1.19.0 declares `datapoints` under the same id and fields, and
+         this pack hands it there (`hands` below), so every record with projects can hold readings and a project's key
+         numbers read them. Every figure and block here still reads it. */
       {
         metric: 'datapoints-30d',
         name: 'Numbers reported, 30 days',
@@ -773,9 +738,26 @@ export const FOUNDER = {
         ],
       },
     ],
-    seeds: [{ register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'example', at: '-1d' } }],
-    /* THE ORGANISATIONS GO TO PEOPLE WITH THEIR ROWS, SINCE 2.0.0: People 3.0.0 declares the list under the same id. */
-    hands: { 'register.organisations': 'people' },
+    /* NO EXAMPLE NUMBER OF ITS OWN SINCE 3.0.0: a pack seeds only its own lists, and Numbers is Portfolio's now. The
+       example is the module's, among `FOUNDER_EXAMPLES` below. */
+    /* THE ORGANISATIONS GO TO PEOPLE WITH THEIR ROWS, SINCE 2.0.0: People 3.0.0 declares the list under the same id.
+       AND NUMBERS GOES TO PORTFOLIO WITH ITS ROWS, SINCE 3.0.0: Portfolio 1.19.0 declares the list under the same id. */
+    hands: { 'register.organisations': 'people', 'register.datapoints': 'portfolio' },
+    /* AND THE ORGANISATION AND THE SERVICE A READING IS ABOUT STAY THIS PACK'S, LAID ON PORTFOLIO'S NUMBERS, SINCE 3.0.0:
+       they point at People's and Estate's lists, which come after Projects, and this pack holds every figure and block
+       that reads them (Numbers on an organisation's page, Server and provider numbers), so a field and what reads it
+       are on a record together or not at all (`fitted` in `install.ts`). The same ids and fields 2.7.0 declared. */
+    extends: {
+      'register.datapoints': {
+        fields: [
+          { id: 'organisation', label: 'Organisation', type: 'ref', to: 'organisations', index: true },
+          /* THE SERVICE A READING IS ABOUT (REC-C12): how full a server's disk is has no project. `about_service`, NOT
+             `service`: a field id one add-on alone declares is a name the core may not spell (`tools/gates/core-names.mjs`),
+             and that word is in two dozen places of it already. */
+          { id: 'about_service', label: 'Service', type: 'ref', to: 'services', index: true },
+        ],
+      },
+    },
     /* WHAT AN ORGANISATION REPORTS, ON PEOPLE'S PAGE FOR IT, SINCE 2.0.0, where it was a page of this pack's own (the
        numbers, the latest of them, and where a project sends them), after its people: two pages for one organisation
        would have been two addresses for one name. */
@@ -847,6 +829,8 @@ export const FOUNDER_EXAMPLES = [
   },
   { register: 'tracks', fields: { name: 'Launch the annual plan', state: 'open', opened: '-12d' } },
   { register: 'tasks', fields: { what: 'Write the pricing page copy', state: 'open', by: '+4d' } },
+  /* PORTFOLIO'S NUMBERS SINCE founder 3.0.0, where it was this pack's own seed. */
+  { register: 'datapoints', fields: { name: 'Monthly recurring revenue', value: 4200, unit: 'GBP', source: 'example', at: '-1d' } },
 ];
 
 /**

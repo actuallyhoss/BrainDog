@@ -110,6 +110,22 @@ const LAID: Record<string, Laid> = {
     declares: '587379d1d9fe0800',
     history: ['2.7.0 lays what 2.6.0 laid, word for word; it adds `needs` and nothing it lays moved -> 587379d1d9fe0800'],
   },
+  /* 3.0.0, THE KPI PLAN OF 21 OCTOBER (K1-A): it lays what 2.7.0 laid and hands Numbers to Portfolio as well. */
+  'founder@3.0.0': {
+    lays: [
+      'adds page.relation after People: Numbers, 30 days',
+      'adds page.relation after People: Latest numbers',
+      'adds page.relation after People: Send numbers here',
+      'adds page.portfolio after In play: ',
+      'adds page.estate after Next ninety days: Server and provider numbers',
+      'adds page.relation after Notes: Where it was seen',
+      'adds page.someone after Notes: Where it was seen',
+      'hands register.organisations to people',
+      'hands register.datapoints to portfolio',
+    ],
+    declares: '192a7f45d2533b26',
+    history: ['3.0.0 lays what 2.7.0 laid, word for word, and hands Numbers to Portfolio 1.19.0, which declares it under the same id -> 192a7f45d2533b26'],
+  },
   /* PERSONAL LAYS FOR THE FIRST TIME AT 2.4.0 (budgets-set-73, integrate 73): the count of budgets set goes to Money,
      which declares it since money-core 3.17.0. 2.3.1, released, laid nothing and has no entry. */
   'personal@2.4.0': {
