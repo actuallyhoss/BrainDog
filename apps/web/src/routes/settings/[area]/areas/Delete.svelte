@@ -12,6 +12,7 @@
   import Section from '$lib/ui/Section.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
   import { settingsState, type AreaProps } from '../settings-state.svelte.ts';
 
   let { shell }: AreaProps = $props();
@@ -26,22 +27,47 @@
   const RECORD = $derived(shell.index.name);
   const SLUG = $derived(shell.index.slug);
 
-  /* The slug, typed to confirm (`02 §9`); the button is disabled until it matches. */
-  let typedSlug = $state('');
+  /* THE NAME, TYPED TO CONFIRM (`02 §9`, agents F15 with the spec's Δ): the record's name as it is read everywhere, not
+     its slug, compared without case. A name is what a person knows; an id is what the host knows, and is what is sent. */
+  let typed = $state('');
   let deleting = $state(false);
   let deletedSaid = $state('');
+  /* SAID ONLY AFTER A PRESS OR AN ENTER WITH THE WRONG NAME, never while typing. */
+  let wrong = $state(false);
+  let field = $state<HTMLInputElement | null>(null);
+
+  const words = {
+    label: (name: string) => `Type ${name} to confirm`,
+    exactly: (name: string) => `Type ${name} exactly.`,
+    notIt: (name: string) => `That is not ${name}.`,
+    exportFirst: 'Export a copy first',
+  } as const;
+
+  const matches = $derived(typed.trim().toLocaleLowerCase() === RECORD.trim().toLocaleLowerCase());
 
   async function deleteNow() {
     if (deleting) return;
+    /* OFF IS NOT DISABLED: the press says why and puts the person in the field (first F16). */
+    if (!matches) {
+      wrong = typed.trim() !== '';
+      field?.focus();
+      return;
+    }
     deleting = true;
     const at = opened();
-    const out = await deleteRecordNow(apiBase(), typedSlug.trim());
+    const out = await deleteRecordNow(apiBase(), SLUG);
     closed(true, at);
     deleting = false;
     if (out.ok) {
       deletedSaid = copy.recordDeleted(RECORD);
       toasts.push(deletedSaid, { intent: 'good' });
     } else toasts.push(out.fix, { intent: 'warn' });
+  }
+
+  function onkey(e: KeyboardEvent) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    void deleteNow();
   }
 </script>
 
@@ -93,12 +119,14 @@
          the host has already decided against, and `destroy()` takes no copy on the way out.
          `delete-costs.test.ts` holds both. -->
     <p class="danger-why">{copy.deleteCosts}</p>
-    <!-- `field-row` PUTS THE LABEL ABOVE THE FIELD, a form's `--sp-2` over it; the label alone sat
-         inline after the sentence with nothing to set its distance from the field. -->
+    <!-- THE ONE WAY BACK, BEFORE THE FIELD: a copy taken now is the only thing that answers a change of mind. -->
+    <div><Button href="/settings/export" size="sm"><Icon name="download" size="s" />{words.exportFirst}</Button></div>
+    <!-- `field-row` PUTS THE LABEL ABOVE THE FIELD. ARMED, the button is the primary with its bin (2.A.1); OFF it is
+         quiet and `aria-disabled`, and a press says why. -->
     <div class="field-row">
-      <label class="field-row-label" for="delete-slug">{copy.typeSlug(SLUG)}</label>
+      <label class="field-row-label" for="delete-slug">{words.label(RECORD)}</label>
       <div class="field-row-controls">
-        <div class="field field-lg">
+        <div class="field field-lg" data-invalid={wrong ? '' : undefined}>
           <input
             class="field-input"
             id="delete-slug"
@@ -106,17 +134,27 @@
             autocapitalize="off"
             spellcheck="false"
             autocomplete="off"
-            bind:value={typedSlug}
+            aria-invalid={wrong}
+            aria-describedby="delete-said"
+            bind:this={field}
+            bind:value={typed}
+            oninput={() => (wrong = false)}
+            onkeydown={onkey}
           />
         </div>
         <Button
+          weight={matches ? 'primary' : 'quiet'}
           tone="bad"
-          disabled={typedSlug.trim() !== SLUG}
+          aria-disabled={!matches}
           aria-busy={deleting}
+          disabled={deleting}
           onclick={deleteNow}
           >{copy.deleteRecord(RECORD)}</Button
         >
       </div>
+      <p id="delete-said" class="said" data-wrong={wrong ? '' : undefined} aria-live="polite">
+        {#if wrong}<Icon name="alert" size="s" />{words.notIt(RECORD)}{:else if !matches}{words.exactly(RECORD)}{/if}
+      </p>
     </div>
     {#if deletedSaid}<p class="hint" role="status">{deletedSaid}</p>{/if}
   </div>
@@ -129,33 +167,53 @@
   .hint {
     margin: 0 0 var(--sp-3);
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   .danger {
     display: grid;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
     max-inline-size: var(--measure);
   }
 
-  .danger > p {
+  .danger p {
     margin: 0;
   }
 
-  /* WHAT HAPPENS, AT THE ROW'S WEIGHT IN INK. It was red, and red means "needs you" and nothing else: the
-     act is irreversible because the sentence says so, not because of its colour. */
+  /* WHAT HAPPENS, AT THE ROW'S WEIGHT IN INK. Red means "needs you": the act is irreversible because the sentence says
+     so, not because of its colour. */
   .danger-title {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
   }
 
   .danger-why {
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
+  }
+
+  /* THE LINE UNDER THE FIELD: what to type in the quiet ink, and the wrong name in red with its glyph. Held at one line,
+     so the row does not move when it changes. */
+  .said {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    min-block-size: 20px;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 20px;
+  }
+
+  .said[data-wrong] {
+    color: var(--red);
+  }
+
+  .field[data-invalid] {
+    box-shadow: inset 0 0 0 1px var(--red);
   }
 </style>

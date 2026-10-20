@@ -491,7 +491,11 @@ test('and the delete control is the confirmation rather than a sentence about on
   /* `SLUG` IS THE SHELL'S SLUG, which is the record's own where there is a record and the sample's
      where there is none. It was `boot().index.slug` — the in-browser sample, on every record — so a
      live record's delete gate was satisfied by typing the SAMPLE's name and refused the real one. */
-  assert.match(src, /disabled=\{typedSlug\.trim\(\) !== SLUG\}/u, 'the button is not gated on the typed slug');
+  /* ARMED ONLY ON THE RECORD'S NAME, typed without regard to case (UI pass 20 Oct, agents F15 Δ): off is quiet and
+     `aria-disabled`, and the slug the host needs is sent only once the name matches. */
+  assert.match(src, /const matches = \$derived\(typed\.trim\(\)\.toLocaleLowerCase\(\) === RECORD\.trim\(\)\.toLocaleLowerCase\(\)\)/u, 'the button is not gated on the typed name');
+  assert.match(src, /aria-disabled=\{!matches\}/u, 'the button does not say it is off');
+  assert.match(src, /deleteRecordNow\(apiBase\(\), SLUG\)/u, 'the slug is not what is sent');
   /* The old toast, and not the comment quoting it — a bare grep over the file matches the paragraph
      explaining why the toast is gone, which is the assertion catching its own evidence. */
   assert.doesNotMatch(src, /toasts\.push\([^)]*Deleting a record asks you to type its name first/u, 'the toast still describes the safeguard');
