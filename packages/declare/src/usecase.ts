@@ -98,7 +98,8 @@ export type ModuleId = (typeof MODULES)[number];
  * has it, as the `PROVIDES_CONFLICT` two packs owning one declaration always get at install.
  */
 export const MODULE_LISTS: Readonly<Record<ModuleId, { name: string; lists: readonly string[] }>> = {
-  portfolio: { name: 'Portfolio', lists: ['things'] },
+  /* NUMBERS AND KEY NUMBERS ARE PORTFOLIO'S SINCE portfolio 1.19.0, taken over from the founder use case (`hands`). */
+  portfolio: { name: 'Portfolio', lists: ['things', 'datapoints', 'kpis'] },
   people: { name: 'People', lists: ['people', 'organisations'] },
   'money-core': {
     name: 'Money',

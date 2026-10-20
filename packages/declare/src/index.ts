@@ -1896,7 +1896,14 @@ export async function plan(given: Pack, installed: Installed, options: PlanOptio
        Founder 2.0.0 hands it `register.organisations`, was `PROVIDES_CONFLICT` at that list, and Founder 2.0.0 could not
        go first either, since its pages read the organisations as only People 3.0.0 lays them. So the use case cycled.
        What the list holds and this body lacks stays, as it does for a list handed before this pack was installed. */
-    if (already.pack_id !== null && already.pack_id !== mine && installed.handed?.[decl.id] === mine) {
+    /* AND A LIST A BRAINDOG MODULE OWNS THAT A USE CASE HELD BEFORE THE MODULE DECLARED IT, SINCE portfolio 1.19.0
+       (`FIRST_PARTY_LISTS`): Portfolio takes Numbers from the founder use case, whose next version hands it over, and the
+       night updates the modules before the use cases (`packs/quiet.ts` in `@braindog/seed`), so Portfolio was refused
+       PROVIDES_CONFLICT, and the use case after it could not lay its fields on a list it was still handing. A module's
+       list is the module's, which is what the Kennel already says of an add-on declaring one, so the module takes it
+       over as it would one it was handed, whichever of the two a record updates first. */
+    const moduleTakes = already.pack_id !== null && already.pack_id.startsWith('usecase-') && decl.kind === 'register' && FIRST_PARTY_LISTS.get(decl.id.slice('register.'.length)) === mine;
+    if (already.pack_id !== null && already.pack_id !== mine && (installed.handed?.[decl.id] === mine || moduleTakes)) {
       changes.push({ id: decl.id, from_version: already.version, summary: summarise(decl), from: already.pack_id });
       if (decl.kind !== 'register') continue;
       const over = carried(already.body, decl.body);
