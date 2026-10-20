@@ -90,7 +90,7 @@ test('a rail link that is no list is never blamed for being empty', () => {
 });
 
 test('after "Make it mine" the first-run page is no longer before the press', () => {
-  const made = { ...START, counts: { people: 1, assignments: 3 }, roles: [{ role: 'heading', name: 'Your BrainDog is ready', landmark: 'main' }] };
+  const made = { ...START, counts: { people: 1, assignments: 3 }, roles: [{ role: 'heading', name: 'Your BrainDog is made', landmark: 'main' }] };
   assert.equal(firstScreen['nothing-before-press'](made, LAYLA).pass, null);
   const making = { ...made, roles: [{ role: 'button', name: 'Making it', landmark: 'main' }] };
   assert.equal(firstScreen['nothing-before-press'](making, LAYLA).pass, null);
