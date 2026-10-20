@@ -6277,7 +6277,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const placedDecided = (ctx: CallContext): Decision[] => {
     const rows = sql.all<{ id: string; body_kind: string; body: string | null; opened_by: string; opened_at: string; resolved_as: string | null; asked: string | null; ts: string; decided: string | null }>(
       `SELECT s.id AS id, s.body_kind AS body_kind, s.body AS body, s.opened_by AS opened_by, s.opened_at AS opened_at, s.resolved_as AS resolved_as,
-              (SELECT coalesce(q.to_v, q.note) FROM event q WHERE q.kind = 'suggest' AND q.target = r.target ORDER BY q.rowid LIMIT 1) AS asked,
+              (SELECT coalesce(q.to_v, q.note) FROM event q WHERE q.kind = 'suggest' AND q.target = r.target AND q.field IS NULL AND coalesce(q.to_v, '') <> 'reopened' ORDER BY q.rowid DESC LIMIT 1) AS asked,
               r.ts AS ts,
               (SELECT d.to_v FROM event d WHERE r.batch IS NOT NULL AND d.batch = r.batch AND d.kind = 'decide' ORDER BY d.rowid DESC LIMIT 1) AS decided
          FROM suggestion s

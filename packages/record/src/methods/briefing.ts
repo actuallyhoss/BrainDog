@@ -166,7 +166,7 @@ export function briefFactsFor(deps: RecordDeps, ctx: CallContext, nowMs: number)
   /** The words a question was asked in, as the kernel's own signs read them: its `suggest` line's question or note. */
   const askedIn = (id: string): string | null => {
     const line = sql.one<{ said: string | null }>(
-      "SELECT coalesce(to_v, note) AS said FROM event WHERE kind = 'suggest' AND target = ? AND field IS NULL ORDER BY rowid LIMIT 1",
+      "SELECT coalesce(to_v, note) AS said FROM event WHERE kind = 'suggest' AND target = ? AND field IS NULL AND coalesce(to_v, '') <> 'reopened' ORDER BY rowid DESC LIMIT 1",
       `suggestion:${id}`,
     );
     return typeof line?.said === 'string' ? scrubbed(kernel.nameSpoken(line.said)) : null;

@@ -185,7 +185,7 @@ export function staleFor(deps: RecordDeps, ctx: CallContext, nowMs: number, list
   const first = old[0];
   if (first !== undefined) {
     const line = sql.one<{ said: string | null }>(
-      "SELECT coalesce(to_v, note) AS said FROM event WHERE kind = 'suggest' AND target = ? AND field IS NULL ORDER BY rowid LIMIT 1",
+      "SELECT coalesce(to_v, note) AS said FROM event WHERE kind = 'suggest' AND target = ? AND field IS NULL AND coalesce(to_v, '') <> 'reopened' ORDER BY rowid DESC LIMIT 1",
       `suggestion:${first.id}`,
     );
     const words = typeof line?.said === 'string' ? scrubbed(line.said) : null;

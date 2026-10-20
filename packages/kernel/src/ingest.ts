@@ -3753,7 +3753,14 @@ export function unfile(deps: IngestDeps, suggestion: string, asked: { question: 
     delete body.why;
     body.context = asked.context;
     deps.sql.exec('UPDATE suggestion SET body = ? WHERE id = ?', JSON.stringify(body), suggestion);
-    deps.sql.exec("UPDATE event SET note = ?, to_v = NULL WHERE target = ? AND kind = 'suggest' AND field IS NULL", asked.question.slice(0, 280), `suggestion:${suggestion}`);
+    /* THE QUESTION IS ASKED AGAIN AS A NEW LINE, never written over the first: the log only grows, and the newest line is what is asked. */
+    deps.sql.exec(
+      "INSERT INTO event (id, ts, actor, kind, target, target_kind, note) VALUES (?, ?, 'system', 'suggest', ?, 'suggestion', ?)",
+      deps.mint(),
+      instant(deps.nowMs),
+      `suggestion:${suggestion}`,
+      asked.question.slice(0, 280),
+    );
   } catch {
     /* left as it was: still open, and a person answers it */
   }

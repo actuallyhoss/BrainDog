@@ -444,7 +444,7 @@ const OPEN = "status = 'open' AND (defer_until IS NULL OR defer_until <= ?)";
 /** The words a question was asked in: its `suggest` event's question (`to_v`) or note. */
 function askedIn(sql: Sql, id: string): string {
   const row = sql.one<{ said: string | null }>(
-    "SELECT coalesce(to_v, note) AS said FROM event WHERE kind = 'suggest' AND target = ? AND field IS NULL ORDER BY rowid LIMIT 1",
+    "SELECT coalesce(to_v, note) AS said FROM event WHERE kind = 'suggest' AND target = ? AND field IS NULL AND coalesce(to_v, '') <> 'reopened' ORDER BY rowid DESC LIMIT 1",
     `suggestion:${id}`,
   );
   return typeof row?.said === 'string' && row.said.trim() !== '' ? row.said.trim() : NO_WORDS;

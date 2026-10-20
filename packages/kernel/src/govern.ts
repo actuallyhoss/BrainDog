@@ -592,7 +592,7 @@ export function propose(deps: GovernDeps, actor: string | (() => string), p: Pro
      immutable `decision.question` — the record's permanent answer to "what was asked", wrong, with
      the original nowhere. */
   event(deps, at, by, 'suggest', `suggestion:${id}`, 'suggestion', p.question);
-  /* WHY IT IS BACK, under the question, after the `suggest` event so `questionOf` still reads the question first. Only
+  /* WHY IT IS BACK, under the question, after the `suggest` event, which `questionOf` skips. Only
      when an answer was set aside: an `again` on a cause nobody answered says nothing the question does not. */
   if (memory !== null && p.again !== undefined) event(deps, at, by, 'note', `suggestion:${id}`, 'suggestion', AGAIN, p.again.trim());
   /* AND WHO DECIDES IT, written as `handQuestion` writes it, so an agent's question that names Ada arrives already hers. */
@@ -3401,7 +3401,7 @@ export function keepApplied(deps: GovernDeps, decision: string, applied: Record<
 export function questionOf(sql: Sql, id: string): string | null {
   return (
     sql.one<{ q: string | null }>(
-      "SELECT coalesce(to_v, note) AS q FROM event WHERE kind = 'suggest' AND target = ? ORDER BY rowid LIMIT 1",
+      "SELECT coalesce(to_v, note) AS q FROM event WHERE kind = 'suggest' AND target = ? AND field IS NULL AND coalesce(to_v, '') <> 'reopened' ORDER BY rowid DESC LIMIT 1",
       `suggestion:${id}`,
     )?.q ?? null
   );
