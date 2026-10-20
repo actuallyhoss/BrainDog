@@ -58,7 +58,7 @@
 <div class="human" role="group" aria-label={copy.signupHuman} bind:this={box}>
   {#if phase === 'failed'}
     <div class="failed">
-      <p class="line" role="alert">{words.line}</p>
+      <p class="human-line" role="alert">{words.line}</p>
       <span class="again"><Button onclick={() => box && void draw(box)}>{words.again}</Button></span>
     </div>
   {/if}
@@ -77,7 +77,7 @@
     min-block-size: 65px;
   }
 
-  .line {
+  .human-line {
     flex: 1;
     min-inline-size: 0;
     margin: 0;

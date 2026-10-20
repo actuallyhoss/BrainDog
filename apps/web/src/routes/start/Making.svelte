@@ -42,7 +42,7 @@
 <section class="making" aria-labelledby="making-h">
   <header class="head">
     <h1 class="name" id="making-h" tabindex="-1" bind:this={heading}>{part ? words.partTitle : words.title}</h1>
-    <p class="line">{part ? words.partLine : words.line}</p>
+    <p class="making-line">{part ? words.partLine : words.line}</p>
   </header>
   <!-- READ ALOUD AS EACH TILE CHANGES, one tile at a time: a tile is whole to a screen reader, its name and its state. -->
   <ul class="tiles" aria-live="polite">
@@ -96,7 +96,7 @@
     outline: none;
   }
 
-  .line {
+  .making-line {
     margin: 0;
     max-inline-size: var(--measure);
     color: var(--ink2);
