@@ -17,6 +17,7 @@
 
 import { notInThisBuild } from '@braindog/kernel';
 import { dropIndex, moveAt } from '../record/arrange.ts';
+import { REGISTERS } from '../record/held.ts';
 import { often } from '../record/actions.ts';
 import { DAYS, EVERY, calendarWords, clockWords, inMonths } from './calendar.ts';
 import { idWords } from './chips.ts';
@@ -1227,6 +1228,44 @@ const MARKED = /\u0002([^\u0003]*)\u0003/gu;
 const mark = (text: string): string => text.replace(/\{\{\s*([^}]+?)\s*\}\}/gu, (_, path: string) => `${OPEN}${path}${SHUT}`);
 const aloud = (v: unknown): string => (typeof v === 'string' ? mark(v.trim()) : typeof v === 'number' ? String(v) : '');
 const withText = (lead: string, text: string): string => (text === '' ? lead : `${lead}: ${text}`);
+
+/* ── names, never ids ─────────────────────────────────────────────────────── */
+
+/**
+ * WHAT A PERSON CALLS A FIELD: its declared label, in the list named or else any list this tab has learnt that declares
+ * it, and its id in words where none does. The canvas said "filing_rules whose match is counterparty_text" and "only
+ * when filed_by is empty": the record's ids, where the lists already say "Filing rules", "Matches" and "As the bank
+ * wrote it" (UI pass 20 Oct, names never ids).
+ */
+export function fieldName(id: string, register?: string): string {
+  const own = register ? REGISTERS[register]?.fields.find((f) => f.id === id) : undefined;
+  const any = own ?? Object.values(REGISTERS).map((r) => r.fields.find((f) => f.id === id)).find((f) => f !== undefined);
+  const label = any?.label?.trim();
+  return label ? label : id.replace(/[_-]+/gu, ' ');
+}
+
+/** A field's name inside a sentence: its first letter lower case, unless the name is an initialism ("VAT"). */
+const fieldSaid = (id: string, register?: string): string => {
+  const name = fieldName(id, register);
+  return /^[A-Z][A-Z]/u.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
+};
+
+/** One item of a list, as a sentence says it: "the filing rule". The list's own singular, else its id in words. */
+const oneOf = (register: string): string => {
+  const one = REGISTERS[register]?.one?.trim();
+  return one ? one.charAt(0).toLowerCase() + one.slice(1) : register.replace(/[_-]+/gu, ' ').replace(/s$/u, '');
+};
+
+/** The ids with an underscore in a condition as written ("filed_by is empty"), said as their fields' names. A
+    reference in braces is left whole, for `mark` to make a chip of. */
+const idsSaid = (text: string, register?: string): string =>
+  text
+    .split(/(\{\{[^}]*\}\})/u)
+    .map((part) => (part.startsWith('{{') ? part : part.replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/gu, (id) => fieldSaid(id, register))))
+    .join('');
+
+/** A reference as a card names it: `{{counterparty_text}}`, the item's own field, by its name; `{{vars.rate}}` as `rate`. */
+const refText = (path: string): string => (path.includes('.') ? (path.split('.').pop() ?? path) : fieldName(path));
 const andList = (items: readonly string[], joint = 'and'): string =>
   items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} ${joint} ${items[items.length - 1]}`;
 const cap = (s: string): string => (s === '' ? s : s[0]!.toUpperCase() + s.slice(1));
@@ -1272,14 +1311,14 @@ export function leafOf(cond: unknown): { field: string; op: CompareOp; value: nu
 export const leafTo = (field: string, op: CompareOp, value: number): Record<string, unknown> => ({ field, [op]: value });
 
 /** A condition in words: a sentence as written, a numeric leaf in the builder's words, and a tree as what it is. */
-export function sayCondition(cond: unknown): string {
-  return unmark(conditionWords(cond));
+export function sayCondition(cond: unknown, register?: string): string {
+  return unmark(conditionWords(cond, register));
 }
 
-function conditionWords(cond: unknown): string {
-  if (typeof cond === 'string') return mark(cond.trim());
+function conditionWords(cond: unknown, register?: string): string {
+  if (typeof cond === 'string') return mark(idsSaid(cond.trim(), register));
   const leaf = leafOf(cond);
-  if (leaf) return `${leaf.field.replace(/_/gu, ' ')} ${COMPARE.find((c) => c.op === leaf.op)!.said} ${leaf.value}`;
+  if (leaf) return `${fieldSaid(leaf.field, register)} ${COMPARE.find((c) => c.op === leaf.op)!.said} ${leaf.value}`;
   return isObject(cond) ? 'the condition holds' : '';
 }
 
@@ -1291,7 +1330,7 @@ function conditionWords(cond: unknown): string {
  */
 export function sayStart(d: Draft, listSaid?: (id: string) => string): string {
   const filed = conditionOf(d);
-  const cond = filed === null ? '' : sayCondition(filed);
+  const cond = filed === null ? '' : sayCondition(filed, 'written' in d.trigger ? (d.trigger.written.register ?? undefined) : undefined);
   return cond === '' ? sayTrigger(d.trigger, listSaid) : `${sayTrigger(d.trigger, listSaid)}, only when ${cond}`;
 }
 
@@ -1306,7 +1345,7 @@ export function sayTrigger(t: Trigger, listSaid: (id: string) => string = (id) =
     const w = t.written;
     const ops = (w.op ?? []).map((o) => ({ create: 'added', update: 'changed', delete: 'deleted' })[o]);
     const said = `When an item in ${w.register ? listSaid(w.register) : 'a list'} is ${ops.length > 0 ? andList(ops, 'or') : 'added or changed'}`;
-    const fields = w.fields && w.fields.length > 0 ? `, and only when ${andList(w.fields.map((f) => f.replace(/_/gu, ' ')), 'or')} changes` : '';
+    const fields = w.fields && w.fields.length > 0 ? `, and only when ${andList(w.fields.map((f) => fieldSaid(f, w.register ?? undefined)), 'or')} changes` : '';
     return `${said}${fields}${w.from_rules ? ', including changes other automations make' : ''}`;
   }
   if ('arrival' in t) {
@@ -1341,7 +1380,7 @@ export function sayTrigger(t: Trigger, listSaid: (id: string) => string = (id) =
 }
 
 /** A marked sentence with its references read aloud: `{{vars.rate}}` as `rate`. */
-const unmark = (text: string): string => text.replace(MARKED, (_, path: string) => path.split('.').pop() ?? path);
+const unmark = (text: string): string => text.replace(MARKED, (_, path: string) => refText(path));
 
 /** One piece of a card's sentence: words, or a reference (`ref` is its whole path, `text` the name a card shows). */
 export type Part = { text: string; ref?: string };
@@ -1357,7 +1396,7 @@ export function sayParts(step: Step): Part[] {
   for (const m of whole.matchAll(MARKED)) {
     if (m.index > at) out.push({ text: whole.slice(at, m.index) });
     const path = m[1]!;
-    out.push({ text: path.split('.').pop() ?? path, ref: path });
+    out.push({ text: refText(path), ref: path });
     at = m.index + m[0].length;
   }
   if (at < whole.length) out.push({ text: whole.slice(at) });
@@ -1401,11 +1440,13 @@ function saying(step: Step): string {
     case 'untag':
       return withText('Take the tag off', aloud(a));
     case 'set':
-      return at('field') === '' ? 'Set a field' : `Set ${at('field')} to ${at('to') || 'nothing'}`;
+      return at('field') === '' ? 'Set a field' : `Set ${fieldSaid(at('field'))} to ${at('to') || 'nothing'}`;
     case 'move':
       return aloud(a) === '' ? 'Move it to a state' : `Move it to ${aloud(a)}`;
     case 'link':
-      return at('field') === '' ? 'Link it to another item' : `Link ${at('field')} to the ${at('to', 'register') || 'item'} whose ${at('to', 'by')} is ${at('to', 'value')}`;
+      return at('field') === ''
+        ? 'Link it to another item'
+        : `Link ${fieldSaid(at('field'))} to the ${at('to', 'register') ? oneOf(at('to', 'register')) : 'item'} whose ${fieldSaid(at('to', 'by'), at('to', 'register') || undefined)} is ${at('to', 'value')}`;
     case 'note':
       return withText('Add a note', aloud(a));
     case 'create': {
