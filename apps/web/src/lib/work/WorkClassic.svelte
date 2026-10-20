@@ -1615,8 +1615,8 @@
     box-sizing: border-box;
     block-size: var(--ctl-h);
     padding: 3px;
-    background: var(--bg);
-    border-radius: var(--r-pill);
+    background: var(--tile);
+    border-radius: var(--r-ctl);
   }
 
   .seg-btn {
@@ -1627,10 +1627,10 @@
     padding: 0 var(--sp-3);
     background: transparent;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     cursor: pointer;
     transition:
@@ -1640,7 +1640,7 @@
 
   .seg-btn[aria-pressed='true'] {
     background: var(--ink);
-    color: var(--on-ink);
+    color: var(--on-red);
   }
 
   /* A 36PX WHITE CIRCLE, with its tooltip and its name. */
@@ -1651,9 +1651,9 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--bg);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
@@ -1663,21 +1663,13 @@
   :global(.head[data-under]) .seg,
   :global(.head[data-under]) .circle {
     background: transparent;
-    backdrop-filter: none;
     box-shadow: none;
   }
 
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    :global(.head[data-under]) .seg,
-    :global(.head[data-under]) .circle {
-      -webkit-backdrop-filter: none;
-    }
-  }
 
   @media (hover: hover) and (pointer: fine) {
     .circle:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .seg-btn:hover:not([aria-pressed='true']) {
@@ -1694,8 +1686,8 @@
     column-gap: var(--sp-2);
     min-block-size: 40px;
     padding: 0 var(--sp-1) 0 var(--sp-3);
-    background: var(--s1);
-    border-radius: var(--r-md);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
   }
 
   .capture-field:focus-within {
@@ -1704,7 +1696,7 @@
 
   .capture-mark {
     display: inline-grid;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .capture-box {
@@ -1716,13 +1708,13 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     /* focus-ok: the whole field draws the ring (`.capture-field:focus-within`), and the caret is in it. */
     outline: none;
   }
 
   .capture-box::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* THE PANEL'S KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): `x`, Esc and Enter show on their pill under the
@@ -1761,12 +1753,12 @@
   .field {
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   /* THE SELECT IS THE PHONE'S FILTER; from 900px up the chips are, and the select is not drawn twice for a screen reader. */
@@ -1791,12 +1783,12 @@
     gap: 6px;
     block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-3) 0 var(--sp-2);
-    background: var(--hover-wash);
+    background: var(--hover);
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
@@ -1806,19 +1798,18 @@
   }
 
   .chip[aria-pressed='true'] {
-    background: var(--bg);
-    box-shadow: var(--e1);
+    background: var(--tile);
     color: var(--ink);
   }
 
   .chip-n {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 400;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .chip:hover:not([aria-pressed='true']) {
-      background: var(--hold-wash);
+      background: var(--tile-2);
       color: var(--ink);
     }
   }
@@ -1832,9 +1823,9 @@
     block-size: var(--ctl-h-sm);
     margin-inline-start: auto;
     padding: 0 var(--sp-3);
-    background: var(--hover-wash);
-    border-radius: var(--r-pill);
-    color: var(--dim);
+    background: var(--hover);
+    border-radius: var(--r-ctl);
+    color: var(--ink-3);
   }
 
   .find:focus-within {
@@ -1849,13 +1840,13 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     /* focus-ok: the pill draws the ring (`.find:focus-within`), and the caret is in it. */
     outline: none;
   }
 
   .find input::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* ── the bands ── */
@@ -1875,8 +1866,8 @@
     gap: var(--sp-4);
     min-inline-size: 0;
     padding: var(--sp-5) var(--sp-4) var(--sp-4);
-    background: var(--bg);
-    border-radius: var(--r-lg);
+    background: var(--tile);
+    border-radius: var(--r-tile);
   }
 
   .lead-tile > .capture,
@@ -1911,22 +1902,22 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     text-align: start;
     cursor: pointer;
   }
 
   .pl:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .pl[aria-pressed='true'] {
     background: var(--ink);
-    color: var(--on-ink);
+    color: var(--on-red);
   }
 
   .pl-name {
@@ -1938,7 +1929,7 @@
   }
 
   .pl-n {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 400;
   }
 
@@ -1975,7 +1966,7 @@
     padding-inline: var(--sp-2);
   }
 
-  /* A GROUP ON THE GROUND: the title at `--t-group`, its count quiet, a note or the keys at the right, and one hairline
+  /* A GROUP ON THE GROUND: the title at `--fs-head`, its count quiet, a note or the keys at the right, and one hairline
      under it. The rows follow with no box round them. */
   .head-row {
     display: flex;
@@ -1997,13 +1988,13 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
 
   .n {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
   }
 
@@ -2011,8 +2002,8 @@
   .head-meta {
     margin-inline-start: auto;
     overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
     opacity: 0;
@@ -2058,7 +2049,7 @@
     min-block-size: var(--row-h);
     margin-block: var(--sp-4) var(--sp-1);
     padding-block: var(--sp-2);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .tiers[data-first] {
@@ -2088,13 +2079,13 @@
   /* A SUGGESTION IS SAID IN `--live`, the hue Slash's suggestion lines wear. */
   .stale-said {
     color: var(--live);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .sub {
     margin-block: var(--sp-2) 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 600;
     line-height: 18px;
   }
@@ -2110,27 +2101,27 @@
     min-block-size: var(--row-h);
     margin-inline: calc(-1 * var(--sp-3));
     padding: 0 var(--sp-3);
-    border-radius: var(--r-md);
-    font-size: var(--t-base);
+    border-radius: var(--r-pop);
+    font-size: var(--fs-body);
     transition: background var(--d-state) var(--ease-out);
   }
 
   /* THE CURSOR ROW IS THE WASH, and the row focused from the keyboard wears the a11y layer's ring as well. */
   .row[data-cursor] {
-    background: var(--hover-wash);
+    background: var(--hover);
   }
 
   .row[data-selected] {
-    background: var(--selected);
+    background: var(--red-tint);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .row:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .row[data-selected]:hover {
-      background: var(--selected);
+      background: var(--red-tint);
     }
   }
 
@@ -2140,7 +2131,7 @@
 
   @keyframes arrived {
     from {
-      background-color: var(--arrived-wash);
+      background-color: var(--arrived);
     }
   }
 
@@ -2169,7 +2160,7 @@
     min-inline-size: 0;
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     text-decoration: none;
@@ -2178,7 +2169,7 @@
   }
 
   .row[data-done] .what {
-    color: var(--ink2);
+    color: var(--ink-2);
     text-decoration: line-through;
   }
 
@@ -2188,8 +2179,8 @@
     grid-template-columns: 64px 196px;
     align-items: center;
     gap: var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     transition: opacity var(--d-state) var(--ease-out);
   }
@@ -2242,7 +2233,7 @@
 
   /* "2 DAYS LATE", THE ROW'S ONE RED, and "waits on your review": what needs him. */
   .when[data-tone='danger'] .when-words {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .when[data-tone='warn'] .when-words {
@@ -2254,7 +2245,7 @@
   }
 
   .when[data-tone='earn'] .when-words {
-    color: var(--earn);
+    color: var(--good);
   }
 
   /* THE CURSOR ROW'S HINT: its key cap for the panel, beside the end. */
@@ -2271,9 +2262,9 @@
     padding: 0;
     background: none;
     border: 0;
-    color: var(--link, var(--ink2));
+    color: var(--red, var(--ink-2));
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     text-decoration: underline;
     cursor: pointer;
   }
@@ -2281,12 +2272,12 @@
   .pick-day {
     justify-self: end;
     padding: 0 var(--sp-1);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /**
@@ -2339,13 +2330,12 @@
     gap: 6px;
     block-size: var(--ctl-h-sm);
     padding: 0 5px 0 var(--sp-3);
-    background: var(--bg);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-pill);
-    box-shadow: var(--e1);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     cursor: pointer;
     transition: background var(--d-state) var(--ease-out);
@@ -2353,14 +2343,14 @@
 
   @media (hover: hover) and (pointer: fine) {
     .verb:hover {
-      background: var(--s1);
+      background: var(--tile-2);
     }
   }
 
   .none {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .sr-only {
@@ -2387,8 +2377,8 @@
     align-items: center;
     gap: var(--sp-2);
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .p-due {
@@ -2397,7 +2387,7 @@
   }
 
   .p-due[data-late] {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .p-field {
@@ -2409,8 +2399,8 @@
   }
 
   .p-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -2424,17 +2414,17 @@
     inline-size: 100%;
     min-block-size: 40px;
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   textarea.p-input {
     padding-block: 10px;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     resize: none;
@@ -2446,8 +2436,8 @@
     box-sizing: border-box;
     block-size: var(--ctl-h);
     padding: 3px;
-    background: var(--s1);
-    border-radius: var(--r-pill);
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
   }
 
   .p-seg-btn {
@@ -2457,10 +2447,10 @@
     padding: 0 var(--sp-2);
     background: transparent;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2468,8 +2458,7 @@
   }
 
   .p-seg-btn[aria-pressed='true'] {
-    background: var(--bg);
-    box-shadow: var(--e1);
+    background: var(--tile);
     color: var(--ink);
   }
 
@@ -2483,19 +2472,19 @@
     align-items: baseline;
     gap: var(--sp-2);
     padding-block-end: 6px;
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
   }
 
   .also-title {
     margin: 0;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
   }
 
   .also-n {
-    color: var(--dim);
-    font-size: var(--t-row);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
   }
 
   .also-link {
@@ -2503,8 +2492,8 @@
     align-items: center;
     gap: var(--sp-1);
     margin-inline-start: auto;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: none;
   }
@@ -2518,7 +2507,7 @@
     padding: 0;
     background: none;
     border: 0;
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
     color: var(--ink);
     font: inherit;
     text-align: start;
@@ -2537,7 +2526,7 @@
     flex: 1;
     min-inline-size: 0;
     overflow: hidden;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2545,8 +2534,8 @@
 
   .also-said {
     flex: none;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .also-said[data-live] {
@@ -2571,8 +2560,8 @@
     gap: var(--sp-2);
     margin: auto calc(-1 * (var(--sp-4) + var(--sp-1))) calc(-1 * (var(--sp-4) + var(--sp-1)));
     padding: 14px calc(var(--sp-4) + var(--sp-1));
-    background: var(--bg);
-    border-block-start: 1px solid var(--line);
+    background: var(--tile);
+    border-block-start: 1px solid var(--rule);
   }
 
   .p-gap {
@@ -2587,7 +2576,7 @@
     border: 0;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -2598,7 +2587,7 @@
     flex: 1 1 100%;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .more {
@@ -2607,16 +2596,16 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     padding: 0;
-    background: var(--hover-wash);
+    background: var(--hover);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     cursor: pointer;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .more:hover {
-      background: var(--hold-wash);
+      background: var(--tile-2);
     }
   }
 
@@ -2650,7 +2639,7 @@
     }
 
     .what {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
       white-space: normal;
     }
 

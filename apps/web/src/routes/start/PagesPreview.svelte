@@ -236,7 +236,7 @@
     padding: var(--sp-1) var(--sp-2);
     margin-inline: calc(-1 * var(--sp-2));
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     background: none;
     color: var(--ink);
     font: inherit;
@@ -249,12 +249,12 @@
   }
 
   .card > :global(.icon) {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .card:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -266,7 +266,7 @@
 
   .card-title {
     overflow: hidden;
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     text-overflow: ellipsis;
@@ -275,8 +275,8 @@
 
   .card-where {
     overflow: hidden;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -284,16 +284,16 @@
 
   /* WHAT A PAGE WILL HOLD, under one nothing of theirs reaches: a whole sentence, so it wraps rather than cuts. */
   .card-holds {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   /* THE ONE WRITTEN LINE under the chart and its rows. */
   .reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -308,7 +308,7 @@
     margin: 0;
     padding: env(safe-area-inset-top) var(--sp-4) env(safe-area-inset-bottom);
     border: 0;
-    background: var(--bg);
+    background: var(--tile);
     color: var(--ink);
     overflow-y: auto;
   }
@@ -330,8 +330,7 @@
       max-block-size: calc(100dvh - 2 * var(--sp-6));
       margin: auto;
       padding: var(--sp-4) var(--sp-5) var(--sp-5);
-      border-radius: var(--r-lg);
-      box-shadow: var(--e3);
+      border-radius: var(--r-tile);
     }
   }
 
@@ -346,7 +345,7 @@
   .opened-title {
     min-inline-size: 0;
     overflow-wrap: anywhere;
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
@@ -358,9 +357,9 @@
     inline-size: var(--ctl-h);
     block-size: var(--ctl-h);
     border: 0;
-    border-radius: var(--r-pill);
-    background: var(--s1);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink-2);
     cursor: pointer;
   }
 

@@ -126,21 +126,21 @@
     gap: var(--sp-2);
     margin-block-end: var(--sp-2);
     padding: 4px 4px 4px var(--sp-2);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
   }
 
   .handle {
     display: grid;
     place-items: center;
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: grab;
   }
 
   .kind {
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
   }
 
   .widths {
@@ -148,9 +148,9 @@
     gap: 2px;
     margin-inline-start: auto;
     padding: 3px;
-    background: var(--s2);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
   }
 
   .width {
@@ -158,24 +158,22 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
-    font-size: var(--t-xs);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    font-size: var(--fs-cap);
     font-weight: 500;
     cursor: pointer;
   }
 
   .width:hover:not([data-on]) {
-    background: var(--hover-wash);
-    color: var(--ink2);
+    background: var(--hover);
+    color: var(--ink-2);
   }
 
-  /* THE CHOSEN WIDTH IS THE SEGMENTED CONTROL'S CHOSEN PILL: the tile's colour with a tiny shadow. */
+  /* THE CHOSEN WIDTH IS THE SEGMENTED CONTROL'S CHOSEN PILL: the tile's colour with a hairline ring, no shadow. */
   .width[data-on] {
-    background: var(--bg);
-    box-shadow:
-      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
-      0 0 0 0.5px var(--line);
+    background: var(--tile);
+    box-shadow: 0 0 0 0.5px var(--rule);
     color: var(--ink);
   }
 
@@ -196,16 +194,16 @@
     padding: 0 var(--sp-2);
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
     font-weight: 500;
     cursor: pointer;
   }
 
   .edit-btn:hover {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -223,13 +221,13 @@
     block-size: 26px;
     background: none;
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--dim);
+    border-radius: var(--r-ctl);
+    color: var(--ink-3);
     cursor: pointer;
   }
 
   .icon-btn:hover:not(:disabled) {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 

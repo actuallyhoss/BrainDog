@@ -171,7 +171,7 @@
     min-block-size: 40px;
     padding: var(--sp-2) var(--sp-3);
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
     line-height: var(--lh-body);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -189,23 +189,21 @@
 
   .tok-box:empty::before {
     content: attr(data-placeholder);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
-  /* A PILL IN THE RUNNING TEXT: the tile's own white on the field's `--s1` well, lifted by a hairline shadow the way the
+  /* A PILL IN THE RUNNING TEXT: the tile's own white on the field's `--tile-2` well, edged by a hairline ring the way the
      chosen segment is, in the UI face at the meta size, and never split across two lines. */
   .tok-box :global(.tok-pill) {
     display: inline-block;
     margin: 0 1px;
     padding: 0 var(--sp-2);
-    background: var(--bg);
-    border-radius: var(--r-pill);
-    box-shadow:
-      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
-      0 0 0 0.5px var(--line);
+    background: var(--tile);
+    border-radius: var(--r-ctl);
+    box-shadow: 0 0 0 0.5px var(--rule);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 1.5;
     white-space: nowrap;
@@ -220,8 +218,8 @@
 
   .tok-head {
     margin: var(--sp-1) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -238,12 +236,12 @@
     align-items: center;
     min-block-size: var(--ctl-h-sm);
     padding: 0 var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
     font-family: var(--font-ui);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     cursor: pointer;
     transition:
@@ -253,7 +251,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .tok-chip:hover {
-      background: var(--s2);
+      background: var(--tile-2);
       color: var(--ink);
     }
   }
@@ -265,7 +263,7 @@
 
     .tok-box {
       min-block-size: var(--tap);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 </style>

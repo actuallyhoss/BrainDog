@@ -98,7 +98,7 @@
     overflow-y: hidden;
     overscroll-behavior-inline: contain;
     scrollbar-width: none;
-    background: var(--s1);
+    background: var(--tile-2);
     border-radius: var(--r-ctl, 8px);
   }
 
@@ -157,8 +157,8 @@
     min-block-size: calc(var(--ctl-h) - 6px);
     padding-inline: var(--sp-3);
     border-radius: calc(var(--r-ctl, 8px) - 2px);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     white-space: nowrap;
     text-decoration: none;
@@ -179,19 +179,17 @@
   /* HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it. */
   @media (hover: hover) and (pointer: fine) {
     .tab:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
       color: var(--ink);
     }
   }
 
-  /* Where you are: the tile's own fill with a tiny shadow and a hairline, so it is a shape on the track in light and
-     in dark, where a shadow alone does not show. Ink, and no weight change. */
+  /* Where you are: the tile's own fill with a hairline ring, so it is a shape on the track in light and in dark, and
+     no shadow (SPEC 1.9). Ink, and no weight change. */
   .tab[aria-current='page'],
   .tab-more[data-here] .tab {
-    background: var(--tile, var(--bg));
-    box-shadow:
-      0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent),
-      0 0 0 0.5px var(--line);
+    background: var(--tile);
+    box-shadow: 0 0 0 0.5px var(--rule);
     color: var(--ink);
   }
 
@@ -199,13 +197,13 @@
   .tab-more {
     flex: 0 0 auto;
     padding: 2px;
-    background: var(--s1);
+    background: var(--tile-2);
     border-radius: var(--r-ctl, 8px);
   }
 
   .tally {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* FORCED COLOURS DROP THE GLASS AND THE LIFT, so the track keeps an edge and the current tab an outline. */

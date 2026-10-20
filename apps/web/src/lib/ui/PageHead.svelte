@@ -305,7 +305,7 @@
   /* A LINK IN THE KICKER'S OWN VOICE: quiet until it is pointed at, when it says it goes somewhere. */
   @media (hover: hover) and (pointer: fine) {
     .kicker-link:hover {
-      color: var(--link);
+      color: var(--red);
       text-decoration: underline;
       text-underline-offset: 3px;
     }
@@ -487,8 +487,6 @@
     background: var(--tile);
     border-color: transparent;
     box-shadow: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 
   @media (hover: hover) and (pointer: fine) {

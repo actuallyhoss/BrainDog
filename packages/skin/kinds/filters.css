@@ -32,7 +32,7 @@
     flex-wrap: nowrap;
     padding: 2px;
     border-radius: var(--r-ctl);
-    background: var(--field);
+    background: var(--tile-2);
   }
 
   .filters-choice {
@@ -45,7 +45,7 @@
     border: 0;
     border-radius: var(--r-ctl);
     background: none;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
     font-size: var(--fs-meta);
     font-weight: var(--fw-medium);
@@ -57,7 +57,7 @@
   }
 
   button.filters-choice:hover {
-    background: var(--field);
+    background: var(--tile-2);
     color: var(--ink);
   }
 
@@ -66,8 +66,8 @@
      same fact. */
   .filters-choice:is([aria-pressed='true'], [data-on]),
   button.filters-choice[aria-pressed='true']:hover {
-    background: var(--action-tint-1);
-    color: var(--action-text);
+    background: var(--red-tint);
+    color: var(--red);
   }
 
   /* INSIDE A SEGMENTED TRACK A SEGMENT'S CORNER SITS INSIDE THE TRACK'S, and the chosen one is the tile's colour lifted
@@ -83,15 +83,13 @@
   .filters-group[data-control='segmented'] .filters-choice:is([aria-pressed='true'], [data-on]),
   .filters-group[data-control='segmented'] button.filters-choice[aria-pressed='true']:hover {
     background: var(--tile);
-    box-shadow:
-      0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
-      0 0 0 1px var(--rule);
+    box-shadow: 0 0 0 1px var(--rule);
     color: var(--ink);
   }
 
   .filters-count {
     color: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -103,7 +101,7 @@
     border: 0;
     border-radius: var(--r-ctl);
     background: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font: inherit;
     font-size: var(--fs-meta);
   }
@@ -113,7 +111,7 @@
   }
 
   select.filters-more:hover {
-    background: var(--field);
+    background: var(--tile-2);
     color: var(--ink);
   }
 

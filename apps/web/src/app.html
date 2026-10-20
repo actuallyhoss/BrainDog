@@ -148,7 +148,7 @@
 
       body::before {
         inset: 0;
-        background: var(--ground-light, none), var(--sunk, Canvas);
+        background: var(--board, Canvas);
       }
 
       body::after {
@@ -156,7 +156,7 @@
         inset-inline: 0;
         block-size: 56px;
         background: var(--tile, Canvas);
-        border-block-end: 1px solid var(--line, transparent);
+        border-block-end: 1px solid var(--rule, transparent);
       }
 
       @media (width < 900px) {

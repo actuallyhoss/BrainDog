@@ -1020,10 +1020,9 @@
     align-items: center;
     gap: var(--sp-3);
     padding: var(--sp-3);
-    background: var(--bg);
+    background: var(--tile);
     border: 0;
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1);
+    border-radius: var(--r-tile);
     color: inherit;
     font: inherit;
     text-align: start;
@@ -1032,7 +1031,6 @@
   }
 
   .trigger[data-selected] {
-    box-shadow: var(--e2);
   }
 
   .trigger-main {
@@ -1042,31 +1040,31 @@
   }
 
   .trigger-kicker {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
 
   .trigger-said {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
     overflow-wrap: anywhere;
   }
 
   .trigger-path {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   /* THE ONE LINE SAYING WHY THIS OPENS READ ONLY, under the head, in the head's own muted words. */
   .locked {
     margin: 0 0 var(--sp-3);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* WHAT IS WRONG WITH THE WHOLE OF IT, UNDER THE TRIGGER: red words after the glyph, on the
@@ -1077,8 +1075,8 @@
     gap: var(--sp-2);
     margin: var(--sp-2) 0 0;
     padding-inline: calc(var(--sp-3) + var(--well-l) + var(--sp-3)) var(--sp-3);
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -1087,7 +1085,7 @@
     display: inline-flex;
     flex: none;
     margin-block-start: 1px;
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* THE CALLS' OWN TERM IS THE TILE'S HEADING ALREADY, so it is kept for a screen reader and not drawn twice. */
@@ -1095,7 +1093,7 @@
     display: grid;
     gap: var(--sp-1);
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .calls :global(.calls-h) {
@@ -1122,8 +1120,8 @@
   .said {
     flex: 1 1 16rem;
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -1142,7 +1140,7 @@
   }
 
   .said[data-tone='bad'] {
-    color: var(--danger-text);
+    color: var(--red);
     font-weight: 500;
   }
 
@@ -1250,7 +1248,7 @@
   .mi {
     background: none;
     border: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
     text-align: start;
     cursor: pointer;
@@ -1258,7 +1256,7 @@
 
   .mi:hover,
   .mi:focus-visible {
-    background: var(--hover-wash);
+    background: var(--hover);
     color: var(--ink);
   }
 
@@ -1274,7 +1272,7 @@
   .reading {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -1306,8 +1304,8 @@
   }
 
   .run-say {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     line-height: 18px;
     overflow-wrap: anywhere;
   }
@@ -1332,8 +1330,8 @@
   }
 
   .version-tag {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -1362,18 +1360,18 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .diff-line {
     display: grid;
     grid-template-columns: 2ch minmax(0, 1fr);
     gap: var(--sp-1);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .diff-line[data-op='removed'] .diff-said {
-    color: var(--dim);
+    color: var(--ink-3);
     text-decoration: line-through;
   }
 
@@ -1382,8 +1380,8 @@
   }
 
   .diff-mark {
-    color: var(--dim);
-    font-family: var(--font-id);
+    color: var(--ink-3);
+    font-family: var(--font-mono);
     text-align: center;
   }
 
@@ -1416,11 +1414,11 @@
     margin: 0;
     padding: var(--sp-3);
     overflow: auto;
-    background: var(--s1);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    background: var(--tile-2);
+    border-radius: var(--r-pop);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     line-height: 18px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;

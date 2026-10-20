@@ -529,15 +529,15 @@
     column-gap: var(--sp-2);
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   .source-note {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* THE TEXT AND THE PAGE IT MAKES SIDE BY SIDE on a wide screen, so a change and what it does are one glance; one
@@ -555,14 +555,13 @@
     gap: var(--sp-3);
     min-inline-size: 0;
     padding: 20px;
-    background: var(--bg);
-    border-radius: var(--r-lg);
-    box-shadow: var(--e1);
+    background: var(--tile);
+    border-radius: var(--r-tile);
   }
 
   .source-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
@@ -574,12 +573,12 @@
     min-inline-size: 0;
     margin: 0;
     padding: var(--sp-4);
-    background-color: var(--s1);
+    background-color: var(--tile-2);
     border: 1px solid transparent;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-meta);
     line-height: 1.7;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -588,7 +587,7 @@
   }
 
   .source[data-fault] {
-    border-color: var(--danger);
+    border-color: var(--red);
   }
 
   .source-fault,
@@ -599,15 +598,15 @@
     column-gap: var(--sp-3);
     margin: 0;
     max-inline-size: var(--measure);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .source-fault {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   .source-said {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE LINE IS A BUTTON, which selects it in the box: the sentence says what, the button takes you where. */
@@ -646,7 +645,7 @@
 
   .source-diff :global(.diff-text) {
     max-inline-size: none;
-    font-family: var(--font-id);
+    font-family: var(--font-mono);
   }
 
   .source-preview {
@@ -657,7 +656,7 @@
 
   .source-preview-title {
     margin: 0;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
@@ -684,7 +683,7 @@
   /* 16px TEXT IN A BOX UNDER A FINGER, or a phone zooms the page to read what is being typed. */
   @media (pointer: coarse) {
     .source {
-      font-size: var(--t-base);
+      font-size: var(--fs-body);
     }
   }
 </style>

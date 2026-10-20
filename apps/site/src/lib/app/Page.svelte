@@ -290,7 +290,7 @@
     background: none;
     color: var(--ink2);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
     cursor: pointer;
   }
@@ -306,7 +306,7 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink2);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* THE SOURCE WRAPS INSIDE ITS COLUMN rather than scrolling sideways, as a degraded fence does, so a
@@ -314,12 +314,11 @@
   .source {
     margin: 0;
     padding: 20px;
-    border-radius: var(--r-lg);
-    background: var(--bg);
-    box-shadow: var(--e1);
+    border-radius: var(--r-tile);
+    background: var(--tile);
     color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-xs);
+    font-family: var(--font-mono);
+    font-size: var(--fs-cap);
     line-height: 1.6;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -350,9 +349,8 @@
     flex-direction: column;
     gap: var(--sp-3);
     padding: 20px;
-    border-radius: var(--r-lg);
-    background: var(--bg);
-    box-shadow: var(--e1);
+    border-radius: var(--r-tile);
+    background: var(--tile);
   }
 
   /* The renderer's own spacing under a block belongs to a page of blocks; in a tile the tile's padding is it. */
@@ -370,8 +368,8 @@
     place-items: center;
     inline-size: var(--well);
     block-size: var(--well);
-    border-radius: var(--r-well);
-    background: var(--s1);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
     color: var(--ink2);
   }
 
@@ -380,14 +378,14 @@
     min-block-size: var(--well);
     margin-block-end: var(--sp-3);
     padding-inline-start: calc(var(--well) + 10px);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
   }
 
   .cell-reading {
     margin: auto 0 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
     text-wrap: pretty;
   }

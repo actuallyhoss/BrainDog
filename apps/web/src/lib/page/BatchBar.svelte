@@ -67,22 +67,15 @@
     align-items: center;
     gap: var(--sp-2) var(--sp-3);
     padding: 6px 6px 6px var(--sp-4);
-    background: var(--glass-strong);
-    backdrop-filter: var(--glass-blur);
-    border-radius: var(--r-lg);
-    box-shadow: var(--glass-edge), var(--e2);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+    border: 1px solid var(--rule-strong);
   }
 
-  /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-  @supports (-webkit-backdrop-filter: none) {
-    .batch {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
-  }
 
   .batch-n {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -93,18 +86,18 @@
     min-inline-size: 0;
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--hover-wash);
+    background: var(--hover);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   .batch-note {
     flex: 1;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   @media (width < 640px) {

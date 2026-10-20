@@ -23,8 +23,8 @@
  *
  * Bars have a 3px radius, lines are 2px with round joins and a 3px dot on the last point, a projection or a threshold
  * is dashed, and every label on a chart's axes (a tick, a month, the top and the foot of the scale, the now line's
- * name) is `--t-xs` in the meta ink, the one place the design system sets 12. A word read on or beside a chart, its
- * legend, a note under it, the readout over it, a roadmap's names and the heads of the table of its numbers, is `--t-sm`,
+ * name) is `--fs-cap` in the meta ink, the one place the design system sets 12. A word read on or beside a chart, its
+ * legend, a note under it, the readout over it, a roadmap's names and the heads of the table of its numbers, is `--fs-meta`,
  * the floor for words. A track, a zero rule and a counted-empty cell are the tile's second surface or its hairline,
  * which is what the marks are read against.
  *
@@ -69,8 +69,8 @@
   }
 
   .sparkline-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .sparkline-line {
@@ -93,7 +93,7 @@
     grid-column: 3;
     justify-self: end;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     font-weight: 500;
   }
@@ -236,7 +236,7 @@
   .split-dot:not([data-step]),
   .ring-dot:not([data-step]) {
     background: none;
-    box-shadow: inset 0 0 0 1px var(--edge);
+    box-shadow: inset 0 0 0 1px var(--rule-strong);
   }
 
   .split-cut {
@@ -271,7 +271,7 @@
     align-self: center;
     inline-size: 8px;
     block-size: 8px;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
   }
 
   .split-label {
@@ -290,7 +290,7 @@
   .split-label a:focus-visible {
     color: var(--ink);
     text-decoration: underline;
-    text-decoration-color: var(--line);
+    text-decoration-color: var(--rule);
   }
 
   /* HOVER ONLY WHERE THERE IS ONE, for the reason the forecast's knobs give below. */
@@ -298,7 +298,7 @@
     .split-label a:hover {
       color: var(--ink);
       text-decoration: underline;
-      text-decoration-color: var(--line);
+      text-decoration-color: var(--rule);
     }
   }
 
@@ -368,8 +368,8 @@
   }
 
   .split-empty {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* The hole is `bar`'s, and a button only where the host can act on it. */
@@ -381,12 +381,12 @@
     margin-inline: calc(-1 * var(--sp-3));
     padding: var(--sp-1) var(--sp-3);
     min-block-size: var(--row-h);
-    border: 1px dashed var(--edge);
-    border-radius: var(--r-md);
+    border: 1px dashed var(--rule-strong);
+    border-radius: var(--r-pop);
     background: none;
     color: inherit;
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     text-align: start;
   }
 
@@ -397,7 +397,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     button.split-hole:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -457,7 +457,7 @@
   .bridge-zero,
   .forecast-zero {
     fill: none;
-    stroke: var(--line);
+    stroke: var(--rule);
     stroke-width: 1px;
   }
 
@@ -474,7 +474,7 @@
     align-items: center;
     gap: var(--sp-1);
     padding-inline: var(--sp-1);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     text-align: center;
   }
 
@@ -487,7 +487,7 @@
   .bridge-label {
     min-inline-size: 0;
     max-inline-size: 100%;
-    color: var(--ink2);
+    color: var(--ink-2);
     hyphens: auto;
     overflow-wrap: anywhere;
   }
@@ -502,13 +502,13 @@
   .bridge-note {
     min-inline-size: 0;
     max-inline-size: 100%;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
   .bridge-inline {
-    border-radius: calc(var(--r-sm) / 2);
+    border-radius: calc(var(--r-xs) / 2);
   }
 
   .bridge-note:empty {
@@ -521,7 +521,7 @@
     align-items: baseline;
     gap: var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   @container (inline-size < 30rem) {
@@ -596,7 +596,7 @@
     flex: none;
     inline-size: 8px;
     block-size: 8px;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: var(--series-3);
   }
 
@@ -673,7 +673,7 @@
 
   .series-col {
     position: relative;
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   /* `--y` AND `--h` ARE THE PLAN'S, written on each bar by both drawers; these zeros stand only where a host leaves them out. */
@@ -813,14 +813,14 @@
 
   .series-total-value {
     color: var(--ink);
-    font-size: var(--t-xl);
+    font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.01em;
   }
 
   .series-total-label {
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   .series-ticks {
@@ -885,8 +885,8 @@
   }
 
   .series-empty {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* `progress`: a track a row, filled toward its target. The label and the figure on one line, the track under them,
@@ -953,7 +953,7 @@
   .progress-share {
     grid-area: share;
     min-inline-size: 4ch;
-    color: var(--ink2);
+    color: var(--ink-2);
     font-variant-numeric: tabular-nums;
     text-align: end;
   }
@@ -986,7 +986,7 @@
     position: absolute;
     inset-block: 0;
     inset-inline: calc(var(--limit) * 100%) 0;
-    border-inline-start: 2px solid var(--bg);
+    border-inline-start: 2px solid var(--tile);
     /* PAST THE LIMIT IS OVER, and over is the one thing a chart paints red (DIRECTION §39), unless the row's own tone
        says otherwise. */
     background: repeating-linear-gradient(135deg, var(--tone, var(--chart-late)) 0 3px, transparent 3px 6px);
@@ -994,7 +994,7 @@
 
   .progress-left {
     grid-area: left;
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1004,14 +1004,14 @@
 
   .progress-note {
     grid-area: note;
-    color: var(--dim);
+    color: var(--ink-3);
     text-align: end;
   }
 
 
   .progress-empty {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* A CHART'S NUMBERS ARE FOR A SCREEN READER where the drawing or its rows already say them: a series, a split, a bridge,
@@ -1053,8 +1053,8 @@
     display: flex;
     align-items: center;
     min-block-size: var(--ctl-h);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     list-style: none;
     cursor: pointer;
   }
@@ -1067,7 +1067,7 @@
   @media (hover: hover) and (pointer: fine) {
     .lines-toggle:hover,
     .forecast-toggle:hover {
-      color: var(--ink2);
+      color: var(--ink-2);
     }
   }
 
@@ -1087,7 +1087,7 @@
   .heat-table {
     inline-size: 100%;
     border-collapse: collapse;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .series-table th,
@@ -1105,7 +1105,7 @@
   .heat-table th,
   .heat-table td {
     padding: var(--sp-1) var(--sp-2);
-    border-block-end: 1px solid var(--line);
+    border-block-end: 1px solid var(--rule);
     color: var(--ink);
     font-weight: 400;
     text-align: end;
@@ -1118,8 +1118,8 @@
   .split-table thead th,
   .sparkline-table thead th,
   .heat-table thead th {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .series-table th:first-child,
@@ -1142,7 +1142,7 @@
 
   .series-said {
     margin-inline-start: var(--sp-2);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   @container (inline-size < 30rem) {
@@ -1195,7 +1195,7 @@
 
   .lines-now {
     color: var(--ink);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
@@ -1203,13 +1203,13 @@
 
   .lines-change {
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .lines-against {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .lines-legend {
@@ -1219,14 +1219,14 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .lines-key {
     display: inline-flex;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .lines-swatch {
@@ -1295,8 +1295,8 @@
     position: absolute;
     white-space: nowrap;
     inset-inline-start: calc(100% + var(--sp-2));
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     font-variant-numeric: tabular-nums;
     pointer-events: none;
   }
@@ -1316,7 +1316,7 @@
     inset-block: 0;
     inset-inline-start: calc(var(--at) * 100%);
     inline-size: 1px;
-    background: var(--edge);
+    background: var(--rule-strong);
     pointer-events: none;
   }
 
@@ -1332,23 +1332,12 @@
     max-inline-size: 18rem;
     padding: var(--sp-2) var(--sp-3);
     margin-inline-start: var(--sp-2);
-    border-radius: var(--r-md);
-    background: var(--glass-strong);
-    backdrop-filter: var(--glass-blur);
+    border-radius: var(--r-pop);
+    background: var(--tile);
     border: 1px solid var(--rule-strong);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     pointer-events: none;
-  }
-
-  /* SAFARI'S SPELLING, in a block of its own so the build cannot fold it into the rule above (`tokens.css` has why).
-     It reads the same token, so the readout's glass follows the scheme and goes with less transparency, as every
-     other glass does. The other browsers skip the block. */
-  @supports (-webkit-backdrop-filter: none) {
-    .lines-readout,
-    .forecast-readout {
-      -webkit-backdrop-filter: var(--glass-blur);
-    }
   }
 
   .lines-readout {
@@ -1360,7 +1349,7 @@
   }
 
   .lines-readout-day {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .lines-readout-value {
@@ -1368,7 +1357,7 @@
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: var(--sp-2);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .lines-readout-value .num {
@@ -1390,8 +1379,8 @@
     position: absolute;
     inset-inline-start: calc(var(--at) * 100%);
     translate: -50% 0;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     white-space: nowrap;
   }
 
@@ -1404,8 +1393,8 @@
   }
 
   .lines-empty {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   @container (inline-size < 30rem) {
@@ -1470,12 +1459,12 @@
     align-items: baseline;
     gap: var(--sp-2);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .forecast-against,
   .forecast-empty {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .forecast-plot {
@@ -1697,11 +1686,11 @@
   }
 
   .forecast-readout-day {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .forecast-readout-balance {
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
@@ -1709,7 +1698,7 @@
     display: flex;
     justify-content: space-between;
     gap: var(--sp-3);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .forecast-ticks {
@@ -1745,7 +1734,7 @@
     display: grid;
     gap: var(--sp-1);
     min-inline-size: 12rem;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* THE KNOBS UNDER THE CHART ARE A CALM GRID, each slider the width of its column and every column starting on one
@@ -1769,7 +1758,7 @@
   }
 
   .forecast-knob-name {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .forecast-knob-value {
@@ -1778,11 +1767,11 @@
   }
 
   .forecast-knob-note {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
-  /* A SLIDER IN A CHART IS THE HOUSE'S SLIDER. `controls.css` draws every range, an ink thumb on an `--edge` track,
+  /* A SLIDER IN A CHART IS THE HOUSE'S SLIDER. `controls.css` draws every range, an ink thumb on an `--rule-strong` track,
      and `--ctl-h` is the 44px control height under a thumb, so this rule only gives it the knob's width. It used to
      paint the browser's slider in the accent, which put the brand's red on a control that only asks a question. */
   .forecast-range {
@@ -1808,7 +1797,7 @@
     min-block-size: var(--ctl-h);
     min-inline-size: 16ch;
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1821,8 +1810,8 @@
 
   .forecast-counts-side {
     flex-basis: 100%;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* EVERYTHING A KNOB OFFERS TO PRESS IS A PILL, the quiet button a tile holds: the second surface with
@@ -1853,7 +1842,7 @@
     .forecast-chip:hover,
     .forecast-reset:hover,
     .forecast-tool:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
   }
 
@@ -1863,8 +1852,8 @@
 
   .forecast-chip[aria-checked='false'] {
     background: transparent;
-    border-color: var(--line);
-    color: var(--dim);
+    border-color: var(--rule);
+    color: var(--ink-3);
   }
 
   /* ON IS COUNTED AND OFF IS LEFT OUT, one meaning in one control. "Leave out" and "What counts" pressed the opposite
@@ -1888,13 +1877,13 @@
   }
 
   .forecast-chip[aria-checked='true'] .switch-track {
-    background: var(--on);
-    border-color: var(--on);
+    background: var(--red-fill);
+    border-color: var(--red-fill);
   }
 
   .forecast-chip[aria-checked='true'] .switch-track::after {
     translate: 16px 0;
-    background: var(--on-ink);
+    background: var(--on-red);
   }
 
   .forecast-chip[aria-checked='true']:dir(rtl) .switch-track::after {
@@ -1965,7 +1954,7 @@
 
   /* OPEN, ADJUST READS AS PRESSED: the second surface, in ink. */
   :is(.forecast-adjust, .forecast-tool[data-adjust])[aria-expanded='true'] {
-    background: var(--s2);
+    background: var(--tile-2);
     color: var(--ink);
   }
 
@@ -1984,7 +1973,7 @@
     justify-self: start;
     padding-inline: 0;
     background: transparent;
-    color: var(--ink2);
+    color: var(--ink-2);
     text-decoration: underline;
     text-underline-offset: 0.2em;
   }
@@ -2001,7 +1990,7 @@
      way instead. */
   .forecast-chip-amount {
     flex: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -2012,7 +2001,7 @@
     .forecast-tool,
     .forecast-range {
       min-block-size: var(--tap);
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
     }
   }
 
@@ -2042,8 +2031,8 @@
     padding: 0;
     overflow: auto;
     border: 1px solid transparent;
-    border-radius: var(--r-lg);
-    background: var(--bg);
+    border-radius: var(--r-tile);
+    background: var(--tile);
     color: var(--ink);
     /* ON THE CLOSED LOOK, NOT ONLY THE OPEN ONE: a closing dialog is still `flex` while it goes, and with the column
        left on `[open]` its head and body sprang side by side for the whole close. */
@@ -2085,7 +2074,7 @@
   .forecast-sheet[open]::backdrop {
     opacity: 1;
     transition:
-      opacity var(--d-panel) var(--ease-fade),
+      opacity var(--d-panel) var(--ease-standard),
       display var(--d-panel) allow-discrete,
       overlay var(--d-panel) allow-discrete;
   }
@@ -2116,7 +2105,7 @@
 
     .forecast-sheet::backdrop {
       transition:
-        opacity var(--sheet-out) var(--ease-fade),
+        opacity var(--sheet-out) var(--ease-standard),
         display var(--sheet-out) allow-discrete,
         overlay var(--sheet-out) allow-discrete;
     }
@@ -2144,7 +2133,7 @@
   .forecast-sheet-title {
     min-inline-size: 0;
     margin: 0;
-    font-size: var(--t-lg);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: var(--lh-tight);
     overflow-wrap: anywhere;
@@ -2202,8 +2191,8 @@
     .forecast-sheet-grab-bar {
       inline-size: var(--sp-6);
       block-size: var(--sp-1);
-      background: var(--edge);
-      border-radius: var(--r-pill);
+      background: var(--rule-strong);
+      border-radius: var(--r-ctl);
     }
 
     /* The handle's strip is the head's top padding on a phone, so it is not paid twice. */
@@ -2260,7 +2249,7 @@
     }
 
     .forecast-chip + .forecast-chip {
-      border-block-start: 1px solid var(--line);
+      border-block-start: 1px solid var(--rule);
     }
 
     .forecast-chip[aria-checked] {
@@ -2320,8 +2309,8 @@
     inset-block: 0;
     inset-inline-start: calc(var(--at) * 100%);
     padding-inline-start: var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
     line-height: 18px;
     white-space: nowrap;
   }
@@ -2342,12 +2331,12 @@
   /* TODAY IS THE ONE LINE IN INK, and says its name at the top. */
   .roadmap-today {
     z-index: var(--z-raise);
-    color: var(--ink2);
+    color: var(--ink-2);
     font-weight: 500;
   }
 
   .roadmap-today::before {
-    border-inline-start-color: var(--ink2);
+    border-inline-start-color: var(--ink-2);
   }
 
   .roadmap-list {
@@ -2363,7 +2352,7 @@
     grid-template-columns: subgrid;
     align-items: center;
     min-block-size: var(--roadmap-row);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   /* A NAME IS ONE LINE, cut with an ellipsis, so every row is the same height and the bars keep one rhythm: a name on
@@ -2377,7 +2366,7 @@
     padding-inline-start: var(--sp-2);
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 1.35;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2406,7 +2395,7 @@
     inset-block: 0;
     inset-inline-start: calc(var(--at) * 100%);
     inline-size: max(6px, calc(var(--span) * 100%));
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: var(--chart-1);
   }
 
@@ -2417,7 +2406,7 @@
 
   /* AT RISK IS AMBER, between working and late, so a plan says which bars to watch before any of them is red. */
   .roadmap-item[data-intent='warn'] .roadmap-bar {
-    background: var(--chart-risk);
+    background: var(--warn);
   }
 
   .roadmap-item[data-intent='good'] .roadmap-bar {
@@ -2429,7 +2418,7 @@
     inset-block: -1px;
     inline-size: 14px;
     translate: -50% 0;
-    box-shadow: 0 0 0 2px var(--bg);
+    box-shadow: 0 0 0 2px var(--tile);
   }
 
   .roadmap-bar[data-grip] {
@@ -2437,7 +2426,7 @@
   }
 
   .roadmap-bar[data-dragging] {
-    box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--chart-1);
+    box-shadow: 0 0 0 2px var(--tile), 0 0 0 3px var(--chart-1);
   }
 
   /* ITS DAYS ON HOVER, beside the bar where they fit and before it past seven tenths of the track (`data-flip`). A
@@ -2449,10 +2438,10 @@
     z-index: var(--z-raise);
     margin-inline-start: calc((var(--at) + var(--span)) * 100% + var(--sp-2));
     padding-inline: var(--sp-1);
-    border-radius: var(--r-sm);
-    background: var(--bg);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    border-radius: var(--r-xs);
+    background: var(--tile);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     white-space: nowrap;
     pointer-events: none;
     opacity: 0;
@@ -2474,7 +2463,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     .roadmap-item:hover {
-      background: var(--hover-wash);
+      background: var(--hover);
     }
 
     .roadmap-item:hover > .roadmap-item-when {
@@ -2509,8 +2498,8 @@
     padding-block-start: var(--sp-3);
     padding-inline-start: var(--sp-2);
     list-style: none;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .roadmap-key {
@@ -2525,7 +2514,7 @@
     flex: none;
     inline-size: 8px;
     block-size: 8px;
-    border-radius: var(--r-pill);
+    border-radius: var(--r-ctl);
     background: var(--chart-1);
   }
 
@@ -2534,7 +2523,7 @@
   }
 
   .roadmap-key[data-key='warn']::before {
-    background: var(--chart-risk);
+    background: var(--warn);
   }
 
   .roadmap-key[data-key='good']::before {
@@ -2544,8 +2533,8 @@
   .roadmap-empty,
   .roadmap-skipped {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .roadmap-skipped {
@@ -2574,7 +2563,7 @@
     .roadmap-item {
       gap: var(--sp-2) var(--sp-3);
       padding-block: var(--sp-3);
-      border-block-end: 1px solid var(--line);
+      border-block-end: 1px solid var(--rule);
       border-radius: 0;
     }
 
@@ -2594,7 +2583,7 @@
       padding: 0;
       translate: none;
       background: none;
-      color: var(--dim);
+      color: var(--ink-3);
       opacity: 1;
     }
 
@@ -2658,13 +2647,13 @@
   }
 
   .ring-track {
-    stroke: var(--s1);
+    stroke: var(--tile-2);
     stroke-opacity: 1;
   }
 
   .ring-figure {
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     font-weight: 600;
   }
@@ -2678,7 +2667,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   .ring-item {
@@ -2689,7 +2678,7 @@
 
 
   .ring-label {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .ring-value,
@@ -2701,14 +2690,14 @@
 
   .ring-of {
     margin-inline: var(--sp-1);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .ring-share,
   .ring-note,
   .ring-left,
   .ring-empty {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .ring-share,
@@ -2741,8 +2730,8 @@
 
   .heat-day {
     aspect-ratio: 1;
-    border-radius: calc(var(--r-sm) / 3);
-    box-shadow: inset 0 0 0 1px var(--line);
+    border-radius: calc(var(--r-xs) / 3);
+    box-shadow: inset 0 0 0 1px var(--rule);
   }
 
   .heat-day[data-future] {
@@ -2754,7 +2743,7 @@
   }
 
   .heat-day[data-wash='0'] {
-    background: var(--s1);
+    background: var(--tile-2);
   }
 
   .heat-day[data-wash='1'] {
@@ -2766,7 +2755,7 @@
   }
 
   .heat-day[data-wash='3'] {
-    background: color-mix(in oklab, var(--chart-1) 80%, var(--bg));
+    background: color-mix(in oklab, var(--chart-1) 80%, var(--tile));
   }
 
   .heat-day[data-wash='4'] {
@@ -2784,8 +2773,8 @@
   .heat-share,
   .heat-more {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* `heat who`: A LINE A PERSON, a dot a week. The name holds a column of its own and the twelve weeks share the
@@ -2817,7 +2806,7 @@
   .heat-who {
     overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -2832,7 +2821,7 @@
     inline-size: 8px;
     block-size: 8px;
     border-radius: 50%;
-    background: var(--line);
+    background: var(--rule);
   }
 
   .heat-week[data-on] {
@@ -2845,8 +2834,8 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
   }
 
   .heat-tick {

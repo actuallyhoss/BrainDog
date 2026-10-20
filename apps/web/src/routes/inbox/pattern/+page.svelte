@@ -536,12 +536,12 @@
   }
 
   .step:disabled {
-    color: var(--dim);
+    color: var(--ink-3);
     cursor: default;
   }
 
   .step-n {
-    color: var(--dim);
+    color: var(--ink-3);
     font-variant-numeric: tabular-nums;
   }
 
@@ -555,15 +555,15 @@
   .screen-title {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-group);
+    font-size: var(--fs-head);
     font-weight: 600;
     line-height: 24px;
   }
 
   .sub {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
@@ -573,22 +573,22 @@
   .bar-note {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .fix {
     margin: 0;
-    color: var(--danger-text);
-    font-size: var(--t-sm);
+    color: var(--red);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .summary {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .pager {
@@ -599,8 +599,8 @@
   }
 
   .counter {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -615,15 +615,15 @@
   .sample-from {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
 
   .sample-subject {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -631,8 +631,8 @@
     max-block-size: 40dvh;
     margin: var(--sp-2) 0 0;
     overflow-y: auto;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 1.6;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -647,7 +647,7 @@
     margin: 0;
     color: var(--ink);
     font-family: var(--font-display);
-    font-size: var(--t-figure);
+    font-size: var(--fs-figure);
     font-weight: 600;
     line-height: 34px;
     letter-spacing: -0.02em;
@@ -655,8 +655,8 @@
   }
 
   .figure-unit {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
     letter-spacing: 0;
@@ -664,12 +664,12 @@
 
   .reading {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
-  /* A FIELD IS A SOFT WELL: 40 tall, `--s1`, no border, radius 12, its label above it. */
+  /* A FIELD IS A SOFT WELL: 40 tall, `--tile-2`, no border, radius 12, its label above it. */
   .form-row {
     display: flex;
     flex-direction: column;
@@ -687,12 +687,12 @@
     box-sizing: border-box;
     min-block-size: 40px;
     padding: var(--sp-2) var(--sp-3);
-    background-color: var(--s1);
+    background-color: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .paste {
@@ -710,7 +710,7 @@
   .match-lead {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .conditions {
@@ -730,8 +730,8 @@
   }
 
   .and {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* THE WAYS TO FIND IT, AS ROWS ON THE GROUND with a hairline between them and no box round them. */
@@ -753,7 +753,7 @@
   }
 
   .anchor + .anchor {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .anchor-main {
@@ -766,14 +766,14 @@
 
   .anchor-said {
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     overflow-wrap: anywhere;
   }
 
   .anchor-value {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     overflow-wrap: anywhere;
   }
 
@@ -805,18 +805,11 @@
       inset-block-end: calc(var(--tabbar) + var(--sp-3));
       z-index: var(--z-raise);
       padding: 6px;
-      background: var(--glass-strong);
-      backdrop-filter: var(--glass-blur);
-      border-radius: var(--r-lg);
-      box-shadow: var(--glass-edge), var(--e2);
+      background: var(--tile);
+      border-radius: var(--r-tile);
+      border: 1px solid var(--rule-strong);
     }
 
-    /* Safari before 18 knows the blur only by its prefixed name, and lightningcss folds a same-rule pair into one. */
-    @supports (-webkit-backdrop-filter: none) {
-      .bar {
-        -webkit-backdrop-filter: var(--glass-blur);
-      }
-    }
 
     .bar-note {
       flex-basis: 100%;

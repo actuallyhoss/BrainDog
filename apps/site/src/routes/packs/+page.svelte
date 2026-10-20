@@ -178,9 +178,9 @@
     gap: var(--sp-2);
     min-block-size: 40px;
     padding-inline: var(--sp-3);
-    border-radius: var(--r-md);
-    background: var(--s1);
-    color: var(--dim);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
+    color: var(--ink-3);
   }
 
   .field:focus-within {
@@ -198,13 +198,13 @@
     background: none;
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
     /* focus-ok: the field around it draws the 2px ink ring on focus-within. */
     outline: none;
   }
 
   .field input::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .filters {
@@ -220,8 +220,8 @@
     min-block-size: var(--ctl-h);
     padding-inline: 14px;
     border: 0;
-    border-radius: var(--r-pill);
-    background: var(--s1);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
     color: var(--ink2);
     font: inherit;
     font-size: var(--t-site-small);
@@ -233,11 +233,11 @@
   /* The kind on show is the chosen segment: ink, with its count in the on-ink word. */
   .filter[aria-pressed='true'] {
     background: var(--ink);
-    color: var(--on-ink);
+    color: var(--on-red);
   }
 
   .filter-count {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 400;
   }
 
@@ -247,7 +247,7 @@
 
   .shown {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
@@ -285,7 +285,7 @@
     display: block;
     block-size: 10px;
     border-radius: 3px;
-    background: var(--s1);
+    background: var(--tile-2);
   }
 
   .fill {
@@ -294,7 +294,7 @@
     min-inline-size: 6px;
     block-size: 100%;
     border-radius: 3px;
-    background: var(--dim);
+    background: var(--ink-3);
   }
 
   .bar[data-top] .fill {
@@ -343,7 +343,7 @@
   }
 
   .card .tile-head {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .card-title {
@@ -351,7 +351,7 @@
     min-inline-size: 0;
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 600;
     line-height: 20px;
     overflow-wrap: anywhere;
@@ -367,7 +367,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: var(--r-lg);
+    border-radius: var(--r-tile);
   }
 
   .summary {
@@ -386,7 +386,7 @@
      the tile wider than the column. */
   .adds {
     margin: 0;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
     line-height: 20px;
     overflow-wrap: anywhere;
@@ -398,13 +398,12 @@
     column-gap: var(--sp-3);
     margin: 0;
     margin-block-start: auto;
-    color: var(--dim);
+    color: var(--ink-3);
     font-size: var(--t-site-small);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .card:hover {
-      box-shadow: var(--e2);
     }
 
     .card:hover .tile-head {
@@ -412,7 +411,7 @@
     }
 
     .filter[aria-pressed='false']:hover {
-      background: var(--s2);
+      background: var(--tile-2);
     }
   }
 
