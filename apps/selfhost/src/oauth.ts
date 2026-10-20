@@ -332,8 +332,16 @@ export function oauthHere(here: OAuthHereOptions): OAuthHere {
        only from a page on the issuer (`sameOrigin`). */
     consent: (id) => `${here.origin}${CONSENT_AT}?request=${encodeURIComponent(id)}`,
     approver,
-    /* A REVOKED OR EXPIRED TOKEN ENDS ITS REFRESH FAMILY AT ONCE, asked of the record's own token table. */
-    alive: async (bearer) => (await here.api.kernel.verifyToken(bearer, 'oauth')).ok,
+    /* AN APP'S ONE-HOUR KEY, minted under the sealed parent by the record's host-only `mintChild`, under the operator's
+       cut-off as every bearer is. A parent that no longer works answers `null`, which ends the app's refresh family at
+       once; anything else the record refuses is thrown, so a record that is briefly away does not log the app out. */
+    child: async (parent, minutes) => {
+      const out = await here.api.mintChild(parent, { minutes });
+      if (out.ok) return { bearer: out.value.bearer, expires_at: out.value.expires_at };
+      const refusal = 'refusal' in out ? out.refusal : null;
+      if (refusal?.at === 'parent') return null;
+      throw new Error(`The record could not mint an app's key: ${refusal?.code ?? 'CONFLICT'}.`);
+    },
     fetchDocument: (url) => readDocument(url, send, pin),
     resources,
   });

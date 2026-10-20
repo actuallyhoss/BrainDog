@@ -7,8 +7,13 @@
  * Document), and sends the person's browser to `/oauth/authorize`. That request is held ten minutes while the person
  * reads the consent screen; Allow mints an ordinary agent token through the record's own `createToken`, seals it under
  * a one-time code and sends the browser back to the app with the code; the app trades the code and its PKCE verifier
- * at `/oauth/token` for the bearer. The app also gets a refresh token, good ninety days from its last use, so it signs in again only after three
- * unused months or when the person removes it.
+ * at `/oauth/token` for a one-hour key and a refresh token, good ninety days from its last use, so it signs in again
+ * only after three unused months or when the person removes it.
+ *
+ * THE APP NEVER HOLDS THE TOKEN ALLOW MADE (sharing plan 2.9). That token is the parent: sealed under the code, then
+ * under each refresh token, and never sent. What the app gets is a child of it (`deps.child`), good for an hour and
+ * never more than its parent, and each refresh mints a new one only while the parent still works. Removing the app in
+ * Settings revokes the parent, which ends every child at its next call and the refresh family at its next use.
  *
  * PURE, OVER PORTS, SO BOTH HOSTS SERVE THE SAME PROTOCOL. The store is `OAuthStore` (the Directory's SQL through
  * `@braindog/record/oauth`), the person is `Approver` (the host's own browser session and record), and reading an
@@ -42,8 +47,10 @@ export type OAuthScope = (typeof OAUTH_SCOPES)[number];
 
 /** How many days an app may sit unused before it must sign in again: the refresh token's sliding life. */
 export const TOKEN_DAYS = 90;
-/** The bearer lives as long as the kernel allows, so a refresh can hand it back; revoking it in Settings still ends it. */
+/** The parent lives as long as the kernel allows, so a refresh can mint under it; revoking it in Settings still ends it. */
 const BEARER_DAYS = 365;
+/** What an app's access token is good for: one hour, as a child key of the sealed parent. */
+const CHILD_MINUTES = 60;
 const DAY_MS = 86_400_000;
 /** A refresh token that was just replaced still works this long, for a client that never saw our answer and retries. */
 const REFRESH_GRACE = 2 * 60_000;
@@ -110,8 +117,12 @@ export type OAuthDeps = {
   /** Where the browser goes to answer a held request: the app's consent route, or a host's own page until it exists. */
   consent: (request: string) => string;
   approver: (request: Request, record: string) => Promise<Approver>;
-  /** Whether a bearer still works (not revoked), so a refresh for a removed app ends at once. Absent: the bearer's own 401 does it. */
-  alive?: ((bearer: string) => Promise<boolean>) | undefined;
+  /**
+   * A child key of the sealed parent, for `minutes`, from the record the parent's first half names (`mintChild`, a
+   * host-only call): its bearer and when it ends, or `null` when the parent no longer works (revoked, run out, its
+   * person stopped), which ends the app's refresh family at once.
+   */
+  child: (parent: string, minutes: number) => Promise<{ bearer: string; expires_at: string } | null>;
   /** The text of a metadata document at an `https:` client id, at most `DOCUMENT_MOST_BYTES`, or `null`. Absent: no documents. */
   fetchDocument?: ((url: string) => Promise<string | null>) | undefined;
   /**
@@ -830,10 +841,13 @@ async function token(request: Request, deps: OAuthDeps): Promise<Response> {
   if (f.redirect_uri !== undefined && f.redirect_uri !== row.request.redirect_uri) return oauthError(400, 'invalid_grant', 'The redirect address is not the one this code was asked for.');
   if (f.resource !== undefined && !isResource(textField(f.resource), deps)) return oauthError(400, 'invalid_target', `This server issues tokens for ${deps.issuer}/mcp and nothing else.`);
   if ((await challengeOf(verifier)) !== row.request.challenge) return oauthError(400, 'invalid_grant', 'The code_verifier does not match the code_challenge this sign-in began with.');
-  const bearer = await openBearer(row.bearer_sealed, code);
-  if (bearer === null) return oauthError(400, 'invalid_grant', spent);
-  /* A refresh family is started with the bearer, so the app can come back without asking the person again. Unmade when
-     the table is full: the app still has its bearer, and signs in again at the end of it as it always did. */
+  const parent = await openBearer(row.bearer_sealed, code);
+  if (parent === null) return oauthError(400, 'invalid_grant', spent);
+  /* THE APP GETS A CHILD, NEVER THE PARENT. A parent removed in the minute between Allow and here mints none. */
+  const child = await deps.child(parent, CHILD_MINUTES);
+  if (child === null) return oauthError(400, 'invalid_grant', REMOVED);
+  /* A refresh family is started with the parent sealed in it, so the app can come back for a new key without asking the
+     person again. Unmade when the table is full: the app has its hour, and signs in again at the end of it. */
   const now = deps.now();
   const ends = now + (BEARER_DAYS - 1) * DAY_MS;
   const refresh = b64url(random(32));
@@ -841,22 +855,28 @@ async function token(request: Request, deps: OAuthDeps): Promise<Response> {
     op: 'family',
     row: {
       id: b64url(random(18)), client_id: row.request.client_id, record: row.record, scope: row.request.scope,
-      cur_hash: await digest(refresh), cur_sealed: await sealBearer(bearer, refresh), prev_hash: null, prev_sealed: null, prev_until: 0,
+      cur_hash: await digest(refresh), cur_sealed: await sealBearer(parent, refresh), prev_hash: null, prev_sealed: null, prev_until: 0,
       expires: Math.min(ends, now + TOKEN_DAYS * DAY_MS), ends,
     },
   });
   return json(200, {
-    access_token: bearer, token_type: 'Bearer', expires_in: Math.floor((ends - now) / 1000), scope: ladder(row.request.scope),
+    access_token: child.bearer, token_type: 'Bearer', expires_in: secondsLeft(child.expires_at, now), scope: ladder(row.request.scope),
     ...(made === 'ok' ? { refresh_token: refresh } : {}),
   }, [['pragma', 'no-cache']]);
 }
 
+/** What a removed app is told, at the code and at every refresh after. */
+const REMOVED = 'This app was removed, or the person who allowed it was stopped. Sign in again.';
+
+/** Seconds until an instant, as `expires_in` says them: at least one, so an answer never says a key is already over. */
+const secondsLeft = (instant: string, now: number): number => Math.max(1, Math.floor((Date.parse(instant) - now) / 1000));
+
 /**
- * `grant_type=refresh_token`: the refresh token for the bearer and a new refresh token, the old one kept for a short
- * grace. Sliding: every use moves the family's end ninety days on, never past the bearer's own.
+ * `grant_type=refresh_token`: a new one-hour child of the sealed parent and a new refresh token, the old one kept for a
+ * short grace. Sliding: every use moves the family's end ninety days on, never past the parent's own.
  *
- * REVOKING THE TOKEN IN SETTINGS STILL ENDS THE APP, because the bearer is the kernel's own token row and a revoked one
- * answers 401 whatever refresh hands back; `deps.alive`, when the host gives it, also ends the family at once.
+ * REVOKING THE PARENT IN SETTINGS ENDS THE APP. Its children answer 401 at their next call, and the next refresh finds
+ * no child to mint (`deps.child` answers `null`), drops the family and answers `invalid_grant`.
  */
 async function refreshed(f: Record<string, unknown>, deps: OAuthDeps): Promise<Response> {
   const gone = 'This refresh token is not one BrainDog gave, was replaced, or has not been used for ninety days. Sign in again.';
@@ -870,12 +890,8 @@ async function refreshed(f: Record<string, unknown>, deps: OAuthDeps): Promise<R
     if (f.client_id !== undefined && textField(f.client_id) !== row.client_id) return oauthError(400, 'invalid_grant', 'This refresh token was given to another app.');
     if (f.resource !== undefined && !isResource(textField(f.resource), deps)) return oauthError(400, 'invalid_target', `This server issues tokens for ${deps.issuer}/mcp and nothing else.`);
     const sealed = row.which === 'current' ? row.cur_sealed : row.prev_sealed;
-    const bearer = sealed === null ? null : await openBearer(sealed, presented);
-    if (bearer === null) return oauthError(400, 'invalid_grant', gone);
-    if (deps.alive !== undefined && !(await deps.alive(bearer))) {
-      await deps.store({ op: 'refresh_drop', id: row.id });
-      return oauthError(400, 'invalid_grant', 'This app was removed. Sign in again.');
-    }
+    const parent = sealed === null ? null : await openBearer(sealed, presented);
+    if (parent === null) return oauthError(400, 'invalid_grant', gone);
     const now = deps.now();
     const next = b64url(random(32));
     const retried = row.which === 'previous';
@@ -884,15 +900,22 @@ async function refreshed(f: Record<string, unknown>, deps: OAuthDeps): Promise<R
       id: row.id,
       expect_cur: row.cur_hash,
       next: {
-        cur_hash: await digest(next), cur_sealed: await sealBearer(bearer, next),
+        cur_hash: await digest(next), cur_sealed: await sealBearer(parent, next),
         /* The one just presented stays good for the grace; a retry of an older one does not get a longer grace. */
-        prev_hash: hash, prev_sealed: await sealBearer(bearer, presented), prev_until: retried ? row.prev_until : now + REFRESH_GRACE,
+        prev_hash: hash, prev_sealed: await sealBearer(parent, presented), prev_until: retried ? row.prev_until : now + REFRESH_GRACE,
         expires: now + TOKEN_DAYS * DAY_MS,
       },
     });
     if (!ok) continue;
+    /* MINTED AFTER THE ROTATION WINS, so two retries racing make one child, and checked against the parent every time:
+       a parent revoked since the last refresh mints nothing, and the family goes with it. */
+    const child = await deps.child(parent, CHILD_MINUTES);
+    if (child === null) {
+      await deps.store({ op: 'refresh_drop', id: row.id });
+      return oauthError(400, 'invalid_grant', REMOVED);
+    }
     return json(200, {
-      access_token: bearer, token_type: 'Bearer', expires_in: Math.max(60, Math.floor((row.ends - now) / 1000)), scope: ladder(row.scope), refresh_token: next,
+      access_token: child.bearer, token_type: 'Bearer', expires_in: secondsLeft(child.expires_at, now), scope: ladder(row.scope), refresh_token: next,
     }, [['pragma', 'no-cache']]);
   }
   return oauthError(400, 'invalid_grant', gone);

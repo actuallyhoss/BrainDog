@@ -80,7 +80,10 @@ it is the one a client reached.
   client `access_denied`.
 - `POST /oauth/token` trades the code and its verifier for `{ access_token, token_type: 'Bearer',
   expires_in, scope }`. A code is spent by being asked for, so a second use fails. Every redirect
-  carries `iss` (RFC 9207). The app also gets a refresh token, good ninety days from its last use.
+  carries `iss` (RFC 9207). The access token is a one-hour child key of the token Allow made, which
+  stays sealed and is never sent; the app also gets a refresh token, good ninety days from its last
+  use, and each refresh mints a new one-hour child while that token still works. Removing the app in
+  Settings revokes it, every child with it, and the next refresh answers `invalid_grant`.
 - Errors at `/oauth/*` are OAuth's own `{ error, error_description }`. `/oauth/register` and
   `/oauth/authorize` are counted per address in the Directory's lockout table and answer 429 with
   `Retry-After` past the limit.

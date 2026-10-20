@@ -1,23 +1,31 @@
 /**
- * The refresh grant: a code gets a bearer and a refresh token, a refresh gets the bearer back with a new refresh token,
- * the one just replaced still works for a short grace, and a replay after the grace ends the whole family.
- * Invented names only; the store is the record's own `answerOAuth` over a tiny in-memory SQL.
+ * The refresh grant with one-hour keys (sharing plan 2.9): Allow's token is the parent, sealed and never sent; a code
+ * gets a one-hour child of it and a refresh token; a refresh gets a new child and a new refresh token, the one just
+ * replaced still working for a short grace, and a replay after the grace ends the whole family. Removing the app
+ * revokes the parent, which ends its children at their next call and the family at its next refresh.
+ *
+ * The children are the record's own (`createRecordApi`'s host-only `mintChild`) on one clock with the door. The OAuth
+ * store is a map with the same compare-and-set and grace rules the SQL has. Invented names only.
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { createRecordApi } from '@braindog/record';
 import type { OAuthAnswers, OAuthCall, RefreshRow } from '@braindog/record/oauth';
 
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
 import { challengeOf, serveOAuthDoor, sealBearer, type OAuthDeps, type OAuthStore } from '../src/oauth.ts';
 
 const ISSUER = 'https://brain.example';
 const VERIFIER = 'v'.repeat(50);
-const BEARER = 'bd_invented_bearer';
+const OWNER = 'p_owner';
+const RECORD = 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD';
+const START = Date.UTC(2026, 9, 20, 12);
 const DAY = 86_400_000;
 
 /** Only the refresh and code ops, kept in maps, with the same compare-and-set and grace rules the SQL has. */
-function store(clock: { now: number }): OAuthStore {
+function store(clock: { now: () => number }): OAuthStore {
   const codes = new Map<string, { request: { client_id: string; redirect_uri: string; challenge: string; scope: string }; record: string; bearer_sealed: string; expires: number; code_hash: string }>();
   const families = new Map<string, RefreshRow>();
   const answer = (call: OAuthCall): OAuthAnswers[OAuthCall['op']] => {
@@ -35,10 +43,10 @@ function store(clock: { now: number }): OAuthStore {
         return 'ok';
       case 'refresh_get': {
         for (const row of families.values()) {
-          if (row.expires <= clock.now || row.ends <= clock.now) continue;
+          if (row.expires <= clock.now() || row.ends <= clock.now()) continue;
           if (row.cur_hash === call.hash) return { ...row, which: 'current' as const };
           if (row.prev_hash === call.hash) {
-            if (row.prev_until > clock.now) return { ...row, which: 'previous' as const };
+            if (row.prev_until > clock.now()) return { ...row, which: 'previous' as const };
             families.delete(row.id);
             return null;
           }
@@ -61,61 +69,141 @@ function store(clock: { now: number }): OAuthStore {
   return (async (call: OAuthCall) => answer(call)) as OAuthStore;
 }
 
-async function signedIn(clock: { now: number }, extra: Partial<OAuthDeps> = {}) {
+type Answer = { access_token: string; refresh_token?: string; expires_in: number; error?: string };
+
+/** A record with its owner, the token Allow would have minted, its code held, and the door wired to the record's children. */
+async function signedIn() {
+  const clock = fixedClock(START);
+  const api = await createRecordApi({ sql: openSqlite(), clock });
+  const made = api.kernel.createRecord({ id: RECORD, slug: 'orchardline', name: 'Orchardline', tz: 'UTC', locale: 'en', owner: { id: OWNER } });
+  assert.ok(made.ok);
+  const minted = await api.kernel.createToken(OWNER, { scope: 'read', label: 'Invented app', days: 365 });
+  assert.ok(minted.ok);
+  const parent = minted.value;
+
   const s = store(clock);
-  const deps: OAuthDeps = { issuer: ISSUER, store: s, now: () => clock.now, address: null, consent: () => '/', approver: async () => ({ ok: false, status: 401, say: 'no' }), ...extra };
-  const token = (fields: Record<string, string>) =>
-    serveOAuthDoor(new Request(`${ISSUER}/oauth/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields) }), deps).then((r) => r as Response);
+  const deps: OAuthDeps = {
+    issuer: ISSUER,
+    store: s,
+    now: () => clock.now(),
+    address: null,
+    consent: () => '/',
+    approver: async () => ({ ok: false, status: 401, say: 'no' }),
+    /* As both hosts wire it: the record's host-only `mintChild`, and `null` when the parent no longer works. */
+    child: async (bearer, minutes) => {
+      const out = await api.mintChild(bearer, { minutes });
+      if (out.ok) return { bearer: out.value.bearer, expires_at: out.value.expires_at };
+      if ('refusal' in out && out.refusal.at === 'parent') return null;
+      throw new Error('the record could not mint');
+    },
+  };
+  const token = async (fields: Record<string, string>): Promise<{ status: number; body: Answer }> => {
+    const res = (await serveOAuthDoor(
+      new Request(`${ISSUER}/oauth/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields) }),
+      deps,
+    )) as Response;
+    return { status: res.status, body: (await res.json()) as Answer };
+  };
   const code = 'c'.repeat(43);
   const digest = async (t: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))].map((b) => b.toString(16).padStart(2, '0')).join('');
   await s({
     op: 'code',
-    row: { code_hash: await digest(code), request: { client_id: 'bdc_invented', redirect_uri: 'https://app.example/cb', challenge: await challengeOf(VERIFIER), scope: 'read' }, record: 'rec_invented', bearer_sealed: await sealBearer(BEARER, code), expires: clock.now + 60_000 },
+    row: { code_hash: await digest(code), request: { client_id: 'bdc_invented', redirect_uri: 'https://app.example/cb', challenge: await challengeOf(VERIFIER), scope: 'read' }, record: RECORD, bearer_sealed: await sealBearer(parent.bearer, code), expires: clock.now() + 60_000 },
   });
-  const first = await token({ grant_type: 'authorization_code', code, code_verifier: VERIFIER, client_id: 'bdc_invented' });
-  assert.equal(first.status, 200);
-  return { token, first: (await first.json()) as { access_token: string; refresh_token: string; expires_in: number } };
+  const redeem = () => token({ grant_type: 'authorization_code', code, code_verifier: VERIFIER, client_id: 'bdc_invented' });
+  const works = async (bearer: string) => (await api.kernel.verifyToken(bearer, 'mcp')).ok;
+  const remove = () => api.kernel.revokeToken(OWNER, parent.id);
+  return { clock, api, parent, token, redeem, works, remove };
 }
 
-test('a code answers a bearer and a refresh token, and a refresh answers the same bearer and a new refresh token', async () => {
-  const clock = { now: 1_800_000_000_000 };
-  const { token, first } = await signedIn(clock);
-  assert.equal(first.access_token, BEARER);
-  assert.ok(first.refresh_token);
-  clock.now += 30 * DAY;
-  const again = await token({ grant_type: 'refresh_token', refresh_token: first.refresh_token, client_id: 'bdc_invented' });
-  assert.equal(again.status, 200);
-  const body = (await again.json()) as { access_token: string; refresh_token: string };
-  assert.equal(body.access_token, BEARER);
-  assert.notEqual(body.refresh_token, first.refresh_token);
+async function firstAnswer(t: Awaited<ReturnType<typeof signedIn>>): Promise<Answer & { refresh_token: string }> {
+  const first = await t.redeem();
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.ok(first.body.refresh_token);
+  return first.body as Answer & { refresh_token: string };
+}
+
+test('A CODE ANSWERS A ONE-HOUR CHILD, never the parent, and a refresh token', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  assert.equal(first.expires_in, 3600);
+  assert.notEqual(first.access_token, t.parent.bearer, 'the app was handed the parent');
+  assert.ok(await t.works(first.access_token));
+  const seen = await t.api.kernel.verifyToken(first.access_token, 'mcp');
+  assert.ok(seen.ok);
+  assert.equal(seen.value.id, t.parent.id, 'the app is not one agent across its hourly keys');
+  assert.equal(seen.value.scope, 'read');
+
+  t.clock.advance(3600_000);
+  assert.equal(await t.works(first.access_token), false, 'a child outlived its hour');
+  assert.ok(await t.works(t.parent.bearer), 'the parent ended with its child');
+});
+
+test('A REFRESH ANSWERS A NEW CHILD and a new refresh token, and the app lists as one key', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  t.clock.advance(30 * DAY);
+  const again = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token, client_id: 'bdc_invented' });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.equal(again.body.expires_in, 3600);
+  assert.notEqual(again.body.access_token, first.access_token);
+  assert.notEqual(again.body.access_token, t.parent.bearer);
+  assert.notEqual(again.body.refresh_token, first.refresh_token);
+  assert.ok(await t.works(again.body.access_token));
+  assert.equal(await t.works(first.access_token), false);
+
+  const listed = t.api.kernel.listTokens();
+  assert.equal(listed.length, 1, 'a child was listed as a key of its own');
+  assert.equal(listed[0]!.children?.length, 2);
 });
 
 test('a client that retries with the token just replaced is not logged out, and gets a token that works', async () => {
-  const clock = { now: 1_800_000_000_000 };
-  const { token, first } = await signedIn(clock);
-  await token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
-  clock.now += 30_000;
-  const retry = await token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  t.clock.advance(30_000);
+  const retry = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
   assert.equal(retry.status, 200);
-  const { refresh_token } = (await retry.json()) as { refresh_token: string };
-  assert.equal((await token({ grant_type: 'refresh_token', refresh_token })).status, 200);
+  assert.ok(await t.works(retry.body.access_token));
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: retry.body.refresh_token! })).status, 200);
 });
 
 test('the token just replaced is refused after its grace, and so is an app a refresh was never given to', async () => {
-  const clock = { now: 1_800_000_000_000 };
-  const { token, first } = await signedIn(clock);
-  await token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
-  clock.now += 10 * 60_000;
-  assert.equal((await token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 400);
-  assert.equal((await token({ grant_type: 'refresh_token', refresh_token: 'x'.repeat(43) })).status, 400);
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  t.clock.advance(10 * 60_000);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 400);
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: 'x'.repeat(43) })).status, 400);
 });
 
-test('ninety days unused ends the family, and a removed app ends it at once', async () => {
-  const clock = { now: 1_800_000_000_000 };
-  const unused = await signedIn(clock);
-  clock.now += 91 * DAY;
-  assert.equal((await unused.token({ grant_type: 'refresh_token', refresh_token: unused.first.refresh_token })).status, 400);
+test('ninety days unused ends the family', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  t.clock.advance(91 * DAY);
+  const late = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  assert.equal(late.status, 400);
+  assert.equal(late.body.error, 'invalid_grant');
+});
 
-  const removed = await signedIn(clock, { alive: async () => false });
-  assert.equal((await removed.token({ grant_type: 'refresh_token', refresh_token: removed.first.refresh_token })).status, 400);
+test('A REMOVED APP: its child is refused at its next call, and its refresh answers invalid_grant, for good', async () => {
+  const t = await signedIn();
+  const first = await firstAnswer(t);
+  assert.ok(await t.works(first.access_token));
+  t.remove();
+  assert.equal(await t.works(first.access_token), false, "a removed app's key still worked");
+
+  const refused = await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token });
+  assert.equal(refused.status, 400);
+  assert.equal(refused.body.error, 'invalid_grant');
+  assert.equal((await t.token({ grant_type: 'refresh_token', refresh_token: first.refresh_token })).status, 400, 'the family outlived the app');
+});
+
+test('an app removed between Allow and the code gets invalid_grant, and no key', async () => {
+  const t = await signedIn();
+  t.remove();
+  const late = await t.redeem();
+  assert.equal(late.status, 400);
+  assert.equal(late.body.error, 'invalid_grant');
+  assert.equal(late.body.access_token, undefined);
 });

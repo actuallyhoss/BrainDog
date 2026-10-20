@@ -33,7 +33,8 @@ import {
   type OAuthDeps,
   type OAuthStore,
 } from '@braindog/host/oauth';
-import type { AuthResult, Who } from '@braindog/ports';
+import type { ChildArgs, Minted as KernelMinted } from '@braindog/kernel';
+import type { AuthResult, Result, Who } from '@braindog/ports';
 import type { CallContext } from '@braindog/record';
 import type { SwitcherRow } from '@braindog/record/directory';
 import type { OAuthAnswers, OAuthCall } from '@braindog/record/oauth';
@@ -68,8 +69,15 @@ type DirectoryCalls = {
   madeAt(person: string): Promise<number | null>;
 };
 
-/** A record's calls: what it says a person holds, and a request to its API, which `inward` has already given a context. */
-type RecordCalls = { access(person: string): Promise<Held | null>; fetch(request: Request): Promise<Response> };
+/**
+ * A record's calls: what it says a person holds, a request to its API, which `inward` has already given a context, and
+ * a child key under an app's sealed parent (`Record$.mintChild`).
+ */
+type RecordCalls = {
+  access(person: string): Promise<Held | null>;
+  fetch(request: Request): Promise<Response>;
+  mintChild(parent: string, args: ChildArgs): Promise<Result<KernelMinted>>;
+};
 
 /** The longest name a person's choice of record is read as. A slug is at most thirty-two characters and an id is thirty. */
 const RECORD_NAME_MOST = 64;
@@ -184,11 +192,17 @@ function wiring<I>(request: Request, env: OAuthEnv<I>, host: string) {
        page drawn on the old name would be one whose Allow always failed. */
     consent: (id) => `${origin}${CONSENT_AT}?request=${encodeURIComponent(id)}`,
     approver,
-    /* A REVOKED OR EXPIRED TOKEN ENDS ITS REFRESH FAMILY AT ONCE: the bearer's first half names the record that holds it. */
-    alive: async (bearer) => {
-      const id = bearer.split('.')[0] ?? '';
-      if (id === '' || id.length > RECORD_NAME_MOST) return false;
-      return (await (record(id) as RecordCalls & { verify(b: string, surface: string): Promise<unknown> }).verify(bearer, 'oauth')) !== null;
+    /* AN APP'S ONE-HOUR KEY, minted by the record the parent's first half names (`Record$.mintChild`, an RPC and never a
+       route). A parent that no longer works answers `null`, which ends the app's refresh family at once; anything else
+       the record refuses is thrown, so a record that is briefly away does not log the app out. */
+    child: async (parent, minutes) => {
+      const id = parent.split('.')[0] ?? '';
+      if (id === '' || id.length > RECORD_NAME_MOST) return null;
+      const out = await record(id).mintChild(parent, { minutes });
+      if (out.ok) return { bearer: out.value.bearer, expires_at: out.value.expires_at };
+      const refusal = 'refusal' in out ? out.refusal : null;
+      if (refusal?.at === 'parent') return null;
+      throw new Error(`The record could not mint an app's key: ${refusal?.code ?? 'CONFLICT'}.`);
     },
     fetchDocument: readDocument,
   };

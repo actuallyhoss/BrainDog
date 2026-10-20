@@ -69,6 +69,7 @@ function doors(minted: Minted = { ok: true, bearer: 'bd_invented_bearer' }, proo
     now: () => Date.now(),
     address: null,
     consent: (id) => `/app/connect?request=${id}`,
+    child: async () => null,
     approver: async () => ({
       ok: true,
       record: 'rec_invented',

@@ -147,9 +147,9 @@ export const UNROUTED = [
   /* The shape door's record half (PRF-A13): host shape.ts hands it the bearer, and it reads the grant before a row. */
   'shapeGrant',
   'shapeExport',
-  /* `operationGrant`, `signingKey` AND `restored` ARE INTERNAL TOO AND ARE NOT LISTED YET. `router-groups.mjs`
+  /* `operationGrant`, `signingKey`, `restored` AND `mintChild` ARE INTERNAL TOO AND ARE NOT LISTED YET. `router-groups.mjs`
      refuses a name here that `30 §5`'s INTERNAL row does not carry, and that row has not been amended for them. None of
-     the three is in `ROUTES`, and `packages/record/test/file-doors.test.ts` fails if one is added. */
+     the four is in `ROUTES`, and `packages/record/test/file-doors.test.ts` fails if one is added. */
 ] as const;
 
 const BY_NAME = new Map(ROUTES.map((r) => [r.name, r]));

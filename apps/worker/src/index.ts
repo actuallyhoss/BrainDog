@@ -118,7 +118,7 @@ import { servesOAuth, servesOAuthMeta } from './route.ts';
 import { claimIdle, holdClaim, runnerContext } from '@braindog/host';
 import { recordOf } from './route.ts';
 import { validFromOf } from './cut-off.ts';
-import type { Verified } from '@braindog/kernel';
+import type { ChildArgs, Minted as ChildMinted, Verified } from '@braindog/kernel';
 /* THE FRONT DOORS: a crash answered by reference, the limiter, the guard in front of every
    statement, and the JSON lines. */
 import { crashed } from '@braindog/host';
@@ -1734,6 +1734,18 @@ export class Record$ extends DurableObject<Env> {
     const api = await this.#record();
     const out = await api.kernel.verifyToken(bearer, surface, validFromOf(this.env), build);
     return out.ok ? out.value : null;
+  }
+
+  /**
+   * A one-hour key under an app's sealed parent, for the OAuth door (`oauth.ts`'s `child`). AN RPC AND NEVER A ROUTE:
+   * the record's `mintChild` is host-only, and the parent is proved by its bearer. The operator's `TOKENS_VALID_FROM`
+   * holds here through the record `#open` built, so a parent made before it mints nothing.
+   */
+  async mintChild(parent: string, args: ChildArgs): Promise<Result<ChildMinted>> {
+    if (this.#gone) return { ok: false, refusal: DELETED };
+    const api = await this.#record();
+    const broken = api.kernel.refused();
+    return broken ? { ok: false, refusal: broken } : api.mintChild(parent, args);
   }
 
   /**
