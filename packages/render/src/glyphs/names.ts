@@ -35,7 +35,7 @@ const APP = [
   'stop', 'play', 'money', 'calendar', 'board', 'rows', 'obligation', 'service', 'thing', 'people', 'task', 'doc',
   'tag', 'bell', 'session', 'drag', 'arrowUp', 'arrowDown', 'grid', 'edit', 'trash', 'archive', 'eye', 'download',
   'refresh', 'star', 'ban', 'info', 'ask', 'more', 'keyboard', 'code', 'observe', 'history', 'lock', 'key',
-  'learning', 'skill', 'plug', 'globe',
+  'learning', 'skill', 'plug', 'globe', 'mail',
   /* The rail's places by their own names, as the design system's glyph list gives them. */
   'today', 'work', 'projects', 'activity', 'slash',
 ] as const;
@@ -54,7 +54,7 @@ const CORE_NAMES = {
   users: 1, 'square-check': 1, 'file-text': 1, tag: 1, bell: 1, bot: 1, 'grip-vertical': 1, 'arrow-up': 1,
   'arrow-down': 1, 'layout-grid': 1, pencil: 1, 'trash-2': 1, archive: 1, eye: 1, download: 1, 'rotate-cw': 1,
   star: 1, ban: 1, info: 1, 'circle-question-mark': 1, ellipsis: 1, keyboard: 1, code: 1, activity: 1,
-  history: 1, lock: 1, key: 1, lightbulb: 1, zap: 1, plug: 1, globe: 1,
+  history: 1, lock: 1, key: 1, lightbulb: 1, zap: 1, plug: 1, globe: 1, mail: 1,
 } as const satisfies Record<CoreGlyph, 1>;
 
 const SET_NAMES = {
@@ -72,7 +72,7 @@ const SET_NAMES = {
   'circle-pause': 1, 'circle-play': 1, 'circle-stop': 1, 'circle-slash': 1, 'circle-dashed': 1,
   'circle-plus': 1, 'circle-minus': 1, circle: 1, file: 1, 'file-spreadsheet': 1, 'file-image': 1,
   'file-plus': 1, 'file-check': 1, 'file-x': 1, paperclip: 1, folder: 1, 'folder-open': 1, image: 1, files: 1,
-  mail: 1, 'mail-open': 1, 'message-square': 1, 'message-circle': 1, 'messages-square': 1, phone: 1, send: 1,
+  'mail-open': 1, 'message-square': 1, 'message-circle': 1, 'messages-square': 1, phone: 1, send: 1,
   'at-sign': 1, 'bell-off': 1, reply: 1, forward: 1, megaphone: 1, server: 1, database: 1, cloud: 1, cpu: 1,
   terminal: 1, 'git-branch': 1, 'git-pull-request': 1, 'git-merge': 1, 'git-commit-horizontal': 1,
   'hard-drive': 1, 'chart-line': 1, 'chart-column': 1, 'chart-pie': 1, gauge: 1, 'chart-area': 1,

@@ -177,7 +177,8 @@ test('every glyph in the set is a name the check accepts, so the list the app ca
   const set = await loadSet();
   const refused = Object.keys(set).filter((name) => iconFor(name, 'doc') !== name);
   assert.deepEqual(refused, []);
-  assert.equal(Object.keys(set).length, 188);
+  /* 187 since `mail` moved into the core, for the Inbox's own glyph (frame F15). */
+  assert.equal(Object.keys(set).length, 187);
 });
 
 test('IconWell is a span.well holding the icon, its tone on the well', () => {
