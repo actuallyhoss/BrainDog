@@ -244,6 +244,43 @@ export function writeFigure(text: string, home: string | null, setting: AmountSe
   return { ...w, minus: '+', text: `+${w.text}` };
 }
 
+/* ---- A set of amounts ---------------------------------------------------------------------------------------- */
+
+/**
+ * AMOUNTS THAT STAND TOGETHER, WRITTEN ALIKE (2.A.7, money S3): a column, a tile's lines, a list's totals. If every
+ * amount in the set is whole, none shows its pence; if any has pence, every one shows two places, so the digits line
+ * up down the column. A single amount is a set of one: it shows pence only when they are not `.00`.
+ *
+ * NEVER ROUNDED. A ledger's £2,473.33 beside £6,140 prints "£6,140.00", not "£2,473", because rounding a real amount
+ * misstates it; a whole set still prints "£9,190". `home` is the record's home currency, whose code is never printed.
+ * One currency to a set: two currencies are never one column of sums (`record/money.ts` refuses to add them).
+ */
+export function moneySet(
+  minors: readonly (bigint | number)[],
+  currency: string,
+  home: string | null = currency,
+): { pence: boolean; written: WrittenAmount[] } {
+  const unit = 10n ** BigInt(exponentOf(currency));
+  const whole = minors.every((m) => (typeof m === 'bigint' || Number.isInteger(m)) && BigInt(m) % unit === 0n);
+  const setting: AmountSetting = whole ? 'read' : 'exact';
+  const written = minors.flatMap((minor) => writeAmount({ minor, currency }, home, setting) ?? []);
+  return { pence: !whole && unit > 1n, written };
+}
+
+/**
+ * A DISPLAY FIGURE IN WHOLE UNITS (2.A.7): a tile's figure, a project's hero, a card, Today, the palette, a sentence.
+ * "£33,850", half a unit rounding away from nought. A figure read at a glance is never a ledger line; a list, a table, a
+ * row's own page and a form use `moneySet` instead and are never rounded.
+ */
+export function moneyWhole(minor: bigint | number, currency: string, home: string | null = currency): WrittenAmount | null {
+  if (typeof minor === 'number' && !Number.isInteger(minor)) return null;
+  const unit = 10n ** BigInt(exponentOf(currency));
+  const m = BigInt(minor);
+  const size = m < 0n ? -m : m;
+  const rounded = ((size + unit / 2n) / unit) * unit;
+  return writeAmount({ minor: m < 0n ? -rounded : rounded, currency }, home, 'read');
+}
+
 /* ---- In a sentence ------------------------------------------------------------------------------------------- */
 
 /* A stored amount inside other words: the same shape as `STORED`, not glued to a letter or a digit in front, and

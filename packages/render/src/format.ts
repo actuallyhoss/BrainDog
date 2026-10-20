@@ -738,6 +738,25 @@ export function valueWord(value: string, lead = false): string {
   return lead ? word.charAt(0).toUpperCase() + word.slice(1) : word;
 }
 
+/**
+ * BANK TEXT AS A PERSON WRITES IT (2.A.8): "KILN STOREFRONT PAYOUT" is "Kiln Storefront Payout", and "TALLYARD" is
+ * "Tallyard". A bank sends its lines in capitals, and capitals down a ledger read as shouting and hide the one word that
+ * tells two lines apart.
+ *
+ * ONLY A STRING WITH NO SMALL LETTER IN IT, AND MORE THAN THREE LETTERS IN ALL: "Rent" and "iPad case" are a person's
+ * own and stay as typed, and "VAT" alone is an initialism. Inside a line a word of three letters or fewer is kept as it
+ * came ("VAT", "UK", "S"), since it is far more often an initialism than a word; everything else is title-cased, a word
+ * at a time, its apostrophes and hyphens kept ("O'NEILL-SMITH" is "O'neill-Smith"). Digits are left alone.
+ */
+export function readable(text: string): string {
+  const letters = text.match(/\p{L}/gu) ?? [];
+  if (letters.length <= 3 || /\p{Ll}/u.test(text)) return text;
+  return text.replace(/\p{L}[\p{L}'’]*/gu, (word) => {
+    const bare = word.replace(/['’]/gu, '');
+    return bare.length <= 3 ? word : word.charAt(0) + word.slice(1).toLowerCase();
+  });
+}
+
 /** A ref reads as its spoken id, which is the string a person says out loud. */
 export const ref = (spoken: string): string => {
   const i = spoken.indexOf('#');

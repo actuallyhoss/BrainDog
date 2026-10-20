@@ -245,6 +245,7 @@ export {
   money,
   pct,
   quantity,
+  readable,
   ref,
   relative,
   since,
@@ -264,7 +265,7 @@ export {
   type Home,
 } from './format.ts';
 /* The one writer of an amount for a screen (REC-C05): the stored form read, and written for exact, read and axis. */
-export { AMOUNT_SPACE, amountsIn, readAmount, readFigure, writeAmount, writeFigure, type Amount, type AmountSetting, type Figure, type WrittenAmount } from './money.ts';
+export { AMOUNT_SPACE, amountsIn, moneySet, moneyWhole, readAmount, readFigure, writeAmount, writeFigure, type Amount, type AmountSetting, type Figure, type WrittenAmount } from './money.ts';
 /* The page lint (PRF-A04): what a drawn page prints that a person should never read. The host draws its pages and runs it. */
 export { LINT_RULES, lintHtml, lintPage, lintPart, lintText, type LintFinding, type LintPage, type LintPart, type LintRule } from './lint.ts';
 /* The look sheets (EXP-C05): fixed specimens of every chart form, the plan and the parts, drawn on one fixed day. */
