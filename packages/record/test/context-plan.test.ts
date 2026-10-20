@@ -1,0 +1,273 @@
+/**
+ * THE CONTEXT PLAN (agents and MCP plan §3, W2-B): ranked, budgeted at about 700 tokens, led by what he told the agent.
+ *
+ * The fixtures have the shape of his record: 888 runs of which three others are live in worktrees of the same repo,
+ * 176 keys, ninety open tasks, three hundred lessons, fifteen rules, a queue of decisions and an instruction. And one
+ * test draws the plan from the seed's own `context`, through `factsFromContext`.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { FULL_BUDGET, PLAN_BUDGET, PLAN_CARD_LINES, PLAN_CARD_WORDS, factsFromContext, planContext, planText, tokensOf, type ContextFacts, type LessonFact, type ToldFact } from '../src/context-plan.ts';
+import { decidedLately, lessonsHeld } from '../src/context-caps.ts';
+import { TWO_SESSIONS, wordCount, type CardParts } from '../src/card.ts';
+import { createRecordApi, type CallContext, type Context } from '../src/index.ts';
+import { fixedClock, openSqlite } from '../../kernel/test/sqlite.ts';
+import { NOW, installSeed } from '../../seed/src/index.ts';
+
+const AT = Date.UTC(2026, 9, 21, 12);
+const DAY = 86_400_000;
+const iso = (ms: number): string => new Date(ms).toISOString();
+
+const who = (over: Partial<CardParts> = {}): CardParts => ({
+  who: 'Claude Code on MacBook, working on BrainDog',
+  placed: true,
+  also: null,
+  next: 'Next     Build wave 2 of the agents plan. (Claude Code, 2h ago, check before acting)',
+  signs: 'Signs    1 read red here: Runs end as they ended',
+  waiting: 'Waiting  1 on Sam, first: Add 12 tools for use everywhere?',
+  learned: 'Learned  Money is minor units plus currency.',
+  update: null,
+  step: null,
+  ...over,
+});
+
+const IN4: ToldFact = { id: 'IN4', said: 'Merge wave 1, then stop', by: 'Sam', at: iso(AT - 5 * 60_000), kind: 'tell', when: 'now', to: 'run', state: 'sent', taken_by: null };
+
+/** A lesson, `days` old, confirmed `confirmed` days ago or never. */
+const lesson = (n: number, days: number, over: Partial<LessonFact> = {}): LessonFact => ({
+  spoken: `LN${String(n)}`,
+  said: `Lesson ${String(n)}: check part ${String(n % 13)} first.`,
+  kind: n % 3 === 0 ? 'method' : 'fact',
+  here: n % 2 === 0,
+  made: iso(AT - days * DAY),
+  confirmed: null,
+  ...over,
+});
+
+/** Facts the size of his record. */
+function his(over: Partial<ContextFacts> = {}): ContextFacts {
+  return {
+    stop: null,
+    told: [IN4],
+    who: who(),
+    may: { ceiling: 'write', lists: ['Tasks', 'Learnings'], on: 'BrainDog' },
+    rules: [
+      { said: 'Never add Claude or AI attribution to commits, PRs or files.', here: false },
+      { said: 'Write plain and short, like a person; no AI scaffolding.', here: false },
+      { said: 'No glass, gradients or pills in the UI.', here: false },
+      ...Array.from({ length: 12 }, (_, i) => ({ said: `Rule ${String(i)} for the BrainDog repo: keep the gates green.`, here: true })),
+    ],
+    brief: 'You build BrainDog. Keep to the plan in loop/plans, one builder per worktree.',
+    others: [
+      { spoken: 'S884', agent: 'claude', doing: 'W2-A record methods and guard', branch: 'worktree-agent-a613', worktree: 'agent-a613', for_s: 32 * 60 },
+      { spoken: 'S885', agent: 'claude', doing: 'W2-C MCP tools', branch: 'worktree-agent-ab33', worktree: 'agent-ab33', for_s: 20 * 60 },
+      { spoken: 'S886', agent: 'codex', doing: 'W0-A agent bench', branch: 'worktree-agent-a97f', worktree: 'agent-a97f', for_s: 3 * 3_600 },
+    ],
+    lane: Array.from({ length: 90 }, (_, i) => ({ name: `Task ${String(i)} on part ${String(i % 23)}`, spoken: `tasks#${String(300 + i)}`, version: 2, state: 'open', mine: i % 7 === 0 })),
+    decided: Array.from({ length: 10 }, (_, i) => ({ said: `Ship choice ${String(i)}: after the UI pass`, at: iso(AT - i * 3 * DAY), mine: i === 4 })),
+    learned: Array.from({ length: 300 }, (_, i) => lesson(i, i % 120)),
+    run: 'S883',
+    agent: 'claude',
+    branch: 'worktree-agent-a21c',
+    now: AT,
+    stamp: 'v1234',
+    extra: { keys: Array.from({ length: 176 }, (_, i) => `KEY_${String(i)}`), tools: ['granola', 'xcode'], people: ['Priya', 'Mateo'], signs: ['68 of 73 runs this week did not end normally'] },
+    ...over,
+  };
+}
+
+const lines = (text: string): string[] => text.split('\n');
+
+test('ON A RECORD THE SIZE OF HIS, the default answer is 700 tokens or less, and tokens is the text it prints', () => {
+  const plan = planContext(his());
+  const text = planText(plan);
+  assert.ok(plan.tokens <= PLAN_BUDGET, `${String(plan.tokens)} tokens:\n${text}`);
+  assert.equal(plan.tokens, tokensOf(text));
+  assert.equal(plan.stamp, 'v1234');
+});
+
+test('IT LEADS WITH WHAT HE TOLD IT, in his voice, with the call that takes it, then the card', () => {
+  const text = planText(planContext(his()));
+  const first = lines(text)[0]!;
+  assert.match(first, /^Told {5}Sam said in BrainDog \(IN4\): "Merge wave 1, then stop", 5m ago\. Take it: instructions \{take:"IN4"\}\.$/u);
+  assert.equal(lines(text)[1], 'Claude Code on MacBook, working on BrainDog');
+});
+
+test('THE SECTIONS COME IN RANK ORDER: card, may, rules and brief, here now, lane, decided, lessons', () => {
+  const plan = planContext(his(), { budget: 1_200 });
+  assert.deepEqual(plan.sections.map((s) => s.id), ['told', 'may', 'rules', 'here', 'lane', 'decided', 'learned']);
+  const text = planText(plan);
+  assert.ok(text.includes('May      You write Tasks and Learnings on BrainDog; money, keys and deletes are asked.'), text);
+  assert.ok(text.includes('Rules    Brief: You build BrainDog.'), text);
+});
+
+test('THE CARD IS FIVE LINES AND 120 WORDS AT MOST, with no More line and no signs', () => {
+  const long = 'word '.repeat(80);
+  const plan = planContext(his({ who: who({ next: `Next     ${long}`, waiting: `Waiting  ${long}`, update: 'Update   This command is older than the record. Run braindog update and restart this session.' }) }));
+  const card = lines(plan.card);
+  assert.ok(card.length <= PLAN_CARD_LINES, plan.card);
+  assert.ok(wordCount(plan.card) <= PLAN_CARD_WORDS, `${String(wordCount(plan.card))} words`);
+  assert.ok(card.at(-1)!.startsWith('Update'), 'the Update line is kept');
+  const text = planText(planContext(his()));
+  assert.ok(!text.includes('call context for the full picture'), text);
+  assert.ok(!text.includes('Signs'), text);
+});
+
+test('TOLD YOU IS NEVER CUT, past any budget: a long instruction is said whole', () => {
+  const said = 'Do this. '.repeat(200).trim();
+  const plan = planContext(his({ told: [{ ...IN4, said }] }), { budget: 400 });
+  const text = planText(plan);
+  assert.ok(text.includes(said), 'the instruction was cut');
+  assert.ok(plan.card.length > 0);
+});
+
+test('A STOP IS THE FIRST LINE, in his voice, and what still works', () => {
+  const plan = planContext(his({ stop: { kind: 'pause', id: 'IN7', said: 'Hold until I check the deploy' }, owner: 'Sam' }));
+  const first = lines(planText(plan))[0]!;
+  assert.match(first, /^Stop {5}Sam paused you in BrainDog \(IN7\): "Hold until I check the deploy"\. Wait: only instructions, handoff and log/u);
+});
+
+test('A CUT SECTION SAYS HOW MANY IT LEFT AND THE EXACT CALL', () => {
+  const plan = planContext(his());
+  const lane = plan.sections.find((s) => s.id === 'lane');
+  assert.ok(lane?.more, JSON.stringify(plan.sections.map((s) => s.id)));
+  assert.equal(lane.more.n + lane.lines.length, 90);
+  assert.match(lane.more.call, /^list\(\{ register: "tasks", where: \{"field":"agent","is":"claude"\} \}\)$/u);
+  assert.match(planText(plan), new RegExp(`and ${String(lane.more.n)} more: list`, 'u'));
+});
+
+test('THE LANE: tasks handed to this kind of agent lead, each with its handle and version', () => {
+  const plan = planContext(his(), { budget: 1_200 });
+  const lane = plan.sections.find((s) => s.id === 'lane')!;
+  assert.match(lane.lines[0]!, /^Lane {5}Task 0 on part 0 \(tasks#300 v2\) · open · yours$/u);
+  assert.ok(lane.lines.slice(0, 5).every((l) => l.endsWith('yours')), lane.lines.join('\n'));
+});
+
+test('WORKING HERE NOW: worktree builders of the same repo are said, with branch and how long; no warning across worktrees', () => {
+  const text = planText(planContext(his(), { budget: 1_200 }));
+  assert.ok(text.includes('Here now S884 Claude Code, W2-A record methods and guard (branch worktree-agent-a613, for 32m)'), text);
+  assert.ok(text.includes('S886 Codex, W0-A agent bench (branch worktree-agent-a97f, for 3h)'), text);
+  assert.ok(!text.includes(TWO_SESSIONS), text);
+});
+
+test('ANOTHER RUN ON YOUR BRANCH IS WARNED OF, and the warning is never cut', () => {
+  const others = [...his().others, { spoken: 'S887', agent: 'claude', doing: 'Same branch', branch: 'worktree-agent-a21c', for_s: 60 }];
+  const plan = planContext(his({ others }), { budget: 200 });
+  const text = planText(plan);
+  assert.ok(text.includes(`S887 is on your branch worktree-agent-a21c. ${TWO_SESSIONS}`), text);
+});
+
+test('DECIDED LATELY: the last 14 days, the answer to this run’s own question first', () => {
+  const plan = planContext(his(), { budget: 1_200 });
+  const decided = plan.sections.find((s) => s.id === 'decided')!;
+  assert.match(decided.lines[0]!, /^Decided {2}9 Oct: Ship choice 4: after the UI pass \(you asked\)$/u);
+  assert.equal(decided.lines.length, 3);
+  assert.equal(decided.more?.n, 2, 'five of the ten are within 14 days');
+});
+
+test('LESSONS THAT HELD: confirmed lately first; never confirmed and older than 60 days left out and returned to retire', () => {
+  const learned = [lesson(1, 90), lesson(2, 10), lesson(3, 100, { confirmed: iso(AT - 2 * DAY) }), lesson(4, 5, { kind: 'rule' })];
+  const held = lessonsHeld(learned, AT);
+  assert.deepEqual(held.rows.map((l) => l.spoken), ['LN3', 'LN2']);
+  assert.deepEqual(held.retire, ['LN1']);
+  const plan = planContext(his({ learned }));
+  assert.deepEqual(plan.retire, ['LN1']);
+  assert.ok(plan.card.includes('Learned  Lesson 3: check part 3 first.'), plan.card);
+  assert.ok(!planText(plan).includes('Lesson 1:'));
+});
+
+test('THE TEACHING LINES ARE SAID ONCE A RUN, on its first call only', () => {
+  const teach = ['A note about nothing in particular goes on your own session: log it with no spoken.'];
+  assert.ok(planText(planContext(his({ first: true, teach }), { budget: 1_200 })).includes(teach[0]!));
+  assert.ok(!planText(planContext(his({ first: false, teach }), { budget: 1_200 })).includes(teach[0]!));
+  assert.ok(!planText(planContext(his({ teach }), { budget: 1_200 })).includes(teach[0]!));
+});
+
+test('KEYS, TOOLS, PEOPLE AND SIGNS ONLY ON REQUEST: none of the 176 keys in the default answer, all at depth full', () => {
+  assert.ok(!planText(planContext(his())).includes('KEY_'));
+  const full = planContext(his(), { depth: 'full' });
+  assert.ok(full.tokens <= FULL_BUDGET);
+  assert.ok(planText(full).includes('Keys: KEY_0, KEY_1'), planText(full));
+});
+
+test('AN INSTRUCTION IN HAND is the card’s Next, and Told says how to reply', () => {
+  const told = [{ ...IN4, state: 'working' as const, taken_by: 'S883' }];
+  const plan = planContext(his({ told }));
+  assert.ok(plan.card.includes('Next     IN4, in hand: do it, then reply with instructions.'), plan.card);
+  assert.ok(planText(plan).includes('You have it: when done, instructions {reply:"IN4", said:"…", state:"done"}.'));
+  const theirs = planText(planContext(his({ told: [{ ...IN4, taken_by: 'S884' }] })));
+  assert.ok(theirs.includes('S884 has it.'), theirs);
+});
+
+test('A WORKTREE BUILDER: its lead first, with what the lead was told, and not the owner’s queue', () => {
+  const others = [{ spoken: 'S880', agent: 'claude', doing: 'Running wave 2', role: 'lead' as const, told: 'Build wave 2', for_s: 3_600 }, ...his().others.map((o) => ({ ...o, role: 'sibling' as const }))];
+  const plan = planContext(his({ others }), { budget: 1_200 });
+  const here = plan.sections.find((s) => s.id === 'here')!;
+  assert.match(here.lines[0]!, /^Here now Your lead S880 Claude Code, Running wave 2 \(for 1h\); told "Build wave 2"$/u);
+  assert.ok(!plan.card.includes('Waiting'), plan.card);
+});
+
+test('NO PROJECT HERE: the card says so and names the projects worked on last', () => {
+  const plan = planContext(his({ who: who({ who: 'Claude Code on MacBook, no project yet: say which with handoff', placed: false, next: null }), recent: ['BrainDog', 'Encore', 'Nook'], lane: [] }));
+  assert.equal(lines(plan.card)[0], 'Claude Code on MacBook. No project here. Lately: BrainDog, Encore and Nook; say which with handoff.');
+});
+
+test('A SCRIPT KEY is told only what it was told and what it may do', () => {
+  const plan = planContext(his({ who: null, may: { ceiling: 'propose' } }));
+  assert.deepEqual(plan.sections.map((s) => s.id), ['told', 'may']);
+  assert.equal(plan.card, '');
+});
+
+test('SINCE A STAMP, only what changed, and "nothing new" is one line', () => {
+  const none = planContext(his({ since: { stamp: 'v1240' } }));
+  assert.equal(planText(none), 'Since    Nothing new since you last looked.');
+  assert.equal(none.stamp, 'v1234');
+  const one = planText(planContext(his({ since: { stamp: 'v1240', told: [IN4], runs: ['S889 Claude Code started: W2-D hooks'] } })));
+  assert.equal(one.split('\n').length, 2, one);
+  assert.ok(one.startsWith('Told     Sam said in BrainDog (IN4)'), one);
+});
+
+test('WITH A TASK, the task whole with its version, then its needs; no lane', () => {
+  const task = { name: 'Send the refund email', spoken: 'tasks#396', version: 4, state: 'open', fields: { Due: '24 Oct' }, note: 'Jennifer asked twice.', history: ['21 Oct: moved to open', '20 Oct: made'], keys: ['STRIPE_KEY'], people: ['Jennifer'] };
+  const plan = planContext(his({ task }));
+  const text = planText(plan);
+  assert.ok(text.includes('Task     Send the refund email (tasks#396 v4) · open'), text);
+  assert.ok(text.includes('Note: Jennifer asked twice.'));
+  assert.ok(text.includes('Needs    People: Jennifer'), text);
+  assert.ok(!plan.sections.some((s) => s.id === 'lane'));
+});
+
+test('A SMALLER BUDGET IS KEPT TO, and the lower sections give way first', () => {
+  const plan = planContext(his(), { budget: 400 });
+  assert.ok(plan.tokens <= 400, `${String(plan.tokens)}`);
+  assert.ok(plan.sections.some((s) => s.id === 'may'));
+});
+
+test('decidedLately and the rule card: a decision older than 14 days is not lately', () => {
+  assert.deepEqual(decidedLately([{ said: 'Old', at: iso(AT - 15 * DAY) }, { said: 'Decided 2 Oct: New', at: iso(AT - DAY) }], AT), ['20 Oct: New']);
+});
+
+test('FROM THE SEED’S OWN CONTEXT: the plan is under budget, leads with the card, and teaches nothing twice', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
+  const seeded = await installSeed(api.kernel);
+  assert.ok(seeded.ok);
+  const agent: CallContext = { principal: { kind: 'token', id: 'tok_1', scope: 'write', person: 'p_1', level: 'owner' }, session: { host: 'Studio-MacBook-Pro.local', cwd: '/Users/studio/Code/kiln-type', repo: 'kiln-type', agent: 'claude', client_id: 'c-plan' } };
+  const attached = await api.attach({ source: 'startup', client_id: 'c-plan', doing: 'Planning context' }, agent);
+  assert.ok(attached.ok);
+  const got = (await api.context({}, agent)) as { ok: boolean; value: Context };
+  assert.ok(got.ok);
+  const facts = factsFromContext(got.value, { agent: 'claude', host: 'Studio-MacBook-Pro.local', now: clock.now(), told: [IN4] });
+  const plan = planContext(facts);
+  const text = planText(plan);
+  assert.ok(plan.tokens <= PLAN_BUDGET, text);
+  assert.ok(text.startsWith('Told     Sam said in BrainDog (IN4)'), text);
+  assert.match(lines(text)[1]!, /^Claude Code on MacBook, working on Kiln$/u);
+  assert.ok(plan.sections.some((s) => s.id === 'lane'), text);
+  assert.ok(!text.includes('call context for the full picture'), text);
+  assert.ok(!text.includes('log it with no spoken'), text);
+  sql.close();
+});
