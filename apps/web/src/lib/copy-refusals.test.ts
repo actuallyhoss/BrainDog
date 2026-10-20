@@ -61,7 +61,7 @@ test('A DEAD NETWORK IS ONE SENTENCE, whichever control was pressed', () => {
   assert.equal(copy.recordNotReached, 'Nothing was saved. Check your connection, then try again.');
   /* AND IT NAMES WHAT DID NOT HAPPEN, which is the half a person acts on: nothing was saved, so
      pressing again is safe. A refusal that only says the request failed leaves them guessing. */
-  assert.match(copy.recordNotReached, /nothing was saved/u);
+  assert.match(copy.recordNotReached, /nothing was saved/iu);
 });
 
 test('and neither half of it sells, apologises or uses a word out of the schema', () => {

@@ -254,7 +254,7 @@ test('THE TILE IS FLAT, NAMES ITS MARK BESIDE ITS WORDS, AND IS 44 UNDER A THUMB
 test('THE LAST TILES ARE ASKED ONE AT A TIME, each when the tab is idle, so none queues ahead of the next screen', () => {
   const late = home.split('$effect(').slice(1).find((e) => e.includes('textFaultsOnce(base, io)'))!;
   const body = late.slice(0, late.indexOf('return () =>'));
-  assert.equal(body.match(/tiles\.push\(\(\) => Promise\.all\(/gu)?.length, 6, 'every tile waits its turn');
+  assert.equal(body.match(/tiles\.push\(\(\) => Promise\.all\(/gu)?.length, 7, 'every tile waits its turn');
   assert.doesNotMatch(body, /void Promise\.all\(/u, 'a tile asked at once beside the others');
   assert.match(body, /for \(const tile of tiles\) \{\s*await idle\(\);\s*if \(!here \|\| leaving\.signal\.aborted\) break;/u);
 });

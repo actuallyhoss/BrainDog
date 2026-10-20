@@ -103,7 +103,8 @@ test("THE PAGE'S OWN SENTENCE STAYS UNDER THE HEAD: the reader draws the briefin
   assert.match(body, /\{#if opens && opensAt === at\}/u);
   assert.match(body, /\{#if opens && opensAt < 0\}/u);
   /* And who wrote it goes with the cards. */
-  assert.match(home, /<brief\.Part cards=\{brief\.cards\} foot=\{brief\.foot\} \/>/u);
+  /* The engine line says the model has stopped, so the brief's own paused foot is not said twice. */
+  assert.match(home, /<brief\.Part cards=\{brief\.cards\} foot=\{engineDown !== null && brief\.foot === brief\.paused \? null : brief\.foot\} \/>/u);
 });
 
 test('neither read comes with the screen: each is fetched when asked for, parts and all', () => {

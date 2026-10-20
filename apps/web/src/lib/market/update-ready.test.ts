@@ -46,5 +46,5 @@ test('an earlier version the store has lost reads as a first version, so everyth
 test('the page keeps the sentences that tell a person their edits are kept and that updating asks', () => {
   assert.match(readyWords.kept, /you changed/u);
   assert.match(readyWords.asks, /nothing changes until you approve/u);
-  for (const said of Object.values(readyWords).filter((v: unknown): v is string => typeof v === 'string')) assert.doesNotMatch(said, /—/u);
+  for (const said of Object.values<unknown>(readyWords)) if (typeof said === 'string') assert.doesNotMatch(said, /—/u);
 });

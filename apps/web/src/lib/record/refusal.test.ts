@@ -325,7 +325,8 @@ test('AN EMPTY LIST IS `no-data-yet` EVEN THOUGH THE AUTHOR WROTE AN `empty:`', 
   );
   assert.equal(refusal?.kind, 'no-data-yet', 'the author’s sentence outranked the fact');
   assert.equal(refusal?.title, 'Nothing in Obligations yet.');
-  assert.equal(refusal?.body, 'Obligations holds money owed either way.', '19 §6: be specific about what will be here');
+  /* An empty list says who fills it (the night's empty states: the agent), where it used to say what the list holds. */
+  assert.equal(refusal?.body, 'Your agent fills this as it works.', '19 §6: say what will be here and who puts it there');
 });
 
 test('and it carries the one action `19 §6` gives that state', () => {

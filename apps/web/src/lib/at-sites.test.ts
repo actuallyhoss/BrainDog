@@ -43,6 +43,13 @@ const RENDERED = new Map([
   ['href', 'the sign-in `reprove` hands back is built by `lib/record/vault.ts`'],
 ]);
 
+/** Navigations made in one file with a value that is already right, and why: `file arg`. */
+const RENDERED_IN = new Map([
+  ['lib/page/Arrange.svelte withoutEntry(route.url', 'the page the person is on, with the entry line taken off its query: `route.url` already holds the app base'],
+  ['lib/shell.ts url', 'an outside link opened in this tab (a payment page), which is not an address in the app'],
+  ['routes/+layout.svelte path', '`appPath` answers only an address under `/app`, from the Mac app\'s Go menu'],
+]);
+
 /** The files that read the bare origin on purpose, and what for. Anything else reading it is a record call gone to the root. */
 const BARE_ORIGIN = new Map([
   ['lib/clipboard.ts', 'a copied link is absolute, and `at()` adds the record'],
@@ -54,6 +61,7 @@ const BARE_ORIGIN = new Map([
   ['lib/ui/ShareMenu.svelte', 'a read-only page link is copied whole, so the host is written into it'],
   ['lib/data/offline.ts', 'the service worker scope is an absolute URL, never a record address `at()` builds'],
   ['routes/signin/+page.svelte', 'the Google button goes to `/auth/google/start`, which is the host\'s and not under the app'],
+  ['routes/signin/desktop/+page.svelte', 'the one-time code is swapped at `/auth` on the host, which is not under a record'],
   ['lib/home/WantMore.svelte', 'the connect sheet\'s setup line names the bare host and adds the record itself, as Settings, Agents writes it'],
 ]);
 
@@ -76,7 +84,7 @@ test('NO ADDRESS IN THE APP IS RENDERED WITHOUT `at()`, and no record call goes 
     }
     for (const m of text.matchAll(/\b(goto|location\.assign|redirect)\((?:\s*\d+,)?\s*([^,)]*)/g)) {
       const arg = m[2]!.trim();
-      if (arg === '' || /^(at|inApp)\(/.test(arg) || /^[`'"][?#]/.test(arg) || RENDERED.has(arg)) continue;
+      if (arg === '' || /^(at|inApp)\(/.test(arg) || /^[`'"][?#]/.test(arg) || RENDERED.has(arg) || RENDERED_IN.has(`${name} ${arg}`)) continue;
       found.push(`${name}:${lineOf(text, m.index)}  ${m[1]}(${arg})`);
     }
     if (!BARE_ORIGIN.has(name)) for (const m of text.matchAll(/location\.origin/g)) found.push(`${name}:${lineOf(text, m.index)}  location.origin`);

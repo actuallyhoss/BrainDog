@@ -23,7 +23,7 @@
   let { cards, more, list, name }: { cards: readonly ProjectCard[]; more: number; list: string; name: string } = $props();
 
   const words = {
-    formed: "Formed from your agent's first session.",
+    formed: "Formed from your agent's first run.",
     keep: 'Keep it',
     notOne: 'Not a project',
     next: 'Next step',

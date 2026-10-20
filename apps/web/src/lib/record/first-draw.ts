@@ -57,6 +57,8 @@ export const FIRST_DRAW: readonly FirstRead[] = [
  */
 export const AFTER_DRAW: Readonly<Record<string, string>> = {
   previewChange: 'Needs you, when a proposed change is opened, never the front door',
+  engineHealth: "Home's engine line, asked only where Slash has a model behind it, and a refusal or an older host draws nothing",
+  slashStatus: "Home's engine line, the month's spend beside the model's health, asked only where Slash has a model behind it",
 };
 
 /**

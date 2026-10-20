@@ -30,11 +30,11 @@ test('the head is drawn once, with no element of its own round it', () => {
 });
 
 test('nothing is drawn between the head and the page', () => {
-  assert.match(markup, /<\/PageHead>\s*<div class="page">/u, 'something stands between the head’s sentence and .page');
+  assert.match(markup, /<\/PageHead>\s*<div class="page"(?: inert=\{fromCopy\})?>/u, 'something stands between the head’s sentence and .page');
 });
 
 test('the sheet for asking a question is still drawn, after the page', () => {
-  const page = markup.indexOf('<div class="page">');
+  const page = markup.indexOf('<div class="page"');
   const sheet = markup.indexOf('<AskSheet');
   assert.ok(sheet > page, 'the sheet is drawn before the page, between it and the head');
   assert.match(markup, /<AskSheet open=\{asking\} onclose=\{\(\) => \(asking = false\)\} onfiled=\{filed\} \/>/u);

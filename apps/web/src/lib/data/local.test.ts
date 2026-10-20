@@ -186,7 +186,7 @@ test('BEFORE THIS TAB CLAIMS IT, only the person the last shell named is answere
 
   const next = localCopy(store, () => fake.log, { build: 'b1', now: () => NOON });
   assert.equal(await next.answer('work', 'k', 'https://a', 'p_bo'), null);
-  assert.deepEqual(await next.answer('work', 'k', 'https://a', 'p_ada'), { value: 'w', decls: { tasks: DECL }, current: false });
+  assert.deepEqual(await next.answer('work', 'k', 'https://a', 'p_ada'), { value: 'w', decls: { tasks: DECL }, current: false, kept: NOON });
   const built = localCopy(store, () => fake.log, { build: 'b2', now: () => NOON });
   assert.equal(await built.answer('work', 'k', 'https://a', 'p_ada'), null, 'another build reads no copy');
 });

@@ -6,8 +6,8 @@
  * start one.
  */
 
-import { words as flowWords } from '$lib/flow/flow.ts';
-import type { Proposal, Sentenced, SentencePart, TriggerOption } from '$lib/flow/source.ts';
+import { words as flowWords } from '../../lib/flow/flow.ts';
+import type { Proposal, Sentenced, SentencePart, TriggerOption } from '../../lib/flow/source.ts';
 
 export const sentenceWords = {
   label: 'Say it as a sentence',
