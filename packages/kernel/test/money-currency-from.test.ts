@@ -71,7 +71,7 @@ test('A STORED CODE DOES NOT CHANGE: CURRENCY_FIXED, and the number stays free',
 
 test('CURRENCY_FIXED IS A CODE THE RECORD PUBLISHES', () => {
   assert.ok((REFUSAL_CODES as readonly string[]).includes('CURRENCY_FIXED'));
-  assert.equal(REFUSAL_CODES.length, 129);
+  assert.equal(REFUSAL_CODES.length, 131);
 });
 
 const ACCOUNTS: Declaration = {
