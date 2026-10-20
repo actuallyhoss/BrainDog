@@ -213,7 +213,7 @@ required but the data directory.
 | `PORT` | `8080` | |
 | `BRAINDOG_OWNER` | first start with an empty data directory refuses, naming `init` | the owner's email: that start makes the record (`BRAINDOG_RECORD`, default `home`) and prints a one-time sign-in link |
 
-`.env.example` at the repository root lists every name the self-host reads, each with a line on why, and
+`selfhost.env.example` at the repository root lists every name the self-host reads, each with a line on why, and
 `apps/selfhost/README.md` is the stranger's walk from zero. `braindog backup <folder>` and `braindog restore <folder>`
 are the self-host's carry-off copy and its way back.
 

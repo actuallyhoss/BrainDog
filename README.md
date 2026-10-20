@@ -50,7 +50,7 @@ setting the server reads.
 
 ### The container
 
-The short way is [apps/selfhost/README.md](apps/selfhost/README.md): `cp .env.example .env`, then `docker compose up -d`.
+The short way is [apps/selfhost/README.md](apps/selfhost/README.md): `cp selfhost.env.example .env`, then `docker compose up -d`.
 By hand:
 
 The self-host also builds as one image, the server and the app it serves, with the record in a

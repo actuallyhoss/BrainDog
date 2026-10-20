@@ -1,4 +1,4 @@
-# One command: `cp .env.example .env`, fill in the two values it asks for, then `docker compose up -d`.
+# One command: `cp selfhost.env.example .env`, fill in the two values it asks for, then `docker compose up -d`.
 # The record lives in the named volume, so `docker compose down` keeps it; `down -v` deletes it.
 services:
   braindog:

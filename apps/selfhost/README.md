@@ -8,7 +8,7 @@ with us. You need Docker with Compose, or Node 24.13 and pnpm.
 ```sh
 git clone https://github.com/actuallyhoss/braindog
 cd braindog
-cp .env.example .env
+cp selfhost.env.example .env
 ```
 
 Edit `.env` and set two things:
@@ -35,7 +35,7 @@ The server says each of these in one line when it starts. None is an error.
 - Billing: always off. Nothing is charged or counted.
 - Turnstile: off. Self-host has no public sign-up.
 
-Every setting is in `.env.example`. For a public address, put https in front (or set `BRAINDOG_TLS_CERT` and
+Every setting is in `selfhost.env.example`. For a public address, put https in front (or set `BRAINDOG_TLS_CERT` and
 `BRAINDOG_TLS_KEY`) and set `BRAINDOG_ORIGIN` to it. Passkeys are tied to that address, so choose it first.
 
 ## Backups
