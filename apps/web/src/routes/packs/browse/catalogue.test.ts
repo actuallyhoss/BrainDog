@@ -229,15 +229,19 @@ test('updates on offer for what a record holds, with what changed, and a proposa
   assert.equal(missing.refused.length, 1);
 });
 
-test('browse is named for both kinds it lists, and /packs names a catalogue entry by its title', async () => {
+test('browse is Add-ons, with a section for each kind it lists, and /packs names a catalogue entry by its title', async () => {
   const { copy } = await import('../../../lib/copy.ts');
+  const { words: market } = await import('../../../lib/market/words.ts');
   const { readFileSync } = await import('node:fs');
   const at = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-  assert.match(copy.browseTitle, /use cases/iu);
-  assert.match(copy.browseTitle, /add-ons/iu);
+  /* ONE PLACE, ONE NAME (the UI pass of 20 October, agents F9): browse is the other half of Add-ons, and its sections
+     name the kinds. */
+  assert.equal(copy.packs, 'Add-ons');
+  assert.match(market.sections.usecase, /use cases/iu);
+  assert.match(market.sections.module, /built in/iu);
   assert.match(copy.browseAll, /use cases/iu);
   assert.match(copy.browseAll, /add-ons/iu);
-  assert.match(at('./+page.svelte'), /title=\{copy\.browseTitle\}/u);
+  assert.match(at('./+page.svelte'), /title=\{copy\.packs\}/u);
   assert.match(at('./[id]/+page.svelte'), /\{copy\.browseAll\}/u);
   assert.doesNotMatch(at('./[id]/+page.svelte'), /copy\.useCase(s|All)\b/u);
 

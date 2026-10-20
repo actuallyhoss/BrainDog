@@ -21,6 +21,7 @@
   const MOST = 4;
   const headings = $derived(large ? preview.home : preview.home.slice(0, MOST));
   const rest = $derived(preview.home.length - headings.length);
+  const homeName = $derived(preview.spine.home ?? copy.home);
 </script>
 
 <div class="preview" data-large={large ? '' : undefined} aria-hidden="true">
@@ -38,12 +39,12 @@
   {/if}
   <div class="mini-home">
     <span class="mini-h">{copy.browseHome}</span>
-    <span class="mini-title">{preview.spine.home ?? copy.home}</span>
+    <!-- THE HOME'S OWN NAME ONLY WHEN IT IS NOT THE HEADING'S: "Home" over "Home" said one thing twice (agents F5). -->
+    {#if homeName !== copy.browseHome}<span class="mini-title">{homeName}</span>{/if}
     {#each headings as heading, i (i)}
       <span class="mini-block">{'voice' in heading ? (heading.text ?? VOICE_LINES[heading.voice]) : heading.text}</span>
     {/each}
     {#if rest > 0}<span class="mini-block mini-more">{words.moreLines(rest)}</span>{/if}
-    {#if preview.home.length === 0}<span class="mini-empty">{copy.browseHouseHome}</span>{/if}
     {#if preview.lists.length > 0}
       <span class="mini-h lists-h">{copy.browseLists}</span>
       <span class="mini-lists">{preview.lists.join(', ')}</span>
@@ -56,7 +57,7 @@
   .preview {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -69,7 +70,7 @@
   }
 
   .mini-h {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 600;
   }
 
@@ -81,12 +82,12 @@
     display: flex;
     align-items: center;
     gap: var(--sp-1);
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   .mini-section {
     margin-block-start: var(--sp-1);
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .mini-title {
@@ -98,8 +99,8 @@
   .mini-block {
     overflow: hidden;
     padding-block: var(--sp-1);
-    border-block-start: 1px solid var(--line);
-    color: var(--ink2);
+    border-block-start: 1px solid var(--rule);
+    color: var(--ink-2);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -107,7 +108,7 @@
   .mini-empty,
   .mini-lists,
   .mini-more {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* LARGE, IT IS DRAWN ON ITS OWN GROUND: a `--sunk` well inside the tile that holds it, the way the app's ground sits
@@ -116,9 +117,9 @@
   .preview[data-large] {
     gap: var(--sp-5);
     padding: var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--sunk);
-    font-size: var(--t-sm);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
+    font-size: var(--fs-meta);
   }
 
   @media (width >= 640px) {

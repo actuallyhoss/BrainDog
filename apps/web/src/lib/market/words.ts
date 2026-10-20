@@ -7,14 +7,18 @@
 import type { Category } from '@braindog/declare/catalogue';
 
 export const words = {
-  searchLabel: 'Search use cases and add-ons',
-  searchHint: 'Search by name, what it adds or who made it',
+  searchLabel: 'Search add-ons',
+  searchHint: 'Search add-ons',
+  /* BROWSE IN TWO SECTIONS (the UI pass of 20 October, agents F9): the ways of working as cards with their Home drawn
+     small, and what is built in as rows, the way /packs lists what is installed. An add-on from outside is a third. */
+  sections: { usecase: 'Use cases', module: 'Built in', pack: 'From others' } as const,
+  sortLabel: 'Sort',
   all: 'All',
   categoriesLabel: 'Categories',
   categories: {
     'made-by-braindog': 'Made by BrainDog',
-    'ways-of-working': 'Ways of working',
-    modules: 'Lists',
+    'ways-of-working': 'Use cases',
+    modules: 'Built in',
     templates: 'Templates',
     connectors: 'Connectors',
     doors: 'Doors',
@@ -23,11 +27,10 @@ export const words = {
     themes: 'Themes',
   } satisfies Record<Category, string>,
   orderLabel: 'Order',
-  orders: { 'for-you': 'For you', installed: 'Most installed', newest: 'Newest' },
+  orders: { 'for-you': 'For you', installed: 'Most used', newest: 'Newest' },
   kinds: { module: 'Built in', usecase: 'Use case', pack: 'Add-on' },
   nothingFound: 'Nothing matches that search',
   nothingFoundBody: 'Try fewer words, or pick All.',
-  results: (n: number): string => (n === 1 ? '1 result' : `${n} results`),
   installs: (n: number): string => `On ${n}+ BrainDogs`,
   /* UNDER TEN INSTALLS THE STORE SAYS NO NUMBER (`roundCount`), so an add-on from outside that nobody much holds yet is "New". */
   newOne: 'New',
@@ -52,7 +55,7 @@ export const words = {
   addsExamples: 'Examples',
   addsModules: 'Needs first',
   addsNothing: 'Nothing of its own',
-  addsFigures: 'Figures',
+  addsFigures: 'Numbers it tracks',
   atLeast: (n: string): string => `at least ${n}`,
   atMost: (n: string): string => `at most ${n}`,
   exactly: (n: string): string => `exactly ${n}`,
@@ -64,7 +67,9 @@ export const words = {
   ruleScheduled: 'Runs on a schedule',
   ruleOther: 'Runs when something happens in the record',
   examples: (n: number): string => (n === 0 ? 'No examples' : n === 1 ? '1 example' : `${n} examples`),
-  bump: { major: 'Takes something away', minor: 'Adds something', patch: 'Changes details' },
+  /* A VERSION'S TAG, OR NONE: "Adds something" on every row said nothing (agents F25). A major is still said, since it
+     takes something away. */
+  bump: { major: 'Takes something away', minor: 'New', patch: 'Fixes' },
   first: 'First version',
   /* A DAY, NEVER ISO: "2 Sep" this year, "2 Sep 2025" before it. A version is dated to the day, so a
      time inside the week is not worth the relative form. */
@@ -115,7 +120,9 @@ export const words = {
   countHosts: (n: number): string => (n === 1 ? 'Calls 1 host' : `Calls ${n} hosts`),
   /* THE BROWSE TITLE ROW'S SENTENCE: how many there are, and how many this record holds already. */
   sentence: (n: number, held: number | null): string =>
-    held === null || held === 0 ? `${n} to pick from.` : `${n} to pick from; ${held} ${held === 1 ? 'is' : 'are'} already in your record.`,
+    held === null || held === 0 ? `${n} to pick from.` : `${n} to pick from, and ${held} ${held === 1 ? 'is' : 'are'} already in your BrainDog.`,
+  /* WHAT A USE CASE BRINGS OF ITS OWN, said once under its drawing: its lists by name. */
+  ownLists: (names: readonly string[]): string => names.join(', '),
   /* THE DETAIL PAGE'S PLAN: the row that names every host it calls, and the tail of a row that names more than fit. */
   calledHosts: 'Hosts it calls',
   andMore: (n: number): string => `and ${n} more`,
