@@ -137,19 +137,13 @@
     overflow: hidden;
   }
 
-  .line-short {
-    min-block-size: var(--ctl-h);
-  }
-
   /**
    * UNDER A THUMB THE ROW IS 44 (13 §7). The pointer and not the width: a tablet's desktop row is what a coarse
    * pointer gets above 640, and `--ctl-h` already goes to 44 in this exact condition. The interactive ones only.
    */
   @media (pointer: coarse) {
     a.line,
-    button.line,
-    a.line-short,
-    button.line-short {
+    button.line {
       min-block-size: var(--tap);
     }
   }
@@ -223,12 +217,6 @@
     font-size: var(--t-sm);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-  }
-
-  /* "2 DAYS LATE", THE ROW'S ONE RED. The words carry it, at 500 so the red is never a hairline of colour. */
-  .line-late {
-    color: var(--danger-text);
-    font-weight: 500;
   }
 
   /**
@@ -326,23 +314,6 @@
     }
   }
 
-  /**
-   * A LIST WHOSE LEAD COLUMN IS ONLY A GLYPH. A list of passkeys, backups or records has no id, and the 12ch id column
-   * left a key icon floating a hand's width from its own name. Here the glyph sits against the title, and the trailing
-   * column may wrap, because what lands in it on these screens is a sentence rather than a date.
-   */
-  .ledger-glyph .line {
-    grid-template-columns: var(--icon-m) minmax(0, 1fr) auto auto;
-    gap: var(--sp-3);
-  }
-
-  .ledger-glyph .line-when {
-    flex-wrap: wrap;
-    max-inline-size: 44ch;
-    white-space: normal;
-    text-align: end;
-  }
-
   /* ON A PHONE A TWO-LINE ROW IS 60, the size a thumb reads a list at. */
   @media (width < 900px) {
     .line-tall {
@@ -418,39 +389,6 @@
       grid-row: 3;
     }
 
-    /* The glyph list keeps its glyph beside the title, the facts under the title, and the row's
-       action at the end of the first line. */
-    .ledger-glyph .line {
-      grid-template-columns: var(--icon-m) minmax(0, 1fr) auto;
-      align-items: start;
-      align-content: center;
-      gap: 2px var(--sp-3);
-    }
-
-    .ledger-glyph .seq {
-      grid-column: 1;
-      grid-row: 1;
-      min-inline-size: 0;
-      min-block-size: 1lh;
-    }
-
-    .ledger-glyph .line-main {
-      grid-column: 2;
-      grid-row: 1;
-    }
-
-    .ledger-glyph .line-amount {
-      grid-column: 2 / -1;
-      grid-row: 2;
-      text-align: start;
-    }
-
-    /* ACROSS BOTH LINES, so a 44px button does not push the facts a line's height under the title. */
-    .ledger-glyph .line-when {
-      grid-column: 3;
-      grid-row: 1 / span 2;
-      align-self: center;
-    }
   }
 
   /* A LEAD COLUMN KEEPS ITS PLACE ON A PHONE. The card above moves `.line-main` under the top line, and in a list with a

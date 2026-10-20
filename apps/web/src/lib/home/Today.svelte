@@ -891,6 +891,26 @@
 {/snippet}
 
 <style>
+  /* Today's own row sizes, moved out of the entry stylesheet (`rows.css`) and kept in its layer. */
+  @layer components {
+    .line-short {
+      min-block-size: var(--ctl-h);
+    }
+
+    @media (pointer: coarse) {
+      a.line-short,
+      button.line-short {
+        min-block-size: var(--tap);
+      }
+    }
+
+    /* "2 DAYS LATE", THE ROW'S ONE RED. The words carry it, at 500 so the red is never a hairline of colour. */
+    .line-late {
+      color: var(--danger-text);
+      font-weight: 500;
+    }
+  }
+
   .page {
     max-inline-size: var(--page-max);
     padding: var(--sp-4) var(--gutter) var(--sp-9);

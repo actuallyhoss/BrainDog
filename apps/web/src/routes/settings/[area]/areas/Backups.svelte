@@ -405,6 +405,55 @@
 </Section>
 
 <style>
+  /* A LIST WHOSE LEAD COLUMN IS ONLY A GLYPH: no id, so the glyph sits against the title and the trailing column may
+     wrap. Moved out of the entry stylesheet (`rows.css`), kept in the same layer so the cascade is as it was. */
+  @layer components {
+    .ledger-glyph :global(.line) {
+      grid-template-columns: var(--icon-m) minmax(0, 1fr) auto auto;
+      gap: var(--sp-3);
+    }
+
+    .ledger-glyph :global(.line-when) {
+      flex-wrap: wrap;
+      max-inline-size: 44ch;
+      white-space: normal;
+      text-align: end;
+    }
+
+    @media (width < 900px) {
+      .ledger-glyph :global(.line) {
+        grid-template-columns: var(--icon-m) minmax(0, 1fr) auto;
+        align-items: start;
+        align-content: center;
+        gap: 2px var(--sp-3);
+      }
+
+      .ledger-glyph :global(.seq) {
+        grid-column: 1;
+        grid-row: 1;
+        min-inline-size: 0;
+        min-block-size: 1lh;
+      }
+
+      .ledger-glyph :global(.line-main) {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      .ledger-glyph :global(.line-amount) {
+        grid-column: 2 / -1;
+        grid-row: 2;
+        text-align: start;
+      }
+
+      .ledger-glyph :global(.line-when) {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        align-self: center;
+      }
+    }
+  }
+
   /* THE NIGHT'S COPY, the first line in the tile over the copies, at body size. */
   .last-copy {
     display: flex;
