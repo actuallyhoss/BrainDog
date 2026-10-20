@@ -213,6 +213,14 @@ export function mergeListOf(m: Merge, lists: Readonly<Record<string, object | un
   return people.length === 1 ? people[0]![0] : null;
 }
 
+/**
+ * WHETHER A KEY IS ONE OF THIS MERGE'S OWN PRESSES (Merge all, Keep apart or a Pick). The record answers these on a
+ * rowset whose own options are still Accept and Decline (`merge` folds, `apart` keeps them apart), so a screen that only
+ * sends the options the question lists would drop them without a word. The page and the card send the same key.
+ */
+export const pressOfKey = (m: Merge, key: string): Press | null =>
+  [m.all, m.apart, ...m.candidates.flatMap((c) => (c.pick ? [c.pick] : []))].find((p) => p.option === key) ?? null;
+
 /** The name the merged one keeps: the candidate kept, else the first one named. */
 export const keptName = (m: Merge): string => m.candidates.find((c) => c.kept && c.name !== '')?.name ?? m.candidates.find((c) => c.name !== '')?.name ?? '';
 

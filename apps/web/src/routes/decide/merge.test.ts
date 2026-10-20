@@ -206,3 +206,22 @@ test('THE LIST A MERGE IS ABOUT IS READ OFF THE RECORD: its handles, else the on
   assert.equal(mergeListOf(at('firms#1', 'contacts#2'), lists), 'contacts', 'two lists in one merge fall back to the role');
   assert.equal(mergeListOf(at('Joaquin', 'Jo'), { firms: lists.firms }), null, 'a record with no people role names no list');
 });
+
+/* THE PAGE SENT NOTHING FOR A MERGE'S OWN PRESS (2026-10-20): the question lists Accept and Decline, the record's cluster
+   offers `merge`, `apart` and `pick:..`, and the page sent only keys the question lists, so Merge all said "Merged" and
+   wrote nothing. The card sends the cluster's key; so does the page now. */
+test('a merge press is recognised by key, and the page sends it rather than dropping it', async () => {
+  const { pressOfKey, mergeOf } = await import('./merge.ts');
+  const m = mergeOf(
+    { kind: 'options', body: { candidates: [{ at: 'people#1', name: 'Ana', kept: true }, { at: 'people#2', name: 'Ana B' }, { at: 'people#3', name: 'Ana C' }] } },
+    ['merge', 'apart', 'pick:people#2', 'pick:people#3'],
+  );
+  assert.ok(m);
+  assert.equal(pressOfKey(m, 'merge')?.option, 'merge');
+  assert.equal(pressOfKey(m, 'apart')?.option, 'apart');
+  assert.equal(pressOfKey(m, 'pick:people#2')?.option, 'pick:people#2');
+  assert.equal(pressOfKey(m, 'delete'), null);
+  const page = (await import('node:fs')).readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
+  assert.match(page, /pressOfKey\(merge, key\)/u, 'the page drops a merge press the question does not list');
+  assert.match(page, /toasts\.push\(copy\.recordNotReached/u, 'a press that goes nowhere is silent');
+});

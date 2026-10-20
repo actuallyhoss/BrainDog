@@ -67,7 +67,7 @@
   import { cardWords, spoken } from '$lib/decide/card.ts';
   import { mayAnswer, whyNotAnswering } from '../answering.ts';
   import { acceptKey, declineKey, fromInput, hold, HOLD_MS, keyAct, labelOf, movesOf, notedAfter, twoWords, type Held } from '../press.ts';
-  import { mergeListOf, mergeOf, words as mergeWords, type Press } from '../merge.ts';
+  import { mergeListOf, mergeOf, pressOfKey, words as mergeWords, type Press } from '../merge.ts';
   import MergeCard from '../MergeCard.svelte';
   import { nextOpen, stillWaiting, words as onwardWords } from './onward.ts';
   import { sideOf, words as sideWords } from './side.ts';
@@ -631,8 +631,14 @@
   let threadRead = $state(0);
 
   async function send(key: string, said?: string, only?: number[]) {
-    const a = answerFor(question, key, new Date(now).toISOString());
-    if (!a || from !== 'live' || !client || sending !== null) return;
+    /* A MERGE'S OWN PRESS (`merge`, `apart`, `pick:..`) IS AN ANSWER THE RECORD TAKES THOUGH THE QUESTION LISTS ONLY ACCEPT
+       AND DECLINE; dropping it here said "Merged" and wrote nothing. A press that goes nowhere says so. */
+    const own = merge && question && pressOfKey(merge, key) ? { question: question.id, option: key, title: key === merge.all.option ? mergeWords.mergeAll : key === merge.apart.option ? mergeWords.apart : mergeWords.pick, reason: '', at: new Date(now).toISOString(), by: 'you' } : null;
+    const a = answerFor(question, key, new Date(now).toISOString()) ?? own;
+    if (!a || from !== 'live' || !client || sending !== null) {
+      if (sending === null) toasts.push(copy.recordNotReached, { intent: 'warn' });
+      return;
+    }
     sending = key;
     const accepting = a.option === 'accept' && about !== undefined && isArranging(about.kind) ? about : null;
     const had = accepting ? sidebarNow() : null;
@@ -672,7 +678,7 @@
       await readLive(a.question);
       return;
     }
-    const shown = question ? labelOf({ key: a.option, title: a.title }, question, []) : a.title;
+    const shown = question && !own ? labelOf({ key: a.option, title: a.title }, question, []) : a.title;
     committed = { ...a, title: shown, reason: said?.trim() ?? '' };
     noteOffered = notedAfter(a.option, rows !== undefined);
     toasts.push(copy.decisionRecorded(shown), { intent: 'good' });
