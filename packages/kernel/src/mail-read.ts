@@ -206,7 +206,7 @@ function classify(subject: string, body: string, hasRenewDay: boolean): MailKind
   const renew = score(/\b(renew(?:s|al|ed)?|auto-?renew|expires?|expiry|expiring)\b/iu);
   const ship = score(/\b(shipped|dispatched|tracking|out for delivery|delivery|booking|reservation|itinerary|check-?in|e-?ticket)\b/iu);
   const paid = score(/\b(receipt|you paid|payment received|thank you for your payment|paid in full)\b/iu);
-  const bill = score(/\b(invoice|amount due|balance due|bill|statement|payment due)\b/iu);
+  const bill = score(/\b(invoice|amount due|balance due|bill|payment due)\b/iu);
   if (hasRenewDay && renew > 0 && renew >= Math.max(bill, paid)) return 'renewal';
   if (paid > 0 && paid >= bill) return 'receipt';
   if (bill > 0 && bill >= ship) return 'invoice';
@@ -214,7 +214,7 @@ function classify(subject: string, body: string, hasRenewDay: boolean): MailKind
   return 'none';
 }
 
-const REF = /\b(?:invoice|receipt|order|booking|reference|confirmation)\s*(?:no\.?|number|#|ref\.?)?\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{3,24})\b/iu;
+const REF = /\b(?:invoice|receipt|order|booking|reference|confirmation)\s*(?:no\.?|number|#|ref\.?)?\s*[:#]?\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/iu;
 
 /** One mail read by rules: the forwarded sender if it is a forward, the kind, the total, the days and who it names. */
 export function readMail(m: { from?: string; to?: string; cc?: string; subject?: string; body?: string }): MailRead {
