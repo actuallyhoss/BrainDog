@@ -20,7 +20,10 @@
 
 import type { MeterKey } from '../../../lib/record/actions.ts';
 
-/** A piece of the sentence; `needs` marks the phrase drawn in `--danger`, and `href` makes it a link. */
+/**
+ * A piece of the sentence. `needs` marks what is wrong, which turns the line's dot to `--warn`; the words stay in ink
+ * (agents F13). `href` makes it a link, and the one link is the "Look" at the line's end, in `--red`.
+ */
 export type Part = { text: string; needs?: true; href?: string };
 
 /** One open fault as the record's `faults()` answers it: its sentence, how many times, since when. */
@@ -43,8 +46,11 @@ export type Engine = {
   said: { text: string; whose: 'ours' | 'yours' | null };
 };
 
-/** One vital sign as `signs()` answers it, the part this sentence reads. */
-export type Sign = { sign: string; state: 'green' | 'red' | 'none' };
+/** One vital sign as `signs()` answers it, the part this sentence reads: its state, and its own sentence when red. */
+export type Sign = { sign: string; state: 'green' | 'red' | 'none'; said?: string };
+
+/** The word of the link at the line's end, to where the signs are shown. */
+export const LOOK = 'Look';
 
 /**
  * What else was read, each `null` or absent where it was not: a build without the method, a refusal, a host that hands
@@ -168,10 +174,13 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
     const cut = text.indexOf('. ');
     lead.push(cut < 0 ? [{ text, needs: true }] : [{ text: text.slice(0, cut + 1), needs: true }, { text: text.slice(cut + 1) }]);
   }
+  /* A RED SIGN IS NAMED BY ITS OWN SENTENCE (agents F13): "Last night's copy did not run." and, with more, ", and 1
+     more." A sign that hands no sentence is counted as before. */
   const red = redSigns(more.signs);
   if (red !== null && red > 0) {
-    const said = red === 1 ? 'One vital sign needs a look' : `${red} vital signs need a look`;
-    lead.push([{ text: said, needs: true, ...(more.signsAt ? { href: more.signsAt } : {}) }, { text: '.' }]);
+    const named = more.signs?.find((x) => x.state === 'red' && typeof x.said === 'string' && x.said.trim() !== '')?.said?.trim().replace(/[.!?]$/u, '');
+    const said = named ? (red === 1 ? named : `${named}, and ${red - 1} more`) : red === 1 ? 'One vital sign needs a look' : `${red} vital signs need a look`;
+    lead.push([{ text: said, needs: true }, { text: '.' }]);
   }
 
   /* ── the copy and the month, as before ─────────────────────────────────── */
@@ -196,9 +205,11 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
   const unreadSaid: Part[] =
     unread === 0
       ? []
-      : [{ text: unread === 1 ? 'One vital sign has not been read yet' : `${unread} vital signs have not been read yet`, ...(more.signsAt ? { href: more.signsAt } : {}) }, { text: '.' }];
+      : [{ text: unread === 1 ? 'One vital sign has not been read yet' : `${unread} vital signs have not been read yet` }, { text: '.' }];
+  /* THE ONE LINK, AT THE END: "Look", to where the signs are shown, when a sign is red or unread. */
+  const look: Part[] = more.signsAt && ((red ?? 0) > 0 || unread > 0) ? [{ text: ' ' }, { text: LOOK, href: more.signsAt }] : [];
 
-  if (lead.length === 0 && bad.length === 0 && good.length === 0) return unreadSaid.length > 0 ? unreadSaid : null;
+  if (lead.length === 0 && bad.length === 0 && good.length === 0) return unreadSaid.length > 0 ? [...unreadSaid, ...look] : null;
   if (lead.length === 0 && bad.length === 0 && unreadSaid.length === 0) return [{ text: faultsClear ? `All healthy: ${joined(good)}.` : `${upper(joined(good))}.` }];
 
   const parts: Part[] = [];
@@ -228,6 +239,7 @@ export function healthSaid(copy: CopyState, usage: UsageState, more: More = {}):
     space();
     parts.push(...unreadSaid);
   }
+  parts.push(...look);
   return parts;
 }
 

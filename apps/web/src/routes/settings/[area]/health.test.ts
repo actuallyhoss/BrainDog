@@ -82,7 +82,7 @@ test('an open fault leads, before the engine, the signs and the copy, and the he
     text(said),
     'One thing is not working: BrainDog could not check for people who are here twice. It tries again tonight. ' +
       'Slash’s model has not answered since 6 October. That is ours to fix. Until it is back, BrainDog works from its rules. ' +
-      'One vital sign needs a look. Last night’s copy is in, and nothing runs out before 1 October.',
+      'One vital sign needs a look. Last night’s copy is in, and nothing runs out before 1 October. Look',
   );
   assert.deepEqual(needs(said), ['One thing is not working', 'Slash’s model has not answered since 6 October.', 'One vital sign needs a look']);
   assert.ok(!text(said).includes('All healthy'));
@@ -115,10 +115,11 @@ test('an engine that does not answer is said and marked; one that answers joins 
   assert.equal(healthSaid(null, null, { engine: engine('off', 'Slash has no model on this host, so BrainDog works from its rules.') }), null);
 });
 
-test('red signs are a count that links to where the signs are shown; all green joins all healthy', () => {
+test('red signs are a count with one Look link to where the signs are shown; all green joins all healthy', () => {
   const said = healthSaid('in', null, { signs: signs('red', 'red', 'green'), signsAt: '/p/health' });
   assert.deepEqual(needs(said), ['2 vital signs need a look']);
   assert.deepEqual(links(said), ['/p/health']);
+  assert.ok(text(said).endsWith(' Look'), 'the link is not the one word at the end');
   assert.deepEqual(links(healthSaid(null, null, { signs: signs('red') })), []);
   assert.equal(text(healthSaid(null, null, { faults: [], signs: signs('green', 'green') })), 'All healthy: nothing is broken.');
   assert.equal(healthSaid(null, null, { signs: signs('green', 'green') }), null);
@@ -141,7 +142,7 @@ test('a missed copy after a fault is its own marked sentence', () => {
 
 test('every sign unread is said as unread, never all healthy', () => {
   const said = healthSaid('in', MONTH, { faults: [], signs: signs('none', 'none', 'none'), signsAt: '/p/health' });
-  assert.equal(text(said), 'Last night’s copy is in, nothing runs out before 1 October, and nothing is broken. 3 vital signs have not been read yet.');
+  assert.equal(text(said), 'Last night’s copy is in, nothing runs out before 1 October, and nothing is broken. 3 vital signs have not been read yet. Look');
   assert.doesNotMatch(text(said), /healthy/u);
   assert.deepEqual(needs(said), [], 'unread is not wrong yet, so nothing is marked');
   assert.deepEqual(links(said), ['/p/health']);
@@ -159,7 +160,7 @@ test('one green and the rest unread is never all healthy, and the unread are cou
 
 test('one red with the rest unread: red leads and is marked, and the unread are not said behind it', () => {
   const said = healthSaid('in', null, { faults: [], signs: signs('red', 'none', 'none'), signsAt: '/p/health' });
-  assert.equal(text(said), 'One vital sign needs a look. Last night’s copy is in.');
+  assert.equal(text(said), 'One vital sign needs a look. Last night’s copy is in. Look');
   assert.deepEqual(needs(said), ['One vital sign needs a look']);
   assert.deepEqual(links(said), ['/p/health']);
   assert.doesNotMatch(text(said), /healthy/u);
@@ -209,4 +210,14 @@ test('all three lines together, in order, and nothing at all from an older host 
   assert.deepEqual(engineLines(withHealth('off', { answeredBy: { model: 'quill-2', at: local(9, 14) } }), NOON), []);
   assert.deepEqual(engineLines(null, NOON), []);
   for (const line of engineLines(all, NOON)) assert.ok(!line.includes('—'), 'no em dash');
+});
+
+test('a red sign is named by its own sentence (UI pass 20 Oct, agents F13), and the rest are counted after it', () => {
+  const named: Sign[] = [
+    { sign: 'copies', state: 'red', said: 'Last night’s copy did not run.' },
+    { sign: 'runs', state: 'red', said: 'A run stopped.' },
+  ];
+  assert.equal(text(healthSaid(null, null, { signs: named.slice(0, 1), signsAt: '/p/health' })), 'Last night’s copy did not run. Look');
+  assert.equal(text(healthSaid(null, null, { signs: named })), 'Last night’s copy did not run, and 1 more.');
+  assert.deepEqual(needs(healthSaid(null, null, { signs: named })), ['Last night’s copy did not run, and 1 more']);
 });

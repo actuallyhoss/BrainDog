@@ -251,7 +251,9 @@
    * or a host that hands none is `null`, which `health.ts` says as nothing and never as healthy. Its reads close as fine
    * and never mark the screen refused.
    */
-  const SAID_ON = new Set([undefined, 'billing', 'backups']);
+  /* THE INDEX ONLY (agents F13): Backups and Billing say their own state in their own tiles, and a line on two areas
+     alone moved the chooser 32px lower there than on every other. */
+  const SAID_ON = new Set([undefined]);
   let copyLast = $state<CopyState>(null);
   let month = $state<UsageState>(null);
   let faults = $state<Fault[] | null>(null);
@@ -362,7 +364,9 @@
 
 </script>
 
-{#snippet healthLine()}<span class="health-dot" data-bad={health?.some((p) => p.needs) ? '' : undefined} aria-hidden="true"></span>{#each health ?? [] as part}{#if part.href}<a class="tap" href={at(part.href)} data-needs={part.needs ? '' : undefined}>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else}{part.text}{/if}{/each}{/snippet}
+<!-- THE HEALTH LINE (agents F13): its words in ink, an 8px dot in `--warn` while something needs a look, and one "Look"
+     link at its end in the link red. -->
+{#snippet healthLine()}<span class="health-dot" data-bad={health?.some((p) => p.needs) ? '' : undefined} aria-hidden="true"></span>{#each health ?? [] as part}{#if part.href}<a class="health-look tap" href={at(part.href)}>{part.text}</a>{:else}{part.text}{/if}{/each}{/snippet}
 
 <!-- WHAT CAN BE DONE ABOUT AN OPEN FAULT, under the sentence: Try again on the one it names, and for the owner the whole
      list. A rectangle each; the list is in a tile, and a refusal is the record's own sentence. -->
@@ -519,7 +523,17 @@
   }
 
   .health-dot[data-bad] {
-    background: var(--danger-text);
+    background: var(--warn);
+  }
+
+  .health-look {
+    color: var(--red);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .health-look:hover {
+    text-decoration: underline;
   }
 
   /* TRY AGAIN AND DETAILS: rectangles in a row under the sentence, wrapping on a phone. */
