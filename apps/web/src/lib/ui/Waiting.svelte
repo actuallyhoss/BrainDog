@@ -54,21 +54,21 @@
     min-block-size: var(--row-h);
   }
 
-  /* THE HOLD WASH AND NOT A SURFACE STEP: ink at a fixed strength reads on the ground and on a tile alike, where a
-     `--s*` step is all but invisible on one of them. */
+  /* INK AT A FIXED STRENGTH AND NOT A SURFACE STEP: it reads on the board and on a tile alike, where `--tile-2` is all
+     but invisible on the board. */
   .well {
     flex: none;
     inline-size: var(--well-l);
     block-size: var(--well-l);
-    background: var(--hover-wash);
-    border-radius: var(--r-well);
+    background: color-mix(in oklab, var(--ink) 6%, transparent);
+    border-radius: var(--r-ctl);
   }
 
   .bar {
     display: block;
     block-size: 10px;
-    background: var(--hold-wash);
-    border-radius: var(--r-pill);
+    background: color-mix(in oklab, var(--ink) 9%, transparent);
+    border-radius: var(--r-xs, var(--r-sm));
   }
 
   .bar.title {

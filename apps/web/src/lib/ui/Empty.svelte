@@ -8,8 +8,13 @@
   Three rules the copy obeys: be specific about what WILL be here; a CTA is Verb + Noun, never
   "Get Started"; and the CTA is a real button or link, so it joins the tab order.
 
-  DRAWN IN THE NEW LANGUAGE: the kind's glyph in a 32px icon well, the title, the one line,
-  and the action as the primary ink pill, which the caller passes as `Button weight="primary"`.
+  THE WHOLE SCREEN'S FORM IS ONE TILE ON THE BOARD (the UI pass of 20 October, 2.A.18): 24 in (20 on a phone), at most
+  640 wide, on the page's start edge, never centred. In it, the glyph in a 40px NEUTRAL well, the title at 17/600 in
+  ink, the one line at 15/22 in `--ink-2`, and 12 under it the ONE action, which the caller passes as
+  `Button weight="primary"`; a second action is quiet. Then the agent prompt in a `CodeLine` with its Copy. Inside a
+  tile, a sheet or a panel the same column is drawn on that surface, because a tile never holds a tile.
+
+  INSIDE A SECTION it is the compact one line, its action at the trailing edge (below).
 
   `cleared` has no action, because nobody manufactures work.
 -->
@@ -19,6 +24,7 @@
   import { copy } from '../copy.ts';
   import type { Snippet } from 'svelte';
 
+  import CodeLine from './CodeLine.svelte';
   import Icon from './Icon.svelte';
   import IconWell from './IconWell.svelte';
   import { inline } from 'braindog-render';
@@ -112,17 +118,9 @@
     error: 'alert',
   };
 
+  /* THE WELL IS NEUTRAL IN EVERY KIND: the title says what happened, and a red or green square beside a sentence is a
+     second voice saying it louder. */
   const shown = $derived(glyph ?? GLYPH[kind]);
-
-  /* THE WELL TAKES THE KIND'S TONE WHERE THERE IS ONE: a failure is the red that needs him, a cleared list is done's
-     green, and absence is not an alarm, so nothing-yet and no-results stay the neutral well. */
-  const TONE: Record<EmptyKind, 'danger' | 'earn' | undefined> = {
-    'no-data-yet': undefined,
-    'no-results': undefined,
-    cleared: 'earn',
-    'no-permission': undefined,
-    error: 'danger',
-  };
 
   /**
    * THE HALF OF THE READINESS CONTRACT THAT COSTS NO ROUTE ANYTHING.
@@ -162,8 +160,8 @@
   });
 </script>
 
-<div class="empty" data-kind={kind} class:compact>
-  {#if shown && !compact}<span class="empty-glyph" aria-hidden="true"><IconWell name={shown} size="l" tone={TONE[kind]} /></span>{/if}
+<div class="empty" data-kind={kind} data-surface={compact ? undefined : 'tile'} class:compact>
+  {#if shown && !compact}<span class="empty-glyph" aria-hidden="true"><IconWell name={shown} size="card" /></span>{/if}
   {#if heading}
     <h1 class="empty-title">{#if icon}<Text nodes={inline(title, { icon })} opts={{ icon }} />{:else}{title}{/if}</h1>
   {:else}
@@ -193,13 +191,16 @@
       </button>
     </p>
   {/if}
+  {#if actions}<div class="empty-actions">{@render actions()}</div>{/if}
   {#if agentPrompt}
     <!-- "YOUR AGENT", NOT SLASH: the prompt under it is a line to paste into an agent outside BrainDog (Claude Code, a
-         terminal), which Slash cannot run, so naming Slash here would promise something untrue. -->
-    <p class="empty-agent">Or ask your agent:</p>
-    <pre class="empty-prompt"><code>{agentPrompt}</code></pre>
+         terminal), which Slash cannot run, so naming Slash here would promise something untrue. AFTER the action: the
+         screen's own way on comes first, and the agent's is the other way. -->
+    <div class="empty-prompt">
+      <p class="empty-agent">Or ask your agent:</p>
+      <CodeLine text={agentPrompt} />
+    </div>
   {/if}
-  {#if actions}<div class="empty-actions">{@render actions()}</div>{/if}
   {#if detail}
     <details class="empty-details">
       <summary class="empty-summary tap">{copy.readDetails}</summary>
@@ -222,31 +223,54 @@
     cursor: pointer;
   }
 
-  /* No box: the state sits on the page's own ground, the way the rows it stands in for do. Nothing is centred:
-     centring one block in a column of left-aligned ones is worse than not marking it at all (19 §6). */
+  /* NOTHING IS CENTRED: centring one block in a column of start-aligned ones is worse than not marking it at all
+     (19 §6). */
   .empty {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: var(--sp-2);
-    max-inline-size: 56ch;
-    padding-block: var(--sp-5);
+    box-sizing: border-box;
+    min-inline-size: 0;
   }
 
-  /* THE WELL, 32px, carrying the kind's tone where there is one (the `TONE` table above). */
+  /* THE WHOLE SCREEN'S FORM: one tile on the board, at most 640 wide, on the page's start edge. */
+  .empty:not(.compact) {
+    max-inline-size: 640px;
+    padding: var(--sp-5);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  @media (width < 640px) {
+    .empty:not(.compact) {
+      padding: calc(var(--sp-4) + var(--sp-1));
+    }
+  }
+
+  /* ON A SURFACE ALREADY, the same column without a second tile: a tile never holds a tile. `:where`, so a section's
+     compact line below still outranks it. */
+  :global(:where(.tile, .sheet, dialog, [data-surface='tile'], .block-slot)) .empty:not(.compact) {
+    max-inline-size: 56ch;
+    padding: var(--sp-2) 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  /* THE WELL, 40px and neutral, 16 above the title. */
   .empty-glyph {
     display: flex;
     margin-block-end: var(--sp-2);
   }
 
-  /* THE GROUP HEADING'S STEP, `--t-group` at 600: an empty state is a sentence, not a poster, and it leads the space
-     the rows would fill the way a group heading would. */
+  /* 17 AT 600 IN INK: an empty state is a sentence, not a poster, and it leads the space the rows would fill the way a
+     tile's title would. */
   .empty-title {
     margin: 0;
     color: var(--ink);
     font-family: var(--font-ui);
-    font-size: var(--t-group);
-    font-weight: 600;
+    font-size: var(--fs-head);
+    font-weight: var(--fw-semi);
     line-height: 24px;
     text-wrap: balance;
   }
@@ -259,8 +283,8 @@
     gap: var(--sp-1);
     margin: 0;
     padding: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-meta);
     list-style: none;
   }
 
@@ -273,18 +297,16 @@
    * repeated the same three sentences once per block. The second kept a 20px glyph and a 500-weight
    * title beside it, which is still a heading's weight on a line that is not one.
    *
-   * So the sentence is `--t-base` at 400 in the secondary ink, under a section title of the same
+   * So the sentence is `--fs-body` at 400 in the secondary ink, under a tile title of the same
    * size at 600, with the action at the trailing edge. The body goes, because the body is the
    * register's `holds:` sentence and it is already on the register's own screen, which is where
    * the action leads. The agent line goes with it for the same reason: four copies of one prompt is
    * not four times the help.
    *
    * INSIDE A `Section` THIS IS THE FORM WHETHER OR NOT THE CALLER SAID `compact`. The whole-screen
-   * form belongs to a state that IS the screen, and a section is never that. The settings areas
-   * never passed the flag, so "No passkey yet." drew at 16px 600 with the menu glyph under a 14px
-   * section title and read as the heading, with the heading as its caption.
-   * `Section` emits `section.section` and nothing else does, so the ancestor selector names exactly
-   * the case and no caller has to be edited to be right.
+   * form belongs to a state that IS the screen, and a section is never that. `Section` draws a tile
+   * that also carries `section`, and nothing else does, so the ancestor selector names exactly the
+   * case and no caller has to be edited to be right.
    */
   .empty.compact,
   :global(section.section) .empty {
@@ -298,14 +320,16 @@
     padding: var(--sp-2) 0;
     background: none;
     border: 0;
+    border-radius: 0;
   }
 
   .empty.compact .empty-title,
   :global(section.section) .empty .empty-title {
-    color: var(--ink2);
+    color: var(--ink-2, var(--ink2));
     font-family: inherit;
-    font-size: var(--t-base);
-    font-weight: 400;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-regular);
+    line-height: 22px;
     letter-spacing: normal;
   }
 
@@ -314,11 +338,9 @@
      which clause it failed on is the silence this component exists to break. The glyph is not drawn
      at all when `compact` is passed; this hides the one a section's empty state was handed. */
   .empty.compact .empty-body,
-  .empty.compact .empty-agent,
   .empty.compact .empty-prompt,
   :global(section.section) .empty .empty-glyph,
   :global(section.section) .empty .empty-body,
-  :global(section.section) .empty .empty-agent,
   :global(section.section) .empty .empty-prompt {
     display: none;
   }
@@ -349,54 +371,65 @@
     flex-basis: 100%;
   }
 
-  /* THE ONE LINE: the body size in the quiet ink, at the measure. */
-  .empty-body,
-  .empty-agent {
+  /* THE ONE LINE: 15/22 in the second ink, at the measure. */
+  .empty-body {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-base);
-    line-height: 20px;
     max-inline-size: var(--measure);
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .empty-query {
+    margin: 0;
   }
 
   .empty-query code,
   .empty-rid code {
     padding: 2px 6px;
-    background: var(--s1);
-    border-radius: var(--r-sm);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
+    background: var(--tile-2, var(--s1));
+    border-radius: var(--r-xs, var(--r-sm));
+    font-family: var(--font-mono, var(--font-id));
+    font-size: var(--fs-meta);
   }
 
   .empty-rid {
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  /* THE COMMAND KEEPS THE IDENTIFIER FACE, because it is a literal somebody pastes, and loses the
-     box: a sunk, bordered panel read as a terminal on a screen meant for anybody. */
-  .empty-prompt {
     margin: 0;
-    color: var(--ink2);
-    font-family: var(--font-id);
-    font-size: var(--t-sm);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-meta);
   }
 
+  /* TWELVE UNDER THE LINE: the column's 8 and 4 more. */
   .empty-actions {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
+    margin-block-start: var(--sp-1);
+  }
+
+  /* THE AGENT'S WAY ON, 16 under the action, the prompt in its copyable line. */
+  .empty-prompt {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    align-self: stretch;
+    min-inline-size: 0;
     margin-block-start: var(--sp-2);
+  }
+
+  .empty-agent {
+    margin: 0;
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   /* THE REASON IS QUIET AND WRAPS, as `ReadState`'s is. It is there for whoever reports the fault,
      so it sits under the action in the secondary ink, and an address or a path inside it breaks
      rather than pushing the page sideways at 320. */
   .empty-details {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-meta);
   }
 
   .empty-summary {
@@ -411,6 +444,6 @@
     overflow-wrap: anywhere;
   }
 
-  /* THE TITLE STAYS INK IN EVERY KIND. The glyph carries the tone; a whole sentence in the alarm
-     colour is harder to read and says nothing the glyph beside it does not. */
+  /* THE TITLE STAYS INK IN EVERY KIND. The well is neutral; a whole sentence in the alarm colour is harder to read and
+     says nothing the words do not. */
 </style>

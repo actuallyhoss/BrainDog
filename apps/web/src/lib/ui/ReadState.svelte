@@ -86,15 +86,15 @@
   .read-screen {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-body);
   }
 
   /* THE REASON IS QUIET AND WRAPS. It is there for whoever reports the fault, so it reads below the sentence in the
      secondary ink, and an address or a path inside it breaks rather than pushing the page sideways at 320. */
   .read-details {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3, var(--dim));
+    font-size: var(--fs-meta);
   }
 
   .read-summary {
