@@ -171,10 +171,10 @@ export type Meta = {
  */
 export type Spot = {
   list: string;
-  at: readonly Path;
+  at: Path;
   by: readonly string[] | null;
   newest?: boolean;
-  moved?: readonly Path;
+  moved?: Path;
   lands?: Lands;
   /** The questions waiting on somebody, held at `at` by their `id` (`list` is `QUESTIONS`). */
   questions?: Asks;
@@ -182,14 +182,14 @@ export type Spot = {
   shown?: Shown;
 };
 
-type Path = (string | number)[];
+type Path = readonly (string | number)[];
 
 /**
  * Where an answer holds the questions waiting (`QUESTIONS`). `total` is the path to how many wait in all, of which the
  * answer may hold only the first few. `decided`: the answer also holds what was decided, which an answer adds to and the
  * browser cannot. `drops` are counts over the questions the browser cannot move, taken out when one goes.
  */
-export type Asks = { total?: readonly Path; decided?: boolean; drops?: readonly Path[] };
+export type Asks = { total?: Path; decided?: boolean; drops?: Path[] };
 
 /**
  * Rows of a list drawn in the screen's own shape. `says`: each list field the row draws as it was logged, by the key it
@@ -216,11 +216,11 @@ export type Lands = {
   where: Predicate | null;
   exact: boolean;
   sort?: { field: string; dir: 'asc' | 'desc' };
-  more?: readonly Path;
-  count?: readonly Path;
-  tally?: readonly Path;
+  more?: Path;
+  count?: Path;
+  tally?: Path;
   /** The path to `[<list> <id>, seq][]`: each row a ref may point at, so a create's ref is drawn as the number a row holds. */
-  ids?: readonly Path;
+  ids?: Path;
 };
 
 /**
@@ -573,7 +573,7 @@ const beyond = (value: unknown, lands: Lands): boolean => {
 };
 
 /** Move the count at `path` by `by`; `false` when the answer holds something there that is not a number. */
-function recount(value: unknown, path: readonly Path | undefined, by: number): boolean {
+function recount(value: unknown, path: Path | undefined, by: number): boolean {
   if (!path || path.length === 0) return true;
   const at = dig(value, path.slice(0, -1));
   const k = path[path.length - 1]!;

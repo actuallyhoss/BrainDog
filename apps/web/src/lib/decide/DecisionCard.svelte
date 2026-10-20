@@ -480,7 +480,7 @@
     <span class="queue-label dc-choice-name" dir="auto">{way.label}</span>
     {#if way.because}<span class="dc-choice-does" dir="auto">{way.because}</span>{/if}
     <!-- WHAT IT WOULD CHANGE, drawn small; an option with a swatch, figure or picture of its own keeps that. -->
-    {#if !way.shows}<OptionVisual visual={optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...grounded, now: Date.now(), home: grounded?.home })} />{/if}
+    {#if !way.shows}<OptionVisual visual={optionVisualOf(question, question.options.find((o) => o.key === way.key) ?? way, { ...grounded, now: Date.now(), home: grounded?.home ?? null })} />{/if}
   </span>
 {/snippet}
 

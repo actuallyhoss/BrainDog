@@ -16,11 +16,11 @@
 
   let box = $state<HTMLElement | null>(null);
   let widgetId: string | null = null;
-  let state = $state<WidgetState>('loading');
-  const words = $derived(widgetWords(state));
+  let phase = $state<WidgetState>('loading');
+  const words = $derived(widgetWords(phase));
 
   async function draw(el: HTMLElement): Promise<void> {
-    state = 'loading';
+    phase = 'loading';
     const loaded = await loadWidget({ doc: document });
     const t = turnstileOf();
     if (loaded === 'ready' && t && widgetId === null && el.isConnected) {
@@ -32,7 +32,7 @@
         'error-callback': () => (answer = null),
       });
     }
-    state = loaded === 'ready' && t ? 'ready' : 'failed';
+    phase = loaded === 'ready' && t ? 'ready' : 'failed';
   }
 
   $effect(() => {
@@ -56,7 +56,7 @@
 </script>
 
 <div class="human" role="group" aria-label={copy.signupHuman} bind:this={box}>
-  {#if state === 'failed'}
+  {#if phase === 'failed'}
     <div class="failed">
       <p class="line" role="alert">{words.line}</p>
       <span class="again"><Button onclick={() => box && void draw(box)}>{words.again}</Button></span>

@@ -112,7 +112,7 @@ test('A SEARCH IS NOT ANSWERED FROM A COPY THAT MAY NOT HOLD EVERY ROW, or reads
   assert.equal(searchKept(keptOf(notes, rows, 1, new Map() as never, { cursor: 'next' }), 'ren'), null, 'a next page');
   assert.equal(searchKept(keptOf(notes, rows, 1, new Map() as never), 'ren'), null, 'kept before its cursor was');
   assert.equal(searchKept(keptOf(notes, rows, 4, new Map() as never, { cursor: null }), 'ren'), null, 'counted past the rows');
-  assert.equal(searchKept(keptOf(notes, [{ ...(rows[0] as object), clipped: true } as never], 1, new Map() as never, { cursor: null }), 'ren'), null, 'a cut text');
+  assert.equal(searchKept(keptOf(notes, [{ ...(rows[0] as unknown as object), clipped: true } as never], 1, new Map() as never, { cursor: null }), 'ren'), null, 'a cut text');
   const reffed = { ...notes, fields: [...notes.fields, { id: 'project', type: 'ref', to: 'projects', search: true }] } as unknown as RegisterDecl;
   assert.equal(searchFieldsOf(reffed), null, 'a searchable ref');
   const plain = { ...notes, fields: [{ id: 'title', type: 'text' }, { id: 'body', type: 'text', search: true }, { id: 'old', type: 'text', search: true, retired: true }] } as unknown as RegisterDecl;

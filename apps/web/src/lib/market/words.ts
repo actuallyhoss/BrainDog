@@ -35,9 +35,9 @@ export const words = {
    * HOW MANY HOLD IT, AS A CARD AND A PAGE SAY IT: "On 50+ BrainDogs" from ten up (the count is already rounded, and a
    * count under ten is never sent), "New" for an add-on from outside with no count yet, and nothing for a built-in.
    */
-  held(count: number | null, source: 'bundled' | 'kennel'): string | null {
+  held(count: number | null, source: 'bundled' | 'kennel' | 'file'): string | null {
     if (count !== null) return this.installs(count);
-    return source === 'kennel' ? this.newOne : null;
+    return source === 'bundled' ? null : this.newOne;
   },
   by: (name: string): string => `By ${name}`,
   verified: 'Verified',

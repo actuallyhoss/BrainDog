@@ -53,7 +53,7 @@ test('every offered version is taken back, signed for a key listing and plain fo
     sent.push(JSON.parse(String(init?.body)) as never);
     return new Response(JSON.stringify({ ok: true, value: {} }));
   };
-  const sign = async () => ({ alg: 'ed25519', key_id: 'key-mine', public_key: 'p', sig: 's', signed_at: 't' });
+  const sign = async () => ({ alg: 'ed25519' as const, key_id: 'key-mine', public_key: 'p', sig: 's', signed_at: 't' });
   const [tide, rota] = minesOf(INDEX, { keyId: 'key-mine', personId: 'p_me' });
   assert.deepEqual(await unpublish(fetcher, { ...tide!, versions: ['1.1.0', '1.2.0'] }, sign), { ok: true });
   assert.deepEqual(

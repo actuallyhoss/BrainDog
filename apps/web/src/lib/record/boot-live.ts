@@ -966,7 +966,7 @@ export function layoutOf(b: Boot, implied: Implied | undefined = IMPLIED.get(b))
       records: record ? [{ slug: record.slug, name: record.name, level }] : [],
       lists: held,
       ...((levels) => (levels === null ? {} : { levels }))(levelsFrom((b.me as Record<string, unknown> | undefined)?.levels)),
-      ...(b.me?.prefs ? { prefs: b.me.prefs } : {}),
+      ...(b.me?.prefs ? { prefs: b.me.prefs as Prefs } : {}),
     },
     people: [],
     /* THE FIRST SCREEN'S QUESTIONS, capped as `boot` caps them. Their options and cost are one `governance` read away. */

@@ -27,7 +27,7 @@ registerHooks({
 const { NavPrefs, moved } = await import('./nav-prefs.svelte.ts');
 type Prefs = import('./nav-prefs.svelte.ts').Prefs;
 
-type Value = string[] | string | boolean | Record<string, string> | null;
+type Value = string[] | string | boolean | Record<string, string> | import('./page/shelf.ts').Shelved[] | null;
 type Sent = { key: string; value: Value };
 
 const recorder = (answer: (s: Sent) => { from: 'kept' } | { from: 'refused'; fix: string } = () => ({ from: 'kept' })) => {
