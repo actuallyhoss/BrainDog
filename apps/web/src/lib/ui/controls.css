@@ -6,66 +6,52 @@
  * filter bar, the search page and the onboarding step each grew their own, and by the time anyone
  * looked they disagreed about the surface, the radius and what focus does.
  *
- * A FIELD IS A SOFT WELL: 40 tall, 44 under a thumb, the `--field` fill with no border, radius
- * `--r-ctl`, and its label above it in `--t-sm` `--ink2`. Focus is the 2px ink ring offset 2, the same ring every other
- * control takes from the a11y layer. A segmented control is one `--field` rectangle (radius 8), with the chosen segment
- * the tile's own colour lifted by a hairline. Switches, checkboxes and radios are the working accent when they are on
- * (DIRECTION §39).
+ * A FIELD IS A SOFT WELL: 40 tall, 44 under a thumb, the `--tile-2` fill with no border, radius
+ * `--r-ctl`, and its label above it in `--fs-meta` `--ink-2`. Focus is the 2px ink ring offset 2, the same ring every
+ * other control takes from the a11y layer. A segmented control is one `--tile-2` rectangle (radius 8), with the chosen
+ * segment raised in `--segment-on` (SPEC 2.A.9). A switch, a checkbox and a radio are `--red-fill` when they are on,
+ * with a white mark (SPEC 1.1, 2.A.10).
  */
 
 @layer components {
   /**
-   * THE PRESS, ONCE, FOR EVERY CONTROL IN THE PRODUCT.
+   * THE PRESS, ONCE, FOR EVERY CONTROL IN THE PRODUCT, AND IT IS A FILL (SPEC 2.A.1, F24 with its delta).
    *
-   * A count of `:active` rules across `apps/web/src` returned FOUR. Four, over a hundred and sixty
-   * pressable things: every button, every row of every list, every tab of the bar a phone
-   * navigates by, every segment of every filter, every menu row. Hover answers a mouse and focus
-   * answers a keyboard, and the finger got nothing back at all. On a phone, where there is no
-   * hover, that is the whole of the product's feedback: you touch a row, nothing happens, and the
-   * next screen arrives a moment later as if you had not done it.
+   * A count of `:active` rules across `apps/web/src` once returned four, over a hundred and sixty pressable things, and
+   * on a phone, where there is no hover, a touch got nothing back. So the press is written here, once.
    *
-   * IT IS HERE AND NOT IN EACH COMPONENT for the reason the field shape is: it is ONE contract.
-   * Four scattered `:active` rules is how it got to four.
+   * A FILL CHANGE AND NOTHING ELSE. A row, a tab, a segment, a menu row or a pressable tile takes `--tile-2` over
+   * `--d-press`; a button takes its own pressed fill (`Button.svelte`: `--red-fill-press` on a primary). Nothing
+   * scales and nothing moves (motion section 3), and nothing dims: the old press faded a control to 62%, which read as
+   * disabled. A colour change is not motion, so it lands the same under reduced motion.
    *
-   * TWO PROPERTIES, AND THE SECOND IS NOT DECORATION. `a11y.css` does not soften motion under
-   * `prefers-reduced-motion`, it deletes it: `transition-duration` is forced to 1ms, so a press
-   * written as a scale is not damped for those readers, it is absent. Opacity is a state and not a
-   * duration, so it lands either way. A control that answers some fingers and not others is worse
-   * than one that answers none, because the reader it ignores cannot tell that from a tap the
-   * product missed.
-   *
-   * `.cell` IS DELIBERATELY NOT IN THE LIST. A figure cell sits inside a bordered grid, and
-   * scaling one of three cells pulls its edge off the shared rule between them.
+   * `.cell` IS DELIBERATELY NOT IN THE LIST. A figure cell sits inside a bordered grid of its own.
    */
-  .btn:active:not(:disabled),
   .line:active,
   .tab:active,
   .seg:active,
-  .segment:active,
   button.tile:active,
   a.tile:active,
   .choice:active,
-  .mi:active {
-    opacity: var(--press-dim);
-    transition-duration: var(--d-press);
-    transition-timing-function: var(--ease-push);
-  }
-
-  /* AND THE ROWS A THUMB PRESSES MOST, WHICH THE LIST ABOVE MISSED: a phone list's cards, Home's
-     feed, the register grid's rows, and the small links that hang in a head. A whole card at 62%
-     opacity reads as the row being disabled, so a row answers with the held wash instead, at the
-     press duration; a small link dims like a control. */
+  .mi:active,
   .cards .card:active,
   .feed .event:active,
   .rowgroup .tr:active {
-    background: var(--hold-wash);
+    background: var(--tile-2);
+    transition-duration: var(--d-press);
+    transition-timing-function: var(--ease-in);
+  }
+
+  /* A SEGMENT IS ALREADY ON `--tile-2`, its track's own fill, so its press is a step past it. A small link that hangs in
+     a head takes the ink, which is a fill change of its words. */
+  .segment:active:not([data-on]) {
+    background: var(--hover);
     transition-duration: var(--d-press);
   }
 
   .more:active {
-    opacity: var(--press-dim);
+    color: var(--ink);
     transition-duration: var(--d-press);
-    transition-timing-function: var(--ease-push);
   }
 
   /* AND NOT THE BROWSER'S FLASH AS WELL. A phone browser paints its own translucent blue over
@@ -75,23 +61,18 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* The scale is for buttons only; rows and tabs never scale. */
-  .btn:active:not(:disabled) {
-    transform: scale(var(--press-scale));
-  }
-
   /* THE LABEL SITS ABOVE THE FIELD, in the meta size and the second ink. A screen that sizes its own label in its
      scoped style outranks this whole layer, so this is the default and not a fight. */
   .field-label {
     display: block;
-    margin-block-end: 6px;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    margin-block-end: var(--sp-1);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
 
-  /* 40 TALL AND 44 UNDER A THUMB, on the `--field` fill with no border, at the control's 8px corner, so a field and the
+  /* 40 TALL AND 44 UNDER A THUMB, on the `--tile-2` fill with no border, at the control's 8px corner, so a field and the
      button beside it are one family of rectangles. */
   .field {
     display: flex;
@@ -100,10 +81,10 @@
     box-sizing: border-box;
     min-block-size: 40px;
     padding: 0 var(--sp-3);
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--dim);
+    color: var(--ink-3);
     transition: background var(--d-state) var(--ease-out);
   }
 
@@ -112,7 +93,7 @@
      round a field nobody had typed in yet read as a validation error. */
   .field:focus-within,
   .capture-field:focus-within {
-    outline: 2px solid var(--focus-in);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
     box-shadow: none;
   }
@@ -183,7 +164,7 @@
        the same class and had the same second box. */
     appearance: none;
     color: var(--ink);
-    font-size: var(--t-ui);
+    font-size: var(--fs-body);
   }
 
   /* The field's own clear control, drawn by the browser in its own blue. Hidden rather than
@@ -195,55 +176,63 @@
   }
 
   .field-lg .field-input {
-    font-size: var(--t-md);
+    font-size: var(--fs-body);
   }
 
   .field-input::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /**
-   * A SEGMENTED CONTROL IS ONE RECTANGLE (DIRECTION §39): the `--field` fill at radius 8, 2px round its segments, and
-   * the chosen segment the tile's own colour, sliding to the next choice where `Segmented.svelte` draws the track (the
-   * thumb, below) and with a hairline and a breath of shadow where the track is still written by hand. The selected state has to be a
-   * SHAPE and not a shade: a slightly lighter grey behind one word out of four is the single most-missed control in
-   * dense software. The same on the board and in a tile, because there is no glass to choose between.
+   * A SEGMENTED CONTROL IS ONE RECTANGLE (SPEC 2.A.9, frame F23): the `--tile-2` track at radius 8, 2px round its
+   * segments, each segment at radius 4, and the chosen one RAISED: `--segment-on`, white in light and a step lighter
+   * than the track in dark, with `--ink` at 600 where the others are `--ink-2` at 500. It used to be darker than its
+   * track in dark, so the chosen one read as pressed in. The selected state is a shape and a weight, not a shade.
+   * No hairline and no shadow (SPEC 1.9): the raised fill is the shape.
    *
-   * AND THE TRACK WRAPS, because the alternative hides a state with no way to know it is there. Five segments on a
-   * coarse pointer measured 342px inside a 320px screen, and a strip that scrolls with nothing peeking past its edge
-   * looks like a strip that ends.
+   * AND THE TRACK WRAPS, because the alternative hides a state with no way to know it is there, except on a phone page
+   * (`data-full`, below), where it scrolls in its own row with a fade at its end.
    *
-   * THE CORNERS ARE CONCENTRIC: the track is 8 and a segment 6, so the chosen segment's corner sits inside the track's.
+   * THE CORNERS ARE CONCENTRIC: the track is 8 and a segment 4 inside its 2px.
    */
   .segmented {
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
     padding: 2px;
-    background: var(--field);
+    background: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
   }
 
   /**
-   * THE WHOLE CONTROL IS `--btn-h` UNDER A MOUSE (32), and drawn 40 under a thumb with a 44 hit box round each segment:
-   * density follows the POINTER, never the width (`05 §6`, `13 §7`). `min-block-size`, not `block-size`: a segment
-   * whose label wraps grows.
+   * THE WHOLE CONTROL IS `--ctl-h` (32 under a mouse, 44 under a thumb) and 44 below 640px, where it sits beside the
+   * page's 44px head buttons (SPEC 2.A.9). `min-block-size`, not `block-size`: a segment whose label wraps grows.
+   * Its label is `--fs-ctl`.
    */
   .segment {
-    min-block-size: calc(var(--btn-h) - 4px);
+    min-block-size: calc(var(--ctl-h) - 4px);
     padding: 0 var(--sp-3);
     background: none;
     border: 0;
-    border-radius: calc(var(--r-ctl) - 2px);
-    color: var(--ink2);
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
     font-size: var(--fs-ctl);
     font-weight: var(--fw-medium);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
-      box-shadow var(--d-state) var(--ease-out),
       color var(--d-state) var(--ease-out);
+  }
+
+  /* A COUNT INSIDE A SEGMENT IS THE QUIET INK, and the second ink inside the chosen one, where the quiet ink is 4.16:1
+     on the dark raised fill. */
+  .segment .num {
+    color: var(--ink-3);
+  }
+
+  .segment[data-on] .num {
+    color: var(--ink-2);
   }
 
   /* HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it. */
@@ -253,8 +242,15 @@
     }
   }
 
-  /* UNDER A THUMB each segment is drawn at the button's 40 and is 44 to the finger, on both axes: "On" and "Off" are
-     narrower than a thumb, and a target is both axes. The hit box is `.tap`'s, grown round the drawing. */
+  /* BELOW 640PX THE CONTROL IS 44, beside the head's 44px buttons. */
+  @media (width < 640px) {
+    .segment {
+      min-block-size: calc(var(--tap) - 4px);
+    }
+  }
+
+  /* UNDER A THUMB each segment is 44 to the finger on both axes: "On" and "Off" are narrower than a thumb, and a target
+     is both axes. The hit box is `.tap`'s, grown round the drawing. */
   @media (pointer: coarse) {
     .segmented {
       gap: var(--sp-1);
@@ -262,9 +258,7 @@
 
     .segment {
       position: relative;
-      min-block-size: calc(var(--btn-h) - 4px);
       min-inline-size: var(--tap);
-      font-size: var(--fs-body);
     }
 
     .segment::before {
@@ -274,32 +268,56 @@
     }
   }
 
-  /* THE CHOSEN SEGMENT: the tile's colour and ink text, and no weight change, so choosing does not make it the loudest
-     thing in the bar. */
+  /* THE CHOSEN SEGMENT: raised, in the ink at 600. */
   .segment[data-on] {
-    background: var(--tile);
+    background: var(--segment-on);
     color: var(--ink);
+    font-weight: var(--fw-semi);
   }
 
-  /* ON A TRACK WRITTEN BY HAND, which has no thumb, it is a hairline and a breath of shadow as well, so it is a shape
-     on the track in light and in dark, where a shadow alone does not show. A track the component draws (`data-slides`)
-     never has them, not even before its thumb is measured: the fill it starts with is the thumb's own flat colour, so
-     nothing changes when the thumb takes over. */
-  :not(.segmented[data-slides]) > .segment[data-on] {
-    box-shadow:
-      0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent),
-      0 0 0 1px var(--rule);
-  }
-
-  /* A TRACK OF STEPS IN ORDER is an `ol`, each segment in an `li`: the rule above reads a segment as its parent's
-     child, so it would match one in a list item of the component's track. It has no hairline either. */
-  .segmented[data-slides] > li > .segment[data-on] {
-    box-shadow: none;
-  }
-
+  /* A TRACK OF STEPS IN ORDER is an `ol`, each segment in an `li`. */
   ol.segmented {
     margin: 0;
     list-style: none;
+  }
+
+  /**
+   * A PAGE-LEVEL CONTROL ON A PHONE (`Segmented.svelte`'s `full`, which writes `data-full`): the width of the page, each
+   * segment an equal share at 15px with its label cut by an ellipsis. One whose labels would be cut, or that has more
+   * than four, writes `data-scrolls` as well: it keeps one row and scrolls in it, with no bar, 16px of room at its end
+   * and a fade over the last 24px, so the choice past the edge is seen to be there (SPEC 2.A.9).
+   */
+  @media (width < 640px) {
+    .segmented[data-full] {
+      flex-wrap: nowrap;
+      inline-size: 100%;
+    }
+
+    .segmented[data-full] > .segment,
+    .segmented[data-full] > li {
+      flex: 1 1 0;
+      min-inline-size: 0;
+    }
+
+    .segmented[data-full] > .segment {
+      overflow: hidden;
+      font-size: var(--fs-body);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .segmented[data-full][data-scrolls] {
+      overflow-x: auto;
+      padding-inline-end: var(--sp-4);
+      scrollbar-width: none;
+      /* A mask reads only alpha, so the opaque ink stands for "shown". */
+      mask-image: linear-gradient(to right, var(--ink) calc(100% - 24px), transparent);
+    }
+
+    .segmented[data-full][data-scrolls] > .segment,
+    .segmented[data-full][data-scrolls] > li {
+      flex: none;
+    }
   }
 
   /**
@@ -308,7 +326,8 @@
    * The thumb is the track's `::before` at that box, and choosing MOVES it: one `transform` transition of `--d-state`,
    * so nothing is laid out again and nothing beside the control shifts. Its width is the new label's at once.
    *
-   * IT IS THE TILE'S COLOUR AND NOTHING ELSE: no hairline, no shadow. A shape that travels is seen without them.
+   * IT IS THE RAISED FILL AND NOTHING ELSE (`--segment-on`): no hairline, no shadow. A shape that travels is seen
+   * without them.
    *
    * `data-thumb='jump'` IS A THUMB THAT DOES NOT TRAVEL: the first placing, a label that changed size, a track that
    * has wrapped to two lines, and a reader who asked for less motion (the component says so, and `a11y.css` cuts the
@@ -339,8 +358,8 @@
     inset-inline-start: 0;
     inline-size: var(--w);
     block-size: var(--h);
-    background: var(--tile);
-    border-radius: calc(var(--r-ctl) - 2px);
+    background: var(--segment-on);
+    border-radius: var(--r-xs);
     transform: translate(var(--x), var(--y));
     transition: transform var(--d-state) var(--ease-out);
     pointer-events: none;
@@ -353,28 +372,27 @@
   /* The thumb is the selection now, so the segment under it draws none of its own. */
   .segmented[data-thumb] > .segment[data-on] {
     background: none;
-    box-shadow: none;
   }
 
   .segmented[data-thumb] > li > .segment[data-on] {
     background: none;
-    box-shadow: none;
   }
 
   /* A TRACK WHERE MORE THAN ONE CAN BE CHOSEN is given `many` (`data-many`), and the component then draws it no
-     thumb at all: it never carries `data-thumb`, so every chosen segment keeps the flat tile fill of the plain rule
-     above, with no hairline, because the track is still the component's (`data-slides`). */
+     thumb at all: it never carries `data-thumb`, so every chosen segment keeps the raised fill of the plain rule
+     above. */
 
   /**
-   * A SWITCH, FOR ONE THING THAT IS ON OR OFF.
+   * A SWITCH, FOR ONE THING THAT IS ON OR OFF (SPEC 2.A.10, frame F23).
    *
-   * A two-segment On/Off track stretched across a card said the same fact with twice the ink, and a
-   * segmented control is for choosing between named options. The button is the hit area, 44px under
-   * a thumb; the track is drawn inside it.
+   * A two-segment On/Off track stretched across a card said the same fact with twice the ink, and a segmented control
+   * is for choosing between named options. The button is the hit area, 44px under a thumb; the track is drawn inside it.
    *
-   * ON IS THE INK TRACK, THE THUMB THE TILE'S OWN COLOUR (batch 6). The working accent is the brand's red, and six red
-   * switches down a list of add-ons read as six alarms; ink says "on" and nothing more. The thumb's position says the
-   * state without the colour; the fill says it again for a reader who cannot see the position change.
+   * 36 BY 20, A 16PX WHITE KNOB. OFF IS `--switch-off`, a grey the theme holds at 3:1 on the tile with the white knob at
+   * 3:1 on it, so an off switch no longer reads as on (it was a dark ink track). ON IS `--red-fill` (his decision: a
+   * switch that is on is the button red), with the knob in `--on-red`, the label colour every red fill is held to.
+   * The knob's place says the state without the colour, and the fill says it again. The knob moves over `--d-state`;
+   * nothing casts a shadow.
    */
   .switch {
     display: inline-grid;
@@ -389,15 +407,12 @@
     cursor: pointer;
   }
 
-  /* OFF IS THE `--edge` TRACK, the 3:1 boundary ink the theme holds against every surface, with the tile's own colour
-     for its thumb; ON IS THE INK TRACK. The thumb is one lifted disc in both states, so the switch reads as one object
-     that moved rather than two drawings. No border: the fill is the boundary. */
   .switch-track {
     position: relative;
     display: block;
     inline-size: 36px;
-    block-size: 22px;
-    background: var(--edge);
+    block-size: 20px;
+    background: var(--switch-off);
     border: 0;
     border-radius: var(--r-round);
     transition: background var(--d-state) var(--ease-out);
@@ -408,31 +423,28 @@
     position: absolute;
     inset-block-start: 2px;
     inset-inline-start: 2px;
-    inline-size: 18px;
-    block-size: 18px;
-    background: var(--tile);
+    inline-size: 16px;
+    block-size: 16px;
+    background: var(--knob);
     border-radius: var(--r-round);
-    box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 18%, transparent);
     transition:
       translate var(--d-state) var(--ease-out),
       background var(--d-state) var(--ease-out);
   }
 
-  /* INK, NEVER THE WORKING ACCENT, WHICH IS THE BRAND'S RED: red means late or needs you, and six red switches down a list
-     read as six alarms (`tools/gates/colour-grep.mjs` holds that no switch or ring is red). */
   .switch[aria-checked='true'] .switch-track {
-    background: var(--ink);
+    background: var(--red-fill);
   }
 
   .switch[aria-checked='true'] .switch-track::after {
-    translate: 14px 0;
-    background: var(--tile);
+    translate: 16px 0;
+    background: var(--on-red);
   }
 
-  /* THE THUMB TRAVELS THE OTHER WAY IN A RIGHT-TO-LEFT PAGE. `translate` is physical, and the thumb
-     starts at the inline start, so in Arabic an "on" switch slid its thumb out of the track. */
+  /* THE KNOB TRAVELS THE OTHER WAY IN A RIGHT-TO-LEFT PAGE. `translate` is physical, and the knob
+     starts at the inline start, so in Arabic an "on" switch slid its knob out of the track. */
   .switch[aria-checked='true']:dir(rtl) .switch-track::after {
-    translate: -14px 0;
+    translate: -16px 0;
   }
 
   .switch:disabled {
@@ -454,8 +466,9 @@
    * screen set `accent-color`, with the operating system's chevron on every select and a native
    * thumb on every slider, so one form spoke three design languages.
    * `appearance: none` takes the browser's drawing away and the rules below put the product's back:
-   * the accent for what is on, `--edge` for a box's boundary, the `--field` fill and `--r-ctl` for a field, a round
-   * thumb.
+   * `--red-fill` for what is on with a white mark, the 3:1 grey of an off switch for a box's boundary (a control's
+   * boundary is held to 3:1, which the hairline `--rule-strong` is not), the `--tile-2` fill and `--r-ctl` for a
+   * field, a round thumb.
    *
    * `:where()` AROUND EVERY ELEMENT, SO A SCREEN CAN STILL SIZE AND PLACE ITS OWN. A block that gives
    * its checkbox 18px, or a form that pads its select wider, does it with a class; at zero
@@ -465,8 +478,7 @@
    * own `<style>` is unlayered and outranks this whole layer, so a screen that paints a checkbox's
    * ground there paints its checked state too.
    *
-   * The rest of a field (its focus edge and halo) is `a11y.css`'s, which already names select and
-   * date; a checkbox, radio or range takes the 2px ring there like any other control.
+   * Focus is `a11y.css`'s one ring, on every one of them.
    */
   :where(input[type='checkbox'], input[type='radio']) {
     appearance: none;
@@ -477,8 +489,8 @@
     block-size: var(--icon-m);
     vertical-align: middle;
     background: var(--tile);
-    border: 1.5px solid var(--edge);
-    border-radius: 4px;
+    border: 1.5px solid var(--switch-off);
+    border-radius: var(--r-xs);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
@@ -489,25 +501,25 @@
     border-radius: var(--r-round);
   }
 
-  /* ON IS THE ACCENT'S FILL. `:indeterminate` is the checkbox's alone: a radio matches it whenever no radio
+  /* ON IS THE RED FILL (SPEC 1.1). `:indeterminate` is the checkbox's alone: a radio matches it whenever no radio
      in its group is chosen, and every option of an unanswered question would draw as chosen. */
   :where(input[type='checkbox']):checked,
   :where(input[type='checkbox']):indeterminate,
   :where(input[type='radio']):checked {
-    background: var(--on);
-    border-color: var(--on);
+    background: var(--red-fill);
+    border-color: var(--red-fill);
   }
 
   /* THE MARK IS `::after` AND NEVER `::before`, because `::before` is taken twice over: `.tap` grows
      a small control's hit box with it, and the layout gate reads a control's `::before` as its
      target. A tick drawn there would shrink the one and lie to the other. The mark is the label colour
-     of the accent fill (`--on-action`); the fill alone still says "on" where a browser draws no
+     of the red fill (`--on-red`); the fill alone still says "on" where a browser draws no
      pseudo-element on an input. */
   :where(input[type='checkbox']):checked::after {
     content: '';
     inline-size: 10px;
     block-size: 10px;
-    background: var(--on-action);
+    background: var(--on-red);
     clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
   }
 
@@ -515,7 +527,7 @@
     content: '';
     inline-size: 8px;
     block-size: 2px;
-    background: var(--on-action);
+    background: var(--on-red);
     clip-path: none;
   }
 
@@ -523,7 +535,7 @@
     content: '';
     inline-size: var(--dot);
     block-size: var(--dot);
-    background: var(--on-action);
+    background: var(--on-red);
     border-radius: var(--r-round);
   }
 
@@ -533,8 +545,8 @@
   }
 
   /**
-   * A SELECT IS A FIELD WITH THE HOUSE CHEVRON: the field's `--field` fill, as tall as one, and the
-   * chevron drawn in `--dim` from two gradient strokes, because the icon set cannot reach inside a
+   * A SELECT IS A FIELD WITH THE HOUSE CHEVRON: the field's `--tile-2` fill, as tall as one, and the
+   * chevron drawn in `--ink-3` from two gradient strokes, because the icon set cannot reach inside a
    * `<select>` and a `data:` image would have to spell its colour as a literal.
    *
    * `!important` ON THE CHEVRON AND ITS ROOM, AND ONLY THERE, BECAUSE EVERY SELECT ALREADY SHIPPED
@@ -549,15 +561,15 @@
     appearance: none;
     min-block-size: max(40px, var(--ctl-h));
     padding-inline-start: var(--sp-3);
-    background-color: var(--field);
+    background-color: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
     cursor: pointer;
     padding-inline-end: calc(var(--sp-3) + 12px + var(--sp-2)) !important;
     background-image:
-      linear-gradient(45deg, transparent calc(50% - 0.75px), var(--dim) 0 calc(50% + 0.75px), transparent 0),
-      linear-gradient(135deg, transparent calc(50% - 0.75px), var(--dim) 0 calc(50% + 0.75px), transparent 0) !important;
+      linear-gradient(45deg, transparent calc(50% - 0.75px), var(--ink-3) 0 calc(50% + 0.75px), transparent 0),
+      linear-gradient(135deg, transparent calc(50% - 0.75px), var(--ink-3) 0 calc(50% + 0.75px), transparent 0) !important;
     background-position:
       calc(100% - var(--sp-3) - 6px) 50%,
       calc(100% - var(--sp-3)) 50% !important;
@@ -580,7 +592,7 @@
     appearance: none;
     min-block-size: max(40px, var(--ctl-h));
     padding-inline: var(--sp-3);
-    background-color: var(--field);
+    background-color: var(--tile-2);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
@@ -588,22 +600,22 @@
   }
 
   /* The part of a date being typed is highlighted in the system's blue by default. It takes the
-     `--selected` ground instead. Two rules, because a browser drops a whole rule over one
+     `--red-tint` ground instead, a chosen thing's. Two rules, because a browser drops a whole rule over one
      pseudo-element it does not know. */
   input::-webkit-datetime-edit-year-field:focus,
   input::-webkit-datetime-edit-month-field:focus,
   input::-webkit-datetime-edit-day-field:focus,
   input::-webkit-datetime-edit-hour-field:focus,
   input::-webkit-datetime-edit-minute-field:focus {
-    background-color: var(--selected);
+    background-color: var(--red-tint);
     color: var(--ink);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   input::-webkit-datetime-edit-ampm-field:focus {
-    background-color: var(--selected);
+    background-color: var(--red-tint);
     color: var(--ink);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-xs);
   }
 
   /* Safari on a phone centres a date's value inside an `appearance: none` box; a field reads from its
@@ -613,10 +625,9 @@
   }
 
   /**
-   * A RANGE IS A HAIRLINE TRACK AND AN ACCENT THUMB. The track is `--edge`, the floor every data mark
-   * stands on, which the theme's check D holds at 3:1 against every surface in both schemes
-   * (`packages/theme/src/checks.ts`); the thumb is the thing that is
-   * "on". The input keeps `--ctl-h` as its height, so under a thumb the whole slider is 44px tall
+   * A RANGE IS A HAIRLINE TRACK AND A RED THUMB. The track is the off switch's grey, which the theme's
+   * check T holds at 3:1 on the tile in both schemes (`packages/theme/src/checks.ts`); the thumb is the
+   * thing that is "on". The input keeps `--ctl-h` as its height, so under a thumb the whole slider is 44px tall
    * and only the drawing inside it is small. Each engine names its parts differently, and a rule
    * naming the other engine's part is dropped whole, so each part is written once per engine.
    */
@@ -629,13 +640,13 @@
 
   :where(input[type='range'])::-webkit-slider-runnable-track {
     block-size: 4px;
-    background: var(--edge);
+    background: var(--switch-off);
     border-radius: var(--r-round);
   }
 
   :where(input[type='range'])::-moz-range-track {
     block-size: 4px;
-    background: var(--edge);
+    background: var(--switch-off);
     border-radius: var(--r-round);
   }
 
@@ -645,7 +656,7 @@
     inline-size: 16px;
     block-size: 16px;
     margin-block-start: -6px;
-    background: var(--on);
+    background: var(--red-fill);
     border: 0;
     border-radius: var(--r-round);
   }
@@ -654,7 +665,7 @@
     box-sizing: border-box;
     inline-size: 16px;
     block-size: 16px;
-    background: var(--on);
+    background: var(--red-fill);
     border: 0;
     border-radius: var(--r-round);
   }
@@ -662,7 +673,7 @@
   /* HOVER ONLY WHERE THERE IS ONE, for the reason the segment gives. */
   @media (hover: hover) and (pointer: fine) {
     :where(input[type='checkbox'], input[type='radio']):hover:not(:checked, :disabled) {
-      border-color: var(--ink2);
+      border-color: var(--ink-2);
     }
   }
 
@@ -703,7 +714,7 @@
    * Forced colours replace every background with `Canvas`, and with `appearance: none` there is no
    * native drawing left to fall back on: a checked box's ink fill and its tick both became `Canvas`,
    * so checked and unchecked looked the same, and a slider's track and thumb vanished into the page.
-   * A switch's thumb went the same way. These controls opt out of the forcing and name the system
+   * A switch's knob went the same way. These controls opt out of the forcing and name the system
    * colours themselves, so the reader's own palette still draws on and off: `Highlight` for what is
    * on, `CanvasText` for a boundary, `HighlightText` for a mark on a fill.
    */

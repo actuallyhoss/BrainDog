@@ -1,9 +1,9 @@
 /**
- * THE CHOSEN SEGMENT'S HAIRLINE IS FOR A TRACK WITH NO THUMB (DIRECTION 39).
+ * THE CHOSEN SEGMENT IS RAISED, AND NOTHING CASTS A SHADOW (SPEC 2.A.9, frame F23, SPEC 1.9).
  *
- * WHAT WAS MEASURED. `controls.css` drew a hairline and a shadow on every chosen segment, and took them off again once
- * the part's track (`Segmented.svelte`, `data-slides`) had measured its thumb. Between the two the part's track showed
- * the old outlined fill. A track written by hand has no thumb and still needs them.
+ * WHAT WAS SEEN. In dark the chosen segment was darker than its track, so it read as pressed in; and a track written by
+ * hand drew a hairline and a breath of shadow round it. The chosen segment is `--segment-on` now, white in light and a
+ * step lighter than the track in dark, with the ink at 600, and the raised fill is the shape: no hairline, no shadow.
  *
  * A TEXT TEST OVER THE STYLESHEET, as `segmented-callers.test.ts` is over markup.
  */
@@ -17,26 +17,45 @@ const css = readFileSync(new URL('controls.css', import.meta.url), 'utf8').repla
 /** Every rule as its selector and its body. No rule in the sheet nests braces inside a segment's rule. */
 const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map((m) => ({ selector: m[1]!.trim().replaceAll(/\s+/gu, ' '), body: m[2]! }));
 const chosen = rules.filter((r) => /\.segment\[data-on\]/u.test(r.selector));
-const HAIRLINE = /box-shadow:[^;]*var\(--rule\)/u;
 
-test('the chosen segment is the tile colour on every track', () => {
+test('the chosen segment is raised, in the ink at 600, on every track', () => {
   const plain = chosen.find((r) => r.selector === '.segment[data-on]');
   assert.ok(plain, 'the plain rule for a chosen segment is gone');
-  assert.match(plain.body, /background:\s*var\(--tile\)/u);
-  assert.doesNotMatch(plain.body, /box-shadow/u, 'the plain rule draws a shadow on every track again');
+  assert.match(plain.body, /background:\s*var\(--segment-on\)/u);
+  assert.match(plain.body, /color:\s*var\(--ink\)/u);
+  assert.match(plain.body, /font-weight:\s*var\(--fw-semi\)/u);
 });
 
-test('the hairline is drawn only where the part did not draw the track', () => {
-  const drawn = chosen.filter((r) => HAIRLINE.test(r.body));
-  assert.equal(drawn.length, 1, 'one rule draws the hairline');
-  assert.equal(drawn[0]!.selector, ':not(.segmented[data-slides]) > .segment[data-on]');
+test('the track is the well, a segment sits at radius 4 inside it, and the others are the second ink', () => {
+  const track = rules.find((r) => r.selector === '.segmented');
+  assert.match(track?.body ?? '', /background:\s*var\(--tile-2\)/u);
+  assert.match(track?.body ?? '', /border-radius:\s*var\(--r-ctl\)/u);
+  const segment = rules.find((r) => r.selector === '.segment');
+  assert.match(segment?.body ?? '', /border-radius:\s*var\(--r-xs\)/u);
+  assert.match(segment?.body ?? '', /color:\s*var\(--ink-2\)/u);
+  assert.match(segment?.body ?? '', /font-size:\s*var\(--fs-ctl\)/u);
+});
+
+test('no rule draws a hairline or a shadow on a segment', () => {
+  for (const r of rules.filter((x) => /\.segment/u.test(x.selector)))
+    assert.doesNotMatch(r.body, /box-shadow/u, `${r.selector} casts or rings a segment`);
 });
 
 test('the thumb is the selection, and no rule is left for a second chosen one', () => {
   const under = chosen.find((r) => r.selector === '.segmented[data-thumb] > .segment[data-on]');
   assert.ok(under, 'the rule under the thumb is gone');
   assert.match(under.body, /background:\s*none/u);
-  assert.match(under.body, /box-shadow:\s*none/u);
+  const thumb = rules.find((r) => r.selector === '.segmented[data-thumb]::before');
+  assert.match(thumb?.body ?? '', /background:\s*var\(--segment-on\)/u);
   /* A track where more than one can be chosen is given `many` and draws no thumb, so nothing is chosen beside one. */
   assert.ok(!chosen.some((r) => /~\s*\.segment\[data-on\]/u.test(r.selector)), 'a rule for a second chosen segment is back');
+});
+
+test('a page-level control on a phone fills the row, and one that scrolls fades at its end', () => {
+  const full = rules.find((r) => r.selector === '.segmented[data-full]');
+  assert.match(full?.body ?? '', /inline-size:\s*100%/u);
+  const scrolls = rules.find((r) => r.selector === '.segmented[data-full][data-scrolls]');
+  assert.match(scrolls?.body ?? '', /overflow-x:\s*auto/u);
+  assert.match(scrolls?.body ?? '', /scrollbar-width:\s*none/u);
+  assert.match(scrolls?.body ?? '', /mask-image:\s*linear-gradient\(to right, [^,]+ calc\(100% - 24px\), transparent\)/u);
 });

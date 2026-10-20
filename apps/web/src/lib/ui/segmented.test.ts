@@ -107,18 +107,15 @@ test('a track given many is marked, and measures and draws no thumb', () => {
   assert.ok(leaves < effect.indexOf('new MutationObserver'), 'a track of many is watched');
 });
 
-test('on a track given many, each chosen segment fills itself: the tile colour, flat, and nothing takes it off', () => {
+test('on a track given many, each chosen segment fills itself: the raised fill, flat, and nothing takes it off', () => {
   /* What the part draws for it: `data-slides` and `data-many`, and never `data-thumb`. */
-  assert.match(TRACK, /data-slides=""/u, 'the track is no longer marked as the part\'s, so the hairline of a hand-written one comes back');
-  const reach = RULES.filter(
-    (r) => /\.segment\[data-on\]/u.test(r.selector) && !r.selector.includes('[data-thumb') && !r.selector.includes(':not(.segmented[data-slides])'),
-  );
-  /* The second is a step in an ordered track, read through its list item: it only keeps the hairline of a track written
-     by hand off, and leaves the fill alone. */
-  assert.deepEqual(reach.map((r) => r.selector), ['.segment[data-on]', '.segmented[data-slides] > li > .segment[data-on]']);
-  assert.match(reach[0]!.body, /background:\s*var\(--tile\)/u);
+  assert.match(TRACK, /data-slides=""/u, 'the track is no longer marked as the part\'s');
+  const reach = RULES.filter((r) => /\.segment\[data-on\]$/u.test(r.selector) && !r.selector.includes('[data-thumb'));
+  /* 2026-10-20 (SPEC 2.A.9, 1.9): the chosen segment is `--segment-on`, and no segment anywhere has a hairline or a
+     shadow, so there is no rule left to take one off. */
+  assert.deepEqual(reach.map((r) => r.selector), ['.segment[data-on]']);
+  assert.match(reach[0]!.body, /background:\s*var\(--segment-on\)/u);
   assert.doesNotMatch(reach[0]!.body, /box-shadow/u);
-  assert.match(reach[1]!.body, /^\s*box-shadow:\s*none;\s*$/u);
 });
 
 test('a track without many is unchanged: the thumb goes under its chosen segment and the sheet clears the fill there', () => {
