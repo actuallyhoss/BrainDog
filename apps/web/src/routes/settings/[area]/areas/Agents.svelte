@@ -120,16 +120,19 @@
     const keys = await c.listTokens();
     const runs = await c.list({ register: 'session', limit: RUNS_READ, order: [{ field: 'last_seen', dir: 'desc' }] });
     const presence = new Map<number, RunPresence>();
-    return {
-      ok: true,
-      value: {
-        machines: devices.value,
-        tokens: keys.ok ? standing(keys.value as TokenRow[]) : [],
-        runs: runs.ok ? runsOf(runs.value.rows) : [],
-        live: runs.ok ? livenessOf(runs.value.rows, Date.now(), presence) : new Map(),
-        presence,
-      },
+    const value: Held = {
+      machines: devices.value,
+      tokens: keys.ok ? standing(keys.value as TokenRow[]) : [],
+      runs: runs.ok ? runsOf(runs.value.rows) : [],
+      live: runs.ok ? livenessOf(runs.value.rows, Date.now(), presence) : new Map(),
+      presence,
     };
+    /* THE OFFER IS ASKED INSIDE THE READ, so the screen is not drawn while it is still out (below). */
+    if (!offerAsked && connected(value.machines, value.tokens, value.runs).some((r) => r.live && r.machine?.status !== 'pending')) {
+      offerAsked = true;
+      await offerPack(c);
+    }
+    return { ok: true, value };
   }
 
   /* ASKED ONLY OF AN OWNER, because every one of these reads is an owner's: a colleague asking would be told no, and
@@ -305,18 +308,12 @@
    */
   let offer = $state<Plan | null>(null);
   /* ASKED ONCE PER VISIT, and never again after Not now: the list is read again after every press, and each read
-     would otherwise plan the pack again. */
+     would otherwise plan the pack again.
+
+     FROM `listed` AND NOT FROM AN EFFECT ON THE ROWS. The effect ran a frame after the list had come back, so the
+     screen said it was drawn in between and `/api/packs` was still out when a reader moved on: WebKit reports that
+     cancelled call as refused by access control, on every visit with a machine connected. */
   let offerAsked = false;
-  $effect(() => {
-    if (!rows.some((c) => c.live && c.machine?.status !== 'pending')) return;
-    /* `untrack` FOR THE INGEST AREA'S REASON: `opened()` reads and writes the same state, and an effect that
-       depends on what it writes runs for ever. */
-    untrack(() => {
-      if (offerAsked) return;
-      offerAsked = true;
-      void offerPack(clientOf());
-    });
-  });
   /* THE PLAN'S `calls_out`, beside the plan rather than in it, so `vault.ts` does not pull in `actions.ts`. */
   let offerCalls = $state<CallOut[]>([]);
   let installing = $state(false);
