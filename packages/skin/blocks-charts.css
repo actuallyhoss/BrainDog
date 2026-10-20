@@ -619,7 +619,7 @@
     block-size: 2px;
     inline-size: 12px;
     border-radius: 0;
-    background: var(--chart-late);
+    background: var(--red);
   }
 
   /* THE PLOT LEAVES ITS FIRST COLUMN TO THE SCALE'S FIGURES, and the columns and the bucket names share the rest. */
@@ -719,7 +719,7 @@
 
   /* MORE WENT OUT THAN CAME IN: a 2px cap in the late red at the free end of the money that hangs under zero. */
   .series-col[data-under] > .series-bar[data-dir='out'][data-end] {
-    border-block-end: 2px solid var(--chart-late);
+    border-block-end: 2px solid var(--red);
   }
 
   /* A BUCKET'S FIGURES ON HOVER, in a small card beside its bar at the top of the plot, before the bar in the right
@@ -1538,7 +1538,7 @@
   }
 
   .forecast-under {
-    stop-color: var(--chart-late);
+    stop-color: var(--red);
   }
 
   .forecast-grid {
@@ -1600,19 +1600,21 @@
 
   /* WHERE THE WALK GOES UNDER, ITS LOWEST POINT IS UNDER £0, so its dot is the late red the line is there. */
   .forecast-chart:has(.forecast-area[data-below]) .forecast-low {
-    stroke: var(--chart-late);
+    stroke: var(--red);
   }
 
-  /* THE DAY IT GOES UNDER IS THE LATE RED, the dot, its hairline and its day, because under £0 is what the red means. */
+  /* THE DAY IT GOES UNDER IS RED, the dot, its hairline and its day, because under £0 is what the red means. A line and a
+     dot are marks and not a series' fill, so they take the red words and marks take (`--red`), named by the day beside
+     them; a late bar or part still wears the hatch. */
   .forecast-cross {
-    stroke: var(--chart-late);
+    stroke: var(--red);
   }
 
   /* THE CROSSING IS TIED TO ITS FLAG BY ONE HAIRLINE in the late red at half strength, from the chart's top edge down
      to the point where the balance goes under: enough to say which day the words above mean, quieter than the line. */
   .forecast-cross-rule {
     fill: none;
-    stroke: var(--chart-late);
+    stroke: var(--red);
     stroke-opacity: 0.5;
     stroke-width: 1px;
   }

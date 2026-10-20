@@ -176,7 +176,7 @@
   }
 
   .cell[data-intent='bad'] .trend-end {
-    stroke: var(--chart-late);
+    stroke: var(--red);
   }
 
   /* `stat lead`: the first figure is the screen's one lead figure, up to the page name's 28 (DIRECTION §39: a figure is
