@@ -57,8 +57,10 @@ const SCREENS = [
   '../../routes/v/[view]/+page.svelte',
   '../../routes/usage/+page.svelte',
   '../page/ProjectShape.svelte',
-  '../page/ProjectVisuals.svelte',
 ];
+/* AND THE SCREENS HANDED THEIR DAY BY ONE THAT READS IT: the Path and Money of a project are drawn from the shape's read,
+   on its day (`ProjectShape.svelte`), since the UI pass of 20 October (proj F3), and read no clock of their own. */
+const HANDED = ['../page/ProjectVisuals.svelte'];
 
 test('THE ROW PAGE, THE SAVED VIEW, USAGE AND A PROJECT READ THE RECORD’S CLOCK, never the browser’s', () => {
   for (const file of SCREENS) {
@@ -68,6 +70,10 @@ test('THE ROW PAGE, THE SAVED VIEW, USAGE AND A PROJECT READ THE RECORD’S CLOC
       .replace(/^\s*\/\/.*$/gmu, '');
     assert.doesNotMatch(code, /Date\.now\(\)|new Date\(\)/u, `${file} reads the browser's clock`);
     assert.match(code, /recordNow\(\)/u, `${file} reads no clock at all`);
+  }
+  for (const file of HANDED) {
+    const code = readFileSync(new URL(file, import.meta.url), 'utf8');
+    assert.doesNotMatch(code, /Date\.now\(\)|new Date\(\)/u, `${file} reads the browser's clock`);
   }
 });
 

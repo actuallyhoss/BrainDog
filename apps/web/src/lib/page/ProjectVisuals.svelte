@@ -1,240 +1,195 @@
 <!--
-  What a project's page draws beside its shape blocks: a roadmap of its dated tasks, and the visuals its data earns
-  (`visuals.ts`): money in and out by month as small bars, a dues calendar, a revenue trend.
+  Row 2 of a project's page: its Path and its Money (proj F3 and F8, section 4).
 
-  ROW 2 OF A PROJECT IS ITS PATH AND ITS MONEY (the plan of 20 October, batch 3b): the roadmap at eight columns of
-  twelve and money at four from 1100px, money's lines with its first month-by-month bars under them, each bar at most
-  24px wide with a rounded top, in the project's colour (`hue`), its value on hover and three months named under them.
-  The rest of the visuals follow, half a row each.
+  THE PATH IS A STEPPER, NOT A TIME AXIS: the project's own work (`pathOf`), the last two finished, the one under way, the
+  next three, evenly spaced along one line, never its bills (Money and More about say those). A finished stop is filled
+  in the project's colour with a check, the one now is ringed in it, a late one or one waiting on a person is ringed in
+  the red and says so in words, the rest are a plain ring. "All 17" in the head opens the whole list for the project.
+  Under 640px it turns on its side: a 44px row a stop, the line down the left.
 
-  NOTHING DRAWN EMPTY: a roadmap needs two dated tasks, a visual needs its data, and each is a tile only while it has
-  something to say. Each has "Show the data" under it, as the blocks above do. The roadmap is a horizontal line of time
-  from 640px and the same marks as a list below it, so a phone reads it top to bottom. Both themes, from the tokens.
+  MONEY LEADS WITH ITS FIGURE: what it earned this period at 22, how that compares with the period before in words (good
+  or red), the two periods as 8px bars, what is still to come in as one line, and month bars only when there are three
+  months with two of them above nought; otherwise the total is a line. Bars in the project's colour, the period before at
+  45% of it over the tile so it holds in dark.
+
+  EACH TILE IS AS TALL AS ITS CONTENT (`align-self: start`), so neither stretches to the other. "Show the data" waits for
+  the pointer on a wide screen with a fine pointer (SF10), and is always there on a phone.
 -->
 <script lang="ts">
   import Tile from '$lib/ui/Tile.svelte';
   import Icon from '$lib/ui/Icon.svelte';
-  import { recordNow } from '$lib/record/boot-live.ts';
-  import { lanesOf, roadmapOf, visualsFor, type Listing, type Months, type Mark } from '$lib/record/visuals.ts';
+  import { at } from '$lib/at.ts';
+  import { monthsDrawn, type Months, type Path, type Trend } from '$lib/record/visuals.ts';
   import type { DataRow, MoneyLine } from '$lib/record/project.ts';
 
   let {
-    fields,
-    decl,
+    path = null,
+    pathHref = null,
+    stopHref = () => null,
     inByMonth = null,
     outByMonth = null,
-    listings,
+    trend = null,
     format,
     money = [],
-    hue = null,
     moneyRows = [],
+    arrived = new Set<string>(),
   }: {
-    fields: Readonly<Record<string, unknown>>;
-    decl: Parameters<typeof visualsFor>[0]['decl'];
+    path?: Path | null;
+    /** The whole work list narrowed to the project, for "All 17". */
+    pathHref?: string | null;
+    /** Where a stop opens: its row. */
+    stopHref?: (seq: number | null) => string | null;
     inByMonth?: Months | null;
     outByMonth?: Months | null;
-    listings: readonly Listing[];
+    /** What it earned this period against the period before, where the project says both. */
+    trend?: Trend | null;
     format: (minor: number, currency: string) => string;
-    /** The project's money this month, as the shape reads it (`moneyLines`): the lines over the Money tile's bars. */
+    /** The project's money this month, as the shape reads it (`moneyLines`). */
     money?: readonly MoneyLine[];
-    /** The project's own hue, which the bars and the path's finished stops are drawn in; none draws them in ink. */
-    hue?: number | null;
-    /** The rows behind the money lines, for the Money tile's "Show the data". */
+    /** The rows behind the money lines, for "Show the data". */
     moneyRows?: readonly DataRow[];
+    /** Which figures changed in the read just landed (`data-arrived`, proj F9). */
+    arrived?: ReadonlySet<string>;
   } = $props();
 
-  /* THE RECORD'S DAY (`recordNow`), as every other screen's "today", in the reader's zone. */
-  const today = $derived.by(() => {
-    const d = new Date(recordNow());
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
   const uid = $props.id();
 
-  const road = $derived(roadmapOf(listings, today));
-  const all = $derived(visualsFor({ fields, decl }, { inByMonth, outByMonth, listings, today, format }));
-  /* THE FIRST MONTH-BY-MONTH BARS GO UNDER MONEY'S LINES, in row 2; the rest follow as tiles of their own. */
-  const bars0 = $derived(all.find((v): v is Extract<typeof v, { kind: 'in' | 'out' }> => v.kind === 'in' || v.kind === 'out') ?? null);
-  /* AND WHAT IT EARNED AGAINST THE PERIOD BEFORE: money is one tile, not three. */
-  const rev = $derived(all.find((v): v is Extract<typeof v, { kind: 'revenue' }> => v.kind === 'revenue') ?? null);
-  const visuals = $derived(all.filter((v) => v !== bars0 && v !== rev));
-  const hasMoney = $derived(money.length > 0 || bars0 !== null || rev !== null);
-  const MONEY: Record<MoneyLine['key'], string> = { in: 'In this month', out: 'Out this month', owed: 'Still to come in' };
-
-  /* The marks with a "now" step among them in time order, so the phone's list and the line read the same. */
-  type Step = (Mark & { now?: false }) | { now: true; key: string; at: number };
-  const steps = $derived.by((): Step[] => {
-    if (!road) return [];
-    const out: Step[] = [...road.marks];
-    const at = road.marks.findIndex((m) => m.day > road.today);
-    out.splice(at === -1 ? out.length : at, 0, { now: true, key: 'now', at: road.todayAt });
-    return out;
+  /* ── money ── */
+  const LINE: Record<MoneyLine['key'], string> = { in: 'In this month', out: 'Out this month', owed: 'Still to come in' };
+  const FIGURE: Record<MoneyLine['key'], string> = { in: 'came in this month', out: 'went out this month', owed: 'still to come in' };
+  /* THE FIGURE: what it earned this period where the project says so, else the first line of this month's money. */
+  const lead = $derived.by(() => {
+    if (trend && trend.now > 0) return { key: 'earned', value: trend.now, currency: trend.currency, label: 'earned this period' };
+    const m = money.find((x) => x.key === 'in') ?? money[0];
+    return m ? { key: m.key, value: m.value, currency: m.currency, label: FIGURE[m.key] } : null;
   });
-  /* WHICH LINE EACH LABEL HANGS ON, from where each is drawn (`lanesOf`), so no two run into each other at any width:
-     measured once drawn, again when the tile changes width or the fonts land. Until then, and on a phone where the road
-     is a list, every third label steps down as before. */
-  let roadEl = $state<HTMLOListElement>();
-  let lanes = $state.raw<Readonly<Record<string, number>>>({});
-  let laneCount = $state(3);
-  $effect(() => {
-    void steps;
-    const el = roadEl;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const measure = () => {
-      if (!matchMedia('(width >= 640px)').matches) return;
-      const at = el.getBoundingClientRect().left;
-      const items = [...el.querySelectorAll<HTMLElement>('li.step[data-key]')];
-      const got = lanesOf(items.map((li) => {
-        const r = li.getBoundingClientRect();
-        return { left: r.left - at, right: r.right - at };
-      }));
-      const next = Object.fromEntries(items.map((li, i) => [li.dataset.key!, got[i]!]));
-      if (JSON.stringify(next) !== JSON.stringify(lanes)) lanes = next;
-      laneCount = Math.max(1, ...got.map((l) => l + 1));
-    };
-    measure();
-    const seen = new ResizeObserver(measure);
-    seen.observe(el);
-    void document.fonts?.ready.then(measure);
-    return () => seen.disconnect();
+  const lines = $derived(money.filter((m) => m.key !== lead?.key));
+  const change = $derived.by(() => {
+    if (!trend || trend.before <= 0) return null;
+    const share = Math.round((Math.abs(trend.now - trend.before) / trend.before) * 100);
+    if (share === 0) return { text: 'The same as the period before', tone: 'same' };
+    return trend.now > trend.before ? { text: `${share}% above the period before`, tone: 'good' } : { text: `${share}% below the period before`, tone: 'bad' };
   });
-  const STATE: Record<Mark['state'], string> = { done: 'Done', late: 'Late', next: 'Next', later: 'Later' };
-  const dayWords = (day: string): string => new Date(`${day}T00:00:00Z`).toLocaleString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-  const roadRows = $derived<DataRow[]>((road?.marks ?? []).map((m) => ({ key: `road#${m.key}`, title: m.title, detail: `${dayWords(m.day)}, ${STATE[m.state].toLowerCase()}${m.milestone ? ', milestone' : ''}`, href: null })));
-
-  let open = $state<ReadonlySet<string>>(new Set());
-  const toggle = (k: string) => {
-    const next = new Set(open);
-    if (!next.delete(k)) next.add(k);
-    open = next;
-  };
-
+  const scale = $derived(trend ? Math.max(trend.now, trend.before, 1) : 1);
+  /* THE MONTHS: what came in where that is a shape, else what went out; otherwise one line saying the total. */
+  const months = $derived(monthsDrawn(inByMonth) ? { m: inByMonth, title: 'Money in by month' } : monthsDrawn(outByMonth) ? { m: outByMonth, title: 'Money out by month' } : null);
   const monthName = (key: string): string => new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, 1)).toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
-  const monthLong = (key: string): string => new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, 1)).toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const monthLong = (key: string): string => new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, 1)).toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
+  const since = $derived.by(() => {
+    if (months) return null;
+    const firstOf = (m: Months) => m.months.find((x) => x.value > 0)?.key ?? m.months[0]?.key;
+    for (const [m, word] of [[inByMonth, 'in'], [outByMonth, 'out']] as const) {
+      if (m && m.total > 0) {
+        const from = firstOf(m);
+        return `${format(m.total, m.currency)} ${word}${from ? ` since ${monthLong(from)}` : ''}`;
+      }
+    }
+    return null;
+  });
   const peak = (m: Months): number => Math.max(...m.months.map((x) => x.value), 1);
-  const change = (before: number, now: number): string => {
-    if (before <= 0) return 'Nothing earned the period before.';
-    const share = Math.round((Math.abs(now - before) / before) * 100);
-    return share === 0 ? 'The same as the period before.' : `${share}% ${now > before ? 'above' : 'below'} the period before.`;
-  };
-  const ICON = { revenue: 'money', in: 'money', out: 'money', dues: 'calendar' } as const;
-  const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const hasMoney = $derived(lead !== null || since !== null || months !== null);
+  const monthRows = $derived<DataRow[]>(months ? months.m.months.map((x) => ({ key: `m#${x.key}`, title: monthLong(x.key), detail: format(x.value, months.m.currency), href: null })) : []);
+  const trendRows = $derived<DataRow[]>(
+    trend
+      ? [
+          { key: 'rev#now', title: 'This period', detail: format(trend.now, trend.currency), href: null },
+          { key: 'rev#before', title: 'The period before', detail: format(trend.before, trend.currency), href: null },
+        ]
+      : [],
+  );
+  const dataRows = $derived([...moneyRows, ...trendRows, ...monthRows]);
+  let open = $state(false);
+
+  /* ── the path ── */
+  const doneCount = $derived(path ? path.stops.filter((s) => s.kind === 'done').length : 0);
 </script>
 
-{#snippet disclosure(k: string, list: readonly DataRow[], label: string)}
-  {#if list.length > 0}
-    <button type="button" class="more" aria-expanded={open.has(k)} aria-controls="{uid}-{k}" onclick={() => toggle(k)}>
-      {open.has(k) ? 'Hide the data' : 'Show the data'}<Icon name="chevron" size="s" />
-    </button>
-    {#if open.has(k)}
-      <ul id="{uid}-{k}" class="items" aria-label={label}>
-        {#each list as r (r.key)}
-          <li class="item"><span class="item-title" dir="auto">{r.title}</span>{#if r.detail}<span class="item-detail">{r.detail}</span>{/if}</li>
-        {/each}
-      </ul>
-    {/if}
-  {/if}
-{/snippet}
-
-{#snippet bars(m: Months, tone: string)}
-  {@const ticks = new Set([0, Math.floor((m.months.length - 1) / 2), m.months.length - 1])}
-  <ol class="months" data-tone={tone} aria-label="{monthName(m.months[0]!.key)} to {monthName(m.months.at(-1)!.key)}">
-    {#each m.months as x, n (x.key)}
-      <li title="{monthLong(x.key)}: {format(x.value, m.currency)}">
-        <span class="mval num" aria-hidden="true">{format(x.value, m.currency)}</span>
-        <span class="col" data-partial={x.partial} style:block-size="{Math.max(x.value > 0 ? 4 : 1, Math.round((x.value / peak(m)) * 100))}%"></span>
-        <span class="mname">{ticks.has(n) ? monthName(x.key) : ''}</span>
-      </li>
-    {/each}
-  </ol>
-  <p class="quiet">{format(m.total, m.currency)} over {m.months.length} months</p>
-{/snippet}
-
-{#snippet earned(w: Extract<(typeof all)[number], { kind: 'revenue' }>)}
-  <ul class="trend">
-    <li><span class="t-name">This period</span><span class="t-amount num">{format(w.trend.now, w.trend.currency)}</span><span class="t-bar"><span style:inline-size="{Math.max(4, Math.round((w.trend.now / Math.max(w.trend.now, w.trend.before, 1)) * 100))}%"></span></span></li>
-    <li><span class="t-name">The period before</span><span class="t-amount num">{format(w.trend.before, w.trend.currency)}</span><span class="t-bar" data-before="true"><span style:inline-size="{Math.max(w.trend.before > 0 ? 4 : 0, Math.round((w.trend.before / Math.max(w.trend.now, w.trend.before, 1)) * 100))}%"></span></span></li>
-  </ul>
-  <p class="quiet">{change(w.trend.before, w.trend.now)}</p>
-{/snippet}
-
-{#if road || hasMoney || visuals.length > 0}
-  <div class="visuals" data-hued={hue === null ? undefined : ''} style={hue === null ? undefined : `--hue:${hue}`}>
-    {#if road}
-      <div class="vis path" data-alone={hasMoney ? undefined : ''}>
-        <Tile icon="task" title="Path">
-          <ol class="road" aria-label="Path" bind:this={roadEl} style:--lanes={laneCount}>
-            {#each steps as s (s.key)}
-              {#if 'now' in s && s.now}
-                <li class="step now" style:--at={s.at}><span class="dot" aria-hidden="true"></span><span class="what">Now</span></li>
-              {:else}
-                {@const m = s as Mark}
-                <li class="step" data-key={m.key} data-state={m.state} data-milestone={m.milestone} style:--at={m.at} style:--lane={lanes[m.key] ?? steps.indexOf(s) % 3} title="{dayWords(m.day)}">
-                  <span class="dot" aria-hidden="true"></span>
-                  <span class="what" dir="auto">{m.title}</span>
-                  <span class="when">{dayWords(m.day)}{#if m.state === 'late'}, late{/if}</span>
-                </li>
-              {/if}
+{#if path || hasMoney}
+  <div class="row2" data-alone={path && hasMoney ? undefined : ''}>
+    {#if path}
+      <div class="vis path">
+        <Tile icon="observe" title="Path" href={pathHref ?? undefined} hrefLabel={pathHref ? `All ${path.total}` : undefined}>
+          <ol class="steps" aria-label="Path" style:--stops={path.stops.length} style:--done={doneCount} data-many={path.stops.length > 5 ? '' : undefined}>
+            {#each path.stops as s (s.key)}
+              {@const href = stopHref(s.seq)}
+              <li class="stop" data-kind={s.kind} data-arrived={arrived.has(`stop:${s.key}`) ? '' : undefined}>
+                <span class="c" aria-hidden="true">{#if s.kind === 'done'}<Icon name="check" size="s" />{/if}</span>
+                <span class="words">
+                  {#if href}<a class="t" href={at(href)} dir="auto">{s.title}</a>{:else}<span class="t" dir="auto">{s.title}</span>{/if}
+                  {#if s.sub}<span class="s" data-red={s.red ? '' : undefined}>{s.sub}</span>{/if}
+                </span>
+              </li>
             {/each}
           </ol>
-          {@render disclosure('road', roadRows, 'Path')}
         </Tile>
       </div>
     {/if}
     {#if hasMoney}
-      <div class="vis money" data-alone={road ? undefined : ''}>
+      <div class="vis money">
         <Tile icon="money" title="Money">
-          {#if money.length > 0}
-            <ul class="lines">
-              {#each money as m (m.key)}
-                <li><span class="t-name">{MONEY[m.key]}</span><span class="t-amount num">{format(m.value, m.currency)}</span></li>
+          <div class="mb">
+          {#if lead}
+            <p class="m-figure" data-arrived={arrived.has('money:lead') ? '' : undefined}>
+              <span class="fig num">{format(lead.value, lead.currency)}</span>
+              <span class="fig-label">{lead.label}</span>
+            </p>
+          {/if}
+          {#if change}<p class="change" data-tone={change.tone}>{change.text}</p>{/if}
+          {#if trend}
+            <div class="periods" aria-hidden="true">
+              <span class="bar"><span style:inline-size="{Math.max(trend.now > 0 ? 3 : 0, Math.round((trend.now / scale) * 100))}%"></span></span>
+              <span class="bar" data-before><span style:inline-size="{Math.max(trend.before > 0 ? 3 : 0, Math.round((trend.before / scale) * 100))}%"></span></span>
+            </div>
+          {/if}
+          {#if lines.length > 0}
+            <ul class="m-lines">
+              {#each lines as m (m.key)}
+                <li data-arrived={arrived.has(`money:${m.key}`) ? '' : undefined}><span>{LINE[m.key]}</span><span class="m-amount num">{format(m.value, m.currency)}</span></li>
               {/each}
             </ul>
           {/if}
-          {#if rev}{@render earned(rev)}{/if}
-          {#if bars0}
-            <p class="bars-name">{bars0.title}</p>
-            {@render bars(bars0.months, bars0.kind)}
+          {#if months}
+            {@const m = months.m}
+            {@const ticks = new Set([0, Math.floor((m.months.length - 1) / 2), m.months.length - 1])}
+            <p class="bars-name">{months.title}</p>
+            <ol class="months" aria-label="{monthLong(m.months[0]!.key)} to {monthLong(m.months.at(-1)!.key)}">
+              {#each m.months as x, n (x.key)}
+                <li title="{monthLong(x.key)}: {format(x.value, m.currency)}">
+                  <span class="mval num" data-last={n === m.months.length - 1 ? '' : undefined}>{format(x.value, m.currency)}</span>
+                  <span class="col" data-partial={x.partial} style:block-size="{Math.max(x.value > 0 ? 4 : 1, Math.round((x.value / peak(m)) * 100))}%"></span>
+                  <span class="mname">{ticks.has(n) ? monthName(x.key) : ''}</span>
+                </li>
+              {/each}
+            </ol>
+          {:else if since}
+            <p class="since">{since}</p>
           {/if}
-          {@render disclosure('money', [...moneyRows, ...(rev?.rows ?? []), ...(bars0?.rows ?? [])], 'Money')}
+          {#if dataRows.length > 0}
+            <button type="button" class="show-data" aria-expanded={open} aria-controls="{uid}-money" onclick={() => (open = !open)}>
+              {open ? 'Hide the data' : 'Show the data'}<Icon name="chevron" size="s" />
+            </button>
+            {#if open}
+              <ul id="{uid}-money" class="data-items" aria-label="Money">
+                {#each dataRows as r (r.key)}
+                  <li class="data-item"><span class="item-title" dir="auto">{r.title}</span>{#if r.detail}<span class="item-detail num">{r.detail}</span>{/if}</li>
+                {/each}
+              </ul>
+            {/if}
+          {/if}
+          </div>
         </Tile>
       </div>
     {/if}
-    {#each visuals as v (v.kind)}
-      {@const w = v}
-      <div class="vis" data-kind={w.kind}>
-        <Tile icon={ICON[w.kind]} title={w.title}>
-          {#if w.kind === 'in' || w.kind === 'out'}
-            {@render bars(w.months, w.kind)}
-          {:else if w.kind === 'dues'}
-            <div class="cals">
-              {#each w.calendar as c (c.key)}
-                <div class="cal">
-                  <p class="cal-name">{monthLong(c.key)}</p>
-                  <ol class="grid" aria-label={monthLong(c.key)}>
-                    {#each DAYS as d, i (i)}<li class="dow" aria-hidden="true">{d}</li>{/each}
-                    {#each { length: c.lead } as _, i (i)}<li aria-hidden="true"></li>{/each}
-                    {#each { length: c.days } as _, i (i)}
-                      {@const p = c.dues.get(i + 1)}
-                      <li class="d" data-pay={p ? (p.late ? 'late' : 'on') : undefined} title={p ? `${i + 1} ${monthName(c.key)}: ${p.what}${p.late ? ', late' : ''}` : undefined}>{i + 1}</li>
-                    {/each}
-                  </ol>
-                </div>
-              {/each}
-            </div>
-          {/if}
-          {@render disclosure(w.kind, w.rows, w.title)}
-        </Tile>
-      </div>
-    {/each}
   </div>
 {/if}
 
 <style>
-  .visuals {
+  /* ROW 2: the path at eight of twelve and money at four from 1100px, either alone across the row; stacked below. */
+  .row2 {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--inset);
-    margin-block-start: var(--inset);
+    align-items: start;
   }
 
   .vis {
@@ -242,250 +197,319 @@
     min-inline-size: 0;
   }
 
-  .visuals {
-    --ph: var(--ink);
-  }
-
-  .visuals[data-hued] {
-    --ph: oklch(var(--mark-l) var(--mark-c) var(--hue));
-  }
-
-  @media (width >= 640px) {
-    .visuals {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .vis.path,
-    .vis[data-kind='dues'] {
-      grid-column: 1 / -1;
-    }
-  }
-
-  /* ROW 2 ON A WIDE SCREEN: the path at eight of twelve and money at four, and either alone across the row. */
   @media (width >= 1100px) {
-    .visuals {
-      grid-template-columns: repeat(12, minmax(0, 1fr));
+    .row2 {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     }
 
-    .vis {
-      grid-column: span 6;
-    }
-
-    .vis.path {
-      grid-column: span 8;
-    }
-
-    .vis.money {
-      grid-column: span 4;
-    }
-
-    .vis.path[data-alone],
-    .vis[data-kind='dues'] {
-      grid-column: 1 / -1;
-    }
-
-    .vis.money[data-alone] {
-      grid-column: span 6;
+    .row2[data-alone] {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
-  .lines {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-2);
-    margin: 0 0 var(--sp-3);
-    padding: 0;
-    list-style: none;
-  }
-
-  .lines li {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--sp-3);
-  }
-
-  .bars-name {
-    margin: var(--sp-4) 0 var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .quiet {
-    margin: var(--sp-2) 0 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  /* THE ROADMAP: on a phone a list, a dot and a line to a row; from 640px the same rows lie along one line of time. */
-  .road {
+  /* ── the stepper ── */
+  .steps {
     position: relative;
-    display: flex;
-    flex-direction: column;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: repeat(var(--stops), minmax(0, 1fr));
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .step {
-    position: relative;
-    display: grid;
-    grid-template-columns: 16px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: 36px;
-    color: var(--ink);
-    font-size: var(--t-base);
+  /* THE LINE, centre of the first stop to centre of the last, and the finished part of it in the project's colour. */
+  .steps::before,
+  .steps::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset-block-start: 11px;
+    inset-inline-start: calc(100% / var(--stops) / 2);
+    block-size: 2px;
+    border-radius: 1px;
   }
 
-  .what {
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
+  .steps::before {
+    inset-inline-end: calc(100% / var(--stops) / 2);
+    background: var(--rule-strong);
   }
 
-  .when {
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
-  .dot {
-    inline-size: 10px;
-    block-size: 10px;
-    justify-self: center;
-    border: 2px solid var(--ink);
-    border-radius: 50%;
-    background: var(--bg, transparent);
-  }
-
-  .step[data-state='done'] .dot {
-    border-color: var(--ph);
+  .steps::after {
+    inline-size: calc(100% / var(--stops) * max(var(--done) - 1, 0));
     background: var(--ph);
   }
 
-  .step[data-state='later'] .dot {
-    border-color: var(--dim);
+  .stop {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-inline-size: 0;
+    padding-inline: 6px;
+    text-align: center;
   }
 
-  .step[data-state='late'] .dot {
-    border-color: var(--accent);
-    background: var(--accent);
+  .c {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    box-sizing: border-box;
+    inline-size: 24px;
+    block-size: 24px;
+    border: 2px solid var(--rule-strong);
+    border-radius: 50%;
+    background: var(--tile);
+    color: var(--tile);
   }
 
-  .step[data-state='late'] .when {
-    color: var(--accent-text);
+  .c :global(.icon) {
+    inline-size: 13px;
+    block-size: 13px;
+    stroke-width: 2.4;
   }
 
-  .step[data-state='done'] .what {
-    color: var(--ink2);
+  .stop[data-kind='done'] .c {
+    border-color: var(--ph);
+    background: var(--ph);
+    color: var(--tile);
+    animation: fill-in var(--d-move) var(--ease-emphasis) both;
   }
 
-  .step[data-milestone='true'] .dot {
-    border-radius: 2px;
-    transform: rotate(45deg);
+  .stop[data-kind='now'] .c {
+    border-color: var(--ph);
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--ph) 18%, transparent);
   }
 
-  .now .dot {
-    border: 0;
-    inline-size: 16px;
-    block-size: 2px;
-    border-radius: 1px;
-    background: var(--ink);
+  .stop:is([data-kind='late'], [data-kind='waits']) .c {
+    border-color: var(--danger);
   }
 
-  .now .what {
+  @keyframes fill-in {
+    from {
+      scale: 0.6;
+    }
+  }
+
+  .words {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+  }
+
+  .t {
+    overflow: hidden;
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 600;
+    line-height: 18px;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  @media (width >= 640px) {
-    .road {
-      display: block;
-      /* The line, then one 20px line of labels for each lane they need. */
-      block-size: calc(56px + var(--lanes, 3) * 20px);
-      padding-block-start: 20px;
+  a.t:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .stop[data-kind='done'] .t {
+    color: var(--ink-2);
+  }
+
+  .s {
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .s[data-red] {
+    color: var(--danger-text);
+  }
+
+  /* ON ITS SIDE ON A PHONE: a 44px row a stop, the circle, the title and the day at the right, the line down the left.
+     Five stops at most, so the oldest finished one goes when there are six. */
+  @media (width < 640px) {
+    .steps {
+      grid-template-columns: minmax(0, 1fr);
     }
 
-    .road::before {
-      content: '';
-      position: absolute;
-      inset-inline: 0;
-      inset-block-start: 26px;
-      block-size: 2px;
-      border-radius: 1px;
-      background: var(--s2, var(--s1));
-    }
-
-    /* Each label hangs from its day and is slid by its own share of its width, so neither end leaves the tile. */
-    .step {
-      position: absolute;
-      inset-inline-start: calc(var(--at) * 100%);
-      inset-block-start: 20px;
-      display: block;
-      min-block-size: 0;
-      max-inline-size: 11rem;
-      transform: translateX(calc(var(--at) * -100%));
-      font-size: var(--t-sm);
-    }
-
-    .step .dot {
-      position: absolute;
-      inset-block-start: 1px;
-      inset-inline-start: calc(var(--at) * 100%);
-      margin-inline-start: -5px;
-    }
-
-    .step .what {
-      display: block;
-      padding-block-start: calc(18px + var(--lane, 0) * 20px);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .step .when {
+    .steps[data-many] .stop:first-child {
       display: none;
     }
 
-    .now {
-      inset-block-start: 0;
-      transform: translateX(calc(var(--at) * -100%));
-    }
-
-    .now .dot {
+    .steps::before,
+    .steps::after {
+      inset-block: 22px 22px;
+      inset-inline-start: 11px;
       inline-size: 2px;
-      block-size: 18px;
-      inset-block-start: 6px;
-      margin-inline-start: -1px;
+      block-size: auto;
     }
 
-    .now .what {
+    .steps::after {
+      display: none;
+    }
+
+    .stop {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      align-items: center;
+      gap: 12px;
+      min-block-size: 44px;
       padding: 0;
+      text-align: start;
+    }
+
+    .words {
+      flex-direction: row;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .t {
+      font-size: var(--fs-body);
+      font-weight: 500;
+      line-height: 20px;
+    }
+
+    .s {
+      flex: none;
+      font-size: var(--fs-meta);
     }
   }
 
-  /* MONEY BY MONTH: one column a month, the partial month lighter, in ink for what came in and dimmer for what went out. */
+  /* ── money ── */
+  .mb {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  .m-figure {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    margin: 0;
+  }
+
+  .fig {
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: var(--fs-figure);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 28px;
+  }
+
+  .fig-label {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .change {
+    margin: 4px 0 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+  }
+
+  .change[data-tone='good'] {
+    color: var(--good);
+  }
+
+  .change[data-tone='bad'] {
+    color: var(--danger-text);
+  }
+
+  .periods {
+    display: grid;
+    gap: 6px;
+    margin-block-start: 12px;
+  }
+
+  .bar {
+    display: block;
+    block-size: 8px;
+    border-radius: 4px;
+    background: var(--field);
+    overflow: hidden;
+  }
+
+  .bar > span {
+    display: block;
+    block-size: 100%;
+    border-radius: 4px;
+    background: var(--ph);
+  }
+
+  .bar[data-before] > span {
+    background: color-mix(in oklab, var(--ph) 45%, var(--tile));
+  }
+
+  .m-lines {
+    display: grid;
+    gap: 4px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .m-lines li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .m-amount {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .since {
+    margin: 12px 0 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+  }
+
+  .bars-name {
+    margin: 16px 0 8px;
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
+  }
+
   .months {
     display: flex;
     align-items: stretch;
-    gap: 3px;
-    block-size: 72px;
+    gap: 4px;
+    block-size: 96px;
     margin: 0;
-    padding: 0;
+    padding: 18px 0 0;
+    border-block-end: 1px solid var(--rule-strong);
     list-style: none;
   }
 
   .months li {
+    position: relative;
     display: flex;
     flex: 1 1 0;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    gap: 2px;
     min-inline-size: 0;
   }
 
-  /* AT MOST 24px WIDE WITH A ROUNDED TOP, in the project's colour; what went out a step lighter of the same. */
   .col {
     display: block;
     inline-size: 100%;
@@ -495,206 +519,140 @@
     background: var(--ph);
   }
 
-  [data-tone='out'] .col {
-    background: color-mix(in oklab, var(--ph) 60%, var(--field));
+  .col[data-partial='true'] {
+    opacity: 0.45;
   }
 
-  /* THE VALUE ON HOVER, over its bar; the bar's title says it to a pointer that stays, and the data says it to everyone. */
   .mval {
     position: absolute;
     inset-block-start: -18px;
-    padding: 0 var(--sp-1);
-    border-radius: 4px;
-    background: var(--tile);
     color: var(--ink);
-    font-size: var(--t-xs);
+    font-size: var(--fs-cap);
     white-space: nowrap;
     opacity: 0;
     pointer-events: none;
   }
 
+  .mval[data-last] {
+    opacity: 1;
+  }
+
   @media (hover: hover) and (pointer: fine) {
+    .months:hover .mval[data-last] {
+      opacity: 0;
+    }
+
     .months li:hover .mval {
       opacity: 1;
     }
   }
 
-  .col[data-partial='true'] {
-    opacity: 0.45;
-  }
-
   .mname {
-    flex: none;
-    min-block-size: 12px;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    line-height: 12px;
-    text-align: center;
+    position: absolute;
+    inset-block-end: -18px;
+    color: var(--ink-3);
+    font-size: var(--fs-cap);
+    line-height: 14px;
     white-space: nowrap;
   }
 
-  .months li {
-    position: relative;
+  .months + .show-data,
+  .months ~ .show-data {
+    margin-block-start: 26px;
   }
 
-  .trend {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .trend li {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px var(--sp-3);
-    align-items: baseline;
-  }
-
-  .t-name {
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .t-amount {
-    color: var(--ink);
-    font-weight: 500;
-  }
-
-  .t-bar {
-    grid-column: 1 / -1;
-    block-size: 6px;
-    border-radius: 3px;
-    background: var(--s1);
-    overflow: hidden;
-  }
-
-  .t-bar span {
-    display: block;
-    block-size: 100%;
-    border-radius: 3px;
-    background: var(--ph);
-  }
-
-  .t-bar[data-before='true'] span {
-    background: color-mix(in oklab, var(--ph) 45%, var(--field));
-  }
-
-  /* DUES: a small month at a time, a dot under each due day, the missed ones in the accent. */
-  .cals {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
-    gap: var(--sp-4);
-  }
-
-  .cal-name {
-    margin: 0 0 var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .grid li {
-    position: relative;
-    padding-block: 3px 8px;
-    color: var(--dim);
-    font-size: var(--t-xs);
-    line-height: 14px;
-    text-align: center;
-  }
-
-  .dow {
-    color: var(--dim);
-  }
-
-  .d[data-pay]::after {
-    content: '';
-    position: absolute;
-    inset-inline-start: calc(50% - 3px);
-    inset-block-end: 1px;
-    inline-size: 6px;
-    block-size: 6px;
-    border-radius: 50%;
-    background: var(--ink);
-  }
-
-  .d[data-pay='late']::after {
-    background: var(--accent);
-  }
-
-  .d[data-pay] {
-    color: var(--ink);
-  }
-
-  .more {
+  .show-data {
+    align-self: start;
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-1);
+    gap: 4px;
     min-block-size: 32px;
-    margin-block-start: var(--sp-2);
+    margin-block-start: 8px;
     padding: 0;
     border: 0;
     background: none;
-    color: var(--dim);
+    color: var(--ink-3);
     font: inherit;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     cursor: pointer;
+    transition: opacity var(--d-swap, 120ms) var(--ease-standard, ease);
+  }
+
+  .show-data :global(svg) {
+    transition: transform var(--d-state) var(--ease-out);
+  }
+
+  .show-data[aria-expanded='true'] :global(svg) {
+    transform: rotate(90deg);
   }
 
   @media (pointer: coarse) {
-    .more {
+    .show-data {
       min-block-size: var(--tap);
     }
   }
 
-  .more :global(svg) {
-    transition: transform var(--d-state) var(--ease-out);
-  }
+  /* SHOW THE DATA WAITS FOR THE POINTER on a wide screen (SF10): there, but quiet, until the tile is hovered or holds focus. */
+  @media (hover: hover) and (pointer: fine) and (width >= 1100px) {
+    .show-data[aria-expanded='false'] {
+      opacity: 0;
+    }
 
-  .more[aria-expanded='true'] :global(svg) {
-    transform: rotate(90deg);
-  }
+    .vis:hover .show-data,
+    .vis:focus-within .show-data {
+      opacity: 1;
+    }
 
-  @media (hover: hover) and (pointer: fine) {
-    .more:hover {
+    .show-data:hover {
       color: var(--ink);
     }
   }
 
-  .items {
+  .data-items {
     display: flex;
     flex-direction: column;
-    margin: var(--sp-2) 0 0;
+    margin: 4px 0 0;
     padding: 0;
     list-style: none;
   }
 
-  .item {
+  .data-item {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-block-size: 44px;
-    padding: 6px 0;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    min-block-size: 36px;
+    padding-block: 6px;
+    border-block-start: 1px solid var(--rule);
+    font-size: var(--fs-ctl);
   }
 
   .item-title {
     color: var(--ink);
-    font-size: var(--t-base);
-    font-weight: 500;
-    overflow-wrap: anywhere;
   }
 
   .item-detail {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+  }
+
+  [data-arrived] {
+    border-radius: 6px;
+    animation: landed 1.5s var(--ease-out, ease-out);
+  }
+
+  @keyframes landed {
+    from {
+      background-color: color-mix(in oklab, var(--ph) 18%, var(--tile));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-arrived] {
+      animation: landed 1.5s step-end;
+    }
+
+    .stop[data-kind='done'] .c {
+      animation: none;
+    }
   }
 </style>
