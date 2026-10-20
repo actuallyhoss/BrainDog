@@ -652,6 +652,11 @@ ON CONFLICT (key) DO UPDATE SET
   until = CASE WHEN n = ?3 THEN ?2 ELSE until END
 RETURNING n, until`;
 
+/** How long a fact a read is written from is held while the record's version stands (`heldFor`): 30 s, plan §4.1. */
+const HELD_MS = 30_000;
+/** One held fact: the version and the moment it was worked out at, and what it came to. */
+type Held<T> = { version: string; at: number; value: T };
+
 /* ── the kernel's `session` register: an agent's runs ─────────────────── */
 
 const RUN = sessionDeclaration().body as unknown as {
@@ -6079,6 +6084,81 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * A FACT A READ IS WRITTEN FROM, HELD FOR `HELD_MS` WHILE THE RECORD'S VERSION STANDS (W1-D, plan §4.2): `context`,
+   * `boot` and the rest each worked the same facts out again on every call, which on his record was 1.1 s of record time
+   * for `context` alone. In this object's memory only, never stored, so a restart costs one slow call. Every write moves
+   * the version (`stamp`), so nothing written is missed; what moves without one, a run's heartbeat and the clock, is at
+   * most `HELD_MS` old. A clock that went back reads again. `most` keys are kept, the oldest let go first.
+   */
+  const heldFor = <T>(store: Map<string, Held<T>>, key: string, make: () => T, most = 32): T => {
+    const version = stamp();
+    const now = clock.now();
+    const was = store.get(key);
+    if (was !== undefined && was.version === version && was.at <= now && now - was.at < HELD_MS) return was.value;
+    const value = make();
+    store.delete(key);
+    store.set(key, { version, at: now, value });
+    if (store.size > most) store.delete(store.keys().next().value as string);
+    return value;
+  };
+
+  /**
+   * THE VERSION A HELD FACT IS KEPT AGAINST: the newest event (`kernel.version()`), and beside it the newest row, the
+   * newest declaration, the newest question and which add-ons are on, each the top of its table's rowid and so one step
+   * of the b-tree. Installing a declaration writes no event, and an import or a repair can write a row or a question
+   * with none, so the event alone let a page installed a moment ago go unlisted.
+   */
+  const stamp = (): string => {
+    const at = sql.one<Record<string, unknown>>(
+      `SELECT (SELECT max(rowid) FROM event) AS e, (SELECT max(rowid) FROM entry) AS r, (SELECT max(rowid) FROM declaration) AS d,
+              (SELECT max(rowid) FROM suggestion) AS s, (SELECT group_concat(id || ':' || coalesce(disabled_at, ''), ',') FROM pack) AS p`,
+    );
+    return JSON.stringify(at === undefined ? null : [at.e, at.r, at.d, at.s, at.p]);
+  };
+
+  /**
+   * EVERY INSTALLED PAGE, AS `kernel.pages()` ANSWERS, held (`heldFor`): it resolves every page and the figures each
+   * reads, 135 ms a call on a record his size, and `context` asked it only for the Home page's title. Shared, so it is
+   * read and never changed: the readers below filter and map it into answers of their own.
+   */
+  const pagesHeld = new Map<string, Held<ReturnType<Kernel['pages']>>>();
+  const pagesNow = (): ReturnType<Kernel['pages']> => heldFor(pagesHeld, '', () => kernel.pages());
+
+  /**
+   * THE OPEN QUESTIONS, AS THE KERNEL READS THEM, held (`heldFor`): `boot` read every one three times, for the rail's
+   * count, `waits` and the queue, and `context` twice more, each weighing every question's cost again. Read, never
+   * changed: each reader filters and maps them into its own answer. `waitHeld` is the same queue in the order it waits.
+   */
+  const openHeld = new Map<string, Held<ReturnType<Kernel['openSuggestions']>>>();
+  const openNow = (): ReturnType<Kernel['openSuggestions']> => heldFor(openHeld, '', () => kernel.openSuggestions());
+  const waitHeld = new Map<string, Held<ReturnType<Kernel['governance']>>>();
+  /** What the queue holds back and what it weighs (`costRows`), held as the questions are. */
+  const costHeld = new Map<string, Held<ReturnType<typeof costRows>>>();
+  const costNow = (): ReturnType<typeof costRows> => heldFor(costHeld, '', () => costRows(sql));
+
+  /** Who a reader is, as what she may read turns on: who she is and what she was granted, never her run or her batch. */
+  const readerKey = (ctx: CallContext): string =>
+    JSON.stringify([ctx.principal, ctx.registers ?? null, ctx.levels ?? null, ctx.wheres ?? null, ctx.outbound ?? null, ctx.operation ?? null]);
+
+  /**
+   * `holds`, ANSWERED ONCE A CALLER FOR EACH HELD QUESTION: a question is weighed against the caller's lists and the
+   * rows it names, and `boot` and `context` asked it of every open question in each of their passes. Kept on the row
+   * object itself (a `WeakMap`), so it goes when the held questions do, at the next version. Which caller is what
+   * `holds` reads of her: who she is and what she was granted, never her run.
+   */
+  const heldBackOf = new WeakMap<object, Map<string, boolean>>();
+  const heldBack = (ctx: CallContext, row: Record<string, unknown>): boolean => {
+    const key = readerKey(ctx);
+    let seen = heldBackOf.get(row);
+    if (seen === undefined) heldBackOf.set(row, (seen = new Map()));
+    const was = seen.get(key);
+    if (was !== undefined) return was;
+    const now = holds(ctx, row);
+    seen.set(key, now);
+    return now;
+  };
+
+  /**
    * The runs in one of `states` heard from lately, newest heard from first, at most `most` of them: an INDEX READ on
    * `last_seen` (`entry_i_session__last_seen`), from a day before the stale mark on.
    *
@@ -6169,8 +6249,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * is the record itself (Slash's nightly look), which reads everything.
    */
   const waitsFor = (ctx: CallContext | null): WaitingNow => {
-    const open = kernel.openSuggestions();
-    const rows = open.ok ? open.value.filter((row) => ctx === null || !holds(ctx, row)) : [];
+    const open = openNow();
+    const rows = open.ok ? open.value.filter((row) => ctx === null || !heldBack(ctx, row)) : [];
     const told = ctx === null || allows(ctx, 'owner') === null || (inboxReached(ctx) && wholeRecord(ctx));
     return waitingOf({
       nowMs: clock.now(),
@@ -6178,8 +6258,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       inbox: told ? kernel.inboxWaiting() : null,
       runs: ctx !== null && readable(ctx, SESSION) ? [] : activeRuns(),
       /* THE QUEUE'S OWN RULE FOR A WITHHELD FIELD (`BAND_SQL`), so `waits.hard` and the queue's count are one number. */
-      withheld: costRows(sql).withheld,
-      held: costRows(sql).held,
+      withheld: costNow().withheld,
+      held: costNow().held,
     });
   };
 
@@ -6240,10 +6320,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const waitingFor = (ctx: CallContext): Waiting[] => {
     /* FILTERED, THEN TRIMMED. Twenty newest and then filtered left a scoped caller nothing when the
        twenty newest were all about registers it cannot see. */
-    const rows = kernel.openSuggestions();
+    const rows = openNow();
     if (!rows.ok) return [];
     return rows.value
-      .filter((row) => !holds(ctx, row))
+      .filter((row) => !heldBack(ctx, row))
       .flatMap((row) => {
         /* THE QUEUE `boot` AND `context` READ OUT, so its ids go out as `nameOf` hands them. */
         const id = nameOf(ctx, 'suggestion', String(row.id));
@@ -6260,10 +6340,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * questions lead and are counted. Held as `waitingFor` holds them; the places are never sent.
    */
   const placedWaiting = (ctx: CallContext): ({ id: string; question: string; waits?: string } & Placed)[] => {
-    const rows = kernel.governance('suggestion', { status: 'open', every: true, order: 'wait' });
+    const rows = heldFor(waitHeld, '', () => kernel.governance('suggestion', { status: 'open', every: true, order: 'wait' }));
     if (!rows.ok) return [];
     return rows.value
-      .filter((row) => !holds(ctx, row))
+      .filter((row) => !heldBack(ctx, row))
       .flatMap((row) => {
         const id = nameOf(ctx, 'suggestion', String(row.id));
         if (id === null) return [];
@@ -7549,13 +7629,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const person = p.kind === 'person' ? p.id : p.kind === 'token' ? p.person : null;
     const identity = kernel.identity();
     /* EVERY OPEN QUESTION, NOT A PAGE OF THEM: a count read off two hundred rows said 200 to a queue of 206. */
-    const open = kernel.openSuggestions();
+    const open = openNow();
     /* THE PERSON'S OWN PREFERENCES, READ ONCE. `me.prefs` answers them to the person, and the pen reads a token's person's
        too, because a dismissal is the person's whichever door they came in by. */
     const prefs: Prefs = person === null ? {} : (kernel.prefsOf(person) as Prefs);
     /* EVERY INSTALLED PAGE, READ ONCE: the rail below is the ones this caller may open, and the pen asks of all of them
        which lists a page already reads and which slugs are taken. */
-    const every = kernel.pages();
+    const every = pagesNow();
     const drawn = drawnIn(ctx);
     const opens = every.filter((page) => seesPage(ctx, page));
     /* HOME FOLLOWS THE VOICE, as the use case's own page (`homePageOf` in `@braindog/seed`, `home-<use case>`), and only
@@ -7610,7 +7690,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       computed: computedSet(),
       home,
       counts: {
-        decide: open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0,
+        decide: open.ok ? open.value.filter((row) => !heldBack(ctx, row)).length : 0,
         /* AN OWNER, AND A TOKEN AN OWNER GAVE THE `inbox` REACH, held to the whole record as `inbox` itself is: the agent
            set up to triage the arrivals was told `null` about how many there were. */
         inbox: allows(ctx, 'owner') === null || (inboxReached(ctx) && wholeRecord(ctx)) ? kernel.inboxWaiting() : null,
@@ -7779,8 +7859,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
   /** How many questions wait on this caller in all, by the rule `waitsFor` counts with: `context` sends only the newest. */
   const questionsFor = (ctx: CallContext): number => {
-    const open = kernel.openSuggestions();
-    return open.ok ? open.value.filter((row) => !holds(ctx, row)).length : 0;
+    const open = openNow();
+    return open.ok ? open.value.filter((row) => !heldBack(ctx, row)).length : 0;
   };
 
   /**
@@ -7789,7 +7869,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * which of several is read there is the arrangement's to say.
    */
   const homeTitle = (ctx: CallContext): string | null => {
-    const seen = kernel.pages().filter((p) => seesPage(ctx, p));
+    const seen = pagesNow().filter((p) => seesPage(ctx, p));
     const homes = seen.filter((p) => /^home-[a-z0-9][a-z0-9-]*$/u.test(p.slug));
     const one = homes.length === 1 ? homes[0] : homes.length === 0 ? seen.find((p) => p.slug === 'home') : undefined;
     return one?.title ?? null;
@@ -7841,8 +7921,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * THE PLACE IS RESOLVED AS `attach` RESOLVES IT: from the hints the caller sent, or, when it sent none,
    * from where its run was. A caller who may not read the projects register stands nowhere in
    * particular: naming the project would name a row of a register it cannot see.
+   *
+   * HELD PER CALLER AND PLACE (W1-D, plan §4.1): the same caller with the same hints is answered what it was answered
+   * while the record's version stands, for up to `HELD_MS` (`heldFor`), a copy each time so no reader can change it for
+   * the next. Which caller is everything the context says of her but the call's own batch and when she last proved who
+   * she is, neither of which a briefing reads.
    */
+  const briefed = new Map<string, Held<Context>>();
   const briefing = (ctx: CallContext): Context => {
+    const { batch: _batch, provedAt: _proved, ...caller } = ctx;
+    return structuredClone(heldFor(briefed, JSON.stringify(caller), () => briefingNow(ctx)));
+  };
+
+  /** The briefing worked out now, held by nothing: `briefing` above holds it, and the sign that checks it reads this. */
+  const briefingNow = (ctx: CallContext): Context => {
     const hints = ctx.session ?? {};
     /* HOW MUCH IS SENT (AGT-B09): five rows a list unless the caller asked for the full answer, twenty of each. */
     const format = (hints as { format?: unknown }).format === 'full' ? 'full' : 'brief';
@@ -9316,7 +9408,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          the tool list. A system principal reads the whole briefing, as a session in that repository would be handed it. */
       const signs = await fileRecordSigns(
         kernel,
-        { sql, briefing: (repo) => briefing({ principal: { kind: 'system', id: 'signs' }, session: { repo } }), build, offers: deps.catalogueOffers },
+        { sql, briefing: (repo) => briefingNow({ principal: { kind: 'system', id: 'signs' }, session: { repo } }), build, offers: deps.catalogueOffers },
         clock.now(),
       );
       if (signs.refused.length > 0) throw new Error(`signs were not filed: ${signs.refused.join('; ')}`);
