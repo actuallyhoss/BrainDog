@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { cursor } from '../src/clients/cursor.ts';
 import type { Want } from '../src/clients/index.ts';
-import { looksLikeToken } from '../src/install.ts';
+import { holdsTokenShape } from '../src/install.ts';
 import { looksLikeKey } from '../src/tools.ts';
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'clients');
@@ -149,5 +149,5 @@ test('an HTTP tool is written by its url alone, reads back as the entry, and no 
   await write(want(h, 'tally', TALLY));
   const text = readFileSync(h.file, 'utf8');
   assert.equal(looksLikeKey(text), false);
-  for (const piece of text.split(/[\s"'/\\,:{}[\]]+/).filter((p) => p !== '')) assert.equal(looksLikeToken(piece), false, piece);
+  for (const word of text.split(/[\s"',{}[\]]+/).filter((p) => p !== '')) assert.equal(holdsTokenShape(word), false, word);
 });

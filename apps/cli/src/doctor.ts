@@ -24,7 +24,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { CLIENTS, clientOf, type Client } from './clients/index.ts';
-import { BRAINDOG_SERVER, descriptionOf, isOldServer, looksLikeToken, readReplace, serversFileOf, wordsOf, type Replace } from './install.ts';
+import { BRAINDOG_SERVER, descriptionOf, holdsTokenShape, isOldServer, readReplace, serversFileOf, wordsOf, type Replace } from './install.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -125,7 +125,7 @@ const namesOld = (line: string, r: Replace): boolean =>
  * puts around one. Wider than `install` asks, which hides every argument and so never has to tell: here the answer
  * decides whether an entry is listed, and a miss is a key left in a file that nobody is told of.
  */
-const holdsToken = (word: string): boolean => word.split(/[\\/=:?&"',;\s]+/).some((piece) => piece !== '' && looksLikeToken(piece));
+const holdsToken = holdsTokenShape;
 
 /** A name that says its value is a secret, for an `env` or `headers` entry whose value is too short to look like one. */
 const SECRET_NAME = /token|secret|password|passwd|api[_-]?key|authorization|credential/i;

@@ -721,6 +721,16 @@ export const looksLikeToken = (piece: string) =>
   piece.length >= 32 ||
   (piece.length >= 16 && /\d/.test(piece) && /[a-z]/i.test(piece)) ||
   (piece.length >= 8 && /[a-z]\d+[a-z]/i.test(piece));
+/*
+ * A WORD THAT HOLDS SOMETHING SHAPED LIKE A TOKEN, a path or URL piece by piece. A word that is an absolute filesystem
+ * path (it starts at a root and carries no `=`, `?` or `&`) is where a program lives, and a folder in it is named by its
+ * place: the hex name of a worktree (`.claude/worktrees/agent-a335206d9257debd9`) has the shape of a key and is none.
+ * Its pieces are asked only for an issuer's prefix or a 32-character run, never the shorter mixed-letters-and-digits shape.
+ */
+export const holdsTokenShape = (word: string): boolean => {
+  const onDisk = /^(?:[\\/]|~[\\/]|[A-Za-z]:[\\/])/.test(word.replace(/^["']/, '')) && !/[=?&]/.test(word);
+  return word.split(/[\\/=:?&"',;\s]+/).some((piece) => piece !== '' && (onDisk ? /^(?:hb|sk|pk|rk|ghp|gho|ghs|ghu|github_pat|glpat|xox[a-z]|rec|AKIA)[_-]/i.test(piece) || piece.length >= 32 : looksLikeToken(piece)));
+};
 /* Each path segment on its own, so a folder is still named while a token between two slashes is not. */
 const hidePieces = (text: string) => text.split(/([\\/])/).map((piece) => (piece === '/' || piece === '\\' || !looksLikeToken(piece) ? piece : HIDDEN)).join('');
 

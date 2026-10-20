@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CLIENTS, type Want } from '../src/clients/index.ts';
 import { claudeDesktop, claudeDesktopFor, vscode, vscodeFor } from '../src/clients/others.ts';
-import { looksLikeToken } from '../src/install.ts';
+import { holdsTokenShape } from '../src/install.ts';
 import { looksLikeKey } from '../src/tools.ts';
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'clients', 'others');
@@ -222,7 +222,7 @@ test('AN HTTP TOOL WITH A KEY HEADER: VS Code takes it by its url alone, Claude 
     const text = readFileSync(file, 'utf8');
     assert.equal(looksLikeKey(text), false, file);
     assert.doesNotMatch(text, /sk-|TALLY_KEY|headersHelper|credentials#/);
-    for (const piece of text.split(/[\s"'/\\,:{}[\]]+/).filter((p) => p !== '')) assert.equal(looksLikeToken(piece), false, piece);
+    for (const word of text.split(/[\s"',{}[\]]+/).filter((p) => p !== '')) assert.equal(holdsTokenShape(word), false, word);
   }
 });
 

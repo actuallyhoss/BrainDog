@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import { codex, parseToml } from '../src/clients/codex.ts';
 import type { Want } from '../src/clients/index.ts';
-import { looksLikeToken } from '../src/install.ts';
+import { holdsTokenShape } from '../src/install.ts';
 import { looksLikeKey } from '../src/tools.ts';
 
 delete process.env.CODEX_HOME;
@@ -167,5 +167,5 @@ test('no file BrainDog writes holds anything shaped like a token', async () => {
   const added = readFileSync(h.file, 'utf8').slice(before.length);
   assert.equal(existsSync(h.file), true);
   assert.equal(looksLikeKey(added), false);
-  for (const piece of added.split(/[\s"'/\\,=[\]]+/).filter((p) => p !== '')) assert.equal(looksLikeToken(piece), false, piece);
+  for (const word of added.split(/[\s"',[\]]+/).filter((p) => p !== '')) assert.equal(holdsTokenShape(word), false, word);
 });
