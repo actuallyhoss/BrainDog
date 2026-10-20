@@ -40,7 +40,7 @@
   import { step } from '$lib/funnel.ts';
   import { copy } from '$lib/copy.ts';
   import { read } from '$lib/data/read.svelte.ts';
-  import { QUESTIONS } from '$lib/data/local.ts';
+  import { EVERY, QUESTIONS, type Spot } from '$lib/data/local.ts';
   import { openPaletteWith } from '$lib/palette/open.svelte.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
@@ -137,19 +137,38 @@
   /* A REFUSAL THE RECORD GAVE. A host nobody reached is not one when the local copy holds this reader's Today. */
   const shut = $derived(data.refused && !data.offline ? data.refused : null);
 
-  /* ONE READ FOR THE SCREEN, keyed on the record, asked again when its version moves. A refused shell asks nothing.
-     THE LOCAL COPY DRAWS IT AT ONCE ON OPEN, and is never current: Today holds figures and runs no change line names,
-     so it is always asked behind. Who is working and what changed since the mark are not kept at all: a run drawn as
-     working from yesterday, or yesterday's news under today's mark, would be the wrong thing to see first. */
-  const today = read<Extract<TodayRead, { ok: true }>['value']>(
+  /* ONE READ FOR THE SCREEN, keyed on the record. A refused shell asks nothing. THE LOCAL COPY DRAWS IT AT ONCE ON OPEN
+     and the record is asked once behind it (`recheck`). When the version moves, the copy places the change on its tasks
+     and questions (`todaySpots`) and Today is drawn from it (`follow`); a change it cannot place, or one on any other
+     list, since Today reads money and reminders no spot names (`EVERY`), drops it and Today is asked again. Who is
+     working and what changed since the mark are not kept at all: a run drawn as working from yesterday, or yesterday's
+     news under today's mark, would be the wrong thing to see first, so a drawn copy keeps the ones on screen. */
+  type TodayValue = Extract<TodayRead, { ok: true }>['value'];
+  /** What Today draws of the tasks as a row writes it, and what its reads asked by (`Shown` in `local.ts`). */
+  const todaySpots = (v: TodayValue): Spot[] => {
+    const shown = {
+      says: { what: 'what', agent: 'agent' },
+      asks: ['state', 'by', 'priority', 'thing'],
+      leaves: { field: 'state', values: ['done', 'dropped'] },
+      full: v.full !== false,
+    };
+    return [
+      ...(v.tasks ? [{ list: TASKS, at: ['tasks'], by: null, shown }] : []),
+      ...(v.coming ? [{ list: TASKS, at: ['coming'], by: null, shown }] : []),
+      { list: QUESTIONS, at: ['questions'], by: null, questions: { total: ['open'] } },
+    ];
+  };
+  const today = read<TodayValue>(
     () => (shut ? null : apiBase()),
     () => import('$lib/record/today-live.ts').then((m) => m.readToday(apiBase())),
     {
       local: {
         name: 'Today',
         base: () => apiBase(),
-        lists: () => [TASKS, QUESTIONS],
-        always: true,
+        lists: () => [TASKS, QUESTIONS, EVERY],
+        spots: todaySpots,
+        recheck: true,
+        follow: (shown, kept) => (shown ? { ...kept, runs: shown.runs, sessions: shown.sessions ?? null, host: shown.host ?? null, since: shown.since, upTo: shown.upTo } : kept),
         shrink: (v) => ({ ...v, runs: [], sessions: null, host: null, since: { rows: [], total: 0, capped: false }, upTo: null }),
       },
     },

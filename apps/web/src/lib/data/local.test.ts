@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  EVERY,
   inOrder,
   keepable,
   localCopy,
@@ -11,6 +12,7 @@ import {
   memoryStore,
   PAGE_ANSWERS,
   patched,
+  patchedRow,
   railOf,
   QUESTIONS,
   REDACTED,
@@ -97,7 +99,7 @@ test('NOTHING IS KEPT BEFORE A CLAIM; after one the cursor is taken first and an
   await copy.claim(ada);
   assert.equal(store.saved?.cursor, 1);
   assert.equal(await copy.put('work', 'k', ['tasks'], { tasks: DECL }, [1], copy.ticket()), true);
-  assert.deepEqual(await copy.answer('work', 'k', 'https://a', null), { value: [1], decls: { tasks: DECL }, current: true });
+  assert.deepEqual(await copy.answer('work', 'k', 'https://a', null), { value: [1], decls: { tasks: DECL }, current: true, kept: NOON });
   assert.equal(await copy.answer('work', 'k', 'https://b', null), null, 'another record answers nothing');
 });
 
@@ -451,4 +453,124 @@ test('LOCAL WHERE: plain fields with literal values only', () => {
   assert.equal(localWhere({ field: 'title', matches: 'x' }, TASKS), false);
   assert.equal(localWhere({ field: 'nope', is: 'x' }, TASKS), false);
   assert.equal(localWhere({ pointed: { register: 'projects', by: 'project' } }, TASKS), false);
+});
+
+/* ── refs on a create, restores, questions, rows drawn a screen's way, eviction ─────────── */
+
+test('CREATE WITH A REF: drawn as the number of the row it points at when the answer holds its id, else dropped', () => {
+  const spot: Spot = { ...LIST, lands: { ...LIST.lands!, where: null, ids: ['ids'] } };
+  const row = stored({ ...listed([task(1, { state: 'open' })]), ids: [['projects R3', 3]] }, [spot]);
+  const out = patched(row, [make('c', 2, { title: 'b', project: 'R3' })]) as Listed;
+  assert.equal(out.entries[0]!.fields.project, 3);
+  assert.notEqual(patched(row, [make('c', 2, { title: 'b', project: 'entry:R3' })]), undefined, 'the log may say entry:');
+  assert.equal(patched(row, [make('c', 2, { title: 'b', project: 'R9' })]), undefined, 'a row it holds no id for');
+});
+
+test('RESTORE: a row a placed delete took out comes back where it stood, one version on; one never held drops it', () => {
+  const row = stored(listed([task(1, { state: 'open' }, 4), task(2, { state: 'open' })]), [LIST]);
+  const del: Line = { id: 'd', kind: 'delete', register: 'tasks', seq: 1 };
+  const gone = patchedRow(row, [del])!;
+  assert.deepEqual((gone.value as Listed).entries.map((e) => e.seq), [2]);
+  assert.equal(gone.gone?.length, 1, 'kept beside the answer');
+  const back = patchedRow(gone, [{ id: 'r', kind: 'restore', register: 'tasks', seq: 1 }])!;
+  assert.deepEqual((back.value as Listed).entries.map((e) => e.seq), [1, 2]);
+  assert.equal((back.value as Listed).entries[0]!.version, 5);
+  assert.equal((back.value as Listed).matched, 2);
+  assert.equal(back.gone, undefined, 'and no longer kept aside');
+  assert.notEqual(patched(row, [del, { id: 'r', kind: 'restore', register: 'tasks', seq: 1 }]), undefined, 'both in one catch-up');
+  assert.equal(patched(row, [{ id: 'r', kind: 'restore', register: 'tasks', seq: 9 }]), undefined);
+});
+
+const ASKS: Spot = { list: QUESTIONS, at: ['questions'], by: null, questions: { total: ['open'] } };
+const asked = (ids: string[], open = ids.length) => ({ questions: ids.map((id) => ({ id })), open });
+const resolve = (id: string, to = 'accepted'): Line => ({ id: 'z', kind: 'resolve', register: null, target: `suggestion:${id}`, to });
+
+test('QUESTIONS: an answer takes its card out and the count down; a decision adds nothing; a question asked drops it', () => {
+  const row = stored(asked(['SG1', 'SG2']), [ASKS], [QUESTIONS]);
+  const out = patched(row, [{ id: 'y', kind: 'decide', register: null, target: 'decision:D1' }, resolve('SG1')]) as ReturnType<typeof asked>;
+  assert.deepEqual(out.questions, [{ id: 'SG2' }]);
+  assert.equal(out.open, 1);
+  assert.notEqual(patched(row, [resolve('SG7')]), undefined, 'one it never counted');
+  assert.equal(patched(stored(asked(['SG1', 'SG2'], 5), [ASKS], [QUESTIONS]), [resolve('SG1')]), undefined, 'one not drawn would take its place');
+  assert.equal(patched(stored(asked(['q.01J']), [ASKS], [QUESTIONS]), [resolve('SG7')]), undefined, 'named otherwise than the line');
+  assert.equal(patched(row, [{ id: 'x', kind: 'suggest', register: null, target: 'suggestion:SG3' }]), undefined, 'a question asked');
+  assert.equal(patched(stored(asked(['SG1']), [], [QUESTIONS]), [resolve('SG1')]), undefined, 'no spot for them');
+});
+
+test('QUESTIONS ON A PAGE THAT DRAWS WHAT WAS DECIDED: only a withdrawal is placed, and counts it cannot move go', () => {
+  const spot: Spot = { ...ASKS, questions: { total: ['open'], decided: true, drops: [['waiting']] } };
+  const row = stored({ ...asked(['SG1', 'SG2']), waiting: { hardToUndo: 1, stale: 0 } }, [spot], [QUESTIONS]);
+  const out = patched(row, [resolve('SG1', 'withdrawn')]) as { waiting?: unknown; open: number };
+  assert.equal(out.open, 1);
+  assert.equal(out.waiting, undefined);
+  assert.equal(patched(row, [resolve('SG1')]), undefined, 'an answer is decided');
+  assert.equal(patched(row, [{ id: 'y', kind: 'decide', register: null, target: 'decision:D1' }]), undefined);
+});
+
+const SHOWN: Spot = {
+  list: 'tasks',
+  at: ['tasks'],
+  by: null,
+  shown: { says: { title: 'what' }, asks: ['state', 'due'], leaves: { field: 'state', values: ['done'] } },
+};
+type Drawn = { tasks: { seq: number; what: string; version: number }[] };
+const drawn = (full = false): Stored => stored({ tasks: [{ seq: 1, what: 'Call', version: 1 }, { seq: 2, what: 'Pay', version: 1 }] }, [{ ...SHOWN, shown: { ...SHOWN.shown!, full } }]);
+
+test('SHOWN: a drawn field takes the value logged, another moves the version, done takes the row out', () => {
+  const out = patched(drawn(), [edit('a', 1, 'title', 'Call', 'Call the bank'), edit('b', 2, 'tags', null, ['x'])]) as Drawn;
+  assert.deepEqual(out.tasks[0], { seq: 1, what: 'Call the bank', version: 2 });
+  assert.equal(out.tasks[1]!.version, 2, 'a field it does not draw');
+  assert.deepEqual((patched(drawn(), [{ ...edit('a', 2, 'state', 'open', 'done'), kind: 'state' }]) as Drawn).tasks.map((t) => t.seq), [1]);
+  assert.notEqual(patched(drawn(), [edit('a', 7, 'title', 'x', 'y')]), undefined, 'a row it does not draw');
+  assert.deepEqual((patched(drawn(), [{ id: 'd', kind: 'delete', register: 'tasks', seq: 1 }]) as Drawn).tasks.map((t) => t.seq), [2]);
+});
+
+test('SHOWN: a field the reads asked by, a create, an emptied title or a full read drops it', () => {
+  assert.equal(patched(drawn(), [edit('a', 1, 'due', null, '2026-10-21')]), undefined);
+  assert.equal(patched(drawn(), [edit('a', 9, 'due', null, '2026-10-21')]), undefined, 'and it could bring one in');
+  assert.equal(patched(drawn(), [make('c', 9, { title: 'x' })]), undefined);
+  assert.equal(patched(drawn(), [edit('a', 1, 'title', 'Call', '')]), undefined);
+  assert.equal(patched(drawn(true), [{ ...edit('a', 2, 'state', 'open', 'done'), kind: 'state' }]), undefined, 'one past the limit would come in');
+});
+
+test('EVERY: an answer that reads more than it names drops on a line about a list it holds no spot for', () => {
+  const row = stored({ tasks: [] }, [SHOWN], ['tasks', EVERY]);
+  const money: Line = { id: 'a', kind: 'edit', register: 'accounts', seq: 1, field: 'balance', from: 1, to: 2 };
+  assert.equal(patched(row, [money]), undefined);
+  assert.notEqual(patched(row, [line('g', 'grant.add')]), undefined, 'a line that moves no row');
+  assert.notEqual(patched({ ...row, lists: ['tasks'] }, [money]), undefined, 'without it, not its business');
+});
+
+test('A CATCH-UP HANDS AN `EVERY` ANSWER TO THE PATCH, whatever list the line names', async () => {
+  const { copy, fake } = setup();
+  await copy.claim(ada);
+  await copy.put('today', 'k', ['tasks', EVERY], { tasks: TASKS }, { tasks: [] }, copy.ticket(), { spots: [SHOWN] });
+  fake.write({ id: 'e2', kind: 'edit', register: 'accounts', rowid: 2, seq: 1, field: 'balance', from: 1, to: 2 });
+  await copy.heard();
+  assert.equal(await copy.answer('today', 'k', 'https://a', null), null);
+});
+
+test('EVICTION: the least recently opened go first past the count or the bytes, never the one just kept', async () => {
+  const store = memoryStore();
+  const at = (name: string, opened: number, bytes: number): Stored => ({ at: name, name, key: '', lists: ['tasks'], decls: {}, value: null, kept: 0, opened, bytes });
+  await store.put(at('old', 1, 10));
+  await store.put(at('mid', 2, 10));
+  await store.put(at('new', 3, 10));
+  await store.prune(2, 1_000, null);
+  assert.deepEqual([...store.rows.keys()].sort(), ['mid', 'new']);
+  await store.put(at('big', 0, 50));
+  await store.prune(10, 30, 'big');
+  assert.deepEqual([...store.rows.keys()], ['big'], 'over the bytes, every other answer goes first');
+  await store.touch('big', 9);
+  assert.equal(store.rows.get('big')?.opened, 9);
+});
+
+test('AN ANSWER BIGGER THAN THE BUDGET IS NOT KEPT, and a kept one says when it was opened and its size', async () => {
+  const { copy, store } = setup();
+  await copy.claim(ada);
+  assert.equal(await copy.put('work', 'k', ['tasks'], { tasks: DECL }, [1], copy.ticket()), true);
+  const kept = store.rows.get('work k')!;
+  assert.equal(kept.opened, NOON);
+  assert.ok((kept.bytes ?? 0) > 0);
+  assert.equal(await copy.put('work', 'big', ['tasks'], { tasks: DECL }, 'x'.repeat(21 * 1024 * 1024), copy.ticket()), false);
 });

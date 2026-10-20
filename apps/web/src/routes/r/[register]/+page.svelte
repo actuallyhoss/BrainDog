@@ -25,7 +25,7 @@
   import * as pref from '$lib/pref.ts';
   import { covered, overlays, silenced, typing as isTyping } from '$lib/a11y/keys.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, heldTwiceOn, iconFor, isRows, joinOf, labelOf, toRows, TWICE, twiceOf, twiceWords, type Filter, type Join, whereOf } from '$lib/record/api.ts';
+  import { chipsOf, columnsFor, currencyFor, display, DOM_CAP, heldTwiceOn, iconFor, isRows, joinOf, labelOf, PAGE, sortRows, toRows, TWICE, twiceOf, twiceWords, type Filter, type Join, whereOf } from '$lib/record/api.ts';
   import { createClient } from '@braindog/client';
   /* Type only, so the client's route table stays out of this chunk. */
   import { joinNames, rowsHeldTwice, treeOf, type Names } from '$lib/record/remote.ts';
@@ -34,9 +34,9 @@
   import { live } from '$lib/data/live.svelte.ts';
   import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
-  import { countsOf, keptOf, listsOf, namesOf, searchKept, servedWhole, spotOf, type KeptList } from './kept-list.ts';
+  import { countsOf, keptOf, listsOf, namesOf, searchKept, servedWhole, spotOf, walkWhole, type KeptList, type Paged } from './kept-list.ts';
   import { painted } from '$lib/data/timing.ts';
-  import type { Near } from '$lib/data/local.ts';
+  import { LIST_ROWS_MOST, type Near } from '$lib/data/local.ts';
   import { searchable } from '$lib/record/find.ts';
   import type { Entry, Fields, RegisterDecl } from '$lib/record/schema.ts';
   import { saidPlainly } from '$lib/record/blocks.ts';
@@ -529,6 +529,7 @@
       named = null;
       counted = new Map();
       uncounted = null;
+      foundRoom = false;
     }
     refusal = null;
     stale = false;
@@ -645,20 +646,25 @@
         const timely = await nearLocal<KeptList>(LIST_COPY, said, apiBase(), (got) => void draw(got));
         if (timely !== null && draw(timely)) near = timely;
       }
-      /* A SEARCH OVER A LIST THIS DEVICE KEEPS WHOLE is answered from it at once, marked as this device's, and the record's
-         own answer replaces it when it lands (`searchKept`). Only the search box alone: chips and the people held twice
-         are the record's to answer. */
-      if (near === null && text !== '' && typed.length === 0 && !wantsTwice) {
-        const whole = await nearLocal<KeptList>(LIST_COPY, JSON.stringify([register, [], '', order ?? null, joined ?? null, false]), apiBase());
-        const found = whole === null ? null : searchKept(whole.value, text);
+      /* A SEARCH OR A FILTER OVER A LIST THIS DEVICE KEEPS WHOLE is answered from it at once, marked as this device's, and
+         the record's own answer replaces it when it lands (`searchKept`). Chips the browser asks as the record would (no
+         ref, no relative day); the people held twice are the record's to answer. */
+      if (near === null && (text !== '' || typed.length > 0) && !wantsTwice) {
+        const whole = await nearLocal<KeptList>(LIST_WHOLE, wholeKey(register, order), apiBase());
+        const where = typed.length === 0 ? null : ((treeOf(register, typed, '', new Map(), joined) as Predicate | undefined) ?? null);
+        const found = whole === null ? null : searchKept(whole.value, text, where);
         if (whole !== null && found !== null && asked === said && !done) {
+          const names = namesOf(whole.value);
+          /* ONE PAGE OF IT, ordered as the record's answer will be (`ask` in `data/record.ts`), so it lands where it stood. */
+          const head = found.entries.slice(0, PAGE);
           declared = { register, decl: whole.value.decl };
-          pages = [found.entries];
-          named = namesOf(whole.value);
+          pages = [order && found.matched <= PAGE ? sortRows(register, head, order.field, order.dir, names) : head];
+          named = names;
           cursor = null;
           matched = found.matched;
           fromCopy = true;
           searchedHere = true;
+          foundRoom = true;
         }
       }
       const src = await open();
@@ -682,6 +688,7 @@
           counted = counts && near.value.counted ? countsOf(near.value.counted) : new Map();
           uncounted = null;
           fromCopy = false;
+          keepWhole(register, s.value, order, null, localTicket());
           return true;
         }
       }
@@ -725,6 +732,8 @@
       fromCopy = false;
       searchedHere = false;
       keepList(said, register, s.value, answer.value, { filters: chips, q: text, sort: order, twice: rows !== null, join: joined }, bar ? facets : null, mark);
+      /* AND THE REST OF THE LIST, WHEN IDLE: the whole of it kept beside this page (`keepWhole`). */
+      keepWhole(register, s.value, order, chips.length === 0 && text === '' ? answer.value : null, mark);
       return true;
     });
     done = true;
@@ -752,6 +761,52 @@
     keepLocal(LIST_COPY, said, listsOf(register, d), keptOf(d, got.entries, got.matched, got.names, { cursor: got.cursor, counted: counts }), mark, { [register]: d }, {
       spots: [spotOf(register, ask, pills, where)],
     });
+  }
+
+  /** The walks out now, by the whole copy's key: a list opened twice walks once. */
+  const walking = new Set<string>();
+  /* THE SCREEN WENT: a walk still out stops at its next page. */
+  let left = false;
+  $effect(() => () => {
+    left = true;
+  });
+
+  /** Once the browser is idle, or a second has gone by: a walk never takes a frame the reader is using. */
+  const idle = (): Promise<void> =>
+    new Promise((resolve) => {
+      const ric = (globalThis as { requestIdleCallback?: (fn: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+      if (ric) ric(() => resolve(), { timeout: 1_000 });
+      else setTimeout(resolve, 50);
+    });
+
+  /**
+   * THE WHOLE LIST, KEPT BESIDE ITS FIRST PAGE so a search, a filter and a create reach every row here (`walkWhole` in
+   * `kept-list.ts`): the unfiltered list in this order, its pages walked one at a time when idle, up to
+   * `LIST_ROWS_MOST`. `first` is this opening's own unfiltered first page when it had one, and `mark` the ticket it was
+   * asked under, so a change heard during the walk keeps none of it. A whole copy kept today is the log's to keep right.
+   */
+  function keepWhole(register: string, d: RegisterDecl, order: typeof sort, first: Paged | null, mark: number) {
+    const key = wholeKey(register, order);
+    if (walking.has(key) || (first !== null && first.matched > LIST_ROWS_MOST)) return;
+    walking.add(key);
+    void (async () => {
+      try {
+        const held = await nearLocal<KeptList>(LIST_WHOLE, key, apiBase());
+        if (held !== null && new Date(held.kept).toDateString() === new Date().toDateString()) return;
+        const src = await open();
+        const pageAt = (from: string | null): Promise<Paged | null> =>
+          src.page(register, { filters: [], q: '', sort: order }, from).then((got) => (got.ok ? got.value : null), () => null);
+        const start = first ?? (await idle().then(() => (left || id !== register ? null : pageAt(null))));
+        if (start === null) return;
+        const whole = await walkWhole(start, (c) => pageAt(c), { most: LIST_ROWS_MOST, idle, gone: () => left || id !== register });
+        if (whole === null) return;
+        keepLocal(LIST_WHOLE, key, listsOf(register, d), { ...keptOf(d, whole.entries, whole.matched, whole.names, { cursor: null, counted: null }), whole: true }, mark, { [register]: d }, {
+          spots: [spotOf(register, { filters: [], q: '', sort: order, twice: false }, [], null)],
+        });
+      } finally {
+        walking.delete(key);
+      }
+    })();
   }
 
   /** A refusal, drawn instead of the list. `false`, because that is what `read` records. */
@@ -785,6 +840,14 @@
   let fromCopy = $state(false);
   /** And they are a search this device answered over the list it keeps whole (`searchKept`), said in a line. */
   let searchedHere = $state(false);
+  /**
+   * THE LINE'S ROOM, HELD ONCE IT HAS BEEN SAID for this search, so the record's answer replacing it does not pull the
+   * rows up a line and the next word typed push them down again. Given back when the search and the chips are.
+   */
+  let foundRoom = $state(false);
+  $effect(() => {
+    if (q === '' && filters.length === 0) foundRoom = false;
+  });
   /* The quiet mark over the work while they are (`copy-mark.svelte.ts`). */
   $effect(() => {
     if (!fromCopy) return;
@@ -1047,6 +1110,9 @@
 
   /** The name this screen's answers are kept under in the local copy, keyed by the question (`asked`). */
   const LIST_COPY = 'RegisterList';
+  /** And the whole list, every row in one order, keyed by the list and the order (`keepWhole`). */
+  const LIST_WHOLE = 'RegisterWhole';
+  const wholeKey = (register: string, order: typeof sort): string => JSON.stringify([register, order ?? null]);
 
   /** The moment `19 §6` describes: the register, with their one row in it. */
   const arriving = $derived(page.url.searchParams.has('first'));
@@ -2781,9 +2847,11 @@
         <span>{copy.stale}</span>
         <Button onclick={refresh}>{copy.tryAgain}</Button>
       </p>
-    {:else if searchedHere && fromCopy}
-      <!-- A SEARCH THIS DEVICE ANSWERED, said as that until the record's own answer replaces it. -->
-      <p class="stale" data-from-device role="status">{copy.foundHere}</p>
+    {:else if foundRoom}
+      <!-- A SEARCH THIS DEVICE ANSWERED, said as that until the record's own answer replaces it, in room held for it. -->
+      <p class="stale found-here" data-from-device={searchedHere && fromCopy ? '' : undefined} role="status">
+        <span class:unsaid={!(searchedHere && fromCopy)}>{copy.foundHere}</span>
+      </p>
     {/if}
 
     <!-- THE OFFER, WHERE SHE IS: one at most, above the list's figures and its entries, and none while the list is
@@ -3204,6 +3272,11 @@
     .tb-display :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
       padding-inline: 0;
     }
+  }
+
+  /* THE ROOM STAYS AND THE WORDS GO: hidden, not removed, so the line keeps its height (`foundRoom`). */
+  .found-here .unsaid {
+    visibility: hidden;
   }
 
   /* A DIM NOTE, WITH ITS ONE CONTROL BESIDE IT. It wraps, because at 320px a word and a button on one line is the button

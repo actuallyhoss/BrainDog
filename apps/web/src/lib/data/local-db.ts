@@ -4,6 +4,9 @@
  * ONE DATABASE, TWO STORES: `meta` holds the one owner row, `answers` the kept answers by `name key`. One owner at a
  * time, so a sign-out or a record switch is a `clear` and nothing is left behind under another name.
  *
+ * VERSION 2 INDEXES `opened` AND `bytes`, so eviction walks the least recently opened answers and sums their sizes from
+ * the index keys, without reading a single answer back.
+ *
  * EVERY CALL IS WRAPPED. A private window, blocked site data or a quota refuses IndexedDB in ways that throw or never
  * answer; `idbStore` answers `null` where there is none, and each method rejects instead of throwing, which the copy
  * reads as empty.
@@ -33,11 +36,15 @@ function opened(idb: IDBFactory): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('IndexedDB did not open')), OPEN_MS);
     try {
-      const req = idb.open(NAME, 1);
+      const req = idb.open(NAME, 2);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(META)) db.createObjectStore(META);
-        if (!db.objectStoreNames.contains(ANSWERS)) db.createObjectStore(ANSWERS, { keyPath: 'at' }).createIndex('kept', 'kept');
+        const answers = db.objectStoreNames.contains(ANSWERS) ? req.transaction!.objectStore(ANSWERS) : db.createObjectStore(ANSWERS, { keyPath: 'at' });
+        if (!answers.indexNames.contains('kept')) answers.createIndex('kept', 'kept');
+        /* Answers kept before these were measured are wiped by the copy's format, so none is left out of either index. */
+        if (!answers.indexNames.contains('opened')) answers.createIndex('opened', 'opened');
+        if (!answers.indexNames.contains('bytes')) answers.createIndex('bytes', 'bytes');
       };
       req.onsuccess = () => {
         clearTimeout(timer);
@@ -149,21 +156,44 @@ export function idbStore(idb: IDBFactory | null = here()): Store | null {
       };
       await finished(t);
     },
-    async prune(most) {
+    async prune(most, bytes, keep) {
       const t = await tx([ANSWERS], 'readwrite');
       const s = t.objectStore(ANSWERS);
-      const n = await done(s.count());
-      let over = n - most;
-      if (over > 0) {
-        const req = s.index('kept').openCursor();
+      let n = await done(s.count());
+      /* THE SIZE FROM THE INDEX'S KEYS, which a key cursor reads without bringing a single answer back. */
+      let size = await new Promise<number>((resolve, reject) => {
+        let sum = 0;
+        const req = s.index('bytes').openKeyCursor();
         req.onsuccess = () => {
           const c = req.result;
-          if (!c || over <= 0) return;
-          c.delete();
-          over -= 1;
+          if (!c) return resolve(sum);
+          sum += typeof c.key === 'number' ? c.key : 0;
+          c.continue();
+        };
+        req.onerror = () => reject(req.error ?? new Error('IndexedDB refused'));
+      });
+      if (n > most || size > bytes) {
+        const req = s.index('opened').openCursor();
+        req.onsuccess = () => {
+          const c = req.result;
+          if (!c || (n <= most && size <= bytes)) return;
+          if (c.primaryKey !== keep) {
+            size -= (c.value as Stored).bytes ?? 0;
+            n -= 1;
+            c.delete();
+          }
           c.continue();
         };
       }
+      await finished(t);
+    },
+    async touch(at, when) {
+      const t = await tx([ANSWERS], 'readwrite');
+      const req = t.objectStore(ANSWERS).openCursor(at);
+      req.onsuccess = () => {
+        const c = req.result;
+        if (c) c.update({ ...(c.value as Stored), opened: when });
+      };
       await finished(t);
     },
     async clear() {

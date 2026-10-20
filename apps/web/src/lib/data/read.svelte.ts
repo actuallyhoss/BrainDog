@@ -20,7 +20,7 @@ import { closed, drew, opened, undrew } from '../ui/screen.svelte.ts';
 import { keep, keptAnswer } from './kept.ts';
 import { live } from './live.svelte.ts';
 import { holdCopyMark } from './copy-mark.svelte.ts';
-import { keepLocal, localTicket, nearLocal } from './local-tab.ts';
+import { keepLocal, localTicket, nearLocal, settledLocal } from './local-tab.ts';
 import type { Near, Spot } from './local.ts';
 import { painted } from './timing.ts';
 import { reader, type Resource, type Result, type Snapshot } from './read.ts';
@@ -31,6 +31,8 @@ export type { Phase, Resource, Result } from './read.ts';
  * A read's local copy (`local.ts`). `name` defaults to `kept`; `lists` are the lists the answer was read from; `spots`
  * where its rows are, so a change is patched in rather than dropping it; `always` keeps it never current, for an answer
  * holding reads no line names; `shrink` is what is stored of it, where part of an answer must never be drawn old.
+ * `recheck`: asked once quietly on open even when the copy is current. `follow`: when the record moves, the copy's
+ * patched answer is drawn instead of asking, if it is still current, `follow` putting back what `shrink` left out.
  */
 export type LocalRead<T> = {
   name?: string;
@@ -39,6 +41,8 @@ export type LocalRead<T> = {
   spots?: (value: T) => readonly Spot[];
   always?: boolean;
   shrink?: (value: T) => T;
+  recheck?: boolean;
+  follow?: (shown: T | null, kept: T) => T;
 };
 
 /**
@@ -99,7 +103,7 @@ export function read<T>(
         now = m.now();
         painted(screen, 'copy');
         stale = !near.current;
-        if (near.current) {
+        if (near.current && opts.local.recheck !== true) {
           if (opts.kept !== undefined) keep(opts.kept, k, version, { ok: true, value: near.value });
           return;
         }
@@ -153,9 +157,26 @@ export function read<T>(
   $effect(() => {
     const v = live.version;
     untrack(() => {
-      if (m.heard(v)) void ask(asking, true);
+      if (m.heard(v)) void (opts.local?.follow ? follow(asking) : ask(asking, true));
     });
   });
+
+  /**
+   * THE RECORD MOVED AND THE COPY FOLLOWS IT: once the copy has placed what the log says (`settledLocal`), a current
+   * answer is drawn from it and nothing is asked. A dropped or stale one, or a call already out, asks quietly as before.
+   */
+  async function follow(k: string | null): Promise<void> {
+    const l = opts.local!;
+    if (k === null || localName === undefined || out.size > 0) return ask(k, true);
+    await settledLocal();
+    if (gone || untrack(() => asking) !== k) return;
+    const near = await nearLocal<T>(localName, k, l.base());
+    if (gone || untrack(() => asking) !== k) return;
+    if (near === null || !near.current || out.size > 0) return ask(k, true);
+    const ticket = m.ask(k, true);
+    if (ticket !== null) m.answer(ticket, { ok: true, value: l.follow!(untrack(() => now.value), near.value) });
+    now = m.now();
+  }
 
   /**
    * AN EMPTY ANSWER SETTLES THE SCREEN `empty` WHATEVER THE SCREEN DRAWS.

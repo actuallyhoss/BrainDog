@@ -113,6 +113,9 @@ export function heardLocal(): void {
   if (copy) void copy.heard();
 }
 
+/** When the copy has caught up to every move heard so far: a screen following the log reads it after this. */
+export const settledLocal = (): Promise<void> => (copy ? copy.settled() : Promise.resolve());
+
 /** The record's own format, kernel and primitives, as `version` answers them. */
 export function stampLocal(v: { format: number; kernel: number; primitives: number }): void {
   if (copy) void copy.stamp(`${v.format}.${v.kernel}.${v.primitives}`);

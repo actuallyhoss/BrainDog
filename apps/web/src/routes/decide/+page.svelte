@@ -57,10 +57,11 @@
   import Waffle from '$lib/viz/Waffle.svelte';
   import { closed, drew, opened } from '../../lib/ui/screen.svelte.ts';
   import { mayAnswer, whyNotAnswering } from './answering.ts';
-  import { keepLocal, localTicket, nearLocal } from '$lib/data/local-tab.ts';
+  import { keepLocal, localTicket, nearLocal, settledLocal } from '$lib/data/local-tab.ts';
   import { painted } from '$lib/data/timing.ts';
   import type { Near } from '$lib/data/local.ts';
-  import { QUESTIONS } from '$lib/data/local.ts';
+  import { EVERY, QUESTIONS } from '$lib/data/local.ts';
+  import { decideSpots } from './kept-decide.ts';
   import { holdCopyMark } from '$lib/data/copy-mark.svelte.ts';
   import { live as poll } from '$lib/data/live.svelte.ts';
   import { blocksMineFirst, callsRead, dayWord, decideDrawn, mineFirst, readCalls, readDecide, WORDS, type Call, type DecideBody } from './views.ts';
@@ -108,8 +109,9 @@
 
   /**
    * THE QUEUE AS THE LOCAL COPY LAST HELD IT, drawn while the first read is out and only to read: no card answers, by
-   * press or by key, until the record's own answer replaces it (`lib/data/local.ts`). Kept `always`, so it is never
-   * drawn without being asked again.
+   * press or by key, until the record's own answer replaces it (`lib/data/local.ts`). Every open asks the record once
+   * behind it; a move of the record is placed on the kept queue where it can be (`decideSpots`) and drawn from it
+   * (`follow`), and asked again where it cannot. It reads `EVERY`, since a card names rows of lists no spot holds.
    */
   const DECIDE_COPY = 'Decide';
   type KeptDecide = { got: Opened; calls: Call[] };
@@ -150,7 +152,7 @@
         fromCopy = false;
         if (out.from === 'live') painted('decide', 'network');
       }
-      if (out?.from === 'live') keepLocal(DECIDE_COPY, apiBase(), [QUESTIONS], { got: out, calls: called.from === 'live' ? called.value : calls }, mark, {}, { always: true });
+      if (out?.from === 'live') keepLocal(DECIDE_COPY, apiBase(), [QUESTIONS, EVERY], { got: out, calls: called.from === 'live' ? called.value : calls }, mark, {}, { spots: decideSpots(out) });
       return out?.from === 'live' || (fromCopy && offlineNow());
     } finally {
       reading = false;
@@ -166,6 +168,23 @@
         .catch(() => closed(false, at));
     });
   });
+
+  /**
+   * THE RECORD MOVED: once the copy has placed what the log says, a queue it kept current is drawn from it and nothing
+   * is asked. One it dropped, or a page still drawn from the copy or being read, is read again as before.
+   */
+  async function follow(): Promise<void> {
+    if (!reading && !fromCopy && got?.from === 'live') {
+      await settledLocal();
+      const near = await nearLocal<KeptDecide>(DECIDE_COPY, apiBase(), apiBase());
+      if (near?.current && near.value.got.from === 'live' && !reading && !fromCopy) {
+        got = near.value.got;
+        calls = near.value.calls;
+        return;
+      }
+    }
+    await reread();
+  }
 
   /* A LANDED WRITE, AND A NEW VERSION OF THE RECORD, READ THE PAGE AGAIN without blanking it: an answered question
      goes, and one asked elsewhere arrives. */
@@ -286,7 +305,7 @@
     return () => window.removeEventListener('keydown', onkey, { capture: true });
   });
   /* NOT WHILE AN ANSWER WAITS FOR ITS UNDO, so the card holding it is not drawn afresh under the reader. */
-  listen(reread, () => classic || reading || typing() || document.querySelector('main [data-held], main [aria-busy="true"]') !== null);
+  listen(follow, () => classic || reading || typing() || document.querySelector('main [data-held], main [aria-busy="true"]') !== null);
 
   /* ── the page as Decide draws it ─────────────────────────────────────────── */
 

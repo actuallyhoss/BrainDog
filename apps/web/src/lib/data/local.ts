@@ -23,7 +23,9 @@
  * A line already in the answer (the value it set is there, not the one it replaced) is skipped, and changes nothing.
  * Anything else drops the answer, as before: a link, a ref or a money field, a derived field, a row the answer does not
  * hold whose change could bring it in, a write half in the answer and half not. A list the answer only names rows of
- * is patched by nothing and dropped only when a line could change a name it shows.
+ * is patched by nothing and dropped only when a line could change a name it shows. An answer that reads more than it
+ * can name (Today's money and reminders, a card's rows on Decide) lists `EVERY`: every catch-up hands it to the patch,
+ * and a line on any list it holds no spot for drops it.
  * The compare-and-set is the backstop: a version patched wrong is a refused write and a re-read, never a lost one.
  *
  * CREATES AND DELETES, ONLY WHERE THE SPOT SAYS HOW (`Lands`). A spot that carries the question's filter as the
@@ -34,13 +36,29 @@
  *   `evaluate` over the line's fields, and only for a filter of plain fields with literal values (no ref, no relative
  *   day, no hop, no search). A row it takes goes where the sort puts it (empties last, the newest first among equals,
  *   as the record breaks ties by id), or nowhere past a page boundary, and is counted either way. A row it does not
- *   take is not news when the filter is the whole question (`exact`), else the answer goes. A field the row cannot be
- *   drawn with as logged (a ref is a number on screen and an id in the log, a redacted value) drops it too, and so do
- *   pills over a narrowed question, which count rows the filter leaves out.
+ *   take is not news when the filter is the whole question (`exact`), else the answer goes. A REF IS AN ID IN THE LOG
+ *   AND A NUMBER ON SCREEN: it is drawn as the number of the row it points at when the answer holds that row's id
+ *   (`Lands.ids`, the ids the list's ref walk read, `Names.ids`), and drops the answer when it does not. A redacted value
+ *   drops it too, and so do pills over a narrowed question, which count rows the filter leaves out.
  * - A ROW IT TAKES SAYS WHO MADE IT: `by` is the line's actor, and it is `mine` when that is the person the copy is
  *   kept for (the reader boot named), so it is not drawn blank until the record answers. A run's actor is not `mine`
  *   here, since only the record can say whose token a run holds.
- * - A create already in the answer is skipped. A restore, or a create or delete with no `Lands`, drops it as before.
+ * - A RESTORE (an Undo bringing a row back) carries no fields, so it lands only a row a delete this copy placed took
+ *   out: kept beside the answer (`gone`, the last `GONE_MOST`), put back where the question puts it, one version on.
+ *   A row deleted before the answer was kept drops it, as before.
+ * - A create or a restore already in the answer is skipped. A create, delete or restore with no `Lands` drops it.
+ *
+ * THE QUESTIONS WAITING (`Asks`), on Today and Needs you, by their ids. AN ANSWER OR A WITHDRAWAL (`resolve`) takes its
+ * card out and the count down; a decision (`decide`) adds nothing to wait on. Each drops instead where the browser cannot
+ * say what follows: one the answer counts but does not draw would take the place (Today draws three), a page that also
+ * draws what was decided (only a withdrawal decides nothing), counts over the cards it cannot move (Decide's `waiting`,
+ * taken out), a card id named otherwise than the line names it. A question asked, reopened or replaced always drops it:
+ * the browser can neither draw its card nor say where it ranks.
+ *
+ * ROWS A SCREEN DRAWS ITS OWN WAY (`Shown`), Today's tasks. A held row's drawn field takes the logged value (its title),
+ * a field it neither draws nor was asked by moves only its version, and done or dropped takes it out of every read. A
+ * row not held stays out. A create, a field the reads asked by (the day, the priority, the state otherwise, the
+ * project), or a task leaving while a read came back at its limit (`full`) drops it.
  *
  * THE LAST READER, SIGNED (`local-mark.ts`). A live boot leaves a marker naming who read; a cold open before the shell
  * has claimed the copy, and a boot nobody answered (offline), draws only for that person, and only to read. Offline the
@@ -50,16 +68,29 @@
  * a count only where an unnarrowed list kept one, and the declared pages it holds where their nav put them.
  *
  * WHO DRAWS FROM IT. The classic Work screen and a list's first page are patched and, when current, skip the record.
- * A search over a list kept whole (its first page with no next one, every row it counted held, none cut) is answered
- * from it in the browser (`searchKept` in `kept-list.ts`): every word typed the start of a word in the fields the
- * record's search reads, folded by `find.ts`'s `terms`, which is held against the record's own index. It is drawn with
- * a line saying it was found on this device, and the record's answer replaces it; a list with a searchable ref or
- * money field is the record's to search.
- * Today, a row's page (row, history, what points at it), declared pages (People, Money and the rest under `/p/`, and
- * the live Work page, under the same key `/p/work` keeps) and Needs you are kept `always`: drawn at once, and asked
- * again every time. Needs you and a row's page offer no write while they are the copy's; anywhere else a write from a
- * drawn copy meets the record's compare-and-set like any other. Anything drawn from the copy and not yet answered holds
- * up the quiet mark over the work (`copy-mark.svelte.ts`).
+ * A LIST IS KEPT WHOLE PAST ITS FIRST PAGE: when it is opened, the list unfiltered in its order is walked a page at a
+ * time when the browser is idle (`walkWhole` in `kept-list.ts`), up to `LIST_ROWS_MOST` rows, under the ticket its
+ * first page was asked with, and kept marked `whole` (`RegisterWhole`, by list and order) only when the count still
+ * matches the rows walked; once a day, the log keeping it right between. A search, the chips, or both over a list kept
+ * whole are answered from it in the browser (`searchKept`): the chips asked as the record would (`answersHere`: no ref,
+ * no relative day), every word typed the start of a word in the fields the record's search reads, folded by `find.ts`'s
+ * `terms`, a searchable ref read by its row's kept name and left to the record where that name is not kept. It is drawn
+ * one page of it, in the order the record's answer will have, with a line saying it was found on this device; the line's
+ * room is held while the search stands, so the record's answer replacing it moves no row. Money is the record's to search.
+ * TODAY AND NEEDS YOU ARE PATCHED AND FOLLOW THE LOG: on open they draw the copy and ask the record once, quietly; on a
+ * move of the record they wait for the copy to catch up (`settledLocal`) and draw its answer if it is still current,
+ * and ask only where it was dropped. Today keeps who is working and what changed since the mark from the screen, never
+ * from the copy (`follow`), so what changed since the mark is not followed between opens: the next open says it.
+ * A row's page (row, history, what points at it) and declared pages (People, Money and the rest under `/p/`, and the
+ * live Work page, under the same key `/p/work` keeps) are kept `always`: drawn at once, and asked again every time.
+ * Needs you and a row's page offer no write while they are the copy's; anywhere else a write from a drawn copy meets
+ * the record's compare-and-set like any other. Anything drawn from the copy and not yet answered holds up the quiet mark
+ * over the work (`copy-mark.svelte.ts`).
+ *
+ * EVICTED BY USE. Each answer says when a screen last opened it (`opened`, written at most hourly) and about how much it
+ * takes (`bytes`). Past `LOCAL_MOST` answers or `LOCAL_BYTES_MOST` the least recently opened go first, never the one
+ * just kept; an answer bigger than the whole budget is not kept. Only answers are evicted: the owner, the cursor and the
+ * signed marker's key (the `meta` store) and the last shell (`boot-copy.ts`, not in this database) never are.
  *
  * OPENED BESIDE BOOT. The layout starts the database opening before it waits on anything (`warmLocal`), and the store
  * and the marker's key share one connection, so a screen's 60 ms wait (`NEAR_MS`) meets an open database rather than a
@@ -70,6 +101,12 @@
  * MEASURED BY HAND (`timing.ts`). With `localStorage['braindog.timing']` at `1`, each screen logs to the console how
  * long it took from open (the navigation, or the page load) to its first paint from the copy, from memory and from the
  * network, against the targets: 0.3 s, 0.1 s and 1 s. Off by default, and it only logs.
+ * THE PLAN, on the owner's record in a desktop browser and on a phone, each with the hook on and the copy warm (a day's
+ * use) and then cold (forgotten in Settings): open Today, Needs you, a list of a few rows, a list past one page, a row
+ * and Work, five times each, cold load and navigation both; then a search and a filter on the big list once it has been
+ * kept whole. Note each screen's `copy` and `network` times and how many record calls a version move makes on Today and
+ * Needs you (none when the copy follows it). The copy is done when every `copy` paint is under 0.3 s, every revisit
+ * under 0.1 s, every cold open under 1 s, and a search on a list kept whole paints before the record answers.
  *
  * FORGOTTEN ON ASKING. Settings > Sessions says how much is kept here and forgets it (`forgetLocal`): the copy, its
  * signed marker, the last shell and the offline cache. A live open keeps it again, as after a sign-out.
@@ -84,12 +121,27 @@
 
 import { evaluate, type FieldSpec, type Predicate, type Schema } from '@braindog/where';
 
-/** Bump when what is stored changes shape: a copy of another format is wiped. */
-export const LOCAL_FORMAT = 1;
+/** Bump when what is stored changes shape: a copy of another format is wiped. 2: answers carry `opened` and `bytes`. */
+export const LOCAL_FORMAT = 2;
 /** How old a kept answer may be and still be drawn. A week, as the shell copy and the offline copy. */
 export const LOCAL_MS = 7 * 24 * 3_600_000;
-/** The most answers kept; past it the oldest go. */
+/** The most answers kept; past it the least recently opened go. */
 export const LOCAL_MOST = 120;
+/**
+ * The most a record's copy may take, as JSON. Past it the least recently opened answers go. 20 MB is far under any
+ * browser's quota for a site, and an answer that size still reads back from IndexedDB in well under a frame budget's
+ * worth of a phone's time per open, which is the whole point of keeping it.
+ */
+export const LOCAL_BYTES_MOST = 20 * 1024 * 1024;
+/**
+ * The most rows a list is kept whole with, walked page by page in the background. Past 5,000 (25 of the record's pages)
+ * a walk is more requests than an idle open should spend, and a search over that many rows is the record's to answer.
+ */
+export const LIST_ROWS_MOST = 5_000;
+/** How long an answer's `opened` may lag before a read writes it again: an hour orders eviction well enough, for a write. */
+const TOUCH_MS = 3_600_000;
+/** The rows a delete took out kept for an Undo to bring back. Fifty: an Undo comes soon, and past it the record answers. */
+export const GONE_MOST = 50;
 
 /** Where the copy's reader stands in the log, as the record handed it: a rowid to an owner, an opaque string to others. */
 export type Cursor = number | string;
@@ -124,9 +176,33 @@ export type Spot = {
   newest?: boolean;
   moved?: readonly Path;
   lands?: Lands;
+  /** The questions waiting on somebody, held at `at` by their `id` (`list` is `QUESTIONS`). */
+  questions?: Asks;
+  /** Rows drawn in a shape of the screen's own (Today's tasks), held at `at` by their `seq`. */
+  shown?: Shown;
 };
 
 type Path = (string | number)[];
+
+/**
+ * Where an answer holds the questions waiting (`QUESTIONS`). `total` is the path to how many wait in all, of which the
+ * answer may hold only the first few. `decided`: the answer also holds what was decided, which an answer adds to and the
+ * browser cannot. `drops` are counts over the questions the browser cannot move, taken out when one goes.
+ */
+export type Asks = { total?: readonly Path; decided?: boolean; drops?: readonly Path[] };
+
+/**
+ * Rows of a list drawn in the screen's own shape. `says`: each list field the row draws as it was logged, by the key it
+ * is drawn under. `asks`: the fields the screen's reads were asked by or draw in a way of their own, which a line on
+ * drops the answer. `leaves`: a value of a field that takes a row out of every read. `full`: some read came back at its
+ * limit, so a row taken out lets in one the answer does not hold.
+ */
+export type Shown = {
+  says: Readonly<Record<string, string>>;
+  asks: readonly string[];
+  leaves?: { field: string; values: readonly string[] };
+  full?: boolean;
+};
 
 /**
  * How a create or a delete is placed on a spot's rows; absent, either drops the answer.
@@ -143,6 +219,8 @@ export type Lands = {
   more?: readonly Path;
   count?: readonly Path;
   tally?: readonly Path;
+  /** The path to `[<list> <id>, seq][]`: each row a ref may point at, so a create's ref is drawn as the number a row holds. */
+  ids?: readonly Path;
 };
 
 /**
@@ -159,7 +237,15 @@ export type Stored = {
   kept: number;
   spots?: Spot[];
   always?: boolean;
+  /** When a screen last read it, which eviction goes by; `kept` until one has. */
+  opened?: number;
+  /** About how much it takes, as JSON, measured when it was kept. */
+  bytes?: number;
+  /** Rows deletes took out, by the spot path they were held at, for a restore to put back. */
+  gone?: Gone[];
 };
+
+type Gone = { at: string; row: Row & Record<string, unknown> };
 
 /** Where the copy lives. Every method may reject: the copy then behaves as if empty. */
 export type Store = {
@@ -171,8 +257,14 @@ export type Store = {
   drop(lists: ReadonlySet<string> | null): Promise<void>;
   /** Hand every answer read from any of `lists` to `fn`, in one pass: what it returns replaces it, `null` drops it. */
   rewrite(lists: ReadonlySet<string>, fn: (row: Stored) => Stored | null): Promise<void>;
-  /** Keep the newest `most`. */
-  prune(most: number): Promise<void>;
+  /**
+   * Drop the least recently opened answers until at most `most` are left and they take at most `bytes`, never `keep`.
+   * Only answers: the meta row (the owner, the cursor) and the marker's key beside it are never evicted, and the shell
+   * copy is not in this store at all (`boot-copy.ts`).
+   */
+  prune(most: number, bytes: number, keep: string | null): Promise<void>;
+  /** Say the answer at `at` was opened `when`. */
+  touch(at: string, when: number): Promise<void>;
   /** Everything, meta included. */
   clear(): Promise<void>;
   /** Every answer, for the rail drawn offline and the size Settings says. */
@@ -229,6 +321,12 @@ const QUIET = new Set([
  */
 export const QUESTIONS = ':questions';
 const ASKING = new Set(['decide', 'supersede', 'suggest', 'resolve', 'predict', 'score', 'propose']);
+
+/**
+ * AN ANSWER THAT READS MORE THAN IT CAN NAME (Today's money, its reminders) names `EVERY` among its lists: every catch-up
+ * that touches anything hands it to the patch, and a line on a list it holds no spot for drops it.
+ */
+export const EVERY = ':every';
 
 /** A name for what an answer holds that is not a declared list (`QUESTIONS`, a page's figures): it starts with a colon. */
 export const isPseudo = (list: string): boolean => list.startsWith(':');
@@ -540,8 +638,24 @@ function placeOf(rows: readonly unknown[], fields: Record<string, unknown>, sort
   return rows.length;
 }
 
-/** A create's fields as a row holds them, or `null` when one cannot be drawn as the log says it. */
-function createdFields(decl: unknown, to: unknown): Record<string, unknown> | null {
+/** The id a ref is logged with, `entry:` taken off, or `null` when it is not one. */
+const refId = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v.replace(/^entry:/u, '') : null);
+
+/** The rows a spot's answer may point at, `<list> <id>` to the number a row holds, from `Lands.ids`. */
+function idsOf(value: unknown, lands: Lands): Map<string, number> | null {
+  if (!lands.ids) return null;
+  const pairs = dig(value, lands.ids);
+  if (!Array.isArray(pairs)) return null;
+  const out = new Map<string, number>();
+  for (const p of pairs) if (Array.isArray(p) && typeof p[0] === 'string' && typeof p[1] === 'number') out.set(p[0], p[1]);
+  return out;
+}
+
+/**
+ * A create's fields as a row holds them, or `null` when one cannot be drawn as the log says it. A REF IS AN ID IN THE
+ * LOG AND A NUMBER ON SCREEN, so it is drawn only when `ids` names the row it points at; any other ref drops the answer.
+ */
+function createdFields(decl: unknown, to: unknown, ids: ReadonlyMap<string, number> | null = null): Record<string, unknown> | null {
   if (typeof to !== 'object' || to === null || Array.isArray(to) || worksOut(decl)) return null;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(to as Record<string, unknown>)) {
@@ -549,6 +663,25 @@ function createdFields(decl: unknown, to: unknown): Record<string, unknown> | nu
     if (v === undefined || v === null) continue;
     const f = fieldOf(decl, k);
     if (!f || typeof f.type !== 'string') return null;
+    if (f.type === 'ref' || (f.type === 'list' && f.of === 'ref')) {
+      const target = (f as { to?: unknown }).to;
+      if (typeof target !== 'string' || ids === null) return null;
+      const seqOf = (x: unknown): number | undefined => {
+        const id = refId(x);
+        return id === null ? undefined : ids.get(`${target} ${id}`);
+      };
+      if (f.type === 'ref') {
+        const seq = seqOf(v);
+        if (seq === undefined) return null;
+        out[k] = seq;
+      } else {
+        if (!Array.isArray(v)) return null;
+        const seqs = v.map(seqOf);
+        if (seqs.some((s) => s === undefined)) return null;
+        out[k] = seqs;
+      }
+      continue;
+    }
     if (f.type === 'list') {
       if (f.of !== 'text' || !Array.isArray(v) || !v.every((x) => typeof x === 'string')) return null;
     } else if (!PLAIN.has(f.type)) return null;
@@ -557,20 +690,14 @@ function createdFields(decl: unknown, to: unknown): Record<string, unknown> | nu
   return out;
 }
 
-/** Place a create on one spot of `value`; `false` drops the answer. */
-function landCreate(value: unknown, spot: Spot, decl: unknown, l: Line, writes: Map<string, 'placed' | 'in'>, me: string | null): boolean {
-  const lands = spot.lands;
-  if (!lands || typeof l.seq !== 'number') return false;
-  const rows = dig(value, spot.at);
-  if (!Array.isArray(rows)) return false;
-  const write = `${spot.at.join('.')} ${l.seq} ${l.batch ?? l.id}`;
-  /* KEPT AFTER THE CREATE, the row is in already. */
-  if (rows.some((r) => isRow(r) && r.seq === l.seq)) {
-    writes.set(write, writes.get(write) ?? 'in');
-    return true;
-  }
-  const fields = createdFields(decl, l.to);
-  if (fields === null) return false;
+/**
+ * Put a row the answer does not hold where the question would: asked of the filter, placed by the sort, counted. A
+ * create and a restore both come here. `false` drops the answer; `true` with nothing placed is a row the question
+ * leaves out, or one past the page held.
+ */
+function land(value: unknown, spot: Spot, decl: unknown, fields: Record<string, unknown>, made: () => Record<string, unknown>, l: Line): boolean {
+  const lands = spot.lands!;
+  const rows = dig(value, spot.at) as unknown[];
   if (lands.where !== null) {
     if (!localWhere(lands.where, decl)) return false;
     let takes: boolean;
@@ -592,20 +719,67 @@ function landCreate(value: unknown, spot: Spot, decl: unknown, l: Line, writes: 
   if (!recount(value, lands.count, 1)) return false;
   /* PAST THE LAST ROW HELD, with more pages, it is on a later page: counted, not drawn. */
   if (at < rows.length || !beyond(value, lands)) {
-    const id = typeof l.target === 'string' && l.target !== '' ? l.target.replace(/^entry:/u, '') : null;
+    rows.splice(at, 0, made());
+    const moved = spot.moved ? dig(value, spot.moved) : undefined;
+    if (typeof moved === 'object' && moved !== null && typeof l.ts === 'string' && typeof l.seq === 'number') (moved as Record<number, string>)[l.seq] = l.ts;
+  }
+  return true;
+}
+
+/** Place a create on one spot of `value`; `false` drops the answer. */
+function landCreate(value: unknown, spot: Spot, decl: unknown, l: Line, writes: Map<string, 'placed' | 'in'>, me: string | null): boolean {
+  const lands = spot.lands;
+  if (!lands || typeof l.seq !== 'number') return false;
+  const rows = dig(value, spot.at);
+  if (!Array.isArray(rows)) return false;
+  const write = `${spot.at.join('.')} ${l.seq} ${l.batch ?? l.id}`;
+  /* KEPT AFTER THE CREATE, the row is in already. */
+  if (rows.some((r) => isRow(r) && r.seq === l.seq)) {
+    writes.set(write, writes.get(write) ?? 'in');
+    return true;
+  }
+  const fields = createdFields(decl, l.to, idsOf(value, lands));
+  if (fields === null) return false;
+  const seq = l.seq;
+  const made = () => {
+    const id = refId(l.target);
     /* WHO MADE IT, from the line and the reader the copy is kept for, so the row is not drawn blank until the record answers. */
     const by = typeof l.actor === 'string' ? l.actor : '';
-    rows.splice(at, 0, { ...(id ? { id } : {}), seq: l.seq, fields, version: 1, created: l.ts ?? '', by, ...(me !== null && by === me ? { mine: true } : {}) });
-    const moved = spot.moved ? dig(value, spot.moved) : undefined;
-    if (typeof moved === 'object' && moved !== null && typeof l.ts === 'string') (moved as Record<number, string>)[l.seq] = l.ts;
-  }
+    return { ...(id ? { id } : {}), seq, fields, version: 1, created: l.ts ?? '', by, ...(me !== null && by === me ? { mine: true } : {}) };
+  };
+  if (!land(value, spot, decl, fields, made, l)) return false;
   /* The rest of the same write (a rule's edit of the row it made) is that one version, as an edit's lines are. */
   writes.set(write, 'placed');
   return true;
 }
 
-/** Take a deleted row off one spot of `value`; `false` drops the answer. */
-function landDelete(value: unknown, spot: Spot, l: Line): boolean {
+/**
+ * Bring a restored row back to one spot of `value`: only one a delete this copy placed took out (`gone`), as it was,
+ * one version on. A restore carries no fields, so a row deleted before the answer was kept drops it, as before.
+ */
+function landRestore(value: unknown, spot: Spot, decl: unknown, l: Line, writes: Map<string, 'placed' | 'in'>, gone: Gone[]): boolean {
+  const lands = spot.lands;
+  if (!lands || typeof l.seq !== 'number') return false;
+  const rows = dig(value, spot.at);
+  if (!Array.isArray(rows)) return false;
+  const write = `${spot.at.join('.')} ${l.seq} ${l.batch ?? l.id}`;
+  /* KEPT AFTER THE RESTORE, the row is in already. */
+  if (rows.some((r) => isRow(r) && r.seq === l.seq)) {
+    writes.set(write, writes.get(write) ?? 'in');
+    return true;
+  }
+  const path = spot.at.join('.');
+  const i = gone.findIndex((g) => g.at === path && g.row.seq === l.seq);
+  if (i === -1) return false;
+  const [was] = gone.splice(i, 1);
+  const back = { ...was!.row, version: (typeof was!.row.version === 'number' ? was!.row.version : 0) + 1 };
+  if (!land(value, spot, decl, back.fields, () => back, l)) return false;
+  writes.set(write, 'placed');
+  return true;
+}
+
+/** Take a deleted row off one spot of `value`, kept in `gone` for a restore; `false` drops the answer. */
+function landDelete(value: unknown, spot: Spot, l: Line, gone: Gone[]): boolean {
   const lands = spot.lands;
   if (!lands || typeof l.seq !== 'number') return false;
   const rows = dig(value, spot.at);
@@ -617,20 +791,125 @@ function landDelete(value: unknown, spot: Spot, l: Line): boolean {
     const pills = lands.tally ? dig(value, lands.tally) : undefined;
     return lands.where === null || pills === undefined || pills === null;
   }
-  const [gone] = rows.splice(at, 1) as Row[];
+  const [out] = rows.splice(at, 1) as (Row & Record<string, unknown>)[];
+  gone.push({ at: spot.at.join('.'), row: out! });
+  if (gone.length > GONE_MOST) gone.splice(0, gone.length - GONE_MOST);
   const moved = spot.moved ? dig(value, spot.moved) : undefined;
   if (typeof moved === 'object' && moved !== null) delete (moved as Record<number, string>)[l.seq];
-  return recount(value, lands.count, -1) && retally(value, lands, gone!.fields, -1);
+  return recount(value, lands.count, -1) && retally(value, lands, out!.fields, -1);
+}
+
+/* ── the questions waiting, and rows a screen draws its own way ─────────────── */
+
+/** A question's id as a handle (`q.<id>`, `d.<id>`) or as the record's own number: a line and a card must say the same. */
+const formOf = (id: unknown): string | null => (typeof id !== 'string' ? null : /^[qd]\./u.test(id) ? 'handle' : 'number');
+
+/**
+ * Place a line about the questions on every spot holding them. AN ANSWER OR A WITHDRAWAL (`resolve`) takes its question
+ * out and the count down, unless one the answer does not hold would take its place. A DECISION (`decide`) adds nothing
+ * to wait on, and drops only an answer that holds what was decided. A QUESTION ASKED, reopened or replaced drops it: the
+ * browser cannot draw its card or say where it ranks. `false` drops the answer.
+ */
+function placeQuestion(value: unknown, spots: readonly Spot[], l: Line): boolean {
+  if (l.kind === 'decide') return !spots.some((s) => s.questions!.decided === true);
+  if (l.kind !== 'resolve') return false;
+  const target = typeof l.target === 'string' ? l.target : '';
+  const id = target.startsWith('suggestion:') ? target.slice('suggestion:'.length) : '';
+  if (id === '') return false;
+  for (const s of spots) {
+    const asks = s.questions!;
+    /* WHAT WAS DECIDED IS HELD TOO: a withdrawal decides nothing, every other close does. */
+    if (asks.decided === true && l.to !== 'withdrawn') return false;
+    const rows = dig(value, s.at);
+    if (!Array.isArray(rows)) return false;
+    const total = asks.total ? dig(value, asks.total) : rows.length;
+    const all = total === undefined || total === null ? rows.length : total;
+    if (typeof all !== 'number') return false;
+    const at = rows.findIndex((r) => typeof r === 'object' && r !== null && (r as { id?: unknown }).id === id);
+    if (at === -1) {
+      /* NOT HELD, BY AN ANSWER HOLDING EVERY ONE IT COUNTS and naming them as the line does: never one of them. */
+      if (all > rows.length || rows.some((r) => formOf((r as { id?: unknown } | null)?.id) !== formOf(id))) return false;
+      continue;
+    }
+    /* ONE IT COUNTS AND DOES NOT DRAW would come up into the place this one leaves. */
+    if (all > rows.length) return false;
+    rows.splice(at, 1);
+    if (!recount(value, asks.total, -1)) return false;
+    for (const p of asks.drops ?? []) {
+      const parent = dig(value, p.slice(0, -1));
+      if (typeof parent === 'object' && parent !== null) delete (parent as Record<string | number, unknown>)[p[p.length - 1]!];
+    }
+  }
+  return true;
 }
 
 /**
- * `row`'s answer with `lines` (oldest first, as `inOrder` gives them) placed on it, or `undefined` when one cannot be
- * placed and the answer must go. The rules are the design note's, top of this file. Lines about lists the answer was
- * not read from are not its business and pass by. `me` is the person the copy is kept for: a row they made is `mine`.
+ * Place a row write on rows a screen draws its own way (`Shown`). A held row's drawn field takes the value logged; a
+ * field it neither draws nor was asked by moves only its version; a value that takes it out of every read takes it off,
+ * unless a read was full. A row not held stays out. A create, a restore, a link, or a field it was asked by drops it.
  */
-export function patched(row: Stored, lines: readonly Line[], me: string | null = null): unknown {
+function placeShown(value: unknown, spots: readonly Spot[], l: Line, writes: Map<string, 'placed' | 'in'>): boolean {
+  if (l.kind === 'note') return true;
+  if (typeof l.seq !== 'number') return false;
+  const seq = l.seq;
+  const find = (rows: unknown[]) => rows.findIndex((r) => typeof r === 'object' && r !== null && (r as { seq?: unknown }).seq === seq);
+  if (l.kind === 'delete') {
+    for (const s of spots) {
+      const rows = dig(value, s.at);
+      if (!Array.isArray(rows)) return false;
+      const at = find(rows);
+      if (at === -1) continue;
+      if (s.shown!.full === true) return false;
+      rows.splice(at, 1);
+    }
+    return true;
+  }
+  if (!VALUES.has(l.kind) || typeof l.field !== 'string' || l.to === REDACTED || l.from === REDACTED) return false;
+  for (const s of spots) {
+    const sh = s.shown!;
+    const rows = dig(value, s.at);
+    if (!Array.isArray(rows)) return false;
+    const at = find(rows);
+    const leaving = sh.leaves !== undefined && sh.leaves.field === l.field && (l.kind === 'edit' || l.kind === 'state') && sh.leaves.values.includes(String(l.to));
+    if (leaving) {
+      if (at === -1) continue;
+      if (sh.full === true) return false;
+      rows.splice(at, 1);
+      continue;
+    }
+    if (sh.asks.includes(l.field)) return false;
+    if (at === -1) continue;
+    const r = rows[at] as Record<string, unknown>;
+    const key = sh.says[l.field];
+    let did: 'placed' | 'in' = 'placed';
+    if (key !== undefined) {
+      /* EMPTIED, a drawn field is the screen's own fallback ("Untitled task"), which is the record's to say. */
+      if (l.kind !== 'edit' || typeof l.to !== 'string' || l.to.trim() === '') return false;
+      if (r[key] === l.to.trim()) did = 'in';
+      else r[key] = l.to.trim();
+    }
+    const write = `${s.at.join('.')} ${seq} ${l.batch ?? l.id}`;
+    const was = writes.get(write);
+    if (key !== undefined && was !== undefined && was !== did) return false;
+    if (was === undefined) {
+      writes.set(write, did);
+      if (did === 'placed' && typeof r.version === 'number') r.version += 1;
+    }
+  }
+  return true;
+}
+
+/**
+ * `row`'s answer with `lines` (oldest first, as `inOrder` gives them) placed on it, and the rows deletes took out, or
+ * `undefined` when one cannot be placed and the answer must go. The rules are the design note's, top of this file.
+ * Lines about lists the answer was not read from are not its business and pass by, unless it reads `EVERY`. `me` is the
+ * person the copy is kept for: a row they made is `mine`.
+ */
+function patch(row: Stored, lines: readonly Line[], me: string | null): { value: unknown; gone: Gone[] } | undefined {
   const spots = row.spots ?? [];
   const value: unknown = structuredClone(row.value);
+  const gone: Gone[] = structuredClone(row.gone ?? []);
+  const every = row.lists.includes(EVERY);
   /* Each write on a row is one `version`: placed once, or found already in. A write that is both is not one answer's. */
   const writes = new Map<string, 'placed' | 'in'>();
 
@@ -638,12 +917,23 @@ export function patched(row: Stored, lines: readonly Line[], me: string | null =
     const lists = linesLists(l);
     if (lists === null) return undefined;
     const mine = lists.filter((x) => row.lists.includes(x));
-    if (mine.length === 0) continue;
-    if (mine.some(isPseudo)) return undefined;
+    if (mine.length === 0) {
+      if (every && lists.length > 0) return undefined;
+      continue;
+    }
     const list = mine[0]!;
+    if (list === QUESTIONS) {
+      const asks = spots.filter((s) => s.list === QUESTIONS && s.questions !== undefined);
+      if (asks.length === 0 || !placeQuestion(value, asks, l)) return undefined;
+      continue;
+    }
+    if (isPseudo(list)) return undefined;
     const decl = row.decls[list];
     if (decl === undefined) return undefined;
-    const held = spots.filter((s) => s.list === list);
+    const drawn = spots.filter((s) => s.list === list && s.shown !== undefined);
+    const held = spots.filter((s) => s.list === list && s.shown === undefined && s.questions === undefined);
+    if (drawn.length > 0 && !placeShown(value, drawn, l, writes)) return undefined;
+    if (drawn.length > 0 && held.length === 0) continue;
 
     /* A LIST THE ANSWER ONLY NAMES ROWS OF: nothing on it is patched, and only a name it might show is news. */
     if (held.length === 0) {
@@ -653,8 +943,12 @@ export function patched(row: Stored, lines: readonly Line[], me: string | null =
     }
 
     if (l.kind === 'note') continue;
-    if (l.kind === 'create' || l.kind === 'delete') {
-      for (const spot of held) if (!(l.kind === 'create' ? landCreate(value, spot, decl, l, writes, me) : landDelete(value, spot, l))) return undefined;
+    if (l.kind === 'create' || l.kind === 'delete' || l.kind === 'restore') {
+      for (const spot of held) {
+        const ok =
+          l.kind === 'create' ? landCreate(value, spot, decl, l, writes, me) : l.kind === 'delete' ? landDelete(value, spot, l, gone) : landRestore(value, spot, decl, l, writes, gone);
+        if (!ok) return undefined;
+      }
       continue;
     }
     if (!VALUES.has(l.kind) || typeof l.seq !== 'number' || typeof l.field !== 'string') return undefined;
@@ -708,13 +1002,40 @@ export function patched(row: Stored, lines: readonly Line[], me: string | null =
       }
     }
   }
-  return value;
+  return { value, gone };
+}
+
+/** `row`'s answer with `lines` placed on it, or `undefined` when it must go (`patch`). */
+export function patched(row: Stored, lines: readonly Line[], me: string | null = null): unknown {
+  return patch(row, lines, me)?.value;
+}
+
+/** The stored answer with `lines` placed on it and the rows its deletes took out kept beside it, or `null` to drop it. */
+export function patchedRow(row: Stored, lines: readonly Line[], me: string | null = null): Stored | null {
+  const out = patch(row, lines, me);
+  if (out === undefined) return null;
+  const rest: Stored = { ...row };
+  delete rest.gone;
+  return out.gone.length > 0 ? { ...rest, value: out.value, gone: out.gone } : { ...rest, value: out.value };
+}
+
+/**
+ * Whether a row answers `where` here as the record would (`localWhere`, then `@braindog/where`'s `evaluate`), for a
+ * screen asking a filter of rows it keeps. `false` for a question the browser cannot answer.
+ */
+export function answersHere(list: string, decl: unknown, where: Predicate, fields: Record<string, unknown>): boolean {
+  if (!localWhere(where, decl)) return false;
+  try {
+    return evaluate(where, fields, schemaFrom(list, decl));
+  } catch {
+    return false;
+  }
 }
 
 const sameDay = (a: number, b: number): boolean => new Date(a).toDateString() === new Date(b).toDateString();
 
-/** What a screen is handed back. `current`: caught up to the newest version heard, kept today. */
-export type Near<T> = { value: T; decls: Record<string, unknown>; current: boolean };
+/** What a screen is handed back. `current`: caught up to the newest version heard, kept today. `kept`: when it was. */
+export type Near<T> = { value: T; decls: Record<string, unknown>; current: boolean; kept: number };
 
 export type LocalCopy = {
   /** This tab's reader, as a live boot names them. Wipes on any other owner; then catches up, or takes a cursor. */
@@ -743,6 +1064,8 @@ export type LocalCopy = {
   size(): Promise<{ answers: number; bytes: number }>;
   /** Wipe everything: a sign-out, a refusal. */
   wipe(): Promise<void>;
+  /** When every catch-up asked so far has landed: a screen reads the copy after it, to draw what the log moved. */
+  settled(): Promise<void>;
 };
 
 const atOf = (name: string, key: string) => `${name} ${key}`;
@@ -816,12 +1139,11 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       /* EACH ANSWER THE LINES TOUCH IS PATCHED WHERE IT CAN BE, and dropped where it cannot (`patched`). */
       epoch += 1;
       const order = inOrder(events, m.cursorId);
+      /* AND EVERY ANSWER THAT READS MORE THAN IT NAMES (`EVERY`), which the patch drops on a list it holds no spot for. */
+      const lists = new Set([...hit.lists, EVERY]);
       await store
-        .rewrite(hit.lists, (row) => {
-          const value = row.spots && row.spots.length > 0 ? patched(row, order, m.owner.person) : undefined;
-          return value === undefined ? null : { ...row, value };
-        })
-        .catch(() => store.drop(hit.lists).catch(() => undefined));
+        .rewrite(lists, (row) => (row.spots && row.spots.length > 0 ? patchedRow(row, order, m.owner.person) : null))
+        .catch(() => store.drop(lists).catch(() => undefined));
     }
     const top = events[0];
     if (top && meta === m) await write({ ...m, cursor: upTo ?? cursorAt(top), cursorId: top.id });
@@ -868,7 +1190,9 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       const row = await store.get(atOf(name, key)).catch(() => null);
       const t = now();
       if (row === null || t < row.kept || t - row.kept >= LOCAL_MS) return null;
-      return { value: row.value as T, decls: row.decls, current: claimed !== null && !row.always && caught === asked && sameDay(row.kept, t) };
+      /* OPENED NOW, for eviction, written at most once an hour an answer: a read that writes on every draw costs a write. */
+      if (claimed !== null && t - (row.opened ?? row.kept) >= TOUCH_MS) void store.touch(row.at, t).catch(() => undefined);
+      return { value: row.value as T, decls: row.decls, current: claimed !== null && !row.always && caught === asked && sameDay(row.kept, t), kept: row.kept };
     },
     async held(base, person) {
       const m = meta ?? (await load());
@@ -882,6 +1206,7 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       const rows = await store.list().catch(() => [] as Stored[]);
       return { answers: rows.length, bytes: rows.reduce((n, r) => n + JSON.stringify(r).length, 0) };
     },
+    settled: () => chain,
     ticket: () => epoch,
     async put(name, key, lists, decls, value, ticket, how = {}) {
       const m = meta;
@@ -895,18 +1220,24 @@ export function localCopy(store: Store, log: (base: string) => Log, opts: { buil
       if (ticket !== epoch) return false;
       try {
         const spots = how.spots?.filter((s) => lists.includes(s.list)).map((s) => ({ ...s }));
-        await store.put({
+        const t = now();
+        const row: Stored = {
           at: atOf(name, key),
           name,
           key,
           lists: [...lists],
           decls: held,
           value: clean,
-          kept: now(),
+          kept: t,
+          opened: t,
           ...(spots && spots.length > 0 ? { spots } : {}),
           ...(how.always ? { always: true } : {}),
-        });
-        await store.prune(LOCAL_MOST);
+        };
+        row.bytes = JSON.stringify(row).length;
+        /* AN ANSWER BIGGER THAN THE WHOLE BUDGET is never kept: it would evict everything and still be over. */
+        if (row.bytes > LOCAL_BYTES_MOST) return false;
+        await store.put(row);
+        await store.prune(LOCAL_MOST, LOCAL_BYTES_MOST, row.at);
         return true;
       } catch {
         return false;
@@ -944,9 +1275,22 @@ export function memoryStore(): Store & { rows: Map<string, Stored>; saved: Meta 
         else rows.set(at, structuredClone(next));
       }
     },
-    prune: async (most: number) => {
-      const old = [...rows.values()].sort((a, b) => a.kept - b.kept);
-      for (const r of old.slice(0, Math.max(0, old.length - most))) rows.delete(r.at);
+    prune: async (most: number, bytes: number, keep: string | null) => {
+      /* THE LEAST RECENTLY OPENED FIRST, as the IndexedDB store walks its `opened` index. */
+      const old = [...rows.values()].sort((a, b) => (a.opened ?? a.kept) - (b.opened ?? b.kept));
+      let n = old.length;
+      let size = old.reduce((s, r) => s + (r.bytes ?? 0), 0);
+      for (const r of old) {
+        if (n <= most && size <= bytes) break;
+        if (r.at === keep) continue;
+        rows.delete(r.at);
+        n -= 1;
+        size -= r.bytes ?? 0;
+      }
+    },
+    touch: async (at: string, when: number) => {
+      const r = rows.get(at);
+      if (r) r.opened = when;
     },
     clear: async () => {
       rows.clear();

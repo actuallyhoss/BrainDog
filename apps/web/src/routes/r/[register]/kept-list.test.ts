@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { countsOf, keptOf, listsOf, namesOf, searchFieldsOf, searchKept, servedWhole, spotOf } from './kept-list.ts';
+import { countsOf, keptOf, listsOf, namesOf, searchFieldsOf, searchKept, servedWhole, spotOf, walkWhole } from './kept-list.ts';
 import type { RegisterDecl } from '../../../lib/record/schema.ts';
 
 const decl = {
@@ -87,4 +87,44 @@ test('A SEARCH IS NOT ANSWERED FROM A COPY THAT MAY NOT HOLD EVERY ROW, or reads
   assert.equal(searchFieldsOf(reffed), null, 'a searchable ref');
   const dated = { ...notes, title: 'due', fields: [{ id: 'due', type: 'day' }, { id: 'body', type: 'text', search: true }] } as unknown as RegisterDecl;
   assert.deepEqual(searchFieldsOf(dated), ['body'], 'a date title is not indexed');
+});
+
+test('A FILTER OVER A WHOLE KEPT LIST is asked here as the record would, with or without words; a ref or a relative day is not', () => {
+  const kept = keptOf(notes, [row(3, { title: 'Rent', kind: 'a' }), row(2, { title: 'Renewals', kind: 'b' }), row(1, { title: 'Rates', kind: 'a' })], 3, new Map() as never, { cursor: null });
+  const seqs = (q: string, where: unknown) => searchKept(kept, q, where as never)?.entries.map((e) => e.seq);
+  assert.deepEqual(seqs('', { field: 'kind', is: 'a' }), [3, 1], 'chips alone');
+  assert.deepEqual(seqs('ren', { field: 'kind', is: 'a' }), [3], 'chips and words');
+  assert.equal(searchKept(kept, '', null), null, 'nothing asked');
+  assert.equal(seqs('', { field: 'nope', is: 'x' }), undefined, 'not a question the browser asks');
+});
+
+test('A SEARCHABLE REF IS READ BY ITS ROW\'S KEPT NAME, and left to the record where that name is not kept', () => {
+  const reffed = { ...notes, fields: [...notes.fields, { id: 'project', type: 'ref', to: 'projects', search: true }] } as unknown as RegisterDecl;
+  const names = new Map([['projects#4', 'Kiln build']]);
+  const kept = keptOf(reffed, [row(2, { title: 'Order bricks', project: 4 }), row(1, { title: 'Call' })], 2, names as never, { cursor: null });
+  assert.deepEqual(searchKept(kept, 'kiln')?.entries.map((e) => e.seq), [2]);
+  const lost = keptOf(reffed, [row(2, { title: 'Order bricks', project: 5 })], 1, names as never, { cursor: null });
+  assert.equal(searchKept(lost, 'kiln'), null);
+});
+
+test('THE IDS COME WITH THE NAMES, and the page carries where they are for a create', () => {
+  const names = Object.defineProperty(new Map([['projects#1', 'Kiln']]), 'ids', { value: new Map([['projects R1', 1]]), enumerable: false });
+  const kept = keptOf(decl, [], 0, names as never);
+  assert.deepEqual(JSON.parse(JSON.stringify(kept)).ids, [['projects R1', 1]]);
+  assert.equal(namesOf(kept).ids?.get('projects R1'), 1);
+  assert.deepEqual(spotOf('tasks', { filters: [], q: '', sort: undefined, twice: false }, [], null).lands?.ids, ['ids']);
+});
+
+test('WALKED WHOLE: the pages after the first, each when idle, kept only when the count still matches', async () => {
+  const page = (seqs: number[], cursor: string | null, matched = 4) => ({ entries: seqs.map((s) => row(s, { title: `r${s}` })), matched, names: new Map() as never, cursor });
+  let idles = 0;
+  const opts = { most: 10, idle: async () => void (idles += 1), gone: () => false };
+  const whole = await walkWhole(page([4, 3], 'c1'), async (c) => (c === 'c1' ? page([2, 1], null) : null), opts);
+  assert.deepEqual(whole?.entries.map((e) => e.seq), [4, 3, 2, 1]);
+  assert.equal(whole?.cursor, null);
+  assert.equal(idles, 1);
+  assert.equal(await walkWhole(page([4, 3], 'c1'), async () => page([2], null, 4), opts), null, 'a row missed at the seam');
+  assert.equal(await walkWhole(page([4, 3], 'c1'), async () => null, opts), null, 'a page refused');
+  assert.equal(await walkWhole(page([4, 3], 'c1', 40), async () => page([2, 1], null, 40), opts), null, 'more than it keeps');
+  assert.equal(await walkWhole(page([4, 3], 'c1'), async () => page([2, 1], null), { ...opts, gone: () => true }), null, 'the screen went');
 });

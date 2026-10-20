@@ -143,6 +143,8 @@ export type Today = {
   dayStart?: number;
   /** Added: the lines automations put on Today. Empty when there are none or the record cannot say. */
   reminders?: ReminderLine[];
+  /** Added: a read of the tasks came back at its limit, so a task leaving lets in one this answer does not hold. */
+  full?: boolean;
 };
 
 export type TodayRead = { ok: true; value: Today } | { ok: false; refusal: { code: string; fix: string } };
@@ -536,7 +538,7 @@ async function thingsOf(client: Client): Promise<{ names: Map<string, string>; h
 /** How far ahead the week strip and the days under it look. */
 export const AHEAD_DAYS = 14;
 
-async function tasksFor(client: Client, held: ReadonlySet<string>, today: string): Promise<{ tasks: TaskRow[]; coming: DayRow[] } | null> {
+async function tasksFor(client: Client, held: ReadonlySet<string>, today: string): Promise<{ tasks: TaskRow[]; coming: DayRow[]; full: boolean } | null> {
   if (!held.has(TASKS)) return null;
   const live = 'state is not done or dropped';
   /* FOUR READS, ONE PREDICATE EACH, because the record answers one a read: what is late or due today, what was handed
@@ -550,7 +552,9 @@ async function tasksFor(client: Client, held: ReadonlySet<string>, today: string
   ]);
   const tasks = tasksOf(due, urgent, today, things.names, review, things.hues);
   const shown = new Set(tasks.map((t) => t.seq));
-  return { tasks, coming: comingOf(ahead, today, dayPlus(today, AHEAD_DAYS), things.names, things.hues, shown) };
+  /* AT ITS LIMIT, a read may hold more than it answered: the local copy then takes no task out in place (`local.ts`). */
+  const full = due.length >= 25 || urgent.length >= 15 || review.length >= 10 || ahead.length >= 60;
+  return { tasks, coming: comingOf(ahead, today, dayPlus(today, AHEAD_DAYS), things.names, things.hues, shown), full };
 }
 
 async function sessionsFor(client: Client, held: ReadonlySet<string>, dayStart: number, now: number): Promise<SessionRow[] | null> {
@@ -675,6 +679,7 @@ export async function readToday(base: string, io?: Fetch, at?: number): Promise<
       host,
       dayStart,
       reminders: reminded,
+      full: work ? work.full : false,
     },
   };
 }

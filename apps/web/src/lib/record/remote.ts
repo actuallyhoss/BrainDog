@@ -46,8 +46,11 @@ export type RefMap = {
  *
  * `marks` IS THE SAME WALK'S IDENTITIES, keyed alike. A ref into a register with an identity is drawn as a mark as
  * well as a name, and both have to come from the record, or a live row wears the sample's project beside its own.
+ *
+ * `ids` IS THE WALK'S ROW IDS, `<register> <id>` to the number, so the local copy can draw a logged create's ref, an id
+ * in the log, as the number a row holds (`local.ts` `Lands.ids`).
  */
-export type Names = ReadonlyMap<string, string> & { readonly marks?: ReadonlyMap<string, Identity> };
+export type Names = ReadonlyMap<string, string> & { readonly marks?: ReadonlyMap<string, Identity>; readonly ids?: ReadonlyMap<string, number> };
 
 /** A `RefMap` for each register a ref field on the asked register points at. */
 export type Refs = ReadonlyMap<string, RefMap>;
@@ -192,16 +195,21 @@ export function refMapOf(register: string, rows: readonly Pick<RecordRow, 'id' |
 export function namesOf(refs: Refs): Names {
   const out = new Map<string, string>();
   const marks = new Map<string, Identity>();
+  const ids = new Map<string, number>();
   for (const [register, map] of refs) {
     for (const [seq, title] of map.titleOf) out.set(`${register}#${seq}`, title);
     for (const [seq, mark] of map.markOf ?? []) marks.set(`${register}#${seq}`, mark);
+    for (const [id, seq] of map.seqOf) ids.set(`${register} ${id}`, seq);
   }
-  return withMarks(out, marks);
+  return withMarks(out, marks, ids);
 }
 
 /* NOT ENUMERABLE, so a `Names` still compares and spreads as the map of titles it always was. */
-const withMarks = (names: Map<string, string>, marks: ReadonlyMap<string, Identity>): Names =>
+const withMarks = (names: Map<string, string>, marks: ReadonlyMap<string, Identity>, ids?: ReadonlyMap<string, number>): Names => {
   Object.defineProperty(names, 'marks', { value: marks, enumerable: false });
+  if (ids) Object.defineProperty(names, 'ids', { value: ids, enumerable: false });
+  return names as Names;
+};
 
 /**
  * Two answers' names as one, the later winning: a list that loads a second page keeps the names the first one gave.
@@ -209,7 +217,8 @@ const withMarks = (names: Map<string, string>, marks: ReadonlyMap<string, Identi
  */
 export function joinNames(first: Names | null | undefined, next: Names): Names {
   const out = new Map([...(first ?? []), ...next]);
-  return withMarks(out, new Map([...(first?.marks ?? []), ...(next.marks ?? [])]));
+  const ids = first?.ids || next.ids ? new Map([...(first?.ids ?? []), ...(next.ids ?? [])]) : undefined;
+  return withMarks(out, new Map([...(first?.marks ?? []), ...(next.marks ?? [])]), ids);
 }
 
 const norm = (v: string): string => v.toLowerCase().replace(/_/g, ' ').trim();
