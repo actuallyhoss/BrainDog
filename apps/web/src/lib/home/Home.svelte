@@ -731,6 +731,26 @@
   const anchors = $derived(anchorsFor(board ? (desked?.blocks ?? []) : [], board && reader));
   const moreWords = { open: 'More', shut: 'Show less' } as const;
 
+  /**
+   * `j` PAST THE LAST ROW THE DESK SHOWS OPENS MORE, and the walk goes on into what it holds. The rows folded behind More
+   * (the late and urgent tasks, the work handed back) are the ones `x` ticks, and a key that walks every row of Today
+   * could not reach them while they were folded. Read after the page's own handler has moved the cursor: if it did not
+   * move, there was no row further on. Not while a box has the caret, a layer is open, or after `g`.
+   */
+  let goAt = 0;
+  function walkOn(e: KeyboardEvent) {
+    if (e.key === 'g') goAt = Date.now();
+    if (e.key !== 'j' || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+    if (!board || moreOpen || folds === 0 || Date.now() - goAt < 1000 || typing()) return;
+    const on = e.target;
+    if (on instanceof HTMLElement && on.closest('input, textarea, select, [contenteditable], [role="grid"], dialog')) return;
+    if (document.querySelector('dialog[open]') !== null) return;
+    const was = document.querySelector('[data-row-cursor]');
+    setTimeout(() => {
+      if (!moreOpen && document.querySelector('[data-row-cursor]') === was) moreOpen = true;
+    });
+  }
+
   /* A RECORD WITH NO LISTS AT ALL goes to the prompt (`+layout.ts`); this is what is left if it is reached anyway. */
   const empty = $derived(data.index.registers.length === 0 && data.lists.length === 0 && data.open === 0);
 
@@ -856,6 +876,8 @@
   {@const here = anchors.at.get(i)}
   {#if here}{@render placedParts(here)}{/if}
 {/snippet}
+
+<svelte:window onkeydowncapture={walkOn} />
 
 <div class="page">
   {#if data.refused}
