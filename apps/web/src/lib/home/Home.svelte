@@ -360,8 +360,9 @@
     reading = true;
     const mine = ++pageRead;
     const before = newsNow();
-    void readBody(slug, spoken, held)
-      .then((out) => {
+    const first = new Promise<void>((done) => setTimeout(done, HANDLED_WAIT_MS));
+    void Promise.all([readBody(slug, spoken, held), Promise.race([Promise.all([handledLanded, deskLanded]), first])])
+      .then(([out]) => {
         if (slug !== declares) return;
         /* A QUIET READ THAT FAILS KEEPS WHAT IS DRAWN, as every quiet read does (`read.ts`). */
         if (was && out?.from !== 'live') return;
@@ -429,7 +430,7 @@
   /* THE LINE `boot`'S COUNTS SAY BY THEMSELVES, for a page that draws nothing it can be counted from; `null` while nothing
      waits, which is the only time the calm line may be said. */
   const waitsLine = $derived(
-    waits && (waits.questions > 0 || (waits.inbox ?? 0) > 0) ? sentenceOf(waits.questions, [], waits.working, '', 0, waits.inbox ?? 0) : null,
+    waits && (waits.questions > 0 || (waits.inbox ?? 0) > 0) ? sentenceOf({ needYou: waits.questions, agents: waits.working, inbox: waits.inbox ?? 0 }) : null,
   );
 
   /* THE ONE LINE, worked out from the blocks drawn, else what `boot` says waits, else the page's own line, else the calm
@@ -527,6 +528,14 @@
   let faults = $state.raw<{ found: FaultsFound; Part: FaultsPart } | null>(null);
   /* WHAT BRAINDOG DID BY ITSELF TODAY, said as one line at the foot of Needs you (today F6); nought says nothing. */
   let handled = $state.raw<HandledFound | null>(null);
+  /* THE FIRST BODY WAITS FOR THE FIRST HANDLED READ, a short while at most (`HANDLED_WAIT_MS`), so the foot's line is in
+     the first picture and never pushes the board down when it lands (CLS, today F1). */
+  let handledHeard: () => void = () => {};
+  const handledLanded = new Promise<void>((done) => (handledHeard = done));
+  /* AND FOR THE DESK'S FIRST READ, the projects' row, which pushed what is under it down as it landed. */
+  let deskHeard: () => void = () => {};
+  const deskLanded = new Promise<void>((done) => (deskHeard = done));
+  const HANDLED_WAIT_MS = 800;
   /* WHAT THE ANSWERS TAUGHT, kept only when there is something: nought draws nothing. */
   let learned = $state.raw<{ found: LearnedFound; Part: LearnedPart } | null>(null);
   /* WHAT MAY BE ONE, kept only when there is something: nought draws nothing. */
@@ -615,13 +624,15 @@
     let here = true;
     /* THE DESK AS TODAY LAST DREW IT, at once (`today-kept.ts`), and read again behind it. */
     if (untrack(() => desk) === null) desk = keptPart<NonNullable<typeof desk>>('desk', base);
+    if (untrack(() => desk) !== null) deskHeard();
     void Promise.all([import('./desk-read.ts'), import('./Desk.svelte')]).then(
       async ([m, part]) => {
         const lists = data.lists;
         const cards = await tileOnce('desk', base, ver, () => m.readCards(base, lists, asked)).catch(() => null);
         if (here) keepPart('desk', base, (desk = { cards, Part: part.default }));
+        deskHeard();
       },
-      () => undefined,
+      () => deskHeard(),
     );
     return () => {
       here = false;
@@ -638,12 +649,14 @@
     const base = apiBase();
     let here = true;
     if (untrack(() => handled) === null) handled = keptPart<HandledFound>('handled', base);
+    if (untrack(() => handled) !== null) handledHeard();
     void import('./handled.ts').then(
       async (m) => {
         const found = await tileOnce('handled', base, ver, () => m.loadHandled(base)).catch(() => null);
         if (here) keepPart('handled', base, (handled = found && found.rows.length > 0 ? found : null));
+        handledHeard();
       },
-      () => undefined,
+      () => handledHeard(),
     );
     return () => {
       here = false;
