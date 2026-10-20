@@ -4,7 +4,7 @@
  *
  * A SHELF ITEM IS HOW A BLOCK IS BUILT AND NEVER DATA. It names a list and says how to draw it (kind, columns, filter,
  * order); the rows are read when it is placed, so it is always today's. The record refuses a rowed block (`authored`) in
- * `shelf.items`. PURE: no runes, so `shelf.test.ts` holds it in Node.
+ * `shelf.kept`. PURE: no runes, so `shelf.test.ts` holds it in Node.
  */
 
 export type Declared = { kind: string; [key: string]: unknown };
@@ -26,7 +26,7 @@ export const shelfWords = {
   refused: 'The shelf could not be kept.',
 };
 
-/** What the record answered for `shelf.items`, read tolerantly: anything that is not a well-formed item is left out. */
+/** What the record answered for `shelf.kept`, read tolerantly: anything that is not a well-formed item is left out. */
 export function shelvedOf(v: unknown): Shelved[] {
   if (!Array.isArray(v)) return [];
   return v.flatMap((i) => {

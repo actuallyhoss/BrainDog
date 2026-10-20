@@ -13,7 +13,7 @@
   },
   "declarations": [
     {
-      "register": "ventures",
+      "register": "fresh_starts",
       "name": "Projects",
       "icon": "rocket",
       "one": "project",
@@ -87,7 +87,7 @@
           "id": "venture",
           "label": "Project",
           "type": "ref",
-          "to": "ventures",
+          "to": "fresh_starts",
           "index": true
         },
         {
@@ -173,7 +173,7 @@
           "id": "venture",
           "label": "Project",
           "type": "ref",
-          "to": "ventures",
+          "to": "fresh_starts",
           "index": true
         },
         {
@@ -212,7 +212,7 @@
           "id": "venture",
           "label": "Project",
           "type": "ref",
-          "to": "ventures",
+          "to": "fresh_starts",
           "index": true
         },
         {
@@ -244,7 +244,7 @@
       "icon": "rocket",
       "pack": "new-project",
       "requires": [
-        "register.ventures",
+        "register.fresh_starts",
         "register.venture_steps",
         "register.venture_choices"
       ],
@@ -261,7 +261,7 @@
           "heading": "Where you are",
           "icon": "rocket",
           "span": 12,
-          "source": "register.ventures",
+          "source": "register.fresh_starts",
           "columns": [
             {
               "field": "name",
@@ -642,7 +642,7 @@
   ],
   "seeds": [
     {
-      "register": "ventures",
+      "register": "fresh_starts",
       "fields": {
         "name": "Lanternfish",
         "about": "A small tool that sorts a photographer's receipts.",

@@ -72,7 +72,7 @@ export type Prefs = {
   'look.shot'?: boolean;
   'look.accent'?: string;
   /** THE COMPONENTS THIS PERSON KEPT ON THEIR SHELF, each a name and a block's declaration, never rows (`page/shelf.ts`). */
-  'shelf.items'?: Shelved[];
+  'shelf.kept'?: Shelved[];
 };
 
 /** What a change came to: kept by the record, kept on this device, or refused with the record's sentence. */
@@ -336,7 +336,7 @@ export class NavPrefs {
       this.home = address(prefs['home.page']);
       keepKept(HOME, this.home);
     }
-    if ('shelf.items' in prefs) this.shelf = shelvedOf(prefs['shelf.items']);
+    if ('shelf.kept' in prefs) this.shelf = shelvedOf(prefs['shelf.kept']);
     if ('nav.labels' in prefs) {
       this.labels = names(prefs['nav.labels']);
       keepKept(LABELS, this.labels);
@@ -496,7 +496,7 @@ export class NavPrefs {
   #setShelf(next: Shelved[]): Promise<Saved> {
     const before = this.shelf;
     this.shelf = next;
-    return this.#commit('shelf.items', next, () => {
+    return this.#commit('shelf.kept', next, () => {
       this.shelf = before;
     });
   }

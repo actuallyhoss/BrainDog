@@ -224,17 +224,17 @@ test('A SHELF KEEPS HOW A COMPONENT IS BUILT FOR THE PERSON, never rows of data'
   const { api, sql } = await record();
   const code = (r: { ok: boolean }) => (r.ok ? 'ok' : (r as unknown as { refusal: { code: string } }).refusal.code);
   const block = { kind: 'lines', source: 'register.pots', columns: [{ field: 'day' }, { field: 'sum' }], where: 'day is between today and +90d' };
-  assert.equal(code(await api.setPref({ key: 'shelf.items', value: [{ id: 'c1', name: ' Cash ahead ', block }] }, ada)), 'ok');
-  assert.deepEqual((await prefsOf(api, ada))?.['shelf.items'], [{ id: 'c1', name: 'Cash ahead', block }]);
+  assert.equal(code(await api.setPref({ key: 'shelf.kept', value: [{ id: 'c1', name: ' Cash ahead ', block }] }, ada)), 'ok');
+  assert.deepEqual((await prefsOf(api, ada))?.['shelf.kept'], [{ id: 'c1', name: 'Cash ahead', block }]);
   assert.deepEqual(await prefsOf(api, bo), {}, "somebody else's shelf followed Ada's");
 
-  assert.equal(code(await api.setPref({ key: 'shelf.items', value: [{ id: 'c1', name: 'x', block: { ...block, authored: 'a | 1' } }] }, ada)), 'VALUE_MALFORMED');
-  assert.equal(code(await api.setPref({ key: 'shelf.items', value: [{ id: 'c1', name: 'x', block: { ...block, rows: [1] } }] }, ada)), 'VALUE_MALFORMED');
-  assert.equal(code(await api.setPref({ key: 'shelf.items', value: [{ id: 'c1', name: 'a', block }, { id: 'c1', name: 'b', block }] }, ada)), 'VALUE_MALFORMED');
-  assert.equal(code(await api.setPref({ key: 'shelf.items', value: [{ id: 'c1', name: '', block }] }, ada)), 'VALUE_MALFORMED');
-  assert.equal(code(await api.setPref({ key: 'shelf.items', value: [{ id: 'c1', name: 'x', block }] }, agent)), 'FORBIDDEN');
+  assert.equal(code(await api.setPref({ key: 'shelf.kept', value: [{ id: 'c1', name: 'x', block: { ...block, authored: 'a | 1' } }] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'shelf.kept', value: [{ id: 'c1', name: 'x', block: { ...block, rows: [1] } }] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'shelf.kept', value: [{ id: 'c1', name: 'a', block }, { id: 'c1', name: 'b', block }] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'shelf.kept', value: [{ id: 'c1', name: '', block }] }, ada)), 'VALUE_MALFORMED');
+  assert.equal(code(await api.setPref({ key: 'shelf.kept', value: [{ id: 'c1', name: 'x', block }] }, agent)), 'FORBIDDEN');
 
-  await api.setPref({ key: 'shelf.items', value: null }, ada);
+  await api.setPref({ key: 'shelf.kept', value: null }, ada);
   assert.deepEqual(await prefsOf(api, ada), {});
   sql.close();
 });

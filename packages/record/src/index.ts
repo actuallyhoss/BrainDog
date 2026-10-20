@@ -972,7 +972,7 @@ export const PREF_KEYS = [
   'look.theme',
   'look.shot',
   'packs.known_keys',
-  'shelf.items',
+  'shelf.kept',
 ] as const;
 export type PrefKey = (typeof PREF_KEYS)[number];
 /**
@@ -1017,7 +1017,7 @@ export type Prefs = {
   'look.shot'?: boolean;
   'packs.known_keys'?: Record<string, string[]>;
   /** The person's shelf: drawn components they kept, each a name and a block declaration (`shelfFault`). */
-  'shelf.items'?: { id: string; name: string; block: Record<string, unknown> }[];
+  'shelf.kept'?: { id: string; name: string; block: Record<string, unknown> }[];
 };
 
 /** The words each `look.*` key takes. `look.accent` takes `LOOK_ACCENTS`, which follows the suggested accents. */
@@ -1042,7 +1042,7 @@ const SHELF_BLOCK_MOST = 4000;
  * no rows of its own. Returns the sentence that refuses it, or `null`.
  */
 function shelfFault(value: unknown): string | null {
-  const say = `shelf.items is a list of at most ${SHELF_MOST} components, each an id, a name of 1 to ${SHELF_NAME_MOST} characters and a block declaration, or null to take it away.`;
+  const say = `shelf.kept is a list of at most ${SHELF_MOST} components, each an id, a name of 1 to ${SHELF_NAME_MOST} characters and a block declaration, or null to take it away.`;
   if (!Array.isArray(value) || value.length > SHELF_MOST) return say;
   const seen = new Set<string>();
   for (const item of value) {
@@ -10178,7 +10178,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         );
         if (fault) return no(fault.code, fault.fix, { ...(fault.at === undefined ? {} : { at: fault.at }), ...(fault.allowed ? { allowed: [...fault.allowed] } : {}) });
         kept = value as string;
-      } else if (value !== null && key === 'shelf.items') {
+      } else if (value !== null && key === 'shelf.kept') {
         const fault = shelfFault(value);
         if (fault) return no('VALUE_MALFORMED', fault, { at: 'value' });
         kept = (value as { id: string; name: string; block: Record<string, unknown> }[]).map((i) => ({ id: i.id, name: i.name.trim(), block: i.block }));
