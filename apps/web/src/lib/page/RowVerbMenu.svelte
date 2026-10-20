@@ -136,58 +136,15 @@
 {/if}
 
 <style>
-  /* The menu's lines, as Work's and the list screen's row menus draw them. */
-  .mi {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    inline-size: 100%;
-    min-block-size: 32px;
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-ui);
-    text-align: start;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .mi-name {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  .mi-rule {
-    margin: 4px 0;
-    border: 0;
-    border-block-start: 1px solid var(--line);
-  }
-
   .pick {
     position: fixed;
     z-index: var(--z-palette);
     min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--bg);
-    border: 0;
-    border-radius: var(--r-md);
-    box-shadow: var(--e2);
+    background: var(--tile);
+    border: 1px solid var(--rule-strong, var(--edge));
+    border-radius: var(--r-pop, var(--r-md));
     color: var(--ink);
     font: inherit;
-  }
-
-  @media (width < 640px), (pointer: coarse) {
-    .mi {
-      min-block-size: var(--tap);
-    }
   }
 </style>

@@ -2620,41 +2620,6 @@
     }
   }
 
-  /* The menu's rows, as the list screen's row menu draws them (`ListRowMenu.svelte`). */
-  .mi {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    inline-size: 100%;
-    min-block-size: 32px;
-    padding: 0 var(--sp-3);
-    background: none;
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font: inherit;
-    font-size: var(--t-ui);
-    text-align: start;
-    text-decoration: none;
-    cursor: pointer;
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .mi-name {
-    flex: 1;
-  }
-
-  .mi-rule {
-    margin: 4px 0;
-    border: 0;
-    border-block-start: 1px solid var(--line);
-  }
-
   /* BELOW 900PX, A PHONE'S SCREEN: the select is the filter. */
   @media (width < 900px) {
     .pick {
@@ -2715,14 +2680,6 @@
     .field,
     .p-input {
       min-block-size: var(--tap);
-    }
-
-    .mi {
-      min-block-size: var(--tap);
-    }
-
-    .mi :global(kbd) {
-      display: none;
     }
   }
 

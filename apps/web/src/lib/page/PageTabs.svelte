@@ -93,7 +93,7 @@
     flex: 0 1 auto;
     gap: 2px;
     min-inline-size: 0;
-    padding: 3px;
+    padding: 2px;
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-inline: contain;
@@ -198,7 +198,7 @@
   /* MORE IS ITS OWN SMALL TRACK BESIDE THE STRIP, the same rectangle. */
   .tab-more {
     flex: 0 0 auto;
-    padding: 3px;
+    padding: 2px;
     background: var(--s1);
     border-radius: var(--r-ctl, 8px);
   }
@@ -206,35 +206,6 @@
   .tally {
     color: var(--dim);
     font-size: var(--t-sm);
-  }
-
-  /* The Menu's rows, as the rail's switcher draws them: a list of places, one of which you may be in. */
-  .mi {
-    display: flex;
-    align-items: center;
-    min-block-size: calc(var(--ctl-h-sm) + var(--sp-1));
-    padding: 0 var(--sp-3);
-    border-radius: var(--r-md);
-    color: var(--ink2);
-    font-size: var(--t-base);
-    text-decoration: none;
-  }
-
-  @media (pointer: coarse) {
-    .mi {
-      min-block-size: var(--tap);
-    }
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
-  .mi[aria-current] {
-    color: var(--ink);
-    font-weight: 600;
   }
 
   /* FORCED COLOURS DROP THE GLASS AND THE LIFT, so the track keeps an edge and the current tab an outline. */

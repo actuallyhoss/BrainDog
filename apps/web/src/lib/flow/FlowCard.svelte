@@ -479,22 +479,6 @@
     white-space: nowrap;
   }
 
-  /* THE MENU'S ROWS: `Menu.svelte` gives them their height and rhythm; the colours are the caller's. */
-  .mi {
-    background: none;
-    border: 0;
-    color: var(--ink2);
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
   @media (pointer: coarse) {
     .card {
       --lead: calc(var(--tap) + var(--sp-1) + var(--sp-2) + var(--well) + var(--sp-2));

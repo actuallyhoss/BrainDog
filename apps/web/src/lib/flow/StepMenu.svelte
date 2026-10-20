@@ -229,22 +229,6 @@
     margin-block-start: var(--sp-1);
   }
 
-  /* THE MENU'S ROWS: `Menu.svelte` gives them their height and rhythm; the colours are the caller's. */
-  .mi {
-    background: none;
-    border: 0;
-    color: var(--ink2);
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
-  }
-
-  .mi:hover,
-  .mi:focus-visible {
-    background: var(--hover-wash);
-    color: var(--ink);
-  }
-
   /* THE PHONE'S TRIGGER IS A BARE BUTTON AROUND THE SAME PILL, so the column looks the same at every width. */
   .open {
     padding: 0;
