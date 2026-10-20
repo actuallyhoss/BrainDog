@@ -396,7 +396,7 @@ test('the home page counts none of the product own parts at a stranger', when(NO
  *   - NO PHOTOGRAPH OF IT. He said of the screenshots this page carried *i hate those screenshots. they look
  *     terrible. dont just add scnreehots like that*. A `<picture>` or an `<img>` coming back is that regression.
  */
-test('the home page opens on the hero with the desk, holds the four cards, and holds no picture', when(NO_BUILD), () => {
+test('the home page opens on the hero with the desk, then its six bands in order, and holds no picture', when(NO_BUILD), () => {
   const html = uncommented(read('index.html'));
 
   const sections = [...html.matchAll(/<section\b[^>]*>/g)];
@@ -411,8 +411,10 @@ test('the home page opens on the hero with the desk, holds the four cards, and h
       'the best thing this page has.',
   );
 
-  const cards = [...html.matchAll(/<article\b[^>]*\sclass="(?:[^"]*\s)?card(?:\s[^"]*)?"/g)];
-  assert.equal(cards.length, 4, `index.html draws ${cards.length} cards, where the page holds four: the brief, the agents, the chores and Slash`);
+  /* SITE 2a (20 October): one product picture, then six full-bleed bands that each say one new thing, and no close. */
+  const bands = [...html.matchAll(/<section\b[^>]*\sclass="[^"]*\bband--([a-z]+)\b/g)].map((m) => m[1]);
+  assert.equal(bands.length, 6, `index.html draws ${bands.length} bands, where the page holds six: who, chores, tools, slash, yours and the questions`);
+  assert.deepEqual(bands, ['who', 'chores', 'tools', 'slash', 'yours', 'faq'], 'the bands are in the order the page says them');
 
   const pictures = [...html.matchAll(/<(?:picture|img)\b[^>]*>/g)].map((m) => m[0]);
   assert.deepEqual(pictures, [], 'index.html draws a photograph again, where the product on this page is drawn in HTML and CSS');
@@ -480,7 +482,7 @@ test('the Worker serves a prerendered 404 page for a path with no file', () => {
    indexed, rather than some other page that happens to have been written under that name. */
 test('the build writes 404.html, in the site shell and not indexed', when(NO_BUILD), () => {
   const html = read('404.html');
-  assert.match(html, /There is no page here/);
+  assert.match(html, /There(?:'|&#39;|’)s no page here/);
   assert.match(html, /name="robots" content="noindex"/);
   assert.match(html, /href="\/slash"/);
 });

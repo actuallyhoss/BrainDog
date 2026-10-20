@@ -36,15 +36,15 @@ const SEEDS = join(HERE, 'negative');
  */
 const PAGES = ['slash', 'agents', 'pricing', 'docs', 'changelog', 'support', 'security', 'legal', '404'];
 
-/** The home page's shape, as `content.test.ts` holds it from batch 103: the hero with the desk, four cards, no picture. */
-const HOME = 'the home page opens on the hero with the desk, holds the four cards, and holds no picture';
+/** The home page's shape, as `content.test.ts` holds it from 20 October: the hero with the desk, six bands, no picture. */
+const HOME = 'the home page opens on the hero with the desk, then its six bands in order, and holds no picture';
 const REPO = 'every page links /legal, and links the repository only when LAUNCH.repo';
 
 /** Each rule: its seed, its file, its test's name, and what its failure says. */
 const RULES = [
   { seed: 'img', file: 'content.test.ts', name: HOME, says: /draws a photograph again/ },
   { seed: 'no-desk', file: 'content.test.ts', name: HOME, says: /the hero of index\.html does not hold the desk/ },
-  { seed: 'fifth-card', file: 'content.test.ts', name: HOME, says: /index\.html draws 5 cards/ },
+  { seed: 'fifth-card', file: 'content.test.ts', name: HOME, says: /index\.html draws 7 bands/ },
   /* A planted link to the private repository, while it is private. Once `LAUNCH.repo` is on the rule asks for the
      link instead, and this seed would be the clean site's shape, so it stands down with the flag. */
   ...(LAUNCH.repo ? [] : [{ seed: 'repo-link', file: 'content.test.ts', name: REPO, says: /support\.html links the repository, and LAUNCH\.repo is off/ }]),

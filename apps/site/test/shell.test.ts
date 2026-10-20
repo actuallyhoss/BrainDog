@@ -16,6 +16,7 @@ import { compile } from 'svelte/compiler';
 import { render } from 'svelte/server';
 import type { Component } from 'svelte';
 
+import { shell } from '../src/lib/copy/shell.ts';
 import { HELD, LAUNCH } from '../src/lib/launch.ts';
 import { SOURCE } from '../src/lib/links.ts';
 import { PAGES, reachable } from '../src/lib/nav.ts';
@@ -80,23 +81,25 @@ test('the signed-in rules beat a component\'s own display: !important, because a
   assert.match(css, /html:not\(\[data-in\]\) \.when-in \{\s*display: none !important;/);
 });
 
-test('Start draws both states: Start free signed out, Open BrainDog signed in', async () => {
+test('Start draws both states: Get early access signed out (while sign-up is by invite), Open BrainDog signed in', async () => {
   const Start = await component<{ size?: 'md' | 'sm'; tone?: 'red' }>('Start');
   const { body } = render(Start, { props: {} });
-  assert.match(body, /<a class="btn red when-out" href="\/app\/signup" rel="external">Start free<\/a>/);
+  assert.equal(shell.nav.start, LAUNCH.invite ? 'Get early access' : 'Start free', 'one key says the start button (SF13)');
+  assert.match(body, new RegExp(`<a class="btn red when-out" href="/app/signup" rel="external">${shell.nav.start}</a>`));
   assert.match(body, /<a class="btn red when-in" href="\/app" rel="external">Open BrainDog<\/a>/);
   const small = render(Start, { props: { size: 'sm' } }).body;
   assert.match(small, /class="btn red sm when-out"/);
   assert.match(small, /class="btn red sm when-in"/);
 });
 
-test('SignIn is drawn only while signed out, and Close ends on Start', async () => {
+test('SignIn is drawn only while signed out, and the early access strip ends on Start', async () => {
   const SignIn = await component<{ class?: string }>('SignIn');
   assert.match(render(SignIn, { props: { class: 'menu-link' } }).body, /<a class="when-out menu-link" href="\/app\/signin" rel="external">Sign in<\/a>/);
-  const Close = await component<{ title: string; body: string }>('Close');
-  const close = render(Close, { props: { title: 'Start your record.', body: 'One sentence.' } }).body;
-  assert.match(close, /<h2 class="huge[^"]*">Start your record\.<\/h2>/);
-  assert.ok(close.includes('Start free') && close.includes('Open BrainDog'), 'the close does not end on Start');
+  const EarlyStrip = await component<Record<string, never>>('EarlyStrip');
+  const strip = render(EarlyStrip, { props: {} }).body;
+  assert.ok(strip.includes(shell.early.strong) && strip.includes(shell.early.rest), 'the strip does not say early access');
+  assert.ok(strip.includes(shell.nav.start) && strip.includes('Open BrainDog'), 'the strip does not end on Start');
+  assert.doesNotMatch(strip, /<h2/, 'the strip is one line, not a huge close');
 });
 
 test('PageHead draws one h1 and its lead', async () => {
@@ -107,10 +110,10 @@ test('PageHead draws one h1 and its lead', async () => {
   assert.ok(head.includes('Every plan has the whole app.'));
 });
 
-test('the header row is Slash, Agents and Docs while pricing is held', () => {
+test('the header row is Slash, Agents, Pricing, Security and Docs (site F12)', () => {
   const row = reachable({ public: false }).filter((p) => p.header);
-  assert.deepEqual(row.map((p) => p.label), ['Slash', 'Agents', 'Docs']);
-  assert.deepEqual(row.map((p) => p.path), ['/slash', '/agents', '/docs']);
+  assert.deepEqual(row.map((p) => p.label), ['Slash', 'Agents', 'Pricing', 'Security', 'Docs']);
+  assert.deepEqual(row.map((p) => p.path), ['/slash', '/agents', '/pricing', '/security', '/docs']);
 });
 
 test('/packs is held, so the sitemap and the 404 do not name it', () => {
@@ -120,7 +123,7 @@ test('/packs is held, so the sitemap and the 404 do not name it', () => {
 });
 
 const links = (launch: { legal: boolean; repo: boolean; public: boolean }) =>
-  footerGroups(launch, '/docs/start/welcome').flatMap((g) => g.links.map((l) => l.label));
+  footerGroups(launch).flatMap((g) => g.links.map((l) => l.label));
 
 test('the footer names GitHub only with LAUNCH.repo, and Terms and Privacy only with LAUNCH.legal', () => {
   const now = links({ ...LAUNCH, legal: false, repo: false });
@@ -135,15 +138,16 @@ test('the footer names GitHub only with LAUNCH.repo, and Terms and Privacy only 
   assert.ok(legal.includes('Terms') && legal.includes('Privacy'), 'the live texts are not in the footer');
 });
 
-test('the footer is Product, Learn and Company, as the design draws them', () => {
-  const groups = footerGroups({ ...LAUNCH, legal: false, repo: false }, '/docs/start/welcome');
+test("the footer is Product, Who it's for and Help, plain links and no blurb (site F10)", () => {
+  const groups = footerGroups({ ...LAUNCH, legal: false, repo: false });
   assert.deepEqual(
     groups.map((g) => [g.title, g.links.map((l) => l.label)]),
     [
-      ['Product', ['Agents', 'Slash', 'Security']],
-      ['Learn', ['Get started', 'Connect an agent', 'Docs']],
-      ['Company', ['Support', 'Legal']],
+      ['Product', ['Slash', 'Agents', 'Pricing', 'Security']],
+      ["Who it's for", ['Small businesses', 'Teams and agencies', 'Developers']],
+      ['Help', ['Docs', 'Support', 'Legal']],
     ],
   );
-  assert.equal(groups[1]?.links[0]?.href, '/docs/start/welcome');
+  assert.deepEqual(groups[1]?.links.map((l) => l.href), ['/for/founders', '/for/teams', '/docs/agents/connect']);
+  assert.ok(!('tagline' in shell.footer), 'the footer carries no blurb');
 });

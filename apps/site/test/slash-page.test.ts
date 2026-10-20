@@ -3,11 +3,12 @@
  *
  *   node --test apps/site/test/slash-page.test.ts
  *
- * FOUR THINGS HOLD. The page's words are the prototype's headings, with the counts of asks read off `plans.ts` and no
- * word the writing guide refuses. Every answer the made-up record holds renders on the server whole, the way the
- * prerender writes it, so a reader with scripting off has it. The typing paints the finished frame at once under
- * reduced motion and sets no timer. And the built `slash.html` has its one h1, the three modes, the table of asks and
- * the first answer's figure in plain text: that part reads `build/`, and a missing build is a skip that says so.
+ * FOUR THINGS HOLD. The page's words are the early access copy (`loop/ui-pass-2026-10-20/site.md` 2b), with the
+ * count of asks read off `plans.ts` and no word the writing guide refuses. Every answer the made-up record holds renders
+ * on the server whole, the way the prerender writes it, so a reader with scripting off has it. The typing paints the
+ * finished frame at once under reduced motion and sets no timer. And the built `slash.html` has its one h1, the three
+ * modes, how asks are counted and the first answer's figure in plain text, and the home page's Slash band is that
+ * first answer: those parts read `build/`, and a missing build is a skip that says so.
  *
  * THE COMPONENTS ARE COMPILED INTO THE TEMP DIRECTORY with `svelte/compiler`, as `src/lib/Decide.test.ts` does, each
  * `.svelte` it imports compiled beside it and each `.ts` module pointed back at its source.
@@ -56,21 +57,19 @@ const NEVER: readonly RegExp[] = [
   /spark(?!line)/i,
 ];
 
-test("the page's words are the prototype's headings, and every count of asks is the plan table's", () => {
-  assert.equal(slashPage.head.title, 'Slash knows your whole record.');
+test("the page's words are the early access copy, and its one count of asks is the plan table's", () => {
+  assert.equal(slashPage.head.title, 'Slash knows your whole business.');
   assert.deepEqual(
     [slashPage.ask.title, slashPage.find.title, slashPage.make.title, slashPage.counted.title, slashPage.agents.title, slashPage.faq.title],
-    ['Ask', 'Find', 'Make', 'How asks are counted', 'Slash and your agents', 'Questions'],
+    ['Ask', 'Find', 'Make', 'How asks are counted', 'Slash and your AI tools', 'Questions'],
   );
-  assert.equal(slashPage.close.title, 'Press / and ask.');
+  assert.ok(!('close' in slashPage), 'the page ends on the early access strip, not a close of its own (site F11)');
   assert.equal(slashPage.faq.questions.length, 4);
   assert.equal(slashPage.agents.lines.length, 4);
-  assert.deepEqual(slashPage.counted.plans, [TABLE.free.name, TABLE.hosted.name, TABLE.plus.name]);
-  assert.deepEqual(slashPage.counted.month.cells, [TABLE.free.credits, TABLE.hosted.credits, TABLE.plus.credits]);
-  assert.equal(slashPage.counted.key.cell, 'No limit');
-  assert.equal(slashPage.close.body, `Free comes with ${TABLE.free.credits} asks a month.`);
-  assert.equal(slashDrawing.modes.ask.note, `One ask per question. Free has ${TABLE.free.credits} a month.`);
-  /* THE KNOWN FIX TO THE PROTOTYPE'S WORDS. */
+  /* No paid plan is named while billing is off: one count, the early access month (site D2). */
+  assert.ok(slashPage.counted.say.includes(`Early access includes ${TABLE.free.credits} asks a month`));
+  for (const plan of [TABLE.hosted.name, TABLE.plus.name]) assert.ok(!strings(slashPage).some((s) => s.includes(plan)), `the page names ${plan}`);
+  assert.equal(slashDrawing.modes.ask.note, `One ask per question. Early access has ${TABLE.free.credits} a month.`);
   assert.ok(slashPage.ask.body.some((p) => p.includes('Every figure opens what it came from')));
 });
 
@@ -159,13 +158,14 @@ test('every answer the made-up record holds renders on the server, whole', async
   }
 });
 
-test("the home card's scene is the first Ask, asked and answered, before any script runs", async () => {
+test("the home page's Slash band is the first Ask, asked and answered, before any script runs", when(missing(['index.html'])), () => {
   const first = ASKS[0]!;
-  const said = text(await render('Scene', {}));
-  assert.ok(said.includes(first.q), `the scene has no question typed in: ${said.slice(0, 300)}`);
-  for (const f of figures(first.lead)) assert.ok(said.includes(f), `the scene lost the figure ${f}`);
-  for (const m of Object.values(slashDrawing.modes)) assert.ok(said.includes(m.tab), `no ${m.tab} tab`);
-  assert.ok(said.includes(slashDrawing.modes.ask.note));
+  const html = readFileSync(new URL('index.html', BUILD), 'utf8');
+  const at = html.search(/<section\b[^>]*class="[^"]*\bband--slash\b/);
+  assert.ok(at >= 0, 'index.html has no Slash band');
+  const said = text(html.slice(at, html.indexOf('</section>', at)));
+  assert.ok(said.includes(first.q), `the band has no question typed in: ${said.slice(0, 300)}`);
+  for (const f of figures(first.lead)) assert.ok(said.includes(f), `the band lost the figure ${f}`);
   assert.ok(!said.includes('\u2014'));
 });
 
@@ -218,13 +218,13 @@ test('with motion, it types letter by letter, reads, then answers, and a stop ca
 
 const NO_BUILD = missing(['slash.html']);
 
-test('slash.html has one h1, the three modes, the table of asks and the first answer in plain text', when(NO_BUILD), () => {
+test('slash.html has one h1, the three modes, how asks are counted and the first answer in plain text', when(NO_BUILD), () => {
   const html = readFileSync(new URL('slash.html', BUILD), 'utf8');
   assert.equal((html.match(/<h1\b/g) ?? []).length, 1, 'not one h1');
   const h2s = [...html.matchAll(/<h2\b[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => text(m[1] ?? '').trim());
   for (const h of ['Ask', 'Find', 'Make', 'How asks are counted']) assert.ok(h2s.includes(h), `no "${h}" heading`);
   const said = text(html);
   assert.ok(said.includes(slashPage.head.title));
-  assert.match(said, new RegExp(`Asks a month ${TABLE.free.credits} ${TABLE.hosted.credits} ${TABLE.plus.credits}`));
+  assert.ok(said.includes(slashPage.counted.say), 'how asks are counted is not said in plain text');
   for (const f of figures(ASKS[0]!.lead)) assert.ok(said.includes(f), `the first answer's ${f} is not in the page`);
 });

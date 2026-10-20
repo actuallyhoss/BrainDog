@@ -15,6 +15,10 @@
  * relative `.ts` imports at their sources, `.svelte` imports at their compiled neighbours, and `$lib/launch.ts` at a
  * module that exports the test's copy of `LAUNCH`.
  *
+ * WHILE BILLING IS OFF THE PAGE IS THE EARLY ACCESS PAGE (D2, 20 October): one plan at $0, a tile that says paid
+ * plans come later, and three questions, with no paid plan's name or price. The plans page is what it draws with
+ * billing on, and both are rendered here.
+ *
  * THE LAST TEST READS THE BUILT PAGE, and skips while there is none, or while the build is older than the page's
  * sources (a stale build is the old page); under `SITE_BUILT=1` it always runs (`built.ts`).
  */
@@ -26,6 +30,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { shell } from '../src/lib/copy/shell.ts';
 import { HELD as HELD_PATHS, LAUNCH, held } from '../src/lib/launch.ts';
 import { PLANS, TABLE, priceOf } from '../src/lib/plans.ts';
 import { cardsFor } from '../src/lib/pricing/cards.ts';
@@ -107,14 +112,14 @@ test('rendered with billing on, Choose Cloud and Choose Cloud Plus link their pl
   assert.doesNotMatch(words(body), /Coming soon/, 'with billing on a card still says Coming soon');
 });
 
-test('rendered with billing off, no paid card links anything, each says Coming soon, and Free keeps Start free', async () => {
+test('rendered with billing off, no paid card links anything, each says Coming soon, and Free keeps the start button', async () => {
   const { body } = await render('lib/pricing/Plans.svelte', { billing: false });
   const hrefs = links(body).map((a) => a.href);
   for (const plan of PAID) assert.ok(!hrefs.includes(plan.href), `${plan.name} links ${plan.href} while billing is off`);
   assert.ok(!links(body).some((a) => a.text.startsWith('Choose')), 'a Choose button is drawn while billing is off');
   assert.equal(words(body).match(/Coming soon/g)?.length, PAID.length, 'each paid card does not say Coming soon once');
   assert.match(body, /<p class="soon[^"]*">Coming soon<\/p>/, 'Coming soon is not plain text in the button’s place');
-  assert.ok(links(body).some((a) => a.text === 'Start free'), 'Free has no Start free');
+  assert.ok(links(body).some((a) => a.text === shell.nav.start), `Free has no ${shell.nav.start}`);
   assert.ok(links(body).some((a) => a.text === 'Open BrainDog'), 'Free has no Open BrainDog for a visitor signed in');
   assert.match(body, /class="when-out[^"]*">Start here</, 'Free’s tag does not say Start here signed out');
   assert.match(body, /class="when-in[^"]*">Your plan</, 'Free’s tag does not say Your plan signed in');
@@ -139,25 +144,30 @@ const HELD = (() => {
 const figures = (text: string): string[] => [...text.matchAll(/\$?\d[\d,]*(?:\.\d+)?/g)].map((m) => m[0].replace(/[.,]$/, ''));
 
 test('every figure on the page is TABLE’s, with billing on and off', async () => {
-  for (const billing of [true, false]) {
-    const { body } = await render('routes/pricing/+page.svelte', { billing });
-    const said = figures(words(body));
-    assert.ok(said.length > 30, `the page says only ${said.length} figures, so the check read nothing`);
-    assert.deepEqual(said.filter((f) => !HELD.has(f)), [], `with billing ${billing ? 'on' : 'off'} the page says a figure TABLE does not hold`);
-    for (const plan of PLANS) assert.ok(said.includes(plan.price), `${plan.name}'s ${plan.price} is not on the page`);
-  }
+  const on = figures(words((await render('routes/pricing/+page.svelte', { billing: true })).body));
+  assert.ok(on.length > 30, `the page says only ${on.length} figures, so the check read nothing`);
+  assert.deepEqual(on.filter((f) => !HELD.has(f)), [], 'with billing on the page says a figure TABLE does not hold');
+  for (const plan of PLANS) assert.ok(on.includes(plan.price), `${plan.name}'s ${plan.price} is not on the page`);
+  /* THE EARLY ACCESS PAGE says Free's own figures and no paid plan's price. */
+  const off = figures(words((await render('routes/pricing/+page.svelte', { billing: false })).body));
+  assert.deepEqual(off.filter((f) => !HELD.has(f)), [], 'with billing off the page says a figure TABLE does not hold');
+  for (const f of [TABLE.free.price.month, String(TABLE.free.agents), String(TABLE.free.credits)]) assert.ok(off.includes(f), `early access does not say ${f}`);
+  for (const plan of PAID) assert.ok(!off.includes(plan.price), `the early access page says ${plan.name}'s ${plan.price}`);
   /* THE PLANTED FAULT: the roadmap's old Cloud Plus runs, and a price no plan has, are seen. */
   assert.deepEqual(figures('60,000 runs and $14').filter((f) => !HELD.has(f)), ['60,000', '$14']);
 });
 
-test('the page draws one h1 with no price, the three plans, the seven meters, and asks about cancelling only with billing on', async () => {
+test('with billing off one h1 and one plan, no paid plan; with it on the plans, the seven meters, and cancelling', async () => {
   const off = await render('routes/pricing/+page.svelte', { billing: false });
   const on = await render('routes/pricing/+page.svelte', { billing: true });
-  const h1 = [...off.body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => words(m[1]!));
-  assert.deepEqual(h1, ['Free for one person.'], 'the page does not have one h1, Free’s');
-  assert.equal((off.body.match(/<tr\b/g) ?? []).length, 1 + 7 + 1 + 4, 'the two tables are not a header and seven meters, and a header and four prices');
+  const h1 = (r: { body: string }) => [...r.body.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => words(m[1]!));
+  assert.deepEqual(h1(off), ['Free while in early access.'], 'the early access page does not have its one h1');
+  assert.deepEqual(h1(on), ['Free for one person.'], 'the plans page does not have one h1, Free’s');
+  assert.equal((off.body.match(/<tr\b/g) ?? []).length, 0, 'the early access page draws a table of plans');
+  for (const plan of PAID) assert.ok(!words(off.body).includes(plan.name), `the early access page names ${plan.name}`);
+  assert.match(words(off.body), /Early access \$0/, 'the one plan is Early access at $0');
+  assert.equal((on.body.match(/<tr\b/g) ?? []).length, 1 + 7 + 1 + 4, 'the two tables are not a header and seven meters, and a header and four prices');
   /* The cap is a promise about a checkout that is not sold yet, so it is said only with billing on (`extra-use-capped`). */
-  assert.match(words(off.body), /Extra use, if you want it Coming soon\./);
   assert.doesNotMatch(words(off.body), /monthly cap/, 'the page promises a cap on extra use while nothing is sold');
   assert.match(words(on.body), /Off by default\. Turn it on with a monthly cap, and BrainDog never goes past it\. Coming soon\./);
   assert.doesNotMatch(words(off.body), /Can I cancel any time\?/, 'the page asks about cancelling while nothing is sold');
@@ -176,12 +186,17 @@ const stale = (): string | null =>
 /* WHILE THE PAGE IS HELD the build writes no pricing.html (`HELD` in launch.ts), so there is nothing built to read. */
 const HIDDEN = held() && (HELD_PATHS as readonly string[]).includes('/pricing');
 
-test('the built pricing page: one h1 with no $, three plan names, and the seven meters', HIDDEN ? { skip: 'the pricing page is held until BrainDog is priced' } : when(missing(['pricing.html']) ?? stale()), () => {
+test('the built pricing page: one h1 with no $, and as billing stands, the early access plan or the three plans', HIDDEN ? { skip: 'the pricing page is held' } : when(missing(['pricing.html']) ?? stale()), () => {
   const html = readFileSync(page, 'utf8');
   const h1 = [...html.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => words(m[1]!));
   assert.equal(h1.length, 1, `pricing.html has ${h1.length} h1`);
   assert.doesNotMatch(h1[0]!, /\$/, 'the h1 carries a price, and Free leads');
   const text = words(html);
+  if (!LAUNCH.billing) {
+    for (const plan of PAID) assert.ok(!text.includes(plan.name), `pricing.html names ${plan.name} while billing is off`);
+    assert.ok(text.includes('Early access'), 'pricing.html does not name early access');
+    return;
+  }
   for (const plan of PLANS) assert.ok(text.includes(plan.name), `pricing.html does not name ${plan.name}`);
   for (const meter of ['Agents connected', 'Questions and drafts from Slash', 'People on the record', 'Automation runs', 'Requests to other services', 'Data fetched', 'Script time'])
     assert.ok(text.includes(meter), `pricing.html has no "${meter}" row`);

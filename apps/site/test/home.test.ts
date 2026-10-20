@@ -1,12 +1,13 @@
 /**
- * The home page of 17 October (DIRECTION §47): its words, and the page the build writes from them.
+ * The home page of the UI pass of 20 October (`loop/ui-pass-2026-10-20/site.md` 2a): its words, and the page the
+ * build writes from them.
  *
- * THE WORDS ARE THE APPROVED DESIGN'S. `copy/home.ts` holds them at the key paths the claims ledger reads, word for
- * word as `loop/site-2026-10-17/src/site.html` says them, with no em dash and none of the words a reader never meets
- * (`docs/54-WRITING.md`). The plans band left with the pricing page, which is held until BrainDog is priced.
+ * THE WORDS ARE THE REVIEW'S, with the spec's changes. `copy/home.ts` holds them at the key paths the claims ledger
+ * reads, with no em dash and none of the words a reader never meets (`docs/54-WRITING.md`), but for the one quiet link
+ * and the one answer that name the protocol for a developer. No paid plan is named while billing is off.
  *
- * THE BUILT PAGE reads completely with scripting off: one h1, the four cards in order with everything they draw
- * already in the HTML, the makers by name, no picture, and no solid red but the Start free button. Those checks read
+ * THE BUILT PAGE reads completely with scripting off: one h1, the six bands in order with everything they draw already
+ * in the HTML, the makers by name, no picture, and no solid red but the start button. Those checks read
  * `apps/site/build` and skip, saying why, until it has been built.
  */
 
@@ -31,53 +32,48 @@ function strings(value: unknown, path = 'home'): [string, string][] {
 /* The words the site never says in prose (docs/54-WRITING.md), whole words and either case. */
 const NEVER = /\b(rows?|list items?|entit(?:y|ies)|register|schemas?|slugs?|MCP|packs?|credentials?|snapshots?)\b/i;
 
-test('home.ts holds the design words at the key paths the ledger reads', () => {
+test('home.ts holds the words of site 2a at the key paths the ledger reads', () => {
   assert.equal(home.hero.title, 'Give your business a memory.');
-  assert.equal(home.hero.sub, 'One record of your projects, money and people, shared by you and every AI agent you use.');
-  assert.equal(home.hero.secondary, 'Connect an agent');
+  assert.equal(home.hero.sub, 'One place that remembers your work and tells you what needs you today. Your AI tools read from it too.');
+  assert.equal(home.hero.secondary, 'Connect your AI tools');
   assert.equal(home.hero.works, 'Works with');
   assert.deepEqual(
     home.hero.makers.map((m) => m.name),
     ['Claude', 'ChatGPT', 'Codex', 'Cursor', 'VS Code'],
   );
-  const c = home.cards;
-  assert.equal(c.brief.title, 'It tells you where things stand.');
-  assert.equal(c.brief.say, 'A short brief every morning, rewritten whenever something changes. Tap a figure to see why.');
-  assert.equal(c.brief.label, "Maya's brief");
-  assert.equal(c.brief.behind, 'where it comes from');
-  assert.equal(c.agents.title, 'Your agents share one memory.');
-  assert.equal(c.agents.say, "Each starts with your brief and leaves a note when it's done. Nothing gets explained twice.");
-  assert.equal(c.agents.notes, 'Notes on Tidepool');
-  assert.equal(c.agents.connect, 'Connect yours in one line');
-  assert.equal(c.chores.title, 'It does the chores. You make the calls.');
+  assert.equal(home.who.title, "Who it's for");
+  assert.deepEqual(
+    [home.who.small.title, home.who.build.title, home.who.team.title],
+    ['Run a small business', 'Build with AI', 'Work as a team or agency'],
+  );
+  assert.deepEqual([home.who.small.href, home.who.build.href, home.who.team.href], ['/for/founders', '/agents', '/for/teams']);
+  assert.equal(home.chores.title, 'It does the chores. You make the calls.');
   assert.equal(
-    c.chores.say,
+    home.chores.say,
     'Filing, naming and sorting just happen, each with a reason and an undo. You only see what needs a person.',
   );
-  assert.equal(c.chores.waits, 'Waits for you');
-  assert.equal(c.chores.done, 'Done on its own');
-  assert.equal(c.chores.floor, 'Money, keys, sharing and deletes always wait for your yes.');
-  assert.equal(c.chores.floorMore, 'No rule and no agent can change that.');
-  assert.equal(c.slash.name, 'Slash');
-  assert.equal(c.slash.title, 'Press / and ask anything.');
-  assert.equal(
-    c.slash.say,
-    'Slash answers from your record, finds anything in a keystroke, and drafts what you ask for. Nothing goes in without your yes.',
-  );
-  assert.equal(c.slash.more, 'How Slash works');
+  assert.equal(home.chores.floor, 'Money, keys, sharing and deletes always wait for your yes. No rule and no AI tool can change that.');
+  assert.equal(home.tools.title, 'Your AI tools share one memory.');
+  assert.equal(home.tools.say, "Each one starts from your brief and leaves a note when it's done. Nothing gets explained twice.");
+  assert.equal(home.slash.title, 'Press / and ask anything.');
   assert.equal(home.yours.title, 'It stays yours.');
-  assert.deepEqual(home.yours.points, [
-    { title: 'Every change has a name on it.', body: 'You see who changed what, you or which agent, and you can undo it.' },
-    { title: 'Take it all with you.', body: 'Export the whole record as one file, whenever you like.' },
-    { title: 'Keys stay in the vault.', body: 'Agents use your keys without ever seeing them, and no key goes into a chat.' },
+  assert.deepEqual(home.yours.points.map((p) => p.text), [
+    'Every change has a name on it, and an undo.',
+    'Export everything as one file, any time.',
+    'AI tools use your keys without ever seeing them.',
   ]);
-  assert.equal(home.closing.title, 'Start your record.');
-  assert.equal(home.closing.body, 'Say what you work on, connect an agent, and read your first brief in a few minutes.');
+  assert.equal(home.free.title, 'Free while in early access.');
+  assert.equal(home.faq.questions.length, 5);
+  assert.ok(!('closing' in home), 'home has no recap close (site F1)');
 });
+
+/* THE ONE LINK AND THE ONE ANSWER THAT NAME THE PROTOCOL, for the developer who came for it (site 2a sections 4 and 7). */
+const FOR_DEVELOPERS = new Set(['home.tools.dev', 'home.faq.questions.1.a']);
 
 test('the home words hold no em dash and none of the never-words', () => {
   for (const [path, said] of strings(home)) {
     assert.ok(!said.includes('—'), `${path} holds an em dash: ${said}`);
+    if (FOR_DEVELOPERS.has(path)) continue;
     assert.ok(!NEVER.test(said), `${path} says ${said.match(NEVER)?.[0]}: ${said}`);
   }
 });
@@ -114,26 +110,20 @@ test('the hero is section.hero with the slogan and the .sub sentence', when(NO_B
   const hero = html.match(/<section\b[^>]*class="[^"]*\bhero\b[^"]*"[^>]*>[\s\S]*?<\/section>/);
   assert.ok(hero, 'section.hero');
   assert.match(hero[0], /id="hero-title"/);
-  assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One record of your projects/);
+  assert.match(hero[0], /class="[^"]*\bsub\b[^"]*"[^>]*>\s*(<!--[^>]*-->)?\s*One place that remembers your work/);
 });
 
-test('the four cards, then It stays yours and the close, in order', when(NO_BUILD), () => {
+test('the six bands, in order, and no close after them', when(NO_BUILD), () => {
   const said = text(page());
-  const order = [
-    home.cards.brief.title,
-    home.cards.agents.title,
-    home.cards.chores.title,
-    home.cards.slash.title,
-    home.yours.title,
-    home.closing.title,
-  ];
+  const order = [home.who.title, home.chores.title, home.tools.title, home.slash.title, home.yours.title, home.free.title, home.faq.title];
   let at = 0;
   for (const heading of order) {
     const found = said.indexOf(heading, at);
     assert.ok(found >= 0, `"${heading}" is on the page after the one before it`);
     at = found + heading.length;
   }
-  assert.equal([...page().matchAll(/<article\b[^>]*class="[^"]*\bcard\b/g)].length, 4, 'four article.card');
+  assert.equal([...page().matchAll(/<section\b[^>]*class="[^"]*\bband--/g)].length, 6, 'six section.band');
+  assert.doesNotMatch(said, /Start your record\./, 'the recap close is gone');
 });
 
 test('the makers are named, and the page draws no picture', when(NO_BUILD), () => {
@@ -143,24 +133,25 @@ test('the makers are named, and the page draws no picture', when(NO_BUILD), () =
   assert.doesNotMatch(html, /<img\b/i);
 });
 
-test('the only solid red on the page is Start free', when(NO_BUILD), () => {
+test('the only solid red button in the served page is the start button', when(NO_BUILD), () => {
   for (const m of page().matchAll(/<(\w+)\b[^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/\1>/g)) {
     const classes = m[2]!.split(/\s+/);
     if (!(classes.includes('btn') && classes.includes('red'))) continue;
     assert.equal(m[1], 'a', `a solid red ${m[1]}`);
-    assert.match(text(m[3]!).trim(), /^(Start free|Open BrainDog)$/, `a solid red button says "${text(m[3]!).trim()}"`);
+    assert.match(text(m[3]!).trim(), /^(Get early access|Start free|Open BrainDog)$/, `a solid red button says "${text(m[3]!).trim()}"`);
   }
 });
 
-test('with scripting off, every card says what it draws', when(NO_BUILD), async () => {
-  const { BRIEF, EVIDENCE, HANDLED, NEEDS, NOTES, ASKS } = await import('../src/lib/demo/maya.ts');
+test('with scripting off, every band says what it draws', when(NO_BUILD), async () => {
+  const { ASKED, EVIDENCE, HANDLED, NEEDS, NOTES, ASKS } = await import('../src/lib/demo/maya.ts');
   const said = text(page());
-  const brief = BRIEF.parts.map((p) => (typeof p === 'string' ? p : p.text)).join('');
-  assert.ok(said.includes(brief), 'the brief, in plain text');
-  assert.ok(said.includes(EVIDENCE.inv.head), "the first figure's facts are open");
+  assert.ok(said.includes('2 things need you, 2 agents are working, and cash lasts about 14 months.'), "the greeting's line, in plain text");
+  for (const n of NEEDS) assert.ok(said.includes(n.ask), `the desk's ask "${n.ask}"`);
+  assert.ok(said.includes(EVIDENCE.inv.head), "the first need's facts are there");
   for (const n of NOTES) assert.ok(said.includes(n.text), `the note "${n.text}"`);
-  for (const n of NEEDS) assert.ok(said.includes(n.ask), `the ask "${n.ask}"`);
+  for (const n of ASKED) assert.ok(said.includes(n.ask), `the chores band's ask "${n.ask}"`);
   for (const h of HANDLED) assert.ok(said.includes(h.text), `the chore "${h.text}"`);
-  assert.ok(said.includes(ASKS[0]!.q), "the Slash card's first question");
-  assert.ok(said.includes(home.cards.chores.floor), 'the floor');
+  assert.ok(said.includes(ASKS[0]!.q), "the Slash band's first question");
+  assert.ok(said.includes(home.chores.floor), 'the floor');
+  for (const q of home.faq.questions) assert.ok(said.includes(q.a), `the answer to "${q.q}"`);
 });

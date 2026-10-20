@@ -18,7 +18,6 @@ import { markOf } from '@braindog/skin/agent-marks.ts';
 import { CONNECT, CONNECT_WORDS, hintParts, hintText } from '../src/lib/connect/apps.ts';
 import { agents } from '../src/lib/copy/agents.ts';
 import { MCP } from '../src/lib/links.ts';
-import { TABLE } from '../src/lib/plans.ts';
 import { BUILD, missing, when } from './built.ts';
 
 registerHooks({
@@ -92,8 +91,12 @@ test('a hint keeps its code apart from its words', () => {
 });
 
 test("the page's words hold no em dash and no never-word outside code", () => {
+  /* THE ROW FOR DEVELOPERS NAMES THE PROTOCOL ON PURPOSE (site 2b, 20 October): it is the one place on the page a
+     developer is sent to, so its words are held to the em dash rule and not to the never-words. */
+  const { dev, ...rest } = agents.agents;
+  for (const s of strings(dev)) assert.ok(!s.includes(EM_DASH), `an em dash in "${s}"`);
   const words = [
-    ...strings(agents),
+    ...strings(rest),
     ...strings(CONNECT_WORDS),
     ...CONNECT.flatMap((a) => [a.name, ...a.ways.flatMap((w) => [...(w.file ? [] : [w.where]), ...hintParts(w.hint).filter((p) => !p.code).map((p) => p.text)])]),
   ];
@@ -101,8 +104,8 @@ test("the page's words hold no em dash and no never-word outside code", () => {
     assert.ok(!s.includes(EM_DASH), `an em dash in "${s}"`);
     assert.doesNotMatch(s, NEVER, `a never-word in "${s}"`);
   }
-  assert.equal(agents.agents.lead.startsWith('Claude, ChatGPT, Codex, Cursor and VS Code can read your record'), true);
-  assert.ok(agents.agents.close.body.includes(['no', 'one', 'two', 'three', 'four', 'five'][TABLE.free.agents] ?? String(TABLE.free.agents)));
+  assert.equal(agents.agents.lead.startsWith('Claude, ChatGPT, Codex, Cursor and VS Code can read your BrainDog'), true);
+  assert.equal(agents.agents.dev.address, MCP, 'the row for developers gives the address the box gives');
 });
 
 test('the box draws every app and every way in the HTML, so it reads with scripting off', () => {
@@ -135,6 +138,9 @@ test('the served connect page: one h1, the five names, every way in a <pre>, no 
   const text = prose(html);
   for (const app of CONNECT) assert.ok(text.includes(app.name), `${app.name} is named`);
   assert.equal((html.match(/<pre\b/gu) ?? []).length, CONNECT.flatMap((a) => a.ways).length, 'a <pre> for each way in');
-  assert.doesNotMatch(text, /\bMCP\b/u, 'MCP in prose');
+  /* Outside the row for developers, which names it on purpose (site 2b). */
+  const outside = prose(html.replace(/<section class="wrap dev[\s\S]*?<\/section>/u, ''));
+  assert.doesNotMatch(outside, /\bMCP\b/u, 'MCP in prose');
+  assert.match(text, /For developers/u, 'the row for developers is on the page');
   assert.ok(!html.includes(EM_DASH), 'an em dash in the served page');
 });

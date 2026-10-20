@@ -1,17 +1,18 @@
 /**
  * THE HERO'S LIVE DESK (`src/lib/desk/`), as a reader with scripting off receives it, and the shared asks it moves.
  *
- * ALL FOUR PLACES ARE IN THE HTML. The desk is a real tablist over four panels, and only the chosen one shows once
- * the script runs; with scripting off a <noscript> rule lays all four out one under another. So the served page must
- * hold the tablist with its four names, four panels, the brief's sentence as plain words, and that rule. No <img>:
- * every band is the product's own parts, never a picture of them (§23, §47).
+ * ALL FIVE PLACES ARE IN THE HTML (site F5, 20 October). The desk is a real tablist over five panels, and only the
+ * chosen one shows once the script runs; with scripting off a <noscript> rule lays all five out one under another. So
+ * the served page must hold the tablist with its five names, five panels, the greeting's line as plain words, and
+ * that rule. No <img>: every band is the product's own parts, never a picture of them (§23, §47).
  *
  * THE SAME CHECKS RUN TWICE. Once over the desk rendered on the server here, which needs no build, and once over the
  * built `index.html`, which waits for a build newer than the desk (`built.ts`): an older build holds someone else's
  * page, and under `SITE_BUILT=1` a missing one is a failure, not a skip.
  *
- * THE ASKS ARE ONE STATE (`needs.svelte.ts`) the desk and the home page's red card both read. Its reducer is held to
- * the order here, and the module itself is compiled and driven the way a page drives it.
+ * THE DESK'S ASKS ARE ONE STATE (`needs.svelte.ts`) its Today, its Needs you and its count all read, and the chores
+ * band asks other things from a store of its own. The reducer is held to the order here, and the module itself is
+ * compiled and driven the way a page drives it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +23,7 @@ import { compile, compileModule } from 'svelte/compiler';
 import { render } from 'svelte/server';
 import type { Component } from 'svelte';
 
-import { BRIEF, NEEDS, TERM } from '../src/lib/demo/maya.ts';
+import { ASKED, NEEDS } from '../src/lib/demo/maya.ts';
 import { DESK, TABS } from '../src/lib/desk/words.ts';
 import { BUILD, STRICT, missing, when } from './built.ts';
 
@@ -51,6 +52,7 @@ type Move = { kind: 'answer'; id: string; yes: boolean } | { kind: 'undo'; id: s
 type State = { open: readonly string[]; done: readonly string[] };
 const shared = await load<{
   needs: Store;
+  asked: Store;
   start: (order: readonly string[]) => State;
   step: (s: State, m: Move, order: readonly string[]) => State;
 }>('../src/lib/desk/needs.svelte.ts');
@@ -75,7 +77,8 @@ const words = (html: string): string =>
     .replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ');
 
-const SENTENCE = BRIEF.parts.map((p) => (typeof p === 'string' ? p : p.text)).join('');
+/** The greeting's line as it reads on load, with both of the desk's asks open. */
+const SENTENCE = '2 things need you, 2 agents are working, and cash lasts about 14 months.';
 
 /** The desk's promises over one page of HTML, whichever way it was made. */
 function holdsTheDesk(html: string, where: string): void {
@@ -84,19 +87,16 @@ function holdsTheDesk(html: string, where: string): void {
   const tabs = [...tablist[1]!.matchAll(/<button[^>]*role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map((m) =>
     words(m[1]!).replace(/\d+/g, '').trim(),
   );
-  assert.deepEqual(tabs, TABS.map((t) => DESK.tabs[t]), `${where}: the four places, by name, in order`);
-  assert.match(tablist[1]!, /<button[^>]*role="tab"[^>]*aria-selected="true"[^>]*>\s*Today/, `${where}: Today is chosen`);
+  assert.deepEqual(tabs, TABS.map((t) => DESK.tabs[t]), `${where}: the five places, by name, in order`);
+  assert.deepEqual(tabs, ['Today', 'Needs you', 'Projects', 'Money', 'Agents'], `${where}: the app's five places`);
+  assert.match(tablist[1]!, /<button[^>]*role="tab"[^>]*aria-selected="true"[^>]*>(?:(?!<\/button>)[\s\S])*?Today/, `${where}: Today is chosen`);
 
   /* The desk's own panels: the connect box and the Slash card hold tab panels of their own on the same page. */
   const panels = html.match(/id="desk-pane-[a-z]+"[^>]*role="tabpanel"|role="tabpanel"[^>]*id="desk-pane-[a-z]+"/g) ?? [];
-  assert.equal(panels.length, 4, `${where} holds four panels`);
+  assert.equal(panels.length, 5, `${where} holds five panels`);
   for (const t of TABS) assert.match(html, new RegExp(`id="desk-pane-${t}"`), `${where} has the ${t} panel`);
-  assert.ok(html.indexOf('id="desk-pane-today"') < html.indexOf('id="desk-pane-project"'), 'Today comes first');
-
-  assert.ok(words(html).includes(SENTENCE), `${where}: the brief is plain words: "${SENTENCE}"`);
-  for (const line of TERM.filter((l) => l.text.trim())) {
-    assert.ok(words(html).includes(line.text.trim()), `${where}: the terminal line "${line.text.trim()}" is there`);
-  }
+  assert.ok(html.indexOf('id="desk-pane-today"') < html.indexOf('id="desk-pane-needs"'), 'Today comes first');
+  assert.ok(words(html).includes(SENTENCE), `${where}: the greeting's line is plain words: "${SENTENCE}"`);
 
   const rule = html.match(/<noscript>\s*<style[^>]*>([\s\S]*?)<\/style>\s*<\/noscript>/);
   assert.ok(rule, `${where} has no <noscript><style> rule`);
@@ -108,12 +108,13 @@ function holdsTheDesk(html: string, where: string): void {
   assert.ok(!words(html).includes(EM_DASH), `${where} has an em dash a person reads`);
 }
 
-test('the desk rendered on the server holds every place, the brief in plain words and the noscript rule', () => {
+test('the desk rendered on the server holds every place, the greeting in plain words and the noscript rule', () => {
   const { body, head } = render(Desk, { props: {} });
   const html = head + body;
   holdsTheDesk(html, 'the server-rendered desk');
   for (const n of NEEDS) assert.ok(words(html).includes(n.ask), `Needs you holds "${n.ask}"`);
-  assert.match(html, /<span class="count[^"]*"[^>]*>3<\/span>/, 'the count on Needs you says 3');
+  assert.match(html, /<span class="count[^"]*"[^>]*>2<\/span>/, 'the count on Needs you says 2');
+  for (const n of ASKED) assert.ok(!words(html).includes(n.ask), `the desk does not repeat the chores band's "${n.ask}"`);
   assert.doesNotMatch(html, /id="desk-drop"/, 'the bar is closed until pressed');
   const visible = words(body);
   assert.doesNotMatch(visible, /\b(rows?|list items?|entity|entities|schema|slug|MCP)\b/i, 'no never-word on the desk');
@@ -138,19 +139,24 @@ test('the asks move in order: yes moves across first, Not now drops, Undo goes b
   assert.equal(shared.step(s, { kind: 'answer', id: 'nope', yes: true }, order), s, 'an ask not open is not answered');
 });
 
-test('the shared asks start open in the record order, and the desk and the card see one state', () => {
-  const { needs } = shared;
+test("the desk's asks start open in the record order, and Today, Needs you and the count see one state", () => {
+  const { needs, asked } = shared;
   const ids = NEEDS.map((n) => n.id);
   assert.deepEqual(needs.open, ids);
   needs.answer(ids[0]!, true);
-  needs.answer(ids[1]!, false);
-  assert.deepEqual(needs.open, ids.slice(2));
+  assert.deepEqual(needs.open, ids.slice(1));
   assert.deepEqual(needs.done, [ids[0]]);
+  needs.answer(ids[1]!, false);
+  assert.deepEqual(needs.open, []);
   needs.undo(ids[0]!);
-  assert.deepEqual(needs.open, [ids[0], ids[2]]);
+  assert.deepEqual(needs.open, [ids[0]]);
   assert.deepEqual(needs.done, []);
   needs.open.push('a copy');
   assert.equal(needs.open.includes('a copy'), false, 'a reader gets a copy, never the state itself');
+  /* The chores band's questions are their own: answering one leaves the desk's alone. */
+  assert.deepEqual(asked.open, ASKED.map((n) => n.id));
+  asked.answer(ASKED[0]!.id, true);
+  assert.deepEqual(needs.open, [ids[0]]);
 });
 
 /* THE BUILT PAGE IS READ ONLY WHEN IT IS NEWER THAN EVERY DESK FILE, unless the step has just built it. */
