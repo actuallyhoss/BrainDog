@@ -52,10 +52,14 @@ export const LEDGER: Record<string, unknown>[] = [
        column names a second field (`or: 'what'`, a column's own key since batch 72) and a host reads the description
        where the payee holds nothing. `LEDGER_COLUMNS` below; `test/money-ledger-tile.test.ts` holds both lines.
 
+       PLAIN, SINCE BATCH 6: the line said "36 filed today. 0 filed for you in 30 days.", two counts that read as a
+       contradiction (everything was made today, and none of it by a rule), so it says the one count. `filed-for-you-30d`
+       stays declared for Filing rules.
+
        NO GATE OF ITS OWN: a line is not a thing a tile holds, so a Ledger nothing has moved on is still not drawn. */
     kind: 'timeline',
     heading: 'Ledger',
-    body: '{{filed-today}} filed today. {{filed-for-you-30d}} filed for you in 30 days.',
+    body: '{{filed-today}} filed today.',
     icon: 'receipt',
     span: 12,
     source: 'register.transactions',

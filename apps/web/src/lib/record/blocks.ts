@@ -717,6 +717,11 @@ function projectRows(block: BlockResult, cells: number, markAt?: (i: number) => 
     const values = Array.from({ length: cells }, (_, n) => {
       const field = fields[n];
       if (!field || !entry) return '';
+      /* A COLUMN'S `or` IS READ WHERE ITS OWN FIELD HOLDS NOTHING, by the reader that built the cells (`toRows`). Said again
+         from the raw fields it was an empty cell on every Ledger line the bank named no payee on, the day above the amount
+         with nobody between them. */
+      const second = (block.columns[n] as { or?: string } | undefined)?.or;
+      if (second !== undefined && row.cells[n]) return row.cells[n];
       /* An `instant` on a row that is a live thing reads as an age, not a timestamp: a session's
          `last_seen` is "8m ago", which is the only form of it anybody says out loud.
 

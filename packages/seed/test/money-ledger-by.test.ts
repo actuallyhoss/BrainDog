@@ -136,7 +136,9 @@ test('THE WRITTEN LINE COUNTS THE DAY, from the two figures over who made the en
   const said = (LEDGER[0] as { body?: unknown }).body;
   assert.equal(typeof said, 'string', 'the Ledger tile has no written line');
   const text = String(said);
-  for (const id of ['filed-for-you-30d', 'filed-today']) assert.ok(text.includes(`{{${id}}}`), `the line does not read ${id}, which is drawn nowhere else`);
+  /* ONE COUNT SINCE BATCH 6: "3 filed today. 2 filed for you in 30 days." read as two counts at odds, so the line says the day alone. */
+  assert.ok(text.includes('{{filed-today}}'), 'the line does not read filed-today');
+  assert.ok(!text.includes('filed-for-you-30d'), 'the line says a second count again');
   /* A LINE A PERSON READS: no dash, and none of the words that name the record's own parts. */
   assert.doesNotMatch(text, /[—–]/u);
   assert.doesNotMatch(text, /\b(rows?|entity|entities|list items?)\b/iu);
@@ -147,10 +149,10 @@ test('THE WRITTEN LINE COUNTS THE DAY, from the two figures over who made the en
   assert.notEqual(drawn.drawn, false);
   /* THREE WERE MADE TODAY, AND TWO OF THEM FOR HER: the bank add-on's two. The one a rule filed after is the bank
      add-on's still, because an entry counts once, under whoever made it. */
-  assert.deepEqual(drawn.values, { 'filed-today': 3, 'filed-for-you-30d': 2 });
+  assert.deepEqual(drawn.values, { 'filed-today': 3 });
   assert.equal(drawn.unnamed, undefined, 'the line asks for something the record does not have');
   const filled = text.replace(/\{\{([^{}]+)\}\}/gu, (_, path: string) => String(drawn.values?.[path.trim()]));
-  assert.equal(filled, '3 filed today. 2 filed for you in 30 days.');
+  assert.equal(filled, '3 filed today.');
 });
 
 test('THE LINE IS NO REASON TO DRAW AN EMPTY LEDGER: a record nothing has moved on draws no tile', async () => {
