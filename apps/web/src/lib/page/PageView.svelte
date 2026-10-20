@@ -51,7 +51,10 @@
   import ChangePage from './ChangePage.svelte';
   import PageBody from './PageBody.svelte';
   import ProjectShape from './ProjectShape.svelte';
-  import { withoutRepeats, type Block } from '$lib/record/project.ts';
+  import { isProject, withoutRepeats, type Block } from '$lib/record/project.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { hueOf as projectHue, slotStyle } from '$lib/home/project-cards.ts';
+  import { onProject, moreSaid } from './project-page.ts';
   import HeadCapture from '$lib/home/HeadCapture.svelte';
   import { areaOf, headCaptureAt, layoutOf } from './layout.ts';
   import { arranged, emptyHidden } from './home.ts';
@@ -184,6 +187,25 @@
   let shapeKnown = $state(false);
   const about = $derived(mode === 'page' ? (live?.page.page.param ?? null) : null);
   const spoken = $derived(about ? `${about.register}#${about.seq}` : null);
+  /* A PAGE ABOUT A PROJECT'S ROW (proj section 4): its hero holds the name, so the head is the way back and the actions. */
+  const projectPage = $derived(about !== null && isProject(REGISTERS[about.register]));
+  /* THE WAY BACK TO THE PROJECTS, the page the rail files this one under, else the list itself. */
+  const projectBack = $derived.by(() => {
+    if (!projectPage || !about) return undefined;
+    const under = live?.page.page.nav?.section;
+    const entry = (shell?.nav ?? []).find((n) => n.title === under);
+    return entry ? `/p/${entry.id}` : `/r/${about.register}`;
+  });
+  /* THE NEXT STEP IS THE HERO'S LAST LINE (proj F7), so the look's next action is not drawn under the head as well. */
+  const bodyPage = $derived(projectPage && live?.page.page.look ? { ...live.page.page, look: { ...live.page.page.look, next: null } } : null);
+  /* THE PROJECT'S COLOUR OVER EVERYTHING ON ITS PAGE (proj F6): charts draw in it, the red stays for what is late. */
+  const projectStyle = $derived.by(() => {
+    if (!projectPage || !about || !shapeRow) return undefined;
+    const d = REGISTERS[about.register];
+    const hue = d ? projectHue(d as Parameters<typeof projectHue>[0], shapeRow) : null;
+    const more = moreSaid(laidFrom);
+    return `${slotStyle(hue)};--chart-1:var(--ph);--chart-2:color-mix(in oklab, var(--ph) 55%, var(--tile));--chart-3:color-mix(in oklab, var(--ph) 28%, var(--tile))${more ? `;--more-said:${JSON.stringify(more)}` : ''}`;
+  });
   /* AN UNBOXED ACTIONS SECTION IS COUNTED TOO, for the one case that asks: it is left out when the shape took what it heads. */
   const asking = (bs: readonly LiveBlock[]) => bs.map((b) => (b.kind === 'section' && (b as { panel?: unknown }).panel === 'actions' ? ({ ...b, box: true } as LiveBlock) : b));
   const asks = $derived(spoken !== null && asksActions(asking(live?.page.blocks ?? [])));
@@ -439,8 +461,11 @@
     /* A SCREEN WHOSE SHELL NAMES NO READER keeps every line, as it drew them before, and the record answers a press. */
     const drawn = heldTo(inVoice(blocks, said), (list) => !shell?.me || may(shell, 'append', list));
     /* A BLOCK THE PROJECT'S SHAPE SAYS ALREADY IS LEFT OUT, by the source it declares (`repeatOf`), once the shape has it. */
-    if (about && !shapeKnown) return withoutRepeats(drawn, ['runs-on'], counted?.length ?? null, null);
-    return about && shapeDrew.length > 0 ? withoutRepeats(drawn, shapeDrew, counted?.length ?? null, shapeRow) : drawn;
+    /* ON A PROJECT'S PAGE, WHAT THE HERO AND ITS TILES SAY IS NOT SAID AGAIN, and More about is folded (`project-page.ts`).
+       Not while the page is arranged, which moves the blocks as they are declared. */
+    const shaped = projectPage && !arrangement.editing && arrangement.slots === null && !toArrange ? onProject(drawn, about?.register ?? '') : drawn;
+    if (about && !shapeKnown) return withoutRepeats(shaped, ['runs-on'], counted?.length ?? null, null);
+    return about && shapeDrew.length > 0 ? withoutRepeats(shaped, shapeDrew, counted?.length ?? null, shapeRow) : shaped;
   });
 
   /** Declared, then added. One list, so ordering and spans do not care which is which. This is what Arrange moves. */
@@ -625,9 +650,10 @@
     icon={iconFor(live.page.page.icon, 'doc')}
     hue={hueOf(live.page.page.identity)}
     kicker={headKicker}
-    back={backInKicker ? declared?.back?.href : undefined}
+    back={backInKicker ? declared?.back?.href : projectBack}
     count={declared?.count?.value}
     title={live.page.page.title}
+    headless={projectPage && !arranging && !showSource}
     define={headlined ? undefined : 'page'}
     below={headBelow ? declaredBelow : undefined}
   >
@@ -641,6 +667,10 @@
         <!-- SHARE, AND ONE "⋯" FOR THE REST (DIRECTION §35): How this is built, Change this page and Edit layout were
              four controls in a row over every page, and a reader uses Share far more often than the other three. The
              menu is `ChangePage.svelte`; Edit layout's way in is `Arrange.svelte`'s, handed over as `entry()`. -->
+        {#if projectPage && about}
+          <!-- EDIT DETAILS, where the hero's Details link was (proj F7); the ⋯ menu is `ChangePage`'s and offers no row. -->
+          <Button href={`/r/${about.register}/${about.seq}`}><Icon name="edit" size="s" />Edit details</Button>
+        {/if}
         <ShareMenu {slug} />
         <ChangePage {slug} title={live.page.page.title} {showSource} {reread} onarrange={arranger?.entry() ?? null} {look} keys={drawnKeys} heads={blockHeads} />
       {/if}
@@ -700,10 +730,11 @@
   {:else}
     <!-- A PAGE ABOUT A PROJECT'S ROW OPENS ON THE PROJECT'S ONE SHAPE, as the row's own page does; its blocks follow. -->
     {#snippet shapeAt()}<ProjectShape register={about?.register ?? ''} seq={about?.seq ?? 0} onshape={(b, r, known) => ((shapeDrew = b), (shapeRow = r), (shapeKnown = known))} />{/snippet}
+    <div class="body-wrap" data-project={projectPage ? '' : undefined} style={projectStyle}>
     <PageBody
       mode="page"
       opens={about ? shapeAt : null}
-      page={live.page.page}
+      page={bodyPage ?? live.page.page}
       blocks={all}
       held={counted}
       now={live.now}
@@ -717,6 +748,7 @@
       pick={hosting ? picked : null}
       {onwalk}
     />
+    </div>
     <!-- THE OFFER COMES AFTER EVERY BLOCK OF THE PAGE, never before the first. -->
     {#if offer}<div class="page-offer" data-after="blocks">{@render offer()}</div>{/if}
     {#if hosting}<BatchBar {picked} />{/if}
@@ -820,6 +852,56 @@
 {/if}
 
 <style>
+  /* THE PAGE'S BODY, which on a project's page carries the project's colour down to every chart (`projectStyle`). */
+  .body-wrap {
+    display: contents;
+  }
+
+  /* MORE ABOUT, FOLDED (proj F1): one tile, its heading, a 13px line naming what is inside, and Show at the right. */
+  .body-wrap[data-project] :global(.block[data-kind='section'] .sec:has(.sec-fold)) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--sp-3);
+  }
+
+  .body-wrap[data-project] :global(.block[data-kind='section'] .sec:has(.sec-fold) > .sec-title) {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .body-wrap[data-project] :global(.block[data-kind='section'] .sec:has(.sec-fold) > .sec-fold) {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+  }
+
+  .body-wrap[data-project] :global(.block[data-kind='section'] .sec:has(.sec-fold)::after) {
+    content: var(--more-said, '');
+    grid-row: 2;
+    grid-column: 1;
+    overflow: hidden;
+    margin-block-start: 2px;
+    padding-inline-start: calc(var(--well, 28px) + var(--sp-3));
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ON A PHONE THE BAR OVER THE PAGE IS ALREADY THE WAY BACK, so a project's head keeps only its actions. */
+  @media (width < 640px) {
+    .hosted:has(.body-wrap[data-project]) :global(.page-head[data-headless] .head-back) {
+      display: none;
+    }
+  }
+
+  @media (width < 640px) {
+    .body-wrap[data-project] :global(.block[data-kind='section'] .sec:has(.sec-fold)::after) {
+      padding-inline-start: 0;
+      white-space: normal;
+    }
+  }
   /* THE OFFER UNDER THE PAGE'S BLOCKS, one tile gap below the last, in the page's own gutter. */
   .page-offer {
     padding-inline: var(--gutter);
