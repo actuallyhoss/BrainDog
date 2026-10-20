@@ -937,7 +937,7 @@ never run inside `fetch()` or a Durable Object constructor (`EvalError` in worke
 `ajv/dist/standalone` at build time is the fallback if JSON Schema ever becomes primary. The MCP
 tool-definition generator binds to `@valibot/to-json-schema`, and it runs at build:
 `scripts/gen-schemas.ts` writes the committed tool schemas and a drift test keeps them equal to
-their Valibot source ([44-SPEC-MCP](44-SPEC-MCP.md) §13 D1). Superseded for MCP: the sixteen tools carry
+their Valibot source ([44-SPEC-MCP](44-SPEC-MCP.md) §13 D1). Superseded for MCP: the seventeen tools carry
 hand-written JSON Schemas in `packages/mcp/src/index.ts`, so no generator runs (44 §2).
 
 **Rejected:** ArkType — a 90.7 ms cold start for one schema module and an error path 12× its
