@@ -111,6 +111,14 @@ test('a link is said without the id it is held as, which names nothing to a read
   assert.equal(noteOf('tickets', { ts: at, actor: 'p_1', kind: 'edit', field: 'cycle', from: ulid, to: null }), 'cycle cleared');
 });
 
+test('A WITHHELD AMOUNT IS SAID AS CHANGED, never as cleared or as its mark: "paid so far cleared" was a new amount the history keeps back', () => {
+  const at = '2026-09-17T00:00:00.000Z';
+  assert.equal(noteOf('obligations', { ts: at, actor: 'p_1', kind: 'edit', field: 'paid_so_far', from: '--redacted--', to: '--redacted--' }), 'paid so far changed');
+  assert.equal(noteOf('obligations', { ts: at, actor: 'p_1', kind: 'edit', field: 'paid_so_far', from: null, to: '--redacted--' }), 'paid so far set');
+  assert.equal(noteOf('obligations', { ts: at, actor: 'p_1', kind: 'edit', field: 'paid_so_far', from: '--redacted--', to: null }), 'paid so far cleared');
+  assert.doesNotMatch(noteOf('obligations', { ts: at, actor: 'p_1', kind: 'edit', field: 'paid_so_far', from: '--erased--', to: '--redacted--' }), /--/u);
+});
+
 test('WHO DID IT IS SAID BY NAME, and never as a person\'s id: You, the name the record has, or Someone on this record', () => {
   const me = 'p_01M2PAKF00EG11XPVBJ3PM4ZN8';
   const other = 'p_01M2PAZ28BN3FTKQB266DVT4HX';

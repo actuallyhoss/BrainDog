@@ -60,6 +60,10 @@ export function noteOf(register: string, e: Event): string {
   /* A LINK IS HELD AS THE ROW'S ID, which names nothing to a reader: Home read "cycle set to cycles#01M2PAZ…" once a use
      case's examples were linked. The event does not carry the row's title, so a link is said without its value. */
   const id = (v: unknown): boolean => typeof v === 'string' && /^(?:[a-z][a-z0-9_]*#)?[0-9A-HJKMNP-TV-Z]{26}$/u.test(v);
+  /* A VALUE THE HISTORY WITHHOLDS (every money amount and key, `--redacted--`) or lost (`--erased--`) is not a value:
+     "paid so far cleared" was said of a change whose new amount was only withheld. It is said without its value. */
+  const kept = (v: unknown): boolean => typeof v === 'string' && /^--(?:redacted|erased)--$/u.test(v);
+  if (kept(e.to) || kept(e.from)) return e.to === null || e.to === undefined || e.to === '' ? `${name} cleared` : e.from === null || e.from === undefined || e.from === '' ? `${name} set` : `${name} changed`;
   if (f?.type === 'ref' || id(e.to) || id(e.from)) return e.to === null || e.to === undefined || e.to === '' ? `${name} cleared` : e.from === null || e.from === undefined || e.from === '' ? `${name} set` : `${name} changed`;
   const was = display(register, e.field, e.from);
   const now = display(register, e.field, e.to);
