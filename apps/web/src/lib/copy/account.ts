@@ -782,8 +782,8 @@ export const account = {
   /* Sign-up for a stranger, a record of your own for somebody signed in with none, and the passkey the first run ends on */
   signupClosedTitle: 'Sign-up is not open yet',
   signupClosedWhy: 'BrainDog is not taking new sign-ups yet. If you already have one, sign in.',
-  signupNameLabel: 'A name for your record',
-  signupNameHint: 'Lower-case letters, digits and hyphens. It is part of your record\'s address.',
+  signupNameLabel: 'A name for your BrainDog',
+  signupNameHint: 'Lower-case letters, digits and hyphens. It is part of your BrainDog\'s address.',
   signupNameChecking: 'Checking the name',
   signupNameFree: 'That name is free.',
   signupNameUnreachable: 'BrainDog could not check that name. It is checked again when you send the form.',
@@ -799,13 +799,13 @@ export const account = {
   signupLinkFailedWhy: 'A link works once, within a day. Start again and a new one is sent.',
   signupStartAgain: 'Start again',
   signupPayFor: (name: string) => `Pay for ${name}`,
-  signupPayRecord: 'Pay for your record',
-  signupPayWhy: (price: string) => `BrainDog keeps your record for ${price}. You pay on Stripe's page, then come straight back here.`,
+  signupPayRecord: 'Pay for your BrainDog',
+  signupPayWhy: (price: string) => `BrainDog keeps your BrainDog for ${price}. You pay on Stripe's page, then come straight back here.`,
   signupPaying: 'Opening the payment page',
   signupCancelled: 'The payment was not made, and nothing was charged.',
-  signupWaiting: 'Making your record',
+  signupWaiting: 'Making your BrainDog',
   signupWaitingWhy: 'Your payment is in. This takes a few seconds.',
-  signupWaitingSlow: 'This is taking longer than it should. Your record is made as soon as the payment arrives, so check again in a minute.',
+  signupWaitingSlow: 'This is taking longer than it should. Your BrainDog is made as soon as the payment arrives, so check again in a minute.',
   signupCheckAgain: 'Check again',
   /* SIGN IN'S FOOT, BY WHO MAY SIGN UP (first F4, SF13): invite only asks for an invite, open creates one; closed says
      nothing, because nobody can be sent anywhere. Never "Make a record". */

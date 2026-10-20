@@ -67,14 +67,14 @@ export const words = {
   /** And when what was said was too long for a link to carry whole: said on the device that sent it. */
   sentCut: 'The link in the letter carries the start of what you said. All of it waits on this device.',
   /** Under the sentence, on a device that opened such a link and has no copy of its own. */
-  linkCut: 'The link carried the start of what you said. The rest was left for later: add it here, or once your record is made.',
+  linkCut: 'The link carried the start of what you said. The rest was left for later: add it here, or once your BrainDog is made.',
 
   /** Straight after the link, over the passkey (`PasskeyFirst`), before the build is made. */
   lockTitle: 'Your email is confirmed',
 
   /** The screen while the record is made and the build is written into it, one line for each stage. */
   making: 'Making your BrainDog',
-  makingRecord: 'Making your record',
+  makingRecord: 'Making your BrainDog',
   makingParts: (parts: readonly string[]) => (parts.length === 0 ? 'Setting it up' : `Adding ${firstRun.and(parts)}`),
   makingOpen: 'Opening it',
   /**
@@ -94,7 +94,7 @@ export const words = {
   makeFailed: 'That did not go through. Check the name, then make it again.',
   makingNow: 'Making it',
   /** A second record is on a paid plan, and a person who wants one can go there from here. */
-  payInstead: 'Pay for a record instead',
+  payInstead: 'Pay for one instead',
   /** Sign-up refused, in this screen's words where the host sent none. */
   sendFailed: 'That did not go through. Check the address, then send it again.',
   /** The mailed link opened while the host could not be reached: the link is not spent, so it is not called expired. */
