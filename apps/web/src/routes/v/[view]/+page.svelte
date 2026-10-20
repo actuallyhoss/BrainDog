@@ -44,10 +44,10 @@
   import { goto } from '$app/navigation';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { page } from '$app/state';
-  import { CapLine, Table } from 'braindog-render/svelte';
+  import { CapLine } from 'braindog-render/svelte';
   import { copy } from '$lib/copy.ts';
   import { said } from '$lib/voice.svelte.ts';
-  import { DOM_CAP, homeCurrency, iconFor, columnsFor, seqWidth, display, labelOf, toRows, whereOf, type Filter } from '$lib/record/api.ts';
+  import { DOM_CAP, iconFor, columnsFor, seqWidth, display, labelOf, toRows, whereOf, type Filter } from '$lib/record/api.ts';
   import { REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -60,7 +60,11 @@
   import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import { keptColumns, viewReader, type ViewReader, type Viewed } from '$lib/record/views-live.ts';
   import { closed, drew, opened } from '../../../lib/ui/screen.svelte.ts';
-  import { deadlineOf, withoutGood } from '../../r/[register]/parts/list.ts';
+  import { deadlineOf, isLate, weighed, wholeMoney } from '../../r/[register]/parts/list.ts';
+  import ListTable from '../../r/[register]/parts/ListTable.svelte';
+  import ListSummary from '../../r/[register]/parts/ListSummary.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
+  import type { Entry, FieldDecl } from '$lib/record/schema.ts';
   import type { Predicate } from '@braindog/where';
   import { chipsOf } from '$lib/record/api.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
@@ -202,14 +206,35 @@
   const shown = $derived(entries.slice(0, DOM_CAP));
   /* WHAT A DOT MEANS IS WHAT IT MEANS ON THE LIST THIS VIEW NARROWS (`parts/list.ts`): a finished row
      carries none, and the deadline's column carries the rest, beside the date it is about. */
-  const rows = $derived(register ? withoutGood(toRows(register, shown, columns, clock, names)) : []);
+  const rows = $derived(register ? toRows(register, shown, columns, clock, names) : []);
   const dueField = $derived(deadlineOf(decl));
   /* The number's column holds the digits of the highest id in hand, as on the list this view narrows. */
+  /* AND EACH COLUMN AS WIDE AS THE LIST DRAWS IT (`weighed`), the deadline's wide enough for "64 days late · 1 Jul 2026"
+     once a row in hand is late, so the Due cell reads as it does on the list. */
+  const anyLate = $derived(entries.some((e) => isLate(decl, e, clock)));
   const sized = $derived(
-    columns.map((c) => ({ ...(c.field === 'seq' ? { ...c, width: seqWidth(entries) } : c), tone: c.field === dueField })),
+    columns
+      .map((c) => weighed(c, c.field === decl?.title, entries))
+      .map((c) => ({ ...(c.field === 'seq' ? { ...c, width: seqWidth(entries) } : anyLate && c.field === dueField ? { ...c, width: '27ch' } : c), tone: c.field === dueField })),
   );
 
-  let focus = $state({ row: 0, col: 1 });
+  /* NO ROW IS MARKED UNTIL THE KEYBOARD MOVES (money F10): `{ row: 0 }` drew the first row grey for good, a selection
+     nobody made. The grid's caret still starts on the first cell; `focus` is only what the page draws as chosen. */
+  let focus = $state<{ row: number; col: number } | undefined>(undefined);
+
+  /* THE LIST'S OWN TABLE, READ-ONLY HERE: a view is somewhere to read the narrowed list, and its rows open their page to
+     be changed. So nothing is editable in a cell, nothing is picked, and no row wears a receipt. */
+  const bySeq = $derived(new Map(entries.map((e) => [e.seq, e] as const)));
+  const rowAt = (seq: number): Entry | undefined => bySeq.get(seq);
+  const fieldOf = (field: string): FieldDecl | undefined => decl?.fields.find((f) => f.id === field);
+  const shownValue = (seq: number, field: string): unknown => bySeq.get(seq)?.fields[field];
+  const whole = $derived(wholeMoney(decl, entries));
+  const none = new Set<number>();
+  const noKeys = new Set<string>();
+  const noFresh = new Map<number, number>();
+  const nothing = (): void => {};
+  /* The view's rows by name, which the summary's largest line says. */
+  const titleSaid = (e: Entry): string => String((decl && e.fields[decl.title]) ?? '');
   let binding = $state(false);
 
   /* ── narrowing the view with the query builder ─────────────────────────── */
@@ -260,6 +285,9 @@
     const out = await reader.read(key, chips, q);
     return out.from === 'live' ? { n: out.matched, of: out.total } : null;
   }
+
+  /* This screen's own words. */
+  const viewWords = { board: 'Board' } as const;
 
   const describeNarrowing = $derived(slashAnswers(page.data) && name ? describeWith(apiBase(), name) : undefined);
 
@@ -389,15 +417,16 @@
            pill here as well; `o` still opens it. "Narrow this view" wherever the list has fields to narrow by,
            and the way back to the view's own address once the address has narrowed it. -->
       {#if fields.length}
-        <Button weight="glass" aria-haspopup="dialog" onclick={() => (narrowing = true)}><Icon name="filter" size="s" />{copy.queryNarrowView}</Button>
+        <Button weight="glass" aria-haspopup="dialog" onclick={() => (narrowing = true)}><Icon name="filter" size="s" />{copy.filter}</Button>
       {/if}
       {#if narrowed}
         <Button weight="glass" href="/v/{key}"><Icon name="close" size="s" />{copy.backToView}</Button>
       {/if}
       <!-- `BindBlock`'s own file header opens "THIS IS THE WHOLE WIZARD", which is what `13 §10`
-           means by a page builder. An icon circle, so its name is its label and its tooltip. -->
+           means by a page builder. It says its word, "Board" (money F10): an icon alone beside "Filter" was a square
+           nobody could name. The tooltip says the whole of it. -->
       <span class="bind-slot">
-        <Button weight="glass" aria-label={copy.bindBlock} title={copy.bindBlock} aria-haspopup="dialog" onclick={() => (binding = true)}><Icon name="board" size="m" /></Button>
+        <Button weight="glass" title={copy.bindBlock} aria-haspopup="dialog" onclick={() => (binding = true)}><Icon name="board" size="s" />{viewWords.board}</Button>
       </span>
     {/snippet}
   </PageHead>
@@ -413,7 +442,7 @@
     <!-- THE BUILDER OVER THE VIEW'S NARROWING, in the same sheet the list's filter opens in, with the count and Done
          pinned at its foot. The rows reach the address when the sheet closes. -->
     {#if fields.length && register}
-      <Sheet bind:open={narrowing} title={copy.queryNarrowView}>
+      <Sheet bind:open={narrowing} title={copy.filter}>
         <QueryBuilder
           value={narrowingValue}
           {fields}
@@ -466,22 +495,49 @@
          THE SAME CARDS AS THE LIST, read against the same clock and naming refs by the same record's
          names. Without them a card dated its tone by this browser's clock and named a ref by the
          titles this tab happened to have learnt. -->
+    <!-- THE LIST'S FIGURES OVER THE VIEW'S ROWS, at every width and in every body, as the list draws them over its own. -->
+    {#if entries.length > 1}
+      <ListSummary {decl} entries={shown} now={clock} byState headSaid={saying} titleOf={titleSaid} />
+    {/if}
     {#if entries.length > 0 && rowsAsCards()}
       <RowCards {register} entries={shown} now={clock} {names} />
-    {:else}
-    <div class="table-slot" class:gone={entries.length === 0}>
-      <Table
-        columns={sized}
-        {rows}
-        home={homeCurrency()}
-        total={matched}
-        cap={DOM_CAP}
-        label={name}
-        href={at}
-        bind:focus
-        onactivate={(row) => goto(at(`/r/${register}/${row.key.split('#')[1]}`))}
-      />
-    </div>
+    {:else if entries.length > 0}
+      <!-- THE LIST'S OWN TABLE IN ONE TILE (money F10): its Due cell ("64 days late · 1 Jul"), its status rings, the
+           project's dot, and an empty cell left empty. This drew a second table of its own on the bare board, with
+           an em dash in every empty cell and a lone dot for a state. -->
+      <Tile class="list-tile view-tile">
+        <ListTable
+          {register}
+          {decl}
+          columns={sized}
+          {rows}
+          total={matched}
+          sort={undefined}
+          now={clock}
+          {whole}
+          pickable={false}
+          selected={none}
+          selectedKeys={noKeys}
+          bind:focus
+          editing={null}
+          fresh={noFresh}
+          {names}
+          onactivate={(row) => goto(at(`/r/${register}/${row.key.split('#')[1]}`))}
+          {rowAt}
+          {fieldOf}
+          editableHere={() => false}
+          {shownValue}
+          listCurrency={() => null}
+          receiptFor={() => undefined}
+          toggleSelect={nothing}
+          openEditor={nothing}
+          commitEdit={nothing}
+          cancelEdit={nothing}
+          leftTheRow={nothing}
+          cellKeys={nothing}
+          openCardMenu={nothing}
+        />
+      </Tile>
     {/if}
 
     <!--
@@ -504,40 +560,20 @@
 {/if}
 
 <style>
-  /* ONE BODY AT A TIME, and an empty state is a body. The table draws its own header row whatever
-     it holds, so leaving it under the empty state gave a column strip standing over the sentence
-     saying there was nothing to put in it. */
-  .table-slot.gone,
-  .gone :global(.cards) {
-    display: none;
-  }
-
   /* ONE HAIRLINE BETWEEN ROWS AND NONE AROUND THE TABLE, as on the list this view narrows: the last
      row's own line closed the list like a box. */
-  .table-slot :global(.rowgroup:not(:has(~ .rowgroup)) > .tr:last-child) {
+  :global(.view-tile .rowgroup:not(:has(~ .rowgroup)) > .tr:last-child) {
     border-block-end-color: transparent;
   }
 
-  /* THE BIND CONTROL IS AN ICON CIRCLE: 36 across, its name its label and its tooltip. */
+  /* THE BIND CONTROL, "Board", beside "Filter". */
   .bind-slot {
     display: inline-flex;
-  }
-
-  .bind-slot :global(.btn) {
-    inline-size: var(--ctl-h);
-    padding: 0;
   }
 
   /* Authoring is a desktop surface (13 §10). */
   @media (width < 900px) {
     .bind-slot {
-      display: none;
-    }
-  }
-
-  /* One body at a time, and this is the other half of `RowCards`' own rule. */
-  @media (width < 640px) {
-    .table-slot {
       display: none;
     }
   }
