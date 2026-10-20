@@ -293,7 +293,6 @@
         },
         {
           "kind": "table",
-          "lead": true,
           "heading": "Due this week",
           "icon": "calendar-clock",
           "span": 12,

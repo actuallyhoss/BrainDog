@@ -30,7 +30,7 @@ test('STUDIES READS THROUGH THE ADD-ON DOOR AND INSTALLS IN A SCRATCH RECORD wit
 });
 
 test('IT HOLDS FOUR LISTS AND ONE PAGE, AND THE PAGE LEADS WITH WHAT IS DUE THIS WEEK', () => {
-  assert.deepEqual(FILE.declarations.filter((d) => d.register).map((d) => d.register), ['courses', 'assignments', 'course_reads', 'study_sessions']);
+  assert.deepEqual(FILE.declarations.filter((d) => d.register && !d.rule).map((d) => d.register), ['courses', 'assignments', 'course_reads', 'study_sessions']);
   const page = FILE.declarations.find((d) => d.page === 'studies');
   assert.equal(page?.blocks?.[1]?.heading, 'Due this week');
 });
