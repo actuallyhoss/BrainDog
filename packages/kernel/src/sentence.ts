@@ -358,6 +358,17 @@ function triggerOf(text: string, world: SentenceWorld, implied: SentenceDoor | n
       options: (['create', 'update', 'delete'] as const).map((o) => ({ label: EVENT_WORDS[o], set: { 0: o === 'create' ? 'a new ' : 'a ', [timing]: EVENT_WORDS[o] } })),
     };
     conditionParts(parts, extra, list.fields);
+    /* A LIST THAT LACKS A FIELD THE CONDITION NAMES takes the condition off with it, or the swapped sentence would not read back. */
+    if (extra !== null)
+      for (const option of swap) {
+        const other = world.lists.find((l) => l.name === option.label);
+        if (other === undefined || extra.clauses.every((c) => other.fields.some((f) => f.id === c.field.id))) continue;
+        const set = option.set as Record<number, string>;
+        extra.clauses.forEach((_, i) => {
+          set[named + 1 + 2 * i] = '';
+          set[named + 2 + 2 * i] = '';
+        });
+      }
     return {
       kind: op, list, door: null, on: { written: { register: list.id, op: [op] } }, when: extra?.when ?? '', once: ['entry'], noun,
       said: joined(parts), inline: false, parts,

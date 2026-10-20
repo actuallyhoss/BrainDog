@@ -1856,7 +1856,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
 
   /** Which of these rows are private, by id, so a list can mark them: a lock beside a row its viewer kept to themselves. */
   const privateAmong = (ids: readonly string[]): Set<string> =>
-    ids.length === 0 ? new Set() : new Set(sql.all<{ entry_id: string }>(`SELECT entry_id FROM entry_private WHERE entry_id IN (${ids.map(() => '?').join(', ')})`, ...ids).map((r) => r.entry_id));
+    ids.length === 0 ? new Set() : new Set(sql.all<{ entry_id: string }>('SELECT entry_id FROM entry_private WHERE entry_id IN (SELECT value FROM json_each(?))', JSON.stringify(ids)).map((r) => r.entry_id));
 
   /** Whether a row is private to somebody other than the viewer: then it is theirs alone and reads as absent. */
   const hiddenFrom = (id: string, viewer: string | undefined): boolean =>

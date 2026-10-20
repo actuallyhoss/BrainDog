@@ -109,8 +109,8 @@ test('A MAIL IS READ BY ITS PARTS IN A RULE: {{trigger.body.from_address}} meets
   assert.ok(sara.ok);
   assert.deepEqual(sara.value.rows.map((r) => [r.fields.name, r.fields.email]), [['Sara Ali', 'sara@halden.example']]);
   assert.deepEqual(steps(sql, 'meet-senders').map((s) => s.state), ['done']);
-  /* The run's history names her, never her row's id. */
-  assert.deepEqual(steps(sql, 'meet-senders').map((s) => s.answer), ['Sara Ali, added']);
+  /* The run's history names her, never her row's id. The mail's own reading met her first, so the rule meets who is already held. */
+  assert.deepEqual(steps(sql, 'meet-senders').map((s) => s.answer), ['Sara Ali']);
   /* A name alone adds nobody, and the run says so. */
   const named = steps(sql, 'note-names');
   assert.equal(named[0]?.state, 'skipped');
@@ -130,7 +130,8 @@ test('A RULE MEETS AS UNTRUSTED WHATEVER ITS SOURCE SAYS: a stranger who looks l
   value(k.arrive({ channel: 'email', headers: { from: '"Ada Lovelace" <ada@elsewhere.example>' }, body: 'Hi.', sha256: 'u1', verified: true }));
   await k.drain();
   assert.equal(k.count('people'), 1, 'a source worded "the inbox" is still text anybody could have written');
-  assert.deepEqual(steps(sql, 'meet-inbox').map((s) => s.answer), ['Nobody added: they look like someone already known, and a question asks whether the new address is theirs.']);
+  /* The mail's own reading asked the one question; the rule meeting the same sender adds nobody and asks no second. */
+  assert.match(steps(sql, 'meet-inbox')[0]?.answer ?? '', /^Nobody added:/);
   const asked = sql.all<{ n: number }>("SELECT COUNT(*) AS n FROM suggestion WHERE status = 'open' AND body_kind = 'rowset'");
   assert.equal(asked[0]?.n, 1);
   /* HER OWN ADDRESS IS STILL HER: an exact key is met as before. */
@@ -167,13 +168,14 @@ test('A RULE THAT SAYS only: known ADDS NOBODY NEW, meets who it knows, and any 
   const { k, sql } = await record(
     rule({
       rule: 'meet-known',
-      on: { arrival: { channel: 'email' } },
-      steps: [{ meet: { email: '{{trigger.body.from_address}}', name: '{{trigger.body.from_name}}', where: 'mail', source: 'mail', only: 'known' } }],
+      on: { arrival: { channel: 'webhook' } },
+      steps: [{ meet: { email: '{{trigger.body.sender}}', name: '{{trigger.body.who}}', where: 'a form', source: 'a form', only: 'known' } }],
     }),
   );
   value(k.create('people', { name: 'Ada Lovelace', email: 'ada@example.com' }, OWNER));
-  value(k.arrive({ channel: 'email', headers: { from: '"Sam Stranger" <sam@nowhere.example>' }, body: 'Buy now.', sha256: 'k1', verified: true }));
-  value(k.arrive({ channel: 'email', headers: { from: '"Ada Lovelace" <ada@example.com>' }, body: 'Hello.', sha256: 'k2', verified: true }));
+  /* A WEBHOOK, since a mail is read for who sent it before any rule runs, and that reading meets a stranger itself. */
+  value(k.arrive({ channel: 'webhook', body: JSON.stringify({ who: 'Sam Stranger', sender: 'sam@nowhere.example' }), sha256: 'k1', verified: true }));
+  value(k.arrive({ channel: 'webhook', body: JSON.stringify({ who: 'Ada Lovelace', sender: 'ada@example.com' }), sha256: 'k2', verified: true }));
   await k.drain();
   const people = k.list({ register: 'people' });
   assert.ok(people.ok);

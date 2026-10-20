@@ -1,4 +1,4 @@
-import { briefFromNote } from '@braindog/kernel';
+import { briefFromNote, exponentOf } from '@braindog/kernel';
 import { LOOK_B_CSS } from '@braindog/theme/look-b.ts';
 
 /**
@@ -78,12 +78,8 @@ const text = (x: unknown): string | null => (typeof x === 'string' && x.trim() !
 
 /** An amount in minor units and its currency, said as a person reads it: "GBP 1,200", "JPY 5,000". */
 export function moneyLine(amount: number, currency: string): string {
-  let digits = 2;
-  try {
-    digits = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2;
-  } catch {
-    /* An unknown code is said with two decimals rather than refused: this is a card, not the ledger. */
-  }
+  /* THE ISO 4217 EXPONENT A RECORD STORES, from the kernel's one table; an unknown code is said with two decimals. */
+  const digits = exponentOf(currency);
   const major = amount / 10 ** digits;
   return `${currency} ${major.toLocaleString('en', { maximumFractionDigits: digits })}`;
 }
