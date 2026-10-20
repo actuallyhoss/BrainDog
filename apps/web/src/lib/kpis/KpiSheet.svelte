@@ -1,0 +1,728 @@
+<!--
+  ADD OR CHANGE ONE KEY NUMBER ON A PROJECT (the KPI plan of 21 October, 2.8): the shared sheet, a side panel from 900px
+  up and a bottom sheet on a phone (`Sheet.svelte`).
+
+  THREE THINGS AT REST: its name, where the number comes from, and what good looks like (a target, its unit, and by
+  when). Everything else is behind "More", with a default that follows the source until somebody sets it by hand
+  (`sheet.ts`), so most people type a name, pick a source and press Add. A number whose hidden fields say something
+  other than the defaults opens with "More" already open.
+
+  WHERE IT COMES FROM is four plain choices on one track, each with one line of what it means; the track is the
+  segmented control's idiom stood on end (`--tile-2`, the chosen one raised in `--segment-on`), with the house radio
+  beside each word so the choice is said by more than its fill. A number that already reads Numbers under its name
+  keeps that as a fifth choice.
+
+  THE WRITES ARE THE APP'S ONE ROW WRITER (`rowWriter`) on the `kpis` list: an add, or a change of only what changed.
+  What will not do is said under its field before anything is sent, and the caret goes to the first; what the record
+  refuses is said in the foot, since a toast waits for the sheet to close. A done write closes the sheet and leaves a
+  toast naming the number with Undo.
+
+  44 UNDER A THUMB: every field, segment, choice and the switch take `--tap` where the pointer is coarse or the screen
+  is a phone's.
+-->
+<script lang="ts">
+  import { page } from '$app/state';
+  import { tick } from 'svelte';
+  import { apiBase } from '$lib/at.ts';
+  import { kpis as words } from '$lib/copy/kpis.ts';
+  import { homeCurrency } from '$lib/record/api.ts';
+  import type { Shell } from '$lib/record/boot-live.ts';
+  import { REGISTERS } from '$lib/record/held.ts';
+  import { rowWriter, type RowWriter } from '$lib/record/rows-write.ts';
+  import type { Entry, Fields } from '$lib/record/schema.ts';
+  import Button from '$lib/ui/Button.svelte';
+  import Field from '$lib/ui/Field.svelte';
+  import Icon from '$lib/ui/Icon.svelte';
+  import Segmented from '$lib/ui/Segmented.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
+  import { toasts } from '$lib/ui/toast.svelte.ts';
+  import '$lib/ui/forms.css';
+  import {
+    draftOf,
+    everyFor,
+    faultsOf,
+    FIGURES,
+    firstFault,
+    newDraft,
+    patchOf,
+    rowOf,
+    saysMore,
+    sourcesFor,
+    TODAY,
+    undoOf,
+    withFigure,
+    withSource,
+    type Context,
+    type Faults,
+    type KpiDraft,
+    type KpiEvery,
+    type KpiGood,
+    type KpiSource,
+    type KpiToday,
+  } from './sheet.ts';
+
+  let {
+    open = $bindable(false),
+    project,
+    kpi = null,
+    you,
+    writer,
+    onsaved,
+  }: {
+    open?: boolean | undefined;
+    /** The project the number is on: its number and its name. */
+    project: { seq: number; name: string };
+    /** The number to change; none to add one. */
+    kpi?: Entry | null | undefined;
+    /** Who keeps a number they type; the signed-in person's name when not given. */
+    you?: string | undefined;
+    /** The writer to use; the app's own row writer when not given. */
+    writer?: RowWriter | undefined;
+    /** The number as the record now holds it, after an add, a change, a stop or an undo. */
+    onsaved?: ((entry: Entry) => void) | undefined;
+  } = $props();
+
+  const LIST = 'kpis';
+  const uid = $props.id();
+  const id = (field: string): string => `${uid}-${field}`;
+
+  const shell = $derived(page.data as unknown as Partial<Shell>);
+  const at = $derived<Context>({
+    you: you ?? (shell.me?.person ? shell.names?.[shell.me.person] : undefined) ?? null,
+    home: homeCurrency(),
+  });
+
+  let draft = $state<KpiDraft>(newDraft());
+  let touched = $state(new Set<'unit' | 'good' | 'every' | 'owner'>());
+  let more = $state(false);
+  let tried = $state(false);
+  let busy = $state(false);
+  let refused = $state<string | null>(null);
+
+  /* EACH OPENING STARTS FROM WHAT THE NUMBER HOLDS, or from the defaults, never from what the last opening left. */
+  let was = false;
+  $effect(() => {
+    if (open && !was) start();
+    was = open;
+  });
+
+  function start() {
+    const ctx = at;
+    draft = kpi ? draftOf(kpi.fields) : newDraft(ctx);
+    /* A field that differs from the default its source would give was set by somebody, so a change of source keeps it. */
+    const plain = withSource(draft, draft.source, new Set(), ctx);
+    touched = new Set((['unit', 'good', 'every', 'owner'] as const).filter((k) => draft[k] !== plain[k]));
+    more = kpi ? saysMore(draft, ctx) : false;
+    tried = false;
+    busy = false;
+    refused = null;
+  }
+
+  const faults = $derived<Faults>(tried ? faultsOf(draft) : {});
+  const figure = $derived(draft.source === 'figure');
+  const kept = $derived(kpi !== null && kpi !== undefined);
+  const suggested = $derived(kpi?.fields.draft === true);
+
+  const touch = (k: 'unit' | 'good' | 'every' | 'owner') => (touched = new Set([...touched, k]));
+  const pickSource = (s: KpiSource) => (draft = withSource(draft, s, touched, at));
+  const pickFigure = (f: string) => (draft = withFigure(draft, f, touched, at));
+
+  const SOURCE_SAID: Record<KpiSource, { title: string; line: () => string }> = {
+    typed: { title: words.kpiSourceTyped, line: () => words.kpiSourceTypedLine },
+    agent: { title: words.kpiSourceAgent, line: () => words.kpiSourceAgentLine(project.name) },
+    feed: { title: words.kpiSourceFeed, line: () => words.kpiSourceFeedLine },
+    figure: { title: words.kpiSourceFigure, line: () => words.kpiSourceFigureLine },
+    numbers: { title: words.kpiSourceNumbers, line: () => words.kpiSourceNumbersLine },
+  };
+  const EVERY_SAID: Record<KpiEvery, string> = { '1h': words.kpiEveryHour, '1d': words.kpiEveryDay, '1w': words.kpiEveryWeek, '1m': words.kpiEveryMonth };
+  const TODAY_SAID: Record<KpiToday, { label: string; line: string }> = {
+    auto: { label: words.kpiTodayAuto, line: words.kpiTodayAutoLine },
+    pinned: { label: words.kpiTodayPinned, line: words.kpiTodayPinnedLine },
+    hidden: { label: words.kpiTodayHidden, line: words.kpiTodayHiddenLine },
+  };
+  const GOOD: readonly { value: KpiGood; label: string }[] = [
+    { value: 'up', label: words.kpiGoodUp },
+    { value: 'down', label: words.kpiGoodDown },
+  ];
+
+  let own: RowWriter | undefined;
+  const writes = (): RowWriter => writer ?? (own ??= rowWriter(apiBase()));
+
+  /**
+   * THE LIST IS LEARNT BEFORE THE FIRST WRITE, as `retype-write.ts` learns its own: the row writer turns the project's
+   * number into its id by the list's declaration, and a tab that has drawn no key number yet has not been told it, so the
+   * number went as typed and the record refused it ("thing takes a row id"). Once a tab, and only for the app's writer.
+   */
+  async function ready(): Promise<void> {
+    if (writer || REGISTERS[LIST]) return;
+    const [{ createClient }, { learn }] = await Promise.all([import('@braindog/client'), import('$lib/record/remote.ts')]);
+    await learn((list) => createClient({ base: apiBase() }).schema(list), LIST, new Map());
+  }
+
+  async function save(e?: SubmitEvent) {
+    e?.preventDefault();
+    if (busy) return;
+    tried = true;
+    const first = firstFault(faultsOf(draft));
+    if (first !== null) {
+      await tick();
+      document.getElementById(id(first))?.focus();
+      return;
+    }
+    busy = true;
+    refused = null;
+    await ready();
+    const w = writes();
+    const name = draft.name.trim();
+    if (!kpi) {
+      const out = await w.create(LIST, rowOf(draft, project.seq));
+      busy = false;
+      if (!out.ok) return void (refused = out.fix);
+      open = false;
+      const made = out.entry;
+      toasts.push(words.kpiAdded(name, project.name), { undo: () => void back(w.archive(LIST, made.seq, made.version)) });
+      onsaved?.(made);
+      return;
+    }
+    const before = kpi;
+    const patch = patchOf(before.fields, draft);
+    if (Object.keys(patch).length === 0) {
+      busy = false;
+      open = false;
+      return;
+    }
+    const out = await w.update(LIST, before.seq, patch, before.version);
+    busy = false;
+    if (!out.ok) return void (refused = out.fix);
+    open = false;
+    const after = out.entry;
+    toasts.push(words.kpiSaved(name), { undo: () => void back(w.update(LIST, before.seq, undoOf(before.fields, patch), after.version)) });
+    onsaved?.(after);
+  }
+
+  /** Stop tracking: the number is retired, its values kept, and Undo makes it live again. */
+  async function stop() {
+    if (!kpi || busy) return;
+    busy = true;
+    refused = null;
+    const w = writes();
+    const before = kpi;
+    const out = await w.update(LIST, before.seq, { state: 'retired' } satisfies Fields, before.version);
+    busy = false;
+    if (!out.ok) return void (refused = out.fix);
+    open = false;
+    const after = out.entry;
+    toasts.push(words.kpiStopped(String(before.fields.name ?? '')), { undo: () => void back(w.update(LIST, before.seq, { state: before.fields.state ?? 'live' }, after.version)) });
+    onsaved?.(after);
+  }
+
+  /** An undo's write: said when it lands, and the record's sentence when it does not. */
+  async function back(write: Promise<Awaited<ReturnType<RowWriter['update']>>>) {
+    const out = await write;
+    if (!out.ok) return void toasts.push(out.fix, { intent: 'bad' });
+    toasts.push(words.kpiUndone);
+    onsaved?.(out.entry);
+  }
+
+  /** Arrows move a radiogroup's choice, and wrap, as `RowForm`'s segments do. */
+  function arrows<T extends string>(e: KeyboardEvent, i: number, values: readonly T[], set: (v: T) => void) {
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (step === 0) return;
+    e.preventDefault();
+    const n = (i + step + values.length) % values.length;
+    const next = values[n];
+    if (next === undefined) return;
+    set(next);
+    ((e.currentTarget as HTMLElement).parentElement?.children[n] as HTMLElement | undefined)?.focus();
+  }
+</script>
+
+{#snippet choose(key: string, label: string, options: readonly { value: string; label: string }[], current: string, set: (v: string) => void, line?: string)}
+  <div class="kpi-pick">
+    <span class="field-label" id={id(`${key}-label`)}>{label}</span>
+    <Segmented role="radiogroup" aria-labelledby={id(`${key}-label`)} aria-describedby={line ? id(`${key}-line`) : undefined} full>
+      {#each options as o, i (o.value)}
+        <button
+          type="button"
+          class="segment"
+          role="radio"
+          tabindex={current === o.value || (current === '' && i === 0) ? 0 : -1}
+          data-on={current === o.value ? '' : undefined}
+          aria-checked={current === o.value ? 'true' : 'false'}
+          onclick={() => set(o.value)}
+          onkeydown={(e) => arrows(e, i, options.map((x) => x.value), set)}>{o.label}</button
+        >
+      {/each}
+    </Segmented>
+    {#if line}<p class="kpi-line" id={id(`${key}-line`)}>{line}</p>{/if}
+  </div>
+{/snippet}
+
+<Sheet bind:open title={kept ? words.kpiEditTitle(String(kpi?.fields.name ?? '')) : words.kpiNewTitle} subtitle={suggested ? words.kpiOnDraft(project.name) : words.kpiOn(project.name)}>
+  <form class="kpi-form" id={id('form')} novalidate onsubmit={save}>
+    <Field id={id('name')} label={words.kpiName} error={faults.name}>
+      {#snippet children(c)}
+        <div class="field">
+          <input
+            id={id('name')}
+            class="field-input"
+            type="text"
+            autocomplete="off"
+            enterkeyhint="done"
+            maxlength="120"
+            placeholder={words.kpiNamePlaceholder}
+            aria-describedby={c.describedBy}
+            aria-invalid={c.invalid ? 'true' : undefined}
+            bind:value={draft.name}
+          />
+        </div>
+      {/snippet}
+    </Field>
+
+    <fieldset class="kpi-sources">
+      <legend class="field-label">{words.kpiSource}</legend>
+      <div class="kpi-track">
+        {#each sourcesFor(draft) as s (s)}
+          <label class="kpi-source" data-on={draft.source === s ? '' : undefined}>
+            <input type="radio" name={id('source')} value={s} checked={draft.source === s} onchange={() => pickSource(s)} />
+            <span class="kpi-source-words">
+              <span class="kpi-source-title">{SOURCE_SAID[s].title}</span>
+              <span class="kpi-source-line">{SOURCE_SAID[s].line()}</span>
+            </span>
+          </label>
+        {/each}
+      </div>
+    </fieldset>
+
+    {#if figure}
+      <Field id={id('figure')} label={words.kpiFigure} error={faults.figure}>
+        {#snippet children(c)}
+          <select
+            id={id('figure')}
+            class="kpi-select"
+            aria-describedby={c.describedBy}
+            aria-invalid={c.invalid ? 'true' : undefined}
+            value={draft.figure}
+            onchange={(e) => pickFigure(e.currentTarget.value)}
+          >
+            <option value="" disabled>{words.kpiFigurePick}</option>
+            {#each FIGURES as f (f.id)}<option value={f.id}>{f.label}</option>{/each}
+          </select>
+        {/snippet}
+      </Field>
+    {/if}
+
+    <!-- WHAT GOOD LOOKS LIKE: the figure and what it counts in side by side, the day beside them where there is room. -->
+    <div class="kpi-target">
+      <Field id={id('target')} label={words.kpiTarget} error={faults.target}>
+        {#snippet children(c)}
+          <div class="field">
+            <input
+              id={id('target')}
+              class="field-input"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              placeholder={words.kpiTargetPlaceholder}
+              aria-describedby={c.describedBy}
+              aria-invalid={c.invalid ? 'true' : undefined}
+              bind:value={draft.target}
+            />
+          </div>
+        {/snippet}
+      </Field>
+      <Field id={id('unit')} label={words.kpiUnit} error={faults.unit}>
+        {#snippet children(c)}
+          <div class="field">
+            <input
+              id={id('unit')}
+              class="field-input"
+              type="text"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder={words.kpiUnitPlaceholder}
+              aria-describedby={c.describedBy}
+              aria-invalid={c.invalid ? 'true' : undefined}
+              value={draft.unit}
+              oninput={(e) => {
+                draft.unit = e.currentTarget.value;
+                touch('unit');
+              }}
+            />
+          </div>
+        {/snippet}
+      </Field>
+      <div class="kpi-by">
+        <Field id={id('target_by')} label={words.kpiBy} error={faults.target_by}>
+          {#snippet children(c)}
+            <div class="field">
+              <input
+                id={id('target_by')}
+                class="field-input"
+                type="date"
+                aria-describedby={c.describedBy}
+                aria-invalid={c.invalid ? 'true' : undefined}
+                bind:value={draft.target_by}
+              />
+            </div>
+          {/snippet}
+        </Field>
+      </div>
+    </div>
+
+    <button type="button" class="kpi-more" aria-expanded={more} aria-controls={id('more')} onclick={() => (more = !more)}>
+      <Icon name="chevronDown" size="s" />
+      <span>{more ? words.kpiFewer : words.kpiMore}</span>
+    </button>
+
+    {#if more}
+      <div class="kpi-rest" id={id('more')}>
+        <Field id={id('measures')} label={words.kpiMeasures}>
+          {#snippet children(c)}
+            <div class="field">
+              <input id={id('measures')} class="field-input" type="text" autocomplete="off" maxlength="200" placeholder={words.kpiMeasuresPlaceholder} aria-describedby={c.describedBy} bind:value={draft.measures} />
+            </div>
+          {/snippet}
+        </Field>
+
+        {#if !figure}
+          <Field id={id('measure')} label={words.kpiMeasure} help={words.kpiMeasureHelp}>
+            {#snippet children(c)}
+              <div class="field">
+                <input id={id('measure')} class="field-input" type="text" autocomplete="off" maxlength="120" placeholder={draft.name.trim() || words.kpiNamePlaceholder} aria-describedby={c.describedBy} bind:value={draft.measure} />
+              </div>
+            {/snippet}
+          </Field>
+        {/if}
+
+        {@render choose('good', words.kpiGood, GOOD, draft.good, (v) => {
+          draft.good = v as KpiGood;
+          touch('good');
+        })}
+
+        {#if !figure}
+          {@render choose(
+            'every',
+            words.kpiEvery,
+            everyFor(draft).map((v) => ({ value: v, label: EVERY_SAID[v] })),
+            draft.every,
+            (v) => {
+              draft.every = v as KpiEvery;
+              touch('every');
+            },
+            words.kpiEveryHelp,
+          )}
+
+          <Field id={id('owner')} label={words.kpiOwner}>
+            {#snippet children(c)}
+              <div class="field">
+                <input
+                  id={id('owner')}
+                  class="field-input"
+                  type="text"
+                  autocomplete="off"
+                  maxlength="80"
+                  placeholder={words.kpiOwnerPlaceholder}
+                  aria-describedby={c.describedBy}
+                  value={draft.owner}
+                  oninput={(e) => {
+                    draft.owner = e.currentTarget.value;
+                    touch('owner');
+                  }}
+                />
+              </div>
+            {/snippet}
+          </Field>
+        {/if}
+
+        {@render choose(
+          'today',
+          words.kpiToday,
+          TODAY.map((v) => ({ value: v, label: TODAY_SAID[v].label })),
+          draft.today,
+          (v) => (draft.today = v as KpiToday),
+          TODAY_SAID[draft.today].line,
+        )}
+
+        <div class="kpi-switch">
+          <span class="kpi-switch-words">
+            <span class="kpi-switch-title" id={id('headline-label')}>{words.kpiHeadline}</span>
+            <span class="kpi-line" id={id('headline-line')}>{words.kpiHeadlineLine(project.name)}</span>
+          </span>
+          <button
+            type="button"
+            class="switch"
+            role="switch"
+            aria-checked={draft.headline}
+            aria-labelledby={id('headline-label')}
+            aria-describedby={id('headline-line')}
+            onclick={() => (draft.headline = !draft.headline)}><span class="switch-track"></span></button
+          >
+        </div>
+      </div>
+    {/if}
+
+    {#if kept && kpi?.fields.state !== 'retired'}
+      <div class="kpi-stop">
+        <Button weight="quiet" disabled={busy} onclick={() => void stop()}>{words.kpiStop}</Button>
+        <p class="kpi-line">{words.kpiStopLine}</p>
+      </div>
+    {/if}
+  </form>
+
+  {#snippet footer()}
+    {#if refused}<p class="kpi-refused" role="alert"><Icon name="alert" size="s" /><span>{refused}</span></p>{/if}
+    <Button weight="quiet" disabled={busy} onclick={() => (open = false)}>{words.kpiCancel}</Button>
+    <Button weight="primary" type="submit" form={id('form')} disabled={busy}>{busy ? words.kpiSaving : suggested ? words.kpiKeep : kept ? words.kpiSave : words.kpiAdd}</Button>
+  {/snippet}
+</Sheet>
+
+<style>
+  /* ONE COLUMN, 20 BETWEEN FIELDS, the sheet's own 16 round it. */
+  .kpi-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+    margin: 0;
+  }
+
+  .kpi-select {
+    inline-size: 100%;
+    font: inherit;
+    font-size: var(--fs-body);
+  }
+
+  /* WHERE IT COMES FROM: a fieldset with no frame of its own, its choices one track. */
+  .kpi-sources {
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .kpi-sources legend {
+    padding: 0 0 var(--sp-2);
+  }
+
+  /* THE SEGMENTED IDIOM STOOD ON END: the `--tile-2` track at the control's corner, 2 of padding, the chosen choice
+     raised in `--segment-on` at the inner corner. */
+  .kpi-track {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px;
+    background: var(--tile-2);
+    border-radius: var(--r-ctl);
+  }
+
+  .kpi-source {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    min-block-size: var(--tap);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-xs);
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .kpi-source input {
+    flex: none;
+    margin: 2px 0 0;
+  }
+
+  .kpi-source[data-on] {
+    background: var(--segment-on);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .kpi-source:not([data-on]):hover {
+      background: var(--hover);
+    }
+  }
+
+  /* THE RING ONLY FOR THE KEYBOARD: a choice pressed with a pointer is said by its radio and its fill. */
+  .kpi-source:has(input:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+
+  .kpi-source input:focus-visible {
+    /* focus-ok: the choice's own row draws the ring above, inside the track. */
+    outline: none;
+  }
+
+  .kpi-source-words {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .kpi-source-title {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
+  }
+
+  .kpi-source[data-on] .kpi-source-title {
+    font-weight: var(--fw-semi);
+  }
+
+  .kpi-source-line {
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  /* THE TARGET, ITS UNIT AND ITS DAY: three columns where the sheet is wide, the day on its own row on a phone. */
+  .kpi-target {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: var(--sp-3);
+    align-items: start;
+  }
+
+  @media (width < 640px) {
+    .kpi-target {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .kpi-by {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /* "MORE": a text button on the start edge, its chevron turning as it opens. 44 tall under a thumb. */
+  .kpi-more {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    margin-block: calc(-1 * var(--sp-2));
+    padding: 0 var(--sp-2);
+    margin-inline-start: calc(-1 * var(--sp-2));
+    background: none;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  .kpi-more :global(svg) {
+    transition: rotate var(--d-state) var(--ease-out);
+  }
+
+  .kpi-more[aria-expanded='true'] :global(svg) {
+    rotate: 180deg;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .kpi-more:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+
+  @media (pointer: coarse), (width < 640px) {
+    .kpi-more {
+      min-block-size: var(--tap);
+    }
+  }
+
+  .kpi-rest {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-5);
+  }
+
+  /* A CHOICE ON A TRACK IS LAID OUT AS A FIELD IS (`Field.svelte`): its label, 8, the track, 8, its line. */
+  .kpi-pick {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  .kpi-pick .field-label,
+  .kpi-sources legend {
+    margin-block-end: 0;
+  }
+
+  .kpi-pick :global(.segmented) {
+    align-self: flex-start;
+  }
+
+  .kpi-line {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  /* THE LINE UNDER A TRACK IS A FIELD'S HELP LINE, in its size and ink. */
+  .kpi-pick .kpi-line {
+    color: var(--ink-3);
+    font-size: var(--fs-body);
+    line-height: 1.45;
+  }
+
+  /* ONE SWITCH ROW: its title and line, the switch at the end. */
+  .kpi-switch {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+  }
+
+  .kpi-switch-words {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .kpi-switch-title {
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+  }
+
+  .kpi-stop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .kpi-refused {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-2);
+    margin: 0;
+    color: var(--red);
+    font-size: var(--fs-body);
+  }
+
+  .kpi-refused :global(svg) {
+    flex: none;
+    margin-block-start: 0.2em;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kpi-more :global(svg) {
+      transition: none;
+    }
+  }
+</style>
