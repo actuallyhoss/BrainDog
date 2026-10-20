@@ -76,7 +76,7 @@ test('the page draws that inbox as one tile, in place of the two tiles and the e
   assert.equal(one.match(/<Empty\b/gu)?.length, 1);
   assert.doesNotMatch(one, /<Tile\b/u, 'the one tile still draws the ways in or the rules beside it');
   assert.match(one, /title=\{quietWords\.title\} body=\{quietWords\.why\}/u);
-  assert.match(one, /<Button href="\/settings\/ingest">\{quietWords\.add\}<\/Button>/u);
+  assert.match(one, /<Button weight="primary" href="\/settings\/ingest">\{quietWords\.add\}<\/Button>/u, "the one thing to do is the primary (first F13)");
   /* IT WAITS FOR THE TALLY, so the cleared inbox is never drawn first and swapped a moment later. */
   assert.match(markup, /\{:else if INBOX\.length === 0 && !tallied\}\s*<Waiting \/>\s*\{:else if never\}/u);
   assert.match(src, /const never = \$derived\(patterns\.length === 0 && nothingEver\(tally, ways, INBOX\.length\)\);/u);

@@ -748,7 +748,7 @@
          rules' figure and what waits would each say nothing, three times. -->
     <div class="clear">
       <Empty kind="no-data-yet" glyph="inbox" title={quietWords.title} body={quietWords.why}>
-        {#snippet actions()}<Button href="/settings/ingest">{quietWords.add}</Button>{/snippet}
+        {#snippet actions()}<Button weight="primary" href="/settings/ingest">{quietWords.add}</Button>{/snippet}
       </Empty>
     </div>
   {:else}
