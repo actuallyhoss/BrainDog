@@ -661,6 +661,20 @@ export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member } from './members.ts';
 export { whereFor, scopeFor, NOBODY, viewerOfPrincipal, viewerOfRead, WHERE_MAX_CHARS, type Wheres } from './members.ts';
+/* SHARING (the sharing plan, Slice 1): the lens as pure functions, and nothing wired yet. `Rung` and `Capability` are
+   already names here (`change-kind.ts`, `capabilities.ts`), so the share ones go out as `ShareRung` and `LensCap`. */
+export {
+  activeAt, CAPS as LENS_CAPS, checkShare, fold as foldLens, gateFields, lensOf, nextEdge as shareNextEdge, ONCE_MS as SHARE_ONCE_MS,
+  PARAMS_MAX as SHARE_PARAMS_MAX, paramsOf as shareParamsOf, paramsOn as shareParamsOn, ROWS_MAX as SHARE_ROWS_MAX, RUNGS as SHARE_RUNGS,
+  schemaOf as lensSchemaOf, shareFault, WHERE_MAX_DEPTH as SHARE_WHERE_MAX_DEPTH, WHERE_MAX_LEAVES as SHARE_WHERE_MAX_LEAVES, whereFault as shareWhereFault,
+} from './lens.ts';
+export type {
+  Cap as LensCap, Catalog as LensCatalog, CatalogField as LensCatalogField, CatalogList as LensCatalogList, Caps as ShareCaps,
+  CheckOpts as ShareCheckOpts, Expr as LensExpr, HeldShare, Hide as ShareHide, Hours as ShareHours, Lens, LensCtx, LensLevel, LensSources,
+  Narrow as TokenNarrow, Pred as LensPred, Rung as ShareRung, Share, Target as ShareTarget, When as ShareWhen, Where as ShareWhere, Who as ShareWho,
+} from './lens.ts';
+export { dayOf as shareDayOf, sentenceOf as shareSentenceOf, type ShareNames, type WordsOpts as ShareWordsOpts } from './share-words.ts';
+export { SHARE_TEMPLATES, type ShareTemplate, type TemplateAsk as ShareTemplateAsk, type TemplateRow as ShareTemplateRow } from './share-templates.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
 export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
