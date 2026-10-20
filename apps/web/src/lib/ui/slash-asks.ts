@@ -317,7 +317,7 @@ export const words = {
   model: 'Model',
   resets: 'Resets',
   spent: 'Out of asks',
-  noModel: 'This host has no model set up for Slash, so there are no asks to count.',
+  noModel: 'Slash suggests from your own rules until a model is connected.',
   capLabel: 'Monthly limit',
   capHint: 'The most asks Slash answers in a month. Zero turns Slash off.',
   capGo: 'Save the limit',

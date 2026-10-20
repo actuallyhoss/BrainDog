@@ -25,7 +25,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Tile from '$lib/ui/Tile.svelte';
 
-  let { daily = null, link = false }: { daily?: Daily | null; link?: boolean } = $props();
+  /* `row`: one switch row inside Settings' Slash tile (UI pass 20 Oct, agents F21) rather than a tile of its own. */
+  let { daily = null, link = false, row = false }: { daily?: Daily | null; link?: boolean; row?: boolean } = $props();
 
   let client: SlashClient | null = null;
   let read = $state<Daily | null>(null);
@@ -60,42 +61,59 @@
   }
 </script>
 
+{#snippet toggle(on: boolean)}
+  <button
+    type="button"
+    class="switch"
+    role="switch"
+    aria-checked={on}
+    aria-label={words.dailySwitch}
+    aria-describedby="slash-daily-said"
+    disabled={busy}
+    onclick={flip}><span class="switch-track"></span></button
+  >
+{/snippet}
+
+{#snippet body(on: Daily)}
+  <p class="slash-daily-said" class:switch-row-line={row} id="slash-daily-said">{dailySaid(on)}</p>
+  {#if braked}<p class="slash-daily-brake" data-part="slash-brake">{braked}</p>{/if}
+  {#if link}<a class="slash-daily-link tap" href={at('/slash?history')}>{words.dailyMore}<Icon name="arrow" size="s" /></a>{/if}
+{/snippet}
+
 {#if shown}
-  <Tile icon="clock" title={words.dailyTitle} data-part="slash-daily">
-    {#snippet actions()}
-      <button
-        type="button"
-        class="switch"
-        role="switch"
-        aria-checked={shown.on}
-        aria-label={words.dailySwitch}
-        aria-describedby="slash-daily-said"
-        disabled={busy}
-        onclick={flip}><span class="switch-track"></span></button
-      >
-    {/snippet}
-    <p class="slash-daily-said" id="slash-daily-said">{dailySaid(shown)}</p>
-    {#if braked}<p class="slash-daily-brake" data-part="slash-brake">{braked}</p>{/if}
-    {#if link}<a class="slash-daily-link tap" href={at('/slash?history')}>{words.dailyMore}<Icon name="arrow" size="s" /></a>{/if}
-  </Tile>
+  {#if row}
+    <!-- ONE SWITCH ROW (`settings.css` `.switch-row`): the title and the sentence, the switch at the tile's end. -->
+    <div class="switch-row" data-part="slash-daily">
+      <div class="switch-row-words">
+        <span class="switch-row-title">{words.dailyTitle}</span>
+        {@render body(shown)}
+      </div>
+      {@render toggle(shown.on)}
+    </div>
+  {:else}
+    <Tile icon="clock" title={words.dailyTitle} data-part="slash-daily">
+      {#snippet actions()}{@render toggle(shown.on)}{/snippet}
+      {@render body(shown)}
+    </Tile>
+  {/if}
 {/if}
 
 <style>
   /* THE SENTENCE IS THE TILE'S BODY, at the body size in the second ink, kept to the measure. */
   .slash-daily-said {
     margin: 0;
-    max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    max-inline-size: 75ch;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   /* THE BRAKE'S LINE, under the sentence and quieter than it: the dim ink, the same size, the same measure. */
   .slash-daily-brake {
     margin: 0;
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-base);
+    max-inline-size: 75ch;
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -105,8 +123,8 @@
     align-items: center;
     align-self: flex-start;
     gap: var(--sp-1);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     text-decoration: none;
     transition: color var(--d-state) var(--ease-out);

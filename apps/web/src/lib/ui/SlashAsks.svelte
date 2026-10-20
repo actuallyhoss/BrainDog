@@ -36,7 +36,9 @@
 
   /* THE PAGE'S OWN `anOwner`, handed in, so there is one predicate for who owns the record and not a second one here. The
      engine decides again on every save and answers anyone else 403 `FORBIDDEN`, so this only decides what is offered. */
-  let { owner = false }: { owner?: boolean } = $props();
+  /* `bare`: drawn inside Settings' one Slash tile (UI pass 20 Oct, agents F21), which carries the title and the no-model
+     line itself, so here only the facts a model has are drawn, with no tile of their own. */
+  let { owner = false, bare = false }: { owner?: boolean; bare?: boolean } = $props();
 
   let client: ReturnType<typeof createClient> | null = null;
   let status = $state<SlashStatus | null>(null);
@@ -107,8 +109,7 @@
   }
 </script>
 
-{#if page.data.live && (!modelHere || status || refused)}
-  <Section title={words.title}>
+{#snippet body()}
     {#if !modelHere}
       <p class="hint">{words.noModel}</p>
     {:else if refused}
@@ -168,10 +169,21 @@
         </form>
       {/if}
     {/if}
-  </Section>
+  {/snippet}
+
+{#if page.data.live && bare && modelHere && (status || refused)}
+  <div class="asks-bare">{@render body()}</div>
+{:else if page.data.live && !bare && (!modelHere || status || refused)}
+  <Section title={words.title}>{@render body()}</Section>
 {/if}
 
 <style>
+  .asks-bare {
+    display: grid;
+    gap: var(--sp-3);
+    padding-block-end: var(--sp-3);
+  }
+
   /* THE SETTINGS PAGE'S FACTS AND FIELD, REDRAWN HERE, because that page's rules are scoped to it and do not reach a
      component. Same tokens, same measures, so this row lines up with `You` and `Signed in as` in the next area over. */
   .facts {

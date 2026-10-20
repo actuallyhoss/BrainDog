@@ -21,6 +21,9 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import Tile from '$lib/ui/Tile.svelte';
 
+  /* `row`: drawn as one switch row inside Settings' Slash tile (UI pass 20 Oct, agents F21), not a tile of its own. */
+  let { row = false }: { row?: boolean } = $props();
+
   let client: SlashClient | null = null;
   let read = $state<Reads | null>(null);
   let tier = $state<string | null>(null);
@@ -65,42 +68,45 @@
   }
 </script>
 
+{#snippet toggle(on: boolean)}
+  <button
+    type="button"
+    class="switch"
+    role="switch"
+    aria-checked={on}
+    aria-label={words.switch}
+    aria-describedby="slash-reads-said"
+    disabled={busy}
+    onclick={flip}><span class="switch-track"></span></button
+  >
+{/snippet}
+
 {#if shown}
-  <Tile icon="eye" title={words.title} data-part="slash-reads">
-    {#snippet actions()}
-      <button
-        type="button"
-        class="switch"
-        role="switch"
-        aria-checked={shown.on}
-        aria-label={words.switch}
-        aria-describedby="slash-reads-said"
-        disabled={busy}
-        onclick={flip}><span class="switch-track"></span></button
-      >
-    {/snippet}
-    <p class="slash-reads-said" id="slash-reads-said">{readsSaid(shown, host)}</p>
-  </Tile>
+  {#if row}
+    <!-- ONE SWITCH ROW (`settings.css` `.switch-row`): the title and the sentence, the switch at the tile's end. -->
+    <div class="switch-row" data-part="slash-reads">
+      <div class="switch-row-words">
+        <span class="switch-row-title">{words.title}</span>
+        <p class="slash-reads-said switch-row-line" id="slash-reads-said">{readsSaid(shown, host)}</p>
+      </div>
+      {@render toggle(shown.on)}
+    </div>
+  {:else}
+    <Tile icon="eye" title={words.title} data-part="slash-reads">
+      {#snippet actions()}{@render toggle(shown.on)}{/snippet}
+      <p class="slash-reads-said" id="slash-reads-said">{readsSaid(shown, host)}</p>
+    </Tile>
+  {/if}
 {/if}
 
 <style>
-  /* THE PARAGRAPH IS THE TILE'S BODY, at the body size in the second ink, kept to the measure. */
+  /* THE PARAGRAPH, at the body size in the second ink, kept to 75 characters. ONE SWITCH SHAPE: the shared one in
+     `controls.css`, ink when on with a tile-coloured knob (the rectangle this file drew is gone, agents F19). */
   .slash-reads-said {
     margin: 0;
-    max-inline-size: var(--measure);
-    color: var(--ink2);
-    font-size: var(--t-base);
+    max-inline-size: 75ch;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 22px;
-  }
-
-  /* A RECTANGLE SWITCH. The shared switch (`controls.css`) rounds its track and thumb fully; here both take a
-     rectangle's corners, the thumb two under the track's so the gap between them stays even. Colour, size, travel and
-     the right-to-left turn are the shared ones. */
-  .switch-track {
-    border-radius: 6px;
-  }
-
-  .switch-track::after {
-    border-radius: 4px;
   }
 </style>

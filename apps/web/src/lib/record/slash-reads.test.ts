@@ -20,9 +20,9 @@ test('the paragraph names what is sent, to whom, and what never is, on and off',
       assert.ok(said.includes(words.to[host]), said);
     }
   }
-  assert.match(readsSaid({ on: true }, 'included'), /the model this host runs/u);
+  assert.match(readsSaid({ on: true }, 'included'), /the model BrainDog runs/u);
   assert.match(readsSaid({ on: true }, 'key'), /your own provider, on your key/u);
-  assert.match(readsSaid({ on: true }, 'own'), /the endpoint this host is set up with/u);
+  assert.match(readsSaid({ on: true }, 'own'), /the endpoint you set up/u);
 });
 
 test('on and off are said differently, and off says the rules do the work and his own ask still goes', () => {
@@ -38,9 +38,9 @@ test('on and off are said differently, and off says the rules do the work and hi
 test('a host with no model says nothing is sent, and never names a model it does not have', () => {
   for (const on of [true, false]) {
     const said = readsSaid({ on }, 'none');
-    assert.match(said, /no model/u, said);
+    assert.match(said, /no model/iu, said);
     assert.match(said, /nothing is sent/u, said);
-    assert.doesNotMatch(said, /the model this host runs|your own provider/u, said);
+    assert.doesNotMatch(said, /the model BrainDog runs|your own provider/u, said);
   }
 });
 
@@ -93,26 +93,26 @@ test('a refusal is said in the record’s own words, and a host with no such cal
   assert.deepEqual(await readReads(odd), { ok: false, fix: words.unreached });
 });
 
-/* THE DRAWING, READ AS TEXT (no browser): one rectangle switch with its name and its paragraph, beside the daily look. */
-test('the tile draws one rectangle switch named and described, and Settings draws it under the daily look', () => {
+/* THE DRAWING, READ AS TEXT (no browser): one switch with its name and its paragraph, beside the daily look. */
+test('the tile draws the one shared switch named and described, and Settings draws it under the daily look', () => {
   const tile = readFileSync(new URL('../ui/SlashReads.svelte', import.meta.url), 'utf8');
   assert.match(tile, /role="switch"/u);
-  assert.match(tile, /aria-checked=\{shown\.on\}/u);
+  assert.match(tile, /aria-checked=\{on\}/u);
+  assert.match(tile, /@render toggle\(shown\.on\)/u);
   assert.match(tile, /aria-label=\{words\.switch\}/u);
   assert.match(tile, /aria-describedby="slash-reads-said"/u);
   assert.match(tile, /id="slash-reads-said"/u);
   assert.match(tile, /setReads\(client, !shown\.on\)/u);
   assert.match(tile, /readsSaid\(shown, host\)/u);
   assert.equal((tile.match(/role="switch"/gu) ?? []).length, 1);
-  /* NO PILL: the track and its thumb take a rectangle's corners here, and nothing in the file rounds fully. */
-  assert.match(tile, /\.switch-track\s*\{[^}]*border-radius:\s*6px/u);
-  assert.match(tile, /\.switch-track::after\s*\{[^}]*border-radius:\s*4px/u);
+  /* ONE SWITCH SHAPE IN THE APP (UI pass 20 Oct, agents F19): the rectangle override is gone, so `controls.css` draws it. */
+  assert.doesNotMatch(tile, /\.switch-track\s*\{/u);
   assert.doesNotMatch(tile, /r-round|999|border-radius:\s*50%/u);
   assert.doesNotMatch(tile, /gradient|box-shadow|backdrop-filter|—/u);
   /* The body text is the body size, never below 15px. */
-  assert.match(tile, /font-size:\s*var\(--t-base\)/u);
+  assert.match(tile, /font-size:\s*var\(--fs-body\)/u);
 
   const area = readFileSync(new URL('../../routes/settings/[area]/areas/Agents.svelte', import.meta.url), 'utf8');
   assert.match(area, /import SlashReads from '\$lib\/ui\/SlashReads\.svelte'/u);
-  assert.match(area, /<SlashDaily link \/>\s*(<!--[\s\S]*?-->\s*)?<SlashReads \/>/u);
+  assert.match(area, /<SlashDaily link row \/>\s*(<!--[\s\S]*?-->\s*)?<SlashReads row \/>/u);
 });

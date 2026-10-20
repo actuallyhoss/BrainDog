@@ -25,9 +25,14 @@
   import { read, type Result } from '$lib/data/read.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import {
-    RUNS_READ, connectLines, connected, nameOf, reachKey, reachOf, reportKeyOf,
-    runName, runsOf, standing, waiting, type Connection, type DeviceRow, type Run, type TokenRow,
+    RUNS_READ, connectLines, connected, heardFrom, nameOf, projectsOf, reachKey, reachOf, reportKeyOf,
+    runName, runsOf, standing, waiting, type Connection, type DeviceRow, type Heard, type HeardScope, type Run, type TokenRow,
   } from '$lib/record/device.ts';
+  import { recordNow } from '$lib/record/boot-live.ts';
+  import { agentKey, agentName } from '$lib/record/hand.ts';
+  import ScopeChip from '$lib/ui/ScopeChip.svelte';
+  import { words as askWords } from '$lib/ui/slash-asks.ts';
+  import { page } from '$app/state';
   import { lineOf, partsOf } from '$lib/record/apps.ts';
   import { planOf, revoke, words as vaultWords, type Plan } from '$lib/record/vault.ts';
   /* THE SIX-DIGIT FIELD, ONE COMPONENT that Home's connect sheet draws too; it approves through `vault.ts` `approve`,
@@ -49,7 +54,6 @@
   import { PRESENCE_WORDS, presenceSaid, type RunPresence } from '$lib/ui/presence-words.ts';
   import { untrack } from 'svelte';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
   import SlashAsks from '$lib/ui/SlashAsks.svelte';
   import SlashModel from '$lib/ui/SlashModel.svelte';
   import SlashDaily from '$lib/ui/SlashDaily.svelte';
@@ -83,7 +87,7 @@
    * each of those runs is at work now, gone quiet or stopped (`RunLive`), which the faces draw as their ring, and the one
    * word each reads as beside it (`RunPresence`): a run that finished reads Ended, not Stopped.
    */
-  type Held = { machines: DeviceRow[]; tokens: TokenRow[]; runs: Run[]; live: Map<number, RunLive>; presence: Map<number, RunPresence> };
+  type Held = { machines: DeviceRow[]; tokens: TokenRow[]; runs: Run[]; heard: Heard[]; live: Map<number, RunLive>; presence: Map<number, RunPresence> };
 
   /**
    * Each run's state as its face draws it, from the run's own `state` and when it was last heard from.
@@ -119,12 +123,19 @@
     if (!devices.ok) return devices;
     const keys = await c.listTokens();
     const runs = await c.list({ register: 'session', limit: RUNS_READ, order: [{ field: 'last_seen', dir: 'desc' }] });
+    /* THE PROJECTS A RUN WAS PLACED IN, by name, so a row says "on Kiln" and never `things#1`. A record without the list
+       is a row with no project, never a refusal. */
+    const things = await c.list({ register: 'things', limit: 200 }).catch(() => null);
+    const projects: Map<string, HeardScope> = things?.ok ? projectsOf('things', things.value.rows) : new Map();
     const presence = new Map<number, RunPresence>();
+    /* THE RECORD'S CLOCK (`recordNow`), so "3 min ago" is the record's and not this browser's. */
+    const now = recordNow();
     const value: Held = {
       machines: devices.value,
       tokens: keys.ok ? standing(keys.value as TokenRow[]) : [],
       runs: runs.ok ? runsOf(runs.value.rows) : [],
-      live: runs.ok ? livenessOf(runs.value.rows, Date.now(), presence) : new Map(),
+      heard: runs.ok ? heardFrom(runs.value.rows, now, projects) : [],
+      live: runs.ok ? livenessOf(runs.value.rows, now, presence) : new Map(),
       presence,
     };
     /* THE OFFER IS ASKED INSIDE THE READ, so the screen is not drawn while it is still out (below). */
@@ -140,7 +151,18 @@
   const held = read(() => (anOwner ? `agents:${apiBase()}` : null), listed);
   const rows = $derived(held.value ? connected(held.value.machines, held.value.tokens, held.value.runs) : []);
   const machines = $derived(held.value?.machines ?? []);
-  const first = $derived(waiting(machines, Date.now()).length > 0);
+  const first = $derived(waiting(machines, recordNow()).length > 0);
+
+  /**
+   * THE AGENTS HEARD FROM IN RUNS that no machine or key row above already names (agents F1): a record whose agents
+   * came in without a key drawn here (the seed, an import) still lists Claude and Codex, with when each was last heard
+   * and where. No Revoke on these: there is nothing here to revoke.
+   */
+  const heard = $derived.by(() => {
+    const named = new Set(rows.flatMap((c) => (c.run?.agent ? [agentKey(c.run.agent)] : [])));
+    return (held.value?.heard ?? []).filter((h) => !named.has(h.agent));
+  });
+  const count = $derived(rows.length + heard.length);
 
   /* ONE APPROVAL OF THE SIX DIGITS over this screen's own client, made when first asked; a refusal keeps the code
      typed, and an approval reads the list again (`CodeForm.svelte`). */
@@ -159,6 +181,10 @@
    * the line under the list that says what a propose-only key means for the person reading it.
    */
   const words = {
+    workHere: 'Agents that work here',
+    lastHeard: (when: string) => `Last heard ${when}`,
+    on: ', on ',
+    slash: 'Slash',
     scope: { read: 'can read', propose: 'can propose', write: 'can write' } as Record<string, string>,
     /* A GRANT THAT IS NOT A KEY'S SCOPE says what it may do in its own two words, and the sentence under its name says
        for how long; a one-time grant is "once", which is the whole of what makes it one. */
@@ -380,7 +406,7 @@
   {/snippet}
 
   {#if first}
-    <Section title={copy.approveTitle}><CodeForm id="user-code" approve={approveCode} onchanged={() => held.reread()} /></Section>
+    <Tile icon="key" title={copy.approveTitle}><CodeForm id="user-code" approve={approveCode} onchanged={() => held.reread()} /></Tile>
   {/if}
 
   <!--
@@ -390,15 +416,17 @@
     secret, a handle or an id: a row is named by what runs on it or the name it was given (`12 §3`). A pure list, so the
     one tile that holds no chart.
   -->
-  <Tile icon="session" title={copy.connectedTitle} count={held.state === 'ready' ? rows.length : undefined} meta={atWork}>
+  <!-- THE ONE PRIMARY ON THIS SCREEN, in the first tile's head (agents F21). -->
+  {#snippet connectButton()}
+    <Button weight="primary" size="sm" disabled={loadingSheet} onclick={() => void openSheet()}>{copy.connectTitle}</Button>
+  {/snippet}
+  <Tile icon="session" title={words.workHere} count={held.state === 'ready' ? count : undefined} actions={connectButton}>
     {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
       <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
-    {:else if rows.length === 0}
-      <Empty kind="no-data-yet" compact title={copy.connectedNone} body={copy.connectedNoneWhy}>
-        {#snippet actions()}<Button weight="primary" onclick={() => void openSheet()}>{copy.connectYourAgent}</Button>{/snippet}
-      </Empty>
+    {:else if count === 0}
+      <Empty kind="no-data-yet" compact title={copy.connectedNone} body={copy.connectedNoneWhy} />
     {:else}
-      {@const nowMs = Date.now()}
+      {@const nowMs = recordNow()}
       <ul class="whos">
         {#each rows as c (c.key)}
           {@const scope = scopeOf(c)}
@@ -433,6 +461,17 @@
               {#if c.live}
                 <Button weight="bare" size="sm" tone="bad" disabled={revoking !== null} onclick={() => void revokeRow(c)}>{copy.revokeKey}</Button>
               {/if}
+            </span>
+          </li>
+        {/each}
+        {#each heard as h (h.agent)}
+          <li class="who" data-heard="">
+            <AgentFace agent={h.agent} run={`S${h.seq}`} live={held.value?.live.get(h.seq) ?? 'stopped'} size="m" />
+            <span class="who-words">
+              <span class="who-name">{agentName(h.agent)}</span>
+              <span class="who-detail who-heard"
+                >{words.lastHeard(since(h.seen, nowMs))}{#if h.scope}{words.on}<ScopeChip scope={h.scope} inline />{/if}</span
+              >
             </span>
           </li>
         {/each}
@@ -486,11 +525,8 @@
     </div>
   {/if}
 
-  <!-- CONNECT AN AGENT: one primary button where the three boxes stood. The sheet it opens is a chunk of its own, asked
-       for on the first press; the six-digit field rides in it under the setup line while no machine waits above. -->
-  <div class="connect">
-    <Button weight="primary" disabled={loadingSheet} onclick={() => void openSheet()}>{copy.connectTitle}</Button>
-  </div>
+  <!-- CONNECT AN AGENT is the first tile's one primary; the sheet it opens is a chunk of its own, asked for on the first
+       press, and the six-digit field rides in it under the setup line while no machine waits above. -->
   {#if ConnectSheet}
     <ConnectSheet bind:open={sheetOpen} {lines} {listen} code={first ? undefined : codeForm} onchanged={() => void held.reread()} />
   {/if}
@@ -500,12 +536,17 @@
        three ways in that the record would refuse them at the end. -->
   <MyTokens />
 {/if}
-<SlashAsks owner={anOwner} />
+<!-- ONE SLASH TILE (agents F21): its one line while no model is connected, what a model has when one is, and the two
+     switch rows. Never "host": the person did not set one up. -->
+<Tile icon="slash" title={words.slash} data-part="slash">
+  {#if page.data.slash !== true}<p class="slash-line">{askWords.noModel}</p>{/if}
+  <SlashAsks owner={anOwner} bare />
+  <!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in. -->
+  <SlashDaily link row />
+  <!-- WHAT SLASH READS ON ITS OWN, and what a model is sent: the one switch for it, and the paragraph that says so. -->
+  <SlashReads row />
+</Tile>
 <SlashModel owner={anOwner} />
-<!-- SLASH LOOKING ON ITS OWN is the owner's choice, beside the agents they let in. -->
-<SlashDaily link />
-<!-- WHAT SLASH READS ON ITS OWN, and what a model is sent: the one switch for it, and the paragraph that says so. -->
-<SlashReads />
 
 <style>
   /* THE CONNECTED TILE'S ROWS: the face or the 32px well, the name over what is known about it, what it can
@@ -728,9 +769,20 @@
     margin-block-start: var(--sp-3);
   }
 
-  /* THE ONE BUTTON THAT CONNECTS AN AGENT, on the board under the list it adds to. */
-  .connect {
+  /* "LAST HEARD 3 MIN AGO, ON ● KILN": the dot and the name in the sentence, no box. */
+  .who-heard {
     display: flex;
-    margin-block-start: var(--sp-3);
+    flex-wrap: wrap;
+    align-items: center;
+    white-space: pre-wrap;
+  }
+
+  /* SLASH'S ONE LINE, under its title and over its switch rows. */
+  .slash-line {
+    margin: 0 0 var(--sp-2);
+    max-inline-size: 75ch;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 22px;
   }
 </style>
