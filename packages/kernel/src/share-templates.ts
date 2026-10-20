@@ -36,7 +36,12 @@ export const SHARE_TEMPLATES: readonly ShareTemplate[] = [
     name: 'Contractor on a project',
     asks: ['project'],
     days: 30,
-    rows: [{ effect: 'allow', what: { project: '$project', lists: ['tasks'] }, can: 'edit', caps: { delete: false } }],
+    /* THE LISTS ARE THE PROJECT'S OWN, read off the declarations (every list its scope field reaches), less the lists
+       with a money field, so the template names no list of anybody's. */
+    rows: [
+      { effect: 'allow', what: { project: '$project' }, can: 'edit', caps: { delete: false } },
+      { effect: 'deny', what: { lists: { has: 'money' } }, can: 'view' },
+    ],
   },
   {
     id: 'assistant',

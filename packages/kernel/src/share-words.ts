@@ -18,6 +18,8 @@ export type ShareNames = {
   row?: (list: string, id: string) => string | undefined;
   /** A saved view: "Review". */
   view?: (id: string) => string | undefined;
+  /** The list `meet` writes, as a sentence says it, for a share on that role. */
+  meets?: () => string | undefined;
 };
 
 export type WordsOpts = { now: number; tz?: string };
@@ -38,13 +40,16 @@ function whoOf(s: Share, n: ShareNames): string {
   if (kind === 'person') return n.person?.(id) ?? 'someone';
   if (kind === 'group') {
     const g = n.group?.(id);
-    return g ? `${g.name} (${g.people} ${g.people === 1 ? 'person' : 'people'})` : 'a group';
+    return g ? `${g.name} (${g.people === 1 ? '1 person' : `${g.people} people`})` : 'a group';
   }
   if (kind === 'email') return id;
   return 'anyone with the link';
 }
 
 const listName = (id: string, n: ShareNames): string => n.list?.(id) ?? 'a list';
+
+/** The list playing a role, by the name it was declared with: the vault's index is keys, the list `meet` writes its own. */
+const roleName = (role: 'keys' | 'meets', n: ShareNames): string => (role === 'keys' ? 'keys' : (n.meets?.() ?? 'the people you meet'));
 
 /** What a target is, as the object of a sentence. */
 function whatOf(t: Target, n: ShareNames): string {
@@ -57,7 +62,7 @@ function whatOf(t: Target, n: ShareNames): string {
     const ls = t.lists;
     if (Array.isArray(ls)) return joined(ls.map((l) => listName(l, n)));
     if ('has' in ls) return 'money lists';
-    return ls.role === 'keys' ? 'keys' : 'people';
+    return roleName(ls.role, n);
   }
   if ('rows' in t) {
     if (t.rows.length === 1) return n.row?.(t.list, t.rows[0]!) ?? `a row in ${listName(t.list, n)}`;
@@ -69,7 +74,7 @@ function whatOf(t: Target, n: ShareNames): string {
 
 /** What a deny takes away, as a noun: "money", "keys", "Payroll". */
 function nounOf(t: Target, n: ShareNames): string {
-  if ('lists' in t && !Array.isArray(t.lists) && !('project' in t)) return 'has' in t.lists ? 'money' : t.lists.role === 'keys' ? 'keys' : 'people';
+  if ('lists' in t && !Array.isArray(t.lists) && !('project' in t)) return 'has' in t.lists ? 'money' : roleName(t.lists.role, n);
   return whatOf(t, n);
 }
 

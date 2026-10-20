@@ -134,6 +134,7 @@ export function methods(deps: RecordDeps) {
         return { name: g.name, people: n };
       },
       list: (id) => listOf(id)?.name.toLowerCase(),
+      meets: () => catalog.lists.find((l) => l.role === 'meets')?.name.toLowerCase(),
       project: titleOf,
       row: (list, id) => {
         const row = rowOf(id);

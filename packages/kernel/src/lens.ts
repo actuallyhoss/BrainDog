@@ -42,7 +42,7 @@ export type Target =
   | { record: true }
   | { lists: string[] }
   | { lists: { has: 'money' } }
-  | { lists: { role: 'keys' | 'people' } }
+  | { lists: { role: 'keys' | 'meets' } }
   | { project: string; lists?: string[] }
   | { list: string; where: Where; view?: string }
   | { list: string; rows: string[] };
@@ -73,7 +73,7 @@ export type CatalogList = {
   id: string;
   name: string;
   fields: CatalogField[];
-  role?: 'keys' | 'people' | 'projects';
+  role?: 'keys' | 'meets' | 'projects';
   ownerOnly?: boolean;
   /** The field the record mirrors onto the `state` column, as `Schema.state` says. */
   state?: string;
@@ -435,7 +435,7 @@ function targetFault(t: unknown): string | null {
     const l = t.lists;
     if (isTexts(l)) return l.length ? null : 'Name at least one list.';
     if (isObj(l) && Object.keys(l).join() === 'has') return l.has === 'money' ? null : 'Lists are picked by has money.';
-    if (isObj(l) && Object.keys(l).join() === 'role') return l.role === 'keys' || l.role === 'people' ? null : 'The role is keys or people.';
+    if (isObj(l) && Object.keys(l).join() === 'role') return l.role === 'keys' || l.role === 'meets' ? null : 'The role is keys or meets.';
     return 'lists is ids, has money, or a role.';
   }
   if (keys === 'project' || keys === 'lists,project')
@@ -503,7 +503,7 @@ export function shareFault(s: unknown): { at: string; fix: string } | null {
 
 /* ------------------------------------------------------------------------------------------------- reading a target */
 
-const isGated = (l: CatalogList): boolean => l.ownerOnly === true || l.role === 'keys' || l.role === 'people';
+const isGated = (l: CatalogList): boolean => l.ownerOnly === true || l.role === 'keys' || l.role === 'meets';
 const hasMoney = (l: CatalogList): boolean => l.fields.some((f) => !f.retired && f.type === 'money');
 const scopeField = (l: CatalogList): CatalogField | undefined => l.fields.find((f) => f.scope !== undefined && !f.retired);
 

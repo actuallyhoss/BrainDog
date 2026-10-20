@@ -74,7 +74,7 @@ const CATALOG: Catalog = {
     { id: 'payroll', name: 'Payroll', fields: [{ id: 'title', type: 'text', title: true }, { id: 'salary', type: 'money' }] },
     { id: 'notes', name: 'Notes', fields: [{ id: 'body', type: 'text', title: true }] },
     { id: 'keys', name: 'Keys', role: 'keys', fields: [{ id: 'label', type: 'text', title: true }] },
-    { id: 'people', name: 'People', role: 'people', fields: [{ id: 'name', type: 'text', title: true }, { id: 'email', type: 'text' }] },
+    { id: 'people', name: 'People', role: 'meets', fields: [{ id: 'name', type: 'text', title: true }, { id: 'email', type: 'text' }] },
     { id: 'diary', name: 'Diary', ownerOnly: true, fields: [{ id: 'body', type: 'text', title: true }] },
   ],
 };

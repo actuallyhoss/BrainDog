@@ -178,7 +178,7 @@ export function catalogOf(lists: Iterable<ListLike>, roles: { keys: string; peop
   const out: CatalogList[] = [];
   for (const l of lists) {
     const fields: CatalogField[] = l.fields.map((f) => ({ ...(f as unknown as CatalogField), ...(f.id === l.title ? { title: true } : {}) }));
-    const role: CatalogList['role'] = l.id === roles.keys ? 'keys' : l.id === roles.people ? 'people' : l.scopes !== undefined ? 'projects' : undefined;
+    const role: CatalogList['role'] = l.id === roles.keys ? 'keys' : l.id === roles.people ? 'meets' : l.scopes !== undefined ? 'projects' : undefined;
     out.push({
       id: l.id,
       name: l.name,

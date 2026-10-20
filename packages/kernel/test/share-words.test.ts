@@ -56,7 +56,7 @@ test('THE TEMPLATES, filled in as the sheet fills them, read as the plan writes 
     t(id).rows.map((r) => extra({ ...r, who: { kind: 'person', id: who }, what: fill(r.what), ...(days ? { when: { until: at(NOW + days * DAY) } } : {}) })) as unknown as Share[];
 
   assert.equal(say(made('accountant', 'p_priya')), 'Priya can view money lists until 18 Jan. No keys.');
-  assert.equal(say(made('contractor', 'p_sam')), 'Sam can edit tasks in Kiln until 19 Nov.');
+  assert.equal(say(made('contractor', 'p_sam')), 'Sam can edit everything in Kiln until 19 Nov. No money.');
   assert.equal(say(made('assistant', 'p_lee')), 'Lee can edit everything except money and keys.');
   assert.equal(say(made('reviewer', 'p_ana', (r) => ({ ...r, what: { ...(r.what as object), view: 'v_review' } }))), 'Ana can comment on tasks in Review until 3 Nov.');
   assert.equal(say(made('one-row', 'p_omar', (r) => r, 6)), 'Omar can view Task 42 until Monday.');
@@ -92,7 +92,7 @@ test('NAMES, NEVER IDS, and no em dash, whatever the namer knows', () => {
   const targets: Target[] = [
     { record: true },
     { lists: ['ghost'] },
-    { lists: { role: 'people' } },
+    { lists: { role: 'meets' } },
     { project: 'r_who' },
     { project: 'r_who', lists: ['ghost'] },
     { list: 'ghost', rows: ['r_row'] },
