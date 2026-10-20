@@ -78,11 +78,12 @@
   import { spineOf } from '$lib/spine.ts';
   import { said } from '$lib/voice.svelte.ts';
   import Sheet from '$lib/ui/Sheet.svelte';
+  import Count from '$lib/ui/Count.svelte';
   import Icon, { type IconName } from '$lib/ui/Icon.svelte';
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
   import Pull from '$lib/ui/Pull.svelte';
   import { untrack } from 'svelte';
-  import { beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
+  import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
   import { page } from '$app/state';
   /* The Mac app's Go menu and braindog://goto: only an address under /app moves the window (`appPath`). */
   $effect(() => onShell('goto', (to) => {
@@ -122,11 +123,12 @@
      with no nav and no palette, and must not imply there is a record behind it (50 §5.13 step 6),
      and `/signin` because a rail listing somebody else's registers behind a sign-in form is the
      screen claiming you are already in. `/connect`, an app's consent screen, comes before any work
-     in a record as sign-in does, and without the rail it fits a phone with Allow in thumb reach. */
+     in a record as sign-in does, and without the rail it fits a phone with Allow in thumb reach. AND EVERY SCREEN UNDER
+     `/signin/`: the desktop app's return drew inside the shell, the top bar's counts over a "Signing in" (first F12). */
   const bare = $derived.by(() => {
     /* Read inside the record: the address is `/app/acme/start` and the rule is about `/start`. */
     const at = here(page.url.pathname);
-    return at === '/start' || at === '/signin' || at === '/signup' || at === '/invite' || at === '/connect' || at === '/s' || at.startsWith('/s/');
+    return at === '/start' || at === '/signin' || at.startsWith('/signin/') || at === '/signup' || at === '/invite' || at === '/connect' || at === '/s' || at.startsWith('/s/');
   });
 
   /* THE SHELL'S, AND A PAGE'S. It was local, so a page could not open the palette — which is why
@@ -188,13 +190,6 @@
     return where === href || where.startsWith(`${href}/`);
   };
 
-  /* SEARCH FROM MORE IS THE PALETTE, the one surface that reaches anything in the record, opened as
-     the sheet closes rather than over it. */
-  function find() {
-    moreOpen = false;
-    palette.open = true;
-  }
-
   /** The same order the rail draws, one nav and not two shapes. */
   /* A SAVED VIEW DRAWN UNDER ITS LIST is not drawn again under Views. The palette still reads every page in `data.nav`. */
   /* AND A TABBED SECTION'S PAGE PAST THE RAIL'S BUDGET IS THE STRIP'S, NOT THE RAIL'S (`cut`). */
@@ -228,14 +223,14 @@
      word is written out rather than read from `record/actions.ts`, which would carry the usage reader into the entry
      chunk for one word. Settings goes to `/settings`, the index of areas below 900px. */
   const USAGE = 'Usage';
-  const places = $derived([
+  /* SETTINGS IS NOT A TOOL: it stands at the sheet's foot with Sign out. */
+  const tools = $derived([
     ...(spine.includes('inbox') && !navPrefs.isHidden('/inbox') ? ([['/inbox', said('inbox'), 'inbox']] as const) : []),
     ['/automations', copy.automations, 'refresh'],
     ['/jobs', copy.jobs, 'play'],
     ['/packs', copy.packs, 'packs'],
     ['/vault', copy.vault, 'vault'],
     ['/usage', USAGE, 'observe'],
-    ['/settings', copy.settings, 'settings'],
   ] as const);
 
   /* THE PERSON'S OWN RAIL, as `boot` answered it, before anything draws it (`nav-prefs.svelte.ts`). */
@@ -293,6 +288,22 @@
   /* THE TOP BAR'S FIVE: the same places in the same order, without the phone's own pick, which Settings names for the
      phone. Agents may sit past the rail's seven, so the places under More are read too. */
   const barPlaces = $derived(tabsOf([...rail.places, ...rail.more]));
+  /* WHAT THE MORE SHEET HOLDS IS WHAT THE BAR ON SCREEN DOES NOT (frame F7): the tab bar's five below 900px, the top
+     bar's five above it, nothing at all beside a rail, which draws every place itself. */
+  let narrow = $state(false);
+  $effect(() => {
+    const mq = matchMedia('(width < 900px)');
+    const set = (): void => void (narrow = mq.matches);
+    set();
+    mq.addEventListener('change', set);
+    return () => mq.removeEventListener('change', set);
+  });
+  const onBar = $derived(new Set((narrow ? tabs : navPrefs.shape === 'rail' ? [] : barPlaces).map((i) => i.key)));
+  const moreBeyond = $derived(rail.places.filter((i) => !onBar.has(i.key)));
+  const moreViews = $derived(rail.places.flatMap((i) => rail.views[i.key] ?? []));
+  const moreOther = $derived(rail.more.filter((i) => !onBar.has(i.key)));
+  /* WHERE THE PALETTE'S "GO TO" LEADS WITH NOTHING TYPED: the bar's five places, and Settings (2.A.15). */
+  const goPlaces = $derived([...barPlaces, { key: 'settings', href: '/settings', label: copy.settings, icon: 'settings' }]);
   /* WHERE THE TOP BAR'S WORKING CHIP GOES: the Agents place, wherever the rail put it. */
   const agentsAt = $derived(agentsHref([...rail.places, ...rail.more]));
 
@@ -323,8 +334,6 @@
     drawn = { keys: new Set(now.map((i) => i.key)), hidden: [...navPrefs.hidden] };
     if (names.length > 0) toasts.push(copy.placeArrived(names));
   });
-  /* WHAT THE TOP BAR SAYS IS UNDER MORE: the places past its five, the pages that are not rows, and the lists. */
-  const behind = $derived(rail.places.length + rail.more.length - barPlaces.length + flat.pages.length + moreLists.length);
   /* THE PERSON READING, by the name the record told them, for the top bar's face. */
   const personName = $derived((data.me.person && Object.hasOwn(data.names, data.me.person) ? (data.names[data.me.person] ?? '') : '').trim());
 
@@ -475,19 +484,111 @@
      AND THE MORE SHEET CLOSES ON ONE, whichever of its rows started it: the sheet belongs to the
      shell, which outlives every screen, so a row that navigated left it open over the new screen
      unless each row closed it by hand. */
-  beforeNavigate(() => {
+  beforeNavigate((nav) => {
     leaving();
     /* The dev timing hook measures the next screen from here (`timing.ts`); off, it does nothing. */
     timingOpened();
     moreOpen = false;
     switching = false;
+    keepPlace(nav);
+  });
+
+  /**
+   * BACK TAKES YOU BACK TO WHERE YOU WERE, AND A NEW PAGE STARTS AT ITS NAME (motion F4, F5.1).
+   *
+   * The window never scrolls here: `.body` is the one scroll container, so the browser's own restoring and SvelteKit's
+   * restore nothing, and every Back landed at the top. So the place each screen was read to is kept as it is left (the
+   * last fifty), and on Back the screen is waited for (`data-screen`, at most 1.5s, and long enough to scroll that far)
+   * and put back there.
+   *
+   * FOCUS WENT TO THE BODY after every move, so a keyboard started again from the skip link and a screen reader heard
+   * nothing of the new page. After a link or a `goto` it lands on the page's `h1` (`PageHead` makes it focusable by
+   * script, with no ring for a pointer); on Back it lands on the link that was pressed to leave, when that is on screen.
+   * Not when the palette moved: it was the thing in the reader's hands.
+   */
+  const scrolls = new Map<string, number>();
+  const leftBy = new Map<string, string>();
+  const placeKey = (u: URL): string => u.pathname + u.search;
+  const scroller = (): HTMLElement | null => document.getElementById('main');
+  let fromPalette = false;
+
+  /** Resolves once `ok()` holds, or at `ms` whichever is first, checking once a frame. */
+  function waitFor(ok: () => boolean, ms: number): Promise<boolean> {
+    return new Promise((done) => {
+      const until = performance.now() + ms;
+      const tick = (): void => {
+        if (ok()) return done(true);
+        if (performance.now() >= until) return done(false);
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
+  }
+
+  /** A bounded map: the newest fifty places, so a long session does not keep every address it saw. */
+  function remember<V>(map: Map<string, V>, key: string, value: V): void {
+    map.delete(key);
+    map.set(key, value);
+    if (map.size > 50) map.delete(map.keys().next().value!);
+  }
+
+  function keepPlace(nav: { from: { url: URL } | null; to: { url: URL } | null; type: string }): void {
+    const el = scroller();
+    if (!el || !nav.from) return;
+    const from = placeKey(nav.from.url);
+    remember(scrolls, from, el.scrollTop);
+    if (nav.to && nav.type === 'link') remember(leftBy, from, placeKey(nav.to.url));
+    fromPalette = document.activeElement?.closest('dialog.palette') != null;
+  }
+
+  afterNavigate((nav) => {
+    if (nav.type === 'enter' || nav.to === null || nav.from === null) return;
+    const to = placeKey(nav.to.url);
+    const moved = nav.from.url.pathname !== nav.to.url.pathname;
+    if (nav.type === 'popstate') {
+      const y = scrolls.get(to) ?? 0;
+      const link = leftBy.get(to);
+      void waitFor(() => {
+        const el = scroller();
+        return el !== null && el.dataset.screen !== undefined && el.scrollHeight - el.clientHeight >= y;
+      }, 1500).then(() => {
+        const el = scroller();
+        if (!el) return;
+        el.scrollTop = y;
+        /* THE LINK THAT LEFT, by where it went, if it is on screen. */
+        const back = link ? [...el.querySelectorAll<HTMLAnchorElement>('a[href]')].find((a) => placeKey(new URL(a.href)) === link) : undefined;
+        const r = back?.getBoundingClientRect();
+        if (back && r && r.bottom > 0 && r.top < innerHeight) back.focus({ preventScroll: true });
+      });
+      return;
+    }
+    if (!moved || nav.to.url.hash || fromPalette) return;
+    /* A SCREEN THAT DRAWS ITS HEAD AGAIN WHEN ITS FRESH ANSWER LANDS takes the focused `h1` away with the old one, so for
+       a moment after the move a focus dropped on the body goes back to the `h1` there now. Never once the reader has
+       pressed or typed anything, and never off something they moved to. */
+    let touched = false;
+    const touch = (): void => void (touched = true);
+    addEventListener('pointerdown', touch, { capture: true, once: true });
+    addEventListener('keydown', touch, { capture: true, once: true });
+    void waitFor(() => {
+      if (touched) return true;
+      const h1 = scroller()?.querySelector<HTMLElement>('h1');
+      const now = document.activeElement;
+      if (h1 && (now === null || now === document.body)) h1.focus({ preventScroll: true });
+      return false;
+    }, 1500).then(() => {
+      removeEventListener('pointerdown', touch, { capture: true });
+      removeEventListener('keydown', touch, { capture: true });
+    });
   });
 
   /**
    * A NEW SCREEN CROSS-FADES IN, AND ONLY THE WORK MOVES (DIRECTION 38: the shell holds still, what fills it recomposes).
    *
    * Where the browser has the View Transitions API, a navigation to another screen is wrapped in one: the browser
-   * takes a picture of the work as it was, Kit draws the new screen, and the two cross-fade over `--d-page`. `#main` is
+   * takes a picture of the work as it was, Kit draws the new screen, the screen is given 250ms to draw, and the old
+   * picture leaves over `--d-exit` as the new one rises in over `--d-page` (`app.css`). The tab bar and the toasts are
+   * named and held still. `#main` is
    * named `page` for as long as that takes and the root is told not to animate (`app.css`), so the rail, the strip and
    * a docked panel do not take part. A browser without it gets the cut it always had, with `arrive`'s settle.
    *
@@ -514,6 +615,9 @@
       const moving = document.startViewTransition(async () => {
         done();
         await nav.complete.catch(() => undefined);
+        /* THE NEW PICTURE IS THE REAL PAGE: the screen is given up to 250ms to say it has drawn (`data-screen`), so the
+           fade never ends on a half-built page (motion F6). */
+        await waitFor(() => scroller()?.dataset.screen !== undefined, 250);
       });
       crossing = moving;
       moving.ready.catch(() => undefined);
@@ -912,7 +1016,6 @@
         {#if shape === 'bar'}
           <TopBar
             entries={barPlaces}
-            {behind}
             record={data.index.name || personName}
             person={personName}
             working={workingNow()}
@@ -987,7 +1090,7 @@
     </button>
   {/if}
 
-  {#if Palette}<Palette bind:open={palette.open} nav={data.nav} />{/if}
+  {#if Palette}<Palette bind:open={palette.open} nav={data.nav} places={goPlaces} />{/if}
 {/if}
 
 <!--
@@ -1012,28 +1115,21 @@
 </Sheet>
 
 <!--
-  MORE: THE PHONE'S RAIL, IN THE RAIL'S ORDER, WITH THE RAIL'S GLYPHS.
+  MORE: WHAT THE BAR DOES NOT HOLD (frame F7, 2.A.24).
 
-  It carries the declared pages under their section headings AND every list, because a page can be
-  uninstalled with the pack that declared it and the lists underneath it still have to be reachable:
-  on a phone that second group once did not exist, and the lists that hold every row in the record
-  were not in the navigation at all. The headings come too, because they are a grouping over one
-  ordered list of `page` rows, and without them "Board" is a bare word. A section's Overview is its
-  heading, not a row. It draws the flat list first, then what the rail keeps under More (`flatNav`).
+  It repeated the nav and the palette: a second "Ask or change anything" field, then the five places already in the bar,
+  then words with no glyph. Now, under "BrainDog": the record and its switcher on one row; each project with its colour;
+  "Your things", which is every place the bar or the tab bar leaves out, their views, the lists and the tools; and at the
+  foot Settings and Sign out. No search: the bar and each screen's head carry it. Every row is 44 or more and wears a
+  glyph (`doc` for a page with none of its own), and the row for the screen you are on is marked: `aria-current`, the
+  selected fill and an ink glyph. A row closes the sheet by navigating (`beforeNavigate` above). From 900px it is 360
+  wide at the window's end edge.
 
-  Every row is 44px or more and wears its glyph, and the row for the screen you are on is marked:
-  `aria-current`, the `--selected` ground and an ink glyph, as the rail marks it. A row closes the
-  sheet by navigating (`beforeNavigate` above).
+  THE LISTS COME WITH IT, because a page can be uninstalled with the pack that declared it and the lists underneath it
+  still have to be reachable.
 -->
-<Sheet bind:open={moreOpen} title={copy.more}>
+<Sheet bind:open={moreOpen} title={copy.product}>
   <nav class="more-nav" aria-label={copy.more}>
-    <!-- SEARCH AT THE HEAD, drawn as the field it leads to. It is a button and not an input: an input
-         here would be the sheet's first field, and `Sheet.svelte` puts the caret in the first field,
-         so every press of More would raise the keyboard over the list somebody came to read. -->
-    <button type="button" class="more-find" onclick={find}>
-      <Icon name="search" size="m" /><span class="more-find-words">{copy.palettePlaceholder}</span>
-    </button>
-
     <!-- THE RECORD, AND UNDER IT THE OTHER RECORDS THIS PERSON CAN OPEN. The tile is ink with the
          ground's letter, as the rail's is; the brand red belongs to the mark. -->
     <div class="more-record">
@@ -1075,23 +1171,6 @@
       </a>
     {/if}
 
-    <!-- THE PLACES, AS THE RAIL DRAWS THEM (`railOf`). On a phone the tab bar carries the first five and this carries all
-         of them, so a place past the fifth is one press from any screen. -->
-    <ul class="more-list more-spine">
-      {#each rail.places as item (item.key)}
-        <li>
-          <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) && !(rail.views[item.key] ?? []).some((v) => under(v.href)) ? 'page' : undefined}>
-            <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
-            {#if item.count}<span class="more-tally num">{item.count}</span>{/if}
-          </a>
-          <!-- A place's views, Board under Work, indented under it: the tab bar has no room for them. -->
-          {#each rail.views[item.key] ?? [] as v (v.href)}
-            <a class="more-row more-view" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}><span class="more-name">{v.title}</span></a>
-          {/each}
-        </li>
-      {/each}
-    </ul>
-
     <!-- EACH SECTION'S OWN THINGS UNDER ITS NAME, a project per row under Projects, in the thing's own colour. -->
     {#each rail.things as [section, list] (section)}
       <h3 class="more-section">{section}</h3>
@@ -1107,35 +1186,51 @@
       </ul>
     {/each}
 
-    <!-- AND THE HEADING GOES WITH THEM. `index.registers` holds only the lists that have something
-         in them, so on a young record this section would be a title over nothing. It is the record's
-         own word for its lists, as the rail's heading is (`said('lists')`), not the build's. -->
-    {#if moreLists.length > 0}
-      <h3 class="more-section">{said('lists')}</h3>
-      <ul class="more-list">
-        {#each moreLists as r}
+    <!-- YOUR THINGS: the places the bar leaves out with their views, every list with its views, and the tools. -->
+    <h3 class="more-section">{said('lists')}</h3>
+    <ul class="more-list">
+      {#each moreBeyond as item (item.key)}
+        <li>
+          <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) && !(rail.views[item.key] ?? []).some((v) => under(v.href)) ? 'page' : undefined}>
+            <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
+            {#if item.count && item.key === 'decide'}<Count n={item.count} />{:else if item.count}<span class="more-tally num">{item.count}</span>{/if}
+          </a>
+        </li>
+      {/each}
+      {#each moreViews as v (v.href)}
+        <li>
+          <a class="more-row" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}><Icon name="doc" size="m" /><span class="more-name">{v.title}</span></a>
+        </li>
+      {/each}
+      {#each moreLists as r}
+        <li>
+          <a class="more-row" href={at(`/r/${r.id}`)} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
+            <Icon name={r.icon} size="m" />
+            <span class="more-name">{r.name}</span>
+            <span class="more-tally num">{r.count}</span>
+          </a>
+        </li>
+        <!-- And its saved views, which are the same list with a predicate. -->
+        {#each r.views ?? [] as v}
           <li>
-            <a class="more-row" href={at(`/r/${r.id}`)} aria-current={under(`/r/${r.id}`) ? 'page' : undefined}>
-              <Icon name={r.icon} size="m" />
-              <span class="more-name">{r.name}</span>
-              <span class="more-tally num">{r.count}</span>
-            </a>
-            <!-- And its saved views, which are the same list with a predicate: no glyph, and indented. -->
-            {#each r.views ?? [] as v}
-              <a class="more-row more-view" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}>
-                <span class="more-name">{v.name}</span>
-              </a>
-            {/each}
+            <a class="more-row" href={at(v.href)} aria-current={under(v.href) ? 'page' : undefined}><Icon name="doc" size="m" /><span class="more-name">{v.name}</span></a>
           </li>
         {/each}
-      </ul>
-    {/if}
+      {/each}
+      {#each tools as [href, label, glyph] (href)}
+        <li>
+          <a class="more-row" href={at(href)} aria-current={under(href) ? 'page' : undefined}>
+            <Icon name={glyph} size="m" /><span class="more-name">{label}</span>
+          </a>
+        </li>
+      {/each}
+    </ul>
 
     <!-- THE PLACES PAST SEVEN, AND ACTIVITY, as the rail keeps them under More. -->
-    {#if rail.more.length > 0}
+    {#if moreOther.length > 0}
       <h3 class="more-section">{copy.otherPages}</h3>
       <ul class="more-list">
-        {#each rail.more as item (item.key)}
+        {#each moreOther as item (item.key)}
           <li>
             <a class="more-row" href={at(item.href)} aria-current={isHere(item, place) ? 'page' : undefined}>
               <Icon name={item.icon as IconName} size="m" /><span class="more-name">{item.label}</span>
@@ -1145,15 +1240,13 @@
       </ul>
     {/if}
 
+    <!-- AT THE FOOT, THE ACCOUNT'S TWO: Settings, and Sign out (LCH-A04), a press and not a link, 44 under a thumb. -->
     <ul class="more-list more-places">
-      {#each places as [href, label, glyph] (href)}
-        <li>
-          <a class="more-row" href={at(href)} aria-current={under(href) ? 'page' : undefined}>
-            <Icon name={glyph} size="m" /><span class="more-name">{label}</span>
-          </a>
-        </li>
-      {/each}
-      <!-- SIGN OUT, THE ACCOUNT'S LAST ROW (LCH-A04): a press and not a link, 44px under a thumb like every row here. -->
+      <li>
+        <a class="more-row" href={at('/settings')} aria-current={under('/settings') ? 'page' : undefined}>
+          <Icon name="settings" size="m" /><span class="more-name">{copy.settings}</span>
+        </a>
+      </li>
       <li>
         <button type="button" class="more-row" onclick={() => void signOutHere()} aria-busy={signingOut}>
           <Icon name="lock" size="m" /><span class="more-name">{signingOut ? copy.signingOut : copy.signOut}</span>
@@ -1333,7 +1426,7 @@
     z-index: -1;
     border-radius: inherit;
     background: var(--tile);
-    box-shadow: var(--glass-edge), var(--e2);
+    border: 1px solid var(--edge);
     transition: background var(--d-state) var(--ease-out);
   }
 
@@ -1386,8 +1479,15 @@
     color: var(--dim);
   }
 
+  /* ONE MOTION PER CHANGE (motion F6): where a page change is a view transition the transition is the arrival, and the
+     work's own settle would be a second one inside it. */
+  @supports not (view-transition-name: none) {
+    .body {
+      animation: arrive var(--d-page) var(--ease-out) backwards;
+    }
+  }
+
   .body {
-    animation: arrive var(--d-move) var(--ease-out) backwards;
     min-inline-size: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -1517,29 +1617,11 @@
     gap: var(--sp-1);
   }
 
-  /* SEARCH, DRAWN AS THE FIELD IT OPENS: a field's fill and radius, 44px, the words in `--dim`. */
-  .more-find {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    min-block-size: var(--tap);
-    margin-block-end: var(--sp-3);
-    padding-inline: var(--sp-3);
-    background: var(--s1);
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--dim);
-    font: inherit;
-    font-size: var(--t-md);
-    text-align: start;
-    cursor: pointer;
-  }
-
-  .more-find-words {
-    min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* FROM 900px THE SHEET IS 360 WIDE at the window's end edge: a list of places, not a form. */
+  @media (width >= 900px) {
+    :global(dialog:has(.more-nav)) {
+      inline-size: min(360px, calc(100vw - 2 * var(--inset)));
+    }
   }
 
   .more-list {
@@ -1661,12 +1743,6 @@
     color: var(--dim);
     font-size: var(--t-sm);
     font-weight: 600;
-  }
-
-  /* A saved view is its list looked at another way, and Board its place: indented under it, with no glyph of its own. */
-  .more-view {
-    padding-inline-start: calc(var(--sp-2) + var(--icon-m) + var(--sp-3));
-    color: var(--ink2);
   }
 
   /* The places the rail keeps at its foot, apart from the record's own by a hairline. */
