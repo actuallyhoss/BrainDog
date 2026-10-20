@@ -46,7 +46,7 @@ const proseAi = { run: async () => ({ choices: [{ message: { role: 'assistant', 
 test('A THROW REACHES onFail ONCE, with the phrase, the provider id and its own words scrubbed of the prompt and cut', async () => {
   const ai = throwingAi();
   const fails: ModelFail[] = [];
-  const model = workerSlashModel({ AI: ai.AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes' }, noGrants, { onFail: (f) => fails.push(f) });
+  const model = workerSlashModel({ AI: ai.AI, SLASH_INCLUDED: 'yes' }, noGrants, { onFail: (f) => fails.push(f) });
   await assert.rejects(model!.draft({ said: PROMPT } as never));
   assert.equal(ai.runs(), 1);
   assert.equal(fails.length, 1);
@@ -119,7 +119,6 @@ async function pressing(t: TestContext) {
   const c = await cloud({
     SLASH_ENDPOINT: '',
     AI: ai.AI,
-    AI_GATEWAY: 'braindog',
     SLASH_INCLUDED: 'yes',
     OPS_ALERT_TO: 'ops@example.test',
     MAIL_FROM: 'hello@brain.example.test',

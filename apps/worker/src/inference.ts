@@ -86,7 +86,16 @@ export type AiOptions = { gateway?: { id: string; collectLog?: boolean } | undef
 export type AiBinding = { run(model: string, inputs: Record<string, unknown>, options?: AiOptions): Promise<unknown> };
 
 /** The two keys this reads off the Worker's env. `AI` is `Ai`; `AI_GATEWAY` is the gateway's name, per environment. */
-export type AiEnv = { AI?: AiBinding | undefined; AI_GATEWAY?: string | undefined };
+export type AiEnv = {
+  AI?: AiBinding | undefined;
+  AI_GATEWAY?: string | undefined;
+  /** The account id (a plain var) and a Workers AI API token (the secret `WORKERS_AI_TOKEN`) for the REST path. Both, or no REST path. */
+  CF_ACCOUNT_ID?: string | undefined;
+  WORKERS_AI_TOKEN?: string | undefined;
+};
+
+/** What a test may swap: the fetch the REST path uses and where the one fault line goes. */
+export type AiDeps = { fetch?: typeof fetch | undefined; log?: ((line: string) => void) | undefined };
 
 /**
  * A model this host serves: what Workers AI calls it, and what it costs in neurons.
@@ -152,6 +161,9 @@ const tokensIn = (text: string): number => Math.ceil(new TextEncoder().encode(te
  */
 const NO_SUCH_MODEL = /no such model|model not found|not a valid model|unknown model/iu;
 
+/** A throw the model itself gave (overloaded, rate limited, a 5xx): another route to the same model would say the same, so none is tried. */
+const MODEL_SIDE = /\b(?:429|50\d)\b|overload|capacity|rate.?limit/iu;
+
 const sayOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 /** The most of the provider's own message a log line keeps. */
@@ -199,6 +211,58 @@ export const scrubRaw = (said: string): string =>
  * account level instead of the record's.
  */
 const through = (env: AiEnv): AiOptions => (env.AI_GATEWAY ? { gateway: { id: env.AI_GATEWAY, collectLog: false } } : {});
+
+/**
+ * ONE MODEL CALL THAT SURVIVES A BROKEN GATEWAY. The binding with the gateway first; if that throws anything but "no such
+ * model", the binding once more without the gateway option (a gateway that does not exist on the account makes the binding
+ * throw while the model itself is fine); if that throws too, Workers AI's REST endpoint when `CF_ACCOUNT_ID` and
+ * `WORKERS_AI_TOKEN` are both set. When no later path answers, the first throw is rethrown. A path other than the first that
+ * answers, or none answering, leaves ONE `console.warn` line naming it, so `cf-logs ai:` finds it.
+ */
+export async function runModel(env: AiEnv, model: string, inputs: Record<string, unknown>, deps: AiDeps = {}): Promise<unknown> {
+  const ai = env.AI;
+  if (ai === undefined) throw new Error('no AI binding');
+  const log = deps.log ?? ((line: string) => console.warn(line));
+  const options = through(env);
+  let first: unknown;
+  try {
+    return await ai.run(model, inputs, options);
+  } catch (e) {
+    first = e;
+    if (NO_SUCH_MODEL.test(sayOf(e)) || MODEL_SIDE.test(sayOf(e))) throw e;
+  }
+  const said = scrubRaw(sayOf(first));
+  if (options.gateway !== undefined) {
+    try {
+      const answer = await ai.run(model, inputs);
+      log(`ai: answered by binding-without-gateway; gateway ${env.AI_GATEWAY ?? ''} failed: ${said}`);
+      return answer;
+    } catch (e) {
+      if (NO_SUCH_MODEL.test(sayOf(e)) || MODEL_SIDE.test(sayOf(e))) throw e;
+    }
+  }
+  const account = env.CF_ACCOUNT_ID?.trim() ?? '';
+  const token = env.WORKERS_AI_TOKEN ?? '';
+  if (account === '' || token === '') {
+    log(`ai: no path answered; rest not configured (set CF_ACCOUNT_ID and secret WORKERS_AI_TOKEN); binding said: ${said}`);
+    throw first;
+  }
+  try {
+    const res = await (deps.fetch ?? fetch)(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/ai/run/${model}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(inputs),
+    });
+    const body = (await res.json().catch(() => null)) as { success?: unknown; result?: unknown; errors?: unknown } | null;
+    if (!res.ok || body === null || body.success === false || body.result === undefined)
+      throw new Error(`rest ${res.status} ${scrubRaw(JSON.stringify(body?.errors ?? ''))}`);
+    log(`ai: answered by rest; binding failed: ${said}`);
+    return body.result;
+  } catch (e) {
+    log(`ai: no path answered; rest said: ${scrubRaw(sayOf(e))}; binding said: ${said}`);
+    throw first;
+  }
+}
 
 /** JSON Schema's name for what a value is. `integer` is handled at the call site, since JavaScript has one number type. */
 const kindOf = (v: unknown): string => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
@@ -317,14 +381,14 @@ const int8 = (row: number[]): Int8Array => {
  * calls cross a Durable Object RPC boundary that an exception carries neither a code nor a
  * sentence across.
  */
-export function aiInference(env: AiEnv): Inference {
+export function aiInference(env: AiEnv, deps: AiDeps = {}): Inference {
   /** The binding's answer, or one of the three `Missing` reasons, so neither caller re-reads the platform's error. */
   /* `raw` IS THE PLATFORM'S OWN SENTENCE, scrubbed and cut (`scrubRaw`), carried beside the phrase and never instead. */
   const call = async (provider: string, inputs: Record<string, unknown>): Promise<{ answer: unknown } | { why: Missing; raw: string }> => {
     const ai = env.AI;
     if (ai === undefined) return { why: 'no adapter on this host', raw: '' };
     try {
-      return { answer: await ai.run(provider, inputs, through(env)) };
+      return { answer: await runModel(env, provider, inputs, deps) };
     } catch (e) {
       const said = sayOf(e);
       return { why: NO_SUCH_MODEL.test(said) ? 'the provider does not serve it' : 'the provider did not answer', raw: scrubRaw(said) };

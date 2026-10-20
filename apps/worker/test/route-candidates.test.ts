@@ -55,7 +55,7 @@ const fakeAi = (fail: boolean) => {
   };
 };
 
-const included = (ai = fakeAi(false)) => ({ AI: ai.AI, AI_GATEWAY: 'braindog', SLASH_INCLUDED: 'yes' });
+const included = (ai = fakeAi(false)) => ({ AI: ai.AI, SLASH_INCLUDED: 'yes' });
 const FALLBACK = {
   SLASH_FALLBACK_URL: FALLBACK_URL,
   SLASH_FALLBACK_MODEL: 'second-chat-model',

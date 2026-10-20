@@ -78,6 +78,9 @@ export type SlashEnv = {
   /** Workers AI, and the gateway its calls go through (`inference.ts` `AiEnv`). */
   AI?: AiBinding | undefined;
   AI_GATEWAY?: string | undefined;
+  /** The REST fallback for model calls: the account id, and the secret `WORKERS_AI_TOKEN` (`inference.ts` `runModel`). */
+  CF_ACCOUNT_ID?: string | undefined;
+  WORKERS_AI_TOKEN?: string | undefined;
   /** `yes` to offer Slash's included model. Anything else, including unset, is off, and Slash answers only on his own key. */
   SLASH_INCLUDED?: string | undefined;
   /** The most one record's asks may spend of the included model in a UTC month, in neurons. See `INCLUDED_MONTH_NEURONS`. */
@@ -312,6 +315,8 @@ export function includedInference(
       const port = aiInference({
         AI: { run: async (model, inputs, options) => ((ran = true), (provider = model), (last = await ai.run(model, inputs, options))) },
         AI_GATEWAY: env.AI_GATEWAY,
+        CF_ACCOUNT_ID: env.CF_ACCOUNT_ID,
+        WORKERS_AI_TOKEN: env.WORKERS_AI_TOKEN,
       });
       const out = await port.complete({
         model: call.model,
