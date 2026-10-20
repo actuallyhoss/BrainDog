@@ -548,6 +548,11 @@
         { "count": 1, "on": "2026-10-09", "why": "Batch 46 swept the web, the cli's source and import, and the render lint: 42 files, 142 lines. The record's own index is the one left." },
         { "count": 0, "on": "2026-10-09", "why": "Batch 47 swapped the record index's six lines (record-index-47). Nothing is allowed now." }
       ]
+    },
+    "sight.ALLOWED": {
+      "lines": [
+        { "count": 46, "on": "2026-10-20", "why": "The record's reads of rows that sit behind no sight check, each with its reason by file and function: the sight module itself, the record's own nightly and Slash paths read as NOBODY, the owner's and the decider's, reads that answer no row, and two write paths not yet held to the row. Sharing slice 3 completed the list and turned the gate on; an entry goes when its site is gated." }
+      ]
     }
   },
   "deviations": {

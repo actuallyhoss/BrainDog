@@ -244,4 +244,7 @@ export default function sight(
 }
 
 /* AND IT IS STILL A SCRIPT, as every called gate is. `?? 0` because a pass returns nothing. */
-if (import.meta.main) process.exitCode = sight(process.argv.slice(2).find((a) => !a.startsWith('--'))) ?? 0;
+if (import.meta.main) {
+  const [, , ...args] = process.argv;
+  process.exitCode = sight(args.find((a) => !a.startsWith('--'))) ?? 0;
+}
