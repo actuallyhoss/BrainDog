@@ -634,7 +634,8 @@
     {#snippet actions()}
       {#if headLine && wide.current}{@render lineInHead()}{/if}
       {#if declared?.action && !arranging && !showSource}
-        <Button weight="primary" onclick={pressHead}>{declared.action.label}</Button>
+        <!-- AN ADD WEARS THE PLUS, so on a phone it is the 36px square the head draws for a glyph (`PageHead.svelte`). -->
+        <Button weight="primary" onclick={pressHead}>{#if /^(add|new)\b/iu.test(declared.action.label)}<Icon name="plus" size="s" />{/if}{declared.action.label}</Button>
       {/if}
       {#if !arranging}
         <!-- SHARE, AND ONE "⋯" FOR THE REST (DIRECTION §35): How this is built, Change this page and Edit layout were
