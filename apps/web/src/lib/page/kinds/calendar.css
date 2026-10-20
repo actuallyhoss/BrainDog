@@ -341,15 +341,10 @@
       grid-column: 1 / -1;
     }
 
-    /* "Mon" is drawn as its first letter: the word is still the cell's, and `abbr` names it in full. */
+    /* The weekday over its column, "Mon" at the caption size, centred: at 45px a day it fits whole. */
     .calendar-month th {
       padding: 0 0 var(--sp-1);
-      font-size: 0;
       text-align: center;
-    }
-
-    .calendar-month th::first-letter {
-      font-size: var(--fs-cap);
     }
 
     .calendar-month tr {
