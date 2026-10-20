@@ -4,8 +4,9 @@
  *
  * ROWS ARE THE SHAPES (`leak/fixture.ts`): the owner, a whole-record view, the five share templates as today's member
  * rows emulate them (assistant, accountant, contractor on Kiln, reviewer as a condition, one row), a whole-record reader
- * held to Kiln's tasks, adds only, and Sam who keeps rows private. Each runs as the person, a write-scope token and a
- * read-scope token. COLUMNS ARE THE READ PATHS (`leak/routes.ts`, `leak/mcp.ts`): every READ+ and DATA route that changes
+ * held to Kiln's tasks, adds only, and Sam who keeps rows private; and the same grants made as real shares through the
+ * share API, with a deny inside an allow, an expired share, a group's share and the comment rung. Each runs as the person,
+ * a write-scope token and a read-scope token, and each share grantee also as the owner seeing as them. COLUMNS ARE THE READ PATHS (`leak/routes.ts`, `leak/mcp.ts`): every READ+ and DATA route that changes
  * nothing, through the host's handler table, and all 17 MCP tools and the resources, through `serveMcp`.
  *
  * THE PROPERTIES ARE §4.4's: P1 (no canary or out-of-sight id in any answer) on every path; P2 (non-interference: an
@@ -25,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { scopeOf } from '../../../apps/web/src/lib/data/local.ts';
 import { leaks } from './leak/canary.ts';
-import { build, personCtx, SHAPES, unseen, type Caller, type Fixture, type RowInfo, type Shape } from './leak/fixture.ts';
+import { build, personCtx, SHAPES, unseen, variantsOf, type Caller, type Fixture, type RowInfo, type Shape } from './leak/fixture.ts';
 import { argsFor, ask, CORE, handlers, LIST_IDS, READ_ROUTES, walked, type Args } from './leak/routes.ts';
 import { callTool, listResources, readResource, TOOL_NAMES, toolArgs, WRITES } from './leak/mcp.ts';
 
@@ -88,7 +89,10 @@ for (const route of READ_ROUTES) {
       for (const caller of f.callers) {
         const answer = await ask(h, route, args, caller.ctx);
         assert.equal((answer as { threw?: string }).threw, undefined, `${route} threw for ${caller.label} on ${JSON.stringify(args)}`);
-        for (const l of leaks(answer, f.out(caller))) note(found, caller, `${l} <- ${JSON.stringify(args).slice(0, 80)}`);
+        /* A PAGE BODY SHE DRAFTED IS ECHOED AS SHE WROTE IT, an id she typed in a block's `where` among it, which is no
+           leak back to her. Only that echo is left out; the rows the preview draws are still read for canaries. */
+        const read = route === 'previewPage' ? JSON.parse(JSON.stringify(answer, (k, v) => (k === 'where' ? undefined : v))) : answer;
+        for (const l of leaks(read, f.out(caller))) note(found, caller, `${l} <- ${JSON.stringify(args).slice(0, 80)}`);
       }
     assert.equal(found.size, 0, `${route} answered what its caller may not see:\n${said(found)}`);
   });
@@ -398,7 +402,13 @@ test('G8 a removed member\'s poll is answered in a way the app wipes the copy on
 
 /* ── the shapes the matrix could not build yet ──────────────────────────── */
 
-test('SHAPES: the §4.2 grants not buildable before shares are wired wait on their slices', { todo: 'hidden field (G9), comment rung (G10), groups, time, once and deny (G11), child tokens and See as: Slice 5 onward' }, () => {
+test('SHAPES: the §4.2 grants made as real shares are in the matrix, each also seen as by the owner', () => {
   const built = new Set(SHAPES.map((s: Shape) => s.id));
-  for (const wanted of ['hidden-field', 'comment', 'group', 'expired', 'hours', 'once', 'deny', 'child-token', 'see-as']) assert.ok(built.has(wanted), wanted);
+  for (const wanted of ['sh-whole', 'sh-accountant', 'sh-contractor', 'sh-condition', 'sh-one-row', 'deny', 'expired', 'group', 'comment']) assert.ok(built.has(wanted), wanted);
+  for (const s of SHAPES.filter((x) => x.shares)) assert.ok(variantsOf(s).includes('see-as'), s.id);
+});
+
+test('SHAPES: the §4.2 grants that wait on later slices', { todo: 'hidden field (Slice 6), outside its hours, once after it ran out, and child tokens (Slice 9)' }, () => {
+  const built = new Set(SHAPES.map((s: Shape) => s.id));
+  for (const wanted of ['hidden-field', 'hours', 'once', 'child-token']) assert.ok(built.has(wanted), wanted);
 });

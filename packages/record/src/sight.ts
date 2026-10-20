@@ -10,8 +10,8 @@
  * `backlinks` and a search's count. Each is handed the caller's `wheres` and viewer, so none of them is a second copy
  * of who may see what.
  *
- * THE WRITE HALF (Slice 4, `writeSight`). Today's grants feed it: the write predicate on a list is the caller's read
- * scope there (`kernel.scope`), because one rule per list per person says both what a member reads and what they write.
+ * THE WRITE HALF (Slice 4, `writeSight`). The write predicate on a list is a share's narrower write rule where the lens
+ * gave one (`ctx.writes`, `kernel.writeScope`), else the caller's read scope there (`kernel.scope`).
  * BEFORE THE WRITE (`writable`): a row outside the predicate (`mayWrite`) is answered exactly as a row that is not
  * there, the same code and sentence as the method gives for a missing one, so no refusal proves a row exists; a delete
  * asks the delete capability; a hidden field in a patch is a field the list does not have; and a writer whose predicate
@@ -169,16 +169,17 @@ export function writeSight(deps: SightDeps) {
 
   /**
    * The rows this caller may add to one list (the append predicate), as the scope the kernel's create takes, or
-   * `undefined` for any row. An appender who reads nothing still adds, inside her rule.
+   * `undefined` for any row. An appender who reads nothing still adds, inside her rule. A share's narrower write rule
+   * holds her adds too (`writeScope`), so a view of the whole list and an edit of some of it add only to that part.
    */
-  const added = (ctx: CallContext, register: string): Json | undefined => kernel.scope(ctx, register);
+  const added = (ctx: CallContext, register: string): Json | undefined => kernel.writeScope(ctx, register);
 
   /**
    * The rows of one list already there this caller may write (the write predicate), as the scope the kernel's write
    * takes: `undefined` for every row, and `null` for none, when she cannot read the list at all, since the write
    * predicate includes read.
    */
-  const within = (ctx: CallContext, register: string): Json | undefined => (reads(ctx, register) ? kernel.scope(ctx, register) : null);
+  const within = (ctx: CallContext, register: string): Json | undefined => (reads(ctx, register) ? kernel.writeScope(ctx, register) : null);
 
   /** Whether one row is inside what this caller may write on its list, deleted or not. One query, by id. */
   const mayWrite = (ctx: CallContext, register: string, id: string): boolean => {
@@ -187,8 +188,9 @@ export function writeSight(deps: SightDeps) {
   };
 
   /**
-   * THE GATE FIELDS OF A LIST: every field some active grant's condition on it reads (today a member's `row_where`), so
-   * changing one changes who sees the row. Slice 5 adds the shares' conditions and a project share's scope field.
+   * THE GATE FIELDS OF A LIST: every field some active grant's condition on it reads, a member's `row_where` and a
+   * share's condition, and the scope field of a list a project share covers (§2.6), so changing one changes who sees
+   * the row.
    */
   const gateFields = (register: string): ReadonlySet<string> => {
     const rules = sql.all<{ row_where: string }>(
@@ -196,8 +198,9 @@ export function writeSight(deps: SightDeps) {
         WHERE m.register = ? AND m.row_where IS NOT NULL AND p.suspended_at IS NULL`,
       register,
     );
-    if (rules.length === 0) return NONE;
-    const out = new Set<string>();
+    const shared = kernel.gateFields(register);
+    if (rules.length === 0 && shared.length === 0) return NONE;
+    const out = new Set<string>(shared);
     for (const r of rules) {
       let rule: Json;
       try {
@@ -243,7 +246,7 @@ export function writeSight(deps: SightDeps) {
     }
     /* A CONDITIONAL WRITER LEAVES THE GATE FIELDS AS THEY ARE. Whole-list writers, and creates, are not asked here: the
        kernel holds a create to the predicate after it is made. */
-    const conditional = ctx.wheres !== undefined && Object.hasOwn(ctx.wheres, register);
+    const conditional = (ctx.wheres !== undefined && Object.hasOwn(ctx.wheres, register)) || (ctx.writes !== undefined && Object.hasOwn(ctx.writes, register));
     if (row === null || !conditional) return null;
     const gates = gateFields(register);
     for (const key of Object.keys(sent)) {

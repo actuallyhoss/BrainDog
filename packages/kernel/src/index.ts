@@ -2050,6 +2050,17 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   };
 
   /**
+   * The rows of a list this caller may change (sharing plan §2.6), as `WriteContext.within` takes them: a share's
+   * narrower write predicate (`ctx.writes`) where the lens gave one, which already holds read inside it, else the read
+   * scope. The private rows left out for the viewer stay out either way.
+   */
+  const writeScope = (ctx: Parameters<typeof scope>[0] & { writes?: Readonly<Wheres> | undefined }, register: string): Json | undefined => {
+    if (ctx.writes === undefined || !Object.hasOwn(ctx.writes, register)) return scope(ctx, register);
+    const viewer = viewerOfRead(ctx);
+    return scopeFor({ [register]: ctx.writes[register]! }, register, viewer, anyHiddenFrom(viewer, register));
+  };
+
+  /**
    * The clause a row of one list meets to be admitted under a grant (`wheres`) for a viewer, or `null` when every row is:
    * `scope`'s rule compiled once, so a reader that writes its own SQL (`inScope`, `backlinks`, a search's count) leaves
    * out what `list` leaves out. A rule that cannot be read admits nothing, as `narrowed` holds it for `list`.
@@ -11621,6 +11632,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     privateAmong,
     madeBy: (id: string): string | null => madeByIn(sql, id),
     scope,
+    writeScope,
     /** Writes held to the row (sharing plan §2.6): whether a scope admits one row, the fields a rule names, and who to ask. */
     admits,
     ruleFields,

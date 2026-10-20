@@ -11,7 +11,8 @@
  * row rule (`row_where`, `wheres`), each made through `invite` and read back through `kernel.access` into the context a
  * host builds (`sessionContext` for a person; `bearerOf`'s shape for a token). The five templates of
  * `kernel/src/share-templates.ts` are emulated by those rows until Slice 5 wires shares (`templateRows`), and each shape
- * runs as the person, their write-scope token and their read-scope token.
+ * runs as the person, their write-scope token and their read-scope token. The shapes with `shares` are made through the
+ * share API (Slice 7) on guests, and run as the owner seeing as them too (`seeAs`).
  */
 
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ import assert from 'node:assert/strict';
 import type { Entry } from '@braindog/kernel';
 
 import { createRecordApi, type CallContext } from '../../src/index.ts';
-import { sessionContext } from '../../../host/src/auth.ts';
+import { seeAs, sessionContext, type HeldAccess } from '../../../host/src/auth.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../../kernel/test/sqlite.ts';
 import { minter, mulberry32, primes, type Canary } from './canary.ts';
 
@@ -38,7 +39,13 @@ const text = (id: string, extra: Record<string, unknown> = {}) => ({ id, type: '
 /** The lists, each with the fields §4.1 names. */
 export const LISTS = [
   register({ id: 'things', name: 'Projects', title: 'name', scopes: { repos: 'repos' }, fields: [text('name', { required: true }), text('notes'), { id: 'repos', type: 'list', of: 'text' }] }),
-  register({ id: 'people', name: 'People', title: 'name', fields: [text('name', { required: true }), { id: 'email', type: 'email', index: true }] }),
+  register({
+    id: 'people',
+    name: 'People',
+    title: 'name',
+    meets: { name: 'name', email: 'email', met: 'met', merged_into: 'merged_into' },
+    fields: [text('name', { required: true }), { id: 'email', type: 'email', index: true }, { id: 'met', type: 'list', of: 'text' }, { id: 'merged_into', type: 'ref', to: 'people' }],
+  }),
   register({
     id: 'tasks',
     name: 'Tasks',
@@ -124,12 +131,19 @@ export type Shape = {
   sees: (r: RowInfo, f: Built) => boolean;
   /** Whether this shape is narrowed by a row rule, which is where today's gaps are. */
   narrowed?: boolean;
+  /**
+   * The shares that make the grant, through the share API as the owner makes them (Slice 7), each lasting 30 days. The
+   * person is a guest with no member row. `ended` is a share that has run out by the time the matrix asks.
+   */
+  shares?: (f: Built) => (Record<string, unknown> & { ended?: true })[];
+  /** The shares go to a group the person is in, not to the person. */
+  group?: true;
 };
 
-export type Variant = 'person' | 'write-token' | 'read-token';
+export type Variant = 'person' | 'write-token' | 'read-token' | 'see-as';
 export type Caller = { shape: Shape; variant: Variant; ctx: CallContext; label: string };
 
-type Built = { ids: { kiln: string; loom: string }; seqs: Record<string, number> };
+type Built = { ids: { kiln: string; loom: string; one: string }; seqs: Record<string, number> };
 
 export const SHAPES: readonly Shape[] = [
   { id: 'owner', name: 'Owner (non-interference control)', person: OWNER, sees: () => true },
@@ -180,9 +194,80 @@ export const SHAPES: readonly Shape[] = [
   },
   { id: 'adds', name: 'Adds only on money', person: 'p_add', invite: { registers: { money: 'append' } }, sees: () => false },
   { id: 'maker', name: 'Sam, who keeps rows private', person: SAM, invite: { level: 'write' }, sees: () => true },
+
+  /* THE SAME GRANTS AS SHARES (Slice 7), on guests with no member row. A whole-record share leaves out the lists only
+     named shares reach: Keys and the people `meet` writes (sharing plan §2.3). */
+  { id: 'sh-whole', name: 'Whole-record view, shared', person: 'p_wsh', shares: () => [{ what: { record: true }, can: 'view' }], sees: (r) => r.list !== 'people' },
+  {
+    id: 'sh-accountant',
+    name: 'Accountant, shared',
+    person: 'p_acs',
+    shares: () => [
+      { what: { lists: { has: 'money' } }, can: 'view' },
+      { effect: 'deny', what: { lists: { role: 'keys' } }, can: 'view' },
+    ],
+    sees: (r) => r.list === 'tasks' || r.list === 'money',
+  },
+  {
+    id: 'sh-contractor',
+    name: 'Contractor on Kiln, shared',
+    person: 'p_cos',
+    shares: (f) => [{ what: { project: f.ids.kiln, lists: ['tasks'] }, can: 'edit', caps: { delete: false } }],
+    sees: (r) => (r.list === 'tasks' && r.thing === 'kiln') || r.key === 'kiln',
+    narrowed: true,
+  },
+  {
+    id: 'sh-condition',
+    name: 'Condition (tasks where stage = Review), shared',
+    person: 'p_rvs',
+    shares: () => [{ what: { list: 'tasks', where: { field: 'stage', is: 'review' } }, can: 'view' }],
+    sees: (r) => r.list === 'tasks' && r.stage === 'review',
+    narrowed: true,
+  },
+  {
+    id: 'sh-one-row',
+    name: 'A single row, shared',
+    person: 'p_ors',
+    shares: (f) => [{ what: { list: 'tasks', rows: [f.ids.one] }, can: 'view' }],
+    sees: (r, f) => r.list === 'tasks' && r.seq === f.seqs.one,
+    narrowed: true,
+  },
+  {
+    id: 'deny',
+    name: 'A deny on a row inside an allow',
+    person: 'p_dny',
+    shares: (f) => [
+      { what: { lists: ['tasks'] }, can: 'view' },
+      { effect: 'deny', what: { list: 'tasks', rows: [f.ids.one] }, can: 'view' },
+    ],
+    sees: (r, f) => r.list === 'tasks' && r.seq !== f.seqs.one,
+    narrowed: true,
+  },
+  {
+    id: 'expired',
+    name: 'Expired, beside a share still live',
+    person: 'p_exp',
+    shares: () => [
+      { what: { lists: ['notes'] }, can: 'view' },
+      { what: { record: true }, can: 'view', ended: true },
+    ],
+    sees: (r) => r.list === 'notes',
+  },
+  { id: 'group', name: "A group's share", person: 'p_grp', group: true, shares: () => [{ what: { lists: ['money'] }, can: 'view' }], sees: (r) => r.list === 'money' },
+  {
+    id: 'comment',
+    name: 'Comment on Kiln',
+    person: 'p_cmt',
+    shares: (f) => [{ what: { project: f.ids.kiln }, can: 'comment' }],
+    sees: (r) => r.key === 'kiln' || (['tasks', 'money', 'notes'].includes(r.list) && r.thing === 'kiln'),
+    narrowed: true,
+  },
 ];
 
-export const VARIANTS: readonly Variant[] = ['person', 'write-token', 'read-token'];
+export const VARIANTS: readonly Variant[] = ['person', 'write-token', 'read-token', 'see-as'];
+
+/** The variants one shape runs as: See as only where somebody can be seen as, a grantee of shares. */
+export const variantsOf = (shape: Shape): readonly Variant[] => (shape.shares ? VARIANTS : VARIANTS.filter((v) => v !== 'see-as'));
 
 export type Fixture = Awaited<ReturnType<typeof build>>;
 
@@ -280,7 +365,7 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
   await move('t-into-kiln', 'kiln');
   await move('t-out-of-kiln', 'loom');
 
-  const built: Built = { ids: { kiln: rows.get('kiln')!.id, loom: rows.get('loom')!.id }, seqs: { one: one.seq } };
+  const built: Built = { ids: { kiln: rows.get('kiln')!.id, loom: rows.get('loom')!.id, one: one.id }, seqs: { one: one.seq } };
 
   /* THE PAGES, THEIR FIGURES, AND THE GRANTS. */
   for (const page of PAGES) okValue(await api.setDeclaration({ body: page } as never, owner), `page ${page.page}`);
@@ -297,6 +382,25 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
       } as never),
       `invite ${shape.id}`,
     );
+  }
+
+  /* THE SHARES, through the share API as the owner makes them, to guests with nothing else on the record. */
+  const until = new Date(NOW + 30 * 86_400_000).toISOString();
+  for (const shape of shapes) {
+    if (!shape.shares) continue;
+    sql.exec('INSERT OR IGNORE INTO person (id, email, name, suspended_at) VALUES (?, ?, ?, NULL)', shape.person, `${shape.person}@example.test`, shape.name);
+    let who = { kind: 'person', id: shape.person };
+    if (shape.group) {
+      const group = `g_${shape.id}`;
+      sql.exec('INSERT INTO share_group (id, name, made_by, made_at) VALUES (?, ?, ?, ?)', group, shape.name, OWNER, new Date(NOW).toISOString());
+      sql.exec('INSERT INTO share_group_member (group_id, person_id, added_by, added_at) VALUES (?, ?, ?, ?)', group, shape.person, OWNER, new Date(NOW).toISOString());
+      who = { kind: 'group', id: group };
+    }
+    for (const { ended, ...share } of shape.shares(built)) {
+      const made = okValue<{ id: string }>(await api.share({ share: { effect: 'allow', ...share, who, when: { until } } } as never, owner), `share ${shape.id}`);
+      if (ended) sql.exec('UPDATE share SET starts_at = ?, ends_at = ? WHERE id = ?', new Date(NOW - 30 * 86_400_000).toISOString(), new Date(NOW - 86_400_000).toISOString(), made.id);
+    }
+    api.kernel.accessChanged();
   }
 
   /* COMMENTS AND QUESTIONS ABOUT ROWS INSIDE AND OUTSIDE EACH GRANT, each carrying the word of the row it is about. */
@@ -332,11 +436,16 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
   /* THE CALLERS: each shape as the person, a write-scope token and a read-scope token. */
   let tokens = 0;
   const callers: Caller[] = [];
+  const ownerHeld = api.kernel.access(OWNER) as HeldAccess;
   for (const shape of shapes)
-    for (const variant of VARIANTS) {
+    for (const variant of variantsOf(shape)) {
       const base = personCtx(api, shape.person);
       let ctx: CallContext = base;
-      if (variant !== 'person') {
+      if (variant === 'see-as') {
+        const as = await seeAs(shape.person, { person: OWNER, email: 'ada@example.com', record: 'rec', provedAt: NOW } as never, ownerHeld, (p) => api.kernel.access(p) as HeldAccess | null);
+        assert.ok(as !== null && 'ctx' in as, `the owner sees as ${shape.id}`);
+        ctx = as.ctx as CallContext;
+      } else if (variant !== 'person') {
         const id = `t_leak_${++tokens}`;
         const scope = variant === 'write-token' ? 'write' : 'read';
         sql.exec('INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, ?, ?, ?, ?, ?)', id, shape.person, `h_${id}`, scope, `${shape.id} ${scope}`, new Date(NOW).toISOString());
@@ -348,7 +457,7 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
 
   /** Whether a caller may see a row: the shape's rule, then the private rows, which only their maker sees. */
   const visible = (caller: Caller, r: RowInfo): boolean =>
-    !r.deleted && (r.privateBy === undefined || r.privateBy === caller.shape.person) && caller.shape.sees(r, built) && reaches(caller, r.list);
+    !r.deleted && (r.privateBy === undefined || (r.privateBy === caller.shape.person && caller.variant !== 'see-as')) && caller.shape.sees(r, built) && reaches(caller, r.list);
 
   /** A token reaches what its person does; an `append` grant reads nothing. */
   const reaches = (caller: Caller, list: string): boolean => {

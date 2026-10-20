@@ -107,11 +107,8 @@ export const ALLOWED = [
   { file: `${R}/preview-change.ts`, fn: 'walkCost', why: `${NONE}how many rows and currencies a walk would read, to refuse one too costly to preview.` },
   { file: `${R}/row-values.ts`, fn: 'docValues', why: 'Fills the `{{path}}`s of a document on a row `get` already admitted, each block held by `hold` (`heldBlock`).' },
 
-  /* WRITE PATHS NOT YET HELD TO THE ROW. `update`, `log`, `handoff` and `makePrivate` ask `sight.mayWrite` and are gated. */
-  { file: `${R}/index.ts`, fn: 'metOnLadder', why: `${WRITE}what an agent's \`meet\` asserted about a row the kernel matched, read to put it on the ladder.` },
-  { file: `${R}/index.ts`, fn: 'assertedOn', why: `${WRITE}the row one meeting wrote onto, read back after the write.` },
+  /* WRITE PATHS NOT YET HELD TO THE ROW. `update`, `log`, `handoff`, `makePrivate` and `meet` ask `sight.mayWrite` and are gated. */
   { file: `${R}/index.ts`, fn: 'mentioned', why: `${WRITE}the caller's own run and its project, to keep a mention where the agent was.` },
-  { file: `${R}/index.ts`, fn: 'meeting', why: `${WRITE}the row \`meet\` just wrote or matched, said back to the agent that met it.` },
   { file: `${R}/methods/same-one.ts`, fn: 'sameOne', why: 'The people a "same person?" question names, each asked of `admitted` (its own `kernel.scope` read) before it is filed.' },
 ];
 

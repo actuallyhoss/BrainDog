@@ -8976,6 +8976,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
+   * `meet` HELD TO THE ROW (sharing plan §2.6): a meeting the kernel matched onto somebody already there whom this caller
+   * may not write (outside her rule, private to another, on a list she only adds to) is unwound, so she is never handed
+   * their name. Meeting them as if they were not there would add a second row under their key, so it is refused in the
+   * words a unique collision gets, which no more proves a row exists than that one does.
+   */
+  const heldMet = (ctx: CallContext, out: Result<unknown>): Result<unknown> => {
+    const m = (out.ok ? out.value : null) as { row?: { id?: unknown } | null; created?: unknown } | null;
+    if (m === null || m.created === true || typeof m.row?.id !== 'string') return out;
+    const at = kernel.get(m.row.id, { includeDeleted: true });
+    if (at !== null && sight.mayWrite(ctx, at.register, at.id)) return out;
+    throw new Unwind(no('FORBIDDEN', `That can't be added here. Ask ${kernel.ownerName() ?? 'the owner'}.`, { at: 'name' }));
+  };
+
+  /** One meeting, written and held to the row in one transaction: a match the caller may not write leaves nothing. */
+  const meetHeld = (ctx: CallContext, sent: never, by: WriteContext): Result<unknown> =>
+    unwound(() => kernel.transaction(() => heldMet(ctx, kernel.meet(sent, by) as Result<unknown>)));
+
+  /**
    * AN AGENT'S `meet`, AT ITS RUNG (research-audit-20 H4, DIRECTION §38). What `meet` does on its own stays automatic,
    * since understanding is meant to fill People without asking and every write it makes keeps its Undo: a person or an
    * organisation it adds, the dated line of where they were met, the last day in touch, the run's project, and a merge
@@ -8994,20 +9012,21 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     try {
       first = kernel.transaction(() => {
         const mark = sql.one<{ n: number | null }>('SELECT max(rowid) AS n FROM event')?.n ?? 0;
-        const met = kernel.meet(sent, by) as Result<unknown>;
-        const held = met.ok ? assertedOn(met.value, mark) : null;
+        const met = heldMet(ctx, kernel.meet(sent, by) as Result<unknown>);
+        const held = met.ok ? assertedOn(ctx, met.value, mark) : null;
         if (held !== null) throw new Asserting(held);
         return met;
       });
     } catch (e) {
+      if (e instanceof Unwind) return e.refusal;
       if (!(e instanceof Asserting)) throw e;
       asserted = e.asserted;
     }
     if (asserted === null) return meeting(ctx, first as Result<unknown>);
-    const self = kernel.get(asserted.id);
+    const self = sight.mayWrite(ctx, asserted.register, asserted.id) ? kernel.get(asserted.id) : null;
     const rung = self === null ? null : laddered(ctx, asserted.register, 'update', asserted.patch, self);
     if (rung === null || self === null || rung.gate.write) {
-      const out = meeting(ctx, kernel.meet(sent, by) as Result<unknown>);
+      const out = meeting(ctx, meetHeld(ctx, sent, by));
       if (out.ok && rung?.gate.write) trust.kept(rung.caller.token, rung.gate.kinds, ladderNames(rung.caller.token));
       return out;
     }
@@ -9027,13 +9046,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * after `mark`: each field it changed, as the row now holds it, or `null` when it added the row or wrote nothing but
    * where and when they were met. A fold by the strong rules is read on the row kept, as a key match is.
    */
-  const assertedOn = (met: unknown, mark: number): Asserting['asserted'] | null => {
+  const assertedOn = (ctx: CallContext, met: unknown, mark: number): Asserting['asserted'] | null => {
     const m = (met ?? {}) as { row?: { id?: unknown } | null; created?: unknown; matched_by?: unknown };
     /* A STRONG FOLD IS READ AS A KEY MATCH IS (research-audit-22 M1): the row folded in was the agent's, and what it
        carried onto the person kept (a key above all) is an assertion about somebody the record already held. */
     if (m.created === true || (m.matched_by !== 'key' && m.matched_by !== 'strong') || typeof m.row?.id !== 'string') return null;
     const row = kernel.get(m.row.id);
-    if (!row) return null;
+    if (!row || !sight.mayWrite(ctx, row.register, row.id)) return null;
     const own = meetingParts(row.register);
     const fields = sql
       .all<{ field: string }>('SELECT DISTINCT field FROM event WHERE target = ? AND rowid > ? AND field IS NOT NULL', `entry:${row.id}`, mark)
@@ -9125,7 +9144,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const said = (out.value ?? {}) as Record<string, unknown>;
     const row = said.row !== null && typeof said.row === 'object' ? (said.row as { id?: unknown; name?: unknown }) : null;
     const ref = typeof row?.id === 'string' ? row.id : typeof said.person === 'string' ? said.person : null;
-    const at = ref === null ? null : kernel.get(ref);
+    /* NAMED ONLY WHEN SHE IS SHOWN IT: `heldMet` has already unwound a match onto a row she may not write. */
+    const found = ref === null ? null : kernel.get(ref);
+    const at = found !== null && sight.admits(ctx, found) ? found : null;
     const title = at ? kernel.register(at.register)?.title : undefined;
     const asked = typeof said.question === 'string' ? said.question : typeof said.merge === 'string' ? said.merge : null;
     /* A QUESTION THE KERNEL NAMES BY ITS NUMBER goes out as `nameOf` hands it; anything else it said is its own words. */
@@ -11452,7 +11473,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          unless it says it arrived (`PeopleDeps.typed` in the kernel). A token, a rule or the system never does. */
       const by = ctx.principal.kind === 'person' ? { ...writerOf(ctx), principal: { kind: 'person' as const } } : writerOf(ctx);
       const sent = { ...met, ...(doubted ? { untrusted: true } : {}) } as never;
-      if (caller === null) return tail(meeting(ctx, kernel.meet(sent, by) as Result<unknown>));
+      if (caller === null) return tail(meeting(ctx, meetHeld(ctx, sent, by)));
       /* AN AGENT ON A SUGGEST GRANT ONLY EVER LEAVES A MENTION (research-audit-20 H4): its scope holds every kind at Ask
          (`CEILING`), so nothing it meets is written, and nothing is asked either, since the owner chose for it to suggest. */
       if (CEILING[caller.scope] !== 'quiet') return tail(ok(mentioned(kind, said, caller, null)));

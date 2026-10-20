@@ -18,7 +18,7 @@ import type { Entry } from '@braindog/kernel';
 
 import type { CallContext } from '../src/index.ts';
 import { mulberry32 } from './leak/canary.ts';
-import { build, NOW, SAM, type Caller, type Fixture, type RowInfo } from './leak/fixture.ts';
+import { build, NOW, personCtx, SAM, type Caller, type Fixture, type RowInfo, type Shape } from './leak/fixture.ts';
 import { ask, handlers } from './leak/routes.ts';
 import { callTool } from './leak/mcp.ts';
 
@@ -124,6 +124,79 @@ test('the post-image is checked in the kernel: a move out of the rule unwinds wi
     ok: false,
     refusal: { code: 'VALUE_MALFORMED', fix: `There is no row tasks#${loom.seq} in tasks.`, at: 'id' },
   });
+});
+
+test("a share's narrower write rule holds the write, and the fields any share's condition reads are gate fields", async () => {
+  /* LEE VIEWS EVERY TASK AND EDITS KILN'S; RIA VIEWS THE TASKS IN REVIEW, so the stage decides what Ria sees. */
+  const lee: Shape = {
+    id: 'mixed',
+    name: 'Lee',
+    person: 'p_lee',
+    shares: (b) => [
+      { what: { lists: ['tasks'] }, can: 'view' },
+      { what: { project: b.ids.kiln, lists: ['tasks'] }, can: 'edit' },
+    ],
+    sees: (r) => r.list === 'tasks' || r.key === 'kiln',
+  };
+  const ria: Shape = { id: 'review', name: 'Ria', person: 'p_ria', shares: () => [{ what: { list: 'tasks', where: { field: 'stage', is: 'review' } }, can: 'view' }], sees: (r) => r.list === 'tasks' && r.stage === 'review' };
+  const f = await build({ shapes: [lee, ria] });
+  const h = handlers(f);
+  const ctx = personCtx(f.api, 'p_lee');
+  assert.ok(ctx.writes?.tasks, 'the lens hands her a write rule narrower than her read');
+  assert.equal(ctx.wheres?.tasks, undefined);
+  type Out = { ok: boolean; refusal?: { code: string; fix: string; at?: string } };
+  const loom = f.rows.get('t-loom-todo')!;
+  const kiln = f.rows.get('t-kiln-todo')!;
+  /* A LOOM TASK SHE READS IS ONE SHE MAY NOT WRITE, answered as a row that is not there. */
+  const edit = (await ask(h, 'update', { register: 'tasks', seq: loom.seq, patch: { notes: 'mine' } }, ctx)) as Out;
+  const none = (await ask(h, 'update', { register: 'tasks', seq: 999, patch: { notes: 'mine' } }, ctx)) as Out;
+  assert.equal(edit.ok, false);
+  assert.equal(JSON.stringify(edit).replaceAll(`TK${loom.seq}`, 'TK999').replaceAll(`tasks#${loom.seq}`, 'tasks#999'), JSON.stringify(none));
+  assert.equal(((await ask(h, 'log', { register: 'tasks', seq: loom.seq, note: 'Seen.' }, ctx)) as Out).ok, false);
+  /* AN ADD ON LOOM IS UNDONE IN THE KERNEL; ONE ON KILN LANDS. */
+  const made = (await ask(h, 'create', { register: 'tasks', fields: { name: 'On Loom', thing: f.built.ids.loom } }, ctx)) as Out;
+  assert.equal(made.refusal?.code, 'FORBIDDEN');
+  assert.ok(((await ask(h, 'create', { register: 'tasks', fields: { name: 'On Kiln', thing: f.built.ids.kiln } }, ctx)) as Out).ok);
+  /* SHE EDITS A KILN TASK, BUT NOT ITS PROJECT (the project share's scope field) NOR ITS STAGE (Ria's condition). */
+  assert.ok(((await ask(h, 'update', { register: 'tasks', seq: kiln.seq, patch: { notes: 'glazed' } }, ctx)) as Out).ok);
+  const moved = (await ask(h, 'update', { register: 'tasks', seq: kiln.seq, patch: { thing: f.built.ids.loom } }, ctx)) as Out;
+  assert.deepEqual(moved.refusal, { code: 'FORBIDDEN', fix: 'Only the owner or an Admin can change Project on a shared task.', at: 'thing' });
+  const staged = (await ask(h, 'update', { register: 'tasks', seq: kiln.seq, patch: { stage: 'review' } }, ctx)) as Out;
+  assert.equal(staged.refusal?.at, 'stage');
+  assert.deepEqual(f.api.kernel.gateFields('tasks'), ['stage', 'thing']);
+  /* THE OWNER, WHO WRITES THE WHOLE LIST, IS HELD BY NONE OF IT. */
+  assert.ok(((await ask(h, 'update', { register: 'tasks', seq: kiln.seq, patch: { stage: 'review' } }, f.owner)) as Out).ok);
+});
+
+test('meet is held to the row: a match outside her rule is never named, and no second person is made under its key', async () => {
+  const kept: Shape = {
+    id: 'priya-only',
+    name: 'Pia',
+    person: 'p_pia',
+    invite: { registers: { people: 'write' }, wheres: () => ({ people: { field: 'email', is: 'priya@example.com' } }) },
+    sees: (r) => r.list === 'people' && r.key === 'priya',
+    narrowed: true,
+  };
+  const f = await build({ shapes: [kept] });
+  const ctx = personCtx(f.api, 'p_pia');
+  const omar = f.rows.get('omar')!;
+  const people = () => f.api.kernel.count('people');
+  const before = people();
+  const events = () => f.sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM event')!.n;
+  const was = events();
+  const out = (await f.api.meet({ name: 'Omar', email: 'omar@example.com', where: 'the studio' } as never, ctx)) as { ok: boolean; refusal?: { code: string; fix: string } };
+  assert.deepEqual({ ok: out.ok, code: out.refusal?.code, fix: out.refusal?.fix }, { ok: false, code: 'FORBIDDEN', fix: "That can't be added here. Ask the owner." });
+  assert.ok(!JSON.stringify(out).includes(omar.canary.word) && !JSON.stringify(out).includes(omar.id), 'his name and id are not handed back');
+  assert.equal(people(), before, 'no second Omar');
+  assert.equal(events(), was, 'nothing is written');
+  /* PRIYA, INSIDE HER RULE, IS MET AND NAMED; SOMEBODY NEW IS ADDED. */
+  const priya = (await f.api.meet({ email: 'priya@example.com', where: 'the studio' } as never, ctx)) as { ok: boolean; value?: { row: { name: string } | null; created: boolean } };
+  assert.ok(priya.ok && priya.value?.row?.name.startsWith('Priya'), JSON.stringify(priya));
+  const fresh = (await f.api.meet({ name: 'Nia Brook', email: 'nia@example.com', where: 'the studio' } as never, ctx)) as { ok: boolean; value?: { created: boolean } };
+  assert.ok(fresh.ok && fresh.value?.created, JSON.stringify(fresh));
+  /* AND THE OWNER, WHO READS EVERYBODY, MEETS OMAR AS BEFORE. */
+  const own = (await f.api.meet({ email: 'omar@example.com', where: 'the studio' } as never, f.owner)) as { ok: boolean; value?: { row: { id: string } | null; created: boolean } };
+  assert.ok(own.ok && own.value?.created === false && own.value.row !== null, JSON.stringify(own));
 });
 
 test("a unique value another row holds out of the writer's sight is refused without naming it", async () => {
