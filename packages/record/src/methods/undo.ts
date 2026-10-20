@@ -473,6 +473,8 @@ export function methods(deps: RecordDeps) {
      * or a rule its write started; one line by anybody else, or by the nightly walk, refuses the whole batch.
      */
     async undoOwn(args: { batch?: unknown; dry?: unknown } | undefined, ctx: CallContext): Promise<Result<UndoPlan | Undone>> {
+      const stop = guard(ctx, 'write');
+      if (stop) return { ok: false, refusal: stop };
       const a = args ?? {};
       if (!said(a.batch)) return no('REQUIRED_MISSING', 'Say which write to take back, by the batch its receipt gave.', { at: 'batch' });
       const batch = a.batch.trim();
