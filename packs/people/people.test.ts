@@ -230,13 +230,12 @@ test('ITS VERSION IS THE MODULE\'S, which is not released yet, and it says what 
   assert.equal(doc.config, undefined);
 });
 
-test('PROJECTS AND MONEY ARE ASKED FOR ONLY WHERE THEY ARE READ: six parts wait, and nothing else', () => {
+test('PROJECTS AND MONEY ARE ASKED FOR ONLY WHERE THEY ARE READ: five parts wait, and nothing else', () => {
   const doc = file();
   assert.deepEqual(doc.requires, { format: 1, primitives: 1, packs: {} }, 'People installs on a record with no other add-on');
   assert.deepEqual(waits(doc), [
     { at: '"People", "Met in"', holds: [PROJECTS] },
     { at: '"Organisations", "Projects"', holds: [PROJECTS] },
-    { at: '"People", "Everyone", "Met in"', holds: [PROJECTS] },
     { at: '"someone", "cards", "Met in"', holds: [PROJECTS] },
     { at: '"relation", "Projects"', holds: [PROJECTS] },
     { at: '"relation", "Money"', holds: [MONEY] },
@@ -267,12 +266,10 @@ async function waitingParts(holds: readonly string[]): Promise<Waiting[]> {
   const field = (list: string): number => (body(`register.${list}`).fields as Body[]).findIndex((f) => f.id === 'projects');
   const block = (page: string, test: (b: Body) => boolean): number => (body(`page.${page}`).blocks as Body[]).findIndex(test);
   const column = (page: string, at: number): number => (((body(`page.${page}`).blocks as Body[])[at]!.columns as Body[]) ?? []).findIndex((c) => c.field === 'projects');
-  const everyone = block('people', (b) => b.heading === 'Everyone');
   const lead = block('someone', (b) => b.lead === true);
   const all: Waiting[] = [
     { at: `register.people.fields[${field('people')}]`, holds: [PROJECTS] },
     { at: `register.organisations.fields[${field('organisations')}]`, holds: [PROJECTS] },
-    { at: `page.people.blocks[${everyone}].columns[${column('people', everyone)}]`, holds: [PROJECTS] },
     { at: `page.someone.blocks[${lead}].columns[${column('someone', lead)}]`, holds: [PROJECTS] },
     { at: `page.relation.blocks[${block('relation', (b) => b.source === `register.${PROJECTS}`)}]`, holds: [PROJECTS] },
     { at: `page.relation.blocks[${block('relation', (b) => b.source === `register.${MONEY}`)}]`, holds: [MONEY] },

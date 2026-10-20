@@ -7,7 +7,7 @@ with it, and it is written here as a file anybody can read, the same as any othe
   known by, a note, the day you were last in touch and where they were seen. An organisation is its name, its kind, its
   domain, the addresses it is known by and a note. Only the name must be said.
 - **The pages.** People opens with who has gone quiet and since when, and how many people may be on the record twice,
-  then everyone as a card with the day you were last in touch. Each person and each organisation has a page of their
+  then everyone as a line with the day you last spoke. Each person and each organisation has a page of their
   own. Health, Calendar and Activity are pages here too.
 - **What it does by itself.** Whoever writes in is met: the person a mail is from, the organisation the domain belongs
   to, and who a payment was with. Nobody is asked anything.

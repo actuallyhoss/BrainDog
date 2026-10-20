@@ -89,18 +89,6 @@
           "body": "Nothing needs a push, {{questions-open-in:things}} question(s) for you"
         },
         {
-          "kind": "stat",
-          "heading": "In play and earning",
-          "icon": "gauge",
-          "span": 12,
-          "key": "in-play-earning",
-          "when": { "metric": "projects-live", "gt": 0 },
-          "cells": [
-            { "metric": "projects-live", "label": "In play", "trend": "12w" },
-            { "metric": "projects-lane-earning", "label": "Earning", "trend": "12w" }
-          ]
-        },
-        {
           "kind": "split",
           "heading": "Where they are",
           "icon": "thing",
@@ -177,13 +165,6 @@
           "key": "open-earns"
         },
         {
-          "kind": "note",
-          "span": 12,
-          "when": { "metric": "projects-earning-said", "gt": 0 },
-          "body": "{{projects-earning-said}} of {{projects-live}} projects in play say what they earned in a year",
-          "key": "open-earns-said"
-        },
-        {
           "kind": "table",
           "heading": "With an agent",
           "icon": "session",
@@ -236,13 +217,6 @@
           "order": [ { "field": "revenue", "dir": "desc" } ],
           "limit": 8,
           "when": { "metric": "projects-earning-said", "gt": 0 }
-        },
-        {
-          "kind": "note",
-          "span": 12,
-          "when": { "metric": "projects-earning-said", "gt": 0 },
-          "body": "{{projects-earning-said}} of {{projects-live}} projects in play say what they earned in a year",
-          "key": "earns-said"
         },
         {
           "kind": "table",

@@ -155,34 +155,24 @@
           "body": "{{held-twice-shown}} people may be on this record twice, {{held-twice}} too many. [See them](/r/people?twice=1)."
         },
         {
-          "kind": "stat",
-          "heading": "In touch",
-          "icon": "gauge",
-          "span": 12,
-          "when": { "metric": "people-count", "gt": 0 },
-          "cells": [ { "metric": "people-in-touch-30d", "label": "In touch, 30 days", "trend": "30d" } ]
-        },
-        {
-          "kind": "cards",
+          "kind": "table",
           "heading": "Everyone",
           "icon": "people",
           "span": 12,
           "source": "register.people",
           "where": "merged_into is empty",
           "columns": [
-            { "field": "name", "label": "Name", "as": "who" },
-            { "field": "role", "label": "Role", "as": "fact" },
-            { "field": "org", "label": "Organisation", "as": "fact" },
-            { "field": "projects", "label": "Met in", "as": "fact", "when": { "holds": [ "things" ] } },
-            { "field": "in_touch", "label": "Last in touch", "as": "when" }
+            { "field": "name", "label": "Name", "width": "minmax(14ch,2fr)" },
+            { "field": "role", "label": "Role", "width": "12ch" },
+            { "field": "org", "label": "With", "width": "minmax(14ch,2fr)" },
+            { "field": "in_touch", "label": "Last spoke", "width": "14ch", "align": "end" }
           ],
-          "group": "org",
-          "fold": 3,
           "order": [ { "field": "in_touch", "dir": "desc" }, { "field": "seq", "dir": "desc" } ],
+          "limit": 50,
           "empty": "Nobody yet. Add someone, or an agent adds whoever it meets in a commit or a mail."
         },
         {
-          "kind": "cards",
+          "kind": "table",
           "heading": "Organisations",
           "icon": "building",
           "span": 12,
@@ -190,9 +180,9 @@
           "where": "merged_into is empty",
           "when": { "metric": "organisations-count", "gt": 0 },
           "columns": [
-            { "field": "name", "label": "Organisation", "as": "who" },
-            { "field": "kind", "label": "Kind", "as": "fact" },
-            { "field": "domain", "label": "Website", "as": "fact" }
+            { "field": "name", "label": "Organisation", "width": "minmax(14ch,2fr)" },
+            { "field": "kind", "label": "Kind", "width": "12ch" },
+            { "field": "domain", "label": "Website", "width": "minmax(14ch,2fr)" }
           ],
           "order": [ { "field": "name", "dir": "asc" } ]
         },
