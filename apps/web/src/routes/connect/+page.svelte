@@ -34,6 +34,8 @@
   import { reprove } from '$lib/record/vault.ts';
   import { titleOf } from '$lib/title.ts';
   import { TONES } from 'braindog-render';
+  import { markedOf } from '@braindog/skin/agent-marks.ts';
+  import AgentMark from '$lib/ui/AgentMark.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Empty from '$lib/ui/Empty.svelte';
   import Face from '$lib/ui/Face.svelte';
@@ -112,6 +114,10 @@
   }
 
   const title = $derived(consent ? copy.consentNamed(consent.client_name) : copy.consentTitle);
+  /* A KNOWN AGENT WEARS ITS MAKER'S MARK, as it does on Connect your agent (first F11); any other app its initials. */
+  const marked = $derived(consent ? markedOf(consent.client_name) : null);
+  /** The BrainDog the app would reach, by its name, once there is one to name. */
+  const recordName = $derived(choices.find((c) => c.slug === record)?.name ?? null);
 </script>
 
 <svelte:head><title>{titleOf(title)}</title></svelte:head>
@@ -122,18 +128,30 @@
          hue in the rounded square a thing wears, so the name that asks is also a shape. `dir="auto"` on what the app
          wrote: its name is its own, in whatever script it chose. -->
     <header class="who">
-      {#if consent !== null}<Face name={consent.client_name} of="record" size="l" />{/if}
-      <h1 class="title" dir="auto">{title}</h1>
+      {#if marked !== null}
+        <span class="agent-disc" aria-hidden="true"><AgentMark kind={marked} size="m" /></span>
+      {:else if consent !== null}
+        <Face name={consent.client_name} of="record" size="l" />
+      {/if}
+      <h1 class="entry-title" dir="auto">{title}</h1>
     </header>
 
     {#if request === null}
-      <div class="state"><Empty kind="no-data-yet" title={copy.consentNone} body={copy.consentNoneWhy} /></div>
+      <!-- NOBODY IS ASKING, AND IT IS NOT A DEAD END (first F11): the way to connect one from this side, and the way in. -->
+      <div class="state">
+        <Empty kind="no-data-yet" title={copy.consentNone} body={copy.consentNoneWhy}>
+          {#snippet actions()}
+            <Button weight="primary" href="/settings/agents">{copy.consentConnectAgent}</Button>
+            <Button href="/">{copy.openBrainDog}</Button>
+          {/snippet}
+        </Empty>
+      </div>
     {:else if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
       <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
     {:else if gone !== null}
       <div class="state"><Empty kind="no-data-yet" title={copy.consentGone} body={gone} /></div>
     {:else if consent !== null}
-      <p class="asks" dir="auto">{copy.consentAsks(consent.client_name, consent.redirect_host)}</p>
+      <p class="asks" dir="auto">{copy.consentAsks(consent.client_name, recordName, consent.redirect_host)}</p>
       {#if proven !== null}
         <p class="proven" data-intent={proven.tone}>
           <span class="glyph" role="img" aria-label={TONES[proven.tone].label}>{TONES[proven.tone].glyph}</span>
@@ -229,23 +247,36 @@
     min-inline-size: 0;
   }
 
-  /* `t-title`, 28/34 at 600; the phone's large title below 900. */
-  .title {
+  /* The title is the entry screens' one (`Entry.svelte`); here it shares its row with the app's face. */
+  .who :global(.entry-title) {
     min-inline-size: 0;
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-title);
-    font-weight: 600;
-    line-height: calc(34 / 28);
-    letter-spacing: -0.02em;
-    overflow-wrap: anywhere;
-    text-wrap: balance;
   }
 
-  /* `Empty`'s own padding goes, because the column's gap already spaces it. */
+  /* A KNOWN AGENT'S MARK IN A ROUND WELL: an agent is a who, so its face is round, 40 with the mark at 20 inside. */
+  .agent-disc {
+    display: grid;
+    flex: none;
+    place-items: center;
+    inline-size: 40px;
+    block-size: 40px;
+    background: var(--tile-2);
+    border-radius: var(--r-round);
+    color: var(--ink);
+  }
+
+  /* `Empty` stands in the sheet with no tile of its own, and its padding goes: the column's gap already spaces it. */
   .state :global(.empty) {
-    padding-block: 0;
+    padding: 0;
+    background: none;
+  }
+
+  .state :global(.empty-actions) {
+    align-self: stretch;
+  }
+
+  .state :global(.btn) {
+    inline-size: 100%;
+    min-block-size: max(40px, var(--ctl-h));
   }
 
   /* WHAT THE APP WROTE AND WHERE IT GOES, THE SCREEN'S ONE SENTENCE: 16/24 in the second ink, breaking
@@ -376,13 +407,5 @@
     font-size: var(--t-sm);
     line-height: 18px;
     overflow-wrap: anywhere;
-  }
-
-  @media (width < 900px) {
-    .title {
-      font-family: var(--font-display);
-      font-size: var(--t-figure);
-      line-height: calc(36 / 30);
-    }
   }
 </style>

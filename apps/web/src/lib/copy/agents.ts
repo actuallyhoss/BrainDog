@@ -59,16 +59,20 @@ export const agents = {
   consentNamed: (app: string) => `Connect ${app}`,
   consentNone: 'No app is asking to connect',
   consentNoneWhy: 'When you add BrainDog to an app, the app sends you to this page to allow it.',
+  /* NOT A DEAD END (first F11): the way to connect one from this side, and the way into BrainDog. */
+  consentConnectAgent: 'Connect an agent',
   consentGone: 'This sign-in has ended',
-  consentAsks: (app: string, host: string) => `${app} is asking to reach your record. BrainDog will send it back to ${host}.`,
-  consentRecord: 'Which record',
+  /* THE BRAINDOG IT WOULD REACH IS NAMED, because it is the fact being decided (first F11). */
+  consentAsks: (app: string, record: string | null, host: string) =>
+    `${app} wants to reach ${record ?? 'your BrainDog'}. After you answer, you go back to ${host}.`,
+  consentRecord: 'Which BrainDog',
   consentReach: 'What it may do',
   consentScope: {
-    read: 'Read your record',
-    propose: 'Read your record and propose changes, which wait for you to decide',
-    write: 'Read your record, propose changes, and change things in it directly',
+    read: 'Read only',
+    propose: 'Read and suggest changes. You decide each one.',
+    write: 'Read and change things directly',
   },
-  consentLasts: 'It can reach that record for ninety days. It is listed under Settings, Agents, by its name, and removing it there stops it at once.',
+  consentLasts: 'This lasts 90 days. Remove it any time in Settings, Agents.',
   consentAllow: (app: string) => `Allow ${app}`,
   consentDeny: (app: string) => `Deny ${app}`,
   consentNotOwner: "Only a record's owner can connect an app to it, and you own no record here. You can still turn the app away.",
