@@ -100,7 +100,9 @@ import { ack, enqueue, lease, retryDead, unlease, type Ack, type AckDeps, type O
 import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
-import { access, invite, members, remove, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
+import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
+import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, LensCache, type ListLike } from './shares.ts';
+import type { Catalog } from './lens.ts';
 import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, type Wheres } from './members.ts';
 import { stopped as stoppedOf, type Suspended } from './members.ts';
 import {
@@ -133,7 +135,6 @@ import {
   type TokenRow,
   type Verified,
 } from './token.ts';
-import type { Narrow as TokenNarrowOf } from './lens.ts';
 import {
   decide,
   getGovernance,
@@ -664,7 +665,8 @@ export { AGENTS_KEY, agentCap, agentsFull, liveAgents, type AgentCap } from './t
 export { CHILD_MINUTES_MOST } from './token.ts';
 export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
-export type { Member } from './members.ts';
+export type { Member, Grant, Held as AccessHeld } from './members.ts';
+export { EPOCH as ACCESS_EPOCH, bumpEpoch, epochOf, LensCache, sharesFor, narrowsOf, catalogOf, gateFieldsOf } from './shares.ts';
 export { whereFor, scopeFor, NOBODY, viewerOfPrincipal, viewerOfRead, WHERE_MAX_CHARS, type Wheres } from './members.ts';
 /* SHARING (the sharing plan, Slice 1): the lens as pure functions, and nothing wired yet. `Rung` and `Capability` are
    already names here (`change-kind.ts`, `capabilities.ts`), so the share ones go out as `ShareRung` and `LensCap`. */
@@ -1158,6 +1160,9 @@ const RESERVED =new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'v
  */
 type DeclaredField = RegisterDecl['fields'][number];
 const TAGS: DeclaredField = { id: 'tags', type: 'list', of: 'text' };
+/** The vault's index list, which a share reaches only by naming it (`lens.ts`'s `keys` role). */
+const VAULT_LIST = 'credentials';
+
 const withTags = (fields: readonly DeclaredField[]): readonly DeclaredField[] =>
   fields.some((f) => f.id === 'tags') ? fields : [...fields, TAGS];
 
@@ -1629,11 +1634,46 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /** Each spoken prefix other than `#`, to the register that speaks it. */
   let prefixes = new Map<string, string>();
 
-  function reload(): void {
+  /**
+   * THE DECLARATION REVISION AND WHAT HANGS OFF IT (sharing plan §2.8): the lists as the lens reads them, built once per
+   * revision, and the lens cache, keyed on the revision so a list installed or a field retired is never answered from a
+   * lens made before it. The cache holds 256 answers, the one used longest ago going first.
+   */
+  let revision = 0;
+  let catalogMemo: Catalog | null = null;
+  const lensCache = new LensCache<Held | null>(256);
+
+  function reload(opts: { copied?: true } = {}): void {
+    const before = revision === 0 || opts.copied === true ? null : [...registers.keys()].sort().join('\u0000');
     ({ registers, prefixes } = listsOf(
       sql.all<{ id: string; body: string }>("SELECT id, body FROM declaration WHERE kind = 'register' AND superseded_at IS NULL AND retired = 0"),
     ));
+    revision++;
+    catalogMemo = null;
+    lensCache.clear();
+    /* THE SET OF LISTS IS PART OF WHO HOLDS WHAT: a list installed falls under somebody's whole-record share. So the epoch
+       moves when it changes, as it does for a share, and an open tab re-boots onto the lists it now has. Never on the
+       first read, which is the record opening and writes nothing, and never for a file read in (`copied`): an import
+       or restore brings its own counter, and a copy that moved it would not export as the file it came from. */
+    if (before !== null && before !== [...registers.keys()].sort().join('\u0000')) transaction(() => bumpEpoch(sql));
   }
+
+  /** The record's lists as the lens reads them (`lens.ts`'s `Catalog`), for this declaration revision. */
+  const catalogNow = (): Catalog =>
+    (catalogMemo ??= catalogOf(
+      [...registers.values()].map((d) => ({ ...d, fields: withTags(d.fields) as unknown as ListLike['fields'] })),
+      { keys: VAULT_LIST, people: meetsRole(registers.values())?.register ?? null },
+    ));
+
+  /** What `access` needs to merge shares, for one call. */
+  const accessLens = (): AccessLens => ({
+    catalog: catalogNow,
+    nowMs: clock.now(),
+    tz: () => recordTz(),
+    people: () => meetsRole(registers.values())?.register ?? null,
+    revision,
+    cache: lensCache,
+  });
 
   /** The list cache `reload` keeps, built from register bodies: each list by its id, and each spoken prefix to its list. */
   function listsOf(rows: readonly { body: string }[]): { registers: Map<string, RegisterDecl>; prefixes: Map<string, string> } {
@@ -7958,6 +7998,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       ),
   });
 
+  /** A change to who holds what moves the access epoch in its own transaction, so a cached lens and an open tab see it. */
+  const moved = <T,>(out: Result<T>): Result<T> => {
+    if (out.ok) bumpEpoch(sql);
+    return out;
+  };
+
   const memberDeps = (): MemberDeps => ({
     sql,
     nowMs: clock.now(),
@@ -9908,8 +9954,24 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       });
     },
 
-    /** What a person holds here; an agent's narrowing chain, handed in, comes back on the answer (a stub until slice 5). */
-    access: (person: string, narrows?: readonly TokenNarrowOf[]) => access(sql, person, narrows),
+    /**
+     * What a person holds here, or `null`: their role and member rows merged with their shares and their groups' shares
+     * (`members.ts`'s `access`, the lens). `token` is the id of the key they call through, whose narrowing chain is
+     * ANDed into everything. Cached per (person, key, epoch, declaration revision) until the lens's next clock edge.
+     */
+    access: (person: string, token?: string | null): Held | null => access(sql, person, token ?? null, accessLens()),
+
+    /** The access epoch: the `access` counter, which moves with every change to who holds what. */
+    accessEpoch: (): number => epochOf(sql),
+
+    /** Move the access epoch on, for a change to who holds what made outside the methods that move it themselves. */
+    accessChanged: (): number => transaction(() => bumpEpoch(sql)),
+
+    /** The record's lists as the lens reads them. */
+    catalog: (): Catalog => catalogNow(),
+
+    /** The gate fields of one list (§2.6): what any active share condition names, and its scope field under a project share. */
+    gateFields: (list: string): string[] => gateFieldsOf(sql, catalogNow(), list, clock.now(), recordTz()),
 
     /**
      * Who owns this record, by id.
@@ -9957,17 +10019,17 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         wheres?: Wheres;
         why?: string;
       },
-    ): Result<Member> => transaction(() => invite(memberDeps(), by, args)),
+    ): Result<Member> => transaction(() => moved(invite(memberDeps(), by, args))),
 
     /** Take somebody off. Never the last owner, and their person row stays. */
     /** Stop somebody without deciding about them, or start them again. */
     suspendMember: (by: string, person: string, on: boolean, why?: string): Result<Suspended> =>
-      transaction(() => suspend(memberDeps(), by, person, on, why)),
+      transaction(() => moved(suspend(memberDeps(), by, person, on, why))),
 
     /** Whether this person is on the record and an owner has stopped them: which sentence a door turns them away with. */
     memberStopped: (person: string): boolean => stoppedOf(sql, person),
 
-    removeMember: (by: string, person: string, why?: string): Result<null> => transaction(() => remove(memberDeps(), by, person, why)),
+    removeMember: (by: string, person: string, why?: string): Result<null> => transaction(() => moved(remove(memberDeps(), by, person, why))),
 
     /* ── agent tokens ───────────────────────────────────── */
 
@@ -10545,7 +10607,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const out = importBrainl(sql, transaction, all, { shape: allowShape });
         if (out.ok) {
           await renameDeclarations(sql);
-          reload();
+          reload({ copied: true });
           rebuildFts();
           transaction(() => rebuildKeys(sql, instant(clock.now())));
           transaction(() => lifecycleEvent('import', 'system', `import ${out.value.rows} rows`));
@@ -10622,7 +10684,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         return { ok: false as const, refusal: refusal as Refusal };
       }
       await renameDeclarations(sql);
-      reload();
+      reload({ copied: true });
       rebuildFts();
       transaction(() => rebuildKeys(sql, instant(clock.now())));
       /* A RECORD REPLACED FROM A FILE IS A HAND ON IT (`hold.ts`, PRF-A18), marked after the import so the night it

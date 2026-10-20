@@ -35,8 +35,7 @@ import { dropCopy } from './boot-copy.ts';
 import type { Answer, SwitcherRow } from './switcher.ts';
 import { declaredOf, noteOf } from './history-live.ts';
 import type { NewsItem, PageDecl, Person, Question } from './schema.ts';
-import type { Level } from './schema.ts';
-import { levelsFrom } from './may.ts';
+import { levelsFrom, type HeldLevel } from './may.ts';
 import type { IconName } from '../ui/icons.ts';
 import { agentKindOf, hueFor, type AgentKind } from '../ui/face.ts';
 /* THE HOLDING PEN, AS THE RECORD SENDS IT (`boot`'s `pen`), held to the shape the settings screen draws. */
@@ -154,7 +153,7 @@ export type Shell = ShellBase & {
      * owner-only lists are already left out for a record-wide appender, so the app asks and never works it out. Absent
      * from a host older than the field, rather than guessed.
      */
-    levels?: Readonly<Record<string, Level>>;
+    levels?: Readonly<Record<string, HeldLevel>>;
     /** A person's own navigation on this record, key by key (`nav-prefs.svelte.ts`). Absent for a token. */
     prefs?: Prefs;
   };

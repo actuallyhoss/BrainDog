@@ -663,32 +663,76 @@ export async function deriveSessionKey(material: Uint8Array): Promise<Uint8Array
 }
 
 /**
+ * What a record's `access` answers about one person, as every door reads it: the role, the ceiling, the per-list levels
+ * and rules, and what the lens adds when shares made the answer (sharing plan §2.4).
+ */
+export type HeldAccess<L extends string = string> = {
+  level: L | null;
+  registers: readonly string[] | null;
+  levels: Readonly<Record<string, L>>;
+  wheres?: Readonly<Wheres> | undefined;
+  writes?: Readonly<Wheres> | undefined;
+  hides?: Readonly<Record<string, readonly string[]>> | undefined;
+  nots?: Readonly<Record<string, readonly ('history' | 'delete')[]>> | undefined;
+  grant?: HeldGrant | undefined;
+};
+
+/** Where a lens came from and how long it holds: the access epoch, the next clock edge, the shares, whether agents carry it. */
+export type HeldGrant = Readonly<{ epoch: number; until: string | null; via: string[]; agents: boolean }>;
+
+/** The part of a call's context a held answer makes, each key present only when it says something. */
+export type HeldParts<L extends string = string> = {
+  registers?: readonly string[];
+  levels?: Readonly<Record<string, L>>;
+  wheres?: Readonly<Wheres>;
+  writes?: Readonly<Wheres>;
+  hides?: Readonly<Record<string, readonly string[]>>;
+  nots?: Readonly<Record<string, readonly ('history' | 'delete')[]>>;
+  grant?: HeldGrant;
+};
+
+const says = (o: object | undefined): o is object => o !== undefined && Object.keys(o).length > 0;
+
+/**
+ * THE ONE PLACE A HELD ANSWER BECOMES A CONTEXT (sharing plan §2.5, choke point 2). Every door calls it: the session path
+ * here, the Worker's bearer and the self-host's two, so a key the lens grows tomorrow is one edit and no door can forget
+ * it. `wheres` goes wherever `levels` goes, the rows of each list a narrowed grant reaches, and `writes`, `hides`, `nots`
+ * and `grant` go with them. A key that says nothing is left off, so a caller holding no share gets the context it always
+ * got.
+ */
+export function heldContext<L extends string>(held: HeldAccess<L>): HeldParts<L> {
+  return {
+    ...(held.registers === null ? {} : { registers: held.registers }),
+    ...(says(held.levels) ? { levels: held.levels } : {}),
+    ...(says(held.wheres) ? { wheres: held.wheres } : {}),
+    ...(says(held.writes) ? { writes: held.writes } : {}),
+    ...(says(held.hides) ? { hides: held.hides } : {}),
+    ...(says(held.nots) ? { nots: held.nots } : {}),
+    ...(held.grant === undefined ? {} : { grant: held.grant }),
+  };
+}
+
+/**
  * The context a live session is, in the shape the bearer path builds, from the Directory's `Who` and the
  * record's own `access(person)`.
  *
  * `provedAt` COMES FROM THE SESSION ROW AND FROM NOWHERE ELSE, which is what lets the vault ask for a proof
  * in the last fifteen minutes. `credentialed`, because a cookie is a credential of the person's own.
  *
- * `wheres` GOES WHEREVER `levels` GOES, the rows of each list a narrowed grant reaches, so both hosts hand every reader
- * the same rules. Absent from `held`, which is a record older than migration 19,
- * no grant is narrowed.
+ * WHAT THE PERSON HOLDS IS `heldContext`'s, as at every other door, so a narrowed grant reaches every reader the same
+ * way through a session as through a bearer.
  */
 export function sessionContext<L extends string>(
   who: Who,
-  held: { level: L | null; registers: readonly string[] | null; levels: Readonly<Record<string, L>>; wheres?: Readonly<Wheres> },
-): {
+  held: HeldAccess<L>,
+): HeldParts<L> & {
   principal: { kind: 'person'; id: string; level: L | null };
-  registers?: readonly string[];
-  levels?: Readonly<Record<string, L>>;
-  wheres?: Readonly<Wheres>;
   credentialed: true;
   provedAt: number;
 } {
   return {
     principal: { kind: 'person', id: who.person, level: held.level },
-    ...(held.registers === null ? {} : { registers: held.registers }),
-    ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
-    ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
+    ...heldContext(held),
     credentialed: true,
     provedAt: who.provedAt,
   };

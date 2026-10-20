@@ -31,6 +31,7 @@ import {
   sameOrigin,
   serveAccount,
   serveAuth,
+  heldContext,
   sessionContext,
   sessionCookie,
   type AccountDoor,
@@ -480,7 +481,9 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
 
   /* THE PERSON'S LEVEL COMES FROM THE RECORD, never from a constant, so a token outlives nothing its
      holder has lost. NOT ON THIS RECORD IS 403, and a credential this record does not know is 401. */
-  const held = api.kernel.access(seen.value.person_id);
+  /* THE KEY'S OWN ID GOES WITH THE PERSON, so the record ANDs its narrowing chain into what they hold (`token_lens`): a
+     child key is narrowed by its own row and its parent's, so it is the child's id, not the agent's the principal names. */
+  const held = api.kernel.access(seen.value.person_id, seen.value.child?.id ?? seen.value.id);
   if (!held) return { refused: OFF };
   /* THE REACH IS THE TOKEN ROW'S, AS `verifyToken` READ IT, and nothing in the request can add to it. The record's inbox
      gate admits a whole-record owner token that carries `inbox`; before this line no token
@@ -497,11 +500,9 @@ async function bearerFor(sent: string, site: Site, surface: 'api' | 'mcp', door?
         level: held.level,
         ...(reach.length === 0 ? {} : { reach }),
       },
-      ...(held.registers === null ? {} : { registers: held.registers }),
-      ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
-      /* `wheres` GOES WHEREVER `levels` GOES, the rows of each list a narrowed grant reaches, as
-         `sessionContext` copies it for the session path. */
-      ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
+      /* WHAT THE PERSON HOLDS IS `heldContext`'s, as at every door: the ceiling, the levels, the rows of each list a
+         narrowed grant reaches, and what the lens adds. */
+      ...heldContext(held),
     },
   };
 }
@@ -573,10 +574,8 @@ async function operationFor(sent: string, api: Api): Promise<Known> {
       principal: { kind: 'person', id: grant.value.person, level: held.level },
       operation: grant.value.method,
       credentialed: true,
-      ...(held.registers === null ? {} : { registers: held.registers }),
-      ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels }),
-      /* `wheres` GOES WHEREVER `levels` GOES, as the bearer path above copies it too. */
-      ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
+      /* `heldContext`, as the bearer path above. */
+      ...heldContext(held),
     },
   };
 }

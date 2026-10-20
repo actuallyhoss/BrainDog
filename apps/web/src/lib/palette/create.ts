@@ -23,12 +23,12 @@
  */
 
 import { REGISTERS } from '../record/held.ts';
-import { may } from '../record/may.ts';
+import { may, type HeldLevel } from '../record/may.ts';
 import type { Shell } from '../record/boot-live.ts';
 import type { List } from '../record/palette.ts';
 import type { Fetch } from '../record/row-live.ts';
 import type { Captured, Wrote } from '../record/rows-write.ts';
-import type { Entry, Fields, Level } from '../record/schema.ts';
+import type { Entry, Fields } from '../record/schema.ts';
 import type { Creation } from './admit.ts';
 import { chipFields, isQuestion, type Chip } from './tokens.ts';
 
@@ -133,7 +133,7 @@ export function addable<T extends Pick<List, 'id'>>(lists: readonly T[]): T[] {
 /** What the shell says about the lists and the caller, and only that. */
 export type Offer<T> = {
   lists?: readonly T[];
-  me?: { level: string; lists: readonly string[] | null; levels?: Readonly<Record<string, Level>> | undefined };
+  me?: { level: string; lists: readonly string[] | null; levels?: Readonly<Record<string, HeldLevel>> | undefined };
 };
 
 /**

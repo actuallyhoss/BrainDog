@@ -14,18 +14,27 @@ import type { Level } from './schema.ts';
 import type { Shell } from './boot-live.ts';
 
 /**
+ * A level the record may name for a caller: the five, and `comment` (sharing plan §2.15), the rung of a share that reads
+ * and comments or suggests and changes nothing. No member row holds it; the record's lens hands it over in `me.levels`.
+ * Asked as a need, `comment` is "may comment on or suggest a change to", which every level that proposes does.
+ */
+export type HeldLevel = Level | 'comment';
+
+/**
  * What each level does, in the record's own ladder (`LEVEL_REACH`, `packages/record/src/index.ts`).
  *
  * `append` ADDS AND READS NOTHING, which is the one rung that is not a prefix of the ones above it (`20 §1`), so a
  * comparison of places on the ladder would hand an appender every read. The record answers a press either way; this
  * only keeps the screen from offering what it would refuse.
  */
-const DOES: Readonly<Record<Level, readonly Level[]>> = {
+const DOES: Readonly<Record<HeldLevel, readonly HeldLevel[]>> = {
   read: ['read'],
-  append: ['append'],
-  write: ['read', 'append', 'write'],
-  decide: ['read', 'append', 'write', 'decide'],
-  owner: ['read', 'append', 'write', 'decide', 'owner'],
+  /* READ AND PROPOSE, as `LEVEL_REACH.comment` says: comments and suggestions on what they can see, and no change. */
+  comment: ['read', 'comment'],
+  append: ['append', 'comment'],
+  write: ['read', 'comment', 'append', 'write'],
+  decide: ['read', 'comment', 'append', 'write', 'decide'],
+  owner: ['read', 'comment', 'append', 'write', 'decide', 'owner'],
 };
 
 /**
@@ -38,7 +47,7 @@ const DOES: Readonly<Record<Level, readonly Level[]>> = {
 export const LIST_LEVELS: readonly Level[] = ['read', 'append', 'write'];
 
 /** A level this build knows, looked up with `Object.hasOwn` because the word arrived over the wire. */
-const isLevel = (said: unknown): said is Level => typeof said === 'string' && Object.hasOwn(DOES, said);
+const isLevel = (said: unknown): said is HeldLevel => typeof said === 'string' && Object.hasOwn(DOES, said);
 
 /**
  * `me.levels` as `boot` sent it, keeping only a level this build knows, or `null` when the host sent none.
@@ -46,9 +55,9 @@ const isLevel = (said: unknown): said is Level => typeof said === 'string' && Ob
  * A HOST OLDER THAN THE FIELD SENDS NOTHING, and that is not the same as a caller who holds no list: `null` leaves the
  * key off the shell, and `may` then asks the record-wide level as it did before the field existed.
  */
-export function levelsFrom(said: unknown): Record<string, Level> | null {
+export function levelsFrom(said: unknown): Record<string, HeldLevel> | null {
   if (said === null || typeof said !== 'object' || Array.isArray(said)) return null;
-  const out: Record<string, Level> = {};
+  const out: Record<string, HeldLevel> = {};
   for (const [list, level] of Object.entries(said)) if (isLevel(level)) out[list] = level;
   return out;
 }
@@ -63,7 +72,7 @@ export function levelsFrom(said: unknown): Record<string, Level> | null {
  * as a fallback (`layoutOf` in `boot-live.ts`) so that nothing downstream meets a word it does not know, and `lists` is
  * how it says the fallback is one, so here they may do nothing that belongs to the whole record.
  */
-export function may(shell: Pick<Shell, 'me'>, need: Level, list?: string): boolean {
+export function may(shell: Pick<Shell, 'me'>, need: HeldLevel, list?: string): boolean {
   const me = shell.me;
   const whole: unknown = me.lists === null ? me.level : null;
   const held: unknown =

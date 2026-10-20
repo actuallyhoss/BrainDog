@@ -24,6 +24,7 @@ import {
   safeNext,
   sameKey,
   sameOrigin,
+  heldContext,
   serveAuth,
   sessionContext,
   sessionCookie,
@@ -242,6 +243,31 @@ test('sessionContext is the bearer-shaped context, with the proof time and nothi
     credentialed: true,
     provedAt: NOW,
   });
+});
+
+test('heldContext carries what the lens adds, and leaves off every key that says nothing', () => {
+  const grant = { epoch: 4, until: null, via: ['sh_1'], agents: true };
+  const held = {
+    level: null,
+    registers: ['tasks'],
+    levels: { tasks: 'comment' },
+    wheres: { tasks: { field: 'thing', is: 'r_kiln' } },
+    writes: {},
+    hides: { tasks: ['rate'] },
+    nots: { tasks: ['delete' as const] },
+    grant,
+  };
+  assert.deepEqual(heldContext(held), {
+    registers: ['tasks'],
+    levels: { tasks: 'comment' },
+    wheres: { tasks: { field: 'thing', is: 'r_kiln' } },
+    hides: { tasks: ['rate'] },
+    nots: { tasks: ['delete'] },
+    grant,
+  });
+  const who = { person: 'p_2', email: 'sam@example.com', record: 'rec_1', provedAt: NOW };
+  assert.deepEqual(sessionContext(who, held), { principal: { kind: 'person', id: 'p_2', level: null }, ...heldContext(held), credentialed: true, provedAt: NOW });
+  assert.deepEqual(heldContext({ level: 'owner', registers: null, levels: {} }), {}, 'an owner’s context gains nothing');
 });
 
 /* ── the loop, against a real Directory ───────────────────────────────── */

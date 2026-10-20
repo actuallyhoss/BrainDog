@@ -20,10 +20,10 @@
  * is addressed, and one 403 answers every name that is not.
  */
 
-import { clearCookie, readSid, sameOrigin, sessionContext, sessionCookie } from '@braindog/host/auth';
+import { clearCookie, heldContext, readSid, sameOrigin, sessionContext, sessionCookie, type HeldAccess } from '@braindog/host/auth';
 import { shareOf } from '@braindog/host';
 import { OPERATION_METHOD } from '@braindog/kernel';
-import type { TokenReach, Wheres } from '@braindog/kernel';
+import type { TokenReach } from '@braindog/kernel';
 import { MEMBER_STOPPED } from '@braindog/kernel';
 import type { AuthResult, Refusal, Who } from '@braindog/ports';
 import { TOKEN_REACHES, type CallContext } from '@braindog/record';
@@ -34,9 +34,10 @@ import { capped, LAPSED_FIX, mayWrite, mcpWrites } from './lapse.ts';
 
 /**
  * What the record says a person holds in it. The same shape `Record$.access` answers. `wheres` is optional because a
- * record whose kernel is older than migration 19 answers without it, and that is a record with no narrowed grant.
+ * record whose kernel is older than migration 19 answers without it, and that is a record with no narrowed grant; the
+ * lens's `writes`, `hides`, `nots` and `grant` are there only when shares made the answer (`heldContext`).
  */
-export type Held = { level: string | null; registers: string[] | null; levels: Record<string, string>; wheres?: Wheres };
+export type Held = HeldAccess;
 
 export type Deps = {
   /** `https://<PUBLIC_HOST>`, the one origin a cookie write may come from. */
@@ -140,8 +141,14 @@ export type BearerDeps = {
    * `build` is the command's own build as its `x-braindog-cli` header says it (AGT-A02), for the record to keep on the key
    * as its `last_build`, and absent when the caller sent none. The record drops a value that is not a build.
    */
-  verify: (record: string, bearer: string, surface: 'api' | 'mcp', build?: string) => Promise<{ id: string; person_id: string; scope: string; reach?: readonly TokenReach[] } | null>;
-  access: (record: string, person: string) => Promise<Held | null>;
+  verify: (
+    record: string,
+    bearer: string,
+    surface: 'api' | 'mcp',
+    build?: string,
+  ) => Promise<{ id: string; person_id: string; scope: string; reach?: readonly TokenReach[]; child?: { id: string; parent: string } } | null>;
+  /** `token` is the id of the key the bearer is, so the record ANDs its narrowing into what the person holds. */
+  access: (record: string, person: string, token?: string) => Promise<Held | null>;
   /** The record a live name means, the Directory's `resolve`. Asked only for a bearer that came under `/app/<slug>`. */
   named?: (slug: string) => Promise<string | null>;
   /**
@@ -250,7 +257,9 @@ export async function bearerOf(request: Request, surface: 'api' | 'mcp', deps: B
       ...scoped(admitted.held),
     });
   }
-  const admitted = await heldBy(deps, record, seen.person_id, slug);
+  /* THE KEY'S OWN ID GOES WITH THE PERSON, so the record ANDs its narrowing chain into what they hold (`token_lens`): a
+     child key is narrowed by its own row and its parent's, so it is the child's id, not the agent's the principal names. */
+  const admitted = await heldBy(deps, record, seen.person_id, slug, seen.child?.id ?? seen.id);
   if ('status' in admitted) return admitted;
   const held = admitted.held;
   /* THE REACH IS THE TOKEN ROW'S, AS `verifyToken` READ IT INSIDE THE RECORD, and nothing in the request can add to it.
@@ -298,17 +307,14 @@ async function lapseOf(deps: BearerDeps, record: string, method: string, ctx: Ca
 type PersonPrincipal = Extract<CallContext['principal'], { kind: 'person' }>;
 
 /**
- * The lists a person is held to on the record, when they are held to any, and the rows of each they reach.
+ * The lists a person is held to on the record, when they are held to any, the rows of each they reach, and what the lens
+ * adds (`writes`, `hides`, `nots`, `grant`).
  *
- * `wheres` TRAVELS WHEREVER `levels` DOES, so a narrowed grant reaches every reader the same way through a bearer as
- * through a session. Left off, every reader would show a narrowed colleague the
- * whole list.
+ * `heldContext` IS THE ONE PLACE THIS IS DONE, the session path's too, so a narrowed grant reaches every reader the same
+ * way through a bearer as through a session. Left off, every reader would show a narrowed colleague the whole list.
  */
-const scoped = (held: Held): Pick<CallContext, 'registers' | 'levels'> & { wheres?: Wheres } => ({
-  ...(held.registers === null ? {} : { registers: held.registers }),
-  ...(Object.keys(held.levels).length === 0 ? {} : { levels: held.levels as CallContext['levels'] }),
-  ...(held.wheres === undefined || Object.keys(held.wheres).length === 0 ? {} : { wheres: held.wheres }),
-});
+const scoped = (held: Held): Pick<CallContext, 'registers' | 'levels' | 'wheres' | 'writes' | 'hides' | 'nots' | 'grant'> =>
+  heldContext(held) as Pick<CallContext, 'registers' | 'levels' | 'wheres' | 'writes' | 'hides' | 'nots' | 'grant'>;
 
 /**
  * The half every bearer shares once its secret is checked: the path's slug agrees with the bearer's record, and the
@@ -319,10 +325,16 @@ const scoped = (held: Held): Pick<CallContext, 'registers' | 'levels'> & { where
  * SECRET IS CHECKED, so a bearer nobody issued is the same 401 under any slug and a stranger cannot ask which record a
  * name belongs to. A name nobody holds is the same 403 as another record's.
  */
-async function heldBy(deps: BearerDeps, record: string, person: string, slug: string | null): Promise<{ held: Held } | { status: 403; refusal: Refusal }> {
+async function heldBy(
+  deps: BearerDeps,
+  record: string,
+  person: string,
+  slug: string | null,
+  token?: string,
+): Promise<{ held: Held } | { status: 403; refusal: Refusal }> {
   if (slug !== null && (deps.named === undefined || (await deps.named(slug)) !== record))
     return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'This token is for a different record than the one this address names.', at: 'slug' } };
-  const held = await deps.access(record, person);
+  const held = token === undefined ? await deps.access(record, person) : await deps.access(record, person, token);
   if (!held) return { status: 403, refusal: { code: 'FORBIDDEN', fix: 'You are not on this record.' } };
   return { held };
 }

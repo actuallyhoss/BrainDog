@@ -93,14 +93,21 @@ export type LensSources = {
   /** The `*` member row's level, or `null` for a guest with shares only. */
   role: Level | null;
   suspended?: boolean;
-  /** Legacy per-list member rows: on that list they replace the role. `where` is a tree; anything else reaches no row. */
+  /**
+   * Legacy per-list member rows: on that list they replace the role. `where` is the rule as `invite` stored it, a tree or
+   * a sentence, carried as one leaf for the reader to compile as it always has (`ruleOf`); `null` or anything else is a
+   * rule the record could not read, which reaches no row.
+   */
   lists?: { register: string; level: Level; where?: Json | null }[];
   /** The person's shares and their groups' shares, revoked ones included (they count for nothing). */
   shares: HeldShare[];
   /** The People rows whose address is the person's sign-in, for `$me`. None, and `$me` matches nothing. */
   me?: string[];
-  /** Present when an agent is calling: its narrowing, or `null` for a root token with none. */
-  token?: { narrow: Narrow | null } | null;
+  /**
+   * Present when an agent is calling: its narrowing, or `null` for a root token with none. `narrows` is a child key's
+   * chain (its parent's narrowing, then its own, as `verifyToken` reads them), every link ANDed in beside `narrow`.
+   */
+  token?: { narrow: Narrow | null; narrows?: readonly Narrow[] } | null;
   /** The access epoch, the `access` counter. */
   epoch?: number;
 };
@@ -164,6 +171,17 @@ const LEVEL_CAPS: Record<Level, readonly Cap[]> = {
   owner: CAPS,
 };
 const RANK: Record<Level, number> = { read: 1, append: 0, write: 3, decide: 4, owner: 5 };
+
+/**
+ * Whether a role reaches a list on its own, before any share: every list, as the ladder has always read it, except that
+ * a record-wide "Adds only" stops at the owner's lists (Keys, People and any `owner_only` list), as the record's
+ * `ownersListStop` says. A share still reaches Keys and People only by naming them (`coverOf`).
+ */
+const roleReaches = (role: Level, l: CatalogList): boolean => role !== 'append' || !isGated(l);
+
+/** A legacy rule as the lens carries it: TRUE for none, the rule itself as one leaf, or FALSE when it cannot be read. */
+const legacyCond = (where: Json | null | undefined): Expr =>
+  where === undefined ? true : (typeof where === 'string' && where.trim() !== '') || isObj(where) ? (where as Where) : false;
 
 /* ---------------------------------------------------------------------------------------------------------- folding */
 
@@ -630,6 +648,8 @@ function lensOrThrow(sources: LensSources, catalog: Catalog, nowMs: number, tz: 
   if (!Array.isArray(me) || !me.every(isText)) return null;
   const token = sources.token ?? null;
   if (token !== null && (!isObj(token) || (token.narrow !== null && narrowFault(token.narrow) !== null))) return null;
+  const chain: Narrow[] = token === null ? [] : [...(token.narrow === null ? [] : [token.narrow]), ...(token.narrows ?? [])];
+  if (token !== null && token.narrows !== undefined && (!Array.isArray(token.narrows) || token.narrows.some((n) => narrowFault(n) !== null))) return null;
   const epoch = sources.epoch ?? 0;
   if (!Number.isInteger(epoch)) return null;
   if (!Array.isArray(sources.shares)) return null;
@@ -642,16 +662,15 @@ function lensOrThrow(sources: LensSources, catalog: Catalog, nowMs: number, tz: 
     for (const r of sources.lists ?? []) if (!isObj(r) || !isText(r.register) || !(r.level in RANK)) return null;
   }
 
-  /* THE TOKEN'S NARROWING, one condition per list, ANDed into everything. */
-  const narrowOn = (l: CatalogList): Expr => {
-    if (token === null || token.narrow === null) return true;
-    const n = token.narrow;
+  /* THE TOKEN'S NARROWING, one condition per list per link of its chain, ANDed into everything. */
+  const narrowOne = (n: Narrow, l: CatalogList): Expr => {
     if ('share' in n) {
       const s = sources.shares.find((x) => x.id === n.share && x.effect === 'allow');
       return s ? (compiles(s.what, l) ? coverOf(s.what, l, me).cond : false) : false;
     }
     return compiles(n, l) ? coverOf(n, l, me).cond : false;
   };
+  const narrowOn = (l: CatalogList): Expr => (chain.length === 0 ? true : chain.length === 1 ? narrowOne(chain[0]!, l) : { all: chain.map((n) => narrowOne(n, l)) });
 
   const pred = Object.fromEntries(CAPS.map((c) => [c, {} as Record<string, Pred>])) as Record<Cap, Record<string, Pred>>;
   const hides: Record<string, string[]> = {};
@@ -671,8 +690,8 @@ function lensOrThrow(sources: LensSources, catalog: Catalog, nowMs: number, tz: 
     }
     const legacy = (sources.lists ?? []).find((r) => r.register === l.id);
     const base: { level: Level; cond: Expr } | null = legacy
-      ? { level: legacy.level, cond: legacy.where === undefined ? true : isObj(legacy.where) && whereFault(legacy.where) === null ? (legacy.where as Where) : false }
-      : role !== null && !isGated(l)
+      ? { level: legacy.level, cond: legacyCond(legacy.where) }
+      : role !== null && roleReaches(role, l)
         ? { level: role, cond: true }
         : null;
 
@@ -727,10 +746,14 @@ function ctxOf(lens: Omit<Lens, 'ctx'>, sources: LensSources, catalog: Catalog, 
     lens.owner
       ? catalog.lists.every((l) => CAPS.every((c) => pred[c][l.id] === true))
       : role !== null &&
-        catalog.lists.every((l) => (isGated(l) ? CAPS.every((c) => pred[c][l.id] === false) : LEVEL_CAPS[role].every((c) => pred[c][l.id] === true)));
+        catalog.lists.every((l) => (roleReaches(role, l) ? LEVEL_CAPS[role].every((c) => pred[c][l.id] === true) : CAPS.every((c) => pred[c][l.id] === false)));
+  /* A ROLE THAT STILL REACHES EVERY LIST KEEPS THE WHOLE RECORD AS ITS CEILING, as it did with only member rows: a member
+     with a legacy row or a share on one list is held there by `levels` and `wheres`, never by a ceiling naming every
+     list, which a list installed tomorrow would fall outside. */
+  const ceiling = whole || (role !== null && !lens.owner && reached.length === catalog.lists.length);
   const ctx: LensCtx = {
     level,
-    registers: whole ? null : reached,
+    registers: ceiling ? null : reached,
     levels: {},
     wheres: {},
     writes: {},
@@ -748,8 +771,11 @@ function ctxOf(lens: Omit<Lens, 'ctx'>, sources: LensSources, catalog: Catalog, 
   for (const l of reached) {
     /* A LEVEL ONLY WHERE THE LIST DIFFERS FROM WHAT THE ROLE GIVES, so an Admin's lists carry none. */
     const asRole = role !== null && CAPS.every((c) => (pred[c][l] !== false) === LEVEL_CAPS[role].includes(c));
-    const t = top(l);
-    if (t !== null && t !== level && !asRole) ctx.levels[l] = t;
+    /* A LEGACY ROW NO SHARE CHANGED KEEPS ITS OWN LEVEL, `decide` included, which the ladder of predicates cannot say. */
+    const legacy = (sources.lists ?? []).find((r) => r.register === l);
+    const asLegacy = legacy !== undefined && CAPS.every((c) => (pred[c][l] !== false) === LEVEL_CAPS[legacy.level].includes(c));
+    const t = asLegacy ? legacy.level : top(l);
+    if (t !== null && t !== level && (asLegacy ? legacy.level !== role : !asRole)) ctx.levels[l] = t;
     const r = pred.read[l]!;
     const w = toWhere(r);
     if (w) ctx.wheres[l] = w;

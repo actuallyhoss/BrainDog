@@ -46,7 +46,7 @@ import { BLOCK_INSTALLS, NOBODY, admitHostSources, costRows, rememberedLine, vie
 import { mayOf, openInstructions, type Instr, type Profile, type Stop } from '@braindog/kernel';
 import { OWN_RUN, personNamed, stopLine, toldOf, type Told } from './methods/instructions.ts';
 import { saysOf } from './methods/agent-profile.ts';
-import type { InvitationRow } from '@braindog/kernel';
+import type { Grant, InvitationRow } from '@braindog/kernel';
 import type { Backlinks } from '@braindog/kernel';
 import type { ViewRow } from '@braindog/kernel';
 import type { MetricDecl } from '@braindog/kernel';
@@ -444,6 +444,15 @@ export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
 export type Level = (typeof LEVELS)[number];
 
 /**
+ * A level a caller holds for one call: the five, and `comment` (sharing plan §2.15), which a share at the comment rung
+ * gives: read and propose, and nothing above. No `member` row stores it, so the table's CHECK is untouched; only the
+ * lens hands it to a host, which hands it here.
+ */
+export type HeldLevel = Level | 'comment';
+/** Every held level, in the order `LEVELS` is, with `comment` above the two that only read or only add. */
+export const HELD_LEVELS: readonly HeldLevel[] = ['read', 'append', 'comment', 'write', 'decide', 'owner'];
+
+/**
  * A read an owner may hand one token beside its scope. One, and it is not a rung: `inbox` opens the inbox and nothing
  * else, and it does not lift the token to `owner` anywhere.
  *
@@ -464,12 +473,12 @@ export type Principal =
    * them. `null` is the honest value, and the type carrying it is what makes every reader deal with
    * it.
    */
-  | { kind: 'person'; id: string; level: Level | null }
+  | { kind: 'person'; id: string; level: HeldLevel | null }
   /**
    * `reach` IS WHAT THE OWNER NAMED WHEN THEY MINTED IT, set by a host from the token's own row and never from anything
    * the caller sent. Absent is no reach, which is every token minted before it existed.
    */
-  | { kind: 'token'; id: string; scope: Scope; person: string; level: Level | null; reach?: readonly TokenReach[] | undefined }
+  | { kind: 'token'; id: string; scope: Scope; person: string; level: HeldLevel | null; reach?: readonly TokenReach[] | undefined }
   /**
    * A machine that runs jobs: a device grant of reach `runner` (`packages/kernel/src/device.ts`), built by a host from
    * that verified grant and never from anything the caller sent.
@@ -498,7 +507,7 @@ export type CallContext = {
    * this says what they may DO with one of them — and the two are separate because "read the record
    * and write this one" and "see only this one" are different invitations.
    */
-  levels?: Readonly<Record<string, Level>> | undefined;
+  levels?: Readonly<Record<string, HeldLevel>> | undefined;
 
   /**
    * One `where` per list this caller's grant narrows, filled by a host wherever `levels` is.
@@ -510,6 +519,32 @@ export type CallContext = {
    * search and Slash confirm a row they already read is still one this `where` admits before answering it.
    */
   wheres?: Readonly<Wheres> | undefined;
+
+  /**
+   * The rows of a list this caller may change, where that differs from the rows they read (`wheres`): a share at `view`
+   * on the rest of a list beside `edit` on some of it. Filled by a host from the lens (`heldContext`), wherever `wheres`
+   * is. The write paths hold a write to it (the sharing plan's slice 4); absent, a write is held to `wheres`.
+   */
+  writes?: Readonly<Wheres> | undefined;
+
+  /** What a share switched off on a list: `history` (its past values) and `delete`. Filled by a host from the lens. */
+  nots?: Readonly<Record<string, readonly ('history' | 'delete')[]>> | undefined;
+
+  /** Fields hidden from this caller, by list, as the union of their shares' hides says. Filled by a host from the lens. */
+  hides?: Readonly<Record<string, readonly string[]>> | undefined;
+
+  /**
+   * Where this caller's access came from when shares made it: the access epoch, the next instant the clock alone would
+   * change it, the shares that reached something, and whether their agents carry it. `boot` and `version` hand it to the
+   * app, whose copy is keyed on the epoch. Absent for anybody who holds no share, the owner among them.
+   */
+  grant?: Readonly<Grant> | undefined;
+
+  /**
+   * An owner or Admin seeing the record as somebody else sees it ("See as", the plan's slice 7): the person whose lens
+   * this context is. Read-only, and set only by a host.
+   */
+  preview?: string | undefined;
 
   /**
    * This read leaves the record: to a model, a mail, a push or a file somebody else opens. Every reader then reads as
@@ -805,8 +840,10 @@ const TOKEN_REACH: Record<Scope, Need[]> = {
   write: ['read', 'propose', 'append', 'write'],
 };
 
-const LEVEL_REACH: Record<Level, Need[]> = {
+const LEVEL_REACH: Record<HeldLevel, Need[]> = {
   read: ['read'],
+  /* READ AND PROPOSE, the comment rung of a share (sharing plan §2.1): comments and suggestions on what they can see. */
+  comment: ['read', 'propose'],
   /* AND NO READ, which is the whole of what `append` means. 20 §1: *"`create`, `propose` and `log`
      — and no read. The conservative half: an appender sees nothing, not even what it filed."* This
      included `read`, so a contractor invited to file expenses could list every register inside their
@@ -882,7 +919,7 @@ export function allows(ctx: CallContext, need: Need, nameOf: (list: string) => s
     };
   }
 
-  const level: Level = p.level;
+  const level: HeldLevel = p.level;
   const reach =
     p.kind === 'person'
       ? LEVEL_REACH[level]
@@ -1133,13 +1170,18 @@ export type Boot = {
     kind: 'person' | 'token' | 'system';
     person: string | null;
     name: string | null;
-    level: Level | null;
+    level: HeldLevel | null;
     /**
      * The level the caller holds on each list, by id: a grant naming the list, else the record-wide level, and no key for
      * a list they hold nothing on (outside their ceiling, or an owner's list a record-wide appender does not reach). What
      * the app asks before it draws a control (`may`, `apps/web/src/lib/record/may.ts`), so it never works it out.
      */
-    levels: Record<string, Level>;
+    levels: Record<string, HeldLevel>;
+    /**
+     * Where the caller's access came from when shares made it (`CallContext.grant`): the epoch the app keys its copy on,
+     * and when the clock alone will change it. Absent for anybody who holds no share, the owner among them.
+     */
+    grant?: Grant;
     /** What this person arranged for themselves (`setPref`), key by key as `Prefs` says. A person only. */
     prefs?: Prefs;
   };
@@ -1770,6 +1812,11 @@ export type Version = {
   app: string | null;
   /** Whether `SLASH_ENDPOINT` is set, so `/api/slash/*` is routed at all (`33 §4`). */
   slash: boolean;
+  /**
+   * The caller's grant when shares made their access (`CallContext.grant`): a tab that sees its epoch move re-boots onto
+   * what it now holds (sharing plan §2.8). Absent for anybody who holds no share, the owner among them.
+   */
+  grant?: Grant;
 };
 
 /**
@@ -2534,7 +2581,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        `allows`, and an unrecognised value sorts below every real one, so it never got there. Every
        grant is asked now, and `LEVEL_REACH[<anything else>]` is `undefined`, whose `.includes`
        throws a TypeError out of the one check this package promises never to throw over. */
-    const held = Object.values(ctx.levels ?? {}).filter((level) => LEVELS.includes(level));
+    const held = Object.values(ctx.levels ?? {}).filter((level) => HELD_LEVELS.includes(level));
     if (held.length === 0) return whole ?? guard(ctx, need);
 
     /* DOES ANY GRANT REACH THIS, RATHER THAN DOES THE HIGHEST ONE. This took the index-max level
@@ -2552,7 +2599,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        invited as, and else THE FURTHEST-REACHING GRANT'S, so the sentence
        names the largest thing they hold rather than whichever register happened to be listed first. */
     if (whole) return whole;
-    const best = held.sort((a, b) => LEVELS.indexOf(b) - LEVELS.indexOf(a))[0]!;
+    const best = held.sort((a, b) => HELD_LEVELS.indexOf(b) - HELD_LEVELS.indexOf(a))[0]!;
     return allows({ ...ctx, principal: { ...p, level: best } }, need, listName);
   };
 
@@ -7089,7 +7136,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * named payments, payees and runs from the rest of the record to it. Reading every list is reading all of each.
    */
   const readsEveryList = (ctx: CallContext): boolean =>
-    wholeRecord(ctx) && Object.keys(ctx.wheres ?? {}).length === 0 && Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
+    wholeRecord(ctx) &&
+    Object.keys(ctx.wheres ?? {}).length === 0 &&
+    /* AND NO FIELD HIDDEN ANYWHERE (sharing plan §2.7): reading every list is reading all of each row of each, so a share
+       that hides one field switches on every conservative path already built for a narrowed caller. */
+    Object.values(ctx.hides ?? {}).every((fields) => fields.length === 0) &&
+    Object.keys(ctx.levels ?? {}).every((list) => readable(ctx, list) === null);
 
   /**
    * Whether the gap between two of this caller's lines counts nothing they may not read, which is who may hold a rowid.
@@ -7680,14 +7732,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * ASKED OF THE SAME RULES `guard` ASKS (`reaches`, `ownersListStop`), so the app is told what a press would meet and
    * never works it out (`apps/web/src/lib/record/may.ts`).
    */
-  const levelsOf = (ctx: CallContext): Record<string, Level> => {
+  const levelsOf = (ctx: CallContext): Record<string, HeldLevel> => {
     const p = ctx.principal;
     if (p.kind !== 'person' && p.kind !== 'token') return {};
-    const out: Record<string, Level> = {};
+    const out: Record<string, HeldLevel> = {};
     for (const list of kernel.registers().keys()) {
       if (reaches(ctx, list) !== null || ownersListStop(ctx, list) !== null) continue;
       const held = Object.hasOwn(ctx.levels ?? {}, list) ? ctx.levels?.[list] : p.level;
-      if (held !== undefined && held !== null && LEVELS.includes(held)) out[list] = held;
+      if (held !== undefined && held !== null && HELD_LEVELS.includes(held)) out[list] = held;
     }
     return out;
   };
@@ -7913,6 +7965,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         name: person === null ? null : (kernel.members().find((m) => m.person_id === person)?.name ?? null),
         level: p.kind === 'person' || p.kind === 'token' ? p.level : null,
         levels: levelsOf(ctx),
+        ...(ctx.grant === undefined ? {} : { grant: { ...ctx.grant } }),
         ...(p.kind === 'person' ? { prefs } : {}),
       },
       pages,
@@ -13708,7 +13761,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     /** What this record is at, and what is reading it. `33 §4`, line 356. */
     async version(ctx: CallContext): Promise<Result<Version>> {
-      const stop = guard(ctx, 'read');
+      /* `scoped`, AS `boot` ASKS: whoever may open the app may poll it. A colleague held to named lists, a guest among
+         them, holds nothing record-wide, and `guard` refused the poll that tells their tab the grant moved. */
+      const stop = scoped(ctx, 'read');
       return stop
         ? { ok: false, refusal: stop }
         : ok({
@@ -13722,6 +13777,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                not told what I am". `deploy-parity` reads the second and cannot read the first. */
             app: build?.app || null,
             slash: build?.slash ?? false,
+            ...(ctx.grant === undefined ? {} : { grant: { ...ctx.grant } }),
           });
     },
 

@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { fixOf, type Result } from '@braindog/ports';
 
 import { access } from '../src/members.ts';
+import { narrowsOf } from '../src/shares.ts';
 import { applyMigrations } from '../src/migrate.ts';
 import {
   AGENTS_KEY,
@@ -172,11 +173,11 @@ test("P9: A KEY'S NARROWING ONLY TAKES AWAY, its child's is ANDed onto its paren
   assert.deepEqual(seen.narrows, [kiln, tasks], "the child's narrowing replaced its parent's instead of joining it");
   assert.deepEqual(value(await verifyToken(deps(), value(await mintChild(deps(), parent.bearer, { minutes: 5 })).bearer)).narrows, [kiln]);
 
-  /* The chain rides on the person's own access, which is never widened by it: the person's levels come back as they are. */
+  /* The chain is read from `token_lens` by the key's id, parent's first, and rides on the person's own access, which is
+     never widened by it: without a catalog to narrow against, the person's member rows come back as they are. */
   const person = access(sql, OWNER)!;
-  const agent = access(sql, OWNER, seen.narrows)!;
-  assert.deepEqual({ ...agent, narrows: undefined }, { ...person, narrows: undefined });
-  assert.deepEqual(agent.narrows, [kiln, tasks]);
+  assert.deepEqual(access(sql, OWNER, child.id), person);
+  assert.deepEqual(narrowsOf(sql, child.id), [kiln, tasks]);
 
   /* Random well-formed narrows: a key never verifies with fewer links than it was minted with. */
   const shapes: Narrow[] = [{ record: true }, { lists: ['a', 'b'] }, { lists: { has: 'money' } }, { project: 'e_x', lists: ['tasks'] }, { list: 'tasks', rows: ['e_1'] }, { share: 'sh_1' }];

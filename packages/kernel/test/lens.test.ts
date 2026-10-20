@@ -162,7 +162,11 @@ test('A ROLE COVERS THE RECORD and registers is null, and a deny takes it back t
   const plain = lens({ person: 'p_m', role: 'write', shares: [] });
   assert.equal(plain.ctx.registers, null);
   assert.deepEqual(plain.ctx.levels, {});
-  assert.equal(plain.pred.read.keys, false, 'a role reaches no owner-only list');
+  assert.equal(plain.pred.read.keys, true, 'a role reaches Keys as the ladder always has');
+  const adds = lens({ person: 'p_x', role: 'append', shares: [] });
+  assert.equal(adds.pred.append.keys, false, 'a record-wide Adds only stops at the owner lists');
+  assert.equal(adds.pred.append.diary, false);
+  assert.equal(adds.pred.append.notes, true);
   const admin = lens({ person: 'p_a', role: 'decide', shares: [] });
   assert.deepEqual(admin.ctx.levels, {}, 'an Admin carries no per-list level');
   const denied = lens({ person: 'p_m', role: 'write', shares: [held({ effect: 'deny', what: { lists: ['payroll'] } })] });
@@ -174,10 +178,27 @@ test('A ROLE COVERS THE RECORD and registers is null, and a deny takes it back t
 
 test('a legacy per-list row replaces the role on its list, and a rule it cannot read reaches no row', () => {
   const rule = { field: 'state', is: 'open' };
-  const l = lens({ person: 'p_m', role: 'write', shares: [], lists: [{ register: 'tasks', level: 'read', where: rule }, { register: 'notes', level: 'write', where: 'a sentence' }] });
+  const l = lens({
+    person: 'p_m',
+    role: 'write',
+    shares: [],
+    lists: [
+      { register: 'tasks', level: 'read', where: rule },
+      { register: 'notes', level: 'write', where: 'a sentence' },
+      { register: 'bills', level: 'write', where: null },
+      { register: 'payroll', level: 'decide' },
+    ],
+  });
   assert.deepEqual(l.pred.read.tasks, rule);
   assert.equal(l.pred.write.tasks, false);
-  assert.equal(l.pred.read.notes, false);
+  /* A SENTENCE IS CARRIED AS IT WAS STORED, one leaf the reader compiles as it always has. */
+  assert.equal(l.pred.read.notes, 'a sentence' as unknown as Where);
+  assert.equal(l.pred.read.bills, false);
+  assert.equal(l.ctx.levels.payroll, 'decide', 'a legacy level the predicates cannot say is kept');
+  assert.deepEqual(l.ctx.registers, ['things', 'tasks', 'payroll', 'notes', 'keys', 'people', 'diary'], 'a rule nobody can read takes its list off');
+  const one = lens({ person: 'p_m', role: 'read', shares: [held({ what: { lists: ['notes'] }, can: 'edit' })], lists: [{ register: 'tasks', level: 'write' }] });
+  assert.equal(one.ctx.registers, null, 'a role that still reaches every list keeps the whole record as its ceiling');
+  assert.deepEqual(one.ctx.levels, { tasks: 'write', notes: 'write' });
 });
 
 test('AN OWNER SEES EVERYTHING, and a narrowed key of theirs only what it is narrowed to', () => {

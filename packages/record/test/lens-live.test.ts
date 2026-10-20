@@ -1,0 +1,345 @@
+/**
+ * The lens goes live (sharing plan slice 5): share rows written straight into the tables come back out of `access` as
+ * the context every reader already honours, the owner is untouched by any of it, and the lens is quick.
+ *
+ * The shares are inserted by SQL, as the share methods (slice 7) will write them, and the access epoch is moved by hand
+ * as those methods will move it. Each grant shape is the plan's (§4.2), on a record with projects (Things), Tasks in
+ * them with a money rate, Money and Notes. Each is asserted as `kernel.access` answers it, and the contractor and the
+ * commenter are then driven through `list`, `boot` and `version` with the context a host builds from that answer.
+ */
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { access as memberAccess } from '../../kernel/src/members.ts';
+import { createRecordApi, type CallContext } from '../src/index.ts';
+import { fixedClock, openSqlite, type NodeSql } from '../../kernel/test/sqlite.ts';
+
+const NOW = Date.UTC(2026, 9, 20, 12);
+const DAY = 86_400_000;
+const at = (ms: number) => new Date(ms).toISOString();
+
+const reg = (id: string, name: string, title: string, fields: unknown[], more: Record<string, unknown> = {}) => ({
+  id: `register.${id}`,
+  kind: 'register' as const,
+  body: { id, name, title, fields, ...more } as never,
+});
+
+const DECLS = [
+  reg('things', 'Things', 'name', [
+    { id: 'name', type: 'text', required: true },
+    { id: 'repos', type: 'list', of: 'text' },
+  ], { scopes: { repos: 'repos' } }),
+  reg('tasks', 'Tasks', 'what', [
+    { id: 'what', type: 'text', required: true },
+    { id: 'thing', type: 'ref', to: 'things', scope: {} },
+    { id: 'stage', type: 'enum', values: ['Doing', 'Review', 'Done'] },
+    { id: 'rate', type: 'money' },
+  ]),
+  reg('money', 'Money', 'payee', [
+    { id: 'payee', type: 'text', required: true },
+    { id: 'amount', type: 'money', required: true },
+  ]),
+  reg('notes', 'Notes', 'body', [{ id: 'body', type: 'text', required: true }]),
+];
+
+const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' } };
+
+const value = <T>(r: unknown): T => {
+  const x = r as { ok: boolean; value: T; refusal?: { code: string; fix: string } };
+  assert.ok(x.ok, x.ok ? '' : `${x.refusal?.code}: ${x.refusal?.fix}`);
+  return x.value;
+};
+
+type Api = Awaited<ReturnType<typeof createRecordApi>>;
+
+async function record() {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
+  const put = await api.kernel.install(DECLS);
+  assert.ok(put.ok, JSON.stringify(put));
+  assert.ok(api.kernel.createRecord({ id: 'rec_01JZ8QK3F7R2M9V4XN6TCB5HAD', slug: 'the-studio', name: 'The Studio', tz: 'UTC', locale: 'en', owner: { id: 'p_1' } }).ok);
+  const kiln = value<{ id: string }>(await api.create({ register: 'things', fields: { name: 'Kiln' } }, owner));
+  const mill = value<{ id: string }>(await api.create({ register: 'things', fields: { name: 'Mill' } }, owner));
+  const glaze = value<{ id: string }>(await api.create({ register: 'tasks', fields: { what: 'Glaze test', thing: kiln.id, stage: 'Review', rate: { amount: 4_000, currency: 'GBP' } } }, owner));
+  value(await api.create({ register: 'tasks', fields: { what: 'Fire the kiln', thing: kiln.id, stage: 'Doing' } }, owner));
+  value(await api.create({ register: 'tasks', fields: { what: 'Oil the mill', thing: mill.id, stage: 'Review' } }, owner));
+  value(await api.create({ register: 'money', fields: { payee: 'Clay Co', amount: { amount: 12_000, currency: 'GBP' } } }, owner));
+  value(await api.create({ register: 'notes', fields: { body: 'Kiln temperatures' } }, owner));
+  /* THE PEOPLE THE SHARES ARE FOR, as the record mirrors them. Guests hold no member row; Ann is a member who adds to Money only. */
+  const people: [string, string][] = [['p_sam', 'Sam'], ['p_lee', 'Lee'], ['p_pri', 'Priya'], ['p_ana', 'Ana'], ['p_omar', 'Omar'], ['p_vic', 'Vic'], ['p_cat', 'Cat'], ['p_ann', 'Ann'], ['p_gus', 'Gus']];
+  for (const [id, name] of people)
+    sql.exec('INSERT INTO person (id, email, name, suspended_at) VALUES (?, ?, ?, NULL)', id, `${name.toLowerCase()}@example.test`, name);
+  value(await api.invite({ person: 'p_ann', name: 'Ann', registers: { money: 'append' } }, owner));
+  return { api, sql, clock, kiln: kiln.id, mill: mill.id, glaze: glaze.id };
+}
+
+let n = 0;
+/** One share row, as the share methods will write it. */
+function share(
+  sql: NodeSql,
+  who: string,
+  what: unknown,
+  can: string,
+  more: { effect?: 'allow' | 'deny'; caps?: unknown; hide?: unknown; ends?: string; kind?: 'person' | 'group' } = {},
+): string {
+  const id = `sh_${String(++n).padStart(3, '0')}`;
+  sql.exec(
+    `INSERT INTO share (id, effect, who_kind, who, what, can, caps, hide, ends_at, made_by, made_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'p_1', ?)`,
+    id,
+    more.effect ?? 'allow',
+    more.kind ?? 'person',
+    who,
+    JSON.stringify(what),
+    can,
+    more.caps === undefined ? null : JSON.stringify(more.caps),
+    more.hide === undefined ? null : JSON.stringify(more.hide),
+    more.ends ?? null,
+    at(NOW),
+  );
+  return id;
+}
+
+/** The context a host builds from the answer (`heldContext`, `packages/host/src/auth.ts`), for a person. */
+function contextOf(api: Api, person: string): CallContext {
+  const held = api.kernel.access(person);
+  assert.ok(held, `${person} holds nothing`);
+  const says = (o: object | undefined) => o !== undefined && Object.keys(o).length > 0;
+  return {
+    principal: { kind: 'person', id: person, level: held.level },
+    ...(held.registers === null ? {} : { registers: held.registers }),
+    ...(says(held.levels) ? { levels: held.levels } : {}),
+    ...(says(held.wheres) ? { wheres: held.wheres! } : {}),
+    ...(says(held.writes) ? { writes: held.writes! } : {}),
+    ...(says(held.hides) ? { hides: held.hides! } : {}),
+    ...(says(held.nots) ? { nots: held.nots! } : {}),
+    ...(held.grant === undefined ? {} : { grant: held.grant }),
+  } as CallContext;
+}
+
+test('THE PLAN’S GRANT SHAPES, written as share rows, come out of access as the context every reader honours', async () => {
+  const { api, sql, kiln, glaze } = await record();
+  const tasksIn = (thing: string) => ({ field: 'thing', is: thing });
+
+  share(sql, 'p_vic', { record: true }, 'view'); // G1 whole-record view
+  share(sql, 'p_lee', { record: true }, 'edit'); // G2 Assistant
+  share(sql, 'p_lee', { lists: { has: 'money' } }, 'view', { effect: 'deny' });
+  share(sql, 'p_lee', { lists: { role: 'keys' } }, 'view', { effect: 'deny' });
+  const accountant = share(sql, 'p_pri', { lists: { has: 'money' } }, 'view', { ends: at(NOW + 90 * DAY) }); // G3 Accountant
+  share(sql, 'p_pri', { lists: { role: 'keys' } }, 'view', { effect: 'deny' });
+  share(sql, 'p_sam', { project: kiln, lists: ['tasks'] }, 'edit', { caps: { delete: false } }); // G4 Contractor on Kiln
+  share(sql, 'p_ana', { list: 'tasks', where: { field: 'stage', is: 'Review' } }, 'comment'); // G5 a condition
+  share(sql, 'p_omar', { list: 'tasks', rows: [glaze] }, 'view'); // G6 a single row
+  share(sql, 'p_cat', { lists: ['tasks'] }, 'view', { hide: { tasks: ['rate'] } }); // G7 a hidden field
+  share(sql, 'p_gus', { project: kiln, lists: ['tasks'] }, 'comment'); // G8 Comment on Kiln
+  share(sql, 'p_ann', { lists: ['notes'] }, 'view'); // G9 Adds only on Money, a member, with a share beside it
+  api.kernel.accessChanged();
+  const epoch = api.kernel.accessEpoch();
+  const grant = (via: string[], until: string | null = null) => ({ epoch, until, via, agents: true });
+  const ids = (who: string) => sql.all<{ id: string }>("SELECT id FROM share WHERE who = ? AND effect = 'allow' ORDER BY id", who).map((r) => r.id);
+  const all = (who: string) => sql.all<{ id: string }>('SELECT id FROM share WHERE who = ? ORDER BY id', who).map((r) => r.id);
+
+  /* `session` is the kernel's own list of agent runs, which a whole-record share reaches as it reaches any list but Keys and People. */
+  assert.deepEqual(api.kernel.access('p_vic'), { level: 'read', registers: ['session', 'things', 'tasks', 'money', 'notes'], levels: {}, grant: grant(ids('p_vic')) }, 'G1');
+  /* Tasks holds a money rate, so "everything but money" keeps it from Lee too. Keys are denied though the record has none. */
+  assert.deepEqual(api.kernel.access('p_lee'), { level: 'write', registers: ['session', 'things', 'notes'], levels: {}, grant: grant(all('p_lee').filter((id) => id !== all('p_lee')[2])) }, 'G2');
+  assert.deepEqual(
+    api.kernel.access('p_pri'),
+    { level: null, registers: ['tasks', 'money'], levels: { tasks: 'read', money: 'read' }, grant: grant([accountant], at(NOW + 90 * DAY)) },
+    'G3',
+  );
+  assert.deepEqual(
+    api.kernel.access('p_sam'),
+    {
+      level: null,
+      registers: ['things', 'tasks'],
+      levels: { things: 'read', tasks: 'write' },
+      wheres: { things: { field: 'id', is: kiln }, tasks: tasksIn(kiln) },
+      nots: { tasks: ['delete'] },
+      grant: grant(ids('p_sam')),
+    },
+    'G4',
+  );
+  assert.deepEqual(
+    api.kernel.access('p_ana'),
+    { level: null, registers: ['tasks'], levels: { tasks: 'comment' }, wheres: { tasks: { field: 'stage', is: 'Review' } }, grant: grant(ids('p_ana')) },
+    'G5',
+  );
+  assert.deepEqual(
+    api.kernel.access('p_omar'),
+    { level: null, registers: ['tasks'], levels: { tasks: 'read' }, wheres: { tasks: { field: 'id', in: [glaze] } }, grant: grant(ids('p_omar')) },
+    'G6',
+  );
+  assert.deepEqual(
+    api.kernel.access('p_cat'),
+    { level: null, registers: ['tasks'], levels: { tasks: 'read' }, hides: { tasks: ['rate'] }, grant: grant(ids('p_cat')) },
+    'G7',
+  );
+  assert.deepEqual(
+    api.kernel.access('p_gus'),
+    { level: null, registers: ['things', 'tasks'], levels: { things: 'read', tasks: 'comment' }, wheres: { things: { field: 'id', is: kiln }, tasks: tasksIn(kiln) }, grant: grant(ids('p_gus')) },
+    'G8',
+  );
+  assert.deepEqual(
+    api.kernel.access('p_ann'),
+    { level: null, registers: ['money', 'notes'], levels: { money: 'append', notes: 'read' }, grant: grant(ids('p_ann')) },
+    'G9: a legacy Adds only row keeps its level beside a share',
+  );
+});
+
+test('WRITES: what a caller may change, where it is narrower than what they read, and denies inside allows', async () => {
+  const { api, sql, kiln, mill, glaze } = await record();
+  /* Reads every task, edits only those in Review: `wheres` is absent, `writes` holds the condition. */
+  share(sql, 'p_ana', { lists: ['tasks'] }, 'view');
+  share(sql, 'p_ana', { list: 'tasks', where: { field: 'stage', is: 'Review' } }, 'edit');
+  /* Edits Kiln's tasks, with one row denied: the deny is inside both. */
+  share(sql, 'p_sam', { project: kiln, lists: ['tasks'] }, 'edit');
+  share(sql, 'p_sam', { list: 'tasks', rows: [glaze] }, 'view', { effect: 'deny' });
+  /* A group's share reaches its member. */
+  sql.exec("INSERT INTO share_group (id, name, made_by, made_at) VALUES ('gr_mill', 'Mill crew', 'p_1', ?)", at(NOW));
+  sql.exec("INSERT INTO share_group_member (group_id, person_id, added_by, added_at) VALUES ('gr_mill', 'p_gus', 'p_1', ?)", at(NOW));
+  share(sql, 'gr_mill', { project: mill, lists: ['tasks'] }, 'view', { kind: 'group' });
+  api.kernel.accessChanged();
+
+  const ana = api.kernel.access('p_ana')!;
+  assert.deepEqual(ana.levels, { tasks: 'write' });
+  assert.equal(ana.wheres, undefined);
+  assert.deepEqual(ana.writes, { tasks: { field: 'stage', is: 'Review' } });
+
+  const sam = api.kernel.access('p_sam')!;
+  const inKiln = { all: [{ field: 'thing', is: kiln }, { none: [{ field: 'id', in: [glaze] }] }] };
+  assert.deepEqual(sam.wheres?.tasks, inKiln);
+  assert.equal(sam.writes, undefined, 'writes are left off where they are the reads');
+
+  assert.deepEqual(api.kernel.access('p_gus')?.wheres?.tasks, { field: 'thing', is: mill }, 'G10: a group’s share');
+
+  /* AND THE READERS HONOUR IT: Sam lists Kiln's tasks less the denied one, through the ordinary `list`. */
+  const rows = value<{ rows: { fields: { what: string } }[]; matched: number }>(await api.list({ register: 'tasks' }, contextOf(api, 'p_sam')));
+  assert.deepEqual(rows.rows.map((r) => r.fields.what), ['Fire the kiln']);
+  assert.equal(rows.matched, 1);
+  /* A list outside the grant is refused at the ceiling. */
+  const notes = (await api.list({ register: 'notes' }, contextOf(api, 'p_sam'))) as { ok: boolean };
+  assert.equal(notes.ok, false);
+});
+
+test('TIME, REVOKING AND THE EPOCH: a share that ended or was revoked reaches nothing, and the cache never outlives it', async () => {
+  const { api, sql, clock, kiln } = await record();
+  const ends = share(sql, 'p_sam', { project: kiln, lists: ['tasks'] }, 'edit', { ends: at(NOW + DAY) });
+  api.kernel.accessChanged();
+  const before = api.kernel.access('p_sam');
+  assert.equal(before?.grant?.until, at(NOW + DAY));
+  assert.equal(api.kernel.access('p_sam'), before, 'the second call is the cached answer');
+  clock.advance(DAY);
+  assert.equal(api.kernel.access('p_sam'), null, 'G11: an ended share is the stranger’s answer, cache or not');
+
+  const kept = share(sql, 'p_omar', { lists: ['notes'] }, 'view');
+  api.kernel.accessChanged();
+  assert.ok(api.kernel.access('p_omar'));
+  sql.exec('UPDATE share SET revoked_at = ? WHERE id = ?', at(clock.now()), kept);
+  assert.ok(api.kernel.access('p_omar'), 'a revoke that has not moved the epoch is not seen yet');
+  api.kernel.accessChanged();
+  assert.equal(api.kernel.access('p_omar'), null, 'revoked, and the epoch moved');
+  assert.ok(ends);
+
+  /* A member row moves the answer whatever the epoch, since the member rows are read on every call. */
+  sql.exec("INSERT INTO member (person_id, register, level) VALUES ('p_omar', 'notes', 'read')");
+  assert.deepEqual(api.kernel.access('p_omar'), { level: null, registers: ['notes'], levels: { notes: 'read' } });
+
+  /* A suspended guest holds nothing. */
+  share(sql, 'p_cat', { lists: ['notes'] }, 'view');
+  api.kernel.accessChanged();
+  assert.ok(api.kernel.access('p_cat'));
+  value(api.kernel.suspendMember('p_1', 'p_cat', true));
+  assert.equal(api.kernel.access('p_cat'), null);
+
+  /* A share row nobody can read is nobody's lens: fails closed rather than dropping it. */
+  share(sql, 'p_lee', { lists: ['notes'] }, 'view');
+  sql.exec("INSERT INTO share (id, who_kind, who, what, can, made_by, made_at) VALUES ('sh_bad', 'person', 'p_lee', '{\"lists\":7}', 'view', 'p_1', ?)", at(NOW));
+  api.kernel.accessChanged();
+  assert.equal(api.kernel.access('p_lee'), null);
+});
+
+test('THE COMMENT RUNG reads and proposes, and boot and version carry the grant the app keys its copy on', async () => {
+  const { api, sql, kiln } = await record();
+  const via = share(sql, 'p_gus', { project: kiln, lists: ['tasks'] }, 'comment');
+  api.kernel.accessChanged();
+  const gus = contextOf(api, 'p_gus');
+  const boot = value<{ me: { level: unknown; levels: Record<string, string>; grant?: { epoch: number; via: string[] } } }>(await api.boot(gus));
+  assert.deepEqual(boot.me.levels, { things: 'read', tasks: 'comment' });
+  assert.deepEqual(boot.me.grant?.via, [via]);
+  assert.equal(boot.me.grant?.epoch, api.kernel.accessEpoch());
+  const version = value<{ grant?: { epoch: number } }>(await api.version(gus));
+  assert.equal(version.grant?.epoch, api.kernel.accessEpoch());
+
+  const listed = value<{ rows: { id: string; fields: { what: string } }[] }>(await api.list({ register: 'tasks' }, gus));
+  assert.deepEqual(listed.rows.map((r) => r.fields.what).sort(), ['Fire the kiln', 'Glaze test']);
+  /* Comment reaches propose and not write. */
+  const edit = (await api.update({ register: 'tasks', seq: 1, patch: { what: 'Renamed' } }, gus)) as { ok: boolean; refusal?: { code: string } };
+  assert.equal(edit.ok, false);
+  assert.equal(edit.refusal?.code, 'LEVEL_REQUIRED');
+});
+
+test('OWNER NON-INTERFERENCE: the owner’s access, context and boot are the same bytes with shares on the record and without', async () => {
+  const bare = await record();
+  const shared = await record();
+  const ownerHeld = (api: Api) => JSON.stringify(api.kernel.access('p_1'));
+  const ownerBoot = async (api: Api) => JSON.stringify(value(await api.boot(owner)));
+
+  const was = ownerHeld(shared.api);
+  const booted = await ownerBoot(shared.api);
+  assert.equal(was, JSON.stringify({ level: 'owner', registers: null, levels: {} }));
+  assert.equal(was, JSON.stringify(memberAccess(shared.sql, 'p_1')), 'the lens adds nothing for an owner');
+
+  share(shared.sql, 'p_sam', { project: shared.kiln, lists: ['tasks'] }, 'edit');
+  share(shared.sql, 'p_pri', { lists: { has: 'money' } }, 'view', { hide: { types: ['money'] } });
+  share(shared.sql, 'p_1', { lists: ['notes'] }, 'view', { effect: 'deny' }); // a share naming the owner is never read
+  shared.api.kernel.accessChanged();
+
+  assert.equal(ownerHeld(shared.api), was);
+  assert.equal(ownerHeld(shared.api), ownerHeld(bare.api));
+  assert.equal(await ownerBoot(shared.api), booted);
+  const v = value<Record<string, unknown>>(await shared.api.version(owner));
+  assert.equal(Object.hasOwn(v, 'grant'), false, 'an owner’s version carries no grant');
+});
+
+test('LENS SPEED (§2.13): 20 shares and 3 groups, cold at most 3 ms and cached at most 0.05 ms, median of 200', async (t) => {
+  const { api, sql, kiln, mill } = await record();
+  for (const g of ['gr_a', 'gr_b', 'gr_c']) {
+    sql.exec('INSERT INTO share_group (id, name, made_by, made_at) VALUES (?, ?, ?, ?)', g, g, 'p_1', at(NOW));
+    sql.exec('INSERT INTO share_group_member (group_id, person_id, added_by, added_at) VALUES (?, ?, ?, ?)', g, 'p_pri', 'p_1', at(NOW));
+  }
+  const shapes: [unknown, string, Parameters<typeof share>[4]][] = [
+    [{ lists: { has: 'money' } }, 'view', { ends: at(NOW + 90 * DAY) }],
+    [{ lists: { role: 'keys' } }, 'view', { effect: 'deny' }],
+    [{ project: kiln, lists: ['tasks'] }, 'edit', { caps: { delete: false } }],
+    [{ project: mill }, 'comment', {}],
+    [{ list: 'tasks', where: { all: [{ field: 'stage', is: 'Review' }, { field: 'what', contains: 'glaze' }] } }, 'comment', {}],
+    [{ list: 'notes', where: { field: 'body', contains: 'Kiln' } }, 'view', { hide: { notes: ['body'] } }],
+    [{ list: 'money', where: { field: 'payee', is: 'Clay Co' } }, 'edit', {}],
+    [{ list: 'tasks', rows: ['r_1', 'r_2', 'r_3'] }, 'view', { effect: 'deny' }],
+  ];
+  for (let i = 0; i < 20; i++) {
+    const [what, can, more] = shapes[i % shapes.length]!;
+    share(sql, i < 14 ? 'p_pri' : (['gr_a', 'gr_b', 'gr_c'][i % 3] as string), what, can, { ...more, ...(i < 14 ? {} : { kind: 'group' as const }) });
+  }
+  api.kernel.accessChanged();
+  assert.ok(api.kernel.access('p_pri'), 'Priya holds something');
+
+  const median = (xs: number[]) => xs.sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
+  const time = (fn: () => unknown): number => {
+    const t = performance.now();
+    fn();
+    return performance.now() - t;
+  };
+  /* COLD: no cache, so each call reads the rows and folds the lens, against the catalog the kernel holds. */
+  const lens = { catalog: () => api.kernel.catalog(), nowMs: NOW, tz: () => 'UTC', people: () => null };
+  for (let i = 0; i < 20; i++) memberAccess(sql, 'p_pri', null, lens);
+  const cold = median(Array.from({ length: 200 }, () => time(() => memberAccess(sql, 'p_pri', null, lens))));
+  for (let i = 0; i < 20; i++) api.kernel.access('p_pri');
+  const cached = median(Array.from({ length: 200 }, () => time(() => api.kernel.access('p_pri'))));
+  t.diagnostic(`lens cold ${cold.toFixed(3)} ms, cached ${cached.toFixed(4)} ms`);
+  assert.ok(cold <= 3, `cold ${cold.toFixed(3)} ms`);
+  assert.ok(cached <= 0.05, `cached ${cached.toFixed(4)} ms`);
+});

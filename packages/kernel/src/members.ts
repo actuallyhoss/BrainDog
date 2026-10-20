@@ -19,9 +19,10 @@ import type { Refusal, Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 import { compile, type Compiled, type Json, type Schema } from '@braindog/where';
 
-import type { Narrow } from './lens.ts';
+import { lensOf, type Catalog, type LensLevel, type LensSources } from './lens.ts';
 import { predicateOf, type EvalContext } from './metrics.ts';
 import { instant } from './migrate.ts';
+import { epochOf, meOf, narrowsOf, saysMe, sharesFor, type LensCache } from './shares.ts';
 
 /** The five, and only a person ever reaches the top two. */
 export const LEVELS = ['read', 'append', 'write', 'decide', 'owner'] as const;
@@ -88,15 +89,16 @@ export type MemberDeps = {
  * that register and nothing else — which is what makes "invite the bookkeeper to one register"
  * true rather than decorative.
  *
- * `narrows` IS AN AGENT'S CHAIN, as `verifyToken` answers it (`Verified.narrows`: the parent's narrowing, then the key's
- * own). Handed in, it comes back on the answer so the lens can AND every link into what the person holds. A STUB: no
- * reader applies it yet, and the sharing plan's slice 5 turns this answer into a lens that does (`lensOf`'s `token`).
+ * THE LENS (sharing plan §2.4, §2.15). With `lens` handed in, the person's shares and their groups' shares are merged
+ * with their role and their legacy list rows through `lensOf`, and `token` (a key's id) brings its narrowing chain from
+ * `token_lens`, ANDed into everything. The answer is a superset of the one before: `writes`, `hides`, `nots` and `grant`
+ * join `wheres` where they say something. A person holding no share, through a key narrowed to nothing, gets exactly
+ * the answer they got before shares existed, so an owner's call and every reader built on it are unchanged. It fails
+ * closed: a share that cannot be read, or a narrowing that cannot, is `null`, the stranger's answer.
+ *
+ * Without `lens` (a caller with no catalog to hand) it is the member rows alone, as it always was.
  */
-export function access(
-  sql: Sql,
-  person: string,
-  narrows?: readonly Narrow[],
-): { level: Level | null; registers: string[] | null; levels: Record<string, Level>; wheres?: Wheres; narrows?: Narrow[] } | null {
+export function access(sql: Sql, person: string, token?: string | null, lens?: AccessLens): Held | null {
   /* A SUSPENDED PERSON HOLDS NOTHING, and until now the column was a thing the interface could show
      and the ladder could not enforce: `access` read only `member`, `verifyToken` joined nothing, and
      a suspension was a label. Suspending somebody is what you do when you cannot yet decide whether
@@ -120,12 +122,62 @@ export function access(
 
      An `INNER JOIN` is the fix and it is the shape the sentence above always described: a level
      belongs to a person, so no person is no level. */
-  const rows = sql.all<{ register: string; level: Level; row_where: string | null }>(
+  const rows = sql.all<MemberRow>(
     `SELECT m.register AS register, m.level AS level, m.row_where AS row_where
        FROM member m JOIN person p ON p.id = m.person_id
       WHERE m.person_id = ? AND p.suspended_at IS NULL`,
     person,
   );
+  if (lens === undefined) return memberAccess(rows);
+
+  /* THE CACHE (§2.8), keyed on everything the answer is made of that can change without the clock. The member rows are
+     read on every call anyway, so they are in the key and a raw write to `member` is never answered from the cache;
+     shares and groups move the epoch, and the set of lists moves the revision. An answer is good until the instant the
+     clock alone would change it. */
+  const epoch = epochOf(sql);
+  const key = lens.cache === undefined ? '' : [person, token ?? '', epoch, lens.revision ?? 0, JSON.stringify(rows)].join('\u0000');
+  const hit = lens.cache?.get(key, lens.nowMs);
+  if (hit !== undefined) return hit.value;
+  const { held, until } = merged(sql, person, rows, token ?? null, lens, epoch);
+  return lens.cache === undefined ? held : lens.cache.set(key, held, until);
+}
+
+type MemberRow = { register: string; level: Level; row_where: string | null };
+
+/** What `access` answers: the role, the ceiling, the per-list levels and rules, and with shares, what the lens adds. */
+export type Held = {
+  level: LensLevel | null;
+  registers: string[] | null;
+  levels: Record<string, LensLevel>;
+  wheres?: Wheres;
+  /** The rows of a list this caller may change, where that differs from what they read (`CallContext.writes`). */
+  writes?: Wheres;
+  /** Fields hidden from this caller, by list. */
+  hides?: Record<string, string[]>;
+  /** `history` and `delete`, by list, where a share switched them off. */
+  nots?: Record<string, ('history' | 'delete')[]>;
+  /** Present when shares made the answer: the epoch, the next clock edge, the shares that reached something. */
+  grant?: Grant;
+};
+
+/** Where a lens came from and how long it holds (§2.4, §2.8). */
+export type Grant = { epoch: number; until: string | null; via: string[]; agents: boolean };
+
+/** What `access` needs to merge shares: the record's lists, its clock and zone, the People list for `$me`, and the cache. */
+export type AccessLens = {
+  catalog: () => Catalog;
+  nowMs: number;
+  /** The record's time zone, asked only when a lens is computed. */
+  tz?: () => string;
+  /** The list `meet` writes, whose rows `$me` names, asked only when a share says `$me`. */
+  people?: () => string | null;
+  /** The declaration revision, which moves when the set of lists or their fields does. */
+  revision?: number;
+  cache?: LensCache<Held | null>;
+};
+
+/** The answer from the member rows alone, as it was before shares. */
+function memberAccess(rows: readonly MemberRow[]): Held | null {
   const whole = rows.find((r) => r.register === RECORD);
   const scoped = rows.filter((r) => r.register !== RECORD);
   if (!whole && scoped.length === 0) return null;
@@ -164,7 +216,61 @@ export function access(
     registers: whole ? null : scoped.map((r) => r.register),
     levels: Object.fromEntries(scoped.map((r) => [r.register, r.level])),
     ...(Object.keys(wheres).length === 0 ? {} : { wheres }),
-    ...(narrows === undefined || narrows.length === 0 ? {} : { narrows: [...narrows] }),
+  };
+}
+
+/**
+ * The member rows merged with the person's shares and a key's narrowing through `lensOf`, and until when that holds.
+ *
+ * NOTHING TO MERGE IS THE MEMBER ROWS' OWN ANSWER: no share and no narrowing, or an owner with no narrowing (a share
+ * never targets an owner). A person on no member row is a guest, who is on the record while a share reaches something.
+ */
+function merged(sql: Sql, person: string, rows: readonly MemberRow[], token: string | null, lens: AccessLens, epoch: number): { held: Held | null; until: number } {
+  const forever = Number.POSITIVE_INFINITY;
+  const narrows = token === null ? [] : narrowsOf(sql, token);
+  if (narrows === undefined) return { held: null, until: forever };
+  const whole = rows.find((r) => r.register === RECORD);
+  const owner = whole?.level === 'owner';
+  if (owner && narrows.length === 0) return { held: memberAccess(rows), until: forever };
+  const shares = owner ? [] : sharesFor(sql, person);
+  if (shares === null) return { held: null, until: forever };
+  if (shares.length === 0 && narrows.length === 0) return { held: memberAccess(rows), until: forever };
+  if (rows.length === 0) {
+    /* A GUEST HOLDS ONLY SHARES, and a suspended one holds nothing, as a suspended member does. */
+    if (shares.length === 0) return { held: null, until: forever };
+    if (sql.one('SELECT 1 AS y FROM person WHERE id = ? AND suspended_at IS NULL', person) === undefined) return { held: null, until: forever };
+  }
+
+  const sources: LensSources = {
+    person,
+    role: whole?.level ?? null,
+    lists: rows
+      .filter((r) => r.register !== RECORD)
+      .map((r) => ({ register: r.register, level: r.level, ...(r.row_where === null ? {} : { where: parsed(r.row_where) }) })),
+    shares,
+    ...(saysMe(shares) ? { me: meOf(sql, person, lens.people?.() ?? null) } : {}),
+    ...(token === null ? {} : { token: { narrow: null, narrows } }),
+    epoch,
+  };
+  const got = lensOf(sources, lens.catalog(), lens.nowMs, lens.tz?.() ?? 'UTC');
+  if (got === null) return { held: null, until: forever };
+  const until = got.until === null ? forever : Date.parse(got.until);
+  const c = got.ctx;
+  /* SOMEBODY WHO REACHES NO LIST AND HOLDS NOTHING ON THE RECORD IS NOT ON IT: a guest whose shares have all ended. */
+  if (c.level === null && c.registers !== null && c.registers.length === 0) return { held: null, until };
+  const some = (o: object): boolean => Object.keys(o).length > 0;
+  return {
+    held: {
+      level: c.level,
+      registers: c.registers,
+      levels: c.levels,
+      ...(some(c.wheres) ? { wheres: c.wheres as Wheres } : {}),
+      ...(some(c.writes) ? { writes: c.writes as Wheres } : {}),
+      ...(some(c.hides) ? { hides: c.hides } : {}),
+      ...(some(c.nots) ? { nots: c.nots } : {}),
+      ...(shares.length === 0 ? {} : { grant: c.grant }),
+    },
+    until,
   };
 }
 
@@ -207,8 +313,29 @@ export function ruleOf(where: Json, schema: Schema, ctx: EvalContext): Compiled 
   if (typeof where !== 'string' && (where === null || typeof where !== 'object' || Array.isArray(where)))
     return { sql: '', params: [], bad: [{ code: 'VALUE_MALFORMED', fix: 'A rule is a where: a sentence, or the conditions a filter holds.' }] };
   const said = predicateOf(where as Parameters<typeof predicateOf>[0], schema, ctx);
-  if (said.bad.length) return { sql: '', params: [], bad: said.bad };
-  return compile(said.predicate, schema);
+  const whole = said.bad.length ? { sql: '', params: [], bad: said.bad } : compile(said.predicate, schema);
+  /* A LENS COMPOSES GROUPS A FILTER MAY NOT (`lens.ts`'s `fold`): a share's condition inside its allow and its deny nests
+     deeper than the grammar's three, and a legacy sentence rides in one as a leaf. A group the filter path refuses is
+     joined here instead, each part compiled as a rule, so a part means what it means alone; a part that cannot be read
+     leaves the whole of it unread, which reaches no row. */
+  return whole.bad.length ? (groupRule(where, schema, ctx) ?? whole) : whole;
+}
+
+/** A group of rules, joined part by part, or `null` when `where` is not a group. */
+function groupRule(where: Json, schema: Schema, ctx: EvalContext): Compiled | null {
+  if (where === null || typeof where !== 'object' || Array.isArray(where)) return null;
+  const keys = Object.keys(where);
+  const k = keys[0];
+  if (keys.length !== 1 || (k !== 'all' && k !== 'any' && k !== 'none')) return null;
+  const kids = (where as Record<string, Json>)[k];
+  if (!Array.isArray(kids)) return null;
+  const parts = kids.map((kid) => ruleOf(kid, schema, ctx));
+  const bad = parts.flatMap((p) => p.bad);
+  if (bad.length) return { sql: '', params: [], bad };
+  const params = parts.flatMap((p) => p.params);
+  if (k === 'all') return { sql: parts.length ? parts.map((p) => `(${p.sql})`).join(' AND ') : '1 = 1', params, bad: [] };
+  const or = parts.length ? parts.map((p) => `(${p.sql})`).join(' OR ') : '0 = 1';
+  return { sql: k === 'any' ? or : `NOT (${or})`, params, bad: [] };
 }
 
 /**

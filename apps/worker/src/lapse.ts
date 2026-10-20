@@ -14,7 +14,7 @@
 import { OPERATION_METHOD, type OutboxRow } from '@braindog/kernel';
 import { ROUTES } from '@braindog/host';
 import { TOOLS } from '@braindog/mcp';
-import type { CallContext, Level } from '@braindog/record';
+import type { CallContext, HeldLevel as Level } from '@braindog/record';
 
 /** The one sentence a lapsed record answers every write with, on every surface: the app, `/api` and `/mcp`. */
 export const LAPSED_FIX = 'Read-only until billing resumes. Export is available.';

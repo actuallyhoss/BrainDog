@@ -1752,14 +1752,18 @@ export class Record$ extends DurableObject<Env> {
    * What this person may do inside this record, or `null` if they are not on it.
    *
    * THE RECORD'S OWN `member` TABLE, which is the table `invite` writes and the one that travels in
-   * a `.brain` file. `registers` is the ceiling and `null` is all of them.
+   * a `.brain` file, MERGED WITH THEIR SHARES through the lens (`kernel.access`). `registers` is the ceiling and `null`
+   * is all of them. `token` is the key a bearer is, whose narrowing is ANDed into everything. The answer is computed in
+   * this object on every call and cached here, never in the Worker, so a revoke reaches the next call.
+   *
+   * THE DECLARED TYPE IS THE OLD THREE KEYS, as it was when `wheres` joined them: the answer crosses the RPC whole
+   * (`wheres`, `writes`, `hides`, `nots`, `grant` included) and `session.ts` reads it as `HeldAccess`, while a JSON tree
+   * named in an RPC signature is a type the stub's mapping cannot finish instantiating.
    */
-  async access(
-    person: string,
-  ): Promise<{ level: string | null; registers: string[] | null; levels: Record<string, string> } | null> {
+  async access(person: string, token?: string): Promise<{ level: string | null; registers: string[] | null; levels: Record<string, string> } | null> {
     if (this.#gone) return null;
     const api = await this.#record();
-    return api.kernel.access(person);
+    return api.kernel.access(person, token ?? null);
   }
 
   /** Whether this person is on the record and an owner has stopped them, so a door can say so rather than "not on this record". */
@@ -2785,7 +2789,7 @@ function bearerDeps(env: Env): BearerDeps {
        with no billing row answers `false` and is never capped. */
     lapsed: async (id) => ((await directory.billing({ op: 'lapsed', record: id })) as unknown) === true,
     verify: (id, bearer, surface, build) => held(env, id, (record) => record.verify(bearer, surface, build)),
-    access: (id, person) => held(env, id, (record) => record.access(person)),
+    access: (id, person, token) => held(env, id, (record) => (token === undefined ? record.access(person) : record.access(person, token))),
     /* ASKED ONLY UNDER `/app/<slug>`, to hold the path to the record the bearer names. */
     named: async (slug) => (await directory.resolve(slug))?.record ?? null,
     /* ASKED ONLY AT THE FOUR PATHS AN OPERATION OPENS, because asking spends it (`session.ts`). An armed record rejects

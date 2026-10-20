@@ -62,3 +62,25 @@ test('A REACH THAT CROSSES THE RPC AS TEXT IS NOT A LIST, and opens nothing', as
   const seen = await bearerOf(new Request('https://app.brain.dog/api/inbox', { method: 'POST', headers: { authorization: `Bearer ${bearer}` } }), 'api', deps);
   assert.equal('reach' in (seen as { ctx: { principal: object } }).ctx.principal, false);
 });
+
+test('THE BEARER HANDS ITS KEY TO access, so a key narrowed to one list reaches that list and nothing else', async () => {
+  const w = await worker();
+  const asked: (string | undefined)[] = [];
+  const deps: BearerDeps = {
+    ...w.deps,
+    access: async (_record, person, token) => {
+      asked.push(token);
+      return w.api.kernel.access(person, token ?? null) as Held | null;
+    },
+  };
+  const put = await w.api.kernel.install([{ id: 'register.notes', kind: 'register', body: { id: 'notes', name: 'Notes', title: 'body', fields: [{ id: 'body', type: 'text' }] } as never }]);
+  assert.ok(put.ok, JSON.stringify(put));
+  const out = await w.api.kernel.createToken('p_1', { scope: 'read', label: 'narrowed', narrow: { lists: ['notes'] } });
+  assert.ok(out.ok, JSON.stringify(out));
+  const seen = await bearerOf(new Request('https://app.brain.dog/api/boot', { headers: { authorization: `Bearer ${out.value.bearer}` } }), 'api', deps);
+  assert.ok('ctx' in seen, JSON.stringify(seen));
+  assert.deepEqual(asked, [out.value.id]);
+  assert.deepEqual(seen.ctx.registers, ['notes']);
+  /* The owner's own call, through no key, is the whole record as it always was. */
+  assert.deepEqual(w.api.kernel.access('p_1'), { level: 'owner', registers: null, levels: {} });
+});
