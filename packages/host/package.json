@@ -21,6 +21,7 @@
     "./slash": "./src/slash.ts",
     "./slash-answers": "./src/slash-answers.ts",
     "./stripe-sign": "./src/stripe-sign.ts",
+    "./table": "./src/table.ts",
     "./types": "./src/types.ts",
     "./understand": "./src/understand.ts"
   },

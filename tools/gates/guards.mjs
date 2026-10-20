@@ -188,8 +188,10 @@ export default function guards(
 ) {
   const findings = [];
 
-  /* ── the route table, as data: `index.ts`'s rows, then each file under `routes/` ── */
-  const host = read(root, 'packages', 'host', 'src', 'index.ts');
+  /* ── the route table, as data: `table.ts`'s rows (they were `index.ts`'s until the client needed them without the host's
+     doors), then each file under `routes/` ── */
+  const index = read(root, 'packages', 'host', 'src', 'index.ts');
+  const host = index === null ? null : index + (read(root, 'packages', 'host', 'src', 'table.ts') ?? '');
   const routes =
     host === null
       ? []

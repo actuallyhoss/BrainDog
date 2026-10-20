@@ -108,7 +108,8 @@ export default function routerGroups(
   /* TWO HALVES: `index.ts`'s own rows, and one file of rows per area under `routes/`, which `index.ts`
      concatenates after its own. A tree with no `routes/` folder has no rows
      there, and that is not a finding: `index.ts` is the file that must be there, and `read` still throws without it. */
-  const host = read('packages/host/src/index.ts');
+  /* `table.ts` holds `index.ts`'s own rows since the client took them without the host's doors; a tree without it has them in `index.ts`. */
+  const host = read('packages/host/src/index.ts') + (existsSync(join(root, 'packages', 'host', 'src', 'table.ts')) ? read('packages/host/src/table.ts') : '');
   const routesDir = join(root, 'packages', 'host', 'src', 'routes');
   const extra = existsSync(routesDir)
     ? readdirSync(routesDir)
