@@ -40,6 +40,20 @@ export type Got =
  */
 export type Docs = Record<string, DocValues>;
 
+/**
+ * THE LISTS A FIELD HELD AS A SPOKEN ID POINTS INTO, `things#1`, beside the ones its `ref` fields declare. A run keeps its
+ * project as text (`session.project`, the kernel's own list), so the walk never named it and the run's page said
+ * "Project: Things #1" under a project called Kiln. Only a whole value of that shape, and only a list not walked already.
+ */
+export function spokenTargets(fields: Readonly<Record<string, unknown>>, walked: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const v of Object.values(fields)) {
+    const to = typeof v === 'string' ? /^([a-z][a-z0-9_]*)#[1-9][0-9]*$/u.exec(v)?.[1] : undefined;
+    if (to !== undefined && !walked.includes(to) && !out.includes(to)) out.push(to);
+  }
+  return out;
+}
+
 /** The row's documents' values off a `get` answered with `values: true`, empty where it carried none. */
 function docsOf(row: RecordRow | null): Docs {
   const docs = row === null ? undefined : (row as RecordRow & { docs?: unknown }).docs;
@@ -202,7 +216,7 @@ export function rowReader(base: string, io?: Fetch): RowReader {
       if (row === null) return { from: 'live', entry: null, names: new Map() };
       /* Each target walked before the row is turned into an `Entry`, so a ref is drawn as the row's name, not `courses#1`. */
       const refs = new Map<string, RefMap>();
-      for (const target of targetsOf(register)) {
+      for (const target of [...targetsOf(register), ...spokenTargets(row.fields, targetsOf(register))]) {
         const map = await mapOf(target);
         if (map) refs.set(target, map);
       }

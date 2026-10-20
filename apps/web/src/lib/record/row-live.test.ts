@@ -18,7 +18,7 @@ import './fixtures/fill.ts';
 import { copy } from '../copy.ts';
 import { REGISTERS } from './api.ts';
 import { ROWS } from './fixtures/sample.ts';
-import { rowReader, type Fetch } from './row-live.ts';
+import { rowReader, spokenTargets, type Fetch } from './row-live.ts';
 
 const BASE = 'http://record.test';
 
@@ -387,4 +387,10 @@ test('a row that is not there costs the row and the declaration, where a row tha
      it is why the return is worth an assertion rather than a shrug. */
   assert.deepEqual(warm.asked.map(route), ['get courses', 'schema courses', 'schema teachers', 'list teachers']);
   assert.deepEqual(warm.carried, [400]);
+});
+
+test("A RUN'S PROJECT, HELD AS things#1, IS A LIST THE ROW'S WALK NAMES, so its page says the project's name", () => {
+  assert.deepEqual(spokenTargets({ project: 'things#1', doing: 'Kerning pass', repo: 'kiln-type' }, []), ['things']);
+  assert.deepEqual(spokenTargets({ project: 'things#1' }, ['things']), [], 'a list already walked is not walked twice');
+  assert.deepEqual(spokenTargets({ note: 'see things#1 later', n: 3 }, []), [], 'only a whole value of that shape');
 });

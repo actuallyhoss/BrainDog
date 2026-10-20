@@ -231,11 +231,8 @@ export function spokenRow(value: unknown, names?: Names): { label: string; href:
   if (!m) return null;
   const [, register, seq] = m as unknown as [string, string, string];
   const titleField = REGISTERS[register]?.title;
-  const said = names
-    ? names.get(value as string)
-    : titleField
-      ? TITLES.get(register)?.get(Number(seq))
-      : undefined;
+  /* THE SCREEN'S NAMES FIRST, then what this tab has learnt: a row's own walk names only the lists it points at. */
+  const said = names?.get(value as string) ?? (titleField ? TITLES.get(register)?.get(Number(seq)) : undefined);
   const label = typeof said === 'string' && said.trim() !== '' ? said : unnamed(register, seq);
   return { label, href: `/r/${register}/${seq}` };
 }
