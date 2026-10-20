@@ -2330,7 +2330,49 @@ function twice(deps: Pick<PeopleDeps, 'sql' | 'nameOf' | 'othersRow'>, list: Dec
   const own = selfRows(deps, list).filter((r) => deps.othersRow?.(r.id) !== true);
   for (const r of own.slice(1)) join(own[0]!.id, r.id);
   for (const [a, b] of plainPairs(deps, list, false)) join(a.id, b.id);
+  /* AND EVERY PAIR A MERGE QUESTION IS WAITING ON, whoever found it (a model, an agent, a person filing one with `meet`, the
+     strong rules short of a fold). The plain rules leave out two rows that both hold an address and a row that only an
+     import vouches for, so two people each listed twice were on Decide with a question and in no count: no "may be on
+     this record twice" under People's line. A question already open is the surest sign there is a pair to look at. */
+  for (const [x, y] of openFolds(deps, list)) join(x, y);
   return { ids: [...ids], surplus };
+}
+
+/**
+ * The pairs of live rows an open merge question folds: each row it points at the one kept, by the ids of the rows. A
+ * question naming a row that is gone, or one that does not fold, names no pair.
+ */
+function openFolds(deps: Pick<PeopleDeps, 'sql' | 'nameOf'>, list: DeclaredList<MeetsFields>): [string, string][] {
+  const merged = list.fields.merged_into;
+  if (merged === undefined) return [];
+  const open = deps.sql.all<{ body: string }>(
+    "SELECT body FROM suggestion WHERE status = 'open' AND body_kind = 'rowset' AND json_extract(body, '$.register') = ?",
+    list.register,
+  );
+  if (open.length === 0) return [];
+  const named: [string, string][] = [];
+  for (const { body } of open) {
+    try {
+      const rows = (JSON.parse(body) as { rows?: { at?: unknown; patch?: Record<string, unknown> }[] }).rows ?? [];
+      for (const r of rows) {
+        const into = r?.patch?.[merged];
+        if (typeof r?.at === 'string' && typeof into === 'string' && into !== '') named.push([r.at, into]);
+      }
+    } catch {
+      /* A body that is not read names no pair. */
+    }
+  }
+  if (named.length === 0) return [];
+  const idOf = new Map<string, string>();
+  const rows = deps.sql.all<{ id: string; seq: number | null; version: number; fields: string }>(
+    `SELECT id, seq, version, fields FROM entry WHERE ${LIVE} ORDER BY seq DESC LIMIT 2000`,
+    ...live(list.register, merged),
+  );
+  for (const r of rows) idOf.set(deps.nameOf(r.id), r.id);
+  return named.flatMap(([x, y]): [string, string][] => {
+    const [a, b] = [idOf.get(x), idOf.get(y)];
+    return a === undefined || b === undefined ? [] : [[a, b]];
+  });
 }
 
 /**

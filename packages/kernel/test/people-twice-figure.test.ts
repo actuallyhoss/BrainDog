@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 
 import { BUILT_IN_FIGURES, RECORD_PEOPLE, builtInFigure, readPeopleTwice } from '../src/built-in-figures.ts';
 import { openRecord, type Declaration, type Entry, type Kernel, type Reading, type WriteContext } from '../src/index.ts';
-import { askPlainPairs, peopleTwice, peopleTwiceIn, type PeopleDeps } from '../src/people.ts';
+import { askPlainPairs, peopleTwice, peopleTwiceIdsIn, peopleTwiceIn, type PeopleDeps } from '../src/people.ts';
 import type { MeetsFields } from '../src/roles.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
@@ -169,5 +169,30 @@ test('ANOTHER MEMBER\'S OWN ADDITION IS THEIRS, read off the log: never counted,
   assert.equal(read(sql).value, 1);
   sql.exec('UPDATE entry SET deleted_at = ? WHERE id = ?', new Date(NOW).toISOString(), mine.id);
   assert.equal(read(sql).value, 0);
+  sql.close();
+});
+
+test('TWO PEOPLE EACH LISTED TWICE, WHO BOTH HOLD A KEY, COUNT ONCE A MERGE QUESTION WAITS ON THEM, and not after his no', async () => {
+  const { k, sql } = await record();
+  const a = person(k, { name: 'Priya Raman', email: 'priya@encore.example', handles: ['github:priya'] });
+  const b = person(k, { name: 'Priya Raman', email: 'priya@larkspur.example', handles: ['github:sudipb'] });
+  person(k, { name: 'Layla' });
+  assert.equal(read(sql).value, 0, 'two who each hold a key are two people until something says otherwise');
+  const asked = value<{ id: string }>(
+    k.propose(
+      {
+        question: 'Are Priya Raman and Priya Raman one person?',
+        body_kind: 'rowset',
+        body: { register: 'folk', rows: [{ at: k.nameOf(b.id), version: b.version, patch: { merged_into: k.nameOf(a.id), deleted_at: new Date(NOW).toISOString() } }] },
+      },
+      'system',
+    ),
+  );
+  const waiting = read(sql);
+  assert.equal(waiting.value, 1, 'a merge question was open and the People page said nothing of the twin');
+  assert.equal(peopleTwiceIn(sql), peopleTwice(deps(k, sql)));
+  assert.deepEqual(new Set(peopleTwiceIdsIn(sql)), new Set([a.id, b.id]));
+  value(k.decide(asked.id, { decide: { option: 'reject', reason: 'two people' } }, 'p_owner'));
+  assert.equal(read(sql).value, 0, 'his no was not heard');
   sql.close();
 });
