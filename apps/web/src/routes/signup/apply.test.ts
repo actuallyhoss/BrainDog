@@ -83,8 +83,8 @@ test('THE INVITE-ONLY WORDS: no dash, titles and buttons with no full stop, butt
     assert.doesNotMatch(line, /[–—]/, `${line} carries a dash`);
     assert.doesNotMatch(line, /\b(row|rows|entity|list item|code)\b/i, `${line} names the machinery`);
   }
-  assert.equal(words.inviteTitle, 'BrainDog is invite only for now');
-  assert.equal(words.inviteWhy, 'If you were sent an invite, open its link. Otherwise, apply and we will email you when your invite is ready.');
+  assert.equal(words.inviteTitle, 'Free while in early access');
+  assert.equal(words.inviteWhy, 'Ask for an invite and we will email it when it is ready. Already have one? Open its link.');
   assert.equal(words.applied, "Thanks. We'll email you when your invite is ready.");
   for (const title of [words.inviteTitle, words.applySend, words.haveOne]) assert.doesNotMatch(title, /\.$/, `${title} ends with a full stop`);
   /* A VERB, THEN WHAT IT ACTS ON. */

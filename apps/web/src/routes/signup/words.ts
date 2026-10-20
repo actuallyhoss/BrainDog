@@ -104,8 +104,8 @@ export const words = {
    * SIGN-UP BY INVITATION, REACHED WITH NO CODE (LAUNCH 103, item 10): its own screen (`Apply.svelte`), not the closed
    * page. The site says nothing about invites; only this page does, and it offers a way in: apply, and be emailed.
    */
-  inviteTitle: 'BrainDog is invite only for now',
-  inviteWhy: 'If you were sent an invite, open its link. Otherwise, apply and we will email you when your invite is ready.',
+  inviteTitle: 'Free while in early access',
+  inviteWhy: 'Ask for an invite and we will email it when it is ready. Already have one? Open its link.',
   applyName: 'Your name',
   applyEmail: 'Your email',
   applyUse: 'What would you use it for?',
