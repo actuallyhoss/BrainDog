@@ -3095,7 +3095,8 @@ export default {
     if (isSupportMail(message.to, env.SUPPORT_ADDRESS)) {
       const target = env.SUPPORT_FORWARD?.trim() ?? '';
       if (target === '') return message.setReject('support mail is not set up yet');
-      return message.forward(target);
+      await message.forward(target);
+      return;
     }
     await takeMail(message, { ...cloudIngest(arrivals(env)), keep: fileKeeper(env.BLOBS) });
   },
