@@ -71,7 +71,7 @@ test('a member is told whose the plan is, and a month with no limit or no ledger
   assert.deepEqual(sentenceOf(member), { text: words.notOwner });
   const events: UsageView = { ...usageFromLedger(ledger(0), '2026-09'), records: [], totals: { runs: 12, requests: 0, bytes: 0, failures: 0 } };
   assert.deepEqual(sentenceOf(events), { text: '12 runs this month.' });
-  assert.equal(sentenceOf({ ...events, totals: { ...events.totals, runs: 0 } }), null, 'nothing ran is the empty state, not a sentence');
+  assert.deepEqual(sentenceOf({ ...events, totals: { ...events.totals, runs: 0 } }), { text: 'Nothing has run in September.' }, 'nothing ran is said by the month, over the empty state');
 });
 
 test('the rings: amber from 80%, red only when used up, and the figure never says 0% of something', () => {

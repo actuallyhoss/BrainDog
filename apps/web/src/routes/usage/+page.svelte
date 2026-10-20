@@ -41,6 +41,7 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import Empty from '$lib/ui/Empty.svelte';
+  import Button from '$lib/ui/Button.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import SlashUsage from '$lib/ui/SlashUsage.svelte';
   import Bars from '$lib/viz/Bars.svelte';
@@ -106,6 +107,12 @@
    * THIS PAGE'S OWN WORDS. The rest are `actions.ts`'s
    * and `reading.ts`'s.
    */
+  /* The empty month's words. */
+  const usageWords = {
+    emptyBody: 'When an agent or an automation runs, what it used is counted here, day by day.',
+    seeAgents: 'See your agents',
+  } as const;
+
   const said = {
     counted: 'Deliveries and arrivals',
     countedWhy: 'Counted here and never held by the monthly limit, because neither is work this record chose to run: one is a notice it owed somebody, the other is something sent to it.',
@@ -213,7 +220,7 @@
 
 <!-- THE HEAD IN EVERY STATE, so the screen always has its one `h1` and a refusal reads as this page's,
      not as a page of its own. -->
-<PageHead title={words.usage} sentence={sentence?.text} needs={sentence?.needs} actions={months} />
+<PageHead icon="chart-bar" title={words.usage} sentence={sentence?.text} needs={sentence?.needs} actions={months} />
 <div class="page">
   {#if usage.state === 'waiting' || usage.state === 'refused' || usage.state === 'offline'}
     <ReadState state={usage.state} refusal={usage.refusal} onretry={usage.reread} />
@@ -301,7 +308,10 @@
 
       <!-- A MONTH WITH NO RUNS SAYS SO ONCE, in place of the lists it would have. -->
       {#if view.totals.runs === 0}
-        <Empty kind="no-data-yet" title={view.current ? words.noUsage : words.noUsageIn(monthWords(view.month))} />
+        <!-- WHAT WOULD BE COUNTED, AND WHERE IT RUNS FROM (money F14): the tile said a month was empty and stopped. -->
+        <Empty kind="no-data-yet" title={view.current ? words.noUsage : words.noUsageIn(monthWords(view.month))} body={usageWords.emptyBody}>
+          {#snippet actions()}<Button weight="primary" href="/agents">{usageWords.seeAgents}</Button>{/snippet}
+        </Empty>
       {:else}
         <!-- BY PROJECT, EACH PROJECT'S ACTIONS UNDER IT and the global ones last under Everywhere; a project's "Runs on"
              opens its slice, and the link beside the heading shows every project again. -->

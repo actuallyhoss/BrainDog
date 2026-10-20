@@ -58,7 +58,9 @@ export function sentenceOf(view: UsageView): Sentence | null {
     if (top.share >= NEAR) return { text: `${name} is at ${lower(share)} of the month's allowance; at the limit, actions wait until ${r.resets}.` };
     return { text: `Everything ran, and the busiest meter is at ${lower(share)}.` };
   }
-  if (view.totals.runs === 0) return null;
+  /* A MONTH WITH NO RUNS SAYS SO IN THE HEAD TOO (money F14), by the month's name, over the empty tile that says what
+     would be counted. */
+  if (view.totals.runs === 0) return { text: `Nothing has run in ${month}.` };
   const runs = said.runsSaid(view.totals.runs);
   const limit = r ? ', with no monthly limit' : '';
   return { text: view.current ? `${runs} this month${limit}.` : `${runs} in ${month}${limit}.` };
