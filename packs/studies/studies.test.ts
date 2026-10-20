@@ -50,7 +50,7 @@ test('EVERY AUTOMATION IT CARRIES IS OFF UNTIL SOMEONE TURNS IT ON', () => {
 
 test('THE FRONT READS AS A USE CASE, hears studying words, and stands on this add-on', () => {
   const read = normaliseUseCase(FRONT);
-  if (!read.ok) assert.fail(`${read.refusal.code}: ${read.refusal.fix}`);
+  if (!read.ok) assert.fail(JSON.stringify(read));
   const u = FRONT as { usecase: string; signals: string[]; needs: string[] };
   assert.equal(u.usecase, 'studies');
   assert.ok(u.signals.includes('assignments') && u.signals.includes('grades'));

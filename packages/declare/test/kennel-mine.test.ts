@@ -13,7 +13,7 @@ const AT = '2026-10-01T09:00:00Z';
 const REACH = { modules: [], lists: [], pages: [], rules: [], examples: 0, skills: [], calls_out: [] };
 const version = (v: string, extra: Partial<CatalogueVersion> = {}): CatalogueVersion => ({ version: v, checksum: 'a'.repeat(64), bytes: 10, published_at: AT, bump: null, reach: REACH, ...extra });
 const MINE = { kind: 'key' as const, id: 'key-mine', name: 'Me' };
-const entry = (id: string, versions: CatalogueVersion[], publisher = MINE): CatalogueEntry => ({
+const entry = (id: string, versions: CatalogueVersion[], publisher: CatalogueEntry['publisher'] = MINE): CatalogueEntry => ({
   kind: 'pack',
   id,
   title: id.toUpperCase(),

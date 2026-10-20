@@ -41,7 +41,7 @@ test('the steps are in the checksum, so a changed skill is a changed add-on', as
 test('a skill is refused by what is wrong with it, at the place it is wrong', () => {
   const at = (raw: unknown): string | undefined => {
     const out = readPackSkills(raw);
-    return out.ok ? undefined : out.refusal.at;
+    return out.ok || !("refusal" in out) ? undefined : out.refusal.at;
   };
   assert.equal(at('no'), 'skills');
   assert.equal(at([{ ...SKILL, name: 'Weekly Tidy' }]), 'skills.0.name');

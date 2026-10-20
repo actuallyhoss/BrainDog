@@ -276,6 +276,7 @@ export async function kennelAnswer(method: string, pathname: string, folder: str
         return refused(404, 'ROUTE_UNKNOWN', `This BrainDog holds no ${asked.path}, and ${base === null ? 'it reads no Kennel' : 'the Kennel did not answer for it'}.`);
       return { status: 200, headers: asked.ask === 'file' ? KEPT : READ, body: text };
     }
+    case 'mine':
     case 'submit':
     case 'yank':
     case 'mine':

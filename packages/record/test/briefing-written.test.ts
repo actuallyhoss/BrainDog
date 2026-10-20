@@ -103,7 +103,7 @@ test('a bill paid since the brief was written voids it at once, and the rules sa
   const r = await morning();
   const late = (await r.facts())[0]!;
   await r.keep([`${late.title} is {{${late.h}.days}} late.`]);
-  value(r.api.kernel.update(r.rent.id, { status: 'paid' } as never, { actor: 'p_1' }));
+  value(r.api.kernel.update('bills', r.rent.id, { status: 'paid' } as never, { actor: 'p_1' }));
   const brief = await r.read();
   assert.equal(brief.written, null);
   assert.ok(brief.cards.every((c) => !c.line.includes('Studio rent')));

@@ -54,7 +54,7 @@ test('EVERY AUTOMATION IT CARRIES IS OFF UNTIL SOMEONE TURNS IT ON', () => {
 
 test('THE FRONT READS AS A USE CASE for a team, and stands on this add-on', () => {
   const read = normaliseUseCase(FRONT);
-  if (!read.ok) assert.fail(`${read.refusal.code}: ${read.refusal.fix}`);
+  if (!read.ok) assert.fail(JSON.stringify(read));
   const u = FRONT as { usecase: string; audience: string; needs: string[] };
   assert.equal(u.usecase, 'team-board');
   assert.equal(u.audience, 'team');

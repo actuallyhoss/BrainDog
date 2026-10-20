@@ -1297,7 +1297,7 @@ type Turn = {
   titles: Map<string, string>;
   boot?: Promise<Result<unknown>>;
   /** The batch a write landed under, which its receipt hands to `undo`; or the question a `propose` filed, which `withdraw` takes back. */
-  batch?: string;
+  batch?: string | undefined;
   asks?: string;
 };
 
