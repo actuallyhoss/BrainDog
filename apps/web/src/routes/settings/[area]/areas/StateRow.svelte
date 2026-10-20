@@ -53,7 +53,10 @@
 <style>
   /* THE ROW'S ANATOMY, at the height of a two-line row (`--row-h-2`). The well sits on the title's line rather than the
      row's middle, so a line that wraps to three does not float the glyph away from the name it belongs to: the well is
-     28 and the title's line is 20, so it starts 4 above the title and ends 4 below it. */
+     28 and the title's line is 20, so it starts 4 above the title and ends 4 below it.
+
+     THE WHOLE TILE WIDE (agents F19): the words keep to 75 characters, and the action, a switch or a button, stands at
+     the tile's end edge, where every settings row puts it, never 350px short of it. */
   .state-row {
     position: relative;
     display: grid;
@@ -63,7 +66,6 @@
     row-gap: var(--sp-2);
     min-block-size: var(--row-h-2);
     padding-block: var(--sp-3);
-    max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
   .state-row.has-action {
@@ -80,7 +82,7 @@
     inset-block-start: 0;
     inset-inline: calc(var(--well) + var(--sp-3)) 0;
     block-size: 1px;
-    background: var(--line);
+    background: var(--rule);
     pointer-events: none;
   }
 
@@ -97,17 +99,18 @@
   }
 
   .state-title {
+    max-inline-size: 75ch;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
     line-height: 20px;
     overflow-wrap: anywhere;
   }
 
   .state-line {
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    max-inline-size: 75ch;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -133,7 +136,7 @@
     }
 
     .state-title {
-      font-size: var(--t-md);
+      font-size: var(--fs-body);
       line-height: 22px;
     }
 
