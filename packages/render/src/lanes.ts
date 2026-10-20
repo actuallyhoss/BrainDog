@@ -41,6 +41,8 @@ export const lanesMore = (n: number): string => `And ${n} more that started earl
 
 /** The most names along the top, and how near now's line, as a share of the width, a name gives way to it. */
 const TICKS_MOST = 8;
+/** The most names along a window of a day or less. */
+const TICKS_DAY = 4;
 const NEAR = 0.06;
 /** Past this long a window the names along the top are months, and years where months would crowd. */
 const MONTHLY = 62 * DAY;
@@ -91,7 +93,7 @@ export type Lane<R> = {
   row: R;
   at: string;
   span: string;
-  /** How its time is said: `09:00 – 10:30`, `Since 09:00`, or with its day where the window is longer than one. */
+  /** How its time is said: `09:00 to 10:30`, `Since 09:00`, or with its day where the window is longer than one. */
   when: string;
   /** No end was written, so it is still going. */
   open: boolean;
@@ -149,8 +151,12 @@ function ticksOf(from: number, to: number, offset: number, now: number | null): 
 
   const days = wallOf(to - 1, offset).date !== wallOf(from, offset).date || length > DAY;
   const hourly = length <= 2 * DAY;
-  const steps = hourly ? [5 * MINUTE, 10 * MINUTE, 15 * MINUTE, 30 * MINUTE, ...[1, 2, 3, 4, 6, 12].map((h) => h * HOUR)] : [1, 2, 7, 14].map((d) => d * DAY);
-  const step = steps.find((s) => length / s <= TICKS_MOST) ?? steps[steps.length - 1]!;
+  /* A DAY OR LESS IS NAMED AT MOST FOUR TIMES, on the hours a day is read by (00:00, 06:00, 12:00, 18:00): eight names
+     along a day's axis were a ruler, and the lanes under it are what is read (the UI pass of 20 October, agents F7). */
+  const day = hourly && length <= DAY && length >= 6 * HOUR;
+  const steps = hourly ? [5 * MINUTE, 10 * MINUTE, 15 * MINUTE, 30 * MINUTE, ...(day ? [1, 2, 3, 6, 12] : [1, 2, 3, 4, 6, 12]).map((h) => h * HOUR)] : [1, 2, 7, 14].map((d) => d * DAY);
+  const most = day ? TICKS_DAY : TICKS_MOST;
+  const step = steps.find((s) => length / s <= most) ?? steps[steps.length - 1]!;
   /* Hours fall on multiples of the step, so a window from 09:00 names 10:00 and 12:00; days are counted from the
      first midnight in the window, since a step of a week counted from 1970 would start every axis on a Thursday. */
   const grain = hourly ? step : DAY;
@@ -240,8 +246,8 @@ export function lanesPlan<R extends { cells: readonly string[] }>(rows: readonly
       : point
         ? one(s, ws)
         : whole || oneDay || !sameDay(ws, we)
-          ? `${one(s, ws)} – ${one(e, we)}`
-          : `${one(s, ws)} – ${timeOf(we)}`;
+          ? `${one(s, ws)} to ${one(e, we)}`
+          : `${one(s, ws)} to ${timeOf(we)}`;
     lanes.push({
       row: r.row,
       at: percent((left - from) / length),
@@ -272,6 +278,19 @@ export function lanesPlan<R extends { cells: readonly string[] }>(rows: readonly
     empty: lanes.length === 0,
   };
 }
+
+/**
+ * WHO A LANE IS, ITS FOURTH CELL, where the host wrote one: the agent of a run (`Claude`), drawn with its maker's mark
+ * before the lane's words. `''` for a lane that names nobody, the window row's fourth cell, now, never being a lane.
+ */
+export const laneWho = (cells: readonly string[]): string => (cells[3] ?? '').trim();
+
+/**
+ * THE HUE A LANE AT WORK IS PAINTED IN, as the inline style's tail: its agent's maker colour (`--agent-claude`), and
+ * nothing where the mark is drawn in ink or there is no mark, which leaves the sheet's own ink (SF9). Never red.
+ */
+export const laneHue = (tone: string | null | undefined): string =>
+  tone && tone !== 'ink' && /^[a-z]+$/u.test(tone) ? `;--lane-c:var(--agent-${tone}, var(--ink))` : '';
 
 /** The drawing as one sentence, which is the list's name: how many there are and the time they sit in. */
 export const lanesSentence = (plan: { lanes: readonly unknown[]; said: string }): string => `${plan.lanes.length} on the timeline, ${plan.said}`;

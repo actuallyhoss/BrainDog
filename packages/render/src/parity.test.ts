@@ -941,6 +941,8 @@ test('THE TWO RENDERERS DRAW ONE MARK FOR AN AGENT the host names, on a card, a 
     SHAPES['agents working now']!,
     '```cards\nwho: Agent | fact: Doing\nClaude | Fix the export\nJ. Okonkwo | Proofs\n```',
     SHAPES['a feed with bursts, a mark and a tone']!,
+    /* A RUN'S LANE NAMES ITS AGENT (the fourth cell), drawn with its mark and its bar in the agent's hue. */
+    '```lanes | Today\nwindow | 2026-10-07T00:00:00+02:00 | 2026-10-07T15:00:00+02:00 | 2026-10-07T15:00:00+02:00\nQA pass | 2026-10-07T10:00:00+02:00 |  | Claude | info\nCopy | 2026-10-07T11:00:00+02:00 | 2026-10-07T12:00:00+02:00 | Codex\n```',
   ]) {
     const block = page(src);
     const svelte = tree(render(Marked, { props: { block, opts } }).body);

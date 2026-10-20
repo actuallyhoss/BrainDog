@@ -11,8 +11,8 @@
   renderer does not draw.
 -->
 <script lang="ts">
-  import { MISSING, TONES, WORKING_GLYPH, WORKING_LABEL, inline, takeWorking, text, type Block, type RenderOptions, type Row } from '../src/index.ts';
-  import { LANES_NONE, LANES_NOW, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from '../src/lanes.ts';
+  import { MISSING, TONES, WORKING_GLYPH, WORKING_LABEL, agentMarkFill, inline, takeWorking, text, type AgentMark, type Block, type RenderOptions, type Row } from '../src/index.ts';
+  import { LANES_NONE, LANES_NOW, laneHue, laneWho, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from '../src/lanes.ts';
   import Text from './Text.svelte';
 
   let { block, opts = {} }: { block: Block; opts?: RenderOptions } = $props();
@@ -21,7 +21,16 @@
   const plan = $derived(lanesPlan(block.rows, opts.now));
   const outside = $derived(plan.outside.length ? lanesOutside(plan.outside.map((i) => said(block.rows[i]!))) : '');
   const skipped = $derived(plan.skipped.length ? lanesSkipped(plan.skipped.map((i) => said(block.rows[i]!))) : '');
+  /** The mark the host draws for an agent's name, or `null`, as `markFor` in `src/html.ts`. */
+  const markFor = (name: string): AgentMark | null => (name && opts.agentMark ? opts.agentMark(name) : null);
 </script>
+
+<!-- AN AGENT'S FACE AS ITS MAKER'S MARK, as `agentFaceHtml` in `src/html.ts` draws one, hidden: the name is beside it. -->
+{#snippet agentFace(m: AgentMark)}{@const fill = agentMarkFill(m.tone)}<span class="lanes-face" data-agent="" aria-hidden="true"
+    ><svg class="agent-mark" data-tone={m.tone} viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor" style={fill ?? undefined}
+      ><path d={m.d} fill-rule={m.rule} clip-rule={m.rule}></path></svg
+    ></span
+  >{/snippet}
 
 {#snippet under()}{#if outside}<p class="lanes-outside">{outside}</p>{/if}{#if skipped}<p class="lanes-skipped">{skipped}</p>{/if}{/snippet}
 
@@ -35,15 +44,18 @@
     <ol class="lanes-list" aria-label={lanesSentence(plan)}>
       {#each plan.lanes as l}
         {@const title = takeWorking(l.row.cells[0] || MISSING)}
+        {@const who = laneWho(l.row.cells)}
+        {@const mark = who ? markFor(who) : null}
         <li
           class="lanes-item"
           data-intent={l.row.tone}
+          data-who={who ? '' : undefined}
           data-open={l.open ? '' : undefined}
           data-point={l.point ? '' : undefined}
           data-before={l.before ? '' : undefined}
           data-after={l.after ? '' : undefined}
-          style="--at:{l.at};--span:{l.span}"
-          ><span class="lanes-title"
+          style="--at:{l.at};--span:{l.span}{laneHue(mark?.tone)}"
+          >{#if who}<span class="lanes-who">{#if mark}{@render agentFace(mark)}{/if}<span class="lanes-agent">{who}</span></span>{/if}<span class="lanes-title"
             >{#if title.working}<span role="img" aria-label={WORKING_LABEL} title={WORKING_LABEL}>{WORKING_GLYPH}</span>{' '}{/if}<Text
               nodes={inline(title.text ?? '', opts)}
               {opts}

@@ -187,6 +187,87 @@
     border-end-end-radius: 0;
   }
 
+  /* ── a run's lane: who, what, when ─────────────────────────────────────── */
+
+  /* A LANE THAT NAMES ITS AGENT IS THE RUN'S ROW (agents F7): the face and the agent at 15/500, what it was doing at
+     15/400 in the second ink and cut with an ellipsis, and under them its time at 13 in the quiet ink, "10:00 to 13:00",
+     in a 360px column at a desk's width; the bar beside them in the agent's hue. One row, the same as the cards above. */
+  :where(.block[data-kind='lanes']) .lanes:has(.lanes-item[data-who]) {
+    --lanes-name: 360px;
+  }
+
+  /* NOT THE LIST'S SUBGRID: the face and the agent, then the words, share the name column, and the track takes the
+     same width the axis does, the block's width less the name column and its gap, so every bar lines up. */
+  .lanes-item[data-who] {
+    grid-template-columns: auto minmax(0, 1fr) calc(100% - var(--lanes-name) - var(--sp-4));
+    grid-template-rows: auto auto;
+    column-gap: 0;
+    row-gap: 2px;
+    align-items: center;
+  }
+
+  .lanes-item[data-who] > .lanes-who {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-inline-end: var(--sp-2);
+  }
+
+  .lanes-face {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 24px;
+    block-size: 24px;
+    padding: 5px;
+    box-sizing: border-box;
+    border-radius: var(--r-round);
+    background: var(--tile-2);
+    color: var(--ink);
+  }
+
+  .lanes-agent {
+    flex: none;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
+    line-height: 20px;
+    white-space: nowrap;
+  }
+
+  .lanes-item[data-who] > .lanes-title {
+    grid-column: 2;
+    grid-row: 1;
+    padding-inline-end: var(--sp-4);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+    line-height: 20px;
+  }
+
+  .lanes-item[data-who] > .lanes-when {
+    position: static;
+    grid-column: 1 / span 2;
+    grid-row: 2;
+    inline-size: auto;
+    block-size: auto;
+    overflow: visible;
+    clip-path: none;
+    padding-inline-start: calc(24px + var(--sp-2));
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .lanes-item[data-who] > .lanes-track {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    block-size: 20px;
+  }
+
   /* ── the hours and now ─────────────────────────────────────────────────── */
 
   /* OVER THE TRACKS' COLUMN, under the lanes drawn after it. Clipped at its own edge, so an hour named close to the end
@@ -305,6 +386,22 @@
     /* Every other hour, so the ones left do not run into each other. */
     .lanes-tick:nth-child(even) {
       display: none;
+    }
+
+    /* A RUN'S LANE ON A PHONE: who and what on the first line, its time under them, its bar under both, the width. */
+    .lanes-item[data-who] {
+      grid-template-columns: auto minmax(0, 1fr);
+      grid-template-rows: auto auto auto;
+    }
+
+    .lanes-item[data-who] > .lanes-title {
+      padding-inline-end: 0;
+    }
+
+    .lanes-item[data-who] > .lanes-track {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      margin-block-start: var(--sp-1);
     }
   }
 }

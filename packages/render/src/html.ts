@@ -52,7 +52,7 @@ import { ROADMAP_LEGEND, ROADMAP_NONE, ROADMAP_TODAY, roadmapAxis, roadmapFlip, 
 import { RING_NONE, RING_OF, RING_PAINT, RING_STEP_OPACITY, ringPlan } from './ring.ts';
 import { HEAT_DAY, HEAT_NONE, HEAT_SHARE_HEAD, HEAT_SHARE_LINE, HEAT_VALUE, heatLines, heatMissed, heatOutside, heatPeopleMore, heatPeoplePlan, heatPersonSaid, heatPlan, heatSkipped, heatTitle, heatWeekTitle } from './heat.ts';
 import { CALENDAR_FEW, CALENDAR_NONE, CALENDAR_TODAY, CALENDAR_WEEK_NONE, WEEKDAYS, calendarMore, calendarOutside, calendarPlan, calendarSkipped, calendarStripPlan } from './calendar.ts';
-import { LANES_NONE, LANES_NOW, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from './lanes.ts';
+import { LANES_NONE, LANES_NOW, laneHue, laneWho, lanesOutside, lanesPlan, lanesSentence, lanesSkipped } from './lanes.ts';
 import { LINKS_NONE, linkPlan } from './links.ts';
 import { GALLERY_NONE, galleryPlan, pictureSrc } from './gallery.ts';
 import { EMBED_NONE, embedOpen, embedPlan } from './embed.ts';
@@ -1087,7 +1087,7 @@ function runFaceHtml(f: RunFace, o: RenderOptions): string {
     : d
       ? `<path d="${escape(d)}" transform="translate(9 9) scale(0.75)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>`
       : '';
-  return `<a class="cards-face cards-run" style="background:none" href="${escape(hrefFor(o, `/r/session/${f.seq}`))}" data-live="${f.live}" aria-label="${escape(RUN_OPEN)}"><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:${f.hue}"><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg))"></circle>${ring}${path}</svg></a>`;
+  return `<a class="cards-face cards-run tap" style="background:none" href="${escape(hrefFor(o, `/r/session/${f.seq}`))}" data-live="${f.live}" aria-label="${escape(RUN_OPEN)}"><svg class="cards-run-mark" viewBox="0 0 36 36" width="100%" height="100%" aria-hidden="true" style="--run-hue:${f.hue}"><circle class="cards-run-disc" cx="18" cy="18" r="14" style="fill:color-mix(in srgb, oklch(var(--mark-l) var(--mark-c) var(--run-hue)) 30%, var(--bg))"></circle>${ring}${path}</svg></a>`;
 }
 
 /**
@@ -1892,8 +1892,13 @@ function lanes(b: Block, o: RenderOptions): string {
   }</ol>`;
   const list = `<ol class="lanes-list" aria-label="${escape(lanesSentence(plan))}">${plan.lanes
     .map(
-      (l) =>
-        `<li class="lanes-item"${toneAttrs(l.row.tone)}${l.open ? ' data-open=""' : ''}${l.point ? ' data-point=""' : ''}${l.before ? ' data-before=""' : ''}${l.after ? ' data-after=""' : ''} style="--at:${l.at};--span:${l.span}">${cell('lanes-title', l.row.cells[0] || MISSING, o)}${toneGlyph(l.row.tone)}<span class="lanes-when num">${escape(l.when)}</span><span class="lanes-track" aria-hidden="true"><span class="lanes-bar"></span></span></li>`,
+      (l) => {
+        /* A LANE THAT NAMES WHO IT IS (`laneWho`): the agent's face and name before its words, its bar in its hue. */
+        const who = laneWho(l.row.cells);
+        const mark = who ? markFor(o, who) : null;
+        const lead = who ? `<span class="lanes-who">${mark ? agentFaceHtml(mark, 'lanes-face') : ''}<span class="lanes-agent">${escape(who)}</span></span>` : '';
+        return `<li class="lanes-item"${toneAttrs(l.row.tone)}${who ? ' data-who=""' : ''}${l.open ? ' data-open=""' : ''}${l.point ? ' data-point=""' : ''}${l.before ? ' data-before=""' : ''}${l.after ? ' data-after=""' : ''} style="--at:${l.at};--span:${l.span}${laneHue(mark?.tone)}">${lead}${cell('lanes-title', l.row.cells[0] || MISSING, o)}${toneGlyph(l.row.tone)}<span class="lanes-when num">${escape(l.when)}</span><span class="lanes-track" aria-hidden="true"><span class="lanes-bar"></span></span></li>`;
+      },
     )
     .join('')}</ol>`;
   return `<div class="lanes" style="--rows:${plan.lanes.length}">${axis}${list}${under}</div>`;

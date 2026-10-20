@@ -29,16 +29,16 @@ test('a span is placed between the two ends of the window, as percentages, and n
   assert.deepEqual(
     plan.lanes.map((l) => [l.at, l.span, l.when]),
     [
-      ['10%', '15%', '09:00 – 10:30'],
+      ['10%', '15%', '09:00 to 10:30'],
       /* Written in another offset and placed by the instant, said on the window's clock. */
-      ['20%', '10%', '10:00 – 11:00'],
+      ['20%', '10%', '10:00 to 11:00'],
     ],
   );
   assert.equal(plan.now, '50%');
   assert.equal(plan.said, '7 Oct 2026, 08:00 – 18:00');
   assert.equal(lanesSentence(plan), '2 on the timeline, 7 Oct 2026, 08:00 – 18:00');
-  /* Every two hours, on the hour where the window was written, and the one under now's line gives way to it. */
-  assert.deepEqual(plan.ticks.map((t) => `${t.label}@${t.at}`), ['08:00@0%', '10:00@20%', '12:00@40%', '14:00@60%', '16:00@80%', '18:00@100%']);
+  /* A DAY OR LESS IS NAMED AT MOST FOUR TIMES: every three hours here, on the hour where the window was written. */
+  assert.deepEqual(plan.ticks.map((t) => `${t.label}@${t.at}`), ['09:00@10%', '12:00@40%', '15:00@70%', '18:00@100%']);
 });
 
 test('a span still going runs to now, one cut at an edge says so, and a single instant is a point', () => {
@@ -99,8 +99,8 @@ test('with no clock a span still going runs to the end of the window, and no lin
 test('a block with no window takes it from its rows, and whole days are said as days', () => {
   const plan = lanesPlan(rows(['Design', '2026-09-01', '2026-09-11'], ['Build', '2026-09-06', '2026-09-21']), Date.UTC(2026, 9, 7));
   assert.deepEqual(plan.lanes.map((l) => [l.at, l.span, l.when]), [
-    ['0%', '50%', '1 Sep – 11 Sep'],
-    ['25%', '75%', '6 Sep – 21 Sep'],
+    ['0%', '50%', '1 Sep to 11 Sep'],
+    ['25%', '75%', '6 Sep to 21 Sep'],
   ]);
   assert.equal(plan.now, null);
   assert.deepEqual(plan.ticks.map((t) => t.label), ['1 Sep', '8 Sep', '15 Sep']);
@@ -113,7 +113,7 @@ test('a block with no window takes it from its rows, and whole days are said as 
 
 test('a window over several days says each time with its day', () => {
   const plan = lanesPlan(rows(['window', '2026-10-07T00:00:00Z', '2026-10-09T00:00:00Z'], ['Run', '2026-10-07T22:00:00Z', '2026-10-08T02:00:00Z'], ['Short', '2026-10-08T09:00:00Z', '2026-10-08T10:00:00Z']));
-  assert.deepEqual(plan.lanes.map((l) => l.when), ['7 Oct, 22:00 – 8 Oct, 02:00', '8 Oct, 09:00 – 10:00']);
+  assert.deepEqual(plan.lanes.map((l) => l.when), ['7 Oct, 22:00 to 8 Oct, 02:00', '8 Oct, 09:00 to 10:00']);
   assert.equal(plan.said, '7 Oct 2026, 00:00 – 9 Oct 2026, 00:00');
   assert.deepEqual(plan.ticks.map((t) => t.label), ['7 Oct', '06:00', '12:00', '18:00', '8 Oct', '06:00', '12:00', '18:00', '9 Oct']);
 });
@@ -139,10 +139,10 @@ test('a lanes fence draws an axis, a lane a row with its tone, and the rows it c
     'Someday | soon\n```';
   const html = toHTML(parse(src), { link: () => null });
   assert.match(html, /<figure class="block block-list" data-kind="lanes" data-primitive="list">/u);
-  assert.match(html, /<div class="lanes" style="--rows:2"><ol class="lanes-axis" aria-hidden="true"><li class="lanes-tick" style="--at:0%">08:00<\/li>/u);
+  assert.match(html, /<div class="lanes" style="--rows:2"><ol class="lanes-axis" aria-hidden="true"><li class="lanes-tick" style="--at:10%">09:00<\/li>/u);
   assert.match(html, /<li class="lanes-now" style="--at:50%">Now<\/li><\/ol>/u);
   assert.match(html, /<ol class="lanes-list" aria-label="2 on the timeline, 7 Oct 2026, 08:00 – 18:00">/u);
-  assert.match(html, /<li class="lanes-item" style="--at:10%;--span:15%"><span class="lanes-title"><a [^>]*href="\/r\/things\/2"[^>]*>Sync<\/a><\/span><span class="lanes-when num">09:00 – 10:30<\/span><span class="lanes-track" aria-hidden="true"><span class="lanes-bar"><\/span><\/span><\/li>/u);
+  assert.match(html, /<li class="lanes-item" style="--at:10%;--span:15%"><span class="lanes-title"><a [^>]*href="\/r\/things\/2"[^>]*>Sync<\/a><\/span><span class="lanes-when num">09:00 to 10:30<\/span><span class="lanes-track" aria-hidden="true"><span class="lanes-bar"><\/span><\/span><\/li>/u);
   assert.match(html, /<li class="lanes-item" data-intent="bad" data-open="" style="--at:40%;--span:10%"><span class="lanes-title">Export<\/span><span class="glyph" role="img" aria-label="wrong">[^<]+<\/span><span class="lanes-when num">Since 12:00<\/span>/u);
   assert.match(html, /<p class="lanes-skipped">Not shown, because the times do not read: Someday\.<\/p><\/div>/u);
   assert.match(toHTML(parse('```lanes\n```')), /<div class="lanes"><p class="lanes-empty">Nothing in this time\.<\/p><\/div>/u);

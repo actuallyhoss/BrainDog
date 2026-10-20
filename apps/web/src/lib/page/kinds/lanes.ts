@@ -66,11 +66,24 @@ function named(title: string, href: unknown): string {
   return typeof href === 'string' && PATH.test(href) && title !== '' && !/[[\]]/u.test(title) ? `[${cell}](${href})` : cell;
 }
 
+/**
+ * WHO A LANE IS, WHERE ITS ROW SAYS: the record answers a lane's row beside it, at the same place (`rows`), and a row of
+ * the list of runs names its `agent`. Written as the lane's fourth cell, before its tone, so the drawer draws the run's
+ * face and paints its bar in that agent's hue (SF9). Nothing where the row names none, or the answer carries no rows.
+ */
+function whoOf(result: unknown, at: number): string {
+  const rows = result !== null && typeof result === 'object' ? (result as { rows?: unknown }).rows : null;
+  const row = Array.isArray(rows) ? rows[at] : null;
+  const fields = row !== null && typeof row === 'object' ? (row as { fields?: unknown }).fields : null;
+  const agent = fields !== null && typeof fields === 'object' ? (fields as { agent?: unknown }).agent : null;
+  return typeof agent === 'string' ? agent.replace(/[|\n\r]+/gu, ' ').trim() : '';
+}
+
 /** The rows a lanes block writes, one a lane the answer holds that can be placed on an axis. */
 export function lanesRows(result: unknown): string[] {
   const lanes = result !== null && typeof result === 'object' ? (result as { lanes?: unknown }).lanes : null;
   if (!Array.isArray(lanes)) return [];
-  return lanes.flatMap((l) => {
+  return lanes.flatMap((l, at) => {
     if (l === null || typeof l !== 'object') return [];
     const { title, start, end, tone, href } = l as { title?: unknown; start?: unknown; end?: unknown; tone?: unknown; href?: unknown };
     const from = instant(start);
@@ -81,7 +94,8 @@ export function lanesRows(result: unknown): string[] {
     if (end !== null && end !== undefined && (to === null || to < from)) return [];
     const name = typeof title === 'string' ? title.replace(/\s+/gu, ' ').trim() : '';
     const said = typeof tone === 'string' && Object.hasOwn(TONES, tone) ? ` | ${tone}` : '';
-    return [`${named(name, href)} | ${written(from)} | ${to === null ? '' : written(to)}${said}`];
+    const who = whoOf(result, at);
+    return [`${named(name, href)} | ${written(from)} | ${to === null ? '' : written(to)}${who === '' ? '' : ` | ${escapeCell(who)}`}${said}`];
   });
 }
 
@@ -93,11 +107,30 @@ export function windowRow(result: unknown, fallback: number): string | null {
   const w = result !== null && typeof result === 'object' ? (result as { window?: unknown }).window : null;
   if (w === null || typeof w !== 'object') return null;
   const { from, to, now } = w as { from?: unknown; to?: unknown; now?: unknown };
-  const a = instant(from);
+  let a = instant(from);
   const b = instant(to);
   if (a === null || b === null || b <= a) return null;
   const at = instant(now) ?? (writable(fallback) ? fallback : null);
+  /* A DAY'S WINDOW IS TODAY WHEN EVERY LANE IN IT IS TODAY'S (agents F7): the window opens at the record's midnight, so
+     yesterday's hours are not drawn empty inside "Today's runs" and its axis names no date. Midnight is the record's,
+     the offset the window was written in. A lane that ended before midnight keeps the whole window. */
+  const zone = typeof from === 'string' ? (lanesInstant(from)?.offset ?? 0) : 0;
+  const midnight = Math.floor((b + zone * 60_000) / 86_400_000) * 86_400_000 - zone * 60_000;
+  if (midnight > a && midnight < b && endsOf(result).every((e) => e >= midnight)) a = midnight;
   return `${LANES_WINDOW} | ${written(a)} | ${written(b)} | ${at === null ? '' : written(at)}`;
+}
+
+/** When each lane ends, or `Infinity` for one still going; a lane whose times do not read is not counted. */
+function endsOf(result: unknown): number[] {
+  const lanes = result !== null && typeof result === 'object' ? (result as { lanes?: unknown }).lanes : null;
+  if (!Array.isArray(lanes)) return [];
+  return lanes.flatMap((l) => {
+    if (l === null || typeof l !== 'object') return [];
+    const { end } = l as { end?: unknown };
+    if (end === null || end === undefined) return [Infinity];
+    const to = instant(end);
+    return to === null ? [] : [to];
+  });
 }
 
 /**
