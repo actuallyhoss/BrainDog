@@ -3715,7 +3715,10 @@ function receiptOf(name: string, said: string, turn: Turn, value: unknown): stri
   const did = first === '' ? `Done with ${name}` : first.length > 110 ? `${first.slice(0, 109)}…` : first;
   if (turn.batch !== undefined) return `Receipt: ${did}. To undo, call undo with batch "${turn.batch}".`;
   if (turn.asks !== undefined) return `Receipt: ${did}. To take it back, call propose with withdraw "${turn.asks}".`;
-  if (name === 'propose' || (isObject(value) && 'filed' in value)) return `Receipt: ${did}. Nothing was written, so there is nothing to undo.`;
+  /* A PROPOSAL THE LADDER LET THROUGH WAS WRITTEN (`landed`, or the `rung` it went through on), so it is not said to have written nothing. */
+  const ruled = ruledOf(value);
+  const landed = ruled !== null && !('filed' in ruled);
+  if (!landed && (name === 'propose' || (isObject(value) && 'filed' in value))) return `Receipt: ${did}. Nothing was written, so there is nothing to undo.`;
   return `Receipt: ${did}. No undo handle came back for this one; the owner can put it back from the app.`;
 }
 

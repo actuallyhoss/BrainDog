@@ -191,7 +191,8 @@ test('ON A REAL RECORD THE DOOR READS ONE THING, offered, beside what the record
     },
   });
   await tools(watched).resources(owner);
-  const UNDECIDED = new Set(['briefing', 'exceptions', 'stale', 'learnings', 'version']);
+  /* `arrangement` IS `design`'S: the design book is not an address `offered` decides, so it is read before it is listed, as it always was, through the arrangement. */
+  const UNDECIDED = new Set(['briefing', 'exceptions', 'stale', 'learnings', 'version', 'arrangement']);
   assert.deepEqual(asked.filter((m) => !UNDECIDED.has(m)), ['offered'], 'the door read the record to make the list');
   for (const never of ['page', 'pages', 'boot', 'figures', 'metric', 'list', 'context', 'previewPage', 'inbox'])
     assert.equal(asked.includes(never), false, `${never} was asked to make the list`);

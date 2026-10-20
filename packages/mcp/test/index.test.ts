@@ -10,13 +10,13 @@
  *
  * SO EVERY TOOL IS CALLED, THROUGH THE SAME `handle` STDIO SERVES, over a real record. The table is
  * exhaustive against `TOOLS` on purpose: a tool added without a case here is red, which is the only
- * way a list of sixteen stays true. What is asserted is narrow and is the whole of the claim: the
+ * way a list of seventeen stays true. What is asserted is narrow and is the whole of the claim: the
  * name reached a method, so the answer is not `ROUTE_UNKNOWN` and not `NOT_IN_THIS_BUILD`. Whether
  * each tool then does what it says is `mcp.test.ts`.
  *
  * AND ONCE MORE OVER A SURFACE WITH NO OPTIONAL METHOD ON IT, which is what the command line hands
  * the tools when its allow-list is short. That run says exactly which tools go dark, and the list is
- * five; a sixth appearing in it is a tool somebody has to add a name for before it ships.
+ * six; a seventh appearing in it is a tool somebody has to add a name for before it ships.
  */
 
 import { test } from 'node:test';
@@ -77,6 +77,7 @@ const CALLS: Record<string, Record<string, unknown>> = {
   handoff: { doing: 'Checking the tool list', next: 'Report what answered' },
   meet: { name: 'Ada', where: 'commit 4464966 in braindog' },
   triage: { arrival: 'arr_1', ignore: true },
+  undo: { batch: 'no-such-batch', dry: true },
 };
 
 type ToolResult = { isError?: boolean; content: { text: string }[]; structuredContent: Record<string, unknown> };
@@ -104,7 +105,7 @@ test('EVERY ADVERTISED TOOL REACHES A METHOD, asked over the wire rather than re
 
 /**
  * THE NARROWEST SURFACE THAT TYPE-CHECKS: the sixteen methods `McpSurface` requires and not one of
- * the optional seven. What goes dark on it is exactly what a transport's own list has to carry.
+ * the optional eight. What goes dark on it is exactly what a transport's own list has to carry.
  */
 const narrowOver = (api: Awaited<ReturnType<typeof record>>['api']): McpSurface<CallContext> => ({
   boot: (ctx) => api.boot(ctx),
@@ -125,7 +126,7 @@ const narrowOver = (api: Awaited<ReturnType<typeof record>>['api']): McpSurface<
   digestToday: (args, ctx) => api.digestToday(args, ctx),
 });
 
-test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FIVE OF THEM, which is the list a transport has to route', async () => {
+test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS SIX OF THEM, which is the list a transport has to route', async () => {
   /* THE COMMAND LINE BUILDS ITS SURFACE FROM A FIXED LIST (`apps/cli/src/surface.ts`), and a name
      missing from it is a tool that refuses for ever. */
   const { sql, api } = await record();
@@ -133,7 +134,7 @@ test('AND A SURFACE WITH NOTHING OPTIONAL ON IT DARKENS FIVE OF THEM, which is t
 
   const dark: string[] = [];
   for (const tool of TOOLS) if ((await called(tool.name, narrow, owner)) === 'NOT_IN_THIS_BUILD') dark.push(tool.name);
-  assert.deepEqual(dark, ['context', 'activity', 'handoff', 'meet', 'triage']);
+  assert.deepEqual(dark, ['context', 'activity', 'handoff', 'meet', 'triage', 'undo']);
   sql.close();
 });
 

@@ -36,6 +36,14 @@
  * way: out of `meet`'s own examples, four descriptions that said a thing twice, and the opening line's list of what a
  * record holds. It measured 2,755 after, and 2,759 once `keys` said its items are text (Gemini refuses an array schema
  * without them), paid for by `handoff`'s `state` dropping a `type` its enum already says.
+ *
+ * 3,100, RAISED A SECOND TIME, FOR A TOOL AND A STANDARD AND NOT FOR WORDS (the night of 19 to 20 October). `undo` is the
+ * seventeenth tool and measures 123, the way back that every write's receipt now offers; and every read now says
+ * `readOnlyHint` and `openWorldHint`, which a directory asks of each tool and reads a missing one as a write it cannot
+ * vouch for, 13 on each of nine reads. Together they took the list and the instructions from 2,759 to
+ * 3,097. Nothing was cut to pay for them: a description or a schema that says less is a tool an agent calls
+ * wrongly, and the five passes that paid for earlier tools had already taken out every word that said a thing twice.
+ * The figure is the list as it stands to the token (3,097 of 3,100), so the next tool or hint is paid for here too.
  */
 
 import { test } from 'node:test';
@@ -49,7 +57,7 @@ import { stub } from './stub.ts';
 import { tokenBudget } from './tokens.ts';
 
 
-const CEILING = 2_760;
+const CEILING = 3_100;
 
 const listed = async () => {
   const { surface } = stub();

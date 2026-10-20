@@ -114,7 +114,8 @@ test('THE DOOR PASSES op_id TO THE RECORD, and a replay the record marks ends wi
   const said = await tools(surface).answer('create', { register: 'errands', fields: { what: 'Buy stamps' }, op_id: 'op-1' }, { who: 'agent' });
   assert.equal((sent[0] as { op_id?: string }).op_id, 'op-1');
   assert.ok(said.result.ok);
-  assert.equal(said.text.split('\n').at(-1), REPLAYED);
+  /* THE RECEIPT IS THE LAST LINE OF A WRITE, so the replay's one line is the last before it. */
+  assert.equal(said.text.split('\n').filter((l) => !l.startsWith('Receipt: ')).at(-1), REPLAYED);
   assert.equal((said.result.value as { replayed?: boolean }).replayed, true);
 
   const fresh = await tools(stub({ create: async () => ({ ok: true, value: entry }) as never }).surface).answer(

@@ -70,7 +70,7 @@ test("PROPOSE'S ANSWER SAYS THE QUESTION IN NAMES, with its own handle to act on
     propose: (async () => ({ ok: true, value: { id: 'SG7', question: proposal.question } })) as never,
   });
   const said = await tools(surface).answer('propose', proposal, agent);
-  assert.match(said.text ?? '', /^Asked Mara: Is someone the same person as Joaquin Herrera \(P3\)\? \(SG7\)\nMara decides in BrainDog\.$/u);
+  assert.match(said.text ?? '', /^Asked Mara: Is someone the same person as Joaquin Herrera \(P3\)\? \(SG7\)\nMara decides in BrainDog\.\nReceipt: Asked Mara: Is someone the same person as Joaquin Herrera \(P3\)\? \(SG7\)\. To take it back, call propose with withdraw "SG7"\.$/u);
   clean(said.text ?? '', 'the propose answer');
 });
 

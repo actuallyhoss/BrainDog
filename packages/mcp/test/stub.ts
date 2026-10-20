@@ -42,6 +42,7 @@ export function stub(over: Partial<McpSurface<Ctx>> = {}) {
     recentHistory: said('recentHistory', { events: [] as unknown[], cursor: null }),
     actions: said('actions', [] as unknown[]),
     triage: said('triage', { id: 'a1', state: 'ignored', entry: null, already: false }),
+    undoOwn: said('undoOwn', { say: 'Put back 1 change.', lines: [] as string[] }),
     understandPlan: said('understandPlan', { dry: true, kinds: [] as unknown[], writes: [] as string[], more: 0, questions: [] as string[], asks: {}, done: true }),
     ...over,
   };

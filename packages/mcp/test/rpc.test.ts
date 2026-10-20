@@ -238,6 +238,7 @@ const EACH: [tool: string, args: Record<string, unknown>, methods: string[], fir
   ['handoff', { next: 'Wire the self-host.', tried: 'Reading the cookie.' }, ['handoff'], { next: 'Wire the self-host.', tried: 'Reading the cookie.' }],
   ['meet', { name: 'Ada', where: 'commit 4464966 in braindog' }, ['meet'], { name: 'Ada', where: 'commit 4464966 in braindog' }],
   ['triage', { arrival: 'a1', ignore: true }, ['triage'], { arrival: 'a1', ignore: true }],
+  ['undo', { batch: 'b1' }, ['undoOwn'], { batch: 'b1' }],
 ];
 
 test('EVERY TOOL REACHES THE RIGHT METHOD, with the context the transport handed over', async () => {

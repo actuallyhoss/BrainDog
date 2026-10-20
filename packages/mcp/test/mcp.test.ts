@@ -76,13 +76,14 @@ const refusal = (r: unknown) => {
 
 /* ── the surface itself ──────────────────────────────────────────────────── */
 
-test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
+test('THE COUNT IS THE DESIGN: seventeen, and each is named by the plan', () => {
   /* The eight of `10-MCP` §3 less what no token can use, plus `context`,
      `handoff` and `meet`, which are what an agent does every session. `decide` is ABSENT because no
      token reaches that rung: a tool that could only ever refuse is a tool an agent spends its turns
      discovering. `activity` is the fifteenth, a record-wide log, the one thing agents coming from
      other records reach for and nowhere here: see `activity.test.ts` for the rest of that comparison.
-     `triage` is the sixteenth, the one tool the ceiling was raised for. `understand` was a seventeenth (DIRECTION
+     `triage` is the sixteenth, the one tool the ceiling was raised for. `undo` is the seventeenth: it takes back one of the
+     caller's own writes by the batch its receipt gave, which is what lets an agent put right what it just wrote. `understand` was a seventeenth (DIRECTION
      §38) and is the resource `braindog:understand` now (AGT-B05, "keep the 16" of §37): it takes nothing and writes
      nothing, and its words paid for `op_id` on `create` and `update`.
 
@@ -92,7 +93,7 @@ test('THE COUNT IS THE DESIGN: sixteen, and each is named by the plan', () => {
      other pack's (`figures.test.ts`). */
   assert.deepEqual(
     TOOLS.map((t) => t.name),
-    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
+    ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'undo'],
   );
   for (const t of TOOLS) assert.ok(t.description.length > 30, `${t.name} has a description nobody can choose from`);
 });
@@ -106,7 +107,7 @@ test('AND NO TOOL READS A CREDENTIAL, because there is no vault tool', () => {
 test('a tool says whether it writes, so a client can tell its user before it runs', () => {
   assert.deepEqual(
     TOOLS.filter((t) => t.writes).map((t) => t.name),
-    ['propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage'],
+    ['propose', 'create', 'update', 'log', 'handoff', 'meet', 'triage', 'undo'],
   );
 });
 

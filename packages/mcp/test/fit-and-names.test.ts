@@ -235,7 +235,8 @@ test('ON THE SEED, A QUESTION THAT NAMES A ROW BY HANDLE OR BY ID IS READ IN ITS
     return (reply.result as { content: { text: string }[] }).content[0]!.text;
   };
   const queue = await call('governance', {});
-  assert.ok(queue.includes(`Does ${words} (things#1) ship its specimen first?`), queue);
+  /* A HANDLE IN A QUESTION IS FILED AS THE ROW'S NAME (the record says names, not numbers), a row id is said by the door with its handle beside the name. */
+  assert.ok(queue.includes(`Does ${words} ship its specimen first?`), queue);
   assert.ok(queue.includes(`Is ${words} (things#1) the project to price per seat?`), queue);
   assert.doesNotMatch(queue, /\b[0-9A-HJKMNP-TV-Z]{26}\b/u, 'a row id reached the queue');
   const card = await call('context', {});

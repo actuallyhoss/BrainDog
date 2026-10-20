@@ -23,7 +23,7 @@ const entry = (extra: Record<string, unknown> = {}) => ({ id: ROW, register: 'ta
 test('A WRITE ITS RUNG LET THROUGH SAYS DONE, in names, and who can undo it', async () => {
   const { surface } = stub({ boot: boot as never, schema: schema as never, create: (async () => ({ ok: true, value: entry({ rung: 'tell' }) })) as never });
   const said = await tools(surface).answer('create', { register: 'tasks', fields: { title: 'Ship the undo' } }, agent);
-  assert.equal(said.text, 'Added: Ship the undo (T4) · version 2\nDone, as you may on Tasks · Mara can undo it');
+  assert.equal(said.text, `Added: Ship the undo (T4) · version 2\nDone, as you may on Tasks · Mara can undo it\nReceipt: Added: Ship the undo (T4) · version 2. No undo handle came back for this one; the owner can put it back from the app.`);
   assert.equal((said.result.ok && (said.result.value as Record<string, unknown>).rung) || null, 'tell');
   assert.doesNotMatch(said.text ?? '', /01M345/u, 'the answer carried a row id');
 });
@@ -32,7 +32,7 @@ test('A WRITE FILED AS A SUGGESTION SAYS NOTHING WAS WRITTEN, and names the ques
   const filed = { filed: { id: 'Q12', question: 'Mark Ship the undo done?' } };
   const { surface } = stub({ boot: boot as never, schema: schema as never, update: (async () => ({ ok: true, value: filed })) as never });
   const said = await tools(surface).answer('update', { spoken: 'tasks#4', patch: { state: 'done' }, version: 2 }, agent);
-  assert.equal(said.text, 'Filed for Mara to decide: Mark Ship the undo done? (Q12)\nNothing is written until Mara accepts it in BrainDog.');
+  assert.equal(said.text, `Filed for Mara to decide: Mark Ship the undo done? (Q12)\nNothing is written until Mara accepts it in BrainDog.\nReceipt: Filed for Mara to decide: Mark Ship the undo done? (Q12). Nothing was written, so there is nothing to undo.`);
   assert.deepEqual(said.result.ok && said.result.value, filed);
 });
 
@@ -42,7 +42,7 @@ test('A FILED WRITE LINKS THE QUESTION where the host serves the app', async () 
     create: (async () => ({ ok: true, value: { filed: { id: 'Q3', question: 'Add Renew brain.dog?' } } })) as never,
   });
   const said = await tools(surface, 'https://brain.dog').answer('create', { register: 'tasks', fields: {} }, agent);
-  assert.match(said.text ?? '', /^Filed for Mara to decide: Add Renew brain\.dog\? \(Q3\)\nNothing is written until Mara accepts it in BrainDog at https:\/\/brain\.dog\/app\/mara\/decide\/Q3\.$/u);
+  assert.match(said.text ?? '', /^Filed for Mara to decide: Add Renew brain\.dog\? \(Q3\)\nNothing is written until Mara accepts it in BrainDog at https:\/\/brain\.dog\/app\/mara\/decide\/Q3\.\nReceipt: Filed for Mara to decide: Add Renew brain\.dog\? \(Q3\)\. Nothing was written, so there is nothing to undo\.$/u);
 });
 
 test('A WRITE THE RECORD ANSWERS `asked` IS FILED, with its reason, and never said as written', async () => {
@@ -52,7 +52,7 @@ test('A WRITE THE RECORD ANSWERS `asked` IS FILED, with its reason, and never sa
   const said = await tools(surface).answer('create', { register: 'tasks', fields: { title: 'Ship the undo' } }, agent);
   assert.equal(
     said.text,
-    'Filed for Mara to decide: Add Ship the undo to Tasks? (Q14)\nChanges like this ask until 10 of them have been kept as they were. Nothing is written until Mara accepts it in BrainDog.',
+    `Filed for Mara to decide: Add Ship the undo to Tasks? (Q14)\nChanges like this ask until 10 of them have been kept as they were. Nothing is written until Mara accepts it in BrainDog.\nReceipt: Filed for Mara to decide: Add Ship the undo to Tasks? (Q14). Nothing was written, so there is nothing to undo.`,
   );
   assert.doesNotMatch(said.text ?? '', /^Added/mu);
 });
@@ -61,25 +61,26 @@ test('A PROPOSAL THE RECORD SAYS LANDED BY THE LADDER IS DONE, NOT ASKED', async
   const landed = { id: 'Q8', landed: true, decision: 'D3', undo: { decision: 'D3' } };
   const { surface } = stub({ boot: boot as never, schema: schema as never, propose: (async () => ({ ok: true, value: landed })) as never });
   const said = await tools(surface).answer('propose', { question: 'Close two tasks?', body_kind: 'rowset', body: { register: 'tasks', rows: [] } }, agent);
-  assert.equal(said.text, 'Done, as you may on Tasks · Mara can undo it');
+  /* WRITTEN, SO ITS RECEIPT DOES NOT SAY NOTHING WAS. */
+  assert.equal(said.text, `Done, as you may on Tasks · Mara can undo it\nReceipt: Done, as you may on Tasks · Mara can undo it. No undo handle came back for this one; the owner can put it back from the app.`);
 });
 
 test('A NOTE ON ITS RUNG SAYS DONE AFTER WHERE IT WENT', async () => {
   const { surface } = stub({ boot: boot as never, schema: schema as never, update: (async () => ({ ok: true, value: entry({ rung: 'quiet' }) })) as never });
   const said = await tools(surface).answer('log', { spoken: 'tasks#4', note: 'Started on it.' }, agent);
-  assert.equal(said.text, 'Noted on Ship the undo (T4) · version 2\nDone, as you may on Tasks · Mara can undo it');
+  assert.equal(said.text, `Noted on Ship the undo (T4) · version 2\nDone, as you may on Tasks · Mara can undo it\nReceipt: Noted on Ship the undo (T4) · version 2. No undo handle came back for this one; the owner can put it back from the app.`);
 });
 
 test('A PROPOSAL THE LADDER ACCEPTED IS DONE, NOT ASKED', async () => {
   const { surface } = stub({ boot: boot as never, schema: schema as never, propose: (async () => ({ ok: true, value: { id: 'Q7', rung: 'tell' } })) as never });
   const said = await tools(surface).answer('propose', { question: 'Close two tasks?', body_kind: 'rowset', body: { register: 'tasks', rows: [] } }, agent);
-  assert.equal(said.text, 'Done, as you may on Tasks · Mara can undo it');
+  assert.equal(said.text, `Done, as you may on Tasks · Mara can undo it\nReceipt: Done, as you may on Tasks · Mara can undo it. No undo handle came back for this one; the owner can put it back from the app.`);
 });
 
 test('A WRITE WITH NO RUNG SAID IS ANSWERED AS IT ALWAYS WAS, as a person\'s is', async () => {
   const { surface } = stub({ boot: boot as never, schema: schema as never, create: (async () => ({ ok: true, value: entry() })) as never });
   const said = await tools(surface).answer('create', { register: 'tasks', fields: { title: 'Ship the undo' } }, agent);
-  assert.equal(said.text, 'Added: Ship the undo (T4) · version 2');
+  assert.equal(said.text, `Added: Ship the undo (T4) · version 2\nReceipt: Added: Ship the undo (T4) · version 2. No undo handle came back for this one; the owner can put it back from the app.`);
   assert.equal(ruledOf({ rung: 'ask' }), null, 'Ask is never a write that went through');
   assert.equal(ruledOf({ filed: { id: '' } }), null);
 });

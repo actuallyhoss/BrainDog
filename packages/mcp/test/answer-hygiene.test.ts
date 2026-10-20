@@ -112,7 +112,13 @@ test('NO BRIEF ANSWER CARRIES A ROW ID, A PERSON OR TOKEN ID, OR A NULL, over ev
   const version = Number(made.value.version);
   await call('update', { spoken, patch: { state: 'doing' }, version });
   await call('update', { spoken, patch: { state: 'done' }, version });
-  await call('log', { spoken, note: 'Every answer was read.' });
+  const noted = await call('log', { spoken, note: 'Every answer was read.' });
+  /* AND THE WAY BACK: the batch the receipt gave is looked at, then taken, and one that is not a batch is refused in a sentence. */
+  const batch = /undo with batch "([^"]+)"/u.exec(noted.text)?.[1];
+  assert.ok(batch !== undefined, `the note's receipt gave no batch: ${noted.text}`);
+  await call('undo', { batch, dry: true });
+  await call('undo', { batch });
+  await call('undo', { batch: 'no-such-batch' });
   /* WHAT THE RECORD WOULD LINK, A RESOURCE NOW (AGT-B05): its `said` is read with the same eyes as a tool's text. */
   const understood = (await handle({ jsonrpc: '2.0', id: ++n, method: 'resources/read', params: { uri: 'braindog:understand' } }, api, { ...agent })) as Reply;
   assert.ok('result' in understood, JSON.stringify(understood));

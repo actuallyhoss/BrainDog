@@ -96,6 +96,8 @@ const ASK: Record<string, (fx: Fixture) => Record<string, unknown>[]> = {
   meet: () => [{ name: 'Ada Lovelace', email: 'ada@example.com', where: 'the refs round trip' }],
   /* NOTHING TO ASK: `triage` files an arrival from the inbox, and this record holds none, so it answers no row. */
   triage: () => [],
+  /* NOTHING TO ASK: `undo` takes back a write by the batch its receipt gave, and no ref is among its arguments. */
+  undo: () => [],
 };
 
 /** A row an answer carried, with its register and the ref fields it has set. */
