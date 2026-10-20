@@ -552,6 +552,8 @@ export type InviteSeen = {
   record: string | null;
   level: InviteLevel | null;
   lists: { id: string; name: string; level: InviteLevel }[];
+  /** What is shared with the address, in the host's own sentences ("Ada shared Pottery with you. ..."), or `null`. */
+  shared: string | null;
 };
 
 /** The lists an invitation names, keeping only a row with an id, a name and a level this build knows. */
@@ -579,6 +581,7 @@ export async function lookInvite(token: string, io: Io = live()): Promise<Said<I
       record: typeof v.record === 'string' && v.record ? v.record : null,
       level: levelOf(v.level),
       lists: inviteListsOf(v.lists),
+      shared: typeof v.shared === 'string' && v.shared.trim() !== '' ? v.shared : null,
     },
   };
 }

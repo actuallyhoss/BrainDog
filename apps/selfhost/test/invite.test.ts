@@ -137,6 +137,7 @@ test('THE WHOLE INVITATION: minted by the owner, opened by a stranger who cannot
       record: 'The Studio',
       level: 'write',
       lists: [],
+      shared: null,
       signedInAs: null,
     });
     const unproved = await s.call('/auth/invite', { body: { inviteToken: token, accept: true } });

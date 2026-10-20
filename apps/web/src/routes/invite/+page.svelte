@@ -196,6 +196,10 @@
                it; the moment it settled `empty` the gate looked and found no `h1` at four widths. The
                branches are exclusive, so exactly one of these is ever on the page. -->
           <h1 class="entry-title">{copy.inviteLanding(recordName)}</h1>
+          <!-- WHAT IS SHARED WITH THEM, IN THE SHARE'S OWN WORDS: "Ada shared Pottery with you. You can edit tasks in
+               Pottery until 1 Dec." Beside what the link gives on the record and its lists, which a link carrying only
+               shares leaves empty. -->
+          {#if seen.value.shared}<p class="calm-body">{seen.value.shared}</p>{/if}
           {#if opens(seen.value).length > 0}
             <ul class="opens">
               {#each opens(seen.value) as line (line)}<li>{line}</li>{/each}

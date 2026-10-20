@@ -463,3 +463,115 @@ export function newListGrants(deps: ShareWriteDeps, catalog: Catalog, added: rea
     }
   return n;
 }
+
+/* ------------------------------------------------------------------------- people not on the record yet (slice 8) */
+
+/**
+ * The live shares waiting for an address, allow and deny, oldest first: what an invitation to it carries and what
+ * accepting binds. A row that cannot be read is left out, as `sharesKept` leaves it.
+ */
+export function sharesWaiting(sql: Pick<Sql, 'all'>, email: string): ShareKept[] {
+  return sql
+    .all<KeptRow>(`SELECT ${KEPT} FROM share s WHERE s.who_kind = 'email' AND lower(s.who) = lower(?) AND s.revoked_at IS NULL ORDER BY s.made_at, s.id`, email)
+    .map(keptOf)
+    .filter((s): s is ShareKept => s !== null);
+}
+
+/**
+ * Whether an address has something waiting for it now: a live allow that has not run out. AN INVITATION THAT CARRIES
+ * NOTHING BUT SHARES IS GOOD ONLY WHILE THIS HOLDS, so stopping the last of them withdraws its link as well.
+ */
+export const waitingFor = (sql: Pick<Sql, 'all'>, email: string, nowMs: number): boolean =>
+  sharesWaiting(sql, email).some((s) => s.effect === 'allow' && (s.when?.until === undefined || Date.parse(s.when.until) > nowMs));
+
+/**
+ * Every share waiting for an address, bound to the person who proved it, IN THE CALLER'S TRANSACTION: each moves from
+ * `email` to `person`, its version on, with an `access.grant` whose `from_v` is the share as it was, and the epoch moves
+ * once. Answers the ids bound.
+ */
+export function bindWaiting(deps: ShareWriteDeps, by: string, email: string, person: string, note: string | null): string[] {
+  const out: string[] = [];
+  for (const was of sharesWaiting(deps.sql, email)) {
+    deps.sql.exec("UPDATE share SET who_kind = 'person', who = ?, version = version + 1 WHERE id = ? AND revoked_at IS NULL", person, was.id);
+    const now = { ...was, who: { kind: 'person' as const, id: person } };
+    shareEvent(deps, by, 'access.grant', was.id, granteeOf(now), said(was), said(now), note);
+    out.push(was.id);
+  }
+  if (out.length > 0) bumpEpoch(deps.sql);
+  return out;
+}
+
+/* ------------------------------------------------------------------------------------------------ groups (slice 8) */
+
+/** One group as the Sharing page draws it: its name, its people by id, and how many live shares it holds. */
+export type GroupKept = { id: string; name: string; made_by: string; made_at: string; retired_at: string | null; people: string[]; shares: number };
+
+/** One group by id, retired or not, or `null` when there is none. */
+export function groupKept(sql: Pick<Sql, 'one' | 'all'>, id: string): GroupKept | null {
+  const g = sql.one<{ id: string; name: string; made_by: string; made_at: string; retired_at: string | null }>(
+    'SELECT id, name, made_by, made_at, retired_at FROM share_group WHERE id = ?',
+    id,
+  );
+  if (!g) return null;
+  const people = sql.all<{ person_id: string }>('SELECT person_id FROM share_group_member WHERE group_id = ? ORDER BY added_at, person_id', id).map((r) => r.person_id);
+  const shares = Number(sql.one<{ n: number }>("SELECT COUNT(*) AS n FROM share WHERE who_kind = 'group' AND who = ? AND revoked_at IS NULL", id)?.n ?? 0);
+  return { ...g, people, shares };
+}
+
+/** The live shares a group holds, oldest first. */
+const groupShares = (sql: Pick<Sql, 'all'>, group: string): ShareKept[] =>
+  sql
+    .all<KeptRow>(`SELECT ${KEPT} FROM share s WHERE s.who_kind = 'group' AND s.who = ? AND s.revoked_at IS NULL ORDER BY s.made_at, s.id`, group)
+    .map(keptOf)
+    .filter((s): s is ShareKept => s !== null);
+
+/**
+ * Make a group, or rename one (`id`), IN THE CALLER'S TRANSACTION. A group holds nothing until a share names it, so
+ * neither writes an event; a group nobody can find is the only refusal.
+ */
+export function putGroup(deps: ShareWriteDeps, by: string, args: { id?: string; name: string }): { id: string } | { fault: string } {
+  if (args.id !== undefined) {
+    const g = groupKept(deps.sql, args.id);
+    if (g === null || g.retired_at !== null) return { fault: 'There is no live group with that id.' };
+    deps.sql.exec('UPDATE share_group SET name = ? WHERE id = ?', args.name, args.id);
+    return { id: args.id };
+  }
+  const id = `gr_${deps.mint()}`;
+  deps.sql.exec('INSERT INTO share_group (id, name, made_by, made_at) VALUES (?, ?, ?, ?)', id, args.name, by, deps.at);
+  return { id };
+}
+
+/**
+ * Retire a group, IN THE CALLER'S TRANSACTION: every share it holds ends with its own `access.revoke` (and every share
+ * made onward from one), and the group is kept, retired, so the ledger's `group:` grantees still have a name. Answers
+ * the ids ended.
+ */
+export function retireGroup(deps: ShareWriteDeps, by: string, id: string, why: string | null): string[] {
+  const ended: string[] = [];
+  for (const s of groupShares(deps.sql, id)) ended.push(...revokeShare(deps, by, s.id, why));
+  deps.sql.exec('UPDATE share_group SET retired_at = ? WHERE id = ? AND retired_at IS NULL', deps.at, id);
+  bumpEpoch(deps.sql);
+  return ended;
+}
+
+/**
+ * Put somebody in a group or take them out, IN THE CALLER'S TRANSACTION. EACH SHARE THE GROUP HOLDS IS SAID FOR THEM:
+ * one `access.grant` per share on joining and one `access.revoke` per share on leaving, the grantee in `field` as
+ * `person:<id>` and the group in the note, so "who could see this row on 12 March" replays a membership as it replays
+ * a share. The epoch moves. Answers the ids of the shares said, or `null` when nothing changed.
+ */
+export function setGroupMember(deps: ShareWriteDeps, by: string, group: string, person: string, on: boolean): string[] | null {
+  const g = groupKept(deps.sql, group);
+  if (g === null || g.retired_at !== null) return null;
+  if (g.people.includes(person) === on) return null;
+  if (on) deps.sql.exec('INSERT INTO share_group_member (group_id, person_id, added_by, added_at) VALUES (?, ?, ?, ?)', group, person, by, deps.at);
+  else deps.sql.exec('DELETE FROM share_group_member WHERE group_id = ? AND person_id = ?', group, person);
+  const ids: string[] = [];
+  for (const s of groupShares(deps.sql, group)) {
+    const shape = said(s);
+    shareEvent(deps, by, on ? 'access.grant' : 'access.revoke', s.id, `person:${person}`, on ? null : shape, on ? shape : null, `${on ? 'joined' : 'left'} ${g.name}`);
+    ids.push(s.id);
+  }
+  bumpEpoch(deps.sql);
+  return ids;
+}

@@ -61,6 +61,43 @@ test('AN OWNER ON FREE CANNOT INVITE ANYBODY, and is told why and how to move on
   assert.equal(held(), 1);
 });
 
+test('A SHARE TO SOMEBODY NOT ON THE RECORD YET IS A SECOND PERSON: refused on Free and Cloud as an invitation is, taken on Cloud Plus', async () => {
+  const c = await studio();
+  const share = async () => {
+    const res = await c.ask('/api/share', {
+      method: 'POST',
+      cookie: c.cookie,
+      body: JSON.stringify({ share: { who: { kind: 'email', id: 'bo@example.test' }, what: { record: true }, can: 'view', when: { until: '2099-01-01T00:00:00.000Z' } } }),
+    });
+    return { status: res.status, body: (await res.json()) as Out };
+  };
+  await c.plan('free');
+  const free = await share();
+  assert.equal(free.status, 403, JSON.stringify(free.body));
+  assert.deepEqual(free.body.refusal, { code: 'FORBIDDEN', fix: FREE_ONE_PERSON, at: 'plan' });
+  const held = () => Number((c.storages.get(REC)?.sql.exec('SELECT count(*) AS n FROM share').toArray()[0] as { n: number } | undefined)?.n ?? -1);
+  assert.equal(held(), 0, 'a share was kept on Free');
+
+  await c.plan('hosted');
+  assert.equal((await share()).status, 403);
+
+  await c.plan('plus');
+  const paid = await share();
+  assert.equal(paid.status, 200, JSON.stringify(paid.body));
+  assert.equal(held(), 1);
+});
+
+test('WHILE THE HOST SELLS NO PLAN, a share to an address on Free is kept', async () => {
+  const c = await studio({});
+  await c.plan('free');
+  const res = await c.ask('/api/share', {
+    method: 'POST',
+    cookie: c.cookie,
+    body: JSON.stringify({ share: { who: { kind: 'email', id: 'bo@example.test' }, what: { record: true }, can: 'view', when: { until: '2099-01-01T00:00:00.000Z' } } }),
+  });
+  assert.equal(res.status, 200, await res.text());
+});
+
 test('A FREE RECORD IS READ FROM THE DIRECTORY when billing never told the object, as after an eviction', async () => {
   const c = await studio();
   assert.equal((c.directory as unknown as { setPlan(r: string, p: string): unknown }).setPlan(REC, 'free'), null);

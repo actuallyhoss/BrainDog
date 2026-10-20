@@ -220,6 +220,7 @@ import { REPORT_BYTES_MOST, REPORT_FIXED_MOST, REPORT_NAME_MOST, REPORT_PREFIX, 
 import type { Directory } from './directory.ts';
 import { methods, type RecordDeps as MethodDeps } from './methods/index.ts';
 import { narrowBeyond } from './methods/own-tokens.ts';
+import { sharedSaid } from './methods/sharing.ts';
 import { staleCount, staleFor as staleLines } from './methods/stale.ts';
 import { learnedOrder, learnedSorted, replacedIn, replacesField } from './methods/learnings.ts';
 import { briefFactsFor } from './methods/briefing.ts';
@@ -1961,6 +1962,12 @@ export type RecordDeps = {
   /** Whether this host can make a read-only link to a page, and why not (`sharesOf` at the Worker's door). Absent is no. */
   shares?: (() => { can: boolean; why?: string }) | undefined;
   /**
+   * The Plus gate on a share to somebody not on the record yet (sharing plan §2.15), the host's because the host knows
+   * the plan: the Worker's answers Free's one-person refusal where it sells plans, beside its `invite` wrapper. Absent,
+   * nothing is held back, which is the self-host and every host while it sells nothing.
+   */
+  plus?: ((ctx: CallContext, who: { kind: string; id: string }) => Refusal | null | Promise<Refusal | null>) | undefined;
+  /**
    * The operator's cut-off, `TOKENS_VALID_FROM` on the Worker and `BRAINDOG_TOKENS_VALID_FROM` on the self-host: an ISO
    * instant before which every token and device grant this record issued is refused (`TokenDeps.validFrom`, `53 §5.11`).
    *
@@ -2227,7 +2234,7 @@ export async function createRecordApi(deps: RecordDeps) {
   return { ...api(kernel, deps, cursors), kernel };
 }
 
-function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning'>, cursors: HistoryCursors) {
+function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler' | 'build' | 'snapshots' | 'destroy' | 'invitations' | 'catalogue' | 'readAddress' | 'slashModel' | 'slashMeter' | 'engineHealth' | 'engineProbe' | 'engineLedger' | 'catalogueOffers' | 'catalogueShelf' | 'tryScript' | 'trialsToday' | 'shares' | 'plus' | 'answersSlash' | 'directory' | 'validFrom' | 'meaning'>, cursors: HistoryCursors) {
   const { sql, clock, scheduler, build, snapshots, destroy, invitations } = deps;
   /* THE LADDER OF TRUST, the record's half (`ladder.ts`): what an agent's write does at the rung it stands on. */
   const trust = ladder({ sql, kernel, now: () => clock.now() });
@@ -8793,7 +8800,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -12520,6 +12527,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             const list = kernel.register(id);
             return list ? [{ id, name: list.name, level: held }] : [];
           }),
+          /* AND WHAT IS SHARED WITH THE ADDRESS, said to them in the share's own words (sharing plan §3.4): "Ada shared
+             Pottery with you. You can edit tasks in Pottery until 1 Dec." Names, never ids. `null` when nothing waits. */
+          shared: sharedSaid(sql, kernel.catalog(), kernel.sharesWaiting(email), clock.now(), kernel.identity()?.tz ?? undefined),
         });
       }
       const { id, email, name } = args.person;

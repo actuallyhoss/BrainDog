@@ -213,7 +213,8 @@ function joinedSlug(value: unknown): string | null {
  * WHAT IT OPENS, SAID BEFORE THE PRESS. The page could say only the address and the date, so somebody accepted a record
  * they could not name, at a level they had not been told, and found out what they held by opening it. `record` is the
  * record's own name, `null` for one never named; `level` is what the link gives on the whole record, `null` where it
- * gives named lists alone; `lists` is each list it gives something on, by the list's name, with the level there.
+ * gives named lists alone; `lists` is each list it gives something on, by the list's name, with the level there; and
+ * `shared` is what is shared with the address, in sentences.
  *
  * THE THREE ARE OPTIONAL HERE AND ONLY HERE. A record older than them answers the address and the date alone, and on the
  * Worker that answer crosses an RPC whose type is a cast, so this type says what can arrive and `InviteSeen` says what
@@ -225,6 +226,11 @@ export type InviteLook = {
   record?: string | null;
   level?: Level | null;
   lists?: { id: string; name: string; level: Level }[];
+  /**
+   * WHAT IS SHARED WITH THE ADDRESS (sharing plan §3.4), said from the share's own sentences: "Ada shared Pottery with you.
+   * You can edit tasks in Pottery until 1 Dec." Names, never ids. `null` or absent when nothing is shared with it.
+   */
+  shared?: string | null;
 };
 
 /** What the page is told before anybody accepts: the address, when it runs out, what it opens, and who is signed in. */
@@ -234,6 +240,7 @@ export type InviteSeen = {
   record: string | null;
   level: Level | null;
   lists: { id: string; name: string; level: Level }[];
+  shared: string | null;
   signedInAs: string | null;
 };
 
@@ -250,6 +257,7 @@ function seenOf(look: InviteLook, signedInAs: string | null): InviteSeen {
     record: look.record ?? null,
     level: look.level ?? null,
     lists: look.lists ?? [],
+    shared: typeof look.shared === 'string' && look.shared !== '' ? look.shared : null,
     signedInAs,
   };
 }

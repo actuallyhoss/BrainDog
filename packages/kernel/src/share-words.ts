@@ -141,3 +141,21 @@ export function sentenceOf(shares: Share | readonly Share[], names: ShareNames, 
   if (!whole && nouns.length) out += ` No ${joined(nouns, 'or')}.`;
   return out;
 }
+
+/** What a share is about, as the thing somebody was handed: a project by its name, anything else as `whatOf` says it. */
+const subjectOf = (t: Target, n: ShareNames): string => ('project' in t ? (n.project?.(t.project) ?? 'a project') : whatOf(t, n));
+
+/**
+ * What is shared with somebody, said to them (§3.4): "Ada shared Pottery with you. You can edit tasks in Pottery until 1 Dec."
+ * One line saying who shared what, then one sentence per allow, each with the denies beside it. `by` is the sharer's
+ * name; names, never ids. Empty when nothing is allowed.
+ */
+export function sharedWithYou(shares: readonly Share[], by: string | undefined, names: ShareNames, opts: WordsOpts): string {
+  const allows = shares.filter((s) => s.effect === 'allow');
+  if (allows.length === 0) return '';
+  const denies = shares.filter((s) => s.effect === 'deny');
+  const things = [...new Set(allows.map((s) => subjectOf(s.what, names)))];
+  const you: ShareNames = { ...names, person: () => 'you' };
+  const said = allows.map((s) => sentenceOf([{ ...s, who: { kind: 'person', id: 'you' } }, ...denies.map((d) => ({ ...d, who: { kind: 'person' as const, id: 'you' } }))], you, opts));
+  return [`${by ?? 'Someone'} shared ${joined(things)} with you.`, ...said].join(' ');
+}

@@ -509,6 +509,25 @@ export function switcherAsk(kernel: SwitcherSource, person: string): SwitcherAsk
   return { level: null, name, lists, names: listNames(kernel, lists) };
 }
 
+/**
+ * Whether a request is one of the record's sharing methods that can leave somebody holding nothing: `unshare`, and a
+ * group changed (`groupMember`, `groupPut`), under either base, `/api/...` or `/app/<slug>/api/...`.
+ *
+ * THE LAST SHARE ENDED IS A REMOVAL TOO (sharing plan slice 8). A guest holds shares and no member row, so stopping the
+ * last of them leaves the Directory's `dir_member` naming somebody the record refuses, as a removal did before the
+ * hosts followed it with `leave`. Each of these answers `left`, the people it left with nothing, and the host calls
+ * the Directory's `leave` for each (`leftBy`), so the record drops from their switcher.
+ */
+export const leavesAsked = (method: string, pathname: string): boolean => method === 'POST' && /\/api\/+(?:unshare|groupMember|groupPut)\/*$/.test(pathname);
+
+/** The people a sharing answer says it left with nothing, from the record's own `{ ok, value: { left } }`; none for anything else. */
+export function leftBy(answer: unknown): string[] {
+  if (typeof answer !== 'object' || answer === null) return [];
+  const value = (answer as { ok?: unknown; value?: unknown }).ok === true ? (answer as { value?: unknown }).value : undefined;
+  const left = typeof value === 'object' && value !== null ? (value as { left?: unknown }).left : undefined;
+  return Array.isArray(left) ? left.filter((p): p is string => typeof p === 'string' && p !== '') : [];
+}
+
 export type Directory = ReturnType<typeof createDirectory>;
 
 /* ── plans and usage ─────────────────────────────────────────────────────── */

@@ -56,7 +56,7 @@ import { certificateNames, originFor } from './reach.ts';
 import { fileSnapshots, signCopies, type FileSnapshots } from './snapshots.ts';
 import { blobsFolder, eraseFile, keepAttachment, serveFiles, servesFiles } from './files.ts';
 import { seedCatalogue } from '@braindog/seed/usecases/catalogue';
-import { badSlug, createDirectory, switcherAsk, type Directory } from '@braindog/record/directory';
+import { badSlug, createDirectory, leavesAsked, leftBy, switcherAsk, type Directory } from '@braindog/record/directory';
 import { fixOf, type Auth, type Param, type Refusal, type Row, type Scheduler, type Sql } from '@braindog/ports';
 import type { Result } from '@braindog/ports';
 
@@ -2507,6 +2507,7 @@ async function answer(
     /* Slash's DOOR AHEAD OF THE KEY DOORS AND BOTH AHEAD OF `serveApi`, because `serveApi` answers anything it does
        not know as `ROUTE_UNKNOWN`, which is what `POST /api/slash/read` got until this line existed. */
     const removal = method === 'POST' && /^\/+api\/+removeMember\/*$/.test(path) ? request.clone() : null;
+    const leaving = leavesAsked(method, path);
     /* A RUNNER'S CLAIM IS HELD HERE UNTIL A JOB IS QUEUED OR ITS WAIT RUNS OUT (`holdClaim`), as the Worker's
        `heldClaim` holds it, and every other call is answered once. Only the runner's own principal is held, so a person
        or a token asking `claimJob` is answered at once with the record's refusal. */
@@ -2522,6 +2523,8 @@ async function answer(
       const asked = (await removal.json().catch(() => null)) as { person?: unknown } | null;
       if (typeof asked?.person === 'string' && asked.person !== '') site.leave(asked.person);
     }
+    /* AND SO IS A SHARE THAT WAS SOMEBODY'S LAST (`leftBy`): the record answers who it left with nothing. */
+    if (leaving && out.status === 200) for (const person of leftBy(await out.clone().json().catch(() => null))) site.leave(person);
     return write(res, out, seen.cookie);
   }
   /* AND THE STATUS COMES FROM THE SHARED TABLE. This answered one status for three different facts —

@@ -101,7 +101,7 @@ import { embedJob } from './embed.ts';
 import { ERASED, eraseSubjects, subjectsOf, type EraseReport, type EraseRequest } from './erase.ts';
 import { leasedPushTarget, ownersPushSubs, pushSubOf, settlePush, type PushSettled, type PushTarget } from './push.ts';
 import { access, invite, members, remove, type AccessLens, type Held, type Level as MemberLevel, type Member, type MemberDeps, suspend } from './members.ts';
-import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, LensCache, newListGrants, putShare, revokeShare, shareKept, sharesKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
+import { bumpEpoch, catalogOf, epochOf, gateFieldsOf, groupKept, LensCache, newListGrants, putGroup, putShare, retireGroup, revokeShare, setGroupMember, shareKept, sharesKept, sharesWaiting, type GroupKept, type ListLike, type ShareInput, type ShareKept } from './shares.ts';
 import type { Catalog } from './lens.ts';
 import { NOBODY, narrowed, ruleOf, scopeFor, viewerOfRead, type Wheres } from './members.ts';
 import { stopped as stoppedOf, type Suspended } from './members.ts';
@@ -114,6 +114,7 @@ import {
   revokeInvitation,
   secretOf as inviteSecret,
   tokenParts as inviteParts,
+  type Accepted as InviteAccepted,
   type InvitationRow,
   type InviteArgs,
   type Invited,
@@ -670,7 +671,7 @@ export { LEVELS as MEMBER_LEVELS, RECORD as WHOLE_RECORD } from './members.ts';
 export { STOPPED as MEMBER_STOPPED, type Suspended } from './members.ts';
 export type { Member, Grant, Held as AccessHeld } from './members.ts';
 export { EPOCH as ACCESS_EPOCH, bumpEpoch, epochOf, LensCache, sharesFor, narrowsOf, catalogOf, gateFieldsOf } from './shares.ts';
-export { meOf as shareMeOf, type ShareInput, type ShareKept } from './shares.ts';
+export { meOf as shareMeOf, type GroupKept, type ShareInput, type ShareKept } from './shares.ts';
 export { whereFor, scopeFor, NOBODY, viewerOfPrincipal, viewerOfRead, WHERE_MAX_CHARS, type Wheres } from './members.ts';
 /* SHARING (the sharing plan, Slice 1): the lens as pure functions, and nothing wired yet. `Rung` and `Capability` are
    already names here (`change-kind.ts`, `capabilities.ts`), so the share ones go out as `ShareRung` and `LensCap`. */
@@ -684,10 +685,10 @@ export type {
   CheckOpts as ShareCheckOpts, Expr as LensExpr, HeldShare, Hide as ShareHide, Hours as ShareHours, Lens, LensCtx, LensLevel, LensSources,
   Narrow as TokenNarrow, Pred as LensPred, Rung as ShareRung, Share, Target as ShareTarget, When as ShareWhen, Where as ShareWhere, Who as ShareWho,
 } from './lens.ts';
-export { dayOf as shareDayOf, sentenceOf as shareSentenceOf, type ShareNames, type WordsOpts as ShareWordsOpts } from './share-words.ts';
+export { dayOf as shareDayOf, sentenceOf as shareSentenceOf, sharedWithYou, type ShareNames, type WordsOpts as ShareWordsOpts } from './share-words.ts';
 export { SHARE_TEMPLATES, type ShareTemplate, type TemplateAsk as ShareTemplateAsk, type TemplateRow as ShareTemplateRow } from './share-templates.ts';
 export { GONE as INVITE_GONE, INVITE_HOURS, tokenParts as inviteTokenParts } from './invitations.ts';
-export type { InvitationRow, InviteArgs, Invited } from './invitations.ts';
+export type { Accepted as InviteAccepted, InvitationRow, InviteArgs, Invited } from './invitations.ts';
 export type { ChildArgs, ClientKind, CreateTokenArgs, Minted, Scope, TokenClient, TokenReach, TokenRow, Verified } from './token.ts';
 /* THE JOB QUEUE'S NAMES (`jobs.ts`, `kernel.jobs`). Its `Claimed` stays unexported here, because the scheduler's `Claimed`
    already has the name; a caller reads it as `ReturnType` of `kernel.jobs.claim`. */
@@ -10103,6 +10104,29 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     /** Every live share, newest first, and those ended since `since` when it is given. */
     sharesKept: (since?: string): ShareKept[] => sharesKept(sql, since),
 
+    /** The live shares waiting for an address until its person accepts an invitation (slice 8), oldest first. */
+    sharesWaiting: (email: string): ShareKept[] => sharesWaiting(sql, email),
+
+    /** One group by id, retired or not, with its people and how many live shares it holds. */
+    groupKept: (id: string): GroupKept | null => groupKept(sql, id),
+
+    /** Make a group, or rename one (`id`). A group holds nothing until a share names it. */
+    groupSave: (by: string, args: { id?: string; name: string }): Result<{ id: string }> =>
+      transaction(() => {
+        const out = putGroup({ sql, at: instant(clock.now()), mint }, by, args);
+        return 'fault' in out ? no<{ id: string }>('REF_UNKNOWN', out.fault, { at: 'id' }) : ok(out);
+      }),
+
+    /** Retire a group: every share it holds ends, each with its `access.revoke`. The ids ended. */
+    groupRetire: (by: string, id: string, why?: string | null): string[] => transaction(() => retireGroup({ sql, at: instant(clock.now()), mint }, by, id, why ?? null)),
+
+    /**
+     * Put somebody in a group or take them out, with one `access.grant` or `access.revoke` per share the group holds,
+     * the epoch moved. The ids of the shares said, or `null` when nothing changed.
+     */
+    groupMember: (by: string, group: string, person: string, on: boolean): string[] | null =>
+      transaction(() => setGroupMember({ sql, at: instant(clock.now()), mint }, by, group, person, on)),
+
     /** The gate fields of one list (§2.6): what any active share condition names, and its scope field under a project share. */
     gateFields: (list: string): string[] => gateFieldsOf(sql, catalogNow(), list, clock.now(), recordTz()),
 
@@ -10220,9 +10244,9 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       const hash = await inviteHash(token);
       return hash === null ? no<InvitationRow>('UNAUTHORIZED', INVITE_GONE, { at: 'token' }) : lookInvitation(sql, clock.now(), hash);
     },
-    acceptInvitation: async (token: string, person: { person: string; email: string; name?: string }): Promise<Result<Member>> => {
+    acceptInvitation: async (token: string, person: { person: string; email: string; name?: string }): Promise<Result<InviteAccepted>> => {
       const hash = await inviteHash(token);
-      if (hash === null) return no<Member>('UNAUTHORIZED', INVITE_GONE, { at: 'token' });
+      if (hash === null) return no<InviteAccepted>('UNAUTHORIZED', INVITE_GONE, { at: 'token' });
       return attempt(sql, transaction, () => acceptInvitation({ ...memberDeps(), recordId: () => recordIdentity(sql)?.id ?? null }, hash, person));
     },
 

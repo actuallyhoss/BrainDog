@@ -39,7 +39,7 @@ import { fixOf, ok, refused } from '@braindog/ports';
 import type { Auth, AuthCall, AuthResult, Param, Refusal, Result, Row, Scheduler, Snapshots, Sql, Who } from '@braindog/ports';
 
 import { teamsOn } from '@braindog/record/plans';
-import { TEAMS_HELD_SAID, FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
+import { TEAMS_HELD_SAID, FREE_JOIN_REFUSED, FREE_JOIN_REFUSED_SHORT, FREE_ONE_PERSON, FREE_ONE_PERSON_SHORT, createDirectory, leavesAsked, leftBy, switcherAsk, type AccountUsage, type Directory as Dir, type RunUsage, type SessionAsk, type SwitcherAsk, type SwitcherRow } from '@braindog/record/directory';
 import type { ApplyAnswers, ApplyCall, InviteAnswers, InviteCall, SeenAnswers, SeenCall, SignupNeeds, SignupStart } from '@braindog/record/directory';
 import type { BillingAnswers, BillingCall } from '@braindog/record/directory';
 import type { MeterTally, Person, SlashDay, SlashTally, UsageNotice } from '@braindog/record/directory';
@@ -722,10 +722,24 @@ export class Record$ extends DurableObject<Env> {
     const invite = api.invite.bind(api);
     api.invite = async (args, ctx) => {
       const member = typeof args?.person === 'string' && api.kernel.members().some((m) => m.person_id === args.person);
-      if (!member && this.env.TEAMS_HELD === '1') return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: TEAMS_HELD_SAID, at: 'plan' } };
-      if (!member && sells(this.env) && !teamsOn(await this.#planOf(api))) return { ok: false as const, refusal: { code: 'FORBIDDEN', fix: sells(this.env) ? FREE_ONE_PERSON : FREE_ONE_PERSON_SHORT, at: 'plan' } };
+      if (!member) {
+        const stop = await this.#outsiders(api);
+        if (stop) return { ok: false as const, refusal: stop };
+      }
       return invite(args, ctx);
     };
+  }
+
+  /**
+   * Whether this record's plan takes somebody not on it yet, asked by `invite` above and by `share` to an outsider (the
+   * record's `plus` hook): `null` is yes. THE ONE RULE FOR BOTH, so a person kept out of `invite` is not let in by a
+   * share to their address: held while TEAMS_HELD is set (invites wait until sharing ships), off while the host sells
+   * nothing, and on Free and Cloud the one-person refusal.
+   */
+  async #outsiders(api: RecordApi): Promise<Refusal | null> {
+    if (this.env.TEAMS_HELD === '1') return { code: 'FORBIDDEN', fix: TEAMS_HELD_SAID, at: 'plan' };
+    if (!sells(this.env) || teamsOn(await this.#planOf(api))) return null;
+    return { code: 'FORBIDDEN', fix: sells(this.env) ? FREE_ONE_PERSON : FREE_ONE_PERSON_SHORT, at: 'plan' };
   }
 
   /** Set or clear this record's lapse: billing's webhook, when a payment moves it into or out of one. */
@@ -946,6 +960,10 @@ export class Record$ extends DurableObject<Env> {
         invitations: () => ((this.env.SESSION_SECRET ?? '').length >= 32 ? null : INVITES_OFF),
         /* WHETHER THIS WORKER MAKES READ-ONLY LINKS (`sharesOf`): `KEK` bound and `SHARE_LINKS` on, and the owner's sentence when not. */
         shares: () => sharesOf(this.env),
+        /* THE PLUS GATE ON A SHARE TO SOMEBODY NOT ON THE RECORD YET (sharing plan §2.15), the same rule and the same
+           sentence as `#oneOnly`'s on `invite` beside it: off while this host sells nothing, and on Free or Cloud a
+           share to an outsider is a second person, which is Cloud Plus's. A share to somebody already here passes. */
+        plus: () => this.#outsiders(api),
         /* AN AGENT'S TRIALS TODAY, from the Directory's ledger, which every metered trial already writes to (`script-try-cap.ts`). */
         trialsToday: (r) => this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory')).trialsToday(r, Date.now()) as unknown as Promise<number>,
         ...(copies === undefined ? {} : { snapshots: copies }),
@@ -3663,8 +3681,10 @@ async function forward(inner: Request, env: Env, record: string, ctx: CallContex
      taken first. Only this one method is copied: every other request goes through untouched. */
   const removal = removalAsked(inner.method, new URL(inner.url).pathname) ? inner.clone() : null;
   const renaming = renameAsked(inner.method, new URL(inner.url).pathname);
+  const leaving = leavesAsked(inner.method, new URL(inner.url).pathname);
   const out = await stub().fetch(inner);
   if (removal !== null && out.status === 200) await leftDirectory(removal, env, record);
+  if (leaving && out.status === 200) await leftWithNothing(out.clone(), env, record);
   if (renaming && out.status === 200) await renamedEverywhere(out.clone(), env, ctx);
   if (!restoreAsked(inner.method, new URL(inner.url).pathname)) return out;
   return afterRestore(out, actorOf(ctx), {
@@ -3693,6 +3713,22 @@ async function leftDirectory(asked: Request, env: Env, record: string): Promise<
     await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).leaveRecord(record, person);
   } catch {
     /* A Directory that did not answer leaves the list as it was, and the record has already said who is on it. */
+  }
+}
+
+/**
+ * The Directory's `leave` for each person a sharing answer left holding nothing (`leftBy`): their last share ended,
+ * or the group that held it let them go, so the record drops from their switcher.
+ *
+ * THE RECORD'S ANSWER STANDS WHATEVER THIS DOES, as `leftDirectory`'s does: the record already refuses them, and a
+ * Directory that did not follow only leaves the record listed where `switcherRows` leaves it out anyway.
+ */
+async function leftWithNothing(answer: Response, env: Env, record: string): Promise<void> {
+  try {
+    const directory = env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+    for (const person of leftBy(await answer.json())) await directory.leaveRecord(record, person);
+  } catch {
+    /* A Directory that did not answer leaves the list as it was, and the record has already said who holds what. */
   }
 }
 

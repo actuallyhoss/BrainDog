@@ -24,7 +24,9 @@ import {
   shareSentenceOf,
   shareTargetReaches,
   shareTargetWhole,
+  sharedWithYou,
   sharesFor,
+  type GroupKept,
   type HeldShare,
   type Json,
   type LensCatalog,
@@ -38,7 +40,7 @@ import {
   type ShareTarget,
   type ShareWhen,
 } from '@braindog/kernel';
-import type { Refusal, Result } from '@braindog/ports';
+import type { Refusal, Result, Sql } from '@braindog/ports';
 import { ok } from '@braindog/ports';
 
 import { FRESH, type CallContext } from '../index.ts';
@@ -48,6 +50,8 @@ import type { RecordDeps } from './index.ts';
 export const SHARES_ENDED_DAYS = 30;
 /** The most live shares one person holds, their groups' among them (T14). */
 export const SHARES_PER_PERSON_MOST = 50;
+/** The longest name a group takes, in characters. */
+export const GROUP_NAME_MOST = 80;
 
 const DAY_MS = 86_400_000;
 
@@ -88,6 +92,60 @@ const refuse = (code: string, fix: string, at: string): Result<never> => ({ ok: 
 const AGENTS_NEVER: Refusal = { code: 'NEEDS_BROWSER_SESSION', fix: 'Open this from the app; an agent cannot share or see what is shared.', at: 'principal' };
 const personOnly = (ctx: CallContext): Refusal | null => (ctx.principal.kind === 'person' ? null : AGENTS_NEVER);
 
+/** A person as a sentence says them: their name, else their address. */
+const personName = (sql: Pick<Sql, 'one'>, id: string): string | undefined => {
+  const row = sql.one<{ name: string | null; email: string | null }>('SELECT name, email FROM person WHERE id = ?', id);
+  return row ? (row.name ?? row.email ?? undefined) : undefined;
+};
+
+/** Names, never ids, for a sentence (§3.5). */
+export function namesOf(sql: Pick<Sql, 'one'>, catalog: LensCatalog): ShareNames {
+  const listOf = (id: string): LensCatalogList | undefined => catalog.lists.find((l) => l.id === id);
+  const rowOf = (id: string): { register: string; seq: number | null; fields: string } | undefined =>
+    sql.one<{ register: string; seq: number | null; fields: string }>('SELECT register, seq, fields FROM entry WHERE id = ? AND deleted_at IS NULL', id);
+  const titleOf = (id: string): string | undefined => {
+    const row = rowOf(id);
+    const l = row ? listOf(row.register) : undefined;
+    const title = l?.fields.find((f) => f.title)?.id;
+    if (!row || title === undefined) return undefined;
+    try {
+      const v = (JSON.parse(row.fields) as Record<string, unknown>)[title];
+      return typeof v === 'string' && v !== '' ? v : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  return {
+    person: (id) => personName(sql, id),
+    group: (id) => {
+      const g = sql.one<{ name: string }>('SELECT name FROM share_group WHERE id = ? AND retired_at IS NULL', id);
+      if (!g) return undefined;
+      const n = Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM share_group_member WHERE group_id = ?', id)?.n ?? 0);
+      return { name: g.name, people: n };
+    },
+    list: (id) => listOf(id)?.name.toLowerCase(),
+    meets: () => catalog.lists.find((l) => l.role === 'meets')?.name.toLowerCase(),
+    project: titleOf,
+    row: (list, id) => {
+      const row = rowOf(id);
+      const name = listOf(list)?.name;
+      return row && name && row.seq !== null ? `${name.replace(/s$/i, '')} ${row.seq}` : titleOf(id);
+    },
+  };
+}
+
+/**
+ * What an invitation says is shared with its address, before anybody accepts (§3.4): "Ada shared Pottery with you. You can
+ * edit tasks in Pottery until 1 Dec." Said from the shares waiting for it, the sharer being whoever made the first; `null`
+ * when nothing is waiting.
+ */
+export function sharedSaid(sql: Pick<Sql, 'one'>, catalog: LensCatalog, waiting: readonly ShareKept[], now: number, tz?: string): string | null {
+  if (waiting.length === 0) return null;
+  const by = waiting.find((s) => s.effect === 'allow')?.made_by;
+  const text = sharedWithYou(waiting, by === undefined ? undefined : personName(sql, by), namesOf(sql, catalog), { now, ...(tz ? { tz } : {}) });
+  return text === '' ? null : text;
+}
+
 export function methods(deps: RecordDeps) {
   const { kernel, sql, scoped, clock } = deps;
   const team = deps.team ?? ((ctx: CallContext, reads?: string) => deps.admin(ctx, reads));
@@ -103,46 +161,7 @@ export function methods(deps: RecordDeps) {
   /** The people who own this record: no share ever targets one (§2.3). */
   const owners = (): string[] => kernel.members().filter((m) => m.level === 'owner').map((m) => m.person_id);
 
-  const personName = (id: string): string | undefined => {
-    const row = sql.one<{ name: string | null; email: string | null }>('SELECT name, email FROM person WHERE id = ?', id);
-    return row ? (row.name ?? row.email ?? undefined) : undefined;
-  };
-
-  /** Names, never ids, for a sentence (§3.5). */
-  const names = (catalog: LensCatalog): ShareNames => {
-    const listOf = (id: string): LensCatalogList | undefined => catalog.lists.find((l) => l.id === id);
-    const rowOf = (id: string): { register: string; seq: number | null; fields: string } | undefined =>
-      sql.one<{ register: string; seq: number | null; fields: string }>('SELECT register, seq, fields FROM entry WHERE id = ? AND deleted_at IS NULL', id);
-    const titleOf = (id: string): string | undefined => {
-      const row = rowOf(id);
-      const l = row ? listOf(row.register) : undefined;
-      const title = l?.fields.find((f) => f.title)?.id;
-      if (!row || title === undefined) return undefined;
-      try {
-        const v = (JSON.parse(row.fields) as Record<string, unknown>)[title];
-        return typeof v === 'string' && v !== '' ? v : undefined;
-      } catch {
-        return undefined;
-      }
-    };
-    return {
-      person: personName,
-      group: (id) => {
-        const g = sql.one<{ name: string }>('SELECT name FROM share_group WHERE id = ? AND retired_at IS NULL', id);
-        if (!g) return undefined;
-        const n = Number(sql.one<{ n: number }>('SELECT COUNT(*) AS n FROM share_group_member WHERE group_id = ?', id)?.n ?? 0);
-        return { name: g.name, people: n };
-      },
-      list: (id) => listOf(id)?.name.toLowerCase(),
-      meets: () => catalog.lists.find((l) => l.role === 'meets')?.name.toLowerCase(),
-      project: titleOf,
-      row: (list, id) => {
-        const row = rowOf(id);
-        const name = listOf(list)?.name;
-        return row && name && row.seq !== null ? `${name.replace(/s$/i, '')} ${row.seq}` : titleOf(id);
-      },
-    };
-  };
+  const names = (catalog: LensCatalog): ShareNames => namesOf(sql, catalog);
 
   const sentence = (s: Share | readonly Share[], catalog: LensCatalog): string => shareSentenceOf(s, names(catalog), { now: clock.now() });
 
@@ -160,7 +179,7 @@ export function methods(deps: RecordDeps) {
    * Why this share may not be kept for this caller, or `null`: the grammar's rules, a grantee who is there, never an
    * owner, at most `SHARES_PER_PERSON_MOST` each, and the Plus hook for somebody not on the record yet.
    */
-  const refusalOf = (ctx: CallContext, s: Share, catalog: LensCatalog, but?: string): Refusal | null => {
+  const refusalOf = async (ctx: CallContext, s: Share, catalog: LensCatalog, but?: string): Promise<Refusal | null> => {
     const who = s.who;
     if (who.kind === 'person' && sql.one('SELECT 1 AS y FROM person WHERE id = ?', who.id) === undefined)
       return { code: 'REF_UNKNOWN', fix: 'There is nobody here by that id. Share with them by email instead.', at: 'who' };
@@ -172,7 +191,8 @@ export function methods(deps: RecordDeps) {
     if (others.length >= SHARES_PER_PERSON_MOST)
       return { code: 'OUT_OF_BOUNDS', fix: `They already hold ${SHARES_PER_PERSON_MOST} shares. Stop one, or combine some of them.`, at: 'who' };
     const outsider = who.kind === 'email' || (who.kind === 'person' && !onRecord(who.id));
-    return outsider ? (deps.plus?.(ctx, who) ?? null) : null;
+    /* THE PLUS GATE (§2.15) IS THE HOST'S, which knows the plan and asks for it, so it may answer later. */
+    return outsider ? ((await deps.plus?.(ctx, who)) ?? null) : null;
   };
 
   /**
@@ -279,6 +299,27 @@ export function methods(deps: RecordDeps) {
     return null;
   };
 
+  /* ------------------------------------------------------------------------------------ who was left with nothing */
+
+  /** The people a share reaches by name: its person, or its group's members. An address reaches nobody here yet. */
+  const reachedBy = (id: string): string[] => {
+    const s = kernel.shareKept(id);
+    if (s === null) return [];
+    if (s.who.kind === 'person') return [s.who.id];
+    if (s.who.kind === 'group') return kernel.groupKept(s.who.id)?.people ?? [];
+    return [];
+  };
+
+  /**
+   * THE LAST SHARE ENDED (§3.4): of these people, the ones with no member row who now hold nothing at all. The host
+   * takes each off its Directory (`leave`), so the record drops from their switcher, and their next call is refused.
+   */
+  const leftOf = (people: Iterable<string>): string[] =>
+    [...new Set(people)].filter((p) => sql.one('SELECT 1 AS y FROM member WHERE person_id = ? LIMIT 1', p) === undefined && kernel.access(p) === null).sort();
+
+  /** A group as the Sharing page draws it: names, never ids, beside the ids it is changed by. */
+  const groupOf = (g: GroupKept) => ({ id: g.id, name: g.name, people: g.people.map((p) => ({ id: p, name: personName(sql, p) ?? null })), shares: g.shares });
+
   return {
     /** Every share on the record, live and ended in the last 30 days, each said as one sentence (§3.2). */
     async sharing(_args: unknown, ctx: CallContext): Promise<Result<SharingRow[]>> {
@@ -302,7 +343,7 @@ export function methods(deps: RecordDeps) {
       const was = id === undefined ? null : kernel.shareKept(id);
       if (id !== undefined && (was === null || was.revoked_at)) return refuse('REF_UNKNOWN', 'There is no live share with that id. Share it again instead.', 'id');
       const catalog = kernel.catalog();
-      const bad = refusalOf(ctx, s, catalog, id);
+      const bad = await refusalOf(ctx, s, catalog, id);
       if (bad) return { ok: false, refusal: bad };
       const confirm = unconfirmed(ctx, s);
       if (confirm) return { ok: false, refusal: confirm };
@@ -322,14 +363,60 @@ export function methods(deps: RecordDeps) {
     },
 
     /** Stop one share at once, and every share made onward from it (§2.2, `parent_id`). Revoking never asks to confirm. */
-    async unshare(args: { id?: unknown; why?: unknown } | undefined, ctx: CallContext): Promise<Result<{ ended: string[] }>> {
+    async unshare(args: { id?: unknown; why?: unknown } | undefined, ctx: CallContext): Promise<Result<{ ended: string[]; left: string[] }>> {
       const stop = team(ctx);
       if (stop) return { ok: false, refusal: stop };
       const id = typeof args?.id === 'string' ? args.id : '';
       const was = id === '' ? null : kernel.shareKept(id);
       if (was === null || was.revoked_at) return refuse('REF_UNKNOWN', 'There is no live share with that id. It may have ended already.', 'id');
       const why = typeof args?.why === 'string' && args.why.trim() !== '' ? args.why.trim().slice(0, 500) : null;
-      return deps.tail(ok({ ended: kernel.shareRevoke(ctx.principal.id, id, why) }));
+      const ended = kernel.shareRevoke(ctx.principal.id, id, why);
+      /* WHO EACH ENDED SHARE REACHED, READ AFTER IT ENDED: a group's members are still its members. */
+      return deps.tail(ok({ ended, left: leftOf(ended.flatMap(reachedBy)) }));
+    },
+
+    /**
+     * Make a group, rename one (`id`), or retire one (`retire: true`), which ends every share it holds. A group holds
+     * nothing until a share names it; its people are put in and taken out by `groupMember`.
+     */
+    async groupPut(args: { id?: unknown; name?: unknown; retire?: unknown; why?: unknown } | undefined, ctx: CallContext) {
+      const stop = team(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const id = typeof args?.id === 'string' && args.id !== '' ? args.id : undefined;
+      const live = id === undefined ? null : kernel.groupKept(id);
+      if (id !== undefined && (live === null || live.retired_at !== null)) return refuse('REF_UNKNOWN', 'There is no group by that id.', 'id');
+      if (args?.retire === true) {
+        if (live === null) return refuse('REQUIRED_MISSING', 'Which group? Retiring one needs its id.', 'id');
+        const why = typeof args.why === 'string' && args.why.trim() !== '' ? args.why.trim().slice(0, 500) : null;
+        const ended = kernel.groupRetire(ctx.principal.id, live.id, why);
+        return deps.tail(ok({ ...groupOf(kernel.groupKept(live.id)!), ended, left: leftOf(live.people) }));
+      }
+      const name = typeof args?.name === 'string' ? args.name.trim().replace(/\s+/g, ' ') : '';
+      if (name === '') return refuse('REQUIRED_MISSING', 'A group needs a name, such as Accountants.', 'name');
+      if ([...name].length > GROUP_NAME_MOST || /[\p{Cc}\p{Cf}]/u.test(name))
+        return refuse('VALUE_MALFORMED', `A group's name is plain words, at most ${GROUP_NAME_MOST} characters.`, 'name');
+      const out = kernel.groupSave(ctx.principal.id, { ...(id === undefined ? {} : { id }), name });
+      if (!out.ok) return out;
+      return deps.tail(ok({ ...groupOf(kernel.groupKept(out.value.id)!), ended: [] as string[], left: [] as string[] }));
+    },
+
+    /**
+     * Put somebody on the record in a group (`in: true`) or take them out (`in: false`). Each share the group holds is
+     * an event for them, so leaving ends the group's shares for them out loud. Never an owner, who holds everything.
+     */
+    async groupMember(args: { group?: unknown; person?: unknown; in?: unknown } | undefined, ctx: CallContext) {
+      const stop = team(ctx);
+      if (stop) return { ok: false as const, refusal: stop };
+      const group = typeof args?.group === 'string' ? args.group : '';
+      const g = group === '' ? null : kernel.groupKept(group);
+      if (g === null || g.retired_at !== null) return refuse('REF_UNKNOWN', 'There is no group by that id.', 'group');
+      const person = typeof args?.person === 'string' ? args.person : '';
+      if (person === '' || sql.one('SELECT 1 AS y FROM person WHERE id = ?', person) === undefined)
+        return refuse('REF_UNKNOWN', 'There is nobody here by that id.', 'person');
+      if (typeof args?.in !== 'boolean') return refuse('REQUIRED_MISSING', 'Put them in the group, or take them out?', 'in');
+      if (args.in && owners().includes(person)) return refuse('FORBIDDEN', 'An owner already holds everything here, so a group adds nothing.', 'person');
+      const said = kernel.groupMember(ctx.principal.id, g.id, person, args.in) ?? [];
+      return deps.tail(ok({ ...groupOf(kernel.groupKept(g.id)!), said, left: args.in ? [] : leftOf([person]) }));
     },
 
     /** A share as the sheet would keep it, kept nowhere: its sentence, and how many rows of each list it reaches now. */
@@ -432,7 +519,7 @@ export function methods(deps: RecordDeps) {
         ...(Object.keys(hide).length ? { hide } : {}),
         ...(Object.keys(when).length ? { when } : {}),
       };
-      const bad = refusalOf(ctx, s, catalog);
+      const bad = await refusalOf(ctx, s, catalog);
       if (bad) return { ok: false, refusal: bad };
       const note = typeof args?.note === 'string' && args.note.trim() !== '' ? args.note.trim().slice(0, 500) : undefined;
       const out = kernel.shareSave(me, { ...s, parent_id: parent.id, ...(note === undefined ? {} : { note }) });

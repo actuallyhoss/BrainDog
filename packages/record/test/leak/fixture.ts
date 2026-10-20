@@ -391,10 +391,10 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
     sql.exec('INSERT OR IGNORE INTO person (id, email, name, suspended_at) VALUES (?, ?, ?, NULL)', shape.person, `${shape.person}@example.test`, shape.name);
     let who = { kind: 'person', id: shape.person };
     if (shape.group) {
-      const group = `g_${shape.id}`;
-      sql.exec('INSERT INTO share_group (id, name, made_by, made_at) VALUES (?, ?, ?, ?)', group, shape.name, OWNER, new Date(NOW).toISOString());
-      sql.exec('INSERT INTO share_group_member (group_id, person_id, added_by, added_at) VALUES (?, ?, ?, ?)', group, shape.person, OWNER, new Date(NOW).toISOString());
-      who = { kind: 'group', id: group };
+      /* THE GROUP THROUGH THE API, as the owner makes one: named, then the person put in it. */
+      const made = okValue<{ id: string }>(await api.groupPut({ name: shape.name } as never, owner), `group ${shape.id}`);
+      okValue(await api.groupMember({ group: made.id, person: shape.person, in: true } as never, owner), `group member ${shape.id}`);
+      who = { kind: 'group', id: made.id };
     }
     for (const { ended, ...share } of shape.shares(built)) {
       const made = okValue<{ id: string }>(await api.share({ share: { effect: 'allow', ...share, who, when: { until } } } as never, owner), `share ${shape.id}`);

@@ -19,6 +19,16 @@ import { no, ok } from '@braindog/ports';
 
 import { instant } from './migrate.ts';
 import { LEVELS, invite, type Level, type Member, type MemberDeps } from './members.ts';
+import { bindWaiting, bumpEpoch, waitingFor } from './shares.ts';
+
+/**
+ * What accepting answers: the person as the record now holds them, and the shares bound to them. A guest, who holds
+ * shares and no level, is `level: null` with no lists.
+ */
+export type Accepted = Member & { shares: string[] };
+
+/** Whether an invitation carries no level and no list: then it carries the shares waiting for its address, and only those. */
+const sharesOnly = (i: { level: Level | null; registers: Record<string, Level> }): boolean => i.level === null && Object.keys(i.registers).length === 0;
 
 /** `12 §3`: an invitation link lives 24 hours. */
 export const INVITE_HOURS = 24;
@@ -103,8 +113,10 @@ export function mintInvitation(deps: InviteDeps, by: string, args: InviteArgs, s
 
   if (args.level !== undefined && !(LEVELS as readonly string[]).includes(args.level))
     return no<Invited>('ENUM_VALUE_UNKNOWN', `${String(args.level)} is not a level.`, { at: 'level', allowed: LEVELS });
-  if (args.level === undefined && Object.keys(args.registers ?? {}).length === 0)
-    return no<Invited>('REQUIRED_MISSING', 'An invitation says what somebody may reach, on the record or on a register.', { at: 'level' });
+  /* AN INVITATION TO NOTHING IS NO INVITATION, BUT ONE TO WHAT IS SHARED WITH THE ADDRESS IS (sharing plan slice 8): a
+     share made to an email waits for that person, and the link is how they come for it. */
+  if (args.level === undefined && Object.keys(args.registers ?? {}).length === 0 && !waitingFor(deps.sql, email, deps.nowMs))
+    return no<Invited>('REQUIRED_MISSING', 'An invitation says what somebody may reach, on the record or on a register, or something is shared with them first.', { at: 'level' });
   /* `at` IS A PATH INTO WHAT THE CALLER SENT, and `registers` is an object keyed by slug, so the
      entry that is wrong is at `registers.<slug>`. Both branches passed the bare slug, which names a
      value rather than a place: no payload has a top-level `nope` key, and a screen given `nope` has
@@ -167,7 +179,12 @@ export function lookInvitation(sql: Sql, nowMs: number, hash: string): Result<In
     hash,
     instant(nowMs),
   );
-  return raw ? ok(shaped(raw, nowMs)) : no<InvitationRow>('UNAUTHORIZED', GONE, { at: 'token' });
+  if (!raw) return no<InvitationRow>('UNAUTHORIZED', GONE, { at: 'token' });
+  const row = shaped(raw, nowMs);
+  /* ONE CARRYING ONLY SHARES IS GOOD WHILE ONE OF THEM IS: every share to the address stopped, the link is as dead as a
+     withdrawn one, in the same words. */
+  if (sharesOnly(row) && !waitingFor(sql, row.email, nowMs)) return no<InvitationRow>('UNAUTHORIZED', GONE, { at: 'token' });
+  return ok(row);
 }
 
 /**
@@ -181,32 +198,57 @@ export function acceptInvitation(
   deps: InviteDeps,
   hash: string,
   args: { person: string; email: string; name?: string },
-): Result<Member> {
+): Result<Accepted> {
   const found = lookInvitation(deps.sql, deps.nowMs, hash);
   if (!found.ok) return found as Result<never>;
   const invitation = found.value;
-  if (!args?.person) return no<Member>('REQUIRED_MISSING', 'Who is accepting?', { at: 'person' });
+  if (!args?.person) return no<Accepted>('REQUIRED_MISSING', 'Who is accepting?', { at: 'person' });
   if ((args.email ?? '').trim().toLowerCase() !== invitation.email.toLowerCase())
-    return no<Member>('FORBIDDEN', 'This invitation is for another address. Sign in as the person it was sent to.', { at: 'email' });
-  if (deps.sql.one('SELECT 1 AS x FROM member WHERE person_id = ? LIMIT 1', args.person))
-    return no<Member>('ALREADY_KNOWN', 'You are already on this record.', { at: 'person' });
+    return no<Accepted>('FORBIDDEN', 'This invitation is for another address. Sign in as the person it was sent to.', { at: 'email' });
+  const guest = sharesOnly(invitation);
+  /* A LEVEL IS WHAT SOMEBODY ALREADY ON THE RECORD HOLDS, and a second one would replace it. What is shared with their
+     address is added to whatever they hold, so a link carrying only shares binds them for a member too. */
+  if (!guest && deps.sql.one('SELECT 1 AS x FROM member WHERE person_id = ? LIMIT 1', args.person))
+    return no<Accepted>('ALREADY_KNOWN', 'You are already on this record.', { at: 'person' });
+  const why = `Accepted invitation ${invitation.id}.`;
 
-  const joined = invite(deps, 'system', {
-    person: args.person,
-    email: invitation.email,
-    ...(args.name ? { name: args.name } : {}),
-    ...(invitation.level === null ? {} : { level: invitation.level }),
-    registers: invitation.registers,
-    why: `Accepted invitation ${invitation.id}.`,
-  });
-  if (!joined.ok) return joined;
+  let joined: Member;
+  if (guest) {
+    /* A GUEST HOLDS SHARES AND NO MEMBER ROW, and a suspended one is let in by nothing. The person row is the record's
+       mirror, written without overwriting what it knows, as `invite` writes it. */
+    if (deps.sql.one('SELECT 1 AS x FROM person WHERE id = ? AND suspended_at IS NOT NULL', args.person))
+      return no<Accepted>('LEVEL_REQUIRED', 'You were stopped on this record. Ask its owner to let you back in.', { at: 'person' });
+    deps.sql.exec(
+      `INSERT INTO person (id, email, name, suspended_at) VALUES (?, ?, ?, NULL)
+       ON CONFLICT (id) DO UPDATE SET email = COALESCE(excluded.email, person.email), name = COALESCE(excluded.name, person.name)`,
+      args.person,
+      invitation.email,
+      args.name ?? null,
+    );
+    const p = deps.sql.one<{ email: string | null; name: string | null }>('SELECT email, name FROM person WHERE id = ?', args.person);
+    joined = { person_id: args.person, email: p?.email ?? invitation.email, name: p?.name ?? null, level: null, scoped: [], seen_at: null, suspended_at: null };
+  } else {
+    const made = invite(deps, 'system', {
+      person: args.person,
+      email: invitation.email,
+      ...(args.name ? { name: args.name } : {}),
+      ...(invitation.level === null ? {} : { level: invitation.level }),
+      registers: invitation.registers,
+      why,
+    });
+    if (!made.ok) return made as Result<never>;
+    joined = made.value;
+  }
+  /* WHAT WAS SHARED WITH THE ADDRESS IS NOW THE PERSON'S, one `access.grant` a share, and who holds what moved. */
+  const shares = bindWaiting({ sql: deps.sql, at: instant(deps.nowMs), mint: deps.mint }, 'system', invitation.email, args.person, why);
+  bumpEpoch(deps.sql);
   deps.sql.exec(
     'UPDATE invitation SET accepted_at = ?, accepted_by = ? WHERE id = ? AND accepted_at IS NULL',
     instant(deps.nowMs),
     args.person,
     invitation.id,
   );
-  return joined;
+  return ok({ ...joined, shares });
 }
 
 /**

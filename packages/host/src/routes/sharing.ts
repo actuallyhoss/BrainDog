@@ -19,6 +19,8 @@ export const ROUTES: readonly Route[] = [
   { name: 'share', group: 'ADMIN', writes: true, what: 'Share part of the record with somebody, or change a share. Never with an owner, and never by an agent.' },
   { name: 'unshare', group: 'ADMIN', writes: true, what: 'Stop one share at once, and every share made onward from it.' },
   { name: 'sharePreview', group: 'ADMIN', writes: true, postRead: true, what: 'A share said as one sentence, with how many rows of each list it reaches now. It keeps nothing.' },
+  { name: 'groupPut', group: 'ADMIN', writes: true, what: 'Make a group of people to share with, rename one, or retire one, which ends every share it holds.' },
+  { name: 'groupMember', group: 'ADMIN', writes: true, what: "Put somebody on the record in a group, or take them out, which ends the group's shares for them." },
   { name: 'myShares', group: 'DATA', writes: false, what: 'What has been shared with you here, each as one sentence. A person only.' },
   { name: 'shareOnward', group: 'DATA', writes: true, what: 'Share on what you manage, with somebody on the record, at most Edit and never past your own share.' },
 ];
