@@ -236,7 +236,7 @@ export async function serveMcp<C>(
     session?: (ctx: C, said: unknown) => C;
     /** Where this host serves the app, such as `https://brain.dog`. It is handed to `handle`, and the tools read it only to put a `decide` link on a filed question. Left out, that link is left out. */
     origin?: string;
-    /** This host's build, sent on every answer as the header `braindog-build`, so the bridge can see a deploy mid-session (AGT-A02). */
+    /** This host's build, sent on every answer as the header `braindog-build`, so the bridge can see a deploy mid-session (AGT-A02), and as `serverInfo.version`. */
     build?: string;
     /** Called after a `tools/call` is answered without a protocol error (AGT-A02; the scope's critic moved this half to AGT-B01's marks). */
     called?: (ctx: C, name: string) => void | Promise<void>;
@@ -281,7 +281,7 @@ async function answered<C>(request: Request, surface: McpSurface<C>, ctx: C | nu
      else 2025-03-26, which the specification tells a server to assume of a request that sends no header. `handle`
      reads it only to decide whether a result says `resultType`, which no client older than 2026-07-28 expects. */
   const version = request.headers.get('mcp-protocol-version') ?? versionIn(meta) ?? OLDEST;
-  const reply = await handle(message, surface, who, options.origin, version, callerOf(options.caller?.(who) ?? request.headers.get('authorization') ?? '', said));
+  const reply = await handle(message, surface, who, options.origin, version, callerOf(options.caller?.(who) ?? request.headers.get('authorization') ?? '', said), options.build);
   if (options.called && reply !== null && !('error' in reply) && isObject(message) && message.method === 'tools/call') {
     const name = isObject(message.params) && typeof message.params.name === 'string' ? message.params.name : '';
     if (name !== '') await options.called(who, name);

@@ -97,6 +97,39 @@ test('server/discover IS ANSWERED, with the versions, the capabilities, who this
   assert.equal(calls.length, 0, 'discover read the record');
 });
 
+test('serverInfo.version IS THE BUILD the host hands over, in initialize, server/discover and the hello mark', async () => {
+  /* EVERY HOST ANSWERED 0.0.0, so a client that reads serverInfo could not tell one deploy from the next. */
+  const marks: { kind: string; build?: string }[] = [];
+  const { surface } = stub({ doorHeard: async (m: { kind: string; build?: string }) => (marks.push(m), { ok: true, value: null }) } as never);
+  const build = '2026.10.21+abc1234';
+  const init = result<{ serverInfo: { version: string } }>(await handle(req('initialize', { protocolVersion: VERSIONS[1] }), surface, ctx, undefined, undefined, '', build));
+  assert.equal(init.serverInfo.version, build);
+  const discover = result<{ _meta: Record<string, { version: string }> }>(await handle(req('server/discover'), surface, ctx, undefined, undefined, '', build));
+  assert.equal(discover._meta['io.modelcontextprotocol/serverInfo']!.version, build);
+  assert.deepEqual(marks.filter((m) => m.kind === 'hello').map((m) => m.build), [build]);
+  /* A HOST THAT HANDS NONE, or only space, still says 0.0.0: not told, which is never read as a build. */
+  for (const none of [undefined, '', '  '])
+    assert.equal(result<{ serverInfo: { version: string } }>(await handle(req('initialize', {}), surface, ctx, undefined, undefined, '', none)).serverInfo.version, '0.0.0');
+});
+
+test('OVER HTTP THE HOST BUILD IS serverInfo.version, beside the braindog-build header it already sent', async () => {
+  const { surface } = stub();
+  const build = '2026.10.21+abc1234';
+  const res = await serveMcp(
+    new Request('https://brain.dog/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(req('initialize', { protocolVersion: VERSIONS[1] })),
+    }),
+    surface,
+    ctx,
+    { build },
+  );
+  assert.equal(res.headers.get('braindog-build'), build);
+  const body = (await res.json()) as { result: { serverInfo: { version: string } } };
+  assert.equal(body.result.serverInfo.version, build);
+});
+
 test('ping answers, and prompts are an empty list for now', async () => {
   const { surface } = stub();
   assert.deepEqual(result(await handle(req('ping'), surface, ctx)), { resultType: 'complete' });

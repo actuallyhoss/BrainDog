@@ -155,6 +155,16 @@ const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'obj
 
 /* THE TITLE IS WHAT A HOST SHOWS A PERSON for the server, since 2025-06-18, where `name` is the handle it keys on. */
 const SERVER = { name: 'braindog', title: 'BrainDog', version: '0.0.0' };
+
+/**
+ * Who this server is, with the build it runs as its version (`2026.10.21+abc1234`).
+ *
+ * THE BUILD AND NOT `0.0.0`. Every host answered `0.0.0`, so a client could tell two deploys apart only by the
+ * `braindog-build` header, which a client that reads `serverInfo` never sees, and the door's own `hello` mark recorded
+ * the same nothing. A host hands its build to `handle`; one that hands none (a self-host started without one, the
+ * command line answering on the machine) still says `0.0.0`, which reads as "not told", never as a build.
+ */
+const serverOf = (build: string | undefined) => (build === undefined || build.trim() === '' ? SERVER : { ...SERVER, version: build.trim() });
 const CAPABILITIES = { tools: {}, resources: {}, prompts: {} };
 
 /**
@@ -293,6 +303,8 @@ export function negotiate(asked: unknown): (typeof VERSIONS)[number] | null {
  * `called` on a caller's first tool call and at most once a minute after; `internal` for an answer whose code is
  * INTERNAL. None is waited on and none can fail the call (`hear`). `caller` is the transport's key for who is calling,
  * which only the minute between `called` marks reads; a stdio pipe is one caller and passes none.
+ *
+ * `build` IS THE HOST'S OWN BUILD, `serverInfo.version` in `initialize` and `server/discover` and the `hello` mark's.
  */
 export async function handle<C>(
   message: unknown,
@@ -301,6 +313,7 @@ export async function handle<C>(
   origin?: string,
   version?: string,
   caller = '',
+  build?: string,
 ): Promise<Reply | null> {
   if (Array.isArray(message)) return fail(null, RPC.invalid, 'Send one message at a time; a batch is not accepted.');
   if (!isObject(message)) return fail(null, RPC.invalid, 'A message is a JSON object.');
@@ -319,7 +332,7 @@ export async function handle<C>(
   if (!isObject(params)) return fail(id, RPC.params, 'params is an object.');
 
   try {
-    return await dispatch(id, message.method, params, surface, ctx, origin, revisionOf(params, version), caller);
+    return await dispatch(id, message.method, params, surface, ctx, origin, revisionOf(params, version), caller, serverOf(build));
   } catch (e) {
     const ref = crypto.randomUUID();
     console.error('mcp', ref, message.method, e);
@@ -337,6 +350,7 @@ async function dispatch<C>(
   origin: string | undefined,
   version: string,
   caller: string,
+  server: typeof SERVER,
 ): Promise<Reply> {
   const mcp = tools(surface, origin);
   const said = (result: Record<string, unknown>) => whole(id, result, version);
@@ -357,8 +371,8 @@ async function dispatch<C>(
       /* ANSWERED UNDER THE REVISION IT AGREES, so a client of the stateless one reads `resultType` here as on every other
          result, and an older client's handshake carries nothing it does not know. */
       const client = clientOf(params);
-      hear(surface, ctx, { kind: 'hello', build: SERVER.version, ...(client === undefined ? {} : { client }) });
-      return whole(id, { protocolVersion, capabilities: CAPABILITIES, serverInfo: SERVER, instructions: INSTRUCTIONS }, protocolVersion);
+      hear(surface, ctx, { kind: 'hello', build: server.version, ...(client === undefined ? {} : { client }) });
+      return whole(id, { protocolVersion, capabilities: CAPABILITIES, serverInfo: server, instructions: INSTRUCTIONS }, protocolVersion);
     }
 
     /* WHAT A 2026-07-28 CLIENT ASKS BEFORE ANYTHING ELSE, which that revision says every server answers:
@@ -368,7 +382,7 @@ async function dispatch<C>(
       return whole(id, {
         supportedVersions: [...VERSIONS],
         capabilities: CAPABILITIES,
-        _meta: { 'io.modelcontextprotocol/serverInfo': SERVER },
+        _meta: { 'io.modelcontextprotocol/serverInfo': server },
         instructions: INSTRUCTIONS,
         ttlMs: HOUR,
         cacheScope: 'public',
