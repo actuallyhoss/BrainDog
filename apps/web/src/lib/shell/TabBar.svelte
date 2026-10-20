@@ -1,5 +1,5 @@
 <!--
-  Below 900px the rail becomes a tab bar. Not a shrunken desktop.
+  Below 900px the rail becomes a tab bar. Not a shrunken desktop (2.A.23).
 
   FIVE PLACES, AS ON 19 OCTOBER (his call 2, 20 October): Today, Needs you, Projects, Money, Agents (`tabsOf`), the same
   five the top bar draws, with the rail's glyphs and words: a place whose glyph or word differs between two shapes is a
@@ -7,10 +7,12 @@
   under the face at the top of each screen (`PageHead.svelte`), which opens the More sheet. Search is the 44px button
   beside that face, never a tab.
 
-  FLAT, AND DOCKED TO THE BOTTOM EDGE (DIRECTION §39). It was a glass bar floating over the work, which drew a second
-  card over every screen a phone shows. It is now the tile's white with one hairline over it, as the top bar is, the
-  width of the window, the home indicator inside it: equal tabs, 22px glyphs over 11px words, every target 44 or more. The tab you
-  are on is ink, glyph and word; the rest are `--dim`. The only red is the count of what waits on you.
+  FLAT, AND DOCKED TO THE BOTTOM EDGE (DIRECTION §39), on the nav's own surface with one hairline over it, as the top bar
+  is: equal tabs, 24px glyphs over 12/500 captions, every target 44 or more. The tab you are on is ink, glyph and word;
+  the rest are the quiet ink. The only red is the count of what waits on you, the one `Count`, cut out of its glyph.
+
+  IT HOLDS STILL WHILE A PAGE CHANGES (motion F3): named `tabbar` for the view transition, which `app.css` does not
+  animate, so the page's two pictures pass under it and its labels never blink.
 
   Safe-area insets are paid exactly once, on the fixed element only. Paying twice is a real, easy bug.
 -->
@@ -18,6 +20,7 @@
   import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy/frame.ts';
+  import Count from '../ui/Count.svelte';
   import Icon, { type IconName } from '../ui/Icon.svelte';
   import { isHere, placeOf, type FlatItem } from '../nav.ts';
 
@@ -36,8 +39,8 @@
   {#each tabs as tab (tab.key)}
     <a class="tab tap" href={at(tab.href)} aria-current={isHere(tab, path) ? 'page' : undefined}>
       <span class="badge-slot">
-        <Icon name={tab.icon as IconName} size="l" />
-        {#if tab.count && tab.key === 'decide'}<span class="badge" aria-label={`${tab.count} ${copy.openQuestions}`}>{tab.count}</span>{/if}
+        <Icon name={tab.icon as IconName} size="xl" />
+        {#if tab.count && tab.key === 'decide'}<span class="badge"><Count n={tab.count} size="s" label={`${tab.count} ${copy.openQuestions}`} /></span>{/if}
       </span>
       <span class="tab-name">{tab.label}</span>
     </a>
@@ -46,8 +49,8 @@
 
 <style>
   /**
-   * THE BAR: the window's width at the bottom edge, `--tab-h` tall over the home indicator, in the board's colour with a
-   * hairline over it, as the top bar is the tile's at the top. Opaque, so a row passing under it is never read through it. `--tabbar` (the bar and the indicator)
+   * THE BAR: the window's width at the bottom edge, `--tab-h` tall over the home indicator, on the nav's surface with a
+   * hairline over it. Opaque, so a row passing under it is never read through it. `--tabbar` (the bar and the indicator)
    * is what the shell and the toasts clear.
    *
    * EQUAL TABS, AND FIVE OF THEM FIT THE NARROWEST PHONE: 320 over five is 64 across, so every tab clears 44 on both axes
@@ -64,7 +67,9 @@
     block-size: var(--tabbar);
     padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     background: var(--tile);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
+    /* HELD STILL IN A PAGE CHANGE: the page's pictures pass under it (`app.css` gives this name no animation). */
+    view-transition-name: tabbar;
   }
 
   /* THE KEYBOARD TAKES THE BOTTOM OF THE SCREEN, and four dead targets over the keys somebody is using would sit above
@@ -73,36 +78,31 @@
     display: none;
   }
 
-  /* A 22px glyph over its word, and a target the bar's full height. The word is 11, a step under the smallest on the
-     scale, because it is a caption under a glyph and six of them share a 320 phone. */
+  /* A 24px glyph over its caption, and a target the bar's full height. The caption is 12/500, the one step under the
+     meta size, kept for captions under a glyph and the count. */
   .tab {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: var(--sp-1);
     min-inline-size: 0;
     min-block-size: max(var(--tap), var(--tab-h));
-    padding: 0 2px;
+    padding: 0 var(--sp-1);
     border: 0;
     background: none;
     color: var(--dim);
-    font-size: calc(var(--t-xs) - 1px);
-    font-weight: 500;
-    line-height: 1.2;
+    font-size: var(--t-xs);
+    font-weight: var(--fw-medium);
+    line-height: calc(16 / 12);
     text-decoration: none;
     transition: color var(--d-state) var(--ease-out);
-  }
-
-  .tab :global(.icon) {
-    inline-size: 22px;
-    block-size: 22px;
   }
 
   /* HERE IS INK, glyph and word, and the weight a step up: no fill, no pill, no accent. */
   .tab[aria-current='page'] {
     color: var(--ink);
-    font-weight: 600;
+    font-weight: var(--fw-semi);
   }
 
   .badge-slot {
@@ -118,23 +118,12 @@
     white-space: nowrap;
   }
 
-  /* DECIDE'S COUNT, the one filled mark on the bar, on the corner of its glyph. A count is the one thing a pill holds. */
+  /* NEEDS YOU'S COUNT ON THE CORNER OF ITS GLYPH: 4 over its top, 14 in from its start, its ring cut out of the glyph. */
   .badge {
     position: absolute;
-    inset-block-start: -5px;
-    inset-inline-start: 13px;
-    box-sizing: border-box;
-    min-inline-size: 18px;
-    block-size: 18px;
-    padding: 0 5px;
-    background: var(--danger);
-    border-radius: var(--r-round);
-    color: var(--on-ink);
-    font-size: var(--t-xs);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    line-height: 18px;
-    text-align: center;
+    inset-block-start: calc(-1 * var(--sp-1));
+    inset-inline-start: 14px;
+    display: flex;
   }
 
   /* FORCED COLOURS KEEP THE BAR'S EDGE, and the tab you are on an outline of its own. */
