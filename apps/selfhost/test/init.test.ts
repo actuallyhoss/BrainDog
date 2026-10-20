@@ -234,7 +234,7 @@ test('AND A COMMAND THIS HOST DOES NOT HAVE IS ONE SENTENCE, not a stack', async
     assert.equal(out.code, 1);
     /* THE LAST LINE, because Node prints its own experimental-SQLite warning first and that is the
        runtime's sentence rather than this command's. */
-    assert.equal(out.said.trim().split(String.fromCharCode(10)).at(-1), 'braindog has no nonsense. It has serve and init.');
+    assert.equal(out.said.trim().split(String.fromCharCode(10)).at(-1), 'braindog has no nonsense. It has serve, init, backup and restore.');
 
     /* AND `serve` WITH NOTHING TO SERVE SAYS WHAT TO DO ABOUT IT, rather than starting a server for
        a record nobody created — which is what an empty file quietly becomes. */
