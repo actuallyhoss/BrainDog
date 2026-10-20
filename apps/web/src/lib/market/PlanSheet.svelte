@@ -147,13 +147,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-5);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .plan-summary {
     margin: 0;
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* ONE PACK'S PART OF A PLAN THAT HAS SEVERAL: its name over its groups, a hairline above every part after the first. */
@@ -165,7 +165,7 @@
 
   .plan-part + .plan-part {
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .plan-part-h {
@@ -182,8 +182,8 @@
   }
 
   .plan-move {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
@@ -212,7 +212,7 @@
   }
 
   .plan-count {
-    color: var(--dim);
+    color: var(--ink-3);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -220,7 +220,7 @@
   /* WHAT STOPS IT: the danger well and the danger ink on its title. The rows stay ink, so a long refusal is read at full
      contrast rather than as a block of red. */
   .plan-stops .plan-title {
-    color: var(--danger-text);
+    color: var(--red);
   }
 
   /* THE ROWS UNDER A HEADING, set in from its edge by the well and its gap, a hairline between two. */
@@ -242,7 +242,7 @@
   }
 
   .plan-row + .plan-row {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .plan-text {
@@ -251,23 +251,23 @@
   }
 
   .plan-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
     overflow-wrap: anywhere;
   }
 
   .plan-change {
     margin-inline-start: var(--sp-2);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
   }
 
   .plan-note {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -280,7 +280,7 @@
     flex-direction: column;
     gap: var(--sp-2);
     padding-block-start: var(--sp-4);
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   /* ON A PHONE THE ROWS TAKE THE WHOLE WIDTH: the well stays at the heading, and the words under it keep the room. */

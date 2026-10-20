@@ -84,8 +84,8 @@
     inline-size: 100%;
     overflow-x: auto;
     padding: var(--sp-4);
-    border-radius: var(--r-md);
-    background: var(--sunk);
+    border-radius: var(--r-pop);
+    background: var(--tile-2);
   }
 
   /* NO EDGE AND NO FILL OF ITS OWN: a card's drawing well is the one surface (`ListingCard.svelte`), and a second box

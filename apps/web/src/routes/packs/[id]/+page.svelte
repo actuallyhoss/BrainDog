@@ -28,6 +28,8 @@
      was the sample's `PACKS`, which carried the same six and two add-ons nobody wrote, then a hand copy with
      stale versions. */
   import { firstPartyModules } from '@braindog/seed/packs/modules';
+  /* THE GLYPH OF THE PLACE IT BRINGS, as its row on /packs wears it (agents F25). */
+  import { glyphOf } from '../glyph.ts';
   import { PAGES, REGISTERS } from '$lib/record/held.ts';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -380,7 +382,7 @@
     </Empty>
   </div>
 {:else if from === 'ready' && settings}
-  <PageHead icon="packs" kicker={copy.packs} back="/packs" title={name} sentence={pack?.blurb}>
+  <PageHead icon={glyphOf(pack?.pages, page.data.nav ?? [])} kicker={copy.packs} back="/packs" title={name} sentence={pack?.blurb}>
     {#snippet actions()}
       {#if installed}
         <button
@@ -690,8 +692,8 @@
     flex-wrap: wrap;
     column-gap: var(--sp-3);
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -702,15 +704,15 @@
 
   .turn-said {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* WHAT WAITS IS READ AS A SENTENCE, at body size, under the version: the count and the list it waits for are the words. */
   .waits {
     margin: var(--sp-1) 0 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 22px;
   }
 
@@ -725,16 +727,16 @@
 
   .when {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .rates-why {
     max-inline-size: 62ch;
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
     text-wrap: pretty;
   }
@@ -767,8 +769,8 @@
 
   .rate-note {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -781,7 +783,7 @@
   .setting {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
 
@@ -798,15 +800,15 @@
   }
 
   .setting-label {
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
     font-weight: 500;
     line-height: 18px;
   }
 
   .setting[data-kind='switch'] .setting-label {
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -842,9 +844,9 @@
   }
 
   .setting-unit {
-    color: var(--dim);
+    color: var(--ink-3);
     font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 
   /* A SELECT OR A DATE IS A FIELD: the `--s1` well, no border, the `--r-md` corner, 40 tall and 44 under a thumb. The
@@ -852,23 +854,23 @@
   .setting-select {
     min-block-size: 40px;
     padding: 0 var(--sp-3);
-    background-color: var(--s1);
+    background-color: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .setting-note,
   .setting-why {
     margin: 0;
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
   .setting-note {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   /* A REFUSAL BESIDE ITS FIELD: its dot in the danger fill and its words in ink (a tone is its glyph, never colour). */
@@ -882,7 +884,7 @@
 
   .setting-said {
     margin: 0;
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   .setting-said:empty {
@@ -904,7 +906,7 @@
 
   .added-go {
     display: inline-grid;
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .added-go:dir(rtl) {

@@ -257,8 +257,8 @@
 
   .from-blurb {
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -310,20 +310,20 @@
     inline-size: 100%;
     min-block-size: 8lh;
     padding: var(--sp-2) var(--sp-3);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-pop);
     color: var(--ink);
     font-family: var(--font-id);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     line-height: 18px;
     resize: vertical;
   }
 
   .from-hint {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   .from-said {
@@ -331,8 +331,8 @@
     flex-direction: column;
     gap: var(--sp-1);
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   .from-voice {
@@ -347,7 +347,7 @@
   .from-legend {
     margin-block-end: var(--sp-1);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
     font-weight: 600;
   }
 
@@ -357,6 +357,6 @@
     gap: var(--sp-2);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-sm);
+    font-size: var(--fs-meta);
   }
 </style>

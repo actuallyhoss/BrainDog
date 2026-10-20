@@ -405,8 +405,8 @@
   .quiet {
     margin: 0;
     max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
     line-height: 22px;
   }
 
@@ -434,14 +434,14 @@
     gap: var(--sp-3);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
   .pair {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--sp-2);
     max-inline-size: var(--measure);
     min-inline-size: 0;
   }
@@ -458,7 +458,7 @@
     padding: 0;
     list-style: none;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -470,12 +470,12 @@
   }
 
   .lines li + li {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .detail {
-    color: var(--dim);
-    font-size: var(--t-base);
+    color: var(--ink-3);
+    font-size: var(--fs-body);
   }
 
   .linklike {

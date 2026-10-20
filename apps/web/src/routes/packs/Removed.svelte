@@ -98,12 +98,12 @@
   }
 
   .gone-name {
-    color: var(--ink2);
+    color: var(--ink-2);
   }
 
   /* THE WHOLE SENTENCE, wrapped at 390 rather than cut, at body size. */
   .gone-line {
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
     white-space: normal;
   }
@@ -111,8 +111,8 @@
   .gone-said {
     grid-column: 1 / -1;
     margin: 0;
-    color: var(--ink2);
-    font-size: var(--t-base);
+    color: var(--ink-2);
+    font-size: var(--fs-body);
   }
 
   @media (pointer: coarse) {
