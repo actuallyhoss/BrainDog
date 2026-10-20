@@ -397,10 +397,9 @@
     {/if}
     {#if rowSaid}<p class="hint" role="status">{rowSaid}</p>{/if}
   {/if}
-</Section>
 
-<!-- HOW YOU SIGN IN, AS ROWS: each fact with its glyph, what it is in the meta line and what is true in the title's. -->
-<Section title={copy.identitySignInWays}>
+<!-- HOW YOU SIGN IN, AS ROWS, IN THE SAME TILE AS WHO YOU ARE (agents F14): each fact with its glyph, what it is in the
+     meta line and what is true in the title's. Two tiles of one and two lines each were one thing said twice. -->
   <ul class="facts">
     <!-- THE EMAIL, NOT THE PERSON ID. It printed `you` (the schema's own id for the signed-in
          human) while `/settings/people` one click away renders the same person as "You" with
@@ -647,7 +646,6 @@
     margin: 0 0 var(--sp-3);
     padding: 0;
     list-style: none;
-    max-inline-size: calc(var(--measure) + var(--sp-9));
   }
 
   .facts li {
@@ -672,7 +670,7 @@
     inset-block-start: 0;
     inset-inline: calc(var(--well) + var(--sp-3)) 0;
     block-size: 1px;
-    background: var(--line);
+    background: var(--rule);
   }
 
   .fact-key {
