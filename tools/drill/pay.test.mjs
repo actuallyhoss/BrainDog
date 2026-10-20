@@ -92,7 +92,7 @@ test('EACH MISSING NAME MAKES ITS STEPS SKIP AND SAY WHY, AND NOTHING IS RED', a
   assert.equal(by['old-key'].said, `skipped: ${NAMES.oldKey} is not set, so whether the pasted key was rolled cannot be asked.`);
   assert.equal(by['sign-in'].said, 'skipped: CANARY_MAIL_DOOR is not set, so no stranger signs up.');
   assert.equal(by.extra.said, `skipped: ${EXTRA_SKIPPED}`);
-  for (const name of ['free', 'upgrade', 'allowance', 'invite', 'switch', 'pack', 'past-due', 'cancel', 'delete', 'events'])
+  for (const name of ['free', 'upgrade', 'allowance', 'switch', 'invite', 'pack', 'past-due', 'cancel', 'delete', 'events'])
     assert.deepEqual([by[name].skipped, by[name].said], [true, 'skipped: no stranger is signed in with a record of their own.'], name);
   assert.ok(results.every((r) => r.pass), 'a missing name turned a step red');
 });
@@ -112,12 +112,12 @@ test('THE OLD KEY MUST BE REFUSED BY STRIPE; IT GOES ONLY TO STRIPE, IN THE HEAD
 });
 
 test('THE STEPS RUN IN PAY’S ORDER, WHICH IS THE REHEARSAL’S, AND EXTRA USAGE IS LISTED AND SKIPPED', async () => {
-  assert.deepEqual(PAY, ['mode', 'old-key', 'sign-in', 'free', 'upgrade', 'allowance', 'invite', 'switch', 'pack', 'extra', 'past-due', 'cancel', 'delete', 'events']);
+  assert.deepEqual(PAY, ['mode', 'old-key', 'sign-in', 'free', 'upgrade', 'allowance', 'switch', 'invite', 'pack', 'extra', 'past-due', 'cancel', 'delete', 'events']);
   assert.deepEqual(Object.keys(STEPS).sort(), [...PAY].sort());
   /* THE REHEARSAL TEST'S WALK NAMES ITS STEPS IN COMMENTS (`/* free: ...`), each one of PAY's, in PAY's order. */
   const source = await readFile(new URL('../../apps/worker/test/billing-rehearsal.test.ts', import.meta.url), 'utf8');
   const named = [...source.matchAll(/\/\* ([a-z-]+): /gu)].map((m) => m[1]).filter((n) => PAY.includes(n));
-  assert.deepEqual(named, ['free', 'upgrade', 'allowance', 'invite', 'switch', 'pack', 'past-due', 'cancel', 'delete']);
+  assert.deepEqual(named, ['free', 'upgrade', 'allowance', 'switch', 'invite', 'pack', 'past-due', 'cancel', 'delete']);
   assert.deepEqual(named, PAY.filter((n) => named.includes(n)), 'the rehearsal walks in another order than PAY');
   const only = await runPay(payFor(HOST, {}, { send: stub('test').send, waitMs: 10, every: 1 }), { steps: ['extra'] });
   assert.deepEqual(only.map((r) => r.name), ['mode', 'extra'], 'mode is always asked first');
@@ -198,7 +198,7 @@ test('THE WHOLE WALK ON THE HARNESS: every step green against the fake Stripe, e
     assert.deepEqual(said.map((r) => r.name), PAY);
     for (const name of PAY.filter((n) => n !== 'extra' && n !== 'delete')) assert.deepEqual([by[name].pass, by[name].skipped], [true, undefined], `${name}: ${by[name].said}`);
     assert.equal(by.extra.said, `skipped: ${EXTRA_SKIPPED}`);
-    assert.match(by.invite.said, /still shows one seat at 12\.00/u);
+    assert.match(by.invite.said, /still shows one seat at 17\.00/u);
     assert.match(by.cancel.said, /read-only: “Read-only until billing resumes\. Export is available\.”/u);
     /* A LAPSED OWNER CANNOT DELETE THEIR RECORD TODAY (`mayWrite` in apps/worker/src/lapse.ts lets only `export` by):
        red with the lapse's sentence until the blocked line lands, and green after it. */

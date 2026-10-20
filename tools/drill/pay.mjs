@@ -5,8 +5,8 @@
  *   node tools/drill/pay.mjs --host <origin> [--steps a,b]
  *
  * THE SAME WALK `apps/worker/test/billing-rehearsal.test.ts` TAKES against a fake Stripe, step for step and by the same
- * names (`PAY`): Free; Cloud bought on Stripe's Checkout page with the test Visa; the plan and the allowance move; a
- * second person joins and the invoice still shows one seat; Cloud Plus confirmed on the portal and its 400 credits; a
+ * names (`PAY`): Free; Cloud bought on Stripe's Checkout page with the test Visa; the plan and the allowance move;
+ * Cloud Plus confirmed on the portal and its 400 credits; a second person joins and the invoice still shows one seat; a
  * pack; a renewal on a failing card reads `past_due` and recovers; a cancel leaves the record read-only with its one
  * sentence; it is deleted. Then the events: each acted-on type Stripe sent was delivered, and the Worker's lines say so.
  *
@@ -35,7 +35,7 @@ import { drillFor, isProduction, lineOf, runDrill } from './run.mjs';
 import { api, ask, fixOf, ok, red, skip } from './steps.mjs';
 
 /** Every step, in the order the walk takes them. The rehearsal test's steps carry these names. */
-export const PAY = ['mode', 'old-key', 'sign-in', 'free', 'upgrade', 'allowance', 'invite', 'switch', 'pack', 'extra', 'past-due', 'cancel', 'delete', 'events'];
+export const PAY = ['mode', 'old-key', 'sign-in', 'free', 'upgrade', 'allowance', 'switch', 'invite', 'pack', 'extra', 'past-due', 'cancel', 'delete', 'events'];
 
 /** Stripe's test cards (docs.stripe.com/testing), and the test payment methods Stripe's API takes for the same cards. */
 export const CARDS = { visa: '4242424242424242', failsLater: '4000000000000341', declined: '4000000000000002' };
@@ -68,7 +68,7 @@ const LIVE_KEY = /^[sr]k_live_/u;
 
 export const HELP = `node tools/drill/pay.mjs --host <origin> [--steps a,b]
 
-One stranger's paid life on a host in test mode: Free, Cloud, a second person, Cloud Plus, a pack,
+One stranger's paid life on a host in test mode: Free, Cloud, Cloud Plus, a second person (teams are part of Plus), a pack,
 a failed renewal and its recovery, a cancel, the delete, and every acted-on event delivered.
 Steps, in order: ${PAY.join(', ')}.
 Production is always refused, and so is a host whose billing is not in test mode.
@@ -253,7 +253,7 @@ async function allowance(p) {
 /** The invitation's token from the answer `invite` gives (as `ends.mjs` reads it). */
 const tokenOf = (v) => (typeof v?.token === 'string' && v.token !== '' ? v.token : (/\/invite#([^&\s]+)/u.exec(String(v?.link ?? ''))?.[1] ?? null));
 
-/** `invite`: a second address is invited and joins; the invoice still shows one seat, colleagues being free. */
+/** `invite`: Teams are part of Cloud Plus, so this comes after `switch`. A second address is invited and joins; the invoice still shows one seat, colleagues being free. */
 async function invite(p) {
   const why = wants(p) ?? p.second.why ?? null;
   if (why) return skip(p.d, 'invite', why);

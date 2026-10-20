@@ -161,14 +161,6 @@ test('A STRANGER’S WHOLE PAID LIFE, FREE TO DELETED, THROUGH THE REAL DOORS AN
     assert.deepEqual(w.usageOf(record)?.month.allowance, PLAN_TABLE.hosted.allowance);
     assert.equal(w.usageOf(record)?.slash.included, PLAN_TABLE.hosted.credits);
 
-    /* invite: a second person joins; nothing is asked of Stripe and the invoice still shows one seat at 12.00. */
-    const before = w.stripe.asked.length;
-    w.people.set(record, 2);
-    assert.equal(w.stripe.asked.length, before);
-    const first = w.stripe.invoices.at(-1) as { lines: { data: { quantity: number; amount: number }[] }; amount_paid: number };
-    assert.deepEqual(first.lines.data.map((l) => [l.quantity, dollars(l.amount)]), [[1, '12.00']]);
-    assert.equal(dollars(first.amount_paid), '12.00');
-
     /* switch: Cloud Plus confirmed on the portal; the plan, its 400 credits and a 17.00 difference follow. */
     const portal = value<{ url: string }>(await w.doors.portal!(w.who, { record, plan: 'plus' })).url;
     assert.match(portal, /^https:\/\/billing\.stripe\.com\/p\/session\//u);
@@ -179,6 +171,14 @@ test('A STRANGER’S WHOLE PAID LIFE, FREE TO DELETED, THROUGH THE REAL DOORS AN
     assert.deepEqual(w.usageOf(record)?.month.allowance, PLAN_TABLE.plus.allowance);
     assert.equal(dollars(w.stripe.invoices[0]?.['amount_paid']), '17.00');
     assert.equal(refusal(await w.doors.portal!(w.who, { record, plan: 'plus' })).code, 'ALREADY_KNOWN');
+
+    /* invite: Teams are part of Cloud Plus, so it comes after the switch. A second person joins; nothing is asked of Stripe and the first invoice still shows one seat at 12.00. */
+    const before = w.stripe.asked.length;
+    w.people.set(record, 2);
+    assert.equal(w.stripe.asked.length, before);
+    const first = w.stripe.invoices.at(-1) as { lines: { data: { quantity: number; amount: number }[] }; amount_paid: number };
+    assert.deepEqual(first.lines.data.map((l) => [l.quantity, dollars(l.amount)]), [[1, '12.00']]);
+    assert.equal(dollars(first.amount_paid), '12.00');
 
     /* pack: 100 credits by card at 5.00; 500 by bank debit, credited only once the money settles; that one refunded. */
     const small = value<{ url: string }>(await w.doors.checkout!(w.who, { record, pack: 'credits-100' })).url;
