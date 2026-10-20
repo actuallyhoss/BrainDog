@@ -1,5 +1,5 @@
 /**
- * A declared icon draws from all 251 glyphs, not only the 68 the app draws for itself, and the app's
+ * A declared icon draws from all 251 glyphs, not only the 69 the app draws for itself, and the app's
  * own are the design system's icon shapes, drawn as the elements they are.
  *
  * BEFORE THIS FILE, `icon: rocket` ON A PAGE DREW A DOCUMENT. `iconFor` checked the name against
@@ -144,7 +144,7 @@ test('a core glyph the app never drew resolves, and draws at mount without waiti
 test('the rail places resolve by their own names', () => {
   for (const name of ['today', 'work', 'projects', 'money', 'activity', 'decide', 'settings', 'search', 'slash', 'plus'])
     assert.equal(iconFor(name, 'doc'), name);
-  assert.equal(Object.keys(PATHS).length, 68);
+  assert.equal(Object.keys(PATHS).length, 69);
 });
 
 test('the people glyphs Settings leads with draw at mount, in the app\'s hand, without waiting on the set', () => {

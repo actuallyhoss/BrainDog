@@ -40,7 +40,8 @@ export const PATHS = {
   projects: '<rect x="3.75" y="3.75" width="9.5" height="7" rx="2"/><rect x="15.25" y="3.75" width="5" height="7" rx="2"/><rect x="3.75" y="12.75" width="5" height="7.5" rx="2"/><rect x="10.75" y="12.75" width="9.5" height="7.5" rx="2"/>',
   money: '<path d="M18.5 7.25V5.9a1.4 1.4 0 0 0-1.75-1.36L6 7.25"/><rect x="3.75" y="7.25" width="16.5" height="12.5" rx="3"/><path d="M20.25 11.5h-3.5a2 2 0 0 0 0 4h3.5"/>',
   activity: '<path d="M3 12.5h3.75l2.5-6 4.5 11 2.5-5h4.75"/>',
-  decide: '<path d="M12 20.5v-6.25L6.25 8.5"/><path d="M12 14.25l5.75-5.75"/><path d="M6.25 13V8.5h4.5"/><path d="M17.75 13V8.5h-4.5"/>',
+  /* Needs you is the tray, as `inbox` draws it: the forking arrows it drew read as a letter at 16px (frame F15). */
+  decide: '<path d="M3.75 13.25 6.4 5.9a2 2 0 0 1 1.88-1.15h7.44a2 2 0 0 1 1.88 1.15l2.65 7.35"/><path d="M3.75 13.25v4.5a2.5 2.5 0 0 0 2.5 2.5h11.5a2.5 2.5 0 0 0 2.5-2.5v-4.5h-5l-1.5 2.5h-3.5l-1.5-2.5z"/>',
   settings: '<path d="M4 6.5h9M17 6.5h3M4 12h3M11 12h9M4 17.5h11M19 17.5h1"/><circle cx="15" cy="6.5" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/>',
   search: '<circle cx="10.75" cy="10.75" r="6.5"/><path d="M20 20l-4.6-4.6"/>',
   /* Ask, the Slash field. `star` draws the same, because every caller that named `star` meant Slash, and
@@ -48,6 +49,8 @@ export const PATHS = {
   slash: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M14.25 7.75l-4.5 8.5"/>',
   star: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="4.5"/><path d="M14.25 7.75l-4.5 8.5"/>',
   inbox: '<path d="M3.75 13.25 6.4 5.9a2 2 0 0 1 1.88-1.15h7.44a2 2 0 0 1 1.88 1.15l2.65 7.35"/><path d="M3.75 13.25v4.5a2.5 2.5 0 0 0 2.5 2.5h11.5a2.5 2.5 0 0 0 2.5-2.5v-4.5h-5l-1.5 2.5h-3.5l-1.5-2.5z"/>',
+  /* The Inbox page, mail that came in: an envelope, so the tray stays Needs you's alone. */
+  mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4 7 8 6 8-6"/>',
   /* A house: a property, and the palette's way home. Today is `today`. */
   home: '<path d="M4 10.5 12 4l8 6.5"/><path d="M6 9v10.25h12V9"/><path d="M10 19.25v-5h4v5"/>',
 
