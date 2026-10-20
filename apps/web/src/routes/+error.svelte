@@ -42,6 +42,8 @@
     <Empty kind="error" heading title={said.title} body={said.body}>
       {#snippet actions()}
         <Button weight="primary" onclick={() => location.reload()}>{said.action}</Button>
+        <!-- THE OTHER WAY ON (first F13): a page that will not load is not the only place to be. -->
+        <Button href="/">{words.home}</Button>
       {/snippet}
     </Empty>
     {#if stuck}<p class="stuck">{words.stuck(SUPPORT_EMAIL)}</p>{/if}
