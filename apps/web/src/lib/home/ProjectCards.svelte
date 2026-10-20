@@ -1,10 +1,10 @@
 <!--
   The projects that are live, as cards on Today (Today as the desk; the UI pass of 20 October, today F16, proj section 4).
 
-  ONE CARD EVERYWHERE: each live project is `ui/ProjectCard.svelte`, the card Projects draws too, in the one grid (four
-  across from 1280, three from 1024, two from 640, one below), and the whole card opens the project's page. A row of
-  three ends short rather than stretching, so a card is the same width here as on Projects. Only a draft the record
-  formed is drawn here, with its two presses.
+  ONE CARD EVERYWHERE: each live project is `ui/ProjectCard.svelte`, the card Projects draws too, and the whole card opens
+  the project's page. ON TODAY THE CARDS FILL THEIR ROW (the Today polish of 20 October): one to three share the width,
+  four and more wrap at four across, so the board never ends a row on a hole. Only a draft the record formed is drawn
+  here, with its two presses.
 
   ITS HEAD IS A TILE'S HEAD ON THE BOARD: the grid's glyph in a neutral well, "Projects" and how many, the lanes as one
   segmented control ("In play 3", "Earning 2", "Building 1"), and "All projects" at the end. NOTHING IS DRAWN FOR
@@ -239,21 +239,12 @@
     min-inline-size: 0;
   }
 
+  /* ON TODAY THE CARDS FILL THEIR ROW (Today polish 2): one to three share the whole width evenly, and four and more
+     wrap at four across (each at least a quarter of the row, and never under 280). A row is one height, and each card's
+     foot sits at its foot, so the feet are on one line. */
   @media (width >= 640px) {
     .cards {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (width >= 1024px) {
-    .cards {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-  }
-
-  @media (width >= 1280px) {
-    .cards {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(max(280px, calc((100% - 3 * 12px) / 4)), 1fr));
     }
   }
 
