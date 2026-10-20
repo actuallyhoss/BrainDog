@@ -27,6 +27,9 @@
     all: 'Activity',
     review: (n: number) => `${n.toLocaleString('en-GB')} to review`,
     names: (n: number) => `Show the ${n.toLocaleString('en-GB')}`,
+    /* A GROUPED LINE IN PARTS, so its count and its list stand a step heavier: "BrainDog filed 6 into Tools". */
+    filed: (who: string) => `${who} filed`,
+    into: 'into',
   } as const;
 
   const lines = $derived(arrivalsOf(rows));
@@ -51,8 +54,7 @@
 {#if lines.length > 0}
   <Tile icon="activity" title={words.title} count={rows.length} data-landed>
     {#snippet actions()}
-      {#if review > 0}<a class="l-review tap" href={at('/inbox')}>{words.review(review)}<Icon name="arrow" size="s" /></a>
-      {:else}<a class="l-review l-all tap" href={at('/audit')}>{words.all}<Icon name="arrow" size="s" /></a>{/if}
+      {#if review > 0}<a class="l-review tap" href={at('/inbox')}>{words.review(review)}<Icon name="arrow" size="s" /></a>{/if}
     {/snippet}
     <ul class="stream">
       {#each lines as r (r.key)}
@@ -61,8 +63,8 @@
           <span class="l-face"><Face name={r.who} kind={r.kind} run={r.run} size="s" /></span>
           {#if 'group' in r}
             <span class="l-what" dir="auto">
-              <button type="button" class="l-open tap" aria-expanded={open.has(r.key)} onclick={() => toggle(r.key)}
-                ><span class="l-name">{groupSaid(r)}</span><Icon name="chevronDown" size="s" /></button
+              <button type="button" class="l-open tap" aria-expanded={open.has(r.key)} aria-label={groupSaid(r)} onclick={() => toggle(r.key)}
+                ><span class="l-said" aria-hidden="true">{words.filed(r.who)} <b class="l-count num">{r.rows.length.toLocaleString('en-GB')}</b> {words.into} <b class="l-list">{r.to}</b></span><Icon name="chevronDown" size="s" /></button
               >
             </span>
             {#if open.has(r.key)}
@@ -83,6 +85,8 @@
         </li>
       {/each}
     </ul>
+    <!-- THE DOOR TO THE WHOLE LOG, AT THE TILE'S FOOT (Today polish 3), where the tiles beside it keep theirs. -->
+    <a class="l-review l-all l-foot tap" href={at('/audit')}>{words.all}<Icon name="arrow" size="s" /></a>
   </Tile>
 {/if}
 
@@ -94,13 +98,33 @@
   }
 
   /* NO RADIUS ON A RULED ROW: a corner and a hairline together curl the rule at both ends (today F10). */
+  /* A LINE AN ARRIVAL, 44 TALL (Today polish 9): when in a 64 column, the mark at 20, then what came, and the list. */
   .l-row {
     display: grid;
-    grid-template-columns: 4.5rem auto minmax(0, 1fr) auto;
+    grid-template-columns: 64px 20px minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--sp-2) var(--sp-3);
-    padding: var(--sp-2) 0;
+    gap: var(--sp-1) var(--sp-3);
+    min-block-size: 44px;
+    padding-block: var(--sp-1);
+    box-sizing: border-box;
     font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+  }
+
+  .l-face {
+    display: grid;
+    place-items: center;
+    inline-size: 20px;
+    block-size: 20px;
+  }
+
+  .l-said {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  .l-said > b {
+    font-weight: var(--fw-semi);
   }
 
   .l-row + .l-row {
@@ -126,6 +150,8 @@
   .l-at {
     color: var(--ink-3);
     font-size: var(--fs-meta);
+    font-weight: var(--fw-regular);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
@@ -234,6 +260,11 @@
 
   .l-all {
     color: var(--ink-2);
+  }
+
+  .l-foot {
+    align-self: flex-start;
+    margin-block-start: auto;
   }
 
   /* ON A PHONE, ONE LINE AN ARRIVAL (today F10): the time, the face, the name with its note cut short, and the list. */
