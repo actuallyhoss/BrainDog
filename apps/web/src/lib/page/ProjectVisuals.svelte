@@ -132,7 +132,7 @@
               <li><span class="t-name">The period before</span><span class="t-amount num">{format(w.trend.before, w.trend.currency)}</span><span class="t-bar" data-before="true"><span style:inline-size="{Math.max(w.trend.before > 0 ? 4 : 0, Math.round((w.trend.before / Math.max(w.trend.now, w.trend.before, 1)) * 100))}%"></span></span></li>
             </ul>
             <p class="quiet">{change(w.trend.before, w.trend.now)}</p>
-          {:else if w.kind === 'payroll'}
+          {:else if w.kind === 'dues'}
             <div class="cals">
               {#each w.calendar as c (c.key)}
                 <div class="cal">
