@@ -147,7 +147,8 @@ export function methods(deps: RecordDeps & { createDoor?: CreateDoor | undefined
     if (grant === null) return null;
     const run = kernel.findRun(ctx.session ?? {}, ctx.principal.id);
     const app = typeof ctx.session?.client === 'string' && ctx.session.client.trim() !== '' ? ctx.session.client.trim() : null;
-    return { token: ctx.principal.id, scope: grant.scope, person: grant.person, run: run === null ? null : kernel.nameOf(run.id), app };
+    const conv = typeof ctx.session?.client_id === 'string' && ctx.session.client_id.trim() !== '' ? ctx.session.client_id.trim() : null;
+    return { token: ctx.principal.id, scope: grant.scope, person: grant.person, run: run === null ? null : kernel.nameOf(run.id), app, conv };
   };
 
   /** What the ladder calls an agent and a list: the grant's label, and the list's own name. */

@@ -136,14 +136,17 @@ const plain = (a: Listed): Standing['agents'][number] => ({ agent: a.agent, conn
 /** What the ladder needs of the record. */
 export type LadderDeps = { sql: Sql; kernel: Kernel; now: () => number };
 
-/** A token call as the ladder reads it: the grant, its scope, the run it writes as (when there is one yet) and its app. */
-export type Caller = { token: string; scope: Scope; person: string; run: string | null; app: string | null };
+/**
+ * A token call as the ladder reads it: the grant, its scope, the run it writes as (when there is one yet), its app, and
+ * the conversation it says it is (`client_id`, the host's session id), or `null` when it names none.
+ */
+export type Caller = { token: string; scope: Scope; person: string; run: string | null; app: string | null; conv?: string | null };
 
 /** The record's per-agent memory of one kind: when each change was kept, newest last, and the declines in a row. */
 type Kept = { kept: string[]; declines: number };
 
 /** What a write at its rung does: write it, or file it as a question and say why in one line. */
-export type Gate = { write: true; rung: Rung; kinds: ChangeKind[] } | { write: false; why: string; kinds: ChangeKind[] };
+export type Gate = { write: true; rung: Rung; kinds: ChangeKind[] } | { write: false; why: string; kinds: ChangeKind[]; outside?: true };
 
 const json = (text: string | undefined): unknown => {
   if (text === undefined) return undefined;
@@ -173,27 +176,38 @@ export function ladder(deps: LadderDeps) {
    * Whether a run read text from outside the record (DIRECTION §37: "untrusted text drops the run to Ask for the rest of
    * it"), and where from, or `null`.
    *
-   * A MARK MADE BEFORE THE RUN OPENED IS THE TOKEN'S, and the run it opens next adopts it: a read opens no run, so an agent
-   * whose first call reads the inbox has no run to mark yet, and its first write must still ask.
+   * A MARK MADE BEFORE THE RUN OPENED IS THE CONVERSATION'S, and the run it opens next adopts it: a read opens no run, so
+   * an agent whose first call reads the inbox has no run to mark yet, and its first write must still ask.
+   *
+   * AND ONLY THAT CONVERSATION'S (live 20 Oct). The mark was kept under the token alone, so one session of Claude Code
+   * that read a bank text before it wrote marked the key, and the first write of every other session on that key, on
+   * any day after, asked "This run read something that arrived from outside the record". A call that names its
+   * conversation (`client_id`) is marked, and adopts, under that name; a call that names none still marks the whole key,
+   * since nothing tells its sessions apart, and every call on the key reads that one.
    */
-  const untrusted = (c: Pick<Caller, 'token' | 'run'>): string | null => {
+  const preRun = (c: Pick<Caller, 'token' | 'conv'>): string => (c.conv ? `token:${c.token}:${c.conv}` : `token:${c.token}`);
+  const untrusted = (c: Pick<Caller, 'token' | 'run' | 'conv'>): string | null => {
     if (c.run !== null) {
       const own = prefRead(MARKS, c.run) as { from?: unknown } | undefined;
       if (own && typeof own.from === 'string') return own.from;
     }
-    const held = prefRead(MARKS, `token:${c.token}`) as { from?: unknown } | undefined;
-    if (!held || typeof held.from !== 'string') return null;
-    if (c.run !== null) {
-      kernel.setPref(MARKS, c.run, { from: held.from, at: iso() });
-      kernel.setPref(MARKS, `token:${c.token}`, null);
+    const keys = [...new Set([preRun(c), `token:${c.token}`])];
+    for (const key of keys) {
+      const held = prefRead(MARKS, key) as { from?: unknown } | undefined;
+      if (!held || typeof held.from !== 'string') continue;
+      if (c.run !== null) {
+        kernel.setPref(MARKS, c.run, { from: held.from, at: iso() });
+        kernel.setPref(MARKS, key, null);
+      }
+      return held.from;
     }
-    return held.from;
+    return null;
   };
 
-  /** Mark a run, or the token's next run, as having read untrusted text. The first source is kept. */
-  const markUntrusted = (c: Pick<Caller, 'token' | 'run'>, from: string): void => {
+  /** Mark a run, or the conversation's next run, as having read untrusted text. The first source is kept. */
+  const markUntrusted = (c: Pick<Caller, 'token' | 'run' | 'conv'>, from: string): void => {
     if (untrusted(c) !== null) return;
-    kernel.setPref(MARKS, c.run ?? `token:${c.token}`, { from, at: iso() });
+    kernel.setPref(MARKS, c.run ?? preRun(c), { from, at: iso() });
   };
 
   /** A mark as it is kept, or `null`: where the text came from, said in words, and when it was read. */
@@ -341,7 +355,7 @@ export function ladder(deps: LadderDeps) {
     const shape = shapeIn(sql, list);
     const kinds = kindsOfWrite({ list, op, patch, shape, madeBy: selfId === null ? null : madeByIn(sql, selfId), person: c.person, was });
     const from = untrusted(c);
-    if (from !== null) return { write: false, kinds, why: `This run read ${from}, so its changes ask for the rest of it.` };
+    if (from !== null) return { write: false, kinds, why: `This run read ${from}, so its changes ask for the rest of it.`, outside: true };
     const floor = kinds.find((k) => k.floor !== null);
     if (floor) return { write: false, kinds, why: `${FLOOR_SAID[floor.floor!]}, which always asks.` };
     /* A LEARNING CAPTURED OR CONFIRMED NEEDS NOBODY (`learnt`), below the two lines above and never over them. It is

@@ -5907,7 +5907,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (grant === null) return null;
     const run = kernel.findRun(ctx.session ?? {}, ctx.principal.id);
     const app = typeof ctx.session?.client === 'string' && ctx.session.client.trim() !== '' ? ctx.session.client.trim() : null;
-    return { token: ctx.principal.id, scope: grant.scope, person: grant.person, run: run === null ? null : kernel.nameOf(run.id), app };
+    const conv = typeof ctx.session?.client_id === 'string' && ctx.session.client_id.trim() !== '' ? ctx.session.client_id.trim() : null;
+    return { token: ctx.principal.id, scope: grant.scope, person: grant.person, run: run === null ? null : kernel.nameOf(run.id), app, conv };
   };
 
   /** What the ladder says an agent and a list are called: the grant's label, and the list's own name. */
@@ -5977,14 +5978,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     return { ...(fields as Record<string, unknown>), [accent]: nextAccentHue(held) } as Patch;
   };
 
-  const askInstead = (ctx: CallContext, register: string, row: Record<string, unknown>, self: Entry | null, why: string): Result<Asked> => {
+  /**
+   * THE QUESTION SAYS WHY IT ASKS, in the one line the agent was answered with (`body.context`, which Decide draws as
+   * "Why it's asked"): on the owner's record every write of a cleanup run reached Needs you as a bare "Mark ... stale?",
+   * and nothing said it asked because the run had read a bank text. One its run asked for having read outside text is
+   * marked `outside`, so BrainDog never settles it for him (`handledFault`).
+   */
+  const askInstead = (ctx: CallContext, register: string, row: Record<string, unknown>, self: Entry | null, why: string, outside = false): Result<Asked> => {
     const question = askedOf(register, row, self);
     /* THE SAME WRITE TRIED AGAIN JOINS THE OPEN QUESTION (AGT-C07): its cause is the list, the row (or `new`) and a hash
        of what it would write, so another patch to the same row is another question. */
     const target = typeof row.at === 'string' ? row.at : 'new';
     const patch = row.patch ?? row;
     const cause = `write#${register}#${target}#${sha256(new TextEncoder().encode(canonValue(patch))).slice(0, 24)}`;
-    const filed = filedAs(ctx, kernel.propose({ question, body_kind: 'rowset', body: { register, rows: [row] }, ...(CAUSE.test(cause) ? { cause } : {}) }, writerOf(ctx)));
+    const filed = filedAs(ctx, kernel.propose({ question, body_kind: 'rowset', body: { register, rows: [row], context: why, ...(outside ? { outside: true } : {}) }, ...(CAUSE.test(cause) ? { cause } : {}) }, writerOf(ctx)));
     if (!filed.ok) return filed;
     return ok({ asked: { id: filed.value.id, question, why, ...(filed.value.joined === true ? { joined: true as const } : {}) } });
   };
@@ -8836,7 +8843,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (rung && !rung.gate.write) {
         const refused = wouldRefuse((w) => offRegister(args.register, kernel.create(args.register, args.fields, { ...writerOf(ctx), reads: refsSeen(ctx), ...w })));
         if (refused) return refused;
-        return tail(askInstead(ctx, args.register, { ...(args.fields as Record<string, unknown>) }, null, rung.gate.why));
+        return tail(askInstead(ctx, args.register, { ...(args.fields as Record<string, unknown>) }, null, rung.gate.why, rung.gate.outside === true));
       }
       return tail(
         keptOnLadder(
@@ -8976,7 +8983,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           ),
         );
         if (refused) return refused;
-        return tail(askInstead(ctx, args.register, { at: `${args.register}#${args.seq}`, version: args.version ?? self.version, patch: args.patch }, self, rung.gate.why));
+        return tail(askInstead(ctx, args.register, { at: `${args.register}#${args.seq}`, version: args.version ?? self.version, patch: args.patch }, self, rung.gate.why, rung.gate.outside === true));
       }
       return tail(
         keptOnLadder(
