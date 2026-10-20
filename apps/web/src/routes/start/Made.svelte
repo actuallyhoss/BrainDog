@@ -21,6 +21,7 @@
   import { heardOf, poll, type Heard } from '$lib/agents/connect.ts';
   import { appLines, firstWords, signOf } from '$lib/agents/first-connect.ts';
   import { listenFor } from '$lib/agents/listen.ts';
+  import { INSTALL_LINES, osOf } from '$lib/device.ts';
   import { connectLines } from '$lib/record/device.ts';
   import { step } from '$lib/funnel.ts';
   import Button from '$lib/ui/Button.svelte';
@@ -37,7 +38,7 @@
 
   /* THIS RECORD'S LINES: the bare host, and the record's own address where the shell names it. */
   const slug = $derived(page.data.live === true ? (page.data.index?.slug ?? null) : null);
-  const apps = $derived(appLines(connectLines(page.url.origin, slug)));
+  const apps = $derived(appLines(connectLines(page.url.origin, slug), INSTALL_LINES[osOf(typeof navigator === 'undefined' ? undefined : navigator)]));
 
   let heard = $state<Heard[]>([]);
   const sign = $derived(signOf(heard));
@@ -75,11 +76,13 @@
         <div class="words">
           <span class="name">{a.name}</span>
           <span class="what">{a.what}</span>
+          {#if a.before !== null}<code class="line mono">{a.before}</code>{/if}
           <code class="line mono">{a.line}</code>
         </div>
         <Button size="sm" onclick={() => {
             step('copied_line');
-            void clipboard.put(a.line, a.line, copy.lineCopied);
+            const whole = a.before === null ? a.line : `${a.before}\n${a.line}`;
+            void clipboard.put(whole, whole, copy.lineCopied);
           }}>{a.button}</Button>
       </li>
     {/each}

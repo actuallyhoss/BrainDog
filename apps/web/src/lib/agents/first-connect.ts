@@ -11,7 +11,7 @@ import type { ConnectLines } from '../record/device.ts';
 import { connectWords, type Heard } from './connect.ts';
 
 /** One app and the line that connects it for this record. `mark` is the key of its maker's logo. */
-export type AppLine = { id: string; name: string; mark: MarkedAgent | AppMark; what: string; line: string; button: string };
+export type AppLine = { id: string; name: string; mark: MarkedAgent | AppMark; what: string; line: string; button: string; /** A line to run first, shown above `line` and copied with it, or `null`. */ before: string | null };
 
 export const firstWords = {
   title: 'Connect your agent',
@@ -26,14 +26,14 @@ export const firstWords = {
  * The five apps, in the order a person is likeliest to have them. VS Code takes its own command for an HTTP server;
  * the others take what `connectLines` already hands the connect sheet.
  */
-export function appLines(lines: ConnectLines): AppLine[] {
+export function appLines(lines: ConnectLines, install: string = lines.install): AppLine[] {
   const vscode = JSON.stringify({ name: 'braindog', type: 'http', url: lines.mcp });
   return [
-    { id: 'claude-code', name: 'Claude Code', mark: 'claude', what: 'Run in a terminal', line: lines.setup, button: connectWords.copyCommand },
-    { id: 'claude', name: 'Claude', mark: 'claude', what: 'Settings, Connectors, add a custom connector', line: lines.web, button: connectWords.copyAddress },
-    { id: 'chatgpt', name: 'ChatGPT', mark: 'chatgpt', what: 'Settings, Connectors, add a connector', line: lines.mcp, button: connectWords.copyAddress },
-    { id: 'vscode', name: 'VS Code', mark: 'vscode', what: 'Run in a terminal', line: `code --add-mcp '${vscode}'`, button: connectWords.copyCommand },
-    { id: 'cursor', name: 'Cursor', mark: 'cursor', what: 'Add to mcp.json', line: lines.cursor, button: connectWords.copyEntry },
+    { id: 'claude-code', name: 'Claude Code', mark: 'claude', what: 'Run in a terminal', line: lines.setup, button: connectWords.copyCommand, before: install },
+    { id: 'claude', name: 'Claude', mark: 'claude', what: 'Settings, Connectors, add a custom connector', line: lines.web, button: connectWords.copyAddress, before: null },
+    { id: 'chatgpt', name: 'ChatGPT', mark: 'chatgpt', what: 'Settings, Connectors, add a connector', line: lines.mcp, button: connectWords.copyAddress, before: null },
+    { id: 'vscode', name: 'VS Code', mark: 'vscode', what: 'Run in a terminal', line: `code --add-mcp '${vscode}'`, button: connectWords.copyCommand, before: null },
+    { id: 'cursor', name: 'Cursor', mark: 'cursor', what: 'Add to mcp.json', line: lines.cursor, button: connectWords.copyEntry, before: null },
   ];
 }
 

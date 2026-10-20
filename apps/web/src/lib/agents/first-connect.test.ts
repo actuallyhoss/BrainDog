@@ -11,7 +11,9 @@ test('five apps, each with a line for this record and no key', () => {
     apps.map((a) => a.name),
     ['Claude Code', 'Claude', 'ChatGPT', 'VS Code', 'Cursor'],
   );
+  assert.equal(apps[0]?.before, 'curl -fsSL https://brain.dog/cli/install.sh | sh', 'the install line comes before setup');
   assert.equal(apps[0]?.line, 'braindog setup https://brain.dog/app/acme');
+  assert.equal(apps[1]?.before, null);
   assert.equal(apps[1]?.line, 'https://brain.dog/mcp');
   assert.ok(apps.every((a) => !/bearer|token|—/iu.test(a.line + a.what)));
 });

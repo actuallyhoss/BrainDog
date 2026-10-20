@@ -22,6 +22,7 @@ import type { DeviceApproved, DeviceRow } from '@braindog/client';
 
 import { BASE } from '../at.ts';
 import { copy } from '../copy.ts';
+import { INSTALL_LINES } from '../device.ts';
 import { REGISTERS } from './held.ts';
 /* A CYCLE, ON PURPOSE AND SAFE: `apps.ts` reads `reportKeyOf` from here and this reads `partsOf` from there, both
    function declarations called only after both modules have loaded. */
@@ -170,20 +171,22 @@ export const standing = (rows: readonly TokenRow[]): TokenRow[] => rows.filter((
  * checkout of the repository had.
  *
  * THE SETUP LINE NAMES THE RECORD when the screen knows it. The Cloud device flow is refused without a slug, and a line
- * with the bare origin did not work where most people would paste it. `setup` logs in, installs the hooks, registers
+ * with the bare origin did not work where most people would paste it. `install` is the line before it, because the
+ * command does not exist on a machine until it is run. `setup` logs in, installs the hooks, registers
  * the MCP server and syncs the skills in one command.
  *
  * AND THE LINES PER APP, for the connect sheet (AGT-A07): `codex` is Codex's own command for an HTTP server, `cursor`
  * the entry its server file takes (`~/.cursor/mcp.json`), and `web` and `other` the address, which is all Claude on the
  * web and any other app are given. Each is the line for doing it by hand; `setup` finds Codex and Cursor itself.
  */
-export type ConnectLines = { mcp: string; claude: string; setup: string; codex: string; cursor: string; web: string; other: string };
+export type ConnectLines = { mcp: string; claude: string; install: string; setup: string; codex: string; cursor: string; web: string; other: string };
 
 export function connectLines(origin: string, slug?: string | null): ConnectLines {
   const mcp = `${origin}/mcp`;
   return {
     mcp,
     claude: `claude mcp add --transport http braindog ${mcp}`,
+    install: INSTALL_LINES.unix,
     setup: `braindog setup ${slug ? `${origin}${BASE}/${slug}` : origin}`,
     codex: `codex mcp add braindog --url ${mcp}`,
     cursor: JSON.stringify({ mcpServers: { braindog: { url: mcp } } }),
