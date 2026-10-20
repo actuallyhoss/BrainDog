@@ -58,8 +58,6 @@ export const packs = {
 
   /* USE CASES, SHARED AND INSTALLED. A use case is a file like an add-on, planned and
      approved the same way, so these sentences say what it arranges and never how the screen works. */
-  /* BROWSE LISTS BOTH: the built-in use cases, and the use cases and add-ons this BrainDog's catalogue serves. */
-  browseTitle: 'Use cases and add-ons',
   browseAll: 'All use cases and add-ons',
   chooseFile: 'Choose a file',
   shareAddressNotOne: 'That is not a web address. Paste the whole https address of the file.',
@@ -79,9 +77,7 @@ export const packs = {
   browseRail: 'Rail',
   browseHome: 'Home',
   browseLists: 'Lists',
-  browseHouseHome: 'The house Home',
   browseNoRail: 'Nothing added to the rail',
-  shareWhat: "The file carries this BrainDog's modules, its lists and pages, its rail, its voice and its labels. None of what you keep goes in unless you pick it here.",
   shareNoUseCase: 'No use case is on here, so the file carries the modules that are on and the pages you placed.',
   shareTitle: 'Title',
   shareVersion: 'Version',

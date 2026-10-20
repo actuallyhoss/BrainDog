@@ -222,10 +222,6 @@ export const HELD = {
     ids: ['work'],
     why: "the declared Work page's slug, `page.work`, which `/?work` draws.",
   },
-  'apps/web/src/routes/packs/+page.svelte': {
-    ids: ['updates'],
-    why: "the Packs screen's Updates tab.",
-  },
   'apps/web/src/routes/automations/[id]/+page.svelte': {
     ids: ['steps'],
     why: "the automation screen's Steps tab.",
