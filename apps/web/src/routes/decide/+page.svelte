@@ -360,7 +360,7 @@
        asking a question is drawn after the page, not here. -->
   <PageHead icon="decide" title={said('decide')} sentence={headLine} needs={cleared ? undefined : shaped?.sentence.needs || undefined}>
     {#snippet actions()}
-      {#if answerable}<Button weight="primary" onclick={() => (asking = true)}>{WORDS.ask}</Button>{/if}
+      {#if answerable}<Button weight="primary" onclick={() => (asking = true)}><Icon name="ask" size="s" />{WORDS.ask}</Button>{/if}
     {/snippet}
   </PageHead>
 

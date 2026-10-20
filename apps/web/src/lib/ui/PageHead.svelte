@@ -12,6 +12,8 @@
   The count says `n of N`, and when examples are in the figure it says so (19 §6).
 
   THE ACTIONS ARE THE PAGE'S OWN: one primary, and the rest behind its "⋯", which the page hands over as `actions`.
+  ON A PHONE THEY STAY ON THE TITLE ROW and never wrap under it: a button with a glyph is the glyph alone in a 36px
+  square, its words still its name to a screen reader, and the name beside them wraps in its own column.
 
   TWO SHAPES, ONE ON EACH SIDE OF 900px.
 
@@ -682,18 +684,45 @@
       display: none;
     }
 
-    /* THE NAME TAKES ITS OWN WIDTH, AND THE ACTIONS WRAP ONLY IF THEY HAVE TO, to the end of whichever line they land on. */
+    /* THE ACTIONS STAY ON THE TITLE ROW (batch 5c): the name wraps in its own column and the actions keep their width at
+       its end. They used to wrap under the name and float half way across the second line. */
     .head-main {
-      flex-wrap: wrap;
-      row-gap: var(--sp-2);
+      flex-wrap: nowrap;
+      gap: var(--sp-2);
     }
 
     .name-row {
-      flex: 1 1 auto;
+      flex: 1 1 0;
+      flex-wrap: wrap;
     }
 
+    /* LEVEL WITH THE SEARCH BUTTON AND THE FACE: the actions keep to the bar's band at the top of the row, however many
+       lines the name beside them takes. */
     .head-actions {
+      flex: none;
+      flex-wrap: nowrap;
+      align-self: flex-start;
+      min-block-size: var(--sticky);
       margin-inline-start: auto;
+    }
+
+    /* A BUTTON WITH A GLYPH IS THE GLYPH ALONE, in a 36px square: its words stay in it at no size, so they are still its
+       name to a screen reader, and `.tap` keeps the 44px target round it. A page's "+" and "⋯" take the same square. */
+    .head-actions :global(.btn:has(.icon)) {
+      inline-size: 36px;
+      min-block-size: 36px;
+      padding: 0;
+      gap: 0;
+      font-size: 0em;
+    }
+
+    .head-actions :global(:is(.capture-open, .head-more)) {
+      inline-size: 36px;
+      block-size: 36px;
+    }
+
+    .head-actions :global(:is(.btn, .capture-open, .head-more, .menu-trigger)) {
+      flex: none;
     }
 
     /* AND THE SHORTCUT HINT GOES, because below 900px there is no keyboard to press it with. */
