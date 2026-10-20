@@ -59,7 +59,6 @@ import {
   type QueueQuestion,
   isQuiet,
   isStale,
-  STALE_MS,
   runAge,
   exponentOf,
   openRecord,
@@ -6166,37 +6165,35 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * The runs in one of `states` heard from lately, newest heard from first, at most `most` of them: an INDEX READ on
-   * `last_seen` (`entry_i_session__last_seen`), from a day before the stale mark on.
+   * The runs in one of `states` heard from lately, newest heard from first, of the newest `most` heard from: an INDEX
+   * READ down `last_seen` (`entry_i_session__last_seen`) that stops at `most`, and only the ones `isStale` keeps are read
+   * whole.
    *
-   * WHY. His record holds 888 runs and 842 of them never ended, so "every open run, newest first" sorted all 842 on each
-   * `context` and `boot` to keep the few heard from in the last 45 minutes. Every reader of this drops a run older than
-   * the stale mark (`isStale`, or the working mark, which is nearer), so a run older than that and a day more is never
-   * one of theirs. The day is room for a `last_seen` written in another offset, which sorts as text. Of those, only the
-   * runs inside the stale mark by the clock are read whole, so a day of runs gone quiet costs an index entry each.
+   * WHY. His record holds 888 runs and 842 of them never ended, so "the newest open runs" sorted all 842 on each
+   * `context` and `boot` to keep the few heard from in the last 45 minutes, and read fifty or two hundred of them whole.
+   * Every reader of this drops a stale run, or keeps only a working one, which is nearer, so the rest are never theirs.
+   * The clock is asked of `presence.ts` alone (`isStale`, the `one-clock` gate).
    */
   const heardSince = (states: readonly string[], nowMs: number, most: number): Entry[] => {
-    const from = new Date(nowMs - STALE_MS - 86_400_000).toISOString();
     /* NAMED, because a store that was never analysed reads the whole register by `entry_made` instead and sorts it. A
        record without the index (none is made without migration 0002, but a copy could lose it) reads as before. */
     const read = (indexed: string) =>
-      sql.all<{ id: string; seen: unknown }>(
-        `SELECT id, json_extract(fields, '$.last_seen') AS seen FROM entry ${indexed}
-         WHERE register = '${SESSION}' AND deleted_at IS NULL AND json_extract(fields, '$.last_seen') >= ?
+      sql.all<{ id: string; seen: string; updated_at: string }>(
+        `SELECT id, json_extract(fields, '$.last_seen') AS seen, updated_at FROM entry ${indexed}
+         WHERE register = '${SESSION}' AND deleted_at IS NULL AND json_extract(fields, '$.last_seen') IS NOT NULL
            AND json_extract(fields, '$.${RUN.state}') IN (SELECT value FROM json_each(?))
          ORDER BY json_extract(fields, '$.last_seen') DESC, updated_at DESC LIMIT ?`,
-        from,
         JSON.stringify(states),
         most,
       );
-    let heard: { id: string; seen: unknown }[];
+    let heard: { id: string; seen: string; updated_at: string }[];
     try {
       heard = read(`INDEXED BY entry_i_${SESSION}__last_seen`);
     } catch {
       heard = read('');
     }
     return heard
-      .filter(({ seen }) => typeof seen === 'string' && Date.parse(seen) >= nowMs - STALE_MS)
+      .filter((r) => !isStale({ fields: { last_seen: r.seen }, updated_at: r.updated_at }, nowMs))
       .flatMap(({ id }) => ((row) => (row === null || row === undefined ? [] : [row]))(kernel.get(id)));
   };
 
