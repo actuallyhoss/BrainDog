@@ -8,8 +8,10 @@
  * and `graph` gates require of anything under `packages/`.
  *
  * STATELESS. `initialize` negotiates a version and hands over the instructions, and nothing is
- * remembered: every message stands alone, which is what a Worker that keeps nothing can serve. The one exception is
- * when a caller's calls were last marked (`calledBy`), which writes fewer marks and changes no reply.
+ * remembered: every message stands alone, which is what a Worker that keeps nothing can serve. Two exceptions: when a
+ * caller's calls were last marked (`calledBy`), which writes fewer marks and changes no reply, and each list's
+ * declaration as a caller was answered it (`namingKept`), kept at the record's version, which asks the record less and
+ * answers what asking again would.
  */
 
 import { refused, type Result } from '@braindog/ports';
@@ -262,6 +264,116 @@ function called(surface: object, caller: string, now: number): number | null {
   return (was?.n ?? 0) + 1;
 }
 
+/** How long a caller's lists are kept at one version of the record before they are asked again whatever it says. */
+const NAMING_FOR = 5 * MINUTE;
+/** The most callers one surface keeps lists for, and the most lists one caller keeps; the oldest caller goes first. */
+const NAMING_CALLERS = 200;
+const NAMING_LISTS = 200;
+
+/** One caller's lists as the record answered them, at the version it stood at when they were kept. `null` is a caller seen once. */
+type Naming = { stamp: number | null; at: number; lists: Map<string, Result<unknown>> };
+
+/**
+ * The naming state, held across messages: each list's declaration as `schema` answered it, which is where `tools` reads
+ * its prefix, its ref fields, its text fields and its card (`learnPrefix`, `index.ts`).
+ *
+ * WHAT IT COST. `tools` is built for every message, so its maps died with the answer, and every answer that named a row
+ * asked `schema` again for each list it touched: a `list tasks` asked for Tasks, Projects and People before it could
+ * say one name, and on the record the `schema` read parses every block declaration it holds (`record/src/index.ts`,
+ * `schema`). The same few lists, read again on every call of a session, for an answer that moves only when a list is
+ * declared again.
+ *
+ * KEYED BY THE RECORD AND THE CALLER'S WHOLE CONTEXT, and stamped with the version the record answers that caller.
+ * The record is the surface object, one per record on a host that keeps its record open. The caller is the context as
+ * it came, written out whole, because a list's declaration is told only to whoever may read it: an earlier attempt at
+ * keeping names keyed them by what `whoami` said, which says nothing of `ctx.levels`, and a token held to `append` on
+ * one list was told the names of its rows. Two contexts that write out the same are the same grant, the same ceiling
+ * and the same run; anything else is another key, and a context that cannot be written out is not kept at all.
+ *
+ * THE STAMP IS THE RECORD'S `version` FOR THAT CALLER, which moves when any line she may read is written, and a list
+ * the record declares again is one: every install it makes names who made it, and that writes the `declare` line
+ * (`kernel/src/index.ts`, `declared`), measured on the seed moving both an owner's and a token's version. So a kept
+ * list is never older than the version it was read at, and the next version asks again. `NAMING_FOR` bounds it
+ * besides, for a declaration put in with nobody named (a seed, a migration), which writes no line.
+ *
+ * A CALLER SEEN ONCE IS NOT KEPT, AND ASKS NO VERSION. Its first message reads as it always did; its second asks the
+ * version once and keeps what it reads at it; every one after asks the version and nothing it already has. A start
+ * hook that calls one tool pays nothing for a cache it never uses. A refused `schema` is never kept, so a list the
+ * caller may not read is asked again, and refused again, by the record.
+ *
+ * ONLY `schema` IS KEPT. Rows, names and everything else an answer reads are asked fresh, every message, with the
+ * caller's own context: `namesIn` in `index.ts` says why a name is never kept past its answer.
+ */
+const namingKept = new WeakMap<object, Map<string, Naming>>();
+
+/** A context written out whole, the key a caller's lists are kept under, or `null` for one that cannot be. */
+function reachOf(ctx: unknown): string | null {
+  try {
+    const said: unknown = JSON.stringify(ctx ?? null);
+    return typeof said === 'string' ? said : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The surface one message's tools are built over: the caller's own, with `schema` answered from the lists kept for this
+ * caller at this version (`namingKept`). Every other method is the surface's, reached through it as before.
+ */
+function named<C>(surface: McpSurface<C>): McpSurface<C> {
+  let byReach = namingKept.get(surface);
+  if (byReach === undefined) namingKept.set(surface, (byReach = new Map()));
+  const kept = byReach;
+  /* ONE VERSION A MESSAGE FOR EACH CALLER IT SPEAKS FOR, asked only when a list is first wanted. */
+  const checked = new Map<string, Promise<Naming | null>>();
+  const keep = (reach: string, naming: Naming): Naming => {
+    kept.delete(reach);
+    if (kept.size >= NAMING_CALLERS) kept.delete(kept.keys().next().value as string);
+    kept.set(reach, naming);
+    return naming;
+  };
+  const namingFor = (reach: string, ctx: C): Promise<Naming | null> => {
+    let said = checked.get(reach);
+    if (said === undefined) {
+      said = (async (): Promise<Naming | null> => {
+        const was = kept.get(reach);
+        const now = Date.now();
+        if (was === undefined) {
+          keep(reach, { stamp: null, at: now, lists: new Map() });
+          return null;
+        }
+        let stamp: number | null = null;
+        try {
+          const v = await surface.version(ctx);
+          stamp = v.ok && typeof v.value?.version === 'number' ? v.value.version : null;
+        } catch {
+          stamp = null;
+        }
+        if (stamp === null) {
+          kept.delete(reach);
+          return null;
+        }
+        if (was.stamp === stamp && now - was.at <= NAMING_FOR) return was;
+        return keep(reach, { stamp, at: now, lists: new Map() });
+      })();
+      checked.set(reach, said);
+    }
+    return said;
+  };
+  const schema: McpSurface<C>['schema'] = async (args, ctx) => {
+    const reach = reachOf(ctx);
+    const naming = reach === null ? null : await namingFor(reach, ctx);
+    const had = naming?.lists.get(args.register);
+    if (had !== undefined) return had;
+    const out = await surface.schema(args, ctx);
+    if (naming !== null && out.ok && naming.lists.size < NAMING_LISTS) naming.lists.set(args.register, out);
+    return out;
+  };
+  const over = Object.create(surface) as McpSurface<C>;
+  Object.defineProperty(over, 'schema', { value: schema, enumerable: true });
+  return over;
+}
+
 /** The client as a mark names it, its name and version, held to the record's 80 characters. */
 function clientOf(params: Record<string, unknown>): string | undefined {
   const info = params.clientInfo;
@@ -352,7 +464,8 @@ async function dispatch<C>(
   caller: string,
   server: typeof SERVER,
 ): Promise<Reply> {
-  const mcp = tools(surface, origin);
+  /* OVER THE NAMING STATE THIS CALLER WAS ANSWERED BEFORE, at the version the record says it is at (`named`). */
+  const mcp = tools(named(surface), origin);
   const said = (result: Record<string, unknown>) => whole(id, result, version);
   /* EVERY LIST IS ONE PAGE, AND SAYS SO BY CARRYING NO `nextCursor`. So a cursor is one this server never issued, which
      the specification answers -32602; a client that sends one is never handed the whole list again as if it were the
