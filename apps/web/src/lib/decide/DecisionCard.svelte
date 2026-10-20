@@ -77,7 +77,8 @@
   import { hold, type Held } from '../../routes/decide/press.ts';
   import MergeCard from '../../routes/decide/MergeCard.svelte';
   import { answeredLine, cardOf, cardWords, inlineOf, pressOf, pressSaid, primaryOf, saysChanges, startsOn, wayTail } from './card.ts';
-  import { footprint, settle } from './settle.ts';
+  import { footprint, leave, pointerOff, settle } from './settle.ts';
+  import { answerPressed, answerTakenBack, answerWritten } from '$lib/home/waits.svelte.ts';
   import { step } from '$lib/funnel.ts';
   import { othersLine, namer } from '../../routes/decide/[id]/decider.ts';
 
@@ -194,6 +195,11 @@
   let busy = $state(false);
   /** The answer held for its Undo, or `null` once it has gone or was taken back. */
   let holding = $state<Held | null>(null);
+  /* THE ROW IS ON ITS WAY OUT, sent and waiting for the pointer to leave its queue, or closing (`settle.ts` `leave`). It
+     carries `data-held` meanwhile, so the page reads itself again only once the row has gone and nothing moves then. */
+  let leaving = $state(false);
+  /** How long a declined line stays for its note where no pointer rests on the queue. */
+  const NOTE_MS = 4_000;
   /* ONE PRESS ON A CHOICE DECIDES (`card.ts` `pressOf`): two or three answers, none hard to undo. Not while the record's
      reason line is open, where the choice is changed and Send gives it, nor on a host that takes the press for itself. */
   const oneTap = $derived(listed && answerable && onpress === undefined && phase !== 'asking' && pressOf(card));
@@ -263,14 +269,17 @@
       const out = await answerQuestion(apiBase(), question.id, way.key, said);
       if (out.from === 'written') {
         phase = 'answered';
+        answerWritten(question.id);
         step('needs_answered');
         onanswered();
+        void goOut();
         /* AND THE RAIL'S COUNT FOLLOWS: the write dropped the kept `boot` (`decide-write.ts`), and the layout reads it
            again. `/p/<slug>` reads its body by its slug and not from the layout, so there this does not read the card away. */
         void invalidateAll();
         return;
       }
       mergeLine = '';
+      answerTakenBack(question.id);
       /* A REFUSED ANSWER OPENS THE CARD BACK OUT OF ITS LINE as Undo does, rather than in one jump. */
       if (out.from === 'refused' && out.wants === 'reason') {
         await morph(() => (phase = 'asking'));
@@ -295,6 +304,9 @@
     chosen = way;
     mergeLine = said;
     answeredAt = new Date().toISOString();
+    /* THE COUNT MOVES ON THE PRESS (`waits.svelte.ts`): the rail, the tab and the head say one less now, not after the
+       six seconds of Undo and the poll that follows the write. */
+    answerPressed(question.id);
     await morph(() => {
       phase = 'answered';
       holding = hold(() => {
@@ -305,11 +317,32 @@
     done?.focus();
   }
 
+  /**
+   * THE SENT ANSWER'S ROW GOES WITHOUT MOVING WHAT THE READER IS AIMING AT: it waits for the mouse to leave its queue,
+   * then closes to nothing with the gap under it (`settle.ts`), and the page's next read takes it out with nothing left to
+   * move. Only a row of a queue (`.qa`); a host that draws the card alone reads itself again as it always did.
+   */
+  async function goOut() {
+    const row = done?.closest<HTMLElement>('.qa') ?? null;
+    if (!row || note !== 'shut') return;
+    leaving = true;
+    try {
+      await pointerOff(row.parentElement);
+      /* A DECLINE OFFERS ITS NOTE IN THE LINE: on a screen with no pointer to wait for, the line stays a moment for it. */
+      if (chosen?.key === 'reject' && typeof matchMedia === 'function' && !matchMedia('(hover: hover)').matches) await new Promise((r) => setTimeout(r, NOTE_MS));
+      /* A NOTE BEING WRITTEN KEEPS ITS LINE. */
+      if (note === 'shut') await leave(row);
+    } finally {
+      leaving = false;
+    }
+  }
+
   /** Undo, while the answer is held: the card comes back as it was, focus on the answer that was pressed. */
   async function undo() {
     const was = holding;
     if (!was?.undo()) return;
     holding = null;
+    answerTakenBack(question.id);
     mergeLine = '';
     const key = chosen?.key;
     await morph(() => (phase = 'open'));
@@ -421,6 +454,7 @@
     if (!chosen) return;
     if (reason.trim() === '') return reveal();
     answeredAt = new Date().toISOString();
+    answerPressed(question.id);
     void morph(() => (phase = 'answered'));
     void send(chosen, reason);
   }
@@ -494,7 +528,7 @@
 
 {#if phase === 'answered' && chosen}
   <!-- ONE LINE, QUIET: what was chosen, by whom and when, where the card was, with Undo while the answer waits. -->
-  <p class="qa-done" role="status" tabindex="-1" bind:this={done} data-held={holding ? '' : undefined}>
+  <p class="qa-done" role="status" tabindex="-1" bind:this={done} data-held={holding || busy || leaving ? '' : undefined}>
     <Face name={copy.feedYou} you size="s" /><span class="qa-done-words">{line}</span>
     {#if holding}
       <button type="button" class="qa-see qa-undo tap" onclick={undo}>{cardWords.undo}</button>

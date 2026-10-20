@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { msOf, SETTLE_MOST, settleOf } from './settle.ts';
+import { leaveOf, msOf, SETTLE_MOST, settleOf } from './settle.ts';
 
 const src = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -60,4 +60,18 @@ test('the question’s own page has a side only with something in it: who asked 
   /* AT LEAST THE CARD'S 280px, and wider on a wide page, only where there is a side. */
   assert.match(gate, /\.gate-form\[data-side\] \{\n\s+display: grid;\n\s+grid-template-columns: minmax\(0, 1fr\) clamp\(280px, 26cqi, 360px\);/u);
   assert.ok(gate.indexOf('<div class="gate-side">') < gate.indexOf('<section class="options"'), 'who asked and why are read after the answers');
+});
+
+test('a sent answer’s row closes to nothing with the gap under it, so the read that takes it out moves nothing', () => {
+  assert.deepEqual(leaveOf(84, 12, 180, false), [
+    { blockSize: '84px', marginBlockEnd: '0px', opacity: 1 },
+    { blockSize: '0px', marginBlockEnd: '-12px', opacity: 0 },
+  ]);
+  assert.equal(leaveOf(84, 12, 180, true), null, 'less motion: gone at once, to the same end');
+  assert.equal(leaveOf(0.4, 12, 180, false), null, 'a row with no height has nothing to play');
+  assert.deepEqual(leaveOf(84, Number.NaN, 180, false)?.[1], { blockSize: '0px', marginBlockEnd: '0px', opacity: 0 });
+  const card = src('./DecisionCard.svelte');
+  assert.match(card, /await pointerOff\(row\.parentElement\);/u, 'it waits for the mouse to leave its queue first');
+  assert.match(card, /data-held=\{holding \|\| busy \|\| leaving \? '' : undefined\}/u, 'and holds the page’s read until it has gone');
+  assert.match(card, /answerWritten\(question\.id\);[\s\S]*void goOut\(\);/u, 'it goes once the record wrote it');
 });

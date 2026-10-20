@@ -72,7 +72,7 @@
   import { railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
   import { needYouCount } from '$lib/home/today-tiles.ts';
-  import { heardWaits, waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
+  import { heardWaits, waitsNow, waitsTicket, workingNow } from '$lib/home/waits.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { penCount } from '$lib/design/pen.ts';
@@ -687,11 +687,13 @@
     heardAt = { base, version };
     if (base === null || first) return;
     let gone = false;
+    /* THE TICKET BEFORE THE READ, so an answer written while it is out stays taken off the count (`waits.svelte.ts`). */
+    const asked = waitsTicket();
     void import('$lib/record/boot-live.ts')
       .then(async (m) => {
         const got = await m.rereadBoot(base);
         if (!gone && got.from === 'live') {
-          heardWaits({ waits: m.waitsOf(got.boot), working: m.workingOf(got.boot) });
+          heardWaits({ waits: m.waitsOf(got.boot), working: m.workingOf(got.boot) }, asked);
           hear([
             ...(got.boot.waiting ?? []).map(questionAlert),
             /* ONLY RECENT HANDOFFS: the feed holds old ones, and the first poll would otherwise ring for all of them. */

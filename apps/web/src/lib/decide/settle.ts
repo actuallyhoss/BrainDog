@@ -77,3 +77,82 @@ export function settle(el: HTMLElement | null, from: number): Animation | null {
   void a.finished.then(done, done);
   return a;
 }
+
+/**
+ * AN ANSWER SENT TAKES ITS ROW AWAY WITHOUT A JUMP. The line stayed where the card was until the page read itself again,
+ * and then went in one frame, the row's height and the gap under it (84px on his record), and a click aimed at the next
+ * card met the empty space it left. Now the row closes to nothing over `--d-rows`, the gap with it, so when the read
+ * takes it out of the page nothing else moves; for a reader who asked for less motion it is gone at once, the same end.
+ *
+ * `leaveOf` IS PURE: the frames from the row's height and the gap after it to none at all, or `null` to go at once.
+ */
+export function leaveOf(height: number, gap: number, ms: number, less: boolean): Keyframe[] | null {
+  if (less || ms <= 0 || !Number.isFinite(height) || height < STILL) return null;
+  const g = Number.isFinite(gap) && gap > 0 ? gap : 0;
+  return [
+    { blockSize: `${height}px`, marginBlockEnd: '0px', opacity: 1 },
+    { blockSize: '0px', marginBlockEnd: `${-g}px`, opacity: 0 },
+  ];
+}
+
+/** The room a row ends in once it has gone: no height, no padding, and the gap after it taken back. */
+function gone(el: HTMLElement, gap: number): void {
+  el.style.boxSizing = 'border-box';
+  el.style.overflow = 'clip';
+  el.style.blockSize = '0px';
+  el.style.minBlockSize = '0px';
+  el.style.paddingBlock = '0px';
+  el.style.borderBlockWidth = '0px';
+  el.style.marginBlockEnd = `${-gap}px`;
+  el.style.opacity = '0';
+  el.style.visibility = 'hidden';
+}
+
+/**
+ * Close `el` to nothing, the gap its parent puts after it as well, and answer once it has. It stays in the page at no
+ * height until whoever drew it takes it out, so that taking it out moves nothing.
+ */
+export async function leave(el: HTMLElement | null): Promise<void> {
+  if (!el) return;
+  const parent = el.parentElement;
+  const gap = parent ? Number.parseFloat(getComputedStyle(parent).rowGap) || 0 : 0;
+  const style = getComputedStyle(el);
+  const ms = msOf(style.getPropertyValue('--d-rows'), 180);
+  const hidden = typeof document !== 'undefined' && document.hidden;
+  const frames = typeof el.animate === 'function' && !hidden ? leaveOf(el.getBoundingClientRect().height, gap, ms, still()) : null;
+  if (frames) {
+    el.style.boxSizing = 'border-box';
+    el.style.overflow = 'clip';
+    const easing = style.getPropertyValue('--ease-standard').trim() || 'ease-in-out';
+    const a = el.animate(
+      [
+        { ...frames[0], paddingBlock: style.paddingBlock || '0px' },
+        { ...frames[1], paddingBlock: '0px' },
+      ],
+      { duration: ms, easing, fill: 'forwards' },
+    );
+    await a.finished.catch(() => undefined);
+  }
+  gone(el, gap);
+}
+
+/**
+ * NOTHING MOVES UNDER THE POINTER: answers once a mouse is no longer over `el` (the queue the row is in), so the rows a
+ * reader is aiming at stay where they are while they aim. At once on a touch screen, where no pointer rests, and when
+ * the tab is put away.
+ */
+export function pointerOff(el: Element | null): Promise<void> {
+  if (!el || typeof matchMedia !== 'function' || !matchMedia('(hover: hover)').matches || !el.matches(':hover')) return Promise.resolve();
+  return new Promise((resolve) => {
+    const away = () => {
+      if (document.hidden) done();
+    };
+    const done = () => {
+      el.removeEventListener('pointerleave', done);
+      document.removeEventListener('visibilitychange', away);
+      resolve();
+    };
+    el.addEventListener('pointerleave', done);
+    document.addEventListener('visibilitychange', away);
+  });
+}
