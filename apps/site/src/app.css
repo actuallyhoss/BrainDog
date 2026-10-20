@@ -2,11 +2,12 @@
  * The site's own half of the stylesheet. Everything else is `@braindog/skin`, and the colours and faces are Look B's
  * (`look-b.css`, DIRECTION §47).
  *
- * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER (`loop/site-2026-10-17/src/site.html`): a dark night band at the top of
- * every page (the header, then the page's own head), the page on a flat white ground below it with big flat cards,
- * a huge centred close and a dark footer. No glass, no gradients, no glows. Titles are Lexend 600 set tight, every
- * other word is Geist. The one solid red on a page is "Start free"; inside the product's drawings red means late or
- * needs you.
+ * THE LOOK IS THE SITE DESIGN OF 17 OCTOBER as the UI pass of 20 October rebuilt it (`loop/ui-pass-2026-10-20/
+ * site.md`, SPEC 4.7): a dark night band at the top of every page (the header, then the page's own head), then
+ * full-bleed colour bands, each on its own ground in both schemes, with flat radius-16 tiles inside, and a dark
+ * footer. No glass, no gradients, no glows, no shadows. Titles are Lexend 600 set tight, every other word is Geist.
+ * Red is the app's two tokens: `--red-fill` under white words (the start button, an answer, a count, the chores
+ * band) and `--red` for red words and marks (late, needs you, links).
  *
  * WHAT EVERY PAGE DRAWS THE SAME WAY IS HERE, and a page's own sheet only places it: the column (`.wrap`), the night
  * ground, the buttons, the cards, the tables, the questions and the key cap, beside the older tile grid the kept
@@ -83,13 +84,15 @@
     --t-xs: var(--t-site-small);
     --t-sm: var(--t-site-small);
     /**
-     * A STATE THAT NEEDS LOOKING AT TAKES THE ACCENT. The drawings are the product's own renderer, which paints a late
-     * bill or a budget run over in `--danger`; on the site that is the house red the accent already is, so the page
-     * carries one red and not two, and the words beside it still say what is wrong.
+     * ONE RED IN TWO TOKENS (SPEC 0.1). The drawings are the product's own renderer, which paints a late bill or a
+     * budget run over in `--danger`, and the app's older names (`--accent`, `--accent-text`) still reach a page through
+     * `house.css`; on the site each maps to `--red` (words and marks) or `--red-fill` (a fill under white words).
      */
-    --danger: var(--accent-text);
-    --danger-text: var(--accent-text);
-    --danger-fill: var(--accent);
+    --danger: var(--red);
+    --danger-text: var(--red);
+    --danger-fill: var(--red-fill);
+    --accent: var(--red-fill);
+    --accent-text: var(--red);
   }
 
   /**
@@ -130,7 +133,7 @@
     display: block;
   }
 
-  .band + .band {
+  .band:not([class*='band--']) + .band:not([class*='band--']) {
     margin-block-start: var(--inset);
   }
 
@@ -210,7 +213,6 @@
     padding: 20px;
     background: var(--bg);
     border-radius: var(--r-lg);
-    box-shadow: var(--e1);
     color: var(--ink);
   }
 
@@ -378,12 +380,12 @@
   /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
   /**
-   * THE SITE DESIGN'S BUTTONS (DIRECTION §47): a 48px rectangle, radius 12, in Geist 500. `.red` is "Start free", the
-   * one solid red a page carries, and is drawn only by `lib/site/Start.svelte`; `.ghost` sits on the night ground,
-   * `.line` and `.quiet` on the page, `.tint` is the red's tint, and `.sm` is the 34px one. A `.btn` with none of these
+   * THE SITE DESIGN'S BUTTONS (DIRECTION §47): a 48px rectangle, radius 12, in Geist 500. `.red` is the solid red
+   * with white words: the start button (`lib/site/Start.svelte`) and a drawing's suggested answer (site S2); `.ghost`
+   * sits on the night ground, `.line` and `.quiet` on the page, and `.sm` is the 34px one. A `.btn` with none of these
    * is the quiet one, so a kept page's plain button stays drawn.
    *
-   * THE PRESS IS A ONE-PIXEL DROP, which `a11y.css` stills under reduced motion along with every transition.
+   * THE PRESS IS A FILL CHANGE, never a move (SPEC 2.A.1), which `a11y.css` stills under reduced motion.
    */
   .btn {
     display: inline-flex;
@@ -401,18 +403,11 @@
     font: 500 15.5px/1 var(--ui);
     text-decoration: none;
     white-space: nowrap;
-    transition:
-      background 0.15s,
-      transform 0.1s,
-      box-shadow 0.15s;
+    transition: background var(--d-press, 70ms) ease-out;
   }
 
   .btn:hover {
     background: var(--soft);
-  }
-
-  .btn:active {
-    transform: translateY(1px);
   }
 
   .btn svg {
@@ -427,21 +422,22 @@
     color: var(--on-red);
   }
 
-  /* Darker than the fill in both themes, so the white text only gains on it. */
   .btn.red:hover {
-    background: color-mix(in srgb, var(--red-fill), var(--night) 14%);
+    background: var(--red-fill-hover);
+  }
+
+  .btn.red:active {
+    background: var(--red-fill-press);
   }
 
   /* The design's white at 8 and 14 in a hundred over the night, mixed from the night's own ink. */
-  .btn.ghost,
-  .btn-glass {
+  .btn.ghost {
     background: color-mix(in srgb, var(--on-night) 8%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--on-night) 14%, transparent);
     color: var(--on-night);
   }
 
-  .btn.ghost:hover,
-  .btn-glass:hover {
+  .btn.ghost:hover {
     background: color-mix(in srgb, var(--on-night) 14%, transparent);
   }
 
@@ -449,13 +445,6 @@
     background: transparent;
     box-shadow: inset 0 0 0 1px var(--rule);
     color: var(--ink);
-  }
-
-  .btn.tint,
-  .btn.tint:hover {
-    background: var(--red-tint);
-    box-shadow: none;
-    color: var(--red-ink);
   }
 
   /* THE OLD FILLED BUTTON, ink, which a kept page may still draw until its own builder moves it to `Start`. */
@@ -518,74 +507,6 @@
     white-space: nowrap;
   }
 
-  /* Glass for chrome drawn on the site: the frosted fill, its blur and its hairline pair, at level two. */
-  .glass {
-    background: var(--glass);
-    box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
-  }
-
-  @supports (-webkit-backdrop-filter: none) {
-    .glass {
-      -webkit-backdrop-filter: var(--glass-blur);
-      backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  /* ── The band of E: words on the ground beside the product in one glass frame ── */
-
-  /* TWO COLUMNS AT A DESK, the words 400 wide and the frame the rest; `.flip` puts the frame first. Below 900 the words
-     come first and the frame under them, whichever side it took. */
-  .feature {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: center;
-    gap: var(--sp-6) var(--sp-8);
-  }
-
-  @media (width >= 900px) {
-    .feature {
-      grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
-    }
-
-    .feature.flip {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
-    }
-
-    .feature.flip > .words {
-      order: 2;
-    }
-  }
-
-  .words {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--sp-4);
-    min-inline-size: 0;
-  }
-
-  /* THE FRAME: the glass the product sits in, one inset of it round the product's own opaque tiles. */
-  .frame {
-    min-inline-size: 0;
-    padding: var(--inset);
-    border-radius: calc(var(--r-lg) + var(--inset));
-    background: var(--glass);
-    box-shadow: var(--glass-edge), var(--e2);
-    backdrop-filter: var(--glass-blur);
-  }
-
-  @supports (-webkit-backdrop-filter: none) {
-    .frame {
-      -webkit-backdrop-filter: var(--glass-blur);
-      backdrop-filter: var(--glass-blur);
-    }
-  }
-
-  /* A band of E sits further from the next than a row of tiles does: each is one idea with room round it. */
-  .band.spaced + .band.spaced {
-    margin-block-start: clamp(72px, 6vw + 24px, 128px);
-  }
 
   /* Read by a screen reader and not drawn. */
   .sr {
@@ -640,12 +561,12 @@
     display: none !important;
   }
 
-  /* THE BIG CARDS: paper, the black one and the red one, each one value of the product with the product working in it. */
+  /* THE BIG CARDS of an inner page: paper, the black one and the red one, flat, radius 16 like every tile (site F7). */
   .card {
     position: relative;
     overflow: hidden;
-    padding: 52px;
-    border-radius: 30px;
+    padding: 40px;
+    border-radius: 16px;
   }
 
   .card.paper {
@@ -664,8 +585,8 @@
   }
 
   .card h2 {
-    max-inline-size: 12ch;
-    font-size: clamp(2.3rem, 4.5vw, 3.9rem);
+    max-inline-size: 14ch;
+    font-size: clamp(30px, 3.4vw, 48px);
     line-height: 1;
     letter-spacing: -0.045em;
     text-wrap: balance;
@@ -812,8 +733,7 @@
     }
 
     .card {
-      padding: 30px 20px 22px;
-      border-radius: 24px;
+      padding: 24px 20px;
     }
 
     .say {
@@ -821,25 +741,157 @@
     }
   }
 
-  /* A TILE RISES INTO PLACE THE FIRST TIME IT SCROLLS IN, and only on a page the script has marked `js` (`reveal.ts`).
-     Without scripting, under reduced motion (as `scripts/shot.mjs` captures) or printed, it is simply there. */
-  @media (prefers-reduced-motion: no-preference) {
-    :root.js .reveal {
-      transition:
-        opacity 0.7s ease,
-        transform 0.7s ease;
+  /* ── The home's full-bleed bands (site F6, F7) ────────────────────────────── */
+
+  /**
+   * A BAND IS ONE IDEA, EDGE TO EDGE, on its own ground (`--band-*` in Look B), so two neighbours never share one in
+   * either scheme. Its content sits in `.wrap`; its tiles are flat, radius 16, with no border or shadow.
+   */
+  .band[class*='band--'] {
+    padding-block: 80px;
+  }
+
+  .band--who {
+    background: var(--band-who);
+    color: var(--ink);
+  }
+
+  .band--chores {
+    background: var(--red-fill);
+    color: var(--on-red);
+  }
+
+  .band--tools {
+    background: var(--band-ai);
+    color: var(--on-night);
+  }
+
+  .band--slash {
+    background: var(--band-slash);
+    color: var(--ink);
+  }
+
+  .band--yours {
+    background: var(--band-yours);
+    color: var(--ink);
+  }
+
+  .band--faq {
+    background: var(--band-faq);
+    color: var(--ink);
+  }
+
+  /* A BAND'S HEADING (site F8): two lines at 1440, heavy and tight; its one line under it at 18/1.5. */
+  .band-h2 {
+    margin: 0;
+    max-inline-size: 17ch;
+    font: 600 clamp(34px, 4.2vw, 60px) / 1 var(--head);
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+
+  .band-say {
+    max-inline-size: 34em;
+    margin: 16px 0 0;
+    color: var(--ink2);
+    font-size: 18px;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .band--tools .band-say {
+    color: var(--on-night-2);
+  }
+
+  .band--chores .band-say {
+    color: var(--on-red);
+  }
+
+  /* TWELVE COLUMNS, 16 apart; at 1059 and under, every part takes the row. */
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .cols > * {
+    grid-column: 1 / -1;
+    min-inline-size: 0;
+  }
+
+  @media (width >= 1060px) {
+    .cols > .c4 {
+      grid-column: span 4;
     }
 
-    :root.js .reveal:not(.seen) {
-      opacity: 0;
-      transform: translateY(16px);
+    .cols > .c5 {
+      grid-column: span 5;
+    }
+
+    .cols > .c6 {
+      grid-column: span 6;
+    }
+
+    .cols > .c7 {
+      grid-column: span 7;
+    }
+
+    .cols > .c8 {
+      grid-column: span 8;
     }
   }
 
-  @media print {
+  /* Three tiles of a kind sit three across down to a tablet. */
+  @media (761px <= width < 1060px) {
+    .cols.trio > .c4 {
+      grid-column: span 4;
+    }
+  }
+
+  .ftile {
+    padding: 24px;
+    border-radius: 16px;
+  }
+
+  @media (max-width: 1059px) {
+    .band[class*='band--'] {
+      padding-block: 64px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .band[class*='band--'] {
+      padding-block: 56px;
+    }
+
+    .ftile {
+      padding: 20px;
+    }
+
+    .band-say {
+      font-size: 16px;
+    }
+  }
+
+  /**
+   * A BAND RISES 8PX AS IT SCROLLS IN, AND NEVER HIDES (site F4): a transform-only rise on the scroll's own timeline,
+   * so a full-page capture, a reader that does not scroll and a crawler all see every band at full strength, and a
+   * browser without scroll timelines simply draws it in place.
+   */
+  @media (prefers-reduced-motion: no-preference) {
     .reveal {
-      opacity: 1 !important;
-      transform: none !important;
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+
+    @keyframes rise {
+      from {
+        translate: 0 8px;
+      }
+      to {
+        translate: 0 0;
+      }
     }
   }
 }
