@@ -53,6 +53,7 @@
   import { CapLine } from 'braindog-render/svelte';
   import BindBlock from '$lib/ui/BindBlock.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import Kbd from '$lib/ui/Kbd.svelte';
   import { drew } from '../../../lib/ui/screen.svelte.ts';
   import { capturedFields, holdInPlace, inverseOf, rowWriter, type Held, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
   import { draftOf, editable, patchOf, runFact, runFactWhy, unchanged, wrongValue } from '$lib/record/field-draft.ts';
@@ -61,6 +62,11 @@
   import {
     arrivedAt,
     chipOn,
+    chipText,
+    quickOf,
+    quickOn,
+    setQuickIn,
+    type Quick,
     deadlineOf,
     defaultFrom,
     defaultKey,
@@ -69,7 +75,6 @@
     filterableOf,
     laneChoicesOf,
     laneFieldOf,
-    listedOf,
     nextSort,
     readDefault,
     readingOf,
@@ -1157,10 +1162,12 @@
   /* THE MONEY COLUMNS WHERE EVERY AMOUNT IN HAND IS WHOLE, which the table draws without their ".00" (`wholeMoney`). */
   const wholeColumns = $derived(wholeMoney(decl, result.entries));
 
-  /* NO COLUMN LEADS THE TITLE. The picker had one of its own, empty until a pointer arrived, so every row started 30px
-     in from the toolbar and the line that adds a row: three left edges in one tile. It is among the row's verbs now
-     (`ListTable`), and the toolbar, the add line and the rows start on the tile's one edge. */
+  /* THE PICKER LEADS THE ROW, in a 32px column of its own (the UI pass of 20 October, money F7): a box at the far end,
+     drawn only under the pointer, was found by nobody, and the select-all box has nowhere to stand but over it. The box
+     shows under the pointer and stays on every row once one is ticked (`ListTable`). Only on a list long enough to
+     pick from. */
   const columns = $derived([
+    ...(siftable ? [{ field: 'select', label: copy.select, hideLabel: true, width: '32px', truncate: 'never' as const }] : []),
     ...projected.filter((c) => c.field !== 'seq'),
     /* THE SPOKEN ID ENDS THE ROW, quiet, where a list keeps what you look up rather than read. It
        led the row, so every line opened on a number; the project's mark that shared its cell now
@@ -1182,7 +1189,9 @@
      * `hideLabel`, because the header of a column of controls is not a heading, and `truncate:
      * 'never'`, because a truncated verb is a different verb.
      */
-    { field: 'act', label: copy.rowActions, hideLabel: true, width: siftable ? '13ch' : '11ch', align: 'end' as const, truncate: 'never' as const },
+    /* 176 WHERE A ROW CAN CHANGE, so a receipt's "Archived" and its "Put back" fit beside each other and the way back is
+       never cut (motion F7.3). Fixed, so a receipt arriving moves no column. */
+    { field: 'act', label: copy.rowActions, hideLabel: true, width: changes ? '176px' : '11ch', align: 'end' as const, truncate: 'never' as const },
   ]);
 
   /**
@@ -1415,7 +1424,7 @@
   /* `act` IS A COLUMN OF CONTROLS, NOT OF VALUES, and Display on a phone offered to sort by it:
      "Sorted by" listed seven options and the last was `What you can do here`, which is the label of
      the row-actions column. There is nothing in it to put in an order. */
-  const sortable = $derived(columns.filter((c) => c.field !== 'act'));
+  const sortable = $derived(columns.filter((c) => c.field !== 'act' && c.field !== 'select'));
 
   /** A header pressed, or a row of Display's "Sorted by": the same toggle, into the same parameter. */
   const sortBy = (field: string) => setParam((p) => p.set('sort', nextSort(sort, field)));
@@ -1432,7 +1441,7 @@
    * The toast stays for the archive done from the keyboard with the row off screen.
    */
   function archive(seq: number) {
-    void archiveOnRecord([seq], `${id}#${seq}`);
+    void archiveOnRecord([seq], `“${nameOf(seq)}”`);
   }
 
   /**
@@ -1492,10 +1501,10 @@
     return { ok: false, fix: out.fix };
   };
 
-  /** A row's name in a receipt: its title where it has one, and its number where it does not. */
+  /** A row's name in a receipt: its title as the list says it, and "this one" where it has none. Never its id. */
   const nameOf = (seq: number): string => {
-    const title = decl?.title ? rowAt(seq)?.fields[decl.title] : undefined;
-    return typeof title === 'string' && title.trim() !== '' ? title : `${id}#${seq}`;
+    const e = rowAt(seq);
+    return e ? titleSaid(e) : copy.thisRow;
   };
 
   function landRow(entry: Entry) {
@@ -1539,7 +1548,7 @@
    * `Archived` and its own `Put back`, and says so in a toast, so a row added by mistake is one press from gone and
    * one more from here again. Before this, the only way to take back a typed row was to find Archive in its menu.
    */
-  const takeBack = (entry: Entry) => () => void archiveOnRecord([entry.seq], `${id}#${entry.seq}`);
+  const takeBack = (entry: Entry) => () => void archiveOnRecord([entry.seq], `“${nameOf(entry.seq)}”`);
 
   /**
    * BRING THE ROW INTO VIEW, AND ONLY IF IT IS NOT ALREADY THERE.
@@ -1652,7 +1661,7 @@
     /* AND THE FILLED FIELDS ARE SAID ONCE, WHERE THEY ARE LOOKING. The chip carries it on the row for as long as
        the answer is up; this is for the reader whose eye is on the line they just typed in. The toast carries the
        chip's own way back, because a row filled in with guesses is the row most likely to be unwanted. */
-    if (filled.length > 0) toasts.push(copy.captureFilled(filled), { undo: takeBack(out.entry) });
+    if (filled.length > 0) toasts.push(copy.captureFilled(filled), { undo: takeBack(out.entry), offer: false });
     return out.entry;
   }
 
@@ -2185,7 +2194,50 @@
    * `aria-pressed` on every segment in the bar already promises. `listedOf` keeps each clause's
    * place in the address, so taking one off is exact.
    */
-  const listed = $derived(listedOf(filters, decl));
+
+  /**
+   * THE QUICK SLICES OVER THE ROWS (money F7), with their counts: from the rows in hand while they are the whole list
+   * and nothing narrows it, which is exact and live; otherwise the record's own count of each slice, asked once a list.
+   */
+  const quickPlain = $derived(quickOf(decl, standing, now, whole && !narrowed && q === '' && !arriving));
+  let quickCounts = $state<{ list: string; n: Partial<Record<Quick['key'], number>> } | null>(null);
+  $effect(() => {
+    const counted = quickPlain.every((x) => x.count !== null);
+    if (quickPlain.length === 0) return;
+    const list = id;
+    if (counted) {
+      quickCounts = { list, n: Object.fromEntries(quickPlain.map((x) => [x.key, x.count!])) };
+      return;
+    }
+    if (untrack(() => quickCounts?.list) === list) return;
+    const slices = quickPlain;
+    void open().then(async (src) => {
+      const n: Partial<Record<Quick['key'], number>> = {};
+      for (const x of slices) {
+        const got = await src.count(list, { filters: chipsOf(new URLSearchParams(x.chips.map((c) => ['f', c]))), q: '' });
+        if (got.ok) n[x.key] = got.value;
+      }
+      if (list === id) quickCounts = { list, n };
+    });
+  });
+  const quick = $derived(quickPlain.map((x) => ({ ...x, count: x.count ?? (quickCounts?.list === id ? (quickCounts.n[x.key] ?? null) : null) })));
+  const quickAt = $derived(quickOn(quick, filters, decl));
+  const setQuick = (key: Quick['key']) => setParam((p) => setQuickIn(p, quick, key, decl ?? undefined));
+
+  /**
+   * EACH FILTER THAT IS ON, AS THE RECTANGLE THAT TAKES IT OFF: its field's name, how it compares and what, in the list's
+   * own words. The quick slice's own chips are its segment, and are not drawn twice.
+   */
+  const chipRects = $derived.by(() => {
+    const own = new Set(quickAt && quickAt !== 'all' ? (quick.find((x) => x.key === quickAt)?.chips ?? []) : []);
+    return filters
+      .map((f, at) => ({ f, at }))
+      .filter(({ f }) => !own.has(chipText(f)))
+      .map(({ f, at }) => {
+        const field = decl?.fields.find((d) => d.id === f.field);
+        return { at, said: copy.filterClause(field ? labelOf(field) : f.field, f.values.map((v) => saidInLine(f.field, v)), f.op) };
+      });
+  });
 
   const dropFilter = (at: number) => setParam((p) => dropChip(p, at));
 
@@ -2456,6 +2508,11 @@
     selected = next;
   }
 
+  /** The select-all box: every row on screen picked, or none. */
+  function selectAll(on: boolean) {
+    selected = on ? new Set(result.entries.slice(0, DOM_CAP).map((e) => e.seq)) : new Set();
+  }
+
   /* ── the verbs a selection is FOR ──────────────────────────────────────────
      Copy the numbers, move the state, archive: three verbs, drawn by `parts/BulkBar.svelte` and
      each done here, on the rows the reader is looking at. */
@@ -2474,7 +2531,7 @@
     const text = picked.map((e) => `${id}#${e.seq}`).join(' ');
     try {
       await navigator.clipboard.writeText(text);
-      toasts.push(copy.copied(`${picked.length} ${picked.length === 1 ? 'number' : 'numbers'}`));
+      toasts.push(copy.copied(`${picked.length} ${picked.length === 1 ? 'reference' : 'references'}`));
     } catch {
       toasts.push(copy.copyRefused, { intent: 'warn' });
     }
@@ -2555,10 +2612,24 @@
       return;
     }
     const line = landed.length === seqs.length ? copy.writeArchived(named) : copy.writeArchivedSome(landed.length, seqs.length);
+    /* THE TOAST SAYS WHAT HAPPENED AND NOTHING MORE (motion F20): each row wears its own "Put back", so the toast draws no
+       second Undo for the same change, and ⌘Z still reaches it. */
     toasts.push(first ? `${line} ${first}` : line, {
       undo: () => void restoreOnRecord(landed, list),
+      offer: false,
       ...(first ? { intent: 'warn' as const } : { life: UNDO_MS }),
     });
+    /* AND WHEN THE WAY BACK RUNS OUT THE ROW LEAVES (motion F7.2), with the list's motion, rather than waiting for the
+       next read. A row put back in the meantime wears another chip, and stays. */
+    const gone = landed.map((e) => e.seq);
+    setTimeout(() => {
+      if (list !== id) return;
+      const leaving = new Set(gone.filter((seq) => receipts.get(seq)?.mark === copy.markArchived));
+      if (leaving.size === 0) return;
+      pages = pages.map((p) => p.filter((e) => !leaving.has(e.seq)));
+      matched = Math.max(0, matched - leaving.size);
+      for (const seq of leaving) clearReceipt(seq);
+    }, UNDO_MS);
   }
 
   /**
@@ -2712,7 +2783,7 @@
     /* ONE ROW IS NOT "1 obligations". The register declares both spellings, `name` for the list and
        `one` for a row of it, and the bulk archive read only the first, so every single-row bulk archive
        said the plural. The keyboard path next door has always said `obligations#1`. */
-    void archiveOnRecord(seqs, `${seqs.length} ${(seqs.length === 1 ? decl?.one : decl?.name)?.toLowerCase() ?? 'rows'}`);
+    void archiveOnRecord(seqs, seqs.length === 1 ? `“${nameOf(seqs[0]!)}”` : `${seqs.length} ${decl?.name.toLowerCase() ?? copy.rowsWord(seqs.length)}`);
   }
 
   /** The register's own states, so the menu is the vocabulary rather than a list typed here. */
@@ -2745,6 +2816,20 @@
 
   /* This screen's own words: the head's overflow, named with the list it is about. */
   const headWords = { more: (list: string) => `More for ${list}`, whole: 'Add one with all its fields' } as const;
+  /* The toolbar's own "⋯": how the list is shown, and keeping what is on screen. */
+  const toolWords = { more: 'Display and views' } as const;
+
+  /* THE ADD SHEET'S EXAMPLE, from the list itself: the newest row's name, so the line shows what a name here looks like. */
+  const captureExample = $derived.by(() => {
+    const e = standing.find((x) => x.seq > 0 && !added.has(x.seq));
+    return e ? titleSaid(e) : null;
+  });
+
+  /** The toolbar's primary: the add line opens, or takes the caret again where it is already open. */
+  function openCapture() {
+    captureOpen = true;
+    void tick().then(() => document.getElementById('capture')?.focus());
+  }
 </script>
 
 <svelte:head><title>{titleOf(decl?.name)}</title></svelte:head>
@@ -2826,9 +2911,12 @@
       {/if}
       <!-- THE REST OF WHAT A LIST OFFERS, IN THE OVERFLOW: a row started with every field in front of you, the view over
            what is handed to you, on a list that says who holds its rows, and the list's fields (`ListEditor.svelte`). -->
-      {#if handedToMe || proposes || (adds && !arriving)}
+      {#if handedToMe || proposes || (adds && !arriving) || rowsAsCards()}
         <Menu label={headWords.more(decl.name)} align="end">
-          {#snippet trigger()}<span class="head-more" title={headWords.more(decl.name)}><Icon name="more" size="m" /></span>{/snippet}
+          <!-- NAMED, as every "⋯" is (motion F11): the name is text inside the trigger, never a `title` on a child. On a
+               phone it also holds Display, which the toolbar's own "⋯" holds from 640. -->
+          {#snippet trigger()}<span class="head-more" data-list-more={rowsAsCards() ? '' : undefined}><Icon name="more" size="m" /><span class="sr-only">{headWords.more(decl.name)}</span></span>{/snippet}
+          {#if rowsAsCards()}<button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" />{copy.display}</button>{/if}
           {#if adds && !arriving}<button type="button" role="menuitem" data-new-row onclick={() => (createOpen = true)}>{headWords.whole}</button>{/if}
           {#if handedToMe}<a role="menuitem" href={at(handedToMe)}>{copy.handedToMe}</a>{/if}
           {#if proposes}<button type="button" role="menuitem" data-fields-open onclick={() => (fieldsOpen = true)}>{sheetWords.open}</button>{/if}
@@ -2838,7 +2926,7 @@
   </PageHead>
   {#if proposes}<ListEditor bind:open={fieldsOpen} register={id} {owner} onchanged={refresh} />{/if}
 
-  <div class="page" aria-busy={busy ? 'true' : undefined} data-from-copy={fromCopy ? '' : undefined}>
+  <div class="page" aria-busy={busy ? 'true' : undefined} data-from-copy={fromCopy ? '' : undefined} data-picking={picked.length > 0 ? '' : undefined}>
     <!-- THE LIST HAS MOVED ON AND MORE THAN ONE PAGE OF IT IS IN HAND, so it says so rather than splicing a new head
          onto old pages (`recheck` above). `role="status"` because it arrives without the reader doing anything, and a
          screen reader should hear it once, politely. -->
@@ -2866,7 +2954,7 @@
          And only on a list long enough to sift: five rows are read faster than a chart of them, and the tile would be
          the figure of what the eye already has. -->
     {#if whole && !arriving && siftable && standing.length > 0}
-      <ListSummary {decl} entries={standing} {now} byState={view !== 'board' && !narrowed && q === ''} headSaid={reading !== null} titleOf={titleSaid} />
+      <ListSummary {decl} entries={standing} {now} byState={!narrowed && q === ''} headSaid={reading !== null} titleOf={titleSaid} />
     {/if}
 
     <!--
@@ -2899,59 +2987,9 @@
           <Button data-held-twice-show href={twiceHref}>Show them</Button>
         </p>
       {/if}
-      <div class="list-tools" data-uncounted={unsaid ? '' : undefined}>
-        <!-- THE SEARCH AND THE FILTERS, which draw themselves only while there is something to sift, and the phone's
-             filter sheet behind its one button. Which filters are on is the address, read and written here. -->
-        <ChipsBar
-          shown={siftable || q !== '' || filters.length > 0}
-          register={id}
-          name={decl.name}
-          {q}
-          filtered={q !== '' || filters.length > 0}
-          savable={twice === null}
-          {enums}
-          {listed}
-          {facets}
-          {isOn}
-          {toggleFilter}
-          {dropFilter}
-          {setQuery}
-          saveView={() => void saveView()}
-        />
-        <div class="list-views">
-          {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} onview={setView} />{/if}
-          <!-- DISPLAY: the order and the columns, what YOU see and never what the record says. `v`, printed on it under
-               the pointer. Its word stays in the button for a screen reader and for the gates that press it by name. -->
-          <span class="tb-display">
-            <Button kbd="v" title={copy.display} onclick={() => (displayOpen = true)}>
-              <Icon name="settings" size="m" /><span class="tb-word">{copy.display}</span>
-            </Button>
-          </span>
-        </div>
-      </div>
-
-      <!-- THE FILTERS CARRY NO NUMBERS, AND THIS SAYS SO: the record would not count the list for this person, or the
-           count did not come back. One plain line under the bar, where the numbers would have been read. -->
-      {#if unsaid}
-        <p class="uncounted" data-uncounted-note role="status">{unsaid.code === 'FORBIDDEN' ? copy.countsWithheld : copy.countsUnread}</p>
-      {/if}
-
-      <!-- CAPTURE, THE LIST'S FIRST LINE: a name and Enter. Not on the arrival itself, where New in the head is the way
-           in, and where nobody may add, why not, in the line's place. -->
-      {#if !adds}
-        <p class="reach">{reachWords.readOnly(decl.name)}</p>
-      {:else if !arriving}
-        <CaptureLine one={decl.one} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
-      {/if}
-
-      {#if rows.length === 0 && twice && filters.length === 0 && q === '' && result.total > 0}
-        <!-- NOBODY IS HELD TWICE, said as that and not as a search that found nothing. -->
-        <p class="held-none" data-held-twice-none>{thingSaid?.none ?? twiceWords.none}</p>
-      {:else if rows.length === 0}
-        <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
-      {:else if picked.length > 0}
-        <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS BODIES, so the bar is drawn here for every view. It floats
-             over the rows it acts on. -->
+      {#if picked.length > 0 && rows.length > 0}
+        <!-- THE VERBS BELONG TO THE LIST, NOT TO ONE OF ITS BODIES, so the bar is drawn here for every view. While anything
+             is picked it takes the toolbar's place, in the tile, and gives it back when nothing is (money F7). -->
         <BulkBar
           count={picked.length}
           {decl}
@@ -2965,6 +3003,67 @@
           picked={changes ? picked.map((e) => ({ seq: e.seq, version: e.version, fields: e.fields, name: titleSaid(e) })) : undefined}
           onmoved={refresh}
         />
+      {:else}
+      <div class="list-tools" data-uncounted={unsaid ? '' : undefined}>
+        <!-- THE SEARCH AND THE FILTERS, which draw themselves only while there is something to sift, and the phone's
+             filter sheet behind its one button. Which filters are on is the address, read and written here. -->
+        <ChipsBar
+          shown={siftable || q !== '' || filters.length > 0}
+          register={id}
+          name={decl.name}
+          {q}
+          filtered={q !== '' || filters.length > 0}
+          savable={twice === null}
+          {enums}
+          chips={chipRects}
+          {quick}
+          {quickAt}
+          {setQuick}
+          {facets}
+          {isOn}
+          {toggleFilter}
+          {dropFilter}
+          {setQuery}
+          saveView={() => void saveView()}
+        />
+        <!-- THE TOOLBAR'S END (money F7): how the list is drawn, then its "⋯" with Display (`v`) and Save as a view, then
+             the one way to add, the list's primary, named with what it adds. Below 640 the head holds the "+" and the
+             "⋯", so this end is not drawn. -->
+        <div class="list-views">
+          {#if result.total > 0}<ViewSwitch {view} board={boardable} groups={groupable ? iconFor(decl.icon, 'rows') : null} onview={setView} />{/if}
+          <Menu label={toolWords.more} align="end">
+            {#snippet trigger()}<span class="tool-more" data-list-more><Icon name="more" size="m" /><span class="sr-only">{toolWords.more}</span></span>{/snippet}
+            <button type="button" role="menuitem" onclick={() => (displayOpen = true)}><Icon name="settings" size="s" /><span class="mi-name">{copy.display}</span><Kbd keys="v" /></button>
+            {#if (q !== '' || filters.length > 0) && twice === null}
+              <button type="button" role="menuitem" onclick={() => void saveView()}><Icon name="plus" size="s" />{copy.saveAsView}</button>
+            {/if}
+          </Menu>
+          {#if adds && !arriving}
+            <span class="tool-add"><Button weight="primary" data-capture-open onclick={openCapture}><Icon name="plus" size="s" />{copy.captureIn(decl.one)}</Button></span>
+          {/if}
+        </div>
+      </div>
+      {/if}
+
+      <!-- THE FILTERS CARRY NO NUMBERS, AND THIS SAYS SO: the record would not count the list for this person, or the
+           count did not come back. One plain line under the bar, where the numbers would have been read. -->
+      {#if unsaid}
+        <p class="uncounted" data-uncounted-note role="status">{unsaid.code === 'FORBIDDEN' ? copy.countsWithheld : copy.countsUnread}</p>
+      {/if}
+
+      <!-- CAPTURE IS A SHEET NOW, behind the toolbar's primary and the phone's "+": a name and Enter, and it stays open for
+           the next (motion F7.4). Where nobody may add, why not, in the add's place. -->
+      {#if !adds}
+        <p class="reach">{reachWords.readOnly(decl.name)}</p>
+      {:else if !arriving}
+        <CaptureLine one={decl.one} example={captureExample} bind:value={capture} bind:open={captureOpen} {captureRow} allFields={() => (createOpen = true)} />
+      {/if}
+
+      {#if rows.length === 0 && twice && filters.length === 0 && q === '' && result.total > 0}
+        <!-- NOBODY IS HELD TWICE, said as that and not as a search that found nothing. -->
+        <p class="held-none" data-held-twice-none>{thingSaid?.none ?? twiceWords.none}</p>
+      {:else if rows.length === 0}
+        <ListEmpty kind={emptyKind} register={id} {decl} size={result.total} {q} {filters} {searched} />
       {/if}
 
       {#if tiled && rows.length > 0}
@@ -3038,6 +3137,7 @@
         {listCurrency}
         {receiptFor}
         {toggleSelect}
+        {selectAll}
         {openEditor}
         {commitEdit}
         {cancelEdit}
@@ -3209,69 +3309,56 @@
     margin-inline-start: auto;
   }
 
-  /* THE HEAD'S OVERFLOW, a square control the height of the primary beside it, in the field's quiet fill. */
-  .head-more {
+  /* A NAME FOR A SCREEN READER AND NOTHING ON SCREEN: the "⋯" buttons' words. */
+  .sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* THE TOOLBAR'S "⋯": a 36px square in the quiet fill, the toolbar's height, its glyph in the second ink. */
+  .tool-more {
     display: inline-grid;
     place-items: center;
-    inline-size: var(--btn-h);
-    block-size: var(--btn-h);
-    background: var(--field);
+    inline-size: 36px;
+    block-size: 36px;
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     transition: background var(--d-state) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
-    :global(.menu-trigger):hover > .head-more {
-      background: var(--field-hover);
+    :global(.menu-trigger):hover > .tool-more {
+      background: var(--hover);
       color: var(--ink);
     }
   }
 
   @media (pointer: coarse) {
-    .head-more {
+    .tool-more {
       inline-size: var(--tap);
       block-size: var(--tap);
     }
   }
 
-  /* DISPLAY IS ITS GLYPH AND ITS WORD, and on a phone the glyph alone, its word kept in the button for a screen reader
-     and a tooltip on it. */
-  .tb-display {
+  .tool-add {
     display: contents;
   }
 
+  /* BELOW 640 THE HEAD HOLDS THE "+" AND THE "⋯", so the toolbar's end is not drawn: the bar is search and Filter. */
   @media (width < 640px) {
-    .tb-display :global(.btn) {
-      min-inline-size: var(--tap);
-      padding-inline: 0;
-    }
-
-    .tb-word {
-      position: absolute;
-      inline-size: 1px;
-      block-size: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
+    .list-views {
+      display: none;
     }
   }
 
-  /* THE KEYS ARE PRINTED WHEN ASKED FOR (DIRECTION 35): `v` on Display and `n` on New show under the pointer or with
-     keyboard focus, never as standing chrome. Without its cap a button takes its even padding back. */
-  :is(.tb-display, .new-row) :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
+  /* THE KEY IS PRINTED WHEN ASKED FOR (DIRECTION 35): `n` on New shows under the pointer or with keyboard focus. */
+  .new-row :global(.btn:not(:hover, :focus-visible) > .btn-kbd) {
     display: none;
-  }
-
-  :is(.tb-display, .new-row) :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
-    padding-inline-end: var(--sp-3);
-  }
-
-  /* BUT NOT ON THE PHONE'S SQUARE: the even padding above outweighs its zero and pushed the glyph off centre. */
-  @media (width < 640px) {
-    .tb-display :global(.btn:not(:hover, :focus-visible):has(> .btn-kbd)) {
-      padding-inline: 0;
-    }
   }
 
   /* THE ROOM STAYS AND THE WORDS GO: hidden, not removed, so the line keeps its height (`foundRoom`). */
@@ -3355,6 +3442,13 @@
   @media (640px <= width < 900px) {
     .page {
       padding-block-end: var(--sp-8);
+    }
+  }
+
+  /* THE PHONE'S PICKED STRIP SITS OVER THE FOOT OF THE LIST, so the list keeps 72px under its last row while it shows. */
+  @media (width < 640px) {
+    .page[data-picking] {
+      padding-block-end: calc(var(--sp-8) + 72px);
     }
   }
 </style>
