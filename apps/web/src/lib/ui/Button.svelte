@@ -1,16 +1,24 @@
 <!--
-  One control, three weights, and every one of them a rectangle (DIRECTION §39).
+  One control, three weights, and every one of them a rectangle (DIRECTION §39, the UI pass of 20 October 2.A.1).
 
-  PRIMARY is the working accent's fill with `--on-action` for its label, one per screen. QUIET, the default, is the
-  secondary: the quiet `--field` fill with ink words, the same on a tile and on the board. BARE is the tertiary, words in
-  `--ink2` that take the wash when pointed at. GLASS is kept as a name for the toolbar's callers and draws as QUIET:
-  there is no glass any more.
+  PRIMARY is the red fill with white words, one per screen: `--red-fill` at rest, `--red-fill-hover` under the pointer,
+  `--red-fill-press` while it is held, and `--on-red` (white) on all three, in light and in dark. QUIET, the default, is
+  the secondary: `--tile` on the board and `--tile-2` on a tile, a sheet or a panel, with ink words. BARE is the
+  tertiary, words in `--ink-2` that take the hover fill when pointed at. GLASS is kept as a name for the toolbar's
+  callers and draws as QUIET: there is no glass.
 
-  Radius `--r-ctl` (8), `--btn-h` tall (32, 40 under a thumb with the 44 hit box `.tap` adds), 14 medium.
+  Radius `--r-ctl` (8), `--ctl-h` tall (32, and 44 under a thumb), the label at `--fs-ctl` 14 medium. `sm` is 28 with 8
+  of padding, for a row's verbs and a heading's.
 
-  THERE IS NO RED FILL. `tone` still reaches the element as `data-intent`, so a gate or a test can read what the verb
-  is, but it colours nothing: a destructive verb says what it costs in its words ("Accept, can't be undone easily"), and
-  red means "late" or "needs you" and nothing else.
+  A PRESS IS A FILL, NOTHING MOVES. The fill changes over `--d-press`; a button never scales or slides.
+
+  A DELETE THAT IS READY (`tone="bad"` on a primary) wears the primary's look with a 16px bin before its words, so the
+  armed form of a destructive verb is told from the screen's ordinary primary by its glyph and its words, never by a
+  second red. On any other weight `tone` colours nothing: it reaches the element as `data-intent`, so a gate or a test
+  can read what the verb is.
+
+  A PRIMARY IS NEVER DISABLED FOR A MISSING FIELD: the press focuses the field and says why (first-run F16). `disabled`
+  is for a control that truly cannot act right now, a save already on its way, and draws `--tile-2` with `--ink-3`.
 
   `kbd` draws the key cap inside the button at its trailing edge (Geist Mono 12, an 18px cap), so the fast path is
   printed on the slow one. It is hidden from a screen reader, which already has the verb.
@@ -21,6 +29,7 @@
   import type { Snippet } from 'svelte';
 
   import { at } from '../at.ts';
+  import Icon from './Icon.svelte';
   import Kbd from './Kbd.svelte';
 
   let {
@@ -39,7 +48,7 @@
     href?: string | undefined;
     type?: 'button' | 'submit' | undefined;
     tone?: 'good' | 'warn' | 'bad' | 'info' | undefined;
-    /** `m` is `--btn-h` (32, 40 under a thumb); `sm` is `--btn-h-sm` (28) for a row's verbs and a heading's. */
+    /** `m` is `--ctl-h` (32, 44 under a thumb); `sm` is `--btn-h-sm` (28) for a row's verbs and a heading's. */
     size?: 'm' | 'sm' | undefined;
     /** The key that does the same thing, in the table's spelling (`⌘K`, `e`); `Kbd` says it for this platform. */
     kbd?: string | undefined;
@@ -53,6 +62,9 @@
      `/r/<list>/<seq>`, which since the move to `brain.dog/app` is outside the app and would load the marketing site.
      `at` leaves an address it has already rendered, a query and another origin as they came. */
   const to = $derived(href ? at(href) : href);
+
+  /* The armed delete: the primary's fill and the bin, so it is not mistaken for the screen's ordinary primary. */
+  const armed = $derived(weight === 'primary' && tone === 'bad');
 </script>
 
 <svelte:element
@@ -67,20 +79,23 @@
   {onclick}
   {...rest}
 >
-  {@render children()}{#if kbd}<span class="btn-kbd" aria-hidden="true"><Kbd keys={kbd} /></span>{/if}
+  {#if armed}<Icon name="trash" size="m" />{/if}{@render children()}{#if kbd}<span class="btn-kbd" aria-hidden="true"><Kbd keys={kbd} /></span>{/if}
 </svelte:element>
 
 <style>
-  /* A RECTANGLE TOLD BY ITS FILL: no border on any weight, radius 8, the label at 14 medium. */
+  /* A RECTANGLE TOLD BY ITS FILL: no border on any weight, radius 8, the label at 14 medium. On the board a quiet
+     button is the tile's colour, so it reads as a control and not a hole. */
   .btn {
+    --btn-fill: var(--tile);
+
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: var(--sp-2);
     box-sizing: border-box;
-    min-block-size: var(--btn-h);
+    min-block-size: var(--ctl-h);
     padding: 0 var(--sp-3);
-    background: var(--field);
+    background: var(--btn-fill);
     border: 0;
     border-radius: var(--r-ctl);
     color: var(--ink);
@@ -90,19 +105,21 @@
     text-decoration: none;
     white-space: nowrap;
     cursor: pointer;
-    /* OPACITY AND TRANSFORM TOO. The press in `controls.css` dims and scales a button, and with neither property listed
-       here both snapped. */
+    /* COLOUR ONLY. A press and a hover are fills; nothing about a button moves. */
     transition:
-      background var(--d-state) var(--ease-out),
-      color var(--d-state) var(--ease-out),
-      opacity var(--d-state) var(--ease-out),
-      transform var(--d-state) var(--ease-out);
+      background var(--d-press) var(--ease-out),
+      color var(--d-press) var(--ease-out);
+  }
+
+  /* ON A TILE, A SHEET OR A PANEL the quiet fill is a step under the surface, `--tile-2`, so it still reads as a thing
+     to press on white. */
+  :global(:is(.tile, .sheet, dialog, .menu, [data-surface='tile'], .block-slot)) .btn {
+    --btn-fill: var(--tile-2, var(--field));
   }
 
   .btn[data-size='sm'] {
     min-block-size: var(--btn-h-sm);
-    padding: 0 10px;
-    font-size: var(--fs-meta);
+    padding: 0 var(--sp-2);
   }
 
   /* A KEY CAP ASKS FOR A LITTLE LESS ROOM AT ITS END, so the cap sits in the corner the way the label sits in the other. */
@@ -115,23 +132,31 @@
     display: none;
   }
 
+  /* THE PRESS: a step deeper than the fill, while it is held. */
   .btn:active:not(:disabled) {
-    background: var(--field-hover);
+    background: color-mix(in oklab, var(--ink) 8%, var(--btn-fill));
   }
 
-  /* THE ACCENT'S FILL, the one filled control on a screen. */
+  /* THE RED FILL, the one filled control on a screen, with white words in both schemes. */
   .btn[data-weight='primary'] {
-    background: var(--action);
-    color: var(--on-action);
+    --btn-fill: var(--red-fill, var(--action));
+
+    background: var(--btn-fill);
+    color: var(--on-red, var(--on-action));
   }
 
   .btn[data-weight='primary']:active:not(:disabled) {
-    background: var(--action-hover);
+    background: var(--red-fill-press, var(--action-hover));
   }
 
   .btn[data-weight='bare'] {
     background: none;
-    color: var(--ink2);
+    color: var(--ink-2, var(--ink2));
+  }
+
+  .btn[data-weight='bare']:active:not(:disabled) {
+    background: var(--tile-2, var(--field));
+    color: var(--ink);
   }
 
   /* HOVER ONLY WHERE THERE IS ONE. A phone reports `:hover` on the last thing tapped and keeps it.
@@ -140,53 +165,53 @@
      also a hovered one. */
   @media (hover: hover) and (pointer: fine) {
     .btn:hover:not(:disabled):not(:active) {
-      background: var(--field-hover);
+      background: var(--hover, var(--field-hover));
     }
 
-    .btn[data-weight='primary']:hover:not(:disabled) {
-      background: var(--action-hover);
+    .btn[data-weight='primary']:hover:not(:disabled):not(:active) {
+      background: var(--red-fill-hover, var(--action-hover));
     }
 
     .btn[data-weight='bare']:hover:not(:disabled):not(:active) {
-      background: var(--hover-wash);
+      background: var(--hover, var(--hover-wash));
       color: var(--ink);
     }
   }
 
-  /* THE CAP. `Kbd` draws the `--field` cap; on the accent fill it takes a tint of the label instead, or a light cap on
-     a blue button would be the loudest thing in it. */
+  /* THE CAP. `Kbd` draws the `--tile-2` cap; on the red fill it takes a tint of the white label instead, or a light
+     cap on a red button would be the loudest thing in it. */
   .btn-kbd {
     display: inline-flex;
     flex: none;
   }
 
   .btn[data-weight='primary'] :global(.kbd) {
-    background: color-mix(in srgb, var(--on-action) 20%, transparent);
-    color: var(--on-action);
+    background: color-mix(in srgb, var(--on-red, var(--on-action)) 20%, transparent);
+    color: var(--on-red, var(--on-action));
   }
 
-  /* A disabled control loses the fill as well as the label, so a disabled primary does not read as live. */
+  /* A DISABLED CONTROL loses the fill as well as the label, so a disabled primary does not read as live. */
   .btn:disabled {
-    color: var(--dim);
+    color: var(--ink-3, var(--dim));
     cursor: not-allowed;
   }
 
   .btn[data-weight='primary']:disabled {
-    background: var(--field);
-    color: var(--dim);
+    background: var(--tile-2, var(--field));
+    color: var(--ink-3, var(--dim));
   }
 
-  /* AND ITS KEY CAP GOES QUIET WITH IT: the on-accent cap on the grey fill was a cap nobody could see. */
+  /* AND ITS KEY CAP GOES QUIET WITH IT: the white cap on the grey fill was a cap nobody could see. */
   .btn[data-weight='primary']:disabled :global(.kbd) {
-    background: var(--hover-wash);
-    color: var(--dim);
+    background: var(--hover, var(--hover-wash));
+    color: var(--ink-3, var(--dim));
   }
 
   .btn[data-weight='bare']:disabled {
     background: none;
   }
 
-  /* 15 UNDER A THUMB, a step up from the mouse's 14, on the 40px drawing inside the 44 hit box. */
+  /* 15 UNDER A THUMB, a step up from the mouse's 14, on the 44px control. */
   @media (pointer: coarse) {
     .btn {
       font-size: var(--fs-body);
