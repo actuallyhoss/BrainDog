@@ -681,13 +681,6 @@ const updates = (rows: Record<string, unknown>[], register = 'obligations') => (
   body: { register, rows },
 });
 
-const conflictOf = (r: unknown): { version: number; actor: string } => {
-  const x = r as { ok: boolean; conflict?: { version: number; actor: string } };
-  assert.equal(x.ok, false, 'a stale update went through');
-  assert.ok(x.conflict, 'a stale update was answered with something other than the conflict');
-  return x.conflict;
-};
-
 test('AN ACCEPTED UPDATE CHANGES THE ROW, as the person who decided, beside the rows it creates', async () => {
   const { k, sql } = await record();
   const row = value<Entry>(k.create('obligations', { what: 'Invoice 41', state: 'open' }, { actor: 'p_1' }));
@@ -730,7 +723,7 @@ test('AN ACCEPTED UPDATE CHANGES THE ROW, as the person who decided, beside the 
   sql.close();
 });
 
-test('A STALE VERSION IS THE HOUSE CONFLICT, and not one row of the rowset lands', async () => {
+test('A FIELD SOMEBODY CHANGED SINCE SETTLES THE ROWSET IN A PLAIN LINE, and not one row of it lands', async () => {
   const { k, sql } = await record();
   const one = value<Entry>(k.create('obligations', { what: 'Invoice 41' }, { actor: 'p_1' }));
   const two = value<Entry>(k.create('obligations', { what: 'Invoice 42' }, { actor: 'p_1' }));
@@ -744,18 +737,20 @@ test('A STALE VERSION IS THE HOUSE CONFLICT, and not one row of the rowset lands
     ),
   );
 
-  /* Somebody edits the second row after the proposal was drawn. */
-  value(k.update('obligations', two.id, { what: 'Invoice 42, reissued' }, { actor: 'p_3', version: two.version }));
+  /* Somebody sets the second row's party another way after the proposal was drawn. An edit to a field the proposal
+     does not change is taken onto the fresh row instead (`rowset-moved.test.ts`). */
+  value(k.update('obligations', two.id, { party: 'Barclays' }, { actor: 'p_3', version: two.version }));
 
-  const clash = conflictOf(k.decide(made.id, { decide: { option: 'accept', reason: 'both are right' } }, 'p_2'));
-  assert.equal(clash.version, two.version + 1);
-  assert.equal(clash.actor, 'p_3');
+  const out = value<{ decision: string | null; status: string; settled?: string }>(k.decide(made.id, { decide: { option: 'accept', reason: 'both are right' } }, 'p_2'));
+  assert.equal(out.decision, null);
+  assert.equal(out.status, 'resolved');
+  assert.match(out.settled ?? '', /^The party of Invoice 42 changed after this was asked/u);
 
   assert.equal(k.get(one.id)?.fields.party, undefined, 'half a rowset landed');
   assert.equal(k.get(one.id)?.version, one.version);
+  assert.equal(k.get(two.id)?.fields.party, 'Barclays');
   assert.equal(sql.all("SELECT 1 FROM event WHERE actor = 'p_2'").length, 0);
   assert.equal(sql.all('SELECT 1 FROM decision').length, 0);
-  assert.equal(k.governanceRow('suggestion', made.id)?.status, 'open', 'the question was answered and nothing happened');
   sql.close();
 });
 

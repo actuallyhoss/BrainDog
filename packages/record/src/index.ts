@@ -10884,7 +10884,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       }
       const out = kernel.decide(args.id, verdict, actorOf(ctx));
       /* THE LADDER COUNTS THE ANSWER (`ladderAnswered`): kept whole, declined, or a rung offered and answered. */
-      if (out.ok && !('defer' in verdict))
+      /* NOT A ROWSET SETTLED IN ITS PLAIN LINE (`settled`): nothing of the agent's was kept, and the owner said no word on it. */
+      if (out.ok && !('defer' in verdict) && out.value.settled === undefined)
         ladderAnswered(String(args.id), 'decide' in verdict ? verdict.decide.option : 'declined', !('decide' in verdict) || verdict.decide.rows === undefined);
       /* AND A CHOICE THE NIGHTLY WALK ASKED IS CARRIED OUT (`understoodAnswer`), or let go when it was dismissed. */
       if (out.ok && !('defer' in verdict)) understoodAnswer(String(args.id), 'decide' in verdict ? verdict.decide.option : 'none', actorOf(ctx));

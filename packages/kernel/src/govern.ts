@@ -2616,6 +2616,73 @@ function checkUpdates(deps: GovernDeps, register: string, rows: readonly Record<
 }
 
 /**
+ * What one update row of a rowset meets when its row moved after the question was asked (`moved`):
+ *
+ *   - `ok` with the version the row holds now, when nothing it changes was written since, so it applies onto the fresh
+ *     row and keeps what moved beside it (a rename beside a new last seen);
+ *   - `clash` with the fields it changes that were written since to another value, which no press can make true.
+ *
+ * MEASURED ON THE LIVE RECORD, 20 Oct: "Change the last seen of apify?" was asked at version 3, the row was renamed
+ * before the owner answered, and every Accept was refused VERSION_STALE against the version the question still held,
+ * which no read could change. The question waited for ever, and he had to decline it.
+ *
+ * SINCE THE QUESTION WAS FILED, by its `suggest` event and the row's events written after it, and only when those account
+ * for every version the row moved. A question with no such event, or a row moved by something the log does not hold,
+ * keeps the compare-and-set it always had.
+ */
+type Moved = { ok: true; version: number } | { ok: false; clash: string[]; fields: Record<string, unknown> } | null;
+function moved(deps: GovernDeps, asked: string, list: string, r: Record<string, unknown>): Moved {
+  const row = deps.row(list, String(r.at));
+  if (!row || row.deleted) return null;
+  /* A DELETE OR A MERGE TAKES THE WHOLE ROW, an edit made since with it, so it stays the house conflict. */
+  if (isPlain(r.patch) && Object.hasOwn(r.patch, 'deleted_at')) return null;
+  const now = deps.sql.one<{ version: number; fields: string }>('SELECT version, fields FROM entry WHERE id = ?', row.id);
+  if (!now || now.version === Number(r.version)) return null;
+  /* BY ROWID, THE ORDER THE LOG WAS WRITTEN IN: ids minted in one millisecond do not sort by when. */
+  const filed = deps.sql.one<{ n: number }>("SELECT rowid AS n FROM event WHERE kind = 'suggest' AND target = ? ORDER BY rowid LIMIT 1", `suggestion:${asked}`)?.n;
+  if (filed === undefined) return null;
+  const lines = deps.sql.all<{ kind: string; field: string | null; write: string }>(
+    "SELECT kind, field, coalesce(batch, id) AS write FROM event WHERE target = ? AND rowid > ? AND kind <> 'note'",
+    `entry:${row.id}`,
+    filed,
+  );
+  /* EVERY VERSION THE ROW MOVED IS A WRITE THE LOG HOLDS SINCE, or what moved it is not known: read before the question
+     was filed, or written by a path that kept no line, and it stays the house conflict. */
+  if (new Set(lines.map((l) => l.write)).size < now.version - Number(r.version)) return null;
+  const since = new Set(lines.flatMap((e) => (e.kind === 'create' ? ['*'] : e.field === null ? [] : [e.field])));
+  const fields = parse(now.fields) ?? {};
+  const patch = isPlain(r.patch) ? r.patch : {};
+  /* AN EDIT FOLDED INTO THE ROW'S CREATE, in its first moments, moves that line after the question and names no field,
+     so every field the patch changes is taken as written since. */
+  if (since.has('*')) for (const f of Object.keys(patch)) since.add(f);
+  /* A FIELD WRITTEN SINCE TO THE VERY VALUE ASKED IS NO CLASH: what was asked is already so. */
+  const clash = Object.keys(patch).filter((f) => since.has(f) && canon(patch[f] ?? null) !== canon(fields[f] ?? null));
+  return clash.length === 0 ? { ok: true, version: now.version } : { ok: false, clash, fields };
+}
+
+const isPlain = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/**
+ * The plain line a rowset question settles with when what it changes was written since to something else: the
+ * fields by the names a person reads, and the row by its title. Nothing was written, and the question is closed.
+ */
+function movedSaid(deps: GovernDeps, list: string, clash: readonly string[], fields: Record<string, unknown>): string {
+  const decl = parse(
+    deps.sql.one<{ body: string }>('SELECT body FROM declaration WHERE id = ? AND superseded_at IS NULL AND retired = 0 ORDER BY version DESC LIMIT 1', `register.${list}`)?.body ?? '',
+  );
+  const specs = Array.isArray(decl?.fields) ? (decl.fields as { id?: unknown; label?: unknown }[]) : [];
+  const labels = clash.map((id) => {
+    const label = specs.find((f) => f.id === id)?.label;
+    const said = typeof label === 'string' && label.trim() !== '' ? label.trim() : id.replace(/[_-]+/gu, ' ');
+    return /^\p{Lu}\p{Ll}/u.test(said) ? said[0]!.toLowerCase() + said.slice(1) : said;
+  });
+  const title = typeof decl?.title === 'string' ? fields[decl.title] : undefined;
+  const named = typeof title === 'string' && title.trim() !== '' ? title.trim() : 'this entry';
+  const what = new Intl.ListFormat('en-GB', { type: 'conjunction' }).format(labels);
+  return `The ${what} of ${named} changed after this was asked, so nothing was written and the question is closed.`;
+}
+
+/**
  * One update row of an accepted `rowset`, as the person deciding, compare-and-set.
  *
  * A DELETE IS ITS OWN WRITE, after the fields. The write path logs a delete as a single event, so
@@ -2695,6 +2762,11 @@ export type Decided = {
   status: string;
   /** Rows an accepted `rowset` wrote. */
   wrote: string[];
+  /**
+   * The plain line an accepted `rowset` settled with instead, when what it changes was written since to something else
+   * (`moved`): nothing was written, and the question is closed as moot.
+   */
+  settled?: string;
   /** A declaration an accepted `pattern` or `change` asks the caller to install. */
   install?: Record<string, unknown>;
   /**
@@ -3023,12 +3095,31 @@ export function decide(deps: GovernDeps, id: string, verdict: Verdict, actor: st
       /* THE LADDER'S ROWS ARE THE AGENT'S, signed by the run that filed them; the decision is still the ladder's. */
       const by = signer ?? actor;
       const mechanism = typeof body.ingest === 'string' ? `ingest:${body.ingest}` : by;
+      /* A ROW THAT MOVED SINCE THIS WAS ASKED (`moved`) is asked before anything is written: applied onto the row as it
+         is now when nothing it changes was written since, and when something was, the question is settled in a plain
+         line and nothing is written, so an Accept is never refused for a version no read can bring back. */
+      const fresh = new Map<number, number>();
+      for (const [n, r] of ((body.rows ?? []) as Record<string, unknown>[]).entries()) {
+        if ((only !== null && !only.has(n)) || !('at' in r)) continue;
+        const list = typeof r.register === 'string' ? r.register : register;
+        const met = moved(deps, id, list, r);
+        if (met === null) continue;
+        if (met.ok) {
+          fresh.set(n, met.version);
+          continue;
+        }
+        const line = movedSaid(deps, list, met.clash, met.fields);
+        deps.sql.exec("UPDATE suggestion SET status = 'resolved', resolved_as = 'moot' WHERE id = ? AND status = 'open'", id);
+        event(deps, at, 'system', 'resolve', `suggestion:${id}`, 'suggestion', 'moot', line);
+        return ok({ decision: null, suggestion: id, status: 'resolved', wrote: [], settled: line });
+      }
       for (const [n, r] of ((body.rows ?? []) as Record<string, unknown>[]).entries()) {
         if (only !== null && !only.has(n)) continue;
         /* AN UPDATE IS SIGNED BY THE PERSON DECIDING, whoever drew the proposal, because changing a
            row that exists is what their press authorised. A row a rowset creates keeps the ingest's
            name when an ingest produced it. */
-        const made = 'at' in r ? applyUpdate(deps, register, r, by, batch) : deps.write(register, r, mechanism, batch);
+        const now = fresh.get(n);
+        const made = 'at' in r ? applyUpdate(deps, register, now === undefined ? r : { ...r, version: now }, by, batch) : deps.write(register, r, mechanism, batch);
         /* ALL THE ROWS OR NONE. Half a rowset accepted is a decision whose answer is not true of the
            record, and the caller's transaction is what undoes the rest. A stale version is the
            house conflict, and it undoes the rest the same way. */

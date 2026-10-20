@@ -75,7 +75,7 @@ test('A ROWSET AN UNDO REOPENS CAN BE ACCEPTED AGAIN, its rows read at the versi
   sql.close();
 });
 
-test('A ROW CHANGED IN A WAY THE QUESTION NEVER SAW KEEPS ITS OLD VERSION, and a yes is still refused', async () => {
+test('A ROW CHANGED IN A WAY THE QUESTION NEVER SAW KEEPS ITS OLD VERSION, and a yes settles it without writing', async () => {
   const { k, sql, task } = await record();
   /* THE NOTE IS ALREADY WHAT THE PATCH ASKS, so the decision leaves it alone; somebody changes it afterwards. */
   const asked = value<{ id: string }>(
@@ -89,7 +89,10 @@ test('A ROW CHANGED IN A WAY THE QUESTION NEVER SAW KEEPS ITS OLD VERSION, and a
 
   assert.equal(statusOf(sql, asked.id), 'open');
   assert.equal(bodyOf(sql, asked.id).rows[0]!.version, task.version, 'the note moved since, so the question keeps what it read');
-  assert.equal(k.decide(asked.id, { decide: { option: 'accept', reason: 'yes, again' } }, 'p_owner').ok, false);
+  /* SETTLED IN A PLAIN LINE, never refused for a version no read brings back (`rowset-moved.test.ts`). */
+  const again = value<{ settled?: string }>(k.decide(asked.id, { decide: { option: 'accept', reason: 'yes, again' } }, 'p_owner'));
+  assert.ok(again.settled, 'a yes on a row moved since wrote over it');
+  assert.equal(statusOf(sql, asked.id), 'resolved');
   assert.equal(k.get(task.id)!.fields.note, 'next week');
   sql.close();
 });
@@ -136,7 +139,7 @@ test('A LIST SOMEBODY ADDED TO AFTER THE UNDO KEEPS ITS OLD VERSION, so a yes ne
 
   assert.deepEqual(k.get(task.id)!.fields.tags, ['work', 'urgent'], 'the undo took off only what the decision added');
   assert.equal(bodyOf(sql, asked.id).rows[0]!.version, task.version, 'the list is not what it was before the decision');
-  assert.equal(k.decide(asked.id, { decide: { option: 'accept', reason: 'yes, again' } }, 'p_owner').ok, false);
+  assert.ok(value<{ settled?: string }>(k.decide(asked.id, { decide: { option: 'accept', reason: 'yes, again' } }, 'p_owner')).settled, 'a yes wrote over the list');
   assert.deepEqual(k.get(task.id)!.fields.tags, ['work', 'urgent']);
   sql.close();
 });
