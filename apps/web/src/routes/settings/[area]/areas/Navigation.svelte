@@ -1,5 +1,6 @@
 <!--
-  Settings > Navigation: the shape of the navigation, the order of its pages, the pages hidden from it, the switch that
+  Settings > Navigation: what the app opens on, the phone bar drawn live with its switches, the pages in the nav and the
+  ones not in it (Pages folded in here, UI pass 20 Oct, agents F14 and F18), where the navigation lives, the switch that
   lets the record offer anything, and the holding pen itself.
 
   EVERY SETTING HERE IS THE PERSON'S OWN ON A RECORD (`nav-prefs.svelte.ts`): the shape is `nav.shape`, the switch is
@@ -22,8 +23,9 @@
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { navPrefs, TABS_MOST, type Saved } from '$lib/nav-prefs.svelte.ts';
   import { arrange } from '$lib/nav.ts';
+  import type { IconName } from '$lib/ui/icons.ts';
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import Empty from '$lib/ui/Empty.svelte';
@@ -32,27 +34,21 @@
   import PageView from '$lib/page/PageView.svelte';
   import type { AreaProps } from '../settings-state.svelte.ts';
   import StateRow from './StateRow.svelte';
+  import Pages from './Pages.svelte';
 
-  let { shell }: AreaProps = $props();
+  let { shell, area }: AreaProps = $props();
 
   /* THIS AREA'S OWN WORDS: the group the switch sits in, so the row inside can carry the switch's own name, and the
      order of the pages, which says what a press does in the person's own page names. */
   const words = {
     offers: 'Suggestions',
-    yours: 'Your pages',
-    yoursHint: 'Move a page up or down under its heading, or hide it. Nothing is deleted.',
-    up: (title: string) => `Move ${title} up`,
-    down: (title: string) => `Move ${title} down`,
-    hide: 'Hide',
-    hideOne: (title: string) => `Hide ${title}`,
-    hidden: (title: string) => `${title} is hidden from your nav.`,
     bar: 'Phone bar',
-    barHint: 'Today is always first. Pick up to four pages for the rest of the bar; with none picked it holds Needs you, Projects, Money and Agents.',
+    barHint: 'Today is always first, then up to four more. The bar above is what a phone draws.',
     barOn: (title: string) => `${title} on the phone bar`,
-    barFull: 'The bar is full. Take one off first.',
+    barFull: 'Today is always first. Four at most after it; turn one off first.',
     barReset: 'Use the default bar',
-    none: 'No pages in your nav yet',
-    noneWhy: 'Pages arrive with the add-ons you turn on, and with the pages you make.',
+    barNow: 'The phone bar as it is now',
+    under: (section: string) => `In ${section}`,
   };
 
   /** A refusal is the record's own sentence, and a change it kept is said only once it kept it. */
@@ -77,42 +73,44 @@
       return seen.length > 0 ? [[section, seen] as const] : [];
     }),
   );
-  const shownCount = $derived(shown.reduce((n, [, list]) => n + list.length, 0));
-  /* WHETHER A PRESS WOULD MOVE ANYTHING, so the arrow at a heading's edge is not offered. */
-  const edge = (href: string, step: -1 | 1): boolean => {
-    const list = shown.find(([, l]) => l.some((e) => e.href === href))?.[1] ?? [];
-    const at = list.findIndex((e) => e.href === href);
-    return step === -1 ? at <= 0 : at >= list.length - 1;
-  };
 
-  /* THE PHONE BAR: a page is on it or off it, at most `TABS_MOST`, and Today is not one of the pick. */
-  const barFull = $derived(navPrefs.tabs.length >= TABS_MOST);
-  const onBar = (href: string): boolean => navPrefs.tabs.includes(href);
+  /**
+   * THE PHONE BAR, DRAWN AS IT IS (agents F18). Today is always first; after it, the four the person picked, or with none
+   * picked the default `tabsOf` (`lib/nav.ts`) draws: Needs you, then Projects, Money and Agents by their sections, then
+   * the next pages in the nav's order. The switches start as the bar is, so turning one on or off changes one tab, and a
+   * fifth is refused in words beside its switch rather than silently dropping three.
+   */
+  const NEEDS = '/decide';
+  const FIVE = ['orders', 'shop', 'projects', 'money', 'agents'];
+  type BarRow = { href: string; title: string; icon: IconName; section?: string | undefined };
+  const barRows = $derived<BarRow[]>([
+    { href: NEEDS, title: voiceSaid('decide'), icon: 'inbox' },
+    ...shown.flatMap(([section, list]) => list.map((p) => ({ href: p.href, title: p.title, icon: p.icon as IconName, section }))),
+  ]);
+  const plain = (x: string | undefined): string => (x ?? '').trim().toLowerCase();
+  const defaultBar = $derived.by((): string[] => {
+    const named = FIVE.flatMap((name) => {
+      const lead = barRows.find((r) => plain(r.section) === name);
+      return lead ? [lead.href] : [];
+    });
+    const rest = barRows.filter((r) => r.href !== NEEDS && !named.includes(r.href)).map((r) => r.href);
+    return [NEEDS, ...named, ...rest].slice(0, TABS_MOST);
+  });
+  const picked = $derived(navPrefs.tabs.filter((h) => barRows.some((r) => r.href === h)));
+  const barNow = $derived(picked.length > 0 ? picked : defaultBar);
+  const sameBar = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((h, i) => h === b[i]);
+  const isDefault = $derived(sameBar(barNow, defaultBar));
+  const barFull = $derived(barNow.length >= TABS_MOST);
+  const onBar = (href: string): boolean => barNow.includes(href);
+  /* THE PREVIEW: Today and the four, each its glyph over its caption, as the tab bar draws them. */
+  const preview = $derived<BarRow[]>([
+    { href: '/', title: copy.today, icon: 'today' },
+    ...barNow.flatMap((h) => barRows.filter((r) => r.href === h)),
+  ]);
   function flipBar(href: string) {
-    const next = onBar(href) ? navPrefs.tabs.filter((h) => h !== href) : [...navPrefs.tabs, href];
-    void navPrefs.setTabs(next).then((saved) => said(saved));
-  }
-
-  function move(href: string, step: -1 | 1) {
-    void navPrefs.move(arranged, href, step)?.then((saved) => said(saved));
-  }
-
-  function hidePage(p: { href: string; title: string }) {
-    void navPrefs.hide(p.href).then((saved) => {
-      if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
-      else toasts.push(words.hidden(p.title), { undo: () => void navPrefs.show(p.href) });
-    });
-  }
-
-  /* THE PAGES THIS PERSON HID FROM THEIR NAV, by the name the rail gave them, and the way back. */
-  const hiddenPages = $derived(
-    navPrefs.hidden.map((href) => ({ href, title: navPrefs.labelOf(href, shell.nav.find((e) => e.href === href)?.title ?? (href === '/inbox' ? voiceSaid('inbox') : href)) })),
-  );
-  function showAgain(p: { href: string; title: string }) {
-    void navPrefs.show(p.href).then((saved) => {
-      if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
-      else toasts.push(copy.shownInNav(p.title), { undo: () => void navPrefs.hide(p.href) });
-    });
+    const next = onBar(href) ? barNow.filter((h) => h !== href) : [...barNow, href];
+    /* BACK TO THE DEFAULT IS NO PICK AT ALL, so a bar that matches it follows it when the record's places change. */
+    void navPrefs.setTabs(sameBar(next, defaultBar) ? [] : next).then((saved) => said(saved));
   }
 
   const navShapeLabel = (s: NavShape): string => (s === 'rail' ? copy.navShapeRail : s === 'bar' ? copy.navShapeBar : copy.navShapeMenu);
@@ -293,10 +291,58 @@
   </span>
 {/snippet}
 
-<Section title={copy.navShape}>
-  <!-- ON A PHONE THE SHAPE IS ONE SENTENCE. A phone always draws the tab bar, so a picker there offers a choice
-       the phone would not draw; `wide-only` (`settings.css`) leaves the picker to the screens that use it. -->
-  <!-- ONE HINT A SECTION: the picker's own on the screens that draw it, and the phone's one sentence on a phone. -->
+<!-- WHAT THE APP OPENS ON, first: Pages folded in here (agents F14). -->
+<Pages {shell} {area} part="opens" />
+
+<!-- THE PHONE BAR, drawn live above one switch for each page: his pick wins over the five of 19 October. -->
+{#snippet barSwitch(r: BarRow)}
+  <button
+    type="button"
+    class="switch"
+    role="switch"
+    aria-checked={onBar(r.href)}
+    aria-label={words.barOn(r.title)}
+    disabled={!onBar(r.href) && barFull}
+    onclick={() => flipBar(r.href)}><span class="switch-track"></span></button
+  >
+{/snippet}
+<Tile icon="monitor" title={words.bar}>
+  {#snippet actions()}
+    {#if !isDefault}<Button size="sm" weight="quiet" onclick={() => void navPrefs.setTabs([]).then((saved) => said(saved))}>{words.barReset}</Button>{/if}
+  {/snippet}
+  <div class="bar-preview" role="img" aria-label={`${words.barNow}: ${preview.map((t) => t.title).join(', ')}`}>
+    {#each preview as t, i (t.href)}
+      <span class="bar-slot" data-on={i === 0 ? '' : undefined}><Icon name={t.icon} size="m" /><span class="bar-cap">{t.title}</span></span>
+    {/each}
+  </div>
+  <!-- WHEN THE BAR IS FULL THE LINE SAYS SO ONCE, over the switches it disables, rather than under each of them. -->
+  <p class="hint" role="status">{barFull ? words.barFull : words.barHint}</p>
+  <ul class="bar-rows">
+    {#each barRows as r (r.href)}
+      {@const line = r.section && plain(r.section) !== plain(r.title) ? words.under(r.section) : undefined}
+      <li class="switch-row bar-row">
+        <span class="bar-row-main">
+          <IconWell name={r.icon} />
+          <span class="switch-row-words">
+            <span class="switch-row-title">{r.title}</span>
+            {#if line}<span class="bar-row-line">{line}</span>{/if}
+          </span>
+        </span>
+        {@render barSwitch(r)}
+      </li>
+    {/each}
+  </ul>
+</Tile>
+
+<!-- THE PAGES IN THE NAV, their order and Hide, then every page not in it with the way back (Pages folded in here). -->
+<Pages {shell} {area} part="nav" />
+<Pages {shell} {area} part="others" />
+
+<!--
+  WHERE THE NAVIGATION LIVES. `19 §3` carries five shapes and three conditions; the three that are choices are here,
+  and on a phone, which always draws the tab bar, it is one sentence.
+-->
+<Tile icon="rows" title={copy.navShape}>
   <div class="wide-only">
     <p class="hint">{copy.navShapeHint}</p>
     <div class="pictures" role="group" aria-label={copy.navShape}>
@@ -309,95 +355,7 @@
     </div>
   </div>
   <p class="hint phone-only">{copy.navShapeOnPhone}</p>
-</Section>
-
-<!-- THE PHONE BAR, one plain switch for each page: his pick wins over the five of 19 October. -->
-<Section title={words.bar}>
-  <p class="hint">{words.barHint}</p>
-  <ul class="ledger ledger-lead">
-    {#each shown.flatMap(([, list]) => list) as p (p.href)}
-      <li>
-        <div class="line">
-          <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
-          <span class="line-main"><span class="line-title">{p.title}</span></span>
-          <span class="line-amount"></span>
-          <span class="line-when">
-            <button
-              type="button"
-              class="switch"
-              role="switch"
-              aria-checked={onBar(p.href)}
-              aria-label={words.barOn(p.title)}
-              title={!onBar(p.href) && barFull ? words.barFull : undefined}
-              disabled={!onBar(p.href) && barFull}
-              onclick={() => flipBar(p.href)}><span class="switch-track"></span></button
-            >
-          </span>
-        </div>
-      </li>
-    {/each}
-  </ul>
-  {#if navPrefs.tabs.length > 0}<Button weight="quiet" onclick={() => void navPrefs.setTabs([]).then((saved) => said(saved))}>{words.barReset}</Button>{/if}
-</Section>
-
-<!--
-  THE ORDER OF THE NAV, which `nav.order` has kept since the rail's own menu lost Move up and Hide. Each heading's pages
-  in the order drawn, an arrow up and down that moves one a place inside its heading, and Hide. The arrows are there on
-  hover and on focus under a pointer, and always under a thumb.
--->
-<Section title={words.yours} count={shownCount}>
-  <p class="hint">{words.yoursHint}</p>
-  {#if shown.length === 0}
-    <Empty kind="cleared" title={words.none} body={words.noneWhy} />
-  {:else}
-    {#each shown as [section, list] (section)}
-      <p class="order-head">{section}</p>
-      <ul class="ledger ledger-lead order">
-        {#each list as p (p.href)}
-          <li class="order-row">
-            <div class="line">
-              <span class="line-mark"><IconWell name={p.icon} size="l" /></span>
-              <span class="line-main"><span class="line-title">{p.title}</span></span>
-              <span class="line-amount"></span>
-              <span class="line-when order-acts">
-                <button type="button" class="step" aria-label={words.up(p.title)} disabled={edge(p.href, -1)} onclick={() => move(p.href, -1)}
-                  ><Icon name="arrow-up" size="s" /></button
-                >
-                <button type="button" class="step" aria-label={words.down(p.title)} disabled={edge(p.href, 1)} onclick={() => move(p.href, 1)}
-                  ><Icon name="arrow-down" size="s" /></button
-                >
-                <Button weight="bare" aria-label={words.hideOne(p.title)} onclick={() => hidePage(p)}>{words.hide}</Button>
-              </span>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/each}
-  {/if}
-</Section>
-
-<!-- THE WAY BACK FOR A HIDDEN PAGE, which the rail's "pages hidden" row opens at. -->
-<div id="hidden">
-  <Section title={copy.hiddenPages} count={hiddenPages.length}>
-    <p class="hint">{copy.hiddenPagesHint}</p>
-    {#if hiddenPages.length === 0}
-      <Empty kind="cleared" title={copy.hiddenNone} body={copy.hiddenNoneWhy} />
-    {:else}
-      <ul class="ledger ledger-lead">
-        {#each hiddenPages as p (p.href)}
-          <li>
-            <div class="line">
-              <span class="line-mark"><IconWell name="doc" size="l" /></span>
-              <span class="line-main"><span class="line-title">{p.title}</span></span>
-              <span class="line-amount"></span>
-              <span class="line-when"><Button weight="quiet" onclick={() => showAgain(p)}>{copy.showAgain}</Button></span>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </Section>
-</div>
+</Tile>
 
 <!--
   THE SWITCH THIS AREA WAS ADDED TO HOLD (`19 §2`, `29 §4`: "one global switch, the same shape as Character keys: off").
@@ -416,15 +374,15 @@
   >
 {/snippet}
 
-<Section title={words.offers}>
+<Tile icon="learning" title={words.offers}>
   <StateRow icon="learning" title={copy.suggestPages} line={copy.suggestPagesHint} action={suggestSwitch} />
-</Section>
+</Tile>
 
 <!--
   THE HOLDING PEN. Every offer, whatever its kind, is one row: what it is, one sentence of why, and three presses, "Show
   it", "Keep it" and "Not this one". Nothing in it is ever applied without the second (`19 §3`).
 -->
-<Section title={copy.suggested} count={waitingCount}>
+<Tile icon="inbox" title={copy.suggested} count={waitingCount}>
   {#if !navPrefs.suggest}
     <!-- NOT `no-data-yet`, WHICH WOULD BE A LIE ABOUT THE RECORD. `19 §6` separates the empty states precisely so that
          "nothing has happened yet" and "you turned this off" cannot read the same. -->
@@ -479,7 +437,7 @@
       </ul>
     {/if}
   {/if}
-</Section>
+</Tile>
 
 <!-- WHERE EVERY CHOICE ABOVE IS KEPT, SAID ONCE FOR THE AREA. It was under three sections, and the page's own footer
      said the opposite under a fourth. -->
@@ -527,17 +485,17 @@
      inside it is this file's. */
   .hint {
     margin: 0 0 var(--sp-3);
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    max-inline-size: 75ch;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
   }
 
   /* WHERE THE AREA'S CHOICES ARE KEPT, once, as the line under every area that keeps its own is drawn. */
   .kept {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-xs);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
   }
 
   /* THE PHONE'S ONE SENTENCE ABOUT THE SHAPE, where the picker is not drawn. */
@@ -555,7 +513,7 @@
     display: grid;
     gap: 4cqi;
     padding: 4cqi;
-    background: radial-gradient(90cqi 40cqi at 50% -12cqi, var(--ground-glow), transparent), var(--sunk);
+    background: var(--board);
   }
 
   .nav-look[data-shape='rail'] {
@@ -571,14 +529,12 @@
     align-items: start;
   }
 
-  /* THE CHROME IS GLASS, as the shell's is: the frosted fill and its hairline pair. */
+  /* THE CHROME IS THE NAV'S OWN SURFACE, flat with its hairline, as the shell's is now: no glass, no shadow. */
   .nav-chrome {
     display: flex;
     gap: 2.2cqi;
-    background: var(--glass);
-    box-shadow:
-      0 0 0 0.4cqi color-mix(in srgb, var(--ink) 7%, transparent),
-      0 0.4cqi 1.6cqi color-mix(in srgb, var(--ink) 8%, transparent);
+    background: var(--nav);
+    outline: 0.4cqi solid var(--rule);
   }
 
   .nav-rail {
@@ -612,7 +568,7 @@
     inline-size: 5.4cqi;
     block-size: 3.8cqi;
     border-radius: 1cqi;
-    background: var(--accent);
+    background: var(--red-fill);
   }
 
   .nav-rail .nav-mark {
@@ -672,8 +628,7 @@
   .nav-tile {
     block-size: 14cqi;
     border-radius: 3cqi;
-    background: var(--bg);
-    box-shadow: var(--e1);
+    background: var(--tile);
   }
 
   .nav-row {
@@ -683,71 +638,70 @@
     background: color-mix(in srgb, var(--ink) 20%, transparent);
   }
 
-  /* ── the order of the nav ── */
+  /* ── the phone bar ── */
 
-  .order-head {
-    margin: 0 0 var(--sp-1);
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 500;
+  /* THE BAR AS A PHONE DRAWS IT: five equal slots on the nav's surface, a 20px glyph over a 12px caption, Today in ink
+     and the rest in the second ink, as `TabBar.svelte` draws the bar you are not on. 390 wide at most, so it reads as the
+     phone's and not as a toolbar across the desk. */
+  .bar-preview {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    max-inline-size: 390px;
+    margin-block-end: var(--sp-4);
+    padding-block: var(--sp-2);
+    background: var(--nav);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-pop);
   }
 
-  .order + .order-head {
-    margin-block-start: var(--sp-4);
-  }
-
-  .order-acts {
-    display: flex;
-    align-items: center;
+  .bar-slot {
+    display: grid;
+    justify-items: center;
     gap: var(--sp-1);
+    min-inline-size: 0;
+    color: var(--ink-2);
   }
 
-  /* AN ARROW IS A SQUARE THE SIZE OF A CONTROL, with its glyph in the quiet ink until it is pointed at. */
-  .step {
-    display: inline-grid;
-    place-items: center;
-    inline-size: var(--ctl-h);
-    block-size: var(--ctl-h);
-    padding: 0;
-    background: none;
-    border: 0;
-    border-radius: var(--r-md);
-    color: var(--dim);
-    cursor: pointer;
-    transition:
-      background var(--d-state) var(--ease-out),
-      opacity var(--d-state) var(--ease-out);
-  }
-
-  .step:hover:not(:disabled) {
-    background: var(--hover-wash);
+  .bar-slot[data-on] {
     color: var(--ink);
   }
 
-  .step:disabled {
-    cursor: default;
-    opacity: 0.3;
+  .bar-cap {
+    max-inline-size: 100%;
+    overflow: hidden;
+    font-size: var(--fs-cap);
+    font-weight: 500;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  /* UNDER A POINTER THE PRESSES WAIT FOR THE PAGE THEY MOVE, and come with hover or focus, so the list reads as the
-     names of the pages. Under a thumb there is no hover, and they are always there. */
-  @media (pointer: fine) {
-    .order-row .order-acts {
-      opacity: 0;
-      transition: opacity var(--d-state) var(--ease-out);
-    }
-
-    .order-row:hover .order-acts,
-    .order-row:focus-within .order-acts {
-      opacity: 1;
-    }
+  .bar-slot[data-on] .bar-cap {
+    font-weight: 600;
   }
 
-  @media (pointer: coarse) {
-    .step {
-      inline-size: var(--tap);
-      block-size: var(--tap);
-    }
+  .bar-rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bar-row-main {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .bar-row-main > :global(.well) {
+    flex: none;
+    margin-block-start: -4px;
+  }
+
+  .bar-row-line {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 
   .pen-acts {
@@ -762,8 +716,8 @@
     align-items: center;
     gap: var(--sp-3);
     margin: 0 0 var(--sp-4);
-    color: var(--ink2);
-    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
   }
 
   /* AT 390 THE PEN IS A LIST OF FULL-WIDTH ROWS, the three presses on their own line under the why, each 44 tall so a

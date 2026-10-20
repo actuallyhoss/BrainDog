@@ -37,7 +37,7 @@
   import { closed, opened } from '$lib/ui/screen.svelte.ts';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import type { IconName } from '$lib/ui/icons.ts';
-  import Section from '$lib/ui/Section.svelte';
+  import Tile from '$lib/ui/Tile.svelte';
   import Button from '$lib/ui/Button.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import IconWell from '$lib/ui/IconWell.svelte';
@@ -48,7 +48,13 @@
   import type { AreaProps } from '../settings-state.svelte.ts';
   import { ownsRecord } from '../../levels.ts';
 
-  let { shell }: AreaProps = $props();
+  /**
+   * PAGES IS FOLDED INTO NAVIGATION (UI pass 20 Oct, agents F14): Navigation draws this file three times, one `part` each,
+   * "Opens on" at the top, then "In your nav", then "Not in your nav", so the two areas can no longer count the same
+   * pages two ways ("Your pages 40" here beside "Your pages 8" there). With no `part` all three are drawn, in that order.
+   */
+  let { shell, part }: AreaProps & { part?: 'opens' | 'nav' | 'others' | undefined } = $props();
+  const drawn = (which: 'opens' | 'nav' | 'others'): boolean => part === undefined || part === which;
 
   /* THE PAGE ITSELF IS THE OWNER'S TO CHANGE, as the record's `setDeclaration` and `slashDraft` hold. */
   const owner = $derived(ownsRecord(shell.me));
@@ -60,7 +66,18 @@
     opensOn: 'Opens on',
     homeSet: (name: string) => `BrainDog opens on ${name} now.`,
     pages: 'Your pages',
+    inNav: 'In your nav',
+    inNavHint: 'Move a page up or down under its heading, or hide it. Nothing is deleted.',
     other: 'Not in your nav',
+    otherHint: 'Hidden pages, and pages the nav has no room for. Show one and it returns to the place it had.',
+    nothingOut: 'Every page is in your nav',
+    up: (title: string) => `Move ${title} up`,
+    down: (title: string) => `Move ${title} down`,
+    hideOne: (title: string) => `Hide ${title}`,
+    upWord: 'Move up',
+    downWord: 'Move down',
+    hideWord: 'Hide',
+    showWord: 'Show',
     open: 'Open',
     more: (title: string) => `More for ${title}`,
     layout: 'Edit layout',
@@ -116,6 +133,19 @@
   const views = $derived(new Set(shell.index.registers.flatMap((r) => r.views.map((v) => v.href))));
   const inNav = $derived(shell.nav.filter((e) => !e.cut && !e.row && !views.has(e.href)));
   const sections = $derived(arrange(inNav, navPrefs.order));
+  /* THE ORDER A MOVE IS MADE IN: the nav's own arrangement, hidden pages in, so a page shown again goes back where it was. */
+  const arranged = $derived(arrange(navPrefs.relabel(inNav), navPrefs.order));
+  /* WHETHER A PRESS WOULD MOVE ANYTHING, among the pages of its heading still drawn, so an arrow at an edge is not offered. */
+  const edge = (href: string, step: -1 | 1): boolean => {
+    const list = (arranged.find(([, l]) => l.some((e) => e.href === href))?.[1] ?? []).filter((e) => !navPrefs.isHidden(e.href));
+    const at = list.findIndex((e) => e.href === href);
+    return at < 0 || (step === -1 ? at <= 0 : at >= list.length - 1);
+  };
+  function move(href: string, step: -1 | 1) {
+    void navPrefs.move(arranged, href, step)?.then((saved) => {
+      if (saved.from === 'refused') toasts.push(saved.fix, { intent: 'warn' });
+    });
+  }
   const groups = $derived(
     sections.map(
       ([section, list]) =>
@@ -150,7 +180,9 @@
         if (item.href === WORK && holdsTasks) out.push(app(WORK, item.label, item.icon as IconName));
         const held = bySection.get(item.label.trim().toLocaleLowerCase());
         if (!held) continue;
-        for (const p of held.list) out.push(same(p.own, held.section) ? p : { ...p, section: held.section });
+        /* A NAME THAT REPEATS SAYS WHERE IT IS (agents F14): Work the screen and Work the page read "Work", then
+           "Work" with "In Work" under it, rather than the same word twice. */
+        for (const p of held.list) out.push(same(p.own, held.section) && !out.some((o) => same(o.own, p.own)) ? p : { ...p, section: held.section });
       }
     }
     return out;
@@ -216,7 +248,10 @@
   const FOLD = 8;
   let unfolded = $state(false);
   const othersShown = $derived(unfolded ? others : others.filter((p) => !p.row).slice(0, FOLD));
-  const total = $derived(ordered.length + others.length);
+  /* WHAT IS IN THE NAV NOW, and the pages hidden from it, which "Not in your nav" leads with. */
+  const navShown = $derived(ordered.filter((p) => !navPrefs.isHidden(p.href)));
+  const hiddenRows = $derived(ordered.filter((p) => navPrefs.isHidden(p.href)));
+  const outCount = $derived(hiddenRows.length + others.length);
 
   /* ── the home page ── */
 
@@ -357,7 +392,19 @@
       </span>
       <span class="line-amount"></span>
       <span class="line-when line-verbs page-acts">
-        <span class="page-open" aria-hidden="true">{words.open}</span>
+        {#if hidden}
+          <!-- A HIDDEN PAGE'S ONE PRESS, drawn and not in a menu: the way back. -->
+          <span class="moves"><Button size="sm" onclick={() => toggleHidden(p, title)}>{words.showWord}</Button></span>
+        {:else if p.inNav && !p.app}
+          <!-- MOVE AND HIDE ARE ALWAYS DRAWN (agents F18), 32px, 44 under a thumb; below 640px they live in the menu. -->
+          <span class="moves" data-moves="">
+            <button type="button" class="step" aria-label={words.up(title)} disabled={edge(p.href, -1)} onclick={() => move(p.href, -1)}><Icon name="arrow-up" size="s" /></button>
+            <button type="button" class="step" aria-label={words.down(title)} disabled={edge(p.href, 1)} onclick={() => move(p.href, 1)}><Icon name="arrow-down" size="s" /></button>
+            <Button size="sm" weight="bare" aria-label={words.hideOne(title)} onclick={() => toggleHidden(p, title)}>{words.hideWord}</Button>
+          </span>
+        {:else}
+          <span class="page-open" aria-hidden="true">{words.open}</span>
+        {/if}
         {#if !(p.app && first)}<span class="page-menu">
           <Menu label={words.more(title)} align="end">
             {#snippet trigger()}
@@ -367,12 +414,16 @@
               <a class="mi wide-only" role="menuitem" href={at(p.href)}>{words.layout}</a>
               <button type="button" class="mi" role="menuitem" onclick={() => startChange(p)}>{words.slash}</button>
             {/if}
+            {#if p.inNav && !p.app && !hidden}
+              <button type="button" class="mi mi-phone" role="menuitem" disabled={edge(p.href, -1)} onclick={() => move(p.href, -1)}>{words.upWord}</button>
+              <button type="button" class="mi mi-phone" role="menuitem" disabled={edge(p.href, 1)} onclick={() => move(p.href, 1)}>{words.downWord}</button>
+            {/if}
             {#if p.inNav && !p.app}
               <button type="button" class="mi" role="menuitem" onclick={() => startRename(p)}>{words.rename}</button>
             {/if}
             <button type="button" class="mi" role="menuitem" onclick={() => toggleFirst(p)}>{first ? words.notFirst : words.first}</button>
-            {#if p.inNav && !p.app}
-              <button type="button" class="mi" role="menuitem" onclick={() => toggleHidden(p, title)}>{hidden ? words.show : words.hide}</button>
+            {#if p.inNav && !p.app && !hidden}
+              <button type="button" class="mi mi-phone" role="menuitem" onclick={() => toggleHidden(p, title)}>{words.hide}</button>
             {/if}
           </Menu>
         </span>{/if}
@@ -381,40 +432,7 @@
   </li>
 {/snippet}
 
-<Section title={words.pages} count={total}>
-  <!-- WHAT THE APP OPENS ON: one line and one select. -->
-  <div class="opens">
-    <IconWell name="home" />
-    <label class="opens-label" for="home-select">{words.opensOn}</label>
-    <select id="home-select" class="home-select" value={homeNow} onchange={(e) => pickHome(e.currentTarget.value)}>
-      {#each homes as h (h.href)}<option value={h.href}>{h.name}</option>{/each}
-    </select>
-  </div>
-  {#if total === 0}
-    <Empty kind="cleared" title={words.none} body={words.noneWhy} />
-  {:else}
-    <!-- ONE LIST, ONE RHYTHM: a hairline between every row, the nav's order, and no gap round a page on its own. -->
-    <ul class="ledger ledger-lead pages">
-      {#each ordered as p (p.href)}{@render pageRow(p)}{/each}
-    </ul>
-    {#if others.length > 0}
-      <p class="group-head">{words.other}</p>
-      <ul class="ledger ledger-lead pages">
-        {#each othersShown as p (p.href)}{@render pageRow(p)}{/each}
-        {#if others.length > othersShown.length}
-          <!-- THE REST IS A ROW LIKE THE OTHERS, its chevron saying a press opens more. -->
-          <li class="page-row page-fold">
-            <button type="button" class="line fold-line" onclick={() => (unfolded = true)}>
-              <span class="line-mark"><IconWell name="doc" size="l" /></span>
-              <span class="line-main"><span class="line-title">{words.morePages(others.length - othersShown.length)}</span></span>
-              <span class="line-amount"></span>
-              <span class="line-when fold-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
-            </button>
-          </li>
-        {/if}
-      </ul>
-    {/if}
-  {/if}
+{#snippet addonsLine()}
   <!-- THE ADD-ONS THE PAGES CAME WITH, as one line: what is on, and the door to where each is turned off or on. -->
   {#if addons !== null}
     <p class="addons">
@@ -424,7 +442,63 @@
       <a class="addons-manage" href={at('/packs')}>{words.manage}</a>
     </p>
   {/if}
-</Section>
+{/snippet}
+
+{#if drawn('opens')}
+  <!-- WHAT THE APP OPENS ON: one row and one select, at the top of Navigation. -->
+  <Tile>
+    <div class="opens">
+      <IconWell name="home" />
+      <label class="opens-label" for="home-select">{words.opensOn}</label>
+      <select id="home-select" class="home-select" value={homeNow} onchange={(e) => pickHome(e.currentTarget.value)}>
+        {#each homes as h (h.href)}<option value={h.href}>{h.name}</option>{/each}
+      </select>
+    </div>
+  </Tile>
+{/if}
+
+{#if drawn('nav')}
+  <Tile icon="rows" title={words.inNav} count={navShown.length}>
+    <p class="hint">{words.inNavHint}</p>
+    {#if navShown.length === 0}
+      <Empty kind="cleared" title={words.none} body={words.noneWhy} />
+    {:else}
+      <!-- ONE LIST, ONE RHYTHM: a hairline between every row, the nav's order, and a page under a section named
+           otherwise says where it is ("In Work"). -->
+      <ul class="ledger ledger-lead pages">
+        {#each navShown as p (p.href)}{@render pageRow(p)}{/each}
+      </ul>
+    {/if}
+  </Tile>
+{/if}
+
+{#if drawn('others')}
+  <div id="hidden">
+    <Tile icon="eye" title={words.other} count={outCount}>
+      <p class="hint">{words.otherHint}</p>
+      {#if outCount === 0}
+        <p class="nothing-out">{words.nothingOut}</p>
+      {:else}
+        <ul class="ledger ledger-lead pages">
+          {#each hiddenRows as p (p.href)}{@render pageRow(p)}{/each}
+          {#each othersShown as p (p.href)}{@render pageRow(p)}{/each}
+          {#if others.length > othersShown.length}
+            <!-- THE REST IS A ROW LIKE THE OTHERS, its chevron saying a press opens more. -->
+            <li class="page-row page-fold">
+              <button type="button" class="line fold-line" onclick={() => (unfolded = true)}>
+                <span class="line-mark"><IconWell name="doc" size="l" /></span>
+                <span class="line-main"><span class="line-title">{words.morePages(others.length - othersShown.length)}</span></span>
+                <span class="line-amount"></span>
+                <span class="line-when fold-go" aria-hidden="true"><Icon name="chevron" size="s" /></span>
+              </button>
+            </li>
+          {/if}
+        </ul>
+      {/if}
+      {@render addonsLine()}
+    </Tile>
+  </div>
+{/if}
 
 {#if naming}
   {@const n = naming}
@@ -466,10 +540,78 @@
 <style>
   .hint {
     margin: 0 0 var(--sp-3);
-    max-inline-size: var(--measure);
-    color: var(--dim);
-    font-size: var(--t-sm);
+    max-inline-size: 75ch;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: var(--lh-body);
+  }
+
+  .nothing-out {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-body);
+  }
+
+  /* A ROW THAT CAN BE MOVED KEEPS ITS PRESSES IN SIGHT (agents F18): `rows.css` waits for the pointer, these do not. */
+  .page-acts:has(.moves) {
+    opacity: 1;
+  }
+
+  /* MOVE AND HIDE, over the row's link so each press is its own. */
+  .moves {
+    position: relative;
+    z-index: var(--z-raise);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+  }
+
+  .step {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 32px;
+    block-size: 32px;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: var(--r-ctl);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .step:hover:not(:disabled) {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+
+  .step:disabled {
+    cursor: default;
+    opacity: 0.35;
+  }
+
+  @media (pointer: coarse) {
+    .step {
+      inline-size: var(--tap);
+      block-size: var(--tap);
+    }
+  }
+
+  /* BELOW 640PX THE ROW HAS ONE "⋯" (agents F18): moves and Hide are its first items there, and not drawn on the row. */
+  @media (width < 640px) {
+    .moves[data-moves] {
+      display: none;
+    }
+  }
+
+  @media (width >= 640px) {
+    :global(.mi.mi-phone) {
+      display: none;
+    }
   }
 
   /* ONE LINE: the home glyph, "Opens on", and the select, a step clear of the pages under it. */
@@ -478,26 +620,13 @@
     align-items: center;
     gap: var(--sp-3);
     min-block-size: var(--row-h);
-    margin-block-end: var(--sp-3);
-    padding-inline: var(--sp-2);
   }
 
   .opens-label {
+    flex: 1 1 auto;
     color: var(--ink);
-    font-size: var(--t-row);
+    font-size: var(--fs-body);
     font-weight: 500;
-  }
-
-  .group-head {
-    margin: 0 0 var(--sp-1);
-    padding-inline: var(--sp-2);
-    color: var(--dim);
-    font-size: var(--t-xs);
-    font-weight: 500;
-  }
-
-  .pages + .group-head {
-    margin-block-start: var(--sp-4);
   }
 
   .page-row[data-hidden] .page-link {
@@ -644,8 +773,8 @@
     min-block-size: var(--ctl-h);
     max-inline-size: 14rem;
     padding: 0 var(--sp-3);
-    background: var(--s3);
-    border: 1px solid var(--line);
+    background: var(--tile);
+    border: 1px solid var(--switch-off);
     border-radius: var(--r-md);
     color: var(--ink);
     font: inherit;
