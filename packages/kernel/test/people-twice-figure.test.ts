@@ -174,7 +174,7 @@ test('ANOTHER MEMBER\'S OWN ADDITION IS THEIRS, read off the log: never counted,
 
 test('TWO PEOPLE EACH LISTED TWICE, WHO BOTH HOLD A KEY, COUNT ONCE A MERGE QUESTION WAITS ON THEM, and not after his no', async () => {
   const { k, sql } = await record();
-  const a = person(k, { name: 'Priya Raman', email: 'priya@encore.example', handles: ['github:priya'] });
+  const a = person(k, { name: 'Priya Raman', email: 'priya@kiln.example', handles: ['github:priya'] });
   const b = person(k, { name: 'Priya Raman', email: 'priya@larkspur.example', handles: ['github:sudipb'] });
   person(k, { name: 'Layla' });
   assert.equal(read(sql).value, 0, 'two who each hold a key are two people until something says otherwise');

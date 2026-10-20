@@ -594,7 +594,7 @@ test('REVISION: a list moves only when the log touched it, everything moves on a
   await copy.heard();
   assert.notEqual(copy.revision(), declared, 'a declaration moves the declarations');
   assert.notEqual(copy.revision('projects'), projects, 'and every list');
-  fake.refuse('UNAVAILABLE');
+  fake.refuse('UNREACHABLE');
   await copy.heard();
   assert.equal(copy.revision('projects'), null, 'a catch-up that failed vouches for nothing');
 });

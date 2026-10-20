@@ -31,7 +31,7 @@ const registers = {
 };
 
 const PRISM = '01M3MVSXC7CQRV4F1ATNTD2196';
-const names = { [PRISM]: 'Prism', 'things#23': 'Larkspur', 'things#28': 'Encore' };
+const names = { [PRISM]: 'Prism', 'things#23': 'Larkspur', 'things#28': 'Kiln' };
 
 test('AN OLDER QUESTION KEEPS ITS WORDS: boot names only the newest, so the row itself is read next', () => {
   const asked = new Map([['SG200', 'Mark Ship it done?']]);
@@ -61,7 +61,7 @@ test('AN UPDATE IS NOT A CREATE: createsOf leaves rows with an `at` to updatesOf
 
 test('A LIST OF REFS IS SAID BY NAMES, never "things#23,things#28", and an id nothing names is never drawn', () => {
   const show = plainOf(registers, names);
-  assert.equal(show('people', 'projects', ['things#23', 'things#28']), 'Larkspur, Encore');
+  assert.equal(show('people', 'projects', ['things#23', 'things#28']), 'Larkspur, Kiln');
   assert.equal(show('people', 'projects', [PRISM]), 'Prism');
   assert.equal(show('tasks', 'thing', '01M3MVSXC7CQRV4F1ATNTD2199'), 'A row you cannot open');
   assert.equal(show('people', 'note', 'Also met in things#23.'), 'Also met in Larkspur.');
@@ -71,7 +71,7 @@ test('A LIST OF REFS IS SAID BY NAMES, never "things#23,things#28", and an id no
     { people: [{ seq: 4, version: 1, fields: { name: 'Priya', projects: ['things#23'] } }] },
     show,
   );
-  assert.deepEqual(u!.changes.map((c) => (c.long ? null : [c.before, c.after])), [['Larkspur', 'Larkspur, Encore']]);
+  assert.deepEqual(u!.changes.map((c) => (c.long ? null : [c.before, c.after])), [['Larkspur', 'Larkspur, Kiln']]);
 });
 
 test('THE REFS A QUESTION NAMES are read once each, from patches, the rows as they are, creates and text', () => {
@@ -94,10 +94,10 @@ test('HELD BY NAMES EVERY REF from the row it points at, in that list own title 
     boot: async () => ({ ok: true, value: {} }),
     governance: async () => ({ ok: true, value: null }),
     schema: async (r) => ({ ok: true, value: registers[r as keyof typeof registers] }),
-    get: async () => ({ ok: false, refusal: { code: 'NOT_FOUND', fix: '' } }),
+    get: async () => ({ ok: false, refusal: { code: 'REF_UNKNOWN', fix: '' } }),
     call: async (_name, args) => {
       const got = rows[String(args?.spoken)];
-      return got ? { ok: true, value: got } : { ok: false, refusal: { code: 'NOT_FOUND', fix: '' } };
+      return got ? { ok: true, value: got } : { ok: false, refusal: { code: 'REF_UNKNOWN', fix: '' } };
     },
   };
   const held = await heldBy(client, [{ register: 'tasks', rows: [{ what: 'x', thing: PRISM }] }], { names: true });
