@@ -56,10 +56,10 @@ test('WHEN BOTH BINDING CALLS THROW, THE REST ENDPOINT ANSWERS', async () => {
     return new Response(JSON.stringify({ success: true, result: GOOD }), { status: 200 });
   }) as unknown as typeof fetch;
   const lines: string[] = [];
-  const got = await aiInference({ ...env, CF_ACCOUNT_ID: 'acct1', WORKERS_AI_TOKEN: 'tok' }, { fetch: fetchStub, log: (l) => lines.push(l) }).complete(ask);
+  const got = await aiInference({ ...env, AI_REST_URL: 'https://ai.example/run/', WORKERS_AI_TOKEN: 'tok' }, { fetch: fetchStub, log: (l) => lines.push(l) }).complete(ask);
   assert.ok(got.ok);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0]?.url, 'https://api.cloudflare.com/client/v4/accounts/acct1/ai/run/@cf/meta/llama-3.2-1b-instruct');
+  assert.equal(calls[0]?.url, 'https://ai.example/run/@cf/meta/llama-3.2-1b-instruct');
   assert.equal(calls[0]?.auth, 'Bearer tok');
   assert.equal(lines.length, 1);
   assert.match(lines[0] ?? '', /^ai: answered by rest/u);

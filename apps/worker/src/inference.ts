@@ -89,8 +89,9 @@ export type AiBinding = { run(model: string, inputs: Record<string, unknown>, op
 export type AiEnv = {
   AI?: AiBinding | undefined;
   AI_GATEWAY?: string | undefined;
-  /** The account id (a plain var) and a Workers AI API token (the secret `WORKERS_AI_TOKEN`) for the REST path. Both, or no REST path. */
-  CF_ACCOUNT_ID?: string | undefined;
+  /** Workers AI's REST run address up to `/ai/run/` (a plain var naming the account) and its token (the secret
+   * `WORKERS_AI_TOKEN`) for the REST path. Both, or no REST path. */
+  AI_REST_URL?: string | undefined;
   WORKERS_AI_TOKEN?: string | undefined;
 };
 
@@ -215,7 +216,7 @@ const through = (env: AiEnv): AiOptions => (env.AI_GATEWAY ? { gateway: { id: en
 /**
  * ONE MODEL CALL THAT SURVIVES A BROKEN GATEWAY. The binding with the gateway first; if that throws anything but "no such
  * model", the binding once more without the gateway option (a gateway that does not exist on the account makes the binding
- * throw while the model itself is fine); if that throws too, Workers AI's REST endpoint when `CF_ACCOUNT_ID` and
+ * throw while the model itself is fine); if that throws too, Workers AI's REST endpoint when `AI_REST_URL` and
  * `WORKERS_AI_TOKEN` are both set. When no later path answers, the first throw is rethrown. A path other than the first that
  * answers, or none answering, leaves ONE `console.warn` line naming it, so `cf-logs ai:` finds it.
  */
@@ -241,14 +242,14 @@ export async function runModel(env: AiEnv, model: string, inputs: Record<string,
       if (NO_SUCH_MODEL.test(sayOf(e)) || MODEL_SIDE.test(sayOf(e))) throw e;
     }
   }
-  const account = env.CF_ACCOUNT_ID?.trim() ?? '';
+  const base = env.AI_REST_URL?.trim() ?? '';
   const token = env.WORKERS_AI_TOKEN ?? '';
-  if (account === '' || token === '') {
-    log(`ai: no path answered; rest not configured (set CF_ACCOUNT_ID and secret WORKERS_AI_TOKEN); binding said: ${said}`);
+  if (base === '' || token === '') {
+    log(`ai: no path answered; rest not configured (set AI_REST_URL and secret WORKERS_AI_TOKEN); binding said: ${said}`);
     throw first;
   }
   try {
-    const res = await (deps.fetch ?? fetch)(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(account)}/ai/run/${model}`, {
+    const res = await (deps.fetch ?? fetch)(`${base.endsWith('/') ? base : `${base}/`}${model}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
       body: JSON.stringify(inputs),
