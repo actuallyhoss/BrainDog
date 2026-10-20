@@ -220,10 +220,13 @@ export async function changesSince(before: string | null, after: string): Promis
 /** Each change as one line a person reads. `nameOf` turns a module's id into its name. */
 export function changeLines(c: Changes, nameOf: (module: string) => string): string[] {
   const kind = (k: string): string => (Object.hasOwn(publishWords.kinds, k) ? (publishWords.kinds[k] as string) : publishWords.part);
+  /* A TITLE STILL HOLDING A PLACEHOLDER (a page for each row is titled `{{name}}`) names nothing, so its line is left
+     out rather than drawn with the braces in it (agents F5). */
+  const named = (n: { title: string }): boolean => !n.title.includes('{{');
   return [
-    ...c.added.map((n) => publishWords.added(kind(n.kind), n.title)),
-    ...c.changed.map((n) => publishWords.changed(kind(n.kind), n.title)),
-    ...c.removed.map((n) => publishWords.removed(kind(n.kind), n.title)),
+    ...c.added.filter(named).map((n) => publishWords.added(kind(n.kind), n.title)),
+    ...c.changed.filter(named).map((n) => publishWords.changed(kind(n.kind), n.title)),
+    ...c.removed.filter(named).map((n) => publishWords.removed(kind(n.kind), n.title)),
     ...c.modules.added.map((m) => publishWords.needs(nameOf(m))),
     ...c.modules.removed.map((m) => publishWords.needsNoMore(nameOf(m))),
     ...c.hosts.added.map(publishWords.callsNew),

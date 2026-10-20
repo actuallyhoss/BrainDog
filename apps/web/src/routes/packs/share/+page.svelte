@@ -303,10 +303,10 @@
 
 <svelte:head><title>{titleOf(copy.shareSetup)}</title></svelte:head>
 
-<PageHead icon="packs" kicker={copy.packs} back="/packs" title={copy.shareSetup} sentence={mode === 'addon' ? addonWords.sentence : copy.shareWhat} />
+<PageHead icon="packs" kicker={copy.packs} back="/packs" title={copy.shareSetup} sentence={mode === 'addon' ? addonWords.sentence : words.what} />
 
 <div class="page">
-  <Segmented role="group" aria-label={addonWords.modeGroup}>
+  <Segmented class="modes" role="group" aria-label={addonWords.modeGroup}>
     {#each [['usecase', addonWords.modeUseCase], ['addon', addonWords.modeAddon]] as const as [m, label] (m)}
       <button type="button" class="segment" aria-pressed={mode === m} data-on={mode === m ? '' : undefined} onclick={() => switchTo(m)}>{label}</button>
     {/each}
@@ -448,10 +448,17 @@
     padding: var(--sp-5) var(--gutter) var(--sp-9);
   }
 
+  /* THE TWO KINDS OF FILE TAKE THEIR WORDS' WIDTH, never a grey band across the page (agents F27). */
+  :global(.segmented.modes) {
+    align-self: start;
+    inline-size: fit-content;
+    max-inline-size: 100%;
+  }
+
   .note {
     margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -473,11 +480,11 @@
     padding-block-start: var(--sp-2);
   }
 
-  /* A FIELD'S LABEL ABOVE IT, 6 apart. */
+  /* A FIELD'S LABEL ABOVE IT, 8 apart. */
   .pair {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--sp-2);
     min-inline-size: 0;
   }
 
@@ -523,7 +530,7 @@
     gap: var(--sp-3);
     min-block-size: var(--tap);
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -534,8 +541,8 @@
   }
 
   .pick-detail {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
     line-height: 18px;
   }
 
@@ -547,7 +554,7 @@
     padding: 0;
     list-style: none;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     line-height: 20px;
   }
 
@@ -556,20 +563,20 @@
   }
 
   .changes li + li {
-    border-block-start: 1px solid var(--line);
+    border-block-start: 1px solid var(--rule);
   }
 
   .wrong {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
   }
 
   /* The answer is one sentence, and its link is ink and underlined: red is never a link here. */
   .sent {
     margin: 0;
     color: var(--ink);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
     overflow-wrap: anywhere;
   }
 

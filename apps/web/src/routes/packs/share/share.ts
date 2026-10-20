@@ -11,6 +11,8 @@
  */
 
 export const words = {
+  /* THE PAGE'S SENTENCE (agents F27): what the file is, in the words a person uses for it, and what stays out. */
+  what: 'A file of this setup: your add-ons, pages, nav order and the names you gave things. Nothing you wrote goes in unless you pick it below.',
   /* THE FORM'S FIRST GROUP: what the file is called, its version, and what and who it is for. */
   about: 'The file',
   changesSince: (since: string): string => `What changed since ${since}`,
@@ -27,9 +29,16 @@ export const words = {
 /** One skill as the share offers it: the row the file carries, its title, and when to use it. */
 export type SkillOffer = { seq: number; title: string; trigger: string };
 
-/** A skill's folder name in words: "review-pr" reads "Review pr". */
+/** Short words a folder name uses that a person would not: a pull request is a branch to review. */
+const SAID: Readonly<Record<string, string>> = { pr: 'a branch' };
+
+/** A skill's folder name in words: "review-pr" reads "Review a branch", "log-handoff" "Log handoff". */
 export const skillTitle = (name: string): string => {
-  const said = name.replaceAll(/[-_]+/gu, ' ').trim();
+  const said = name
+    .split(/[-_]+/u)
+    .filter((w) => w !== '')
+    .map((w) => SAID[w.toLowerCase()] ?? w)
+    .join(' ');
   return said.charAt(0).toUpperCase() + said.slice(1);
 };
 
