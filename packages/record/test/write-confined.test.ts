@@ -110,11 +110,11 @@ test('a narrowed writer is told why a write that leaves her rule is undone, and 
 test('the post-image is checked in the kernel: a move out of the rule unwinds with the owner named', async () => {
   const f = await build();
   /* NAMED OWNER, AND A WRITER WHOSE RULE IS ON THE STAGE: moving a task out of Review is a move out of her rule. */
-  f.sql.exec("UPDATE person SET name = 'Sam' WHERE id = ?", 'p_ada');
+  f.sql.exec("UPDATE person SET name = 'Mara' WHERE id = ?", 'p_ada');
   const kiln = f.rows.get('t-kiln-review')!;
   const rule = { field: 'stage', is: 'review' };
   const out = f.api.kernel.update('tasks', `tasks#${kiln.seq}`, { stage: 'done' } as never, { actor: 'p_x', within: rule as never });
-  assert.deepEqual(out, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That would move it out of what you can edit. Ask Sam.', at: 'patch' } });
+  assert.deepEqual(out, { ok: false, refusal: { code: 'FORBIDDEN', fix: 'That would move it out of what you can edit. Ask Mara.', at: 'patch' } });
   const row = f.api.kernel.get(`tasks#${kiln.seq}`)!;
   assert.equal(row.fields.stage, 'review');
   assert.equal(row.version, 1);

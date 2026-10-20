@@ -2181,7 +2181,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     )?.name;
     return typeof name === 'string' && name.trim() !== '' ? name.trim() : null;
   };
-  /** "Ask Sam." with the owner's name, else "Ask the owner." */
+  /** "Ask Mara." with the owner's name, else "Ask the owner." */
   const askOwner = (): string => `Ask ${ownerName() ?? 'the owner'}.`;
 
   /**
