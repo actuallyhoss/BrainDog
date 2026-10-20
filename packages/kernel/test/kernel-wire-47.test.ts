@@ -186,6 +186,8 @@ test('PRF-A18 RESTORED: a restore marks a hand', async () => {
 
 test('AGT-C08 THE ORDER: a question that moves money leads the queue over an older one', async () => {
   const { k, sql, clock } = await record();
+  /* A QUESTION THAT STAYS OPEN is what this tests, so BrainDog settling its own arranging (the Handled list) is turned off. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('record:handled', 'on', 'false', '2026-10-01T00:00:00.000Z')");
   value(k.create('tasks', { what: 'Glaze test' }, OWNER));
   const old = value<{ id: string }>(
     k.propose({ question: 'Rename it?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: 'tasks#1', version: 1, patch: { what: 'Glaze two' } }] } }, 'slash'),
@@ -207,6 +209,8 @@ test('AGT-C08 THE ORDER: a question that moves money leads the queue over an old
 
 test('AGT-C08 RECHECK: the hourly sweep closes a question the owner already did by hand, as moot', async () => {
   const { k, sql } = await record();
+  /* A QUESTION THAT STAYS OPEN is what this tests, so BrainDog settling its own arranging (the Handled list) is turned off. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('record:handled', 'on', 'false', '2026-10-01T00:00:00.000Z')");
   value(k.create('tasks', { what: 'Glaze test' }, OWNER));
   const asked = value<{ id: string }>(
     k.propose({ question: 'Rename it?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: 'tasks#1', version: 1, patch: { what: 'Glaze two' } }] } }, 'slash'),

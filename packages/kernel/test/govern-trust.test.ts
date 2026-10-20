@@ -50,6 +50,8 @@ const value = <T>(out: { ok: boolean }): T => {
 async function record(scope = 'write'): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
+  /* THE LADDER IS WHAT IS UNDER TEST: BrainDog settling its own arranging (the Handled list) is turned off, or a question would be answered as it is filed. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('record:handled', 'on', 'false', '2026-10-01T00:00:00.000Z')");
   value(await k.install([TASKS, BILLS]));
   sql.exec("INSERT INTO token (id, person_id, hash, scope, created_at) VALUES ('t_1', 'p_owner', 'h', ?, '2026-10-01T00:00:00.000Z')", scope);
   value(k.create('tasks', { name: 'Ship the ladder' }, AGENT));

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { NOBODY, openRecord, type Declaration, type MetricDecl } from '../src/index.ts';
+import { NOBODY, RECORD_ACTIVITY, openRecord, type Declaration, type MetricDecl } from '../src/index.ts';
 import { fixedClock, openSqlite } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 20, 9);
@@ -92,7 +92,7 @@ test('ONLY THE MAKER MAY KEEP A ROW PRIVATE OR SHARE IT AGAIN', async () => {
 test('THE ACTIVITY FIGURE AND THE MONEY CURRENCIES LEAVE OUT A ROW KEPT PRIVATE FROM ANOTHER VIEWER', async () => {
   const { k, mine } = await jotter();
   assert.ok(k.setPrivate('p_ada', mine, true).ok);
-  const how = { metric: 'moves', name: 'Moves', activity: 'kind', window: '7d' } as unknown as MetricDecl;
+  const how = { metric: 'moves', name: 'Moves', source: RECORD_ACTIVITY, value: { count: 'id' }, window: '7d', compare: 'none', format: 'int', activity: 'kind' } as unknown as MetricDecl;
   const total = (viewer?: string) => {
     const out = k.metric(how, viewer === undefined ? {} : { viewer });
     assert.ok(out.ok, JSON.stringify(out));

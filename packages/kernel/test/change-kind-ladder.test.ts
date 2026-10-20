@@ -71,7 +71,7 @@ test('MIGRATION 25 KEEPS DO AND TELL FOR WHAT EACH WRITE TOKEN DID IN THE LAST T
   sql.exec('DELETE FROM migration WHERE version >= 25');
   const { result } = await applyMigrations(sql, fixedClock(NOW));
   assert.ok(result.ok, fixOf(result as never));
-  assert.deepEqual(result.value.applied, [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]);
+  assert.deepEqual(result.value.applied, [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41]);
 
   /* ADDING AND MARKING DONE CARRY ON; the costed task (money) and the delete ask, and so does every other token. */
   assert.deepEqual(ladder(sql), [
@@ -178,6 +178,8 @@ const ladderSays = (k: Kernel, id: string): string | null => {
 async function people(): Promise<{ k: Kernel; sql: NodeSql }> {
   const sql = openSqlite();
   const k = await openRecord(sql, fixedClock(NOW));
+  /* THE LADDER IS WHAT IS UNDER TEST: BrainDog settling its own arranging (the Handled list) is turned off, or a question would be answered as it is filed. */
+  sql.exec("INSERT INTO pref (person_id, key, value, updated_at) VALUES ('record:handled', 'on', 'false', '2026-10-01T00:00:00.000Z')");
   value(await k.install([NOTED, PEOPLE, ORGS]));
   sql.exec("INSERT INTO token (id, person_id, hash, scope, created_at) VALUES ('t_1', 'p_owner', 'h', 'write', '2026-10-01T00:00:00.000Z')");
   value(k.create('people', { name: 'Ada Vine', email: 'ada@vine.test' }, AGENT));

@@ -75,7 +75,7 @@ test('A MOVE TO DONE BY A RULE OR SLASH LANDS TOO, and one Undo on its decision 
   assert.equal(plan.steps.length, 1);
   value(k.undoApply({ decision }, plan.hash, 'p_owner'));
   assert.equal(JSON.parse(sql.one<{ fields: string }>("SELECT fields FROM entry WHERE register = 'tasks' AND seq = 2")!.fields).state, 'open');
-  assert.equal(value<Filed>(k.propose(ask({ state: 'done' }, 'tasks#2'), 'slash')).handled, true);
+  assert.equal(value<Filed>(k.propose(ask({ state: 'done' }, 'tasks#1'), 'slash')).handled, true);
 });
 
 test('MONEY, A NEW ROW, A DELETE AND ANOTHER PERSON\'S ROW STILL FILE A QUESTION', async () => {

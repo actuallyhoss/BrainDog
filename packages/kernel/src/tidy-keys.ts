@@ -60,7 +60,7 @@ const unopened = (g: string): string =>
 function whereOf(l: SealedList, since: string): { where: string; params: string[] } {
   /* A KEY ROW ITS MAKER KEPT PRIVATE IS NOT COUNTED OR NAMED: this answer is shared, so it reads as nobody (`''`). */
   const where = `register = ? AND deleted_at IS NULL AND coalesce(state, '') NOT IN (SELECT value FROM json_each(?))
-    AND (${l.sealed.map((f) => unopened(fieldOf(f))).join(' OR ')}) AND ${unprivate()}`;
+    AND (${l.sealed.map((f) => unopened(fieldOf(f))).join(' OR ')}) AND ${unprivate('entry.id')}`;
   return { where, params: [l.list, JSON.stringify(l.done), ...l.sealed.flatMap(() => [since, since]), ''] };
 }
 

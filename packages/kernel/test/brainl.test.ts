@@ -133,6 +133,8 @@ async function filled() {
   value(k.update('obligations', 'obligations#3', { deleted_at: '2026-09-05' }, { actor: 'p_1' }));
   value(k.update('obligations', 'obligations#1', { state: 'paid' }, { actor: 'rule:settle', note: 'Cleared on the statement' }));
   everythingElse(sql);
+  /* A ROW ITS MAKER KEPT PRIVATE (migration 40), so entry_private travels with the rest. */
+  value(k.setPrivate('p_2', 'obligations#2', true));
   return { k, sql };
 }
 
