@@ -88,7 +88,7 @@ test('WORK’S OVERVIEW AND BOARD OPEN ON THE SAMPLE WITH NO BLOCK REFUSED, and 
     assert.ok(out.ok, sayOf(out));
     return out.value.value;
   };
-  assert.equal(opened(k, 'work').head?.count?.value, TASKS.filter(open).length, 'the head does not count what is open');
+  assert.equal((opened(k, 'work').head as { count?: { value?: number } } | undefined)?.count?.value, TASKS.filter(open).length, 'the head does not count what is open');
   assert.equal(read('tasks-done-7d'), TASKS.filter((t) => t.state === 'done' && String(t.done_on) > new Date(NOW - 8 * 86_400_000).toISOString().slice(0, 10)).length);
   assert.equal(read('open-tasks'), TASKS.filter(open).length);
   assert.equal(read('tasks-waiting'), TASKS.filter((t) => t.state === 'review' || t.state === 'blocked').length);

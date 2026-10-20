@@ -627,7 +627,7 @@ const beforeUiPass = (doc: Body, id: 'portfolio' | 'work'): Body => ({
     if (id === 'work' && d.page === 'work') {
       /* A RECORD WITHOUT PROJECTS DRAWS NO PROJECT COLUMN, as the document it was made with says. */
       const linked = (doc.declarations as Body[]).some((x) => x.register === 'tasks' && (x.fields as Body[]).some((f) => f.id === 'thing'));
-      const page = { ...BEFORE_UI_PASS.work.page, nav: d.nav };
+      const page: Body = { ...BEFORE_UI_PASS.work.page, nav: d.nav };
       return linked ? page : { ...page, filters: undefined, blocks: (page.blocks as Body[]).map((b) => (Array.isArray(b.columns) ? { ...b, columns: (b.columns as Body[]).filter((c) => c.field !== 'thing') } : b)) };
     }
     if (id === 'work' && d.register === 'updates' && Array.isArray(d.fields))

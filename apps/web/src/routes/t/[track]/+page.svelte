@@ -638,12 +638,6 @@
     text-wrap: pretty;
   }
 
-  .quiet {
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--t-sm);
-  }
-
   /* THE RUNS INSIDE THE TILE KEEP TO THE TILE'S OWN WIDTH, so a row's wash stays inside the tile's padding. */
   .side :global(.tile .ledger) {
     margin-inline: calc(-1 * var(--sp-2));

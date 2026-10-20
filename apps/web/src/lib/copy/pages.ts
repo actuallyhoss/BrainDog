@@ -193,8 +193,6 @@ export const pages = {
      rename reached the head and the kicker of this screen, which read it from the declaration; the
      three sentences below them were typed into the route, so they went on saying the word the rest
      of the product had stopped using. They are here so the next rename reaches them. */
-  threadNoUpdate: 'An update is a sentence, a health and a date. It is the only thing on a thread that says how it is actually going.',
-  threadNoTasks: 'No open tasks on this thread.',
   /* POSTING ONE. The button's own word was typed into the route, so
      the one control in the product that writes an update kept its words where no review of the
      copy could see them, which is the whole reason the copy is kept in one place. */
