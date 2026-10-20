@@ -1474,7 +1474,7 @@ const DECLARED: Record<string, Version> = {
       rule.payment-unsettles script.unsettle
       metric.lasts-no-income
     `,
-    declares: 'db5273f19a418802',
+    declares: 'ce04c1a199af2266',
     history: [
       "`cash-cross-check` is declared (cash-check-52, REC-A17): Cash now worked out a second way, each cash account walked entry by entry from its newest statement, less Cash now, a currency at a time; no value while no balance is typed -> 73738171ae2405ba",
       'The Money page draws the check (cash-page-54, REC-A17): one tile, Cash now does not add up, while `cash-cross-check` is not nought, and one line while no balance is typed -> e4a453d69795fe22',
@@ -1508,6 +1508,7 @@ const DECLARED: Record<string, Version> = {
       "Folded into the unreleased 3.17.0 (numbers-order-categories-97, batch 97; commit 63423720, the deployed build, holds 3.16.0): `page.money-book` opens, while a live category is marked the other way from how the Ledger books it, on one line saying how many over `categories-against-direction` with a link to Categories -> bb886a37434f889a",
       "Folded into the unreleased 3.17.0 (batch 100, integrate 100; commit 63423720, the deployed build, holds 3.16.0), one fingerprint for four changes, two ids added and none taken away: the side column's tile is Lasts, calm, drawn while there is an account and Cash now is at or above nought, and Runs out, in the danger colour while Cash now is under nought, is declared and not placed yet (money-lasts-tile-100, REC-B07 step 8); `page.money`'s and `page.money-book`'s Cash ahead open on ten weeks, `horizon: 70`, offer `horizons: [70, 90, 180, 365, 730, 1825, last]` and declare `axis: fit`, and a book's empty line says Nothing in {{name}} is dated ahead yet. (money-ten-weeks-100, REC-B08); `page.money` ends on Where it went, a folded heading over the split This month, by category (`spent-by-category-month`, unset No category yet) and the bar No category yet, by who was paid (Ledger entries going out with no category in the last 91 days by `payee`, eight bars, drawn while `txn-uncategorised` is more than nought), and gives up This month's spending, Budgets and Last confirmed, which stay declared in their files, so the page still declares 24 blocks (money-where-it-went-100, PGS-C20 job 2); and `script.settle_matched_line` is back as payment-matches' second step, moving a repeating line's Next by the host's ctx.cycle, and `rule.recurring-went-through` moves Next on when 'It went through' is pressed; settle gains quiet and told (money-next-moves-100, REC-B11 jobs 4 and 5) -> e217149ab3abd4e8",
       "Inside the unreleased 3.17.0 (places-and-computed-101, SHL-A18; batch 101; commit 63423720, the deployed build, holds 3.16.0): `page.money` says its place on the rail, `nav.place` 40, lowest first; no id added or taken away -> db5273f19a418802",
+      "Inside the unreleased 3.17.0 (money-days-word): `page.money`'s first line says days after the count of how long the cash lasts with no income, `day(s)`; no id added or taken away -> ce04c1a199af2266",
     ],
   },
   'work@1.17.0': {

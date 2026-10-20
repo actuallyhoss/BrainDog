@@ -56,7 +56,7 @@ export const HEADLINE: Record<string, unknown>[] = [
  * its own after a comma, because the writer leaves out a whole clause when one of its holes reads nothing (`leadOf`):
  * past five years, or over two currencies with no rate, the clause goes and the rest of the line stands.
  */
-const NO_INCOME = 'and it lasts {{lasts-no-income}} with no income';
+const NO_INCOME = 'and it lasts {{lasts-no-income}} day(s) with no income';
 export const HEADLINE_LASTS: Record<string, unknown>[] = [
   {
     ...HEADLINE[0],
@@ -74,7 +74,7 @@ export const HEADLINE_LASTS: Record<string, unknown>[] = [
     lead: true,
     span: 12,
     when: { all: [ONE_BOOK, { metric: 'runway-days', beyond: true }] },
-    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year, or {{lasts-no-income}} with no income.`,
+    body: `${WHAT_THERE_IS.slice(0, -1)}, and on what is due it lasts the year, or {{lasts-no-income}} day(s) with no income.`,
   },
   { ...HEADLINE[1], body: `${String(HEADLINE[1]!.body).slice(0, -1)}, ${NO_INCOME}.` },
 ];

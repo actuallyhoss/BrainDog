@@ -188,11 +188,11 @@ test('MONEY WITH TWO BOOKS OPENS ON WHERE THE MONEY IS KEPT, two counts and no s
   account('Everyday', own, 'GBP');
   /* ONE ACCOUNT WITH MONEY ON IT AND NOTHING DUE LASTS THE YEAR, and since money-core 3.17.0 the line says so
      (`HEADLINE_LASTS`): one lead still, the line of what there is stepping aside for it. */
-  assert.deepEqual(leads().map((b) => b.body), ['Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year, or {{lasts-no-income}} with no income.']);
+  assert.deepEqual(leads().map((b) => b.body), ['Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year, or {{lasts-no-income}} day(s) with no income.']);
 
   account('Studio dollars', book('Studio'), 'USD');
   const two = leads();
-  assert.deepEqual(two.map((b) => b.body), ['Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s), and it lasts {{lasts-no-income}} with no income.'], 'one lead, and never the sum over two books');
+  assert.deepEqual(two.map((b) => b.body), ['Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s), and it lasts {{lasts-no-income}} day(s) with no income.'], 'one lead, and never the sum over two books');
   assert.deepEqual(two[0]!.values, { 'books-held': 2, 'cash-accounts': 2 });
   /* AND THE PAGE IS STILL WITHIN WHAT A PAGE DECLARES. */
   assert.ok(value<{ blocks: unknown[] }>(k.page('money')).blocks.length <= 24);

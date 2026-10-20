@@ -735,8 +735,8 @@ const withoutBatch92 = (doc: Body): Body => {
  * the three lead notes ending where it ended before. On a document without the second job both find nothing.
  */
 const NO_INCOME_95: readonly (readonly [string, string])[] = [
-  [', and it lasts {{lasts-no-income}} with no income.', '.'],
-  [', or {{lasts-no-income}} with no income.', '.'],
+  [', and it lasts {{lasts-no-income}} day(s) with no income.', '.'],
+  [', or {{lasts-no-income}} day(s) with no income.', '.'],
 ];
 const withoutBatch95 = (doc: Body): Body =>
   withPage(

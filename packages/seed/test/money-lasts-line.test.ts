@@ -91,9 +91,9 @@ const bill = (k: Kernel, amount: number, due: number): void =>
   void value(k.create('obligations', { what: 'Corporation tax', direction: 'owed_by_me', amount: gbp(amount), due: day(due), state: 'open' }, OWNER));
 
 /* EACH LINE ENDS ON HOW LONG THE CASH LASTS WITH NO INCOME, since money-core 3.17.0 (money-lasts-no-income-95). */
-const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and it lasts {{lasts-no-income}} with no income.';
-const LASTS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year, or {{lasts-no-income}} with no income.';
-const BOOKS = 'Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s), and it lasts {{lasts-no-income}} with no income.';
+const WHAT_THERE_IS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and it lasts {{lasts-no-income}} day(s) with no income.';
+const LASTS = 'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year, or {{lasts-no-income}} day(s) with no income.';
+const BOOKS = 'Your money is kept in {{books-held}} books, across {{cash-accounts}} account(s), and it lasts {{lasts-no-income}} day(s) with no income.';
 const bodies = (k: Kernel, page = LINE): (string | undefined)[] => leads(k, page).map((b) => b.body);
 
 test('ON MONEY ITSELF, a one-book record whose walk never goes under reads that it lasts the year', async () => {

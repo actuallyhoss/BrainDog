@@ -119,7 +119,7 @@ test('MONEY\'S LEAD SAYS IT: the one line drawn is the one whose body names how 
   assert.equal(leads.length, 1, 'one lead under the page name');
   assert.equal(
     leads[0]!.body,
-    'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year, or {{lasts-no-income}} with no income.',
+    'Cash is {{cash-now}} across {{cash-accounts}} account(s), {{cash-now.change}} on a month ago, and on what is due it lasts the year, or {{lasts-no-income}} day(s) with no income.',
   );
   assert.equal(leads[0]!.values?.['lasts-no-income'], 68);
 });
