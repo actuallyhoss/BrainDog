@@ -91,4 +91,48 @@
   .block[data-kind='note'][data-form='lead'] .panel:not([data-marked]) {
     padding-inline-start: 0;
   }
+
+  /* A NOTE IN A BOXED SECTION IS A ROW OF THE TILE (Needs a look, Heads up; the UI pass of 20 October, agents F7):
+     44 tall, its mark in the quiet ink at the start, the line at 15 in ink and its link in the action red, the full
+     width. A grey well 716 wide inside the tile was a box in a box, and read as something else than the tile's lines.
+     Two in a row are parted by a hairline, as a list's rows are. */
+  .box .block[data-kind='note']:not([data-form='lead']) .panel {
+    display: flex;
+    align-items: center;
+    min-block-size: var(--tap);
+    padding-block: var(--sp-2);
+    padding-inline-end: 0;
+    background: none;
+    border-radius: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+  }
+
+  .box .block[data-kind='note']:not([data-form='lead']) .panel[data-marked] {
+    padding-inline-start: calc(var(--icon-m) + var(--sp-3));
+  }
+
+  .box .block[data-kind='note']:not([data-form='lead']) .panel:not([data-marked]) {
+    padding-inline-start: 0;
+  }
+
+  .box .block[data-kind='note']:not([data-form='lead']) .panel-glyph {
+    inset-inline-start: 0;
+    inset-block-start: 50%;
+    translate: 0 -50%;
+    color: var(--ink-3);
+  }
+
+  .box .block[data-kind='note']:not([data-form='lead']) .panel a {
+    color: var(--action);
+    text-underline-offset: 3px;
+  }
+
+  .box > .block-slot:has(> .block[data-kind='note']:not([data-form='lead'])) + .block-slot:has(> .block[data-kind='note']:not([data-form='lead'])) {
+    margin-block-start: calc(-1 * var(--sp-5));
+  }
+
+  .box > .block-slot:has(> .block[data-kind='note']:not([data-form='lead'])) + .block-slot > .block[data-kind='note']:not([data-form='lead']) .panel {
+    border-block-start-color: var(--rule);
+  }
 }
