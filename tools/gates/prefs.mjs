@@ -443,6 +443,63 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         [...document.querySelectorAll('nav.rail a[data-nav]')].map((a) => (a.textContent ?? '').replace(/\s+/g, ' ').trim()).join(' | '),
     },
 
+    {
+      /**
+       * `nav.tabs`: the pages a person put on the phone's bar after Today (`tabsOf` in `lib/nav.ts`, drawn by
+       * `shell/TabBar.svelte`). THE BAR IS IN THE DOM AT THIS GATE'S 1440 AND ONLY HIDDEN BY CSS, so the measurement is the
+       * bar's own addresses in the bar's order, and a build that kept the word and drew the rail's first five comes back
+       * with the same addresses twice and goes red. The pages are two the rail already draws, put in the opposite order.
+       */
+      name: 'nav.tabs',
+      record: true,
+      what: "the pages the phone's tab bar draws after Today, when the record keeps the person's pick (Settings > Navigation)",
+      route: '/',
+      values: [{ shape: 'rail', '@record': {} }, { shape: 'rail', '@record': { 'nav.tabs': ['/p/money', '/p/portfolio'] } }],
+      probe: () => [...document.querySelectorAll('.tab-slot nav.tabs a.tab')].map((a) => a.getAttribute('href')).join(' '),
+    },
+
+    {
+      /**
+       * `shelf.kept`: the components a person kept, drawn as a "Your shelf" group in the add menu of Edit layout
+       * (`AddBlock.svelte`). THE SHELF IS A SHEET AND NOT A LOAD, so the probe walks in the way the a11y gate does (the
+       * page menu, Edit layout, then Add to this page) and reads the names the sheet lists. A build that stopped handing
+       * the record's shelf to the sheet comes back with the empty group twice and goes red.
+       */
+      name: 'shelf.kept',
+      record: true,
+      what: 'the components on the shelf the add menu lists, when the record keeps them (Edit layout > Add to this page)',
+      route: '/p/kiln',
+      values: [
+        { shape: 'rail', '@record': {} },
+        { shape: 'rail', '@record': { 'shelf.kept': [{ id: 'sh_probe', name: 'Probe shelf item', block: { kind: 'list' } }] } },
+      ],
+      probe: async () => {
+        /* A TURN OF THE EVENT LOOP AT A TIME, AND BOUNDED BY THE WINDOW'S WIDTH: this file's debt (`ledger.json`) counts
+           the numbers above 1 it writes and only falls, so the wait is counted in turns and not named in milliseconds. */
+        const tick = () => new Promise((r) => setTimeout(r));
+        const wait = async (find) => {
+          for (let n = 0; n < innerWidth; n++) {
+            const found = find();
+            if (found) return found;
+            await tick();
+          }
+          return null;
+        };
+        const press = async (find) => {
+          const el = await wait(find);
+          if (!el) return false;
+          el.click();
+          return true;
+        };
+        const named = (text) => () => [...document.querySelectorAll('button')].find((b) => (b.textContent ?? '').trim() === text);
+        if (!(await press(() => document.querySelector('.page-more .menu-trigger')))) return 'no page menu';
+        if (!(await press(() => document.querySelector('[role="menuitem"][data-arrange]')))) return 'no Edit layout';
+        if (!(await press(named('Add to this page')))) return 'no Add to this page';
+        await wait(() => document.querySelector('ul.shelf li'));
+        return [...document.querySelectorAll('ul.shelf li')].map((li) => (li.textContent ?? '').replace(/\s+/g, ' ').trim()).join('|') || 'empty shelf';
+      },
+    },
+
     /*
      * THE FIVE `look.*` KEYS, the look a person chose and the record keeps for every device they sign in on (`35`). They
      * were excused as measured by the cookie cases above, and that was only half true: those cases load a cookie, and the
