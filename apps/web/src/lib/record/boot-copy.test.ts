@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 import { COPY_KEY, COPY_MS, dropCopy, drawnFrom, readCopy, saveCopy } from './boot-copy.ts';
 import type { Shell } from './boot-live.ts';
@@ -15,38 +16,38 @@ describe('boot copy', () => {
     const s = mem();
     saveCopy('/app/acme', shell(), 1000, s);
     const got = readCopy('/app/acme', 2000, s)!;
-    expect(got.stale).toBe(true);
-    expect(got.me.level).toBe('read');
-    expect(got.me.owner).toBe(false);
-    expect(got.pen).toEqual([]);
-    expect(got.index.name).toBe('Acme');
+    assert.equal(got.stale, true);
+    assert.equal(got.me.level, 'read');
+    assert.equal(got.me.owner, false);
+    assert.deepEqual(got.pen, []);
+    assert.equal(got.index.name, 'Acme');
   });
   it('does not draw another record, an old copy or a bad one', () => {
     const s = mem();
     saveCopy('/app/acme', shell(), 1000, s);
-    expect(readCopy('/app/kiln', 2000, s)).toBeNull();
-    expect(readCopy('/app/acme', 1000 + COPY_MS, s)).toBeNull();
-    expect(s.m.has(COPY_KEY)).toBe(false);
+    assert.equal(readCopy('/app/kiln', 2000, s), null);
+    assert.equal(readCopy('/app/acme', 1000 + COPY_MS, s), null);
+    assert.equal(s.m.has(COPY_KEY), false);
     s.setItem(COPY_KEY, '{nope');
-    expect(readCopy('/app/acme', 2000, s)).toBeNull();
-    expect(s.m.has(COPY_KEY)).toBe(false);
+    assert.equal(readCopy('/app/acme', 2000, s), null);
+    assert.equal(s.m.has(COPY_KEY), false);
   });
   it('never keeps a refused or unanswered shell, and drops on request', () => {
     const s = mem();
     saveCopy('/app/acme', shell({ refused: { code: 'X', fix: 'y' } }), 1, s);
     saveCopy('/app/acme', shell({ live: false }), 1, s);
-    expect(s.m.size).toBe(0);
+    assert.equal(s.m.size, 0);
     saveCopy('/app/acme', shell(), 1, s);
     dropCopy(s);
-    expect(s.m.size).toBe(0);
+    assert.equal(s.m.size, 0);
   });
   it('survives storage that throws', () => {
     const boom = () => {
       throw new Error('blocked');
     };
     const bad = { getItem: boom, setItem: boom, removeItem: boom };
-    expect(() => saveCopy('/a', shell(), 1, bad)).not.toThrow();
-    expect(readCopy('/a', 1, bad)).toBeNull();
-    expect(drawnFrom(shell()).stale).toBe(true);
+    assert.doesNotThrow(() => saveCopy('/a', shell(), 1, bad));
+    assert.equal(readCopy('/a', 1, bad), null);
+    assert.equal(drawnFrom(shell()).stale, true);
   });
 });
