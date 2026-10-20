@@ -175,6 +175,16 @@
     line-clamp: unset;
   }
 
+  /* THE NAME WRAPS TO A SECOND LINE BEFORE IT IS CUT: "File what an account holds in the account's book" lost its end
+     on a phone, and the end is the part that says which. */
+  .name {
+    display: -webkit-box;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
   /* A ROW WITH A SWITCH: the same three columns and the switch as a fourth, at the row's own trailing edge. The row is
      as tall as any other, because the switch's 32px target fits inside the 56. */
   .switched {

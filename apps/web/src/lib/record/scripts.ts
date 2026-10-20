@@ -24,6 +24,7 @@ import { since } from 'braindog-render';
 import { moneyInText } from './money.ts';
 import { recordNow } from './boot-live.ts';
 import { humanize, listName } from './names.ts';
+import { often } from './actions.ts';
 
 export type Fetch = NonNullable<ClientOptions['fetch']>;
 
@@ -180,6 +181,8 @@ export function afterResume(rows: readonly Script[], script: string, nowIso: str
 
 export const words = {
   heading: 'Scripts',
+  /* THE TILE ON A SCRIPT'S OWN PAGE that says where it stands, over the form that changes it. */
+  standing: 'Where it stands',
   /* THE ONE WAY IN, since nothing on this list otherwise starts a script. */
   newScript: 'New script',
   none: 'No scripts yet',
@@ -188,15 +191,25 @@ export const words = {
   resumeOne: (title: string) => `Resume ${title}`,
   resumed: (title: string) => `${title} runs again now. Three more refused runs in a row pause it again.`,
   /* What starts it. */
-  every: (every: string) => `every ${every}`,
+  /* `15m`, `1h`, `1d` AS A PERSON SAYS THEM: "every 15 minutes", "every hour", "every day" (`often`). */
+  every: (every: string) => often(every),
   door: (door: string) => `when something arrives at ${door}`,
   rule: 'when an automation starts it',
-  runs: (parts: string[]) => `Runs ${parts.join(', and ')}.`,
+  runs: (parts: string[]) => `Runs ${parts.join(' and ')}.`,
   never: 'Runs only when started by hand.',
   /* Where it stands. */
   paused: (n: number) => `Paused after ${n} refused runs in a row. It runs again when you resume it.`,
-  notRun: (next: string | null) => (next ? `Not run yet. First run ${next}.` : 'Not run yet.'),
-  ranOk: (last: string, next: string | null) => (next ? `Last ran ${last}. Next run ${next}.` : `Last ran ${last}.`),
+  notRun: (next: string | null) => (next === null ? 'Not run yet.' : next === DUE ? 'Not run yet. Due to run.' : `Not run yet. First run ${next}.`),
+  ranOk: (last: string, next: string | null) => (next === null ? `Last ran ${last}.` : next === DUE ? `Last ran ${last}. Due to run again.` : `Last ran ${last}. Next run ${next}.`),
+  /* THE ROW'S SHORT WORD on the list: where it stands, with no sentence round it. */
+  short: {
+    paused: 'Paused',
+    refused: 'Refused on its last run',
+    notRun: 'Not run yet',
+    due: 'Due to run',
+    first: (next: string) => `First run ${next}`,
+    ran: (last: string) => `Last ran ${last}`,
+  },
   ranRefused: (last: string, say: string) => (say ? `Last run ${last} was refused: ${say}` : `Last run ${last} was refused.`),
   ranOther: (last: string, say: string) => (say ? `Last run ${last}: ${say}` : `Last run ${last} did not finish.`),
   /* THE STREAK AGAINST WHAT PAUSES IT, so "2 of 3" says how close the next refusal is to stopping the script. */
@@ -234,10 +247,42 @@ export function startsBy(s: Pick<ScriptRow, 'runs'>): string {
   return parts.length === 0 ? words.never : words.runs(parts);
 }
 
+/** The word a run that is already due is said by, in place of a time. */
+const DUE = 'due';
+
+const two = (n: number): string => String(n).padStart(2, '0');
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * WHEN A RUN STILL TO COME IS, AGAINST THE RECORD'S CLOCK (`recordNow`, SF3): "today at 18:00", "tomorrow at 06:00" or
+ * "5 Sep at 18:00", and `DUE` once that moment has passed, since a next run seven weeks behind the clock is one waiting
+ * to go, never one "7w ago".
+ */
+export function nextSaid(iso: string, now: number = recordNow()): string {
+  const at = Date.parse(iso);
+  if (!Number.isFinite(at) || at <= now) return DUE;
+  const d = new Date(at);
+  const day = (t: Date): number => Date.UTC(t.getFullYear(), t.getMonth(), t.getDate());
+  const days = Math.round((day(d) - day(new Date(now))) / 86_400_000);
+  const time = `${two(d.getHours())}:${two(d.getMinutes())}`;
+  return days === 0 ? `today at ${time}` : days === 1 ? `tomorrow at ${time}` : `${d.getDate()} ${MONTHS[d.getMonth()]!} at ${time}`;
+}
+
+/** What starts a script and where it stands, as the list's one meta line: "Runs every day · Not run yet". */
+export function rowOf(s: Pick<ScriptRow, 'runs' | 'status' | 'last' | 'next'>, now: number = recordNow()): { what: string; said: string; tone: 'warn' | 'bad' | undefined } {
+  const what = startsBy(s).replace(/\.$/u, '');
+  if (s.status === 'paused') return { what, said: words.short.paused, tone: 'warn' };
+  if (s.last?.outcome === 'refused') return { what, said: words.short.refused, tone: 'bad' };
+  if (s.last !== null) return { what, said: words.short.ran(since(s.last.at, now)), tone: undefined };
+  if (s.next === null) return { what, said: words.short.notRun, tone: undefined };
+  const next = nextSaid(s.next, now);
+  return { what, said: next === DUE ? words.short.due : words.short.first(next), tone: undefined };
+}
+
 /** Where a script stands: one calm sentence, its tone, and whether Resume is offered. Paused is `warn`, refused `bad`. */
 export function stateOf(s: Pick<ScriptRow, 'status' | 'last' | 'next' | 'refused'>, now: number = recordNow()): { line: string; tone: 'warn' | 'bad' | undefined; resume: boolean } {
   if (s.status === 'paused') return { line: words.paused(s.refused.pauses_at), tone: 'warn', resume: true };
-  const next = s.next === null ? null : since(s.next, now);
+  const next = s.next === null ? null : nextSaid(s.next, now);
   if (s.last === null) return { line: words.notRun(next), tone: undefined, resume: false };
   const last = since(s.last.at, now);
   const say = moneyInText(s.last.say);
@@ -250,13 +295,18 @@ export function stateOf(s: Pick<ScriptRow, 'status' | 'last' | 'next' | 'refused
  * The facts a card lists: how close it is to pausing, this month's runs, and what it may read, write, fetch and open.
  * Lists by their names and keys by their vault labels, never an id.
  */
-export function factsOf(s: Pick<ScriptRow, 'reads' | 'writes' | 'egress' | 'keys' | 'refused' | 'month'>): { label: string; value: string }[] {
+export function factsOf(
+  s: Pick<ScriptRow, 'reads' | 'writes' | 'egress' | 'keys' | 'refused' | 'month'>,
+  named: (list: string) => string = listName,
+): { label: string; value: string }[] {
   const said = (xs: readonly string[]): string => (xs.length === 0 ? words.nothing : xs.join(', '));
   return [
-    { label: words.inARowLabel, value: words.inARow(s.refused.in_a_row, s.refused.pauses_at) },
+    /* HOW CLOSE IT IS TO PAUSING, ONLY ONCE IT IS ANY CLOSER: "0 of 3" on every script was a fact about nothing. */
+    ...(s.refused.in_a_row > 0 ? [{ label: words.inARowLabel, value: words.inARow(s.refused.in_a_row, s.refused.pauses_at) }] : []),
     { label: words.monthLabel, value: words.month(s.month.runs, s.month.refused) },
-    { label: words.reads, value: said(s.reads.map(listName)) },
-    { label: words.writes, value: said(s.writes.map(listName)) },
+    /* LISTS BY THE NAMES THIS RECORD GIVES THEM (`named`, from its index), never the id in words: "Ledger", not "Transactions". */
+    { label: words.reads, value: said(s.reads.map(named)) },
+    { label: words.writes, value: said(s.writes.map(named)) },
     { label: words.fetches, value: said(s.egress) },
     { label: words.keys, value: said(s.keys) },
   ];

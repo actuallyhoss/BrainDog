@@ -22,11 +22,27 @@
   import Empty from '$lib/ui/Empty.svelte';
   import ReadState from '$lib/ui/ReadState.svelte';
   import ScriptForm from './ScriptForm.svelte';
+  import ScriptCard from '../ScriptCard.svelte';
+  import { readScripts } from '$lib/record/scripts.ts';
+  import { listName } from '$lib/record/names.ts';
 
   const shell = $derived(page.data as unknown as Shell);
   const owner = $derived(shell.me.level === 'owner');
   const lists = $derived(shell.index.registers.map((r) => ({ id: r.id, name: r.name })));
   const id = $derived(page.params.id ?? '');
+  /* A LIST BY THE NAME THIS RECORD GIVES IT, from its own index, else its declared name. */
+  const named = $derived.by(() => {
+    const names = new Map(lists.map((l) => [l.id, l.name]));
+    return (list: string): string => names.get(list) ?? listName(list);
+  });
+
+  /* WHERE IT STANDS, from the same read the list is drawn from: its facts, its recent runs, its versions and Resume. */
+  const standing = read(
+    () => apiBase(page.url),
+    () => readScripts(apiBase(page.url)),
+    { empty: (v) => v.length === 0 },
+  );
+  const mine = $derived(standing.value?.find((s) => s.script === id) ?? null);
 
   /* ONE QUESTION FOR THE SCRIPT AND WHAT THE FORM MAY OFFER, keyed by the record and the script, so moving to another
      script under the same route asks again. */
@@ -63,6 +79,7 @@
 
 <PageHead icon="code" title={held?.script.row.title ?? words.parent} kicker={words.parent} back="/scripts" />
 <div class="page">
+  {#if mine}<ScriptCard s={mine} {named} onresumed={() => standing.reread()} />{/if}
   {#if held !== null && held.id === id && opened.value !== null}
     {#key held}
       <ScriptForm
@@ -86,6 +103,9 @@
 
 <style>
   .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
     max-inline-size: var(--page-max);
   }
