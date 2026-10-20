@@ -387,7 +387,7 @@ const tidy = (said: string): string => said.replace(/\(([A-Z]{1,3}\d+),\s*/gu, '
 const ROOM = LINE - LABEL;
 
 /** A brief line: the label padded as every slot's is, then its words. */
-const labeled = (label: string, said: string): string => `${label.padEnd(LABEL - 1)} ${said}`;
+export const labeled = (label: string, said: string): string => `${label.padEnd(LABEL - 1)} ${said}`;
 
 /**
  * Next as one short line: the first thing a person handed to this agent, else the record's first Next line, else the
@@ -547,14 +547,14 @@ const labelOf = (line: string): string => line.slice(0, LABEL).trim();
  * the same-tree line its warning; only then any line but the one saying the command is older, down to four. No real
  * card comes here; a handoff, a sign or a question a run wrote as a paragraph could.
  */
-function cutWords(lines: string[]): string[] {
+function cutWords(lines: string[], most = CARD_MOST): string[] {
   const out = [...lines];
   const passes: [(line: string) => boolean, number][] = [[(line) => SOFT.has(labelOf(line)), 8], [(line) => labelOf(line) !== 'Update', 4]];
   for (const [may, least] of passes) {
-    for (let total = wordCount(out.join('\n')); total > CARD_MOST; total = wordCount(out.join('\n'))) {
+    for (let total = wordCount(out.join('\n')); total > most; total = wordCount(out.join('\n'))) {
       const at = out.map((line, i) => ({ i, n: wordCount(line) })).filter(({ i }) => may(out[i]!)).sort((a, z) => z.n - a.n)[0];
       if (at === undefined || at.n <= least) break;
-      const keep = Math.max(least, at.n - (total - CARD_MOST));
+      const keep = Math.max(least, at.n - (total - most));
       const parts = out[at.i]!.split(/(\s+)/u);
       let seen = 0;
       let end = 0;
@@ -566,27 +566,53 @@ function cutWords(lines: string[]): string[] {
 }
 
 /**
+ * The card's lines one by one, each whole and labelled, `null` where it has nothing true to say: what `card` joins, and
+ * what the context plan (`context-plan.ts`) draws its own card from. `who` is line one; `placed` says whether it names a
+ * project; `step` is the whole Next line for a session that just compacted.
+ */
+export type CardParts = {
+  who: string;
+  placed: boolean;
+  also: string | null;
+  next: string | null;
+  signs: string | null;
+  waiting: string | null;
+  learned: string | null;
+  update: string | null;
+  step: string | null;
+};
+
+/** The card's lines for a context, drawn for who and where the session is (`at`) at the instant `now`, not yet cut. */
+export function cardParts(c: Context, at: CardAt, now: number): CardParts {
+  const own = at.run === undefined ? (c.session?.spoken ?? null) : at.run;
+  const step = nextSlot(c, at, own).slot;
+  const slot = (s: Slot | null): string | null => (s === null ? null : lineOfSlot(s));
+  const brief = (label: string, said: string | null): string | null => (said === null || oneLine(said) === '' ? null : labeled(label, said));
+  return {
+    who: whoLine(c, at),
+    placed: c.project !== null,
+    also: slot(alsoSlot(c, own, at)),
+    next: brief('Next', nextBrief(c, at, own)),
+    signs: brief('Signs', signsBrief(c)),
+    waiting: brief('Waiting', waitingBrief(c, at)),
+    learned: brief('Learned', learnedBrief(c, at)),
+    update: slot(olderSlot(at, now)),
+    step: slot(step),
+  };
+}
+
+/** Lines cut, last resort first, to at most `most` words (`CARD_MOST` for the card): what `card` does past its size. */
+export const cutTo = (lines: readonly string[], most = CARD_MOST): string[] => cutWords([...lines], most);
+
+/**
  * The card for a context, drawn for who and where the session is (`at`) at the instant `now`.
  *
  * `next` is the Next line alone, whole and as it stood, for a session that just compacted: the step it is on without
  * what it already read. `words` is the card's size as the sign `agent-card-words` reads it.
  */
 export function card(c: Context, at: CardAt, now: number): Card {
-  const own = at.run === undefined ? (c.session?.spoken ?? null) : at.run;
-  const next = nextSlot(c, at, own);
-  const nextLine = next.slot === null ? null : lineOfSlot(next.slot);
-  const extra = (slot: Slot | null): string[] => (slot === null ? [] : [lineOfSlot(slot)]);
-  const brief = (label: string, said: string | null): string[] => (said === null || oneLine(said) === '' ? [] : [labeled(label, said)]);
-  const lines = [
-    whoLine(c, at),
-    ...extra(alsoSlot(c, own, at)),
-    ...brief('Next', nextBrief(c, at, own)),
-    ...brief('Signs', signsBrief(c)),
-    ...brief('Waiting', waitingBrief(c, at)),
-    ...brief('Learned', learnedBrief(c, at)),
-    labeled('More', 'call context for the full picture'),
-    ...extra(olderSlot(at, now)),
-  ];
+  const p = cardParts(c, at, now);
+  const lines = [p.who, p.also, p.next, p.signs, p.waiting, p.learned, labeled('More', 'call context for the full picture'), p.update].filter((l): l is string => l !== null);
   const said = cutWords(lines).join('\n');
-  return { card: said, next: nextLine, words: wordCount(said) };
+  return { card: said, next: p.step, words: wordCount(said) };
 }
