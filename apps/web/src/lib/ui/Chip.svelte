@@ -1,12 +1,14 @@
 <!--
-  A state or an intent, as a chip.
+  A chip: a short label in its own small box, or, given a tone, a state as its dot and its word (the UI pass of
+  20 October, 2.A.12).
 
-  The glyph is part of the token, not a choice here: under simulated dichromacy the four intent hues
-  collapse — measured, and the mechanism is inescapable, because tuning five hues to the same
-  contrast target against the same ground necessarily gives them the same luminance (13 §2.3).
+  THE BOX IS NEVER A PILL. 28 tall, radius 8, `--tile-2`, the word at `--fs-ctl` in `--ink-2`: the shape of a control's
+  label, so a chip beside a button reads as one family. Pills are for counts only (`Count.svelte`).
 
-  So colour never carries meaning alone, and there is no API in this app that lets a caller render
-  an intent without its glyph.
+  A STATE IS NOT BOXED. Given `tone`, the chip is the dot and the word with nothing round them, as every status in the
+  product is drawn: the glyph is part of the token, not a choice here. Under simulated dichromacy the four intent hues
+  collapse (13 §2.3), so colour never carries meaning alone, and there is no API in this app that lets a caller render
+  an intent without its glyph and its word.
 -->
 <script lang="ts">
   import { TONES } from 'braindog-render';
@@ -27,22 +29,32 @@
 </span>
 
 <style>
-  /* A STATUS IS A 6px DOT AND ITS WORD, and nothing round them. The pill on the hold wash is gone:
-     the only filled badge in the product is the red square count (`Count.svelte`), and a row of washed capsules beside
-     a page's one primary was the loudest thing in Needs you, a thread and a run.
-
-     THE WORD IS `--ink2` AND THE DOT CARRIES THE HUE. `blocks.css` draws every `.glyph` as the dot in `--tone-fill`,
-     with its character indented out of sight and the intent's name kept for a screen reader (`13 §2.3`): colour is the
-     second channel, the word is the first, and an intent has no contrast headroom to spend as text. A chip with no tone
-     is the word alone. */
+  /* THE BOX: 28 tall, radius 8, the quiet fill, the control's label size. */
   .chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    color: var(--ink2);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    line-height: 18px;
+    gap: var(--sp-2);
+    box-sizing: border-box;
+    min-block-size: var(--btn-h-sm);
+    padding-inline: var(--sp-2);
+    background: var(--tile-2, var(--field));
+    border-radius: var(--r-ctl);
+    color: var(--ink-2, var(--ink2));
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
     white-space: nowrap;
+  }
+
+  /* A STATE IS ITS DOT AND ITS WORD, AND NOTHING ROUND THEM. `blocks.css` draws every `.glyph` as the dot in
+     `--tone-fill`, with its character indented out of sight and the intent's name kept for a screen reader: colour is
+     the second channel, the word is the first. */
+  .chip[data-intent] {
+    min-block-size: 0;
+    padding-inline: 0;
+    background: none;
+    border-radius: 0;
+    font-size: var(--fs-meta);
+    line-height: 18px;
   }
 </style>

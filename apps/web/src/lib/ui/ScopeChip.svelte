@@ -1,7 +1,13 @@
 <!--
-  Where a row applies, as one chip: the project's mark in its hue and its name, or the globe and "Everywhere".
-  Every row of a list with a `scope` field wears it, on its list, on its page and in Needs you, so the
-  answer to "which project is this for" reads the same wherever the row is.
+  Where a row applies, as one chip: the project's 8px dot in its slot and its name, or the globe and "Everywhere" (the
+  UI pass of 20 October, 2.A.12). It is `Chip`'s box: 28 tall, radius 8, `--tile-2`, the name at `--fs-ctl`.
+
+  Every row of a list with a `scope` field wears it, on its list, on its page and in Needs you, so the answer to "which
+  project is this for" reads the same wherever the row is. IN A META LINE (`inline`) it is no box at all: the dot and
+  the name at 13, in the sentence ("on ● Kiln").
+
+  THE DOT IS THE PROJECT'S SLOT (`slotOf` in `face.ts`): its hue picks one of the eight category colours, which clear
+  3:1 as a mark on every surface in light and dark. The name always sits beside it, so colour is never the only signal.
 
   "EVERYWHERE" IS A PLACE AND NOT A GAP. An empty scope field was drawn as an unset chip, "+ Where it applies", which
   says the row is missing something when it applies to every project there is. The globe says it as the answer it is.
@@ -10,24 +16,26 @@
   so to a screen reader; without it, the chip is words and draws no control, because a control that cannot act is
   absent and never greyed.
 
-  THE NAME KEEPS TWELVE CHARACTERS before it gives way: a chip that cut "Marlow & Co Studio" to
-  "Marl…" in a narrow cell would name a different project to anybody who has two starting the same way.
+  THE NAME KEEPS TWELVE CHARACTERS before it gives way: a chip that cut "Marlow & Co Studio" to "Marl…" in a narrow
+  cell would name a different project to anybody who has two starting the same way.
 -->
 <script lang="ts">
-  import { markOf } from 'braindog-render';
+  import { slotOf } from './face.ts';
   import Icon from './Icon.svelte';
-  import { isGlyph } from './icons.ts';
   import { words, type Scope } from '../record/scope-move.ts';
 
   let {
     scope,
     size = 's',
+    inline = false,
     onmove,
   }: {
     /** The project the row applies to, or `null` for everywhere. */
     scope: Scope | null;
     /** `s` in a list's row and in Decide; `m` in a row's own header. */
     size?: 's' | 'm';
+    /** In a meta line: the dot and the name in the sentence, no box. */
+    inline?: boolean;
     /** Opens the move, where the reader may make one. */
     onmove?: (() => void) | undefined;
   } = $props();
@@ -35,18 +43,14 @@
   const name = $derived(scope?.name ?? words.everywhere);
   /* ONLY A NAME LONGER THAN TWELVE CHARACTERS IS HELD AT TWELVE: a shorter one is as wide as its words. */
   const long = $derived(name.length > 12);
+  const slot = $derived(scope === null ? null : slotOf(scope.hue));
 </script>
 
 {#snippet body()}
-  <!-- THE PROJECT'S OWN MARK (`markOf`, as a card draws it): its picture, or the letter of its name where the mark names
-       no picture or names a control, never the word itself. Its hue is the project's own, read by the rule below. -->
-  {#if scope === null}<Icon name="globe" size="s" />{:else if scope.mark !== null}{@const m = markOf(scope.mark, scope.name)}{#if m}<span
-        class="scope-mark"
-        data-shape={scope.mark}
-        style={scope.hue === null ? undefined : `--hue:${scope.hue}`}
-        aria-hidden="true"
-        >{#if m.length > 1 && isGlyph(m)}<Icon name={m} size="s" />{:else}{m}{/if}</span
-      >{/if}{/if}<span class="scope-name" data-long={long ? '' : undefined}>{name}</span>
+  {#if scope === null}<Icon name="globe" size="s" />{:else}<span class="scope-dot" data-slot={slot} aria-hidden="true"></span>{/if}<span
+    class="scope-name"
+    data-long={long ? '' : undefined}>{name}</span
+  >
 {/snippet}
 
 {#if onmove}
@@ -54,52 +58,103 @@
     {@render body()}<Icon name="chevronDown" size="s" />
   </button>
 {:else}
-  <span class="scope-chip" data-size={size}>{@render body()}</span>
+  <span class="scope-chip" data-size={size} data-inline={inline ? '' : undefined}>{@render body()}</span>
 {/if}
 
 <style>
-  /* A PILL ON THE WASH, the shape every choice in the product has, and 28px tall at every width, inside
-     the 44px target `.tap` grows under a thumb. */
+  /* CHIP'S BOX: 28 tall at every width, inside the 44px target `.tap` grows under a thumb. */
   .scope-chip {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-1);
+    gap: var(--sp-2);
+    box-sizing: border-box;
     min-inline-size: 0;
     max-inline-size: 100%;
     min-block-size: var(--ctl-h-sm);
     padding-inline: var(--sp-2);
-    background: var(--hover-wash);
+    background: var(--tile-2, var(--hover-wash));
     border: 0;
-    border-radius: var(--r-pill);
-    color: var(--ink2);
+    border-radius: var(--r-ctl);
+    color: var(--ink-2, var(--ink2));
     font: inherit;
-    font-size: var(--t-sm);
-    font-weight: 500;
-    line-height: var(--lh-tight);
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    line-height: 20px;
     vertical-align: middle;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
   }
 
   .scope-chip[data-size='m'] {
     padding-inline: var(--sp-3);
-    font-size: var(--t-sm);
+  }
+
+  /* IN A META LINE: no box, the dot and the name at the meta size, in the sentence's own ink. */
+  .scope-chip[data-inline] {
+    gap: var(--sp-1);
+    min-block-size: 0;
+    padding-inline: 0;
+    background: none;
+    border-radius: 0;
+    color: inherit;
+    font-size: var(--fs-meta);
+    font-weight: inherit;
+    line-height: inherit;
+    vertical-align: baseline;
   }
 
   .scope-move {
     cursor: pointer;
   }
 
-  /* A WASH ONLY UNDER A MOUSE: a tapped chip on a phone would keep it after the finger lifted. */
+  /* A FILL ONLY UNDER A MOUSE: a tapped chip on a phone would keep it after the finger lifted. */
   @media (hover: hover) and (pointer: fine) {
     .scope-move:hover {
-      background: var(--hold-wash);
+      background: var(--hover, var(--hold-wash));
       color: var(--ink);
     }
   }
 
-  /* The project's own hue, the one identity accent, and the name's colour where it declares none. */
-  .scope-mark {
-    margin-inline-end: 0;
-    color: oklch(var(--mark-l) var(--mark-c) var(--hue));
+  /* THE PROJECT'S DOT, 8px, in its slot's colour. */
+  .scope-dot {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    background: var(--ph, var(--ink-3, var(--dim)));
+    border-radius: var(--r-round);
+  }
+
+  .scope-dot[data-slot='blue'] {
+    --ph: var(--cat-blue, var(--info));
+  }
+
+  .scope-dot[data-slot='violet'] {
+    --ph: var(--cat-violet, var(--info));
+  }
+
+  .scope-dot[data-slot='pink'] {
+    --ph: var(--cat-pink, var(--ink2));
+  }
+
+  .scope-dot[data-slot='teal'] {
+    --ph: var(--cat-teal, var(--earn));
+  }
+
+  .scope-dot[data-slot='sky'] {
+    --ph: var(--cat-sky, var(--info));
+  }
+
+  .scope-dot[data-slot='gold'] {
+    --ph: var(--cat-gold, var(--warn));
+  }
+
+  .scope-dot[data-slot='lime'] {
+    --ph: var(--cat-lime, var(--earn));
+  }
+
+  .scope-dot[data-slot='slate'] {
+    --ph: var(--cat-slate, var(--dim));
   }
 
   .scope-name {
@@ -112,5 +167,11 @@
   /* TWELVE CHARACTERS AND THE ELLIPSIS, at the least, before a long name gives way. */
   .scope-name[data-long] {
     min-inline-size: 13ch;
+  }
+
+  @media (forced-colors: active) {
+    .scope-dot {
+      background: CanvasText;
+    }
   }
 </style>
