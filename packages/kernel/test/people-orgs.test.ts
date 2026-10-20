@@ -15,7 +15,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openRecord, type Declaration, type Entry, type Kernel, type Met, type WriteContext } from '../src/index.ts';
-import { domainOrgName, trustOf } from '../src/people.ts';
+import { domainOrgName } from '../src/identity-keys.ts';
+import { trustOf } from '../src/people.ts';
 import { fixedClock, openSqlite, type NodeSql } from './sqlite.ts';
 
 const NOW = Date.UTC(2026, 9, 7, 12);

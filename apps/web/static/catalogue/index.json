@@ -2838,9 +2838,9 @@
       "versions": [
         {
           "version": "1.0.0",
-          "checksum": "dc4f59d7001a460715710b950150dcf269776d16a1b36259824c8f0bfd567cb3",
-          "bytes": 16282,
-          "published_at": "2026-10-20T05:45:12.344Z",
+          "checksum": "6fca0ee3daf192521944445c5a17034c9cdb37ca58bc065a391adc514bc0db8c",
+          "bytes": 16258,
+          "published_at": "2026-10-20T06:04:14.288Z",
           "bump": null,
           "reach": {
             "modules": [],
@@ -2860,7 +2860,8 @@
             "skills": [],
             "calls_out": []
           },
-          "notes": "The first version."
+          "notes": "The first version.",
+          "preview": true
         }
       ],
       "categories": [
@@ -3904,7 +3905,7 @@
           "version": "1.0.0",
           "checksum": "2b34c143afc44e6a6e2570e4c57f6d36b6195d1b0c6a94a2a970b6ec1b60e3c5",
           "bytes": 4290,
-          "published_at": "2026-10-20T05:45:12.344Z",
+          "published_at": "2026-10-20T06:04:14.288Z",
           "bump": null,
           "reach": {
             "modules": [
