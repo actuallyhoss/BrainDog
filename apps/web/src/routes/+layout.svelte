@@ -1502,10 +1502,15 @@
     min-inline-size: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* THE PAGE'S FOOT, and on the top bar and menu shapes the room the search button in the bottom
-       corner needs: a floating button over the last row of a list hides exactly the thing a long
-       list is scrolled to the bottom to see. */
-    padding-block-end: calc(var(--tap) + var(--sp-5));
+  }
+
+  /* THE ROOM THE SEARCH BUTTON IN THE BOTTOM CORNER NEEDS, and only on the shape that draws it: a floating button over
+     the last row of a list hides exactly the thing a long list is scrolled to the bottom to see. Every other shape
+     ends where the page's own foot does (48px under its last tile), not 68px further down (Today polish, 21 Oct). */
+  @media (width >= 900px) {
+    .shell[data-shape='menu'] .body {
+      padding-block-end: calc(var(--tap) + var(--sp-5));
+    }
   }
 
   /* Below 900px the rail becomes a tab bar; above it, the tab bar does not exist. */
