@@ -2031,6 +2031,16 @@ function rowSaid(sql: Sql, register: string, row: { id: string; seq: number | nu
   return `${opening(one)} ${row.seq ?? ''}`.trim();
 }
 
+/**
+ * Whether digits an account holds are the end of the digits a message printed: three or more, fewer than printed, and
+ * what they end in (`826` for `5826`). The reverse tail reads a text that way (`printedTail`), so a tail question and its
+ * answer read the account the same way, as the same digits kept short, and never as an account that holds others.
+ *
+ * MEASURED ON THE LIVE RECORD, 20 Oct: HSBC (EGP) held 826 and the bank's texts print 5826. The question offered every
+ * account as holding nothing yet, and pressing HSBC was refused because it "already holds 014".
+ */
+const endsIn = (held: string, digits: string): boolean => /^\d{3,}$/.test(held) && held.length < digits.length && digits.endsWith(held);
+
 /** The options a tail question offers: the rows the lookup's filter admits, the suggested one and those with no digits first, then "None of these". */
 function tailOptions(deps: Pick<IngestDeps, 'sql' | 'schemaOf' | 'nowMs'>, tail: TailAsked, suggested: string | null): { id: string; label: string; because: string; recommended?: true }[] {
   const { one, label } = tailWords(deps.sql, tail);
@@ -2039,13 +2049,16 @@ function tailOptions(deps: Pick<IngestDeps, 'sql' | 'schemaOf' | 'nowMs'>, tail:
     const v = r.fields[tail.by];
     return v === null || v === undefined || typeof v === 'object' ? '' : String(v).trim();
   };
-  const rank = (r: LiveRow): number => (r.id === suggested ? 0 : valueOf(r) === '' ? 1 : 2);
+  /* AN ACCOUNT HOLDING THE END OF THE DIGITS (`endsIn`) IS SAID SO, beside the suggested one, ahead of those holding none. */
+  const short = (r: LiveRow): boolean => (tail.split ? partsOf(valueOf(r)) : [valueOf(r)]).some((v) => endsIn(v, tail.digits));
+  const rank = (r: LiveRow): number => (r.id === suggested ? 0 : short(r) ? 1 : valueOf(r) === '' ? 2 : 3);
   const offered = [...rows].sort((a, b) => rank(a) - rank(b) || (a.seq ?? 0) - (b.seq ?? 0)).slice(0, TAIL_OPTIONS_MOST);
   return [
     ...offered.map((r) => ({
       id: r.id,
       label: rowSaid(deps.sql, tail.register, r),
-      because: valueOf(r) === '' ? `Nothing is in its ${label} yet.` : `${label}: ${valueOf(r)}.`,
+      because:
+        valueOf(r) === '' ? `Nothing is in its ${label} yet.` : short(r) ? `${label}: ${valueOf(r)}, the end of ${tail.digits}.` : `${label}: ${valueOf(r)}.`,
       ...(r.id === suggested ? { recommended: true as const } : {}),
     })),
     {
@@ -2419,11 +2432,15 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
   if (held !== undefined)
     return no('UNIQUE_VIOLATION', `${rowSaid(deps.sql, tail.register, held)} already holds ${tail.digits}. Take it off that account first, or pick it.`, { at: 'option' });
   const before = valueOf(chosen);
-  const over = !tail.split && before !== '' && before !== tail.digits;
+  /* DIGITS KEPT SHORT ARE THESE DIGITS (`endsIn`): the account holds the end of what the bank prints, so the answer is
+     the account the question offered, and its digits are kept whole from now on. */
+  const kept = (tail.split ? partsOf(before) : [before]).find((v) => endsIn(v, tail.digits)) ?? null;
+  const over = !tail.split && before !== '' && before !== tail.digits && kept === null;
   if (over && mine(chosen, before))
     return no('UNIQUE_VIOLATION', `${rowSaid(deps.sql, tail.register, chosen)} already holds ${before} in ${label}. Change it on the account first, or pick another.`, { at: 'option' });
   if (!holds(chosen)) {
-    const wrote = deps.write(tail.register, chosen.id, { [tail.by]: tail.split && before !== '' ? `${before}, ${tail.digits}` : tail.digits }, a.actor);
+    const whole = kept !== null ? (tail.split ? partsOf(before).map((v) => (v === kept ? tail.digits : v)).join(', ') : tail.digits) : null;
+    const wrote = deps.write(tail.register, chosen.id, { [tail.by]: whole ?? (tail.split && before !== '' ? `${before}, ${tail.digits}` : tail.digits) }, a.actor);
     if (!wrote.ok) return wrote as Result<never>;
   }
   /* AND OFF EVERY OTHER ACCOUNT THAT HELD THEM, so the next text names one account and not two. What a wrong answer
@@ -2444,6 +2461,7 @@ function answerTail(deps: IngestDeps, a: Answered, asked: Record<string, unknown
   const name = rowSaid(deps.sql, tail.register, chosen);
   const moved = [
     over ? `${name} held ${before} in ${label}, put there by an agent; it holds ${tail.digits} now.` : '',
+    kept !== null ? `${name} held ${kept} in ${label}, the end of ${tail.digits}; it holds ${tail.digits} now.` : '',
     ...off.map((other) => `${tail.digits} was taken off ${rowSaid(deps.sql, tail.register, other)}, where an agent put it.`),
   ];
   const line = [filedSaid(ran, name), ...moved].filter((part) => part !== '').join(' ');

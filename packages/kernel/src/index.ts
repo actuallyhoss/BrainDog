@@ -11315,7 +11315,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       if (made.ok) offerAgain(ingestDeps(), register);
       return made;
     },
-    update: (register: string, ref: string, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
+    /* AND AN ACCOUNT EDITED IS OFFERED AGAIN AS IT NOW IS: digits put on it by hand were offered as "nothing yet" by a
+       question filed before, and the answer was then refused for the digits the option said were not there. */
+    update: (register: string, ref: string, patch: Patch, w: WriteContext) => {
+      const made = write(register, ref, patch, w);
+      if (made.ok) offerAgain(ingestDeps(), register);
+      return made;
+    },
     /* Four arguments and no fifth: a `Door` is the kernel's own to open. */
     write: (register: string, ref: string | null, patch: Patch, w: WriteContext) => write(register, ref, patch, w),
 
