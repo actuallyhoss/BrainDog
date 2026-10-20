@@ -36,7 +36,6 @@ const FUZZ = Number(process.env.LEAK_FUZZ ?? 2);
  * Each line is the todo's own sentence, so the run lists it.
  */
 const GAP = {
-  G1: 'G1 writes ignore row rules and private rows: a narrowed writer edits, deletes and notes rows outside its rule, creates rows outside it, and anyone who writes a list writes, and is answered, another person\'s private row',
   G2: 'G2 context reads each list with kernel.inScope, without the private exclusion, so every agent is briefed on other people\'s private rows',
   G3: 'G3 backlinks never checks the target row against the rule: a hidden row number answers with its id, where a missing one answers null',
   G4: 'G4 metric checks only that the list can be read, so a narrowed caller gets a figure over the whole list and the row numbers behind it',
@@ -51,7 +50,7 @@ const GAP = {
 
 /** Which P1 tests are held open by a gap: the route, and the sentence. */
 const P1_OPEN: Record<string, string> = { backlinks: GAP.G3, context: GAP.G2 };
-const MCP_OPEN: Record<string, string> = { update: GAP.G1, log: GAP.G1 };
+const MCP_OPEN: Record<string, string> = {};
 /** And which P2 tests: an answer that moves when something unseen does. */
 const P2_OPEN: Record<string, string> = {
   recentHistory: GAP.N1,
@@ -344,9 +343,9 @@ test('P4 backlinks: a row out of sight answers as a row number nobody holds', { 
   assert.deepEqual(unlike.slice(0, 12), [], `${unlike.length} answer(s) told a hidden row from a missing one`);
 });
 
-/* ── P5's first half, G1: a write outside the rule is refused ───────────── */
+/* ── P5's first half (G1, closed in Slice 4): a write outside the rule is refused ── */
 
-test('P5 a narrowed writer cannot edit, delete, note or create a row outside its rule, and nobody writes another person\'s private row', { todo: GAP.G1 }, async () => {
+test('P5 a narrowed writer cannot edit, delete, note or create a row outside its rule, and nobody writes another person\'s private row', async () => {
   const f = await build();
   const h = handlers(f);
   const contractor = personCtx(f.api, 'p_con');

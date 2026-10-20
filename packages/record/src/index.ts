@@ -235,6 +235,7 @@ import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
 import { byMeaning } from './near.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
+import { writeSight } from './sight-write.ts';
 import { OLDER, agentName, card as cardOf, type CardAt } from './card.ts';
 import { factsFromContext, planContext, planText, type KpiFact, type TaskFact, type ToldFact } from './context-plan.ts';
 import { BRIEF_ROWS, capRegister, DECIDED, decidedHere, peopleHere, projectWaiting, rulesOf, type Decision, type Placed } from './context-caps.ts';
@@ -2599,6 +2600,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * read again, filtered on its own `seq` and the same rule, and it is admitted only if that still finds it. `seq:
    * null` is a row no register's `where` can be written against, so it is never withheld by one.
    */
+  /** Writes held to the row (`sight-write.ts`, sharing plan §2.6). */
+  const sight = writeSight({ kernel, sql, listName, reads: (ctx, register) => readable(ctx, register) === null });
+
   const rowAdmitted = (ctx: CallContext, register: string, seq: number | null): boolean => {
     if (seq === null) return true;
     /* THE SCOPE ALSO CARRIES THE PRIVATE ROWS (migration 40), so a row kept to its maker is absent here with no case of its own. */
@@ -8677,7 +8681,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -9402,13 +9406,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
      * write on the list to have made the row at all, and an agent's token acts for the person who minted it.
      */
     async makePrivate(args: { ref: string; on?: boolean }, ctx: CallContext) {
-      if (!args?.ref) return no('REQUIRED_MISSING', 'Which row?', { at: 'ref' });
-      const row = kernel.get(args.ref);
-      if (!row) return no('REF_UNKNOWN', `There is no row called ${args.ref}.`, { at: 'ref' });
-      const stop = guard(ctx, 'write', row.register);
-      if (stop) return { ok: false as const, refusal: stop };
+      /* WHO MAY ASK COMES BEFORE WHETHER THE ROW IS THERE. This looked the row up first, so a report key, refused
+         everything else, was answered "no row" for one number and its own refusal for another, and could count rows. */
+      const may = scoped(ctx, 'write');
+      if (may) return { ok: false as const, refusal: may };
       const who = ctx.principal.kind === 'person' ? ctx.principal.id : ctx.principal.kind === 'token' ? ctx.principal.person : undefined;
       if (who === undefined) return no('FORBIDDEN', 'A row is kept private by a person, signed in.', { at: 'principal' });
+      /* ONLY SOMEBODY WITH A ROLE ON THE RECORD (a `*` row) KEEPS ROWS PRIVATE (sharing plan §2.6): a guest invited to some
+         lists works in the open there. */
+      if ('level' in ctx.principal && ctx.principal.level === null)
+        return no('FORBIDDEN', 'Only somebody with a role on the whole record can keep a row private. Ask the owner for one.', { at: 'principal' });
+      if (!args?.ref) return no('REQUIRED_MISSING', 'Which row?', { at: 'ref' });
+      /* A ROW SHE MAY NOT WRITE, OR NOT READ, IS ONE THAT IS NOT THERE, in the same words. */
+      const missing: Refusal = { code: 'REF_UNKNOWN', fix: `There is no row called ${args.ref}.`, at: 'ref' };
+      const row = kernel.get(args.ref);
+      if (!row || readable(ctx, row.register) !== null) return { ok: false as const, refusal: missing };
+      const held = sight.writable(ctx, row.register, row, null, missing);
+      if (held) return { ok: false as const, refusal: held };
+      const stop = guard(ctx, 'write', row.register);
+      if (stop) return { ok: false as const, refusal: stop };
       return tail(kernel.setPrivate(who, args.ref, args.on !== false));
     },
 
@@ -9434,12 +9450,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* ONE ROW PER KEY ON PEOPLE AND ORGANISATIONS: a key another row holds is that row, met again (`keyHeld`). */
       const known = keyHeld(ctx, args.register, args.fields, null);
       if (known) return { ok: false, refusal: known };
+      /* HELD TO THE ROWS SHE MAY WRITE (`sight-write.ts`): no hidden field, and the new row inside her predicate, which
+         the kernel asks once the row is made, in the same transaction (`within`). */
+      const sighted = sight.writable(ctx, args.register, null, args.fields as Record<string, unknown>, { code: 'REF_UNKNOWN', fix: '' });
+      if (sighted) return { ok: false, refusal: sighted };
+      const within = sight.added(ctx, args.register);
       /* AN AGENT WRITES AT THE RUNG IT HAS EARNED, AND ASKS BELOW IT (`ladder.ts`): at Ask, on the floor, or after its
          run read text from outside the record, the row is filed on Decide instead, and the answer says so in one line. */
       args = { ...args, fields: huedOf(args.register, args.fields) };
       const rung = laddered(ctx, args.register, 'create', args.fields, null);
       if (rung && !rung.gate.write) {
-        const refused = wouldRefuse((w) => offRegister(args.register, kernel.create(args.register, args.fields, { ...writerOf(ctx), reads: refsSeen(ctx), ...w })));
+        const refused = wouldRefuse((w) => offRegister(args.register, kernel.create(args.register, args.fields, { ...writerOf(ctx), reads: refsSeen(ctx), within, ...w })));
         if (refused) return refused;
         return tail(askInstead(ctx, args.register, { ...(args.fields as Record<string, unknown>) }, null, rung.gate.why, rung.gate.outside === true));
       }
@@ -9454,6 +9475,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               kernel.create(args.register, args.fields, {
                 ...writerOf(ctx),
                 reads: refsSeen(ctx),
+                within,
                 ...(args.note === undefined ? {} : { note: args.note }),
                 ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
                 /* A RETRY IS ONE ROW. An agent whose answer was lost sends the same request again, and
@@ -9550,7 +9572,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (missing) return { ok: false, refusal: missing };
       const stop = guard(ctx, 'write', args.register);
       if (stop) return { ok: false, refusal: stop };
-      const self = kernel.get(`${args.register}#${args.seq}`, { includeDeleted: true });
+      /* A ROW SHE MAY NOT WRITE IS ONE THAT IS NOT THERE (`sight-write.ts`): every check below reads it as missing, and
+         the kernel, handed `within`, answers it in a missing row's words at a missing row's step. */
+      const found = kernel.get(`${args.register}#${args.seq}`, { includeDeleted: true });
+      const self = found !== null && sight.admitted(ctx, args.register, found.id) ? found : null;
+      const within = sight.within(ctx, args.register);
+      const held = self === null ? null : sight.writable(ctx, args.register, self, args.patch as Record<string, unknown>, { code: 'REF_UNKNOWN', fix: '' });
+      if (held) return { ok: false, refusal: held };
       /* ONLY DECIDE MERGES, AND ONLY UNDO TAKES A MERGE BACK (`mergeShaped`). */
       const merges = mergeShaped(ctx, args.register, args.patch, self);
       if (merges) return { ok: false, refusal: merges };
@@ -9575,6 +9603,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
               ...writerOf(ctx),
               reads: refsSeen(ctx),
+              within,
               ...(args.version === undefined ? {} : { version: args.version }),
               ...w,
             }),
@@ -9594,6 +9623,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               kernel.update(args.register, `${args.register}#${args.seq}`, args.patch, {
                 ...writerOf(ctx),
                 reads: refsSeen(ctx),
+                within,
                 ...(args.version === undefined ? {} : { version: args.version }),
                 ...(args.note === undefined ? {} : { note: args.note }),
                 ...(ctx.batch === undefined ? {} : { batch: ctx.batch }),
@@ -10876,7 +10906,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false as const, refusal: stop };
       /* AN AGENT'S NOTE MEETS ONLY THE FLOOR (`noteFault`): a row another person made, or a list of keys. */
       const caller = args.register === SESSION ? null : callerOf(ctx);
-      const noted = caller === null ? null : kernel.get(`${args.register}#${args.seq}`);
+      /* A ROW SHE MAY NOT WRITE IS ONE THAT IS NOT THERE: no floor is asked of it here, and the kernel, handed `within`,
+         answers it in a missing row's words (`sight-write.ts`). */
+      const within = sight.within(ctx, args.register);
+      const seen = caller === null ? null : kernel.get(`${args.register}#${args.seq}`);
+      const noted = seen !== null && sight.admitted(ctx, args.register, seen.id) ? seen : null;
       const held = caller === null || noted === null ? null : trust.noteFault(caller, args.register, noted.id);
       if (held !== null) return no('FORBIDDEN', held, { at: 'note' });
       /* AND IT IS A `note` EVENT RATHER THAN AN `edit`. This went through `update` with an empty
@@ -10885,7 +10919,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          field. 30 §2: `note` is "the one row a person or an agent writes on purpose". */
       /* A TOKEN'S NOTE IS SIGNED BY ITS RUN, found or opened as its writes are, and it moves the run's
          heartbeat. The kernel finds the row first, so a note against nothing opens no run. */
-      return tail(kernel.log(args.register, args.seq, { ...writerOf(ctx), ...(ctx.batch === undefined ? {} : { batch: ctx.batch }) }, note));
+      return tail(kernel.log(args.register, args.seq, { ...writerOf(ctx), within, ...(ctx.batch === undefined ? {} : { batch: ctx.batch }) }, note));
     },
 
     /* ── AN AGENT'S RUN ─────────────────────────────── */
@@ -10944,7 +10978,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (patch.agent === 'other' && typeof run.fields.agent === 'string' && run.fields.agent !== 'other') delete patch.agent;
       if (hints.client_id !== undefined && run.fields.client_id === undefined) patch.client_id = hints.client_id;
       if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
-      const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}` });
+      const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}`, within: sight.added(ctx, SESSION) });
       if (!out.ok) return tail(out as Result<never>);
       return tail(ok({ session: out.value, spoken, resumed: true, project: projectOf(out.value), context: briefed() }));
     },
@@ -10999,11 +11033,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (said.why !== undefined) return no('VALUE_MALFORMED', 'why is the reason a step is dropped, and goes with drop.', { at: 'why' });
           if (!token) return no('FORBIDDEN', 'A step is work for a run, so only an agent takes one. Drop it with a reason instead.', { at: 'take' });
           if (typeof said.take !== 'string') return no('VALUE_MALFORMED', `take names the run that left the step, such as ${PREFIX}12.`, { at: 'take' });
-          return tail(kernel.takeHandoff(writerOf(ctx), said.take));
+          return tail(kernel.takeHandoff({ ...writerOf(ctx), within: sight.within(ctx, SESSION) }, said.take));
         }
         if (typeof said.drop !== 'string') return no('VALUE_MALFORMED', `drop names the run that left the step, such as ${PREFIX}12.`, { at: 'drop' });
         if (said.why !== undefined && typeof said.why !== 'string') return no('VALUE_MALFORMED', 'why is a few words saying why the step is dropped.', { at: 'why' });
-        return tail(kernel.dropHandoff(writerOf(ctx), said.drop, typeof said.why === 'string' ? said.why : ''));
+        return tail(kernel.dropHandoff({ ...writerOf(ctx), within: sight.within(ctx, SESSION) }, said.drop, typeof said.why === 'string' ? said.why : ''));
       }
       if (said.why !== undefined) return no('VALUE_MALFORMED', 'why is the reason a step is dropped, and goes with drop.', { at: 'why' });
       if (token && said.session !== undefined)
@@ -11114,7 +11148,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
                or place for the ladder to find it by a second time. */
             by = writerOf({ ...ctx, session: { ...hints, spoken: found.value.spoken } });
           } else {
-            const named = kernel.get(String(said.session).trim());
+            /* A RUN SHE MAY NOT WRITE IS NOT A RUN, in the words for one that is not there (`sight-write.ts`). */
+            const asked = kernel.get(String(said.session).trim());
+            const named = asked !== null && asked.register === SESSION && sight.admitted(ctx, SESSION, asked.id) ? asked : null;
             if (!named || named.register !== SESSION)
               throw new Unwind(no('VALUE_MALFORMED', `${String(said.session)} is not a run. Runs are spoken ${PREFIX}1, ${PREFIX}2.`, { at: 'session' }));
             run = named;
@@ -11145,7 +11181,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               : handKey === 'done' && taskSaid?.asked === undefined && now.fields.task === handed!.spoken
                 ? { task: null }
                 : null;
-          const written = kernel.update(SESSION, now.id, patch, inHand === null ? by : { ...by, stamp: inHand });
+          const within = token ? sight.added(ctx, SESSION) : sight.within(ctx, SESSION);
+          const written = kernel.update(SESSION, now.id, patch, inHand === null ? { ...by, within } : { ...by, stamp: inHand, within });
           if (!written.ok) throw new Unwind(written as Result<never>);
           /* WHAT THE RUN SAYS IT FINISHED is read against its project's open tasks, after its own write has gone in. */
           kernel.readRunWork(by, run.id);
@@ -11430,7 +11467,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             }
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
-          const opened = kernel.propose({ ...args, body: filed.value }, writerOf(ctx));
+          const opened = kernel.propose({ ...args, body: filed.value }, { ...writerOf(ctx), sees: (list, id) => sight.admitted(ctx, list, id) });
           const asked = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
           /* ANSWERED FROM MEMORY (govern-47): the person already said, so nothing is decided again here. */
           if (asked.ok && asked.value.answered !== undefined) return tail(answeredAs(ctx, asked));
@@ -11440,7 +11477,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A TOKEN'S PROPOSAL IS SIGNED BY ITS RUN, as its writes are. AND IT IS ANSWERED WITH THE CARD'S FACTS
          (`cardFactsOf`), read before anything answers it, so the agent can say what money it asked to move and what
          it asked to change as the person will read it. */
-      const opened = kernel.propose(args, writerOf(ctx));
+      /* A ROW THE BODY NAMES THAT SHE MAY NOT WRITE IS ONE THAT IS NOT THERE, held to her lens (`sight-write.ts`). */
+      const opened = kernel.propose(args, { ...writerOf(ctx), sees: (list, id) => sight.admitted(ctx, list, id) });
       const filed = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
       /* A JOINED QUESTION IS ANSWERED AS A FILED ONE IS (AGT-C07): its name, its card's facts, and the sentence the agent
          passes on, since an open question already holds this cause (`cause`, the filer's or derived) and nothing new was

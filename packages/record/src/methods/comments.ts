@@ -44,7 +44,7 @@ const GOVERNED = { suggestion: 'q.', decision: 'd.' } as const;
 const NOTHING = 'There is nothing by that name you can read. Name a row as it is spoken, or a question or a decision by the name you were given for it.';
 
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, guard, scoped, sightOf, no, tail } = deps;
+  const { kernel, sql, guard, scoped, sightOf, sight, no, tail } = deps;
 
   /**
    * The rung a comment and a resolution need of the caller before anything is looked up: `read` for a person, who says
@@ -146,6 +146,10 @@ export function methods(deps: RecordDeps) {
       if (stop) return { ok: false, refusal: stop };
       const at = targetOf(ctx, args?.on);
       if (at === null) return no('REF_UNKNOWN', NOTHING, { at: 'on' });
+      /* AND A ROW SHE MAY COMMENT ON (sharing plan §2.6): seen is not enough once a grant reads more than it writes, and
+         one she may not comment on is answered as one that is not there. */
+      if (at.list !== null && sight !== undefined && !sight.admitted(ctx, at.list, at.target.slice('entry:'.length)))
+        return no('REF_UNKNOWN', NOTHING, { at: 'on' });
       /* THE KERNEL'S OWN MOST (`COMMENT_MOST`), asked here first so the refusal says how many over (HD.381), counted by
          character as the kernel counts; the kernel still asks it again, so the two cannot let a long one through. */
       const over = typeof args?.body === 'string' ? [...args.body.trim()].length - COMMENT_MOST : 0;

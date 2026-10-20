@@ -105,7 +105,7 @@ test('THE QUESTION CARD HANDS A wheres-NARROWED READER NEITHER THE RUN NOR WHAT 
   assert.ok(full.run !== undefined && full.changes !== undefined, 'the owner reads every fact');
 
   /* AN AGENT HELD TO SHIP'S ROWS PROPOSES ON SHIP, AND IS ANSWERED THE CARD AS A READER OF ONE LIST IS. */
-  const held: CallContext = { ...agent, wheres: { tasks: { field: 'name', op: 'eq', value: 'Ship' } } as never };
+  const held: CallContext = { ...agent, wheres: { tasks: { field: 'name', is: 'Ship' } } as never };
   const filed = value<Facts & { id: string }>(
     await api.propose({ question: 'Price Ship?', body_kind: 'rowset', body: { register: 'tasks', rows: [{ at: `tasks#${ship.seq}`, version: ship.version, patch: { cost: { amount: 900, currency: 'EUR' } } }] } }, held),
   );

@@ -1120,9 +1120,24 @@ export type WriteContext = {
    * this is a person's or an agent's and is not narrowed at all.
    */
   pack?: true | undefined;
+  /**
+   * The rows of the written list this writer may write (sharing plan §2.6), as the scope a reader hands `list`
+   * (`scope(ctx, register)`): the grant's rule and the private rows left out for them. Absent is every row.
+   *
+   * CHECKED ON BOTH SIDES OF THE WRITE, IN ITS TRANSACTION, by the SQL reads use, so there is no second evaluator. A row
+   * it does not admit before the write is answered exactly as a row that is not there; a row it does not admit after
+   * the write (a create outside it, an edit that moves the row out) is unwound with a sentence saying so. It holds for
+   * the one list the write names, never for what the rules pass writes after it. `null` admits no row already there.
+   */
+  within?: Json | undefined;
+  /**
+   * For a proposal: whether a row its body names is one the proposer may see (sharing plan §2.6). A row it does not
+   * admit is answered as a row that is not there. Absent, every row is.
+   */
+  sees?: ((register: string, id: string) => boolean) | undefined;
 };
 
-const RESERVED = new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
+const RESERVED =new Set(['id', 'seq', 'register', 'created_at', 'updated_at', 'version', 'spoken', 'title']);
 
 /**
  * `tags`, which every list takes whether or not it declared it.
@@ -1273,6 +1288,8 @@ type Door = {
   /** The kernel's own instruction path (`instruction.ts`), the one writer of an instruction's delivery fields and state. */
   instructs?: boolean;
   seal?: { field: string; bind: (actor: string, held: string | null) => Result<GrantRow> };
+  /** `WriteContext.within`, taken off the context at the door so the rules pass's own writes never carry it. */
+  within?: Json;
 };
 
 /* ── the record ──────────────────────────────────────────────────────────── */
@@ -1987,6 +2004,48 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
   /** Whether a row is private to somebody other than the viewer: then it is theirs alone and reads as absent. */
   const hiddenFrom = (id: string, viewer: string | undefined): boolean =>
     viewer !== undefined && sql.one('SELECT 1 AS y FROM entry_private WHERE entry_id = ? AND person_id <> ?', id, viewer) !== undefined;
+
+  /**
+   * Whether one row of a list is inside a scope (`scope`, `WriteContext.within`), deleted or not: the clause `list` and
+   * `count` run, asked of one id. A scope that cannot be read admits no row, as it reads none, and `null` is a writer
+   * who may write no row already there (one who adds to a list she cannot read).
+   */
+  const admits = (register: string, within: Json, id: string): boolean => {
+    if (within === null || !registers.has(register)) return false;
+    const c = narrowed({ sql: '(1)', params: [], bad: [] }, ruleOf(within, schemaOf(register), evalContext()));
+    return sql.one(`SELECT 1 AS y FROM entry WHERE id = ? AND register = ? AND (${c.sql})`, id, register, ...c.params) !== undefined;
+  };
+
+  /** The name of the person who owns this record, as a refusal tells somebody to ask them, or `null` when it has none. */
+  const ownerName = (): string | null => {
+    const name = sql.one<{ name: string | null }>(
+      `SELECT p.name FROM member m JOIN person p ON p.id = m.person_id
+        WHERE m.register = '*' AND m.level = 'owner' AND p.suspended_at IS NULL ORDER BY m.person_id LIMIT 1`,
+    )?.name;
+    return typeof name === 'string' && name.trim() !== '' ? name.trim() : null;
+  };
+  /** "Ask Sam." with the owner's name, else "Ask the owner." */
+  const askOwner = (): string => `Ask ${ownerName() ?? 'the owner'}.`;
+
+  /**
+   * The fields of a list a rule names (`row_where`, a share's condition), so a write can tell which fields decide who
+   * sees a row (sharing plan §2.6, gate fields). A rule that cannot be read names none.
+   */
+  const ruleFields = (register: string, rule: Json): string[] => {
+    if (!registers.has(register)) return [];
+    const said = predicateOf(rule as Predicate | string, schemaOf(register), evalContext());
+    const out = new Set<string>();
+    const walk = (n: unknown): void => {
+      if (n === null || typeof n !== 'object') return;
+      if (Array.isArray(n)) return n.forEach(walk);
+      const o = n as Record<string, unknown>;
+      if (typeof o.field === 'string') out.add(o.field.split('.')[0]!);
+      if (typeof o.via === 'string') out.add(o.via.split('.')[0]!);
+      for (const k of ['all', 'any', 'none']) if (Array.isArray(o[k])) walk(o[k]);
+    };
+    walk(said.predicate);
+    return [...out];
+  };
 
   /**
    * Keep a row to its maker, or give it back to the record. Only the person who made it may (`madeByIn`), because a
@@ -3958,11 +4017,30 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     const barred = schemaRefusal(state);
     if (barred) return barred;
 
+    /* THE ROWS THIS WRITER MAY WRITE GO ON THE DOOR AND OFF THE CONTEXT, so the pre-image check below reads them and
+       the rules pass's writes, handed `w`, never hold another list's rows to them. */
+    const { within, ...rest } = w;
+    if (within !== undefined) {
+      w = rest;
+      door = { ...door, within };
+    }
     /* A SEALING WRITE BINDS A GRANT PART-WAY THROUGH ITS PERSIST STEP, so a refusal after that rolls
-       back to a savepoint rather than trusting that nothing was written before it. */
-    const out = door.seal
-      ? attempt(sql, transaction, () => writing(register, ref, patch, w, door))
-      : writing(register, ref, patch, w, door);
+       back to a savepoint rather than trusting that nothing was written before it. AND A WRITE HELD TO ITS WRITER'S
+       ROWS (sharing plan §2.6) is asked once more before it commits, by the same clause, whether the row it leaves is
+       still one of them: a create outside them, or an edit that moves the row out, is unwound whole, the rules pass
+       with it. */
+    const out =
+      door.seal || within !== undefined
+        ? attempt(sql, transaction, () => {
+            const made = writing(register, ref, patch, w, door);
+            if (!made.ok || within === undefined || admits(register, within, made.value.id)) return made;
+            return no<Entry>(
+              'FORBIDDEN',
+              ref === null ? `That would put it outside what you can edit. ${askOwner()}` : `That would move it out of what you can edit. ${askOwner()}`,
+              { at: ref === null ? 'fields' : 'patch' },
+            );
+          })
+        : writing(register, ref, patch, w, door);
     /* THE ONE WRITE A REFUSAL MAKES. Ten of the same refusal in a month across three days means the
        DECLARATION is wrong rather than one caller having a bad afternoon — and a record that threw
        its refusals away could never notice the difference. It is outside the transaction the write
@@ -4047,7 +4125,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
           { at: 'version' },
         );
 
-      const current = ref === null ? null : get(ref, { includeDeleted: true });
+      const found = ref === null ? null : get(ref, { includeDeleted: true });
+      /* A ROW THIS WRITER MAY NOT WRITE IS A ROW THAT IS NOT THERE (sharing plan §2.6, P4): the same code and the same
+         sentence, at the same step, so no refusal proves a row exists. */
+      const current = found !== null && door.within !== undefined && found.register === register && !admits(register, door.within, found.id) ? null : found;
       if (ref !== null && !current)
         return no<Entry>('VALUE_MALFORMED', `There is no row ${ref} in ${register}.`, { at: 'id' });
       if (current && current.register !== register)
@@ -4367,6 +4448,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
             value as never,
             current?.id ?? '',
           );
+          /* A ROW THE WRITER CANNOT READ IS NAMED BY NO COLLISION (sharing plan §2.6), so uniqueness is not a way to test
+             whether a row exists: a list she cannot read, or a row outside what she may write. */
+          if (clash && (hidden(register) || (door.within !== undefined && !admits(register, door.within, clash.id))))
+            return no<Entry>('FORBIDDEN', `That can't be added here. ${askOwner()}`, { at: f.id });
           if (clash)
             return no<Entry>(
               clash.seq === null ? 'UNIQUE_VIOLATION' : 'ALREADY_KNOWN',
@@ -9800,9 +9885,13 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * heartbeat: an agent that only reads and notes is still working. The row is found first, so a note
      * against nothing opens no run.
      */
-    log(register: string, seq: number, w: WriteContext, note: string): Result<{ id: string }> {
+    log(register: string, seq: number, held: WriteContext, note: string): Result<{ id: string }> {
       const found = bySeq(register, seq);
-      if (!found) return no<{ id: string }>('OUT_OF_BOUNDS', `There is no ${register} #${seq}.`, { at: 'seq' });
+      /* A ROW THE WRITER MAY NOT WRITE IS ONE THAT IS NOT THERE (`WriteContext.within`), in the same words. The rows are
+         this list's, so they come off the context before the run that signs the note is found or opened. */
+      const { within, ...w } = held;
+      if (!found || (within !== undefined && !admits(register, within, found.id)))
+        return no<{ id: string }>('OUT_OF_BOUNDS', `There is no ${register} #${seq}.`, { at: 'seq' });
       return transaction(() => {
         const theirs = foreignRun<{ id: string }>(w);
         if (theirs) return theirs;
@@ -10015,7 +10104,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const { title, ...given } = p;
         /* A QUESTION IS WRITTEN WITH NAMES: an agent's ids are turned into the rows' names as it is filed. */
         const asked = typeof given.question === 'string' ? { ...given, question: nameSpoken(given.question) } : given;
-        const out = openSuggestion(governDeps(), () => signedBy(typeof w === 'string' ? { actor: w } : w), asked, drafted);
+        /* A ROW THE BODY NAMES THAT THE PROPOSER MAY NOT SEE IS ONE THAT IS NOT THERE (`WriteContext.sees`), in the words
+           a missing one gets. Only at filing: the person who accepts it reads the record whole. */
+        const sees = typeof w === 'string' ? undefined : w.sees;
+        const base = governDeps();
+        const deps: GovernDeps = sees === undefined ? base : { ...base, row: (register, at) => { const row = base.row(register, at); return row && sees(register, row.id) ? row : null; } };
+        const out = openSuggestion(deps, () => signedBy(typeof w === 'string' ? { actor: w } : w), asked, drafted);
         /* A JOINING RUN IS NOT TITLED after somebody else's question. */
         if (out.ok && !out.value.joined && out.value.answered === undefined) {
           nameRunBy(out.value.id, typeof w === 'string' ? { actor: w } : w, typeof title === 'string' ? title : undefined);
@@ -11343,6 +11437,10 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     privateAmong,
     madeBy: (id: string): string | null => madeByIn(sql, id),
     scope,
+    /** Writes held to the row (sharing plan §2.6): whether a scope admits one row, the fields a rule names, and who to ask. */
+    admits,
+    ruleFields,
+    ownerName,
     setPrivate,
     version,
     history,
@@ -11479,29 +11577,35 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * A REFUSAL LEAVES NOTHING BEHIND (`attempt`): not the run opened to sign it, nor a take's first write when its second
      * failed, which `take`'s own transaction cannot undo from inside this one.
      */
-    takeHandoff: (w: WriteContext, left: string): Result<Taken> => {
+    takeHandoff: (held: WriteContext, left: string): Result<Taken> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
       const said = typeof left === 'string' ? left.trim() : '';
       if (said === '') return no('REQUIRED_MISSING', 'Say which step to take, by the run that left it.', { at: 'left' });
+      /* A RUN THE TAKER MAY NOT WRITE (`WriteContext.within`, over the runs) is answered as one that is not there. */
+      const { within, ...w } = held;
       return attempt(sql, transaction, () => {
         const taker = runFor(w, 'opened: took a step');
         if (!taker.ok) return taker;
         /* A RUN TAKES ONLY A STEP LEFT IN ITS OWN PLACE (handoff-guard-49), its project or its repository, as
            `openHandoffs` offers it: by its name alone it could take a step it was never shown. */
         const at = runPlace(taker.value.run);
-        return takeHandoff(sql, { id: taker.value.run.id, spoken: taker.value.spoken }, said, clock.now(), handoffWrite, (run: RunRow) => inPlace(at, run));
+        return takeHandoff(sql, { id: taker.value.run.id, spoken: taker.value.spoken }, said, clock.now(), handoffWrite, (run: RunRow) =>
+          inPlace(at, run) && (within === undefined || admits(SESSION, within, run.id)),
+        );
       });
     },
     /**
      * Close the step `left` left without taking it, saying `why` in words (`handoff.ts`). An agent drops a step that is
      * no longer true, signed by its run as `propose` signs; a person drops one from the app, signed as themselves.
      */
-    dropHandoff: (w: WriteContext, left: string, why: string): Result<{ left: string; next: string }> => {
+    dropHandoff: (held: WriteContext, left: string, why: string): Result<{ left: string; next: string }> => {
       const barred = schemaRefusal(state);
       if (barred) return barred;
       const said = typeof left === 'string' ? left.trim() : '';
       if (said === '') return no('REQUIRED_MISSING', 'Say which step to drop, by the run that left it.', { at: 'left' });
+      const { within, ...w } = held;
+      const seen = (run: RunRow): boolean => within === undefined || admits(SESSION, within, run.id);
       return attempt(sql, transaction, () => {
         const theirs = foreignRun<{ left: string; next: string }>(w);
         if (theirs) return theirs;
@@ -11511,11 +11615,12 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
         const repoOf = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
         const may = located
           ? (run: RunRow) =>
+              seen(run) &&
               inPlace(
                 { project: located.project?.spoken ?? null, repo: (located.found ? repoOf(byId(located.found.id)?.fields.repo) : null) ?? w.session?.repo ?? null },
                 run,
               )
-          : undefined;
+          : seen;
         return dropHandoff(sql, signedBy(w), said, typeof why === 'string' ? why : '', clock.now(), handoffWrite, may);
       });
     },

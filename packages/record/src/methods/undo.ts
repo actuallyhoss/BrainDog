@@ -71,7 +71,7 @@ const rowOf = (v: unknown): UndoRow | null => {
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 export function methods(deps: RecordDeps) {
-  const { kernel, sql, admin, guard, readable, tail, no, clock } = deps;
+  const { kernel, sql, admin, guard, readable, tail, no, clock, sight } = deps;
   const trust = ladder({ sql, kernel, now: () => clock.now() });
   /** A batch for one row put back, minted on the record's clock as the record mints every other. */
   const mint = ulids(() => clock.now());
@@ -484,7 +484,19 @@ export function methods(deps: RecordDeps) {
         if (found !== null) [found.id, kernel.nameOf(found.id)].forEach((x) => typeof x === 'string' && mine.add(x));
       } else mine.add(actorOf(ctx));
       const actors = sql.all<{ actor: string | null }>('SELECT DISTINCT actor FROM event WHERE batch = ? OR (batch IS NULL AND id = ?)', batch, batch).map((e) => e.actor);
-      if (actors.length === 0) return no('ROW_UNKNOWN', 'No write was made under that batch, so there is nothing to take back.', { at: 'batch' });
+      const nothing = () => no<UndoPlan | Undone>('ROW_UNKNOWN', 'No write was made under that batch, so there is nothing to take back.', { at: 'batch' });
+      if (actors.length === 0) return nothing();
+      /* EVERY ROW IT WOULD PUT BACK IS ONE THE CALLER MAY STILL WRITE (sharing plan §2.6). A row since moved out of her
+         rule, or kept private by its maker, is answered as a batch that wrote nothing, so the undo proves nothing. */
+      if (sight !== undefined)
+        for (const { target } of sql.all<{ target: string }>(
+          "SELECT DISTINCT target FROM event WHERE (batch = ? OR (batch IS NULL AND id = ?)) AND target LIKE 'entry:%'",
+          batch,
+          batch,
+        )) {
+          const row = kernel.get(target.slice('entry:'.length), { includeDeleted: true });
+          if (row !== null && !sight.admitted(ctx, row.register, row.id)) return nothing();
+        }
       const own = actors.some((x) => x !== null && mine.has(x));
       const foreign = actors.some((x) => x === null || (!mine.has(x) && !x.startsWith('rule:')));
       if (!own || foreign)
