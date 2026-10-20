@@ -32,6 +32,12 @@
      one primary is the 44px button with the plus on the name's row. Beside the name they cut "Automations" in two and
      left the primary on a row of its own. */
   const phone = new MediaQuery('(width < 900px)', false);
+
+  const head = $state(emptyHead());
+  shareHead(head);
+
+  const tab = $derived(tabHere(page.route.id, page.url.searchParams));
+  const shown = $derived(tab ? headFor(tab, head) : null);
   const make = $derived(
     tab === 'automations'
       ? { href: '/automations/new', label: words.newOne }
@@ -41,12 +47,6 @@
           ? { href: '/scripts/new', label: w.newScript }
           : null,
   );
-
-  const head = $state(emptyHead());
-  shareHead(head);
-
-  const tab = $derived(tabHere(page.route.id, page.url.searchParams));
-  const shown = $derived(tab ? headFor(tab, head) : null);
 
   /* A TAB LEFT TAKES ITS FIGURES WITH IT. The head lives as long as this layout, so the count and the sentence read
      on one visit to a tab were still here on the next, shown as today's until the page had read again. `$effect.pre`,
