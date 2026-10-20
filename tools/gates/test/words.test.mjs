@@ -124,7 +124,8 @@ test('the held list names real files, each with a count and a reason, and the re
   const r = spawnSync(process.execPath, [gate], { cwd: join(import.meta.dirname, '..', '..', '..'), encoding: 'utf8', env });
   assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
   const n = Object.values(list.held).reduce((s, h) => s + h.count, 0);
-  assert.match(r.stdout, new RegExp(`, ${n} held in ${Object.keys(list.held).length} files`), 'the held count is printed, and every held finding is still there to hold');
+  const files = Object.keys(list.held).length;
+  assert.match(r.stdout, new RegExp(`, ${n} held in ${files} files?\\b`), 'the held count is printed, and every held finding is still there to hold');
 });
 
 test('THE PAGE LINT SAYS THE SAME: its words are the list\'s page entries and its buttons the list\'s, word for word', () => {
