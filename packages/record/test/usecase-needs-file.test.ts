@@ -100,7 +100,7 @@ async function planAndInstall(doc: unknown) {
 
 /** The lists a record holds, less the kernel's own. */
 const listsIn = (sql: ReturnType<typeof openSqlite>): string[] =>
-  [...new Set(sql.all<{ id: string }>("SELECT id FROM declaration WHERE kind = 'register'").map((r) => r.id))].filter((id) => id !== 'register.session').sort();
+  [...new Set(sql.all<{ id: string }>("SELECT id FROM declaration WHERE kind = 'register'").map((r) => r.id))].filter((id) => id !== 'register.session' && id !== 'register.instructions').sort();
 
 const carried = (planned: Planned) => planned.packs.find((p) => p.role === 'usecase')!.doc as { declarations: Decl[] };
 

@@ -490,7 +490,8 @@ export function readUsage(
       /* a body that will not parse is nothing Slash can say anything about */
     }
     if (d.kind === 'register') {
-      if (bare === 'session') continue;
+      /* The kernel's own two lists, runs and what he told them (migration 42), are not his lists to describe. */
+      if (bare === 'session' || bare === 'instructions') continue;
       if (!reads(bare)) {
         held.add(bare);
         continue;

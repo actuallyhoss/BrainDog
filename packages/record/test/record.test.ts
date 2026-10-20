@@ -267,7 +267,7 @@ test('a ceiling holds through every method that names a register', async () => {
 test('and boot shows only the registers the caller may touch, because a list of names is information', async () => {
   const { api, sql } = await record();
   const all = value<{ registers: { id: string }[] }>(await api.boot(owner));
-  assert.deepEqual(all.registers.map((r) => r.id).sort(), ['notes', 'obligations', 'session']);
+  assert.deepEqual(all.registers.map((r) => r.id).sort(), ['instructions', 'notes', 'obligations', 'session']);
 
   const scoped = value<{ registers: { id: string }[] }>(await api.boot({ ...owner, registers: ['obligations'] }));
   assert.deepEqual(scoped.registers.map((r) => r.id), ['obligations']);
