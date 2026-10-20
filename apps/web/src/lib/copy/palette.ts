@@ -14,9 +14,6 @@ export const palette = {
   /* WHAT THE PALETTE IS NOT SHOWING, and where the rest is. It printed eight hits and said nothing
      about the ninth — on the surface `19 §4` makes the primary way to reach a row, and with a
      round-robin that gives one hit per list, eight across nine lists is one row each. */
-  /* `/search?q=` — `19 §2`'s spine screen, which the route directory did not have. `search` is
-     already declared above, as the nav's own word for the same place. */
-  searchRecord: 'Search the record',
   searchWaiting: 'Find anything you keep',
   /* NOT `noneMatching`, which counts the rows a LIST holds and reads "0 rows, none matching" here —
      a search is over every list at once, so there is no single total to count against. */

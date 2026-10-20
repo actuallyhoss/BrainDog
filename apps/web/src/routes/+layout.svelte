@@ -41,8 +41,7 @@
   import '$lib/ui/controls.css';
 
   import * as pref from '$lib/pref.ts';
-  import { restore as restoreAccent } from '$lib/accent.ts';
-  import { copy } from '$lib/copy.ts';
+  import { copy } from '$lib/copy/frame.ts';
   import { leaving, settled } from '$lib/ui/screen.svelte.ts';
   import { GoPrefix, overlays, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { watchKeyboard } from '$lib/a11y/keyboard.ts';
@@ -54,7 +53,6 @@
   import Toasts from '$lib/ui/Toasts.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
   import { follow, live } from '$lib/data/live.svelte.ts';
-  import { claimLocal } from '$lib/data/local-tab.ts';
   import { timingOpened } from '$lib/data/timing.ts';
   /* THE PALETTE AND THE `?` SHEET'S BODY ARRIVE AFTER THE SHELL. Both are closed on every first
      paint, and the palette carries its commands, its search and Slash's drawing, so importing them
@@ -71,7 +69,7 @@
   import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
   import { railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
-  import { needYouCount } from '$lib/home/today-tiles.ts';
+  import { needYouCount } from '$lib/home/need-you.ts';
   import { heardWaits, waitsNow, waitsTicket, workingNow } from '$lib/home/waits.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
@@ -376,9 +374,14 @@
    * and the reason, which is the half a reader cannot get from anywhere else, so it is the right
    * thing to say until that key exists.
    */
+  /* LOADED ONLY WHEN THE COOKIE HOLDS A COLOUR: the contrast checks behind `restoreAccent` are the theme builder's, and a
+     browser on the house colour has nothing for them to check. */
   $effect(() => {
-    const out = restoreAccent();
-    if (!out.ok) untrack(() => toasts.push(copy.accentRefused(out.dropped, out.codes), { intent: 'warn' }));
+    if (!pref.read().theme) return;
+    void import('$lib/accent.ts').then(({ restore: restoreAccent }) => {
+      const out = restoreAccent();
+      if (!out.ok) untrack(() => toasts.push(copy.accentRefused(out.dropped, out.codes), { intent: 'warn' }));
+    });
   });
 
   /**
@@ -665,7 +668,8 @@
     if (data.live !== true || data.refused || data.stale) return;
     const base = apiBase(page.url);
     const me = data.me;
-    untrack(() => claimLocal(base, me));
+    /* THE LOCAL COPY'S READER AND ITS PREDICATES ARRIVE AFTER THE SHELL: nothing on the first paint is drawn from here. */
+    untrack(() => void import('$lib/data/local-tab.ts').then((m) => m.claimLocal(base, me)));
   });
 
   /**

@@ -10,7 +10,7 @@
  * kernel with it. `voice.test.ts` holds the keys here to `VOICE_KEYS` there.
  */
 
-import { copy } from './copy.ts';
+import { copy } from './copy/frame.ts';
 import { penWords } from './design/words.ts';
 import { words as homeWords } from './home/words.ts';
 

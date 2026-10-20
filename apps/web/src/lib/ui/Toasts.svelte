@@ -40,7 +40,7 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
-  import { copy } from '../copy.ts';
+  import { copy } from '../copy/frame.ts';
   import Icon from './Icon.svelte';
   import Kbd from './Kbd.svelte';
   import { scrims, settled } from './panel.ts';

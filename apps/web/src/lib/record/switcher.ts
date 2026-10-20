@@ -18,7 +18,7 @@
  */
 
 import { BASE } from '../at.ts';
-import { copy } from '../copy.ts';
+import { copy } from '../copy/frame.ts';
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 

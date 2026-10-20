@@ -10,7 +10,7 @@
   is hidden from a screen reader and never the only way to tell who did a thing.
 -->
 <script lang="ts">
-  import { AGENT_GLYPHS, type AgentKind } from './face.ts';
+  import { AGENT_GLYPHS, type AgentKind } from './agent-glyphs.ts';
   import { AGENT_MARKS, isMarked } from '@braindog/skin/agent-marks.ts';
   import Icon from './Icon.svelte';
 

@@ -66,12 +66,8 @@ export function dayNamed(day: string, today: string): string {
 
 /* ── the sentence ───────────────────────────────────────────────────────── */
 
-/**
- * THE ONE COUNT OF WHAT NEEDS YOU: the open questions, as `boot` says them (`waits`), else the count the reader was
- * handed. The rail's badge, the phone tab's badge, Today's header and Today's sentence all ask here, so no two disagree.
- * The late work is a separate number and is said on its own; it is never folded into this one.
- */
-export const needYouCount = (waits: { questions: number } | null | undefined, fallback: number): number => waits?.questions ?? fallback;
+/* THE ONE COUNT OF WHAT NEEDS YOU lives in `need-you.ts`, which the shell imports without this file. */
+export { needYouCount } from './need-you.ts';
 
 /** The sentence under the title, and the one phrase in it that needs him, drawn red; `''` when nothing does. */
 export type Sentence = { text: string; needs: string };

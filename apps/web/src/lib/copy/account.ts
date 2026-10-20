@@ -30,7 +30,6 @@ export const account = {
   hiddenNoneWhy: 'Hide a page from Settings, under Navigation or Pages.',
   perPerson: 'Kept for you on this record, on every device you sign in on.',
   promoted: (title: string) => `${title} is in your nav, at the end of its section.`,
-  recordOpenSignIn: 'Sign in again to open another record.',
 
   /* The chip on a row that has just been acted on. One word, in the past tense, so the row says
      what happened to it where the row is rather than in a toast at the other end of the screen. */
@@ -659,10 +658,7 @@ export const account = {
   passkeyExists: 'This device already has a passkey for this record.',
   passkeyFailed: 'The passkey was not added. Try again.',
   openBrainDog: 'Open BrainDog',
-  signOut: 'Sign out',
-  signingOut: 'Signing out',
   signedOut: 'You are signed out.',
-  signOutFailed: 'You are still signed in. Try again.',
   levelMoved: (name: string, to: string) => `${name} is set to ${to} across this record.`,
   accessRemoved: (name: string) => `${name} no longer has access to this record.`,
   exceptionRemoved: (list: string, to: string) => `${list} is back to ${to}.`,

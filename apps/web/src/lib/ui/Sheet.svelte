@@ -24,7 +24,7 @@
   while it is up waits for it rather than drawing under it.
 -->
 <script lang="ts">
-  import { copy } from '../copy.ts';
+  import { copy } from '../copy/frame.ts';
   import type { Snippet } from 'svelte';
   import { overlays } from '../a11y/keys.svelte.ts';
   import Icon from './Icon.svelte';

@@ -51,7 +51,6 @@ export const decide = {
   commit: 'Record the decision',
   decidedBy: 'Decided by',
   immutable: 'A decision cannot be edited once it is made.',
-  noQuestions: 'Nothing needs you',
   noQuestionsWhy: 'When your agent needs a choice from you, it shows up here.',
   lastDecided: 'The last one was decided',
   /* THE QUESTION IS NOT SAID. Its callers used to pass the question's id, `SG2`, and an id is never a word a person
@@ -68,7 +67,6 @@ export const decide = {
      an email. Naming it after the mechanism that carried it is naming it after the plumbing. */
   archiveArrival: 'Archive this',
   inboxConnect: 'Set up a connector',
-  inboxClear: 'The inbox is clear',
   inboxClearWhy: 'Mail and texts you forward land here until they are filed.',
   /* THE AIM FOR THE DECIDE QUEUE, SAID WITH WHAT IT COUNTS. `/decide` printed the metric's note by itself at the end
      of its heading row: a fragment with no subject, beside a count of 4 it was failing. The target is said as every

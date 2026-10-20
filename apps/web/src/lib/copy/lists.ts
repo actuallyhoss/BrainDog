@@ -103,19 +103,7 @@ export const lists = {
      disappears the moment somebody types — so the field announced itself right up until it had
      content, and then stopped. */
   searchIn: (name: string) => `Search ${name}`,
-  newRow: 'New',
   done: 'Done',
-  /**
-   * VERB + NOUN, never "Save" or "Submit": the button says what will exist afterwards.
-   *
-   * IT WAS STATED HERE AND KEPT BY ABOUT HALF THE FILE. Fourteen labels were a bare verb or a
-   * pronoun — `Add it`, `Back`, `Edit`, `Stop`, `Archive`, `Raise it`, `Add one`, `Done`, `Defer`,
-   * `Open`, `Peek`, `Clear`, `Show me an example`, `Show them all`. Each is unambiguous while you
-   * are looking at the thing it acts on and unreadable in a list of shortcuts, a screen reader's
-   * control list, or a sentence quoting it. A CTA that needs its surroundings to mean anything is a
-   * CTA that means nothing to somebody arriving at it from the side.
-   */
-  addRow: 'Add',
   noneChosen: 'None',
   yes: 'Yes',
   secretsLiveInTheVault: 'Passwords and keys go in the Vault. This records what one opens.',

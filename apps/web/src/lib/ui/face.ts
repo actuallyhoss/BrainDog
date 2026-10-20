@@ -7,7 +7,8 @@
 import { RULE_NAMES } from '@braindog/seed/usecases/names';
 
 import { AGENT_NAMES, nameWords, saidKind, type ActorKind } from '../record/names.ts';
-import type { IconName } from './icons.ts';
+import type { AgentKind } from './agent-glyphs.ts';
+import { HUES, hueFor } from './hue.ts';
 
 /**
  * The letter in a writer's disc.
@@ -69,53 +70,17 @@ export const faceKindOf = (name: string): ActorKind => {
   return 'person';
 };
 
-/** How many hues a person's face is drawn from, thirty degrees apart round the wheel. */
-const HUES = 12;
-
-/**
- * A person's hue, from something that stays the same for them (their id where the caller has it, else their name).
- *
- * TWELVE STEPS, NOT 360. Two hues a few degrees apart read as the same colour, so a face that should tell two people
- * apart would not; twelve steps at the theme's mark lightness and chroma are each their own colour, and past twelve
- * people the name beside the face is what carries who it is anyway. The hash is FNV-1a over the code points, so the
- * same person is the same hue on every screen and every visit.
- */
-export const hueFor = (key: string): number => {
-  let hash = 0x811c9dc5;
-  for (const ch of key) {
-    hash ^= ch.codePointAt(0) ?? 0;
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return (hash % HUES) * (360 / HUES);
-};
+/* THE HUE IS `hue.ts`'s, so the rail can draw one without the names above. */
+export { hueFor };
 
 /* ── an agent's run ─────────────────────────────────────────────────────────── */
 
-/** The kinds of agent a run face tells apart: each named one by its maker's mark (`@braindog/skin/agent-marks.ts`), the rest by a glyph. */
-export type AgentKind = 'claude' | 'codex' | 'cursor' | 'gemini' | 'copilot' | 'windsurf' | 'slash' | 'runner' | 'other';
+/* THE KINDS AND THEIR GLYPHS ARE `agent-glyphs.ts`'s, so the rail's mark draws without the names above. */
+export { AGENT_GLYPHS, type AgentKind } from './agent-glyphs.ts';
 
 /** Where a run is: working, gone quiet while still open, or stopped. The ring says which. */
 export type RunLive = 'working' | 'quiet' | 'stopped';
 
-/**
- * The glyph each kind of agent falls back to, from the app's own set, where there is no mark to draw.
- *
- * A NAMED AGENT WEARS ITS MAKER'S MARK NOW, not this. An earlier rule said "a glyph and never a vendor logo"; the
- * owner overruled it and asked for the real logos, so `AgentMark`
- * draws Claude, Codex, Cursor, Gemini, Copilot and Windsurf as their makers do, and these glyphs are what a runner and
- * an agent nobody names wear, and what a surface too small for a mark falls back to. Slash is not here, because it
- * wears its own mark, the slash `Face` draws.
- */
-export const AGENT_GLYPHS = {
-  claude: 'bot',
-  codex: 'code',
-  cursor: 'keyboard',
-  gemini: 'bot',
-  copilot: 'code',
-  windsurf: 'code',
-  runner: 'play',
-  other: 'session',
-} as const satisfies Record<Exclude<AgentKind, 'slash'>, IconName>;
 
 /** The kinds a word can name outright, as an id or a name. */
 const KNOWN = ['claude', 'codex', 'cursor', 'gemini', 'copilot', 'windsurf'] as const satisfies readonly AgentKind[];

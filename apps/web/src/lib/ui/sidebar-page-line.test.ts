@@ -41,7 +41,9 @@ test('only the Pages place holds the line', () => {
 test('the line is drawn under a place in both lists, after its views, and nowhere else', () => {
   assert.equal((SOURCE.match(/\{@render pageLineOf\(item\)\}/g) ?? []).length, 2);
   assert.equal((SOURCE.match(/\{@render viewsOf\(item\)\}\s*\{@render pageLineOf\(item\)\}/g) ?? []).length, 2);
-  assert.match(SOURCE, /import \{[^}]*\bnewPage\b[^}]*\} from '\.\.\/record\/page-new\.ts'/);
+  /* THE CALL IS LOADED ON ENTER, so the rail carries its words and not the client behind them. */
+  assert.match(SOURCE, /await import\('\.\.\/record\/page-new\.ts'\)/);
+  assert.match(SOURCE, /const \{[^}]*\bnewPage\b[^}]*\} = made;/);
 });
 
 test('the rail keeps what it had', () => {

@@ -19,7 +19,9 @@ import { dev } from '$app/environment';
 import { tick } from 'svelte';
 
 import { poller, Wait, type LiveState, type Visibility } from './live.ts';
-import { heardLocal, stampLocal, wipeLocal } from './local-tab.ts';
+/* THE LOCAL COPY IS ASKED FOR WHEN THE POLL HAS SOMETHING TO TELL IT, never with the shell: its reader carries the
+   predicate engine, and the first paint draws nothing from it. Each of the three is fire-and-forget already. */
+const localTab = () => import('./local-tab.ts');
 import { forget, hear, keep } from './offline.ts';
 
 /**
@@ -80,14 +82,15 @@ function asker(base: string): () => Promise<number> {
          page the worker does not control yet (the first visit, before it claims the tab). */
       if ('refusal' in out && out.refusal.code === 'UNAUTHORIZED') {
         void forget().catch(() => undefined);
-        void wipeLocal();
+        void localTab().then((m) => m.wipeLocal());
       }
       /* A RATE LIMIT SAYS HOW LONG TO WAIT, and the poll waits that long without calling the tab offline. */
       if ('refusal' in out && out.refusal.code === 'RATE_LIMITED') throw new Wait(Number(out.refusal.retry_after) || 60);
       throw new Error('the record did not answer its version');
     }
     /* A RECORD WHOSE FORMAT MOVED UNDER THE LOCAL COPY wipes what it kept (`local.ts`). */
-    stampLocal(out.value);
+    const stamped = out.value;
+    void localTab().then((m) => m.stampLocal(stamped));
     return out.value.version;
   };
 }
@@ -120,7 +123,7 @@ export function follow(base: string | null): void {
       visible: tab,
       onChange: (version) => {
         /* THE LOCAL COPY ASKS THE LOG WHAT CHANGED, beside the screens asking their own questions again. */
-        heardLocal(version);
+        void localTab().then((m) => m.heardLocal(version));
         live.version = version;
       },
       onState: (state) => {

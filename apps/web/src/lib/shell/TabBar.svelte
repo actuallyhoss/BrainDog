@@ -16,7 +16,7 @@
 <script lang="ts">
   import { at, here as inside } from '../at.ts';
   import { page } from '$app/state';
-  import { copy } from '../copy.ts';
+  import { copy } from '../copy/frame.ts';
   import Icon, { type IconName } from '../ui/Icon.svelte';
   import { isHere, placeOf, type FlatItem } from '../nav.ts';
 

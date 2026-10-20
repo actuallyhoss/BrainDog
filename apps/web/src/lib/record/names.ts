@@ -15,7 +15,7 @@
 
 import { RULE_NAMES } from '@braindog/seed/usecases/names';
 
-import { copy } from '../copy.ts';
+import { copy } from '../copy/frame.ts';
 import { REGISTERS } from './held.ts';
 import { mergedFieldOf } from './people.ts';
 

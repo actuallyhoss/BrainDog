@@ -453,4 +453,30 @@ export const shell = {
   /* A PLACE THE RAIL DID NOT HOLD AT ITS LAST DRAW, named once in a toast (`routes/+layout.svelte`): a page stays off the
      rail until one of its lists holds something, so the first thing typed can bring a place nobody saw arrive. */
   placeArrived: (names: readonly string[]) => `${list([...names])} ${names.length === 1 ? 'is' : 'are'} in your rail now.`,
+
+  /* ── WORDS THE FRAME DRAWS FROM OTHER AREAS, kept here so the frame's copy (`frame.ts`) is this file and not theirs ── */
+
+  /* The account's: the rail, the More sheet and the record switcher say them on every screen. */
+  recordOpenSignIn: 'Sign in again to open another record.',
+  signOut: 'Sign out',
+  signingOut: 'Signing out',
+  signOutFailed: 'You are still signed in. Try again.',
+  /* Decide's, which the record's voice (`voice.ts`) names on every screen. */
+  noQuestions: 'Nothing needs you',
+  inboxClear: 'The inbox is clear',
+  /* `/search?q=`, `19 §2`'s spine screen; the More sheet's search row says it, and so does the palette. */
+  searchRecord: 'Search the record',
+  /* The lists', which the record's voice names. */
+  newRow: 'New',
+  /**
+   * VERB + NOUN, never "Save" or "Submit": the button says what will exist afterwards.
+   *
+   * IT WAS STATED HERE AND KEPT BY ABOUT HALF THE FILE. Fourteen labels were a bare verb or a
+   * pronoun — `Add it`, `Back`, `Edit`, `Stop`, `Archive`, `Raise it`, `Add one`, `Done`, `Defer`,
+   * `Open`, `Peek`, `Clear`, `Show me an example`, `Show them all`. Each is unambiguous while you
+   * are looking at the thing it acts on and unreadable in a list of shortcuts, a screen reader's
+   * control list, or a sentence quoting it. A CTA that needs its surroundings to mean anything is a
+   * CTA that means nothing to somebody arriving at it from the side.
+   */
+  addRow: 'Add',
 } as const;

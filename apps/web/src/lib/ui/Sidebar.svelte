@@ -74,7 +74,7 @@
   import { BASE, apiBase, at, here as inside } from '../at.ts';
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
-  import { copy } from '../copy.ts';
+  import { copy } from '../copy/frame.ts';
   import { said } from '../voice.svelte.ts';
   import { isHere, orderLists, placeOf, type FlatItem } from '../nav.ts';
   import { navPrefs } from '../nav-prefs.svelte.ts';
@@ -83,7 +83,7 @@
   import type { NavEntry } from '../record/api.ts';
   import AgentMark from './AgentMark.svelte';
   import Icon, { type IconName } from './Icon.svelte';
-  import { hueFor } from './face.ts';
+  import { hueFor } from './hue.ts';
   import { agentsHref } from '../nav/rail.ts';
   import Kbd from './Kbd.svelte';
   import Mark from './Mark.svelte';
@@ -91,7 +91,8 @@
   import Menu from './Menu.svelte';
   import { toasts } from './toast.svelte.ts';
   import { levelWord, openRecord, type SwitcherRow } from '../record/switcher.ts';
-  import { dropPage, newPage, pageClient, pageWords } from '../record/page-new.ts';
+  /* THE LINE'S WORDS ONLY: the call that makes a page carries the client, so it is loaded on Enter (`makePage`). */
+  import { pageWords } from '../record/page-words.ts';
   import type { Shell, Working } from '../record/boot-live.ts';
   import type { SpineKey } from '../spine.ts';
 
@@ -217,6 +218,13 @@
   async function makePage() {
     if (making) return;
     making = true;
+    const made = await import('../record/page-new.ts').catch(() => null);
+    if (made === null) {
+      making = false;
+      toasts.push(pageWords.notReached, { intent: 'warn' });
+      return void nameBox?.focus();
+    }
+    const { dropPage, newPage, pageClient } = made;
     const client = pageClient(apiBase());
     const title = pageTitle.replace(/\s+/gu, ' ').trim();
     const out = await newPage(pageTitle, { client, pages: shell.pages ?? [], owner: shell.me?.owner === true });
