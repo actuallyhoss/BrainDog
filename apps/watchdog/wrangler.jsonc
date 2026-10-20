@@ -5,8 +5,8 @@
      brain.dog, so a site that was down could not say so. This one holds no route and no binding to either app Worker:
      it asks brain.dog over the public internet, as a visitor does, every five minutes (`src/index.ts`).
 
-     TODO(deploy, his word): NOT DEPLOYED. Before `pnpm --filter @braindog/watchdog deploy:production`:
-       1. `wrangler kv namespace create braindog-watchdog`, and put its id where STATE_KV_ID_TODO is below.
+     Before `pnpm --filter @braindog/watchdog deploy:production`:
+       1. The KV namespace braindog-watchdog exists (created 20 Oct; its id is below).
        2. Email Sending on the account must allow `hello@brain.dog` (the same sender the app Worker uses).
        3. Deploy the site Worker (its old cron is gone from this branch) at the same time, or both mail for a while. */
   "name": "braindog-watchdog",
@@ -19,5 +19,5 @@
   "vars": { "OPS_ALERT_TO": "admin@brain.dog", "MAIL_FROM": "hello@brain.dog", "WATCH_HOST": "brain.dog" },
   "send_email": [{ "name": "EMAIL" }],
   /* Each probe is one log line a run (name, ok, status, ms, slow), so a slow day is a search of the Worker's logs. */
-  "kv_namespaces": [{ "binding": "STATE", "id": "STATE_KV_ID_TODO" }]
+  "kv_namespaces": [{ "binding": "STATE", "id": "13420cc4d4c54df7b282fb781b9128bb" }]
 }
