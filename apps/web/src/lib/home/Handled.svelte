@@ -1,35 +1,64 @@
 <!--
-  What BrainDog arranged by itself today, as one tile on Today (DIRECTION d3): the heading, a few lines of what it did
-  without asking, the reason under each, and an Undo on each that puts that whole batch back.
+  What BrainDog did by itself today (DIRECTION d3, today F6): a few lines of what it did without asking, when, the reason
+  under each, and an Undo on each that puts that whole batch back.
 
-  A TILE AND NEVER A QUESTION. These already happened, with a mark; the only press here takes one back. A line that is
-  put back leaves the tile, and at nought the tile is gone.
+  A PLACE, NOT A QUESTION. These already happened, with a mark; the only press here takes one back. On Needs you it is
+  the third column, its head drawn like Money's and Quick's (`head="column"`), over the board and outside the tile.
 
-  "N MORE" OPENS THE REST IN PLACE (plan of 20 October), and the focus goes to the first line it opened. Needs you draws
-  the same tile as its third column, named Handled there (`heading`).
+  UNDO IS A WORD, NOT A ROW OF GREY BUTTONS: 13/500 in the accent's words, a thumb's height to press. A LINE PUT BACK
+  STAYS where it was, struck through in the quiet ink and saying so ("Put back just now"), so the press is seen to have
+  done something and nothing jumps; no toast says it again.
+
+  "N MORE" OPENS THE REST IN PLACE, and the focus goes to the first line it opened. What the record itself held back past
+  its own limit is said as "and 9 more", opening the full record of what BrainDog did (`/audit?by=braindog`).
 -->
 <script lang="ts">
   import { tick } from 'svelte';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at } from '$lib/at.ts';
   import { reread } from '$lib/data/live.svelte.ts';
   import { undoDecision } from '$lib/record/undo-write.ts';
-  import Button from '$lib/ui/Button.svelte';
-  import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { HANDLED_WORDS, handledTile, type Handled } from './handled.ts';
+  import IconWell from '$lib/ui/IconWell.svelte';
+  import { HANDLED_SHOWN, HANDLED_WORDS, type Handled } from './handled.ts';
 
-  let { found, heading }: { found: Handled; /** The tile's name where it is not Today's ("Handled" on Needs you). */ heading?: string } = $props();
+  let {
+    found,
+    heading,
+    head = 'tile',
+  }: {
+    found: Handled;
+    /** The name where it is not Today's ("Handled" on Needs you). */
+    heading?: string;
+    /** `column`: Needs you's third column, its head over the tile as Money's and Quick's are. */
+    head?: 'tile' | 'column';
+  } = $props();
 
-  /* THE DECISIONS PUT BACK FROM HERE, so their lines go at once and the tile does not wait for a reread. */
-  let gone = $state.raw<ReadonlySet<string>>(new Set());
+  const words = {
+    putBack: 'Put back just now',
+    more: (n: number) => `and ${n.toLocaleString('en-GB')} more`,
+  } as const;
+
+  /* THE DECISIONS PUT BACK FROM HERE: their lines stay, struck through, until the next read leaves them out. */
+  let undone = $state.raw<ReadonlySet<string>>(new Set());
   let busy = $state<string | null>(null);
+  let fix = $state('');
   let open = $state(false);
   let list = $state<HTMLUListElement | null>(null);
 
-  const tile = $derived(handledTile({ ...found, rows: found.rows.filter((r) => !gone.has(r.decision)) }, open));
+  const lines = $derived(open ? found.rows : found.rows.slice(0, HANDLED_SHOWN));
+  const opens = $derived(found.rows.length - lines.length);
+  const count = $derived(found.rows.length + found.more);
+  const name = $derived(heading ?? HANDLED_WORDS.heading);
+
+  /** The hour it happened, on the reader's clock: "08:10". */
+  const clock = (iso: string | null): string => {
+    if (!iso) return '';
+    const t = new Date(iso);
+    return Number.isFinite(t.getTime()) ? `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}` : '';
+  };
 
   /** "N more": the rest opens where it is, and the focus goes to the first line that opened, not to the page. */
   async function more() {
-    const from = tile?.lines.length ?? 0;
+    const from = lines.length;
     open = true;
     await tick();
     list?.querySelectorAll<HTMLButtonElement>('[data-handled-undo]')[from]?.focus();
@@ -38,62 +67,108 @@
   async function undo(decision: string) {
     if (busy !== null) return;
     busy = decision;
+    fix = '';
     try {
       const out = await undoDecision(apiBase(), decision);
       if (out.from === 'undone') {
-        gone = new Set([...gone, decision]);
-        toasts.push(out.said === '' ? HANDLED_WORDS.undone : out.said, { intent: 'good' });
+        undone = new Set([...undone, decision]);
         void reread();
-      } else toasts.push(out.fix, { intent: 'warn' });
+      } else fix = out.fix;
     } finally {
       busy = null;
     }
   }
 </script>
 
-{#if tile}
-  <section class="handled" aria-labelledby="handled-h" data-handled>
-    <h2 class="h-head" id="handled-h">{heading ?? tile.heading}</h2>
-    <ul class="h-list" bind:this={list}>
-      {#each tile.lines as row (row.decision)}
-        <li class="h-line">
-          <div class="h-text">
-            <span class="h-what" dir="auto">{row.line}</span>
-            {#if row.why}<span class="h-why" dir="auto">{row.why}</span>{/if}
-          </div>
-          <Button disabled={busy !== null} aria-busy={busy === row.decision} data-handled-undo onclick={() => void undo(row.decision)}>{HANDLED_WORDS.undo}</Button>
-        </li>
-      {/each}
-    </ul>
-    {#if tile.opens > 0}
-      <button type="button" class="h-open tap" data-handled-more onclick={() => void more()}>{HANDLED_WORDS.open(tile.opens)}</button>
-    {:else if tile.more}<p class="h-more">{tile.more[0]!.toUpperCase() + tile.more.slice(1)}.</p>{/if}
+{#if found.rows.length > 0}
+  <section class="handled" aria-labelledby="handled-h" data-handled data-head={head}>
+    <header class="h-head">
+      <IconWell name="check" size="m" />
+      <h2 class="h-title" id="handled-h">{name}<span class="h-count num">{count}</span></h2>
+    </header>
+    <div class="h-body">
+      <ul class="h-list" bind:this={list}>
+        {#each lines as row (row.decision)}
+          {@const back = undone.has(row.decision)}
+          <li class="h-line" data-undone={back ? '' : undefined}>
+            <span class="h-at num">{clock(row.at)}</span>
+            <span class="h-text">
+              <span class="h-what" dir="auto">{row.line}</span>
+              {#if back}<span class="h-why">{words.putBack}</span>{:else if row.why}<span class="h-why" dir="auto">{row.why}</span>{/if}
+            </span>
+            {#if !back}
+              <button type="button" class="h-undo tap" disabled={busy !== null} aria-busy={busy === row.decision} data-handled-undo onclick={() => void undo(row.decision)}
+                >{HANDLED_WORDS.undo}</button
+              >
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      {#if fix}<p class="h-fix" role="status">{fix}</p>{/if}
+      {#if opens > 0}
+        <button type="button" class="h-open tap" data-handled-more onclick={() => void more()}>{HANDLED_WORDS.open(opens)}</button>
+      {/if}
+      {#if found.more > 0}<a class="h-rest tap" href={at('/audit?by=braindog')}>{words.more(found.more)}</a>{/if}
+    </div>
   </section>
 {/if}
 
 <style>
-  /* A TILE OF ITS OWN, the whole row of the board: flat, no border, no shadow, the board's own radius. */
   .handled {
     grid-column: 1 / -1;
+    display: grid;
+    gap: var(--sp-3);
     min-inline-size: 0;
-    padding: var(--tile-pad, 20px);
-    background: var(--tile, var(--bg));
-    border-radius: var(--r-tile, 16px);
+    padding: var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  /* ON NEEDS YOU THE HEAD STANDS OVER THE TILE, level with Money's and Quick's, and the lines are the tile. */
+  .handled[data-head='column'] {
+    padding: 0;
+    background: none;
+    border-radius: 0;
+  }
+
+  .handled[data-head='column'] > .h-body {
+    padding: var(--sp-2) var(--tile-pad);
+    background: var(--tile);
+    border-radius: var(--r-tile);
   }
 
   .h-head {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-block-size: 28px;
+  }
+
+  .h-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
     margin: 0;
     color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-base);
+    font-size: var(--fs-body);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .h-count {
+    color: var(--ink-3);
     font-weight: 500;
-    line-height: 1.4;
+  }
+
+  .h-body {
+    display: grid;
+    min-inline-size: 0;
   }
 
   .h-list {
     display: flex;
     flex-direction: column;
-    margin: var(--sp-3) 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
@@ -102,61 +177,114 @@
     border-block-start: 1px solid var(--rule);
   }
 
+  /* THE TIME, WHAT, AND UNDO AT THE END. */
   .h-line {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    padding: var(--sp-2) 0;
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: var(--sp-3);
+    padding: var(--sp-3) 0;
+  }
+
+  .h-at {
+    padding-block-start: 2px;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-variant-numeric: tabular-nums;
   }
 
   .h-text {
     display: flex;
     flex-direction: column;
+    gap: 2px;
     min-inline-size: 0;
   }
 
   .h-what {
     color: var(--ink);
-    font-size: var(--t-row, 15px);
+    font-size: var(--fs-body);
     line-height: 22px;
+    overflow-wrap: anywhere;
+    transition: color var(--d-swap) var(--ease-out);
+  }
+
+  .h-why {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
     overflow-wrap: anywhere;
   }
 
-  .h-why,
-  .h-more {
-    color: var(--dim);
-    font-size: var(--t-row, 15px);
-    line-height: 22px;
-    overflow-wrap: anywhere;
+  .h-line[data-undone] .h-what {
+    color: var(--ink-3);
+    text-decoration: line-through;
   }
 
-  .h-more {
-    margin: var(--sp-2) 0 0;
+  .h-undo {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--tap);
+    margin-block: -11px;
+    padding: 0 var(--sp-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: none;
+    color: var(--red);
+    font: inherit;
+    font-size: var(--fs-meta);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .h-undo:disabled {
+    color: var(--ink-3);
+    cursor: default;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .h-undo:hover:not(:disabled) {
+      background: var(--hover);
+    }
+  }
+
+  .h-fix {
+    margin: 0 0 var(--sp-2);
+    color: var(--red);
+    font-size: var(--fs-meta);
   }
 
   /* "N MORE", a quiet press under the lines: the second ink, a tap tall, no fill until the pointer is on it. */
-  .h-open {
+  .h-open,
+  .h-rest {
+    justify-self: start;
     display: inline-flex;
     align-items: center;
-    min-block-size: var(--tap, 44px);
-    margin: var(--sp-1) 0 0;
+    min-block-size: var(--tap);
     padding: 0 var(--sp-2);
     margin-inline-start: calc(var(--sp-2) * -1);
     background: none;
     border: 0;
     border-radius: var(--r-ctl);
-    color: var(--ink2);
+    color: var(--ink-2);
     font: inherit;
-    font-size: var(--t-row, 15px);
+    font-size: var(--fs-body);
     font-weight: 500;
+    text-decoration: none;
     cursor: pointer;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .h-open:hover {
-      background: var(--hover-wash);
+    .h-open:hover,
+    .h-rest:hover {
+      background: var(--hover);
       color: var(--ink);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .h-what {
+      transition: none;
     }
   }
 
