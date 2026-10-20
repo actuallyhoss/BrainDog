@@ -29,7 +29,6 @@
   import ScopeMove from '../[seq]/ScopeMove.svelte';
   import type { Names } from '$lib/record/remote.ts';
   import type { Entry, FieldDecl, RegisterDecl } from '$lib/record/schema.ts';
-  import IdentityMark from '$lib/ui/IdentityMark.svelte';
   import Chip from '$lib/ui/Chip.svelte';
   import Icon from '$lib/ui/Icon.svelte';
   import DayBox from '$lib/ui/DayBox.svelte';
@@ -39,7 +38,9 @@
   import ScopeChip from '$lib/ui/ScopeChip.svelte';
   import Face from '$lib/ui/Face.svelte';
   import { ofPeople } from '$lib/ui/RowCards.svelte';
-  import { boxOf, deadlineOf, dueOf, standOf, withoutGood, withoutZeros, type Receipt } from './list.ts';
+  import StatusDot from '$lib/ui/StatusDot.svelte';
+  import { rowIn, rowOut, settle } from '$lib/ui/motion.ts';
+  import { boxOf, deadlineOf, dotOf, dueOf, withoutGood, withoutZeros, type Receipt } from './list.ts';
 
   let {
     register,
@@ -69,6 +70,7 @@
     listCurrency,
     receiptFor,
     toggleSelect,
+    selectAll,
     openEditor,
     commitEdit,
     cancelEdit,
@@ -113,6 +115,8 @@
     listCurrency: (field: string) => string | null;
     receiptFor: (seq: number) => Receipt | undefined;
     toggleSelect: (seq: number, extend: boolean) => void;
+    /** Pick every row on screen, or none: the box over the column of pickers. */
+    selectAll?: ((on: boolean) => void) | undefined;
     openEditor: (seq: number, field: string) => void;
     commitEdit: () => void;
     /** Escape in a cell: the editor closes, and the blur that follows is not a commit. */
@@ -138,7 +142,11 @@
    */
   const dated = $derived(deadlineOf(decl));
   const toned = $derived(columns.map((c) => ({ ...c, tone: c.field === dated })));
-  const calm = $derived(withoutGood(rows));
+  /* A ROW THIS PERSON HAS JUST ADDED WEARS THE ARRIVAL WASH, as a row that landed from elsewhere does: the neutral
+     `--arrived`, fading over 1.5s (motion F7.1). */
+  const calm = $derived(withoutGood(rows).map((r) => (fresh.has(Number(r.key.split('#')[1])) && !r.arrived ? { ...r, arrived: true } : r)));
+  /* EVERY ROW ON SCREEN IS PICKED, which the select-all box says, and some, which it says as a dash. */
+  const allPicked = $derived(rows.length > 0 && rows.every((r) => selected.has(Number(r.key.split('#')[1]))));
   /* A LIST OF PEOPLE, whose titles each wear a face rather than a project's mark (`RowCards`' `ofPeople`). */
   const faced = $derived(ofPeople(decl));
 
@@ -224,13 +232,24 @@
   {#snippet enumSaid(row: TableRow, field: string, value: string)}
     {#if field === decl.state}
       {@const stored = String(rowAt(Number(row.key.split('#')[1]))?.fields[field] ?? '')}
-      <span class="state" data-stand={standOf(decl, stored, row.tone === 'bad')}><span class="state-dot" aria-hidden="true"></span><span class="enum">{copy.valueWord(value)}</span></span>
+      <span class="state" data-stand={dotOf(decl, stored)}><StatusDot state={dotOf(decl, stored)} /><span class="enum">{copy.valueWord(value)}</span></span>
     {:else}<span class="enum">{copy.valueWord(value)}</span>{/if}
   {/snippet}
   <!-- ANY OTHER VALUE: an amount as the column draws it, and a late row's deadline with how late it is before the day. -->
   {#snippet plainSaid(row: TableRow, field: string, value: string)}
     {@const late = lateSaid(row, field)}
-    {#if late}<span class="late-word">{late}</span><span class="late-sep" aria-hidden="true">{' · '}</span>{/if}{figureCell(field, value)}
+    {#if late}<span class="late-dot"><StatusDot state="late" /></span><span class="late-word">{late}</span><span class="late-sep" aria-hidden="true">{' · '}</span>{/if}{figureCell(field, value)}
+  {/snippet}
+  <!-- THE SELECT-ALL BOX over the column of pickers: every row on screen, or none. A dash when some are picked. -->
+  {#snippet selectHead()}
+    <button
+      type="button"
+      class="pick pick-all tap"
+      data-on={allPicked ? '' : selected.size > 0 ? 'some' : undefined}
+      aria-label={allPicked ? copy.deselect : copy.select}
+      aria-pressed={allPicked ? 'true' : selected.size > 0 ? 'mixed' : 'false'}
+      onclick={() => selectAll?.(!allPicked)}
+    >{#if allPicked}<Icon name="check" size="s" />{:else if selected.size > 0}<span class="pick-some" aria-hidden="true"></span>{/if}</button>
   {/snippet}
   <!-- ONE ROW HAS NOTHING TO SORT. `onsort` is optional and the table draws a plain label
        without it, so eight header buttons over a single row, each announcing
@@ -249,13 +268,34 @@
     bind:focus
     {onactivate}
     {onsort}
+    rowin={rowIn}
+    rowout={rowOut}
+    {settle}
+    headCells={pickable ? { select: selectHead } : undefined}
   >
     {#snippet cellSnippet(row, column, value)}
       {@const seq = Number(row.key.split('#')[1])}
       {@const ident = identityOf(register, column.field, rowAt(seq)?.fields[column.field], names)}
       {@const isTitle = column.field === decl.title}
       {@const isEnum = fieldOf(column.field)?.type === 'enum'}
-      {#if column.field === 'seq'}
+      {#if column.field === 'select'}
+        <!-- THE PICKER, LEADING THE ROW: a 16px box, ticked in the button red. It is `tabindex="-1"`, since a grid has one
+             tab stop; the keyboard path is `x`, which the `?` sheet advertises. `mousedown` keeps focus where it is. -->
+        {@const name = display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? copy.thisRow}
+        <button
+          type="button"
+          class="pick tap"
+          tabindex="-1"
+          data-on={selected.has(seq) ? '' : undefined}
+          aria-label="{selected.has(seq) ? copy.deselect : copy.select} {name}"
+          aria-pressed={selected.has(seq) ? 'true' : 'false'}
+          onmousedown={(e) => e.preventDefault()}
+          onclick={(e) => {
+            /* The cell activates the row. Without this, picking one opened it. */
+            e.stopPropagation();
+            toggleSelect(seq, e.shiftKey);
+          }}>{#if selected.has(seq)}<Icon name="check" size="s" />{/if}</button>
+      {:else if column.field === 'seq'}
         <!-- EVERY ROW HERE HAS A NUMBER THE RECORD GAVE IT, and it is drawn as the number under the
              column's name, with no "#" in front: the cell's text is `toRows`' spoken
              form, which is for a sentence and not for a column headed Number.
@@ -412,7 +452,7 @@
         {@const said = receiptFor(seq)}
         {@const name = display(register, decl.title, rowAt(seq)?.fields[decl.title]) ?? copy.thisRow}
         {#if said}
-          <span class="said">
+          <span class="said" data-archived={said.mark === copy.markArchived ? '' : undefined}>
             <Chip label={said.short ?? said.mark} tone={said.intent} />
             {#if said.undo}
               <!-- IT REFUSES FOCUS ON MOUSEDOWN, which is the third of the three rules and the one that
@@ -436,22 +476,6 @@
           </span>
         {:else}
           <span class="verbs">
-            <!-- THE PICKER, AMONG THE ROW'S OWN VERBS. It led the row in a column of its own, which nothing is drawn in
-                 until a pointer arrives, so every title started 30px in from the search box and the heads above it. A
-                 grid is a composite widget with exactly one tab stop, so it is `tabindex="-1"` like the verbs beside it:
-                 the keyboard path is `x`, which the `?` sheet advertises, and the pointer path is this. -->
-            {#if pickable}<button
-              type="button"
-              class="pick tap"
-              tabindex="-1"
-              data-on={selected.has(seq) ? '' : undefined}
-              aria-label="{selected.has(seq) ? copy.deselect : copy.select} {name}"
-              onmousedown={(e) => e.preventDefault()}
-              onclick={(e) => {
-                /* The cell activates the row. Without this, picking one opened it. */
-                e.stopPropagation();
-                toggleSelect(seq, e.shiftKey);
-              }}>{#if selected.has(seq)}<Icon name="check" size="s" />{/if}</button>{/if}
             {#if archive}<button
               type="button"
               class="verb icon tap"
@@ -494,7 +518,9 @@
           <ScopeChip scope={place} />
         {/if}
       {:else if ident}
-        <IdentityMark identity={ident} />
+        <!-- A PROJECT IS ITS 8px SLOT DOT AND ITS NAME (2.A.12), as where a row applies reads: the lettered well in every
+             row was a column of badges. A retired one is the quiet ink. -->
+        <span class="ident" data-retired={ident.retired ? '' : undefined}><ScopeChip scope={{ spoken: ident.name, name: ident.name, mark: ident.mark, hue: ident.hue }} /></span>
       {:else if value === null}
         <!-- AN EMPTY CELL DRAWS NOTHING. A dash in every gap was a column of marks that meant
              nothing; only a title says so, because a row with no name needs words to be found. -->
@@ -589,9 +615,8 @@
   }
 
   /**
-   * WHERE A ROW STANDS, AS A SMALL DOT BEFORE ITS STATE'S WORD (DIRECTION 39): the working accent while it is still to
-   * do, grey once finished, and red for a late row. The word carries which state; the dot is the quick look down a
-   * column, and never fills the row.
+   * WHERE A ROW STANDS, AS ITS STATE'S DOT BEFORE ITS WORD (`StatusDot`): a ring while it is open, half filled when part
+   * of it is done, slate once finished. Never red: a late row says so on its date, in words, with the one red dot.
    */
   .state {
     display: inline-flex;
@@ -600,24 +625,14 @@
     min-inline-size: 0;
   }
 
-  .state-dot {
-    flex: none;
-    inline-size: 8px;
-    block-size: 8px;
-    background: var(--status-working);
-    border-radius: var(--r-round);
-  }
-
-  .state[data-stand='done'] .state-dot {
-    background: var(--status-done);
-  }
-
-  .state[data-stand='late'] .state-dot {
-    background: var(--status-late);
-  }
-
   .state[data-stand='done'] {
-    color: var(--ink2);
+    color: var(--ink-2);
+  }
+
+  .late-dot {
+    display: inline-flex;
+    margin-inline-end: var(--sp-2);
+    vertical-align: middle;
   }
 
   /* THE FACE SITS ON THE TITLE'S LINE, in the middle of it, with the gap a mark keeps before the words. Its disc is one
@@ -695,6 +710,10 @@
     color: var(--ink);
     font-size: inherit;
     font-weight: inherit;
+  }
+
+  .ident[data-retired] :global(.scope-chip) {
+    color: var(--ink-3);
   }
 
   /* WHERE THE CHIP MOVES THE ROW IT IS A BUTTON, a rectangle at the control's radius round the same words, with the
@@ -875,41 +894,16 @@
   }
 
   /**
-   * THE ROW THAT JUST ARRIVED, MARKED FOR A MOMENT.
-   *
-   * A DOT AT THE HEAD OF THE TITLE AND NOT A WASH OVER THE ROW. A tinted row competes with the row's own tone, which
-   * is the declared deadline state and means something; this is a dot in the info ink, never the brand's red,
-   * before the title where no tone is drawn, so the two cannot be confused. It fades rather than blinks: the point is to be findable for
-   * the second somebody's eye takes to arrive, not to demand attention it has already got.
-   *
-   * IT ANIMATES ONCE BECAUSE IT IS MOUNTED ONCE. The page clears `fresh` in `$effect.pre`, before the list
-   * redraws, so the element exists for one continuous stretch rather than being rebuilt mid-animation, which is
-   * the failure the map's own comment records.
+   * THE ROW THAT JUST ARRIVED IS FOUND BY THIS MARK (`showRow` on the page) AND SEEN BY ITS WASH. The red dot that stood
+   * before its title went: a new row wears the neutral `--arrived` wash for a second and a half (`data-arrived`), which
+   * says "this one" without a colour that means late.
    */
   .fresh {
-    display: inline-block;
-    inline-size: var(--dot);
-    block-size: var(--dot);
-    margin-inline-end: var(--sp-2);
-    background: var(--action);
-    border-radius: var(--r-round);
-    vertical-align: middle;
-    animation: fresh-in var(--d-enter) var(--ease-out);
-  }
-
-  @keyframes fresh-in {
-    from {
-      opacity: 0;
-      transform: scaleY(0.4);
-    }
-  }
-
-  /* UNDER `prefers-reduced-motion` THE MARK STAYS AND THE MOVEMENT GOES. It is the thing that says which row is
-     new, so deleting it would take the answer with the animation. */
-  @media (prefers-reduced-motion: reduce) {
-    .fresh {
-      animation: none;
-    }
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   /* THE VERBS ARE QUIET UNTIL THE ROW IS. A column of controls at full contrast on every row of a
@@ -983,29 +977,76 @@
     }
   }
 
-  /* The pointer's way in. It is `tabindex="-1"`, since a grid has one tab stop, so it never takes focus
-     and never needs a focus ring; the keyboard path is `x`, which the `?` sheet advertises. */
-  .pick {
+  /**
+   * THE PICKER: a 16px box, radius 4, its edge 1.5px of the second ink, ticked in the button red with a white check
+   * (money F7). It leads the row in its own 32px column and takes the hover wash under the pointer (motion F19).
+   */
+  .table-slot :global(:is(.td, .th):has(> .pick)) {
     display: grid;
     place-items: center;
-    inline-size: 18px;
-    block-size: 18px;
+    padding-inline: 0;
+  }
+
+  .pick {
+    position: relative;
+    display: grid;
+    place-items: center;
+    inline-size: 16px;
+    block-size: 16px;
     padding: 0;
     background: none;
-    border: 1.5px solid var(--edge);
-    border-radius: 5px;
-    color: var(--on-ink);
+    border: 1.5px solid var(--ink-2);
+    border-radius: var(--r-xs);
+    color: var(--on-red);
     cursor: pointer;
     transition:
       background var(--d-state) var(--ease-out),
-      border-color var(--d-state) var(--ease-out);
+      border-color var(--d-state) var(--ease-out),
+      opacity var(--d-state) var(--ease-out);
   }
 
-  /* A PICKED ROW'S BOX IS THE ACCENT, which is what selection looks like (DIRECTION 39). */
+  .pick :global(svg) {
+    inline-size: 12px;
+    block-size: 12px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .pick:hover {
+      background: var(--hover);
+    }
+  }
+
   .pick[data-on] {
-    background: var(--action);
-    border-color: var(--action);
-    color: var(--on-action);
+    background: var(--red-fill);
+    border-color: var(--red-fill);
+  }
+
+  .pick-some {
+    inline-size: 8px;
+    block-size: 2px;
+    border-radius: 1px;
+    background: currentColor;
+  }
+
+  /* UNDER A MOUSE THE BOX WAITS FOR ITS ROW, and once one is ticked every box stays, the header's too. A thumb has no
+     hover, so a touch screen keeps them drawn. */
+  @media (hover: hover) and (pointer: fine) {
+    .table-slot:not([data-picking]) :global(.tr:not(:hover, :focus-within) .pick:not(:focus-visible)) {
+      opacity: 0;
+    }
+  }
+
+  /**
+   * AN ARCHIVED ROW DIMS, AND ITS RECEIPT DOES NOT (motion F7.2): the cells go to 0.45 over `--d-swap` while "Archived"
+   * and "Put back" stay at full ink, so the press visibly did something. The page takes the row away when its undo runs
+   * out, and it leaves with `rowOut`.
+   */
+  .table-slot :global(.tr:has(.said[data-archived]) > .td:not(:last-child)) {
+    opacity: 0.45;
+  }
+
+  .table-slot :global(.rowgroup .tr > .td) {
+    transition: opacity var(--d-swap) var(--ease-standard);
   }
 
   @media (width < 640px) {
