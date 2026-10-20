@@ -148,9 +148,9 @@
     --ph-tint: var(--cat-sky-tint, var(--s1));
   }
 
-  .face[data-slot='gold'] {
-    --ph: var(--cat-gold, var(--ink));
-    --ph-tint: var(--cat-gold-tint, var(--s1));
+  .face[data-slot='yellow'] {
+    --ph: var(--cat-yellow, var(--ink));
+    --ph-tint: var(--cat-yellow-tint, var(--s1));
   }
 
   .face[data-slot='lime'] {

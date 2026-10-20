@@ -173,9 +173,9 @@
     --ph-tint: var(--cat-sky-tint, var(--field));
   }
 
-  .well[data-slot='gold'] {
-    --ph: var(--cat-gold, var(--warn));
-    --ph-tint: var(--cat-gold-tint, var(--field));
+  .well[data-slot='yellow'] {
+    --ph: var(--cat-yellow, var(--warn));
+    --ph-tint: var(--cat-yellow-tint, var(--field));
   }
 
   .well[data-slot='lime'] {

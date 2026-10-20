@@ -145,8 +145,8 @@
     --ph: var(--cat-sky, var(--info));
   }
 
-  .scope-dot[data-slot='gold'] {
-    --ph: var(--cat-gold, var(--warn));
+  .scope-dot[data-slot='yellow'] {
+    --ph: var(--cat-yellow, var(--warn));
   }
 
   .scope-dot[data-slot='lime'] {

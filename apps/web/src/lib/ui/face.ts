@@ -81,7 +81,7 @@ export { hueFor };
  * and `--cat-<slot>-tint` (the soft fill: a well, a disc), solved to clear 4.5:1 on the tile and on each other in light
  * and in dark. No slot is red or orange, so nothing in a category reads as late or as the accent.
  */
-export type Slot = 'blue' | 'violet' | 'pink' | 'teal' | 'sky' | 'gold' | 'lime' | 'slate';
+export type Slot = 'blue' | 'violet' | 'pink' | 'teal' | 'sky' | 'yellow' | 'lime' | 'slate';
 
 /**
  * Where each slot sits on the OKLCH wheel, measured from its light colour. `slate` is not on it: it is the neutral, the
@@ -93,7 +93,7 @@ export const SLOT_HUES: Readonly<Record<Exclude<Slot, 'slate'>, number>> = {
   pink: 352,
   teal: 185,
   sky: 233,
-  gold: 90,
+  yellow: 90,
   lime: 133,
 };
 

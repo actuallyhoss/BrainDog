@@ -42,7 +42,7 @@ test('a hue snaps to the nearest category slot round the wheel', () => {
   assert.equal(slotOf(176), 'teal');
   assert.equal(slotOf(5), 'pink');
   assert.equal(slotOf(-8), 'pink');
-  assert.equal(slotOf(720 + 90), 'gold');
+  assert.equal(slotOf(720 + 90), 'yellow');
 });
 
 test('no hue is the neutral slot, never a colour', () => {
