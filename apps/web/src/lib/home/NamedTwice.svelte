@@ -16,13 +16,14 @@
 <script lang="ts">
   import { apiBase, at } from '$lib/at.ts';
   import Button from '$lib/ui/Button.svelte';
-  import { askSameAt, type NamedTile } from './named-twice.ts';
+  import { askSameAt, PEOPLE_TWICE_HREF, peopleTwiceSaid, type NamedTile } from './named-twice.ts';
 
   let { found }: { found: NamedTile } = $props();
 
   const words = {
     ask: 'Ask me in Needs you',
     on: 'In Needs you',
+    show: 'Show them',
   } as const;
 
   /* WHAT EACH PRESS ANSWERED, by the pair's handle: the question it filed, or the record's sentence for why not. */
@@ -45,31 +46,40 @@
   }
 </script>
 
-{#if found.lines.length > 0}
+{#if found.lines.length > 0 || found.people > 0}
   <section class="named" aria-labelledby="named-h" data-named-twice>
     <h2 class="n-head" id="named-h">{found.heading}</h2>
-    <ul class="n-list">
-      {#each found.lines as line (line.pair)}
-        {@const question = asked[line.pair]}
-        <li class="n-row">
-          <div class="n-main">
-            <div class="n-text">
-              <p class="n-line" dir="auto">{line.text}</p>
-              {#if line.why}<p class="n-why" dir="auto">{line.why}</p>{/if}
+    {#if found.lines.length > 0}
+      <ul class="n-list">
+        {#each found.lines as line (line.pair)}
+          {@const question = asked[line.pair]}
+          <li class="n-row">
+            <div class="n-main">
+              <div class="n-text">
+                <p class="n-line" dir="auto">{line.text}</p>
+                {#if line.why}<p class="n-why" dir="auto">{line.why}</p>{/if}
+              </div>
+              {#if question}
+                <a class="n-on tap" href={at(`/decide/${encodeURIComponent(question)}`)} data-named-on>{words.on}</a>
+              {:else if line.can}
+                <Button size="sm" aria-label="{words.ask}: {line.text}" disabled={busy !== null} aria-busy={busy === line.pair} data-named-ask onclick={() => void ask(line.pair)}>
+                  {words.ask}
+                </Button>
+              {/if}
             </div>
-            {#if question}
-              <a class="n-on tap" href={at(`/decide/${encodeURIComponent(question)}`)} data-named-on>{words.on}</a>
-            {:else if line.can}
-              <Button size="sm" aria-label="{words.ask}: {line.text}" disabled={busy !== null} aria-busy={busy === line.pair} data-named-ask onclick={() => void ask(line.pair)}>
-                {words.ask}
-              </Button>
-            {/if}
-          </div>
-          {#if refused[line.pair]}<p class="n-no" role="status" dir="auto">{refused[line.pair]}</p>{/if}
-        </li>
-      {/each}
-    </ul>
+            {#if refused[line.pair]}<p class="n-no" role="status" dir="auto">{refused[line.pair]}</p>{/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
     {#if found.more}<p class="n-more">{found.more[0]!.toUpperCase() + found.more.slice(1)}.</p>{/if}
+    <!-- PEOPLE LISTED TWICE: the kernel's count, with the way to the People list narrowed to them. The fold is asked there. -->
+    {#if found.people > 0}
+      <div class="n-people" data-named-people>
+        <p class="n-line" dir="auto">{peopleTwiceSaid(found.people)}</p>
+        <a class="n-on tap" href={at(PEOPLE_TWICE_HREF)}>{words.show}</a>
+      </div>
+    {/if}
   </section>
 {/if}
 
@@ -90,6 +100,16 @@
     font-size: var(--t-base);
     font-weight: 500;
     line-height: 1.4;
+  }
+
+  .n-people {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2) var(--sp-3);
+    margin-block-start: var(--sp-3);
+    min-inline-size: 0;
   }
 
   .n-list {

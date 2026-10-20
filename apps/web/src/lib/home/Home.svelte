@@ -671,7 +671,7 @@
     /* AND THEN WHAT MAY BE ONE, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./named-twice.ts'), import('./NamedTwice.svelte')]).then(async ([m, part]) => {
       const found = await tileOnce('named', base, ver, () => m.loadNamedTwice(base, io));
-      if (here) named = found && found.lines.length > 0 ? { found, Part: part.default } : null;
+      if (here) named = found && (found.lines.length > 0 || found.people > 0) ? { found, Part: part.default } : null;
     }, () => undefined));
     /* AND WHAT HAS NO COLOUR OF ITS OWN, out of the bracket the same way. */
     tiles.push(() => Promise.all([import('./hues.ts'), import('./Hues.svelte')]).then(async ([m, part]) => {

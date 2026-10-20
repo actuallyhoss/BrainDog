@@ -3,7 +3,8 @@
  * screen: two of his things that may be one, by name, with the record's own reason under them, and one press that puts
  * the pair to him on Decide as one question (D38.56). Its yes folds the pair with one Undo; nothing here folds.
  *
- * THROUGH THE RECORD'S OWN `namedTwice` AND NOTHING ELSE. The record says each pair (`{ pair, kind, how, a, b,
+ * THROUGH THE RECORD'S OWN `namedTwice` AND `heldTwice` AND NOTHING ELSE. (`heldTwice` over the people list says how many
+ * people the kernel holds twice, the pairs a merge question waits on among them, as one line under the pairs.) The record says each pair (`{ pair, kind, how, a, b,
  * evidence, score, can }`); this file only keeps what a person can read. `kind`, `how` and `score` are the record's and
  * are never drawn, and a pair with no handle, or a side with no name or a name that is a raw id (a ULID), is dropped.
  *
@@ -20,6 +21,7 @@ import { createClient } from '@braindog/client';
 
 import { copy } from '../copy.ts';
 import type { Fetch } from '../record/boot-live.ts';
+import { PEOPLE } from '../who.ts';
 
 /** How many pairs the tile lists. The rest are counted in one line under them. */
 export const NAMED_SHOWN = 3;
@@ -47,8 +49,17 @@ export type NamedPair = {
 /** One line of the tile: the pair's handle, the two names, the reason under them, and whether he can be asked. */
 export type NamedLine = { pair: string; text: string; why: string; can: boolean };
 
-/** What the tile draws: its heading, at most three lines, and the count of the rest ("and 2 more", or empty). */
-export type NamedTile = { heading: string; lines: NamedLine[]; more: string };
+/**
+ * What the tile draws: its heading, at most three lines, the count of the rest ("and 2 more", or empty), and the people
+ * the record holds twice (`people`: how many entries of its people list are one of a pair, 0 for none).
+ */
+export type NamedTile = { heading: string; lines: NamedLine[]; more: string; people: number };
+
+/** The people line: how many are held twice, said as the People list says it. Empty at nought. */
+export const peopleTwiceSaid = (n: number): string => (n <= 0 ? '' : `${n === 1 ? 'One person' : `${String(n)} people`} may be on this record twice`);
+
+/** Where those people are, narrowed to them: the People list with `twice=1`. */
+export const PEOPLE_TWICE_HREF = `/r/${PEOPLE}?twice=1`;
 
 /** How the screen asks the record: a client's `call`, or anything shaped like it. */
 export type Call = (name: string, args: Record<string, unknown>) => Promise<unknown>;
@@ -100,17 +111,40 @@ export function namedOf(answer: unknown): NamedPair[] | null {
  * The tile: the heading, the first three pairs as "<a> and <b>" with the record's reason, and "and N more" for the
  * rest. `null` at nought, which draws nothing.
  */
-export function namedTile(pairs: readonly NamedPair[] | null): NamedTile | null {
-  if (!pairs || pairs.length === 0) return null;
+export function namedTile(pairs: readonly NamedPair[] | null, people = 0): NamedTile | null {
+  if (!pairs || pairs.length === 0) return people > 0 ? { heading: NAMED_HEADING, lines: [], more: '', people } : null;
   const lines = pairs.slice(0, NAMED_SHOWN).map((p) => ({ pair: p.pair, text: `${p.a.name} and ${p.b.name}`, why: p.reading === '' ? p.evidence : `${p.reading} ${p.evidence}`, can: p.can }));
   const rest = pairs.length - lines.length;
-  return { heading: NAMED_HEADING, lines, more: rest > 0 ? `and ${String(rest)} more` : '' };
+  return { heading: NAMED_HEADING, lines, more: rest > 0 ? `and ${String(rest)} more` : '', people };
+}
+
+/**
+ * HOW MANY OF THE PEOPLE THE RECORD HOLDS TWICE, by the record's own `heldTwice` over its people list: the kernel's
+ * count of pairs, which includes the pairs a merge question is waiting on (`peopleTwice`), as the row numbers of the
+ * entries that are one of a pair. Nought for a refusal, a host without the read, a record that keeps no people, and an
+ * answer of another shape.
+ */
+export function peopleOf(answer: unknown): number {
+  const a = answer as { ok?: unknown; value?: unknown } | null | undefined;
+  if (a?.ok !== true || typeof a.value !== 'object' || a.value === null) return 0;
+  const seqs = (a.value as { seqs?: unknown }).seqs;
+  return Array.isArray(seqs) ? new Set(seqs.filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n > 0)).size : 0;
 }
 
 /** Ask the record's `namedTwice`. `null` on a refusal, a method the host does not know, nought, or a call that threw. */
 export async function readNamedTwice(call: Call): Promise<NamedTile | null> {
+  /* THE TWO READS ARE ASKED TOGETHER AND EACH ANSWERS FOR ITSELF: people held twice are shown though organisations and
+     projects are not (or the host has no such read), and the other way about. */
+  const ask = async (name: string, args: Record<string, unknown>): Promise<unknown> => {
+    try {
+      return await call(name, args);
+    } catch {
+      return null;
+    }
+  };
+  const [named, held] = await Promise.all([ask('namedTwice', { limit: NAMED_ASKED }), ask('heldTwice', { register: PEOPLE })]);
   try {
-    return namedTile(namedOf(await call('namedTwice', { limit: NAMED_ASKED })));
+    return namedTile(namedOf(named), peopleOf(held));
   } catch {
     return null;
   }

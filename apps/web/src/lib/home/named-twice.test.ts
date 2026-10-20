@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import { copy } from '../copy.ts';
-import { NAMED_ASKED, NAMED_HEADING, NAMED_SHOWN, askSame, askSameAt, loadNamedTwice, namedOf, namedTile, readNamedTwice } from './named-twice.ts';
+import { NAMED_ASKED, NAMED_HEADING, NAMED_SHOWN, PEOPLE_TWICE_HREF, askSame, askSameAt, loadNamedTwice, namedOf, namedTile, peopleOf, peopleTwiceSaid, readNamedTwice } from './named-twice.ts';
 
 const ULID = '01J9Z3K4M5N6P7Q8R9S0T1V2W3';
 const side = (name: unknown, seq: unknown = 4) => ({ name, register: 'Studios', seq });
@@ -38,6 +38,7 @@ test('A PAIR IS SAID BY ITS TWO NAMES WITH THE RECORD\'S REASON UNDER THEM, and 
     heading: 'May be one',
     lines: [{ pair: 'p-marrow', text: 'Marrow Press and Marrow Press Ltd', why: 'Both are called Marrow Press.', can: true }],
     more: '',
+    people: 0,
   });
   assert.equal(tile?.heading, NAMED_HEADING);
 });
@@ -98,7 +99,10 @@ test('NOUGHT AND A REFUSAL DRAW NOTHING: ROUTE_UNKNOWN, NOT_IN_THIS_BUILD, a ref
     asked.push([name, args]);
     return answer([MARROW]);
   });
-  assert.deepEqual(asked, [['namedTwice', { limit: NAMED_ASKED }]]);
+  assert.deepEqual(asked, [
+    ['namedTwice', { limit: NAMED_ASKED }],
+    ['heldTwice', { register: 'people' }],
+  ]);
   assert.equal(NAMED_ASKED, 10);
   assert.equal(got?.lines.length, 1);
 });
@@ -161,7 +165,53 @@ test('HOME REACHES THE TILE BY A DYNAMIC IMPORT ONLY, and draws it once, last, a
   }
   assert.match(home, /import\('\.\/named-twice\.ts'\)/u);
   assert.match(home, /import\('\.\/NamedTwice\.svelte'\)/u);
-  assert.match(home, /const found = await tileOnce\('named', base, ver, \(\) => m\.loadNamedTwice\(base, io\)\);\s*if \(here\) named = found && found\.lines\.length > 0 \? \{ found, Part: part\.default \} : null;/u);
+  assert.match(home, /const found = await tileOnce\('named', base, ver, \(\) => m\.loadNamedTwice\(base, io\)\);\s*if \(here\) named = found && \(found\.lines\.length > 0 \|\| found\.people > 0\) \? \{ found, Part: part\.default \} : null;/u);
   assert.equal(home.split('<named.Part').length - 1, 1, 'the tile is drawn once');
   assert.ok(home.indexOf('<named.Part') > home.indexOf('<learned.Part'), 'it comes after what the answers taught');
+});
+
+/* ── people listed twice ──────────────────────────────────────────────────── */
+
+/** The record's `heldTwice` over its people: the numbers of the entries that are one of a pair. */
+const held = (seqs: unknown) => ({ ok: true as const, value: { seqs } });
+/** A call that answers each read by its name. */
+const reads = (named: unknown, heldTwice: unknown) => async (name: string) => (name === 'namedTwice' ? named : heldTwice);
+
+test('PEOPLE LISTED TWICE ARE COUNTED FROM THE KERNEL\'S OWN ROWS, each entry once, and nothing else counts', () => {
+  assert.equal(peopleOf(held([3, 9, 12, 14])), 4);
+  assert.equal(peopleOf(held([3, 3, 9])), 2);
+  assert.equal(peopleOf(held([])), 0);
+  assert.equal(peopleOf(held([0, -1, 2.5, 'a', 7])), 1);
+  assert.equal(peopleOf(held('many')), 0);
+  assert.equal(peopleOf({ ok: true, value: null }), 0);
+  assert.equal(peopleOf({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No.' } }), 0);
+  assert.equal(peopleOf(null), 0);
+});
+
+test('PEOPLE ARE SAID IN THE PEOPLE LIST\'S OWN WORDS, and the way to them is that list narrowed to them', () => {
+  assert.equal(peopleTwiceSaid(4), '4 people may be on this record twice');
+  assert.equal(peopleTwiceSaid(1), 'One person may be on this record twice');
+  assert.equal(peopleTwiceSaid(0), '');
+  assert.equal(PEOPLE_TWICE_HREF, '/r/people?twice=1');
+});
+
+test('A TILE OF PEOPLE ALONE IS DRAWN: no organisation or project pair is needed, and no people is still nothing', () => {
+  assert.deepEqual(namedTile(null, 4), { heading: 'May be one', lines: [], more: '', people: 4 });
+  assert.deepEqual(namedTile(namedOf(answer([])), 2), { heading: 'May be one', lines: [], more: '', people: 2 });
+  assert.equal(namedTile(namedOf(answer([])), 0), null);
+  assert.equal(namedTile(namedOf(answer([MARROW])), 3)?.people, 3);
+});
+
+test('THE READ ASKS FOR THE PEOPLE BESIDE THE PAIRS, and each answers for itself', async () => {
+  const both = await readNamedTwice(reads(answer([MARROW]), held([3, 9])));
+  assert.equal(both?.lines.length, 1);
+  assert.equal(both?.people, 2);
+  /* A host that has no `namedTwice` still tells of its people, and one without `heldTwice` still tells of its pairs. */
+  assert.deepEqual(await readNamedTwice(reads({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: 'No.' } }, held([3, 9]))), { heading: 'May be one', lines: [], more: '', people: 2 });
+  assert.equal((await readNamedTwice(reads(answer([MARROW]), { ok: false, refusal: { code: 'NOT_IN_THIS_BUILD', fix: 'No.' } })))?.people, 0);
+  assert.equal(await readNamedTwice(reads(answer([]), held([]))), null);
+  assert.equal(await readNamedTwice(async () => Promise.reject(new Error('offline'))), null);
+  /* A READ THAT THROWS BEFORE IT ANSWERS IS NOT THE OTHER'S FAULT. */
+  const people = await readNamedTwice((name) => (name === 'namedTwice' ? Promise.reject(new Error('offline')) : Promise.resolve(held([5, 6]))));
+  assert.equal(people?.people, 2);
 });
