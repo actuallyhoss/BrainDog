@@ -7,6 +7,7 @@
  */
 
 import { briefFromNote } from './brief.ts';
+import { actor, humanize } from './names.ts';
 
 /** What of a list's declaration decides its part; the record says all of it, so no list is named here. */
 export type Decl = {
@@ -107,6 +108,16 @@ type Pointing = { block: Pointed | null; name?: string | undefined; rows: readon
 
 const said = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
+/* A HANDLE, NOT A NAME: lowercase, one word or words joined by hyphens, underscores or dots, as a key or a tool is filed. */
+const HANDLE = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/u;
+
+/**
+ * THE NAME A THING IT RUNS ON IS SAID BY: its own words, and where they are a handle ("sketchpad-metrics") the same words
+ * spaced and capitalised ("Sketchpad metrics"), so no key or tool is drawn in the record's own spelling (the audit of
+ * 20 October: five raw key handles on his Sketchpad). Words a person wrote with a capital or a space stay as written.
+ */
+export const thingName = (title: string): string => (HANDLE.test(title) ? humanize(title) : title);
+
 /** The rows of the lists a block draws, as names. The title is the first cell; a detail is the second only. */
 export function rowsOf(block: Pointed, groups: readonly Pointing[]): DataRow[] {
   const out: DataRow[] = [];
@@ -116,7 +127,7 @@ export function rowsOf(block: Pointed, groups: readonly Pointing[]): DataRow[] {
       const title = said(r.cells[0]);
       if (title === '') continue;
       /* BY NAME ONLY on what a project runs on: the detail of a key or a tool could be where it is kept. */
-      const row: DataRow = { key: `${block}#${r.key}`, title, detail: block === 'runs-on' ? '' : said(r.cells[1]), href: r.href ?? null };
+      const row: DataRow = { key: `${block}#${r.key}`, title: block === 'runs-on' ? thingName(title) : title, detail: block === 'runs-on' ? '' : said(r.cells[1]), href: r.href ?? null };
       /* THE KIND IS THE SOURCE LIST'S OWN NAME, as its declaration says it, so what it runs on can be grouped without naming a list. */
       if (block === 'runs-on' && g.name) row.kind = g.name;
       out.push(row);
@@ -181,11 +192,28 @@ export function briefOf(fields: Readonly<Record<string, unknown>>, changes: read
     .slice(0, 2);
 }
 
-export type Working = { agent: string; project: string | null; doing: string | null };
+export type Working = { agent: string; project: string | null; doing: string | null; seq?: number | null | undefined; quiet?: boolean | undefined };
+
+/**
+ * One agent at work on the project, as the line under Who is working draws it: its maker's mark from `agent`, the name a
+ * person reads ("Claude", never the handle `claude`), the run its face opens, and whether it has gone quiet.
+ */
+export type AtWork = Working & { key: string; name: string; run: string; live: 'working' | 'quiet' };
 
 /** The agents on this project, working now first, then the runs the record holds for it. */
-export function agentsOf(name: string, working: readonly Working[], runs: readonly DataRow[]): { now: Working[]; runs: DataRow[] } {
-  return { now: name === '' ? [] : working.filter((w) => w.project === name), runs: [...runs] };
+export function agentsOf(name: string, working: readonly Working[], runs: readonly DataRow[]): { now: AtWork[]; runs: DataRow[] } {
+  const now = name === '' ? [] : working.filter((w) => w.project === name);
+  return {
+    now: now.map((w, i) => ({
+      ...w,
+      key: typeof w.seq === 'number' ? `S${w.seq}` : `w${i}`,
+      name: actor(w.agent).name,
+      run: typeof w.seq === 'number' ? `S${w.seq}` : '',
+      live: w.quiet ? 'quiet' : 'working',
+      doing: said(w.doing) || null,
+    })),
+    runs: [...runs],
+  };
 }
 
 export type Facts = {
@@ -193,7 +221,7 @@ export type Facts = {
   next: string | null;
   money: readonly MoneyLine[];
   people: readonly DataRow[];
-  agents: { now: readonly Working[]; runs: readonly DataRow[] };
+  agents: { now: readonly AtWork[]; runs: readonly DataRow[] };
   runsOn: readonly DataRow[];
 };
 

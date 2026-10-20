@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, repeatOf, rowsOf, runsOnSet, saysNext, withoutRepeats, shapeOf, spans, type Facts } from './project.ts';
+import { agentsOf, blockOf, blocksOf, briefOf, isProject, moneyLines, repeatOf, rowsOf, runsOnSet, saysNext, thingName, withoutRepeats, shapeOf, spans, type Facts } from './project.ts';
 
 const none: Facts = { brief: [], next: null, money: [], people: [], agents: { now: [], runs: [] }, runsOn: [] };
 const row = { key: '1', title: 'Kiln', detail: '', href: null };
@@ -33,6 +33,20 @@ test('AN AGENT WORKING NOW COUNTS AS THE AGENTS BLOCK EVEN WITH NO RUN ROWS', ()
   assert.equal(a.now.length, 1);
   assert.deepEqual(blocksOf({ ...none, agents: a }), ['workers']);
   assert.equal(agentsOf('', [{ agent: 'Claude', project: null, doing: null }], []).now.length, 0);
+});
+
+test('WHO IS WORKING SAYS THE AGENT BY NAME, WITH ITS RUN FOR THE FACE, never the handle ("claude ,")', () => {
+  const [w] = agentsOf('Kiln', [{ agent: 'claude', project: 'Kiln', doing: ' Variable axis QA ', seq: 731, quiet: false }], []).now;
+  assert.deepEqual([w!.name, w!.run, w!.live, w!.doing, w!.key], ['Claude', 'S731', 'working', 'Variable axis QA', 'S731']);
+  assert.equal(agentsOf('Kiln', [{ agent: 'codex', project: 'Kiln', doing: '', quiet: true }], []).now[0]!.doing, null, 'no words, no comma');
+});
+
+test('WHAT IT RUNS ON IS SAID IN WORDS: a handle is spaced and capitalised, a name a person wrote is kept', () => {
+  assert.equal(thingName('sketchpad-metrics'), 'Sketchpad metrics');
+  assert.equal(thingName('google_sa_roomy'), 'Google sa roomy');
+  assert.equal(thingName('Fenwick deploy key'), 'Fenwick deploy key');
+  assert.equal(thingName('supabase SUPABASE_ACCESS_TOKEN'), 'supabase SUPABASE_ACCESS_TOKEN');
+  assert.deepEqual(rowsOf('runs-on', [{ block: 'runs-on', rows: [{ key: '9', cells: ['sketchpad-metrics'] }] }]).map((r) => r.title), ['Sketchpad metrics']);
 });
 
 test('MONEY DRAWS ONLY WHAT IS MORE THAN NOTHING, IN ONE CURRENCY, AS A SHARE OF THE LARGEST', () => {

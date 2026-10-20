@@ -10,6 +10,7 @@
   import { at } from '$lib/at.ts';
   import Tile from '$lib/ui/Tile.svelte';
   import Icon from '$lib/ui/Icon.svelte';
+  import AgentFace from '$lib/ui/AgentFace.svelte';
   import NextStep from '$lib/page/NextStep.svelte';
   import type { IconName } from '$lib/ui/icons.ts';
   import { blocksOf, runsOnSet, spans, type Block, type DataRow, type Facts } from '$lib/record/project.ts';
@@ -97,8 +98,11 @@
         {:else if b === 'crew'}
           <p class="said">{facts.people.map((p) => p.title).join(', ')}</p>
         {:else if b === 'workers'}
-          {#each facts.agents.now as w (w.agent + (w.doing ?? ''))}
-            <p class="said agent"><span class="live" aria-hidden="true"></span>{w.agent}{#if w.doing}<span class="quiet">, {w.doing}</span>{/if}</p>
+          <!-- EACH AGENT BY ITS MAKER'S MARK AND THE NAME A PERSON READS, as Today's Working now draws it ("claude ," was
+               the handle in lower case, and a flex gap set the comma apart: the audit of 20 October). One line of text
+               beside the face, so the comma sits against the name. -->
+          {#each facts.agents.now as w (w.key)}
+            <p class="said agent"><AgentFace agent={w.agent} run={w.run} live={w.live} size="s" /><span class="agent-said"><b>{w.name}</b>{#if w.doing}<span class="quiet">, {w.doing}</span>{/if}</span></p>
           {/each}
           {#if facts.agents.runs.length > 0}<p class="quiet">{facts.agents.runs.length === 1 ? '1 run on it' : `${facts.agents.runs.length} runs on it`}</p>{/if}
         {:else}
@@ -163,12 +167,16 @@
     gap: var(--sp-2);
   }
 
-  .live {
-    flex: none;
-    inline-size: 8px;
-    block-size: 8px;
-    border-radius: 50%;
-    background: var(--ink);
+  .agent-said {
+    min-inline-size: 0;
+  }
+
+  .agent-said b {
+    font-weight: 500;
+  }
+
+  .agent-said .quiet {
+    font-size: inherit;
   }
 
   /* WHAT IT RUNS ON: a small label for each kind, its names wrapped beside it, a few and then "and N more". */

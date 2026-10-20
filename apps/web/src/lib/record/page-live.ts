@@ -49,6 +49,7 @@ import {
 } from './api.ts';
 import { REGISTERS } from './held.ts';
 import { linkOf, REST_MARK, staleOf } from './blocks.ts';
+import { thingName } from './project.ts';
 import { bylineOf } from './byline.ts';
 import { METRICS } from './declared.ts';
 import { readBoot } from './boot-live.ts';
@@ -1543,6 +1544,17 @@ export function blockOf(
       if (c.as !== 'scope') return;
       rows.forEach((row, n) => {
         row.cells[i] = scopes?.[n] ?? EVERYWHERE;
+      });
+    });
+    /* NAMES, NEVER HANDLES, AND NO WIRE (the audit of 20 October, his Sketchpad): a key or a tool filed as
+       `sketchpad-metrics` is said "Sketchpad metrics" (`thingName`, as the project's shape says it), and how a tool is
+       reached, `stdio` or `http`, is how an agent's machine talks to it and nothing a person acts on, so that line is
+       left out and the card draws its other facts. */
+    (b.columns ?? []).forEach((c, i) => {
+      rows.forEach((row, n) => {
+        const cell = row.cells[i];
+        if (c.as === 'title' && c.field === 'name' && typeof cell === 'string') row.cells[i] = thingName(cell);
+        else if (c.field === 'detail' && entries[n]?.fields.kind === 'tool') row.cells[i] = '';
       });
     });
     const scopeCells = scopeCellsOf(b.columns ?? [], rows, scopeMarked);
