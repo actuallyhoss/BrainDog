@@ -342,8 +342,23 @@
     display: contents;
   }
 
-  /* THE OFFER UNDER WHAT EVERY AGENT IS TOLD, one tile gap below it. */
+  /* WHAT EVERY AGENT IS TOLD IS THE PAGE'S LAST TILE, one tile gap under the blocks: the page's end space moves under
+     it, where it stood between the two as 96px of nothing. The offer, when there is one, one tile gap below it. */
+  .read :global(.body-wrap:has(+ .page-offer > [data-lessons]) .page) {
+    padding-block-end: 0;
+  }
+
+  .read :global(.page-offer:has(> [data-lessons])) {
+    padding-block-end: var(--sp-9);
+  }
+
   .read :global([data-lessons] + *) {
     margin-block-start: var(--tile-gap);
+  }
+
+  @media (width < 640px) {
+    .read :global(.page-offer:has(> [data-lessons])) {
+      padding-block-end: var(--sp-8);
+    }
   }
 </style>
