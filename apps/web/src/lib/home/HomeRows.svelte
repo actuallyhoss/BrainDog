@@ -9,7 +9,7 @@
   TICKED IS THE PAGE'S HOLD (`done`, `page-writes.ts` `heldDone`), so a refusal or an Undo takes the tick back, and a
   ticked line the page's next read leaves out stays where it was, done, as a ticked row does in any list.
 
-  COMING UP: each day a 36px chip, the weekday over the date (today's in the accent's tint), and beside it what falls due
+  COMING UP: each day a 44px chip, the weekday over the date (today the word "Today" on ink), and beside it what falls due
   that day, its amount at the right.
 
   No box round a line, no glyph before one: a hairline between lines, and the tile is the surface.
@@ -109,7 +109,7 @@
     {#each days as d (d.day)}
       <li class="hd">
         <span class="hd-chip" data-today={d.today ? '' : undefined} title={d.label}>
-          <span class="hd-week" aria-hidden="true">{d.weekday}</span><span class="hd-date num" aria-hidden="true">{d.date}</span><span class="vh">{d.label}</span>
+          {#if d.today}<span class="hd-today" aria-hidden="true">Today</span>{:else}<span class="hd-week" aria-hidden="true">{d.weekday}</span><span class="hd-date num" aria-hidden="true">{d.date}</span>{/if}<span class="vh">{d.label}</span>
         </span>
         <ul class="hd-lines">
           {#each d.lines as line (line.key)}
@@ -306,7 +306,7 @@
 
   .hd {
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-columns: 44px minmax(0, 1fr);
     column-gap: var(--sp-3);
     align-items: start;
     padding-block: var(--sp-2);
@@ -322,17 +322,24 @@
     display: grid;
     place-content: center;
     justify-items: center;
-    inline-size: 36px;
+    inline-size: 44px;
     block-size: 36px;
-    background: var(--field);
+    background: var(--tile-2);
     border-radius: var(--r-ctl);
     color: var(--ink);
     line-height: 1;
   }
 
+  /* TODAY IS NOT LATE (today F17): the ink chip and the word, and red stays for what is late. */
   .hd-chip[data-today] {
-    background: var(--action-tint-1);
-    color: var(--action-text);
+    background: var(--ink);
+    color: var(--tile);
+  }
+
+  .hd-today {
+    font-size: var(--fs-cap, 12px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   .hd-week {
