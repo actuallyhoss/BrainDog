@@ -62,6 +62,7 @@ import entryMadeIndex0039 from './migrations/0039_entry_made_index.ts';
 import entryPrivate0040 from './migrations/0040_entry_private.ts';
 import entryPrivateTravels0041 from './migrations/0041_entry_private_travels.ts';
 import agents0042 from './migrations/0042_agents.ts';
+import share0043 from './migrations/0043_share.ts';
 
 export type Migration = { version: number; slug: string; sql: string };
 
@@ -109,6 +110,7 @@ export const MIGRATIONS: readonly Migration[] = [
   { version: 40, slug: 'entry_private', sql: entryPrivate0040 },
   { version: 41, slug: 'entry_private_travels', sql: entryPrivateTravels0041 },
   { version: 42, slug: 'agents', sql: agents0042 },
+  { version: 43, slug: 'share', sql: share0043 },
 ];
 
 /**
@@ -169,6 +171,9 @@ export const MIGRATIONS: readonly Migration[] = [
  * Migration 42 adds two rows, the next version of `register.session` with six fields an older file's runs import without
  * and `register.instructions`, which an older file lacks and the import seats; `instruction_seen`, `local`; and
  * `agent_profile` in `governance`, which an older reader skips as a table it has no shape for. So the format is still 1.
+ * Migration 43 adds `share`, `share_group` and `share_group_member` in `governance`, `access_via` in `origin`, and
+ * `token_lens` and `access_seen` in `local`, plus the `access` counter: an older reader skips a table it has no shape
+ * for, so the format is still 1.
  */
 export const FORMAT_VERSION = 1 as const;
 
