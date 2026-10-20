@@ -33,6 +33,11 @@
   /** What Today draws, top to bottom. */
   export type HomePart = 'briefing' | 'page' | 'stale' | 'matched';
 
+  /** Whether Today has been drawn once in this tab: its tiles come in on the first load only. */
+  let enteredOnce = false;
+  /** How long after the first read the tiles still come in, so the desk's late parts land the same way. */
+  const ENTER_HELD_MS = 900;
+
   /**
    * What Today draws and in what order, from how many briefing cards, how many matches and how many kinds of stale
    * thing the record answered: the briefing first, the page, what went stale under it, and who was matched last. A
@@ -54,7 +59,8 @@
 
 <script lang="ts">
   import { idle } from '$lib/ui/idle.ts';
-  import { apiBase } from '$lib/at.ts';
+  import { apiBase, at as inApp } from '$lib/at.ts';
+  import { partsOf } from '$lib/shell/headline.ts';
   import { onAppendOnly, recordNow, type Fetch, type Shell } from '$lib/record/boot-live.ts';
   import { titleOf } from '$lib/title.ts';
   import { copy } from '$lib/copy.ts';
@@ -107,6 +113,8 @@
   import { createClient, wrote, type Cursor, type EngineHealth, type EventLine } from '@braindog/client';
   import { engineLine, type EngineLine } from '$lib/ui/engine-line.ts';
   import { page } from '$app/state';
+  import { afterNavigate } from '$app/navigation';
+  import { still } from '$lib/ui/motion.ts';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
   import { words } from '$lib/home/words.ts';
@@ -445,6 +453,8 @@
   /* AND THE MODEL'S LINE OVER IT when the record sent one written today; without one this is `lead` as it was. */
   const line = $derived(lead && shaped && live ? homeLineOf(lead, slashLineOf(shaped, declares === null), live.now) : null);
   const slashed = $derived(line?.by === 'slash' ? cutLine(line) : null);
+  /** The red phrase that is the count of what needs you ("8 need you"), which opens Needs you. */
+  const NEEDS_DOOR = /^\d[\d,]* needs? you$/u;
 
   /**
    * TODAY'S OWN BODY IS THE DESK (roadmap slice 1a, the 19 October look): what needs you, who is working and cash, the
@@ -456,6 +466,22 @@
    */
   const board = $derived(declares === null);
   let moreOpen = $state(false);
+
+  /**
+   * THE TILES COME IN ONCE, ON THE APP'S FIRST LOAD (Today polish 11): a fade and a 4px rise as each lands, and never
+   * on a way back, which the page change already moves. Held for the first read and a breath after it, then off, so a
+   * tile that comes later (a reread) is simply there.
+   */
+  let entering = $state(false);
+  afterNavigate((nav) => {
+    if (nav.type === 'enter' && !enteredOnce && !still()) entering = true;
+    enteredOnce = true;
+  });
+  $effect(() => {
+    if (!entering || !settled) return;
+    const off = setTimeout(() => (entering = false), ENTER_HELD_MS);
+    return () => clearTimeout(off);
+  });
 
   /* THE PAGE AS HOME DRAWS IT, handed to the reader whole, so the reader's writes index the blocks it draws. A rail with
      nothing beside it, or nothing in it, is one column. On the desk, what it does not show at rest is folded. */
@@ -843,8 +869,7 @@
   {title}
   icon="today"
   kicker={today}
-  sentence={tell ? TELL_LINE : slashed ? slashSaid : lead?.text}
-  needs={tell || slashed ? undefined : lead?.needs || undefined}
+  sentence={tell ? TELL_LINE : slashed ? slashSaid : lead ? leadSaid : undefined}
   actions={capture && wide.current && !board ? headCapture : undefined}
   below={capture && !wide.current && !board ? headCapture : undefined}
 />
@@ -870,6 +895,16 @@
     <span class="home-line" tabindex="0"
       >{slashed.before}{#if slashed.needs}<span class="needs" data-needs>{slashed.needs}</span>{/if}{slashed.after}<span class="home-by">{words.byline}</span></span
     >
+  {/if}
+{/snippet}
+
+<!--
+  THE RULES' LINE (Today polish 7): its figures at 600, and the phrase that needs the reader in the red. "8 need you" is
+  the door to Needs you; any other red phrase (what is late, on a calm day) is words.
+-->
+{#snippet leadSaid()}
+  {#if lead}
+    {#each partsOf(lead.text, lead.needs || undefined) as part, n (n)}{#if part.needs && NEEDS_DOOR.test(part.text)}<a class="home-needs tap" href={inApp('/decide')} data-needs>{part.text}</a>{:else if part.needs}<span data-needs>{part.text}</span>{:else if part.fig}<b class="home-fig">{part.text}</b>{:else}{part.text}{/if}{/each}
   {/if}
 {/snippet}
 
@@ -985,7 +1020,9 @@
       THE DESK (`board`): one twelve-column board that the desk's parts and the page's blocks are laid out on together,
       each where the 19 October desk puts it, and More under them. A kept page is its own board, with More under it.
     -->
-    <div class="body" data-board={board ? '' : undefined}>
+    <div class="body" data-board={board ? '' : undefined} data-enter={entering ? '' : undefined}>
+      <!-- THE FIRST ROW'S RIGHT COLUMN UNDER WHO IS WORKING AND CASH, held so nothing laid out later lands in it. -->
+      {#if board && shaped}<span class="row-one-rest" aria-hidden="true"></span>{/if}
       <!-- A CALM PAGE WITH A LINE IN ITS HEAD STILL DRAWS ITS READER, which holds the writes the line adds through. On the
            desk the parts that are the desk's own stand among its tiles, in the order they are seen (`amid`). -->
       {#if reader}<PageView bind:this={view} {slug} got={drawn} mode="home" {reread} between={board ? amid : undefined} />{/if}
@@ -1035,6 +1072,27 @@
   }
 
   /* ── the head ─────────────────────────────────────────────────────────── */
+
+  /* THE RULES' LINE (Today polish 7): its figures at 600 in the ink, and "8 need you" in the red at 600, the door to
+     Needs you, underlined only under the pointer. */
+  .home-fig {
+    font-weight: var(--fw-semi);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .home-needs {
+    color: var(--red);
+    font-weight: var(--fw-semi);
+    text-decoration: none;
+    border-radius: var(--r-xs);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .home-needs:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
 
   /* THE LINE IS ITS SENTENCE'S ONE CHILD, so a block of its own changes nothing it draws; it holds who said it. */
   .home-line {
@@ -1092,7 +1150,7 @@
     flex-direction: column;
     gap: var(--sp-5);
     max-inline-size: var(--page-max);
-    padding: var(--sp-4) var(--gutter) var(--sp-9);
+    padding: var(--sp-4) var(--gutter) var(--sp-7);
     min-inline-size: 0;
   }
 
@@ -1111,9 +1169,7 @@
      columns to the others, so a row never ends on a hole. Under 960px of board the first of each row takes the whole
      row and the other two halve the next; on a phone every tile is the whole width, in the same order. */
   .body[data-board] {
-    --n: 5;
-    --w: 4;
-    --c: 3;
+    --n: 7;
     --a: 6;
     --u: 3;
     --p: 3;
@@ -1133,15 +1189,10 @@
     display: contents;
   }
 
-  /* WHAT THE ROWS HOLD, read off the board: who is working is the desk's tile or, without the desk, the page's table. */
-  .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) {
-    --n: 8;
-    --c: 4;
-  }
-
-  .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) {
-    --n: 7;
-    --w: 5;
+  /* WHAT THE ROWS HOLD, read off the board: who is working is the desk's tile or, without the desk, the page's table.
+     With neither it nor cash, Needs you is the whole first row. */
+  .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'], .block-slot[data-key='cash'])))) {
+    --n: 12;
   }
 
   .body[data-board]:not(:has(:global(.block-slot[data-key='faces']))) {
@@ -1191,9 +1242,32 @@
     margin-block-start: calc(var(--tile-gap) * -1);
   }
 
-  /* THE FIRST ROW ENDS ON ONE LINE (today F5): Needs you, who is working and cash stretch to the tallest. */
-  .body[data-board] :global(.home-page > .page > :is(.block-slot:is([data-key='needs-you'], [data-key='cash']), [data-working], [data-needs-foot][data-alone])) {
+  /* NOTHING STRETCHES TO A NEIGHBOUR (Today polish 1): who is working and cash are each as tall as what they hold. Only
+     Needs you fills its own span, so its foot butts it when the column beside it is the taller. */
+  .body[data-board] :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot][data-alone])) {
     align-self: stretch;
+  }
+
+  /* THE LAST ROW SHARES ONE HEIGHT (Today polish 3): Arrivals, what is coming up and people, each list at the top and its
+     "N more" or "All people" pinned to the foot. */
+  .body[data-board] :global(.home-page > .page > :is([data-landed], .block-slot:is([data-key='coming-up'], [data-key='faces']))),
+  .body[data-board] > :global([data-landed]) {
+    align-self: stretch;
+  }
+
+  .body[data-board] :global(.home-page > .page > .block-slot:is([data-key='coming-up'], [data-key='faces'])) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .body[data-board] :global(.block-slot:is([data-key='coming-up'], [data-key='faces']) > :is(.block-slice, .block-more)) {
+    margin-block-start: auto;
+    padding-block-start: var(--sp-3);
+  }
+
+  /* THE REST OF THE FIRST ROW'S RIGHT COLUMN, held empty so nothing laid out later is put in it. */
+  .row-one-rest {
+    display: none;
   }
 
   .body[data-board] > :global([data-working]),
@@ -1243,31 +1317,48 @@
      has on the desk (`recompose.ts` `frameOf`), so nothing here holds it anywhere. */
 
   @container desk (inline-size >= 960px) {
-    /* THE FIRST ROW IS PLACED, so the foot under Needs you stays in Needs you's columns and the two tiles beside it run
-       down past it to the foot's lower edge. */
-    .body[data-board] :global(.home-page > .page > :is(.block-slot[data-key='needs-you'], [data-needs-foot][data-alone])) {
-      grid-row: 1;
+    /* THE FIRST ROW IS PLACED (Today polish 1) ON FOUR TRACKS, two stacks side by side: Needs you over its foot at seven
+       of twelve, and at the right who is working over cash, each its own height. Needs you takes the first two tracks
+       and its foot the third; who is working the first, and cash the second to the fourth. So the second track is what
+       Needs you is taller than who is working by, the fourth is what cash runs on past the foot, and neither column
+       stretches to the other. */
+    .body[data-board] :global(.home-page > .page > .block-slot[data-key='needs-you']) {
+      grid-row: 1 / span 2;
+      grid-column: 1 / span var(--n);
+    }
+
+    .body[data-board]:not(:has(:global([data-needs-foot]:not([data-alone])))) :global(.home-page > .page > .block-slot[data-key='needs-you']),
+    .body[data-board] :global(.home-page > .page > [data-needs-foot][data-alone]) {
+      grid-row: 1 / span 3;
       grid-column: 1 / span var(--n);
     }
 
     .body[data-board] :global(.home-page > .page > [data-needs-foot]:not([data-alone])) {
-      grid-row: 2;
+      grid-row: 3;
       grid-column: 1 / span var(--n);
     }
 
     .body[data-board] > :global([data-working]),
     .body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='working'])) {
       grid-row: 1;
-      grid-column: span var(--w);
+      grid-column: calc(var(--n) + 1) / -1;
     }
 
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-row: 1;
-      grid-column: span var(--c);
+      grid-row: 2 / span 3;
+      grid-column: calc(var(--n) + 1) / -1;
     }
 
-    .body[data-board]:has(:global([data-needs-foot]:not([data-alone]))) :global(.home-page > .page > :is([data-working], .block-slot:is([data-key='working'], [data-key='cash']))) {
-      grid-row: 1 / span 2;
+    .body[data-board]:not(:has(:global(:is([data-working], .block-slot[data-key='working'])))) :global(.home-page > .page > .block-slot[data-key='cash']) {
+      grid-row: 1 / span 4;
+    }
+
+    /* EVERY CELL OF THE FIRST ROW'S TRACKS IS HELD, the fourth under the foot and the right column where there is no
+       cash, so nothing laid out later lands in one. It is no height and lies under the tiles. */
+    .body[data-board] > .row-one-rest {
+      display: block;
+      grid-row: 2 / span 3;
+      grid-column: 1 / -1;
     }
 
     .body[data-board] :global(.home-page > .page > .block-slot[data-key='week-due']) {
@@ -1310,51 +1401,142 @@
     }
   }
 
-  /* ON A PHONE, WHO IS WORKING AND CASH SHARE ONE ROW AS TWO HALVES (today F8): the faces under "Working now 2", and the
-     cash figure with how long it lasts; each heading still opens its whole tile's page. */
-  @container desk (inline-size < 640px) {
-    .body[data-board] :global(.home-page > .page > :is([data-working], .block-slot[data-key='cash'])) {
-      grid-column: span 6;
-    }
+  /* ── the tiles, as Today draws them (the Today polish of 20 October) ── */
 
-    .body[data-board]:not(:has(:global(.block-slot[data-key='cash']))) :global(.home-page > .page > [data-working]),
-    .body[data-board]:not(:has(:global([data-working]))) :global(.home-page > .page > .block-slot[data-key='cash']) {
-      grid-column: 1 / -1;
-    }
+  /* THE TILES COME IN ONCE, on the first load: a fade and a 4px rise, each as it lands. */
+  .body[data-board][data-enter] :global(.home-page > .page > *),
+  .body[data-board][data-enter] > :global(:not(.row-one-rest)) {
+    animation: tile-in var(--d-page) var(--ease-out) both;
+  }
 
-    .body[data-board] :global([data-working] :is(.runs, .r-more, .tile-aside)) {
-      display: none;
-    }
-
-    .body[data-board] :global([data-working] .wn-strip) {
-      display: flex;
-    }
-
-    .body[data-board] :global(.block-slot[data-key='cash'] :is(.cell:not(:first-child), .cell-trend, .cell-label, .glyph)) {
-      display: none;
-    }
-
-    .body[data-board] :global(.block-slot[data-key='cash'] .grid) {
-      display: block;
-    }
-
-    .body[data-board] :global(.block-slot[data-key='cash'] .cell) {
-      display: grid;
-      gap: var(--sp-1);
-      padding: 0;
-      border: 0;
-    }
-
-    .body[data-board] :global(.block-slot[data-key='cash'] .cell-figure) {
-      font-size: var(--fs-figure);
-      line-height: 26px;
-    }
-
-    .body[data-board] :global(.block-slot[data-key='cash'] .cell-note) {
-      color: var(--ink-3);
-      font-size: var(--fs-meta);
+  @keyframes -global-tile-in {
+    from {
+      opacity: 0;
+      translate: 0 4px;
     }
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .body[data-board][data-enter] :global(.home-page > .page > *),
+    .body[data-board][data-enter] > :global(:not(.row-one-rest)) {
+      animation: none;
+    }
+  }
+
+  /* NEEDS YOU'S COUNT IS THE ONLY RED IN A TILE'S HEAD (polish 5): red words, not a filled badge, which the top bar has. */
+  .body[data-board] :global(.block-slot[data-key='needs-you'] > .block-bar .block-count) {
+    color: var(--red);
+    font-weight: var(--fw-semi);
+  }
+
+  /* A QUESTION ABOUT MONEY (polish 8): a neutral 32 well with its kind's glyph, the late word carrying the red; the title
+     on one line at a desk, the amount at 15/600 on its baseline, and the answers on the second line at the right. */
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-row .dr-well .well) {
+    background: var(--tile-2);
+    color: var(--ink-2);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-row) {
+    align-items: baseline;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-row > .dr-well) {
+    align-self: center;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-row > .dr-amount) {
+    font-size: var(--fs-body);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions) {
+    gap: var(--sp-2);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions > .dc-btn) {
+    min-block-size: 36px;
+  }
+
+  @media (width >= 900px) {
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-row > .dr-title) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-row > .dr-title > .dc-open) {
+      display: inline;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .body[data-board] :global(.block-slot[data-key='needs-you'] .dc-actions > .dc-btn) {
+      min-block-size: var(--tap);
+    }
+  }
+
+  /* CASH AHEAD, ONE SHAPE AT EVERY WIDTH (polish 1, 4): cash now over its line, the line the tile's width, and how
+     long it lasts; then coming in and going out as two ruled rows, the label at the left and the figure at the right.
+     At five of twelve the stat drew as tiles that wrapped going out under the rest. */
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell) {
+    grid-column: 1 / -1;
+    grid-template-areas:
+      'label glyph figure'
+      'note note note';
+    grid-template-columns: minmax(0, auto) auto minmax(auto, 1fr);
+    grid-template-rows: none;
+    align-items: baseline;
+    column-gap: var(--sp-2);
+    margin: 0;
+    padding: var(--sp-3) 0;
+    border-radius: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell + .cell) {
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:last-child) {
+    padding-block-end: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell .cell-figure) {
+    justify-self: end;
+    font-size: var(--fs-head);
+    text-align: end;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child) {
+    grid-template-areas:
+      'label glyph'
+      'figure figure'
+      'trend trend'
+      'note note';
+    grid-template-columns: fit-content(100%) minmax(0, 1fr);
+    padding-block-start: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child .cell-figure) {
+    justify-self: start;
+    font-family: var(--font-display);
+    font-size: var(--fs-page);
+    text-align: start;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .grid > .cell:first-child .cell-trend) {
+    inline-size: 100%;
+    block-size: 48px;
+    margin-block: var(--sp-2) var(--sp-1);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='cash'] .cell-note:empty) {
+    display: none;
+  }
+
 
   /* PEOPLE, ONE LINE EACH (today F17): the face, the name, and the organisation after it in the quiet ink, never a form's
      label and value. */
@@ -1403,8 +1585,38 @@
     margin: 0;
   }
 
-  .body[data-board] :global(.block-slot[data-key='faces'] .cards-fact dd::before) {
-    content: '· ';
+  /* ONE LINE A PERSON, 44 TALL (Today polish 10): the face at 28, the name at 15/500, and the organisation 8 after it in
+     the quiet ink at 13, with no dot between. */
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-grid) {
+    gap: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-item) {
+    min-block-size: 44px;
+    padding-block: 0;
+    column-gap: var(--sp-2);
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-head) {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-face) {
+    flex: none;
+    inline-size: 28px;
+    block-size: 28px;
+  }
+
+  .body[data-board] :global(.block-slot[data-key='faces'] .cards-title) {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
   }
 
   /* MORE: one plain line across the board, a full target, the count in the quiet ink, the chevron turned when open. */
