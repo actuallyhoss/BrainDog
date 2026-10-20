@@ -251,9 +251,11 @@
     {/if}
 
     <form class="box" onsubmit={add}>
-      <label class="box-label" for="{uid}-new">{words.addLabel}</label>
+      <!-- THE FIELD SAYS WHAT IT IS FOR INSIDE ITSELF (its placeholder), and the label stays for a screen reader only:
+           "Add a comment" over an empty box said the same thing twice, a line apart (UI pass 20 Oct, W2-A). -->
+      <label class="sr-only" for="{uid}-new">{words.addLabel}</label>
       <div class="box-line">
-        <input id="{uid}-new" class="box-input" type="text" autocomplete="off" bind:value={body} />
+        <input id="{uid}-new" class="box-input" type="text" autocomplete="off" placeholder={words.addLabel} bind:value={body} />
         {#if body.trim()}<Button weight="primary" type="submit" disabled={over > 0 || writing}>{words.add}</Button>{/if}
       </div>
       {#if over > 0}<p class="box-over" role="status">{words.tooLong(over)}</p>{/if}
@@ -426,6 +428,20 @@
     .box-input:hover {
       background: var(--tile-2);
     }
+  }
+
+  .box-input::placeholder {
+    color: var(--ink-3);
+  }
+
+  /* The new comment's label, for a screen reader: the field's placeholder says it to the eye. */
+  .sr-only {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .box-over {
