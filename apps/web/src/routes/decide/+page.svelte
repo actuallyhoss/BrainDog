@@ -612,6 +612,13 @@
     order: 1;
   }
 
+  /* ON THE PHONE'S HANDLED TAB, HANDLED COMES FIRST and what was decided lately after it (today F6). */
+  @media (width < 900px) {
+    .body[data-showing='handled'] :global(.page > .page-strip[data-opens]) {
+      order: -1;
+    }
+  }
+
   /* EACH QUESTION IS A TILE (DIRECTION §39, "Decide reads like a form"). The page reader draws a queue as one tile with
      its questions under hairlines, which is right for a page holding a few among other things; Decide is the questions,
      so here the queue's own tile steps back to the board and every question is a tile of its own, a tile's gap apart.
