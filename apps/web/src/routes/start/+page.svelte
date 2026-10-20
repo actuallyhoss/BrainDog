@@ -73,7 +73,7 @@
   import Kbd from '$lib/ui/Kbd.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
-  import { PEOPLE, withChip } from '$lib/who.ts';
+  import { PEOPLE } from '$lib/who.ts';
   import { accept, pressKey, type NotMade, type SetupRow } from './accept.ts';
   import {
     added,
@@ -181,15 +181,6 @@
   let sentence = $state('');
   let field = $state<HTMLTextAreaElement | undefined>(undefined);
   let heardHeading = $state<HTMLHeadingElement | undefined>(undefined);
-
-  /** A chip appends its words as a clause of what is there, and the caret goes back to the end of it. */
-  function chip(said: string) {
-    sentence = withChip(sentence, said);
-    void tick().then(() => {
-      field?.focus();
-      field?.setSelectionRange(sentence.length, sentence.length);
-    });
-  }
 
   /* ENTER READS THE SENTENCE AND SHIFT+ENTER STARTS A NEW LINE, as a chat box does, because the field is one answer. */
   function enter(e: KeyboardEvent) {
@@ -849,7 +840,7 @@
 
       <!-- THE TITLE ROW: the question, and once it is read, the sentence that says where the build stands. -->
       <header class="title">
-        <h1 class="question" id="who-h">{firstRun.whoQuestion}</h1>
+        <h1 class="entry-title" id="who-h">{firstRun.whoQuestion}</h1>
         {#if status}
           <p class="sentence">{status.before}{#if status.needs}<span class="needs" data-needs>{status.needs}</span>{/if}{status.after}</p>
         {/if}
@@ -857,8 +848,7 @@
 
       <div class="board">
         <!-- ── THE CONVERSATION ──────────────────────────────────────────── -->
-        <!-- ON THE GROUND, NOT IN A TILE (DIRECTION §37: tiles hold figures and charts). Words read as a page does, and the
-             build beside them is what is boxed, as on /signup. -->
+        <!-- IN A TILE, AS ON /signup (the UI pass of 20 October, first F5): its field sits on white, never on the bare ground. -->
         <section class="talk" aria-label={words.talk} data-dragging={dragging ? '' : undefined}>
           {#if dragging}<p class="drop" aria-hidden="true">{firstRun.exportDrop}</p>{/if}
           {#if proposal === null}
@@ -879,12 +869,6 @@
                 bind:value={sentence}
                 onkeydown={enter}
               ></textarea>
-              <div class="chips" role="group" aria-label={firstRun.whoChipsLabel}>
-                {#each firstRun.whoChips as c (c)}
-                  <!-- A mouse press keeps focus in the field, so the caret stays where the words are going. -->
-                  <Button size="sm" onmousedown={(e: MouseEvent) => e.preventDefault()} onclick={() => chip(c)}>{c}</Button>
-                {/each}
-              </div>
               <!-- THE OTHER WAY IN AT THE START OF THE ROW, AND THE PRIMARY AT ITS END, under the field's own edge, where
                    the eye is when the sentence is done. What it hears as it is typed is drawn beside, in the build. -->
               <div class="actions go">
@@ -1052,17 +1036,8 @@
         <!-- ── THE BUILD ─────────────────────────────────────────────────── -->
         <div class="build">
           <Tile icon="home" title={waitingOn || !anyOn || proposal === null ? words.building : words.ready}>
-            <!-- ONLY THE PARTS THAT ARE ON, IN THE ORDER THEY WERE HEARD: each its own glyph in an ink well, red while
-                 it waits on an answer. A part left off is not drawn here, so nothing reads as a step behind and there
-                 is nothing to count (USE-B07). The sentence under them says the same aloud, once. -->
-            <ol class="lights" aria-hidden="true">
-              {#each steps as p (p.id)}
-                <li class="light" data-state={p.state} data-arrived={fresh.has(`part:${p.id}`) ? '' : undefined}>
-                  <IconWell name={p.icon} tone={p.state === 'waiting' ? 'danger' : 'ink'} />
-                  <span class="light-name">{p.name}</span>
-                </li>
-              {/each}
-            </ol>
+            <!-- NO ROW OF INK SQUARES (first F6): they cut the parts' names short ("Photograp…"), and the sentence under the
+                 reading says the same parts aloud, once, whole. -->
             <!-- THE READING ITSELF, BUILDING AS IT IS TYPED: each phrase heard and what it became, then "Reading" while the
                  model reads the whole. Not a live region while typing, or a screen reader would be told on every key; the
                  press says it all in the conversation. -->
@@ -1177,18 +1152,6 @@
     min-inline-size: 0;
   }
 
-  /* `t-title` IN GEIST, and the phone's large 30/36 below 900px. */
-  .question {
-    margin: 0;
-    color: var(--ink);
-    font-family: var(--font-ui);
-    font-size: var(--t-title);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 34px;
-    text-wrap: balance;
-  }
-
   /* THE SENTENCE: 16/24 in the second ink, and the phrase that needs him in red. */
   .sentence {
     margin: 0;
@@ -1234,12 +1197,14 @@
   }
 
   /* A TILE THAT JUST CAME ON takes the arrival tint and fades back to the tile over a second and a half. */
-  .build :global(.tile) {
-    transition: background-color 1500ms var(--ease-out);
+  @media (prefers-reduced-motion: no-preference) {
+    .build :global(.tile) {
+      transition: background-color 1500ms var(--ease-out);
+    }
   }
 
   .build :global(.tile[data-arrived]) {
-    background: var(--arrived-wash);
+    background: var(--arrived);
     transition: none;
   }
 
@@ -1256,12 +1221,12 @@
     inline-size: 100%;
     box-sizing: border-box;
     padding: var(--sp-3) var(--sp-4);
-    background: var(--s1);
+    background: var(--tile-2);
     border: 0;
-    border-radius: var(--r-md);
+    border-radius: var(--r-ctl);
     color: var(--ink);
     font: inherit;
-    font-size: var(--t-md);
+    font-size: 16px;
     line-height: 24px;
     resize: vertical;
     /* IT SCROLLS CLEAR OF THE PHONE'S KEYBOARD with the chips and the press under it still in view. */
@@ -1269,7 +1234,7 @@
   }
 
   .prompt-field::placeholder {
-    color: var(--dim);
+    color: var(--ink-3);
   }
 
   .chips {
@@ -1305,12 +1270,14 @@
   /* ── a file ────────────────────────────────────────────────────────────── */
 
   /* THE PICKER IS THE BROWSER'S, kept out of sight; the quiet button opens it. */
+  /* THE BARE BUTTON'S WORDS ON THE COLUMN'S START EDGE, under the field's own edge (first F6). */
   .bring {
     display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-2);
     min-inline-size: 0;
+    margin-inline-start: calc(-1 * var(--sp-2));
   }
 
   .bring-input {
@@ -1364,13 +1331,21 @@
 
   /* ── the conversation ──────────────────────────────────────────────────── */
 
-  /* ON THE GROUND, with the lead tile's own padding at the top so its first line sits level with the build's heading. */
+  /* IN A TILE (first F5): its fill and radius, 24 in and 20 on a phone, so the field and its words sit on white. */
   .talk {
     display: grid;
     gap: var(--sp-4);
     align-content: start;
     min-inline-size: 0;
-    padding-block-start: var(--sp-2);
+    padding: var(--sp-5);
+    background: var(--tile);
+    border-radius: var(--r-tile);
+  }
+
+  @media (width < 640px) {
+    .talk {
+      padding: 20px;
+    }
   }
 
   .talk > .keys {
@@ -1553,15 +1528,17 @@
 
   .phrase {
     overflow: hidden;
-    color: var(--ink);
-    font-weight: 600;
+    color: var(--ink-2);
+    font-weight: 400;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  /* WHAT A PHRASE BECAME, in ink: a place is not an alarm, so never red (first F6). */
   .became {
-    color: var(--dim);
-    font-size: var(--t-sm);
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: 500;
   }
 
   /* A SCREEN READER HEARS "BECAME" AS AN ARROW between the phrase and what it became; the eye reads the two lines. */
@@ -1716,54 +1693,12 @@
 
   /* ── the build ─────────────────────────────────────────────────────────── */
 
-  /* THE PARTS, EACH A WELL OVER ITS NAME, as many to a row as fit: six across the build at 1440, three on a phone. A part
-     that just came on takes the arrival tint for the second and a half the part tiles do. */
-  .lights {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
-    gap: var(--sp-3) var(--sp-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .light {
-    display: grid;
-    justify-items: center;
-    gap: var(--sp-1);
-    padding-block: var(--sp-1);
-    border-radius: var(--r-md);
-    min-inline-size: 0;
-    transition: background-color 1500ms var(--ease-out);
-  }
-
-  .light[data-arrived] {
-    background: var(--arrived-wash);
-    transition: none;
-  }
-
-  .light-name {
-    max-inline-size: 100%;
-    overflow: hidden;
-    color: var(--ink);
-    font-size: var(--t-sm);
-    font-weight: 500;
-    line-height: 18px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .light[data-state='waiting'] .light-name {
-    color: var(--danger-text);
-  }
-
   /* WHAT IT HEARD SO FAR, one phrase to a line, each with the glyph of what it became. */
   .heard-live {
     display: grid;
     gap: var(--sp-2);
     margin: 0;
-    padding: var(--sp-3) 0 0;
-    border-block-start: 1px solid var(--line);
+    padding: 0;
     list-style: none;
   }
 
@@ -1824,12 +1759,6 @@
   /* ── a phone ───────────────────────────────────────────────────────────── */
 
   @media (width < 900px) {
-    .question {
-      font-family: var(--font-display);
-      font-size: var(--t-figure);
-      line-height: 36px;
-    }
-
     /* MAKE IT MINE RIDES THE BOTTOM EDGE on the board's own flat colour (DIRECTION 39: no glass), as the tab bar does:
        the button's own 44 and 4 either side, which is the `--sticky` height, with the home indicator's inset paid once
        under it. */
