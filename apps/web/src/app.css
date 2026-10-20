@@ -35,8 +35,10 @@
     overflow: hidden;
   }
 
+  /* THE BOARD UNDER EVERYTHING (frame F2): `html` and `body` are one colour, so overscroll and the frame before `body`
+     has a size show the page and not a darker grey. */
   html {
-    background: var(--sunk);
+    background: var(--board);
   }
 
   /* THE PAGE IS AS WIDE AS THE WINDOW (DIRECTION 36 and 38). It stopped at 1440, so a 1,728 laptop drew the work as a
@@ -59,11 +61,54 @@
     mix-blend-mode: normal;
   }
 
-  ::view-transition-group(page),
-  ::view-transition-old(page),
-  ::view-transition-new(page) {
+  /* ONE MOTION PER PAGE CHANGE (motion F6, section 3): the old picture leaves fast and the new one arrives with a 4px
+     rise, so two layouts are never on screen at once. Leaving is shorter than arriving. The group itself does not move;
+     the shell waits for the new screen to say it has drawn before the new picture is taken (`+layout.svelte`). */
+  ::view-transition-group(page) {
     animation-duration: var(--d-page);
-    animation-timing-function: var(--ease-fade);
+    animation-timing-function: var(--ease-out);
+  }
+
+  ::view-transition-old(page) {
+    animation: page-out var(--d-exit) var(--ease-in) both;
+  }
+
+  ::view-transition-new(page) {
+    animation: page-in var(--d-page) var(--ease-out) both;
+  }
+
+  @keyframes page-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      translate: 0 4px;
+    }
+  }
+
+  /* ASKED FOR LESS MOTION, A PAGE CHANGE IS CUT (motion section 3): the new page is simply there, with no rise and no
+     fade. A theme change is cut the same way, below. */
+  @media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(page),
+    ::view-transition-new(page) {
+      animation: none;
+    }
+  }
+
+  /* THE TAB BAR AND THE TOASTS ARE HELD STILL THROUGH A PAGE CHANGE (motion F3). On a phone `.body` runs under the
+     fixed tab bar, so its two pictures were painted over the real bar and its labels dropped out for the fade. Named
+     (`TabBar.svelte` `.tabs`, `Toasts.svelte` `.stack`) and played nothing, they stay where they are. */
+  ::view-transition-group(tabbar),
+  ::view-transition-old(tabbar),
+  ::view-transition-new(tabbar),
+  ::view-transition-group(toasts),
+  ::view-transition-old(toasts),
+  ::view-transition-new(toasts) {
+    animation: none;
   }
 
   /* A DOCKED PANEL STAYS WHERE IT IS THROUGH THE FADE. It is named `dock` for the moment (`Panel.svelte`), so it is not
@@ -71,13 +116,37 @@
      with nothing played, and the panel does not move or dip. One the new screen does not draw fades with the work. */
   ::view-transition-group(dock) {
     animation-duration: var(--d-page);
-    animation-timing-function: var(--ease-fade);
+    animation-timing-function: var(--ease-standard);
   }
 
   ::view-transition-old(dock):not(:only-child),
   ::view-transition-new(dock):not(:only-child) {
     animation: none;
     mix-blend-mode: normal;
+  }
+
+  /* A THEME CHANGE IS ONE EVEN CHANGE (motion F15): the old picture of the whole window fades off over the new one in
+     `--d-swap`, and every other transition is off for that frame, so eighteen controls do not each fade at their own
+     speed after the page has changed. `pref.ts` sets `data-retheme` round the view transition and takes it off after. */
+  html[data-retheme] *,
+  html[data-retheme] *::before,
+  html[data-retheme] *::after {
+    transition: none !important;
+  }
+
+  html[data-retheme]::view-transition-old(root) {
+    animation: page-out var(--d-swap) var(--ease-standard) both;
+    mix-blend-mode: normal;
+  }
+
+  html[data-retheme]::view-transition-new(root) {
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html[data-retheme]::view-transition-old(root) {
+      animation: none;
+    }
   }
 
   /* EVERY HEADING IN THE RECORD IS GEIST. The shared base sets headings in the
