@@ -39,7 +39,8 @@ const COLLEAGUE = 'bo@example.com';
 function setup(o: { answersSlug: boolean }) {
   const sql = openSqlite();
   const clock = fixedClock(NOW);
-  const d = createDirectory(sql, clock, CONFIG);
+  /* A HOST THAT SELLS NOTHING, so joining a record is not held to a plan: this suite is about which record the cookie opens. */
+  const d = createDirectory(sql, clock, CONFIG, { sells: false });
   assert.ok(d.person$('ada@example.com').ok && d.person$(COLLEAGUE).ok);
   const studio = d.provision({ slug: 'the-studio', email: 'ada@example.com' });
   const books = d.provision({ slug: 'books-co', email: COLLEAGUE });

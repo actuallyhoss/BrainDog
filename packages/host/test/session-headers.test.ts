@@ -40,11 +40,12 @@ test('THE COUNT OF COMMITS SINCE THE HANDOFF IS KEPT AS SENT, and anything else 
   for (const bad of ['10000', '-1', '012', '1.5', 'twelve', '', '+5', '1e3', '0x1f', '12a']) assert.equal(ahead(bad), undefined, bad);
 });
 
-/* WHO THE RECENT COMMITS WERE BY (`x-braindog-authors`): kept as printable text, up to 512 characters, so the record can
-   meet the people in a project's commits. */
+/* WHO THE RECENT COMMITS WERE BY (`x-braindog-authors`): kept as printable text, up to 1,024 characters (the commits' subjects ride it after the authors), so the record
+   can meet the people in a project's commits and read what they say is done. */
 test('THE AUTHORS OF RECENT COMMITS ARE KEPT AS SENT, and text that cannot ride a header is dropped', () => {
   const authors = (v: string) => sessionOf(new Headers({ 'x-braindog-authors': v })).authors;
   assert.equal(HINTS.authors.header, 'x-braindog-authors');
   assert.equal(authors('Ada Lin <ada@example.com>, Bo <bo@kiln.example>'), 'Ada Lin <ada@example.com>, Bo <bo@kiln.example>');
-  assert.equal(authors('x'.repeat(513)), undefined);
+  assert.equal(authors('x'.repeat(1024)), 'x'.repeat(1024));
+  assert.equal(authors('x'.repeat(1025)), undefined);
 });

@@ -498,7 +498,11 @@ test('THE MODEL-JOBS PASS READS THE NOTES ONCE ITS NIGHT HAS COME, on a host tha
   const open = r.api.kernel.governance('suggestion', {});
   assert.ok(open.ok);
   /* THE ONE QUESTION ABOUT AHMED, AND THE OFFER THE SAME NOTE MAKES WITH NO MODEL: Jo Okonkwo, held, named in full. */
-  assert.equal(open.value.length, 2, 'the question about Ahmed and the link for Jo are on Decide');
+  /* THE LINK FOR JO ONLY ARRANGES A ROW THE OWNER HOLDS, so it settles itself (the Handled list) and Decide holds the one about Ahmed. */
+  assert.equal(open.value.length, 1, 'the question about Ahmed is on Decide, and the link for Jo is not');
+  const linked = r.api.kernel.list({ register: 'people', where: 'name is "Jo Okonkwo"' });
+  assert.ok(linked.ok);
+  assert.deepEqual(linked.value.rows[0]?.fields.projects, [r.bake.id], 'the link for Jo was not made');
   /* AND NOT AGAIN ON THE NEXT ALARM. */
   await serveModelJobs(r.api, deps);
   assert.equal(asked.length, 1);
@@ -683,5 +687,9 @@ test('THE OFFERS NEED NO MODEL: a host with none still offers what the notes spe
   await serveModelJobs(r.api, { inference: undefined, meter: meter(), now: () => T0, store: openSqlite(), log: () => {} });
   const open = r.api.kernel.governance('suggestion', {});
   assert.ok(open.ok);
-  assert.equal(open.value.length, 1, 'the link for Jo is on Decide');
+  /* SETTLED AS IT IS FILED, since it only arranges the owner's own row (the Handled list): nothing waits on Decide, and Jo is linked. */
+  assert.equal(open.value.length, 0, 'the link for Jo waits on Decide');
+  const linked = r.api.kernel.list({ register: 'people', where: 'name is "Jo Okonkwo"' });
+  assert.ok(linked.ok);
+  assert.deepEqual(linked.value.rows[0]?.fields.projects, [r.bake.id], 'the link for Jo was not made');
 });

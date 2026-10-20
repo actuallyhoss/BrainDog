@@ -63,6 +63,7 @@ test('THE ROUTE TABLE IS THE CONTRACT, pinned row by row', () => {
       'GET /auth/signup/name worker',
       'GET /auth/google/start worker',
       'GET /auth/google/callback worker',
+      'POST /auth/google/desktop worker',
       'POST /auth/claim/mint worker',
       'POST /auth/provision worker',
       'POST /auth/suspend worker',
