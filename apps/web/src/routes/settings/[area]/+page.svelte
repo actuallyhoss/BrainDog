@@ -89,7 +89,7 @@
   openSettings(() => shell);
 
   /* NO AREA IS THE INDEX: `/settings` draws this file with nothing in the address. */
-  const asked = $derived(page.params.area);
+  const param = $derived(page.params.area);
 
   /**
    * WHETHER THIS IS AN AREA AT ALL, which nothing asked.
@@ -103,13 +103,13 @@
    *
    * EVERY AREA THIS BUILD DRAWS, whatever the index lists: an area somebody left out of their index still opens.
    */
-  const known = $derived(asked === undefined ? undefined : areaOf(asked));
+  const known = $derived(param === undefined ? undefined : areaOf(param));
   /* THE AREA BY ITS ID, NOT ITS ADDRESS: a moved address (`place.ts` `MOVED`) is the area that holds it now. */
-  const area = $derived(known?.id ?? asked);
+  const area = $derived(known?.id ?? param);
 
   /* THE DESIGN BOOK MOVED TO `/design` (agents F29): its old address goes there, so a link to it still lands. */
   $effect(() => {
-    if (asked === 'look') void goto(at('/design'), { replaceState: true });
+    if (param === 'look') void goto(at('/design'), { replaceState: true });
   });
 
   /* ── the index, declared ─────────────────────────────────────────────────
@@ -410,7 +410,7 @@
 
 <svelte:head><title>{titleOf(label, copy.settings)}</title></svelte:head>
 
-{#if asked === 'look'}
+{#if param === 'look'}
   <!-- On its way to `/design`. -->
 {:else if area !== undefined && !known}
   <div class="gone">
@@ -624,6 +624,31 @@
     min-inline-size: 0;
     max-inline-size: var(--page-max);
     padding: var(--sp-4) var(--gutter) var(--sp-9);
+  }
+
+  /* THE INDEX'S DIVIDERS START AT THE TEXT (agents F28), past the row's well, where the link list's own padding puts the
+     title; a rule through the well column reads as a table's. */
+  .settings-index :global(.list[data-kind='link'] > .item) {
+    border-block-end: 0;
+  }
+
+  .settings-index :global(.list[data-kind='link'] > .item + .item::before) {
+    content: '';
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 56px 0;
+    block-size: 1px;
+    background: var(--rule);
+    pointer-events: none;
+  }
+
+  /* THE ONE IRREVERSIBLE ACT STANDS A STEP APART, 16 under the row before it, with no rule over it. */
+  .settings-index :global(.list[data-kind='link'] > .item:has(> a[href$='/settings/delete'])) {
+    margin-block-start: var(--sp-4);
+  }
+
+  .settings-index :global(.list[data-kind='link'] > .item:has(> a[href$='/settings/delete'])::before) {
+    display: none;
   }
 
   /* THE FALLBACK LIST BRINGS ITS OWN GUTTER (`.settings-place`), so the index does not add a second one round it. */

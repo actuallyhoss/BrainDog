@@ -122,7 +122,7 @@ test('FIVE AREAS STAND ON TOP AND EIGHT UNDER MORE, and the design book is on no
   assert.deepEqual(DEFAULT_GROUPS[1]!.areas.map((a) => a.id), ['signing-in', 'people', 'ingest', 'keyboard', 'backups', 'billing', 'export', 'delete']);
   assert.ok(!DEFAULT_GROUPS.some((g) => g.areas.some((a) => a.id === 'look')), 'the design book is a setting again');
   const route = readFileSync(new URL('./+page.svelte', import.meta.url), 'utf8');
-  assert.match(route, /asked === 'look'\) void goto\(at\('\/design'\)/u, 'a link to the design book no longer lands');
+  assert.match(route, /param === 'look'\) void goto\(at\('\/design'\)/u, 'a link to the design book no longer lands');
   /* THE OLD ADDRESSES LAND ON WHAT HOLDS THEM NOW. */
   for (const [from, to] of [['identity', 'signing-in'], ['recovery', 'signing-in'], ['sessions', 'signing-in'], ['pages', 'navigation']] as const)
     assert.equal(areaOf(from)?.id, to, from);
