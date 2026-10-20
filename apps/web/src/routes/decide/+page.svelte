@@ -840,5 +840,10 @@
     .page:has(> .body:first-child) {
       padding-block-start: var(--sp-4);
     }
+
+    /* And where the phone's switch opens the page over the body. */
+    .page:has(> .switch:first-child) {
+      padding-block-start: var(--sp-4);
+    }
   }
 </style>
