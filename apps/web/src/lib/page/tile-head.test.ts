@@ -46,4 +46,7 @@ test('A WELL`S COLOUR IS A MEANING: a question in the accent, late in the red, c
   assert.equal(headTone({ kind: 'todo', where: 'by after yesterday, by before +1d' }), undefined);
   assert.equal(headTone({ kind: 'todo', where: 'by after -7d, by before today' }), 'danger');
   assert.equal(headTone({ kind: 'table', where: 'created before today' }), undefined);
+  /* AN AGENT LAST SEEN, LEFT OR ENDED BEFORE TODAY is an agent's past, not a debt. */
+  for (const field of ['last_seen', 'left_at', 'ended', 'ended_at'])
+    assert.equal(headTone({ kind: 'table', where: `${field} before today` }), undefined, field);
 });

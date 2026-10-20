@@ -89,7 +89,7 @@ const FLOOR = /^\s*([a-z][a-z0-9_]*)\s+after\s+(?:yesterday|today|now|\+\d+d)\s*
  * THE FIELDS THAT SAY WHEN SOMETHING HAPPENED, not when it falls due: `created before today` is everything older than
  * today, which is history, not lateness.
  */
-const WHEN_HAPPENED: ReadonlySet<string> = new Set(['at', 'created', 'created_at', 'updated', 'updated_at', 'as_of', 'seen', 'since', 'started', 'last', 'paid_on', 'done_on']);
+const WHEN_HAPPENED: ReadonlySet<string> = new Set(['at', 'created', 'created_at', 'updated', 'updated_at', 'as_of', 'seen', 'since', 'started', 'last', 'paid_on', 'done_on', 'last_seen', 'left_at', 'ended', 'ended_at']);
 
 function keepsLate(where: string | undefined): boolean {
   if (typeof where !== 'string') return false;
