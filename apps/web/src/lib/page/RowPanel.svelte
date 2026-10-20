@@ -438,8 +438,14 @@
   .p-fields {
     min-inline-size: 0;
     margin: 0;
-    padding: 0;
+    padding: 0 0 var(--sp-4);
     border: 0;
+  }
+
+  /* A BOX THE KEYBOARD MOVES TO SCROLLS CLEAR OF THE STICKY FOOT, rather than into place under it: the last field read
+     as cut off behind the foot's band. 88 is the foot's height and a step of air. */
+  .p-fields :global(:is(input, select, textarea)) {
+    scroll-margin-block-end: 88px;
   }
 
   .p-foot {
@@ -450,8 +456,9 @@
     align-items: center;
     gap: var(--sp-2);
     margin: auto calc(-1 * (var(--sp-4) + var(--sp-1))) calc(-1 * (var(--sp-4) + var(--sp-1)));
-    padding: 14px calc(var(--sp-4) + var(--sp-1));
-    background: var(--bg);
+    padding: var(--sp-3) calc(var(--sp-4) + var(--sp-1));
+    /* THE PANEL'S OWN SURFACE: `--bg` drew a darker band across the foot in dark. */
+    background: var(--tile);
     border-block-start: 1px solid var(--line);
   }
 
