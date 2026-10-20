@@ -52,7 +52,7 @@ const CONTEXT = {
 };
 
 /** A stub host answering `context` and `handoff`, and recording every request. */
-async function stub(t: After, o: { context?: unknown; handoff?: Answer } = {}) {
+async function stub(t: After, o: { context?: unknown; handoff?: Answer; end?: 'done' | 'handoff' | 'older' } = {}) {
   const seen: Seen[] = [];
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -83,6 +83,7 @@ async function stub(t: After, o: { context?: unknown; handoff?: Answer } = {}) {
         }
         return answer(o.handoff ?? { ok: true, value: { id: 'e_7', register: 'session', seq: 7, state: 'idle', version: 2, fields: {} } });
       }
+      if (method === 'end' && o.end !== 'older') return answer({ ok: true, value: { run: 'S7', state: o.end ?? 'done', changed: true } });
       return answer({ ok: false, refusal: { code: 'ROUTE_UNKNOWN', fix: `The stub does not answer ${method}.` } });
     });
   });
@@ -218,16 +219,36 @@ test('EACH VERB ADDRESSES THE CALLER’S OWN RUN: its Claude Code session’s, n
 
 /* ── end ───────────────────────────────────────────────────────────────── */
 
-test('END DEFAULTS TO IDLE, which is the handoff the end hook already sends', async (t) => {
+test('END WITH NO STATE IS THE RECORD\u2019S TO PICK, so a run its agent ended is Ended and never Abandoned the next day', async (t) => {
   const host = await stub(t);
   const h = setup(t, host.base);
 
   assert.equal(await session(['end'], h.io), 0, h.said.join('\n'));
-  assert.deepEqual(host.seen.map((s) => s.method), ['context', 'handoff']);
-  /* A temporary folder is outside any work tree, so git answers nothing and neither field is sent. */
-  assert.deepEqual(host.seen[1]?.args, { state: 'idle' });
-  assert.deepEqual(h.out, ['S7 is idle.'], h.said.join('\n'));
+  assert.deepEqual(host.seen.map((s) => s.method), ['context', 'end']);
+  /* A temporary folder is outside any work tree, so its position answers nothing and neither field is sent. */
+  assert.deepEqual(host.seen[1]?.args, {});
+  assert.deepEqual(h.out, ['S7 is done.'], h.said.join('\n'));
   assert.deepEqual(h.said, []);
+});
+
+test('END WITH A NEXT STEP LEAVES IT FIRST AND THEN ENDS, and a run that left one reads handed off', async (t) => {
+  const host = await stub(t, { end: 'handoff' });
+  const h = setup(t, host.base);
+
+  assert.equal(await session(['end', '--next', 'Wire session into main.ts'], h.io), 0, h.said.join('\n'));
+  assert.deepEqual(host.seen.map((s) => s.method), ['context', 'handoff', 'end']);
+  assert.deepEqual(host.seen[1]?.args, { next: 'Wire session into main.ts' });
+  assert.deepEqual(h.out, ['S7 is handed off.'], h.said.join('\n'));
+});
+
+test('END ON A HOST WITH NO end KEEPS THE OLD IDLE, as the end hook does', async (t) => {
+  const host = await stub(t, { end: 'older' });
+  const h = setup(t, host.base);
+
+  assert.equal(await session(['end'], h.io), 0, h.said.join('\n'));
+  assert.deepEqual(host.seen.map((s) => s.method), ['context', 'end', 'handoff']);
+  assert.deepEqual(host.seen[2]?.args, { state: 'idle' });
+  assert.deepEqual(h.out, ['S7 is idle.'], h.said.join('\n'));
 });
 
 test('end --state handoff leaves the run to be picked up', async (t) => {
@@ -354,7 +375,7 @@ test('A HANDOFF THAT NEVER LANDS EXITS 3 TOO, and says the host did not answer r
   const host = await stub(t, { handoff: 'cut' });
   const h = setup(t, host.base);
 
-  assert.equal(await session(['end'], h.io), 3, h.said.join('\n'));
+  assert.equal(await session(['end', '--state', 'idle'], h.io), 3, h.said.join('\n'));
   assert.deepEqual(host.seen.map((s) => s.method), ['context', 'handoff']);
   /* Not the refusal's own fix, which carries the reason a socket gave and so could carry anything. */
   assert.deepEqual(h.said, [`${host.base} did not answer.`]);

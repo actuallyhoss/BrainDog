@@ -66,6 +66,9 @@ const SAID: Record<Line, (spoken: string) => string> = {
   note: (spoken) => `${spoken} now carries that note.`,
 };
 
+/** What a host with no `end` answers: no such method at all, or a route whose record is older than it (`hooks.ts`). */
+const OLDER_HOST: ReadonlySet<string> = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD']);
+
 const ENDED: Record<State, (spoken: string) => string> = {
   idle: (spoken) => `${spoken} is idle.`,
   handoff: (spoken) => `${spoken} is handed off.`,
@@ -222,7 +225,8 @@ async function end(rest: string[], io: AgentIo): Promise<number> {
     io.say(USAGE_END);
     return REFUSED;
   }
-  const state = values.state ?? 'idle';
+  const said = values.state;
+  const state = said ?? 'idle';
   if (!isState(state)) {
     io.say(BAD_STATE);
     return REFUSED;
@@ -244,6 +248,33 @@ async function end(rest: string[], io: AgentIo): Promise<number> {
   }
   /* Where the run stopped, as the end hook sends it. A folder git cannot read sends neither field. */
   const where = await positionOf(io.cwd);
+  /* NO STATE SAID IS THE RECORD'S TO PICK, AS THE END HOOK LEAVES IT (AGT-C04). This wrote `idle` for it, and the twelve-hour
+     sweep takes an idle run as abandoned, so a run its own agent ended with `braindog session end` read Abandoned the
+     next day. `end` writes done, or a handoff when the run left a fresh step, and the sweep never touches either. A
+     step typed here is left first, so the record sees it as one the run left. A host with no `end` is told so and
+     keeps the old `idle`, as the hook does. */
+  if (said === undefined) {
+    const position = { ...(where.branch === null ? {} : { branch: where.branch }), ...(where.head === null ? {} : { head: where.head }) };
+    if (next !== undefined) {
+      const left = await at.client.handoff({ next, ...position });
+      if (!left.ok) {
+        refuse(io, left, fixOf(left));
+        return REFUSED;
+      }
+    }
+    const ended = await at.client.call('end', position);
+    if (ended.ok) {
+      const to = (ended.value as { state?: unknown } | undefined)?.state === 'handoff' ? 'handoff' : 'done';
+      io.out(ENDED[to](clip(at.context.session.spoken, 40)));
+      io.answer?.({ value: { run: at.context.session.spoken, state: to } });
+      return 0;
+    }
+    if (refused(ended) && ended.refusal.code === 'UNREACHABLE') return refuse(io, ended, `${at.to.key} did not answer.`);
+    if (!(refused(ended) && OLDER_HOST.has(ended.refusal.code))) {
+      refuse(io, ended, fixOf(ended));
+      return REFUSED;
+    }
+  }
   return send(
     at,
     {
