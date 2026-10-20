@@ -54,7 +54,7 @@ export function declaredHref(url: URL): string {
 /** What the two screens say of each other. The record's refusal is said in the record's sentence, never one of these. */
 export const words = {
   /** The quiet link under the screen as it was. */
-  asPage: 'See it as a page',
+  asPage: 'Open as a full page',
   /** The quiet link under the composed page, and after the sentence that says why it was not drawn. */
   back: 'Back to the list',
   /** Said before the link under the page, so the line reads as a sentence. */

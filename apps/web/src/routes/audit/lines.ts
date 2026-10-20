@@ -51,9 +51,9 @@ export const historyWords = {
   filters: 'Filters',
   /* THE SENTENCE UNDER THE TITLE. History, not need: nothing in it is red. */
   nothingNew: 'Nothing changed since you last looked.',
-  oneAway: 'One thing changed while you were away',
-  manyAway: (n: number) => `${count(n)} things changed while you were away`,
-  moreAway: (n: number) => `More than ${count(n)} things changed while you were away`,
+  oneAway: 'One change since you were last here',
+  manyAway: (n: number) => `${count(n)} changes since you were last here`,
+  moreAway: (n: number) => `More than ${count(n)} changes since you were last here`,
   /* WHAT A CHANGE WAS MADE TO, when the record sent no title: an entry in the person's own list, which is named beside it. */
   aRow: 'an entry',
   rows: (n: number): string => (n === 1 ? 'one entry' : `${count(n)} entries`),
@@ -230,7 +230,7 @@ export function passOf(e: Passed): PassLine | null {
 /* ── the sentence under the title ─────────────────────────────────────── */
 
 /**
- * "26 things changed while you were away; 22 of them by agents."
+ * "26 changes since you were last here. Agents made 22."
  *
  * `actors` IS EVERY LINE'S SIGNATURE SINCE THE READER LAST LOOKED, as the record sent it (`whatsNew`). `capped` is the
  * record saying there is more than the lines it sent, and then the count is a floor and the agents are counted over
@@ -238,7 +238,7 @@ export function passOf(e: Passed): PassLine | null {
  * is a confident wrong answer.
  *
  * `byWho` IS THE RECORD'S OWN COUNT OF WHO WROTE THOSE LINES (SHL-A21), worked out where an agent reads it too. The
- * record's own lines (its update, its seed, Slash) are said apart, "and 3 by BrainDog itself", and never counted as an
+ * record's own lines (its update, its seed, Slash) are said apart, "and BrainDog itself made 3", and never counted as an
  * agent's or a person's. One pass of the update is one line there, and so one here.
  */
 export function awaySaid(
@@ -257,22 +257,22 @@ export function awaySaid(
   const head = capped ? historyWords.moreAway(n) : n === 1 ? historyWords.oneAway : historyWords.manyAway(n);
   const itself = historyWords.itself;
   const few = (k: number): string => (k === 1 ? 'one' : count(k));
+  /* TWO SHORT SENTENCES (money F11): how many, then who. "195 changes since you were last here. Agents made 5." Over
+     a capped page the second is about the newest lines only, and says so. */
+  const newest = capped ? ` of the newest ${count(n)}` : '';
   if (agents === 0) {
     if (own === 0) return `${head}.`;
     if (n === 1 && !capped) return `${head}, by ${itself}.`;
-    if (capped) return own === n ? `${head}; ${itself} made all of the newest ${count(n)}.` : `${head}; ${itself} made ${few(own)} of the newest ${count(n)}.`;
-    return own === n ? `${head}; all of them by ${itself}.` : `${head}; ${few(own)} of them by ${itself}.`;
+    return own === n ? `${head}. ${upper(itself)} made ${capped ? `all${newest}` : 'all of them'}.` : `${head}. ${upper(itself)} made ${few(own)}${newest}.`;
   }
   if (n === 1 && !capped) return `${head}, by an agent.`;
   /* AND WHAT BRAINDOG DID ON ITS OWN APART, never inside the agents' number: a night's update is nobody's work. */
-  const tail = own === 0 ? '' : `, and ${few(own)} by ${itself}`;
-  if (capped) {
-    if (agents === n) return `${head}; agents made all of the newest ${count(n)}.`;
-    return `${head}; agents made ${count(agents)} of the newest ${count(n)}${own === 0 ? '' : `, and ${itself} made ${few(own)}`}.`;
-  }
-  if (agents === n) return `${head}; all of them by agents.`;
-  return agents === 1 ? `${head}; one of them by an agent${tail}.` : `${head}; ${count(agents)} of them by agents${tail}.`;
+  const tail = own === 0 ? '' : `, and ${itself} made ${few(own)}`;
+  if (agents === n) return `${head}. Agents made ${capped ? `all${newest}` : 'all of them'}.`;
+  return `${head}. Agents made ${few(agents)}${newest}${tail}.`;
 }
+
+const upper = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 /* ── the reader's clock ────────────────────────────────────────────────── */
 
@@ -562,6 +562,19 @@ export const foldKeys = (f: RunFold): string[] => [f.head.key, ...f.rest.map((t)
  * that key shut under the reader the moment the run wrote again.
  */
 export const foldOpen = (f: RunFold, opened: ReadonlySet<string>): boolean => foldKeys(f).some((k) => opened.has(k));
+
+/**
+ * THE LOG NEWEST FIRST BY WHEN, THEN BY ITS PLACE IN THE LOG (money F11). The record sends it by version, and a line
+ * written with the record's own "now" ahead of the rules that ran after it put 15:00 between 09:00 and 06:00, an
+ * order the hour headings then printed as wrong. The version breaks a tie inside one moment, newest first.
+ */
+export function newestFirst<T extends { at: string; seq: number }>(log: readonly T[]): T[] {
+  const when = (at: string): number => {
+    const t = Date.parse(at);
+    return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
+  };
+  return [...log].sort((a, b) => when(b.at) - when(a.at) || b.seq - a.seq);
+}
 
 /* ── one line's identity, and the page read again ──────────────────────── */
 

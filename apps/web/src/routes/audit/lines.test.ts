@@ -18,6 +18,7 @@ import { byLine } from '../slash/lines.ts';
 import {
   historyWords,
   awaySaid,
+  newestFirst,
   below,
   burstsOf,
   busyOf,
@@ -210,12 +211,12 @@ test('busy hours are the seven days to today by the hour, and the reading names 
 test('the sentence under the title counts what changed while the reader was away, and how much the agents did', () => {
   const agents = Array.from({ length: 22 }, () => 'agent:claude');
   const yours = Array.from({ length: 4 }, () => 'you');
-  assert.equal(awaySaid([...agents, ...yours], null, NO_NAMES, false), '26 things changed while you were away; 22 of them by agents.');
-  assert.equal(awaySaid(['agent:codex'], null, NO_NAMES, false), 'One thing changed while you were away, by an agent.');
-  assert.equal(awaySaid(['you', 'agent:codex'], null, NO_NAMES, false), '2 things changed while you were away; one of them by an agent.');
-  assert.equal(awaySaid(['you', 'you'], null, NO_NAMES, false), '2 things changed while you were away.');
-  assert.equal(awaySaid(['S4', 'slash'], null, NO_NAMES, false), '2 things changed while you were away; all of them by agents.');
-  assert.equal(awaySaid([...agents, 'you'], null, NO_NAMES, true), 'More than 23 things changed while you were away; agents made 22 of the newest 23.');
+  assert.equal(awaySaid([...agents, ...yours], null, NO_NAMES, false), '26 changes since you were last here. Agents made 22.');
+  assert.equal(awaySaid(['agent:codex'], null, NO_NAMES, false), 'One change since you were last here, by an agent.');
+  assert.equal(awaySaid(['you', 'agent:codex'], null, NO_NAMES, false), '2 changes since you were last here. Agents made one.');
+  assert.equal(awaySaid(['you', 'you'], null, NO_NAMES, false), '2 changes since you were last here.');
+  assert.equal(awaySaid(['S4', 'slash'], null, NO_NAMES, false), '2 changes since you were last here. Agents made all of them.');
+  assert.equal(awaySaid([...agents, 'you'], null, NO_NAMES, true), 'More than 23 changes since you were last here. Agents made 22 of the newest 23.');
   assert.equal(awaySaid([], null, NO_NAMES, false), 'Nothing changed since you last looked.');
 });
 
@@ -435,7 +436,7 @@ test('A NAMED RUN IS STILL COUNTED AS AN AGENT', () => {
    under the title says so. The stamp's own rule is tested where it lives (`lib/page/read-mark.test.ts`). */
 test('THE AWAY LINE IS NOT DRAWN AFTER A STAMP: what was read is said as nothing new', () => {
   const before = { actors: ['p_1', 'run_2', 'run_2'], capped: true, byWho: null };
-  assert.match(awaySaid(before.actors, 'p_1', NO_NAMES, before.capped, before.byWho), /while you were away/u);
+  assert.match(awaySaid(before.actors, 'p_1', NO_NAMES, before.capped, before.byWho), /since you were last here/u);
   const after = seenAfter();
   assert.equal(awaySaid(after.actors, 'p_1', NO_NAMES, after.capped, after.byWho), historyWords.nothingNew);
   assert.equal(readMarkOf(9, after.actors.length), null, 'a page already stamped stamped again');
@@ -481,4 +482,16 @@ test('A DECISION ON A PERSON’S OWN OR AN AGENT’S SUGGESTION READS AS IT DID,
   assert.equal(settledWords.chose, cardWords.chose);
   const src = readFileSync(fileURLToPath(new URL('./lines.ts', import.meta.url)), 'utf8');
   assert.doesNotMatch(src, /`Slash suggested|'accepted'|'declined'/u);
+});
+
+test('THE LOG IS NEWEST FIRST BY WHEN, then by version, whatever order the record sent it in', () => {
+  const at = (h: number) => `2026-09-03T${String(h).padStart(2, '0')}:00:00.000Z`;
+  const log = [
+    { seq: 9, at: at(10) },
+    { seq: 8, at: at(12) },
+    { seq: 7, at: at(12) },
+    { seq: 6, at: at(6) },
+    { seq: 5, at: 'not a time' },
+  ];
+  assert.deepEqual(newestFirst(log).map((e) => e.seq), [8, 7, 9, 6, 5]);
 });

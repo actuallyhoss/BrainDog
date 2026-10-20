@@ -109,28 +109,28 @@ test("the sentence under the title counts the record's own apart from the agents
   const byWho: ByWho = { you: 7, people: 0, agents: 52, rules: 0, record: 1 };
   assert.equal(
     awaySaid(actors, null, NO_NAMES, true, byWho),
-    'More than 60 things changed while you were away; agents made 52 of the newest 60, and BrainDog itself made one.',
+    'More than 60 changes since you were last here. Agents made 52 of the newest 60, and BrainDog itself made one.',
   );
   assert.equal(
     awaySaid(['agent:codex', 'system', 'system', 'you'], null, NO_NAMES, false, { you: 1, people: 0, agents: 1, rules: 0, record: 2 }),
-    '4 things changed while you were away; one of them by an agent, and 2 by BrainDog itself.',
+    '4 changes since you were last here. Agents made one, and BrainDog itself made 2.',
   );
   /* THE RECORD'S COUNT WINS over the web's own reading of who: Slash is the record's, never an agent's. */
   assert.equal(
     awaySaid(['slash', 'you'], null, NO_NAMES, false, { you: 1, people: 0, agents: 0, rules: 0, record: 1 }),
-    '2 things changed while you were away; one of them by BrainDog itself.',
+    '2 changes since you were last here. BrainDog itself made one.',
   );
-  assert.equal(awaySaid(['system'], null, NO_NAMES, false, { you: 0, people: 0, agents: 0, rules: 0, record: 1 }), 'One thing changed while you were away, by BrainDog itself.');
+  assert.equal(awaySaid(['system'], null, NO_NAMES, false, { you: 0, people: 0, agents: 0, rules: 0, record: 1 }), 'One change since you were last here, by BrainDog itself.');
   assert.equal(
     awaySaid(['system', 'system'], null, NO_NAMES, false, { you: 0, people: 0, agents: 0, rules: 0, record: 2 }),
-    '2 things changed while you were away; all of them by BrainDog itself.',
+    '2 changes since you were last here. BrainDog itself made all of them.',
   );
   assert.equal(
     awaySaid([...Array<string>(59).fill('you'), 'system'], null, NO_NAMES, true, { you: 59, people: 0, agents: 0, rules: 0, record: 1 }),
-    'More than 60 things changed while you were away; BrainDog itself made one of the newest 60.',
+    'More than 60 changes since you were last here. BrainDog itself made one of the newest 60.',
   );
   /* A HOST OLDER THAN `byWho` is counted as before. */
-  assert.equal(awaySaid(['S4', 'slash'], null, NO_NAMES, false, null), '2 things changed while you were away; all of them by agents.');
+  assert.equal(awaySaid(['S4', 'slash'], null, NO_NAMES, false, null), '2 changes since you were last here. Agents made all of them.');
   for (const s of [historyWords.itself, historyWords.showSteps(1), historyWords.showSteps(6), historyWords.hideSteps]) {
     assert.doesNotMatch(s, /—|\brow\b/u, 'no em dash and no "row" in what a person reads');
   }

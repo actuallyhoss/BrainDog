@@ -71,8 +71,6 @@ export const account = {
      moment". It had no way to narrow by when at all. */
   auditWhen: 'Day',
   auditAnyDay: 'Any day',
-  auditVersion: (n: string): string =>
-    `This record is at version ${n}. Every change moves it by one, so a version is a way of naming a moment.`,
   verifyFile: 'Check an exported file',
   /* WHAT DELETING DOES, said instead of a one-word heading that states no fact. `Danger` was over
      `Delete this record` over `Delete the studio` — three lines, two of them the same sentence, and

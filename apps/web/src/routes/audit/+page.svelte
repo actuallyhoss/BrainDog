@@ -34,9 +34,10 @@
   import Segmented from '$lib/ui/Segmented.svelte';
   import Section from '$lib/ui/Section.svelte';
   import Tile from '$lib/ui/Tile.svelte';
+  import Sheet from '$lib/ui/Sheet.svelte';
+  import { rowsAsCards } from '$lib/ui/body.svelte.ts';
   import Bars from '$lib/viz/Bars.svelte';
   import HeatGrid from '$lib/viz/HeatGrid.svelte';
-  import Stacked from '$lib/viz/Stacked.svelte';
   import Swimlanes from '$lib/viz/Swimlanes.svelte';
   import { runOf } from '$lib/ui/face.ts';
   import PageHead from '$lib/ui/PageHead.svelte';
@@ -62,6 +63,7 @@
      line, and the three tiles' counts and readings. `lines.ts` holds each rule and why. */
   import {
     awaySaid,
+    newestFirst,
     below,
     byWhoOf,
     burstsOf,
@@ -75,8 +77,6 @@
     fold,
     foldKeys,
     foldOpen,
-    GROUP_TONES,
-    groupWords,
     historyWords,
     HOURS,
     isAgent,
@@ -431,7 +431,8 @@
    * somebody whose every line is hidden, and the title's count is out of what is shown.
    */
   const everything = $derived(route.url.searchParams.has('everything'));
-  const kept = $derived(changesOf(LOG, everything));
+  /* NEWEST FIRST BY WHEN, AND THEN BY VERSION (`newestFirst`), before anything is grouped under an hour. */
+  const kept = $derived(newestFirst(changesOf(LOG, everything)));
   const bookkept = $derived(LOG.filter((e) => isBookkeeping(e)).length);
   const hiddenNow = $derived(everything ? 0 : bookkept);
   /* THE SWITCH IS OFFERED WHERE THERE ARE BOOKS TO SHOW: lines this page held back, or a record holding agent runs,
@@ -460,6 +461,8 @@
   const when = $derived(route.url.searchParams.get('on') ?? '');
   /* A DAY AS A PERSON SAYS IT, from its local noon so no clock change moves it into its neighbour. */
   const daySaid = (d: string): string => dayWord(new Date(`${d}T12:00`).getTime(), clock);
+  /* A DAY IN A LINE'S WORDS AS A PERSON SAYS IT: "renews 2026-09-10" read as the record wrote it (money F11). */
+  const daysIn = (note: string): string => note.replace(/\b(\d{4}-\d{2}-\d{2})(?![T\d])/gu, (d) => daySaid(d));
 
   /* ONE LIST, WHICH TODAY LINKS TO: "12 changes to Tasks since you were last here" opens here narrowed to Tasks. It has no
      control of its own, since a list is chosen from Today or pasted, and the button in the toolbar says it and takes it off. */
@@ -528,13 +531,13 @@
   const lanes = $derived(lanesOf(kept, clock, me, names));
   const tally = $derived(tallyOf(matched, me, names));
   const busy = $derived(busyOf(kept, clock));
-  const groupParts = $derived(tally.groups.map((g) => ({ label: groupWords[g.group], value: g.count, tone: GROUP_TONES[g.group] })));
   const topKinds = $derived(
-    tally.kinds.slice(0, 5).map((k, i) => ({
+    tally.kinds.slice(0, 5).map((k) => ({
       label: kindOf(k.kind).word,
       value: k.count,
-      /* ONE BAR IN INK, the biggest, and only when it is the biggest alone. */
-      tone: i === 0 && (tally.kinds[1]?.count ?? 0) < k.count ? 'ink' : undefined,
+      /* EVERY BAR IN THE SECOND INK (money F11): the kinds are counts side by side, and an accent's tint or one bar in
+         black made one kind read as the thing to look at. */
+      tone: 'var(--ink-2)',
     })),
   );
   const tallyMeta = $derived.by(() => {
@@ -549,6 +552,10 @@
     ),
   );
   const tiles = $derived(lanes.length > 0 || matched.length > 0 || busy.total > 0);
+  /* ON A PHONE THE FILTERS ARE ONE "Filter" BUTTON IN THE HEAD, and a sheet holds them (money F11): the segmented control
+     and its two menus wrapped into a box over the title row at 390. */
+  let filtering = $state(false);
+  const phone = $derived(rowsAsCards());
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(route.url.searchParams);
@@ -662,6 +669,13 @@
   </div>
 {/snippet}
 
+{#snippet filterOpen()}
+  <Button weight="glass" data-filter-open aria-haspopup="dialog" onclick={() => (filtering = true)}><Icon name="filter" size="s" />{copy.filter}</Button>
+  <Sheet bind:open={filtering} title={copy.filter}>
+    <div class="sheet-tools">{@render tools()}</div>
+  </Sheet>
+{/snippet}
+
 {#snippet entry(t: Told, first?: string)}
   {@const e = t.e}
   {@const by = actorSaid(e.by, me, names, e.run_by ?? null)}
@@ -670,10 +684,10 @@
   {@const settled = pass === null ? settledOf(e, me, names) : null}
   {@const declared = pass === null && e.kind === 'declare' ? declaredOf(e.target, e.note) : null}
   {@const thing = pass !== null ? null : (t.many ?? (declared === null && e.target ? thingFor(e.target) : null))}
-  {@const note = declared === null && pass === null ? t.note : ''}
-  <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE; a row that came into being wears
-       the green of done. Nothing here is red: a log is history, not need. -->
-  {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : e.kind === 'create' ? 'earn' : undefined}
+  {@const note = declared === null && pass === null ? daysIn(t.note) : ''}
+  <!-- AN AGENT'S LINE UNDER A MINUTE OLD WEARS THE ONE HUE THAT MEANS ALIVE, and every other well is neutral: "Created"
+       wore the green of done on a hundred lines at once (money F11). Nothing here is red: a log is history, not need. -->
+  {@const tone = isAgent(by.kind) && clock - Date.parse(e.at) <= 60_000 ? 'live' : undefined}
   <!-- THE FIRST LINE A FOLD OPENS takes the focus from "+9 more", which is gone once pressed; `-1`, so it is never a stop
        of its own in the tab order. It wears the ring every focused thing wears, as the page's row cursor does. -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -737,6 +751,34 @@
   </li>
 {/snippet}
 
+{#snippet sideTiles()}
+  <div class="side">
+    {#if lanes.length > 0}
+      <Tile icon="session" title={historyWords.whoWorked} meta={historyWords.lastDay}>
+        <Swimlanes {lanes} start={clock - LANE_SPAN_MS} end={clock} now={clock} subject={historyWords.lanesSubject} />
+        <p class="reading">{lanesSaid(lanes)}</p>
+        {#if !reaches(LOG, more, clock - LANE_SPAN_MS)}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
+      </Tile>
+    {/if}
+
+    {#if matched.length > 0}
+      <Tile icon="history" title={historyWords.whatChanged} count={matched.length} meta={tallyMeta}>
+        <Bars items={topKinds} subject={historyWords.kindsSubject} />
+        <p class="reading">{tallyReading}</p>
+        {#if more}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
+      </Tile>
+    {/if}
+
+    {#if busy.total > 0}
+      <Tile icon="clock" title={historyWords.busyHours} meta={historyWords.lastWeek}>
+        <HeatGrid rows={busy.rows} cols={HOURS} values={busy.values} subject={historyWords.heatSubject} />
+        <p class="reading">{busySaid(busy.values)}</p>
+        {#if !reaches(LOG, more, busy.start)}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
+      </Tile>
+    {/if}
+  </div>
+{/snippet}
+
 <!-- THE WAY ACROSS, one quiet line under the sentence: the same address with the one key, every filter kept. -->
 {#snippet asPage()}
   <p class="as-page"><a href={at(declaredHref(route.url))}>{declaredWords.asPage}</a></p>
@@ -752,7 +794,7 @@
   count={matched.length}
   total={kept.length}
   sentence={lead}
-  actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list || offerAll ? tools : undefined}
+  actions={actors.length > 1 || kinds.length > 1 || days.length > 1 || list || offerAll ? (phone ? filterOpen : tools) : undefined}
   below={asPage}
 />
 
@@ -772,35 +814,11 @@
   {/if}
 
   <div class="board">
-    {#if tiles}
+    {#if tiles && !phone}
       <!-- THE TILES FIRST IN THE DOCUMENT, so a screen reader meets what the stream means before the stream; at 1440
-           they stand in a column to its right, and on a phone above it. -->
-      <div class="side">
-        {#if lanes.length > 0}
-          <Tile icon="session" title={historyWords.whoWorked} meta={historyWords.lastDay}>
-            <Swimlanes {lanes} start={clock - LANE_SPAN_MS} end={clock} now={clock} subject={historyWords.lanesSubject} />
-            <p class="reading">{lanesSaid(lanes)}</p>
-            {#if !reaches(LOG, more, clock - LANE_SPAN_MS)}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
-          </Tile>
-        {/if}
-
-        {#if matched.length > 0}
-          <Tile icon="history" title={historyWords.whatChanged} count={matched.length} meta={tallyMeta}>
-            <Stacked parts={groupParts} subject={historyWords.groupsSubject} />
-            <Bars items={topKinds} subject={historyWords.kindsSubject} />
-            <p class="reading">{tallyReading}</p>
-            {#if more}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
-          </Tile>
-        {/if}
-
-        {#if busy.total > 0}
-          <Tile icon="clock" title={historyWords.busyHours} meta={historyWords.lastWeek}>
-            <HeatGrid rows={busy.rows} cols={HOURS} values={busy.values} subject={historyWords.heatSubject} />
-            <p class="reading">{busySaid(busy.values)}</p>
-            {#if !reaches(LOG, more, busy.start)}<p class="foot">{historyWords.stripRead(LOG.length)}</p>{/if}
-          </Tile>
-        {/if}
-      </div>
+           they stand in a column to its right. On a phone they come after the first day of the stream (money F11), so
+           the screen opens on what changed and not on a chart of it. -->
+      {@render sideTiles()}
     {/if}
 
     <div class="feed">
@@ -824,7 +842,8 @@
         </Empty>
       {/if}
 
-      {#each bands as day (day.key)}
+      {#each bands as day, d (day.key)}
+        {#if d === 1 && tiles && phone}{@render sideTiles()}{/if}
         <Section title={day.title} count={day.count}>
           {#each day.hours as band (band.key)}
             <!-- THE HOUR IS A SUBHEAD INSIDE ITS DAY, in the meta step and tabular, so the times line up down the tile. -->
@@ -847,6 +866,7 @@
           {/each}
         </Section>
       {/each}
+      {#if bands.length === 1 && tiles && phone}{@render sideTiles()}{/if}
 
       <!-- WHAT THE STREAM LEAVES OUT, said once at its foot, and the press that shows it: the same switch as the toolbar's. -->
       {#if hiddenNow > 0 && matched.length > 0}
@@ -863,11 +883,6 @@
         </div>
       {/if}
       {#if olderFix}<p class="foot">{olderFix}</p>{/if}
-      <!-- WHAT THE VERSION IS FOR: it is how you name a moment when you talk to somebody about it. Not for a reader who
-           was sent no version, whose lines carry `version: 0`. -->
-      {#if LOG[0] && LOG[0].version > 0}
-        <p class="foot">{copy.auditVersion(LOG[0].version.toLocaleString('en'))}</p>
-      {/if}
     </div>
   </div>
 </div>
@@ -1037,6 +1052,15 @@
   }
 
   /* ── the toolbar ─────────────────────────────────────────────────────── */
+
+  /* THE PHONE'S "Filter", a thumb's 44 tall, and in its sheet the controls start at the edge rather than the end. */
+  :global(.btn[data-filter-open]) {
+    min-block-size: var(--tap);
+  }
+
+  .sheet-tools .tools {
+    justify-content: flex-start;
+  }
 
   .tools {
     display: flex;
