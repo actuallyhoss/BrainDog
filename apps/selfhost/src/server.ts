@@ -1998,6 +1998,8 @@ export async function start(options: {
           admits: (record, person) => record === api.kernel.identity()?.id && api.kernel.access(person) !== null,
         }
       : undefined,
+    /* A SELF-HOST SELLS NO PLAN, so the teams gate is off here: whoever the owner invites can join, whatever plan the row says. */
+    { sells: false },
   );
   ledger = directory;
   const loopback = [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`];
