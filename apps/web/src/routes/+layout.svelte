@@ -82,7 +82,7 @@
   import Count from '$lib/ui/Count.svelte';
   import Icon, { type IconName } from '$lib/ui/Icon.svelte';
   import LapseBanner from '$lib/ui/LapseBanner.svelte';
-  import SeeAsBanner from '$lib/sharing/SeeAsBanner.svelte';
+  import { seeingAs } from '$lib/sharing/see-as.svelte.ts';
   import Pull from '$lib/ui/Pull.svelte';
   import { untrack } from 'svelte';
   import { afterNavigate, beforeNavigate, goto, invalidate, onNavigate } from '$app/navigation';
@@ -1165,7 +1165,10 @@
         <!-- OFFLINE, THE ERROR PAGE'S OWN WORDS, as one line over what the local copy drew. -->
         <p class="offline-line" role="status">{copy.errorPage.offline.title}. {copy.errorPage.offline.body}</p>
       {/if}
-      <SeeAsBanner />
+      <!-- SEEING AS SOMEBODY (§3.3): the banner is its own chunk, since only an owner or an Admin trying it loads it. -->
+      {#if seeingAs() !== null}
+        {#await import('$lib/sharing/SeeAsBanner.svelte') then { default: SeeAsBanner }}<SeeAsBanner />{/await}
+      {/if}
       <LapseBanner shell={data} />
       <!-- WHAT WAS SHARED WITH A GUEST, ONCE A SHARE (§3.4). Its own chunk: only somebody a share let in loads it. -->
       {#if data.me.grant !== undefined && !data.me.owner}
