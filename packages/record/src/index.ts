@@ -243,6 +243,7 @@ import { choiceOf } from './decided.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
 import { byWhoOf, passesOf, passFolder, passKept, type ByWho, type UpdatePass } from './update-pass.ts';
 import { docValues } from './row-values.ts';
+import { readSight, type LineSight } from './sight-read.ts';
 /* THE VERBS THAT RUN, which the page read cuts a block's actions to (`kernel.page`'s `runs`). */
 import { RUNS } from './verbs.ts';
 import { lookThemeFault, looksOf, themeFor, type LookOffer } from './theme-pick.ts';
@@ -2640,24 +2641,16 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /**
-   * Whether a row this caller can already read on the register is one their own narrowed grant still admits
-   * `list` and register counts hand `kernel.scope(ctx, register)` (the grant and the private rows) straight to the kernel, which narrows
-   * there; a reader that answers one row read some other way (`get`, `history`, a block or question rowset, a search
-   * hit, an MCP tool, a Slash read) has no `where` of its own to hand the kernel, so it asks this instead: the row is
-   * read again, filtered on its own `seq` and the same rule, and it is admitted only if that still finds it. `seq:
-   * null` is a row no register's `where` can be written against, so it is never withheld by one.
+   * Whether a row this caller can already read on the register is one their own narrowed grant still admits, and which
+   * rows of a batch are (`sight-read.ts`, sharing plan §2.5 item 3).
+   * `list` and register counts hand `kernel.scope(ctx, register)` (the grant and the private rows) straight to the kernel,
+   * which narrows there; a reader that answers rows read some other way (`get`, `history`, a block or question rowset, a
+   * search hit, a log line, an MCP tool, a Slash read) asks `sight` instead, which asks the kernel's `admittedIds` under
+   * the same rule once per list per 500 rows. It replaced `rowAdmitted`, which read each row again through `list`.
    */
+  const sight = readSight(kernel);
   /** Writes held to the row (`sight-write.ts`, sharing plan §2.6). */
-  const sight = writeSight({ kernel, sql, listName, reads: (ctx, register) => readable(ctx, register) === null });
-
-  const rowAdmitted = (ctx: CallContext, register: string, seq: number | null): boolean => {
-    if (seq === null) return true;
-    /* THE SCOPE ALSO CARRIES THE PRIVATE ROWS (migration 40), so a row kept to its maker is absent here with no case of its own. */
-    const rule = kernel.scope(ctx, register);
-    if (rule === undefined) return true;
-    const found = kernel.list({ register, where: { field: 'seq', is: seq }, includeDeleted: true, limit: 1 }, rule);
-    return found.ok && found.value.rows.length > 0;
-  };
+  const writing = writeSight({ kernel, sql, listName, reads: (ctx, register) => readable(ctx, register) === null });
 
   /**
    * The vault gate: a person at `owner`, and never a bearer of any kind.
@@ -5919,11 +5912,17 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const rule = kernel.scope(ctx, named);
       if (rule !== undefined) {
         const rows = Array.isArray(body?.rows) ? (body.rows as { at?: unknown }[]) : [];
+        const ids: string[] = [];
         for (const r of rows) {
           if (typeof r.at !== 'string') continue;
           const seq = Number(r.at.slice(r.at.lastIndexOf('#') + 1));
-          if (!Number.isInteger(seq) || !rowAdmitted(ctx, named, seq)) return true;
+          const one = Number.isInteger(seq) ? kernel.get({ register: named, seq }, { includeDeleted: true }) : null;
+          if (one === null) return true;
+          ids.push(one.id);
         }
+        /* EVERY ROW IT NAMES, ASKED ONCE (`sight.admitted`): one the grant leaves out holds the whole question back. */
+        const shown = sight.admitted(ctx, named, ids);
+        if (ids.some((id) => !shown.has(id))) return true;
       }
     }
     if (typeof named !== 'string' || named === '') return !wholeRecord(ctx);
@@ -6478,7 +6477,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const live = (ctx: CallContext): LiveRun[] => {
     const now = clock.now();
-    const rows = heardSince(LIVE, now, 50);
+    /* UNDER HER GRANT ON THE RUNS AND WITHOUT A RUN KEPT PRIVATE FROM HER, as `list` reads them for her (`kernel.scope`). */
+    const rows = sight.rows(ctx, heardSince(LIVE, now, 50));
     /* THE SAME TREE, NOT THE SAME FOLDER NAME (`sameTree`, AGT-B08): the same machine and repository, and neither run
        working for the other. "Same repo" was the folder's name on any machine, so a session on the laptop was warned
        about one on the desktop in a folder of the same name, and about its own helpers. The caller is read from its
@@ -6519,7 +6519,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       nowMs: clock.now(),
       questions: rows.map((row) => ({ opened_at: String(row.opened_at ?? ''), body_kind: String(row.body_kind ?? ''), body: row.body })),
       inbox: told ? kernel.inboxWaiting() : null,
-      runs: ctx !== null && readable(ctx, SESSION) ? [] : activeRuns(),
+      runs: ctx === null ? activeRuns() : readable(ctx, SESSION) ? [] : sight.rows(ctx, activeRuns()),
       /* THE QUEUE'S OWN RULE FOR A WITHHELD FIELD (`BAND_SQL`), so `waits.hard` and the queue's count are one number. */
       withheld: costNow().withheld,
       held: costNow().held,
@@ -6537,11 +6537,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const projectOf = (ref: unknown): string | null => {
       if (typeof ref !== 'string' || ref === '') return null;
       const row = kernel.get(ref);
-      if (!row || readable(ctx, row.register) || !rowAdmitted(ctx, row.register, row.seq)) return null;
+      if (!row || readable(ctx, row.register) || !sight.admits(ctx, row)) return null;
       const title = kernel.titleOfRow(row.id);
       return title === null ? null : (scrubbed(title) ?? null);
     };
-    return activeRuns()
+    return sight
+      .rows(ctx, activeRuns())
       .filter((row) => isWorking(row, now))
       .slice(0, WORKING_MOST)
       .map((row) => ({
@@ -6970,17 +6971,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the vault and the members list are theirs. Everything else is about the record as a whole, so somebody invited to
    * named registers does not see it.
    */
-  const lineOf = (ctx: CallContext, e: LogLine): Walked | null => {
+  const lineOf = (ctx: CallContext, e: LogLine, seen: LineSight = sight.lines(ctx, [e])): Walked | null => {
     const bare: Walked = { ...e, register: null, seq: null, title: null };
     const target = e.target ?? '';
     const colon = target.indexOf(':');
     const kind = e.target_kind ?? (colon > 0 ? target.slice(0, colon) : null);
     const id = colon > 0 ? target.slice(colon + 1) : target;
     if (kind === 'entry') {
-      const row = kernel.get(id, { includeDeleted: true });
-      /* AND A ROW HER GRANT'S `where` DOES NOT ADMIT IS NOT HERS TO READ ABOUT (`rowAdmitted`), as `get` and `history`
+      /* THE ROW AND WHETHER SHE IS SHOWN IT COME FROM `seen`, which a walk reads once for its whole batch of lines
+         (`sight.lines`: one statement per list per 500 lines), where this asked one `list` per line. */
+      const row = seen.row(id);
+      /* AND A ROW HER GRANT'S `where` DOES NOT ADMIT IS NOT HERS TO READ ABOUT (`sight`), as `get` and `history`
          hold it: a token held to the paper jobs read the court jobs' titles and fields off `whatsNew`. */
-      if (!row || readable(ctx, row.register) || !rowAdmitted(ctx, row.register, row.seq)) return null;
+      if (!row || readable(ctx, row.register) || !seen.admits(row)) return null;
       const title = kernel.register(row.register)?.title;
       return { ...bare, register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') || null : null };
     }
@@ -7101,12 +7104,14 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     let walked = 0;
     while (walked < WALK) {
       const batch = kernel.eventsBefore(at, BATCH);
+      /* WHICH ROWS THE BATCH IS ABOUT, AND WHICH SHE IS SHOWN, ASKED ONCE FOR THE BATCH (sharing plan §2.13). */
+      const seen = sight.lines(ctx, batch);
       for (const e of batch) {
         if (e.rowid < floor) return done(null);
         walked += 1;
         at = e.rowid;
         if (skip?.(e)) continue;
-        const line = lineOf(ctx, e);
+        const line = lineOf(ctx, e, seen);
         if (line) keep(line);
         if (lines.length >= want) return done(at);
       }
@@ -7157,8 +7162,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * and an owner held to `append` on Diary read his two Obligations lines at rowids 7 and 9 over the Diary write at 8
    * that `lineOf` hid from him (`reader-rowid-gap.test.ts` (3)). `readsEveryList` alone had already kept that from him,
    * so asking only `owner` handed back a gap this function was written to close.
+   *
+   * AND AN OWNER WHO IS SHOWN EVERY ROW. Once somebody keeps a row private, `lineOf` hides its lines from the owner too,
+   * and his version poll, `MAX(event.rowid)`, moved every time Sam wrote one (leak matrix P2 `version`): the gap counted
+   * Sam's private writes. So he is on the `e.` cursors and the hashed version while any row is kept from him.
    */
-  const holdsRowids = (ctx: CallContext): boolean => allows(ctx, 'owner') === null && readsEveryList(ctx);
+  const holdsRowids = (ctx: CallContext): boolean => allows(ctx, 'owner') === null && readsEveryList(ctx) && !kernel.anyHiddenFrom(viewerOf(ctx));
 
   /**
    * A question's or a decision's name as this caller is handed it: `SG6` to whoever reads every list, and `q.<id>` to
@@ -7191,7 +7200,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (id === '') return null;
     if (kind === 'entry') {
       const row = kernel.get(id);
-      return row !== null && readable(ctx, row.register) === null && rowAdmitted(ctx, row.register, row.seq) ? kernel.nameOf(row.id) : null;
+      return row !== null && readable(ctx, row.register) === null && sight.admits(ctx, row) ? kernel.nameOf(row.id) : null;
     }
     if (kind !== 'suggestion' && kind !== 'decision') return null;
     const row = kernel.governanceRow(kind, id);
@@ -7600,9 +7609,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const versionFor = (ctx: CallContext): number => {
     if (holdsRowids(ctx)) return kernel.version();
     const top = kernel.version();
-    /* THE CALLER IS WHAT `lineOf` ASKS ABOUT, and it asks about nothing else of hers: the principal, the ceiling and the
-       levels. The same person with one list raised is another key, so she is never handed what she was held to. */
-    const key = JSON.stringify([ctx.principal, ctx.registers ?? null, ctx.levels ?? null]);
+    /* THE CALLER IS WHAT `lineOf` ASKS ABOUT, and it asks about nothing else of hers: the principal, the ceiling, the
+       levels and the rules (`wheres`). The same person with one list raised is another key, so she is never handed what
+       she was held to; and the same person under another rule is another key too (leak matrix G6), where one key for
+       both answered a changed rule with the version cached for the old one. */
+    const key = JSON.stringify([ctx.principal, ctx.registers ?? null, ctx.levels ?? null, ctx.wheres ?? null, ctx.outbound ?? null]);
     const was = versions.get(key);
     let before: number | null = null;
     let answer: number | null = null;
@@ -7615,17 +7626,18 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       while (above && answer === null && at - was.top > 1) {
         const batch = kernel.eventsBefore(at, Math.min(BATCH, at - was.top - 1));
         if (batch.length === 0) break;
+        const seen = sight.lines(ctx, batch);
         for (const e of batch) {
           if (e.rowid <= was.top) {
             above = false;
             break;
           }
           at = e.rowid;
-          if (lineOf(ctx, e) !== null) {
+          if (lineOf(ctx, e, seen) !== null) {
             answer = idNumber(e.id);
             break;
           }
-          if (!ROW_WRITES.has(e.kind) || e.target_kind !== 'entry') trusted = false;
+          if (!ROW_WRITES.has(e.kind) || e.target_kind !== 'entry' || sight.moves(ctx, e, seen)) trusted = false;
         }
       }
       before = at;
@@ -8071,7 +8083,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * An organisation row by id as `context` names it, followed through `merged_into` to the one it was folded into, or
    * `null` for a row that is gone or not an organisation. A few steps at most, so a loop written by hand ends.
    */
-  const orgBrief = (orgs: { register: string; fields: Record<string, string> }, id: string): Omit<OrgBrief, 'linked'> | null => {
+  const orgBrief = (orgs: { register: string; fields: Record<string, string> }, id: string, ctx?: CallContext): Omit<OrgBrief, 'linked'> | null => {
     let row = kernel.get(id);
     for (let hop = 0; hop < 4 && row; hop += 1) {
       const into = orgs.fields.merged_into === undefined ? null : text(row.fields[orgs.fields.merged_into]);
@@ -8079,6 +8091,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       row = kernel.get(into);
     }
     if (!row || row.register !== orgs.register) return null;
+    /* NAMED TO A CALLER ONLY WHEN SHE IS SHOWN THE ORGANISATION ITSELF (`sight.admits`), never one kept private from her. */
+    if (ctx !== undefined && !sight.admits(ctx, row)) return null;
     const decl = kernel.register(orgs.register);
     const name = text(row.fields[orgs.fields.name ?? decl?.title ?? 'name']) ?? (decl ? text(row.fields[decl.title]) : null);
     if (name === null) return null;
@@ -8137,7 +8151,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     const decl = meets ? kernel.register(meets.register) : undefined;
     if (!meets || !decl || self === undefined || readable(ctx, meets.register)) return null;
     const got = kernel.list({ register: meets.register, where: { field: self, is: true } as Predicate, limit: 5 });
-    const row = got.ok ? got.value.rows.find((r) => rowAdmitted(ctx, meets.register, r.seq)) : undefined;
+    const row = got.ok ? sight.rows(ctx, got.value.rows)[0] : undefined;
     return row ? text(row.fields[decl.title]) : null;
   };
 
@@ -8191,7 +8205,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          only when the caller may read its list. */
       named: (s) => {
         const row = kernel.get(s);
-        return row !== null && readable(ctx, row.register) === null ? kernel.titleOfRow(row.id) : null;
+        return row !== null && readable(ctx, row.register) === null && sight.admits(ctx, row) ? kernel.titleOfRow(row.id) : null;
       },
     };
     const now = clock.now();
@@ -8340,16 +8354,25 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * A project `context { project }` names, by its spoken name, its id or its title, in the list `holder` keeps projects
    * in, as `resolveProject` answers one: `null` when nothing, or more than one, is called that.
    */
-  const projectAsked = (holder: RegisterDecl, said: string): { id: string; spoken: string; how: 'asked' } | null => {
+  const projectAsked = (ctx: CallContext, holder: RegisterDecl, said: string): { id: string; spoken: string; how: 'asked' } | null => {
     const row = kernel.get(said.trim());
-    if (row !== null && row.register === holder.id) return { id: row.id, spoken: kernel.nameOf(row.id), how: 'asked' };
-    const titled = sql.all<{ id: string }>(
-      'SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(trim(?)) LIMIT 2',
-      holder.id,
-      `$."${holder.title}"`,
-      said,
-    );
-    return titled.length === 1 ? { id: titled[0]!.id, spoken: kernel.nameOf(titled[0]!.id), how: 'asked' } : null;
+    if (row !== null && row.register === holder.id) return sight.admits(ctx, row) ? { id: row.id, spoken: kernel.nameOf(row.id), how: 'asked' } : null;
+    /* ONLY THE PROJECTS SHE IS SHOWN ARE MATCHED BY NAME, so a name never says a project her grant leaves out exists. */
+    const titled = [
+      ...sight.admitted(
+        ctx,
+        holder.id,
+        sql
+          .all<{ id: string }>(
+            'SELECT id FROM entry WHERE register = ? AND deleted_at IS NULL AND lower(trim(json_extract(fields, ?))) = lower(trim(?)) LIMIT 50',
+            holder.id,
+            `$."${holder.title}"`,
+            said,
+          )
+          .map((r) => r.id),
+      ),
+    ];
+    return titled.length === 1 ? { id: titled[0]!, spoken: kernel.nameOf(titled[0]!), how: 'asked' } : null;
   };
 
   /**
@@ -8410,7 +8433,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    */
   const taskInHand = (ctx: CallContext, ref: string): Result<TaskInHand> => {
     const row = kernel.get(ref);
-    if (row === null || readable(ctx, row.register) !== null || !rowAdmitted(ctx, row.register, row.seq))
+    if (row === null || readable(ctx, row.register) !== null || !sight.admits(ctx, row))
       return no('ROW_UNKNOWN', `There is no task you can read called ${ref}.`, { at: 'task' });
     const decl = kernel.register(row.register);
     const scope = decl?.fields.find((f) => f.scope !== undefined && !f.retired);
@@ -8441,13 +8464,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
 
     const holder = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
     /* A PROJECT ASKED FOR BY NAME (`context { project }`) IS WHERE IT STANDS, in place of where its folder places it. */
-    const named = where.project !== undefined && holder && !readable(ctx, holder.id) ? projectAsked(holder, where.project) : null;
-    const resolved: { project: { id: string; spoken: string; how: 'remote' | 'folder' | 'repo' | 'asked' } | null; ambiguous: string[] } = named
+    const named = where.project !== undefined && holder && !readable(ctx, holder.id) ? projectAsked(ctx, holder, where.project) : null;
+    const resolvedAt: { project: { id: string; spoken: string; how: 'remote' | 'folder' | 'repo' | 'asked' } | null; ambiguous: string[] } = named
       ? { project: named, ambiguous: [] }
       : holder && !readable(ctx, holder.id)
         ? kernel.resolveProject(place)
         : { project: null, ambiguous: [] };
-    const home = resolved.project ? kernel.get(resolved.project.id) : null;
+    /* A PROJECT HER GRANT LEAVES OUT, OR ONE KEPT PRIVATE FROM HER, IS NO PROJECT HERE (leak matrix G2): she is briefed
+       as a run in no project, and a project named as a choice is one she is shown. */
+    const found = resolvedAt.project ? kernel.get(resolvedAt.project.id) : null;
+    const home = found && sight.admits(ctx, found) ? found : null;
+    const resolved = {
+      project: home ? resolvedAt.project : null,
+      ambiguous: resolvedAt.ambiguous.filter((spoken) => ((row) => row !== null && sight.admits(ctx, row))(kernel.get(spoken))),
+    };
     const identity = (holder as { identity?: { mark?: string; accent?: string } } | undefined)?.identity;
     const mark = identity?.mark === undefined ? undefined : home?.fields[identity.mark];
     const hue = identity?.accent === undefined ? undefined : home?.fields[identity.accent];
@@ -8543,7 +8573,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (f.scope?.links === true) {
         /* MORE THAN ARE SHOWN, so the ones in touch latest can be chosen from them: the kernel orders by the row's last
            change, and a person whose note was edited is not a person who was in touch. */
-        const linked = home ? kernel.inScope(id, home.id, { limit: LINKED }) : null;
+        const linked = home ? sight.inScope(ctx, id, home.id, { limit: LINKED }) : null;
         if (!linked?.ok || !home) continue;
         /* AN ORGANISATION LINKED TO THE PROJECT IS NOT A PERSON HERE, and is named under `organisations`. */
         if (id === orgs?.register) {
@@ -8560,7 +8590,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const at = `'$.${f.id}'`;
           const here = f.type === 'list' ? `EXISTS (SELECT 1 FROM json_each(fields, ${at}) WHERE value = ?)` : `json_extract(fields, ${at}) = ?`;
           const notSelf = selfAt === undefined ? '' : ` AND coalesce(json_extract(fields, '$.${selfAt}'), 0) != 1`;
-          everyone += sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${here}${notSelf}`, id, home.id)?.n ?? 0;
+          /* COUNTED UNDER HER GRANT, as the rows were read (`sight.clause`). */
+          const held = sight.clause(ctx, id);
+          everyone +=
+            sql.one<{ n: number }>(
+              `SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${here}${notSelf}${held === null ? '' : ` AND (${held.sql})`}`,
+              id,
+              home.id,
+              ...(held === null ? [] : held.params),
+            )?.n ?? 0;
         }
         for (const row of linked.value.rows) {
           const org = own && orgs && parts.org !== undefined ? text(row.fields[parts.org]) : null;
@@ -8568,7 +8606,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             ...brief(decl, f.id, row, 'project'),
             name: text(row.fields[decl.title]) ?? kernel.nameOf(row.id),
             role: roleAt === undefined ? null : text(row.fields[roleAt]),
-            org: org === null || orgs === null ? null : (orgBrief(orgs, org)?.name ?? null),
+            org: org === null || orgs === null ? null : (orgBrief(orgs, org, ctx)?.name ?? null),
             in_touch: own && parts.in_touch !== undefined ? text(row.fields[parts.in_touch]) : null,
             self: selfAt !== undefined && row.fields[selfAt] === true,
           });
@@ -8579,7 +8617,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const fade = fadeOf(decl);
       const fades = fade !== null;
       const cutoff = fade === null ? '' : new Date(clock.now() - fadeDays(fade.after)! * 86_400_000).toISOString().slice(0, 10);
-      const got = kernel.inScope(id, home?.id ?? null, { limit: SCOPE_READ, open: true });
+      /* HELD TO HER GRANT AND THE ROWS KEPT PRIVATE FROM HER (`sight.inScope`, leak matrix G2). */
+      const got = sight.inScope(ctx, id, home?.id ?? null, { limit: SCOPE_READ, open: true });
       if (!got.ok) continue;
       /* WHAT A LEARNING THAT STANDS REPLACES IS NOT HANDED (`replacedIn`), exactly as the `learnings` read leaves it out. */
       const replaced = fades ? replacedIn([...got.value.rows, ...got.value.inherited], replacesField(id, decl.fields as never)) : new Set<string>();
@@ -8601,8 +8640,15 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const at = `'$.${f.id}'`;
       const done = decl.done ?? [];
       const openOnly = done.length ? ` AND coalesce(state, '') NOT IN (SELECT value FROM json_each(?))` : '';
+      const held = sight.clause(ctx, id);
       const countWhere = (where: string, ...params: string[]): number =>
-        sql.one<{ n: number }>(`SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${where}${openOnly}`, id, ...params, ...(done.length ? [JSON.stringify(done)] : []))?.n ?? 0;
+        sql.one<{ n: number }>(
+          `SELECT count(*) AS n FROM entry WHERE register = ? AND deleted_at IS NULL AND ${where}${openOnly}${held === null ? '' : ` AND (${held.sql})`}`,
+          id,
+          ...params,
+          ...(done.length ? [JSON.stringify(done)] : []),
+          ...(held === null ? [] : held.params),
+        )?.n ?? 0;
       const counted = {
         ...(home && got.value.rows.length >= SCOPE_READ
           ? { here: countWhere(f.type === 'list' ? `EXISTS (SELECT 1 FROM json_each(fields, ${at}) WHERE value = ?)` : `json_extract(fields, ${at}) = ?`, home.id) }
@@ -8690,7 +8736,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       people: people.people,
       ...(people.total > people.people.length ? { people_total: people.total } : {}),
       self: selfOf(ctx),
-      organisations: orgs === null ? [] : organisationsOf(orgs, orgLinked, orgNamed),
+      organisations: orgs === null ? [] : organisationsOf(orgs, orgLinked, orgNamed, ctx),
       faded,
       signs: redSigns(ctx),
       stale: staleOf(ctx),
@@ -8734,7 +8780,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight: writing, admin, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up
@@ -8797,7 +8843,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (!meets || at?.self === undefined || readable(ctx, meets.register)) return null;
     const got = kernel.list({ register: meets.register, where: { field: at.self, is: true } as Predicate, limit: 5 });
     if (!got.ok) return null;
-    const rows = got.value.rows.filter((row) => rowAdmitted(ctx, meets.register, row.seq));
+    const rows = sight.rows(ctx, got.value.rows);
     if (rows.length === 0) return null;
     const read = (row: Entry, part: string): unknown => (at[part] === undefined ? undefined : row.fields[at[part]!]);
     const many = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : undefined);
@@ -9096,10 +9142,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * The project's organisations, each once: the ones linked to it first, then the ones its people are with, most people
    * first and the first met first among equals, and at most `ORGS`. A row folded into another counts as the survivor.
    */
-  const organisationsOf = (orgs: { register: string; fields: Record<string, string> }, linked: readonly string[], named: readonly string[]): OrgBrief[] => {
+  const organisationsOf = (orgs: { register: string; fields: Record<string, string> }, linked: readonly string[], named: readonly string[], ctx: CallContext): OrgBrief[] => {
     const seen = new Map<string, { org: Omit<OrgBrief, 'linked'>; own: boolean; n: number; first: number }>();
     for (const [i, id] of [...linked, ...named].entries()) {
-      const org = orgBrief(orgs, id);
+      const org = orgBrief(orgs, id, ctx);
       if (org === null) continue;
       const own = i < linked.length;
       const had = seen.get(org.spoken);
@@ -9332,13 +9378,13 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             );
           const owned = kernel.get(said) ?? folded(said);
           {
-            const out = readFrom(ctx, ok(markedRow(ctx, owned && rowAdmitted(ctx, owner.id, owned.seq) ? owned : null)));
+            const out = readFrom(ctx, ok(markedRow(ctx, owned && owned.register === owner.id && sight.admits(ctx, owned) ? owned : null)));
             return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
           }
         }
         const row = kernel.get(said) ?? folded(said);
         {
-          const out = readFrom(ctx, ok(markedRow(ctx, row && !readable(ctx, row.register) && rowAdmitted(ctx, row.register, row.seq) ? row : null)));
+          const out = readFrom(ctx, ok(markedRow(ctx, row && !readable(ctx, row.register) && sight.admits(ctx, row) ? row : null)));
           return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
         }
       }
@@ -9348,7 +9394,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (stop) return { ok: false, refusal: stop };
       const row = kernel.get({ register: args.register as string, seq: args.seq as number });
       {
-        const out = readFrom(ctx, ok(markedRow(ctx, row && rowAdmitted(ctx, args.register as string, row.seq) ? row : null)));
+        const out = readFrom(ctx, ok(markedRow(ctx, row && sight.admits(ctx, row) ? row : null)));
         return args.values === true ? docValues(kernel, out, (b) => heldBlock(ctx, b)) : out;
       }
     },
@@ -9474,7 +9520,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const missing: Refusal = { code: 'REF_UNKNOWN', fix: `There is no row called ${args.ref}.`, at: 'ref' };
       const row = kernel.get(args.ref);
       if (!row || readable(ctx, row.register) !== null) return { ok: false as const, refusal: missing };
-      const held = sight.writable(ctx, row.register, row, null, missing);
+      const held = writing.writable(ctx, row.register, row, null, missing);
       if (held) return { ok: false as const, refusal: held };
       const stop = guard(ctx, 'write', row.register);
       if (stop) return { ok: false as const, refusal: stop };
@@ -9505,9 +9551,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (known) return { ok: false, refusal: known };
       /* HELD TO THE ROWS SHE MAY WRITE (`sight-write.ts`): no hidden field, and the new row inside her predicate, which
          the kernel asks once the row is made, in the same transaction (`within`). */
-      const sighted = sight.writable(ctx, args.register, null, args.fields as Record<string, unknown>, { code: 'REF_UNKNOWN', fix: '' });
+      const sighted = writing.writable(ctx, args.register, null, args.fields as Record<string, unknown>, { code: 'REF_UNKNOWN', fix: '' });
       if (sighted) return { ok: false, refusal: sighted };
-      const within = sight.added(ctx, args.register);
+      const within = writing.added(ctx, args.register);
       /* AN AGENT WRITES AT THE RUNG IT HAS EARNED, AND ASKS BELOW IT (`ladder.ts`): at Ask, on the floor, or after its
          run read text from outside the record, the row is filed on Decide instead, and the answer says so in one line. */
       args = { ...args, fields: huedOf(args.register, args.fields) };
@@ -9628,9 +9674,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       /* A ROW SHE MAY NOT WRITE IS ONE THAT IS NOT THERE (`sight-write.ts`): every check below reads it as missing, and
          the kernel, handed `within`, answers it in a missing row's words at a missing row's step. */
       const found = kernel.get(`${args.register}#${args.seq}`, { includeDeleted: true });
-      const self = found !== null && sight.admitted(ctx, args.register, found.id) ? found : null;
-      const within = sight.within(ctx, args.register);
-      const held = self === null ? null : sight.writable(ctx, args.register, self, args.patch as Record<string, unknown>, { code: 'REF_UNKNOWN', fix: '' });
+      const self = found !== null && writing.admitted(ctx, args.register, found.id) ? found : null;
+      const within = writing.within(ctx, args.register);
+      const held = self === null ? null : writing.writable(ctx, args.register, self, args.patch as Record<string, unknown>, { code: 'REF_UNKNOWN', fix: '' });
       if (held) return { ok: false, refusal: held };
       /* ONLY DECIDE MERGES, AND ONLY UNDO TAKES A MERGE BACK (`mergeShaped`). */
       const merges = mergeShaped(ctx, args.register, args.patch, self);
@@ -10029,7 +10075,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       return sharing.exportFile(said as ExportArgs, (register) => {
         const denied = readable(ctx, register);
         if (denied) return { ok: false, refusal: denied };
-        const read = kernel.list({ register, limit: 500 });
+        /* HER ROWS, under her grant and without a row kept private from her (`kernel.scope`), as `list` reads them. */
+        const read = kernel.list({ register, limit: 500 }, kernel.scope(ctx, register));
         return read.ok ? ok(read.value.rows as { seq: number | null; fields: Record<string, unknown> }[]) : read;
       });
     },
@@ -10484,7 +10531,10 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          append to answered with the figure, which is the same leak one number wide.
          AND IT IS ASKED OF EVERY LIST THE FIGURE READS, NOT ITS SOURCE ALONE: a rolled cash figure reads its moves and
          balance checks, and a walk (`forecast.runway`) names no list while its legs walk several (`figureLists`). */
-      if (!filled || kernel.figureLists(filled).some((list) => readable(ctx, list) !== null))
+      /* AND OF THE WHOLE OF EACH (`sight.whole`, leak matrix G4): a figure is worked out over every row of its lists, so a
+         caller whose grant narrows one to some of its rows is answered as one who reads none of it, where she was given
+         a sum over the rows she is not shown. */
+      if (!filled || kernel.figureLists(filled).some((list) => readable(ctx, list) !== null || !sight.whole(ctx, list)))
         return no('METRIC_UNKNOWN', `There is no metric called ${args.metric}.`, { at: 'metric' });
       /* AND THE CALLER'S OWN WORDS ARE RESOLVED ONLY AGAINST LISTS SHE READS, BY THE KERNEL, AS `list` RESOLVES THEM. The
          member invited to Jobs alone asking `client-jobs:<title>` was answered `ok` for a client on the Clients list she
@@ -10530,8 +10580,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       for (const row of rows) {
         const decl = JSON.parse(row.body) as MetricDecl;
         const list = decl.source.startsWith('register.') ? decl.source.slice('register.'.length) : null;
-        /* HELD TO `metric`'s OWN CHECK, every list the figure reads, so a figure listed is one `metric` answers. */
-        if (kernel.figureLists(decl).some((l) => readable(ctx, l) !== null)) continue;
+        /* HELD TO `metric`'s OWN CHECK, every list the figure reads and the whole of it (`sight.whole`), so a figure
+           listed is one `metric` answers. */
+        if (kernel.figureLists(decl).some((l) => readable(ctx, l) !== null || !sight.whole(ctx, l))) continue;
         out.push({
           id: row.id.slice('metric.'.length),
           name: decl.name,
@@ -10961,9 +11012,9 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const caller = args.register === SESSION ? null : callerOf(ctx);
       /* A ROW SHE MAY NOT WRITE IS ONE THAT IS NOT THERE: no floor is asked of it here, and the kernel, handed `within`,
          answers it in a missing row's words (`sight-write.ts`). */
-      const within = sight.within(ctx, args.register);
+      const within = writing.within(ctx, args.register);
       const seen = caller === null ? null : kernel.get(`${args.register}#${args.seq}`);
-      const noted = seen !== null && sight.admitted(ctx, args.register, seen.id) ? seen : null;
+      const noted = seen !== null && writing.admitted(ctx, args.register, seen.id) ? seen : null;
       const held = caller === null || noted === null ? null : trust.noteFault(caller, args.register, noted.id);
       if (held !== null) return no('FORBIDDEN', held, { at: 'note' });
       /* AND IT IS A `note` EVENT RATHER THAN AN `edit`. This went through `update` with an empty
@@ -11031,7 +11082,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (patch.agent === 'other' && typeof run.fields.agent === 'string' && run.fields.agent !== 'other') delete patch.agent;
       if (hints.client_id !== undefined && run.fields.client_id === undefined) patch.client_id = hints.client_id;
       if (REVIVED.includes(run.state ?? '')) patch.state = 'active';
-      const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}`, within: sight.added(ctx, SESSION) });
+      const out = kernel.update(SESSION, run.id, patch, { ...writerOf({ ...ctx, session: hints }), note: `attached: ${source}`, within: writing.added(ctx, SESSION) });
       if (!out.ok) return tail(out as Result<never>);
       return tail(ok({ session: out.value, spoken, resumed: true, project: projectOf(out.value), context: briefed() }));
     },
@@ -11086,11 +11137,11 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           if (said.why !== undefined) return no('VALUE_MALFORMED', 'why is the reason a step is dropped, and goes with drop.', { at: 'why' });
           if (!token) return no('FORBIDDEN', 'A step is work for a run, so only an agent takes one. Drop it with a reason instead.', { at: 'take' });
           if (typeof said.take !== 'string') return no('VALUE_MALFORMED', `take names the run that left the step, such as ${PREFIX}12.`, { at: 'take' });
-          return tail(kernel.takeHandoff({ ...writerOf(ctx), within: sight.within(ctx, SESSION) }, said.take));
+          return tail(kernel.takeHandoff({ ...writerOf(ctx), within: writing.within(ctx, SESSION) }, said.take));
         }
         if (typeof said.drop !== 'string') return no('VALUE_MALFORMED', `drop names the run that left the step, such as ${PREFIX}12.`, { at: 'drop' });
         if (said.why !== undefined && typeof said.why !== 'string') return no('VALUE_MALFORMED', 'why is a few words saying why the step is dropped.', { at: 'why' });
-        return tail(kernel.dropHandoff({ ...writerOf(ctx), within: sight.within(ctx, SESSION) }, said.drop, typeof said.why === 'string' ? said.why : ''));
+        return tail(kernel.dropHandoff({ ...writerOf(ctx), within: writing.within(ctx, SESSION) }, said.drop, typeof said.why === 'string' ? said.why : ''));
       }
       if (said.why !== undefined) return no('VALUE_MALFORMED', 'why is the reason a step is dropped, and goes with drop.', { at: 'why' });
       if (token && said.session !== undefined)
@@ -11135,7 +11186,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         const ref = said[handKey];
         if (typeof ref !== 'string' || ref.trim() === '') return no('VALUE_MALFORMED', `${handKey} names a task by its handle, as get and list say it.`, { at: handKey });
         const row = kernel.get(ref.trim());
-        if (row === null || row.register === SESSION || readable(ctx, row.register) !== null || !rowAdmitted(ctx, row.register, row.seq))
+        if (row === null || row.register === SESSION || readable(ctx, row.register) !== null || !sight.admits(ctx, row))
           return no('ROW_UNKNOWN', `There is no task you can read called ${ref.trim()}.`, { at: handKey });
         handed = { row, spoken: kernel.nameOf(row.id), to: handState(row.register, handKey === 'done' ? 'done' : 'doing') };
       }
@@ -11203,7 +11254,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           } else {
             /* A RUN SHE MAY NOT WRITE IS NOT A RUN, in the words for one that is not there (`sight-write.ts`). */
             const asked = kernel.get(String(said.session).trim());
-            const named = asked !== null && asked.register === SESSION && sight.admitted(ctx, SESSION, asked.id) ? asked : null;
+            const named = asked !== null && asked.register === SESSION && writing.admitted(ctx, SESSION, asked.id) ? asked : null;
             if (!named || named.register !== SESSION)
               throw new Unwind(no('VALUE_MALFORMED', `${String(said.session)} is not a run. Runs are spoken ${PREFIX}1, ${PREFIX}2.`, { at: 'session' }));
             run = named;
@@ -11234,7 +11285,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
               : handKey === 'done' && taskSaid?.asked === undefined && now.fields.task === handed!.spoken
                 ? { task: null }
                 : null;
-          const within = token ? sight.added(ctx, SESSION) : sight.within(ctx, SESSION);
+          const within = token ? writing.added(ctx, SESSION) : writing.within(ctx, SESSION);
           const written = kernel.update(SESSION, now.id, patch, inHand === null ? { ...by, within } : { ...by, stamp: inHand, within });
           if (!written.ok) throw new Unwind(written as Result<never>);
           /* WHAT THE RUN SAYS IT FINISHED is read against its project's open tasks, after its own write has gone in. */
@@ -11285,7 +11336,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const asked = depth === 'full' ? { ...ctx, session: { ...(ctx.session ?? {}), format: 'full' } as SessionHints } : ctx;
       if (typeof said.project === 'string') {
         const holder = [...kernel.registers().values()].find((d) => d.scopes !== undefined);
-        if (!holder || readable(ctx, holder.id) !== null || projectAsked(holder, said.project) === null)
+        if (!holder || readable(ctx, holder.id) !== null || projectAsked(ctx, holder, said.project) === null)
           return no('ROW_UNKNOWN', `There is no project you can read called ${said.project.trim()}, or more than one.`, { at: 'project' });
       }
       let task: TaskInHand | null = null;
@@ -11520,7 +11571,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
             }
           const filed = await arrangement.prepare(args.body_kind, body);
           if (!filed.ok) return filed;
-          const opened = kernel.propose({ ...args, body: filed.value }, { ...writerOf(ctx), sees: (list, id) => sight.admitted(ctx, list, id) });
+          const opened = kernel.propose({ ...args, body: filed.value }, { ...writerOf(ctx), sees: (list, id) => writing.admitted(ctx, list, id) });
           const asked = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
           /* ANSWERED FROM MEMORY (govern-47): the person already said, so nothing is decided again here. */
           if (asked.ok && asked.value.answered !== undefined) return tail(answeredAs(ctx, asked));
@@ -11531,7 +11582,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
          (`cardFactsOf`), read before anything answers it, so the agent can say what money it asked to move and what
          it asked to change as the person will read it. */
       /* A ROW THE BODY NAMES THAT SHE MAY NOT WRITE IS ONE THAT IS NOT THERE, held to her lens (`sight-write.ts`). */
-      const opened = kernel.propose(args, { ...writerOf(ctx), sees: (list, id) => sight.admitted(ctx, list, id) });
+      const opened = kernel.propose(args, { ...writerOf(ctx), sees: (list, id) => writing.admitted(ctx, list, id) });
       const filed = opened.ok ? ok({ ...opened.value, ...factsOf(ctx, opened.value.id) }) : opened;
       /* A JOINED QUESTION IS ANSWERED AS A FILED ONE IS (AGT-C07): its name, its card's facts, and the sentence the agent
          passes on, since an open question already holds this cause (`cause`, the filer's or derived) and nothing new was
@@ -13413,7 +13464,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       const stop = guard(ctx, 'read', args.register);
       if (stop) return { ok: false, refusal: stop } as Result<never>;
       const row = kernel.get({ register: args.register, seq: args.seq });
-      return ok(row && rowAdmitted(ctx, args.register, row.seq) ? withSettling(sql, kernel.history(row.id)) : []);
+      return ok(row && sight.admits(ctx, row) ? withSettling(sql, kernel.history(row.id)) : []);
     },
 
     /**
@@ -13446,11 +13497,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       if (args.cursor !== undefined && typeof args.cursor !== 'string')
         return no('VALUE_MALFORMED', 'A cursor is the one the page above answered with.', { at: 'cursor' });
       const only = [...kernel.registers().keys()].filter((register) => readable(ctx, register) === null);
-      return kernel.backlinks({
+      /* THE ROW ASKED ABOUT AND EVERY ROW POINTING AT IT UNDER HER GRANT (`sight.backlinks`, leak matrix G3): a row her
+         rule leaves out answered with its id, where a row nobody holds answers with none. */
+      return sight.backlinks(ctx, {
         register: args.register,
         seq: args.seq,
         only,
-        viewer: viewerOf(ctx),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
         ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
       });
@@ -13726,22 +13778,27 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
        * register ceiling, so a caller is never told about rows they may not read. A caller that hands the
        * count on as a total is therefore saying something true about what they are allowed to see.
        */
-      const found = kernel.searchMatched(String(args.q ?? ''), {
+      /* PRIVATE ROWS AND THE ROWS HER RULE LEAVES OUT ARE LEFT OUT IN THE QUERY (`sight.searchMatched`), so the hits and
+         the counts beside them agree (migration 40; leak matrix G5). */
+      const found = sight.searchMatched(ctx, String(args.q ?? ''), {
         /* AND A CALLER WHO MAY READ EVERY ONE OF THEM IS NOT SCOPED AT ALL, which is the query this
            always ran for an owner. */
         ...(registers.length === every.length ? {} : { registers }),
         ...(args.limit === undefined ? {} : { limit: args.limit }),
-        /* PRIVATE ROWS ARE LEFT OUT IN THE QUERY, so the hits and the counts beside them agree (migration 40). */
-        viewer: viewerOf(ctx),
       });
       /* THE WORDS' ORDER, SHUFFLED BY MEANING WHERE THE ROWS HAVE VECTORS (`rerank.ts`), and where the words found fewer
          than five, the rows nearest the query's own meaning fused in (`near.ts`), each marked `by: 'meaning'`. Before the
          reach below, which only drops hits and so keeps the order it is given. */
       const searched = await byMeaning(sql, deps.meaning, String(args.q ?? ''), found.hits, registers.length === every.length ? {} : { registers });
-      const shown = searched.hits.flatMap((hit) => {
+      /* EVERY HIT ASKED AT ONCE (`sight.rows`): a hit by meaning (`near.ts`) is drawn from outside the words' query, so
+         it is held here even though the words' hits already were. */
+      const read = searched.hits.flatMap((hit) => {
         const row = kernel.get(hit.id);
-        return row && rowAdmitted(ctx, row.register, row.seq) ? [{ row, rank: hit.rank, ...('by' in hit ? { by: hit.by } : {}) }] : [];
+        return row ? [{ row, id: row.id, register: row.register, ...('by' in hit ? { by: hit.by } : {}) }] : [];
       });
+      /* A HIT'S RANK IS ITS PLACE AMONG THE HITS SHE IS SHOWN (leak matrix N3), never `bm25`'s score, which reads the
+         whole index's statistics and moved when a row she cannot see was written. The order is still the words'. */
+      const shown = sight.rows(ctx, read).map(({ row, by }, i) => ({ row, rank: i + 1, ...(by ? { by } : {}) }));
       /* A TITLE IS THE ROW'S OWN WORDS, so an agent handed one from outside the record is marked as `get` marks it. */
       readFrom(ctx, ok({ rows: shown.map((h) => h.row) }));
       return ok({
@@ -13749,10 +13806,8 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
           const title = kernel.register(row.register)?.title;
           return { register: row.register, seq: row.seq, title: title ? String(row.fields[title] ?? '') : '', rank, ...(by ? { by } : {}) };
         }),
-        /* THE TOTAL IS NOT NARROWED THE SAME WAY: `fts.searchMatched` counts every live row of a register
-           this caller may read, and a caller whose grant is further narrowed by a `where` sees a figure over the
-           whole register beside a page that is already narrowed. The hits above never name a row outside the
-           `where`; the count naming how many there might be is the known gap left here. */
+        /* THE TOTAL IS NARROWED THE SAME WAY: `fts.searchMatched` counts the live rows of each list this caller may
+           read that her grant's `where` admits, in the query the hits come from. */
         matched: found.matched,
         meaning: searched.meaning,
         comments,

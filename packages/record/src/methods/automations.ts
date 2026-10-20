@@ -23,6 +23,7 @@ import { ACROSS as READS_ACROSS, ANY_LIST, touches, type Kernel, type Tried } fr
 import { BODY_DEPTH, deeperThan, pathOf, subjectOf } from '../automations.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { readSight } from '../sight-read.ts';
 
 type Body = Record<string, unknown>;
 
@@ -66,6 +67,7 @@ const isObject = (x: unknown): x is Body => x !== null && typeof x === 'object' 
 
 export function methods(deps: RecordDeps) {
   const { kernel, sql, guard, scoped, readable, admin, no, tail } = deps;
+  const sight = readSight(kernel);
 
   /** Who a write is signed by: the person, or the person a token was minted for (`actorOf` in `index.ts`). */
   const actorOf = (ctx: CallContext): string => (ctx.principal.kind === 'token' ? ctx.principal.person : ctx.principal.id);
@@ -200,7 +202,7 @@ export function methods(deps: RecordDeps) {
       if (odd !== undefined) return no('FIELD_UNKNOWN', `sample.${odd} is not something a try starts from. It takes ${SAMPLE_TAKES.join(', ')}.`, { at: `sample.${odd}`, allowed: [...SAMPLE_TAKES] });
       if (typeof given.row === 'string') {
         const row = kernel.get(given.row);
-        if (row === null || readable(ctx, row.register) !== null) return no('REF_UNKNOWN', `sample.row is ${given.row}, and there is no such row.`, { at: 'sample.row' });
+        if (row === null || readable(ctx, row.register) !== null || !sight.admits(ctx, row)) return no('REF_UNKNOWN', `sample.row is ${given.row}, and there is no such row.`, { at: 'sample.row' });
       } else if (isObject(given.row)) {
         const list = subjectOf(body);
         const writes = list === null ? null : guard(ctx, 'append', list);

@@ -222,7 +222,7 @@ export function methods(deps: RecordDeps) {
          the author's own and is carried only when ticked; the store's reviewer reads it with everything else. */
       const skillRows = (): { seq: number; name: string; trigger: string; what: string | null; body: string }[] => {
         if (!kernel.register('skills') || readable(ctx, 'skills')) return [];
-        const read = kernel.list({ register: 'skills', limit: 200 } as never);
+        const read = kernel.list({ register: 'skills', limit: 200 } as never, kernel.scope(ctx, 'skills'));
         if (!read.ok) return [];
         const listed = (read.value as { rows: { seq: number | null; fields: Body }[] }).rows;
         return listed.flatMap((r) => {
@@ -315,7 +315,8 @@ export function methods(deps: RecordDeps) {
         if (denied) return { ok: false, refusal: denied };
         for (const seq of new Set(seqs)) {
           /* BY ITS OWN NUMBER, as other reads find one row, so a list of thousands finds its first and its last. */
-          const read = kernel.list({ register: list, where: { field: 'seq', is: seq }, limit: 1 } as never);
+          /* UNDER HER GRANT, so a row kept private from her or outside her rule is a row this list does not have. */
+          const read = kernel.list({ register: list, where: { field: 'seq', is: seq }, limit: 1 } as never, kernel.scope(ctx, list));
           if (!read.ok) return read as Result<never>;
           const row = (read.value as { rows: { seq: number | null; fields: Body }[] }).rows[0];
           if (row === undefined) return no('ROW_UNKNOWN', `${titleOf(`register.${list}`, decl.body)} has no row ${seq}.`, { at: `rows.${list}` });

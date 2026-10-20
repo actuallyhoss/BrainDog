@@ -37,6 +37,7 @@ import {
   type Kernel,
   type PageBlock,
   type Patch,
+  viewerOfRead,
 } from '@braindog/kernel';
 
 import type { CallContext } from './index.ts';
@@ -496,10 +497,11 @@ export function previewer(deps: PreviewDeps) {
           if (isWalk(block)) {
             const filled = (row === null ? block : fill(block, row)) as BlockResult;
             const cost = walkCost(filled);
-            return cost ? held.heldBlock(ctx, { ...filled, rows: [], matched: 0, refusals: [cost] }) : held.heldBlock(ctx, kernel.block(filled as PageBlock));
+            return cost ? held.heldBlock(ctx, { ...filled, rows: [], matched: 0, refusals: [cost] }) : held.heldBlock(ctx, kernel.block(filled as PageBlock, { viewer: viewerOfRead(ctx) }));
           }
           const read = shown?.blocks[i];
-          return held.heldBlock(ctx, read ?? kernel.block(block as PageBlock));
+          /* DRAWN FOR HER, so no row kept private from her is in it (`viewer`), as `page` draws a block for its reader. */
+          return held.heldBlock(ctx, read ?? kernel.block(block as PageBlock, { viewer: viewerOfRead(ctx) }));
         };
         return namedBack(one(), [plan.back[i]!]) as BlockResult;
       });

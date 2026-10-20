@@ -38,6 +38,7 @@ import { aboutOfRow, candidatesFor, entityLists, ftsQuery, nameWords, type About
 import type { CallContext } from '../index.ts';
 import { scrubbed } from '../scrub.ts';
 import type { RecordDeps } from './index.ts';
+import { readSight } from '../sight-read.ts';
 
 /** One thing as `about` answers it: the kernel's reading, and where the row is, by its list and its number there. */
 export type AboutSaid = About & { register: string; seq: number | null };
@@ -71,14 +72,8 @@ export function methods(deps: RecordDeps) {
     reads: (register) => readable(ctx, register) === null,
   });
 
-  /** Whether a narrowed grant still admits one row, read again by its own number as `heldTwice` reads a person. */
-  const admitted = (ctx: CallContext, register: string, seq: number | null): boolean => {
-    if (seq === null) return true;
-    const rule = kernel.scope(ctx, register);
-    if (rule === undefined) return true;
-    const found = kernel.list({ register, where: { field: 'seq', is: seq }, limit: 1 }, rule);
-    return found.ok && found.value.rows.length > 0;
-  };
+  /** Whether a narrowed grant still admits one row, and the rows kept private from the caller are left out (`sight-read.ts`). */
+  const sight = readSight(kernel);
 
   /** Every word a row holds, as a name is compared: its text fields and its lists of text, and nothing of a ref. */
   const wordsOf = (fields: Readonly<Record<string, unknown>>): string =>
@@ -114,7 +109,7 @@ export function methods(deps: RecordDeps) {
       for (const hit of hits) {
         /* THE WHOLE NAME, WORD FOR WORD: the index matches a word's start, and `Northbanks` is not Northbank. */
         if (!wordsOf(JSON.parse(hit.fields) as Record<string, unknown>).includes(` ${key} `)) continue;
-        if (!admitted(ctx, hit.register, hit.seq)) continue;
+        if (!sight.admits(ctx, hit)) continue;
         const list = kernel.register(hit.register)?.name ?? null;
         const title = kernel.titleOfRow(hit.id);
         if (list === null) continue;
@@ -154,7 +149,7 @@ export function methods(deps: RecordDeps) {
   /** A row as a caller is answered it, or `null` when it is not hers to read or is nothing the kernel's read knows. */
   const said = (ctx: CallContext, about: AboutDeps, id: string): AboutSaid | null => {
     const row = kernel.get(id);
-    if (row === null || row.deleted_at !== null || readable(ctx, row.register) !== null || !admitted(ctx, row.register, row.seq)) return null;
+    if (row === null || row.deleted_at !== null || readable(ctx, row.register) !== null || !sight.admits(ctx, row)) return null;
     const what = aboutOfRow(about, id);
     if (what === null) return null;
     /* ONLY WHEN IT ALONE ANSWERS TO THE NAME is a row that says the name a place it was seen (the file's head). */
@@ -197,7 +192,7 @@ export function methods(deps: RecordDeps) {
       const found = handed.candidates.flatMap((c) => {
         const row = handed.rows.get(c.h);
         const entry = row === undefined ? null : kernel.get(row.id);
-        if (row === undefined || entry === null || !admitted(ctx, row.register, entry.seq)) return [];
+        if (row === undefined || entry === null || !sight.admits(ctx, entry)) return [];
         return [{ c, row, seq: entry.seq }];
       });
       const sure = found.filter((f) => f.row.how !== 'text');

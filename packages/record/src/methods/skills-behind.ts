@@ -37,6 +37,7 @@ import type { Result } from '@braindog/ports';
 import { listFor } from '../agent-lists.ts';
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { readSight } from '../sight-read.ts';
 
 /** The lesson's field that names the skill it bears on ("Skill or topic it bears on"). */
 const TOPIC = 'topic';
@@ -131,6 +132,7 @@ const text = (value: unknown): string | null => (typeof value === 'string' && va
 
 export function methods(deps: RecordDeps) {
   const { kernel, scoped, readable, no } = deps;
+  const sight = readSight(kernel);
 
   /**
    * One list's standing rows as the caller's grant admits them, newest 500 read and handed oldest first, with its
@@ -198,7 +200,8 @@ export function methods(deps: RecordDeps) {
       const projectName = (project: string | null): string | null => {
         if (project === null) return null;
         const row = kernel.get(project);
-        const title = row && readable(ctx, row.register) === null ? kernel.titleOfRow(project) : null;
+        /* AND ONLY A PROJECT HER GRANT SHOWS HER, never one kept private from her (`sight.admits`). */
+        const title = row && readable(ctx, row.register) === null && sight.admits(ctx, row) ? kernel.titleOfRow(project) : null;
         return text(title) ?? 'A project';
       };
       const found = behindOf(skillIn, lessonIn);

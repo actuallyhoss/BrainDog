@@ -44,6 +44,7 @@ import type { Entry } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { readSight } from '../sight-read.ts';
 import { fadeDays, fadeOf } from '../agent-lists.ts';
 import { PROMOTED_WHY, promotionQuestion, promotionsFor, type Lesson, type Promotion } from '../learning-promote.ts';
 
@@ -167,20 +168,15 @@ export function learnedFor(deps: RecordDeps, ctx: CallContext, nowMs: number, li
   const home = holder && readable(ctx, holder.id) === null ? (kernel.resolveProject(place).project?.id ?? null) : null;
 
   /* Finished ones are left out by the kernel, before its limit. A project this list does not apply to is no project. */
-  const placed = home === null ? null : kernel.inScope(id, home, { limit: READ_MOST, open: true });
-  const got = placed?.ok ? placed : kernel.inScope(id, null, { limit: READ_MOST, open: true });
+  /* A GRANT NARROWED TO SOME ROWS reads those and no others, and nobody reads a row kept private from them: the read is
+     held to both in its own query (`sight.inScope`), where each row was asked for again under the rule alone. */
+  const sight = readSight(kernel);
+  const placed = home === null ? null : sight.inScope(ctx, id, home, { limit: READ_MOST, open: true });
+  const got = placed?.ok ? placed : sight.inScope(ctx, id, null, { limit: READ_MOST, open: true });
   if (!got.ok) return none;
 
-  /* A GRANT NARROWED TO SOME ROWS reads those and no others: each row is asked for again under the caller's own rule. */
-  const rule = kernel.scope(ctx, id);
-  const admitted = (row: Entry): boolean => {
-    if (rule === undefined || row.seq === null || row.seq === undefined) return true;
-    const found = kernel.list({ register: id, where: { field: 'seq', is: row.seq }, limit: 1 }, rule);
-    return found.ok && found.value.rows.length > 0;
-  };
-
-  const here = got.value.rows.filter(admitted);
-  const wide = got.value.inherited.filter(admitted);
+  const here = got.value.rows;
+  const wide = got.value.inherited;
   /* WHAT A LEARNING THAT STANDS REPLACES is left out, judged across both places and among the rows this caller reads.
      One that has faded still replaces: it says the old one stopped being true, whether or not it is handed itself. */
   const out = replacedIn([...here, ...wide], replacesField(id, decl.fields as readonly Field[]));
@@ -298,10 +294,11 @@ function twiceFor(deps: RecordDeps, ctx: CallContext): { list: Listed; pairs: Pa
     because: text(row.fields.because),
   }));
   const projectOf = (l: Lesson): string | null => text(byId.get(l.id)?.fields[place.id]);
+  const sight = readSight(kernel);
   const pairs = promotionsFor(lessons, projectOf).map((promotion): Pair => {
     const nameOf = (project: string): string => {
       const row = kernel.get(project);
-      const title = row && readable(ctx, row.register) === null ? kernel.titleOfRow(project) : null;
+      const title = row && readable(ctx, row.register) === null && sight.admits(ctx, row) ? kernel.titleOfRow(project) : null;
       return title ?? (project === promotion.olderProject ? 'One project' : 'another project');
     };
     const asked = promotionQuestion(promotion, nameOf);

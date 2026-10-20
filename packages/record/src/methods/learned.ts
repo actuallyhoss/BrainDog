@@ -25,10 +25,11 @@
  */
 
 import type { Result } from '@braindog/ports';
-import { SLASH } from '@braindog/kernel';
+import { SLASH, type Entry } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { readSight } from '../sight-read.ts';
 
 /** How many lines one answer holds at most, and what `limit` may ask for. */
 export const LEARNED_MOST = 50;
@@ -159,13 +160,7 @@ export function methods(deps: RecordDeps) {
       const merge = held?.fields.merged_into;
       /* THE PEOPLE ARE THERE FOR HER ONLY WHEN SHE READS THEIR LIST, and each of a pair only when her grant admits them. */
       const people = held !== null && merge !== undefined && readable(ctx, held.register) === null ? held.register : null;
-      const rule = people === null ? undefined : kernel.scope(ctx, people);
-      const admitted = (seq: number | null): boolean => {
-        if (rule === undefined) return true;
-        if (seq === null || people === null) return false;
-        const one = kernel.list({ register: people, where: { field: 'seq', is: seq }, limit: 1 }, rule);
-        return one.ok && one.value.rows.length > 0;
-      };
+      const sight = readSight(kernel);
       /** Two of the people kept apart, by row id: said once, by both names, newest answer first. */
       const apart = (a: string, b: string, ts: string, n: number): boolean => {
         if (people === null || a === b) return false;
@@ -173,7 +168,7 @@ export function methods(deps: RecordDeps) {
         if (x === null || y === null || x.register !== people || y.register !== people) return false;
         const key = [x.id, y.id].sort().join(' ');
         if (pairs.has(key)) return true;
-        if (!admitted(x.seq ?? null) || !admitted(y.seq ?? null)) return true;
+        if (!sight.admits(ctx, x) || !sight.admits(ctx, y)) return true;
         pairs.add(key);
         const [nx, ny] = [x, y].map((r) => said((kernel.titleOfRow(r.id) ?? '').trim() || 'Somebody with no name'));
         kept('apart', nx === ny ? `The two called ${nx} are two people.` : `${nx} and ${ny} are two people.`, ts, ts, n);

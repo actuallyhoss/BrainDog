@@ -38,6 +38,7 @@ import { LADDER_RULE, MET_CAP, SLASH, foldFill, identityFloor, shapeIn } from '@
 
 import type { CallContext } from '../index.ts';
 import type { RecordDeps } from './index.ts';
+import { readSight } from '../sight-read.ts';
 
 /** How many folds one answer holds at most, and what `limit` may ask for. */
 export const MATCHED_MOST = 50;
@@ -132,7 +133,7 @@ export function methods(deps: RecordDeps) {
     register: string,
     met: string | undefined,
     limit: number,
-    admitted: (seq: number | null) => boolean,
+    admitted: (id: string | null) => boolean,
     named: (id: string) => string,
   ): { n: number; match: Match }[] => {
     if (met === undefined) return [];
@@ -165,7 +166,7 @@ export function methods(deps: RecordDeps) {
       const before = new Set(linesIn(l.from_v));
       const now = new Set(linesIn(JSON.stringify(fieldsOf(l.fields)[met] ?? null)));
       const line = linesIn(l.to_v).find((x) => !before.has(x) && now.has(x));
-      if (line === undefined || !admitted(l.seq)) continue;
+      if (line === undefined || !admitted(l.row)) continue;
       const name = named(l.row);
       out.push({
         n: l.n,
@@ -228,13 +229,8 @@ export function methods(deps: RecordDeps) {
       };
       /* SOMEBODY A NARROWED GRANT LEAVES OUT IS NOT THERE FOR THIS CALLER, read as `heldTwice` reads it: the one kept,
          again by their own number under the grant's rule. A grant that is whole admits everybody. */
-      const rule = kernel.scope(ctx, register);
-      const admitted = (seq: number | null): boolean => {
-        if (rule === undefined) return true;
-        if (seq === null) return false;
-        const found = kernel.list({ register, where: { field: 'seq', is: seq }, limit: 1 }, rule);
-        return found.ok && found.value.rows.length > 0;
-      };
+      const sight = readSight(kernel);
+      const admitted = (id: string | null): boolean => id !== null && sight.admitted(ctx, register, [id]).has(id);
       const named = (id: string): string => {
         const title = (kernel.titleOfRow(id) ?? '').trim();
         return title === '' ? 'Somebody with no name' : title.length > 80 ? `${title.slice(0, 79)}…` : title;
@@ -287,7 +283,7 @@ export function methods(deps: RecordDeps) {
       for (const g of groups.values()) {
         if (found.length >= limit) break;
         const seq = person(g.end)?.seq ?? null;
-        if (!admitted(seq)) continue;
+        if (!admitted(g.end)) continue;
         /* Said in the order they were folded, and when the last of them was. */
         const folded = [...g.folded].sort((a, b) => a.n - b.n);
         const { offered } = foldFill(

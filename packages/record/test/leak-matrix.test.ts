@@ -33,35 +33,18 @@ const FUZZ = Number(process.env.LEAK_FUZZ ?? 2);
 
 /**
  * The gaps §1.2 names, and the ones this matrix found that it does not (`N<n>`), by the test they hold open.
- * Each line is the todo's own sentence, so the run lists it.
+ * Each line is the todo's own sentence, so the run lists it. Slice 4 closed G1 (`sight-write.ts`), slice 3 G2 to G6 and N1 to N3 (`sight-read.ts`).
  */
 const GAP = {
-  G2: 'G2 context reads each list with kernel.inScope, without the private exclusion, so every agent is briefed on other people\'s private rows',
-  G3: 'G3 backlinks never checks the target row against the rule: a hidden row number answers with its id, where a missing one answers null',
-  G4: 'G4 metric checks only that the list can be read, so a narrowed caller gets a figure over the whole list and the row numbers behind it',
-  G5: 'G5 search matched counts the whole list, not the rows the caller is shown',
-  G6: 'G6 versionFor\'s cache key ignores wheres, and its shortcut assumes a row write cannot change which older lines a narrowed caller sees',
   G7: 'G7 the local copy\'s fingerprint (scopeOf) omits rules, so narrowing a colleague leaves the copy as it was',
   G8: 'G8 a removed member\'s poll is answered 403, and the app and the service worker wipe the copy only on a 401',
-  N1: 'N1 makePrivate writes a log line with no target ("Kept private: tasks#8"), so every reader\'s log, catch-up and version poll sees that a private row was made and its number',
-  N2: 'N2 a page filter\'s pill counts include other people\'s private rows, though the block under it does not',
-  N3: 'N3 a search hit\'s rank is BM25 over the whole index, so it moves when a row the caller cannot see is written',
 } as const;
 
 /** Which P1 tests are held open by a gap: the route, and the sentence. */
-const P1_OPEN: Record<string, string> = { backlinks: GAP.G3, context: GAP.G2 };
+const P1_OPEN: Record<string, string> = {};
 const MCP_OPEN: Record<string, string> = {};
 /** And which P2 tests: an answer that moves when something unseen does. */
-const P2_OPEN: Record<string, string> = {
-  recentHistory: GAP.N1,
-  whatsNew: GAP.N1,
-  boot: GAP.N1,
-  version: `${GAP.G6}; ${GAP.N1}`,
-  page: GAP.N2,
-  search: GAP.G5,
-  backlinks: GAP.G3,
-  metric: GAP.G4,
-};
+const P2_OPEN: Record<string, string> = {};
 
 let fixture: Promise<Fixture> | undefined;
 /** The read fixture, built once: P1 changes nothing on it. */
@@ -212,7 +195,7 @@ for (const route of P2_ROUTES) {
   });
 }
 
-test('P2 search rank: a hit\'s rank is the same after rows its caller cannot see are written', { todo: GAP.N3 }, async () => {
+test('P2 search rank: a hit\'s rank is the same after rows its caller cannot see are written', async () => {
   const moved: string[] = [];
   for (const shape of SHAPES.filter((s) => s.id !== 'adds')) {
     const f = await build();
@@ -251,7 +234,7 @@ test('P3 list, countBy and boot: matched, each count and the rail\'s counts are 
   assert.deepEqual(wrong, []);
 });
 
-test('P3 search: matched counts the rows the caller is shown, by list', { todo: GAP.G5 }, async () => {
+test('P3 search: matched counts the rows the caller is shown, by list', async () => {
   const f = await reads();
   const h = handlers(f);
   const wrong: string[] = [];
@@ -266,7 +249,7 @@ test('P3 search: matched counts the rows the caller is shown, by list', { todo: 
   assert.deepEqual(wrong.slice(0, 12), [], `${wrong.length} count(s) wrong`);
 });
 
-test('P3 page: a block\'s matched and its filter\'s pill counts are the visible rows', { todo: GAP.N2 }, async () => {
+test('P3 page: a block\'s matched and its filter\'s pill counts are the visible rows', async () => {
   const f = await reads();
   const h = handlers(f);
   const wrong: string[] = [];
@@ -288,7 +271,7 @@ test('P3 page: a block\'s matched and its filter\'s pill counts are the visible 
   assert.deepEqual(wrong, []);
 });
 
-test('P3 metric: a figure is a sum over the visible amounts only', { todo: GAP.G4 }, async () => {
+test('P3 metric: a figure is a sum over the visible amounts only', async () => {
   const f = await reads();
   const h = handlers(f);
   const wrong: string[] = [];
@@ -330,13 +313,14 @@ test('P4 get, history, comments and MCP get: a row out of sight answers as a row
   assert.deepEqual(unlike.slice(0, 12), [], `${unlike.length} refusal(s) told a hidden row from a missing one`);
 });
 
-test('P4 backlinks: a row out of sight answers as a row number nobody holds', { todo: GAP.G3 }, async () => {
+test('P4 backlinks: a row out of sight answers as a row number nobody holds', async () => {
   const f = await reads();
   const h = handlers(f);
   const unlike: string[] = [];
   for (const c of f.callers)
     for (const r of [...f.rows.values()].filter((x) => !f.visible(c, x))) {
-      const hidden = JSON.stringify(await ask(h, 'backlinks', { register: r.list, seq: r.seq }, c.ctx)).replaceAll(`"seq":${r.seq}`, '"seq":0');
+      /* BOTH ARE ANSWERED AS THE KERNEL ANSWERS A ROW THAT IS NOT THERE, `seq: null` (`read.test.ts`), or with the number asked. */
+      const hidden = JSON.stringify(await ask(h, 'backlinks', { register: r.list, seq: r.seq }, c.ctx)).replaceAll(`"seq":${r.seq}`, '"seq":0').replaceAll('"seq":null', '"seq":0');
       const none = JSON.stringify(await ask(h, 'backlinks', { register: r.list, seq: 999 }, c.ctx)).replaceAll('"seq":999', '"seq":0').replaceAll('"seq":null', '"seq":0');
       if (hidden !== none) unlike.push(`${c.label} ${r.canary.label}`);
     }
@@ -368,7 +352,7 @@ test('P5 a narrowed writer cannot edit, delete, note or create a row outside its
 
 /* ── G6 to G8: the version poll and the local copy ──────────────────────── */
 
-test('G6 the version poll of a reader held to Kiln agrees with a fresh read after her newest row leaves Kiln, and after her rule changes', { todo: GAP.G6 }, async () => {
+test('G6 the version poll of a reader held to Kiln agrees with a fresh read after her newest row leaves Kiln, and after her rule changes', async () => {
   const f = await build({ shapes: SHAPES.filter((s) => s.id === 'kiln-reader' || s.id === 'owner') });
   const h = handlers(f);
   const version = async (ctx: CallContext, api = f.api) => ((await ask(api === f.api ? h : handlers({ ...f, api }), 'version', {}, ctx)) as { value: { version: number } }).value.version;
