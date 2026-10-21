@@ -72,6 +72,21 @@
     grid-template-columns: var(--well) minmax(0, 1fr) auto;
   }
 
+  /* A ROW OF ONE LINE IS CENTRED ON ITS HEIGHT (UI pass of 21 October, P42): its title, well and switch on the row's
+     middle, not its words at the top of a 56px row with the space under them. */
+  .state-row:not(:has(.state-line)) {
+    align-items: center;
+  }
+
+  .state-row:not(:has(.state-line)) .state-icon {
+    align-self: center;
+    margin-block-start: 0;
+  }
+
+  .state-row:not(:has(.state-line)) .state-act {
+    margin-block: 0;
+  }
+
   /* THE HAIRLINE RUNS UNDER THE WORDS, from the title's edge, as a list's does on the ground: the well column is the
      group's margin, and a line cut through it reads as a table's rule. */
   /* `:global` ON THE ONE BEFORE, because it is another instance of this component: a row cannot see its sibling from
