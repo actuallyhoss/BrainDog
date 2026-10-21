@@ -176,7 +176,7 @@ This is the central design decision of the MCP surface and it exists because of 
 
 ### `tools/list_changed`
 
-Not pushed, and not needed for the tools: the server is stateless, the seventeen do not change on an install, and no
+Not pushed, and not needed for the tools: the server is stateless, the sixteen do not change on an install (they are cut to the caller, §9), and no
 tool description names a register. A register added or removed is seen through `record_index`, `context` and
 `resources/list`, and a client holding a stale register name is answered `REGISTER_UNKNOWN` with the registers there
 are in `allowed` ([44-SPEC-MCP](44-SPEC-MCP.md) §5.6).
@@ -241,7 +241,7 @@ record's answer ends.
 
 **3 · `ttlMs` on every list.** `tools/list` gets `ttlMs: 3600000` and `cacheScope: "private"`, the scope for
 anything a record answers; `server/discover` alone is `"public"`, because it reads nothing and is the same for every
-caller ([44-SPEC-MCP](44-SPEC-MCP.md) §4.3). The seventeen do not change on an install and no tool description names a
+caller ([44-SPEC-MCP](44-SPEC-MCP.md) §4.3). The sixteen do not change on an install (they are cut to the caller, §9) and no tool description names a
 register (§3), so a client holds the list for its hour without holding anything stale. This also keeps the client's
 *upstream prompt cache* stable across reconnects, which the 2026-07-28 spec calls out explicitly as a goal of the
 field.
@@ -515,6 +515,46 @@ decides; a credential never goes in the record, and `braindog keys put` deposits
 record a learning only when a future session would otherwise go wrong; call `meet`; a refusal names the fix;
 **everything you write is read on a phone.** The predecessor duplicates them into descriptions anyway, *"because not all clients honour it."* BrainDog
 does not: its descriptions say when to reach for each tool, and every client is sent the instructions twice.
+
+---
+
+## 9 · What the person tells an agent, and how it is configured
+
+Built on 21 October 2026. The spec is [44-SPEC-MCP](44-SPEC-MCP.md) §15. This is the short version.
+
+**Sixteen tools.** `instructions` joined. `schema` folded into `record_index {register}` and `history` into
+`get {history: true}`; both stay callable until 20 December 2026 and are not listed. The 2,760-token ceiling did not
+move: the list is 2,739.
+
+**He can tell an agent something.** In the app he writes one line to a run, to an agent kind on a project, to whoever is
+next, or on a task. The agent sees it in four ways:
+
+1. `context` leads with it, and the start hook prints it.
+2. Any tool answer can carry one line, "New for you".
+3. In Claude Code, a hook adds it to the next prompt, from a file the bridge keeps fresh.
+4. Opt in: a Claude Code channel, for a push while the agent works.
+
+An agent without hooks, such as Codex or Cursor, gets 1 and 2, and reads with `instructions` when it asks. The app says
+which agents can be reached now and which only at their next call.
+
+**The agent answers.** `instructions {take}` takes one, and only one run can. `instructions {reply, said, state}` answers
+with `done`, `needs_you` or `declined`. The app shows Sent, Seen (and how), Working, then the reply and what changed,
+with Undo.
+
+**Stop and pause hold.** The record refuses a stopped run's writes for every client (`RUN_STOPPED`, `RUN_PAUSED`). In
+Claude Code a hook also denies the next tool call. An agent without hooks is stopped at its next BrainDog call.
+
+**Settings are per kind of agent.** How far it may go, which lists, which tools, a brief, quiet hours, limits and what
+to tell him on finish. New agents start at Suggest. Only he changes a row, signed in to the app, and no token can.
+`tools/list` is cut to what the caller may use, so a narrower agent pays fewer tokens, and a tool turned off is refused
+`TOOL_OFF` with the setting named.
+
+**Prompts.** `/braindog:start`, `/braindog:wrap` and `/braindog:ask` say the steps in order.
+
+**The pulse.** The bridge tells the record every 15 seconds that the run is open and hears what is pending. It writes no
+version and no history. A WebSocket is not used (ADR-075).
+
+**Refusals added:** `PATCH_EMPTY`, `NAME_AMBIGUOUS`, `TOOL_OFF`, `RUN_STOPPED`, `RUN_PAUSED`.
 
 ---
 
