@@ -316,7 +316,7 @@ export type MoneyShown = { lists: readonly string[]; hidden: boolean; figures: r
  * WHAT THEY WILL SEE, MONEY INCLUDED, SAID PLAINLY (the owner's call of 21 October): "Priya will see Kiln's tasks,
  * notes and money: £18,400 earned in a year." From `sharePreview`'s counts and money: each list it reaches rows of now
  * by name (a project's own row is the project, not a list in it), then money with the project's own figures, or
- * "amounts included", or "with every amount hidden", and why when it is hidden because they are outside his team.
+ * "amounts included", or "with money figures hidden", and why when it is hidden because they are outside his team.
  * `drawn` writes the record's "GBP 18,400.00" as the screen draws money. `null` for a share of named rows.
  */
 export function seenSaid(
