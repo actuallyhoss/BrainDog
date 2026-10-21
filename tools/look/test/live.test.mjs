@@ -16,7 +16,7 @@ import { after, before, test } from 'node:test';
 
 import { ROUTES } from '../../../packages/host/src/index.ts';
 import { LOOKS, outFor, ROOT, serve } from '../run.mjs';
-import { allowed, open } from '../sources/live.mjs';
+import { READING, allowed, open } from '../sources/live.mjs';
 
 const TOKEN = 'rec_01J8Z3N4W5X6Y7Z8A9B0C1D2E3.not-a-real-secret-but-a-long-one';
 const heard = [];
@@ -152,7 +152,10 @@ test('a live look writes only under loop/proof/looks', () => {
 });
 
 test('a read sent as a POST goes on, and it is the only write-marked route that does', () => {
-  const posts = ROUTES.filter((r) => r.writes && r.postRead).map((r) => r.name);
+  const posts = ROUTES.filter((r) => r.writes && r.postRead && READING.has(r.group)).map((r) => r.name);
   assert.deepEqual(posts, ['previewPage']);
   assert.ok(allowed().has('previewPage'));
+  /* THE SHARE SHEET'S PREVIEW IS A READ SENT AS A POST TOO, so See as may ask it, and it is ADMIN, so it never goes on. */
+  assert.ok(ROUTES.some((r) => r.name === 'sharePreview' && r.postRead));
+  assert.ok(!allowed().has('sharePreview'));
 });
