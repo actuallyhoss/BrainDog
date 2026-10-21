@@ -26,6 +26,7 @@ import { MISSING, exponentOf, money, writeAmount } from 'braindog-render';
 import type { QueueQuestion } from '@braindog/kernel';
 
 import { homeCurrency } from '../record/api.ts';
+import { REGISTERS } from '../record/held.ts';
 import { namesAmount } from '../record/money.ts';
 
 import type { FieldDecl, PageBlock, RegisterDecl } from '../record/schema.ts';
@@ -1264,8 +1265,17 @@ function lateBeyond(b: LiveBlock, today: string): number {
  */
 export type LateSums = { owed: Map<string, number>; bills: Map<string, number>; billCount: number; things: number };
 
-/** The list of bills and invoices, the one whose late rows are the late money (`overdue` and `late-in` in money-core). */
-const BILLS = 'obligations';
+/**
+ * WHETHER A LIST'S LATE ROWS ARE BILLS, read off its declaration and never its name: a list that owes an amount once
+ * (a required money field), not one a cadence repeats (an amount paired with its period by `qualifies`) and not one
+ * whose cost may be left blank (a service). A list the reader holds no declaration for is counted, as it always was.
+ */
+const billsIn = (list: string): boolean => {
+  const decl = REGISTERS[list];
+  if (!decl) return true;
+  const owed = decl.fields.find((f) => f.type === 'money' && f.required === true);
+  return owed !== undefined && owed.qualifies === undefined && !decl.fields.some((f) => f.qualifies === owed.id);
+};
 
 export function lateSumsOf(blocks: readonly LiveBlock[], today: string): LateSums {
   const out: LateSums = { owed: new Map(), bills: new Map(), billCount: 0, things: 0 };
@@ -1303,7 +1313,7 @@ export function lateSumsOf(blocks: readonly LiveBlock[], today: string): LateSum
       /* A BILL IS A ROW OF BILLS AND INVOICES, the list Money's "Bills late" and the list's own "2 late" sum. A repeating
          charge whose day went by, or a renewal, carries money too, but it is a late thing and not a bill: counted in,
          Today said £10,593 of bills against Money's £10,540. */
-      if (typeof fields.list === 'string' && fields.list !== BILLS) {
+      if (typeof fields.list === 'string' && !billsIn(fields.list)) {
         lateRow(fields.list);
         continue;
       }

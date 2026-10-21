@@ -775,19 +775,28 @@ test('a feed line says a day as "10 Sep", never the record\u2019s ISO date (toda
   assert.equal(dayWords('nothing dated'), 'nothing dated');
 });
 
-test('A LATE BILL IS A ROW OF BILLS AND INVOICES: a repeating charge or a renewal past its day is a late thing, so Today sums what Money sums', async () => {
+test('A LATE BILL IS A ROW OF A LIST THAT OWES ITS AMOUNT ONCE: a repeating charge or a renewal past its day is a late thing, so Today sums what Money sums', async () => {
   const { lateSumsOf } = await import('./default-home.ts');
+  const { REGISTERS } = await import('../record/held.ts');
+  const decl = (id: string, fields: Record<string, unknown>[]) => ({ id, name: id, one: id, title: 'what', mobile: [], fields }) as never;
+  REGISTERS.bills = decl('bills', [{ id: 'amount', type: 'money', required: true }]);
+  REGISTERS.repeats = decl('repeats', [{ id: 'amount', type: 'money', required: true, qualifies: 'every' }]);
+  REGISTERS.renewals = decl('renewals', [{ id: 'cost', type: 'money' }]);
   const gbp = (amount: number) => ({ amount, currency: 'GBP' });
   const late = block({ kind: 'spec', source: 'deadlines' }, [
-    { list: 'obligations', row: 'obligations#20', day: '2026-07-01', amount: gbp(919000), direction: 'out' },
-    { list: 'obligations', row: 'obligations#1', day: '2026-07-27', amount: gbp(480000), direction: 'in' },
-    { list: 'recurring', row: 'recurring#7', day: '2026-08-30', amount: gbp(3900), direction: 'out' },
-    { list: 'services', row: 'services#2', day: '2026-08-30', amount: gbp(1400), direction: 'out' },
-    { list: 'obligations', row: 'obligations#3', day: '2026-09-01', amount: gbp(135000), direction: 'out' },
+    { list: 'bills', row: 'bills#20', day: '2026-07-01', amount: gbp(919000), direction: 'out' },
+    { list: 'bills', row: 'bills#1', day: '2026-07-27', amount: gbp(480000), direction: 'in' },
+    { list: 'repeats', row: 'repeats#7', day: '2026-08-30', amount: gbp(3900), direction: 'out' },
+    { list: 'renewals', row: 'renewals#2', day: '2026-08-30', amount: gbp(1400), direction: 'out' },
+    { list: 'bills', row: 'bills#3', day: '2026-09-01', amount: gbp(135000), direction: 'out' },
   ]);
-  const sums = lateSumsOf([late], '2026-09-03');
-  assert.equal(sums.bills.get('GBP'), 1054000, '£10,540, as Bills late on Money and "2 late" on the list');
-  assert.equal(sums.billCount, 2);
-  assert.equal(sums.owed.get('GBP'), 480000);
-  assert.equal(sums.things, 2, 'the charge and the renewal are late things');
+  try {
+    const sums = lateSumsOf([late], '2026-09-03');
+    assert.equal(sums.bills.get('GBP'), 1054000, '£10,540, as Bills late on Money and "2 late" on the list');
+    assert.equal(sums.billCount, 2);
+    assert.equal(sums.owed.get('GBP'), 480000);
+    assert.equal(sums.things, 2, 'the charge and the renewal are late things');
+  } finally {
+    for (const id of ['bills', 'repeats', 'renewals']) delete REGISTERS[id];
+  }
 });
