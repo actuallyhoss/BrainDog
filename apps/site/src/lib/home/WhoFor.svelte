@@ -234,6 +234,7 @@
 
     .trio {
       gap: 12px;
+      margin-block-start: 24px;
     }
 
     /* The icon sits beside the title, so a tile is four short lines. */

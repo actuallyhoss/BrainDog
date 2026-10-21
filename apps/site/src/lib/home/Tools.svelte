@@ -105,6 +105,11 @@
     color: var(--on-night);
   }
 
+  /* THREE NOTES SAY IT on a desk: a fourth would only stretch the tile past the connect box beside it. */
+  .note:nth-child(n + 4) {
+    display: none;
+  }
+
   .dev {
     display: inline-flex;
     align-items: center;
@@ -136,7 +141,7 @@
 
   @media (max-width: 760px) {
     .body {
-      margin-block-start: 28px;
+      margin-block-start: 24px;
     }
 
     /* ON A PHONE, TWO NOTES SAY IT, and the connect line is the hero's button and the /agents page's. */

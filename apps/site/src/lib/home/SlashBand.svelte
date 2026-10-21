@@ -84,7 +84,7 @@
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    margin: 0 0 20px;
+    margin: 0 0 16px;
     font: 600 20px/1 var(--head);
     letter-spacing: -0.02em;
   }

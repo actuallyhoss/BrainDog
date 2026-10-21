@@ -264,8 +264,8 @@
     display: flex;
     gap: 12px;
     align-items: flex-start;
-    margin-block-start: 24px;
-    padding-block-start: 20px;
+    margin-block-start: 20px;
+    padding-block-start: 16px;
     border-block-start: 1px solid var(--red-rule);
     font-size: var(--t-site-17);
     line-height: 1.5;
@@ -300,13 +300,22 @@
     }
   }
 
+  /* ONE QUESTION AT A TIME, answering it brings the next up, beside three chores (two on a phone). The rest stay in
+     the HTML for a reader without the drawing. */
+  .ask:nth-child(n + 2),
+  .item:nth-child(n + 4) {
+    display: none;
+  }
+
+  .ask:first-child {
+    padding-block-end: 0;
+  }
+
   @media (max-width: 760px) {
     .body {
-      margin-block-start: 28px;
+      margin-block-start: 24px;
     }
 
-    /* ON A PHONE, ONE QUESTION AT A TIME AND TWO CHORES: answering one brings the next up. */
-    .ask:nth-child(n + 2),
     .item:nth-child(n + 3) {
       display: none;
     }

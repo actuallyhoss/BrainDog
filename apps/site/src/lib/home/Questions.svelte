@@ -115,7 +115,7 @@
 
   @media (max-width: 1059px) {
     .qs {
-      margin-block-start: 28px;
+      margin-block-start: 24px;
     }
   }
 
