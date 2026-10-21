@@ -68,7 +68,10 @@
 </script>
 
 {#if alone || any}
-  <section class="needs-foot" data-needs-foot data-alone={alone ? '' : undefined} aria-label={alone ? undefined : heading}>
+  <!-- NOT A LANDMARK OF ITS OWN UNDER THE QUEUE: there it is the lower part of the Needs you tile, which is already the
+       region named Needs you, and a second region of the same name gave a landmark list two alike with no way to tell
+       which is which. Unnamed, a section is no landmark, and its lines read as the tile's. -->
+  <section class="needs-foot" data-needs-foot data-alone={alone ? '' : undefined}>
     {#if alone}
       <header class="nf-head">
         <IconWell name="inbox" size="m" />
