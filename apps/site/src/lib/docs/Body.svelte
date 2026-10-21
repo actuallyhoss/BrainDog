@@ -147,6 +147,12 @@
     margin-block: var(--sp-5);
   }
 
+  /* A doc's tables are a few rows, so they draw at once: the skin's `content-visibility: auto` left them blank to a
+     reader that does not scroll, a full-page capture and a printout. */
+  .doc-text :global(.rowgroup) {
+    content-visibility: visible;
+  }
+
   /* CODE SITS IN A WELL OF THE TILE'S FILL ON THE PAPER, and a long line scrolls inside it, never the page. */
   .doc-text :global(pre) {
     max-inline-size: 100%;

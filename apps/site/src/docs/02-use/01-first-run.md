@@ -1,4 +1,4 @@
-# Making a record
+# Making your BrainDog
 
 A record is your own BrainDog: its lists, its pages and the history of every change. Making one takes an email address, a name for it, and one sentence about who you are.
 
