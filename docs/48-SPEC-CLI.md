@@ -50,9 +50,13 @@ of four codes (§4.4).
 | `keys exec <label \| credentials#n> -- <command> [args...]` | `--as <ENV_NAME>` · `--vault <project>` · `--host <host>` | `POST /api/vault/open { label }` or `{ credential }`, as `put`; then the command, with no shell, its own standard streams, and the key in one environment variable, named by `--as` or made from the label. On Windows the command is found through PATH and PATHEXT, and a `.cmd` or `.bat` starts through `cmd.exe /d /v:off /s /c` with every argument escaped for it and the key never on that line | nothing of its own, and never the value; a missing command, a bad `--as`, a label no name can be made from, a name that changes how a command runs (§8), or a batch file's argument that cannot be escaped is one sentence before any request | the command's exit code (1 for a signal) · 1 · 3 |
 | `run <label \| credentials#n> -- <command> [args...]` | `--as <ENV_NAME>` · `--vault <project>` · `--host <host>` | `keys exec`, dispatched to unchanged. It is a shorter name, not a second door, and never prints a key | what `keys exec` prints | the command's exit code (1 for a signal) · 1 · 3 |
 | `keys headers <credentials#n \| label>` | `--as <Header>`, required · `--vault <project>` · `--host <host>` | nothing when standard output is a terminal, which is refused first; otherwise `POST /api/vault/open { credential }` or `{ label }` under a vault grant and never the login, as `exec`, which the host logs as a `grant.read` (§5.16) | `{"<Header>":"<value>"}` and a line break on stdout, for a program that reads it, such as Claude Code's `headersHelper`, and nothing else. A terminal, a header name outside letters, digits, `-`, `_` and `.`, and a key holding a character a header cannot carry are one sentence each on stderr, and print no key | 0 · 1 · 3 |
+| `keys helper <credentials#n \| label>` | `--vault <project>` · `--host <host>` | as `keys headers`, by the same path: nothing when standard output is a terminal, which is refused first; otherwise `POST /api/vault/open { credential }` or `{ label }` under a vault grant and never the login (§5.16) | the key alone and a line break on stdout, for a program that reads it, such as Claude Code's `apiKeyHelper`, and nothing else. A terminal and a key holding a character a header cannot carry are one sentence each on stderr, and print no key | 0 · 1 · 3 |
 | `skills sync` | `--host <host>` · `--dry-run` | `GET /api/context`; `GET /api/get` for each skill it writes or checks; `POST /api/propose` with a rowset update of `body` and `rev` for a local edit; `POST /api/create` with `managed: false` for a file found by hand. Writes `<CLAUDE_CONFIG_DIR or ~/.claude>/skills/<name>/SKILL.md` or `commands/<name>.md`, a project's under `<top-level>/.claude/`, and the lock at `~/.braindog/skills-lock.json` | one line per file written, updated, deleted, kept and proposed, or registered, a file in a repository marked `(in the repository, not committed)`; `Skills are in sync.` when there was nothing to do | 0 · 1 · 3 |
 | `doctor` | `--replaced <replace.json>` · `--under <folder>` · `--config-dir <folder>` · `--json` | nothing on the network. Reads each profile's settings and servers file, every other agent app's servers file through the clients table, the folders named by `--under`, `crontab -l` and `ps -A`, and writes none of them (§5.18) | one line per profile and per other app, then up to three headings (`Still naming <tool>:`, `Shaped like a key, and the value is never shown here:`, `Not as braindog install leaves a profile:`), each place by its file and its entry, then one `Started before this command was updated: restart <app>.` line per app, then `<n> places to fix.` or `Nothing to fix.`; never a value | 0 · 1 |
 | `env diff` | `--config-dir <folder>` · `--host <host>` · `--json` | on the network only when this machine holds a login: `list` of the tools and the skills lists, in pages of fifty, under the login and with no session headers, so it opens no run. Reads each profile's settings, servers file, skills folder and CLAUDE.md, the profiles `doctor` finds, ccenv's under `CCENV_HOME` among them, and writes none of them | one line per profile with how many servers, plugins, hook events and skills it holds and its CLAUDE.md's hash; then `Missing beside the other profiles:`, `Not the same in every profile:` (a server's entry or CLAUDE.md, by hash) and `Against the record's <n> tools and <n> skills that apply everywhere:`, the profiles that lack the same names on one line; then `<n> differences, by name and hash only.` or `Nothing differs.`. A name shaped like a key is `[hidden name <n>]`; never a value | 0 · 1 |
+| `env apply` | `--profile <name>`, repeatable · `--dry-run` · `--yes-data` · `--host <host>` | in each profile `doctor` finds, or each named, `setup`'s steps 2 to 5 (§5.19): `install --apply` over that profile, `claude mcp add-json braindog` and each tool's `claude mcp add-json` with its `CLAUDE_CONFIG_DIR`, `skills sync` into its folder, and with a list in the role `profiles` its rules in a marked block of its CLAUDE.md. The record by `schemas`, `list`, `get` and `context` under the login with no session headers. An entry that runs a program is asked y/N at a terminal and pinned in `~/.braindog/pins.json` before it is placed | a line per step and profile with its command's own lines under it, each program entry whole with whether it is approved here; then what was left out for want of approval, and `Applied to <profiles>.` or `Nothing changed: every profile already holds what the record applies to it.`. `--dry-run` writes, runs, asks and pins nothing | 0 · 1 |
+| `env pins` | `--forget <name>` · `--json` | nothing on the network: `~/.braindog/pins.json`, which `--forget` alone writes | one line per approved entry, oldest first: its name, its kind, the profiles it was placed in, the first twelve of its hash and the day it was approved; with `--forget`, how many pins of that name went | 0 · 1 |
+| `env check` | `--profile <name>`, repeatable · `--json` | no request of its own: `claude mcp list` once a profile, with that profile's `CLAUDE_CONFIG_DIR` and with none for the default one, in the home folder, three at once and thirty seconds each. The `claude` found on the path is asked y/N at a terminal and pinned before its first run (§5.19) | a line per profile with how many servers stand how, then a line per status naming its servers; last, how many need a sign-in or failed, or `Nothing waits on a sign-in and nothing failed.`. A server by its name alone, and a name shaped like a key as `[hidden name <n>]` | 0 · 1 |
 | `sync inventory` | `--under <folder>` · `--host <host>` · `--json` | on the network only when this machine holds a login: `list` of the skills list, as `env diff` reads it. Names and sizes by `stat`, and no file it lists is opened; the skills lock is read when the record is not. In each repository under `--under`, `git --no-optional-locks status --porcelain=v1 -z --ignored`, `git rev-list --count --branches --not --remotes` and `git rev-parse --git-common-dir`, and nothing that writes | each group by name and size: auto memory (`projects/<project>/memory/` alone), the context folder, the programs in `~/.local/bin`, ccenv's shared files, the skills the record does not hold, the `.env` files git ignores by repository; each repository's commits on no remote and changes not committed, a linked worktree as one of its checkout; then `It would refuse:` with why (a sign-in, session transcripts, a plugin cache, a cache, a link, a name that says it may hold a key); then `It would carry <n> files, <size>, and refuse <n> things.` | 0 · 1 |
 | `tools scan` | `--host <host>` · `--dry-run` | reads `<top-level>/.mcp.json` and `~/.claude.json` (`mcpServers`, and `projects[<path>].mcpServers`) and writes neither; `GET /api/context` and `/api/get`; `POST /api/create` for a new server, `POST /api/update` of `hosts` and `seen` for a matching row, `POST /api/propose` with a rowset for one that differs, asked as `Change how <name> starts?`; a server with no row of its name is matched to the row of its scope that starts the same way (the same command and arguments, or the same address), which is stamped as seen with nothing added or asked; each key through `keys put` | one line per server recorded, proposed or skipped, and one sentence when keys were recorded by name only for want of a vault grant, which the start hook says once per host until a grant is kept; never a value | 0 · 1 · 3 |
 | `tools write` | `--scope user\|project` · `--dry-run` · `--host <host>` | `GET /api/context` and `/api/get`; reads the entry already in `~/.claude.json` or `<top-level>/.mcp.json`; with `--scope`, `claude mcp remove` and `claude mcp add-json <name> <json> --scope <scope>`, only for an entry that is absent, still what `~/.braindog/tools-lock.json` says was written, or still the command the scan read | each entry it would add or replace, as `+ <name> at <scope> scope: <json>` or `~ …`, a line for each need an entry cannot carry, then what was applied; no entry holds a value. A stdio tool's key is wrapped in `keys exec`, and an HTTP tool's header key is named by a `headersHelper` that runs `keys headers` (§5.16) | 0 · 1 · 3 |
@@ -102,6 +106,8 @@ their rows above.
 their rows above.
 `env diff` and `sync inventory` came after those, for the several profiles one machine runs and what a setup sync
 would carry from it, and have their rows above.
+`keys helper`, `env apply`, `env pins` and `env check` came after those, for what each of those profiles is given
+and the programs placed in it, and have their rows above.
 `--json` **is built.** Exactly one JSON document on stdout, every progress line moved to stderr, and the flag is
 taken out of the arguments before dispatch so no command's own `parseArgs` has to know a global exists
 (`apps/cli/src/json.ts`). `mcp` is excluded, because its stdout is the protocol; §4.5 lists the other six.
@@ -479,9 +485,10 @@ streams through. `usecase preview` was the seventh and was missed at first: it s
 `stdio: 'inherit'`, so the child owns the process's stdout until Ctrl+C, and `usecase preview <file> --json` left
 `BrainDog self-host listening on ...` above the document, which `JSON.parse` throws on. Each of the seven is left
 off the flag rather than made to refuse it, so the command's own strict `parseArgs` refuses it in the command's own
-words. `keys headers` and `setup` are left off it for the same reason: the first prints the one header document a
-program reads from stdout, and the second prints for a person while its first step may wait for six digits (§5.15,
-§5.16).
+words. `keys headers`, `keys helper`, `setup` and `env apply` are left off it for the same reason: the first two
+print the one header document or the one key a program reads from stdout, `setup` prints for a person while its first
+step may wait for six digits, and `env apply` prints for a person while it asks y/N at the terminal (§5.15, §5.16,
+§5.19).
 
 **No token is ever in this document**, on any path. It carries only lines a command already wrote to stdout,
 sentences it already wrote to stderr, refusals a host sent, and values a command handed over by name; the bearer is
@@ -900,9 +907,9 @@ only when no step did: no login asked for, no default moved, no hook added, no e
 steps 4 and 5. `--dry-run` asks for no login, writes no file, runs no `claude`, and reads the record only with a login
 already held; without one it says steps 4 and 5 were not read.
 
-### 5.16 · `keys headers` and a tool's `headersHelper` (`keys.ts`, `tools.ts`)
+### 5.16 · `keys headers`, `keys helper` and a tool's `headersHelper` (`keys.ts`, `tools.ts`)
 
-The one command that prints a key. Claude Code runs an HTTP MCP server's
+The one function that prints a key, behind two commands. Claude Code runs an HTTP MCP server's
 `headersHelper` when it connects and reads the server's headers, as a JSON object, from that command's standard
 output and nowhere else, so a key an HTTP tool needs in a header reaches it no other way. `tools write` renders an
 HTTP tool whose `needs` hold `header:<Header>=credentials#N` as
@@ -927,6 +934,12 @@ write it. `keys headers <credentials#n | label> --as <Header>`:
    `secret-grep-headers` holds it to that.
 
 If owner item 3 takes the command back, `tools write` leaves the header out again and says so.
+
+`keys helper <credentials#n | label>` is the same door for Claude Code's `apiKeyHelper`, which a profile that runs on
+an API key reads its key from: a command's standard output, trimmed, sent in a header. It takes `--vault` and `--host`
+and no `--as`, runs steps 1, 3 and 4 above, and `headersOne` prints the key alone and a line break. A key outside
+printable ASCII is refused there too, since Claude Code refuses one. Nothing here writes an `apiKeyHelper` into a
+profile yet; when `env apply` does, it is a program entry (§5.19).
 
 ### 5.17 · `braindog update [--check]` (`update.ts`)
 
@@ -1005,6 +1018,70 @@ At least one of `hooks`, `programs`, `hosts` and `skills` holds something, or th
 by `install --replace`, and listed by `doctor`, only when its description line holds one of `skills`: a folder of notes
 that mentions the old host in its body is nobody's skill, and one with no front matter says nothing about whose it is.
 
+### 5.19 · `env apply`, `env pins` and `env check` (`env-apply.ts`, `pins.ts`, `env-check.ts`)
+
+One machine runs several Claude Code profiles: the default `~/.claude`, each `~/.claude-<name>`, and ccenv's under
+`CCENV_HOME`. These three put the record's own set-up in each, say what was approved to run there, and ask each what
+its servers say. The profiles are the ones `doctor` finds, named as `env diff` names them: `default`, `<name>` for
+`.claude-<name>`, and a ccenv profile by its own name, which is what `--profile` takes.
+
+**`env apply [--profile <name>...] [--dry-run] [--yes-data] [--host <host>]`** runs `setup`'s steps 2 to 5 (§5.15) in
+each profile, with setup's own code:
+
+1. **Hooks.** `install --apply` over that profile alone, its plan printed first.
+2. **MCP server.** `registerServer`: `claude mcp add-json braindog <json> --scope user` with that profile's
+   `CLAUDE_CONFIG_DIR`, and with none for the default one, a copy of its servers file kept first.
+3. **Tools.** `tools write --scope user` into that profile's own servers file (`~/.claude.json` for the default one,
+   `<profile>/.claude.json` for any other), each entry's lock key naming the profile, so what was written in one is
+   never read as what was written in another.
+4. **Skills.** `skills sync` into that profile's folder. A folder two profiles reach through a link, as ccenv makes
+   them, is synced once, with the skills given to either.
+5. **Rules**, with the Profiles add-on: the profile's `rules` in a block of its `CLAUDE.md` between two lines of their
+   own, `<!-- braindog: this profile's rules from Profiles. Change them there; braindog env apply writes this block. -->`
+   and `<!-- braindog: end of the rules from Profiles. -->`. The block is replaced where it stands, added at the end
+   after a blank line, or taken out with that line when the rules are empty; every other byte, line endings included,
+   is the person's, and a copy of the file is kept before its first change. A start with no end, or rules holding a
+   marker line, change nothing and are said.
+
+**Which profile gets what.** The add-on is a list whose declaration plays the role `profiles`, found through `schemas`.
+A record with none says `Install the Profiles add-on to choose per profile; applying what applies everywhere.` once,
+and every profile gets what applies everywhere. With one, a row is a Claude Code profile when its `app` is empty or
+names Claude, matched to a profile by name without case. A tool or skill whose `profiles` field names profiles, by name
+or by a ref to a row, goes to those alone, and one whose field is empty to every profile.
+
+**A program is approved on this machine before it is placed**, as a runner's job kind is (§5.13, step 4). A program
+entry is BrainDog's hooks, its MCP server, or a tool whose entry has a `command` or a `headersHelper`. Each is printed
+whole in its step's plan, asked `Allow <it> to run from Claude Code on this machine? [y/N]` once a run however many
+profiles it goes into, and a yes is pinned in `~/.braindog/pins.json` by the SHA-256 of its kind, its name and the entry
+whole. The same entry is not asked about again, and a changed one is, its new pin replacing the old. A no, or no one at
+a terminal, leaves the entry out, and the last lines name each with the profiles it was left out of. Plain data (an
+HTTP server with no helper, a skill, the rules block) is written with its line and no question.
+
+**Planned, then asked, then written, a step at a time**, so no request to the record waits on a person. At a terminal
+the data is written as the run goes. With no terminal, `--yes-data` writes the plain data and the programs already
+pinned, and asks nothing; without it the run is its plan, and exits 1 when anything waits. `--dry-run` writes no file,
+runs no `claude`, asks nothing and pins nothing.
+
+**No key is written.** A tool's key is named by the command that opens it, `keys exec` or `keys headers` (§5.16), and
+never held. A tool entry, or a profile's rules, that look like a key are left out and said, and such an entry is not
+printed. The record is read under the login with no session headers, as `env diff` reads it. Signed out, unreachable or
+refused, the hooks and the server are still placed and the rest waits, with exit 1. A status line and an
+`apiKeyHelper` are not placed yet; when they are, each is a program entry.
+
+**`env pins [--forget <name>] [--json]`** lists what is pinned, oldest first: each entry's name, its kind, the profiles
+it was placed in, the first twelve of its hash and the day it was approved. `--forget` drops every pin of a name, so it
+is asked about the next time it is placed, and exits 1 when none had that name. The file holds those five things and
+never an entry.
+
+**`env check [--profile <name>...] [--json]`** runs `claude mcp list` in each profile, with that profile's
+`CLAUDE_CONFIG_DIR` and with none for the default one, in the home folder so no repository's `.mcp.json` is read beside
+the profile's own, three at once and thirty seconds each. Claude Code connects to every server to check it, so `claude`
+is a program entry: the file found on the path, with `mcp list`, is shown whole and asked y/N the first time and pinned;
+with no terminal and no pin it does not run, and not on the path it is one sentence. Each server is said by its name and
+its mark alone (connected, needs a sign-in, failed, waits for approval in a session, turned off), never by the words
+Claude Code prints after the mark, which may quote an error. It changes nothing but the pin a yes keeps, and exits 1
+when a server needs a sign-in or failed, or a profile's list was not read.
+
 ## 6 · Refusals and errors
 
 **One sentence per refusal** ([30-BLUEPRINT](30-BLUEPRINT.md) §6, the CLI row):
@@ -1079,13 +1156,16 @@ Startup has nothing to load but one file: no dependency resolution, no `node_mod
 | `export` · `import` | the `.brainl` is verified after it arrives and before it is sent; the `.brain` and `.brainl` are written `0600` — they carry the whole record with its sealed grants (03 §5) |
 | Attachments | bytes are hashed before they are written under their name; the content address is the check |
 | The runner | `--strict-mcp-config`, and `--allowedTools`, `--permission-mode` (`dontAsk` or `acceptEdits`) and `--max-turns` from the approved kind and nothing wider; `--restricted` and `--disable-slash-commands` only where the installed help lists them; the kind's repository folder from this machine's own map, or an empty folder it owns; the kernel's `jobBody` lint run again on the claim, one-line arguments of at most 64 characters, a kind pinned on each machine by its SHA-256 before its first run, the version gate, the job bearer only inside a `0600` `mcp.json` deleted after the job; never `--bare`, never `--dangerously-skip-permissions` (26 §4.4: one flag turns on [C]). The dedicated unix user and the hardened systemd unit of 26 §5 are the operator's ([53-SPEC-OPERATIONS](53-SPEC-OPERATIONS.md)) |
-| `keys` | the value is read from stdin, never an argument, and one command prints a key, `keys headers`, to a program and never to a terminal (§5.16): `exec` puts it into the environment of the one command it spawns, with no shell, and never on stdout, stderr or a file; it travels only in the one deposit request and the one read's answer, neither of which follows a redirect. The vault grant goes only to `/api/vault/*`, and no sentence quotes a value, a grant or a label (12 §6 rule 9). `exec` never puts a key in a variable that changes how a command runs, whether `--as` names it or a label makes it: `PATH`, `PATHEXT`, `HOME`, `USERPROFILE`, `SHELL`, `ENV`, `BASH_ENV`, `COMSPEC`, `SYSTEMROOT`, `WINDIR`, `NODE_OPTIONS`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONSTARTUP`, `PYTHONHOME`, `RUBYOPT`, `RUBYLIB`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `PROMPT_COMMAND`, `PS4`, `IFS`, `SHELLOPTS`, `BASHOPTS`, `ZDOTDIR`, and any name starting `NODE_`, `LD_` or `DYLD_`. On Windows a `.cmd` or `.bat` runs through `cmd.exe` with AutoRun and delayed expansion off and every argument caret-escaped twice, once for `cmd.exe` and once for the batch file's `%*`, so `&`, `|`, `^`, `"` and `%` in an argument start nothing and expand nothing. An argument with a line break, or an environment variable whose name ends in `^`, is refused, because neither can be escaped. A batch file that reads its arguments a third time, through `call`, is outside that promise |
+| `keys` | the value is read from stdin, never an argument, and one function prints a key, behind `keys headers` and `keys helper`, to a program and never to a terminal (§5.16): `exec` puts it into the environment of the one command it spawns, with no shell, and never on stdout, stderr or a file; it travels only in the one deposit request and the one read's answer, neither of which follows a redirect. The vault grant goes only to `/api/vault/*`, and no sentence quotes a value, a grant or a label (12 §6 rule 9). `exec` never puts a key in a variable that changes how a command runs, whether `--as` names it or a label makes it: `PATH`, `PATHEXT`, `HOME`, `USERPROFILE`, `SHELL`, `ENV`, `BASH_ENV`, `COMSPEC`, `SYSTEMROOT`, `WINDIR`, `NODE_OPTIONS`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `DYLD_LIBRARY_PATH`, `PYTHONPATH`, `PYTHONSTARTUP`, `PYTHONHOME`, `RUBYOPT`, `RUBYLIB`, `PERL5OPT`, `PERL5LIB`, `PERLLIB`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `PROMPT_COMMAND`, `PS4`, `IFS`, `SHELLOPTS`, `BASHOPTS`, `ZDOTDIR`, and any name starting `NODE_`, `LD_` or `DYLD_`. On Windows a `.cmd` or `.bat` runs through `cmd.exe` with AutoRun and delayed expansion off and every argument caret-escaped twice, once for `cmd.exe` and once for the batch file's `%*`, so `&`, `|`, `^`, `"` and `%` in an argument start nothing and expand nothing. An argument with a line break, or an environment variable whose name ends in `^`, is refused, because neither can be escaped. A batch file that reads its arguments a third time, through `call`, is outside that promise |
 | The session file | ids, a commit and the host's address, never a token; `0600` beside `hosts.json`; its ids are sent only to the host that wrote it |
 | Hook output | the briefing names a row by its spoken id and its own words, and a key by its label only; it reads only string fields, so a key's sealed-state projection never reaches the model. A failure line is fixed text or the host's refusal sentence, never an exception's message. A commit named by the record is checked to look like one before git sees it |
 | `install` | a dry run unless `--apply`; a copy of the settings file before any write; never a project's `.mcp.json`; a settings file it cannot parse is not quoted, because its `env` may hold keys |
 | `skills sync` | a name matching `^[a-z0-9][a-z0-9-]{0,63}$`, whose path resolves inside the skills or commands folder, or nothing is written; a file is overwritten or deleted only while its SHA-256 is still the lock's, so a local edit is never lost; a row with `managed: false` is never written; a file in a repository is reported and never committed; the lock holds paths, spoken ids, versions and hashes |
 | `tools scan` | both configs are read only; a key-named (`…KEY`, `…TOKEN`, `…SECRET`, `…PASSWORD`, `…PAT`, `Authorization`) or key-shaped env or header value goes only to `keys put`, and the row keeps `NAME=credentials#N`; with no vault grant it keeps the name, drops the value, and says so in one sentence, once per host from the start hook; a key in a command, an argument or an address keeps the server out of the record; a config it cannot parse is named, never quoted; no line, row, proposal or lock holds a value |
 | `tools write` | a dry run unless `--scope` names one; a stdio tool's keys are handed over by `braindog keys exec`, so no entry holds one; a header that needs a key is named by a `headersHelper` that runs `keys headers`, one per entry, and a second is left out and said; `claude` runs with no shell and its output is not relayed; a project's `.mcp.json` changes only under `--scope project`, typed by hand; an entry changed by hand since is left |
+| `env apply` | a program entry (BrainDog's hooks, its server, a tool's `command` or `headersHelper`) is printed whole and placed only after a person at this machine says yes to it, pinned by SHA-256 in `~/.braindog/pins.json`, which holds a name, a kind, profile names, a hash and a time and never an entry; with no terminal one not pinned is left out and named; no key is written, and an entry or rules that look like one are left out and not printed; a CLAUDE.md changes only inside its marked block, after a copy is kept; `claude` runs with no shell and its output is not relayed (§5.19) |
+| `env check` | runs the `claude` found on the path, pinned by its path before the first run, with no shell; a server is said by its name and its mark, and nothing Claude Code prints after the mark is relayed |
+| Agent apps' logins | nothing that runs on the machine names Claude Code's keychain item (`Claude Code-credentials`), the claude.ai login in it (`claudeAiOauth`), a profile's `.credentials.json` or Codex's `auth.json`, except in a list that refuses them, so none is read, held or moved (26 §3: *"may not collect, store, or intermediate"*). `sync inventory` sizes a sign-in by `stat` and refuses it. The `no-login` gate reads the command, its hook scripts, every package's source and the packs, and finds a name anywhere but a refusal list it names by file and `const` |
 | Logging | a line names a host, a command, a code, a count — never a token, a row, a grant, a prompt (12 §8) |
 | Input | `parseArgs` in strict mode; a `.brainl` line that is neither `#…` nor a JSON array is an error; the only DDL a `.brain` build runs is the kernel's own |
 
@@ -1153,6 +1233,19 @@ cover `mcp`. `brief.test.ts` covers the card with no host:
   with a closed port;
 - `install` as a dry run, then with `--apply` and its copy, then with nothing left to change;
 - no child ever printing the token.
+
+`env-apply.test.ts`, `pins.test.ts`, `env-check.test.ts` and `keys-helper.test.ts` cover §5.19 and `keys helper`, over
+a planted home of three profiles (the default one, `.claude-studio` and ccenv's `work`, whose skills folder is a link),
+a record client and a terminal made in the test, and a `claude` that writes the profile's servers file:
+- a dry run that changes no byte of the home, runs nothing, asks nothing and pins nothing;
+- each program asked once for every profile, then pinned, and the next run asking nothing and changing nothing;
+- a changed entry asked again, a no leaving the old entry and naming it, and a yes replacing its pin;
+- off a terminal, nothing asked: a plan without `--yes-data`, and with it the data alone;
+- the person's CLAUDE.md byte for byte around the block, in either line ending, and again once the block is gone;
+- no login and no key-shaped value in any file the run leaves, any line it says, or any argument `claude` is given;
+- `claude mcp list` run with each profile's `CLAUDE_CONFIG_DIR` and none for the default one, and a server said by
+  its name and mark alone;
+- `keys helper` refusing a terminal before any request, and as a process printing the key alone.
 
 ---
 
