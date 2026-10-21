@@ -334,7 +334,8 @@ export default async function keys(root = join(import.meta.dirname, '..', '..'))
       },
       'today-tick': { route: '/', setup: held(onTask), press: ['x'] },
       'today-answer': { route: '/', setup: held(onQuestion), press: ['1'] },
-      /* `n` puts the caret in the page's capture line (`.capture-input`), where a task is typed. */
+      /* `n` puts the caret in the page's capture line (`.capture-input`), where a task is typed, and on the desk, which
+         draws no line, in the ask bar's query. */
       'today-new': { route: '/', press: ['n'] },
 
       /* THE WORK PAGE, at `/?work` (`lib/work/Work.svelte`, the declared `page.work`, whose keys are the page

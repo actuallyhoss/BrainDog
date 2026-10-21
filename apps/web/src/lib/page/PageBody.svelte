@@ -50,6 +50,7 @@
   import NextStep from './NextStep.svelte';
   import { frameResizeObserver } from '$lib/ui/resize.ts';
   import { presses } from '$lib/data/held.svelte.ts';
+  import { openPalette } from '$lib/palette/open.svelte.ts';
 
   let {
     mode,
@@ -1047,8 +1048,14 @@
       case 'n': {
         /* THE LINE A PAGE OPENS ON SITS IN ITS HEAD (`home/HeadCapture.svelte`), outside the body, on a home and on a page. */
         const field = pageEl?.querySelector<HTMLInputElement>('.capture-input') ?? document.querySelector<HTMLInputElement>('.head-capture .capture-input');
-        if (!field) return;
-        field.focus();
+        if (field) {
+          field.focus();
+          break;
+        }
+        /* AND TODAY'S DESK DRAWS NO LINE (`home/Home.svelte`, since 20 October): a task is added there from the ask bar,
+           so on a home with no line `n` opens it, caret in the query, where a typed line is `Add to <list>`. */
+        if (mode !== 'home') return;
+        openPalette();
         break;
       }
       case 'Escape':
