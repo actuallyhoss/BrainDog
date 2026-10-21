@@ -306,7 +306,7 @@
 <PageHead icon="packs" kicker={copy.packs} back="/packs" title={copy.shareSetup} sentence={mode === 'addon' ? addonWords.sentence : words.what} />
 
 <div class="page">
-  <Segmented class="modes" role="group" aria-label={addonWords.modeGroup}>
+  <Segmented class="modes" role="group" aria-label={addonWords.modeGroup} full>
     {#each [['usecase', addonWords.modeUseCase], ['addon', addonWords.modeAddon]] as const as [m, label] (m)}
       <button type="button" class="segment" aria-pressed={mode === m} data-on={mode === m ? '' : undefined} onclick={() => switchTo(m)}>{label}</button>
     {/each}
@@ -464,6 +464,14 @@
     align-self: start;
     inline-size: fit-content;
     max-inline-size: 100%;
+  }
+
+  /* ON A PHONE THE PAGE'S OWN CONTROL, THE WHOLE WIDTH (UI pass of 21 October, H33): at its words' width the second
+     choice wrapped under the first. */
+  @media (width < 640px) {
+    :global(.segmented.modes) {
+      inline-size: 100%;
+    }
   }
 
   .note {
