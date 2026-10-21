@@ -19,7 +19,7 @@
  * `/auth/token`, and step 4 says "sign-up not walked: self-host". The walk on production waits for his deploy word.
  */
 
-import { firstRun, NO_AMEND } from '../../../apps/web/src/lib/first-run.ts';
+import { firstRun, NO_AMEND, STARTING_POINTS } from '../../../apps/web/src/lib/first-run.ts';
 import { words as signupWords } from '../../../apps/web/src/routes/signup/words.ts';
 import { propose, proposeFirst } from '../../../apps/web/src/lib/start/propose.ts';
 import { answer, oneQuestion } from '../../../apps/web/src/lib/start/question.ts';
@@ -81,9 +81,13 @@ const fail = (id, saw) => ({ id, pass: false, saw });
 
 export const expect = {
   /**
-   * Step 1. The first screen asks "Who are you?", offers the person's starting point among the five, and makes the three
+   * Step 1. The first screen asks "Who are you?", the person's starting point is one of the five, and it makes the three
    * promises: free with no card, nothing saved until it is kept, and theirs to export or move. `seen.copy` is every
-   * sentence the sign-up screen draws; `seen.question` and `seen.chips` are its heading and chips.
+   * sentence the sign-up screen draws; `seen.question` is its heading and `seen.chips` the five starting points.
+   *
+   * THE FIVE ARE NO LONGER DRAWN AS CHIPS (the UI pass of 20 October, first F6, a chip cloud): the screen is the question
+   * and one field, and `STARTING_POINTS` in `apps/web/src/lib/first-run.ts` holds the five as what the reading is held to
+   * understand. So the walk hands in those, and her starting point must still be one of exactly five.
    */
   who(seen, person) {
     const missing = [];
@@ -246,7 +250,8 @@ export const expect = {
     const late = seen.late.find((x) => x.id === want.id);
     if (!late) missing.push(`nothing for Orders on day ${seen.lateDay} (the pen held ${seen.late.map((x) => x.id).join(', ') || 'nothing'}, Orders read on ${seen.weeks} weeks, ${seen.thisWeek} due this week)`);
     else if (!/\S/u.test(late.why ?? '') || /\brows?\b/u.test(late.why)) missing.push(`its why says "${late.why}"`);
-    /* THE ORDERS PAGE'S OWN SENTENCE that day, as its head draws it: "6 orders this month, ..., and Salma still owes EGP 1,350". */
+    /* THE ORDERS PAGE'S OWN SENTENCE that day, as its head draws it: "6 orders this month, ..., and Salma still owes EGP 1,350.",
+       with the full stop every page's opening sentence ends on (`stopped` in `page-live.ts`). */
     /* READ AS A PERSON READS IT: the one money writer joins a code to its figure by a no-break space, which reads as a
        space, so a person's script says "EGP 1,350" with a plain one. */
     if (want.lead !== undefined && !new RegExp(want.lead.match, 'u').test((seen.lead ?? '').replaceAll('\u00a0', ' '))) missing.push(`Orders says ${seen.lead ? `"${seen.lead}"` : 'no sentence'}, not "${want.lead.says}"`);
@@ -557,7 +562,7 @@ export async function walk(person, host, say = () => {}, shot = null) {
   const today = () => dayOf(host.now());
 
   /* 1. Who are you? */
-  step(expect.who({ question: firstRun.whoQuestion, chips: firstRun.whoChips ?? [], copy: [...copyOf(signupWords), ...copyOf(firstRun)] }, person));
+  step(expect.who({ question: firstRun.whoQuestion, chips: [...STARTING_POINTS], copy: [...copyOf(signupWords), ...copyOf(firstRun)] }, person));
 
   /* 2. Her words light up, read as the sign-up page reads them (`reading` in its +page.svelte): the zone, the language
      and the zone's own currency go in with the words. */

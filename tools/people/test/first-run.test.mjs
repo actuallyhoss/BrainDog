@@ -71,7 +71,7 @@ test('2. HER WORDS LIGHT UP: green on her own sentence read as the page reads it
   const asPeople = { ...p, heard: p.heard.map((h) => (h.phrase === 'freelance as a designer' ? { ...h, became: 'People' } : h)) };
   assert.match(expect.heard({ proposal: asPeople }, MARIAM).saw, /"freelance as a designer" became "People", not Clients and Invoices/u);
   const noCurrency = { ...p, heard: p.heard.map((h) => (h.phrase === 'who owes me' ? { ...h, became: 'Money' } : h)) };
-  assert.match(expect.heard({ proposal: noCurrency }, MARIAM).saw, /"who owes me" became "Money", not Money and EGP/u);
+  assert.match(expect.heard({ proposal: noCurrency }, MARIAM).saw, /"who owes me" became "Money", not Money and Egyptian pounds/u);
 
   const sample = expect.heard({ proposal: { ...p, usecase: 'business', title: null, places: [{ name: 'Orders' }, ...p.places], rows: [{ register: 'orders', fields: { what: 'Example order' } }] } }, MARIAM);
   for (const said of [/read as business/u, /titled nothing/u, /first place is Orders/u, /before anything is kept/u]) assert.match(sample.saw, said);
@@ -166,7 +166,8 @@ test('6. HER FIRST TODAY: green on the card gone and Paid EGP 900; red on the ti
 
 test('7. A PAGE FOR HER PATTERN: green on day 15 with Orders saying who still owes; red on an early offer, none, or a sentence with no owed clause', () => {
   const offer = { id: 'week:orders', title: 'Orders this week', why: '4 orders due this week. Want a page of their own for them?' };
-  const lead = '6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350';
+  /* WITH ITS FULL STOP, as every page's opening sentence ends since the UI pass of 20 October (P13). */
+  const lead = '6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350.';
   const seen = { early: [], earlyDay: 13, late: [offer], lateDay: 15, weeks: 3, thisWeek: 4, lead };
   const green = expect.offer(seen, MARIAM);
   assert.equal(green.pass, true, green.saw);
@@ -204,7 +205,7 @@ test('MARIAM WITH TWO PEOPLE OWING: the same seven steps, and Orders counts the 
   assert.deepEqual(checkPerson(TWO), []);
   assert.notEqual(TWO.slug, MARIAM.slug);
   assert.notEqual(TWO.email, MARIAM.email);
-  assert.match(TWO.expect.offer.lead.says, /Salma still owes EGP 1,350, with 2 more orders not paid at all$/u);
+  assert.match(TWO.expect.offer.lead.says, /Salma still owes EGP 1,350, with 2 more orders not paid at all\.$/u);
   const host = await selfHost(TWO);
   let results;
   try {

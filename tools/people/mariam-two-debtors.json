@@ -85,7 +85,7 @@
         ],
         "who owes me": [
           "Money",
-          "EGP"
+          "Egyptian pounds"
         ]
       },
       "places": [
@@ -130,8 +130,8 @@
       "before": 13,
       "after": 15,
       "lead": {
-        "says": "8 orders this month, 4 to ship this week, 4 late, and Salma still owes EGP 1,350, with 2 more orders not paid at all",
-        "match": "^8 orders this month, 4 to ship this week, 4 late, and Salma still owes EGP 1,350, with 2 more orders not paid at all$"
+        "says": "8 orders this month, 4 to ship this week, 4 late, and Salma still owes EGP 1,350, with 2 more orders not paid at all.",
+        "match": "^8 orders this month, 4 to ship this week, 4 late, and Salma still owes EGP 1,350, with 2 more orders not paid at all\\.$"
       }
     }
   }

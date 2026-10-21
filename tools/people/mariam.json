@@ -48,7 +48,7 @@
       "became": {
         "a small candle shop": ["Orders", "Products"],
         "freelance as a designer": ["Clients", "Invoices"],
-        "who owes me": ["Money", "EGP"]
+        "who owes me": ["Money", "Egyptian pounds"]
       },
       "places": ["Today", "Orders", "Products", "Clients", "Money"]
     },
@@ -61,8 +61,8 @@
       "before": 13,
       "after": 15,
       "lead": {
-        "says": "6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350",
-        "match": "^6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350$"
+        "says": "6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350.",
+        "match": "^6 orders this month, 4 to ship this week, 2 late, and Salma still owes EGP 1,350\\.$"
       }
     }
   }

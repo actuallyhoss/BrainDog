@@ -11,10 +11,13 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** The starting points the first screen offers (`apps/web/src/lib/first-run.ts` `whoChips`), read as text so nothing is run. */
-function chipsOffered(root) {
+/**
+ * The five starting points (`apps/web/src/lib/first-run.ts` `STARTING_POINTS`), read as text so nothing is run. No screen
+ * draws them as chips since the UI pass of 20 October (first F6); the reading is held to understand each one.
+ */
+function startingPoints(root) {
   const src = readFileSync(join(root, 'apps/web/src/lib/first-run.ts'), 'utf8');
-  const line = /whoChips:\s*\[([^\]]*)\]/u.exec(src)?.[1] ?? '';
+  const line = /STARTING_POINTS\s*=\s*\[([^\]]*)\]/u.exec(src)?.[1] ?? '';
   return [...line.matchAll(/'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/gu)].map((m) => (m[1] ?? m[2]).replace(/\\(.)/gu, '$1'));
 }
 
@@ -82,7 +85,7 @@ export const MAYBE = {
 
 const at = (obj, key) => key.split('.').reduce((o, k) => (o !== null && typeof o === 'object' ? o[k] : undefined), obj);
 
-/** What is wrong with one person, one sentence each; empty when nothing is. `chips` are the starting points offered. */
+/** What is wrong with one person, one sentence each; empty when nothing is. `chips` are the five starting points. */
 export function checkPerson(person, chips = []) {
   const out = [];
   if (person === null || typeof person !== 'object' || Array.isArray(person)) return ['the file is not one person'];
@@ -97,7 +100,7 @@ export function checkPerson(person, chips = []) {
   }
   if (out.length > 0) return out;
   if (!person.said.includes(person.name)) out.push(`said does not hold her name, ${person.name}`);
-  if (person.chip !== undefined && chips.length > 0 && !chips.includes(person.chip)) out.push(`chip "${person.chip}" is not one the first screen offers`);
+  if (person.chip !== undefined && chips.length > 0 && !chips.includes(person.chip)) out.push(`chip "${person.chip}" is not one of the starting points`);
   if (person.said !== person.says.plain) out.push('said is not says.plain');
   if (person.expect.heard.places[0] !== 'Today') out.push('expect.heard.places does not start with Today');
   for (const phrase of Object.keys(person.expect.heard.became ?? {})) if (!person.expect.heard.lit.includes(phrase)) out.push(`expect.heard.became names "${phrase}", which is not lit`);
@@ -116,7 +119,13 @@ export function personFiles(dir) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const here = dirname(fileURLToPath(import.meta.url));
   const root = join(here, '../..');
-  const chips = chipsOffered(root);
+  const chips = startingPoints(root);
+  /* NONE READ IS A READING GONE STALE, never a pass: with no starting points every chip would go unchecked, as it did
+     once `whoChips` left `first-run.ts`. */
+  if (chips.length === 0) {
+    console.log('apps/web/src/lib/first-run.ts: no STARTING_POINTS read, so no chip could be checked');
+    process.exit(1);
+  }
   const files = process.argv.length > 2 ? process.argv.slice(2) : personFiles(here);
   let bad = 0;
   for (const file of files) {
