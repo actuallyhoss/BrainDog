@@ -165,6 +165,18 @@ test('A HOST THAT WILL NEVER ANSWER A PULSE STOPS IT, and a session with no host
   await c.done;
 });
 
+test('A CLIENT THAT SAYS HELLO WITH server/discover IS PULSED TOO: the 2026-07-28 revision never sends initialize', async () => {
+  const h = host(() => ({ run: 'S883', stamp: 'v41', changed: true, pending: [told('IN4')], stop: null, lines: [told('IN4').line] }));
+  const b = open(h.fetch, { pulseMs: 10 });
+  /* AS CLAUDE CODE 2.1.304 STARTS: discover, and then straight to the tools. */
+  b.input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'server/discover', params: {} })}\n`);
+  await until(() => h.pulses().length >= 1);
+  await until(() => existsSync(inboxPath(b.env, 'sess-1')));
+  assert.deepEqual(readInbox(inboxPath(b.env, 'sess-1'))?.pending.map((t) => t.id), ['IN4']);
+  b.input.end();
+  await b.done;
+});
+
 test('THE CHANNEL, ON: the older revision asked for, the capability declared, discover declined, each instruction pushed once', async () => {
   const h = host(() => ({ run: 'S883', stamp: 'v41', changed: true, pending: [told('IN4')], stop: null, lines: [told('IN4').line] }), { channel: true });
   const b = open(h.fetch, { channel: true, pulseMs: 20 });

@@ -706,8 +706,11 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       if (typeof asked === 'string' || typeof asked === 'number') open.get(asked)?.abort();
       continue;
     } else job = forward(message);
-    /* THE HELLO IS ANSWERED BEFORE THE NEXT LINE IS READ, as in `stdio.ts`: what it agrees is how the rest are sent. */
-    if (isObject(message) && message.method === 'initialize') {
+    /* THE HELLO IS ANSWERED BEFORE THE NEXT LINE IS READ, as in `stdio.ts`: what it agrees is how the rest are sent.
+       A CLIENT OF THE 2026-07-28 REVISION SAYS HELLO WITH `server/discover` AND NEVER SENDS `initialize`: Claude Code
+       2.1.304 does, so a pulse started on `initialize` alone never started there, and its prompt and tool hooks heard
+       nothing he said after the start (found by `tools/door-check/instructions.check.mjs`). */
+    if (isObject(message) && (message.method === 'initialize' || message.method === 'server/discover')) {
       await job;
       /* THE PULSE STARTS ONCE THE APP HAS SAID HELLO, its first a whole interval on: the start hook seeded the file. */
       if (!greeted) {
