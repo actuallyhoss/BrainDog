@@ -130,10 +130,12 @@ test('OVER HTTP THE HOST BUILD IS serverInfo.version, beside the braindog-build 
   assert.equal(body.result.serverInfo.version, build);
 });
 
-test('ping answers, and prompts are an empty list for now', async () => {
-  const { surface } = stub();
+test('ping answers, and the prompts are start, wrap and ask (plan §6.3)', async () => {
+  const { surface, calls } = stub();
   assert.deepEqual(result(await handle(req('ping'), surface, ctx)), { resultType: 'complete' });
-  assert.deepEqual(result(await handle(req('prompts/list'), surface, ctx)), { resultType: 'complete', prompts: [], ttlMs: 3_600_000, cacheScope: 'private' });
+  const listed = result<{ prompts: { name: string }[] }>(await handle(req('prompts/list'), surface, ctx));
+  assert.deepEqual(listed.prompts.map((p) => p.name), ['start', 'wrap', 'ask']);
+  assert.equal(calls.length, 0, 'a prompt read the record');
 });
 
 test('AN OLDER CLIENT IS ANSWERED A BARE {} TO A PING, because its revision reads that answer as a closed, empty result', async () => {
@@ -192,6 +194,7 @@ test('EVERY RESULT SAYS IT IS WHOLE TO A 2026-07-28 CLIENT, which refuses a list
     ['resources/list', {}],
     ['resources/templates/list', {}],
     ['prompts/list', {}],
+    ['prompts/get', { name: 'start' }],
   ];
   for (const [method, params] of asked) {
     const r = result<Record<string, unknown>>(await handle(req(method, params), surface, ctx, undefined, VERSIONS[0]));
@@ -210,12 +213,12 @@ test('EVERY RESULT SAYS IT IS WHOLE TO A 2026-07-28 CLIENT, which refuses a list
 
 type Hints = { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
 
-test('tools/list is the seventeen, each with its title and every hint said, and no second copy of the instructions', async () => {
+test('tools/list is the sixteen, each with its title and every hint said, and no second copy of the instructions', async () => {
   const { surface, calls } = stub();
   const r = result<{ tools: { name: string; title: string; inputSchema: { type: string }; annotations: Hints }[]; instructions?: string; ttlMs: number }>(
     await handle(req('tools/list'), surface, ctx),
   );
-  assert.equal(r.tools.length, 17);
+  assert.equal(r.tools.length, 16);
   assert.deepEqual(r.tools.map((t) => t.name), TOOLS.map((t) => t.name));
   assert.equal(r.instructions, undefined, 'the instructions went out a second time');
   assert.equal(r.ttlMs, 3_600_000);
@@ -226,10 +229,10 @@ test('tools/list is the seventeen, each with its title and every hint said, and 
     assert.equal(t.annotations.openWorldHint, false, `${t.name} says it reaches the world`);
   }
   const hints = Object.fromEntries(r.tools.map((t) => [t.name, t.annotations]));
-  for (const name of ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance'])
+  for (const name of ['record_index', 'context', 'get', 'list', 'search', 'activity', 'governance'])
     assert.equal(hints[name]?.readOnlyHint, true, `${name} reads and does not say so`);
   /* THE ADDITIVE WRITES TAKE NOTHING AWAY, so a host need not ask a person before each one as it would a delete. */
-  for (const name of ['create', 'propose', 'log', 'meet', 'triage', 'handoff', 'undo']) {
+  for (const name of ['create', 'propose', 'log', 'meet', 'triage', 'handoff', 'undo', 'instructions']) {
     assert.equal(hints[name]?.readOnlyHint, false, name);
     assert.equal(hints[name]?.destructiveHint, false, `${name} adds and is marked as if it overwrote`);
   }
@@ -251,14 +254,14 @@ test('tools/list is the seventeen, each with its title and every hint said, and 
  * nothing more, and is said by the list's id, so one `list` is one request to a host (`apps/cli/test/hooks.test.ts`
  * counts them).
  */
-const EACH: [tool: string, args: Record<string, unknown>, methods: string[], first?: unknown][] = [
+const EACH: [tool: string, args: Record<string, unknown>, methods: string[], first?: unknown, agents?: boolean][] = [
   ['record_index', {}, ['boot', 'version']],
   ['context', {}, ['context', 'boot'], {}],
-  ['schema', { register: 'obligations' }, ['schema'], { register: 'obligations' }],
+  /* WHAT HE TOLD THE RUN (plan §2), on a record that knows instructions: its settings first, then the door. */
+  ['instructions', { take: 'IN4' }, ['whoami', 'instructionsMine'], { take: 'IN4' }, true],
   ['get', { spoken: 'obligations#41' }, ['get'], { register: 'obligations', seq: 41 }],
   ['list', { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 }, ['list'], { register: 'obligations', where: { field: 'state', is: 'open' }, limit: 5 }],
   ['search', { q: 'invoice' }, ['search'], { q: 'invoice' }],
-  ['history', { spoken: 'obligations#41' }, ['history', 'schema', 'get'], { register: 'obligations', seq: 41 }],
   ['activity', { limit: 5 }, ['recentHistory'], { limit: 5 }],
   /* NO `money` ROW: the tool that read seven of one pack's figures by id left the core, and those figures are
      `braindog:metric/<id>` like every other pack's (`money-out.test.ts`). ONE MORE IS ASKED THAN A PAGE SHOWS, so a
@@ -276,14 +279,15 @@ const EACH: [tool: string, args: Record<string, unknown>, methods: string[], fir
 
 test('EVERY TOOL REACHES THE RIGHT METHOD, with the context the transport handed over', async () => {
   assert.deepEqual(EACH.map(([name]) => name), TOOLS.map((t) => t.name), 'a tool has no golden case');
-  for (const [name, args, methods, first] of EACH) {
-    const { surface, calls } = stub();
+  for (const [name, args, methods, first, agents] of EACH) {
+    const { surface, calls } = stub({}, { agents: agents === true });
     const reply = await handle(req('tools/call', { name, arguments: args }), surface, ctx);
     const r = result<ToolResult>(reply);
     assert.notEqual(r.isError, true, `${name}: ${r.content[0]?.text}`);
     assert.deepEqual(calls.map((c) => c.method), methods, name);
     for (const c of calls) assert.equal(c.ctx, ctx, `${name} did not hand the context on`);
-    if (first !== undefined) assert.deepEqual(calls[0]?.args, first, name);
+    /* THE SETTINGS READ (`whoami`) IS THE DOOR'S, before the tool's own method. */
+    if (first !== undefined) assert.deepEqual(calls.find((c) => c.method !== 'whoami')?.args, first, name);
   }
 });
 

@@ -20,7 +20,8 @@ import { INSTRUCTIONS } from './instructions.ts';
 
 export { INSTRUCTIONS };
 import { CARD_OF_TOOL, cardHtml, cardMeta, cardOf, cardResource, cardResources } from './cards.ts';
-import { HOUR, MINUTE, TEMPLATES, TOOLS, tools, ttlOf, type McpSurface, type Said, type Tool } from './index.ts';
+import { FOLDED, FOLDED_UNTIL, HOUR, MINUTE, TEMPLATES, TOOLS, pendingOf, takesOf, toolNamed, tools, ttlOf, type McpSurface, type Pending, type Said, type Tool } from './index.ts';
+import { PROMPTS, promptOf } from './instructions.ts';
 import { refusalBrief } from './brief.ts';
 import { atIn, unsaid } from './words.ts';
 
@@ -45,6 +46,7 @@ export const METHODS = [
   'resources/templates/list',
   'resources/read',
   'prompts/list',
+  'prompts/get',
 ] as const;
 
 type Id = string | number;
@@ -143,8 +145,8 @@ const render = (said: Said) => ({
 function ownWords(name: string, args: Record<string, unknown>, out: Said, sent: Record<string, unknown> = args): Said {
   if (!refused(out.result)) return out;
   const was = out.result.refusal as unknown as Record<string, unknown>;
-  const tool = TOOLS.find((t) => t.name === name);
-  const takes = Object.keys((tool?.input as { properties?: Record<string, unknown> } | undefined)?.properties ?? {});
+  const tool = toolNamed(name);
+  const takes = [...takesOf(name), ...(tool?.quiet ?? [])];
   const at = tool === undefined ? (typeof was.at === 'string' ? was.at : undefined) : atIn(was.at, takes, sent);
   const fix = typeof was.fix === 'string' ? unsaid(was.fix, at) : was.fix;
   if (at === was.at && fix === was.fix) return out;
@@ -400,6 +402,180 @@ function named<C>(surface: McpSurface<C>): McpSurface<C> {
   return over;
 }
 
+/* ── who is asking, and what waits for it ────────────────────────────────── */
+
+/**
+ * What his settings let this caller have, as `whoami`'s `effective` says it (plan §5.1, §6.2): its ceiling, the tools he
+ * switched off, and the settings row by name for the sentence that says so. `null` for a caller who is no agent's key,
+ * or a record too old to say, which lists and calls everything as before.
+ */
+type Effective = { may: string; off: string[]; profile: string | null };
+
+/**
+ * WHETHER THE RECORD KNOWS WHAT HE TELLS AGENTS AND HOW HE SET THEM UP, which came in one migration with
+ * `instructionsMine`: a surface without it (an older host, the command line's before it routes the name, a test's stub)
+ * is asked nothing more than before, and answers every tool and every call as it did.
+ */
+const knowsAgents = <C>(surface: McpSurface<C>): boolean => typeof surface.instructionsMine === 'function';
+
+/** How long one caller's settings are held between calls: a change in the app reaches its next call after this. */
+const EFFECTIVE_FOR = 15_000;
+
+/**
+ * ONE CALLER'S STATE AT THIS DOOR, kept for fewer reads and quieter answers and never for a reply's truth: the stamp
+ * the last answer carried, the instructions it has been shown on a tool answer (each said once), and its settings for
+ * `EFFECTIVE_FOR`. Kept per surface and caller as `calledBy` is; a surface built per request keeps nothing, and every
+ * answer then asks again and says a waiting instruction again, which is louder and never wrong.
+ */
+type Watch = { stamp: string | null; shown: Set<string>; effective: { at: number; said: Effective | null } | null };
+const watched = new WeakMap<object, Map<string, Watch>>();
+const WATCHED_MOST = 1_000;
+
+function watchOf(surface: object, caller: string): Watch {
+  let byCaller = watched.get(surface);
+  if (byCaller === undefined) watched.set(surface, (byCaller = new Map()));
+  let w = byCaller.get(caller);
+  if (w === undefined) {
+    if (byCaller.size >= WATCHED_MOST) byCaller.delete(byCaller.keys().next().value as string);
+    byCaller.set(caller, (w = { stamp: null, shown: new Set(), effective: null }));
+  }
+  return w;
+}
+
+/** The caller's settings, read fresh (`tools/list`) or held for `EFFECTIVE_FOR` (`tools/call`). Never throws. */
+async function effectiveOf<C>(surface: McpSurface<C>, ctx: C, watch: Watch, fresh: boolean): Promise<Effective | null> {
+  if (!knowsAgents(surface)) return null;
+  const now = Date.now();
+  if (!fresh && watch.effective !== null && now - watch.effective.at < EFFECTIVE_FOR) return watch.effective.said;
+  let said: Effective | null = null;
+  try {
+    const who = await surface.whoami(ctx);
+    const e = who.ok && isObject(who.value) && isObject(who.value.effective) ? who.value.effective : null;
+    if (e !== null && typeof e.may === 'string')
+      said = {
+        may: e.may,
+        off: Array.isArray(e.tools_off) ? e.tools_off.filter((t): t is string => typeof t === 'string') : [],
+        profile: isObject(e.profile) && typeof e.profile.name === 'string' ? e.profile.name : null,
+      };
+  } catch {
+    said = null;
+  }
+  watch.effective = { at: now, said };
+  return said;
+}
+
+/**
+ * THE TOOLS THIS CALLER IS LISTED (plan §6.2): a Read agent lists no writes, and a tool he switched off for it is not
+ * listed, so a narrower agent also pays fewer tokens every turn. The folded tools are never listed.
+ */
+function listedFor(e: Effective | null): readonly Tool[] {
+  if (e === null) return TOOLS;
+  return TOOLS.filter((t) => !(e.may === 'read' && t.writes) && !e.off.includes(t.name));
+}
+
+/** The tool a folded one answers through, whose switch it shares: `schema` is `record_index`'s, `history` is `get`'s. */
+const FOLDED_INTO: Readonly<Record<string, string>> = { schema: 'record_index', history: 'get' };
+
+/**
+ * A call to a tool he switched off for this agent, refused before it runs (`TOOL_OFF`, plan §6.5): a list cached
+ * before he did is still met with why. `null` while it is on.
+ */
+function offFor(name: string, e: Effective | null): Said | null {
+  if (e === null) return null;
+  const switched = e.off.includes(name) || (Object.hasOwn(FOLDED_INTO, name) && e.off.includes(FOLDED_INTO[name]!));
+  if (!switched) return null;
+  const where = `Settings > Agents${e.profile ? ` > ${e.profile}` : ''}`;
+  const refusal = {
+    code: 'TOOL_OFF',
+    fix: `${where} has ${name} off for you, so it is not yours to call. If you need it, ask with propose.`,
+    allowed: listedFor(e).map((t) => t.name),
+  } as const;
+  return { result: { ok: false, refusal: refusal as never }, text: refusalBrief(refusal), structured: refusal };
+}
+
+/** What waits for the caller's run, as `context { since }` answers it: its stamp, everything open, and what stops it. */
+type Waiting = { stamp: string | null; pending: Pending[]; stop: { kind: string; id: string; said: string } | null };
+
+/** How long a tool's answer waits for the check of what waits, after its own answer is ready: never longer. */
+const WAITING_GRACE_MS = 150;
+
+/**
+ * Ask what waits for the caller's run (`context { since }`, a read that marks nothing, W2-A), with a stamp no kernel
+ * makes, so every open instruction comes back and not only the new ones. `null` from a surface without `context`, a
+ * refusal, or a session with no run yet. Never throws.
+ */
+async function waitingFor<C>(surface: McpSurface<C>, ctx: C): Promise<Waiting | null> {
+  if (typeof surface.context !== 'function' || !knowsAgents(surface)) return null;
+  try {
+    const out = await surface.context({ since: '-' } as never, ctx);
+    const s = out.ok && isObject(out.value) && isObject(out.value.since) ? out.value.since : null;
+    if (s === null || typeof s.stamp !== 'string') return null;
+    const stop = isObject(s.stop) && typeof s.stop.id === 'string' ? { kind: String(s.stop.kind), id: s.stop.id, said: String(s.stop.said ?? '') } : null;
+    return { stamp: s.stamp, pending: pendingOf(s.pending), stop };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What waits, as an answer of `context` or `instructions` already said it: its stamp, the instructions it named (the
+ * briefing's `told`, the delta's or the tool's `pending`), and what stops the run. `null` without a stamp.
+ */
+function waitingIn(value: Record<string, unknown>): Waiting | null {
+  if (typeof value.stamp !== 'string') return null;
+  const stop = isObject(value.stop) && typeof value.stop.id === 'string' ? { kind: String(value.stop.kind), id: value.stop.id, said: String(value.stop.said ?? '') } : null;
+  return { stamp: value.stamp, pending: pendingOf(value.told ?? value.pending), stop };
+}
+
+/** A promise's answer if it comes within `ms`, else `null`; the timer never outlives it. */
+async function within<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<null>((done) => {
+    timer = setTimeout(() => done(null), ms);
+  });
+  try {
+    return await Promise.race([p, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The most a tool answer's added lines may come to (plan §3.4): two lines and two hundred characters. */
+const PIGGYBACK_MOST = 200;
+
+/**
+ * THE LINE ADDED TO A TOOL'S ANSWER WHEN SOMETHING NEW WAITS (plan §2.3 B, §3.4): an instruction for this run it has not
+ * been shown, each said once, in his words, with the call that takes it; and while he has it stopped or paused, that,
+ * on every answer, unless the answer is already the record refusing it for that. At most two lines and 200 characters.
+ * Empty when nothing new waits, which is almost always: never noisy.
+ */
+export function piggyback(w: Waiting, shown: ReadonlySet<string>, refusedFor?: string): { lines: string[]; shown: string[] } {
+  const lines: string[] = [];
+  const stopped = w.stop !== null && refusedFor !== 'RUN_STOPPED' && refusedFor !== 'RUN_PAUSED';
+  if (stopped) {
+    const held = w.pending.find((p) => p.id === w.stop!.id);
+    const line = held?.line ?? `This run is ${w.stop!.kind === 'stop' ? 'stopped' : 'paused'} in BrainDog (${w.stop!.id}). Reply with instructions.`;
+    lines.push(line.length <= PIGGYBACK_MOST ? line : `${line.slice(0, PIGGYBACK_MOST - 3).trimEnd()}...`);
+  }
+  /* A RESUME IS NEWS ONLY IN THE STOP LINE GOING AWAY; everything else not yet shown is said, a redirect taken for the
+     run as it was made among them. */
+  const fresh = w.pending.filter((p) => p.kind !== 'stop' && p.kind !== 'pause' && p.kind !== 'resume' && !shown.has(p.id));
+  const room = (): number => PIGGYBACK_MOST - lines.join('\n').length - (lines.length > 0 ? 1 : 0);
+  const said: string[] = [];
+  if (fresh.length > 0 && lines.length < 2) {
+    const first = fresh[0]!;
+    const how = first.taken_by === null ? `Take it: instructions {take:"${first.id}"}` : `It is yours; when done, instructions {reply:"${first.id}"}`;
+    const tail = `. ${how}.${fresh.length > 1 ? ` And ${String(fresh.length - 1)} more: instructions.` : ''}`;
+    const head = `New for you: ${first.by ?? 'The owner'} (${first.id}): "`;
+    const words = first.said.replace(/\s+/gu, ' ').trim();
+    const fits = Math.max(0, room() - head.length - tail.length - 1);
+    const quoted = words.length <= fits ? words : `${words.slice(0, Math.max(0, fits - 3)).trimEnd()}...`;
+    lines.push(`${head}${quoted}"${tail}`);
+    said.push(...fresh.map((p) => p.id));
+  }
+  return { lines: lines.slice(0, 2), shown: said };
+}
+
 /** The client as a mark names it, its name and version, held to the record's 80 characters. */
 function clientOf(params: Record<string, unknown>): string | undefined {
   const info = params.clientInfo;
@@ -605,11 +781,14 @@ async function dispatch<C>(
     /* THE INSTRUCTIONS ARE NOT SENT AGAIN HERE. They went out in `initialize`, or in `server/discover` for a client of the
        stateless revision, and a session that asked for both carried the whole text twice; Claude Code puts the
        instructions in every session's system prompt on its own. Once a connection is the specification's place for them. */
+    /* CUT TO THE CALLER'S SETTINGS (plan §6.2), read fresh: a Read agent lists no writes, and a tool he switched off is
+       not listed. A caller who is no agent's key, or a record too old to say, is listed every tool. */
     case 'tools/list': {
       const wrong = paged(params);
       if (wrong) return wrong;
-      hear(surface, ctx, { kind: 'listed', n: TOOLS.length });
-      return said({ tools: TOOLS.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
+      const listed = surface.onMachine === true ? TOOLS : listedFor(await effectiveOf(surface, ctx, watchOf(surface, caller), true));
+      hear(surface, ctx, { kind: 'listed', n: listed.length });
+      return said({ tools: listed.map(listedTool), ttlMs: HOUR, cacheScope: 'private' });
     }
 
     case 'tools/call': {
@@ -624,7 +803,17 @@ async function dispatch<C>(
          params or among the tool's arguments, so both places are read. */
       if (params.name === 'propose' && (Object.hasOwn(params, 'inputResponses') || Object.hasOwn(args, 'inputResponses')))
         return said(render(ownWords('propose', args, { result: DECIDES_NOT, text: refusalBrief(DECIDES_NOT.refusal), structured: DECIDES_NOT.refusal }, { ...params, ...args })));
-      const out = ownWords(params.name, args, await mcp.answer(params.name, args, ctx));
+      const name = params.name;
+      const watch = watchOf(surface, caller);
+      /* A TOOL HE SWITCHED OFF FOR THIS AGENT IS REFUSED BEFORE IT RUNS, whatever list the client cached (`TOOL_OFF`). */
+      const off = offFor(name, await effectiveOf(surface, ctx, watch, false));
+      if (off !== null) return said(render(off));
+      /* WHAT WAITS FOR THIS RUN IS ASKED BESIDE THE CALL, never before it: a tool's answer waits for it at most
+         `WAITING_GRACE_MS` after its own is ready. `context` and `instructions` say what waits themselves. */
+      const says = name === 'context' || name === 'instructions';
+      const waiting = says ? null : waitingFor(surface, ctx);
+      const answered = await mcp.answer(name, args, ctx);
+      const out = ownWords(name, args, answered);
       if (refused(out.result) && out.result.refusal.code === 'INTERNAL') hear(surface, ctx, { kind: 'internal' });
       /* THE CARD'S DATA RIDES BESIDE THE ANSWER, only when this answer is one the card can draw. */
       let drawn = out.result.ok ? cardOf(params.name, args, out.structured, origin) : null;
@@ -632,8 +821,41 @@ async function dispatch<C>(
       if (drawn !== null && origin !== undefined) drawn = cardOf(params.name, args, out.structured, origin, await slugOf(surface, ctx)) ?? drawn;
       const shown = render(out);
       /* A RULE IS ANSWERED BY `governance`, WHICH LISTS THE DECISION CARD, so the answer names its own template beside it. */
-      const meta = drawn?.kind === 'rule' ? { _meta: cardMeta('rule') } : {};
-      return said(drawn === null ? shown : { ...shown, ...meta, structuredContent: { ...out.structured, card: drawn } });
+      const meta: Record<string, unknown> = drawn?.kind === 'rule' ? cardMeta('rule') : {};
+      const body = drawn === null ? shown : { ...shown, structuredContent: { ...out.structured, card: drawn } };
+
+      /* WHAT WAITS, ON EVERY ANSWER (plan §2.3 B, §8.3): `_meta.braindog = { stamp, pending, stop }`, and one line or
+         two added to the text when something new waits. From the answer itself for `context` and `instructions`, which
+         said it, and everything they said counts as shown. */
+      const w: Waiting | null = says ? waitingIn(out.structured) : await within(waiting!, WAITING_GRACE_MS);
+      if (w === null) return said(Object.keys(meta).length === 0 ? body : { ...body, _meta: meta });
+      watch.stamp = w.stamp;
+      let content = body.content;
+      if (says) for (const p of w.pending) watch.shown.add(p.id);
+      else {
+        const refusedFor = refused(out.result) ? out.result.refusal.code : undefined;
+        const added = piggyback(w, watch.shown, refusedFor);
+        for (const id of added.shown) watch.shown.add(id);
+        if (added.lines.length > 0) content = [{ type: 'text', text: `${body.content[0]?.text ?? ''}\n${added.lines.join('\n')}` }];
+        /* AND THE RECORD HEARS IT WAS SEEN, in a tool answer, never waited on: the app says "Seen by S883 in a tool answer". */
+        if (added.shown.length > 0 && typeof surface.instructionsMine === 'function') {
+          try {
+            void Promise.resolve(surface.instructionsMine({ seen: added.shown, how: 'tool' } as never, ctx)).catch(() => undefined);
+          } catch {
+            /* A mark that throws is a mark not kept. */
+          }
+        }
+      }
+      return said({ ...body, content, _meta: { ...meta, braindog: { stamp: w.stamp, pending: w.pending, stop: w.stop } } });
+    }
+
+    /* THE PROMPTS (plan §6.3): start, wrap and ask, which a client shows as commands and which cost the tool list nothing. */
+    case 'prompts/get': {
+      if (typeof params.name !== 'string') return fail(id, RPC.params, 'prompts/get needs the name of a prompt.', { allowed: PROMPTS.map((p) => p.name) });
+      const given = isObject(params.arguments) ? params.arguments : {};
+      const prompt = promptOf(params.name, given);
+      if (prompt === null) return fail(id, RPC.params, `There is no prompt called ${params.name}.`, { allowed: PROMPTS.map((p) => p.name) });
+      return said(prompt);
     }
 
     /* A minute, not an hour: the list names pages, and a page appears when its row does. */
@@ -674,9 +896,9 @@ async function dispatch<C>(
       });
     }
 
-    /* None yet. The skill and the instructions teach; a prompt library is a third thing to keep true. */
+    /* THREE, EACH THE CALLS IN ORDER (plan §6.3), held to the tools they name by `prompts.test.ts`. */
     case 'prompts/list':
-      return paged(params) ?? said({ prompts: [], ttlMs: HOUR, cacheScope: 'private' });
+      return paged(params) ?? said({ prompts: PROMPTS, ttlMs: HOUR, cacheScope: 'private' });
 
     default:
       return fail(id, RPC.method, `There is no method called ${method}.`, { allowed: METHODS });

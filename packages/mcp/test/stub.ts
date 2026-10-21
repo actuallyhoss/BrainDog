@@ -10,7 +10,11 @@ import type { McpSurface } from '../src/index.ts';
 export type Ctx = { who: string };
 export type Call = { method: string; args: unknown; ctx: unknown };
 
-export function stub(over: Partial<McpSurface<Ctx>> = {}) {
+/**
+ * `agents` IS A RECORD THAT KNOWS WHAT HE TELLS AGENTS (`instructionsMine`, plan §2): the door then reads the caller's
+ * settings and what waits for its run beside each call, which a stub without it is never asked.
+ */
+export function stub(over: Partial<McpSurface<Ctx>> = {}, opts: { agents?: boolean } = {}) {
   const calls: Call[] = [];
   const said =
     <T>(method: string, value: T) =>
@@ -44,6 +48,7 @@ export function stub(over: Partial<McpSurface<Ctx>> = {}) {
     triage: said('triage', { id: 'a1', state: 'ignored', entry: null, already: false }),
     undoOwn: said('undoOwn', { say: 'Put back 1 change.', lines: [] as string[] }),
     understandPlan: said('understandPlan', { dry: true, kinds: [] as unknown[], writes: [] as string[], more: 0, questions: [] as string[], asks: {}, done: true }),
+    ...(opts.agents ? { instructionsMine: said('instructionsMine', { run: 'S1', stamp: 's1', pending: [], stop: null, lines: ['Nothing new for you.'] }) } : {}),
     ...over,
   };
   return { surface, calls };
