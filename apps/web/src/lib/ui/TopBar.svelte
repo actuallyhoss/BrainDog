@@ -22,6 +22,7 @@
   `/search` THE ASK FIELD IS NOT DRAWN: the page's own field is the search, and two fields on one screen read as two.
 -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { BASE, at, here as inside } from '../at.ts';
   import { page } from '$app/state';
   import { copy } from '../copy.ts';
@@ -93,10 +94,16 @@
   const crew = $derived([...new Set(working.map((w) => w.kind))].slice(0, 3));
 
   /* ONE PULSE WHEN THE WORKING COUNT CHANGES, never on the first draw: the dot is drawn again under a new key, which
-     starts its one animation. */
+     starts its one animation. THE FIRST COUNT IS NOT A CHANGE: on a load the count goes from nothing read to what
+     `boot` says, and that pulsed on every page load (VERIFY H43). So it arms only once a count was seen and then moved. */
   let armed = $state(false);
+  let seen: number | undefined;
   $effect(() => {
-    armed = true;
+    const n = working.length;
+    untrack(() => {
+      if (seen !== undefined && n !== seen) armed = true;
+      if (n > 0) seen = n;
+    });
   });
 </script>
 
