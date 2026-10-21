@@ -513,8 +513,9 @@
               {#each sessions.slice(0, 4) as s, n (s.seq ?? n)}
                 <li class="a-row">
                   <AgentFace agent={s.agent} run={s.seq === null ? '' : `S${s.seq}`} live={s.working ? 'working' : 'stopped'} size="xs" />
-                  <!-- WHAT IT DOES, NOT WHO: the face says which agent, and the Work tile names it once (proj F1). -->
-                  <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{s.doing || actor(s.agent).name}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}{#if s.host}{' on '}{s.host}{/if}</span></span>
+                  <!-- WHAT IT DOES, NOT WHO: the face says which agent, and the Work tile names it once (proj F1). NO MACHINE NAME
+                       (VERIFY H14): "on kiln-mbp" is a host's id, not a place a person knows. -->
+                  <span class="a-words" title={actor(s.agent).name}><span class="a-name" dir="auto">{s.doing || actor(s.agent).name}</span><span class="a-sub">{s.working ? `Since ${clock(s.from)}` : `${clock(s.from)} to ${clock(s.to)}`}</span></span>
                 </li>
               {/each}
             </ul>
