@@ -52,111 +52,116 @@
 
 <section class="board" aria-label={s.kept.title}>
   <div class="wrap facts">
-    {#if db}
-      <section class="fact span-8 split" aria-labelledby="db-title">
-        <div class="say-it">
-          {@render head('db-title', db.glyph, db.title)}
-          <p class="fact-text">{db.text}</p>
-        </div>
-        <div class="records" role="img" aria-label={d.records}>
-          {#each [1, 2, 3, 4] as n}
-            <span class="record" aria-hidden="true">
-              <span class="glyph"><Icon name="server" /></span>
-              <span class="record-name" class:mine={n === 1}>{d.recordName(n)}</span>
-            </span>
-          {/each}
-        </div>
-      </section>
-    {/if}
-
-    {#if keys}
-      <section class="fact span-4" aria-labelledby="keys-title">
-        {@render head('keys-title', keys.glyph, keys.title)}
-        <p class="fact-text">{keys.text}</p>
-        <div class="seal" role="img" aria-label={d.sealedLabel}>
-          {#each d.sealed as step, i}
-            {#if i > 0}<span class="seal-arrow" aria-hidden="true"><Icon name="arrow" size="m" /></span>{/if}
-            <span class="seal-step" aria-hidden="true">
-              <span class="glyph l" class:ink={i === 1}><Icon name={i === 0 ? 'key' : i === 1 ? 'lock' : 'server'} /></span>
-              <span class="seal-word">{step}</span>
-            </span>
-          {/each}
-        </div>
-        <p class="note">{d.sealedNote}</p>
-      </section>
-    {/if}
-
-    {#if nights}
-      <section class="fact span-5" aria-labelledby="nights-title">
-        {@render head('nights-title', nights.glyph, nights.title)}
-        <p class="fact-text">{nights.text}</p>
-        <div class="nights" role="img" aria-label={d.nights}>
-          <span class="night-row" aria-hidden="true">
-            {#each NIGHTS as i}<span class="night" class:last={i === NIGHTS.length - 1}></span>{/each}
-          </span>
-          <span class="night-ends" aria-hidden="true"><span>{d.nightsFrom}</span><span>{d.nightsTo}</span></span>
-        </div>
-        <p class="note ink">{d.nightsRead}</p>
-      </section>
-    {/if}
-
-    {#if passkey}
-      <section class="fact span-7 split" aria-labelledby="passkey-title">
-        <div class="say-it">
-          {@render head('passkey-title', passkey.glyph, passkey.title)}
-          <p class="fact-text">{passkey.text}</p>
-        </div>
-        <div class="signin" role="img" aria-label={d.signinLabel}>
-          <span class="drawn ink" aria-hidden="true"><Icon name="key" size="m" />{d.signin[0]}</span>
-          <span class="drawn" aria-hidden="true"><Icon name="mail" size="m" />{d.signin[1]}</span>
-          <span class="no-password" aria-hidden="true"><Icon name="x" size="m" />{d.signin[2]}</span>
-        </div>
-      </section>
-    {/if}
-
-    {#if token}
-      <section class="fact span-8 split" aria-labelledby="token-title">
-        <div class="say-it">
-          {@render head('token-title', token.glyph, token.title)}
-          <p class="fact-text">{token.text}</p>
-        </div>
-        <table class="reach">
-          <thead>
-            <tr>
-              {#each d.reach.head as h}<th scope="col">{h}</th>{/each}
-            </tr>
-          </thead>
-          <tbody>
-            {#each d.reach.rows as [what, can]}
-              <tr>
-                <th scope="row">{what}</th>
-                <td class:no={!can}>
-                  <Icon name={can ? 'check' : 'x'} size="m" /><span class="sr">{can ? d.reach.can : d.reach.cannot}</span>
-                </td>
-                <td><Icon name="check" size="m" /><span class="sr">{d.reach.can}</span></td>
-              </tr>
+    <!-- Two stacks at a desk, each tile as tall as what it holds; one column of six on a phone. -->
+    <div class="stack span-8">
+      {#if db}
+        <section class="fact split" aria-labelledby="db-title">
+          <div class="say-it">
+            {@render head('db-title', db.glyph, db.title)}
+            <p class="fact-text">{db.text}</p>
+          </div>
+          <div class="records" role="img" aria-label={d.records}>
+            {#each [1, 2, 3, 4] as n}
+              <span class="record" aria-hidden="true">
+                <span class="glyph"><Icon name="server" /></span>
+                <span class="record-name" class:mine={n === 1}>{d.recordName(n)}</span>
+              </span>
             {/each}
-          </tbody>
-        </table>
-      </section>
-    {/if}
+          </div>
+        </section>
+      {/if}
 
-    {#if exported}
-      <section class="fact span-4" aria-labelledby="export-title">
-        {@render head('export-title', exported.glyph, exported.title)}
-        <p class="fact-text">{exported.text}</p>
-        <div class="export" role="img" aria-label={exported.text}>
-          <span class="export-row" aria-hidden="true">
-            <span class="glyph on-tile"><Icon name="download" /></span>
-            <span class="export-words">
-              <span class="export-name">{d.exportName}</span>
-              <span class="export-note">{d.exportNote}</span>
+      {#if passkey}
+        <section class="fact split" aria-labelledby="passkey-title">
+          <div class="say-it">
+            {@render head('passkey-title', passkey.glyph, passkey.title)}
+            <p class="fact-text">{passkey.text}</p>
+          </div>
+          <div class="signin" role="img" aria-label={d.signinLabel}>
+            <span class="drawn ink" aria-hidden="true"><Icon name="key" size="m" />{d.signin[0]}</span>
+            <span class="drawn" aria-hidden="true"><Icon name="mail" size="m" />{d.signin[1]}</span>
+            <span class="no-password" aria-hidden="true"><Icon name="x" size="m" />{d.signin[2]}</span>
+          </div>
+        </section>
+      {/if}
+
+      {#if token}
+        <section class="fact split" aria-labelledby="token-title">
+          <div class="say-it">
+            {@render head('token-title', token.glyph, token.title)}
+            <p class="fact-text">{token.text}</p>
+          </div>
+          <table class="reach">
+            <thead>
+              <tr>
+                {#each d.reach.head as h}<th scope="col">{h}</th>{/each}
+              </tr>
+            </thead>
+            <tbody>
+              {#each d.reach.rows as [what, can]}
+                <tr>
+                  <th scope="row">{what}</th>
+                  <td class:no={!can}>
+                    <Icon name={can ? 'check' : 'x'} size="m" /><span class="sr">{can ? d.reach.can : d.reach.cannot}</span>
+                  </td>
+                  <td><Icon name="check" size="m" /><span class="sr">{d.reach.can}</span></td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </section>
+      {/if}
+    </div>
+
+    <div class="stack span-4">
+      {#if keys}
+        <section class="fact" aria-labelledby="keys-title">
+          {@render head('keys-title', keys.glyph, keys.title)}
+          <p class="fact-text">{keys.text}</p>
+          <div class="seal" role="img" aria-label={d.sealedLabel}>
+            {#each d.sealed as step, i}
+              {#if i > 0}<span class="seal-arrow" aria-hidden="true"><Icon name="arrow" size="m" /></span>{/if}
+              <span class="seal-step" aria-hidden="true">
+                <span class="glyph l" class:ink={i === 1}><Icon name={i === 0 ? 'key' : i === 1 ? 'lock' : 'server'} /></span>
+                <span class="seal-word">{step}</span>
+              </span>
+            {/each}
+          </div>
+          <p class="note">{d.sealedNote}</p>
+        </section>
+      {/if}
+
+      {#if nights}
+        <section class="fact" aria-labelledby="nights-title">
+          {@render head('nights-title', nights.glyph, nights.title)}
+          <p class="fact-text">{nights.text}</p>
+          <div class="nights" role="img" aria-label={d.nights}>
+            <span class="night-row" aria-hidden="true">
+              {#each NIGHTS as i}<span class="night" class:last={i === NIGHTS.length - 1}></span>{/each}
             </span>
-          </span>
-        </div>
-        <a class="how" href={d.exportHref}>{d.exportLink}<Icon name="arrow-right" size="s" /></a>
-      </section>
-    {/if}
+            <span class="night-ends" aria-hidden="true"><span>{d.nightsFrom}</span><span>{d.nightsTo}</span></span>
+          </div>
+          <p class="note ink">{d.nightsRead}</p>
+        </section>
+      {/if}
+
+      {#if exported}
+        <section class="fact" aria-labelledby="export-title">
+          {@render head('export-title', exported.glyph, exported.title)}
+          <p class="fact-text">{exported.text}</p>
+          <div class="export" role="img" aria-label={exported.text}>
+            <span class="export-row" aria-hidden="true">
+              <span class="glyph on-tile"><Icon name="download" /></span>
+              <span class="export-words">
+                <span class="export-name">{d.exportName}</span>
+                <span class="export-note">{d.exportNote}</span>
+              </span>
+            </span>
+          </div>
+          <a class="how" href={d.exportHref}>{d.exportLink}<Icon name="arrow-right" size="s" /></a>
+        </section>
+      {/if}
+    </div>
 
     <section class="fact span-12 split report" aria-labelledby="report-title">
       <div class="say-it">
@@ -197,13 +202,56 @@
     background: var(--board);
   }
 
-  /* TWELVE COLUMNS AT A DESK, a tile saying how many it takes; one column below 900. Tiles in a row share its height
-     and their words start at the top (site F18), so no row leaves a hole. */
+  /* TWO STACKS AT A DESK, eight columns and four, each tile as tall as what it holds, so none stands half empty beside
+     a taller one; the shorter stack shares what is left among its tiles, so both end level above the report. One
+     column below 900, in the order the facts are told. */
   .facts {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
-    align-items: stretch;
+  }
+
+  .stack {
+    display: contents;
+  }
+
+  @media (width >= 900px) {
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-inline-size: 0;
+    }
+
+    .stack > * {
+      flex-grow: 1;
+    }
+  }
+
+  @media (width < 900px) {
+    .stack > section[aria-labelledby='keys-title'] {
+      order: 1;
+    }
+
+    .stack > section[aria-labelledby='nights-title'] {
+      order: 2;
+    }
+
+    .stack > section[aria-labelledby='passkey-title'] {
+      order: 3;
+    }
+
+    .stack > section[aria-labelledby='token-title'] {
+      order: 4;
+    }
+
+    .stack > section[aria-labelledby='export-title'] {
+      order: 5;
+    }
+
+    .report {
+      order: 6;
+    }
   }
 
   @media (width >= 900px) {
