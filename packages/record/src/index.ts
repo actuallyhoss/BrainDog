@@ -232,7 +232,8 @@ import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
 import { byMeaning } from './near.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
-import { OLDER, card as cardOf } from './card.ts';
+import { OLDER, card as cardOf, type CardAt } from './card.ts';
+import { factsFromContext, planContext, planText, type TaskFact, type ToldFact } from './context-plan.ts';
 import { BRIEF_ROWS, capRegister, DECIDED, decidedHere, peopleHere, projectWaiting, rulesOf, type Decision, type Placed } from './context-caps.ts';
 import { choiceOf } from './decided.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
@@ -1691,6 +1692,18 @@ export type Context = {
   depth?: ContextDepth;
   /** The task `context { task }` asked for, whole, so an update needs no `get` (§3.1, §4.3). */
   task?: TaskInHand | null;
+  /**
+   * WHAT AN AGENT READS, RANKED AND BUDGETED (`context-plan.ts`, plan §3.2): Stop and Told first, the card, then what it
+   * may do, its rules, who else is here, its lane, decisions and lessons, cut to `budget` tokens at `depth`, each cut
+   * section ending with the call that reads the rest. Only for an agent's key; `card` stays the start hook's.
+   */
+  plan?: string;
+  /** The plan's own card (no More, Signs or Also lines), which `plan` prints after Stop and Told. */
+  plan_card?: string;
+  /** The plan's size, in the plan's own count (characters / 4). */
+  plan_tokens?: number;
+  /** Lessons the plan suggests retiring (never confirmed, older than 60 days), by handle: suggested, never filed. */
+  retire?: string[];
 };
 
 /** What `handoff { task }` or `{ done }` did to the task: its spoken name, its state now, and the question when it was asked. */
@@ -1708,6 +1721,9 @@ export type ContextArgs = { task?: string; project?: string; depth?: ContextDept
  * history lines, newest first.
  */
 export type TaskInHand = { spoken: string; register: string; list: string; version: number; fields: Record<string, unknown>; project: string | null; history: string[] };
+
+/** Where a briefing stands and how much it says: a project asked by name, the depth, and the task asked for whole. */
+type Where = { project?: string; depth?: ContextDepth; task?: TaskInHand };
 
 /**
  * What `context { since }` answers (plan §3.1, §3.4): only what moved for the caller's run since the stamp it holds, as
@@ -8084,7 +8100,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * (its `x-braindog-cli` on this call, else what its key last said) and whether it is older than the oldest the door
    * still works with (`Build.min_cli`), which is the card's last line when it is.
    */
-  const carded = (ctx: CallContext, told: Context, at: { agent: string | null; host: string | null; branch: string | null; ahead: number | null }): Context => {
+  const carded = (
+    ctx: CallContext,
+    told: Context,
+    at: { agent: string | null; host: string | null; branch: string | null; ahead: number | null },
+    where: Where = {},
+  ): Context => {
     const key = ctx.principal.kind === 'token' ? ctx.principal.id : null;
     const said = (ctx.session as { cli?: unknown } | undefined)?.cli;
     const cli =
@@ -8093,28 +8114,89 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         : key === null
           ? null
           : (sql.one<{ last_build: string | null }>('SELECT last_build FROM token WHERE id = ?', key)?.last_build ?? null);
-    const drawn = cardOf(
-      told,
-      {
-        run: told.session?.spoken ?? null,
-        ...at,
-        build: cli,
-        min_cli: build?.min_cli ?? null,
-        decider: deciderOf(ctx),
-        waiting: questionsFor(ctx),
-        home: homeTitle(ctx),
-        /* A ROW A QUESTION NAMES BY ID OR BY A HANDLE THE CONTEXT DID NOT SEND, by its name, as governance says it, and
-           only when the caller may read its list. */
-        named: (s) => {
-          const row = kernel.get(s);
-          return row !== null && readable(ctx, row.register) === null ? kernel.titleOfRow(row.id) : null;
-        },
+    const cardAt: CardAt = {
+      run: told.session?.spoken ?? null,
+      ...at,
+      build: cli,
+      min_cli: build?.min_cli ?? null,
+      decider: deciderOf(ctx),
+      waiting: questionsFor(ctx),
+      home: homeTitle(ctx),
+      /* A ROW A QUESTION NAMES BY ID OR BY A HANDLE THE CONTEXT DID NOT SEND, by its name, as governance says it, and
+         only when the caller may read its list. */
+      named: (s) => {
+        const row = kernel.get(s);
+        return row !== null && readable(ctx, row.register) === null ? kernel.titleOfRow(row.id) : null;
       },
-      clock.now(),
-    );
+    };
+    const now = clock.now();
+    const drawn = cardOf(told, cardAt, now);
     /* BEHIND IS THE UPDATE LINE ITSELF, never the sentence anywhere: a step or a sign a run wrote may quote it. */
     const behind = drawn.card.split('\n').some((line) => line.startsWith('Update ') && line.endsWith(OLDER));
-    return { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind } };
+    const out: Context = { ...told, card: drawn.card, card_next: drawn.next, build: key === null ? null : { cli, behind } };
+    /* AN AGENT'S KEY IS ANSWERED THE PLAN TOO (`context-plan.ts`, plan §3), drawn from the facts this context already
+       holds: what stops it, what he told it, what it may do, his brief and its budget, at the depth it asked. The card
+       stays as it was, for the start hook and `braindog context`, which print it. */
+    if (key === null) return out;
+    const plan = planContext(
+      factsFromContext(out, {
+        ...cardAt,
+        now,
+        stop: told.stop ? { kind: told.stop.kind, id: told.stop.id, said: told.stop.said } : null,
+        told: (told.told ?? []).map(toldFact),
+        may: told.may ?? null,
+        brief: told.brief ?? null,
+        ...(told.stamp ? { stamp: told.stamp } : {}),
+        ...(where.task ? { task: taskFact(where.task) } : {}),
+      }),
+      { budget: told.budget, depth: where.depth },
+    );
+    return { ...out, plan: planText(plan), plan_card: plan.card, plan_tokens: plan.tokens, ...(plan.retire.length > 0 ? { retire: plan.retire } : {}) };
+  };
+
+  /** One instruction as the plan reads it: who said it by name, where it stands, and the task it is about by its words. */
+  const toldFact = (i: Told): ToldFact => {
+    const task = i.task === null ? null : kernel.get(i.task);
+    return {
+      id: i.id,
+      said: i.said,
+      by: i.by_name,
+      at: i.at,
+      kind: i.kind,
+      when: i.when,
+      to: i.to,
+      state: i.state,
+      taken_by: i.taken_by,
+      task: i.task === null ? null : task === null ? i.task : (kernel.titleOfRow(task.id) ?? i.task),
+      replaces: i.replaces,
+    };
+  };
+
+  /** The task `context { task }` hands whole, as the plan says it: its words, its other fields by label, its history. */
+  const taskFact = (t: TaskInHand): TaskFact => {
+    const decl = kernel.register(t.register);
+    const shown = (v: unknown): string | null => {
+      if (v === null || v === undefined || v === '' || typeof v === 'object') return null;
+      if (typeof v !== 'string') return String(v);
+      const row = kernel.get(v);
+      return row === null ? v : (kernel.titleOfRow(row.id) ?? v);
+    };
+    const fields: Record<string, string> = {};
+    for (const f of decl?.fields ?? []) {
+      if (f.retired || f.id === decl?.title || f.id === decl?.state || f.id === 'note') continue;
+      const v = shown(t.fields[f.id]);
+      if (v !== null) fields[f.label ?? f.id.replace(/_/gu, ' ')] = v;
+    }
+    const note = t.fields.note;
+    return {
+      name: (decl === undefined ? null : shown(t.fields[decl.title])) ?? t.spoken,
+      spoken: t.spoken,
+      version: t.version,
+      state: decl?.state === undefined ? null : shown(t.fields[decl.state]),
+      fields,
+      note: typeof note === 'string' && note.trim() !== '' ? note : null,
+      history: t.history,
+    };
   };
 
   /**
@@ -8131,7 +8213,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * she is, neither of which a briefing reads.
    */
   const briefed = new Map<string, Held<Context>>();
-  const briefing = (ctx: CallContext, where: { project?: string } = {}): Context => {
+  const briefing = (ctx: CallContext, where: Where = {}): Context => {
     const { batch: _batch, provedAt: _proved, ...caller } = ctx;
     return structuredClone(heldFor(briefed, JSON.stringify([caller, where]), () => briefingNow(ctx, where)));
   };
@@ -8230,7 +8312,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   };
 
   /** The briefing worked out now, held by nothing: `briefing` above holds it, and the sign that checks it reads this. */
-  const briefingNow = (ctx: CallContext, where: { project?: string } = {}): Context => {
+  const briefingNow = (ctx: CallContext, where: Where = {}): Context => {
     const hints = ctx.session ?? {};
     /* HOW MUCH IS SENT (AGT-B09): five rows a list unless the caller asked for the full answer, twenty of each. */
     const format = (hints as { format?: unknown }).format === 'full' ? 'full' : 'brief';
@@ -8516,7 +8598,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       host: tree.host ?? null,
       branch: hints.branch ?? text(run?.fields.branch) ?? null,
       ahead: aheadOf(hints),
-    });
+    }, where);
   };
 
   /** Whether the caller reads the whole record, which a number counted across every list is held to. */
@@ -11058,7 +11140,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         if (!found.ok) return found as Result<never>;
         task = found.value;
       }
-      const told = briefing(asked, typeof said.project === 'string' ? { project: said.project.trim() } : {});
+      const told = briefing(asked, { ...(typeof said.project === 'string' ? { project: said.project.trim() } : {}), depth, ...(task === null ? {} : { task }) });
       return ok({ ...told, depth, ...(task === null ? {} : { task }) }) as Out;
     },
 
