@@ -79,7 +79,11 @@
       .join(', '),
   );
 
-  /* ── things landing ── A FIGURE THAT CHANGES WHILE THE CARD IS DRAWN washes and rolls in; the first draw is no arrival. */
+  /* ── things landing ── A FIGURE THAT CHANGES WHILE THE CARD IS DRAWN washes and rolls in; the first draw is no arrival.
+     NOR IS THE FRESH READ THAT REPLACES THE KEPT ONE as the page opens: Kiln's "1 late" washed on every Today load and
+     every Back (VERIFY H44), so what changes in the card's first `SETTLING_MS` is taken as the page arriving. */
+  const SETTLING_MS = 2000;
+  const born = typeof performance === 'undefined' ? 0 : performance.now();
   let was = $state<{ figure: string | null; progress: number | null; late: number } | null>(null);
   let arrived = $state<ReadonlySet<'figure' | 'progress' | 'late'>>(new Set());
   $effect(() => {
@@ -87,7 +91,7 @@
     untrack(() => {
       const before = was;
       was = now;
-      if (!before) return;
+      if (!before || performance.now() - born < SETTLING_MS) return;
       const changed = new Set<'figure' | 'progress' | 'late'>();
       if (before.figure !== now.figure) changed.add('figure');
       if (before.progress !== now.progress) changed.add('progress');
@@ -238,9 +242,11 @@
     gap: 4px;
   }
 
-  /* AT RISK IS A WAITING DOT AND DIM WORDS; OFF TRACK THE RED DOT AND THE RED WORD, the one red a card may say. */
+  /* AT RISK IS A WAITING DOT AND DIM WORDS; OFF TRACK THE WARNING DOT AND WORD AT 600 (VERIFY H5). Red on a card is
+     for what is late, and only that. */
   .pc-health[data-tone='off'] {
-    color: var(--red);
+    color: var(--warn);
+    font-weight: 600;
   }
 
   .dot {
@@ -252,7 +258,7 @@
   }
 
   .pc-health[data-tone='off'] .dot {
-    background: var(--red);
+    background: var(--warn);
   }
 
   .pc-late {
