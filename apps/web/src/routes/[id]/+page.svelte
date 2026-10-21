@@ -149,8 +149,18 @@
     /* AN ID THAT RESOLVES NEVER SAYS IT SETTLED HERE: closing the read first set `data-screen` on an empty page for the
        moment before the move, and a picture taken then was a blank board (VERIFY P8). The move clears the claim, and
        the screen it lands on makes its own. */
+    /* AND A MOVE THE SHELL OVERTOOK IS MADE AGAIN (layout gate, 21 October). A shell drawn from the saved copy boots again
+       once `boot` answers, and that `invalidate` ended this `goto` without moving: the promise resolved, the address
+       stayed `/SG10` and the screen stayed empty and unsettled. So while this is still the page and the id, it goes
+       again, a few times at most. */
     if (out.to) {
-      await goto(at(out.to), { replaceState: true }).catch(() => closed(false, began));
+      for (let tries = 0; tries < 3 && page.route.id === '/[id]' && spoken() === said; tries++) {
+        const moved = await goto(at(out.to), { replaceState: true }).then(
+          () => true,
+          () => false,
+        );
+        if (!moved) return closed(false, began);
+      }
       return;
     }
     closed(out.refusal === null, began);
