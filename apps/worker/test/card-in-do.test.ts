@@ -30,7 +30,9 @@
  *
  * Measured: `mcp-own-card` turned the three card cases red ("context over /mcp said another card than the start hook
  * printed"), `stale-step` the seven-day case ("a step eight days old was handed over", age 691,200 seconds), and
- * `uncapped` the 150-word case ("156 words").
+ * `uncapped` the 150-word case ("156 words"). SINCE THE CAP FELL TO 130 AND EACH SLOT IS CUT TO ITS OWN LENGTH, `uncapped`
+ * turns nothing here red (21 October, checked): no case reaches the cap. The cap is held in the record's own tests
+ * (`card-next-lines`, `card-stale`, `card-lived`), which read `CARD_MOST`.
  *
  * WHAT IT FOUND AT HEAD: the three said one card, 51 words, and the step eight days old was no Next line. The card on a
  * record set up with Solo founder and nothing else carried a Signs line, "1 read red: Pages print clean. 2 pages print
@@ -106,7 +108,7 @@ const MUTANTS: Record<string, Rewrite> = {
     from: "const first = open.find((h) => h.mark === 'next');\n    const handoff: Context['handoff'] = first",
     to: "const first = open[0];\n    const handoff: Context['handoff'] = first",
   },
-  uncapped: { file: /[\\/]packages[\\/]record[\\/]src[\\/]card\.ts$/, from: 'export const CARD_MOST = 150;', to: 'export const CARD_MOST = Number.POSITIVE_INFINITY;' },
+  uncapped: { file: /[\\/]packages[\\/]record[\\/]src[\\/]card\.ts$/, from: 'export const CARD_MOST = 130;', to: 'export const CARD_MOST = Number.POSITIVE_INFINITY;' },
 };
 const mutant = process.env.CARD_MUTANT;
 
