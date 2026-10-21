@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { FULL_BUDGET, PLAN_BUDGET, PLAN_CARD_LINES, PLAN_CARD_WORDS, factsFromContext, planContext, planText, tokensOf, type ContextFacts, type LessonFact, type ToldFact } from '../src/context-plan.ts';
+import { FULL_BUDGET, KPI_HOW, PLAN_BUDGET, PLAN_CARD_LINES, PLAN_CARD_WORDS, factsFromContext, kpiLine, planContext, planText, tokensOf, type ContextFacts, type LessonFact, type ToldFact } from '../src/context-plan.ts';
 import { decidedLately, lessonsHeld } from '../src/context-caps.ts';
 import { TWO_SESSIONS, wordCount, type CardParts } from '../src/card.ts';
 import { createRecordApi, type CallContext, type Context } from '../src/index.ts';
@@ -269,5 +269,69 @@ test('FROM THE SEED’S OWN CONTEXT: the plan is under budget, leads with the ca
   assert.ok(plan.sections.some((s) => s.id === 'lane'), text);
   assert.ok(!text.includes('call context for the full picture'), text);
   assert.ok(!text.includes('log it with no spoken'), text);
+  sql.close();
+});
+
+/* ── the key numbers it keeps (the KPI plan of 21 October, K4-A) ── */
+
+const KPIS = [
+  { name: 'Players', every: '1d', last: iso(AT - 2 * DAY), stale: false },
+  { name: 'Revenue a month', every: '1m', last: null, stale: false },
+  { name: 'Servers', every: '1d', last: iso(AT - 23 * DAY), stale: true },
+];
+
+test('NUMBERS: the key numbers it keeps here, stale first, each with when it was last reported, then how to report one', () => {
+  const plan = planContext(his({ kpis: KPIS }), { budget: 1_200 });
+  assert.deepEqual(plan.sections.map((s) => s.id), ['told', 'may', 'rules', 'here', 'lane', 'kpis', 'decided', 'learned']);
+  const text = lines(planText(plan));
+  const at = text.findIndex((l) => l.startsWith('Numbers'));
+  assert.deepEqual(text.slice(at, at + 4), [
+    'Numbers  Servers, daily: reported 23d ago, stale',
+    '         Players, daily: reported 2d ago',
+    '         Revenue a month, monthly: never reported',
+    `         ${KPI_HOW}`,
+  ]);
+  assert.equal(kpiLine({ name: 'Players', last: iso(AT - 3_600_000), stale: false }, AT), 'Players: reported 1h ago');
+});
+
+test('NUMBERS KEEPS TO THE BUDGET: on a record the size of his it is said within 700 tokens, and lower sections give way', () => {
+  const plan = planContext(his({ kpis: KPIS }));
+  const text = planText(plan);
+  assert.ok(plan.tokens <= PLAN_BUDGET, `${String(plan.tokens)} tokens:\n${text}`);
+  assert.ok(text.includes('Numbers  Servers, daily: reported 23d ago, stale'), text);
+  assert.ok(text.includes(KPI_HOW), text);
+  /* MORE THAN FOUR: the more line, then the foot. */
+  const many = Array.from({ length: 6 }, (_, i) => ({ name: `Number ${String(i)}`, every: '1w', last: iso(AT - DAY), stale: false }));
+  const cut = lines(planText(planContext(his({ kpis: many }), { budget: 1_200 })));
+  const at = cut.findIndex((l) => l.startsWith('Numbers'));
+  assert.match(cut[at + 4]!, /^ {9}and 2 more: list\(\{ register: "kpis"/u);
+  assert.equal(cut[at + 5], `         ${KPI_HOW}`);
+  /* NONE KEPT, NO SECTION. */
+  assert.ok(!planContext(his(), { budget: 1_200 }).sections.some((s) => s.id === 'kpis'));
+});
+
+test('FROM THE SEED: Claude on Kiln is told the two numbers it keeps there, and Codex none', async () => {
+  const sql = openSqlite();
+  const clock = fixedClock(NOW);
+  const api = await createRecordApi({ sql, clock });
+  assert.ok((await installSeed(api.kernel)).ok);
+  const as = (agent: string, id: string): CallContext => ({
+    principal: { kind: 'token', id, scope: 'write', person: 'p_1', level: 'owner' },
+    session: { host: 'Studio-MacBook-Pro.local', cwd: '/Users/studio/Code/kiln-type', repo: 'kiln-type', agent, client_id: `c-${agent}` },
+  });
+  const plan = async (ctx: CallContext): Promise<string> => {
+    assert.ok((await api.attach({ source: 'startup', client_id: `c-${String(ctx.session?.agent)}`, doing: 'Numbers' }, ctx)).ok);
+    const got = (await api.context({}, ctx)) as { ok: boolean; value: Context & { plan?: string; plan_tokens?: number } };
+    assert.ok(got.ok);
+    assert.ok((got.value.plan_tokens ?? 0) <= PLAN_BUDGET);
+    return got.value.plan ?? '';
+  };
+  const claude = await plan(as('claude', 'tok_1'));
+  assert.match(claude, /^Numbers {2}Studios licensed, weekly: reported 1d ago$/mu);
+  assert.match(claude, /^ {9}Revenue a month, monthly: reported \d+d ago$/mu);
+  assert.ok(claude.includes(KPI_HOW), claude);
+  assert.ok(!claude.includes('Specimen downloads'), 'nobody keeps it, so no agent is told it');
+  const codex = await plan(as('codex', 'tok_2'));
+  assert.ok(!codex.includes('Numbers  '), codex);
   sql.close();
 });

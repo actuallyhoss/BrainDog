@@ -232,8 +232,8 @@ import { methods as previewChangeMethods } from './methods/preview-change.ts';
 import { landRetype } from './methods/retype.ts';
 import { byMeaning } from './near.ts';
 import { aboutOf, ladder, type Caller, type Gate } from './ladder.ts';
-import { OLDER, card as cardOf, type CardAt } from './card.ts';
-import { factsFromContext, planContext, planText, type TaskFact, type ToldFact } from './context-plan.ts';
+import { OLDER, agentName, card as cardOf, type CardAt } from './card.ts';
+import { factsFromContext, planContext, planText, type KpiFact, type TaskFact, type ToldFact } from './context-plan.ts';
 import { BRIEF_ROWS, capRegister, DECIDED, decidedHere, peopleHere, projectWaiting, rulesOf, type Decision, type Placed } from './context-caps.ts';
 import { choiceOf } from './decided.ts';
 import { alsoHere, nextLines, runName, sameTree, type AlsoHere, type LastHere, type LeftStep, type TreeRun } from './same-tree.ts';
@@ -8153,10 +8153,52 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
         brief: told.brief ?? null,
         ...(told.stamp ? { stamp: told.stamp } : {}),
         ...(where.task ? { task: taskFact(where.task) } : {}),
+        ...(where.depth === 'card' ? {} : { kpis: kpisKept(ctx, told.project, at.agent) }),
       }),
       { budget: told.budget, depth: where.depth },
     );
     return { ...out, plan: planText(plan), plan_card: plan.card, plan_tokens: plan.tokens, ...(plan.retire.length > 0 ? { retire: plan.retire } : {}) };
+  };
+
+  /**
+   * THE KEY NUMBERS THIS AGENT KEEPS WHERE IT STANDS (the KPI plan of 21 October, K4-A, 2.3 "the briefing names the KPIs
+   * an agent owns on the project it works in"): the live rows of the key numbers on this project whose `owner` is this
+   * kind of agent, by its kind or its name ("claude", "Claude", "Claude Code"), each with when its last reading came in
+   * and whether it stopped arriving, as the `kpis` source reads them. A figure is worked out from lists and is nobody's
+   * to report, so it is left out.
+   *
+   * THE LIST IS FOUND BY ITS SHAPE, as the source finds it: a link to the projects and a `measure`, a `figure`, a `today`
+   * and a `headline`. Only when this agent keeps one here is the block drawn, so a context on a record with no key
+   * numbers, or none of this agent's, reads one list and nothing more.
+   */
+  const kpisKept = (ctx: CallContext, project: Context['project'], agent: string | null): KpiFact[] => {
+    const kind = (agent ?? '').trim().toLowerCase().replace(/^agent:/u, '');
+    if (project === null || kind === '' || kind === 'other') return [];
+    const names = new Set([kind, (agentName(kind) ?? kind).toLowerCase()]);
+    const owns = (owner: unknown): boolean => typeof owner === 'string' && names.has(owner.trim().toLowerCase().replace(/^agent:/u, ''));
+    const list = [...kernel.registers()].find(([, r]) => {
+      const live = r.fields.filter((f) => !f.retired);
+      return ['measure', 'figure', 'today', 'headline'].every((id) => live.some((f) => f.id === id)) && live.some((f) => f.id === 'thing' && f.type === 'ref');
+    })?.[0];
+    if (list === undefined || readable(ctx, list) !== null) return [];
+    const here = kernel.get(project.spoken);
+    if (here === null) return [];
+    const got = kernel.list({ register: list, limit: 500 }, kernel.scope(ctx, list));
+    if (!got.ok) return [];
+    const mine = got.value.rows.filter(
+      (r) => (r.fields.thing === here.id || r.fields.thing === project.spoken) && owns(r.fields.owner) && r.fields.draft !== true && r.fields.state !== 'retired' && r.fields.source !== 'figure',
+    );
+    if (mine.length === 0) return [];
+    const drawn = heldBlock(ctx, kernel.block({ kind: 'kpis', source: 'kpis', for: 'project', about: project.spoken } as never, { viewer: viewerOf(ctx) })) as {
+      kpis?: { kpi: string; latest: { at: string } | null; stale: { stale: boolean } }[];
+    };
+    const answers = new Map((drawn.kpis ?? []).map((a) => [a.kpi, a]));
+    return mine.flatMap((r): KpiFact[] => {
+      const name = typeof r.fields.name === 'string' ? r.fields.name.trim() : '';
+      if (name === '') return [];
+      const a = answers.get(r.id);
+      return [{ name, every: typeof r.fields.every === 'string' ? r.fields.every : null, last: a?.latest?.at ?? null, stale: a?.stale.stale === true }];
+    });
   };
 
   /** One instruction as the plan reads it: who said it by name, where it stands, and the task it is about by its words. */

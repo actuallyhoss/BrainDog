@@ -45,6 +45,16 @@ The person can tell an agent something from the BrainDog app. It comes back as a
 
 The prompts `/braindog:start`, `/braindog:wrap` and `/braindog:ask` say these steps in order.
 
+## Key numbers
+
+`context` lists the key numbers you keep on the project under "Numbers", with when each was last reported. "Stale"
+means one is overdue.
+
+- Report a reading with `create` on Numbers (the readings list): the measure's name, the project, a `value` (or an
+  `amount` for money) and `at`.
+- Propose anything else with `propose`: a new key number, or a change to a target, cadence or owner.
+- A money reading for a key number you do not keep is asked too, with `propose`.
+
 ## Stop and pause
 
 The person can stop or pause your run. From then on every change is refused with `RUN_STOPPED` or `RUN_PAUSED`, and the

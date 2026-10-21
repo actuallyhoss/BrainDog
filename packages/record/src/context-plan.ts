@@ -15,6 +15,8 @@
  *   4 Rules and brief    his brief for this agent, then rules here, then everywhere: 120 tokens
  *   5 Working here now   other live runs in this repo (worktrees are the same repo); a run on your branch is warned of
  *   6 Your lane here     open tasks handed to this kind of agent, then ones nobody holds: 5 rows
+ *   6b Numbers           the key numbers this agent keeps on this project, stale first, each with when it last came
+ *                        in, then how to report one: 4 rows
  *   7 Decided lately     the last 14 days here, answers to this run's own questions first: 3 rows
  *   8 Held               lessons that held: confirmed lately, here before everywhere, method before fact: 3 rows
  *   9 On request only    keys, tools, people and signs, at depth "full"
@@ -45,7 +47,7 @@ export const PLAN_CARD_WORDS = 120;
 /** The rules-and-brief section's most tokens. */
 export const RULES_TOKENS = 120;
 /** The most rows of each section in the default answer; `full` holds four times as many. */
-export const ROWS = { here: 4, lane: 5, decided: 3, learned: 3 } as const;
+export const ROWS = { here: 4, lane: 5, kpis: 4, decided: 3, learned: 3 } as const;
 
 /** A text's size as the plan counts it: characters / 4, rounded up. */
 export const tokensOf = (text: string): number => Math.ceil([...text].length / 4);
@@ -109,6 +111,15 @@ export type OtherRun = {
 /** A task in the lane: its words, handle, version and state; `mine` when its agent field is this kind of agent. */
 export type LaneRow = { name: string; spoken: string; version?: number | undefined; state?: string | null | undefined; mine: boolean };
 
+/**
+ * A key number this agent keeps on the project it is in (the KPI plan of 21 October, K4-A): its name, how often a value
+ * should come in, when the last one did (ISO, `null` for never), and whether it stopped arriving.
+ */
+export type KpiFact = { name: string; every?: string | null | undefined; last: string | null; stale: boolean };
+
+/** What an agent does with a key number it keeps, said once under them. */
+export const KPI_HOW = 'Report a reading with create on Numbers; propose anything else.';
+
 /** A lesson: its handle and words, and how `lessonsHeld` ranks it. */
 export type LessonFact = Lesson & { said: string };
 
@@ -142,7 +153,7 @@ export type SinceFact = {
 };
 
 /** The calls a cut section names, by section, and how many rows there are in all where more were left unread. */
-export type SectionId = 'stop' | 'told' | 'may' | 'rules' | 'here' | 'lane' | 'decided' | 'learned' | 'task' | 'needs' | 'teach' | 'extra' | 'since';
+export type SectionId = 'stop' | 'told' | 'may' | 'rules' | 'here' | 'lane' | 'kpis' | 'decided' | 'learned' | 'task' | 'needs' | 'teach' | 'extra' | 'since';
 
 /**
  * Everything `context` may say, gathered by the record (§8.3). `who` is the card's lines (`cardParts`), or `null` for a
@@ -159,6 +170,8 @@ export type ContextFacts = {
   lane: readonly LaneRow[];
   decided: readonly Lately[];
   learned: readonly LessonFact[];
+  /** The key numbers this agent keeps here, by owner. */
+  kpis?: readonly KpiFact[] | undefined;
   task?: TaskFact | undefined;
   since?: SinceFact | undefined;
   /** The caller's run, spoken, its app (`claude`) and its branch. */
@@ -186,7 +199,7 @@ export type ContextFacts = {
 /* ── the plan ──────────────────────────────────────────────────────────── */
 
 /** One section as said: its lines, ready to print, and what was cut with the call that lists it. */
-export type PlanSection = { id: SectionId; lines: string[]; more?: { n: number; call: string } };
+export type PlanSection = { id: SectionId; lines: string[]; more?: { n: number; call: string }; foot?: string };
 
 /**
  * The plan: the card, the sections in the order said, and the size of the whole as `planText` prints it. Sections
@@ -279,6 +292,16 @@ const laneLine = (t: LaneRow): string =>
 const laneCall = (list: string, agent: string | null | undefined): string =>
   `list({ register: ${JSON.stringify(list)}, where: {"field":"agent","is":${JSON.stringify(agent && agent.trim() ? agent.trim() : 'claude')}} })`;
 
+/** A cadence as a person says it. */
+const EVERY_SAID: Readonly<Record<string, string>> = { '1h': 'hourly', '1d': 'daily', '1w': 'weekly', '1m': 'monthly' };
+
+/** A key number as one row: "Players, daily: reported 23d ago, stale", or "never reported". */
+export function kpiLine(k: KpiFact, now: number): string {
+  const every = k.every ? EVERY_SAID[k.every] : undefined;
+  const when = ago(k.last, now);
+  return `${words(k.name, 50)}${every ? `, ${every}` : ''}: ${when === null ? 'never reported' : `reported ${when}`}${k.stale ? ', stale' : ''}`;
+}
+
 /* ── the card ──────────────────────────────────────────────────────────── */
 
 /**
@@ -363,14 +386,15 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
    * One ranked section: as many of its rows as fit in what the budget has left, with the more line when any were cut.
    * `kept` rows are said whatever the budget (the same-branch warning). `total` counts rows the facts did not hold.
    */
-  const fill = (id: SectionId, label: string, all: readonly string[], cap: number, call: string, opt: { kept?: string[]; total?: number; tokens?: number } = {}): void => {
+  const fill = (id: SectionId, label: string, all: readonly string[], cap: number, call: string, opt: { kept?: string[]; total?: number; tokens?: number; foot?: string } = {}): void => {
     const kept = opt.kept ?? [];
     const rows = all.slice(0, cap);
     const total = Math.max(opt.total ?? 0, all.length);
     for (let k = rows.length; k >= 0; k--) {
       const n = total - k;
       if (k === 0 && kept.length === 0 && n === 0) break;
-      const section: PlanSection = { id, lines: rowsUnder(label, [...kept, ...rows.slice(0, k)]), ...(n > 0 ? { more: { n, call } } : {}) };
+      /* A FOOT IS SAID UNDER THE ROWS, after the more line, while any row is, and goes with the last of them. */
+      const section: PlanSection = { id, lines: rowsUnder(label, [...kept, ...rows.slice(0, k)]), ...(n > 0 ? { more: { n, call } } : {}), ...(opt.foot && k > 0 ? { foot: opt.foot } : {}) };
       /* A SECTION WITH A CAP OF ITS OWN (rules and brief, 120 tokens) keeps to it as well as to the budget. */
       if (opt.tokens !== undefined && k > 0 && tokensOf(sectionText(section, label).join('\n')) > opt.tokens) continue;
       if (said({ card: cardText, sections: [...sections, section] }) <= budget) {
@@ -428,6 +452,11 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
   const lane = [...f.lane].sort((a, z) => Number(z.mine) - Number(a.mine));
   if (depth !== 'task' && lane.length > 0) fill('lane', 'Lane', lane.map(laneLine), ROWS.lane * times, calls.lane ?? laneCall(/^([a-z][a-z0-9_]*)#/u.exec(lane[0]!.spoken)?.[1] ?? 'list', f.agent), { total: totals.lane ?? 0 });
 
+  /* 6b NUMBERS: the key numbers it keeps here, stale ones first, then how to report one. */
+  const kpis = [...(f.kpis ?? [])].sort((a, z) => Number(z.stale) - Number(a.stale));
+  if (depth !== 'task' && kpis.length > 0)
+    fill('kpis', 'Numbers', kpis.map((k) => kpiLine(k, f.now)), ROWS.kpis * times, calls.kpis ?? `list({ register: "kpis", where: {"field":"owner","is":${JSON.stringify(f.agent && f.agent.trim() ? f.agent.trim() : 'claude')}} })`, { foot: KPI_HOW });
+
   /* 7 DECIDED LATELY. */
   const decided = decidedLately(f.decided, f.now, Number.POSITIVE_INFINITY);
   if (decided.length > 0) fill('decided', 'Decided', decided, ROWS.decided * times, calls.decided ?? 'governance({ state: "decided" })', { total: totals.decided ?? 0 });
@@ -455,8 +484,9 @@ export function planContext(f: ContextFacts, opts: PlanOptions = {}): Plan {
 
 /** A section's lines with its more line, as printed. */
 function sectionText(s: PlanSection, label: string): string[] {
-  if (!s.more) return s.lines;
-  return s.lines.length === 0 ? [moreLine(label, s.more, true)] : [...s.lines, moreLine(label, s.more, false)];
+  const foot = s.foot ? [`${INDENT}${s.foot}`] : [];
+  if (!s.more) return [...s.lines, ...foot];
+  return s.lines.length === 0 ? [moreLine(label, s.more, true)] : [...s.lines, moreLine(label, s.more, false), ...foot];
 }
 
 /** The label a section's rows print under, for its more line when none of them fit. */
@@ -467,6 +497,7 @@ const LABELS: Record<SectionId, string> = {
   rules: 'Rules',
   here: 'Here now',
   lane: 'Lane',
+  kpis: 'Numbers',
   decided: 'Decided',
   learned: 'Held',
   task: 'Task',
@@ -489,7 +520,7 @@ export const planCardWords = (p: Plan): number => wordCount(p.card);
 /* ── the facts from today's context ────────────────────────────────────── */
 
 /** What `factsFromContext` is told beside the context: the card's `at`, the instant, and what `Context` does not hold. */
-export type FactsAt = CardAt & { now: number } & Partial<Pick<ContextFacts, 'stop' | 'told' | 'may' | 'brief' | 'first' | 'teach' | 'stamp' | 'recent' | 'extra' | 'task' | 'since'>>;
+export type FactsAt = CardAt & { now: number } & Partial<Pick<ContextFacts, 'stop' | 'told' | 'may' | 'brief' | 'first' | 'teach' | 'stamp' | 'recent' | 'extra' | 'task' | 'since' | 'kpis'>>;
 
 const str = (x: unknown): string | null => (typeof x === 'string' && x.trim() !== '' ? x : null);
 
@@ -555,6 +586,7 @@ export function factsFromContext(c: Context, at: FactsAt): ContextFacts {
     branch: at.branch ?? null,
     now: at.now,
     ...(at.task ? { task: at.task } : {}),
+    ...(at.kpis && at.kpis.length > 0 ? { kpis: at.kpis } : {}),
     ...(at.since ? { since: at.since } : {}),
     ...(at.stamp ? { stamp: at.stamp } : {}),
     ...(at.recent ? { recent: at.recent } : {}),
