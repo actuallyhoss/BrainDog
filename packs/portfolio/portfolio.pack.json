@@ -266,7 +266,7 @@
           "span": 12,
           "source": "register.things",
           "where": "lane is building or earning, revenue is set",
-          "columns": [ { "field": "name" }, { "field": "revenue" } ],
+          "columns": [ { "field": "name" }, { "field": "revenue" }, { "field": "hue" } ],
           "order": [ { "field": "revenue", "dir": "desc" } ],
           "limit": 8,
           "when": { "metric": "projects-earning-said", "gt": 1 }
