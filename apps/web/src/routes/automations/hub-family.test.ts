@@ -50,7 +50,7 @@ test('A FAMILY WITH A MEMBER THAT CAME WITH NO COUNT SAYS NO SUM, and one where 
   assert.equal(familySaid(some.family, NOW), '');
   const none = families([kin('a', 0), kin('b', 0)])[0];
   assert.ok(none?.kind === 'family');
-  assert.equal(familySaid(none.family, NOW), 'None of them has run.');
+  assert.equal(familySaid(none.family, NOW), 'None has run');
 });
 
 test("A FAMILY'S NAME IS THE FIELDS AND THE LIST, NEVER THE KEY", () => {

@@ -148,7 +148,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
-    padding: var(--inset);
+    /* THE TILES' OWN PADDING (UI pass of 21 October, P34), so its label starts where "On 31" does under it. */
+    padding: var(--tile-pad);
     background: var(--tile);
     border-radius: var(--r-tile);
   }

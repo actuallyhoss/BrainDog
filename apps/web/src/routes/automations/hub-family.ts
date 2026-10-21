@@ -35,7 +35,7 @@ export type Fold<T extends Kin> = { kind: 'one'; row: T } | { kind: 'family'; fa
 
 export const familyWords = {
   count: (n: number) => `${n.toLocaleString('en')} rules`,
-  noneRan: 'None of them has run.',
+  noneRan: 'None has run',
   someNever: (n: number) => `${spell(n, true)} never ran.`,
 } as const;
 
