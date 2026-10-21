@@ -61,8 +61,8 @@
     hintPending: 'On this device for now. It reaches this record the next time it can.',
     hintDevice: 'Kept on this device.',
     /* THE PREVIEW'S SENTENCE, with its one phrase that needs the person in red, as a page's headline draws it. */
-    said: 'Three things need you today,',
-    needs: 'one is late.',
+    said: '3 need you today,',
+    needs: '1 is late.',
     light: 'Light',
     dark: 'Dark',
     houseRed: 'House red',
@@ -712,15 +712,42 @@
     font-size: var(--fs-meta);
   }
 
+  /* UNDER A THUMB THE BUTTON IS 44 SQUARE AND THE COLOUR STAYS 32 (UI pass of 21 October, P39): the colour, its ring
+     and the chosen outline move onto a 32px disc inside, so the target is the button's own box and measures 44. */
   @media (pointer: coarse) {
     .swatches {
-      gap: var(--sp-3);
+      gap: 0;
+      padding: 0;
     }
 
-    .swatch::after {
+    .swatch {
+      inline-size: 44px;
+      block-size: 44px;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .swatch[data-on]:not(:focus-visible) {
+      outline: 0;
+    }
+
+    .swatch::before {
       content: '';
       position: absolute;
-      inset: -6px;
+      inset: 6px;
+      border-radius: var(--r-round);
+      background: var(--swatch, var(--tile-2));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
+    }
+
+    .swatch[data-on]::before {
+      outline: 2px solid var(--red);
+      outline-offset: 2px;
+    }
+
+    .tick {
+      inset-block-start: -2px;
+      inset-inline-end: -2px;
     }
   }
 
