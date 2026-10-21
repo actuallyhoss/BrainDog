@@ -123,8 +123,10 @@
     color: var(--ink-3);
   }
 
+  /* THE RED FOR WORDS, `--red`, and never the button's `--red-fill`: the fill is solved for white words on it, and as
+     words on a dark tile it read 3.1 to 1. */
   .box .block[data-kind='note']:not([data-form='lead']) .panel a {
-    color: var(--red-fill);
+    color: var(--red);
     text-underline-offset: 3px;
   }
 
