@@ -14,7 +14,7 @@
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -191,6 +191,39 @@ test('EVERY PROFILE IN THE HOME IS FOUND: .claude and each .claude-<name> that h
   mkdirSync(join(home, '.claude-empty'));
   assert.deepEqual(profilesIn(home, [], {}), [join(home, '.claude'), join(home, '.claude-work')]);
   assert.deepEqual(profilesIn(home, [join(home, 'elsewhere')], {}), [join(home, 'elsewhere')]);
+});
+
+test('EVERY CCENV PROFILE IS FOUND, under CCENV_HOME when it is set, and a profile reached twice is read once', () => {
+  const home = newHome();
+  const profiles = join(home, '.ccenv', 'profiles');
+  json(join(home, '.claude', 'settings.json'), {});
+  json(join(profiles, 'studio', 'settings.json'), {});
+  json(join(profiles, 'work', 'settings.json'), {});
+  mkdirSync(join(profiles, 'empty'), { recursive: true });
+  /* A link in the home names one of them, and ccenv's own switch sets CLAUDE_CONFIG_DIR to another. */
+  symlinkSync(join(profiles, 'work'), join(home, '.claude-work'), 'junction');
+  assert.deepEqual(profilesIn(home, [], { CLAUDE_CONFIG_DIR: join(profiles, 'studio') }), [join(home, '.claude'), join(home, '.claude-work'), join(profiles, 'studio')]);
+  /* Set, CCENV_HOME is where ccenv's profiles are looked for, and `~/.ccenv` is not. */
+  const elsewhere = join(home, 'tools', 'ccenv');
+  json(join(elsewhere, 'profiles', 'lab', 'settings.json'), {});
+  assert.deepEqual(profilesIn(home, [], { CCENV_HOME: elsewhere }), [join(home, '.claude'), join(home, '.claude-work'), join(elsewhere, 'profiles', 'lab')]);
+  /* An empty CCENV_HOME is no CCENV_HOME, as an empty CLAUDE_CONFIG_DIR is none. */
+  assert.deepEqual(profilesIn(home, [], { CCENV_HOME: '', CLAUDE_CONFIG_DIR: '' }), profilesIn(home, [], {}));
+});
+
+test('A CCENV PROFILE IS NAMED BY ITS NAME, and its servers are read from its own folder', () => {
+  const home = newHome();
+  const studio = join(home, '.ccenv', 'profiles', 'studio');
+  json(join(studio, 'settings.json'), ours);
+  json(join(studio, '.claude.json'), { mcpServers: { braindog: BRAINDOG_SERVER } });
+  const out = doctor([], { ...quiet, home, env: {}, crontab: () => null });
+  assert.ok(out.lines.includes("Claude Code, ccenv profile studio: BrainDog's server is registered and runs this command. Both hooks are there."), out.lines.join('\n'));
+  assert.equal(out.code, 0, out.lines.join('\n'));
+  /* Under another CCENV_HOME the profile is named by it too. */
+  const other = join(home, 'tools', 'ccenv');
+  json(join(other, 'profiles', 'lab', 'settings.json'), ours);
+  const there = doctor([], { ...quiet, home, env: { CCENV_HOME: other }, crontab: () => null });
+  assert.ok(there.lines.some((l) => l.startsWith('Claude Code, ccenv profile lab: ')), there.lines.join('\n'));
 });
 
 test('ARGUMENTS IT DOES NOT KNOW ARE REFUSED IN ONE SENTENCE, and so is a replace file that does not read', () => {

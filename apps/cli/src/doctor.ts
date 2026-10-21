@@ -18,7 +18,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -83,7 +83,7 @@ const readText = (file: string): string | null => {
   }
 };
 
-const isFolder = (path: string): boolean => {
+export const isFolder = (path: string): boolean => {
   try {
     return statSync(path).isDirectory();
   } catch {
@@ -91,23 +91,45 @@ const isFolder = (path: string): boolean => {
   }
 };
 
+/** Where ccenv keeps its profiles, `CCENV_HOME` or else `~/.ccenv`, one folder each under its `profiles`. */
+export const ccenvHome = (home: string, env: Env): string => (env.CCENV_HOME ? resolve(env.CCENV_HOME) : join(home, '.ccenv'));
+
+/* A folder as the file system finds it, links followed, so one profile reached two ways is read once. */
+export const realOf = (dir: string): string => {
+  try {
+    return realpathSync(dir);
+  } catch {
+    return resolve(dir);
+  }
+};
+
 /**
  * THE PROFILES TO READ: each `--config-dir`, else every one the home holds, `.claude` and each `.claude-<name>` with a
- * `settings.json` in it, and `CLAUDE_CONFIG_DIR` when it is set. `install` reads one profile unless told of more;
- * doctor is asked what is left anywhere, so it looks for all of them. A folder with no settings is no profile.
+ * `settings.json` in it, each ccenv profile with one (`ccenvHome`), and `CLAUDE_CONFIG_DIR` when it is set. `install`
+ * reads one profile unless told of more; doctor is asked what is left anywhere, so it looks for all of them. A folder
+ * with no settings is no profile. EACH ONCE, BY THE FOLDER IT RESOLVES TO: ccenv sets `CLAUDE_CONFIG_DIR` to one of its
+ * own profiles, and a link can name another.
  */
 export function profilesIn(home: string, named: string[], env: Env): string[] {
   if (named.length > 0) return named.map((dir) => resolve(dir));
-  const found = new Set<string>();
-  let names: string[] = [];
-  try {
-    names = readdirSync(home).sort();
-  } catch {
-    /* A home that cannot be listed holds no profile doctor can read. */
-  }
-  for (const name of names) if ((name === '.claude' || name.startsWith('.claude-')) && existsSync(join(home, name, 'settings.json'))) found.add(join(home, name));
-  if (env.CLAUDE_CONFIG_DIR) found.add(resolve(env.CLAUDE_CONFIG_DIR));
-  return [...found];
+  const found = new Map<string, string>();
+  const add = (dir: string) => {
+    const real = realOf(dir);
+    if (!found.has(real)) found.set(real, dir);
+  };
+  const withSettings = (folder: string, takes: (name: string) => boolean) => {
+    let names: string[] = [];
+    try {
+      names = readdirSync(folder).sort();
+    } catch {
+      /* A folder that cannot be listed holds no profile doctor can read. */
+    }
+    for (const name of names) if (takes(name) && existsSync(join(folder, name, 'settings.json'))) add(join(folder, name));
+  };
+  withSettings(home, (name) => name === '.claude' || name.startsWith('.claude-'));
+  withSettings(join(ccenvHome(home, env), 'profiles'), (name) => !name.startsWith('.'));
+  if (env.CLAUDE_CONFIG_DIR) add(resolve(env.CLAUDE_CONFIG_DIR));
+  return [...found.values()];
 }
 
 /* `looksLikeToken`, `wordsOf`, `isOldUrl` and `isOldServer` are `install.ts`'s own, so doctor names exactly the servers
@@ -223,7 +245,7 @@ function linePlaces(kind: 'schedule' | 'startup', file: string, text: string | n
 }
 
 /* Folders a walk for project files never enters: other people's code, and every dot folder, a profile's among them. */
-const SKIPPED = new Set(['node_modules', 'Library', 'dist', 'build', 'target', 'vendor']);
+export const SKIPPED = new Set(['node_modules', 'Library', 'dist', 'build', 'target', 'vendor']);
 /** How deep under a folder a project's `.mcp.json` is looked for: a projects folder, a group in it, a project, one more. */
 const DEPTH = 4;
 
@@ -395,15 +417,19 @@ export function planDoctor(seen: Seen): Report {
 const count = (n: number, one: string, many: string): string => `${String(n)} ${n === 1 ? one : many}`;
 
 /** A file as a person goes to it: under the home it is `~/...`, and anything else is as it is. */
-const shown = (file: string, home: string | undefined): string =>
+export const shown = (file: string, home: string | undefined): string =>
   home !== undefined && home !== '' && (file === home || file.startsWith(`${home}/`) || file.startsWith(`${home}\\`)) ? `~${file.slice(home.length)}` : file;
 
-/** A Claude Code profile by its name: the default one, `.claude-<name>` by its name, and any other by where it is. */
-export function profileName(dir: string, home?: string): string {
+/**
+ * A Claude Code profile by its name: the default one, `.claude-<name>` and a ccenv profile by theirs, and any other by
+ * where it is. `ccenv` is the folder `ccenvHome` gives, `~/.ccenv` when it is not handed in.
+ */
+export function profileName(dir: string, home?: string, ccenv: string | undefined = home === undefined ? undefined : join(home, '.ccenv')): string {
   const name = basename(dir);
   const inHome = home !== undefined && resolve(dirname(dir)) === resolve(home);
   if (inHome && name === '.claude') return 'Claude Code, the default profile';
   if (inHome && name.startsWith('.claude-')) return `Claude Code, profile ${name.slice('.claude-'.length)}`;
+  if (ccenv !== undefined && resolve(dirname(dir)) === resolve(ccenv, 'profiles')) return `Claude Code, ccenv profile ${name}`;
   return `Claude Code, the profile at ${shown(dir, home)}`;
 }
 
@@ -412,14 +438,15 @@ const serverWords = (server: 'this' | 'other' | 'none'): string =>
 
 /**
  * The plan as lines: each profile and each other app in a sentence, then the places under three headings, then each
- * app to restart, then how many there are. `home` is the folder shown as `~`, so a line names a file a person can open.
+ * app to restart, then how many there are. `home` is the folder shown as `~`, so a line names a file a person can open,
+ * and `ccenv` the one a ccenv profile is named under.
  */
-export function printDoctor(report: Report, home?: string): string[] {
+export function printDoctor(report: Report, home?: string, ccenv?: string): string[] {
   const apps = report.apps.length > 0 ? ` and ${count(report.apps.length, 'other app', 'other apps')}` : '';
   const lines = [`braindog doctor read ${count(report.profiles.length, 'profile', 'profiles')}${apps}, and changed nothing.`];
   for (const p of report.profiles) {
     const hooks = p.start && p.end ? 'Both hooks are there' : p.start ? 'The end hook is missing' : p.end ? 'The start hook is missing' : 'Both hooks are missing';
-    lines.push(`${profileName(p.dir, home)}: ${serverWords(p.server)}. ${hooks}.`);
+    lines.push(`${profileName(p.dir, home, ccenv)}: ${serverWords(p.server)}. ${hooks}.`);
   }
   for (const a of report.apps) {
     const old = a.replaced && report.replaced !== null ? ` A server of ${report.replaced}'s is still there.` : '';
@@ -541,5 +568,5 @@ export function doctor(args: string[], io: DoctorIo = {}): { lines: string[]; re
     processes: (io.ps ?? psOf)(),
     installed: (io.installed ?? installedOf)(),
   });
-  return { lines: printDoctor(report, home), report, json: values.json === true, code: report.places.length > 0 ? 1 : 0 };
+  return { lines: printDoctor(report, home, ccenvHome(home, env)), report, json: values.json === true, code: report.places.length > 0 ? 1 : 0 };
 }

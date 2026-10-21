@@ -314,7 +314,7 @@ test('doctor PRINTS ITS LINES, OR ITS REPORT AS THE DOCUMENT, and exits 1 when a
   /* A home with one profile that holds neither BrainDog's server nor a hook, so one thing at least is listed. */
   mkdirSync(join(h.dir, '.claude'), { recursive: true });
   writeFileSync(join(h.dir, '.claude', 'settings.json'), '{}\n');
-  const env = { ...h.env, HOME: h.dir, USERPROFILE: h.dir, CLAUDE_CONFIG_DIR: '' };
+  const env = { ...h.env, HOME: h.dir, USERPROFILE: h.dir, CLAUDE_CONFIG_DIR: '', CCENV_HOME: '' };
 
   const plain = await ran(['doctor'], env, h.dir);
   assert.equal(plain.code, 1, plain.stderr);
