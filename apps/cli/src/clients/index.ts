@@ -38,8 +38,11 @@ export type Scope = 'user' | 'project';
  */
 export type ServerSet = { scope: 'global' | 'project'; source: string; writes: Scope | null; servers: unknown; fault: string | null };
 
-/** One entry to write: what the record renders for a tool, and whether it replaces the entry there. */
-export type Want = { name: string; scope: Scope; entry: Record<string, unknown>; replace: boolean; home: string; top: string | null; cwd: string };
+/**
+ * One entry to write: what the record renders for a tool, and whether it replaces the entry there. `profile` is the
+ * Claude Code profile folder a person-wide entry goes into, the default one's when absent; other apps have none.
+ */
+export type Want = { name: string; scope: Scope; entry: Record<string, unknown>; replace: boolean; home: string; top: string | null; cwd: string; profile?: string | undefined };
 
 /** What a write would do, decided and said before anything is written. */
 export type Plan = { want: Want; file: string | null; lines: string[] };
@@ -56,8 +59,11 @@ export type Client = {
   title: string;
   /** Whether this app is on this machine. */
   found(home: string, env: Env): boolean;
-  /** The reader: every place it keeps servers for this home and repository, in precedence order, later ones winning. */
-  servers(home: string, top: string | null, cwd?: string): ServerSet[];
+  /**
+   * The reader: every place it keeps servers for this home and repository, in precedence order, later ones winning.
+   * `profile` names a Claude Code profile folder whose own servers are read in place of the default one's.
+   */
+  servers(home: string, top: string | null, cwd?: string, profile?: string): ServerSet[];
   /** The lines a write would make, writing nothing. */
   plan(want: Want): Plan;
   /** The write. `copied` holds the files already copied aside this run, so each is copied once, before its first change. */
@@ -91,15 +97,24 @@ function isFile(path: string): boolean {
  * file. A relative path is taken from the folder the client runs it in.
  */
 export function onPath(program: string, env: Env, platform: string = process.platform, cwd: string = process.cwd()): boolean {
-  if (program.trim() === '') return false;
+  return foundOnPath(program, env, platform, cwd) !== null;
+}
+
+/** The file a program runs from, found as `onPath` finds it, or `null` when it is not here. */
+export function foundOnPath(program: string, env: Env, platform: string = process.platform, cwd: string = process.cwd()): string | null {
+  if (program.trim() === '') return null;
   const win = platform === 'win32';
   /* WINDOWS READS AN ENDING IN EITHER CASE, so `.CMD` finds `kiln.cmd`; each is tried as written and in lower case,
      which a case-sensitive disk (a Linux runner) needs and a Windows or Mac disk does not mind. */
   const listed = win ? (env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter((x) => x !== '') : [];
   const endings = win ? ['', ...new Set(listed.flatMap((x) => [x, x.toLowerCase()]))] : [''];
-  if (/[\\/]/.test(program)) return endings.some((x) => isFile(resolve(cwd, program + x)));
-  const dirs = (env.PATH ?? env.Path ?? '').split(win ? ';' : ':').filter((d) => d !== '');
-  return dirs.some((d) => endings.some((x) => isFile(join(d, program + x))));
+  const tried = /[\\/]/.test(program)
+    ? endings.map((x) => resolve(cwd, program + x))
+    : (env.PATH ?? env.Path ?? '')
+        .split(win ? ';' : ':')
+        .filter((d) => d !== '')
+        .flatMap((d) => endings.map((x) => join(d, program + x)));
+  return tried.find(isFile) ?? null;
 }
 
 /**

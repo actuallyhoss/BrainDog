@@ -359,6 +359,11 @@ export type SkillSync = {
    * link that opens it on Decide (AGT-C20). Without it, or for a host that names no record, the line says its handle.
    */
   to?: Pick<Target, 'key'> | undefined;
+  /**
+   * The skills, by spoken id, this profile is not handed (`env apply`, by their profiles field). Each is still the
+   * record's, so a file of its name here is never registered as a new one; it is only not written or updated.
+   */
+  leave?: ReadonlySet<string> | undefined;
 };
 
 type Got = { kind: Kind; text: string; managed: boolean; state: string | null };
@@ -545,6 +550,7 @@ export async function syncSkills(s: SkillSync): Promise<string[]> {
     if (read.late) lines.push('The record holds more skills than there was time to read, so the rest wait for the next sync.');
 
     for (const listedRow of listed) {
+      if (s.leave?.has(listedRow.spoken)) continue;
       let row = listedRow;
       const base = row.scope === 'project' ? projectBase : s.configDir;
       const name = typeof row.name === 'string' ? row.name : '';

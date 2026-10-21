@@ -49,6 +49,7 @@ import type { Brief, Client, Context } from '@braindog/client';
 
 import { hostsPath, readHosts, type Target } from './http.ts';
 import { CLIENTS, clientOf, DEFAULT_CLIENT, foreignPath, onPath, runClaude, type ClaudeRunner, type Env as ClientEnv } from './clients/index.ts';
+import { serversFileOf } from './install.ts';
 import { connectedOf, runClaudeList, type ConnectedList, type ListRunner } from './clients/connected.ts';
 import { HEADER_NAME, keys } from './keys.ts';
 import { decideLink } from './links.ts';
@@ -892,6 +893,16 @@ export type ToolWrite = {
   platform?: string | undefined;
   /** The files already copied aside this run by the caller (setup), so a file it made or copied is not copied again. */
   copied?: Set<string> | undefined;
+  /**
+   * The Claude Code profile folder the person's entries go into (`env apply`), the default one's when none is named.
+   * The caller's `claude` runs with that profile's `CLAUDE_CONFIG_DIR`.
+   */
+  profile?: string | undefined;
+  /**
+   * Asked of each entry about to be written, and of each a dry run shows: `ok` false leaves it out, and `line`, when
+   * there is one, is said under it either way. Nothing is asked when none is given.
+   */
+  approve?: ((name: string, entry: Record<string, unknown>) => Promise<{ ok: boolean; line: string | null }>) | undefined;
 };
 
 /**
@@ -920,12 +931,16 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
   const app = clientOf(s.app ?? DEFAULT_CLIENT);
   if (app === undefined) return [`BrainDog does not know the app ${s.app ?? ''}, so no tool was written.`];
   /* The places a write goes, read once: the person's, then the repository's, each said when it cannot be read. */
-  const read = app.servers(s.home, s.top, s.cwd);
+  const read = app.servers(s.home, s.top, s.cwd, s.profile);
   const places = { user: read.find((r) => r.writes === 'user'), project: s.top === null ? undefined : read.find((r) => r.writes === 'project') };
   for (const place of [places.user, places.project]) if (place?.fault) lines.push(place.fault);
   const env = s.env ?? process.env;
   const platform = s.platform ?? process.platform;
   const copied = s.copied ?? new Set<string>();
+  /* ANOTHER CLAUDE CODE PROFILE'S ENTRIES HAVE LOCK KEYS OF THEIR OWN, so what was written in one is never read as
+     what was written in another; the default profile's keep the keys they always had. */
+  const other = s.profile !== undefined && serversFileOf(s.profile, s.home) !== join(s.home, '.claude.json');
+  const own = app.id !== 'claude' ? `${app.id}|` : other ? `claude@${samePath(s.profile ?? '')}|` : '';
   let applied = false;
 
   try {
@@ -942,8 +957,9 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
       if (entry === null) continue;
       const servers = places[scope]?.servers;
       const existing = isObject(servers) ? servers[name] : undefined;
-      /* THE LOCK KEY NAMES THE APP, other than Claude Code's, whose keys stay as they were, so two apps never share one. */
-      const key = `${app.id === 'claude' ? '' : `${app.id}|`}${scope === 'project' ? 'project' : 'global'}|${scope === 'project' ? samePath(s.top ?? s.cwd) : ''}|${name}`;
+      /* THE LOCK KEY NAMES THE APP, other than Claude Code's, whose keys stay as they were, so two apps never share one;
+         and another Claude Code profile than the default, by its folder (`own` above). */
+      const key = `${own}${scope === 'project' ? 'project' : 'global'}|${scope === 'project' ? samePath(s.top ?? s.cwd) : ''}|${name}`;
       const apply = !s.dryRun && s.scope === scope;
 
       let action: 'add' | 'replace' | 'kept' | 'same';
@@ -974,10 +990,20 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
         continue;
       }
       lines.push(...notes);
-      const plan = app.plan({ name, scope, entry, replace: action === 'replace', home: s.home, top: s.top, cwd: s.cwd });
+      const plan = app.plan({ name, scope, entry, replace: action === 'replace', home: s.home, top: s.top, cwd: s.cwd, profile: s.profile });
       if (!apply) {
-        lines.push(...plan.lines);
+        /* AN ENTRY THE CALLER REFUSES IS NOT SHOWN, only why, since it may be refused for what it holds. */
+        const said = s.approve === undefined ? null : await s.approve(name, entry);
+        if (said === null || said.ok) lines.push(...plan.lines);
+        if (said !== null && said.line !== null) lines.push(said.line);
         continue;
+      }
+      /* ASKED BEFORE IT IS WRITTEN, when the caller asks (`env apply`): an entry that runs a program is approved on
+         this machine first, and one left out says why. */
+      if (s.approve !== undefined) {
+        const ok = await s.approve(name, entry);
+        if (ok.line !== null) lines.push(ok.line);
+        if (!ok.ok) continue;
       }
       const done = await app.apply(plan, { run: s.claude, copied });
       lines.push(...done.lines);
@@ -985,7 +1011,7 @@ export async function writeTools(s: ToolWrite): Promise<string[]> {
       if (!done.written) continue;
       /* WHAT THE APP NOW HOLDS IS HASHED, not the rendered entry: Codex and Cursor take an HTTP tool by its url alone, so
          the rendered entry's hash would make the next run call it changed by hand. */
-      const back = app.servers(s.home, s.top, s.cwd).find((r) => r.writes === scope)?.servers;
+      const back = app.servers(s.home, s.top, s.cwd, s.profile).find((r) => r.writes === scope)?.servers;
       lock.written[key] = sha256(canonical(isObject(back) && back[name] !== undefined ? back[name] : entry));
       applied = true;
     }

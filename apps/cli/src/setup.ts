@@ -162,10 +162,12 @@ function nameOf(dir: string, home: string): string {
  * none for the default one, because Claude Code keeps the default profile's servers in `~/.claude.json` only when the
  * variable is unset (`serversFileOf`), and set to `~/.claude` it writes inside the folder.
  */
-function profileEnv(dir: string, io: SetupIo): Env {
-  const { CLAUDE_CONFIG_DIR: _, ...rest } = io.env;
-  return serversFileOf(dir, io.home) === join(io.home, '.claude.json') ? rest : { ...rest, CLAUDE_CONFIG_DIR: dir };
+export function envFor(dir: string, home: string, env: Env): Env {
+  const { CLAUDE_CONFIG_DIR: _, ...rest } = env;
+  return serversFileOf(dir, home) === join(home, '.claude.json') ? rest : { ...rest, CLAUDE_CONFIG_DIR: dir };
 }
+
+const profileEnv = (dir: string, io: SetupIo): Env => envFor(dir, io.home, io.env);
 
 /** BrainDog's server as another app runs it: this command, with that app's name after `--agent`. No env, so no token. */
 export const serverFor = (agent: string): Record<string, unknown> => ({ type: 'stdio', command: BRAINDOG_SERVER.command, args: [BRAINDOG_SERVER.args[0], 'mcp', '--agent', agent] });
@@ -220,6 +222,51 @@ function registration(file: string): 'same' | 'other' | 'none' {
      `claude mcp add` was measured writing beside the entry (`install.ts`, `handRun`), so neither makes a registration
      differ. */
   return sameServer(servers.braindog, { ...BRAINDOG_SERVER, args: [...BRAINDOG_SERVER.args] }) ? 'same' : 'other';
+}
+
+/**
+ * What step 3 found or did in one profile: BrainDog's server `same` as this command's, one that `would` be registered
+ * in a dry run, registered (`added`, with the copy of the servers file kept first), or not, for want of that copy
+ * (`no-copy`) or because `claude` failed or is missing (`failed`, its exit code, -1 for missing).
+ */
+export type Registered =
+  | { did: 'same' }
+  | { did: 'would'; replaces: boolean }
+  | { did: 'no-copy' }
+  | { did: 'failed'; code: number; what: string }
+  | { did: 'added'; replaced: boolean; kept: string | null };
+
+/**
+ * Step 3 for one profile, which `env apply` runs too: its servers file read for `braindog`, and when that is not this
+ * command's server, a copy of the file kept and `claude mcp add-json` run in that profile, after `claude mcp remove`
+ * for another entry of the name. `copied` holds the files copied this run, so each is copied once.
+ */
+export async function registerServer(dir: string, o: { home: string; env: Env; cwd: string; dryRun: boolean; copied: Set<string>; run: ProfileRunner }): Promise<Registered> {
+  const file = serversFileOf(dir, o.home);
+  const now = registration(file);
+  if (now === 'same') return { did: 'same' };
+  if (o.dryRun) return { did: 'would', replaces: now === 'other' };
+  /*
+   * A COPY BEFORE `claude` CHANGES THE FILE (AGT-A07 build 3), since it writes the file itself and install's writer
+   * never sees it. Once per file a run, so a profile reached twice is copied once, before its first change.
+   */
+  let kept: string | null = null;
+  if (!o.copied.has(file)) {
+    try {
+      kept = keepCopy(file);
+    } catch {
+      return { did: 'no-copy' };
+    }
+    o.copied.add(file);
+  }
+  const env = envFor(dir, o.home, o.env);
+  if (now === 'other') {
+    const removed = await o.run(['mcp', 'remove', 'braindog', '--scope', 'user'], o.cwd, env);
+    if (removed !== 0) return { did: 'failed', code: removed, what: 'remove did not remove the braindog entry there' };
+  }
+  const added = await o.run(['mcp', 'add-json', 'braindog', JSON.stringify(BRAINDOG_SERVER), '--scope', 'user'], o.cwd, env);
+  if (added !== 0) return { did: 'failed', code: added, what: 'add-json did not register braindog' };
+  return { did: 'added', replaced: now === 'other', kept };
 }
 
 /** An app's own person-wide entry of this name, as its reader reads it: the last place that writes at user scope wins. */
@@ -435,54 +482,32 @@ export async function setup(args: string[], io: SetupIo): Promise<number> {
   for (const c of apps.filter((app) => !here.includes(app))) io.out(`3. MCP server, ${c.title}: not on this machine, so setup leaves it.`);
   for (const dir of profiles) {
     const where = `Claude Code in ${nameOf(dir, io.home)}`;
-    const file = serversFileOf(dir, io.home);
-    const now = registration(file);
-    if (now === 'same') {
+    const done = await registerServer(dir, { home: io.home, env: io.env, cwd: io.cwd, dryRun, copied, run });
+    if (done.did === 'same') {
       io.out(`3. MCP server, ${where}: braindog is already registered, running this command.`);
       continue;
     }
-    if (dryRun) {
+    if (done.did === 'would') {
       io.out(
-        `3. MCP server, ${where}: braindog would be registered at user scope${now === 'other' ? ' in place of the braindog entry there, which runs something else' : ''}, with a copy of its servers file kept first: ${entry}`,
+        `3. MCP server, ${where}: braindog would be registered at user scope${done.replaces ? ' in place of the braindog entry there, which runs something else' : ''}, with a copy of its servers file kept first: ${entry}`,
       );
       continue;
     }
-    /*
-     * A COPY BEFORE `claude` CHANGES THE FILE (AGT-A07 build 3), since it writes the file itself and install's writer
-     * never sees it. Once per file a run, so a profile reached twice is copied once, before its first change.
-     */
-    let kept: string | null = null;
-    if (!copied.has(file)) {
-      try {
-        kept = keepCopy(file);
-      } catch {
-        io.out(`3. MCP server, ${where}: a copy of its servers file could not be kept first, so nothing was registered there and setup stopped.`);
-        return 1;
-      }
-      copied.add(file);
+    if (done.did === 'no-copy') {
+      io.out(`3. MCP server, ${where}: a copy of its servers file could not be kept first, so nothing was registered there and setup stopped.`);
+      return 1;
     }
-    const env = profileEnv(dir, io);
-    const failed = (code: number, what: string) =>
+    if (done.did === 'failed') {
       io.out(
-        code === -1
+        done.code === -1
           ? `3. MCP server, ${where}: claude was not found, so setup stopped there. Install Claude Code, then run setup again.`
-          : `3. MCP server, ${where}: claude mcp ${what} (exit ${String(code)}), so setup stopped there.`,
+          : `3. MCP server, ${where}: claude mcp ${done.what} (exit ${String(done.code)}), so setup stopped there.`,
       );
-    if (now === 'other') {
-      const removed = await run(['mcp', 'remove', 'braindog', '--scope', 'user'], io.cwd, env);
-      if (removed !== 0) {
-        failed(removed, 'remove did not remove the braindog entry there');
-        return 1;
-      }
-    }
-    const added = await run(['mcp', 'add-json', 'braindog', entry, '--scope', 'user'], io.cwd, env);
-    if (added !== 0) {
-      failed(added, 'add-json did not register braindog');
       return 1;
     }
     changed = true;
-    io.out(`3. MCP server, ${where}: braindog ${now === 'other' ? 'replaced the entry there and is' : 'is'} registered, running this command.`);
-    if (kept !== null) detail([`The servers file as it was is kept at ${kept}.`]);
+    io.out(`3. MCP server, ${where}: braindog ${done.replaced ? 'replaced the entry there and is' : 'is'} registered, running this command.`);
+    if (done.kept !== null) detail([`The servers file as it was is kept at ${done.kept}.`]);
   }
   /* KEPT FOR THE NEXT RUN, every profile this one reached, once a run that writes has reached them all. */
   if (!dryRun && claude && profiles.join('\n') !== keptBefore.join('\n')) {

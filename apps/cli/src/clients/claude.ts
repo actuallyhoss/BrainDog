@@ -7,6 +7,10 @@
  * hand: it goes through `claude mcp add-json` (and `claude mcp remove` first, for a replaced entry), user scope into
  * `~/.claude.json` and project scope into `.mcp.json`.
  *
+ * ANOTHER PROFILE KEEPS ITS OWN. Handed a profile folder, the person's file is that profile's (`serversFileOf`):
+ * `~/.claude.json` for the default `~/.claude`, `<profile>/.claude.json` for any other. The caller runs `claude` with
+ * that profile's `CLAUDE_CONFIG_DIR`, so the program writes the file read here.
+ *
  * A COPY BEFORE THE FIRST CHANGE (AGT-A07 build 3). The file a run's first write changes is copied beside itself
  * first, by install's `keepCopy`: `<file>.pre-braindog` the first time, then `<file>.bak`, `<file>.bak1` and on, so an
  * earlier copy is never written over. A copy that cannot be made keeps the entry out.
@@ -14,9 +18,9 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 
-import { keepCopy } from '../install.ts';
+import { keepCopy, serversFileOf } from '../install.ts';
 import { isObject, samePath } from '../skills.ts';
 import { onPath, type Client, type Env, type Plan, type Runner, type ServerSet } from './index.ts';
 
@@ -46,21 +50,32 @@ function readConfig(file: string, label: string): { json: Record<string, unknown
   return { json: undefined, fault: `${label} is not valid JSON, so its servers were not read.` };
 }
 
+/** The person's servers file: the default profile's, or the named profile's own. */
+const userFile = (home: string, profile: string | undefined): string => (profile === undefined ? join(home, '.claude.json') : serversFileOf(profile, home));
+
+/** A file as a line names it: `~/` and the rest under the home, else where it is. */
+function named(file: string, home: string): string {
+  const rel = relative(home, file);
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel) ? `~/${rel.replaceAll('\\', '/')}` : file;
+}
+
 /** The reader, in precedence order: the repository's file, then the person's global servers, then this project's there. */
-function servers(home: string, top: string | null, cwd: string = top ?? home): ServerSet[] {
+function servers(home: string, top: string | null, cwd: string = top ?? home, profile?: string): ServerSet[] {
   const sets: ServerSet[] = [];
   if (top !== null) {
     const file = join(top, '.mcp.json');
     const got = readConfig(file, file);
     sets.push({ scope: 'project', source: '.mcp.json', writes: 'project', servers: got.json?.mcpServers, fault: got.fault });
   }
-  const got = readConfig(join(home, '.claude.json'), '~/.claude.json');
-  sets.push({ scope: 'global', source: '~/.claude.json', writes: 'user', servers: got.json?.mcpServers, fault: got.fault });
+  const mine = userFile(home, profile);
+  const source = named(mine, home);
+  const got = readConfig(mine, source);
+  sets.push({ scope: 'global', source, writes: 'user', servers: got.json?.mcpServers, fault: got.fault });
   if (got.json !== undefined) {
     const here = [top, cwd].filter((p): p is string => p !== null).map(samePath);
     const projects = got.json.projects;
-    const mine = Object.entries(isObject(projects) ? projects : {}).find(([path]) => here.includes(samePath(path)))?.[1];
-    if (isObject(mine)) sets.push({ scope: 'project', source: '~/.claude.json', writes: null, servers: mine.mcpServers, fault: null });
+    const theirs = Object.entries(isObject(projects) ? projects : {}).find(([path]) => here.includes(samePath(path)))?.[1];
+    if (isObject(theirs)) sets.push({ scope: 'project', source, writes: null, servers: theirs.mcpServers, fault: null });
   }
   return sets;
 }
@@ -95,7 +110,7 @@ export const claude: Client = {
   servers,
 
   plan(want): Plan {
-    const file = want.scope === 'user' ? join(want.home, '.claude.json') : want.top === null ? null : join(want.top, '.mcp.json');
+    const file = want.scope === 'user' ? userFile(want.home, want.profile) : want.top === null ? null : join(want.top, '.mcp.json');
     const line = `${want.replace ? '~' : '+'} ${want.name} at ${want.scope} scope${want.replace ? ', replacing the entry there' : ''}: ${JSON.stringify(want.entry)}`;
     return { want, file, lines: [line] };
   },
