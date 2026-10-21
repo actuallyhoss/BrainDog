@@ -22,7 +22,7 @@
   let { tile }: { tile: Lessons } = $props();
 </script>
 
-<Tile icon="learning" title={tile.heading} count={tile.lines.length} data-lessons="">
+<Tile icon="skill" title={tile.heading} count={tile.lines.length} data-lessons="">
   <ol class="n-list">
     {#each tile.lines as line, i (i)}
       <li class="n-line">

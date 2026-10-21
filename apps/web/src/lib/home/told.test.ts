@@ -100,7 +100,7 @@ test('THE TILE IS THE ONE TILE WITH ITS ICON, HAS NO BORDER OR SHADOW, NOTHING T
   const part = readFileSync(new URL('./Told.svelte', import.meta.url), 'utf8');
   const style = /<style>([\s\S]*)<\/style>/u.exec(part)![1]!;
   /* THROUGH `Tile` SINCE THE UI PASS OF 20 OCTOBER (today F19): the heading in the tile's own head, with its icon. */
-  assert.match(part, /<Tile icon="learning" title=\{tile\.heading\}/u);
+  assert.match(part, /<Tile icon="skill" title=\{tile\.heading\}/u);
   assert.doesNotMatch(style, /box-shadow|gradient|backdrop-filter/u);
   assert.doesNotMatch(style.replace(/@media \(forced-colors: active\)[\s\S]*$/u, ''), /\bborder:/u);
   for (const size of style.matchAll(/font-size: ([^;]+);/gu)) assert.match(size[1]!, /^var\(--fs-body(, 15px)?\)$/u);
