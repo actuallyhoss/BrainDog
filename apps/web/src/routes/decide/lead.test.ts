@@ -160,6 +160,7 @@ test('the hard-to-undo clause names no place in the queue, whatever the counts',
    said what the tile under it already shows. Who asked and when is the tile's quiet first line instead. */
 test('the gate draws no sentence of counts under its title', () => {
   const gate = readFileSync(new URL('./[id]/+page.svelte', import.meta.url), 'utf8');
-  assert.doesNotMatch(gate, /gateSentence\(|<PageHead[^>]*\bsentence=/u);
+  /* `sentence=""` says nothing and holds no line for one (VERIFY H4); any other sentence is trivia. */
+  assert.doesNotMatch(gate, /gateSentence\(|<PageHead[^>]*\bsentence=(?!"")/u);
   assert.match(gate, /<p class="gate-by">/u, 'the tile no longer says who asked and when');
 });
