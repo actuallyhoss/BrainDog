@@ -9,7 +9,7 @@
              and a small chart at the end.
 
   THE PROJECT'S COLOUR IS `--chart-1`, which the page sets inside a project; a Today row sets its own from `slot`.
-  Change is coloured by which way is good and always carries its word; red is only for off target. Under three points
+  Change is coloured by which way is good and always carries its word; off target is amber with its word, never red. Under three points
   there is no chart, only the number, its date and its target.
 
   The fix a stale KPI offers is the `fix` snippet, or a plain button calling `onfix` when no snippet is given; with

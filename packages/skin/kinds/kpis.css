@@ -144,9 +144,10 @@
     font-weight: var(--fw-medium);
   }
 
-  /* OFF TARGET IS THE ONE RED, and it is words: "Off target: 33 of 50 people by 1 Oct". */
+  /* OFF TARGET IS AMBER, and it is words: "Off target: 33 of 50 people by 1 Oct". Red on a page is late and needs you
+     and nothing else, as Off track on a project card is amber. */
   .kpi-target[data-state='off'] {
-    color: var(--red);
+    color: var(--warn);
     font-weight: var(--fw-medium);
   }
 
@@ -557,7 +558,7 @@
   }
 
   .kpi-why[data-state='off'] {
-    color: var(--red);
+    color: var(--warn);
     font-weight: var(--fw-medium);
   }
 
