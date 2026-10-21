@@ -54,7 +54,7 @@ const LABEL_MOST = 40;
  * changes nothing until he answers. A tool that writes on its own is not offered, since a run nobody watches would
  * write with it.
  */
-export const RECORD_TOOLS: readonly string[] = ['record_index', 'context', 'schema', 'get', 'list', 'search', 'history', 'activity', 'governance', 'propose'].map(
+export const RECORD_TOOLS: readonly string[] = ['record_index', 'context', 'get', 'list', 'search', 'activity', 'governance', 'propose'].map(
   (name) => JOB_MCP_PREFIX + name,
 );
 

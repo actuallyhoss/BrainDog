@@ -434,7 +434,7 @@ braindog/
 │   ├── fixtures/     9 records (8 pages + corpus) · row JSON + rows/gen.mjs for the generated corpora · a pack corpus
 │   ├── host/         ROUTES · httpStatus · resolveContext · serveApi · the MCP wiring — what both hosts share (ADR-064)
 │   ├── kernel/       27 tables (+ 4 dog_* header tables) · migrations as .ts modules · ULID · money · time · the erase cascade
-│   ├── mcp/          17 tools · resources · no prompts yet · the token budget in CI · src/ imports ports alone
+│   ├── mcp/          16 tools · resources · 3 prompts · the token budget in CI · src/ imports ports alone
 │   ├── ports/        ★ the linchpin: 9 interfaces · the Refusal type · ./node-sqlite · the conformance cases · no fakes
 │   ├── record/       the RPC surface, 64 methods · ./directory · Ports = { Sql, Scheduler, Clock }. Nothing else
 │   ├── render/       ★★ MIT · PUBLISHED · in-degree 0 · its own LICENSE
@@ -524,7 +524,7 @@ this product rather than about Ajv:
 does not. Writing the MCP tool-definition generator against it would be a vendor-neutral seam;
 choosing Valibot binds that generator to `@valibot/to-json-schema` instead. **That is cheap, because
 the generator runs at build time** — but it is the cost, and it should be named rather than
-discovered. Named, then, and since avoided: the seventeen tools carry hand-written JSON Schemas in
+discovered. Named, then, and since avoided: the sixteen tools carry hand-written JSON Schemas in
 `packages/mcp/src/index.ts`, so no generator runs and nothing can drift from one
 ([44-SPEC-MCP](44-SPEC-MCP.md) §2).
 

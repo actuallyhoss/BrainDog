@@ -102,7 +102,7 @@ without one gets `403 NEEDS_BROWSER_SESSION`; over MCP every token is refused (�
 
 A customer's registers come from *their* installed packs and from what they and their agents added
 at run time. A freelancer with `money-core` and `freelancer-uk` has
-different registers from a studio with `products` and `people`, and the same seventeen tools reach all of them.
+different registers from a studio with `products` and `people`, and the same sixteen tools reach all of them.
 
 ### The generation rule
 
@@ -128,7 +128,7 @@ Instead:
 | `undo` | put back one of your own writes, by the batch its receipt gave; anyone else's is refused. `dry` shows what would go back and changes nothing | 1 |
 | **Per-register schemas, pages, figures, skills** | delivered as **resources**, not tools | *n* |
 
-**Seventeen tools, fixed, regardless of how many registers a customer has.** The variability lives in the
+**Sixteen tools, fixed, regardless of how many registers a customer has.** The variability lives in the
 *arguments*, as in `list(register: "obligations", where: {...})`, and in the resources, which are fetched when
 needed. Fourteen and not the eight an earlier revision named, because the agent path added three things every
 session does: `context`, `handoff` and `meet`. Five went to pay for them: `pages`, `page` and
@@ -207,7 +207,7 @@ session, with no loss of capability, because the index says what to ask for next
 Three rules follow, and they are the difference between an MCP server agents keep and one they
 disable.
 
-**1 · Seventeen tools, not forty.** A tool per register would put every customer's entire schema in
+**1 · Sixteen tools, not forty.** A tool per register would put every customer's entire schema in
 every context window. Registers are arguments; schemas are resources fetched on demand.
 
 **2 · Progressive disclosure, by contract.** Every response ends with what to ask for next. This is the design:
@@ -485,7 +485,7 @@ the sixty-six methods, each refused to every MCP token **with a reason**, plus `
 transitions that need a person. `markRead`, alone in DATA, answers a person principal only.
 
 Over MCP none of these methods is a tool, so an agent that names one to `tools/call` is answered `ROUTE_UNKNOWN` with
-the seventeen tools in `allowed`, and nothing runs. The reason in the table is what the record answers a token at that
+the sixteen tools in `allowed`, and nothing runs. The reason in the table is what the record answers a token at that
 route over `/api`. A refusal list at the MCP layer, one named refusal per method as the predecessor has, is not built
 ([44-SPEC-MCP](44-SPEC-MCP.md) §6.2).
 
