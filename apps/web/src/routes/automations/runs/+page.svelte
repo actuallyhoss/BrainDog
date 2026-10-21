@@ -137,9 +137,13 @@
       <Tile icon="history" title={w.recentRuns} meta={w.latestRuns}>
         <HeatGrid rows={heat.rows} cols={heat.cols} values={heat.values} subject={w.heatSubject(heat.days.length)} />
         <p class="reading">{heatReading(lines, heat)}</p>
+        <!-- WHAT THE LIST HOLDS, AT THE FOOT OF THE TILE THAT READS IT (UI pass of 21 October, P34): it floated on the
+             board between two tiles. -->
+        <p class="note">{short ? w.runsSomeMissing : w.runsReach}</p>
       </Tile>
+    {:else}
+      <p class="note loose">{short ? w.runsSomeMissing : w.runsReach}</p>
     {/if}
-    <p class="note">{short ? w.runsSomeMissing : w.runsReach}</p>
     {#each days as day (day.key)}
       <Tile class="section" data-surface="tile" title={day.title} count={day.lines.length || undefined}>
         <div class="section-body">
@@ -169,9 +173,13 @@
 
   /* WHAT THE LIST REACHES, said once over it in the quiet ink, and a step closer to the list than to the tile. */
   .note {
-    margin: 0 0 calc(var(--sp-2) - var(--sp-5));
+    margin: var(--sp-2) 0 0;
     max-inline-size: var(--measure);
     color: var(--ink-3);
     font-size: var(--fs-meta);
+  }
+
+  .note.loose {
+    margin: 0 0 calc(var(--sp-2) - var(--sp-5));
   }
 </style>
