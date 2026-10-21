@@ -111,7 +111,7 @@ export type SentenceParts = {
 const NOTHING_LATE = 'nothing is late';
 
 /**
- * "8 need you. £7,200 owed to you is late, and £10,593 you owe. 2 agents are working." (spec 4.1, today F2, and the
+ * "8 need you. £7,200 owed to you is late, and £10,540 you owe. 2 agents are working." (spec 4.1, today F2, and the
  * Today polish of 20 October: short sentences.) WHAT NEEDS YOU LEADS, as the badge's number and in red; the late money
  * is its own sentence, or "Nothing is late." with something to ask; who is working closes it, in ink.
  * Numbers are always digits (SF14). With nothing needing you it says so ("Nothing needs you."), and then the late money,

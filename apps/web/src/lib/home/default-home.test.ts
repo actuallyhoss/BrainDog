@@ -774,3 +774,20 @@ test('a feed line says a day as "10 Sep", never the record\u2019s ISO date (toda
   assert.equal(dayWords('at 2026-09-10T08:00:00Z'), 'at 2026-09-10T08:00:00Z', 'an instant is left to its own reader');
   assert.equal(dayWords('nothing dated'), 'nothing dated');
 });
+
+test('A LATE BILL IS A ROW OF BILLS AND INVOICES: a repeating charge or a renewal past its day is a late thing, so Today sums what Money sums', async () => {
+  const { lateSumsOf } = await import('./default-home.ts');
+  const gbp = (amount: number) => ({ amount, currency: 'GBP' });
+  const late = block({ kind: 'spec', source: 'deadlines' }, [
+    { list: 'obligations', row: 'obligations#20', day: '2026-07-01', amount: gbp(919000), direction: 'out' },
+    { list: 'obligations', row: 'obligations#1', day: '2026-07-27', amount: gbp(480000), direction: 'in' },
+    { list: 'recurring', row: 'recurring#7', day: '2026-08-30', amount: gbp(3900), direction: 'out' },
+    { list: 'services', row: 'services#2', day: '2026-08-30', amount: gbp(1400), direction: 'out' },
+    { list: 'obligations', row: 'obligations#3', day: '2026-09-01', amount: gbp(135000), direction: 'out' },
+  ]);
+  const sums = lateSumsOf([late], '2026-09-03');
+  assert.equal(sums.bills.get('GBP'), 1054000, '£10,540, as Bills late on Money and "2 late" on the list');
+  assert.equal(sums.billCount, 2);
+  assert.equal(sums.owed.get('GBP'), 480000);
+  assert.equal(sums.things, 2, 'the charge and the renewal are late things');
+});

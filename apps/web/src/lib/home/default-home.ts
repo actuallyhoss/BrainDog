@@ -1264,6 +1264,9 @@ function lateBeyond(b: LiveBlock, today: string): number {
  */
 export type LateSums = { owed: Map<string, number>; bills: Map<string, number>; billCount: number; things: number };
 
+/** The list of bills and invoices, the one whose late rows are the late money (`overdue` and `late-in` in money-core). */
+const BILLS = 'obligations';
+
 export function lateSumsOf(blocks: readonly LiveBlock[], today: string): LateSums {
   const out: LateSums = { owed: new Map(), bills: new Map(), billCount: 0, things: 0 };
   const seen = new Set<string>();
@@ -1297,6 +1300,13 @@ export function lateSumsOf(blocks: readonly LiveBlock[], today: string): LateSum
       if (seen.has(key)) continue;
       seen.add(key);
       const amount = fields.amount;
+      /* A BILL IS A ROW OF BILLS AND INVOICES, the list Money's "Bills late" and the list's own "2 late" sum. A repeating
+         charge whose day went by, or a renewal, carries money too, but it is a late thing and not a bill: counted in,
+         Today said £10,593 of bills against Money's £10,540. */
+      if (typeof fields.list === 'string' && fields.list !== BILLS) {
+        lateRow(fields.list);
+        continue;
+      }
       if (!isMoney(amount)) {
         lateRow(typeof fields.row === 'string' ? fields.row.split('#')[0]! : null);
         continue;

@@ -1,7 +1,7 @@
 <!--
   THE FOOT OF TODAY'S NEEDS YOU TILE (today F3, F6, F13): what the questions over it leave out, in one or two plain lines.
 
-  - The late bills with no question about them, as one line in red with its money: "4 payments are late, £10,593 in all",
+  - The late bills with no question about them, as one line in red with its money: "4 payments are late, £10,540 in all",
     opening the late work (`/?work&late`). The questions about money owed to you lead the tile above it.
   - What BrainDog did by itself today: "BrainDog handled 15 itself today. Review", opening Needs you's Handled.
 
