@@ -214,10 +214,11 @@ export const walkedTrue = (seen) => seen.walked?.task === seen.fourth && seen.wa
 /* ── the drive ────────────────────────────────────────────────────────────── */
 
 /** The list the walk opens, its title box and its due box in the panel (`RowForm`'s ids, `new-<list>-<field>`), and
-    the heading the list gives the due day. All four are the seed's own Tasks list (`packages/seed/src/modules/work.ts`). */
+    the headings the list gives the title and the due day. All are the seed's own Tasks list (`packages/seed/src/modules/work.ts`). */
 const LIST = 'tasks';
 const TITLE_BOX = `new-${LIST}-what`;
 const DUE_BOX = `new-${LIST}-by`;
+const TITLE_HEAD = 'Description';
 const DUE_HEAD = 'Due';
 
 /**
@@ -225,19 +226,23 @@ const DUE_HEAD = 'Due';
  *
  *   { tasks: [{ what, day }], row, path, panel: { open, task, box } | null, toast: { text, undo } | null, screen }
  *
- * THE LIST IS READ IN WHICHEVER FORM IT IS DRAWN IN: a table from 900 up, where the day is the cell under the Due
- * heading, and cards on a phone, where it is the card's second line less the chip that says where the task belongs.
+ * THE LIST IS READ IN WHICHEVER FORM IT IS DRAWN IN: a table from 900 up, where the task is the cell under the title's
+ * heading and the day the cell under the Due heading, and cards on a phone, where it is the card's second line less the chip that says where the task belongs.
  * Only what a person can see is read (`checkVisibility`), so a table kept in the document and hidden is not the list.
+ *
+ * THE TASK IS FOUND BY ITS HEADING, AS THE DAY IS, and never by its place: the picker's box leads the row since the UI
+ * pass of 20 October, so the first cell of a row is a checkbox and not the task's name.
  */
-function look({ titleBox, dueHead }) {
+function look({ titleBox, titleHead, dueHead }) {
   const text = (el) => (el?.textContent ?? '').replace(/\s+/gu, ' ').trim();
   const tasks = [];
   const heads = [...document.querySelectorAll('[role="row"] [role="columnheader"]')].map(text);
   const at = heads.indexOf(dueHead);
+  const named = heads.indexOf(titleHead);
   for (const r of document.querySelectorAll('[role="row"]')) {
     const cells = [...r.querySelectorAll('[role="gridcell"]')];
     if (cells.length === 0 || !r.checkVisibility()) continue;
-    tasks.push({ what: text(cells[0]), day: at < 0 ? null : text(cells[at]) || null });
+    tasks.push({ what: named < 0 ? '' : text(cells[named]), day: at < 0 ? null : text(cells[at]) || null });
   }
   for (const c of document.querySelectorAll('a.card')) {
     if (!c.checkVisibility()) continue;
@@ -330,7 +335,7 @@ async function walk(page, width, newDay, seen, at) {
   const fourth = TASKS[WALKED - 1].what;
   const holder = TASKS[NEW_DAY_TASK - 1].what;
   const wait = budget('ready').settleTimeoutMs;
-  const read = () => page.evaluate(look, { titleBox: TITLE_BOX, dueHead: DUE_HEAD });
+  const read = () => page.evaluate(look, { titleBox: TITLE_BOX, titleHead: TITLE_HEAD, dueHead: DUE_HEAD });
   const dayOf = (got, what) => got.tasks.find((t) => t.what === what)?.day ?? null;
   /** Look until `ok(now, before)` or the wait runs out, and hand back the last look either way. */
   async function until(ok) {
