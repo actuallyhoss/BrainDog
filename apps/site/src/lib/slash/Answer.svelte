@@ -205,5 +205,9 @@
     .tag { display: none; }
     .hbar { grid-template-columns: minmax(0, 1fr) 56px auto; }
     .hbar:nth-child(n + 4) { display: none; }
+    /* The table fits a phone without scrolling: 10px between columns, the box's own 16 at its edges. */
+    .dt th, .dt td { padding-inline: 5px; }
+    .dt :is(th, td):first-child { padding-inline-start: 16px; }
+    .dt :is(th, td):last-child { padding-inline-end: 16px; }
   }
 </style>
