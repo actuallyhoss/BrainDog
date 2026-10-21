@@ -151,7 +151,7 @@ export async function installClaude(version, root, home, signal) {
 export async function signIn(home, address, paths, token, signal) {
   mkdirSync(home, { recursive: true });
   const env = envOf(home, address, paths, token);
-  const setup = await run('braindog', ['setup', address], { env, cwd: home, signal, ms: SETUP_MS, echo: true });
+  const setup = await run('braindog', ['setup', address, '--yes'], { env, cwd: home, signal, ms: SETUP_MS, echo: true });
   if (setup.code !== 0) throw new Error(`setup failed: ${lastLine(setup.err || setup.out)}`);
   const bearer = token || tokenIn(home);
   if (!bearer) throw new Error('setup left no key for the record');

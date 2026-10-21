@@ -283,7 +283,7 @@ async function door({ host, record, home, signal }) {
   pinned.version = (await versionOf(bin, env, signal)) || PIN.pinned;
 
   /* (b) SETUP, with its six digits on this terminal when no key was handed in. */
-  const setup = await run('braindog', ['setup', address], { env, cwd: home, signal, ms: SETUP_MS, echo: true });
+  const setup = await run('braindog', ['setup', address, '--yes'], { env, cwd: home, signal, ms: SETUP_MS, echo: true });
   if (setup.code !== 0) return { ...pinned, ok: false, saw: `setup failed: ${lastLine(setup.err || setup.out)}` };
 
   /* (d) and (f): what the host says today, read plainly, with the bearer the sign-in left. */
