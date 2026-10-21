@@ -21,7 +21,7 @@
 <script lang="ts">
   import { BASE, apiBase, at, here } from '$lib/at.ts';
   import { appPath, applyInset, macNotifications, notify, onShell, setBadge, windowFocused } from '$lib/shell.ts';
-  import { handoffAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
+  import { handoffAlert, instructionAlert, questionAlert, ring, type Alert } from '$lib/shell/alerts.ts';
   /* Title-bar room for the Mac app: sets --shell-inset once, 0 in a browser. */
   applyInset();
   /* The shared skin first: `tokens.css` opens with the `@layer` statement, so the layer ORDER — and
@@ -70,8 +70,9 @@
   import { WORK, arrange, flatNav, isHere, orderLists, placeOf, tabsOf } from '$lib/nav.ts';
   import { agentsHref, railOf } from '$lib/nav/rail.ts';
   import { TASKS } from '$lib/work/list.ts';
-  import { needYouCount } from '$lib/home/need-you.ts';
+  import { needYouCount, toldReadable } from '$lib/home/need-you.ts';
   import { heardWaits, waitsNow, waitsTicket, workingNow } from '$lib/home/waits.svelte.ts';
+  import { heardTold, toldNow } from '$lib/home/told-now.svelte.ts';
   import type { Shell } from '$lib/record/boot-live.ts';
   import { navPrefs } from '$lib/nav-prefs.svelte.ts';
   import { penCount, suggested } from '$lib/design/pen.ts';
@@ -201,7 +202,8 @@
   /* WHAT WAITS, AS THE NEWEST `boot` SAID IT (`waits.svelte.ts`): the shell's, and then the poll's re-read of `boot`, so
      the badge moves with the record and says the number Today's header and the sentence in Needs you say. */
   $effect.pre(() => heardWaits({ waits: data.waits ?? null, working: data.working ?? [] }));
-  const open = $derived(needYouCount(waitsNow(), data.open));
+  /* AND WHAT A RUN ANSWERED NEEDS YOU ON, of what he told it (`told-now.svelte.ts`): counted in the same number. */
+  const open = $derived(needYouCount(waitsNow(), data.open, toldNow().needs.length));
   /* THE DOCK BADGE FOLLOWS THE NEEDS YOU COUNT (the PWA badge in a browser that has one); 0 clears it. */
   $effect(() => setBadge(open));
   /* A NEW QUESTION OR HANDOFF RINGS ONCE (`alerts.ts` dedups by id and seeds on the first hearing), never while this
@@ -213,6 +215,31 @@
   $effect.pre(() => {
     const asked = (data.questions ?? []).map((q) => questionAlert({ id: q.id, question: q.title }));
     untrack(() => hear(asked));
+  });
+
+  /**
+   * WHAT CAME BACK FROM WHAT HE TOLD AGENTS (`record/told-live.ts`): the instructions a run answered Needs you, which
+   * count in the badge and on Today, and the ones it finished, which Handled lists. Read with the shell and again
+   * whenever the poll re-reads `boot`, and only where `boot` lists his instructions and says he owns the list, so a
+   * record where he never told an agent anything is asked nothing. A Done or a Needs you moved in the last two minutes
+   * rings as the app's alert (`instructionAlert`), once per state.
+   */
+  const toldBack = (base: string): void => {
+    void import('$lib/record/told-live.ts')
+      .then(async (m) => {
+        const back = await m.readToldBack(base);
+        if (back === null) return;
+        heardTold(back);
+        hear(m.toldMoves(back, m.recordNow()).flatMap((t) => instructionAlert(t) ?? []));
+      })
+      .catch(() => undefined);
+  };
+  $effect(() => {
+    if (bare || data.live !== true || data.refused) return;
+    const base = apiBase(page.url);
+    const reads = data.index.registers;
+    const levels = data.me?.levels;
+    if (toldReadable(reads, levels)) untrack(() => toldBack(base));
   });
   const inbox = $derived(waitsNow()?.inbox ?? data.inbox);
   /* THE SPINE'S RULE FOR INBOX (`spine.ts`): it is a row under More once anything has arrived. A shell no record answered
@@ -846,6 +873,7 @@
         const got = await m.rereadBoot(base);
         if (!gone && got.from === 'live') {
           heardWaits({ waits: m.waitsOf(got.boot), working: m.workingOf(got.boot) }, asked);
+          if (toldReadable(got.boot.registers, got.boot.me?.levels as Readonly<Record<string, string>> | undefined)) toldBack(base);
           hear([
             ...(got.boot.waiting ?? []).map(questionAlert),
             /* ONLY RECENT HANDOFFS: the feed holds old ones, and the first poll would otherwise ring for all of them. */
