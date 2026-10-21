@@ -360,6 +360,10 @@
 
   /* A LIST OR PAGE THIS TAB HAS NOT READ YET IS ITS ADDRESS PUT IN WORDS, never the bare `money_overview`. */
   const inWords = (id: string): string => id.charAt(0).toUpperCase() + id.slice(1).replaceAll(/[-_]/g, ' ');
+  /* A PAGE IS CALLED WHAT THE RECORD CALLS IT (UI pass of 21 October, P45), the title the nav and the browse page say,
+     before the sample's name for it or its address in words. */
+  const pageName = (slug: string): string =>
+    ((page.data.nav ?? []) as { id?: string; title?: string }[]).find((e) => e.id === slug)?.title || PAGES[slug]?.title || inWords(slug);
 </script>
 
 <svelte:window {onkeydown} />
@@ -628,7 +632,9 @@
           </div>
         </Tile>
       {/if}
-    {:else}
+    {:else if !(pack && (pack.registers.length || pack.pages.length))}
+      <!-- ONLY WHEN IT ADDS NOTHING ELSE (UI pass of 21 October, P45): beside the lists and pages it added, a tile saying
+           there is nothing to set was a tile of nothing. -->
       <!-- A PAGE THAT WAS ONE SENTENCE. An add-on with no settings still adds things, and this is
            where somebody comes to find out what they were. Nothing to set is a quiet line under its
            own heading, never a whole-screen state with a glyph above what the add-on does bring. -->
@@ -652,7 +658,7 @@
               <li>
                 <a class="line added" href={at(`/r/${r}`)}>
                   <span class="line-mark"><IconWell name="rows" size="l" /></span>
-                  <span class="line-title">{REGISTERS[r]?.name ?? ((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? inWords(r)}</span>
+                  <span class="line-title">{((page.data.lists ?? []) as { id: string; name: string }[]).find((l) => l.id === r)?.name ?? REGISTERS[r]?.name ?? inWords(r)}</span>
                   <span class="added-go"><Icon name="chevron" size="s" /></span>
                 </a>
               </li>
@@ -661,7 +667,7 @@
               <li>
                 <a class="line added" href={at(`/p/${p}`)}>
                   <span class="line-mark"><IconWell name="doc" size="l" /></span>
-                  <span class="line-title">{PAGES[p]?.title ?? inWords(p)}</span>
+                  <span class="line-title">{pageName(p)}</span>
                   <span class="added-go"><Icon name="chevron" size="s" /></span>
                 </a>
               </li>
