@@ -96,6 +96,8 @@ export function signedOutSurface(fix: string): McpSurface<Ctx> {
     withdraw: no,
     heard: no,
     doorHeard: no,
+    /* ANSWERED ON THE MACHINE: its tool list asks nobody's settings. */
+    onMachine: true,
   };
   return surface;
 }
