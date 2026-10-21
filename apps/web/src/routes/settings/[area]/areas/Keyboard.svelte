@@ -17,7 +17,7 @@
   let props: AreaProps = $props();
 
   /* THE GROUP'S NAME, so the row inside it can be called what the switch is called without the heading saying it too. */
-  const words = { shortcuts: 'Shortcuts' };
+  const words = { shortcuts: 'Shortcuts', every: 'Every shortcut' };
 
   /* SEEDED FROM WHAT IS REMEMBERED, so the switch shows the state the keyboard is already in. */
   const held = pref.read();
@@ -65,6 +65,6 @@
   cookie is written by the effect in the script: reading the cookie would show the previous
   answer until the page reloaded.
 -->
-<Tile icon="rows" title={copy.keymap}>
+<Tile icon="rows" title={words.every}>
   <Keymap silenced={!chars} />
 </Tile>

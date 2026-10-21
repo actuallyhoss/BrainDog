@@ -50,7 +50,11 @@
 <span class="kbd-run">
   {#each parts as part, i}
     {#if i > 0}<span class="kbd-or">or</span>{/if}
-    <kbd class="kbd">{part}</kbd>
+    <!-- A SEQUENCE IS ONE CAP A KEY (UI pass of 21 October, P41): "g then h" is g, the word, then h. -->
+    {#each part.split(' then ') as step, j}
+      {#if j > 0}<span class="kbd-or">then</span>{/if}
+      <kbd class="kbd">{step}</kbd>
+    {/each}
   {/each}
 </span>
 
