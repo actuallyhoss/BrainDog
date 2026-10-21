@@ -40,7 +40,7 @@ they say:
 | Authorise a call against scope, level or ceiling | the record, in one place (30 §10). The tools hand `ctx` on and never read it |
 | Touch a database, a port, a `node:` module or `process` | it holds `surface` and `ctx` and nothing else; the `stack` and `graph` gates hold it to that |
 | Speak the legacy HTTP+SSE transport | not carried (ADR-054) |
-| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the seventeen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
+| Reach VAULT, JOBS or ADMIN | no tool names one. Any other name is `ROUTE_UNKNOWN` with the sixteen in `allowed`, and the record refuses every token at those groups in any case (10 §8). The named refusals of §6.2 are not built |
 | Decide | there is no `decide` tool, and no token holds `decide` (30 §10) |
 | Hand over a credential | there is no vault tool. `context` names a key by its label and what it opens, never its value (§8) |
 
@@ -100,7 +100,7 @@ export type McpSurface<C> = {
 export type Tool = { name: string; description: string; input: Record<string, unknown>; writes: boolean };
 export type Resource = { uri: string; name: string; description: string; ttlMs: number };
 
-export const TOOLS: readonly Tool[];                  // seventeen, §4.4
+export const TOOLS: readonly Tool[];                  // sixteen, §4.4
 export const TEMPLATES: readonly { uriTemplate: string; name: string; description: string }[];   // six, §4.7
 export const HOUR = 3_600_000;
 export const MINUTE = 60_000;
@@ -177,7 +177,7 @@ packages/mcp/
 │                        scripts: test = node --test test/*.test.ts · typecheck = tsc --noEmit -p tsconfig.json
 ├── tsconfig.json        extends ../../tsconfig.base.json; includes src/ and test/
 ├── src/
-│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, ttlOf, compact, tools(): the seventeen, the resource list, the read
+│   ├── index.ts         McpSurface, TOOLS, TEMPLATES, ttlOf, compact, tools(): the sixteen, the resource list, the read
 │   ├── rpc.ts           handle(): framing, version negotiation, the result renderer
 │   ├── http.ts          serveMcp(), gate(), unauthorized(): POST /mcp, §5.1
 │   ├── instructions.ts  INSTRUCTIONS, §4.6
@@ -209,7 +209,7 @@ type-checked, because `tsc` follows the import from `src/index.ts`.
 The transports' own halves live with their hosts. The stdio loop is `apps/cli/src/stdio.ts`, over the surface
 `apps/cli/src/surface.ts` builds on `@braindog/client`, and each host's `/mcp` branch calls `serveMcp`
 (`apps/worker/src/index.ts`, `apps/selfhost/src/server.ts`). There is no `mcp-budget` gate and no generated schema
-file: the budget is `budget.test.ts` (§7), and the seventeen input schemas are written by hand in `index.ts` (§4.4).
+file: the budget is `budget.test.ts` (§7), and the sixteen input schemas are written by hand in `index.ts` (§4.4).
 
 ---
 
@@ -330,6 +330,11 @@ reads nothing and is the same for every caller. The resource list is held for a 
 names pages, and a page appears when its row does.
 
 ### 4.4 · The tools, and what each reaches
+
+> **Since 21 October 2026 the list holds sixteen tools.** `instructions` is new (§15). `schema` is folded into
+> `record_index {register}` and `history` into `get {history: true}`. Both old names stay callable until 20 December
+> 2026 (`FOLDED_UNTIL`) and are not listed. `context` also takes `task`, `project` and `depth`. `handoff` takes `task`
+> and `done`. The table below is the earlier surface; §15 says what changed.
 
 | Tool | Reaches | Arguments | Writes |
 |---|---|---|---|
@@ -618,8 +623,17 @@ resolved, so `braindog:schema/../../x` is `ROUTE_UNKNOWN`.
 
 ### 4.8 · Prompts
 
-None yet. `prompts/list` answers `{ prompts: [] }` and the capability is declared, so a client may ask. The three of
-10 §6 wait: the instructions and the skill teach in the meantime, and a prompt library is a third thing to keep true.
+Three, built (21 October 2026). A client shows them as commands, `/braindog:start` in Claude Code. They cost the tool list
+nothing. Each is a message from the person that lists the calls in order, with the exact arguments.
+
+| Prompt | Arguments | Says |
+|---|---|---|
+| `start` | none | Call `context`. If something was told to you, `instructions {take}`. Say your plan in one line with `handoff {doing}`. |
+| `wrap` | none | Answer what you took with `instructions {reply, said, state}`. `handoff {next}`. Add a lesson only if a future run would get it wrong. |
+| `ask` | `about?` | Lay out a decision with `propose`, `body_kind` `options`. Do not act until the person decides. |
+
+`prompts/get` of any other name is refused with the three in `allowed`. `PROMPTS` and `promptOf` are in
+`packages/mcp/src/instructions.ts`, and `prompts.test.ts` holds each prompt to the tools it names.
 
 ---
 
@@ -1138,6 +1152,136 @@ the documents that still cite the earlier decision.
 | D14 | **`cacheScope` is `private` for anything a record answers, and `public` only for `server/discover`**, the two values the MCP specification allows. `tools/list`, both resource lists, `resources/read` and `prompts/list` carry `private` | `rpc.ts` |
 | D15 | **Versions.** `initialize` answers the version asked for, or the newest this server speaks below it, or the newest of all when none is named, and refuses a date older than all three with `-32602` and the list (§4.1). Over HTTP, a request other than `initialize` that names a version this server does not speak is `-32022` | `rpc.ts`, `negotiate`; `http.ts` |
 | D16 | **A preview or a trial rides on `propose`, not on a tool of its own.** A rule change's `dry_run` is added to the answer after filing; a script change carrying `try` is run and filed nowhere. Neither fits under the ceiling as a tool, and both are asked for on the verb an agent already uses to change what it may not (§4.4) | `index.ts`, `propose` and `trial` |
+
+---
+
+## 15 · Instructions, stop, settings and the pulse
+
+Built on 21 October 2026 on branch `agents-mcp`. The plan is `loop/plans/agents-mcp-2026-10-20/PLAN.md`. This section is
+what was built, and where it differs from the plan, it says so.
+
+### 15.1 · What he tells an agent
+
+The person writes an instruction in the app. It is one row of the kernel's `instructions` register, spoken `IN4`, and
+only a person writes it: `instruct` refuses a token, so no agent instructs another.
+
+- **To:** a run (`S883`), an agent kind on a project or repository, whoever is next on a project, or a task.
+- **When:** `now` reaches the live runs that match. `next` reaches the next run that starts there. A `now` for a run that
+  ends first falls back to `next`.
+- **Kind:** `tell`, `stop`, `pause`, `resume` or `redirect`.
+- **State:** `sent`, `seen`, `working`, `done`, `needs_you`, `declined`, `expired` or `withdrawn`.
+- **Taken by one run, compare and set.** Of two runs taking one instruction, the first wins and the second is told "S884
+  has it". An instruction sent to a run is taken by that run when it first sees it.
+- **Seen, and how:** `start`, `prompt`, `tool`, `channel`, `job` or `asked`, kept in `instruction_seen`.
+- **Receipts are not stored.** They are the run's batches in the log between taking and replying.
+
+### 15.2 · The `instructions` tool
+
+`instructions` writes (it needs `propose`). The three forms are the description:
+
+| Call | Answer |
+|---|---|
+| `{}` | What waits for this run, as lines, or "Nothing new for you". Marks them seen, by `asked`. |
+| `{take: "IN4"}` | Takes it, or says who has it. |
+| `{reply: "IN4", said, state}` | `state` is `done`, `needs_you` or `declined`. Answers with the receipts. Only the run that took it may reply. |
+
+`seen` and `how` are taken and not listed. The bridge and the hooks use them to say what a client showed.
+
+### 15.3 · `context`
+
+`context` takes `task`, `project`, `depth` (`card`, `brief`, `task`, `full`) and `since`. Only `task` and `project` are
+listed; `depth` and `since` are taken and not listed, to hold the token ceiling. The answer is planned by
+`planContext` (`packages/record/src/context-plan.ts`) in this order: stop or pause, what he told you, the card, what you
+may do, rules and brief, who else is working here, your lane, decided lately, learned here. The first two are never cut.
+Every cut section ends `and N more: <call>`. The default budget is 700 tokens, set per agent. The four teaching lines
+are said on a run's first `context` only. `since: <stamp>` answers only what moved, and marks nothing.
+
+### 15.4 · The stamp, `_meta.braindog`
+
+Every answer to a run carries `_meta.braindog = {stamp, pending, stop}`. When the stamp moved and something is for the
+run, the text gets one or two lines, at most 200 characters: "New for you: ... Take it with instructions". The line needs
+a run.
+
+### 15.5 · Stop and pause
+
+The record refuses every change of a stopped or paused run, for every client, with `RUN_STOPPED` or `RUN_PAUSED` (403,
+no `at`). The `fix` says who, which instruction and why. A run that is stopped or paused may still call `instructions`,
+`handoff`, `end`, `beat`, `pulse`, `log` on its own run and `attach`. A helper (subagent) obeys its lead's stop. In Claude
+Code the `tool` hook also denies the next tool call, except BrainDog's own tools and `ToolSearch`. An agent without hooks
+is stopped only at its next BrainDog call.
+
+### 15.6 · Settings rows
+
+One row of `agent_profile` per kind of agent (`claude`, `codex`, `cursor`, `runner`, `script`), optionally bound to a
+token or a machine, and a `default` row for any agent no row matches. The nearest match wins: token, machine and kind,
+kind, then default.
+
+| Setting | Enforced |
+|---|---|
+| `ceiling`: `read`, `propose` or `write` | The record's guard: the lowest of the token's scope, the row and the ladder |
+| `projects`, `lists_write` | The guard. A write outside becomes a question |
+| `tools` | The door. An off tool is not listed, and a call is refused `TOOL_OFF` |
+| `brief`, `model` | `context`; `model` is advice |
+| `quiet`, `caps`, `notify` | Push, runner jobs and the "wrap up" line |
+| `context`: budget, answer lines | `context` and the door |
+| `enforce`: stop switch, channel | The hooks and the bridge |
+
+Only the owner, signed in to a browser, changes a row (`setAgentProfile` is ADMIN). Every token is refused
+`NEEDS_BROWSER_SESSION`. An agent reads its own effective row in `whoami.effective`. Known gap: `whoami.effective` does
+not yet carry `enforce`.
+
+`tools/list` is cut to the caller: a read agent lists no writes, and an off tool is not listed. Existing agents keep what
+they had: the migration seats one row per kind his runs used, at the scope their token holds.
+
+### 15.7 · The pulse
+
+`pulse({stamp, shown, how})` over `POST /api/pulse` says a run is open and answers, in one read:
+`{run, stamp, changed, pending: [{id, kind, said, at, to, line}], stop, lines}`. It adds no version, no event and no
+history line, so it costs about 10 ms in the record. `run` is null when no run is open. The bridge pulses every 15 s, and
+every 5 s while a stop or a pause is pending, and writes the answer to `sessions/<id>.inbox.json` in the CLI's config
+folder. The hooks read only that file, so they cost no network. This replaces the WebSocket of ADR-044 for live updates
+(ADR-075).
+
+### 15.8 · The hooks, the channel and the tokens
+
+`braindog setup` writes the hooks:
+
+| Hook | Does |
+|---|---|
+| `prompt` (UserPromptSubmit) | Adds the pending lines as `additionalContext`, once per stamp |
+| `tool` (PreToolUse) | Denies the call while the run is stopped or paused, except `mcp__braindog__*` and `ToolSearch` |
+| `stop` (Stop) | Blocks once per taken instruction that has no reply, and respects `stop_hook_active` |
+| `watch` (async Stop, `asyncRewake`) | Off. `braindog install --rewake` turns it on. Not tried on a signed-in session |
+
+The channel is opt-in: `BRAINDOG_CHANNEL=1`, and not switched off in his settings. The bridge declares
+`experimental['claude/channel']` and sends the instruction as a notification. It asks for protocol 2025-11-25.
+
+`braindog setup` makes one write token per agent it wires, and `http.ts` picks the one for the caller. `logout` removes
+them. A session open when setup runs is refused on its run until it restarts, because its token changed.
+
+### 15.9 · New refusals
+
+| Code | At | When |
+|---|---|---|
+| `PATCH_EMPTY` | `patch` | `update` with an empty patch. Refused before the ladder. `try` is `log` when a note came with it |
+| `NAME_AMBIGUOUS` | `spoken` | A name that matches several things. The handles are in `allowed`, and `try` is `get` with the first |
+| `TOOL_OFF` | none | The tool is off in his settings for this agent. The `fix` names the setting |
+| `RUN_STOPPED` | none | The run was stopped |
+| `RUN_PAUSED` | none | The run was paused |
+
+`refusal-at.test.ts` holds that `at` is always a field of the tool called.
+
+### 15.10 · Resources, `serverInfo` and the budget
+
+`resources/list` holds at 15 KB or less (the seed: 47 KB down to 15 KB). Pages about a single row are never listed. They
+are still readable by address. `serverInfo.version` is the build; the self-host and the bridge's local answers still say
+`0.0.0` (W2-C, W2-D). `tools/list` is 2,739 of 2,760 tokens. The ceiling did not move.
+
+### 15.11 · Not yet verified
+
+The model receiving `context` as built, the PreToolUse and Stop hooks in a signed-in session, the channel and
+`asyncRewake` all wait for wave 4 with a real client. A "next start" instruction does not reach a live run, and the
+app sends "now". Reply receipts do not yet list row names.
 
 ---
 
