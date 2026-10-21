@@ -1059,7 +1059,11 @@
               </button>
             {/snippet}
 
-            <section class="options" aria-label={merge ? mergeWords.heading : copy.theOptions}>
+            <!-- NAMED BY A HEADING OF ITS OWN, one level under the question, so each option's name under it is the level
+                 after it and a heading list reads question, options, each option. Said to a screen reader only: the eye
+                 reads the cards as the answers without a word over them. -->
+            <section class="options" aria-labelledby="options-h">
+              <h2 class="dc-sr" id="options-h">{merge ? mergeWords.heading : copy.theOptions}</h2>
               {#if merge}
                 <!-- WHO IS WHO: each name and where it was seen, and one press each, held for its Undo. -->
                 <MergeCard
