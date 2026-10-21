@@ -1269,6 +1269,15 @@ const fieldSaid = (id: string, register?: string): string => {
   return /^[A-Z][A-Z]/u.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
 };
 
+/**
+ * A field's name as the list shows it, first letter up: what a start and its condition say (VERIFY H30), "only when
+ * Account changes, Account is set and Book is empty", so a field reads as a field and never as a word of the sentence.
+ */
+const fieldNamed = (id: string, register?: string): string => {
+  const name = fieldName(id, register);
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
+
 /** One item of a list, as a sentence says it: "the filing rule". The list's own singular, else its id in words. */
 const oneOf = (register: string): string => {
   const one = REGISTERS[register]?.one?.trim() || singularOf(REGISTERS[register]?.name?.trim() || register.replace(/[_-]+/gu, ' '));
@@ -1287,7 +1296,7 @@ const idsSaid = (text: string, register?: string): string =>
             /* THE FIELD EACH CLAUSE OPENS WITH, when the list declares it: "state is on" under a trigger that said
                "status changes" is the same field said two ways. */
             .replace(/(^|,\s*|\s(?:and|or)\s)([a-z][a-z0-9_]*)(?=\s)/gu, (whole, lead: string, id: string) =>
-              register && REGISTERS[register]?.fields.some((f) => f.id === id) ? `${lead}${fieldSaid(id, register)}` : whole,
+              register && REGISTERS[register]?.fields.some((f) => f.id === id) ? `${lead}${fieldNamed(id, register)}` : whole,
             )
             .replace(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/gu, (id) => fieldSaid(id, register)),
     )
@@ -1347,20 +1356,41 @@ export function sayCondition(cond: unknown, register?: string): string {
 function conditionWords(cond: unknown, register?: string): string {
   if (typeof cond === 'string') return mark(idsSaid(cond.trim(), register));
   const leaf = leafOf(cond);
-  if (leaf) return `${fieldSaid(leaf.field, register)} ${COMPARE.find((c) => c.op === leaf.op)!.said} ${leaf.value}`;
+  if (leaf) return `${fieldNamed(leaf.field, register)} ${COMPARE.find((c) => c.op === leaf.op)!.said} ${leaf.value}`;
   return isObject(cond) ? 'the condition holds' : '';
 }
+
+/** A condition's clauses as one list: "Account is set, Book is empty" said "Account is set and Book is empty". */
+const clausesJoined = (cond: string): string => (/\s(?:and|or)\s/u.test(cond) ? cond : cond.replace(/,\s+(?=[^,]*$)/u, ' and '));
 
 /**
  * What starts it and what it waits for, as the trigger card says it. THE CONDITION IS SAID IN EITHER FORM: the card
  * drew only a typed sentence, so a rule that tags only bills above 500 was shown as starting on every write to bills.
- * A tree the builder can read is said in its words, "amount is more than 500", and any other as "the condition holds",
+ * A tree the builder can read is said in its words, "Amount is more than 500", and any other as "the condition holds",
  * which is less than it could say and is not nothing.
+ *
+ * ONE "only when" (VERIFY H30): the fields that must change and the condition are one list, "only when Account
+ * changes, Account is set and Book is empty", where it said "only when" twice.
  */
 export function sayStart(d: Draft, listSaid?: (id: string) => string): string {
   const filed = conditionOf(d);
-  const cond = filed === null ? '' : sayCondition(filed, 'written' in d.trigger ? (d.trigger.written.register ?? undefined) : undefined);
-  return cond === '' ? sayTrigger(d.trigger, listSaid) : `${sayTrigger(d.trigger, listSaid)}, only when ${cond}`;
+  const cond = filed === null ? '' : clausesJoined(sayCondition(filed, 'written' in d.trigger ? (d.trigger.written.register ?? undefined) : undefined));
+  if (cond === '') return sayTrigger(d.trigger, listSaid);
+  if ('written' in d.trigger && d.trigger.written.fields?.length) {
+    const p = writtenParts(d.trigger.written, listSaid);
+    return `${p.said}, only when ${p.changes} changes, ${cond}${p.rules}`;
+  }
+  return `${sayTrigger(d.trigger, listSaid)}, only when ${cond}`;
+}
+
+/** A written trigger's three parts: what is written where, the fields that must change, and whether other automations count. */
+function writtenParts(w: Extract<Trigger, { written: unknown }>['written'], listSaid: (id: string) => string = (id) => id) {
+  const ops = (w.op ?? []).map((o) => ({ create: 'added', update: 'changed', delete: 'deleted' })[o]);
+  return {
+    said: `When an item in ${w.register ? listSaid(w.register) : 'a list'} is ${ops.length > 0 ? andList(ops, 'or') : 'added or changed'}`,
+    changes: andList((w.fields ?? []).map((f) => fieldNamed(f, w.register ?? undefined)), 'or'),
+    rules: w.from_rules ? ', including changes other automations make' : '',
+  };
 }
 
 /**
@@ -1371,11 +1401,8 @@ export function sayStart(d: Draft, listSaid?: (id: string) => string): string {
  */
 export function sayTrigger(t: Trigger, listSaid: (id: string) => string = (id) => id): string {
   if ('written' in t) {
-    const w = t.written;
-    const ops = (w.op ?? []).map((o) => ({ create: 'added', update: 'changed', delete: 'deleted' })[o]);
-    const said = `When an item in ${w.register ? listSaid(w.register) : 'a list'} is ${ops.length > 0 ? andList(ops, 'or') : 'added or changed'}`;
-    const fields = w.fields && w.fields.length > 0 ? `, and only when ${andList(w.fields.map((f) => fieldSaid(f, w.register ?? undefined)), 'or')} changes` : '';
-    return `${said}${fields}${w.from_rules ? ', including changes other automations make' : ''}`;
+    const p = writtenParts(t.written, listSaid);
+    return `${p.said}${p.changes ? `, only when ${p.changes} changes` : ''}${p.rules}`;
   }
   if ('arrival' in t) {
     const a = t.arrival;
@@ -1493,13 +1520,13 @@ function saying(step: Step): string {
     case 'ask_slash':
       return withText('Ask Slash', at('question'));
     case 'call':
-      return at('ingest') === '' ? 'Call a service' : `Call ${at('ingest')}${at('as') ? `, keeping the answer as ${at('as')}` : ''}`;
+      return at('ingest') === '' ? 'Call a service' : `Call ${at('ingest')}`;
     case 'run':
       return aloud(a) === '' ? 'Run a call on this item' : `Run ${aloud(a)} on this item`;
-    /* THE ID OF ITS QUEUED RUN, NOT "THE ANSWER": the runner queues the script and goes on (`startScript`), and Decide
-       had to follow this line with a sentence taking "keeping the answer as" back. Worded as the record's dry run is. */
+    /* NO NAME IT IS KEPT UNDER (VERIFY H30): "keeping the id of its queued run as filing" put a variable's name on
+       screen. The runner queues the script and goes on (`startScript`); where its run is kept is the step's own detail. */
     case 'script':
-      return at('id') === '' ? 'Run a script' : `Run the script ${scriptName(at('id'))}${at('as') ? `, keeping the id of its queued run as ${at('as')}` : ''}`;
+      return at('id') === '' ? 'Run a script' : `Run the script ${scriptName(at('id'))}`;
     case 'wait':
       return aloud(a) === '' ? 'Wait' : `Wait ${spanWords(aloud(a))}`;
     case 'schedule':
@@ -1512,7 +1539,7 @@ function saying(step: Step): string {
     }
     /* THE JOB BY ITS NAME IN WORDS, not its declared id (`job.weekly-notes`), and the run's handle as the person named it. */
     case 'run_job':
-      return at('kind') === '' ? 'Start a job' : `Start the job ${jobName(at('kind'))}${at('as') ? `, keeping the id of its run as ${at('as')}` : ''}`;
+      return at('kind') === '' ? 'Start a job' : `Start the job ${jobName(at('kind'))}`;
     case null:
       return 'A step this build cannot draw';
     /* A VERB THE RECORD HOLDS AND THIS BUILD HAS NO WORDS FOR: its id in words and what its arguments hold. */

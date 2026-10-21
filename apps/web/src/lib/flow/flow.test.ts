@@ -375,7 +375,7 @@ test('every trigger and every verb is said in a sentence, with no braces and no 
 });
 
 test('A NUMBER IS COMPARED AS A LEAF, because the sentence grammar has no word for more than, and it is said back in words', () => {
-  assert.equal(sayStep({ if: { field: 'rate', gt: 70 } }), 'If rate is more than 70');
+  assert.equal(sayStep({ if: { field: 'rate', gt: 70 } }), 'If Rate is more than 70');
   assert.deepEqual(leafOf({ field: 'rate', lte: 3 }), { field: 'rate', op: 'lte', value: 3 });
   assert.deepEqual(leafTo('rate', 'gte', 5), { field: 'rate', gte: 5 });
   assert.equal(leafOf({ field: 'rate', gt: '70' }), null, 'a number written as text is not a number the builder can edit');
@@ -488,7 +488,7 @@ test('MEET AND RUN_JOB ARE OFFERED, START BLANK AND HAVE FORMS, like any other s
 });
 
 test('THEIR CARDS SAY NAMES AND WORDS, never a stored id', () => {
-  assert.equal(sayStep({ run_job: { kind: 'job.weekly-notes', as: 'notes' } }), 'Start the job Weekly notes, keeping the id of its run as notes');
+  assert.equal(sayStep({ run_job: { kind: 'job.weekly-notes', as: 'notes' } }), 'Start the job Weekly notes');
   assert.equal(sayStep(blankStep('run_job')), 'Start a job');
   assert.equal(sayStep({ meet: { name: 'Ines Okafor', where: 'the harbour market' } }), 'Meet Ines Okafor: the harbour market');
   assert.equal(sayStep({ meet: { keys: ['bank:{{trigger.row.counterparty}}'], where: 'a bank text' } }), 'Meet the person it names: a bank text');
@@ -621,7 +621,7 @@ const bigBills = { rule: 'paid-tag', register: 'bills', when: { field: 'amount',
 test('C2: A TREE CONDITION IS HELD IN THE DRAFT WHERE THE CARD CAN SEE IT, and a typed sentence is what gets filed', () => {
   const d = draftOf('paid-tag', bigBills);
   assert.deepEqual(d.whenTree, { field: 'amount', gt: 500 }, 'the tree is the draft’s, not hidden in rest');
-  assert.equal(sayStart(d), 'When an item in bills is added or changed, only when amount is more than 500');
+  assert.equal(sayStart(d), 'When an item in bills is added or changed, only when Amount is more than 500');
   assert.deepEqual(bodyOf(d), bigBills, 'opened and not touched, it files what it read');
   const typed = { ...d, when: 'what is Rent' };
   assert.equal(bodyOf(typed).when, 'what is Rent', 'the sentence the person typed is the one filed');

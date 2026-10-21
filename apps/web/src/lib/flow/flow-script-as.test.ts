@@ -24,10 +24,12 @@ holdGrammar({
 
 const scriptAs = (): Arg | undefined => ARGS.script.find((a) => a.path.join('.') === 'script.as');
 
-test('a script step says it keeps the id of its queued run, not an answer', () => {
+/* AND NOT THE NAME IT IS KEPT UNDER (VERIFY H30): "keeping the id of its queued run as filing" put a variable's name
+   on the canvas. The inspector's "Call its run" box still holds it. */
+test('a script step says the script it runs, never an answer and never the name its run is kept under', () => {
   const said = sayStep({ script: { id: 'tidy', as: 'job' } });
-  assert.equal(said, 'Run the script Tidy, keeping the id of its queued run as job');
-  assert.doesNotMatch(said, /answer/u);
+  assert.equal(said, 'Run the script Tidy');
+  assert.doesNotMatch(said, /answer|\bjob\b/u);
   assert.equal(sayStep({ script: { id: 'tidy' } }), 'Run the script Tidy');
 });
 
@@ -35,7 +37,7 @@ test('a script step says it keeps the id of its queued run, not an answer', () =
 test('a script step names the script by the title it declares, and by its id in words before the record says it', () => {
   assert.equal(sayStep({ script: { id: 'close_follow_ups' } }), 'Run the script Close follow ups');
   learnScripts([{ script: 'close_follow_ups', title: 'Close the follow-ups' }]);
-  assert.equal(sayStep({ script: { id: 'close_follow_ups', as: 'closing' } }), 'Run the script Close the follow-ups, keeping the id of its queued run as closing');
+  assert.equal(sayStep({ script: { id: 'close_follow_ups', as: 'closing' } }), 'Run the script Close the follow-ups');
 });
 
 test('the inspector names the field as the id of the queued run, with no answer in it', () => {
