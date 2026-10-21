@@ -35,6 +35,7 @@ import {
 } from '@braindog/kernel';
 
 import type { CallContext } from '../index.ts';
+import { tellFinished } from '../push.ts';
 import type { RecordDeps } from './index.ts';
 
 /* ── what every path hands an agent ─────────────────────────────────────── */
@@ -199,6 +200,18 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !
 export function methods(deps: RecordDeps) {
   const { kernel, sql, guard, no, tail, clock } = deps;
   const nowIso = (): string => new Date(clock.now()).toISOString();
+
+  /** Done and Needs you ring his phones per the run's settings row, once per state (`tellFinished`); never fails the reply. */
+  const tellDone = (i: Instr, runId: string): void => {
+    try {
+      const f = (kernel.get(runId, { includeDeleted: true })?.fields ?? {}) as Record<string, unknown>;
+      const str = (k: string): string | null => (typeof f[k] === 'string' && f[k] !== '' ? (f[k] as string) : null);
+      const profile = kernel.profileFor({ kind: str('agent'), token: str('token_id'), host: str('host') });
+      tellFinished({ sql, outbox: (kind, payload) => void kernel.outbox(kind, payload), nowMs: clock.now(), tz: kernel.identity()?.tz ?? 'UTC' }, i, profile);
+    } catch {
+      /* A PUSH IS NEVER WORTH AN ANSWER: the reply is written either way. */
+    }
+  };
 
   /** The keys of `args` none of `takes` names, the first refused in a sentence naming what the door takes. */
   const strayOf = (name: string, args: Record<string, unknown>, takes: readonly string[]) => {
@@ -470,6 +483,7 @@ export function methods(deps: RecordDeps) {
           ...(a.state === undefined ? {} : { state: a.state as (typeof REPLY_STATES)[number] }),
         });
         if (!answered.ok) return tail(answered as Result<never>);
+        tellDone(answered.value, run.value);
         return tail(ok(mineOf(run.value, { instruction: toldOf(sql, answered.value), receipts: receiptsOf(sql, kernel, answered.value, nowIso()) })));
       }
       const ids = Array.isArray(a.seen) ? (a.seen as string[]) : pendingFor(run.value).map((i) => i.id);

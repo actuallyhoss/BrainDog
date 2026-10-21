@@ -18,6 +18,7 @@
  * trim that keeps one person's list short.
  */
 
+import { inQuietHours, ownersPushSubs, quietOf, type Instr, type Profile, type QuietWindow } from '@braindog/kernel';
 import type { Result, Sql } from '@braindog/ports';
 import { no, ok } from '@braindog/ports';
 
@@ -125,4 +126,62 @@ export function dropPushSub(sql: Sql, person: string, endpoint: string): boolean
   const held = sql.one<{ n: number }>('SELECT count(*) AS n FROM push_sub WHERE person_id = ? AND endpoint = ?', person, endpoint)?.n ?? 0;
   if (Number(held) > 0) sql.exec('DELETE FROM push_sub WHERE person_id = ? AND endpoint = ?', person, endpoint);
   return Number(held) > 0;
+}
+
+/** The states of an instruction that ring a phone: it finished, or it needs him. */
+export const FINISH_STATES = ['done', 'needs_you'] as const;
+
+export type FinishPush = 'sent' | 'off' | 'not_pushed' | 'not_this_state' | 'short' | 'quiet' | 'told' | 'no_phone';
+
+/** What `tellFinished` reads, so the rule is testable without a worker. */
+export type FinishDeps = {
+  sql: Sql;
+  /** The kernel's queue (`kernel.outbox`): one `notify.push` row per phone. */
+  outbox: (kind: 'notify.push', payload: unknown) => void;
+  nowMs: number;
+  /** The record's zone. */
+  tz: string;
+};
+
+/** The window the push is held by: the agent's own quiet hours when its row has them, else the record's. */
+function windowOf(sql: Sql, profile: Profile): { window: QuietWindow; tz: string | null } {
+  if (profile.quiet !== null) return { window: { from: profile.quiet.from, to: profile.quiet.to }, tz: profile.quiet.zone ?? null };
+  return { window: quietOf(sql.one<{ quiet: string | null }>('SELECT quiet FROM record WHERE singleton = 1')?.quiet), tz: null };
+}
+
+/** The handle an instruction's push is told once under. It names the row and the state, never a word anybody said. */
+export const finishCause = (i: Pick<Instr, 'row' | 'state'>): string => `instruction.${i.row}.${i.state}`;
+
+/**
+ * An instruction reached Done or Needs you: ring his phones once, if the agent's settings row says so.
+ *
+ *   - ON FINISH. `off` rings nothing. `told` rings for any instruction he gave. `long` rings for Done only after the
+ *     run held it `notify.minutes` or more, and always for Needs you, which waits on him however short it was.
+ *   - `by` IS THE CHANNEL. Only `push` rings; `needs_you` leaves it to the Needs you list in the app.
+ *   - QUIET HOURS HOLD IT, the row's own or else the record's, as every notice is held. Nothing is queued to go later.
+ *   - ONCE PER INSTRUCTION STATE. The cause rides the queued row, a handle as `asked.<cause>` is, and a row already
+ *     carrying it, sent or not, answers `told`.
+ *   - CONTENT-FREE. The payload is `{ sub: { id }, cause }` and nothing else: no instruction text, reply, project or
+ *     name reaches the outbox, which travels in every backup. The Worker sends a push with no body.
+ *   - A RECORD NOBODY SUBSCRIBED A PHONE ON queues nothing.
+ *
+ * It never fails the reply: the caller keeps the instruction's answer whatever this says.
+ */
+export function tellFinished(deps: FinishDeps, i: Pick<Instr, 'row' | 'state' | 'taken_at'>, profile: Profile): FinishPush {
+  if (!(FINISH_STATES as readonly string[]).includes(i.state)) return 'not_this_state';
+  if (profile.notify.on === 'off') return 'off';
+  if (profile.notify.by !== 'push') return 'not_pushed';
+  if (profile.notify.on === 'long' && i.state === 'done') {
+    const took = i.taken_at === null ? 0 : deps.nowMs - Date.parse(i.taken_at);
+    if (!(took >= (profile.notify.minutes ?? 0) * 60_000)) return 'short';
+  }
+  const { window, tz } = windowOf(deps.sql, profile);
+  if (inQuietHours(deps.nowMs, tz ?? deps.tz, window)) return 'quiet';
+  const subs = ownersPushSubs(deps.sql);
+  if (subs.length === 0) return 'no_phone';
+  const cause = finishCause(i);
+  const told = deps.sql.one<{ n: number }>("SELECT count(*) AS n FROM outbox WHERE kind = 'notify.push' AND json_extract(payload, '$.cause') = ?", cause)?.n ?? 0;
+  if (Number(told) > 0) return 'told';
+  for (const id of subs) deps.outbox('notify.push', { sub: { id }, cause });
+  return 'sent';
 }
