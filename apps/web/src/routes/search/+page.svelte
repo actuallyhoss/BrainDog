@@ -74,6 +74,8 @@
 
   type Registers = { id: string; name: string; count: number; icon: IconName }[];
   const registers = $derived<Registers>(route.data.index?.registers ?? []);
+  /* THE BOX NAMES WHAT IT SEARCHES, "Search The Studio" (P28), where it said "Search the record". */
+  const searchSaid = $derived(route.data.index?.name ? copy.searchIn(route.data.index.name) : copy.searchRecord);
   const nav = $derived<{ title: string; href: string; section: string; row?: boolean; hue?: number; icon: IconName }[]>(route.data.nav ?? []);
   /* EACH SECTION OF THINGS WEARS ITS OWN PAGE'S GLYPH, the one the rail draws for it. */
   const things = $derived(thingsOf(nav).map((t) => ({ ...t, icon: nav.find((n) => n.section === t.section && n.row !== true)?.icon ?? ('projects' as IconName) })));
@@ -81,6 +83,18 @@
   const lists = $derived(listsOf(registers, read?.icons ?? new Map()));
   const people = $derived(read?.met ? read.people : []);
   const recent = $derived(read?.recent ?? []);
+  /* ONE LINE A NAME IN A LIST (P28): two Ledger entries both called "Ledger Post" read as one row said twice, so they
+     fold into the newest with how many; one name in two lists says which list each is. */
+  const lately = $derived.by(() => {
+    const out: { r: Recent; n: number; twice: boolean }[] = [];
+    for (const r of recent) {
+      const same = out.find((x) => x.r.title === r.title && x.r.list === r.list);
+      if (same) same.n += 1;
+      else out.push({ r, n: 1, twice: false });
+    }
+    for (const x of out) x.twice = out.some((y) => y !== x && y.r.title === x.r.title);
+    return out;
+  });
   const jumps = $derived(things.length + (people.length > 0 ? 1 : 0) + (lists.length > 0 ? 1 : 0) + (recent.length > 0 ? 1 : 0));
 
   /* ASKED ONCE A VISIT, and only while nothing is typed: a person who arrives with a query wants its answer, not these.
@@ -299,8 +313,8 @@
       bind:this={box}
       class="field-input"
       type="search"
-      aria-label={copy.searchRecord}
-      placeholder={copy.searchRecord}
+      aria-label={searchSaid}
+      placeholder={searchSaid}
       value={q}
       oninput={(e) => typed((e.currentTarget as HTMLInputElement).value)}
     />
@@ -361,11 +375,11 @@
           {#if recent.length > 0}
             <Tile icon="clock" title={words.recent}>
               <ul class="places">
-                {#each recent as r (r.href)}
+                {#each lately as { r, n, twice } (r.href)}
                   <li>
                     <a class="place" href={at(r.href)}>
                       <span class="place-lead" aria-hidden="true"><Icon name={r.icon} size="m" /></span>
-                      <span class="place-name">{readable(r.title)}</span>
+                      <span class="place-name">{readable(r.title)}{#if n > 1}<span class="place-list">{' · '}{n}</span>{:else if twice}<span class="place-list">{' · '}{r.list}</span>{/if}</span>
                       <span class="place-n">{daySaid(r.at.slice(0, 10), recordNow())}</span>
                     </a>
                   </li>
@@ -451,6 +465,11 @@
 </div>
 
 <style>
+  .place-list {
+    color: var(--ink-3);
+    font-weight: 400;
+  }
+
   .page {
     container-type: inline-size;
     display: flex;
