@@ -107,7 +107,8 @@
       aria-labelledby="desk-tab-{tab}"
       tabindex="0"
     >
-      <h2 class="desk-pane-name">{DESK.tabs[tab]}</h2>
+      <!-- TODAY NAMES ITSELF in its greeting, an h2 that shows with scripts on; the others' names show only without. -->
+      {#if tab !== 'today'}<h2 class="desk-pane-name">{DESK.tabs[tab]}</h2>{/if}
       {#if tab === 'today'}
         <Today ongo={(t) => show(t, true)} />
       {:else if tab === 'needs'}

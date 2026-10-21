@@ -29,7 +29,7 @@
 
 <p class="date">{BRIEF.date}</p>
 <div class="hello">
-  <h3 class="greet"><Icon name="today" />{DESK.tabs.today}</h3>
+  <h2 class="greet"><Icon name="today" />{DESK.tabs.today}</h2>
   <p class="line">
     <button type="button" class="lead needs" class:clear={open.length === 0} onclick={() => ongo('needs')}
       >{DESK.needYou(open.length)}</button
