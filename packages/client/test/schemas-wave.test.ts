@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { batchSchemas, createClient, forgetSchemas } from '../src/index.ts';
+import { batchSchemas, createClient, forgetSchemas, readAs } from '../src/index.ts';
 
 const BLOCKS = { 'block.tally': { title: 'Tally', purpose: 'Counts.' } };
 const DECL = (id: string) => ({ id, name: id, title: 'name', fields: [{ id: 'name', type: 'text' }] });
@@ -161,4 +161,18 @@ test('A WRITE SENT SINCE EVERY LIST WAS ASKED leaves it untaken, since the write
     land(Response.json({ ok: true, value: { lists: { tasks: DECL('tasks') }, refused: {}, blocks: BLOCKS } }));
     assert.equal((await c.schema('tasks')).ok, true);
     assert.deepEqual(h.asked, ['create', 'schema tasks']);
+  }));
+
+test('ANOTHER READER LEAVES EVERY LIST UNTAKEN, since what one reader may read is not what the next may', () =>
+  on(async () => {
+    const h = host();
+    const c = createClient({ base: 'https://a.example', fetch: h.fetch });
+    let land: (r: Response) => void = () => {};
+    readAs('owner');
+    void c.schemas(new Promise<Response>((done) => (land = done)));
+    readAs('guest');
+    land(Response.json({ ok: true, value: { lists: { tasks: DECL('tasks') }, refused: {}, blocks: BLOCKS } }));
+    assert.equal((await c.schema('tasks')).ok, true);
+    assert.deepEqual(h.asked, ['schema tasks']);
+    readAs('');
   }));

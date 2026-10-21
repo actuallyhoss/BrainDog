@@ -1323,9 +1323,10 @@ export function batchSchemas(on: boolean): void {
  * EVERY LIST'S DECLARATION, ASKED ONCE BESIDE `boot` (`schemas`), by host and token: a first screen's lists are
  * then learnt from it as they are asked, and none waits for `boot` to say which lists there are and then for their
  * declarations in turn. Each kept store takes it once, at the version it stands at then, as long as this tab has sent
- * no write since it was asked and it is younger than `SCHEMA_KEPT_MS`; a list it does not hold is asked as before.
+ * no write since it was asked, no grant has moved and it is younger than `SCHEMA_KEPT_MS`; a list it does not hold is
+ * asked as before. Another reader (`readAs`) drops it.
  */
-type Every = { wrote: number; at: number; done: Promise<{ lists: Record<string, unknown>; blocks: Record<string, unknown> } | null>; taken: WeakMap<SchemaStore, Promise<void>> };
+type Every = { wrote: number; regrants: number; at: number; done: Promise<{ lists: Record<string, unknown>; blocks: Record<string, unknown> } | null>; taken: WeakMap<SchemaStore, Promise<void>> };
 let EVERY = new Map<string, Every>();
 
 /** The most lists one `schemas` names, as the record takes them (`SCHEMAS_MOST`). */
@@ -1553,6 +1554,7 @@ export function readAs(reader: string): void {
   READS = new Map();
   OUT = new Map();
   SCHEMAS = new WeakMap();
+  EVERY = new Map();
   FLYING = new WeakMap();
 }
 
@@ -1594,7 +1596,7 @@ export function createClient(options: ClientOptions) {
     let taking = every.taken.get(store);
     if (taking === undefined) {
       taking = every.done.then((got) => {
-        if (got === null || every.wrote !== WROTE || Date.now() - every.at >= SCHEMA_KEPT_MS) return;
+        if (got === null || every.wrote !== WROTE || every.regrants !== REGRANTS || Date.now() - every.at >= SCHEMA_KEPT_MS) return;
         for (const [id, decl] of Object.entries(got.lists)) {
           if (store.lists.has(id) || decl === null || typeof decl !== 'object') continue;
           store.lists.set(id, { version: store.version, at: every.at, answer: Promise.resolve({ ok: true, value: { ...decl, blocks: got.blocks } }) });
@@ -1993,7 +1995,7 @@ export function createClient(options: ClientOptions) {
         (out) => (out.ok && out.value !== null && typeof out.value === 'object' ? { lists: out.value.lists ?? {}, blocks: out.value.blocks ?? {} } : null),
         () => null,
       );
-      EVERY.set(`${base} ${options.token ?? ''}`, { wrote: WROTE, at: Date.now(), done, taken: new WeakMap() });
+      EVERY.set(`${base} ${options.token ?? ''}`, { wrote: WROTE, regrants: REGRANTS, at: Date.now(), done, taken: new WeakMap() });
       return done.then((got) => got !== null);
     },
     /** A list's schema, asked once a version for the whole tab (`SCHEMAS`). A refusal is not kept. */
