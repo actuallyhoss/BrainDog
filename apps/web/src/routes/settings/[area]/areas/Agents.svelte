@@ -152,9 +152,16 @@
       const said = (r as { fields?: { project?: unknown } }).fields?.project;
       if (typeof said === 'string' && said.includes('#')) lists.add(said.slice(0, said.indexOf('#')));
     }
-    /* THE PROJECTS AN AGENT MAY BE HELD TO are the same list's, or the one Tasks are placed in when no run was placed. */
-    const tasksTo = scopeFieldOf('tasks');
-    if (lists.size === 0 && movable(tasksTo)) lists.add(tasksTo.to);
+    /* THE PROJECTS AN AGENT MAY BE HELD TO are the same list's, or, when no run was placed, the list the first of his
+       lists places its rows in, read off its declaration. */
+    if (lists.size === 0)
+      for (const r of shell.index.registers) {
+        const to = scopeFieldOf(r.id);
+        if (movable(to)) {
+          lists.add(to.to);
+          break;
+        }
+      }
     let places: Place[] | null = null;
     for (const list of lists) {
       const got = await placesIn(apiBase(), list).catch(() => null);
@@ -279,7 +286,7 @@
     noKeys: 'No machine or key is connected yet',
     noKeysWhy: 'Connect an agent to give it a key of its own. Its settings then hold for that key alone.',
     atWorkNow: (n: number) => `${n} at work now.`,
-    seeThem: 'See them on Agents',
+    seeThem: 'See their runs',
     /* "yesterday", not "1d ago" (UI pass of 21 October, P38). */
     lastHeard: (when: string) => `Last heard ${when === '1d ago' ? 'yesterday' : when}`,
     on: ', on ',
@@ -526,7 +533,7 @@
     as it did before.
   -->
   {#if !legacy}
-    <Tile icon="session" title={words.yours} actions={connectButton} data-part="agents">
+    <Tile icon="session" title={words.yours} actions={connectButton} data-part="your-agents">
       {#if held.state === 'waiting' || held.state === 'refused' || held.state === 'offline'}
         <ReadState state={held.state} refusal={held.refusal} onretry={held.reread} />
       {:else}
@@ -559,7 +566,7 @@
           {/each}
         </ul>
         {#if atWorkNow > 0}
-          <p class="reading">{words.atWorkNow(atWorkNow)} <a class="run" href={at('/p/agents')}>{words.seeThem}</a></p>
+          <p class="reading">{words.atWorkNow(atWorkNow)} <a class="run" href={at('/r/session')}>{words.seeThem}</a></p>
         {/if}
       {/if}
     </Tile>
