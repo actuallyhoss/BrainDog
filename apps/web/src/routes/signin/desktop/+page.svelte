@@ -5,6 +5,10 @@
 
   ON THE ENTRY FRAME, AS SIGN IN IS (`../Entry.svelte`, first F12): the layout draws this bare, so the brand stands where
   it stood on sign in a moment ago. While it works, one status line; when it fails, the error and the way back.
+
+  THE FAILURE IS THIS SCREEN'S OWN ANSWER, NOT A REFUSAL, so it is drawn in the frame's title and line and not as an
+  error `Empty`: an `Empty` of kind `error` counts as a refusal of the screen (`ui/screen.svelte.ts`), which outranks the
+  `ready` said below, and the gates then read the screen a person lands on without a code as an error card.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
@@ -45,7 +49,7 @@
          finish is this screen's designed answer, so it settles `ready` and is measured as the screen it is. -->
     <div class="said">
       <h1 class="entry-title">{words.desktopFailed}</h1>
-      <p class="entry-lede">{words.desktopFailedWhy}</p>
+      <p class="entry-lede" role="status">{words.desktopFailedWhy}</p>
       <Button weight="primary" href="/signin">{words.desktopBack}</Button>
     </div>
   {:else}
@@ -70,6 +74,7 @@
     line-height: 22px;
   }
 
+  /* The title, the line and the way back, the button a step further from the words than they are from each other. */
   .said {
     display: flex;
     flex-direction: column;
