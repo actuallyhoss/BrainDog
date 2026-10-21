@@ -463,6 +463,8 @@ importers:
 
   packs/portfolio-bands: {}
 
+  packs/profiles: {}
+
   packs/project-brief: {}
 
   packs/rates-poll: {}
