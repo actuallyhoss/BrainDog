@@ -7,7 +7,7 @@ that BrainDog owns and every record has, and **registers** that packs declare.
 
 ## 1 · The kernel
 
-Twenty-seven tables, and four header tables the format adds to every live record — thirty-one in
+Twenty-seven tables (migration 0042 adds `instruction_seen` and `agent_profile`, below), and four header tables the format adds to every live record — thirty-one in
 the file. Nothing a pack declares can alter them, and nothing in them is optional. *(An earlier draft
 said twenty. The review proved seven missing: the people, tokens, lockouts and counters a `.brain` must
 resolve offline, the vault's wrapped keys, and the two job tables of tier C.)*
@@ -64,6 +64,8 @@ vault_key     -- purpose CHECK (record|connector|signing), wrapped BLOB, nonce B
               -- the record's Ed25519 private key (03 §4)
 
 -- JOBS (tier C) ----------------------------------------------------------------
+instruction_seen -- (instruction, run, how, at): which run was shown which instruction, and how. Migration 0042. Local
+agent_profile -- one settings row per kind of agent, or per token or machine, and a 'default' row. Migration 0042. Owner-written only
 job           -- id, kind CHECK (four), args, status CHECK (nine), runner_id, claimed_at, lease_until, seq (event high-water
               -- mark), cancel, session, created_at, expires, claude_session, result, error, cost_minor, turns, ms
 job_event     -- (job_id, seq) PK, kind CHECK (start|say|think|tool|out|limit|note|end|error), body, ts
@@ -139,10 +141,10 @@ The remaining cost is honest: an unindexed field is a scan through `json_extract
 rows per register that is microseconds; the ceiling is stated in
 [22-FRONTEND](22-FRONTEND.md) §4 and it is a rendering ceiling long before it is a query one.
 
-### `session` is the one register the kernel declares, and it is the second exception
+### `session` and `instructions` are the two registers the kernel declares, and they are the second exception
 
 The predecessor's most-used coordination feature — agent sessions with a spoken id, a handoff, and
-derived liveness — had no counterpart here. It becomes **the kernel's one declared register**, for
+derived liveness — had no counterpart here. It becomes **a kernel-declared register**, for
 the same kind of reason `state` is the one promoted column: it is the register whose rows *are* the
 agents, so it cannot live in a pack a user might not install, and making it a plain table would cost
 a ninth MCP tool. [32-PARITY](32-PARITY.md) §2.1 has the declaration and the rules —
@@ -156,11 +158,22 @@ the row also carries `token_id`, so a token's writes are one query, and `project
 placed in by where it runs (§5), absent when the run is global; and **every agent write resolves to a
 session or opens one.** Its `declaration` row carries `pack_id = 'kernel'` — the only row that does, so a
 kernel-declared row and a user-authored one (`pack_id NULL`) are never confused. The CI rule *"the
-kernel contains no register declaration"* gains this one named exception. It arrives by migration 0002
+kernel contains no register declaration"* gains this named exception, and a second (below). It arrives by migration 0002
 ([41-SPEC-KERNEL](41-SPEC-KERNEL.md) §5.2), which writes the declaration row and its eight indexes and
 nothing else. A record created before that migration takes the register on its next open with every row
 it held untouched, and a record that had declared a `register.session` of its own keeps its rows while
 the kernel's declaration becomes that id's next version.
+
+**The second kernel register is `instructions` (migration 0042, 21 October 2026).** It holds what the owner tells an
+agent from the app, spoken `IN4`. It is core for the same reason `session` is: it is how the owner reaches the runs,
+so it cannot depend on a pack being installed, and it has one writer. Its declaration row also carries
+`pack_id = 'kernel'`. No pack or person may declare `register.instructions`: `validate` refuses it with
+`PROVIDES_CONFLICT` unless it is the kernel's own bytes. A token cannot write it. The delivery fields (who took it,
+when it was seen, the reply) are written only by the kernel. The CI rule is now: the kernel contains no register
+declaration except `register.session` and `register.instructions`, each with `pack_id = 'kernel'`, and
+`no-declarations-in-kernel` reads both from one list. The same migration adds two tables, `instruction_seen` (which run
+was shown which instruction, and how) and `agent_profile` (one settings row per kind of agent, ADR-074). The first is
+`local` and the second is `governance` in the `.brain`'s sections.
 
 ### `state` is the one promoted field, and an earlier draft never said so
 

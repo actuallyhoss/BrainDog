@@ -428,7 +428,7 @@ The measurable form of this rule, which belongs in CI rather than in a code revi
 
 ```
 test: the kernel contains no declaration of any of the kinds in §1
-      — except register.session, the one named exception (02-DATA-MODEL §1), whose rows are the agents
+      — except register.session and register.instructions, the two named exceptions (02-DATA-MODEL §1), whose rows are the agents and what the owner tells them
 test: uninstalling every pack leaves a record with a working nav and zero active declarations (retired rows stay — §4)
 test: every shipped pack round-trips through export → import → export to an identical canonical logical dump (33-CONTRACTS §9)
 ```

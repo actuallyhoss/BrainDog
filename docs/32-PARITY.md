@@ -85,7 +85,7 @@ BrainDog gets it as the same kind of acknowledged exception as the promoted `sta
 kernel declares **exactly one register, `session`**, because it is the one register whose rows *are*
 the agents. That means `S42` is a spoken id for free, `list`/`get`/`update` work with no ninth MCP
 tool, `record_index` shows who is live, and the CI rule *"the kernel contains no register
-declaration"* gains one named exception with its reason.
+declaration"* gains one named exception with its reason (`instructions` later became a second, 02 §1).
 
 ```yaml
 register: session                 # declared by the KERNEL, the only one, in migration 0002

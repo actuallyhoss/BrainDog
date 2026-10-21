@@ -217,7 +217,7 @@ rather than this table's.
 | `refusals` | the refusal registry, the `RefusalCode` union, and every `raises:` in the tree | the registry, the type and the code say the same list, and a registered code no code path emits is named | — |
 | `refusal-fixtures` | 30 §6's code tables; `fixtures/refusals/*.yaml`; the code list `declare` exports (42 §2) | one fixture per code, one code per fixture, kebab name equals code, and every `via` is one of 40 §6's nine. It owns the enumeration; the runners of §5.3 own the behaviour | — |
 | `flags` | the flag list and every read of it | six questions, of which the load-bearing one is whether the flag is read at all; `budgets.flags` caps a flag at ninety days and two call sites | — |
-| `no-declarations-in-kernel` | `packages/kernel/**` | one `INSERT INTO declaration`, id `register.session`; no `.yaml`; no other declaration body | — |
+| `no-declarations-in-kernel` | `packages/kernel/**` | one `INSERT INTO declaration`, id `register.session` or `register.instructions`; no `.yaml`; no other declaration body | — |
 | `css-rules` | `apps/web/src/**`, `packages/render/src/**`, the emitted token set, `pairs.json` | the twelve rules of §5.2, one `what` per rule, plus the dead-class report that never goes red | — |
 | `colour-grep` | the same trees, outside the token file | the colour a class computed in TypeScript, an inline SVG `fill` or a data file smuggles past `css-rules`. 22 §7 gate 2, and the one that actually fires | — |
 | `dead-copy` | `copy.ts` and every file that reads it | no key defined and referenced nowhere. Measured on the day it was written: 212 keys, 26 of them rendered by nothing | — |
@@ -477,8 +477,8 @@ registration that disagrees with its file.
 **`no-declarations-in-kernel`** ([02-DATA-MODEL](02-DATA-MODEL.md) §1)
 
 1. Under `packages/kernel/`: no `*.yaml`, `*.yml`.
-2. Across `src/migrations/*.ts`: `INSERT INTO declaration` occurs exactly once, with `'register.session'` and
-   `pack_id = 'kernel'`.
+2. Across `src/migrations/*.ts`: every `INSERT INTO declaration` is `'register.session'` or `'register.instructions'`,
+   with `pack_id = 'kernel'`.
 3. Across `src/**`: no object literal with `kind: '<one of the eight>'` beside an `id:` key.
 
 **`closed-lists`** ([34-GRAMMARS](34-GRAMMARS.md) §6)
