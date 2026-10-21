@@ -117,6 +117,8 @@
   import { still } from '$lib/ui/motion.ts';
   import { sentenceOf } from '$lib/home/today-tiles.ts';
   import { waitsNow, workingNow } from '$lib/home/waits.svelte.ts';
+  import { toldNow } from '$lib/home/told-now.svelte.ts';
+  import { answeredBy, doneToday, toldNeedOf } from '$lib/record/told-live.ts';
   import { words } from '$lib/home/words.ts';
   import { cutLine, homeLineOf } from '$lib/home/home-line.ts';
   import { anchorsFor, inPicture, type Placed } from '$lib/home/desk-order.ts';
@@ -429,7 +431,7 @@
      working tile lists the runs `boot` says are working. `null` from a host older than the field. */
   const waits = $derived.by((): HomeWaits | null => {
     const w = waitsNow();
-    return w === null ? null : { questions: w.questions, inbox: w.inbox, working: w.working, seqs: workingNow().map((r) => r.seq) };
+    return w === null ? null : { questions: w.questions, inbox: w.inbox, working: w.working, seqs: workingNow().map((r) => r.seq), told: toldNow().needs.length };
   });
 
   /* THE PAGE AS HOME DRAWS IT: its line lifted into the head, each row once, and nothing drawn that holds nothing. */
@@ -438,7 +440,7 @@
   /* THE LINE `boot`'S COUNTS SAY BY THEMSELVES, for a page that draws nothing it can be counted from; `null` while nothing
      waits, which is the only time the calm line may be said. */
   const waitsLine = $derived(
-    waits && (waits.questions > 0 || (waits.inbox ?? 0) > 0) ? sentenceOf({ needYou: waits.questions, agents: waits.working, inbox: waits.inbox ?? 0 }) : null,
+    waits && (waits.questions > 0 || (waits.told ?? 0) > 0 || (waits.inbox ?? 0) > 0) ? sentenceOf({ needYou: waits.questions + (waits.told ?? 0), agents: waits.working, inbox: waits.inbox ?? 0 }) : null,
   );
 
   /* THE ONE LINE, worked out from the blocks drawn, else what `boot` says waits, else the page's own line, else the calm
@@ -692,6 +694,9 @@
     };
   });
   const handledCount = $derived(handled ? handled.rows.length + handled.more : 0);
+  /* WHAT AGENTS ASKED HIM BACK AND WHAT THEY FINISHED TODAY, of what he told them, as the shell last read it (`told-now`). */
+  const toldNeeds = $derived(toldNow().needs.map((t) => toldNeedOf(t, toldNow().agents)));
+  const finishedBy = $derived(doneToday(toldNow().done, recordNow()).map((t) => answeredBy(t, toldNow().agents)));
 
   /**
    * WHO IS WORKING, FROM `boot` AND AT ONCE (today F1): Today's own body declares no table of runs, so nothing is drawn
@@ -946,7 +951,7 @@
 <!-- THE FOOT OF NEEDS YOU: the late bills and what BrainDog did itself, or the whole tile with nothing to ask. -->
 {#snippet needsFoot()}
   {#if shaped}
-    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={shaped.lateBills} handled={handledCount} calm={words.nothingNeedsYou} />
+    <NeedsFoot alone={!needsDrawn} heading={voice.needsYou} late={shaped.lateBills} handled={handledCount} told={toldNeeds} finished={finishedBy} calm={words.nothingNeedsYou} />
   {/if}
 {/snippet}
 

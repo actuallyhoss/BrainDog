@@ -36,7 +36,7 @@
   import { createClient } from '@braindog/client';
   import { copy } from '$lib/copy.ts';
   import { said } from '$lib/voice.svelte.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
   import type { Opened } from '$lib/record/page-live.ts';
   import { covered, silenced, typing } from '$lib/a11y/keys.svelte.ts';
   import { goto } from '$app/navigation';
@@ -68,7 +68,10 @@
   import { blocksMineFirst, boardOf, callsRead, dayWord, decideDrawn, GROUP_WORDS, mineFirst, readCalls, readDecide, WORDS, type Call, type Column, type DecideBody } from './views.ts';
   import Segmented from '$lib/ui/Segmented.svelte';
   import Handled from '$lib/home/Handled.svelte';
-  import { loadHandled, type Handled as HandledFound } from '$lib/home/handled.ts';
+  import { loadHandled, ownCount, toldHandled, withTold, type Handled as HandledFound } from '$lib/home/handled.ts';
+  import ToldNeeds from '$lib/home/ToldNeeds.svelte';
+  import { toldNow } from '$lib/home/told-now.svelte.ts';
+  import { toldNeedOf } from '$lib/record/told-live.ts';
   import { words } from './words.ts';
   import { waitsNow } from '$lib/home/waits.svelte.ts';
 
@@ -169,10 +172,14 @@
    * WHAT BRAINDOG DID WITHOUT ASKING TODAY, each with its Undo (`lib/home/handled.ts`): the third column beside Money and
    * Quick (plan of 20 October), read once the questions are asked for and never holding them up. `null` draws nothing.
    */
-  let handled = $state.raw<HandledFound | null>(null);
+  let handledRead = $state.raw<HandledFound | null>(null);
   async function readHandled() {
-    handled = await loadHandled(apiBase());
+    handledRead = await loadHandled(apiBase());
   }
+  /* AND WHAT AGENTS FINISHED TODAY OF WHAT HE TOLD THEM (`toldHandled`), from the shell's read: the same column. */
+  const handled = $derived(withTold(handledRead, toldHandled(toldNow().done, toldNow().agents, recordNow())));
+  /* WHAT AGENTS ASKED HIM BACK, of what he told them: counted in the badge, drawn over the questions. */
+  const toldNeeds = $derived(toldNow().needs.map((t) => toldNeedOf(t, toldNow().agents)));
 
   $effect(() => {
     if (classic) return;
@@ -345,7 +352,7 @@
      BrainDog's own card under it says what waits in its own heading. Said in the head as well, the same sentence stood
      twice, one over the other. */
   /* WITH NOTHING TO ASK THE LINE SAYS SO, and what BrainDog did by itself today (today F12). */
-  const handledToday = $derived(handled ? handled.rows.length + handled.more : 0);
+  const handledToday = $derived(ownCount(handled));
   const headLine = $derived(cleared ? (handledToday > 0 ? words.nothingHandled(handledToday) : undefined) : shaped?.sentence.text);
   const now = $derived(live?.now ?? 0);
   const went = $derived(callsRead(calls));
@@ -424,8 +431,9 @@
       <p class="cannot" id="cannot-decide">{whyNot}</p>
     {/if}
 
+    <ToldNeeds rows={toldNeeds} />
     {#if cleared}
-      {#if improving === 0 && !handled}
+      {#if improving === 0 && !handled && toldNeeds.length === 0}
         <Empty kind="cleared" title={said('no_questions')} body={copy.noQuestionsWhy}>
           {#snippet actions()}
             {#if Number(route.data.inbox ?? 0) > 0}<Button href="/inbox">{copy.decideOpenInbox}</Button>{/if}

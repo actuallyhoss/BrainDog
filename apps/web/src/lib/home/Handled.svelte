@@ -11,12 +11,16 @@
 
   "N MORE" OPENS THE REST IN PLACE, and the focus goes to the first line it opened. What the record itself held back past
   its own limit is said as "and 9 more", opening the full record of what BrainDog did (`/audit?by=braindog`).
+
+  A LINE ABOUT WHAT AN AGENT FINISHED of what he told it (`toldHandled`) puts back what that run changed (Undo all over
+  its receipts, `undoAll`), and has no Undo where it changed nothing in BrainDog.
 -->
 <script lang="ts">
   import { tick } from 'svelte';
   import { apiBase, at } from '$lib/at.ts';
   import { reread } from '$lib/data/live.svelte.ts';
   import { undoDecision } from '$lib/record/undo-write.ts';
+  import { undoAll } from '$lib/record/instruct.ts';
   import IconWell from '$lib/ui/IconWell.svelte';
   import { HANDLED_SHOWN, HANDLED_WORDS, type Handled } from './handled.ts';
 
@@ -69,6 +73,13 @@
     busy = decision;
     fix = '';
     try {
+      const receipts = found.rows.find((r) => r.decision === decision)?.told;
+      if (receipts) {
+        fix = await undoAll(apiBase(), receipts);
+        undone = new Set([...undone, decision]);
+        void reread();
+        return;
+      }
       const out = await undoDecision(apiBase(), decision);
       if (out.from === 'undone') {
         undone = new Set([...undone, decision]);
@@ -96,7 +107,7 @@
               <span class="h-what" dir="auto">{row.line}</span>
               {#if back}<span class="h-why">{words.putBack}</span>{:else if row.why}<span class="h-why" dir="auto">{row.why}</span>{/if}
             </span>
-            {#if !back}
+            {#if !back && (row.told === undefined || (row.told?.changes ?? 0) > 0)}
               <button type="button" class="h-undo tap" disabled={busy !== null} aria-busy={busy === row.decision} data-handled-undo onclick={() => void undo(row.decision)}
                 >{HANDLED_WORDS.undo}</button
               >

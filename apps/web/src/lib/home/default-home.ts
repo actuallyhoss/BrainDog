@@ -767,7 +767,14 @@ export function slashLineOf(drawn: HomeDrawn, today: boolean): unknown {
  * work by the record's one count, and the tile lists only the runs `boot` says are working. Absent from an older host,
  * and Home then counts what it drew, as before.
  */
-export type HomeWaits = { questions: number; inbox: number | null; working: number; seqs: readonly (number | null)[] };
+export type HomeWaits = {
+  questions: number;
+  inbox: number | null;
+  working: number;
+  seqs: readonly (number | null)[];
+  /** What a run answered Needs you on, of what he told it: counted with the questions, drawn in the tile's foot. */
+  told?: number;
+};
 
 export function homeDrawn(
   blocks: readonly LiveBlock[],
@@ -839,7 +846,9 @@ export function homeDrawn(
     /* NEEDS YOU LEADS WITH THE MONEY (today F3), oldest first in each group, and its count is the badge's (SF4). */
     if (isQueue(b) && b.key === 'needs-you' && b.queue) {
       const total = waits ? waits.questions : b.total;
-      shaped.push({ ...b, queue: needsYouOrder(b.queue), total });
+      /* THE HEAD SAYS THE ONE COUNT, an agent's question with the rest (`counted`); "N more" stays the questions'. */
+      const told = waits?.told ?? 0;
+      shaped.push({ ...b, queue: needsYouOrder(b.queue), total, ...(told > 0 ? { counted: total + told } : {}) });
       continue;
     }
     /* WHO IS WORKING IS `boot`'S: a run the page drew that has gone quiet is not drawn as working. */
@@ -1381,8 +1390,8 @@ export function sumsSaid(sums: ReadonlyMap<string, number>): string | null {
  */
 function sentenceFrom(blocks: readonly LiveBlock[], today: string, waits: HomeWaits | null = null): Sentence | null {
   /* SOMETHING WAITING IS ALWAYS SAID; with nothing waiting a page's own line (a use case's) may stand, as before. */
-  let counts = waits !== null && (waits.questions > 0 || (waits.inbox ?? 0) > 0);
-  let needing = waits?.questions ?? 0;
+  let counts = waits !== null && (waits.questions > 0 || (waits.told ?? 0) > 0 || (waits.inbox ?? 0) > 0);
+  let needing = (waits?.questions ?? 0) + (waits?.told ?? 0);
   let agents = 0;
   /* WHETHER THE PAGE READ WHAT IS LATE, so "Nothing is late" is said only where it was looked for. */
   let lateRead = false;

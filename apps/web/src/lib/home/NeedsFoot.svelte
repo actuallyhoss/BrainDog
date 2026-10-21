@@ -4,6 +4,9 @@
   - The late bills with no question about them, as one line in red with its money: "4 payments are late, £10,540 in all",
     opening the late work (`/?work&late`). The questions about money owed to you lead the tile above it.
   - What BrainDog did by itself today: "BrainDog handled 15 itself today. Review", opening Needs you's Handled.
+  - What an agent asked him back, of what he told it (agents and MCP plan §7.2): "Claude needs you on “Merge wave 1”",
+    its question under it, and Answer, which opens the agents and the run's thread; these count in Needs you's number.
+  - What agents finished of what he told them today: "Claude finished what you told it. Review", opening Handled.
 
   DRAWN AS THE TILE'S LOWER PART, under the queue the page's reader draws (Home lays the two together on the board), so
   the tile reads as one. WITH NOTHING TO ASK (`alone`) it is the whole tile: the heading, a calm mark, "Nothing needs
@@ -14,12 +17,15 @@
   import IconWell from '$lib/ui/IconWell.svelte';
   import { at } from '$lib/at.ts';
   import { WORK } from '$lib/nav.ts';
+  import type { ToldNeed } from '$lib/record/told-live.ts';
 
   let {
     alone = false,
     heading,
     late = null,
     handled = 0,
+    told = [],
+    finished = [],
     calm,
   }: {
     /** Nothing waits: the foot is the whole tile. */
@@ -30,6 +36,10 @@
     late?: { count: number; said: string } | null;
     /** How many things BrainDog did by itself today. */
     handled?: number;
+    /** What agents asked him back, of what he told them. */
+    told?: readonly ToldNeed[];
+    /** Who finished what he told them today, by agent name, one per instruction. */
+    finished?: readonly string[];
     /** The calm line drawn alone ("Nothing needs you"). */
     calm: string;
   } = $props();
@@ -38,9 +48,14 @@
     late: (n: number, said: string) => `${n.toLocaleString('en-GB')} ${n === 1 ? 'payment is' : 'payments are'} late, ${said} in all`,
     handled: (n: number) => `BrainDog handled ${n.toLocaleString('en-GB')} itself today.`,
     review: 'Review',
+    answer: 'Answer',
+    finished: (who: readonly string[]) =>
+      who.length === 1 ? `${who[0]!} finished what you told it.` : `Agents finished ${who.length.toLocaleString('en-GB')} of your instructions today.`,
   } as const;
 
-  const any = $derived((late !== null && late.count > 0) || handled > 0);
+  const any = $derived((late !== null && late.count > 0) || handled > 0 || told.length > 0 || finished.length > 0);
+  /* WHAT WAITS ON HIM IS NOT CALM: with only an agent's question, the tile holds that and not "Nothing needs you". */
+  const calmNow = $derived(alone && told.length === 0);
 </script>
 
 {#if alone || any}
@@ -48,16 +63,32 @@
     {#if alone}
       <header class="nf-head">
         <IconWell name="inbox" size="m" />
-        <h2 class="nf-title">{heading}</h2>
+        <h2 class="nf-title">{heading}{#if told.length > 0}<span class="nf-count num">{told.length}</span>{/if}</h2>
       </header>
-      <p class="nf-calm"><IconWell name="check" size="l" tone="good" /><span>{calm}</span></p>
+      {#if calmNow}<p class="nf-calm"><IconWell name="check" size="l" tone="good" /><span>{calm}</span></p>{/if}
     {/if}
     {#if any}
       <ul class="nf-lines">
+        {#each told as t (t.key)}
+          <li>
+            <a class="nf-line nf-told" href={at('/p/agents')} data-told>
+              <Icon name="session" size="s" /><span class="nf-words"
+                ><span class="nf-what" dir="auto">{t.line}</span>{#if t.reply}<span class="nf-reply" dir="auto">{t.reply}</span>{/if}</span
+              ><span class="nf-go">{words.answer}</span>
+            </a>
+          </li>
+        {/each}
         {#if late && late.count > 0}
           <li>
             <a class="nf-line nf-late" href={at(`${WORK}&late`)}>
               <Icon name="clock" size="s" /><span class="nf-words">{words.late(late.count, late.said)}</span><Icon name="chevron" size="s" />
+            </a>
+          </li>
+        {/if}
+        {#if finished.length > 0}
+          <li>
+            <a class="nf-line nf-handled" href={at('/decide?show=handled')} data-finished>
+              <Icon name="session" size="s" /><span class="nf-words">{words.finished(finished)}</span><span class="nf-go">{words.review}</span>
             </a>
           </li>
         {/if}
@@ -146,8 +177,46 @@
     font-weight: 600;
   }
 
-  .nf-handled > :global(.icon) {
+  .nf-handled > :global(.icon),
+  .nf-told > :global(.icon) {
     color: var(--ink-3);
+  }
+
+  /* AN AGENT'S QUESTION: what it is on in the ink, its question under it in the second ink, two lines at most. */
+  .nf-told {
+    align-items: start;
+    padding-block: var(--sp-3);
+  }
+
+  .nf-told > :global(.icon) {
+    margin-block-start: 3px;
+  }
+
+  .nf-what,
+  .nf-reply {
+    display: block;
+  }
+
+  .nf-what {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .nf-reply {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .nf-count {
+    margin-inline-start: var(--sp-2);
+    color: var(--red);
+    font-weight: 600;
   }
 
   .nf-go {
@@ -158,7 +227,8 @@
 
   @media (hover: hover) and (pointer: fine) {
     .nf-line:hover .nf-words,
-    .nf-handled:hover .nf-go {
+    .nf-handled:hover .nf-go,
+    .nf-told:hover .nf-go {
       text-decoration: underline;
       text-underline-offset: 3px;
     }

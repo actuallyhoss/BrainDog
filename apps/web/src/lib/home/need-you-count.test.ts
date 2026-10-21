@@ -95,3 +95,15 @@ test('the rail, the tab and Today all read the one count', () => {
   assert.match(read('./Home.svelte'), /homeDrawn\(live\.page\.blocks, live\.now, voice, one, waits/u);
   assert.match(read('./Today.svelte'), /needYouCount\(waits, t\.open\)/u);
 });
+
+test('an agent asking him back, of what he told it, counts in the badge, the header and the tile’s head', () => {
+  const waits: HomeWaits = { questions: 8, inbox: 0, working: 2, seqs: [], told: 1 };
+  const out = homeDrawn([queue()], NOW, undefined, undefined, waits);
+  const tile = out.blocks.find((b) => b.key === 'needs-you')! as unknown as { total: number; counted?: number };
+  assert.equal(needYouCount(waits, 0, waits.told), 9);
+  assert.match(out.sentence!.text, /^9 need you\b/u);
+  assert.equal(tile.counted, 9, 'the head says the one count');
+  assert.equal(tile.total, 8, '"N more" stays the questions the Needs you page lists after these');
+  assert.equal(needYouCount(null, 3, 2), 5, 'without waits, the reader’s own count and what came back');
+  assert.equal(needYouCount(waits, 0), 8, 'with nothing told, the questions alone');
+});

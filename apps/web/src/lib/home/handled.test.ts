@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { HANDLED_SHOWN, HANDLED_WORDS, handledOf, handledTile, loadHandled, readHandled } from './handled.ts';
+import type { Thread } from '../record/instruct.ts';
+import { HANDLED_SHOWN, HANDLED_WORDS, handledOf, handledTile, loadHandled, ownCount, readHandled, toldHandled, withTold } from './handled.ts';
 
 const ULID = '01J9Z3K4M5N6P7Q8R9S0T1V2W3';
 const line = (n: number) => ({ decision: `D${String(n)}`, line: `Change the last seen of project ${String(n)}`, why: 'It only arranges your own rows.', at: '2026-10-20T08:00:00.000Z' });
@@ -54,4 +55,53 @@ test('"N MORE" OPENS THE LINES THE RECORD SENT, and only what it held back stays
   assert.equal(open?.opens, 0);
   assert.equal(open?.more, 'and 2 more', 'what the record held back is still said');
   assert.equal(handledTile(handledOf(answer([line(1)])), true)?.more, '');
+});
+
+const told = (over: Partial<Thread> = {}): Thread => ({
+  id: 'IN4',
+  said: 'Merge wave 1, then stop',
+  kind: 'tell',
+  when: 'now',
+  to: 'run',
+  to_run: 'S1',
+  to_agent: null,
+  project: null,
+  task: null,
+  state: 'done',
+  seen_by: 'S1',
+  seen_how: 'prompt',
+  seen_at: '2026-10-20T08:00:00.000Z',
+  taken_by: 'S1',
+  taken_at: '2026-10-20T08:00:00.000Z',
+  reply: 'Merged W1-A to E, check green.',
+  replied_at: '2026-10-20T09:00:00.000Z',
+  expires_at: null,
+  at: '2026-10-20T07:59:00.000Z',
+  updated_at: '2026-10-20T09:00:00.000Z',
+  seen: [],
+  receipts: { run: 'S1', batches: [{ batch: 'b1', at: '2026-10-20T08:30:00.000Z', changes: 3, rows: [], names: [] }], changes: 3, head_before: 'a', head_after: 'b' },
+  ...over,
+});
+
+test('WHAT AN AGENT FINISHED TODAY OF WHAT HE TOLD IT LANDS IN HANDLED, by the agent’s name, with its reply and changes', () => {
+  const now = Date.parse('2026-10-20T12:00:00.000Z');
+  const lines = toldHandled([told(), told({ id: 'IN2', replied_at: '2026-10-18T09:00:00.000Z', updated_at: '2026-10-18T09:00:00.000Z' })], { S1: 'claude' }, now);
+  assert.equal(lines.length, 1, 'only what was finished today');
+  assert.equal(lines[0]?.line, 'Claude finished “Merge wave 1, then stop”');
+  assert.equal(lines[0]?.why, 'Merged W1-A to E, check green. · 3 changes');
+  assert.equal(lines[0]?.told?.changes, 3, 'its Undo puts back what the run changed');
+  assert.doesNotMatch(`${lines[0]?.line} ${lines[0]?.why}`, /\bS1\b|\bIN4\b/u);
+  const merged = withTold(handledOf(answer([line(1)])), lines);
+  assert.deepEqual(merged?.rows.map((r) => r.decision), ['told:IN4', 'D1'], 'newest first');
+  assert.equal(ownCount(merged), 1, '"BrainDog handled N itself" counts its own lines alone');
+  assert.equal(withTold(null, []), null);
+  assert.equal(withTold(null, lines)?.rows.length, 1);
+});
+
+test('TODAY SAYS WHAT AGENTS FINISHED AND WHAT THEY ASK, from the shell’s read, and Needs you lists what they ask', () => {
+  const home = readFileSync(new URL('./Home.svelte', import.meta.url), 'utf8');
+  assert.match(home, /told=\{toldNeeds\} finished=\{finishedBy\}/u);
+  const decide = readFileSync(new URL('../../routes/decide/+page.svelte', import.meta.url), 'utf8');
+  assert.match(decide, /<ToldNeeds rows=\{toldNeeds\} \/>/u);
+  assert.match(decide, /withTold\(handledRead, toldHandled\(/u);
 });

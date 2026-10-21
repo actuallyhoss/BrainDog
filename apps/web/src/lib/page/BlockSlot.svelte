@@ -425,7 +425,8 @@
   /* A `kpis` BLOCK'S KEY NUMBERS, as the drawer takes them. */
   const kpis = $derived(block.kind === KPIS_KIND ? kpisIn(block as { kpis?: unknown }) : []);
   const glyph = $derived(headIcon(block.kind, block.icon, isGlyph));
-  const count = $derived(headCount({ kind: block.kind, total: block.total, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }));
+  /* A BLOCK MAY SAY A HEAD COUNT OF ITS OWN (`counted`): Today's Needs you counts an agent's question with its rows. */
+  const count = $derived(headCount({ kind: block.kind, total: (block as { counted?: number }).counted ?? block.total, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }));
 
   /* HOME'S OWN LIST, where Home drew the block as one (`home/home-rows.ts`): what is late as one list, what comes up by
      day. THE HEADING'S WELL IS NEUTRAL on every tile (2.A.5): a heading names a group, and a group is not late or good;

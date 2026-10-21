@@ -7,12 +7,19 @@
  * raw id (a ULID), is dropped. Nothing is drawn at nought, and it never fails the screen: a host built before the read
  * answers `ROUTE_UNKNOWN` or a refusal, and either is `null`.
  *
+ * AND WHAT AN AGENT FINISHED OF WHAT HE TOLD IT (agents and MCP plan §7.2: "Finished instructions land in Handled"),
+ * from the shell's read of his instructions (`told-now.svelte.ts`) and never a read of its own: one line each, "Claude
+ * finished “Merge wave 1”", the agent's reply under it with what it changed, and Undo all over those changes where it
+ * changed something in BrainDog (`undoAll` in `record/instruct.ts`).
+ *
  * A ROUTE-ONLY MODULE, like `learned.ts`: imported lazily from the screen that draws it, never by anything every screen loads.
  */
 
 import { createClient } from '@braindog/client';
 
 import type { Fetch } from '../record/boot-live.ts';
+import type { Receipts, Thread } from '../record/instruct.ts';
+import { answeredBy, doneToday, saidShort } from '../record/told-live.ts';
 
 /** How many lines the tile lists. The record sends at most twenty; the rest are counted in one line. */
 export const HANDLED_SHOWN = 5;
@@ -27,8 +34,11 @@ export const HANDLED_WORDS = {
   open: (n: number) => `${String(n)} more`,
 } as const;
 
-/** One thing BrainDog did: the decision that puts it back, one line, the reason under it, and when. */
-export type HandledLine = { decision: string; line: string; why: string; at: string | null };
+/**
+ * One thing BrainDog did: the decision that puts it back, one line, the reason under it, and when. A line about what an
+ * agent finished of what he told it carries the run's receipts instead (`told`), which its Undo puts back.
+ */
+export type HandledLine = { decision: string; line: string; why: string; at: string | null; told?: Receipts | null };
 
 /** What the record answers: today's lines newest first and how many it held back past its own limit. */
 export type Handled = { rows: HandledLine[]; more: number };
@@ -103,3 +113,34 @@ export function handledTile(found: Handled | null, open = false): HandledTile | 
   const rest = opens + found.more;
   return { heading: HANDLED_WORDS.heading, lines, more: rest > 0 ? HANDLED_WORDS.more(rest) : '', opens };
 }
+
+/** How many changes, said: "3 changes". */
+const changesSaid = (n: number): string => `${String(n)} ${n === 1 ? 'change' : 'changes'}`;
+
+/**
+ * What an agent finished today of what he told it, as Handled's lines, newest first: who and what, the reply under it
+ * with how many changes it made, and the receipts its Undo puts back. On the record's clock (`now`).
+ */
+export function toldHandled(done: readonly Thread[], agents: Readonly<Record<string, string>>, now: number): HandledLine[] {
+  return doneToday(done, now).map((t) => {
+    const changes = t.receipts?.changes ?? 0;
+    const reply = t.reply?.replace(/\s+/gu, ' ').trim() ?? '';
+    return {
+      decision: `told:${t.id}`,
+      line: `${answeredBy(t, agents)} finished “${saidShort(t.said)}”`,
+      why: [reply, changes > 0 ? changesSaid(changes) : ''].filter((x) => x !== '').join(' · '),
+      at: t.replied_at ?? t.updated_at,
+      told: t.receipts ?? null,
+    };
+  });
+}
+
+/** What BrainDog did and what agents finished, one list, newest first; `null` when there is neither. */
+export function withTold(found: Handled | null, told: readonly HandledLine[]): Handled | null {
+  if (told.length === 0) return found;
+  const rows = [...(found?.rows ?? []), ...told].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
+  return { rows, more: found?.more ?? 0 };
+}
+
+/** How many lines are BrainDog's own, which Today's foot says as "BrainDog handled 15 itself today". */
+export const ownCount = (found: Handled | null): number => (found ? found.rows.filter((r) => r.told === undefined).length + found.more : 0);
