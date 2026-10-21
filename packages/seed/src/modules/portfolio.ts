@@ -5,7 +5,7 @@
  * figures and pages sit in one file. `index.ts` composes them and keeps every export it had.
  */
 
-import { LOOKUPS, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
+import { LOOKUPS, NOW, OPEN, day, gbp, type Fields, type SeedMetric, type SeedPage, type SeedRegister, type SeedRule } from './base.ts';
 
 /* ── things, and their frozen identity hues ───────────────────────────────
    The hue is chosen at create by the theme's `nextAccentHue` and written once. The kernel never
@@ -144,6 +144,36 @@ export const PROJECTS_SAID: readonly { things: number; by: string; hours: number
   { things: 2, by: 'cursor', hours: -10, fields: ['next', 'progress'], note: 'set the next step on Marlow & Co to the chaser for 2026-041' },
 ];
 
+/**
+ * KILN'S KEY NUMBERS, THE SAMPLE'S ONLY ONES (the KPI plan of 21 October, K3): what it earns a month, which leads its
+ * card and its page, how many studios hold a licence, and the specimen downloads nobody has reported for three weeks,
+ * so a stale number is on the sample too. `thing` is the project's place in `THINGS`, from 1. A sample's and not
+ * Portfolio's: the add-on ships the list and no row of it.
+ */
+export const SAMPLE_KPIS: Fields[] = [
+  { name: 'Revenue a month', thing: 1, measures: 'What the licences, studio deals and prints brought in each month', source: 'numbers', measure: 'Revenue a month', unit: 'GBP', kind: 'flow', every: '1m', target_amount: gbp(200_000), headline: true, owner: 'claude', order: 1 },
+  { name: 'Studios licensed', thing: 1, measures: 'Studios holding a current licence', source: 'agent', measure: 'Studios licensed', unit: 'studios', kind: 'level', every: '1w', target: 60, target_by: day(90), owner: 'claude', order: 2 },
+  { name: 'Specimen downloads', thing: 1, measures: 'Specimen PDFs downloaded in a week', source: 'typed', measure: 'Specimen downloads', unit: 'downloads', kind: 'level', every: '1w', order: 3 },
+];
+
+/** The 28th of the month this many months before the sample's own, at noon. */
+const monthBack = (n: number): string => {
+  const d = new Date(NOW);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - n, 28, 12)).toISOString();
+};
+
+/** Twelve months that add up to what Kiln earned in a year (GBP 18,400.00), the last whole month the best. */
+const KILN_MONTHS = [125_000, 130_000, 120_000, 140_000, 135_000, 150_000, 145_000, 160_000, 155_000, 170_000, 180_000, 230_000];
+const KILN_STUDIOS = [38, 39, 39, 41, 42, 42, 44, 45, 47, 48, 50, 52];
+const KILN_DOWNLOADS = [212, 240, 198, 260, 275, 251];
+
+/** The readings behind them, in Numbers: a month's revenue on its 28th, the studios each week, the downloads until three weeks ago. */
+export const SAMPLE_READINGS: Fields[] = [
+  ...KILN_MONTHS.map((minor, i) => ({ name: 'Revenue a month', thing: 1, amount: gbp(minor), at: monthBack(KILN_MONTHS.length - i), source: 'reported' })),
+  ...KILN_STUDIOS.map((n, i) => ({ name: 'Studios licensed', thing: 1, value: n, unit: 'studios', at: `${day(-1 - 7 * (KILN_STUDIOS.length - 1 - i))}T09:00:00.000Z`, source: 'reported' })),
+  ...KILN_DOWNLOADS.map((n, i) => ({ name: 'Specimen downloads', thing: 1, value: n, unit: 'downloads', at: `${day(-21 - 7 * (KILN_DOWNLOADS.length - 1 - i))}T09:00:00.000Z`, source: 'typed' })),
+];
+
 /** The kinds of project, since portfolio 1.19.0: what each one is, which picks the key numbers offered for it. */
 export const PROJECT_KINDS = ['business', 'client', 'product', 'content'] as const;
 
@@ -178,6 +208,9 @@ export const KPI_LIST = {
   stale: { periods: 2, days: 14 },
   most: { today: 4, phone: 2 },
 } as const;
+
+/** The sample's key numbers and their readings, by the lists `KPI_LIST` names, written after the projects. */
+export const SAMPLE_ROWS: Readonly<Record<string, readonly Fields[]>> = { [KPI_LIST.list]: SAMPLE_KPIS, [KPI_LIST.readings]: SAMPLE_READINGS };
 
 export const PORTFOLIO_REGISTERS: Record<string, SeedRegister> = {
   things: {

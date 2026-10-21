@@ -28,6 +28,7 @@ import {
   targetConfigOf,
   day,
   PROJECTS_SAID,
+  SAMPLE_ROWS,
   stamp,
 } from '@braindog/seed';
 
@@ -234,6 +235,8 @@ export const ROWS: Record<string, Entry[]> = {
   skills: entriesOf('skills'),
   credentials: entriesOf('credentials'),
   tools: entriesOf('tools'),
+  /* KILN'S KEY NUMBERS AND THEIR READINGS, by the lists the seed names for them, as `installSeed` writes them. */
+  ...Object.fromEntries(Object.keys(SAMPLE_ROWS).map((register) => [register, entriesOf(register)])),
 };
 
 /* ── where this record runs ───────────────────────────────────────────────────── */

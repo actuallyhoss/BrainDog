@@ -29,7 +29,7 @@ export { FIRST_PARTY, FIRST_PARTY_VERSIONS, crossPack, firstPartyDocument, first
 export * from './modules/base.ts';
 export { ACCOUNTS, CATEGORIES, INSTALLMENTS, OBLIGATIONS, RECURRING_ITEMS, SNAPSHOTS, TRANSACTIONS, cashPoints, cashSeries, nightOf, snapshotRows } from './modules/money.ts';
 export { SERVICES } from './modules/estate.ts';
-export { PROJECTS_SAID, THINGS } from './modules/portfolio.ts';
+export { PROJECTS_SAID, SAMPLE_KPIS, SAMPLE_READINGS, SAMPLE_ROWS, THINGS } from './modules/portfolio.ts';
 export { ORGANISATIONS, PEOPLE } from './modules/people.ts';
 export { RUNS, TASKS, TRACKS, UPDATES, openTasksSeries } from './modules/work.ts';
 
@@ -55,7 +55,7 @@ import { STARTER_CATEGORIES } from './modules/money/lists/categories.ts';
 export { MONEY_HOME_SETTING, MONEY_TARGET_SETTINGS, targetConfigOf } from './modules/money.ts';
 import { ESTATE_METRICS, ESTATE_PAGES, ESTATE_REGISTERS, SERVICES } from './modules/estate.ts';
 import { ESTATE_AUTOMATIONS, estateTargetConfig } from './modules/estate.ts';
-import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, THINGS } from './modules/portfolio.ts';
+import { PORTFOLIO_PAGES, PORTFOLIO_REGISTERS, PORTFOLIO_RULES, PROJECTS_SAID, PROJECT_METRICS, SAMPLE_ROWS, THINGS } from './modules/portfolio.ts';
 import { ORGANISATIONS, PEOPLE, PEOPLE_AUTOMATIONS, PEOPLE_METRICS, PEOPLE_PAGES, PEOPLE_REGISTERS } from './modules/people.ts';
 import { RUNS, TASKS, TRACKS, UPDATES, WORK_AUTOMATIONS, WORK_METRICS, WORK_PAGES, WORK_REGISTERS } from './modules/work.ts';
 import { HEALTH_PAGES } from './modules/health.ts';
@@ -151,6 +151,7 @@ export const ROWS: Record<string, readonly Fields[]> = {
   snapshots: SNAPSHOTS,
   services: SERVICES,
   things: THINGS,
+  ...SAMPLE_ROWS,
   organisations: ORGANISATIONS,
   people: PEOPLE,
   tasks: TASKS,
@@ -497,7 +498,7 @@ export async function installSeed(kernel: Kernel, actor = 'p_seed'): Promise<Res
 
   let rows = 0;
   const wrote = kernel.backdate(HISTORY.kept, (): Result<unknown> => {
-    for (const register of [...ORDER, ...AGENTS_ORDER])
+    for (const register of [...ORDER, ...SAMPLE_ORDER, ...AGENTS_ORDER])
       for (const [i, entry] of (ROWS[register] ?? []).entries()) {
         /* WHAT AN AGENT SAID ABOUT A PROJECT IS LEFT OUT OF THE ROW, and the agent writes it below, when it said it. */
         const said = register === 'things' ? PROJECTS_SAID.find((s) => s.things === i + 1) : undefined;
@@ -754,6 +755,13 @@ export function governanceSeed(kernel: Pick<Kernel, 'get'>): SeedQuestion[] {
  * the record register by register over that list, and it declares none of the pack's.
  */
 export const AGENTS_ORDER = ['learnings', 'skills', 'credentials', 'tools'] as const;
+
+/**
+ * THE SAMPLE'S KEY NUMBERS AND THEIR READINGS (`SAMPLE_KPIS`), written after the projects they point at. NOT IN `ORDER`,
+ * whose lists also give a pack its one example row each: a reading of the sample's is the sample's, and Portfolio ships
+ * its lists with no row.
+ */
+export const SAMPLE_ORDER: readonly string[] = Object.keys(SAMPLE_ROWS);
 
 /**
  * Install the agents pack THROUGH THE PACK PATH: normalised, planned and installed as any pack is,
