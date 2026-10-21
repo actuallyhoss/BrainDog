@@ -28,7 +28,7 @@ export type Person = {
 
 export const forPages = {
   person: {
-    /* The link to the other page shown today (site F13): small businesses link teams, and teams link small businesses. */
+    /* The name a screen reader hears on the link to the other page (site F13, 2b): only the link is drawn. */
     others: 'Written for someone else',
 
     who: {

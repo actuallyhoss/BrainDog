@@ -73,9 +73,8 @@
     </article>
   {/each}
 
-  <!-- ── The other page written for someone else (site F13) ────────────────── -->
-  <nav class="others" aria-labelledby="others-title">
-    <h2 class="others-title" id="others-title">{f.others}</h2>
+  <!-- ── The other page written for someone else (site F13): only its link, the words its name (site 2b) ── -->
+  <nav class="others" aria-label={f.others}>
     <ul>
       {#each others as c (c.id)}
         <li><a class="more" href={w.moreFor[c.id].href}>{f.who[c.id].nav}<Icon name="arrow" size="m" /></a></li>
@@ -142,13 +141,6 @@
 
   .others {
     padding-block-start: 52px;
-  }
-
-  .others-title {
-    margin: 0;
-    font-size: var(--fs-page);
-    line-height: 1.1;
-    letter-spacing: -0.035em;
   }
 
   .others ul {
