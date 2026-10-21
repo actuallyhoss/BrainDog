@@ -868,9 +868,11 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         }
         /* THE GATE'S OWN PROOF THAT IT LOOKS AT ANYTHING. `BRAINDOG_GATE_SEED=prefs` pins the two
            tokens the checks read, which is exactly the shape of the bug this gate is named after (a
-           preference reaching the cookie and a constant reaching the page), and the run must go red. */
+           preference reaching the cookie and a constant reaching the page), and the run must go red. The body step is
+           `--fs-body` since the old names went on 21 October (`--t-ui` and `--text`, which nothing reads now, so pinning
+           them planted nothing and the seeded run never named the body step). */
         if (process.env.BRAINDOG_GATE_SEED === 'prefs')
-          await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--t-ui:15px !important;--text:15px !important}' });
+          await page.addStyleTag({ content: ':root{--row-h:34px !important}html{--fs-body:15px !important}' });
         await page.waitForTimeout(120);
         drew = await page.evaluate(test.probe);
         seen.set(JSON.stringify(value), drew);

@@ -262,7 +262,7 @@ const notRun = [];
  */
 export const BROWSER = [
   /**
-   * `prefs`: `BRAINDOG_GATE_SEED=prefs` pins `--row-h`, `--t-ui` and `--text` to constants, which
+   * `prefs`: `BRAINDOG_GATE_SEED=prefs` pins `--row-h` and `--fs-body` to constants, which
    * is precisely what the build shipped for the life of the Text control, and the gate must notice
    * that two settings come back identical.
    */
