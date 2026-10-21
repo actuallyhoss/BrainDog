@@ -560,6 +560,8 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       /**
        * `look.accent`: the colour by its swatch's name. NO ATTRIBUTE TO READ, because the accent is an adopted stylesheet
        * and not a `data-` word (`accent.ts`, "this does not touch data-theme"), so the token it moves is the measurement.
+       * That token is `--red-fill`, the frame's name for the fill a person's colour paints, since the frame tokens of
+       * 20 October: `--accent` went from every sheet then, and read as "no accent" on every load whatever was picked.
        *
        * THE COOKIE CARRIES A HEX AND THE RECORD A NAME, which is how each keeps it. The third load's cookie is the second
        * load's colour, so a build that let the cookie win draws that colour twice.
@@ -577,7 +579,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
         { '@record': { 'look.accent': ACCENTS[0].name } },
         { theme: ACCENTS[0].hex, '@record': { 'look.accent': ACCENTS[ACCENTS.length - 1].name } },
       ],
-      probe: () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || 'no accent',
+      probe: () => getComputedStyle(document.documentElement).getPropertyValue('--red-fill').trim() || 'no accent',
     },
     {
       /**
@@ -595,7 +597,7 @@ export default async function prefs(root = join(import.meta.dirname, '..', '..')
       what: 'which installed look the page is drawn in, when the record keeps the pick (PGS-A21)',
       route: '/',
       values: [{ '@record': {} }, { '@record': { 'look.theme': 'house' } }],
-      probe: () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || 'no accent',
+      probe: () => getComputedStyle(document.documentElement).getPropertyValue('--red-fill').trim() || 'no accent',
     },
   ];
 
