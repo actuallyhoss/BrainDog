@@ -23,9 +23,22 @@
   let { here, full = false }: { here: Tab; full?: boolean } = $props();
 
   /* Run when the track is drawn, and again whenever `here` changes, after the links have been marked. */
+  /* AFTER THE TRACK HAS SETTLED, NOT AS IT IS DRAWN (UI pass of 21 October, H29): the part decides whether a phone's
+     track scrolls once it has measured its words, so a scroll asked for at once found nothing to scroll and Runs stayed
+     off the edge. Two frames, then the bar's own scroll, so the page itself never moves. */
   const inView: Attachment<HTMLElement> = (bar) => {
     void here;
-    bar.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const on = bar.querySelector<HTMLElement>('[aria-current="page"]');
+        if (!on) return;
+        const a = on.getBoundingClientRect();
+        const b = bar.getBoundingClientRect();
+        if (a.right > b.right) bar.scrollLeft += a.right - b.right + 16;
+        else if (a.left < b.left) bar.scrollLeft -= b.left - a.left + 16;
+      });
+    });
+    return () => cancelAnimationFrame(frame);
   };
 </script>
 
