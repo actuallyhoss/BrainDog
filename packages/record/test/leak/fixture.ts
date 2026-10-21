@@ -17,6 +17,10 @@
  * HIDDEN FIELDS (Slice 6) ARE CANARIES ON ROWS IN SIGHT. A task's notes carry a `zh` word beside its own, and its rate
  * and a payment's amount are primes; a shape that hides a field (`hides`) must never be answered what the field holds
  * on any row it sees (`held`, read by `out`).
+ *
+ * A PERSONAL LIST (`personal: true`), Setups, with a project and an amount on each row, is the owner's alone: his own
+ * session and his own keys read it, and no other caller does, a grant and a share naming it, the owner's child key and
+ * a key narrowed to it included (`PERSONAL`, read by `visible`).
  */
 
 import assert from 'node:assert/strict';
@@ -24,7 +28,7 @@ import assert from 'node:assert/strict';
 import type { Entry } from '@braindog/kernel';
 
 import { createRecordApi, type CallContext } from '../../src/index.ts';
-import { seeAs, sessionContext, type HeldAccess } from '../../../host/src/auth.ts';
+import { heldContext, seeAs, sessionContext, type HeldAccess } from '../../../host/src/auth.ts';
 import { fixedClock, openSqlite, type NodeSql } from '../../../kernel/test/sqlite.ts';
 import { minter, mulberry32, primes, type Canary } from './canary.ts';
 
@@ -81,7 +85,19 @@ export const LISTS = [
   }),
   register({ id: 'credentials', name: 'Keys', title: 'label', fields: [text('label', { required: true }), text('opens', { required: true })] }),
   register({ id: 'notes', name: 'Notes', title: 'what', fields: [text('what', { required: true }), { id: 'thing', type: 'ref', to: 'things', scope: {} }] }),
+  /* THE OWNER'S OWN SET-UPS, PERSONAL: on a project and with an amount, so a project or a money share would reach it if
+     anything but the owner could. */
+  register({
+    id: 'setups',
+    name: 'Setups',
+    title: 'what',
+    personal: true,
+    fields: [text('what', { required: true }), { id: 'thing', type: 'ref', to: 'things', scope: {} }, { id: 'cost', type: 'money' }],
+  }),
 ];
+
+/** The lists declared `personal: true`, whose rows only the owner's session and his own keys read. */
+export const PERSONAL: readonly string[] = ['setups'];
 
 export const METRICS = [
   metric({ metric: 'tasks-count', name: 'Tasks', source: 'register.tasks', value: { count: 'name' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' }),
@@ -89,10 +105,11 @@ export const METRICS = [
   metric({ metric: 'money-sum', name: 'Spent', source: 'register.money', value: { sum: 'amount' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' }),
   /* A FIGURE ABOUT ONE PROJECT, as a project page's tiles read one (`project-owed:Kiln`): the money spent on it. */
   metric({ metric: 'money-on', name: 'Spent on it', source: 'register.money', where: 'thing is {{it}}', value: { sum: 'amount' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' }),
+  metric({ metric: 'setups-cost', name: 'Set-up costs', source: 'register.setups', value: { sum: 'cost' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' }),
 ];
 
 /** The field a row's amount is in, by its list. */
-const amountField = (list: string): string => (list === 'money' ? 'amount' : list === 'things' ? 'earned' : 'rate');
+const amountField = (list: string): string => (list === 'money' ? 'amount' : list === 'things' ? 'earned' : list === 'setups' ? 'cost' : 'rate');
 
 export const PAGES = [
   {
@@ -113,6 +130,15 @@ export const PAGES = [
     blocks: [
       { kind: 'table', key: 'money', heading: 'Money', source: 'register.money', columns: [{ field: 'payee' }, { field: 'amount' }] },
       { kind: 'stat', key: 'spent', cells: [{ metric: 'money-sum' }] },
+    ],
+  },
+  {
+    page: 'setups',
+    title: 'Setups',
+    requires: ['register.setups'],
+    blocks: [
+      { kind: 'table', key: 'setups', heading: 'Setups', source: 'register.setups', columns: [{ field: 'what' }, { field: 'cost' }] },
+      { kind: 'stat', key: 'costs', cells: [{ metric: 'setups-cost' }] },
     ],
   },
 ];
@@ -153,14 +179,16 @@ export type Shape = {
    * The shares that make the grant, through the share API as the owner makes them (Slice 7), each lasting 30 days. The
    * person is a guest with no member row. `ended` is a share that has run out by the time the matrix asks.
    */
-  shares?: (f: Built) => (Record<string, unknown> & { ended?: true })[];
+  shares?: (f: Built) => (Record<string, unknown> & { ended?: true; named?: string[] })[];
   /** The shares go to a group the person is in, not to the person. */
   group?: true;
   /** The fields its shares hide, by list, in plain words (sharing plan §2.7): what it must never be answered on a row it sees. */
   hides?: Record<string, string[]>;
+  /** Member rows written straight into the table, for a grant the API refuses to make (one naming a personal list). */
+  rows?: Record<string, Level>;
 };
 
-export type Variant = 'person' | 'write-token' | 'read-token' | 'see-as';
+export type Variant = 'person' | 'write-token' | 'read-token' | 'see-as' | 'child-key' | 'narrowed-key';
 export type Caller = { shape: Shape; variant: Variant; ctx: CallContext; label: string };
 
 type Built = { ids: { kiln: string; loom: string; one: string }; seqs: Record<string, number> };
@@ -216,6 +244,8 @@ export const SHAPES: readonly Shape[] = [
   },
   { id: 'adds', name: 'Adds only on money', person: 'p_add', invite: { registers: { money: 'append' } }, sees: () => false },
   { id: 'maker', name: 'Sam, who keeps rows private', person: SAM, invite: { level: 'write' }, sees: () => true },
+  /* A GRANT NAMING A PERSONAL LIST, written straight into the member rows since `invite` refuses one. */
+  { id: 'named-grant', name: 'Reads the record, and holds Setups by name', person: 'p_nmd', invite: { level: 'read' }, rows: { setups: 'write' }, sees: () => true },
 
   /* THE SAME GRANTS AS SHARES (Slice 7), on guests with no member row. A whole-record share leaves out the lists only
      named shares reach: Keys and the people `meet` writes (sharing plan §2.3). */
@@ -277,6 +307,14 @@ export const SHAPES: readonly Shape[] = [
     sees: (r) => r.list === 'notes',
   },
   { id: 'group', name: "A group's share", person: 'p_grp', group: true, shares: () => [{ what: { lists: ['money'] }, can: 'view' }], sees: (r) => r.list === 'money' },
+  /* A SHARE NAMING A PERSONAL LIST, made on Notes and then written to name Setups too, since the share API refuses one. */
+  {
+    id: 'sh-named',
+    name: 'Notes and Setups, shared by name',
+    person: 'p_nms',
+    shares: () => [{ what: { lists: ['notes'] }, can: 'edit', named: ['notes', 'setups'] }],
+    sees: (r) => r.list === 'notes',
+  },
   /* HIDDEN FIELDS (Slice 6): the rate and the notes of every task, and every amount ("Hide amounts"). */
   {
     id: 'hidden-field',
@@ -318,8 +356,16 @@ export const SHAPES: readonly Shape[] = [
 
 export const VARIANTS: readonly Variant[] = ['person', 'write-token', 'read-token', 'see-as'];
 
-/** The variants one shape runs as: See as only where somebody can be seen as, a grantee of shares. */
-export const variantsOf = (shape: Shape): readonly Variant[] => (shape.shares ? VARIANTS : VARIANTS.filter((v) => v !== 'see-as'));
+/**
+ * The variants one shape runs as: See as only where somebody can be seen as, a grantee of shares. The owner also runs
+ * as a child key minted under his token and as a key narrowed to Notes and Setups, neither of which reads Setups.
+ */
+export const variantsOf = (shape: Shape): readonly Variant[] =>
+  shape.id === 'owner'
+    ? [...VARIANTS.filter((v) => v !== 'see-as'), 'child-key', 'narrowed-key']
+    : shape.shares
+      ? VARIANTS
+      : VARIANTS.filter((v) => v !== 'see-as');
 
 export type Fixture = Awaited<ReturnType<typeof build>>;
 
@@ -414,6 +460,8 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
   await add('key', 'credentials', (w) => ({ label: `Kiln deploy key ${w}`, opens: `the kiln controller ${w}` }));
   await add('n-open', 'notes', (w) => ({ what: `A note on the loom ${w}` }), { thing: 'loom' });
   await add('n-sam', 'notes', (w) => ({ what: `Sam's private note ${w}` }), { privateBy: SAM });
+  await add('s-kiln', 'setups', (w) => ({ what: `The kiln bench setup ${w}` }), { thing: 'kiln', amount: true });
+  await add('s-own', 'setups', (w) => ({ what: `The studio laptop setup ${w}` }), { amount: true });
 
   /* EDITS THAT MOVE ROWS INTO AND OUT OF KILN. */
   const move = async (key: string, to: 'kiln' | 'loom') => {
@@ -442,6 +490,7 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
       } as never),
       `invite ${shape.id}`,
     );
+    for (const [list, level] of Object.entries(shape.rows ?? {})) sql.exec('INSERT INTO member (person_id, register, level) VALUES (?, ?, ?)', shape.person, list, level);
   }
 
   /* THE SHARES, through the share API as the owner makes them, to guests with nothing else on the record. */
@@ -456,9 +505,10 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
       okValue(await api.groupMember({ group: made.id, person: shape.person, in: true } as never, owner), `group member ${shape.id}`);
       who = { kind: 'group', id: made.id };
     }
-    for (const { ended, ...share } of shape.shares(built)) {
+    for (const { ended, named, ...share } of shape.shares(built)) {
       const made = okValue<{ id: string }>(await api.share({ share: { effect: 'allow', ...share, who, when: { until } } } as never, owner), `share ${shape.id}`);
       if (ended) sql.exec('UPDATE share SET starts_at = ?, ends_at = ? WHERE id = ?', new Date(NOW - 30 * 86_400_000).toISOString(), new Date(NOW - 86_400_000).toISOString(), made.id);
+      if (named) sql.exec('UPDATE share SET what = ? WHERE id = ?', JSON.stringify({ lists: named }), made.id);
     }
     api.kernel.accessChanged();
   }
@@ -491,7 +541,7 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
   /* AN INBOX ARRIVAL, read by the owner alone. */
   const inboxWord = mint.word('zq');
   api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@bank.example' }, body: `Your statement ${inboxWord} is ready`, sha256: 'leak-arrival' } as never);
-  const ownerOnly = (c: Caller) => c.shape.id === 'owner';
+  const ownerOnly = (c: Caller) => c.shape.id === 'owner' && c.variant !== 'narrowed-key';
   const extras: Extra[] = [{ canary: { label: 'the inbox arrival', word: inboxWord }, sees: ownerOnly }];
 
   /* THE KERNEL'S OWN LISTS, THE OWNER'S: what he told his agent, what its run was doing and the head its receipt is
@@ -529,6 +579,21 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
         const as = await seeAs(shape.person, { person: OWNER, email: 'ada@example.com', record: 'rec', provedAt: NOW } as never, ownerHeld, (p) => api.kernel.access(p) as HeldAccess | null);
         assert.ok(as !== null && 'ctx' in as, `the owner sees as ${shape.id}`);
         ctx = as.ctx as CallContext;
+      } else if (variant === 'child-key' || variant === 'narrowed-key') {
+        /* THE OWNER'S OWN KEYS HELD TO LESS, read as a host reads one: `access` with the key's id, then `heldContext`. A
+           child is minted under a token and acts by its parent's id; a narrowed key names Setups and is still held off it. */
+        const id = `t_leak_${++tokens}`;
+        const at = new Date(NOW).toISOString();
+        sql.exec('INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, ?, ?, ?, ?, ?)', id, OWNER, `h_${id}`, variant === 'child-key' ? 'write' : 'read', `owner ${variant}`, at);
+        let key = id;
+        if (variant === 'child-key') {
+          key = `t_leak_${++tokens}`;
+          sql.exec('INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, ?, ?, ?, ?, ?)', key, OWNER, `h_${key}`, 'write', `owner ${variant}`, at);
+          sql.exec('INSERT INTO token_lens (token_id, parent_id, narrow, made_by, made_at) VALUES (?, ?, NULL, ?, ?)', key, id, OWNER, at);
+        } else sql.exec('INSERT INTO token_lens (token_id, parent_id, narrow, made_by, made_at) VALUES (?, NULL, ?, ?, ?)', id, JSON.stringify({ lists: ['notes', ...PERSONAL] }), OWNER, at);
+        const held = api.kernel.access(OWNER, key) as HeldAccess | null;
+        assert.ok(held !== null, `the owner's ${variant} is on the record`);
+        ctx = { ...heldContext(held), principal: { kind: 'token', id, scope: variant === 'child-key' ? 'write' : 'read', person: OWNER, level: held.level } } as CallContext;
       } else if (variant !== 'person') {
         const id = `t_leak_${++tokens}`;
         const scope = variant === 'write-token' ? 'write' : 'read';
@@ -539,15 +604,19 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
       callers.push({ shape, variant, ctx, label: `${shape.id} as ${variant}` });
     }
 
-  /** Whether a caller may see a row: the shape's rule, then the private rows, which only their maker sees. */
+  /**
+   * Whether a caller may see a row: the shape's rule, then the private rows, which only their maker sees, then the
+   * personal lists, which only the owner's own session and his own keys read.
+   */
   const visible = (caller: Caller, r: RowInfo): boolean =>
-    !r.deleted && (r.privateBy === undefined || (r.privateBy === caller.shape.person && caller.variant !== 'see-as')) && caller.shape.sees(r, built) && reaches(caller, r.list);
+    !r.deleted &&
+    (r.privateBy === undefined || (r.privateBy === caller.shape.person && caller.variant !== 'see-as')) &&
+    caller.shape.sees(r, built) &&
+    reaches(caller, r.list) &&
+    (!PERSONAL.includes(r.list) || (caller.shape.id === 'owner' && ['person', 'write-token', 'read-token'].includes(caller.variant)));
 
-  /** A token reaches what its person does; an `append` grant reads nothing. */
-  const reaches = (caller: Caller, list: string): boolean => {
-    void list;
-    return caller.shape.id !== 'adds';
-  };
+  /** A token reaches what its person does; an `append` grant reads nothing; the owner's narrowed key reaches Notes alone. */
+  const reaches = (caller: Caller, list: string): boolean => (caller.variant === 'narrowed-key' ? list === 'notes' : caller.shape.id !== 'adds');
 
   /**
    * What a caller must never be answered: every row out of their sight, every extra they may not read, and on a row in
@@ -648,6 +717,20 @@ export async function unseen(f: Fixture, shape: Shape, seed: number, most = 3): 
       name: 'a person is met',
       can: () => !shape.sees(probe('people', null), f.built),
       run: async () => void (await f.add(`p-new-${said.length}-${seed}`, 'people', (w) => ({ name: `Newcomer ${w}` }))),
+    },
+    /* THE OWNER'S OWN SET-UPS CHANGE, which nobody else sees. */
+    {
+      name: 'a personal row is made on Kiln',
+      can: () => shape.id !== 'owner',
+      run: async () => void (await f.add(`s-new-${said.length}-${seed}`, 'setups', (w) => ({ what: `Another setup ${w}` }), { thing: 'kiln', amount: true })),
+    },
+    {
+      name: 'a personal row is edited',
+      can: () => shape.id !== 'owner',
+      run: async () => {
+        const r = f.rows.get('s-kiln')!;
+        assertOk(await f.api.update({ register: r.list, seq: r.seq, patch: { what: `Edited setup ${r.canary.word}`, cost: { amount: f.prime(), currency: 'GBP' } } as never }, owner));
+      },
     },
   ];
   const open = ops.filter((o) => o.can());

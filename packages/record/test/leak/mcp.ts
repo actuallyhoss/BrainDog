@@ -49,7 +49,7 @@ export const listResources = (f: Fixture, ctx: CallContext) => rpc(f, 'resources
 export function toolArgs(name: string, f: Fixture): Args[] {
   const rows = [...f.rows.values()];
   const spoken = rows.map((r) => f.spoken(r));
-  const lists = ['things', 'people', 'tasks', 'money', 'credentials', 'notes'];
+  const lists = ['things', 'people', 'tasks', 'money', 'credentials', 'notes', 'setups'];
   /* THE KERNEL'S OWN LISTS, asked by name: the runs, and what he told them. */
   const kernel = ['session', 'instructions'];
   switch (name) {

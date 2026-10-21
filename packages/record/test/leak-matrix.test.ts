@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { createRecordApi, type CallContext } from '../src/index.ts';
 import { scopeOf } from '../../../apps/web/src/lib/data/local.ts';
 import { leaks } from './leak/canary.ts';
-import { build, personCtx, SHAPES, unseen, variantsOf, type Caller, type Fixture, type RowInfo, type Shape } from './leak/fixture.ts';
+import { build, personCtx, PERSONAL, SHAPES, unseen, variantsOf, type Caller, type Fixture, type RowInfo, type Shape } from './leak/fixture.ts';
 import { argsFor, ask, CORE, FIREWALLED, handlers, KERNEL_FIELDS, LIST_IDS, READ_ROUTES, walked, type Args } from './leak/routes.ts';
 import { callTool, listResources, readResource, TOOL_NAMES, toolArgs, WRITES } from './leak/mcp.ts';
 
@@ -119,6 +119,32 @@ test("A PROJECT'S MONEY IS LIVE: what Kiln earned and what was spent on it are o
   assert.deepEqual(leaks([await ask(h, 'metric', { metric: `money-on:${f.spoken(kiln)}` }, priya.ctx), await ask(h, 'get', { register: 'things', seq: kiln.seq }, priya.ctx)], f.out(priya)), []);
 });
 
+test("A PERSONAL LIST IS LIVE: the owner's set-ups are on his own reads and his own tokens', and nobody else is shown them, a grant naming them included", async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const setups = [...f.rows.values()].filter((r) => PERSONAL.includes(r.list));
+  assert.equal(setups.length, 2);
+  /* THE GRANTS NAMING THE LIST ARE ON THE RECORD: a member row and a share's target, each written past the refusals. */
+  assert.equal(personCtx(f.api, 'p_nmd').levels?.setups, 'write');
+  assert.ok(f.sql.one<{ what: string }>("SELECT what FROM share WHERE who = 'p_nms'")?.what.includes('setups'));
+  const wrong: string[] = [];
+  for (const c of f.callers) {
+    const own = c.shape.id === 'owner' && ['person', 'write-token', 'read-token'].includes(c.variant);
+    const listed = (await ask(h, 'list', { register: 'setups' }, c.ctx)) as { ok: boolean; value?: { rows: unknown[] } };
+    if (own && (!listed.ok || listed.value!.rows.length !== setups.length)) wrong.push(`${c.label} is not shown the set-ups`);
+    if (!own && listed.ok) wrong.push(`${c.label} is shown the set-ups`);
+    const figure = (await ask(h, 'metric', { metric: 'setups-cost' }, c.ctx)) as { ok: boolean };
+    if (figure.ok !== own) wrong.push(`${c.label} is ${own ? 'not ' : ''}answered the set-ups' figure`);
+  }
+  assert.deepEqual(wrong, []);
+  /* AND THE FEED OF WHAT HAPPENED NAMES THEM TO THE OWNER, so a feed drawn for anybody else would be caught carrying them. */
+  const feed = { body: { page: 'probe-feed', title: 'Probe', blocks: [{ kind: 'feed', key: 'feed', heading: 'What happened', source: 'activity', empty: 'Nothing yet.' }] } };
+  assert.ok(JSON.stringify(await ask(h, 'previewPage', feed, f.owner)).includes(f.rows.get('s-kiln')!.canary.word), "the owner's feed does not name his set-up");
+  const admin = f.callers.find((c) => c.shape.id === 'admin' && c.variant === 'person')!;
+  const drawn = (await ask(h, 'previewPage', feed, admin.ctx)) as { ok: boolean; value?: { blocks: { refusals?: unknown[] }[] } };
+  assert.ok(!drawn.ok || (drawn.value!.blocks[0]!.refusals?.length ?? 0) > 0, 'an Admin is drawn the feed while the record keeps a personal list');
+});
+
 /* ── P1: no answer carries a canary ─────────────────────────────────────── */
 
 for (const route of READ_ROUTES) {
@@ -200,6 +226,8 @@ test('P1 MCP resources: the list and every resource read carry no canary', async
   const fixed = [
     'braindog:page/kiln',
     'braindog:page/spend',
+    'braindog:page/setups',
+    'braindog:metric/setups-cost',
     'braindog:metric/tasks-count',
     'braindog:metric/tasks-rate',
     'braindog:metric/money-sum',

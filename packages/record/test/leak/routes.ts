@@ -36,6 +36,7 @@ const FIELDS: Record<string, string[]> = {
   money: ['payee', 'amount', 'thing', 'notes'],
   credentials: ['label', 'opens'],
   notes: ['what', 'thing'],
+  setups: ['what', 'thing', 'cost'],
 };
 export const LIST_IDS = Object.keys(FIELDS);
 
@@ -102,7 +103,7 @@ export function argsFor(name: string, f: Fixture, lean = false): Args[] {
     case 'whatsNew':
       return [{}, { everything: true }];
     case 'page':
-      return [{ slug: 'kiln' }, { slug: 'spend' }, { slug: 'kiln', filter: { stage: 'todo' } }, { slug: 'kiln', filter: { stage: 'review' } }];
+      return [{ slug: 'kiln' }, { slug: 'spend' }, { slug: 'setups' }, { slug: 'kiln', filter: { stage: 'todo' } }, { slug: 'kiln', filter: { stage: 'review' } }];
     case 'previewPage':
       return [
         ...PAGES.map((body) => ({ body })),
@@ -119,13 +120,15 @@ export function argsFor(name: string, f: Fixture, lean = false): Args[] {
             ],
           },
         },
+        /* WHAT HAPPENED ACROSS THE RECORD, a feed naming rows of every list: the owner's alone while he keeps a personal list. */
+        { body: { page: 'probe-feed', title: 'Probe', blocks: [{ kind: 'feed', key: 'feed', heading: 'What happened', source: 'activity', empty: 'Nothing yet.' }] } },
         /* A PAGE OVER THE KERNEL'S LISTS, the runs and what he told them, as a person could draft one. */
         ...Object.entries(KERNEL_FIELDS).map(([register, fields]) => ({
           body: { page: `probe-${register}`, title: 'Probe', requires: [`register.${register}`], blocks: [{ kind: 'table', key: register, heading: 'Probe', source: `register.${register}`, columns: fields.map((field) => ({ field })) }] },
         })),
       ];
     case 'metric':
-      return [{ metric: 'tasks-count' }, { metric: 'tasks-rate' }, { metric: 'money-sum' }, ...(['kiln', 'loom'] as const).map((k) => ({ metric: `money-on:${f.spoken(f.rows.get(k)!)}` }))];
+      return [{ metric: 'tasks-count' }, { metric: 'tasks-rate' }, { metric: 'money-sum' }, { metric: 'setups-cost' }, ...(['kiln', 'loom'] as const).map((k) => ({ metric: `money-on:${f.spoken(f.rows.get(k)!)}` }))];
     case 'comments':
       return [...rows.map((r) => ({ on: f.spoken(r) })), ...KERNEL_SPOKEN.map((on) => ({ on }))];
     case 'usedBy':
