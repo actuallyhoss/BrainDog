@@ -599,8 +599,9 @@
           <!-- THE SELF-HOST'S DOOR, and only a self-host offers it. Open on first run, when no passkey
                exists yet and this is the only way the first person can get in. -->
           {#if doors.key}
-            <details class="own" bind:open={keyOpen}>
-              <summary class="own-q"><Icon name="chevronDown" size="s" />{copy.serverKeyWay}</summary>
+            <!-- THE ONLY DOOR IS NOT FOLDED (UI pass of 21 October, P48): where the server key is the one way in, it is the
+                 form itself, not an open disclosure that reads as a second choice. -->
+            {#snippet keyForm()}
               <form class="form" onsubmit={withKey}>
                 <label class="field-label" for="in-key">{copy.serverKeyLabel}</label>
                 <span class="field">
@@ -628,7 +629,15 @@
                   {asking === 'key' ? copy.signingIn : copy.signIn}
                 </Button>
               </form>
-            </details>
+            {/snippet}
+            {#if !doors.google && !doors.passkey && !doors.magic}
+              {@render keyForm()}
+            {:else}
+              <details class="own" bind:open={keyOpen}>
+                <summary class="own-q"><Icon name="chevronDown" size="s" />{copy.serverKeyWay}</summary>
+                {@render keyForm()}
+              </details>
+            {/if}
           {/if}
         </div>
       {/if}
