@@ -3,7 +3,13 @@
 
   WHEN IT CHANGES, THE OLD FIGURE GOES AND THE NEW ONE RISES 0.35em AND FADES IN over `--d-swap`, on tabular figures so
   nothing beside it moves. Used by tile-head counts, Today's counts, Money's figures, the project hero, card figures and
-  `Count`. A page opening does not roll every number: the roll is armed after the first draw.
+  `Count`.
+
+  A FIGURE'S FIRST DRAW NEVER ROLLS, AND THAT IS DECIDED WHEN ITS ELEMENT IS MADE. The roll was armed by a flag on the
+  wrapper, set in an effect, and an effect can run before the browser first styles the figure, so a figure drawn as a
+  page opened could take its first style already armed and fade in from nothing. The top bar's Needs you badge was
+  photographed that way, a red dot with a ghost of its 8. Now each figure element says when it is made whether it is a
+  change (`data-roll`), and only one made after the first draw is.
 
   ONE MOTION AND NO LAYOUT: both figures sit in one grid cell, so the box is the wider of the two for the moment they
   overlap and the line never reflows. Under `prefers-reduced-motion` the figure simply changes.
@@ -11,16 +17,16 @@
 <script lang="ts">
   let { value }: { value: string | number } = $props();
 
-  let live = $state(false);
-  /* After the first draw, so a page opening does not roll every number on it. */
+  /* Not state: read once as each figure element is made, so a figure already drawn never gains the roll. */
+  const drawn = { yet: false };
   $effect(() => {
-    live = true;
+    drawn.yet = true;
   });
 
   const said = $derived(typeof value === 'number' ? value.toLocaleString('en') : value);
 </script>
 
-<span class="fig num" data-live={live || undefined}>{#key said}<span class="roll">{said}</span>{/key}</span>
+<span class="fig num">{#key said}<span class="roll" data-roll={drawn.yet ? '' : undefined}>{said}</span>{/key}</span>
 
 <style>
   .fig {
@@ -32,21 +38,21 @@
     grid-area: 1 / 1;
   }
 
-  .fig[data-live] .roll {
+  .roll[data-roll] {
     transition:
       translate var(--d-swap) var(--ease-out),
       opacity var(--d-swap) var(--ease-out);
   }
 
   @starting-style {
-    .fig[data-live] .roll {
+    .roll[data-roll] {
       translate: 0 0.35em;
       opacity: 0;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .fig[data-live] .roll {
+    .roll[data-roll] {
       transition: none;
     }
   }
