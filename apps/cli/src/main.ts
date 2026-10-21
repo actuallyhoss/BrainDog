@@ -51,8 +51,10 @@ import { signsCommand } from './signs.ts';
 import { AGENTS, isAgent, positionOf, sessionHeaders, type ClientInfo } from './position.ts';
 import { context } from './context.ts';
 import { doctor } from './doctor.ts';
+import { envCommand } from './env.ts';
 import { session } from './session.ts';
 import { skills } from './skills.ts';
+import { syncCommand } from './sync.ts';
 import { afterHello, startFromServer } from './session-start.ts';
 import { signedOutFix, signedOutSurface } from './signed-out.ts';
 import { serveStdio } from './stdio.ts';
@@ -329,6 +331,10 @@ const usage = () =>
     "  Show the hooks it would add to Claude Code's settings (a profile folder, or one settings file such as a project's .claude/settings.local.json), and write them only with --apply. --rewake also adds the watcher that wakes an idle session when you tell it something, which is off unless typed. It also places BrainDog's Agent Skill in each profile's skills/braindog/. With --replace it also takes out the hooks, MCP servers and skills the replace file names as an old tool's, and says which, and from a .mcp.json only when it is named with --mcp-json and is outside any repository.",
     'braindog doctor [--replaced <replace.json>] [--under <folder>] [--config-dir <folder>] [--json]',
     "  Read this machine and list, by file and entry, what still names a tool BrainDog replaced, what holds something shaped like a key, and each profile missing BrainDog's server or a hook. It changes nothing and shows no value, and exits 1 when anything is listed.",
+    'braindog env diff [--config-dir <folder>] [--host <host>] [--json]',
+    "  Compare every Claude Code profile on this machine by name: its MCP servers, plugins, hook events and skills, with a short hash of each server's entry and of its CLAUDE.md, and the record's tools and skills when signed in. It changes nothing and shows no value, and exits 1 when anything differs.",
+    'braindog sync inventory [--under <folder>] [--host <host>] [--json]',
+    "  List what a setup sync would carry from this machine, by name and size: auto memory, the context folder, your programs, ccenv's shared files and the skills the record does not hold, and with --under each repository's ignored .env files and what it has not pushed or committed. Then what it would refuse and why. It opens no file it lists and changes nothing.",
     'braindog verify <file> [--key <pubkey|url>]',
     "  Check a .brainl file on this machine: its format, every table against its manifest, and its signature, against the key you name when you name one. Nothing is sent, but for fetching a key from an address.",
     'braindog runner enrol <host>',
@@ -774,6 +780,25 @@ function doctorCommand(args: string[]): void {
   process.exitCode = result.code;
 }
 
+/**
+ * `braindog env diff` and `braindog sync inventory`: how this machine's profiles differ, and what a setup sync would
+ * carry from it. BOTH ONLY READ, the files by name, hash and size, and the record, when signed in, by its lists. As
+ * `doctor`'s, the exit code is the plan's and under `--json` the document is the plan either way.
+ */
+async function readsCommand(which: 'env' | 'sync', args: string[]): Promise<void> {
+  let result: Awaited<ReturnType<typeof envCommand>> | Awaited<ReturnType<typeof syncCommand>>;
+  try {
+    result = which === 'env' ? await envCommand(args) : await syncCommand(args);
+  } catch (e) {
+    return stop(e instanceof Error ? e.message : String(e));
+  }
+  if (json) emit({ ok: true, value: result.report });
+  else process.stdout.write(`${result.lines.join('\n')}\n`);
+  /* LEFT TO END ON ITS OWN, for the reason `hook` gives: the record may have been read. */
+  process.exitCode = result.code;
+  setTimeout(() => process.exit(result.code), 1_000).unref();
+}
+
 function install(args: string[]): void {
   let values: { apply?: boolean | undefined; replace?: string | undefined; 'config-dir'?: string[] | undefined; settings?: string[] | undefined; 'mcp-json'?: string[] | undefined; rewake?: boolean | undefined };
   try {
@@ -861,7 +886,7 @@ function install(args: string[]): void {
  * program reads from stdout, and the first prints for a person while its first step may wait for six digits
  * (`setupCommand`, `48 §5.15`, `§5.16`). Both refuse the flag through their own strict `parseArgs`.
  */
-const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people', 'understand', 'signs', 'tidy', 'private-terms', 'doctor', 'actions']);
+const JSON_COMMANDS = new Set(['--version', '-v', 'help', '--help', '-h', 'login', 'logout', 'skills', 'tools', 'page', 'usecase', 'pack', 'kennel', 'import', 'export', 'token', 'context', 'session', 'automations', 'scripts', 'install', 'verify', 'runner', 'people', 'understand', 'signs', 'tidy', 'private-terms', 'doctor', 'env', 'sync', 'actions']);
 
 const [command, ...rest] = process.argv.slice(2);
 /* ONE DECISION, TAKEN BEFORE DISPATCH (`48 §4.5`, `json.ts`): the flag is answered here and removed,
@@ -912,6 +937,7 @@ try {
   else if (command === 'hook') await hook(rest);
   else if (command === 'install') install(args);
   else if (command === 'doctor') doctorCommand(args);
+  else if (command === 'env' || command === 'sync') await readsCommand(command, args);
   /* THE FILE IT REPLACES IS THIS ONE: in the bundle every module is the one file, and from a checkout `build()` says
      `dev+0000000` and `update` refuses before it touches anything. */
   else if (command === 'update') process.exitCode = await update(rest, { file: fileURLToPath(import.meta.url), build: build(), env: process.env, out: (line) => process.stdout.write(`${line}\n`), err: say });

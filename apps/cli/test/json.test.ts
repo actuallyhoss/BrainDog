@@ -333,3 +333,37 @@ test('doctor PRINTS ITS LINES, OR ITS REPORT AS THE DOCUMENT, and exits 1 when a
   assert.equal(wrong.stdout, '');
   assert.match(wrong.stderr, /braindog doctor takes --replaced/);
 });
+
+test('env diff AND sync inventory PRINT THEIR LINES, OR THEIR PLAN AS THE DOCUMENT, with the record read and no token shown', async (t) => {
+  const h = await setup(t);
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  mkdirSync(join(h.dir, '.claude'), { recursive: true });
+  writeFileSync(join(h.dir, '.claude', 'settings.json'), '{}\n');
+  const env = { ...h.env, HOME: h.dir, USERPROFILE: h.dir, CLAUDE_CONFIG_DIR: '', CCENV_HOME: '', CODEX_HOME: '' };
+
+  /* The stub refuses `list`, which is said in one line, and the profile is compared alone. */
+  const plain = await ran(['env', 'diff'], env, h.dir);
+  assert.equal(plain.code, 0, plain.stderr);
+  assert.match(plain.stdout, /^braindog env diff read 1 profile, and changed nothing\./);
+  assert.match(plain.stdout, /BrainDog would not list its tools and skills, so they were not compared\./);
+  const doc = await ran(['env', 'diff', '--json'], env, h.dir);
+  assert.equal(doc.code, 0, doc.stderr);
+  const report = document(doc) as { ok: boolean; value: { profiles: unknown[]; record: { read: boolean; why: string } } };
+  assert.equal(report.ok, true);
+  assert.equal(report.value.profiles.length, 1);
+  assert.deepEqual(report.value.record, { read: false, why: 'refused' });
+
+  const inventory = await ran(['sync', 'inventory', '--json'], env, h.dir);
+  assert.equal(inventory.code, 0, inventory.stderr);
+  const inv = document(inventory) as { ok: boolean; value: { items: unknown[]; skills: { from: string } } };
+  assert.equal(inv.ok, true);
+  assert.deepEqual(inv.value.skills, { from: 'lock', why: 'refused' });
+
+  const wrong = await ran(['env', 'diff', '--apply'], env, h.dir);
+  assert.equal(wrong.code, 1);
+  assert.equal(wrong.stdout, '');
+  assert.match(wrong.stderr, /braindog env diff takes --config-dir/);
+  const verb = await ran(['sync', 'everything'], env, h.dir);
+  assert.equal(verb.code, 1);
+  assert.match(verb.stderr, /braindog sync takes inventory/);
+});
