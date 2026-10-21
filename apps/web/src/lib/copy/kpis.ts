@@ -134,4 +134,19 @@ export const kpis = {
   kpiAutoSaid: (name: string): string => `Today shows ${name} when it needs a look.`,
   kpiLeadSaid: (name: string): string => `${name} leads the card.`,
   kpiUnnamed: 'This number',
+
+  /* A STALE NUMBER'S FIX (`lib/kpis/stale-fix.ts`): ask the agent that keeps it, or add a reading by hand. */
+  kpiAskAgent: (agent: string): string => `Ask ${agent} to report it`,
+  kpiAddReading: 'Add a reading',
+  /* WHAT THE AGENT IS TOLD, in his words: which number, where, and since when. */
+  kpiAskSaid: (name: string, project: string | null, since: string | null): string =>
+    `Please report ${name}${project ? ` on ${project}` : ''}. ${since ? `The last reading was on ${since}.` : 'It has no reading yet.'}`,
+  kpiAsked: (agent: string, name: string): string => `Asked ${agent} to report ${name}.`,
+  kpiAskTakenBack: 'Taken back',
+  kpiReadingTitle: 'Add a reading',
+  kpiReadingValue: 'Value',
+  kpiReadingPlaceholder: '1,200',
+  kpiReadingEmpty: 'Type the value.',
+  kpiReadingNoList: 'This record has nowhere to keep readings.',
+  kpiReadingAdded: (name: string): string => `Added a reading to ${name}.`,
 } as const;

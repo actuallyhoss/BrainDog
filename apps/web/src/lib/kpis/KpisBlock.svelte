@@ -13,6 +13,11 @@
   Every form of the block leaves drafts out (`sources/kpis.ts`), so this is the one place they are seen; Keep is the
   row's `draft` turned off and Not this the row put away, both with Undo.
 
+  A STALE NUMBER OFFERS ITS FIX under "Not updated since", here and on Today's rows (`stale-fix.ts`): one an agent keeps
+  says "Ask Claude to report it", which tells that kind of agent on the number's project which number and since when,
+  with Undo taking it back; one nobody's agent keeps, or a reader who tells no agents, says "Add a reading", which opens
+  a one-field sheet (`ReadingSheet.svelte`) writing one reading into Numbers.
+
   THE LIST IS FOUND BY ITS SHAPE (`kpi-rows.ts`), never named. On a project's page its rows are read as the block is
   drawn, since the suggestions need them; on Today only once a number is pressed or its menu opened. A reader who may not
   write is drawn the numbers and nothing to press. The sheet is loaded on the first press, so the page pays nothing for
@@ -29,7 +34,8 @@
   import type { KpiAnswered } from '$lib/page/kpis-in.ts';
   import { homeCurrency } from '$lib/record/api.ts';
   import { spokenOf } from '$lib/record/row-href.ts';
-  import type { Shell } from '$lib/record/boot-live.ts';
+  import { recordNow, type Shell } from '$lib/record/boot-live.ts';
+  import { control } from '$lib/record/instruct.ts';
   import { may } from '$lib/record/may.ts';
   import type { LiveBlock } from '$lib/record/page-live.ts';
   import { rowWriter, type RowWriter, type Wrote } from '$lib/record/rows-write.ts';
@@ -38,7 +44,8 @@
   import Icon from '$lib/ui/Icon.svelte';
   import Menu from '$lib/ui/Menu.svelte';
   import { toasts } from '$lib/ui/toast.svelte.ts';
-  import { draftsOf, findKpiList, keptOf, readKpis, rowOf, type Reads } from './kpi-rows.ts';
+  import { draftsOf, findKpiList, findReadingList, keptOf, projectsOf, readKpis, rowOf, type Reads } from './kpi-rows.ts';
+  import { staleFixOf, type ReadingFor, type StaleFix } from './stale-fix.ts';
 
   let {
     block,
@@ -77,6 +84,8 @@
   let busy = $state(false);
 
   const writable = $derived(writes !== null && shell.me !== undefined && may(shell as Pick<Shell, 'me'>, 'write', list ?? undefined));
+  /* ONLY THE RECORD'S OWNER TELLS AGENTS (`instruct`), so anyone else is offered the reading instead. */
+  const tells = $derived(writes !== null && shell.me !== undefined && may(shell as Pick<Shell, 'me'>, 'owner'));
   const adds = $derived(form === 'project' && writable && param !== undefined);
   const drafts = $derived(form === 'project' && writable && rows && project ? draftsOf(rows, project) : []);
 
@@ -217,6 +226,47 @@
   const turnDown = (row: Entry, at: string) =>
     settle(writer().archive(at, row.seq, row.version), copy.kpiTurnedDown(nameOf(row)), (v) => writer().restore(at, row.seq, v));
 
+  /* ── a stale number's fix (`stale-fix.ts`) ── */
+
+  const fixOf = (k: KpiView): StaleFix | null => staleFixOf(k.input as KpiAnswered, { tell: tells, add: writable }, { now });
+
+  async function runFix(f: StaleFix, k: KpiView): Promise<void> {
+    if (busy) return;
+    if (f.kind === 'add') return void openReading(k);
+    busy = true;
+    try {
+      const io = control(apiBase());
+      const out = await io.send(f.args);
+      if (!out.ok) return void toasts.push(out.fix, { intent: 'bad' });
+      const id = out.value.id;
+      toasts.push(copy.kpiAsked(f.agent, f.name), {
+        undo: () => void io.takeBack(id).then((b) => toasts.push(b.ok ? copy.kpiAskTakenBack : b.fix, b.ok ? {} : { intent: 'bad' })),
+      });
+    } finally {
+      busy = false;
+    }
+  }
+
+  let readingOn = $state(false);
+  let readingOpen = $state(false);
+  let readingList = $state<string | null>(null);
+  let readingKpi = $state.raw<ReadingFor>({ name: '' });
+  let readingProject = $state<{ seq: number; name: string }>({ seq: 0, name: '' });
+
+  async function openReading(k: KpiView): Promise<void> {
+    if (!(await ready()) || !list) return void toasts.push(copy.kpiNotRead, { intent: 'bad' });
+    const row = rowOf(rows ?? [], k.input.kpi);
+    readingList ??= await findReadingList(reads(), (shell.index?.registers ?? []).map((r) => r.id), projectsOf(list));
+    if (!readingList) return void toasts.push(copy.kpiReadingNoList, { intent: 'bad' });
+    if (!row) return void toasts.push(copy.kpiNotRead, { intent: 'bad' });
+    const f = row.fields;
+    readingKpi = { name: k.name, measure: typeof f.measure === 'string' ? f.measure : null, unit: typeof f.unit === 'string' ? f.unit : (k.input.unit ?? null) };
+    const spoken = (k.input as KpiAnswered).spoken;
+    readingProject = { seq: (spoken ? spokenOf(spoken)?.seq : undefined) ?? param?.seq ?? 0, name: k.input.project ?? param?.title ?? '' };
+    readingOn = true;
+    readingOpen = true;
+  }
+
   let menus = $state<Record<string, boolean>>({});
   /* THE ROWS ARE READ AS A MENU OPENS on Today, so its press has its version in hand. */
   $effect(() => {
@@ -238,6 +288,11 @@
   {/if}
 {/snippet}
 
+{#snippet fix(k: KpiView)}
+  {@const f = fixOf(k)}
+  {#if f}<button type="button" class="kpi-fix" disabled={busy} onclick={() => void runFix(f, k)}>{f.label}</button>{/if}
+{/snippet}
+
 {#snippet foot()}
   <Button size="sm" onclick={() => void addKpi()}><Icon name="plus" size="s" />{copy.kpiAddNumber}</Button>
 {/snippet}
@@ -246,7 +301,7 @@
   {#if kpis.length === 0}
     <p class="kb-none">{unread ? copy.kpiNotRead : copy.kpiNoneYet}</p>
   {/if}
-  <Kpis {kpis} {form} lead={form !== 'project'} leads={copy.kpiLeads} home={homeCurrency()} {now} onopen={writable ? (k) => void openKpi(k) : undefined} href={href ? (k) => href(k as KpiAnswered) : undefined} menu={writable ? menu : undefined} add={adds ? foot : undefined} />
+  <Kpis {kpis} {form} lead={form !== 'project'} leads={copy.kpiLeads} home={homeCurrency()} {now} onopen={writable ? (k) => void openKpi(k) : undefined} href={href ? (k) => href(k as KpiAnswered) : undefined} menu={writable ? menu : undefined} {fix} add={adds ? foot : undefined} />
 
   {#if drafts.length && list}
     {@const at = list}
@@ -269,6 +324,12 @@
     </section>
   {/if}
 </div>
+
+{#if readingOn && readingList && list}
+  {#await import('./ReadingSheet.svelte') then { default: ReadingSheet }}
+    <ReadingSheet bind:open={readingOpen} list={readingList} projects={projectsOf(list)} project={readingProject} kpi={readingKpi} now={recordNow} onsaved={() => void after()} />
+  {/await}
+{/if}
 
 {#if sheetOn && list}
   {#await import('./KpiSheet.svelte') then { default: KpiSheet }}

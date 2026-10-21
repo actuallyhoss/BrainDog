@@ -16,6 +16,7 @@
 import { REGISTERS } from '../record/held.ts';
 import { entryOf, learn, type RecordRow, type SchemaCall } from '../record/remote.ts';
 import type { Entry, Fields, RegisterDecl } from '../record/schema.ts';
+import { readingListIn } from './stale-fix.ts';
 
 /** The fields only a list of key numbers declares together, beside its link to the projects. */
 const SHAPE: readonly string[] = ['measure', 'figure', 'today', 'headline'];
@@ -73,6 +74,23 @@ export async function findKpiList(reads: Pick<Reads, 'schema'>, ids: readonly st
   if (known) return known;
   await Promise.all(ids.filter((id) => !REGISTERS[id]).map((id) => learn(reads.schema, id, asked)));
   return kpiListIn(REGISTERS, projects);
+}
+
+/** The projects list the key numbers' `thing` links to, as this tab knows the list, or `null`. */
+export const projectsOf = (list: string): string | null => {
+  const thing = REGISTERS[list]?.fields.find((f) => f.id === 'thing') as { to?: unknown } | undefined;
+  return typeof thing?.to === 'string' ? thing.to : null;
+};
+
+/**
+ * The readings list (Numbers) a stale number's reading is added to, found by its shape (`stale-fix.ts` `readingListIn`)
+ * among the lists this tab knows, else among `ids` once each has been asked about. `null` when the record keeps none.
+ */
+export async function findReadingList(reads: Pick<Reads, 'schema'>, ids: readonly string[], projects: string | null): Promise<string | null> {
+  const known = readingListIn(REGISTERS, projects);
+  if (known) return known;
+  await Promise.all(ids.filter((id) => !REGISTERS[id]).map((id) => learn(reads.schema, id, asked)));
+  return readingListIn(REGISTERS, projects);
 }
 
 /** Every row of the list, as stored. `null` when the record would not answer. */

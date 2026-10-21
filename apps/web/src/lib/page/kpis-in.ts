@@ -18,8 +18,8 @@ import type { KpiInput, KpiPoint } from 'braindog-render/svelte';
 import { slotOf } from '../ui/face.ts';
 import { rowHref, spokenOf } from '../record/row-href.ts';
 
-/** One key number as the record answered it, as far as this file reads it. */
-export type KpiAnswered = KpiInput & { spoken?: string };
+/** One key number as the record answered it, as far as this file reads it: who keeps it too, for a stale one's fix. */
+export type KpiAnswered = KpiInput & { spoken?: string; owner?: string };
 
 /** The reasons a Today row says in words; the others only order the rows. */
 const SAID: ReadonlySet<string> = new Set(['pinned', 'off-target']);
@@ -62,6 +62,7 @@ export function kpiInputOf(v: unknown): KpiAnswered | null {
     ...(text(a.kpi) ? { kpi: text(a.kpi)! } : {}),
     ...(text(a.project) ? { project: text(a.project)! } : {}),
     ...(text(a.spoken) ? { spoken: text(a.spoken)! } : {}),
+    ...(text(a.owner) ? { owner: text(a.owner)!.trim() } : {}),
     ...(text(a.measures) ? { measures: text(a.measures)! } : {}),
     ...(text(a.unit) ? { unit: text(a.unit)! } : {}),
     ...(kind ? { kind } : {}),
