@@ -193,7 +193,8 @@
    */
   const words = {
     workHere: 'Agents that work here',
-    lastHeard: (when: string) => `Last heard ${when}`,
+    /* "yesterday", not "1d ago" (UI pass of 21 October, P38). */
+    lastHeard: (when: string) => `Last heard ${when === '1d ago' ? 'yesterday' : when}`,
     on: ', on ',
     slash: 'Slash',
     scope: { read: 'can read', propose: 'can propose', write: 'can write' } as Record<string, string>,
