@@ -496,9 +496,9 @@
   a second person exists, which is the day each of them means something.
 -->
 {#if peopleFrom === 'reading'}
-  <Tile icon="people" class="section" data-surface="tile" title={copy.whoCanSee}><div class="section-body">{''}</div></Tile>
+  <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee}><div class="section-body">{''}</div></Tile>
 {:else if peopleFrom === 'refused' || peopleFrom === 'unrouted'}
-  <Tile icon="people" class="section" data-surface="tile" title={copy.whoCanSee}>
+  <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee}>
     <div class="section-body">
       <Empty kind="error" title={peopleRefusal} />
     </div>
@@ -523,7 +523,7 @@
       {/each}
     </ul>
   </Tile>
-  <Tile icon="people" class="section" data-surface="tile" title={copy.whoCanSee} count={people.length || undefined}>
+  <Tile icon="user-check" class="section" data-surface="tile" title={copy.whoCanSee} count={people.length || undefined}>
     <div class="section-body">
       <p class="hint">{copy.accessScope}</p>
       <!-- TWO LINES PER PERSON, and not the five-column `.line` every other ledger uses.
