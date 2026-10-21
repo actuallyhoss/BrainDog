@@ -147,6 +147,14 @@
   const me = $derived(shell.me ?? null);
   const names = $derived(new Map(Object.entries(shell.names ?? {})));
   const answerable = $derived(may ?? (me !== null && (me.owner || mayOf({ me }, 'decide'))));
+  /* THE KEPT COPY OFFERS NO ANSWERS, BUT IT KEEPS THEIR PLACES (VERIFY H45). On a cold open the shell is the saved copy
+     (`boot-copy.ts`), which reads every reader as `read`, so the card drew its answers as words and then as buttons
+     when the live shell landed, and the cards under it moved. While the copy is drawn the card is laid out as for
+     somebody who may answer, every control in its own box, quiet and `aria-disabled`, and nothing presses. Only the
+     live shell says who may answer; a reader who may not then reads the words, as before. */
+  const kept = $derived(may === undefined && shell.stale === true && !answerable);
+  /** Whether the card is laid out with its controls: for somebody who may answer, or held in place for the copy. */
+  const drawn = $derived(answerable || kept);
   /* THE READER BY THE NAME THE RECORD GIVES THEM, for the line a Slash proposal leaves ("Slash suggested · Mara accepted"). */
   const person = $derived((me?.person ? names.get(me.person) : undefined)?.trim() || copy.feedYou);
 
@@ -164,12 +172,12 @@
   /* The one the row fills with the accent: the suggested answer, or the first. */
   const primary = $derived(primaryOf(card));
   /* A READER WHO MAY NOT ANSWER reads a question of options as its answers in words; the record's two say nothing. */
-  const listed = $derived(card.decline === null && card.merge === null && !compact && (!inline || !answerable));
+  const listed = $derived(card.decline === null && card.merge === null && !compact && (!inline || !drawn));
   /* THE ANSWER CHOSEN: the reader's, or the one the form starts on (the suggestion, where a key may give it). */
   let picked = $state<string | null>(null);
   const selected = $derived(picked ?? startsOn(card));
   /* NOT NOW opens the question's own page at the step that puts it off; only where this card is the way in to it. */
-  const notNow = $derived(answerable && whole && !link && !compact && onpress === undefined && card.merge === null);
+  const notNow = $derived(drawn && whole && !link && !compact && onpress === undefined && card.merge === null);
   const chosenForAll = $derived(pick?.has(question.id) ?? false);
   const bulkFix = $derived(pick?.fixes.get(question.id) ?? '');
   const optId = (key: string): string => idOf?.(key) ?? `${uid}-opt-${key}`;
@@ -205,7 +213,7 @@
   const NOTE_MS = 4_000;
   /* ONE PRESS ON A CHOICE DECIDES (`card.ts` `pressOf`): two or three answers, none hard to undo. Not while the record's
      reason line is open, where the choice is changed and Send gives it, nor on a host that takes the press for itself. */
-  const oneTap = $derived(listed && answerable && onpress === undefined && phase !== 'asking' && pressOf(card));
+  const oneTap = $derived(listed && drawn && onpress === undefined && phase !== 'asking' && pressOf(card));
 
   let field = $state<HTMLInputElement | null>(null);
   let done = $state<HTMLParagraphElement | null>(null);
@@ -378,7 +386,7 @@
 
   /** An answer given. With the reason line open it changes the choice and keeps the words already typed. */
   function press(way: Way) {
-    if (busy || holding !== null) return;
+    if (kept || busy || holding !== null) return;
     if (onpress) return onpress(way.key);
     if (phase === 'asking') {
       chosen = way;
@@ -389,7 +397,7 @@
 
   /** A choice chosen, and nothing sent: the form's Decide sends it. With the reason line open it is the answer's change. */
   function selectWay(way: Way) {
-    if (busy || holding !== null) return;
+    if (kept || busy || holding !== null) return;
     if (phase === 'asking') return press(way);
     picked = way.key;
   }
@@ -566,6 +574,7 @@
       data-enter={way.key === card.enter ? '' : undefined}
       data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
       aria-pressed={phase === 'asking' ? chosen?.key === way.key : undefined}
+      aria-disabled={kept ? 'true' : undefined}
       onclick={() => press(way)}
       >{#if keys && i < 9}<span class="queue-key dc-key" aria-hidden="true">{i + 1}</span>{/if}<span dir="auto"
         ><span class="dc-btn-name">{amount !== null && way.key === primary ? amountAnswer(way.label, amount) : way.label}</span>{wayTail(card, way, primary)}</span
@@ -576,7 +585,9 @@
 
 <!-- ASK ME LATER (today F11): a quiet clock at the row's end, opening the question's own page at the step that puts it off. -->
 {#snippet later()}
-  {#if notNow}
+  {#if notNow && kept}
+    <button type="button" class="dc-btn dc-later" data-weight="bare" aria-disabled="true" aria-label={queueWords.notNow}><Icon name="clock" size="s" /></button>
+  {:else if notNow}
     <a class="dc-btn dc-later" data-weight="bare" href={at(`${card.href}?defer`)} aria-label={queueWords.notNow} title={queueWords.notNow}><Icon name="clock" size="s" /></a>
   {/if}
 {/snippet}
@@ -613,7 +624,7 @@
     <h3 class="queue-question dr-title" dir="auto"><a class="dc-open tap" href={at(card.href)}>{row.title}</a>{#if card.band}<span class="queue-cost" data-cost={card.cost} hidden>{card.band}</span>{/if}</h3>
     <span class="dr-amount num">{row.amount}</span>
     <p class="dr-meta"><span class="dr-late">{row.late}</span>{#if row.asks}<span class="dr-asks" dir="auto">{' · '}{row.asks}</span>{/if}</p>
-    {#if answerable}
+    {#if drawn}
       <div class="dc-actions dr-actions" data-inline>
         {@render inlineButtons(row.amount)}
         {@render later()}
@@ -621,8 +632,8 @@
     {/if}
     {#if fix || bulkFix}<p class="qa-fix dr-fix" role="status">{fix || bulkFix}</p>{/if}
     {#if !compact}<p class="dr-asked" dir="auto">{askedLine}</p>{/if}
-    {#if pick && answerable && !compact}
-      <button type="button" role="checkbox" class="queue-select qa-select tap dr-select" aria-checked={chosenForAll} aria-label={pageWords.pick(card.question)} onclick={() => pick?.toggle(question)}
+    {#if pick && drawn && !compact}
+      <button type="button" role="checkbox" class="queue-select qa-select tap dr-select" aria-checked={chosenForAll} aria-label={pageWords.pick(card.question)} aria-disabled={kept ? 'true' : undefined} onclick={kept ? undefined : () => pick?.toggle(question)}
         ><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
       >
     {/if}
@@ -636,7 +647,7 @@
     data-side={side ? '' : undefined}
     bind:this={cardEl}
   >
-    {#if pick && answerable && !compact}
+    {#if pick && drawn && !compact}
       <!-- THE BOX THE RENDERER'S QUEUE DRAWS FOR A BULK ANSWER, named for the question alone. `x` presses it from the
            keyboard (`PageBody.svelte`). -->
       <button
@@ -645,7 +656,8 @@
         class="queue-select qa-select tap"
         aria-checked={chosenForAll}
         aria-label={pageWords.pick(card.question)}
-        onclick={() => pick?.toggle(question)}><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
+        aria-disabled={kept ? 'true' : undefined}
+        onclick={kept ? undefined : () => pick?.toggle(question)}><span aria-hidden="true">{chosenForAll ? '✓' : ''}</span></button
       >
     {/if}
     <!-- THE FORM: who asked, the question, the answers and the buttons. On a wide tile with a side it is the card's first
@@ -694,6 +706,7 @@
                 id={optId(way.key)}
                 data-enter={way.key === card.enter ? '' : undefined}
                 onclick={() => press(way)}
+                aria-disabled={kept ? 'true' : undefined}
                 onkeydown={(e) => onChoiceKey(e, i)}
               >
                 {@render choiceBody(way)}
@@ -705,12 +718,12 @@
       {:else if listed}
         <!-- THE ANSWERS, A LIST TO CHOOSE FROM: each a full-width choice with its name and what it does, the suggested
              one saying so in the accent's words. A press chooses; Decide answers (`form.css`). -->
-        <ul class="queue-options dc-choices" role={answerable ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
+        <ul class="queue-options dc-choices" role={drawn ? 'radiogroup' : undefined} aria-label={queueWords.choices}>
           {#each card.ways as way, i (way.key)}
             {@const marked = way.recommended}
             {@const on = phase === 'asking' ? chosen?.key === way.key : selected === way.key}
-            <li class="queue-option" data-recommended={marked ? '' : undefined} role={answerable ? 'none' : undefined}>
-              {#if answerable}
+            <li class="queue-option" data-recommended={marked ? '' : undefined} role={drawn ? 'none' : undefined}>
+              {#if drawn}
                 <button
                   type="button"
                   role="radio"
@@ -718,6 +731,7 @@
                   id={optId(way.key)}
                   aria-checked={on}
                   data-on={chosen?.key === way.key && phase === 'asking' ? '' : undefined}
+                  aria-disabled={kept ? 'true' : undefined}
                   onclick={(e) => onChoice(e, way)}
                   onkeydown={(e) => onChoiceKey(e, i)}
                 >
@@ -735,7 +749,7 @@
           {/each}
         </ul>
       {/if}
-      {#if answerable && (!card.merge || compact)}
+      {#if drawn && (!card.merge || compact)}
         <!-- THE BUTTONS: a row of answers, one press each, or Decide with the answer chosen; then Not now. Only the one a
              key may press carries `data-enter`: nothing hard to undo, nothing that moves money. Where the choices
              themselves decide, only Not now is here, and with neither the row is not drawn (`form.css`). DECIDE NEVER
@@ -755,6 +769,7 @@
               data-weight="primary"
               data-decide
               data-enter={card.enter !== null && selected !== null ? '' : undefined}
+              aria-disabled={kept ? 'true' : undefined}
               onclick={commit}>{pressSaid(card, queueWords.decide, card.ways.find((w) => w.key === selected))}</button
             >
           {/if}

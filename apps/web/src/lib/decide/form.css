@@ -69,7 +69,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .dc-choice:hover:not(:disabled) {
+  .dc-choice:hover:not(:disabled, [aria-disabled='true']) {
     background: var(--tile-2);
     border-color: var(--rule-strong);
   }
@@ -84,6 +84,20 @@
 
 .dc-choice:disabled {
   cursor: default;
+}
+
+/* HELD IN ITS PLACE WHILE THE KEPT COPY IS DRAWN (VERIFY H45): the same rectangle, quiet, and nothing presses it. The
+   suggested one keeps no accent edge, and the live answer brings it back without moving anything. */
+.dc-choice[aria-disabled='true'],
+.queue-option[data-recommended] > .dc-choice[aria-disabled='true'] {
+  border-color: var(--rule);
+  color: var(--ink-2);
+  cursor: default;
+}
+
+.dc-choice[aria-disabled='true']:active {
+  background: var(--tile);
+  border-color: var(--rule);
 }
 
 /* THE RING, a radio's: hollow at rest, the accent with a dot once chosen. On the first line of the name. */

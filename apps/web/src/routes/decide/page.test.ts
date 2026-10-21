@@ -91,9 +91,16 @@ test('every option is words and not a button for a reader who may not answer, an
   const card = readFileSync(fileURLToPath(new URL('../../lib/decide/DecisionCard.svelte', import.meta.url)), 'utf8');
   /* EACH CHOICE IS A BUTTON ONLY FOR A READER WHO MAY ANSWER, and the same rectangle as words for one who may not; the
      buttons under the choices (Decide, Accept and Decline, Not now) are not drawn for them at all. */
-  assert.match(card, /\{#if answerable\}\n\s+<button\n\s+type="button"\n\s+role="radio"\n\s+class="queue-act dc-choice"/u, 'the card draws a live choice for a reader who may not answer');
+  assert.match(card, /\{#if drawn\}\n\s+<button\n\s+type="button"\n\s+role="radio"\n\s+class="queue-act dc-choice"/u, 'the card draws a live choice for a reader who may not answer');
   assert.match(card, /\{:else\}\n\s+<div class="dc-choice" data-read>\n\s+\{@render choiceBody\(way\)\}/u, 'the card draws nothing in place of the option it will not offer');
-  assert.match(card, /\{#if answerable && \(!card\.merge \|\| compact\)\}\n(\s+<!--[^]*?-->\n)?\s+<div class="dc-actions"/u, 'the card offers its buttons to a reader who may not answer');
+  assert.match(card, /\{#if drawn && \(!card\.merge \|\| compact\)\}\n(\s+<!--[^]*?-->\n)?\s+<div class="dc-actions"/u, 'the card offers its buttons to a reader who may not answer');
+  /* THE KEPT COPY IS THE ONE EXCEPTION (VERIFY H45): while it is drawn nobody is known to answer or not, so the controls
+     keep their boxes, quiet and `aria-disabled`, and nothing presses; the live shell decides. A reader the live shell
+     says may not answer still reads words. */
+  assert.match(card, /const kept = \$derived\(may === undefined && shell\.stale === true && !answerable\);/u, 'the card holds its controls for somebody the live shell said may not answer');
+  assert.match(card, /const drawn = \$derived\(answerable \|\| kept\);/u);
+  assert.match(card, /function press\(way: Way\) \{\n\s+if \(kept \|\|/u, 'a control held for the kept copy answers');
+  assert.match(card, /function selectWay\(way: Way\) \{\n\s+if \(kept \|\|/u, 'a choice held for the kept copy is chosen');
   /* THE SENTENCE THAT SAYS WHY HAS TO BE ON THE PAGE, over the queue, before anybody presses. */
   assert.match(
     page,

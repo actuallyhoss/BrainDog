@@ -354,7 +354,7 @@ test('TWO OR THREE ANSWERS THAT CAN BE UNDONE ARE ONE PRESS EACH, even with a li
 
   const card = src('./DecisionCard.svelte');
   /* NOT WHILE THE RECORD'S REASON LINE IS OPEN, NOR ON A HOST THAT ASKS FOR A REASON ITSELF, where a press only chooses. */
-  assert.match(card, /const oneTap = \$derived\(listed && answerable && onpress === undefined && phase !== 'asking' && pressOf\(card\)\);/u);
+  assert.match(card, /const oneTap = \$derived\(listed && drawn && onpress === undefined && phase !== 'asking' && pressOf\(card\)\);/u);
   /* A BUTTON IN A LIST, NOT A RADIO, with no ring; the gate finds it as it finds every choice, and reads its name. */
   const at = card.indexOf('{:else if oneTap}');
   const list = card.slice(at, card.indexOf('{:else if listed}', at));

@@ -79,6 +79,10 @@ export async function load({ url, fetch, depends }: Pick<LoadEvent, 'url' | 'fet
          here could land while the first navigation was still loading: it took that navigation's place, had no page to
          go back to, and the tab drew nothing at all, on every reload with a copy kept. */
       void live.readBoot(api).catch(() => undefined);
+      /* AND ITS CURRENCY IS THE RECORD'S UNTIL THE LIVE ONE SAYS AGAIN (VERIFY H45): the copy carries the home currency
+         `boot` named, but only a live shell had told `homeCurrency()`, so Needs you said "£2,439 GBP" for a frame and
+         every amount moved when the code went. */
+      (await import('$lib/record/api.ts')).learnHome(copy.index.currency ?? null);
       return { ...copy, slash: false };
     }
   }
