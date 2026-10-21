@@ -123,8 +123,8 @@ const NOTHING_LATE = 'nothing is late';
 export function sentenceOf({ needYou, late = null, lateThings = 0, lateRead = late !== null, agents, inbox = 0 }: SentenceParts): Sentence {
   /* WHAT IS LATE, ONE SENTENCE: what is owed to you first, then the bills, each left out at nought. */
   const owed = late?.owed ? `${late.owed} owed to you` : null;
-  /* WHAT YOU OWE, NOT "BILLS": the late money going out counts every list's (a missed repeat's £39 as well), which Money's
-     "Bills late" does not, so calling it bills put two figures under one name (VERIFY H7). */
+  /* WHAT YOU OWE: the late bills and invoices, the same rows and sum as Money's "Bills late" (`lateSumsOf`, VERIFY H7).
+     A missed repeat or a lapsed renewal is a late thing, counted in the foot, not here. */
   const bills = late?.bills ? `${late.bills} you owe` : null;
   const lateClause =
     owed && bills
