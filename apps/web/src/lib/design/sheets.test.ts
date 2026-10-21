@@ -90,7 +90,7 @@ test('the design book is an address of its own that draws both sheets and keeps 
   assert.match(look, /import SheetCharts from '\$lib\/design\/SheetCharts\.svelte'/u);
   assert.match(look, /const shell = \$derived\(page\.data as unknown as Shell\)/u, 'the charts sheet reads the shell the layout asked for');
   assert.doesNotMatch(look, /from '\.\/copies\.ts'/u, 'its words are its own');
-  assert.match(wordsOf(look), /controls: 'Controls and rows'[\s\S]*charts: 'Charts and marks'/u, 'the two sheets by their names');
+  assert.match(wordsOf(look), /controls: 'Controls and lists'[\s\S]*charts: 'Charts and marks'/u, 'the two sheets by their names');
 });
 
 test('no word on either sheet or the area is an em dash, an id or a word for a database', () => {
@@ -98,8 +98,8 @@ test('no word on either sheet or the area is an em dash, an id or a word for a d
     const words = wordsOf(src);
     assert.doesNotMatch(words, /—/u, `${name} holds an em dash`);
     assert.doesNotMatch(words, /\b[0-9A-HJKMNP-TV-Z]{26}\b|[a-z]+#\d+/u, `${name} prints an id`);
-    /* The sheet called "Controls and rows" is his name for it; nothing else a person reads says "row". */
-    assert.doesNotMatch(words.replace(/'Controls and rows'/gu, ''), /\b(rows?|list items?|entity|entities|records?' rows)\b/iu, `${name} says a word for a database`);
+    /* The sheet called "Controls and lists" since the UI pass of 21 October; nothing a person reads says "row". */
+    assert.doesNotMatch(words, /\b(rows?|list items?|entity|entities|records?' rows)\b/iu, `${name} says a word for a database`);
   }
 });
 

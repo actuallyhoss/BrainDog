@@ -1,6 +1,6 @@
 <!--
   The design book, at `/design` (the UI pass of 20 October, agents F29): the two sheets the product's look is judged by
-  (EXP-C01), and the design book beside them (DIRECTION §45). "Controls and rows" and "Charts and marks", each drawn by
+  (EXP-C01), and the design book beside them (DIRECTION §45). "Controls and lists" and "Charts and marks", each drawn by
   the product's own parts from the record this is opened on. It was a Settings area; it is a reference for designers and
   agents, not a choice, so it is reached from Settings' "⋯ › Design book" and `/settings/look` comes here.
 
@@ -38,7 +38,7 @@
     back: 'Settings',
     lead: 'Every control and every chart, drawn by the product itself from what this record holds.',
     which: 'Which sheet',
-    controls: 'Controls and rows',
+    controls: 'Controls and lists',
     charts: 'Charts and marks',
     design: 'Tokens and type',
   } as const;

@@ -1,5 +1,5 @@
 <!--
-  The look sheet called "Controls and rows": every control the product has, in every state it takes, drawn by the
+  The look sheet called "Controls and lists": every control the product has, in every state it takes, drawn by the
   product's own parts (EXP-C01, decision 2 of the experience area).
 
   A SHEET IS NOT A MOCK. Each thing here is `Button.svelte`, `controls.css`, `rows.css`, `Count.svelte`, `Toasts.svelte`
@@ -86,7 +86,7 @@
     due: 'Due Friday',
     toasts: 'A toast',
     place: { start: 'At the bottom left of the work', centre: 'At the bottom centre of the work' },
-    toast: 'Archived Send the quote',
+    toast: 'Archived “Send the quote”',
     several: 'Answering several at once',
     severalWay: { kept: 'Several can be chosen, and one bar answers them', none: 'One at a time, with no bar' },
     questions: ['Move the printer booking to Monday?', 'Archive the old price list?', 'Add Rent to this month?'],
@@ -98,7 +98,7 @@
     payAgain: 'Pay again',
     exportCopy: 'Export',
     code: 'A command',
-    codeLine: 'braindog keys put stripe-live',
+    codeLine: 'braindog keys put stripe',
     codeInline: 'Run it with',
     codeInlineAfter: 'from the folder.',
     dots: 'A state',
@@ -186,7 +186,7 @@
   <Tile title={words.segmented}>
     {#each SEGMENTS as n (n)}
       <figure class="cell cell-start">
-        <Segmented role="group" aria-label={words.choices(n)}>
+        <Segmented role="group" aria-label={words.choices(n)} full>
           {#each words.segments.slice(0, n) as label, i (label)}
             <button type="button" class="segment" aria-pressed={picked[n] === i} data-on={picked[n] === i ? '' : undefined} onclick={() => (picked[n] = i)}
               >{label}</button
@@ -548,6 +548,13 @@
     block-size: auto;
     min-block-size: 248px;
     padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  }
+
+  /* IN THE PICTURE THE BAR SITS UNDER THE LIST (UI pass of 21 October, P47): held to the frame's foot it covered the
+     last question's "Asked today". */
+  .work-tall :global(.batch) {
+    position: static;
+    margin-block-start: var(--sp-3);
   }
 
   /* The rail, as the flat column it is: a shade of the board, no edge. */
