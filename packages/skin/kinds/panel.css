@@ -128,6 +128,18 @@
     text-underline-offset: 3px;
   }
 
+  /* A ONE-LINE TILE IS NOT MOSTLY EMPTY (the agents home's Needs a look was 136 tall around one line of 23): the first
+     row under a boxed section's heading sits 8 under it, as a tile's line sits under its head, not the 24 that parts two
+     blocks; and the row that ends the tile ends at its words, with the tile's own padding under it. */
+  .box > .block-slot:has(> .block[data-kind='section']) + .block-slot:has(.block[data-kind='note']:not([data-form='lead'])) {
+    margin-block-start: calc(var(--sp-2) - var(--sp-5));
+  }
+
+  .box > .block-slot:last-child .block[data-kind='note']:not([data-form='lead']) .panel {
+    min-block-size: 0;
+    padding-block-end: 0;
+  }
+
   .box > .block-slot:has(> .block[data-kind='note']:not([data-form='lead'])) + .block-slot:has(> .block[data-kind='note']:not([data-form='lead'])) {
     margin-block-start: calc(-1 * var(--sp-5));
   }
