@@ -66,6 +66,20 @@
   const owner = $derived(ownsRecord(shell.me));
 
   /* THIS AREA'S OWN WORDS. They name the person's things: their currency, their lists, what the record says. */
+  /** "British pounds (£)" for GBP, as a person says it (UI pass of 21 October, P43); the code where Intl cannot. */
+  function currencySaid(code: string): string {
+    try {
+      const part = (display: 'name' | 'narrowSymbol') =>
+        new Intl.NumberFormat('en-GB', { style: 'currency', currency: code, currencyDisplay: display }).formatToParts(2).find((p) => p.type === 'currency')?.value;
+      const name = part('name');
+      const symbol = part('narrowSymbol');
+      if (!name) return code;
+      return symbol && symbol !== code && symbol !== name ? `${name} (${symbol})` : name;
+    } catch {
+      return code;
+    }
+  }
+
   const words = {
     /* THE LISTS TILE IS "Your lists" (SPEC agents F4): this is the page where lists are named, so it says the word the
        rail's "Your things" keeps out of everywhere else. */
@@ -75,7 +89,7 @@
     currencyWhy: 'Sums in other currencies are added up in this one, where there is a rate.',
     noMoney: 'Turn on Money in Add-ons to choose one.',
     /* MONEY IS ON AND KEEPS NO CURRENCY SETTING (the seed's): the currency its sums are in, said as what it is. */
-    kept: (code: string) => `Your money is kept in ${code}.`,
+    kept: (code: string) => `Your money is kept in ${currencySaid(code)}.`,
     renameWith: 'A use case lets you rename them.',
     browse: 'Browse use cases',
     currencyNow: (code: string) => (code ? `Home currency is now ${code}.` : 'No home currency now.'),
