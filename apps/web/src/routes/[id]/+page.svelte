@@ -146,11 +146,14 @@
     const out = await resolved(said);
     clearTimeout(slowTimer);
     if (spoken() !== said) return closed(true, began);
-    closed(out.refusal === null, began);
+    /* AN ID THAT RESOLVES NEVER SAYS IT SETTLED HERE: closing the read first set `data-screen` on an empty page for the
+       moment before the move, and a picture taken then was a blank board (VERIFY P8). The move clears the claim, and
+       the screen it lands on makes its own. */
     if (out.to) {
-      await goto(at(out.to), { replaceState: true });
+      await goto(at(out.to), { replaceState: true }).catch(() => closed(false, began));
       return;
     }
+    closed(out.refusal === null, began);
     refusal = out.refusal;
     done = true;
   }

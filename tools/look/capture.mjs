@@ -196,7 +196,14 @@ async function shoot(page, ready, heard, { app, screen, width, theme, out, sourc
   const before = source.counts();
   const started = Date.now();
   await page.goto(`${app}${screen.path}`, { waitUntil: 'domcontentloaded' }).catch((e) => heard.errors.push(`did not open: ${e.message.split('\n')[0]}`));
-  const settled = await ready.settled(page);
+  let settled = await ready.settled(page);
+  /* A SCREEN THAT MOVES ON (`/SG2` opens the row it names) settles twice: the picture is of the screen it landed on,
+     so once the address has moved off the one asked for, its own `data-screen` is waited for (VERIFY P8). */
+  const asked = new URL(`${app}${screen.path}`).pathname;
+  if (new URL(page.url()).pathname !== asked) {
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    settled = await ready.settled(page);
+  }
   const settleTook = Date.now() - started;
   /* NOTHING STILL BUSY: a part of the screen that says it is reading is waited for, and one that never stops is said. */
   const busy = await page
