@@ -183,7 +183,7 @@
 
 {#snippet foot()}
   <Button weight="quiet" onclick={() => (open = false)}>Cancel</Button>
-  <Button weight="primary" disabled={saving} onclick={() => void save()}>{saving ? 'Saving' : 'Save'}</Button>
+  <Button weight="primary" disabled={saving} onclick={() => void save()}>Save</Button>
 {/snippet}
 
 <Sheet bind:open title={row?.name ?? ''} {subtitle} footer={foot}>
@@ -232,7 +232,7 @@
               <p class="pf-quiet">There are no projects yet.</p>
             {:else}
               <fieldset class="picks form-checks">
-                <legend class="sr-only">Projects it may change</legend>
+                <legend class="group-title pf-legend">Projects it may change</legend>
                 {#each places as p (p.id)}
                   <label class="pick"><input type="checkbox" checked={hasPlace(p)} onchange={() => togglePlace(p)} /><span dir="auto">{p.name}</span></label>
                 {/each}
@@ -249,7 +249,7 @@
           </div>
           {#if d.lists_write !== null}
             <fieldset class="picks form-checks">
-              <legend class="sr-only">Lists it may change</legend>
+              <legend class="group-title pf-legend">Lists it may change</legend>
               {#each lists as l (l.id)}
                 <label class="pick"><input type="checkbox" checked={hasList(l)} onchange={() => toggleList(l)} /><span dir="auto">{l.name}</span></label>
               {/each}
@@ -494,6 +494,11 @@
     margin: 0;
     padding: 0;
     border: 0;
+  }
+
+  .pf-legend {
+    padding: 0;
+    margin-block-end: var(--sp-1);
   }
 
   .pick {

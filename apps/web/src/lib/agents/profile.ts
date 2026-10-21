@@ -126,7 +126,7 @@ export type Draft = {
 };
 
 /** A draft from a row the record holds or would hold. */
-export function draftOf(p: Pick<Profile, 'ceiling' | 'projects' | 'lists_write' | 'tools' | 'brief' | 'model' | 'quiet' | 'caps' | 'notify' | 'context' | 'enforce'>): Draft {
+export function draftOf(p: Profile): Draft {
   return {
     ceiling: p.ceiling,
     projects: p.projects === null ? null : [...p.projects],
