@@ -189,8 +189,38 @@ const ownWordsPlugin: Plugin = {
   },
 };
 
+/**
+ * THE SVELTE RUNTIME ONLY ROUTES CALL IS A CHUNK OF ITS OWN, OUTSIDE THE ENTRY.
+ *
+ * Every component imports `svelte/internal/client`, a barrel that re-exports the whole runtime, so to the bundler every
+ * runtime module is reached from the entry and lands in the shared chunk the entry imports, whoever calls it. List
+ * motion (`lib/ui/motion.ts`) put `transition` and its frame loop there, 1.4 KB brotli the boot never runs. These are
+ * the modules nothing in the entry (Kit's client, `root.svelte`) calls. The root layout imports this chunk, so the shell
+ * still names it among the layout's modulepreloads and it arrives in the same wave as before. `svelte:element` is one of
+ * them because it imports `transitions.js`; left in the shared chunk it would pull this chunk back into the entry.
+ *
+ * THREE THINGS MAKE IT HOLD. The modules are marked free of side effects (their top level declares and nothing more), or
+ * the barrel would keep a bare import of this chunk to run them in order. The group takes only these modules, not what
+ * they import, since that is the runtime itself. And taking only them needs `preserveEntrySignatures` looser than Kit's
+ * `strict`: `allow-extension` lets an entry chunk export more than its module did, which Kit never reads. Client build
+ * only; the server build is untouched.
+ */
+const ROUTE_RUNTIME =
+  /[\\/]svelte[\\/]src[\\/]internal[\\/]client[\\/](?:loop|dom[\\/]elements[\\/](?:transitions|actions|bindings[\\/](?:input|size|universal))|dom[\\/]blocks[\\/](?:svelte-element|await|svelte-head|key))\.js$/u;
+const routeRuntimePlugin: Plugin = {
+  name: 'braindog:route-runtime',
+  apply: 'build',
+  applyToEnvironment: (environment) => environment.name === 'client',
+  transform: { filter: { id: ROUTE_RUNTIME }, handler: (code) => ({ code, map: null, moduleSideEffects: false }) },
+  options: (options) => ({ ...options, preserveEntrySignatures: 'allow-extension' }),
+  outputOptions: (output) => ({
+    ...output,
+    codeSplitting: { groups: [{ name: 'route-runtime', test: ROUTE_RUNTIME, includeDependenciesRecursively: false }] },
+  }),
+};
+
 export default defineConfig({
-  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin],
+  plugins: [sveltekit(), entryGraphPlugin, layoutCssPlugin, ownWordsPlugin, routeRuntimePlugin],
   define: { __BRAINDOG_ENV__: JSON.stringify(ENV) },
   resolve: { alias: [{ find: '@braindog/skin/house.css', replacement: PALETTE }] },
   /* `/app/catalogue` AND NOT `/catalogue`: the app is served under `/app` (`svelte.config.js`) and asks for the catalogue
