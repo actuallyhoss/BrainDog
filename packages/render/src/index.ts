@@ -239,6 +239,8 @@ export {
   bytes,
   dateLong,
   day,
+  dayShort,
+  monthShort,
   exponentOf,
   formatTyped,
   integer,

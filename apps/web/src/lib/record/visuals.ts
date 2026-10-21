@@ -7,6 +7,7 @@
  * so nothing is drawn empty. Pure and relative-imported so `visuals.test.ts` can hold the rules without a component.
  */
 
+import { dayShort, monthShort } from 'braindog-render';
 import type { DataRow } from './project.ts';
 
 /** A reading of money by month, as `figures.ts` hands it. */
@@ -136,7 +137,8 @@ export const PATH_STOPS = 6;
 const PATH_DONE = 2;
 const PATH_NEXT = 3;
 
-export const shortDay = (day: string): string => new Date(`${day.slice(0, 10)}T00:00:00Z`).toLocaleString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+/** "3 Sep", from the renderer's one table of months (P16): Intl's en-GB writes "3 Sept". */
+export const shortDay = (day: string): string => dayShort(day.slice(0, 10));
 
 /**
  * THE PROJECT'S WORK AS A STEPPER, NOT A TIME AXIS (proj F3): its own tasks only, never its bills. The last two finished,
@@ -287,7 +289,7 @@ export type Visual =
   | { kind: 'in' | 'out'; title: string; months: Months; rows: DataRow[] }
   | { kind: 'dues'; title: string; calendar: Month[]; dues: Due[]; rows: DataRow[] };
 
-const label = (key: string): string => new Date(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, 1)).toLocaleString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+const label = (key: string): string => `${monthShort(+key.slice(5, 7) - 1)} ${key.slice(0, 4)}`;
 
 const monthRows = (kind: string, m: Months, format: VisualData['format']): DataRow[] =>
   m.months.map((x) => ({ key: `${kind}#${x.key}`, title: label(x.key), detail: format(x.value, m.currency), href: null }));

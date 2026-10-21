@@ -448,6 +448,20 @@ export function magnitudeOf(cell: string): number {
   return m ? Number(m[0].replaceAll(',', '')) : NaN;
 }
 
+/**
+ * A MONTH'S SHORT NAME FROM ONE TABLE, "Sep" and never the "Sept" that `toLocaleString('en-GB')` writes (P16): cards and
+ * Kiln said "3 Sept" where every other screen said "7 Sep". `m` counts from 0.
+ */
+export const monthShort = (m: number): string => MONTHS[m] ?? '';
+
+/** A day with no year, "3 Sep", as a card or a step says it. The day as written where it is not one. */
+export function dayShort(iso: string): string {
+  const t = noon(iso);
+  if (t === null) return iso;
+  const d = new Date(t);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
 export function day(iso: string): string {
   const t = noon(iso);
   if (t === null) return iso;

@@ -6,7 +6,7 @@
  * a card; the lane is whatever the list's state field holds. Pure, so `project-cards.test.ts` holds the rules.
  */
 
-import { cardLayout, trendOf } from 'braindog-render';
+import { cardLayout, dayShort, trendOf } from 'braindog-render';
 
 import { briefFromNote } from '../record/brief.ts';
 import { actor } from '../record/names.ts';
@@ -107,7 +107,7 @@ export const slotStyle = (hue: number | null | undefined): string => {
 };
 
 /** The day a card says, short and without the year: "20 Sep". */
-export const daySaid = (day: string): string => new Date(`${day.slice(0, 10)}T00:00:00Z`).toLocaleString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+export const daySaid = (day: string): string => dayShort(day.slice(0, 10));
 
 /** How it is going, in words, and whether it carries the warning mark: On track says nothing, the others say themselves. */
 export const HEALTH: Readonly<Record<string, { word: string; tone: 'warn' | 'off' }>> = {

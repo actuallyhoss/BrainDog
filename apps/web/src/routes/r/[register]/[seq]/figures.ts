@@ -17,6 +17,7 @@
  * relative and never `$lib`.
  */
 
+import { monthShort } from 'braindog-render';
 import { createClient, type ClientOptions } from '@braindog/client';
 
 import { valueSaid } from '../../../../lib/voice.ts';
@@ -135,7 +136,7 @@ export function monthsOf(reading: unknown): MoneyIn | null {
 export function monthSaid(key: string, now: number): string {
   const [y, m] = key.split('-').map(Number);
   if (!y || !m) return key;
-  const name = new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+  const name = monthShort(m - 1);
   return y === new Date(now).getUTCFullYear() ? name : `${name} ${y}`;
 }
 
