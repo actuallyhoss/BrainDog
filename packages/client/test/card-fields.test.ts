@@ -70,7 +70,8 @@ test('CONTEXT CARRIES THE CARD, ITS NEXT LINE, THE BUILD AND WHO ELSE IS HERE, a
   assert.equal(here.handoff?.left_at, new Date(NOW).toISOString());
   assert.equal(here.handoff?.earlier, 0);
   /* THE CARD AND ITS NEXT LINE, the ahead header read as commits since. */
-  assert.match((here.card ?? '').split('\n')[0]!, /working on|no project yet/u, here.card);
+  /* AN AGENT'S KEY IS ANSWERED THE PLAN'S CARD, whose line one says "No project here." outside one. */
+  assert.match((here.card ?? '').split('\n')[0]!, /working on|No project here\./u, here.card);
   assert.match(here.card_next ?? '', /Kern the lowercase pairs\..*3 commits since/u);
   assert.match(here.next_lines?.[0] ?? '', /3 commits since/u);
   assert.deepEqual(here.build, { cli: '2026.10.09+abc1234', behind: false });
