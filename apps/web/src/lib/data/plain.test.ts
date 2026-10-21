@@ -19,7 +19,7 @@ test('A MAP DEEP IN AN ANSWER COMES BACK A MAP, and the copy keeps what it would
 
 test('ANYTHING BUT A PLAIN OBJECT IS LEFT AS IT IS, so the copy still refuses a Date', () => {
   const when = new Date(0);
-  assert.equal(plainOf({ when }).constructor, Object);
+  assert.equal((plainOf({ when }) as object).constructor, Object);
   assert.equal((plainOf({ when }) as { when: unknown }).when, when);
   assert.equal(scrubbed(plainOf({ when })), undefined);
 });
