@@ -531,8 +531,11 @@
     padding-block-end: 0;
   }
 
+  /* A NAME THAT HAS NO ROOM BESIDE ITS PROJECT TAKES THE NEXT LINE (layout gate, 21 October): on a 320 phone a row's
+     words are 108 wide, and the project took them all and left the name 11px, one letter a line. */
   .kpi-who {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     min-inline-size: 0;
@@ -630,7 +633,8 @@
     text-decoration: none;
   }
 
-  .kpi-open::after {
+  /* ON `::before`, because a touch target is measured as the element and its `::before` (`a11y.css`'s `.tap`). */
+  .kpi-open::before {
     position: absolute;
     inset: 0;
     border-radius: var(--r-xs);
@@ -704,7 +708,7 @@
     cursor: pointer;
   }
 
-  .kpi-press::after {
+  .kpi-press::before {
     position: absolute;
     z-index: var(--z-raise);
     inset: 0;
@@ -719,11 +723,10 @@
     text-underline-offset: 3px;
   }
 
+  /* TWO LINES AND THEN AN ELLIPSIS, as every KPI name (`.kpi-name`); `.kpi-press` above is a block and would lose the clamp. */
   .kpi-who .kpi-press {
-    display: inline;
+    display: -webkit-box;
     min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .kpi:has(.kpi-press) .kpi-fix,
