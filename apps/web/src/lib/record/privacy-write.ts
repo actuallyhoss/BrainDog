@@ -7,6 +7,7 @@
  */
 
 import { copy } from '../copy.ts';
+import { wroteOutside } from '@braindog/client';
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -25,6 +26,8 @@ export async function keepPrivate(base: string, ref: string, on: boolean, io: Fe
   } catch {
     return { ok: false, fix: copy.rowPrivateNotDone };
   }
+  /* A WRITE PAST THE CLIENT: the reads it kept go (`wroteOutside`). */
+  wroteOutside();
   const said: unknown = await res.json().catch(() => undefined);
   if (typeof said !== 'object' || said === null || !('ok' in said)) return { ok: false, fix: copy.rowPrivateNotDone };
   if ((said as { ok: unknown }).ok === true) return { ok: true, private: on };

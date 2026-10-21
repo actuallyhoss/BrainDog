@@ -24,6 +24,7 @@
 
 import type { Fetch } from './boot-live.ts';
 import { copy } from '../copy.ts';
+import { wroteOutside } from '@braindog/client';
 
 /**
  * Where a forwarded message is posted, built from the token the door answered.
@@ -84,6 +85,8 @@ async function press(which: 'mint' | 'revoke', base: string, io?: Fetch): Promis
   } catch {
     return notReached;
   }
+  /* A WRITE PAST THE CLIENT: the reads it kept go (`wroteOutside`). */
+  wroteOutside();
 
   /* `null` IS JSON TOO, and `body.ok` on it threw out of `press`, so the button stayed pressed and no sentence came:
      measured against a host answering the four bytes `null` with a 200. It is a record not reached like any other. */

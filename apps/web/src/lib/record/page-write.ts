@@ -14,7 +14,7 @@
  * is the first terminal state, and not done is the first state that is not terminal.
  */
 
-import { createClient } from '@braindog/client';
+import { createClient, wroteOutside } from '@braindog/client';
 import type { Row, RowRef } from 'braindog-render';
 
 import { copy } from '../copy.ts';
@@ -120,6 +120,8 @@ export async function updateRow(base: string, ref: RowRef, patch: Record<string,
   } catch {
     return { from: 'unreachable', fix: copy.recordNotReached };
   }
+  /* A WRITE PAST THE CLIENT: the reads it kept go (`wroteOutside`). */
+  wroteOutside();
   if (res.status === 401) return { from: 'refused', fix: copy.signInAgain };
   const said: unknown = await res.json().catch(() => undefined);
   if (typeof said !== 'object' || said === null || !('ok' in said)) return { from: 'unreachable', fix: copy.recordNotReached };

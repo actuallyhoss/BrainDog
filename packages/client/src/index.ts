@@ -1343,6 +1343,157 @@ let SCHEMAS = new WeakMap<object, Map<string, SchemaStore>>();
 export function forgetSchemas(): void {
   SCHEMAS = new WeakMap();
   FLYING = new WeakMap();
+  READS = new Map();
+  OUT = new Map();
+  HEARD = new Map();
+  FIRST = new Map();
+}
+
+/**
+ * READS KEPT BY THE RECORD'S VERSION, for an app that follows it (`keepReads`): a read asked again while the version
+ * this tab last heard has not moved, and this tab has sent no write since, is answered from what it was answered, at
+ * once, and asks nothing. Going back to a page, or opening it again, read every block of it again at the same version:
+ * twenty requests for a project page that had not changed (`loop/perf/round2.mjs`).
+ *
+ * OFF UNLESS AN APP TURNS IT ON, and the web turns it on only while its poll follows the record's version, since the
+ * poll is what tells a kept answer from a stale one. A command, a test and an agent's client ask every time, as before.
+ *
+ * WHAT IS KEPT is the reads whose answer is the record's at a version: rows, a page, a figure, the tiles that read the
+ * record. NEVER the version itself, `boot` (kept by the app), who is here now (`presence`) or what is new since the
+ * reader's mark, which move without the version. A refusal is never kept.
+ *
+ * WHAT DROPS ONE: the version moving, any write this tab sends (counted once it has answered, so a read sent while it
+ * was out is never kept as though it saw it), the reader's own mark for the answers that carry it (a page's feed says
+ * what is unread), `KEPT_READ_MS`, and midnight, since "late" and "today" move with the clock and not the version.
+ * Each caller is handed its own copy, as a shared flight is.
+ */
+export const KEPT_READ_MS = 300_000;
+/** The reads that may be kept, by name. */
+const KEEPS = new Set([
+  'get', 'list', 'countBy', 'history', 'backlinks', 'page', 'pages', 'previewPage', 'metric', 'figures', 'governance', 'packs', 'actions',
+  'automations', 'examples', 'briefing', 'namedTwice', 'handled', 'textFaults', 'learned', 'matched', 'skillsBehind', 'huesWanted',
+  'learningsTwice', 'stale', 'heldTwice', 'instructionList',
+]);
+/** The kept reads whose answer may carry the reader's own mark: what a feed draws as unread. */
+const MARKED = new Set(['page', 'pages', 'previewPage']);
+
+/**
+ * Whether a page's answer carries the reader's mark: a feed's `seen`, or the changes a block marks unseen from it. Where
+ * the answer is not a page's blocks it is taken to carry it, so a mark moved always asks it again.
+ */
+function carriesMark(value: unknown): boolean {
+  const blocks = (value as { blocks?: unknown } | null)?.blocks;
+  if (!Array.isArray(blocks)) return true;
+  return blocks.some((b) => typeof b !== 'object' || b === null || 'seen' in b || Array.isArray((b as { changes?: unknown }).changes));
+}
+/** The most reads the tab keeps; past it the oldest goes. */
+const KEPT_READS_MOST = 400;
+let KEEPING = false;
+/** The one key the tab's kept schemas are under while reads are kept. */
+const TAB = {};
+/**
+ * The record's version as this tab last heard it, by host and token, whichever client asked: the poll asks through one
+ * client and the screens read through many, some with a fetch of their own, so the version a kept read is checked
+ * against is the tab's and not one client's.
+ */
+let HEARD = new Map<string, number>();
+/**
+ * THE FIRST VERSION HEARD, and when it was asked. A read asked before the tab had heard any version is kept at none,
+ * and it is still the record's at that first version when it went out after that version was asked: the poll's first
+ * answer is the baseline every screen is drawn against (`live.ts`), and a read sent before it was asked is not kept on.
+ */
+let FIRST = new Map<string, { asked: number; version: number }>();
+type KeptRead = { version: number | null; sent: number; marks: number; at: number; marked: boolean; answer: Result<unknown> };
+
+/** Whether a read kept at `kept`, asked at `at`, is the record's at the version the tab has heard now. */
+function sameVersion(heard: string, kept: number | null, at: number): boolean {
+  const now = HEARD.get(heard) ?? null;
+  if (kept === now) return true;
+  const first = FIRST.get(heard);
+  return kept === null && first !== undefined && first.version === now && at > first.asked;
+}
+/**
+ * THE TAB'S KEPT READS, by address, token and body, whichever client asked: a screen builds a client with a fetch of its
+ * own in many places, and a read kept for one of them is the record's answer for all. Beside them, the reads out now.
+ */
+let READS = new Map<string, KeptRead>();
+let OUT = new Map<string, { version: number | null; sent: number; marks: number; at: number; flight: Promise<Result<unknown>> }>();
+/** Every write this tab sent but a read sent as one, once answered; and the reader's marks it moved. */
+let SENT = 0;
+let MARKS = 0;
+
+/**
+ * The kept answer for `key` on the record `heard` names, or `ask`ed and kept once it lands if nothing moved while it was
+ * out. `marked`: the answer may carry the reader's mark (`carriesMark`).
+ */
+function keptOr<T>(heard: string, key: string, marked: boolean, ask: () => Promise<Result<T>>): Promise<Result<T>> {
+  const version = HEARD.get(heard) ?? null;
+  const now = Date.now();
+  const was = READS.get(key);
+  if (
+    was !== undefined &&
+    sameVersion(heard, was.version, was.at) &&
+    was.sent === SENT &&
+    (!was.marked || was.marks === MARKS) &&
+    now >= was.at &&
+    now - was.at < KEPT_READ_MS &&
+    new Date(was.at).toDateString() === new Date(now).toDateString()
+  )
+    return Promise.resolve(structuredClone(was.answer) as Result<T>);
+  /* THE SAME READ OUT NOW, ASKED AT THIS VERSION, is shared, a POST read among them, whichever client sent it. */
+  const flying = OUT.get(key);
+  if (flying !== undefined && sameVersion(heard, flying.version, flying.at) && flying.sent === SENT && flying.marks === MARKS)
+    /* ONE THAT FAILED IS ASKED AGAIN BY THIS CALLER: the sender's own fetch may have been called off as it left. */
+    return flying.flight.then((r) => (r.ok ? (structuredClone(r) as Result<T>) : ask()));
+  const at = { version, sent: SENT, marks: MARKS, at: now };
+  const flight = ask();
+  const mine = { ...at, flight: flight as Promise<Result<unknown>> };
+  OUT.set(key, mine);
+  void flight.then((got) => {
+    if (OUT.get(key) === mine) OUT.delete(key);
+    if (!got.ok || !KEEPING || !sameVersion(heard, at.version, at.at) || SENT !== at.sent) return;
+    const carries = marked && carriesMark(got.value);
+    if (carries && MARKS !== at.marks) return;
+    READS.delete(key);
+    READS.set(key, { ...at, marked: carries, answer: structuredClone(got) });
+    if (READS.size > KEPT_READS_MOST) READS.delete(READS.keys().next().value!);
+  });
+  return flight;
+}
+
+/**
+ * A read the app makes past this client (its own `fetch`), kept by the version as the client keeps its own (`keepReads`):
+ * `base` is the record's address, as a client is made with, and `key` names the question. Asked every time unless reads
+ * are kept. A refusal is never kept.
+ */
+export function keptRead<R extends { ok: boolean }>(base: string, key: string, ask: () => Promise<R>): Promise<R> {
+  const at = base.replace(/\/+$/, '');
+  /* A RELATIVE ADDRESS NAMES NO RECORD THE POLL HEARS, so it is asked every time. */
+  if (!KEEPING || !/^https?:\/\//u.test(at)) return ask();
+  return keptOr<unknown>(`${at} `, `${at} ${key} outside`, false, ask as unknown as () => Promise<Result<unknown>>) as unknown as Promise<R>;
+}
+
+/** Keep reads by the record's version from now on, or stop and drop what was kept. */
+export function keepReads(on: boolean): void {
+  KEEPING = on;
+  READS = new Map();
+  OUT = new Map();
+  HEARD = new Map();
+  FIRST = new Map();
+}
+
+/** Drop every kept read, so each is asked again: what a pull on a phone asks for. */
+export function forgetReads(): void {
+  READS = new Map();
+  OUT = new Map();
+}
+
+/**
+ * A write the app sent past this client (its own `fetch` to `/api/update` and the like) has answered: the kept reads go,
+ * as after a write sent here, so the read that follows it is never answered from before it.
+ */
+export function wroteOutside(): void {
+  SENT += 1;
 }
 
 export function createClient(options: ClientOptions) {
@@ -1351,8 +1502,11 @@ export function createClient(options: ClientOptions) {
 
   /** This client's kept schemas: dropped whole on a write it sent, and stale once a `version` answer moves. */
   const schemas = (): SchemaStore => {
-    let byHost = SCHEMAS.get(doFetch);
-    if (byHost === undefined) SCHEMAS.set(doFetch, (byHost = new Map()));
+    /* AN APP KEEPING READS (`keepReads`) KEEPS ONE STORE FOR THE TAB, whatever fetch a client was handed: a reader made
+       with a fetch of its own asked every list's schema again, nineteen asks for one page read ahead of a press. */
+    const by = KEEPING ? TAB : doFetch;
+    let byHost = SCHEMAS.get(by);
+    if (byHost === undefined) SCHEMAS.set(by, (byHost = new Map()));
     const key = `${base} ${options.token ?? ''}`;
     let store = byHost.get(key);
     if (store === undefined) byHost.set(key, (store = { version: null, lists: new Map() }));
@@ -1409,25 +1563,38 @@ export function createClient(options: ClientOptions) {
     const sent = writes ? JSON.stringify(args) : undefined;
     const outlives = how.outlive === true && sent !== undefined && new TextEncoder().encode(sent).length < KEEPALIVE_CEILING;
 
+    /* A READ KEPT AT THIS VERSION IS ANSWERED FROM WHAT IT WAS ANSWERED (`KEEPS`), and one asked now is kept once it
+       lands, if nothing moved while it was out. */
+    if (KEEPING && KEEPS.has(name) && (!WRITES.has(name) || POST_READS.has(name)) && !outlives) {
+      const ask = () => (sent === undefined ? shared<T>(name, url, writes, sent, outlives) : send<T>(name, url, writes, sent, outlives));
+      return keptOr<T>(`${base} ${options.token ?? ''}`, `${url.toString()} ${options.token ?? ''} ${sent ?? ''}`, MARKED.has(name), ask);
+    }
+
     /* A READ ALREADY OUT IS NOT SENT TWICE (`FLYING`). The first caller gets the answer itself and every other one its
        own copy, so a reader that sorts or trims the rows it was handed cannot reach into another's. */
-    if (sent === undefined) {
-      let byFetch = FLYING.get(doFetch);
-      if (byFetch === undefined) FLYING.set(doFetch, (byFetch = new Map()));
-      const key = `${url.toString()} ${options.token ?? ''}`;
-      const out = byFetch.get(key);
-      if (out !== undefined) return out.then((r) => structuredClone(r) as Result<T>);
-      const flight = send<T>(name, url, writes, sent, outlives);
-      const flights = byFetch;
-      flights.set(key, flight as Promise<Result<unknown>>);
-      void flight.finally(() => {
-        if (flights.get(key) === flight) flights.delete(key);
-      });
-      return flight;
-    }
+    if (sent === undefined) return shared<T>(name, url, writes, sent, outlives);
     /* A WRITE GOING OUT ENDS THE SHARING: a read asked after it must not be handed one sent before it. */
-    if (WRITES.has(name) && !POST_READS.has(name)) FLYING.get(doFetch)?.clear();
+    if (WRITES.has(name) && !POST_READS.has(name)) {
+      FLYING.get(doFetch)?.clear();
+      OUT.clear();
+    }
     return send<T>(name, url, writes, sent, outlives);
+  }
+
+  /** A read sent once while it is out, every other asker handed its own copy (`FLYING`). */
+  function shared<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
+    let byFetch = FLYING.get(doFetch);
+    if (byFetch === undefined) FLYING.set(doFetch, (byFetch = new Map()));
+    const key = `${url.toString()} ${options.token ?? ''}`;
+    const out = byFetch.get(key);
+    if (out !== undefined) return out.then((r) => structuredClone(r) as Result<T>);
+    const flight = send<T>(name, url, writes, sent, outlives);
+    const flights = byFetch;
+    flights.set(key, flight as Promise<Result<unknown>>);
+    void flight.finally(() => {
+      if (flights.get(key) === flight) flights.delete(key);
+    });
+    return flight;
   }
 
   async function send<T>(name: string, url: URL, writes: boolean, sent: string | undefined, outlives: boolean): Promise<Result<T>> {
@@ -1460,6 +1627,11 @@ export function createClient(options: ClientOptions) {
       WROTE += 1;
       schemas().lists.clear();
     }
+    /* AND ANY WRITE BUT A READ SENT AS ONE DROPS THE KEPT READS (`KEEPS`); the reader's mark only those that carry it. */
+    if (WRITES.has(name) && !POST_READS.has(name)) {
+      if (name === 'markRead') MARKS += 1;
+      else SENT += 1;
+    }
     return out;
   }
 
@@ -1481,13 +1653,17 @@ export function createClient(options: ClientOptions) {
     path: 'keys/put' | 'keys/open' | 'slash/read' | 'slash/settings' | 'slash/propose' | 'slash/pattern' | 'slash/setup' | 'slash/mapping',
     args: Record<string, unknown>,
   ): Promise<Result<T>> {
-    return hostAnswer<T>(() =>
+    OUT.clear();
+    const out = await hostAnswer<T>(() =>
       doFetch(`${base}/api/${path}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(args),
       }),
     );
+    /* A DOOR MAY WRITE ROWS (a key kept, a proposal filed), so the kept reads go, as after any write. */
+    SENT += 1;
+    return out;
   }
 
   /**
@@ -1607,12 +1783,16 @@ export function createClient(options: ClientOptions) {
     },
     boot: () => call<Boot>('boot'),
     version: async () => {
+      const asked = Date.now();
       const out = await call<Version>('version');
       if (out.ok && typeof out.value.version === 'number') {
         const store = schemas();
         /* THE FIRST VERSION HEARD names what was asked before it, the boot's schemas, so they are not all asked again. */
         if (store.version === null) for (const kept of store.lists.values()) if (kept.version === null) kept.version = out.value.version;
         store.version = out.value.version;
+        const heard = `${base} ${options.token ?? ''}`;
+        if (!HEARD.has(heard)) FIRST.set(heard, { asked, version: out.value.version });
+        HEARD.set(heard, out.value.version);
       }
       return out;
     },

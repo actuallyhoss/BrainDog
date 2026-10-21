@@ -20,6 +20,7 @@
  */
 
 import type { Answer, Fetch, Refusal } from '../../lib/record/actions.ts';
+import { wroteOutside } from '@braindog/client';
 
 /** What `actionRun` answers when the action will run. `said` is the record's sentence when it answers one beside it. */
 export type Ran = { ingest: string; due_at: string; said?: string };
@@ -62,6 +63,8 @@ export async function runNow(base: string, ingest: string, io: Fetch = (url, ini
   } catch {
     return refused('UNREACHABLE', runWords.unreached);
   }
+  /* A RUN WRITES WHAT IT DOES: the reads the client kept go (`wroteOutside`). */
+  wroteOutside();
   if (res.status === 401) {
     await res.body?.cancel().catch(() => undefined);
     return refused('UNAUTHORIZED', runWords.signIn);

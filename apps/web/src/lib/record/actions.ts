@@ -25,6 +25,7 @@
 import { bytes as fmtBytes, since, writeAmount } from 'braindog-render';
 
 import { copy } from '../copy.ts';
+import { keptRead, wroteOutside } from '@braindog/client';
 import type { RECONNECT_STATE, ReconnectState } from './vault.ts';
 
 /* ── the shapes ─────────────────────────────────────────────────────────── */
@@ -147,6 +148,8 @@ async function send<T>(io: Fetch, url: string, body?: Record<string, unknown>): 
   } catch {
     return unreachable();
   }
+  /* A RESUME IS A WRITE PAST THE CLIENT: the reads it kept go (`wroteOutside`). */
+  if (body) wroteOutside();
   /* THE BODY IS CANCELLED, NOT LEFT. A 401 returned with its body unread, and the request stayed pending in
      the network panel on /p/kiln for as long as the tab was open. */
   if (res.status === 401) {
@@ -168,7 +171,8 @@ export type Source = {
 
 export function live(io: Fetch, base = ''): Source {
   return {
-    actions: () => send<ActionRow[]>(io, `${base}/api/actions`),
+    /* KEPT BY THE VERSION (`keptRead`), so a project opened again does not wait on its actions at the same version. */
+    actions: () => keptRead(base, 'actions', () => send<ActionRow[]>(io, `${base}/api/actions`)),
     resume: (ingest) => send<Resumed>(io, `${base}/api/resumeAction`, { ingest }),
   };
 }

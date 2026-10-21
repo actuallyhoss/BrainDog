@@ -107,6 +107,10 @@ export function follow(base: string | null): void {
   live.state = 'open';
   live.version = null;
   live.from = null;
+  /* READS ARE KEPT BY THE VERSION ONLY WHILE IT IS FOLLOWED (`keepReads` in the client), since this poll is what tells a
+     kept answer from a stale one; following another record, or none, drops what was kept. */
+  const keeping = base !== null;
+  void import('@braindog/client').then((c) => c.keepReads(keeping), () => undefined);
   if (base === null) return;
   /* THE READ COPY IS KEPT FOR A RECORD BEING FOLLOWED, and only then: never for the sample, which is in the browser
      already, and never over a refusal, which the layout follows as `null`. A copy of another record goes here. */
@@ -157,6 +161,8 @@ let pulls = 0;
  */
 export async function reread(): Promise<void> {
   if (following === null) return;
+  /* A PULL ASKS THE RECORD ITSELF: nothing kept at this version answers it. */
+  await import('@braindog/client').then((c) => c.forgetReads(), () => undefined);
   pulls += 1;
   live.version = pulls + 0.5;
   await tick();

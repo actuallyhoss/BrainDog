@@ -17,6 +17,7 @@
  */
 
 import { copy } from '../copy.ts';
+import { wroteOutside } from '@braindog/client';
 import { forget } from './boot-live.ts';
 
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -47,6 +48,8 @@ async function post(base: string, method: 'fileArrival' | 'archiveArrival' | 'tr
   } catch {
     return unreachable();
   }
+  /* A WRITE PAST THE CLIENT: the reads it kept go (`wroteOutside`). */
+  wroteOutside();
   /* A 401 CARRIES NO BODY. The session ended, and the sentence says what to do about it. */
   if (res.status === 401) return { from: 'refused', fix: copy.signInAgain };
   const said: unknown = await res.json().catch(() => undefined);
