@@ -2445,6 +2445,24 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     };
   };
 
+  /**
+   * The refusal anybody but an owner meets on a list the kernel declares itself (the runs, and what the owner tells his
+   * agents), or `null` when this caller is an owner, the list is not one, or a grant names it.
+   *
+   * THE KERNEL'S LISTS ARE THE OWNER'S. What he tells his agents and what they did are his working notes: a Viewer, an
+   * Admin, a list-scoped member and a guest reach them only when a grant names the list (`ctx.levels`), as Keys is
+   * reached. Decided by the declaration (`kernelLists`, `pack_id` kernel), never by a name. A call about the caller's own
+   * run names no list (`OWN_RUN`), so an agent's own attach, handoff and instructions are not asked this.
+   */
+  const kernelStop = (ctx: CallContext, list: string): Refusal | null => {
+    const p = ctx.principal;
+    if (p.kind !== 'person' && p.kind !== 'token') return null;
+    if ((p.level === 'owner' && ctx.preview === undefined) || Object.hasOwn(ctx.levels ?? {}, list)) return null;
+    if (!kernel.kernelLists().includes(list)) return null;
+    const name = listName(list);
+    return { code: 'FORBIDDEN', fix: `${name} is kept for the owner. Ask the owner to share ${name} by name.`, at: 'register' };
+  };
+
   /** Every method starts here: the ladder, then the ceiling, then the work. */
   const guard = (ctx: CallContext, need: Need, asked?: string): Refusal | null => {
     /* A REPORT KEY REACHES `report` AND NOTHING ELSE. Every DATA and READ+ method asks this function or `scoped`,
@@ -2473,7 +2491,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       register !== undefined && Object.hasOwn(ctx.levels ?? {}, register) ? ctx.levels?.[register] : undefined;
     /* A RECORD-WIDE "ADDS ONLY" STOPS AT THE OWNER'S LISTS, in one sentence naming the list, before the ladder is asked:
        `append` reaches every other list, and a grant naming this one is the owner saying so (`ownersListStop`). */
-    const kept = register === undefined ? null : ownersListStop(ctx, register);
+    const kept = register === undefined ? null : (ownersListStop(ctx, register) ?? kernelStop(ctx, register));
     if (kept) return kept;
     const at: CallContext =
       held === undefined || ctx.principal.kind === 'system' || ctx.principal.kind === 'runner' || ctx.principal.kind === 'share'
@@ -6592,6 +6610,19 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
   const activeRuns = (ctx: CallContext | null): Entry[] => heardSince(ctx, ['active'], clock.now(), 200);
 
   /**
+   * THE RUNS A READER WHO MAY NOT READ RUNS IS COUNTED, AND NEVER SHOWN: the ones on a project row they are shown, so a
+   * Viewer or a guest on Kiln reads "2 agents are working" and never what either is doing. Only `waiting` reads these,
+   * and it answers a number (`WaitingNow.working`).
+   */
+  const countedRuns = (ctx: CallContext): Entry[] =>
+    activeRuns(null).filter((run) => {
+      const ref = run.fields.project;
+      if (typeof ref !== 'string' || ref === '') return false;
+      const row = kernel.get(ref);
+      return row !== null && readable(ctx, row.register) === null && sight.admits(ctx, row);
+    });
+
+  /**
    * WHAT WAITS ON A READER, COUNTED ONCE (`waiting()`): `boot`, Home's line and the queue's counts all read this.
    *
    * HELD TO THE READER AS EACH COUNT ALREADY WAS: the questions `holds` leaves them, the inbox only to an owner and a
@@ -6606,7 +6637,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
       nowMs: clock.now(),
       questions: rows.map((row) => ({ opened_at: String(row.opened_at ?? ''), body_kind: String(row.body_kind ?? ''), body: row.body })),
       inbox: told ? kernel.inboxWaiting() : null,
-      runs: ctx !== null && readable(ctx, SESSION) ? [] : activeRuns(ctx),
+      runs: ctx !== null && readable(ctx, SESSION) ? countedRuns(ctx) : activeRuns(ctx),
       /* THE QUEUE'S OWN RULE FOR A WITHHELD FIELD (`BAND_SQL`), so `waits.hard` and the queue's count are one number. */
       withheld: costNow().withheld,
       held: costNow().held,
@@ -7836,7 +7867,7 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
     if (p.kind !== 'person' && p.kind !== 'token') return {};
     const out: Record<string, HeldLevel> = {};
     for (const list of kernel.registers().keys()) {
-      if (reaches(ctx, list) !== null || ownersListStop(ctx, list) !== null) continue;
+      if (reaches(ctx, list) !== null || ownersListStop(ctx, list) !== null || kernelStop(ctx, list) !== null) continue;
       const held = Object.hasOwn(ctx.levels ?? {}, list) ? ctx.levels?.[list] : p.level;
       if (held !== undefined && held !== null && HELD_LEVELS.includes(held)) out[list] = held;
     }
@@ -8061,7 +8092,12 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
            principal that is neither a person nor a token reads as the record's own, with no level. */
         kind: p.kind === 'person' || p.kind === 'token' ? p.kind : 'system',
         person,
-        name: person === null ? null : (kernel.members().find((m) => m.person_id === person)?.name ?? null),
+        /* A GUEST HOLDS NO MEMBER ROW AND STILL HAS A NAME, the one the record keeps for her, so her face on the bar is
+           her own first letter and never the "Y" of "You". */
+        name:
+          person === null
+            ? null
+            : (kernel.members().find((m) => m.person_id === person)?.name ?? sql.one<{ name: string | null }>('SELECT name FROM person WHERE id = ?', person)?.name ?? null),
         level: p.kind === 'person' || p.kind === 'token' ? p.level : null,
         levels: levelsOf(ctx),
         ...(ctx.grant === undefined ? {} : { grant: { ...ctx.grant } }),
@@ -8878,7 +8914,20 @@ function api(kernel: Kernel, deps: Pick<RecordDeps, 'sql' | 'clock' | 'scheduler
    * the first call, so `context` counts what went stale through the same guards the read `stale` answers through.
    */
   let methodsHanded: MethodDeps | null = null;
-  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
+  /**
+   * A declared figure read as the record itself reads it (`MethodDeps.figure`): money only, else `null`. THE TEAM'S
+   * ALONE, as `sharePreview` that asks it is: anybody else is answered `null` and never a figure.
+   */
+  const figureAsRecord = (name: string, ctx: CallContext): { amount: number; currency: string } | null => {
+    if (team(ctx, 'read a figure') !== null) return null;
+    const at = name.indexOf(':');
+    const decl = kernel.metricDecl(at < 0 ? name : name.slice(0, at));
+    if (!decl || typeof decl.format !== 'string' || !decl.format.startsWith('money') || decl.group_by !== undefined) return null;
+    const filled = at < 0 ? decl : (fill(decl, null, name.slice(at + 1)) as typeof decl);
+    const got = kernel.metric(filled, {});
+    return got.ok && typeof got.value.value === 'number' && typeof got.value.unit === 'string' ? { amount: got.value.value, currency: got.value.unit } : null;
+  };
+  const methodDeps = (): MethodDeps => (methodsHanded ??= { kernel, sql, guard, scoped, readable, sightOf, sight, admin, team, vault, figure: figureAsRecord, named, no, tail, directory: deps.directory ?? null, clock, slashDescribed: slashDrafted, understood: understandNow, walked: walkedBatches, readsEveryList, ...(build?.host === undefined ? {} : { host: build.host }), ...(deps.engineHealth === undefined ? {} : { engineHealth: deps.engineHealth }), ...(deps.engineProbe === undefined ? {} : { engineProbe: deps.engineProbe }), ...(deps.engineLedger === undefined ? {} : { engineLedger: deps.engineLedger }), ...(deps.shares === undefined ? {} : { shares: deps.shares }), ...(deps.plus === undefined ? {} : { plus: deps.plus }), ...(deps.catalogue === undefined ? {} : { catalogue: deps.catalogue }), doorBuild: { host_build: build?.app || null, min_cli: build?.min_cli ?? null }, validFrom: deps.validFrom, untrusted: (ctx, where) => { const reader = callerOf(ctx); if (reader !== null) trust.markUntrusted(reader, where); }, createDoor: (ctx, register, fields) => { const stop = mergeShaped(ctx, register, fields, null) ?? keyHeld(ctx, register, fields, null); return stop ? { refusal: stop } : { fields: huedOf(register, fields) }; }, withheld: drawnWithheld });
 
   /**
    * The stale count `context` carries: the lines the read `stale` would answer this caller at this moment, added up

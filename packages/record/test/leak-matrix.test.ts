@@ -29,7 +29,7 @@ import { createRecordApi, type CallContext } from '../src/index.ts';
 import { scopeOf } from '../../../apps/web/src/lib/data/local.ts';
 import { leaks } from './leak/canary.ts';
 import { build, personCtx, SHAPES, unseen, variantsOf, type Caller, type Fixture, type RowInfo, type Shape } from './leak/fixture.ts';
-import { argsFor, ask, CORE, FIREWALLED, handlers, LIST_IDS, READ_ROUTES, walked, type Args } from './leak/routes.ts';
+import { argsFor, ask, CORE, FIREWALLED, handlers, KERNEL_FIELDS, LIST_IDS, READ_ROUTES, walked, type Args } from './leak/routes.ts';
 import { callTool, listResources, readResource, TOOL_NAMES, toolArgs, WRITES } from './leak/mcp.ts';
 
 const FUZZ = Number(process.env.LEAK_FUZZ ?? 2);
@@ -82,6 +82,43 @@ test('THE CANARIES ARE LIVE: the owner\'s answers, held to a contractor\'s sight
   for (const shape of SHAPES.filter((s) => s.hides)) assert.deepEqual(sorted(personCtx(f.api, shape.person).hides), sorted(shape.hides), shape.id);
 });
 
+test("THE OWNER'S OWN CANARIES ARE LIVE: what he told his agent, what its run was doing, its head and its answer are on his reads", async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const told = f.extras.filter((e) => /instruction|run/u.test(e.canary.label));
+  assert.equal(told.length, 4, told.map((e) => e.canary.label).join(', '));
+  const said = JSON.stringify([
+    await ask(h, 'list', { register: 'instructions' }, f.owner),
+    await ask(h, 'list', { register: 'session' }, f.owner),
+    await ask(h, 'instructionList', {}, f.owner),
+  ]);
+  for (const e of told) assert.ok(said.includes(e.canary.word), `${e.canary.label} is not on the owner's reads`);
+  /* AND A VIEWER OF THE WHOLE RECORD IS ON IT THROUGH HER ROLE, NOT A SHARE: the kernel's lists are held from her by
+     their declaration, not by a ceiling naming every other list. */
+  const vera = f.callers.find((c) => c.shape.id === 'whole' && c.variant === 'person')!;
+  assert.equal(vera.ctx.registers, undefined);
+  for (const register of Object.keys(KERNEL_FIELDS)) assert.equal(((await ask(h, 'list', { register }, vera.ctx)) as { ok: boolean }).ok, false, register);
+});
+
+test("A PROJECT'S MONEY IS LIVE: what Kiln earned and what was spent on it are on the owner's reads, and caught on a project shared with its amounts hidden", async () => {
+  const f = await reads();
+  const h = handlers(f);
+  const kiln = f.rows.get('kiln')!;
+  const spent = f.rows.get('m-kiln')!.canary.amount!;
+  const earned = kiln.held.find((x) => x.field === 'earned')!.amount!;
+  const figure = (await ask(h, 'metric', { metric: `money-on:${f.spoken(kiln)}` }, f.owner)) as { ok: boolean; value?: { value: number } };
+  assert.equal(figure.value?.value, spent, "the owner's figure over Kiln is not what was spent on it");
+  const row = await ask(h, 'get', { register: 'things', seq: kiln.seq }, f.owner);
+  assert.ok(JSON.stringify(row).includes(String(earned)), 'the owner is not shown what Kiln earned');
+  /* AND THE SAME READS, AS SHE MAKES THEM, ARE CAUGHT CARRYING THEM: her canaries are the amounts on the rows she sees. */
+  const priya = f.callers.find((c) => c.shape.id === 'kiln-no-amounts' && c.variant === 'person')!;
+  const caught = leaks([figure, row], f.out(priya));
+  assert.ok(caught.some((l) => l.includes('kiln') && l.includes('hidden earned')), caught.join('\n'));
+  assert.ok(caught.some((l) => l.includes('m-kiln') && l.includes('hidden amount')), caught.join('\n'));
+  /* AND WHAT SHE IS ANSWERED HAS NEITHER. */
+  assert.deepEqual(leaks([await ask(h, 'metric', { metric: `money-on:${f.spoken(kiln)}` }, priya.ctx), await ask(h, 'get', { register: 'things', seq: kiln.seq }, priya.ctx)], f.out(priya)), []);
+});
+
 /* ── P1: no answer carries a canary ─────────────────────────────────────── */
 
 for (const route of READ_ROUTES) {
@@ -107,7 +144,7 @@ test('P1 cursors walked to the end: list, recentHistory and backlinks carry no c
   const f = await reads();
   const h = handlers(f);
   const found: Found = new Map();
-  const walks: [string, Args][] = [...LIST_IDS.map((register): [string, Args] => ['list', { register }]), ['recentHistory', {}], ['recentHistory', { everything: true }]];
+  const walks: [string, Args][] = [...[...LIST_IDS, ...Object.keys(KERNEL_FIELDS)].map((register): [string, Args] => ['list', { register }]), ['recentHistory', {}], ['recentHistory', { everything: true }]];
   for (const caller of f.callers)
     for (const [route, args] of walks)
       for (const page of await walked(h, route, args, caller.ctx)) for (const l of leaks(page, f.out(caller))) note(found, caller, `${l} <- ${route} ${JSON.stringify(args)}`);
@@ -160,7 +197,16 @@ for (const tool of TOOL_NAMES) {
 
 test('P1 MCP resources: the list and every resource read carry no canary', async () => {
   const f = await reads();
-  const fixed = ['braindog:page/kiln', 'braindog:page/spend', 'braindog:metric/tasks-count', 'braindog:metric/tasks-rate', 'braindog:metric/money-sum', 'braindog:inbox', 'braindog:declaration/kiln', ...LIST_IDS.map((l) => `braindog:schema/${l}`)];
+  const fixed = [
+    'braindog:page/kiln',
+    'braindog:page/spend',
+    'braindog:metric/tasks-count',
+    'braindog:metric/tasks-rate',
+    'braindog:metric/money-sum',
+    'braindog:inbox',
+    'braindog:declaration/kiln',
+    ...[...LIST_IDS, ...Object.keys(KERNEL_FIELDS)].map((l) => `braindog:schema/${l}`),
+  ];
   const found: Found = new Map();
   for (const caller of f.callers) {
     const listed = (await listResources(f, caller.ctx)) as { result?: { resources?: { uri: string }[] } };

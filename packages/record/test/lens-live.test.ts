@@ -141,11 +141,11 @@ test('THE PLAN’S GRANT SHAPES, written as share rows, come out of access as th
   const ids = (who: string) => sql.all<{ id: string }>("SELECT id FROM share WHERE who = ? AND effect = 'allow' ORDER BY id", who).map((r) => r.id);
   const all = (who: string) => sql.all<{ id: string }>('SELECT id FROM share WHERE who = ? ORDER BY id', who).map((r) => r.id);
 
-  /* `session` and `instructions` are the kernel's own lists of agent runs and of what he told them, which a whole-record
-     share reaches as it reaches any list but Keys and People, as a Viewer's role does. */
-  assert.deepEqual(api.kernel.access('p_vic'), { level: 'read', registers: ['session', 'instructions', 'things', 'tasks', 'money', 'notes'], levels: {}, grant: grant(ids('p_vic')) }, 'G1');
+  /* `session` and `instructions` are the kernel's own lists of agent runs and of what he told them: HIS, so a whole-record
+     share leaves them out as it leaves out Keys and People, and only a share that names them reaches them. */
+  assert.deepEqual(api.kernel.access('p_vic'), { level: 'read', registers: ['things', 'tasks', 'money', 'notes'], levels: {}, grant: grant(ids('p_vic')) }, 'G1');
   /* Tasks holds a money rate, so "everything but money" keeps it from Lee too. Keys are denied though the record has none. */
-  assert.deepEqual(api.kernel.access('p_lee'), { level: 'write', registers: ['session', 'instructions', 'things', 'notes'], levels: {}, grant: grant(all('p_lee').filter((id) => id !== all('p_lee')[2])) }, 'G2');
+  assert.deepEqual(api.kernel.access('p_lee'), { level: 'write', registers: ['things', 'notes'], levels: {}, grant: grant(all('p_lee').filter((id) => id !== all('p_lee')[2])) }, 'G2');
   assert.deepEqual(
     api.kernel.access('p_pri'),
     { level: null, registers: ['tasks', 'money'], levels: { tasks: 'read', money: 'read' }, grant: grant([accountant], at(NOW + 90 * DAY)) },
@@ -280,6 +280,47 @@ test('THE COMMENT RUNG reads and proposes, and boot and version carry the grant 
   const edit = (await api.update({ register: 'tasks', seq: 1, patch: { what: 'Renamed' } }, gus)) as { ok: boolean; refusal?: { code: string } };
   assert.equal(edit.ok, false);
   assert.equal(edit.refusal?.code, 'LEVEL_REQUIRED');
+});
+
+test('THE KERNEL’S LISTS ARE THE OWNER’S: no role, broad share or Admin reaches the runs or what he told them, and a grant naming one does', async () => {
+  const { api, sql, kiln } = await record();
+  const told = value<{ id: string }>(await api.instruct({ said: 'Fire the test tiles first' }, owner));
+  const words = (r: unknown) => JSON.stringify(r).includes('Fire the test tiles first');
+  const lists = ['session', 'instructions'];
+  /* BY THEIR DECLARATION: the kernel's pack, not a name. */
+  assert.deepEqual([...api.kernel.kernelLists()].sort(), [...lists].sort());
+  assert.equal(api.kernel.catalog().lists.filter((l) => l.kernel === true).length, 2);
+
+  for (const [person, level] of [['p_vic', 'read'], ['p_lee', 'write'], ['p_cat', 'decide']] as const) value(await api.invite({ person, name: person, level }, owner));
+  share(sql, 'p_pri', { record: true }, 'view');
+  share(sql, 'p_omar', { project: kiln }, 'edit');
+  share(sql, 'p_ana', { lists: ['instructions'] }, 'view');
+  share(sql, 'p_gus', { lists: ['instructions'] }, 'view'); // a share naming it, beside a Viewer's role
+  value(await api.invite({ person: 'p_gus', name: 'Gus', level: 'read' }, owner));
+  value(await api.invite({ person: 'p_sam', name: 'Sam', level: 'read', registers: { instructions: 'read' } }, owner)); // a member row naming it
+  api.kernel.accessChanged();
+
+  for (const p of ['p_vic', 'p_lee', 'p_cat', 'p_pri', 'p_omar']) {
+    const ctx = contextOf(api, p);
+    for (const register of lists) {
+      const got = (await api.list({ register }, ctx)) as { ok: boolean; refusal?: { code: string; fix: string } };
+      assert.equal(got.ok, false, `${p} reads ${register}`);
+      assert.match(got.refusal!.fix, /is kept for the owner/u);
+    }
+    assert.equal(words(await api.get({ spoken: told.id } as never, ctx)), false, `${p} reads the instruction`);
+    assert.equal(words(await api.search({ q: 'tiles' }, ctx)), false, `${p} finds the instruction`);
+    const boot = value<{ registers: { id: string }[] }>(await api.boot(ctx));
+    assert.deepEqual(boot.registers.filter((r) => lists.includes(r.id)), [], `${p} is shown a kernel list on the rail`);
+  }
+  /* A GRANT THAT NAMES IT IS THE OWNER SAYING SO. */
+  for (const p of ['p_ana', 'p_gus', 'p_sam']) {
+    const ctx = contextOf(api, p);
+    assert.equal(api.kernel.access(p)?.levels.instructions, 'read', p);
+    assert.ok(words(await api.list({ register: 'instructions' }, ctx)), `${p} is not shown what the share names`);
+    assert.equal(((await api.list({ register: 'session' }, ctx)) as { ok: boolean }).ok, false, `${p} reads the runs`);
+  }
+  /* AND THE OWNER AND HIS AGENTS READ BOTH. */
+  assert.ok(words(await api.list({ register: 'instructions' }, owner)));
 });
 
 test('OWNER NON-INTERFERENCE: the owner’s access, context and boot are the same bytes with shares on the record and without', async () => {

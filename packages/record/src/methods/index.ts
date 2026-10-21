@@ -112,6 +112,13 @@ export type RecordDeps = {
    * does not share with outsiders. Absent, nothing is held back, which is every host while it sells nothing.
    */
   plus?: ((ctx: CallContext, who: { kind: string; id: string }) => Refusal | null | Promise<Refusal | null>) | undefined;
+  /**
+   * One declared figure read as the record reads it, nobody's sight in it, by the id a `stat` cell names
+   * (`project-owed:Kiln`): its value and currency, or `null` for a figure that is not there or is not money. For a sheet
+   * saying what a share would show (`sharePreview`), never for an answer a reader is handed as it is, and `null` to
+   * anybody outside the team.
+   */
+  figure?: ((name: string, ctx: CallContext) => { amount: number; currency: string } | null) | undefined;
   /** An owner in a browser, and no token of any kind. */
   admin: (ctx: CallContext, reads?: string, method?: string) => Refusal | null;
   /** The vault's gate: an owner in a browser, proved within `FRESH`. */

@@ -75,6 +75,12 @@ export type CatalogList = {
   fields: CatalogField[];
   role?: 'keys' | 'meets' | 'projects';
   ownerOnly?: boolean;
+  /**
+   * A list the kernel declares itself (`pack_id` kernel): the runs, and what the owner tells his agents. THE OWNER'S, by
+   * its declaration and never by a name: no role but owner reaches it, and no broad share does (the record, money
+   * lists, a project). Only a share or a member row that names it reaches it.
+   */
+  kernel?: boolean;
   /** The field the record mirrors onto the `state` column, as `Schema.state` says. */
   state?: string;
 };
@@ -177,7 +183,7 @@ const RANK: Record<Level, number> = { read: 1, append: 0, write: 3, decide: 4, o
  * a record-wide "Adds only" stops at the owner's lists (Keys, People and any `owner_only` list), as the record's
  * `ownersListStop` says. A share still reaches Keys and People only by naming them (`coverOf`).
  */
-const roleReaches = (role: Level, l: CatalogList): boolean => role !== 'append' || !isGated(l);
+const roleReaches = (role: Level, l: CatalogList): boolean => l.kernel !== true && (role !== 'append' || !isGated(l));
 
 /** A legacy rule as the lens carries it: TRUE for none, the rule itself as one leaf, or FALSE when it cannot be read. */
 const legacyCond = (where: Json | null | undefined): Expr =>
@@ -503,7 +509,7 @@ export function shareFault(s: unknown): { at: string; fix: string } | null {
 
 /* ------------------------------------------------------------------------------------------------- reading a target */
 
-const isGated = (l: CatalogList): boolean => l.ownerOnly === true || l.role === 'keys' || l.role === 'meets';
+const isGated = (l: CatalogList): boolean => l.ownerOnly === true || l.kernel === true || l.role === 'keys' || l.role === 'meets';
 const hasMoney = (l: CatalogList): boolean => l.fields.some((f) => !f.retired && f.type === 'money');
 const scopeField = (l: CatalogList): CatalogField | undefined => l.fields.find((f) => f.scope !== undefined && !f.retired);
 
@@ -774,14 +780,17 @@ function ctxOf(lens: Omit<Lens, 'ctx'>, sources: LensSources, catalog: Catalog, 
     }
     return ctx;
   }
+  const byId = new Map(catalog.lists.map((x) => [x.id, x]));
   for (const l of reached) {
-    /* A LEVEL ONLY WHERE THE LIST DIFFERS FROM WHAT THE ROLE GIVES, so an Admin's lists carry none. */
-    const asRole = role !== null && CAPS.every((c) => (pred[c][l] !== false) === LEVEL_CAPS[role].includes(c));
+    /* A LEVEL ONLY WHERE THE LIST DIFFERS FROM WHAT THE ROLE GIVES, so an Admin's lists carry none. A list the role does
+       not reach on its own (a kernel list) always carries its level, because a grant naming it is what lets a reader in. */
+    const own = role !== null ? roleReaches(role, byId.get(l)!) : level !== null && !isGated(byId.get(l)!);
+    const asRole = role !== null && own && CAPS.every((c) => (pred[c][l] !== false) === LEVEL_CAPS[role!].includes(c));
     /* A LEGACY ROW NO SHARE CHANGED KEEPS ITS OWN LEVEL, `decide` included, which the ladder of predicates cannot say. */
     const legacy = (sources.lists ?? []).find((r) => r.register === l);
     const asLegacy = legacy !== undefined && CAPS.every((c) => (pred[c][l] !== false) === LEVEL_CAPS[legacy.level].includes(c));
     const t = asLegacy ? legacy.level : top(l);
-    if (t !== null && t !== level && (asLegacy ? legacy.level !== role : !asRole)) ctx.levels[l] = t;
+    if (t !== null && (!own || (t !== level && (asLegacy ? legacy.level !== role : !asRole)))) ctx.levels[l] = t;
     const r = pred.read[l]!;
     const w = toWhere(r);
     if (w) ctx.wheres[l] = w;

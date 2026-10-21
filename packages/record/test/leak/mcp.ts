@@ -50,18 +50,22 @@ export function toolArgs(name: string, f: Fixture): Args[] {
   const rows = [...f.rows.values()];
   const spoken = rows.map((r) => f.spoken(r));
   const lists = ['things', 'people', 'tasks', 'money', 'credentials', 'notes'];
+  /* THE KERNEL'S OWN LISTS, asked by name: the runs, and what he told them. */
+  const kernel = ['session', 'instructions'];
   switch (name) {
     case 'record_index':
     case 'context':
       return [{}, { format: 'json' }];
     case 'schema':
-      return lists.map((register) => ({ register }));
+      return [...lists, ...kernel].map((register) => ({ register }));
     case 'get':
     case 'history':
-      return spoken.map((s) => ({ spoken: s, format: 'json' }));
+      return [...spoken, 'S1', 'IN1'].map((s) => ({ spoken: s, format: 'json' }));
     case 'list':
       return [
         ...lists.map((register) => ({ register, format: 'json' })),
+        ...kernel.map((register) => ({ register, format: 'json' })),
+        ...kernel.map((register) => ({ register })),
         ...lists.map((register) => ({ register })),
         { register: 'tasks', where: { field: 'thing', is: f.built.ids.loom }, format: 'json' },
       ];

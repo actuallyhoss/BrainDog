@@ -1656,6 +1656,8 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
    */
   let revision = 0;
   let catalogMemo: Catalog | null = null;
+  /** The lists the kernel declares itself (`pack_id` kernel), read once a declaration revision. */
+  let kernelMemo: string[] | null = null;
   const lensCache = new LensCache<Held | null>(256);
 
   function reload(opts: { copied?: true } = {}): void {
@@ -1666,6 +1668,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
     ));
     revision++;
     catalogMemo = null;
+    kernelMemo = null;
     lensCache.clear();
     /* THE SET OF LISTS IS PART OF WHO HOLDS WHAT: a list installed falls under somebody's whole-record share. So the epoch
        moves when it changes, as it does for a share, and an open tab re-boots onto the lists it now has. Never on the
@@ -1681,11 +1684,17 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
       });
   }
 
+  /** The lists the kernel declares itself, by their declaration's pack and never by a name, for this declaration revision. */
+  const kernelListsNow = (): readonly string[] =>
+    (kernelMemo ??= sql
+      .all<{ id: string }>("SELECT id FROM declaration WHERE kind = 'register' AND pack_id = 'kernel' AND superseded_at IS NULL AND retired = 0")
+      .map((r) => r.id.slice('register.'.length)));
+
   /** The record's lists as the lens reads them (`lens.ts`'s `Catalog`), for this declaration revision. */
   const catalogNow = (): Catalog =>
     (catalogMemo ??= catalogOf(
       [...registers.values()].map((d) => ({ ...d, fields: withTags(d.fields) as unknown as ListLike['fields'] })),
-      { keys: VAULT_LIST, people: meetsRole(registers.values())?.register ?? null },
+      { keys: VAULT_LIST, people: meetsRole(registers.values())?.register ?? null, kernel: kernelListsNow() },
     ));
 
   /** What `access` needs to merge shares, for one call. */
@@ -11323,10 +11332,7 @@ function makeKernel(sql: Sql, given: Clock, state: SchemaState, opts: RecordOpti
      * The lists the kernel declares itself (`pack_id` kernel: the runs, and what he told them), by id. On every record
      * and no person's or pack's, so a screen that tells him what he filed leaves them out by this and not by a name.
      */
-    kernelLists: (): string[] =>
-      sql
-        .all<{ id: string }>("SELECT id FROM declaration WHERE kind = 'register' AND pack_id = 'kernel' AND superseded_at IS NULL AND retired = 0")
-        .map((r) => r.id.slice('register.'.length)),
+    kernelLists: (): string[] => [...kernelListsNow()],
     /**
      * A live list as `@braindog/where` reads it, or `null` for a list this record does not hold.
      *

@@ -30,7 +30,7 @@ export const CORE = ['list', 'get', 'search', 'history', 'recentHistory', 'whats
 export const READ_ROUTES: readonly string[] = ROUTES.filter((r) => (r.group === 'READ+' || r.group === 'DATA') && (!r.writes || r.name === 'previewPage')).map((r) => r.name);
 
 const FIELDS: Record<string, string[]> = {
-  things: ['name', 'notes'],
+  things: ['name', 'notes', 'earned'],
   people: ['name', 'email'],
   tasks: ['name', 'thing', 'stage', 'rate', 'notes', 'assignee'],
   money: ['payee', 'amount', 'thing', 'notes'],
@@ -38,6 +38,14 @@ const FIELDS: Record<string, string[]> = {
   notes: ['what', 'thing'],
 };
 export const LIST_IDS = Object.keys(FIELDS);
+
+/**
+ * The kernel's own lists, the owner's (the runs, and what he told them), asked by name on every path that takes a list
+ * or a row, with the fields their words are in. They are not in `LIST_IDS`, since the fixture's truth counts no row of
+ * theirs; their words are the fixture's `extras`.
+ */
+export const KERNEL_FIELDS: Record<string, string[]> = { session: ['doing', 'head', 'state'], instructions: ['said', 'reply', 'state'] };
+const KERNEL_SPOKEN = ['S1', 'IN1'];
 
 /**
  * The arguments one route is asked with on this fixture. `lean` is the set P2 asks twice per round: every list and a
@@ -49,9 +57,11 @@ export function argsFor(name: string, f: Fixture, lean = false): Args[] {
   const lists = LIST_IDS.map((register) => ({ register }));
   const route = ROUTES.find((r) => r.name === name);
   const takes = Object.keys((route as { takes?: Record<string, unknown> } | undefined)?.takes ?? {});
+  const kernelLists = Object.keys(KERNEL_FIELDS).map((register) => ({ register }));
+  const kernelRows = [...Object.keys(KERNEL_FIELDS).map((register) => ({ register, seq: 1 })), ...KERNEL_SPOKEN.map((spoken) => ({ spoken }))];
   switch (name) {
     case 'get':
-      return [...rows.map((r) => ({ register: r.list, seq: r.seq })), ...rows.map((r) => ({ spoken: f.spoken(r) })), { register: 'tasks', seq: 9_999 }];
+      return [...rows.map((r) => ({ register: r.list, seq: r.seq })), ...rows.map((r) => ({ spoken: f.spoken(r) })), { register: 'tasks', seq: 9_999 }, ...kernelRows];
     case 'list':
       if (lean)
         return [
@@ -60,9 +70,13 @@ export function argsFor(name: string, f: Fixture, lean = false): Args[] {
           { register: 'tasks', order: [{ field: 'rate', dir: 'desc' }] },
           { register: 'tasks', where: { field: 'thing', is: f.built.ids.loom } },
           { register: 'tasks', where: { field: 'notes', contains: 'private' } },
+          ...kernelLists,
         ];
       return [
         ...lists,
+        ...kernelLists,
+        ...kernelLists.map((l) => ({ ...l, includeDeleted: true })),
+        ...Object.entries(KERNEL_FIELDS).flatMap(([register, fields]) => fields.map((field) => ({ register, order: [{ field, dir: 'desc' }] }))),
         ...lists.map((l) => ({ ...l, includeDeleted: true })),
         ...LIST_IDS.flatMap((register) =>
           FIELDS[register]!.flatMap((field) => [
@@ -77,12 +91,12 @@ export function argsFor(name: string, f: Fixture, lean = false): Args[] {
         { register: 'money', where: { field: 'thing', is: f.built.ids.loom } },
       ];
     case 'countBy':
-      return LIST_IDS.flatMap((register) => FIELDS[register]!.map((by) => ({ register, by })));
+      return [...LIST_IDS.flatMap((register) => FIELDS[register]!.map((by) => ({ register, by }))), ...Object.entries(KERNEL_FIELDS).flatMap(([register, fields]) => fields.map((by) => ({ register, by })))];
     case 'search':
       return words.map((q) => ({ q }));
     case 'history':
     case 'backlinks':
-      return [...rows.map((r) => ({ register: r.list, seq: r.seq })), { register: 'tasks', seq: 9_999 }];
+      return [...rows.map((r) => ({ register: r.list, seq: r.seq })), { register: 'tasks', seq: 9_999 }, ...Object.keys(KERNEL_FIELDS).map((register) => ({ register, seq: 1 }))];
     case 'recentHistory':
       return [{}, { limit: 200 }, { everything: true }];
     case 'whatsNew':
@@ -93,13 +107,34 @@ export function argsFor(name: string, f: Fixture, lean = false): Args[] {
       return [
         ...PAGES.map((body) => ({ body })),
         { body: { ...PAGES[0], blocks: [{ kind: 'table', key: 'loom', heading: 'Loom', source: 'register.tasks', where: { field: 'thing', is: f.built.ids.loom }, columns: [{ field: 'name' }] }] } },
+        /* A TILE OVER ONE PROJECT'S MONEY, and the projects with what each earned, as a project page draws them. */
+        {
+          body: {
+            page: 'probe-money',
+            title: 'Probe',
+            requires: ['register.things', 'register.money'],
+            blocks: [
+              { kind: 'stat', key: 'spent-on', cells: (['kiln', 'loom'] as const).map((k) => ({ metric: `money-on:${f.spoken(f.rows.get(k)!)}` })) },
+              { kind: 'table', key: 'earned', heading: 'Earned', source: 'register.things', columns: [{ field: 'name' }, { field: 'earned' }] },
+            ],
+          },
+        },
+        /* A PAGE OVER THE KERNEL'S LISTS, the runs and what he told them, as a person could draft one. */
+        ...Object.entries(KERNEL_FIELDS).map(([register, fields]) => ({
+          body: { page: `probe-${register}`, title: 'Probe', requires: [`register.${register}`], blocks: [{ kind: 'table', key: register, heading: 'Probe', source: `register.${register}`, columns: fields.map((field) => ({ field })) }] },
+        })),
       ];
     case 'metric':
-      return [{ metric: 'tasks-count' }, { metric: 'tasks-rate' }, { metric: 'money-sum' }];
+      return [{ metric: 'tasks-count' }, { metric: 'tasks-rate' }, { metric: 'money-sum' }, ...(['kiln', 'loom'] as const).map((k) => ({ metric: `money-on:${f.spoken(f.rows.get(k)!)}` }))];
     case 'comments':
-      return rows.map((r) => ({ on: f.spoken(r) }));
+      return [...rows.map((r) => ({ on: f.spoken(r) })), ...KERNEL_SPOKEN.map((on) => ({ on }))];
     case 'usedBy':
-      return rows.map((r) => ({ spoken: f.spoken(r) }));
+      return [...rows.map((r) => ({ spoken: f.spoken(r) })), ...KERNEL_SPOKEN.map((spoken) => ({ spoken }))];
+    case 'instructionList':
+      return [{}, { state: 'done' }, { run: 'S1' }];
+    case 'presence':
+    case 'sessionsLive':
+      return [{}, { repo: 'kiln' }];
     case 'governance':
       return [{}, ...f.asked.map((id) => ({ register: 'suggestion', id })), { status: 'decided' }];
     case 'about':

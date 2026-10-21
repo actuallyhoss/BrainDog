@@ -60,8 +60,11 @@ const TOOLS = reg({
 });
 
 const owner: CallContext = { principal: { kind: 'person', id: 'p_1', level: 'owner' }, credentialed: true };
-/** Somebody invited to the keys, the projects and the runs, and nothing else: the tools are closed to her. */
-const held: CallContext = { principal: { kind: 'person', id: 'p_3', level: 'write' }, registers: ['keys', 'things', 'session'] };
+/**
+ * Somebody invited to the keys, the projects and the runs, and nothing else: the tools are closed to her. The runs are
+ * the owner's own list, so her grant names them (`levels`), as `invite` writes a list grant.
+ */
+const held: CallContext = { principal: { kind: 'person', id: 'p_3', level: 'write' }, registers: ['keys', 'things', 'session'], levels: { session: 'write' } };
 /** The same, without the runs: what runs used is then no evidence she is told of. */
 const runless: CallContext = { principal: { kind: 'person', id: 'p_4', level: 'write' }, registers: ['keys', 'things'] };
 const KILN = 'https://github.com/sam/kiln';

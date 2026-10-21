@@ -42,7 +42,14 @@ const text = (id: string, extra: Record<string, unknown> = {}) => ({ id, type: '
 
 /** The lists, each with the fields §4.1 names. */
 export const LISTS = [
-  register({ id: 'things', name: 'Projects', title: 'name', scopes: { repos: 'repos' }, fields: [text('name', { required: true }), text('notes'), { id: 'repos', type: 'list', of: 'text' }] }),
+  /* A PROJECT SAYS WHAT IT EARNED, as Kiln's "Earned in a year" does: the money a project share shows on its own row. */
+  register({
+    id: 'things',
+    name: 'Projects',
+    title: 'name',
+    scopes: { repos: 'repos' },
+    fields: [text('name', { required: true }), text('notes'), { id: 'repos', type: 'list', of: 'text' }, { id: 'earned', label: 'Earned in a year', type: 'money' }],
+  }),
   register({
     id: 'people',
     name: 'People',
@@ -80,7 +87,12 @@ export const METRICS = [
   metric({ metric: 'tasks-count', name: 'Tasks', source: 'register.tasks', value: { count: 'name' }, format: 'int', target: { gte: 0 }, window: '30d', compare: 'none' }),
   metric({ metric: 'tasks-rate', name: 'Rates', source: 'register.tasks', value: { sum: 'rate' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' }),
   metric({ metric: 'money-sum', name: 'Spent', source: 'register.money', value: { sum: 'amount' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' }),
+  /* A FIGURE ABOUT ONE PROJECT, as a project page's tiles read one (`project-owed:Kiln`): the money spent on it. */
+  metric({ metric: 'money-on', name: 'Spent on it', source: 'register.money', where: 'thing is {{it}}', value: { sum: 'amount' }, format: 'money.GBP', target: { gte: 0 }, window: '30d', compare: 'none' }),
 ];
+
+/** The field a row's amount is in, by its list. */
+const amountField = (list: string): string => (list === 'money' ? 'amount' : list === 'things' ? 'earned' : 'rate');
 
 export const PAGES = [
   {
@@ -156,6 +168,8 @@ type Built = { ids: { kiln: string; loom: string; one: string }; seqs: Record<st
 export const SHAPES: readonly Shape[] = [
   { id: 'owner', name: 'Owner (non-interference control)', person: OWNER, sees: () => true },
   { id: 'whole', name: 'Whole-record view', person: 'p_vera', invite: { level: 'read' }, sees: () => true },
+  /* AN ADMIN SEES EVERY ROW, and still not the owner's own lists: what he told his agents and what they did. */
+  { id: 'admin', name: 'Admin', person: 'p_adm', invite: { level: 'decide' }, sees: () => true },
   {
     id: 'assistant',
     name: 'Assistant',
@@ -214,7 +228,8 @@ export const SHAPES: readonly Shape[] = [
       { what: { lists: { has: 'money' } }, can: 'view' },
       { effect: 'deny', what: { lists: { role: 'keys' } }, can: 'view' },
     ],
-    sees: (r) => r.list === 'tasks' || r.list === 'money',
+    /* EVERY LIST WITH AN AMOUNT IN IT, the projects' own among them. */
+    sees: (r) => r.list === 'tasks' || r.list === 'money' || r.list === 'things',
   },
   {
     id: 'sh-contractor',
@@ -276,8 +291,20 @@ export const SHAPES: readonly Shape[] = [
     name: 'Accountant who is not shown amounts',
     person: 'p_ham',
     shares: () => [{ what: { lists: { has: 'money' } }, can: 'view', hide: { types: ['money'] } }],
-    sees: (r) => r.list === 'tasks' || r.list === 'money',
-    hides: { tasks: ['rate'], money: ['amount'] },
+    sees: (r) => r.list === 'tasks' || r.list === 'money' || r.list === 'things',
+    hides: { things: ['earned'], tasks: ['rate'], money: ['amount'] },
+  },
+  /* A PROJECT SHARED WITH ITS AMOUNTS HIDDEN, as the Share sheet shares one with anybody outside his team (the owner's call
+     of 21 October): Kiln's tasks, notes and money with no amount anywhere, its own "Earned in a year" among them, and no
+     figure or tile over money. */
+  {
+    id: 'kiln-no-amounts',
+    name: 'Kiln, amounts hidden',
+    person: 'p_kna',
+    shares: (f) => [{ what: { project: f.ids.kiln }, can: 'view', hide: { types: ['money'] } }],
+    sees: (r) => r.key === 'kiln' || (['tasks', 'money', 'notes'].includes(r.list) && r.thing === 'kiln'),
+    hides: { things: ['earned'], tasks: ['rate'], money: ['amount'] },
+    narrowed: true,
   },
   {
     id: 'comment',
@@ -340,7 +367,7 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
       ...said,
       ...(info.thing && thingId ? { thing: thingId } : {}),
       ...(info.stage ? { stage: info.stage } : {}),
-      ...(amount !== undefined ? { [list === 'money' ? 'amount' : 'rate']: { amount, currency: 'GBP' } } : {}),
+      ...(amount !== undefined ? { [amountField(list)]: { amount, currency: 'GBP' } } : {}),
     };
     const by = info.privateBy === SAM ? sam() : owner;
     const made = okValue<Entry>(await api.create({ register: list, fields: body as never }, by), `create ${key}`);
@@ -358,7 +385,7 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
       canary: { label: `${list}#${made.seq} (${key})`, word, id: made.id, ...(amount === undefined ? {} : { amount }) },
       held: [
         ...(hidden === undefined ? [] : [{ field: 'notes', word: hidden }]),
-        ...(amount === undefined ? [] : [{ field: list === 'money' ? 'amount' : 'rate', amount }]),
+        ...(amount === undefined ? [] : [{ field: amountField(list), amount }]),
       ],
     };
     rows.set(key, row);
@@ -369,8 +396,8 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
   okValue(await api.invite({ person: SAM, name: 'Sam Reyes', level: 'write' }, owner), 'invite Sam');
 
   /* THE ROWS. */
-  await add('kiln', 'things', (w) => ({ name: `Kiln ${w}`, notes: `The kiln project ${w}` }));
-  await add('loom', 'things', (w) => ({ name: `Loom ${w}`, notes: `The loom project ${w}` }));
+  await add('kiln', 'things', (w) => ({ name: `Kiln ${w}`, notes: `The kiln project ${w}` }), { amount: true });
+  await add('loom', 'things', (w) => ({ name: `Loom ${w}`, notes: `The loom project ${w}` }), { amount: true });
   await add('priya', 'people', (w) => ({ name: `Priya ${w}`, email: 'priya@example.com' }));
   await add('omar', 'people', (w) => ({ name: `Omar ${w}`, email: 'omar@example.com' }));
   const priya = rows.get('priya')!.id;
@@ -464,7 +491,31 @@ export async function build(options: { seed?: number; shapes?: readonly Shape[];
   /* AN INBOX ARRIVAL, read by the owner alone. */
   const inboxWord = mint.word('zq');
   api.kernel.arrive({ channel: 'email', headers: { From: 'alerts@bank.example' }, body: `Your statement ${inboxWord} is ready`, sha256: 'leak-arrival' } as never);
-  const extras: Extra[] = [{ canary: { label: 'the inbox arrival', word: inboxWord }, sees: (c) => c.shape.id === 'owner' }];
+  const ownerOnly = (c: Caller) => c.shape.id === 'owner';
+  const extras: Extra[] = [{ canary: { label: 'the inbox arrival', word: inboxWord }, sees: ownerOnly }];
+
+  /* THE KERNEL'S OWN LISTS, THE OWNER'S: what he told his agent, what its run was doing and the head its receipt is
+     read to, and what it answered. Read by an owner alone, through every choke point. */
+  const agent: CallContext = {
+    principal: { kind: 'token', id: 't_leak_agent', scope: 'write', person: OWNER, level: 'owner' },
+    session: { host: 'studio-mac', repo: 'kiln', agent: 'claude', client_id: 'leak-run' },
+  };
+  sql.exec('INSERT INTO token (id, person_id, hash, scope, label, created_at) VALUES (?, ?, ?, ?, ?, ?)', 't_leak_agent', OWNER, 'h_t_leak_agent', 'write', 'Claude on the studio Mac', new Date(NOW).toISOString());
+  const doing = mint.word('zk');
+  const head = mint.word('zk');
+  const run = okValue<{ spoken: string; session: { id: string } }>(await api.attach({ source: 'startup', doing: `Firing the test tiles ${doing}`, head } as never, agent), 'attach');
+  const told = mint.word('zk');
+  const instruction = okValue<{ id: string }>(await api.instruct({ said: `Check the glaze recipe ${told}`, to_run: run.spoken } as never, owner), 'instruct');
+  okValue(await api.instructionsMine({ take: instruction.id } as never, agent), 'take');
+  const answered = mint.word('zk');
+  okValue(await api.instructionsMine({ reply: instruction.id, said: `Checked it ${answered}`, state: 'done' } as never, agent), 'reply');
+  const instructionRow = api.kernel.get(instruction.id)!;
+  extras.push(
+    { canary: { label: "an instruction's words", word: told, id: instructionRow.id }, sees: ownerOnly },
+    { canary: { label: "a run's doing", word: doing, id: run.session.id }, sees: ownerOnly },
+    { canary: { label: "a run's head, on its receipt", word: head }, sees: ownerOnly },
+    { canary: { label: "a run's answer", word: answered }, sees: ownerOnly },
+  );
 
   /* THE CALLERS: each shape as the person, a write-scope token and a read-scope token. */
   let tokens = 0;

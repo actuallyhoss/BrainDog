@@ -174,7 +174,7 @@ export type ListLike = {
  * marked, and the roles. `keys` is the vault's index list, `people` the list `meet` writes, and the projects list is the
  * one declaring `scopes:`.
  */
-export function catalogOf(lists: Iterable<ListLike>, roles: { keys: string; people: string | null }): Catalog {
+export function catalogOf(lists: Iterable<ListLike>, roles: { keys: string; people: string | null; kernel?: readonly string[] }): Catalog {
   const out: CatalogList[] = [];
   for (const l of lists) {
     const fields: CatalogField[] = l.fields.map((f) => ({ ...(f as unknown as CatalogField), ...(f.id === l.title ? { title: true } : {}) }));
@@ -185,6 +185,7 @@ export function catalogOf(lists: Iterable<ListLike>, roles: { keys: string; peop
       fields,
       ...(role === undefined ? {} : { role }),
       ...(l.owner_only === true ? { ownerOnly: true } : {}),
+      ...(roles.kernel?.includes(l.id) === true ? { kernel: true } : {}),
       ...(l.state === undefined ? {} : { state: l.state }),
     });
   }

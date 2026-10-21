@@ -19,6 +19,7 @@
 import {
   checkShare,
   instant,
+  moneyText,
   SHARE_TEMPLATES,
   lensOf,
   shareMeOf,
@@ -85,8 +86,23 @@ export type SharingRow = {
 /** What `share` and `shareOnward` answer: the share kept, its version, and the sentence it is said in. */
 export type Shared = { id: string; version: number; sentence: string };
 
-/** What `sharePreview` answers: the sentence, and how many rows of each list the share reaches now. */
-export type SharePreview = { sentence: string; lists: { list: string; name: string; rows: number }[] };
+/**
+ * What `sharePreview` answers: the sentence, how many rows of each list the share reaches now, and the money it shows.
+ *
+ * `money` IS SAID PLAINLY, BECAUSE A GUEST READS IT (the owner's call of 21 October): `null` when the share reaches no
+ * list with an amount in it; else the money lists it reaches by name, whether every amount is hidden from them, and,
+ * for a project shared whole or in part, the project's own figures that they will read: what its row leads with, and
+ * what its page's figures say about it over lists the share reaches ("GBP 18,400.00", `moneyText`), at most
+ * `MONEY_SAID_MOST`. No figure is said when the amounts are hidden.
+ */
+export type SharePreview = {
+  sentence: string;
+  lists: { list: string; name: string; rows: number }[];
+  money: { lists: string[]; hidden: boolean; figures: { label: string; said: string }[] } | null;
+};
+
+/** The most figures a preview says a project's money in. */
+export const MONEY_SAID_MOST = 2;
 
 /**
  * One line of "Seen and changed" (§2.10, §3.2): who, through which share, and what they did in plain words, such as
@@ -217,6 +233,20 @@ export function sharedOut(sql: Pick<Sql, 'one'>, catalog: LensCatalog, live: rea
   };
 }
 
+/** Every `stat` cell a page's blocks name, in the page's order, its block's children among them. */
+function statCells(blocks: unknown): { metric: string; label?: string }[] {
+  const out: { metric: string; label?: string }[] = [];
+  const walk = (b: unknown): void => {
+    if (Array.isArray(b)) return b.forEach(walk);
+    if (!isObj(b)) return;
+    if (Array.isArray(b.cells))
+      for (const c of b.cells) if (isObj(c) && typeof c.metric === 'string') out.push({ metric: c.metric, ...(typeof c.label === 'string' ? { label: c.label } : {}) });
+    if (Array.isArray(b.blocks)) walk(b.blocks);
+  };
+  walk(blocks);
+  return out;
+}
+
 export function methods(deps: RecordDeps) {
   const { kernel, sql, scoped, clock } = deps;
   const team = deps.team ?? ((ctx: CallContext, reads?: string) => deps.admin(ctx, reads));
@@ -328,6 +358,64 @@ export function methods(deps: RecordDeps) {
       out.push({ list: l.id, name: l.name, rows: got.ok ? got.value.matched : 0 });
     }
     return out;
+  };
+
+  /* ---------------------------------------------------------------------------------------------- the money shown */
+
+  const moneyFields = (l: LensCatalogList): string[] => l.fields.filter((f) => !f.retired && !f.title && f.type === 'money').map((f) => f.id);
+
+  /**
+   * The money a share shows (`SharePreview.money`): the lists with an amount in them that it reaches rows of now, whether
+   * every amount there is hidden by it, and for a project its own figures.
+   *
+   * THE PROJECT'S OWN FIGURES, AS ITS PAGE DRAWS THEM. The first amount its row says, by its field's label ("Earned in a
+   * year"); then each money figure a page about that list's rows names for it (a `stat` cell's `<figure>:{{<title>}}`),
+   * in the page's order, read as the record reads it, that is more than nothing and over lists the share reaches.
+   * Named by the cell's label, else the figure's name, never an id.
+   */
+  const moneyShown = (s: Share, catalog: LensCatalog, lists: SharePreview['lists'], ctx: CallContext): SharePreview['money'] => {
+    /* THE TEAM'S ALONE, as the preview that asks it is: the project's row and its figures are read for nobody else. */
+    if (team(ctx, 'preview a share') !== null) return null;
+    const byId = new Map(catalog.lists.map((l) => [l.id, l]));
+    const reached = lists.filter((x) => x.rows > 0 && moneyFields(byId.get(x.list)!).length > 0);
+    if (reached.length === 0) return null;
+    const hide = hideMap(s.hide, catalog);
+    const hidden = reached.every((x) => moneyFields(byId.get(x.list)!).every((f) => hide[x.list]?.includes(f)));
+    const figures: { label: string; said: string }[] = [];
+    if (!hidden && 'project' in s.what) {
+      const project = s.what.project;
+      const row = kernel.get(project);
+      const l = row === null ? undefined : byId.get(row.register);
+      if (row !== null && l !== undefined) {
+        for (const f of l.fields) {
+          const v = row.fields[f.id] as { amount?: unknown; currency?: unknown } | undefined;
+          if (f.retired || f.type !== 'money' || hide[l.id]?.includes(f.id) || typeof v?.amount !== 'number' || v.amount <= 0 || typeof v.currency !== 'string') continue;
+          figures.push({ label: f.label ?? f.id, said: moneyText(v.amount, v.currency) });
+          break;
+        }
+        const title = l.fields.find((f) => f.title)?.id;
+        const name = title === undefined ? undefined : row.fields[title];
+        const reaches = new Set(lists.map((x) => x.list));
+        for (const page of kernel.declarations().filter((d) => d.kind === 'page')) {
+          if (figures.length >= MONEY_SAID_MOST || typeof name !== 'string' || title === undefined) break;
+          const body = JSON.parse(page.body) as { for?: { register?: unknown }; blocks?: unknown };
+          if (body.for?.register !== l.id) continue;
+          for (const cell of statCells(body.blocks)) {
+            if (figures.length >= MONEY_SAID_MOST) break;
+            const m = /^([^:]+):\{\{(\w+)\}\}$/u.exec(cell.metric);
+            if (m === null || m[2] !== title) continue;
+            const decl = kernel.metricDecl(m[1]!);
+            if (!decl || kernel.figureLists(decl).some((list) => !reaches.has(list))) continue;
+            const got = deps.figure?.(`${m[1]}:${name}`, ctx) ?? null;
+            if (got === null || got.amount <= 0) continue;
+            const said = moneyText(got.amount, got.currency);
+            if (figures.some((x) => x.said === said)) continue;
+            figures.push({ label: cell.label ?? decl.name, said });
+          }
+        }
+      }
+    }
+    return { lists: reached.map((x) => x.name), hidden, figures };
   };
 
   /* ---------------------------------------------------------------------------------------------- an onward share */
@@ -647,7 +735,8 @@ export function methods(deps: RecordDeps) {
       const catalog = kernel.catalog();
       const bad = checkShare(s, catalog, { owners: owners() });
       if (bad) return { ok: false, refusal: bad };
-      return ok({ sentence: sentence(s, catalog), lists: reachOf(s, catalog) });
+      const lists = reachOf(s, catalog);
+      return ok({ sentence: sentence(s, catalog), lists, money: moneyShown(s, catalog, lists, ctx) });
     },
 
     /** The shares the caller holds, their own and their groups', each as one sentence (§3.4). A person only. */

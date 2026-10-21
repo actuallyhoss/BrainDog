@@ -7,6 +7,8 @@
  * share that hides a field keeps from its grantee (sharing plan §2.7). A row is in or out of sight per caller, so the
  * word belongs to the row and the caller decides whether it is a leak: whatever an answer carries of a row out of the
  * caller's sight (its word, its id, its amount), or of a field hidden from them on a row in sight, is named by `leaks`.
+ * `zk<hex>` is the owner's own: what he told an agent, what a run was doing and what it answered, which nobody but an
+ * owner reads unless a grant names the kernel's list.
  */
 
 /** mulberry32: a seeded PRNG, so every run draws the same cases (as `kernel/test/lens.test.ts` does). */
@@ -25,7 +27,7 @@ export function mulberry32(seed: number): () => number {
 export function minter(seed = 0x5eed) {
   const next = mulberry32(seed);
   const seen = new Set<string>();
-  const word = (prefix: 'zq' | 'zp' | 'zh'): string => {
+  const word = (prefix: 'zq' | 'zp' | 'zh' | 'zk'): string => {
     for (;;) {
       const hex = Math.floor(next() * 0xffffffff).toString(16).padStart(8, '0');
       if (!seen.has(hex)) {
