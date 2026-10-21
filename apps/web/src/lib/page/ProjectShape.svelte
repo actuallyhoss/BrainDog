@@ -500,7 +500,9 @@
   }
 
   /* ── the hero ── */
-  /* THE PROJECT'S COLOUR AT A LOW TINT OVER THE TILE, never a gradient. */
+  /* THE PROJECT'S COLOUR AT A LOW TINT OVER THE TILE, never a gradient.
+     8% IN BOTH SCHEMES. Dark took 12%, and the late count's `--red` over it read 4.2 to 4.4 to 1 for every slot, the
+     amber and the lime lowest; at 8% the lightest slot keeps it over 4.5, and the tint still reads as the project's. */
   .hero {
     --ph: var(--ink);
     --h-wash: 8%;
@@ -513,16 +515,6 @@
     padding: 16px;
     border-radius: var(--r-tile, 16px);
     background: color-mix(in oklab, var(--ph) var(--h-wash), var(--tile));
-  }
-
-  :global(html[data-scheme='dark']) .hero {
-    --h-wash: 12%;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :global(html:not([data-scheme])) .hero {
-      --h-wash: 12%;
-    }
   }
 
   .h-well {
