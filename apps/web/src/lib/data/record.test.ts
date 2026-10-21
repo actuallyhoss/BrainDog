@@ -413,7 +413,7 @@ test('A LIST THE READER MAY NOT READ IS NO NAMES AND NOT NO LIST: its refs are l
 });
 
 test('AND ANY OTHER REFUSAL OF A LINKED LIST IS STILL THE SCREEN\'S', async () => {
-  tab((name, params) => (name === 'list' && params.get('register') === 'people' ? json(503, { ok: false, refusal: { code: 'UNAVAILABLE', fix: 'Try again.' } }) : record(name, params)));
+  tab((name, params) => (name === 'list' && params.get('register') === 'people' ? json(503, { ok: false, refusal: { code: 'RECORD_UNAVAILABLE', fix: 'Try again.' } }) : record(name, params)));
   const source = await open();
   const out = await source.page('obligations', EMPTY, null);
   assert.equal(out.ok, false);
