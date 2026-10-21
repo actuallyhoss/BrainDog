@@ -209,6 +209,11 @@
     color: var(--red);
   }
 
+  /* AND QUIET OTHERWISE, its way in too: what is shared out is not something late. */
+  .nf-shared:not([data-needs]) .nf-go {
+    color: var(--ink);
+  }
+
   /* AN AGENT'S QUESTION: what it is on in the ink, its question under it in the second ink, two lines at most. */
   .nf-told {
     align-items: start;
