@@ -64,7 +64,10 @@
   const shell = $derived(route.data as unknown as Partial<Shell>);
   const form = $derived<'project' | 'today'>((block as { for?: unknown }).for === 'today' ? 'today' : 'project');
   /* WHAT THE DRAWER LEAVES OUT AND THE MENU READS before the rows are: whether it shows on Today, and its project's id. */
-  const raw = $derived<Record<string, unknown>[]>(Array.isArray((block as { kpis?: unknown }).kpis) ? ((block as { kpis: Record<string, unknown>[] }).kpis) : []);
+  const raw = $derived.by((): Record<string, unknown>[] => {
+    const held = (block as { kpis?: unknown }).kpis;
+    return Array.isArray(held) ? held.filter((k): k is Record<string, unknown> => typeof k === 'object' && k !== null) : [];
+  });
   const rawOf = (id: string | undefined): Record<string, unknown> | undefined => (id ? raw.find((r) => r.kpi === id) : undefined);
 
   let list = $state<string | null>(null);
