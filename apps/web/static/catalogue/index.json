@@ -2123,6 +2123,54 @@
     },
     {
       "kind": "pack",
+      "id": "profiles",
+      "title": "Profiles",
+      "summary": "Each setup your agents run under: the app, the account it signs in as, how it is paid for and the projects it serves, with every machine it is on and whether each copy still matches. Kept for you alone, so nobody you share with sees it.",
+      "author": "BrainDog",
+      "license": "Apache-2.0",
+      "audience": "addon",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "checksum": "9c964b3dfd2ecdc220eef10ed9665aa7a6fbdbbf75be5f0c6b027c042f2d5811",
+          "bytes": 8109,
+          "published_at": "2026-10-21T23:20:11.594Z",
+          "bump": null,
+          "reach": {
+            "modules": [
+              "agents"
+            ],
+            "lists": [
+              "Profiles",
+              "Places"
+            ],
+            "pages": [
+              "Profiles"
+            ],
+            "rules": [
+              "Ask about a machine whose profile has been out of step for two days",
+              "Mark a machine not heard from in fourteen days"
+            ],
+            "examples": 2,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The first version."
+        }
+      ],
+      "categories": [
+        "modules",
+        "made-by-braindog"
+      ],
+      "publisher": {
+        "kind": "braindog",
+        "id": "braindog",
+        "name": "BrainDog"
+      }
+    },
+    {
+      "kind": "pack",
       "id": "project-brief",
       "title": "Project brief",
       "summary": "What each project is in a line, the stage it is at, what is in the way, and a plan made of steps you can tick.",
