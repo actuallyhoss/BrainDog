@@ -45,6 +45,23 @@
  *
  * THE INPUT CLOSING ENDS THE RUN (`endOnClose`), once, and only a run this bridge attached by its host session's id.
  *
+ * WHILE THE SESSION IS OPEN THE BRIDGE PULSES THE RECORD (agents and MCP plan §2.3 C, §4.4): every fifteen seconds, and
+ * every five while he has stopped or paused the run, one `pulse` that says the session is open and answers what he
+ * told the run that is still open and what stops it. Its answer is written to the session's inbox file
+ * (`inbox-file.ts`), which the prompt, tool and stop hooks read and nothing else, and the instructions those hooks
+ * showed go back with the next pulse, with how, so the app can say "Seen by S883 on its next prompt". Only for a
+ * session that names its host session by id, since the file is keyed by it. A host older than `pulse`, a sign-in that
+ * ended, or a token that may not pulse stops the pulse for the session; a host that is away leaves the file as it was,
+ * so it goes stale and every hook lets the call go on.
+ *
+ * AND, OPT-IN, A CHANNEL (plan §2.3 D): with `BRAINDOG_CHANNEL=1` (and not switched off in his settings, when the
+ * record says), the bridge declares `experimental['claude/channel']` and sends each new instruction as
+ * `notifications/claude/channel` with its line as `content` and `{instruction, kind}` as `meta`, so a Claude Code
+ * session started with `--dangerously-load-development-channels server:braindog` hears it mid-turn. Claude Code 2.1.304
+ * delivers a channel only on a connection of the older protocol revisions ("connection negotiated a modern protocol
+ * revision with no unsolicited notification path", in its own source), so with the channel on the bridge asks for
+ * `2025-11-25` at the handshake and declines `server/discover`. Only lines from `pulse` are ever sent, which are his.
+ *
  * STDOUT CARRIES THE PROTOCOL AND NOTHING ELSE, and no line written anywhere holds the bearer.
  */
 
@@ -58,6 +75,22 @@ import { agreed, handle, VERSIONS, type Reply } from '@braindog/mcp/rpc';
 import { readDoorCache, writeDoorCache, type DoorCache } from './bridge-cache.ts';
 import { BUDGET_MS, type Target } from './http.ts';
 import { readSession, sessionPath } from './hooks.ts';
+import {
+  heldOf,
+  inboxPath,
+  pruneInboxes,
+  PULSE_HELD_MS,
+  PULSE_MS,
+  readInbox,
+  readState,
+  statePath,
+  toldOf,
+  writeFlags,
+  writeInbox,
+  type Inbox,
+  type SeenHow,
+  type Told,
+} from './inbox-file.ts';
 import { loginCommand } from './login.ts';
 import { cliBuild, positionOf, type ClientInfo } from './position.ts';
 import { signedOutSurface } from './signed-out.ts';
@@ -83,7 +116,30 @@ export type BridgeIo = {
   cwd?: string | undefined;
   /** How long the end waits for Claude Code's end hook to take the run (`END_GRACE_MS`). */
   endGraceMs?: number | undefined;
+  /** How often the bridge pulses (`PULSE_MS`), and how often while the run is stopped or paused (`PULSE_HELD_MS`). */
+  pulseMs?: number | undefined;
+  heldMs?: number | undefined;
+  /** Whether the channel is offered: `BRAINDOG_CHANNEL` in the environment unless a test says. Off by default. */
+  channel?: boolean | undefined;
 };
+
+/** Whether the environment turns the channel on: `BRAINDOG_CHANNEL` set to 1, on, yes or true. Anything else is off. */
+export const channelOn = (env: Record<string, string | undefined>): boolean => /^(?:1|on|yes|true)$/iu.test(env.BRAINDOG_CHANNEL ?? '');
+
+/** The revision the bridge asks for while the channel is on: the newest one Claude Code delivers a channel on. */
+export const CHANNEL_REVISION = '2025-11-25';
+
+/** The capability a server declares to offer a channel, as Claude Code 2.1.304 reads it (`experimental`). */
+export const CHANNEL_CAPABILITY = 'claude/channel';
+
+/** The notification a channel message is, with `content` and string-valued `meta`. */
+export const CHANNEL_METHOD = 'notifications/claude/channel';
+
+/** The refusals that mean this session's pulse will never be answered, so it stops: no such method, or no such caller. */
+const PULSE_NEVER: ReadonlySet<string> = new Set(['ROUTE_UNKNOWN', 'NOT_IN_THIS_BUILD', 'FORBIDDEN', 'UNAUTHORIZED']);
+
+/** The most instruction ids the inbox file keeps as reported, newest last. */
+const REPORTED_MOST = 200;
 
 /** How long the bridge waits, once its input closed, for the session's end hook to say it is ending the run itself. */
 export const END_GRACE_MS = 1_500;
@@ -106,7 +162,8 @@ const idOf = (m: Message): Id | null => (typeof m.id === 'string' || typeof m.id
 
 /**
  * The hints `_meta.session` carries (`packages/host/src/session.ts`), each by the header that says it. `worktree` is
- * one the host does not read yet, and drops as it drops any key it does not name.
+ * the worktree folder apart from its repository (`position.ts`), which the host reads and hands the record, so a lead
+ * and its builders in worktrees of one repository see each other.
  */
 const HINT_OF: Readonly<Record<string, string>> = {
   'x-braindog-session': 'spoken',
@@ -392,12 +449,142 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     }
   };
 
-  /** The app is told the bridge can say a list changed, because now it can. `capabilities` is left as is otherwise. */
+  /**
+   * The app is told the bridge can say a list changed, because now it can, and, with the channel on, that it offers a
+   * channel. `capabilities` is left as is otherwise.
+   */
   const listChanged = (reply: Reply): Reply => {
     if (!('result' in reply) || !isObject(reply.result) || !isObject(reply.result.capabilities)) return reply;
     const caps = reply.result.capabilities;
     const tools = isObject(caps.tools) ? caps.tools : {};
-    return { ...reply, result: { ...reply.result, capabilities: { ...caps, tools: { ...tools, listChanged: true } } } };
+    const experimental = isObject(caps.experimental) ? caps.experimental : {};
+    return {
+      ...reply,
+      result: {
+        ...reply.result,
+        capabilities: { ...caps, tools: { ...tools, listChanged: true }, ...(channel ? { experimental: { ...experimental, [CHANNEL_CAPABILITY]: {} } } : {}) },
+      },
+    };
+  };
+
+  /* ── the pulse, the inbox file and the channel (plan §2.3 C and D) ─────── */
+
+  const env = io.env ?? process.env;
+  const channel = io.channel ?? channelOn(env);
+  const every = io.pulseMs ?? PULSE_MS;
+  const heldEvery = io.heldMs ?? PULSE_HELD_MS;
+  let pulseTimer: ReturnType<typeof setTimeout> | null = null;
+  let pulsing: Promise<void> | null = null;
+  let pulseOff = false;
+  let closing = false;
+  /* WHAT HIS SETTINGS SAY FOR THIS AGENT, read once when the first pulse finds a run: the stop switch, and the channel. */
+  let settings: { hooks: boolean; channel: boolean | null } | null = null;
+  /* THE INSTRUCTIONS SENT BY CHANNEL, and those still to report as seen that way, by id. */
+  const pushed = new Set<string>();
+  const byChannel = new Set<string>();
+  /* WHETHER THE APP HAS AGREED A REVISION, so no notification goes before the handshake is answered. */
+  let greeted = false;
+
+  /** What his settings let this agent's hooks and channel do, from `whoami`; both on unless the record says off. */
+  const readSettings = async (session: Record<string, string>): Promise<{ hooks: boolean; channel: boolean | null }> => {
+    const got = await apiCall(target, 'whoami', {}, session, go, ms);
+    const effective = got.kind === 'ok' && isObject(got.value) && isObject(got.value.effective) ? got.value.effective : {};
+    const enforce = isObject(effective.enforce) ? effective.enforce : {};
+    return { hooks: enforce.hooks !== false, channel: typeof enforce.channel === 'boolean' ? enforce.channel : null };
+  };
+
+  /**
+   * One pulse, and how long until the next. Reads what the hooks showed since the last one, sends it with how, and
+   * writes what came back to the session's inbox file and its flags. Never throws; a host away writes nothing.
+   */
+  const pulseOnce = async (): Promise<number> => {
+    if (!target.token || refusing !== null) {
+      pulseOff = true;
+      return every;
+    }
+    const session = await hints(client).catch(() => ({}) as Record<string, string>);
+    const id = session['x-braindog-client'];
+    if (typeof id !== 'string' || id === '') return every;
+    const file = inboxPath(env, id);
+    const before = readInbox(file);
+    const mine = before !== null && before.host === target.key ? before : null;
+    const state = readState(statePath(env, id));
+    const reported = new Set(mine?.reported ?? []);
+    /* WHAT WAS SHOWN SINCE, BY HOW: one pulse per way, the first carrying the stamp. Almost always one. */
+    const groups = new Map<SeenHow, string[]>();
+    const shown: [string, SeenHow][] = [...Object.entries(state.shown), ...[...byChannel].map((s) => [s, 'channel'] as [string, SeenHow])];
+    for (const [sid, how] of shown) if (!reported.has(sid)) groups.set(how, [...(groups.get(how) ?? []), sid]);
+    const ways = [...groups].map(([how, list]) => ({ how, list: list.slice(0, 50) }));
+    const first = ways.shift();
+    const stamped = mine?.stamp ? { stamp: mine.stamp } : {};
+    const got = await apiCall(target, 'pulse', { ...stamped, ...(first ? { shown: first.list, how: first.how } : {}) }, session, go, ms);
+    if (got.kind === 'refused') {
+      if (PULSE_NEVER.has(got.code)) {
+        pulseOff = true;
+        say(`BrainDog's pulse was refused (${got.code}), so this session's hooks will not hear what you tell it in BrainDog.`);
+      }
+      return every;
+    }
+    if (got.kind === 'gone' || !isObject(got.value)) return every;
+    /* EACH OTHER WAY IS ITS OWN PULSE, with the same stamp, and the last answer is the freshest. */
+    let value: Record<string, unknown> = got.value;
+    for (const way of ways) {
+      const more = await apiCall(target, 'pulse', { ...stamped, shown: way.list, how: way.how }, session, go, ms);
+      if (more.kind === 'ok' && isObject(more.value) && more.value.run === value.run) value = more.value;
+    }
+    if (typeof value.run !== 'string') return every;
+    settings ??= await readSettings(session);
+    const sent = [first, ...ways].flatMap((w) => w?.list ?? []);
+    for (const s of sent) byChannel.delete(s);
+    const pending = (Array.isArray(value.pending) ? value.pending : []).map(toldOf).filter((t): t is Told => t !== null);
+    const stop = heldOf(value.stop);
+    const lines = Array.isArray(value.lines) ? value.lines.filter((l): l is string => typeof l === 'string') : [];
+    /* THE STOP IN THE RECORD'S OWN WORDS: its line when this pulse is the one that saw it, else the one kept for it. */
+    const kept = mine !== null && mine.run === value.run && mine.stop !== null && stop !== null && mine.stop.id === stop.id ? mine.stop_line : null;
+    const said = stop !== null && value.changed === true && lines[0] !== undefined && (stop.id === '' || lines[0].includes(stop.id)) ? lines[0] : kept;
+    const sameRun = mine !== null && mine.run === value.run;
+    const inbox: Inbox = {
+      v: 1,
+      host: target.key,
+      run: value.run,
+      stamp: typeof value.stamp === 'string' ? value.stamp : null,
+      at: new Date().toISOString(),
+      pending,
+      stop,
+      stop_line: said,
+      hooks: settings.hooks,
+      reported: [...new Set([...(sameRun ? [...reported] : []), ...sent])].slice(-REPORTED_MOST),
+    };
+    try {
+      writeInbox(file, inbox);
+      writeFlags(env, id, Date.now(), inbox, state);
+    } catch {
+      /* A folder that cannot be written leaves the hooks with no file, and every hook lets the call go on. */
+    }
+    if (channel && greeted && settings.channel !== false) {
+      for (const t of pending) {
+        if (pushed.has(t.id) || state.shown[t.id] !== undefined) continue;
+        pushed.add(t.id);
+        byChannel.add(t.id);
+        track(send({ jsonrpc: '2.0', method: CHANNEL_METHOD, params: { content: t.line, meta: { instruction: t.id, kind: t.kind } } }));
+      }
+    }
+    return stop !== null ? heldEvery : every;
+  };
+
+  /** The next pulse, `wait` from now, unless the input has closed or the pulse was stopped. */
+  const schedule = (wait: number) => {
+    if (closing || pulseOff) return;
+    pulseTimer = setTimeout(() => {
+      pulseTimer = null;
+      pulsing = pulseOnce()
+        .catch(() => every)
+        .then((next) => {
+          pulsing = null;
+          schedule(next);
+        });
+    }, wait);
+    pulseTimer.unref?.();
   };
 
   /**
@@ -495,8 +682,15 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
     }
     const said = helloOf(message);
     if (said !== null) client = said;
+    /* WITH THE CHANNEL ON, THE HANDSHAKE ASKS FOR A REVISION CLAUDE CODE DELIVERS A CHANNEL ON (see the top). */
+    if (channel) message = channelHello(message);
     let job: Promise<void>;
-    if (!isObject(message) || refusing !== null || message.method === 'ping') {
+    if (channel && isObject(message) && message.method === 'server/discover' && idOf(message) !== null) {
+      /* DECLINED, so the app falls back to `initialize`, the handshake a channel is delivered on. Its error code is a
+         variable, as `stdio.ts` spells them, so every `code` key written here is a refusal code. */
+      const missing = -32601;
+      job = send({ jsonrpc: '2.0', id: idOf(message), error: { code: missing, message: 'This server is reached with initialize while its channel is on.' } });
+    } else if (!isObject(message) || refusing !== null || message.method === 'ping') {
       /* A MALFORMED MESSAGE, A PING, AND EVERYTHING AFTER A 401 are answered on the machine. */
       const surface = refusing ?? offline;
       job = onMachine(message, surface, isObject(message) ? message : undefined).then((reply) => {
@@ -513,12 +707,60 @@ export async function serveBridge(io: BridgeIo, target: Target, hints: Hints): P
       continue;
     } else job = forward(message);
     /* THE HELLO IS ANSWERED BEFORE THE NEXT LINE IS READ, as in `stdio.ts`: what it agrees is how the rest are sent. */
-    if (isObject(message) && message.method === 'initialize') await job;
-    else track(job);
+    if (isObject(message) && message.method === 'initialize') {
+      await job;
+      /* THE PULSE STARTS ONCE THE APP HAS SAID HELLO, its first a whole interval on: the start hook seeded the file. */
+      if (!greeted) {
+        greeted = true;
+        pruneInboxes(env);
+        schedule(every);
+      }
+    } else track(job);
   }
 
+  closing = true;
+  if (pulseTimer !== null) clearTimeout(pulseTimer);
+  if (pulsing !== null) await pulsing;
   while (inFlight.size > 0) await Promise.all(inFlight);
   if (ran !== null && refusing === null) await endOnClose(io, target, ran, () => hints(client), go);
+}
+
+/**
+ * The handshake as it is sent while the channel is on: an `initialize` asking for a revision newer than
+ * `CHANNEL_REVISION` asks for that one instead, since Claude Code delivers no channel on the newer ones. Anything else
+ * goes as the app wrote it.
+ */
+export function channelHello(message: unknown): unknown {
+  if (!isObject(message) || message.method !== 'initialize' || !isObject(message.params)) return message;
+  const asked = message.params.protocolVersion;
+  if (typeof asked !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(asked) || asked <= CHANNEL_REVISION) return message;
+  return { ...message, params: { ...message.params, protocolVersion: CHANNEL_REVISION } };
+}
+
+/** What one call to the host's `/api` came to: its value, the record's refusal code, or no answer. */
+export type ApiOutcome = { kind: 'ok'; value: unknown } | { kind: 'refused'; code: string } | { kind: 'gone' };
+
+/**
+ * One record method through the host's `/api/<method>`, as the session it works for, the way the end is sent
+ * (`endOnClose`). Never throws, and nothing it says quotes the request, which holds the bearer.
+ */
+export async function apiCall(target: Target, method: string, body: Record<string, unknown>, session: Record<string, string>, go: typeof globalThis.fetch, ms: number): Promise<ApiOutcome> {
+  try {
+    const headers = new Headers({ 'content-type': 'application/json', accept: 'application/json', 'x-braindog-cli': cliBuild() });
+    if (target.token) headers.set('authorization', `Bearer ${target.token}`);
+    for (const [name, value] of Object.entries(session)) headers.set(name, value);
+    const res = await go(`${target.base}/api/${method}`, { method: 'POST', headers, body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(Math.min(ms, 10_000)) });
+    if (res.status === 401) {
+      await res.body?.cancel().catch(() => undefined);
+      return { kind: 'refused', code: 'UNAUTHORIZED' };
+    }
+    const said = (await res.json().catch(() => null)) as { ok?: unknown; value?: unknown; refusal?: { code?: unknown } } | null;
+    if (said?.ok === true) return { kind: 'ok', value: said.value };
+    if (said?.ok === false && typeof said.refusal?.code === 'string') return { kind: 'refused', code: said.refusal.code };
+    return { kind: 'gone' };
+  } catch {
+    return { kind: 'gone' };
+  }
 }
 
 /**
