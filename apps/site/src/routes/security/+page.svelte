@@ -263,14 +263,6 @@
       grid-column: span 4;
     }
 
-    .span-5 {
-      grid-column: span 5;
-    }
-
-    .span-7 {
-      grid-column: span 7;
-    }
-
     .span-8 {
       grid-column: span 8;
     }
