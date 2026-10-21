@@ -41,7 +41,7 @@ export const account = {
     read: 'Can read, cannot change',
   } as Record<string, string>,
   auditHolds: 'Every change to this record shows up here, with who made it and when.',
-  export: 'Export the record',
+  export: 'Export a copy',
   /* The two questions an audit log exists to answer, as the labels of the two controls. */
   auditWho: 'Who',
   auditWhat: 'What kind of change',

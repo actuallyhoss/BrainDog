@@ -207,7 +207,12 @@
   }
 
   /** The name the open area is drawn under: the person's, where their index renamed it. */
-  const label = $derived(known ? (labelIn(groups, known.id) ?? known.label) : undefined);
+  const label = $derived.by(() => {
+    if (!known) return undefined;
+    const named = labelIn(groups, known.id) ?? known.label;
+    /* DELETE NAMES WHAT GOES (UI pass of 21 October, P40): "Delete The Studio", where the index left its own words. */
+    return known.id === 'delete' && named === areaOf('delete')?.label && shell.index?.name ? copy.deleteRecord(shell.index.name) : named;
+  });
 
   /**
    * The areas whose controls are actually kept — measured, not assumed.
