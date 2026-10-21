@@ -1290,6 +1290,20 @@ export const PORTFOLIO_PAGES: Record<string, SeedPage> = {
         tiles: true,
       },
       {
+        /* ITS KEY NUMBERS, SINCE founder 3.0.0 and team 2.21.0 (the KPI plan of 21 October, 2.8): the one it leads with
+           large with its chart, the rest as small tiles, each its value, its line from three points, its target and
+           whether it is late, from the project's own rows of Key numbers (`kpis`, the kernel's `sources/kpis.ts`). The
+           whole width under the questions, before the plan. A number is pressed to change it, and the app adds one at
+           the foot and lists what was suggested and not kept yet under it. */
+        kind: 'kpis',
+        heading: 'Key numbers',
+        icon: 'chart-line',
+        span: 12,
+        key: 'kpis',
+        source: 'kpis',
+        for: 'project',
+      },
+      {
         kind: 'stat',
         heading: 'At a glance',
         icon: 'gauge',

@@ -186,6 +186,8 @@ test('A FOUNDER’S PROJECT HAS A PAGE, with Estate since founder 1.4.0: what is
     undefined,
     undefined,
     'Waiting on you',
+    /* ITS KEY NUMBERS, SINCE founder 3.0.0 (the KPI plan of 21 October, K3-C): the whole width under the questions. */
+    'Key numbers',
     /* THE RAIL'S COLUMN SINCE portfolio 1.10.0: the figures, where it stands and what is handed back, one above the
        other beside the chart. */
     'At a glance',

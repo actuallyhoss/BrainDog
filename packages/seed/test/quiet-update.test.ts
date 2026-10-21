@@ -1266,6 +1266,8 @@ const projectBefore = (doc: Body, id: string): Body =>
   withPage(workingBefore(numbersBefore(standsBefore(lookBefore(handedBefore(doc, id), id)), id), id), 'project', (now) =>
     now.flatMap((b) => {
       if (b.kind === 'roadmap') return [DONE_BY_WEEK, b];
+      /* AND UNTIL THE KPI PLAN OF 21 OCTOBER (K3-C) no project page drew its Key numbers. */
+      if (b.kind === 'kpis') return [];
       /* TOOLS AND SERVERS LISTED EVERYBODY'S TOOLS until batch 60 (sketchpad-60), where it now reads the project's own. */
       /* AND UNTIL BATCH 87 (project-runs-tile-87) the three were halves under More about, with no heading of their own
          and nothing said of what reaches a project from everywhere; Money by month was a half beside the bills; and

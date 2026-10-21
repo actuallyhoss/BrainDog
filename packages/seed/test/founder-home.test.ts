@@ -245,7 +245,13 @@ test('WHAT 2.6.0 DECLARED, 3.0.0 DECLARES, BUT NUMBERS, which it hands to Portfo
   const frozen = JSON.parse(readFileSync(join(import.meta.dirname, '../../../apps/web/static/catalogue/usecases/founder/2.6.0.usecase.json'), 'utf8')) as { version: string; pack: { declarations: List[] } };
   const next = useCaseDocument('founder', TODAY)! as { declarations: unknown[]; hands: Record<string, string>; extends: Record<string, { fields: { id: string }[] }> };
   assert.equal(frozen.version, '2.6.0');
-  assert.deepEqual(next.declarations, frozen.pack.declarations.filter((d) => d.register !== 'datapoints'), '3.0.0 declares what the published 2.6.0 declares, but Numbers');
+  /* AND A PROJECT'S KEY NUMBERS ON ITS PAGE, folded into the unreleased 3.0.0 (the KPI plan of 21 October, K3-C): the
+     one block it adds, under the questions, and nothing else of the page moved. */
+  type Page = { page?: string; blocks?: { kind?: string }[] };
+  const project = (next.declarations as Page[]).find((d) => d.page === 'project')!;
+  assert.deepEqual(project.blocks!.filter((b) => b.kind === 'kpis'), [{ kind: 'kpis', heading: 'Key numbers', icon: 'chart-line', span: 12, key: 'kpis', source: 'kpis', for: 'project' }]);
+  const less = (next.declarations as Page[]).map((d) => (d.page === 'project' ? { ...d, blocks: d.blocks!.filter((b) => b.kind !== 'kpis') } : d));
+  assert.deepEqual(less, frozen.pack.declarations.filter((d) => d.register !== 'datapoints'), '3.0.0 declares what the published 2.6.0 declares, but Numbers and the Key numbers block');
   assert.equal(next.hands['register.datapoints'], 'portfolio');
   const was = frozen.pack.declarations.find((d) => d.register === 'datapoints')!.fields!;
   const laid = next.extends['register.datapoints']!.fields;

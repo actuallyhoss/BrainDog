@@ -1602,10 +1602,11 @@ const DECLARED: Record<string, Version> = {
       setting.voice_nothing_needs_you setting.voice_nothing_now setting.voice_nothing_waiting setting.voice_overdue
       setting.voice_pen_waits setting.voice_right_now setting.voice_since_away setting.voice_working_now
     `,
-    declares: '09904ef1a119de83',
+    declares: 'e844999b8bf97975',
     history: [
       "`register.datapoints` is handed to Portfolio 1.19.0 (`hands.register.datapoints.portfolio`), which declares it under the same id, and its organisation and service, links to People's and Estate's lists, stay this pack's, laid on it (`extends.register.datapoints.organisation`, `extends.register.datapoints.about_service`); `setting.label_datapoints` and `setting.one_datapoints` go with the list and the example number leaves the pack's own seeds for the module examples; every figure, page and addition over Numbers stays -> 0507ca88190ea60f",
       "Inside the unreleased 3.0.0 (the UI pass of 20 October, P25): `setting.one_obligations` starts from `bill or invoice`, Money's own word for one of Bills and invoices now, where it started from `item` -> 09904ef1a119de83",
+      "Inside the unreleased 3.0.0 (the KPI plan of 21 October, K3-C): `page.project` draws Key numbers, a `kpis` block `for: project` the whole width under Waiting on you, the project's own key numbers with their lines, targets and late marks; a block added, no id added or taken away -> e844999b8bf97975",
     ],
   },
   'team@2.19.0': {
@@ -1673,7 +1674,7 @@ const DECLARED: Record<string, Version> = {
       rule.cycle_day_each_morning rule.ticket_done_ticks_plan rule.ticket_reopened_unticks_plan script.cycle_day
       script.plan_follows_ticket
     `,
-    declares: '8a1edbc9f3331acf',
+    declares: '28ca804962485e64',
     history: [
       "`page.project`'s Tools and servers reads the project's own tools alone (`kind is tool, scope is project`), where it listed everybody's (sketchpad-60, written into 2.20.0 by batch 60 and moved here by integrate 61) -> 11f9e7507ab3a446",
       "Folded into the unreleased 2.21.0 (project-own-cards-72, PGS-C31; integrate 72; commit 63423720 still holds 2.20.0): `page.project`'s Keys and Skills read the project's own alone (`kind is key, scope is project`, `kind is skill, scope is project`), where each listed everybody's -> 2cb324c057827f0d",
@@ -1681,6 +1682,7 @@ const DECLARED: Record<string, Version> = {
       "Inside the unreleased 2.21.0 (founder-home-quiet-88; integrate 88; commit 63423720 holds 2.20.0): `page.home-team` draws Gone quiet, the founder's table word for word over the source `exceptions` with What, Last seen and Before, six lines at most, straight under its line and not drawn while nothing is quiet; a block added, no id added or taken away -> 1d4ea792097cdc3f",
       "Inside the unreleased 2.21.0 (runs-on-section-89, AGT-D12 job 2; batch 89; commit 63423720 holds 2.20.0): `page.project`'s Keys, Tools and servers and Skills draw six rows each where they drew three, and Keys, Tools and servers and And from everywhere name who used each by `used_agents`, labelled Used by, where Keys and Tools named `used_by` and And from everywhere `used_agent`, each labelled Last used by; no id added or taken away -> 5670bdbb3a98c6a6",
       "Inside the unreleased 2.21.0 (team-cycle-follows-100, USE-A10; batch 100; commit 63423720 holds 2.20.0): the burn-down fills itself, three rules and two scripts (`rule.ticket_done_ticks_plan`, `rule.ticket_reopened_unticks_plan`, `rule.cycle_day_each_morning`, `script.plan_follows_ticket`, `script.cycle_day`) tick a planned line with its ticket and write each morning's cycle day; `page.home-team`'s Bring the team in loses Invite your team and its burn-down's empty line says the record writes the day -> 8a1edbc9f3331acf",
+      "Inside the unreleased 2.21.0 (the KPI plan of 21 October, K3-C; commit 63423720 holds 2.20.0): `page.project` draws Key numbers, a `kpis` block `for: project` the whole width under Waiting on you, the project's own key numbers with their lines, targets and late marks; a block added, no id added or taken away -> 28ca804962485e64",
     ],
   },
   'business@1.6.0': {

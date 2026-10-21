@@ -84,7 +84,8 @@ const blocksOf = (page: Record<string, unknown>): Block[] => (page.blocks as Blo
  * is refused there, so one missing from here is still a failure.
  */
 /* `signs` SINCE people 3.3.0's Health page: each vital sign with its state and sentence. */
-const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home', 'signs']);
+/* `kpis` SINCE the KPI plan of 21 October (K3-C): a project's key numbers on its page (`sources/kpis.ts`). */
+const COMPUTED = new Set(['forecast.runway', 'activity', 'sessions.live', 'actions', 'governance.open', 'runs_on', 'deadlines', 'figures.home', 'signs', 'kpis']);
 
 /**
  * The figures the record computes rather than declares.

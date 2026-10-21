@@ -862,6 +862,15 @@
             "tiles": true
           },
           {
+            "kind": "kpis",
+            "heading": "Key numbers",
+            "icon": "chart-line",
+            "span": 12,
+            "key": "kpis",
+            "source": "kpis",
+            "for": "project"
+          },
+          {
             "kind": "stat",
             "heading": "At a glance",
             "icon": "gauge",

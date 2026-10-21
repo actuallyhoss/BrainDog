@@ -3146,9 +3146,9 @@
       "versions": [
         {
           "version": "3.0.0",
-          "checksum": "5297fe87aca4585d990e678b118d300d3fdec20ea07092e8c26937d573aa1218",
-          "bytes": 40813,
-          "published_at": "2026-10-20T23:39:55.884Z",
+          "checksum": "7fcc509e653d2bc13a2152732e98c1e76775dd1e2df830644d2432dd9f8a5d8c",
+          "bytes": 41048,
+          "published_at": "2026-10-21T04:52:18.145Z",
           "bump": "major",
           "reach": {
             "modules": [
@@ -4015,9 +4015,9 @@
       "versions": [
         {
           "version": "2.21.0",
-          "checksum": "657b3d60383b8af4474701d5fb4653b7e6a8a1b3d0f644272edd00043c6c4d93",
-          "bytes": 36280,
-          "published_at": "2026-10-15T17:05:47.234Z",
+          "checksum": "81388bdbfecf70c5ecd805d7cf7e5dfcccf35e50d8499c59a5959b984dbb8ea3",
+          "bytes": 36515,
+          "published_at": "2026-10-21T04:52:18.145Z",
           "bump": null,
           "reach": {
             "modules": [

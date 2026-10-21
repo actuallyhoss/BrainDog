@@ -219,7 +219,9 @@ export const TEAM = {
      burn-down that fills itself (USE-A10): `TEAM_AUTOMATIONS`, three rules and two scripts added, so finishing a
      ticket ticks its planned line, reopening it unticks it, and each morning the record writes the cycle day; the
      standup skill stops saying it does either; Bring the team in loses Invite your team, which ended in a refusal on
-     a free record. A row and two words changed, declarations added, so still the minor step 2.21.0 is. */
+     a free record. A row and two words changed, declarations added, so still the minor step 2.21.0 is. And the KPI
+     plan's K3-C: the project page it embeds draws Key numbers, the project's own key numbers (`kpis`, `for: project`),
+     the whole width under Waiting on you. A block added, nothing taken away. */
   version: '2.21.0',
   title: 'Team board',
   summary: 'Tickets with an owner and a status, the cycle each is in, and the work your agents took on.',

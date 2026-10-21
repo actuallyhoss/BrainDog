@@ -433,7 +433,9 @@ export const FOUNDER = {
      3.0.0, THE KPI PLAN OF 21 OCTOBER (K1-A): Numbers is handed to Portfolio (`hands`), which declares `datapoints` under
      the same id and fields from 1.19.0 and keeps each project's key numbers over it. Every figure, page and addition
      here still reads it, and a founder's readings stay where they are. A list this pack declared is taken away, so the
-     step is a major one, as 2.0.0 was when organisations went to People; 2.7.0 is published and frozen. */
+     step is a major one, as 2.0.0 was when organisations went to People; 2.7.0 is published and frozen. Still unreleased,
+     it takes K3-C's block with no version of its own: the project page it embeds draws Key numbers, the project's own
+     key numbers (`kpis`, `for: project`), the whole width under Waiting on you. A block added, nothing taken away. */
   version: '3.0.0',
   title: 'Solo founder',
   summary: 'The organisations you run, the money across them, and the numbers your projects report.',
