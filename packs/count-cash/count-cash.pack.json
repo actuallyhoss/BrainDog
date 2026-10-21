@@ -1,9 +1,9 @@
 {
   "pack": "count-cash",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "title": "Count the cash",
   "summary": "Write down what is actually in a cash box or an account, and the record keeps it as a balance check and writes the difference from what it thought was there into the ledger.",
-  "changes": "Money now has a box to count the cash in, under What it holds today, while a balance there is old, and for a week after a count it shows that count: how far out it was and what happened. A count whose difference went into the Ledger now says so under What happened. Nothing is taken away, and taking the pack out takes both off Money.",
+  "changes": "The box to count the cash in and the last count now go with Heads up on Money, and no longer after What it holds today, which Money no longer has. Where Heads up stands in the side column, the two stand in the main column beside it, under the Ledger the difference goes into. Nothing else changed.",
   "author": "BrainDog",
   "license": "Apache-2.0",
   "requires": {
@@ -159,13 +159,14 @@
   "adds": [
     {
       "page": "page.money",
-      "after": "What it holds today",
-      "note": "Where a person counts the cash, drawn while a balance on Money is old, the same while as Money's own balance check.",
+      "after": "Heads up",
+      "note": "Where a person counts the cash, drawn while a balance on Money is old, the same while as Heads up's line on the oldest balance. In the main column, since a form is too wide for the side column Heads up may stand in.",
       "block": {
         "kind": "capture",
         "heading": "Count the cash",
         "icon": "plus",
         "span": 12,
+        "area": "main",
         "register": "cash_counts",
         "when": {
           "metric": "balances-stale",
@@ -175,12 +176,13 @@
     },
     {
       "page": "page.money",
-      "after": "What it holds today",
-      "note": "The newest count of the past week: the day, how far out the record was and what happened. Drawn only while there is one, so Heads up holds no old count.",
+      "after": "Heads up",
+      "note": "The newest count of the past week: the day, how far out the record was and what happened. Drawn only while there is one, so Money holds no old count.",
       "block": {
         "kind": "cards",
         "heading": "The last count",
         "span": 12,
+        "area": "main",
         "source": "register.cash_counts",
         "where": "on after -7d",
         "columns": [

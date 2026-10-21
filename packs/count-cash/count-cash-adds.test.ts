@@ -7,6 +7,12 @@
  * to count the box had to find the Cash counts list first. The two blocks are the pack's `adds`, read by the record's
  * own install path, so taking the pack out takes them off the page and leaves Money's own declaration as it was.
  *
+ * WITH HEADS UP SINCE 1.4.1. 1.4.0 placed both after What it holds today, and the UI pass of 20 October took that box off
+ * Money (Heads up's line on the oldest balance says Update balances instead), so an `after` naming it laid both at the
+ * foot of the page, under Where it went. They follow Heads up now, a heading Money has kept since money-core 3.5.0, and
+ * stand in the main column: inside Heads up's box where it is in the main column (3.16.0), and under the Ledger beside it
+ * where it is in the side column (3.17.0), since a box never crosses columns.
+ *
  * THE RECORD IS FRESH AND THE PACK IS THE FILE AS IT SHIPS, planned and installed the road a person takes from the app,
  * beside money-core and the modules it stands on. The script runs in QuickJS through the runner the self-host builds.
  */
@@ -39,7 +45,7 @@ const said = <T>(r: unknown): T => {
 type Api = Awaited<ReturnType<typeof createRecordApi>>;
 type Sql = ReturnType<typeof openSqlite>;
 type Column = { field: string; label?: string; as?: string };
-type Block = { kind: string; heading?: string; added?: string; drawn?: boolean; why?: string; columns?: Column[]; rows: { id: string; fields: Record<string, unknown> }[]; refusals: unknown[] };
+type Block = { kind: string; heading?: string; area?: string; added?: string; drawn?: boolean; why?: string; columns?: Column[]; rows: { id: string; fields: Record<string, unknown> }[]; refusals: unknown[] };
 type Page = { title: string; blocks: Block[] };
 
 /** The file as it ships, read fresh each time so no test can hand the next one a copy it changed. */
@@ -88,21 +94,21 @@ const blockOf = (page: Page, heading: string): Block => {
 const ledger = (sql: Sql): { what: string; direction: string; amount: { amount: number; currency: string }; account: string }[] =>
   sql.all<{ fields: string }>("SELECT fields FROM entry WHERE register = 'transactions' AND deleted_at IS NULL ORDER BY seq").map((r) => JSON.parse(r.fields));
 
-test('1.4.0 ADDS TWO BLOCKS TO MONEY AFTER WHAT IT HOLDS TODAY, and the plan finds the page on a record holding money-core', async () => {
+test('1.4.1 ADDS TWO BLOCKS TO MONEY WITH HEADS UP, IN THE MAIN COLUMN, and the plan finds the page on a record holding money-core', async () => {
   const file = await readPackFile(TEXT);
   assert.ok(file.ok, fixOf(file));
-  assert.equal(file.value.pack.manifest.version, '1.4.0');
-  const adds = shipped().adds as { page: string; after: string; block: { kind: string; heading: string; when?: unknown; where?: string } }[];
+  assert.equal(file.value.pack.manifest.version, '1.4.1');
+  const adds = shipped().adds as { page: string; after: string; block: { kind: string; heading: string; area?: string; when?: unknown; where?: string } }[];
   assert.deepEqual(
-    adds.map((a) => [a.page, a.after, a.block.kind, a.block.heading]),
+    adds.map((a) => [a.page, a.after, a.block.kind, a.block.heading, a.block.area]),
     [
-      ['page.money', 'What it holds today', 'capture', COUNT],
-      ['page.money', 'What it holds today', 'cards', LAST],
+      ['page.money', 'Heads up', 'capture', COUNT, 'main'],
+      ['page.money', 'Heads up', 'cards', LAST, 'main'],
     ],
   );
   /* THE BOX IS DRAWN WHILE A BALANCE IS OLD, the same while as Money's own balance check beside it; the last count is
      drawn for a week after a count, since how far out it was is worth reading after the balance is current again, and
-     Heads up holds only what is true now, so a count from last month is not kept there. */
+     Money holds only what is true now, so a count from last month is not kept there. */
   assert.deepEqual(adds[0]!.block.when, { metric: 'balances-stale', gt: 0 });
   assert.equal(adds[1]!.block.when, undefined);
   assert.equal(adds[1]!.block.where, 'on after -7d');
@@ -126,10 +132,19 @@ test('A COUNT ON MONEY: EGP 120,400.00 against a till rolled to EGP 119,900.00 r
   );
 
   /* THE TILL WAS LAST SAID TO HOLD WHAT IT HOLDS TWO WEEKS AGO, so the box to count it in is on Money, right after
-     Money's own box for a balance, and no count has been written yet. */
+     Heads up, whose line on the oldest balance is drawn beside it, and no count has been written yet. */
   const old = await money(api);
-  const at = headings(old).indexOf('What it holds today');
+  const at = headings(old).indexOf('Heads up');
+  assert.ok(at >= 0, `Money has no Heads up: ${headings(old).join(', ')}`);
   assert.deepEqual(headings(old).slice(at + 1, at + 3), [COUNT, LAST]);
+  /* AND IN THE MAIN COLUMN, under the Ledger the difference is filed into: Heads up and its lines stand in the side
+     column, and a box never crosses columns, so the two are the first main blocks after the Ledger and not the foot
+     of the page, nor a form squeezed into the side column. */
+  const main = old.blocks.filter((b) => b.area !== 'rail').map((b) => b.heading);
+  const ledgerAt = main.indexOf('Ledger');
+  assert.ok(ledgerAt >= 0, `Money's main column has no Ledger: ${main.join(', ')}`);
+  assert.deepEqual(main.slice(ledgerAt + 1, ledgerAt + 3), [COUNT, LAST]);
+  assert.deepEqual([blockOf(old, 'Heads up').area, blockOf(old, COUNT).area, blockOf(old, LAST).area], ['rail', 'main', 'main']);
   const box = blockOf(old, COUNT);
   assert.deepEqual([box.added, box.drawn ?? true, box.refusals], ['count-cash', true, []]);
   /* AND THE LAST COUNT IS LEFT OUT WHILE THERE IS NONE, rather than a tile with nothing in it. */
@@ -177,7 +192,7 @@ test('A COUNT THAT AGREES FILES NOTHING AND SAYS NOTHING, so What happened never
   close();
 });
 
-test('A COUNT OLDER THAN A WEEK LEAVES MONEY, so Heads up holds no old count, and Cash counts still keeps it', async () => {
+test('A COUNT OLDER THAN A WEEK LEAVES MONEY, so Money holds no old count, and Cash counts still keeps it', async () => {
   const { api, sql, close } = await fresh();
   await put(api, shipped());
   const till = said<{ id: string }>(

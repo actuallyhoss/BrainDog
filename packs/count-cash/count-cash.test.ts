@@ -98,9 +98,11 @@ test('THE PACK CARRIES count.js AS ITS SOURCE, byte for byte; it fetches nothing
      1.3.3 BESIDE THE PUBLISHED 1.3.2: a count in another currency than its account says so on the count, where only
      the run's log did (audit 73 finding 3). A sentence written on two paths, no field added, so a patch.
      1.4.0 BESIDE THE PUBLISHED 1.3.3: Money gains a box to count the cash in and the newest count, by adds, and a count
-     that files says so. A block and a sentence added, so a minor. */
-  assert.equal(file.value.pack.manifest.version, '1.4.0');
-  assert.match(PACK.changes, /Money now has a box to count the cash in/);
+     that files says so. A block and a sentence added, so a minor.
+     1.4.1 BESIDE THE PUBLISHED 1.4.0: the two blocks follow Heads up, in the main column, where they followed What it
+     holds today, which Money no longer has. Where two blocks stand, nothing added or taken away, so a patch. */
+  assert.equal(file.value.pack.manifest.version, '1.4.1');
+  assert.match(PACK.changes, /The box to count the cash in and the last count now go with Heads up on Money/);
   const counts = PACK.declarations.find((d) => d.register === 'cash_counts') as { fields: { id: string }[] };
   assert.deepEqual(counts.fields.map((f) => f.id), ['account', 'counted', 'on', 'difference', 'said', 'note']);
 });

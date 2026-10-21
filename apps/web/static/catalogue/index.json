@@ -316,8 +316,34 @@
       "author": "BrainDog",
       "license": "Apache-2.0",
       "audience": "addon",
-      "latest": "1.4.0",
+      "latest": "1.4.1",
       "versions": [
+        {
+          "version": "1.4.1",
+          "checksum": "e0ec187ce4fd54f5f90044b9b792c802af1a64c362efffb18b58e6469c6b9636",
+          "bytes": 17898,
+          "published_at": "2026-10-21T13:01:08.279Z",
+          "bump": "patch",
+          "reach": {
+            "modules": [
+              "money-core"
+            ],
+            "lists": [
+              "Cash counts"
+            ],
+            "pages": [
+              "Cash counts"
+            ],
+            "rules": [
+              "Write the difference of each count"
+            ],
+            "examples": 0,
+            "skills": [],
+            "calls_out": []
+          },
+          "notes": "The box to count the cash in and the last count now go with Heads up on Money, and no longer after What it holds today, which Money no longer has. Where Heads up stands in the side column, the two stand in the main column beside it, under the Ledger the difference goes into. Nothing else changed.",
+          "preview": true
+        },
         {
           "version": "1.4.0",
           "checksum": "35cbe193eb654c8d6ab21ca8ae36dda1d8cef968076c667bf373854cb756b2b5",
