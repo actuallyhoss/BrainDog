@@ -27,6 +27,9 @@ test('A COUNT IS SAID ONLY ON A LIST A PERSON COUNTS, and never on a figure, a c
   assert.equal(headCount({ kind: 'series', total: 12 }), null);
   assert.equal(headCount({ kind: 'note', total: 1 }), null);
   assert.equal(headCount({ kind: 'table', total: 5, refused: true }), null);
+  /* TODAY'S PEOPLE ARE CARDS AND A LIST OF PEOPLE: counted by their key, and other cards are not. */
+  assert.equal(headCount({ kind: 'cards', total: 9, key: 'faces' }), 9);
+  assert.equal(headCount({ kind: 'cards', total: 9 }), null);
 });
 
 test('A WELL`S COLOUR IS A MEANING: a question in the accent, late in the red, cash in the earn green, the rest quiet', () => {

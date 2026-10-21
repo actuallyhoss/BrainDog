@@ -122,11 +122,14 @@ export function headIcon(kind: string, own: string | undefined, drawable: (name:
 /** The kinds whose tile is a list of things a person counts. Not cards, which are as often one project's own card. */
 const COUNTED: ReadonlySet<string> = new Set(['queue', 'table', 'todo', 'board', 'timeline', 'roadmap', 'deadlines', 'comparison']);
 
+/** Tiles counted by the key they are declared under: Today's People, cards that are a list of people (today F17). */
+const COUNTED_KEYS: ReadonlySet<string> = new Set(['faces']);
+
 /** What a tile's heading reads to count: its kind, how many it holds in all, and whether it could not be drawn. */
-export type Countable = { readonly kind: string; readonly total: number; readonly refused?: boolean };
+export type Countable = { readonly kind: string; readonly total: number; readonly refused?: boolean; readonly key?: string | undefined };
 
 /** The count beside a tile's name, or `null` where the tile says no count: nothing held, or not a list. */
 export function headCount(b: Countable): number | null {
-  if (b.refused || !COUNTED.has(b.kind)) return null;
+  if (b.refused || !(COUNTED.has(b.kind) || (b.key !== undefined && COUNTED_KEYS.has(b.key)))) return null;
   return Number.isInteger(b.total) && b.total > 0 ? b.total : null;
 }

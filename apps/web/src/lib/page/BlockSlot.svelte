@@ -421,7 +421,7 @@
   /* THE TILE'S HEADING ROW, THE SAME ON EVERY TILE (DIRECTION §39): its glyph, or its kind's where it names none, and
      how many it holds where it is a list a person counts (`tile-head.ts`). */
   const glyph = $derived(headIcon(block.kind, block.icon, isGlyph));
-  const count = $derived(headCount({ kind: block.kind, total: block.total, refused: !!drawn.refusal || block.cannot !== undefined }));
+  const count = $derived(headCount({ kind: block.kind, total: block.total, refused: !!drawn.refusal || block.cannot !== undefined, key: typeof block.key === 'string' ? block.key : undefined }));
 
   /* HOME'S OWN LIST, where Home drew the block as one (`home/home-rows.ts`): what is late as one list, what comes up by
      day. THE HEADING'S WELL IS NEUTRAL on every tile (2.A.5): a heading names a group, and a group is not late or good;
