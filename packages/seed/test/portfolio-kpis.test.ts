@@ -50,8 +50,10 @@ const stateOf = (k: Kernel, coming: Record<string, string> = {}): Installed => (
   detached: Object.fromEntries(k.detached().map((d) => [d.id, { was: d.was, body: d.body }])),
   handed: { ...handedOf((sqlOf.get(k)?.all<{ manifest: string }>('SELECT manifest FROM pack') ?? []).map((r) => r.manifest)), ...coming },
 });
+/** The lists the packs laid: the kernel's own two (runs and what he told them) are on every record and are no pack's. */
+const KERNEL_LISTS = ['register.session', 'register.instructions'];
 const held = (k: Kernel): string[] =>
-  (k.declarations() as { id: string; kind: string }[]).filter((d) => d.kind === 'register' && d.id !== 'register.session').map((d) => d.id.slice('register.'.length));
+  (k.declarations() as { id: string; kind: string }[]).filter((d) => d.kind === 'register' && !KERNEL_LISTS.includes(d.id)).map((d) => d.id.slice('register.'.length));
 const listsOf = (id: string): string[] => firstPartyManifest(id as never).provides.flatMap((p) => (p.startsWith('register.') ? [p.slice('register.'.length)] : []));
 async function put(k: Kernel, doc: unknown, coming: Record<string, string> = {}): Promise<void> {
   const pack = value<Pack>(await normalise(doc, { kind: 'local' }));
