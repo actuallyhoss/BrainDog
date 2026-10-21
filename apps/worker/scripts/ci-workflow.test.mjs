@@ -206,7 +206,7 @@ test('the docs tests run by their glob in exactly one leg, and the root pnpm tes
   assert.deepEqual(legs().filter((leg) => leg.links === true).map((leg) => leg.leg), ['apps']);
 
   const scripts = JSON.parse(read('package.json')).scripts;
-  assert.equal(scripts.test, 'pnpm -r --workspace-concurrency=1 run test && node --test docs/test/*.test.mjs && node --test tools/people/test/*.test.mjs && node --test tools/people/expect/*.test.mjs');
+  assert.equal(scripts.test, 'pnpm -r --workspace-concurrency=1 run test && node --test docs/test/*.test.mjs && node --test tools/people/test/*.test.mjs && node --test tools/people/expect/*.test.mjs && node --test tools/agent-bench/test/*.test.mjs');
   assert.equal(scripts.typecheck, 'pnpm -r run typecheck');
 });
 
