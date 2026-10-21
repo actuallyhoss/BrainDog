@@ -1,0 +1,284 @@
+/*
+ * The runs open now on the Agents page (`Presence.svelte` in braindog-render; agents and MCP plan §4.4, §7.1), each the
+ * UI pass's one run row: a 28px face with the maker's mark and its live dot, the agent at 15/500 and what it said at
+ * 15/400 in the second ink, the meta line at 13, then what it holds and the honest line about what can stop it.
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers. No colour is written: the live dot is `--live`, a held run's dot
+ * the quiet ink, a project's dot its slot, and red is only the one primary press of a stop.
+ */
+
+@layer components {
+  /* A STEP UNDER THE TILE'S HEADING, as the composer's field sits under its own. */
+  .pres {
+    display: grid;
+    margin: var(--sp-3) 0 0;
+    padding: 0;
+    list-style: none;
+    container-type: inline-size;
+  }
+
+  .pres-row {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--sp-1) var(--sp-3);
+    padding-block: var(--sp-3);
+    border-block-start: 1px solid var(--rule);
+  }
+
+  .pres-row:first-child {
+    border-block-start: 0;
+    padding-block-start: 0;
+  }
+
+  /* THE FACE (2.A.5): a 28px disc in the step-under fill, the maker's mark 16px in it, and the live dot at its end
+     corner with a cut-out ring in the tile's colour. No ring round the face. */
+  .pres-face {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: var(--r-round);
+    background: var(--tile-2);
+    color: var(--ink);
+  }
+
+  .pres-face .agent-mark {
+    inline-size: 16px;
+    block-size: 16px;
+  }
+
+  .pres-initial {
+    font-size: var(--fs-cap);
+    font-weight: var(--fw-semi);
+  }
+
+  .pres-dot {
+    position: absolute;
+    inset-block-end: -1px;
+    inset-inline-end: -1px;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-round);
+    background: var(--live);
+    box-shadow: 0 0 0 2px var(--tile);
+  }
+
+  .pres-dot[data-live='thinking'] {
+    background: color-mix(in oklab, var(--live) 55%, var(--tile));
+  }
+
+  .pres-dot[data-live='waiting'],
+  .pres-dot[data-live='held'] {
+    background: var(--ink-3);
+  }
+
+  .pres-body {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  .pres-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--sp-2);
+    margin: 0;
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .pres-name {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+    text-decoration: none;
+  }
+
+  a.pres-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  a.pres-name:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .pres-doing {
+    min-inline-size: 0;
+    color: var(--ink-2);
+    overflow-wrap: anywhere;
+  }
+
+  .pres-meta,
+  .pres-holds,
+  .pres-reach {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pres-holds {
+    color: var(--ink-2);
+  }
+
+  .pres-row[data-stopped] .pres-live {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  .pres-proj {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    color: var(--ink-2);
+  }
+
+  .pres-pdot {
+    align-self: center;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: var(--r-round);
+    background: var(--ph, var(--ink-3));
+  }
+
+  .pres-pdot[data-slot='blue'] { --ph: var(--cat-blue, var(--info)); }
+  .pres-pdot[data-slot='violet'] { --ph: var(--cat-violet, var(--info)); }
+  .pres-pdot[data-slot='pink'] { --ph: var(--cat-pink, var(--ink-2)); }
+  .pres-pdot[data-slot='teal'] { --ph: var(--cat-teal, var(--good)); }
+  .pres-pdot[data-slot='sky'] { --ph: var(--cat-sky, var(--info)); }
+  .pres-pdot[data-slot='yellow'] { --ph: var(--cat-yellow, var(--warn)); }
+  .pres-pdot[data-slot='lime'] { --ph: var(--cat-lime, var(--good)); }
+  .pres-pdot[data-slot='slate'] { --ph: var(--cat-slate, var(--ink-3)); }
+
+  .pres-reach {
+    margin-block-start: var(--sp-1);
+  }
+
+  .pres-do {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  /* A QUIET BUTTON, as `Button`'s small quiet one; the confirm's second press is the one red fill. */
+  .pres-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--btn-h-sm, var(--ctl-h-sm));
+    padding: 0 var(--sp-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--d-press) var(--ease-out);
+  }
+
+  .pres-btn[data-weight='primary'] {
+    background: var(--red-fill);
+    color: var(--on-red);
+  }
+
+  .pres-btn:disabled {
+    color: var(--ink-3);
+    cursor: progress;
+  }
+
+  .pres-btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .pres-btn:hover:not(:disabled) {
+      background: var(--hover);
+    }
+
+    .pres-btn[data-weight='primary']:hover {
+      background: var(--red-fill-hover);
+    }
+  }
+
+  /* THE ASK BEFORE A STOP, in place under the row: what it will do, a field for why, then the two presses. */
+  .pres-ask {
+    display: grid;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
+    padding: var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+  }
+
+  .pres-sure {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+  }
+
+  .pres-why {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .pres-input {
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: var(--ctl-h);
+    padding-inline: var(--sp-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-body);
+  }
+
+  .pres-input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .pres-ask .pres-btn:not([data-weight='primary']) {
+    background: var(--tile);
+  }
+
+  /* ON A PHONE the presses go under the words, each a 44px target, so nothing is pushed off the row. */
+  @container (width < 560px) {
+    .pres-row {
+      grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    .pres-acts {
+      grid-column: 2;
+      margin-block-start: var(--sp-2);
+    }
+
+    .pres-btn {
+      min-block-size: var(--tap, 44px);
+      padding-inline: var(--sp-3);
+    }
+
+    .pres-input {
+      min-block-size: var(--tap, 44px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pres-btn {
+      transition: none;
+    }
+  }
+}

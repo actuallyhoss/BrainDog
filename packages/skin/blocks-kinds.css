@@ -34,3 +34,5 @@
 @import './kinds/shot.css';
 @import './kinds/lanes.css';
 @import './kinds/kpis.css';
+@import './kinds/instruct.css';
+@import './kinds/presence.css';

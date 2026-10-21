@@ -1,0 +1,551 @@
+/*
+ * The composer and the threads of the Agents page (`Instruct.svelte`, `Instructions.svelte` in braindog-render; agents
+ * and MCP plan §7.1).
+ *
+ * One of the kind sheets `blocks-kinds.css` gathers. No colour is written: every value is a role, and the one hue that
+ * is not the ink is the agent's own (`--agent-claude`, read through `--told-c`), on its bar. Red is Needs you and the
+ * one red button, Send.
+ */
+
+@layer components {
+  /* ── the composer ────────────────────────────────────────────────────────
+     The field first and full width, the choices under it on one line with Send at its end, then what happens next in
+     a sentence. A RECTANGLE, as every field is: radius 8, the field's flat fill, no border; the focus ring is the
+     wrapper's, never a halo. */
+  .ins {
+    display: grid;
+    gap: var(--sp-3);
+    min-inline-size: 0;
+    container-type: inline-size;
+  }
+
+  .ins-hide {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .ins-field {
+    display: contents;
+  }
+
+  .ins-said {
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: 64px;
+    max-block-size: 240px;
+    padding: var(--sp-3);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-body);
+    line-height: 22px;
+    resize: none;
+    field-sizing: content;
+  }
+
+  .ins-said::placeholder {
+    color: var(--ink-3);
+  }
+
+  .ins-said:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .ins-said[aria-invalid='true'] {
+    box-shadow: inset 0 0 0 1px var(--red);
+  }
+
+  .ins-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+  }
+
+  .ins-picks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    min-inline-size: 0;
+  }
+
+  /* A CHOICE AS A CHIP: radius 8 (never a pill), the quiet fill, its key word in the quiet ink and its value in ink,
+     the platform's select laid over the whole of it so the chip is the control. */
+  .ins-pick {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-1);
+    box-sizing: border-box;
+    min-block-size: var(--ctl-h);
+    max-inline-size: 100%;
+    padding-inline-start: var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink);
+    font-size: var(--fs-ctl);
+    line-height: 20px;
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .ins-pick[data-fixed] {
+    background: transparent;
+    padding-inline: var(--sp-1);
+  }
+
+  .ins-key {
+    flex: none;
+    color: var(--ink-3);
+  }
+
+  .ins-value {
+    font-weight: var(--fw-medium);
+  }
+
+  /* THE APP'S OWN SELECT (`controls.css`), its chevron kept, laid on the chip's fill with no ground or height of its own,
+     so the key word and the value read as one control. */
+  .ins-select {
+    min-inline-size: 0;
+    min-block-size: 0;
+    padding-block: 0;
+    padding-inline-start: 0;
+    border: 0;
+    background-color: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-weight: var(--fw-medium);
+    text-overflow: ellipsis;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .ins-select:focus-visible {
+    outline: none;
+  }
+
+  .ins-pick:has(.ins-select:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .ins-mark {
+    flex: none;
+    inline-size: 16px;
+    block-size: 16px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ins-pick:not([data-fixed]):hover {
+      background: var(--hover);
+    }
+  }
+
+  /* WHEN, AS THE SEGMENTED CONTROL (2.A.9): a track in the quiet fill, the chosen one raised and set in 600. */
+  .ins-when {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+  }
+
+  .ins-when-one {
+    min-block-size: calc(var(--ctl-h) - 4px);
+    padding-inline: var(--sp-2);
+    border: 0;
+    border-radius: var(--r-xs);
+    background: transparent;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition:
+      background var(--d-state) var(--ease-out),
+      color var(--d-state) var(--ease-out);
+  }
+
+  .ins-when-one[aria-checked='true'] {
+    background: var(--segment-on, var(--tile));
+    color: var(--ink);
+    font-weight: var(--fw-semi);
+  }
+
+  .ins-when-one:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+  }
+
+  /* SEND, THE ONE RED FILL ON THE TILE, white words, a fill change on press and nothing that moves. */
+  .ins-send {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    min-block-size: var(--ctl-h);
+    padding: 0 var(--sp-4);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--red-fill);
+    color: var(--on-red);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background var(--d-press) var(--ease-out);
+  }
+
+  .ins-send svg {
+    inline-size: 16px;
+    block-size: 16px;
+  }
+
+  .ins-send:active {
+    background: var(--red-fill-press, var(--red-fill-hover));
+  }
+
+  .ins-send[aria-busy='true'] {
+    cursor: progress;
+  }
+
+  .ins-send:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ins-send:hover:not(:active) {
+      background: var(--red-fill-hover);
+    }
+  }
+
+  .ins-next {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .ins-fault {
+    margin: 0;
+    color: var(--red);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  /* ON A PHONE the choices take the width, each a 44px chip, and Send is a full row under them. */
+  @container (width < 560px) {
+    .ins-bar {
+      display: grid;
+    }
+
+    /* TO TAKES THE ROW, ON AND WHEN SHARE THE NEXT, each select as wide as its chip. */
+    .ins-picks > :first-child {
+      flex: 1 1 100%;
+    }
+
+    .ins-picks > * {
+      flex: 1 1 auto;
+    }
+
+    .ins-pick > .ins-select {
+      flex: 1 1 auto;
+      inline-size: 100%;
+    }
+
+    .ins-pick:not([data-fixed]),
+    .ins-when {
+      min-block-size: var(--tap, 44px);
+    }
+
+    .ins-when-one {
+      min-block-size: calc(var(--tap, 44px) - 4px);
+    }
+
+    .ins-send {
+      inline-size: 100%;
+      min-block-size: var(--tap, 44px);
+    }
+  }
+
+  /* ── the threads ─────────────────────────────────────────────────────────
+     Under the composer, a hairline between one and the next: what he said at the body size, to whom at the end (under
+     it on a phone), the bar and its word, the trail, the reply quoted, what changed. */
+  .told {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    container-type: inline-size;
+  }
+
+  .ins + .told,
+  .told-head + .told {
+    margin-block-start: var(--sp-2);
+  }
+
+  .told-head {
+    margin: var(--sp-5) 0 0;
+    padding-block-start: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-medium);
+    line-height: 18px;
+  }
+
+  .told-item {
+    display: grid;
+    gap: var(--sp-2);
+    padding-block: var(--sp-4);
+    border-block-start: 1px solid var(--rule);
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+
+  .told-item:first-child {
+    border-block-start: 0;
+    padding-block-start: var(--sp-2);
+  }
+
+  .told-item[data-sending] {
+    opacity: 0.72;
+  }
+
+  .told-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-1) var(--sp-4);
+  }
+
+  .told-said {
+    flex: 1 1 24ch;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    line-height: 22px;
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+  }
+
+  .told-to {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--sp-1);
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .told-mark {
+    inline-size: 14px;
+    block-size: 14px;
+  }
+
+  .told-state {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+
+  /* THE BAR, FOUR STRETCHES IN THE AGENT'S HUE: reached is the hue, the one it is at the hue half-strength, ahead the
+     track. Needs you takes red on its last stretch; a thread that went nowhere is the rule throughout. */
+  .told-bar {
+    display: grid;
+    flex: 0 1 200px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3px;
+    min-inline-size: 96px;
+  }
+
+  .told-step {
+    block-size: 6px;
+    border-radius: 3px;
+    background: var(--chart-track, var(--tile-2));
+    transition: background var(--d-state) var(--ease-out);
+  }
+
+  .told-step[data-step='done'] {
+    background: var(--told-c, var(--ink));
+  }
+
+  .told-step[data-step='at'] {
+    background: color-mix(in oklab, var(--told-c, var(--ink)) 45%, var(--chart-track, var(--tile-2)));
+  }
+
+  .told-item[data-tone='needs'] .told-step:last-child {
+    background: var(--red);
+  }
+
+  .told-item[data-tone='ended'] .told-step[data-step]:not([data-step='ahead']) {
+    background: var(--rule-strong);
+  }
+
+  .told-word {
+    color: var(--ink);
+    font-size: var(--fs-meta);
+    font-weight: var(--fw-semi);
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .told-item[data-tone='needs'] .told-word {
+    color: var(--red);
+  }
+
+  .told-item[data-tone='ended'] .told-word {
+    color: var(--ink-3);
+    font-weight: var(--fw-medium);
+  }
+
+  .told-trail {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* THE REPLY IN ITS WORDS, set in from the edge in the quiet fill: a quote and not a card, who said it under. */
+  .told-reply {
+    display: grid;
+    gap: var(--sp-1);
+    margin: 0;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+  }
+
+  .told-quote {
+    margin: 0;
+  }
+
+  .told-quote p {
+    margin: 0;
+    color: var(--ink);
+    font-size: var(--fs-body);
+    line-height: 22px;
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+  }
+
+  .told-by {
+    color: var(--ink-3);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .told-did {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+  }
+
+  .told-did-said {
+    flex: 1 1 24ch;
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .told-did-n {
+    color: var(--ink);
+    font-weight: var(--fw-medium);
+  }
+
+  .told-undone {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: var(--fs-meta);
+    line-height: 18px;
+  }
+
+  .told-do {
+    display: flex;
+  }
+
+  /* A QUIET BUTTON, as `Button`'s small quiet one: the step-under fill on the tile, radius 8, 14 medium. */
+  .told-btn,
+  .told-more {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: var(--btn-h-sm, var(--ctl-h-sm));
+    padding: 0 var(--sp-2);
+    border: 0;
+    border-radius: var(--r-ctl);
+    background: var(--tile-2);
+    color: var(--ink);
+    font: inherit;
+    font-size: var(--fs-ctl);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: background var(--d-press) var(--ease-out);
+  }
+
+  .told-more {
+    justify-self: start;
+    margin-block-start: var(--sp-2);
+  }
+
+  .told-btn:disabled {
+    color: var(--ink-3);
+    cursor: progress;
+  }
+
+  .told-btn:focus-visible,
+  .told-more:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .told-btn:hover:not(:disabled),
+    .told-more:hover {
+      background: var(--hover);
+    }
+  }
+
+  @container (width < 560px) {
+    .told-top {
+      display: grid;
+    }
+
+    .told-bar {
+      flex-basis: 50%;
+    }
+
+    .told-btn,
+    .told-more {
+      min-block-size: var(--tap, 44px);
+      padding-inline: var(--sp-3);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ins-pick,
+    .ins-when-one,
+    .ins-send,
+    .told-item,
+    .told-step,
+    .told-btn,
+    .told-more {
+      transition: none;
+    }
+  }
+}
