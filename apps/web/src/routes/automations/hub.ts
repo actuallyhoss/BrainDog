@@ -530,7 +530,7 @@ export function heatReading(lines: readonly RunLine[], heat: Heat): string {
     const today = heat.days.at(-1);
     const n = heat.rows.length;
     const kinds = new Set(within.map((l) => l.kind));
-    const noun = kinds.size === 1 && kinds.has('automation') ? (n === 1 ? 'automation' : 'automations') : n === 1 ? 'thing' : 'things';
+    const noun = kinds.size === 1 && kinds.has('automation') ? (n === 1 ? 'automation' : 'automations') : 'of these';
     lead = `${spell(n, true)} ${noun} ran ${within.every((l) => dayKey(l.at) === today) ? 'today' : `in the last ${heat.days.length} days`}`;
     if (bad.length === 0) return `${lead}, and none failed.`;
   }
