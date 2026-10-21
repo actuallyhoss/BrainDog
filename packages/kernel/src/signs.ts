@@ -500,7 +500,10 @@ function readCauses(sql: Sql, nowMs: number): SignReading {
   const said = biggest
     ? `${biggest.length} open questions share one cause: ${askedIn(sql, biggest[0]!)} One answer closes them.`
     : faults.length > 0
-      ? `${count(faults.length, 'open question is', 'open questions are')} a fault of the record, not a choice for you.`
+      ? /* THE FAULT'S OWN WORDS (UI pass of 21 October, P36), not "a fault of the record". */
+        faults.length === 1
+        ? `Something went wrong, not a choice for you: ${askedIn(sql, faults[0]!.id)}`
+        : `${faults.length} open questions are things that went wrong, not choices for you. The first: ${askedIn(sql, faults[0]!.id)}`
       : `${uncaused.length} open questions carry no cause.`;
   return reading('red', biggest?.length ?? (faults.length || uncaused.length), said, facts);
 }
