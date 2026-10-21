@@ -512,6 +512,7 @@
      shell, which outlives every screen, so a row that navigated left it open over the new screen
      unless each row closed it by hand. */
   beforeNavigate((nav) => {
+    moves += 1;
     leaving();
     /* The dev timing hook measures the next screen from here (`timing.ts`); off, it does nothing. */
     timingOpened();
@@ -535,6 +536,8 @@
    */
   const scrolls = new Map<string, number>();
   const leftBy = new Map<string, string>();
+  /* HOW MANY MOVES THIS TAB HAS MADE, so a place put back for one screen is never put back over the next one. */
+  let moves = 0;
   const placeKey = (u: URL): string => u.pathname + u.search;
   const scroller = (): HTMLElement | null => document.getElementById('main');
   let fromPalette = false;
@@ -581,12 +584,13 @@
     if (nav.type === 'popstate') {
       const y = scrolls.get(to) ?? 0;
       const link = leftBy.get(to);
+      const move = moves;
       void waitFor(() => {
         const el = scroller();
-        return el !== null && el.dataset.screen !== undefined && el.scrollHeight - el.clientHeight >= y;
+        return moves !== move || (el !== null && el.dataset.screen !== undefined && el.scrollHeight - el.clientHeight >= y);
       }, 1500).then(() => {
         const el = scroller();
-        if (!el) return;
+        if (!el || moves !== move) return;
         el.scrollTop = y;
         /* A SCREEN THAT DRAWS AGAIN WHEN ITS FRESH ANSWER LANDS (Needs you's queue) is short for a frame and drops the
            place to the top (VERIFY H4). So for 1.5s a drop below `y` is put back, until the reader scrolls themselves. */
@@ -596,7 +600,8 @@
         for (const h of hands) addEventListener(h, mine, { capture: true, passive: true, once: true });
         void waitFor(() => {
           const now = scroller();
-          if (own || now === null) return true;
+          /* AND NEVER OVER THE NEXT SCREEN: two Backs in a row put the second screen at the first one's place. */
+          if (own || now === null || moves !== move) return true;
           if (now.scrollTop < y - 1 && now.scrollHeight - now.clientHeight >= y) now.scrollTop = y;
           return false;
         }, 1500).then(() => {
