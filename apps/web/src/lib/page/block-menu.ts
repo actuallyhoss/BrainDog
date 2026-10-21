@@ -14,11 +14,20 @@
  * and stop taking the add-on's updates, so there the menu says where Change to is instead, until a change to one block
  * is an overlay of its own (PGS-B07). The kinds offered are `kindsFor`'s (`braindog-render`), handed in, so this file
  * stays pure and its test needs no renderer.
+ *
+ * AND A KEY NUMBER'S OWN ROWS (the KPI plan of 21 October, 2.5): on a number drawn by a `kpis` block, "Show on Today",
+ * "Hide from Today" and "Let Today choose" set its row's `today`, and "Lead the card with this" sets its `headline` and
+ * clears it on the project's other numbers. These are the number's row, not the page's look, so each is a write through
+ * the app's row writer at the version each row was read at (`kpiWritesOf`, `runKpiWrites`), and its Undo puts each row
+ * back at the version the write left it at.
  */
 
+import { copy } from '../copy.ts';
 import { STEPS, spanLabel, spanOf, stepsFor, type Area } from '../record/arrange.ts';
 import type { LiveLook } from '../record/page-live.ts';
 import type { Laid } from '../record/arrange-look.ts';
+import type { RowWriter } from '../record/rows-write.ts';
+import type { Fields } from '../record/schema.ts';
 import { areaOf, layoutOf } from './layout.ts';
 import { bodyOf, lookPage } from './look.ts';
 
@@ -262,4 +271,103 @@ export function saidOf(edit: Edit, name: string, action?: ActionId, kindName?: s
   if ('area' in edit) return edit.area === 'rail' ? words.toRail(who) : words.toMain(who);
   if ('hide' in edit) return edit.hide ? words.hidden(who) : words.shown(who);
   return action === 'down' ? words.movedDown(who) : words.movedUp(who);
+}
+
+/* ── a key number's own rows ─────────────────────────────────────────────────────────────────────────────────── */
+
+/** A key number as its row is held: its number, the version it was read at, and its fields. */
+export type KpiHeld = { seq: number; version: number; fields: Fields };
+
+export type KpiActionId = 'kpi-pin' | 'kpi-hide' | 'kpi-auto' | 'kpi-lead';
+
+/** One row of a key number's menu. */
+export type KpiAction = { id: KpiActionId; label: string };
+
+/** One write a press makes: the row, the version it is written at, what changes, and what puts it back. */
+export type KpiWrite = { seq: number; version: number; patch: Fields; undo: Fields };
+
+/** A write that landed: the row, the version it now holds, and what puts it back. */
+export type KpiDone = { seq: number; version: number; undo: Fields };
+
+const TODAY_OF: Readonly<Record<Exclude<KpiActionId, 'kpi-lead'>, 'pinned' | 'hidden' | 'auto'>> = { 'kpi-pin': 'pinned', 'kpi-hide': 'hidden', 'kpi-auto': 'auto' };
+
+const todayOf = (fields: Fields): 'pinned' | 'hidden' | 'auto' => (fields.today === 'pinned' || fields.today === 'hidden' ? fields.today : 'auto');
+
+/** A number the menu may act on: kept (not a suggestion), live, and not deleted. */
+const kept = (fields: Fields): boolean => fields.draft !== true && fields.state !== 'retired' && (fields.deleted_at ?? null) === null;
+
+/** The project a number is on, as its row holds it: a row id, or a number once the row writer has named it. */
+const thingOf = (fields: Fields): string | null => (typeof fields.thing === 'string' || typeof fields.thing === 'number' ? String(fields.thing) : null);
+
+/**
+ * THE MENU OF ONE KEY NUMBER, in order: the two ways it is not on Today now, then "Lead the card with this" unless it
+ * already does. A person who may not write it is offered nothing, and so is a suggestion not kept yet: Keep or Not this
+ * is its only question.
+ */
+export function kpiActionsFor(kpi: Pick<KpiHeld, 'fields'>, may: boolean): KpiAction[] {
+  if (!may || !kept(kpi.fields)) return [];
+  const today = todayOf(kpi.fields);
+  const out: KpiAction[] = [];
+  if (today !== 'pinned') out.push({ id: 'kpi-pin', label: copy.kpiMenuPin });
+  if (today !== 'hidden') out.push({ id: 'kpi-hide', label: copy.kpiMenuHide });
+  if (today !== 'auto') out.push({ id: 'kpi-auto', label: copy.kpiMenuAuto });
+  if (kpi.fields.headline !== true) out.push({ id: 'kpi-lead', label: copy.kpiMenuLead });
+  return out;
+}
+
+/**
+ * THE WRITES ONE PRESS MAKES, in the order they go: empty where the press changes nothing.
+ *
+ * TODAY IS ONE ROW. LEAD IS THE PROJECT'S: every other kept number on the same project that leads its card gives it up
+ * first, and then this one takes it, so a press that is turned down half way never leaves two numbers leading one card.
+ */
+export function kpiWritesOf(action: KpiActionId, kpi: KpiHeld, others: readonly KpiHeld[]): KpiWrite[] {
+  if (action !== 'kpi-lead') {
+    const to = TODAY_OF[action];
+    const was = todayOf(kpi.fields);
+    return to === was ? [] : [{ seq: kpi.seq, version: kpi.version, patch: { today: to }, undo: { today: was } }];
+  }
+  if (kpi.fields.headline === true) return [];
+  const project = thingOf(kpi.fields);
+  const led = others.filter((o) => o.seq !== kpi.seq && project !== null && thingOf(o.fields) === project && o.fields.headline === true && kept(o.fields));
+  return [
+    ...led.map((o) => ({ seq: o.seq, version: o.version, patch: { headline: false }, undo: { headline: true } })),
+    { seq: kpi.seq, version: kpi.version, patch: { headline: true }, undo: { headline: false } },
+  ];
+}
+
+/** What a press did, one line over its Undo, naming the number by its name. */
+export function kpiSaidOf(action: KpiActionId, name: string): string {
+  const who = name.trim() || copy.kpiUnnamed;
+  if (action === 'kpi-pin') return copy.kpiPinnedSaid(who);
+  if (action === 'kpi-hide') return copy.kpiHiddenSaid(who);
+  if (action === 'kpi-auto') return copy.kpiAutoSaid(who);
+  return copy.kpiLeadSaid(who);
+}
+
+/**
+ * THE WRITES, ONE AT A TIME THROUGH THE APP'S ROW WRITER, each at the version its row was read at. The first the record
+ * turns down stops the rest, and what had landed is answered beside its sentence, so the caller puts it back.
+ */
+export async function runKpiWrites(
+  writer: Pick<RowWriter, 'update'>,
+  list: string,
+  writes: readonly KpiWrite[],
+): Promise<{ ok: true; done: KpiDone[] } | { ok: false; fix: string; done: KpiDone[] }> {
+  const done: KpiDone[] = [];
+  for (const w of writes) {
+    const out = await writer.update(list, w.seq, w.patch, w.version);
+    if (!out.ok) return { ok: false, fix: out.fix, done };
+    done.push({ seq: w.seq, version: out.entry.version, undo: w.undo });
+  }
+  return { ok: true, done };
+}
+
+/** Puts back what landed, last first, each at the version the write left it at. The record's sentence where it will not. */
+export async function undoKpiWrites(writer: Pick<RowWriter, 'update'>, list: string, done: readonly KpiDone[]): Promise<{ ok: true } | { ok: false; fix: string }> {
+  for (const d of [...done].reverse()) {
+    const out = await writer.update(list, d.seq, d.undo, d.version);
+    if (!out.ok) return { ok: false, fix: out.fix };
+  }
+  return { ok: true };
 }

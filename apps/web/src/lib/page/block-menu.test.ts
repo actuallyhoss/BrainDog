@@ -8,7 +8,27 @@ import assert from 'node:assert/strict';
 import type { LiveLook } from '../record/page-live.ts';
 import { blockAt, changeBlock, changeWords, kindPatch, setBody, withPatch, withoutBlock } from '../record/page-write.ts';
 import type { Fetch as ClientFetch, PageBody } from '../record/pages-live.ts';
-import { actionsFor, editOf, hideBody, laidAfter, laidOf, placeOf, saidOf, words, type Laid, type MenuBlock } from './block-menu.ts';
+import { copy } from '../copy.ts';
+import type { RowWriter, Wrote } from '../record/rows-write.ts';
+import type { Fields } from '../record/schema.ts';
+import {
+  actionsFor,
+  editOf,
+  hideBody,
+  kpiActionsFor,
+  kpiSaidOf,
+  kpiWritesOf,
+  laidAfter,
+  laidOf,
+  placeOf,
+  runKpiWrites,
+  saidOf,
+  undoKpiWrites,
+  words,
+  type KpiHeld,
+  type Laid,
+  type MenuBlock,
+} from './block-menu.ts';
 
 const LATE: MenuBlock = { key: 'late', kind: 'todo', columns: 0, span: 12, name: 'Late', kindName: 'to-do list' };
 const owner = { owner: true, area: null, first: false, last: false, hidden: false } as const;
@@ -308,4 +328,105 @@ test('AN ADD-ON\'S PAGE IS NEVER SET WHOLE from the menu: it would become his co
   assert.deepEqual(out, { from: 'refused', fix: changeWords.notYours });
   assert.equal(sets.length, 0);
   assert.doesNotMatch(changeWords.notYours, /—|\brow\b|\bentity\b/u);
+});
+
+/* ── a key number's own rows ─────────────────────────────────────────────────────────────────────────────────── */
+
+const KILN = 'P01KILN';
+const kpi = (seq: number, fields: Fields, version = 1): KpiHeld => ({ seq, version, fields: { name: `Number ${seq}`, thing: KILN, today: 'auto', headline: false, ...fields } });
+
+/** A row writer over a few rows held in memory, compare-and-set as the record is: a stale version is turned down. */
+function rows(held: KpiHeld[]) {
+  const sent: { seq: number; patch: Fields; version: number | undefined }[] = [];
+  let refuse: number | null = null;
+  const writer: Pick<RowWriter, 'update'> = {
+    async update(_list, seq, patch, version): Promise<Wrote> {
+      sent.push({ seq, patch, version });
+      const row = held.find((r) => r.seq === seq);
+      if (!row || seq === refuse) return { ok: false, why: 'refused', fix: 'Not now.' };
+      if (version !== row.version) return { ok: false, why: 'conflict', fix: 'Somebody changed it.', entry: null };
+      row.fields = { ...row.fields, ...patch };
+      row.version += 1;
+      return { ok: true, entry: { seq, fields: row.fields, version: row.version, created: '', by: '' } };
+    },
+  };
+  return { writer, sent, refuseOn: (seq: number) => (refuse = seq) };
+}
+
+test('A KEY NUMBER\'S MENU: the two ways it is not on Today, then Lead unless it leads', () => {
+  const ids = (k: KpiHeld) => kpiActionsFor(k, true).map((a) => a.id);
+  assert.deepEqual(ids(kpi(1, {})), ['kpi-pin', 'kpi-hide', 'kpi-lead']);
+  assert.deepEqual(ids(kpi(1, { today: 'pinned' })), ['kpi-hide', 'kpi-auto', 'kpi-lead']);
+  assert.deepEqual(ids(kpi(1, { today: 'hidden', headline: true })), ['kpi-pin', 'kpi-auto']);
+  /* AN EMPTY `today` READS AUTO, as the record's default does. */
+  assert.deepEqual(ids(kpi(1, { today: undefined as never })), ['kpi-pin', 'kpi-hide', 'kpi-lead']);
+  assert.deepEqual(
+    kpiActionsFor(kpi(1, {}), true).map((a) => a.label),
+    ['Show on Today', 'Hide from Today', 'Lead the card with this'],
+  );
+  assert.equal(kpiActionsFor(kpi(1, { today: 'pinned' }), true)[1]!.label, copy.kpiMenuAuto);
+});
+
+test('NOTHING IS OFFERED to a reader who may not write, nor on a suggestion, a stopped number or a deleted one', () => {
+  assert.deepEqual(kpiActionsFor(kpi(1, {}), false), []);
+  assert.deepEqual(kpiActionsFor(kpi(1, { draft: true }), true), []);
+  assert.deepEqual(kpiActionsFor(kpi(1, { state: 'retired' }), true), []);
+  assert.deepEqual(kpiActionsFor(kpi(1, { deleted_at: '2026-10-20T10:00:00Z' }), true), []);
+});
+
+test('SHOW AND HIDE SET ONE ROW\'S today AT ITS VERSION, and a press that changes nothing writes nothing', () => {
+  const k = kpi(4, {}, 7);
+  assert.deepEqual(kpiWritesOf('kpi-pin', k, []), [{ seq: 4, version: 7, patch: { today: 'pinned' }, undo: { today: 'auto' } }]);
+  assert.deepEqual(kpiWritesOf('kpi-hide', k, []), [{ seq: 4, version: 7, patch: { today: 'hidden' }, undo: { today: 'auto' } }]);
+  assert.deepEqual(kpiWritesOf('kpi-auto', kpi(4, { today: 'hidden' }, 2), []), [{ seq: 4, version: 2, patch: { today: 'auto' }, undo: { today: 'hidden' } }]);
+  assert.deepEqual(kpiWritesOf('kpi-auto', k, []), []);
+  assert.deepEqual(kpiWritesOf('kpi-pin', kpi(4, { today: 'pinned' }), []), []);
+});
+
+test('LEAD CLEARS THE PROJECT\'S OTHER LEADER FIRST, then takes it; another project\'s and a stopped one\'s are left be', () => {
+  const mine = kpi(1, {}, 3);
+  const leader = kpi(2, { headline: true }, 5);
+  const plain = kpi(3, {});
+  const elsewhere = kpi(4, { headline: true, thing: 'P02MARLOW' });
+  const stopped = kpi(5, { headline: true, state: 'retired' });
+  assert.deepEqual(kpiWritesOf('kpi-lead', mine, [mine, leader, plain, elsewhere, stopped]), [
+    { seq: 2, version: 5, patch: { headline: false }, undo: { headline: true } },
+    { seq: 1, version: 3, patch: { headline: true }, undo: { headline: false } },
+  ]);
+  assert.deepEqual(kpiWritesOf('kpi-lead', leader, [mine, leader]), [], 'the leader is already leading');
+  /* A ROW THE WRITER HAS NAMED HOLDS ITS PROJECT AS A NUMBER, and the same project is the same number. */
+  assert.equal(kpiWritesOf('kpi-lead', kpi(1, { thing: 1 }), [kpi(2, { thing: 1, headline: true })]).length, 2);
+});
+
+test('THE WRITES GO THROUGH THE ROW WRITER IN ORDER, and Undo puts each back at the version it was left at', async () => {
+  const held = [kpi(1, {}, 3), kpi(2, { headline: true }, 5)];
+  const { writer, sent } = rows(held);
+  const out = await runKpiWrites(writer, 'key-numbers', kpiWritesOf('kpi-lead', held[0]!, held));
+  assert.equal(out.ok, true);
+  assert.deepEqual(sent.map((s) => [s.seq, s.version]), [[2, 5], [1, 3]], 'each at the version it was read at');
+  assert.equal(held[0]!.fields.headline, true);
+  assert.equal(held[1]!.fields.headline, false);
+  assert.deepEqual(out.done, [{ seq: 2, version: 6, undo: { headline: true } }, { seq: 1, version: 4, undo: { headline: false } }]);
+  assert.deepEqual(await undoKpiWrites(writer, 'key-numbers', out.done), { ok: true });
+  assert.deepEqual(sent.slice(2).map((s) => [s.seq, s.version]), [[1, 4], [2, 6]], 'last first, at the versions the press left');
+  assert.equal(held[0]!.fields.headline, false);
+  assert.equal(held[1]!.fields.headline, true);
+});
+
+test('A ROW CHANGED SINCE IT WAS READ IS NOT WRITTEN OVER: the press stops there and says why', async () => {
+  const held = [kpi(1, {}, 3), kpi(2, { headline: true }, 5)];
+  const { writer, sent } = rows(held);
+  const stale = { ...held[1]!, version: 4 };
+  const out = await runKpiWrites(writer, 'key-numbers', kpiWritesOf('kpi-lead', held[0]!, [held[0]!, stale]));
+  assert.deepEqual(out, { ok: false, fix: 'Somebody changed it.', done: [] });
+  assert.equal(sent.length, 1, 'nothing after the stale row is sent');
+  assert.equal(held[0]!.fields.headline, false, 'so no two numbers lead the card');
+});
+
+test('WHAT A PRESS SAYS names the number, and a number with no name is This number', () => {
+  assert.equal(kpiSaidOf('kpi-pin', 'Players'), 'Players is on Today.');
+  assert.equal(kpiSaidOf('kpi-hide', 'Players'), 'Players is off Today.');
+  assert.equal(kpiSaidOf('kpi-auto', 'Players'), 'Today shows Players when it needs a look.');
+  assert.equal(kpiSaidOf('kpi-lead', ' '), 'This number leads the card.');
+  for (const a of ['kpi-pin', 'kpi-hide', 'kpi-auto', 'kpi-lead'] as const) assert.doesNotMatch(kpiSaidOf(a, 'Players'), /—|\bkpi\b|\bheadline\b/u);
 });
