@@ -1,0 +1,17 @@
+{
+  "from": "agents-mcp plan 4.1: his MacBook to brain.dog, on his record. Milliseconds and bytes.",
+  "note": "The seed is smaller and has no network, so it can only miss on the in-process cost. A miss is reported, never a failure.",
+  "targets": {
+    "context": { "p50": 450, "p95": 800 },
+    "context since": { "p50": 300, "p95": 500 },
+    "instructions": { "p50": 260, "p95": 400 },
+    "get": { "p50": 280, "p95": 450 },
+    "list": { "p50": 280, "p95": 450 },
+    "search": { "p50": 280, "p95": 450 },
+    "schema": { "p50": 280, "p95": 450 },
+    "record_index": { "p50": 350, "p95": 600 },
+    "governance": { "p50": 350, "p95": 600 },
+    "tools/list": { "p50": 300, "p95": 500 },
+    "resources/list": { "p50": 300, "p95": 500, "bytes": 15000 }
+  }
+}
