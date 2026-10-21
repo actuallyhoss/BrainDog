@@ -278,6 +278,18 @@ test('ONE POINT A DAY, the day’s last; a level is set against its value a mont
   close();
 });
 
+test('A TARGET WITH ITS DAY TO COME IS NOT MISSED YET: under it before the day is open, under it after the day is off', async () => {
+  const { k, ids, close } = await seeded();
+  for (const [name, by] of [['Members ahead', '2026-12-31'], ['Members behind', '2026-10-15']] as const) {
+    assert.ok(k.create('datapoints', { name, value: 40, thing: ids.kiln, at: daysAgo(1) } as never, OWNER).ok);
+    assert.ok(k.create('kpis', { name, thing: ids.kiln, target: 60, target_by: by, order: 9 } as never, OWNER).ok);
+  }
+  const kpis = read(k, { kind: 'kpis', source: 'kpis', for: 'project', about: 'things#1' }).kpis;
+  assert.equal(named(kpis, 'Members ahead').verdict, undefined, '40 of 60 with ten weeks to go is on its way, not off');
+  assert.equal(named(kpis, 'Members behind').verdict, 'off', '40 of 60 six days after its day is off');
+  close();
+});
+
 test('A FIGURE IS READ WITH ITS PROJECT FILLED IN: one number now, judged by the row’s own target, never stale', async () => {
   const { k, close } = await seeded();
   const open = named(read(k, { kind: 'kpis', source: 'kpis', for: 'project', about: 'things#1' }).kpis, 'Open tasks');

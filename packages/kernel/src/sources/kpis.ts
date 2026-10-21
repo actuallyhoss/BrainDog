@@ -501,7 +501,10 @@ function kpisBlock(deps: PageDeps, block: PageBlock, base: BlockResult, also: Al
     const t = k.target;
     const target =
       t === null || t === undefined ? null : typeof t === 'number' ? (currency ? Math.round(t * 10 ** kit.exponentOf(currency)) : t) : currency === null || t.currency === currency ? t.amount : null;
-    const verdict = target !== null ? rank.kpiVerdict(s.judged, target, k.good) : s.met === true ? 'met' : s.met === false ? 'missed' : null;
+    const judged = target !== null ? rank.kpiVerdict(s.judged, target, k.good) : s.met === true ? 'met' : s.met === false ? 'missed' : null;
+    /* NOT MISSED BEFORE ITS DAY: a target with a day still to come and not yet met is open, not off. Read as missed, a
+       count aiming for 60 by December was "Off target" in September at 52. Its day passed, it is missed. */
+    const verdict = judged === 'missed' && typeof k.target_by === 'string' && k.target_by >= at.today ? null : judged;
     const stale = rank.kpiStale(k, s.newest, now);
     const chart = rank.kpiChart({ kind, points: s.count, target: target !== null });
     const said = t === null || t === undefined ? undefined : typeof t === 'number' ? t : kit.moneyText(t.amount, t.currency);
