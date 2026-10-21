@@ -407,8 +407,9 @@
       {#if answerable}
         <Menu label={WORDS.more} align="end">
           {#snippet trigger()}<span class="head-more"><Icon name="more" size="m" /><span class="dsr">{WORDS.more}</span></span>{/snippet}
-          <button type="button" role="menuitem" data-ask onclick={() => (asking = true)}>{WORDS.ask}</button>
-          <button type="button" role="menuitemcheckbox" aria-checked={selecting} data-select onclick={() => (selecting = !selecting)}>{WORDS.select}</button>
+          <!-- EACH ROW LEADS WITH ITS GLYPH, as every menu's does (VERIFY H47). -->
+          <button type="button" role="menuitem" data-ask onclick={() => (asking = true)}><Icon name="ask" size="m" /><span class="mi-name">{WORDS.ask}</span></button>
+          <button type="button" role="menuitemcheckbox" aria-checked={selecting} data-select onclick={() => (selecting = !selecting)}><Icon name="check" size="m" /><span class="mi-name">{WORDS.select}</span></button>
         </Menu>
       {/if}
     {/snippet}

@@ -366,7 +366,7 @@ test('every open queue on the page puts the reader’s first, and a page naming 
 test('nothing red in the head: noting a choice and Select wait in the "⋯", and the boxes wait behind Select', () => {
   assert.doesNotMatch(screen, /<Button weight="primary" onclick=\{\(\) => \(asking = true\)\}>/u, 'the head draws a red button again');
   assert.match(screen, /<Menu label=\{WORDS\.more\} align="end">/u);
-  assert.match(screen, /role="menuitem" data-ask onclick=\{\(\) => \(asking = true\)\}>\{WORDS\.ask\}/u);
+  assert.match(screen, /role="menuitem" data-ask onclick=\{\(\) => \(asking = true\)\}><Icon name="ask" size="m" \/><span class="mi-name">\{WORDS\.ask\}/u);
   assert.match(screen, /role="menuitemcheckbox" aria-checked=\{selecting\} data-select/u);
   assert.match(screen, /\.page:not\(\[data-selecting\]\) :global\(\.qa:not\(\[data-picking\]\) \.qa-select\) \{\n\s+display: none;/u);
   assert.equal(WORDS.ask, 'Note a choice to make');
