@@ -77,14 +77,38 @@ function drawn(result: BlockResult, opts: DrawOptions): Drawn {
       opts,
     );
   const register = listOf(result);
-  const [title = '', day = ''] = fieldsOf(result);
+  const [title = '', day = '', amount = ''] = fieldsOf(result);
   if (!register || !title || !day) return fenced('calendar', [], opts);
-  const rows = entriesOf(result).flatMap((e) => {
-    const on = dayOf(e.fields[day]);
-    if (on === null) return [];
-    return [`${linked(display(register, title, e.fields[title], opts.now) ?? '', register, e.seq)} | ${on}`];
-  });
-  return fenced('calendar', rows, opts);
+  const dated = entriesOf(result).filter((e) => dayOf(e.fields[day]) !== null);
+  const rows = dated.map((e) => `${linked(display(register, title, e.fields[title], opts.now) ?? '', register, e.seq)} | ${dayOf(e.fields[day])}`);
+  return withAmounts(fenced('calendar', rows, opts), amount ? dated.map((e) => amountSaid(register, amount, signOf(result), e.fields)) : null);
+}
+
+/** The third column's `sign:`, where it names one: the field and the value that makes the amount go out. */
+function signOf(result: BlockResult): { field: string; minus: string } | null {
+  const c = (Array.isArray(result.columns) ? result.columns[2] : undefined) as { sign?: { field?: unknown; minus?: unknown } } | undefined;
+  return typeof c?.sign?.field === 'string' && typeof c.sign.minus === 'string' ? { field: c.sign.field, minus: c.sign.minus } : null;
+}
+
+/** A row's amount as the list says it, signed by the way it goes where the column says how: "−£19,100.00", "+£960.00". */
+function amountSaid(register: string, field: string, sign: { field: string; minus: string } | null, fields: Readonly<Record<string, unknown>>): string {
+  const said = display(register, field, fields[field] as never) ?? '';
+  if (!said || !sign) return said;
+  return `${fields[sign.field] === sign.minus ? '\u2212' : '+'}${said.replace(/^[\u2212+-]/u, '')}`;
+}
+
+/**
+ * THE THIRD COLUMN, THE ROW'S AMOUNT, put on the parsed rows (the money review, H20). A calendar fence takes two cells
+ * and a tone, so the amount cannot be written into it; the kernel answers it (`columns: [title, due, amount]`), and the
+ * renderer draws a row's third cell at the end of its line in the list. It was read and dropped here, so Money's
+ * "Due in the next 30 days" named each bill with no amount beside it.
+ */
+function withAmounts(drawn: Drawn, amounts: readonly string[] | null): Drawn {
+  if (amounts === null) return drawn;
+  return {
+    ...drawn,
+    segments: drawn.segments.map((s) => (s.type === 'block' ? { ...s, rows: s.rows.map((r, i) => ({ ...r, cells: [r.cells[0] ?? '', r.cells[1] ?? '', amounts[i] ?? ''] })) } : s)),
+  };
 }
 
 export const calendar: KindDrawer = {
