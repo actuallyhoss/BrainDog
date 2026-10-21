@@ -1273,6 +1273,7 @@
   /* THE PICKER IS THE BROWSER'S, kept out of sight; the quiet button opens it. */
   /* THE BARE BUTTON'S WORDS ON THE COLUMN'S START EDGE, under the field's own edge (first F6). */
   .bring {
+    position: relative;
     display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
@@ -1290,7 +1291,18 @@
   }
 
   /* THE HINT ONLY ON HOVER OR FOCUS (§35): the control is one quiet word until a person reaches for it. */
+  /* UNDER THE BUTTON, OUT OF THE ROW (UI pass of 21 October, P49): taking room in the row, the hidden hint pushed "Show
+     my BrainDog" onto a line of its own at 1512, and beside it, it ran under that button. It lies in the tile's foot,
+     on the words' start edge. */
   .bring-hint {
+    position: absolute;
+    inset-block-start: calc(100% + 2px);
+    inset-inline-start: var(--sp-2);
+    max-inline-size: 60ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
     color: var(--ink-3);
     font-size: var(--fs-meta);
     line-height: 18px;
